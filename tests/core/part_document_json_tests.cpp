@@ -3,6 +3,7 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <filesystem>
 #include <string>
 
 using namespace blcad;
@@ -117,6 +118,41 @@ TEST_CASE("PartDocument JSON round-trips MVP-1 model intent", "[core][json]") {
   const auto clean_plan = restored.value().create_recompute_plan();
   REQUIRE(clean_plan);
   CHECK(clean_plan.value().step_count() == 0);
+}
+
+TEST_CASE("PartDocument JSON file helpers write and read MVP-1 model files", "[core][json]") {
+  const PartDocument document = make_reference_part_document();
+  const auto path = std::filesystem::temp_directory_path() / "blcad_reference_plate_test.blcad.json";
+  std::filesystem::remove(path);
+
+  const auto written = write_part_document_json_file(document, path);
+
+  REQUIRE(written);
+  CHECK(written.value() > 0U);
+  REQUIRE(std::filesystem::exists(path));
+
+  const auto restored = read_part_document_json_file(path);
+
+  REQUIRE(restored);
+  CHECK(restored.value().id().value() == "part.rectangular_plate");
+  CHECK(restored.value().parameter_count() == 4);
+  CHECK(restored.value().feature_count() == 2);
+  CHECK(restored.value().dependency_graph().has_dependency("feature.base_extrude",
+                                                          "feature.center_hole_cut"));
+
+  std::filesystem::remove(path);
+}
+
+TEST_CASE("PartDocument JSON file helpers reject empty paths", "[core][json]") {
+  const auto write_result = write_part_document_json_file(make_reference_part_document(), {});
+  REQUIRE(write_result.has_error());
+  CHECK(write_result.error().category() == ErrorCategory::Validation);
+  CHECK(write_result.error().message() == "part document json file path must not be empty");
+
+  const auto read_result = read_part_document_json_file({});
+  REQUIRE(read_result.has_error());
+  CHECK(read_result.error().category() == ErrorCategory::Validation);
+  CHECK(read_result.error().message() == "part document json file path must not be empty");
 }
 
 TEST_CASE("PartDocument JSON rejects unsupported schema", "[core][json]") {
