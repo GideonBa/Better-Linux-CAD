@@ -1,39 +1,33 @@
 # MVP 1 Core Skeleton
 
-Status: implementierter Core-Skeleton fuer die ersten MVP-1-Datenmodelle
+Status: implemented core skeleton for the first MVP-1 data models.
 
-Dieser Stand enthaelt nur die kleinsten Core-Bausteine fuer MVP 1. Der Core
-selbst hat weiterhin keine Geometrie, keine OCCT-Anbindung, keine GUI, keinen
-Recompute und keinen STEP-Export. OCCT wird nur im optionalen
-`blcad_geometry`-Target verwendet.
+This document describes the current MVP-1 core state. The core itself remains free of OCCT and Qt. Geometry is handled only in the optional `blcad_geometry` target.
 
-## Ziel dieses Schritts
+## Goal of this step
 
-Der Skeleton macht die ersten ADRs ausfuehrbar:
+The skeleton makes the first architecture decisions executable:
 
-- typisierte IDs aus `0002-object-identity-and-naming.md`
-- `Quantity` fuer Laengen in Millimetern aus `0003-units-and-quantities.md`
-- `Error` und `Result` aus `0004-error-handling.md`
-- `Parameter` als erster Baustein des Part-Modells aus der MVP-1-Spezifikation
-- `PartDocument` als erster Container fuer MVP-1-Parameter, Datum-Planes,
-  Sketches, Features, den Dependency Graph, den Invalidierungsstatus und den
-  Recompute-Plan
-- `DatumPlane` und `Sketch` als reine Datenmodelle fuer die erste Platte
-- `RectangleProfile` und `CircleProfile` als erste Skizzenprofile
-- `Feature`, `AdditiveExtrude` und `SubtractiveExtrude` als erste
-  Feature-Datenmodelle
-- `DependencyGraph` als reine Abhaengigkeitsstruktur ohne Recompute
-- `InvalidationState` als reiner Status fuer geaenderte und betroffene Knoten
-- `RecomputePlan` als reine geordnete Liste von `dirty`-Knoten
-- `ShapeCache` als optionales Geometry-Datenmodell fuer berechnete Shapes
+- typed IDs from `0002-object-identity-and-naming.md`
+- `Quantity` for millimeter lengths from `0003-units-and-quantities.md`
+- `Error` and `Result` from `0004-error-handling.md`
+- `Parameter` as the first building block of the part model
+- `PartDocument` as the first container for MVP-1 parameters, datum planes, sketches, features, dependency graph, invalidation state, and recompute plan
+- `DatumPlane` and `Sketch` as pure data models for the first plate
+- `RectangleProfile` and `CircleProfile` as the first sketch profiles
+- `Feature`, `AdditiveExtrude`, and `SubtractiveExtrude` as the first feature data models
+- `DependencyGraph` as a pure dependency structure
+- `InvalidationState` as a pure state model for changed and affected nodes
+- `RecomputePlan` as an ordered list of `dirty` nodes
+- `ShapeCache` as an optional geometry data model for computed shapes
 
-## CMake-Targets
+## CMake targets
 
 ### `blcad_core`
 
-Statische Core-Library.
+Static core library.
 
-Enthaelt aktuell:
+Currently contains:
 
 - `blcad/core/id.hpp`
 - `blcad/core/spatial.hpp`
@@ -49,13 +43,13 @@ Enthaelt aktuell:
 - `blcad/core/invalidation_state.hpp`
 - `blcad/core/recompute_plan.hpp`
 
-Das Target linkt nicht gegen OCCT und nicht gegen Qt.
+This target does not link against OCCT or Qt.
 
 ### `blcad_core_tests`
 
-Catch2-Testprogramm fuer den Core-Skeleton.
+Catch2 test program for the core skeleton.
 
-Aktuelle Testbereiche:
+Current test areas:
 
 - `Quantity`
 - `Parameter`
@@ -73,36 +67,38 @@ Aktuelle Testbereiche:
 
 ### `blcad_geometry`
 
-Optionale statische Library fuer erste OCCT-Adapter.
+Optional static library for the first OCCT adapters.
 
-Aktuell enthalten:
+Currently contains:
 
 - `blcad/geometry/rectangle_extrusion_adapter.hpp`
+- `blcad/geometry/circular_cut_adapter.hpp`
 - `blcad/geometry/recompute_executor.hpp`
 - `blcad/geometry/shape_cache.hpp`
+- `blcad/geometry/step_exporter.hpp`
 
-Das Target wird nur gebaut, wenn `BLCAD_BUILD_GEOMETRY=ON` gesetzt ist. Es
-linkt gegen OCCT, aber nicht gegen Qt.
+This target is built only when `BLCAD_BUILD_GEOMETRY=ON` is set. It links against OCCT, but not against Qt.
 
 ### `blcad_geometry_tests`
 
-Catch2-Testprogramm fuer den optionalen Geometry-Adapter.
+Catch2 test program for the optional geometry layer.
 
-Aktuelle Testbereiche:
+Current test areas:
 
 - `RectangleExtrusionAdapter`
+- `CircularCutAdapter`
 - `GeometryShape`
 - `GeometryRecomputeExecutor`
 - `ShapeCache`
+- `StepExporter`
 
-## Core-Typen
+## Core types
 
-### Typisierte IDs
+### Typed IDs
 
-IDs sind intern typisiert, damit zum Beispiel eine `ParameterId` nicht
-versehentlich als `FeatureId` verwendet wird.
+IDs are typed internally so that, for example, a `ParameterId` cannot accidentally be used as a `FeatureId`.
 
-Aktuell vorbereitet:
+Currently prepared:
 
 - `DocumentId`
 - `ParameterId`
@@ -114,26 +110,26 @@ Aktuell vorbereitet:
 
 ### `Quantity`
 
-`Quantity` repraesentiert fuer MVP 1 nur positive Laengen in Millimetern.
+`Quantity` represents only positive lengths in millimeters for MVP 1.
 
-Regeln:
+Rules:
 
-- interne Einheit: `mm`
-- Werttyp: `double`
-- `0`, negative Werte und nicht-endliche Werte sind ungueltig
-- Erstellung laeuft ueber `Result<Quantity>`
+- internal unit: `mm`
+- value type: `double`
+- `0`, negative values, and non-finite values are invalid
+- creation runs through `Result<Quantity>`
 
 ### `Error`
 
-`Error` beschreibt erwartbare Fehler im Core.
+`Error` describes expected errors in the core.
 
-Mindestfelder:
+Minimum fields:
 
-- Kategorie
-- Objekt-ID
-- Nachricht
+- category
+- object ID
+- message
 
-Aktuelle Kategorien:
+Current categories:
 
 - `validation`
 - `dependency`
@@ -143,254 +139,219 @@ Aktuelle Kategorien:
 
 ### `Result<T>`
 
-`Result<T>` kapselt entweder einen erfolgreichen Wert oder einen erwartbaren
-Fehler. Es ist der normale Rueckgabetyp fuer Validierung und spaetere
-Core-Operationen.
+`Result<T>` wraps either a successful value or an expected error. It is the normal return type for validation and later core operations.
 
 ### `Parameter`
 
-`Parameter` repraesentiert im ersten Schritt nur Laengenparameter im Part-Scope.
+`Parameter` currently represents only length parameters in part scope.
 
-Pflicht:
+Required:
 
-- nicht-leere `ParameterId`
-- nicht-leerer Name
+- non-empty `ParameterId`
+- non-empty name
 - positive `Quantity`
-- Typ `length`
-- Scope `part`
+- type `length`
+- scope `part`
+
+`Parameter::with_value` returns a copy with a new validated value while preserving identity.
 
 ### `PartDocument`
 
-`PartDocument` ist der erste Dokumentcontainer fuer MVP 1. Es enthaelt aktuell:
+`PartDocument` is the first document container for MVP 1. It currently contains:
 
 - `DocumentId`
-- Name
-- Parameterliste
-- Datum-Planes
-- Sketches
-- Features
+- name
+- parameters
+- datum planes
+- sketches
+- features
+- dependency graph
+- invalidation state
 
-Regeln:
+Rules:
 
-- Dokument-ID darf nicht leer sein.
-- Dokumentname darf nicht leer sein.
-- Parameter-IDs muessen innerhalb des Dokuments eindeutig sein.
-- Parameternamen muessen innerhalb des Dokuments eindeutig sein.
-- Parameter koennen per ID und per Name gesucht werden.
-- Die Einfuegereihenfolge der Parameter bleibt erhalten.
-- Datum-Plane-IDs muessen innerhalb des Dokuments eindeutig sein.
-- Sketch-IDs muessen innerhalb des Dokuments eindeutig sein.
-- Sketch-Workplanes muessen auf vorhandene Datum-Planes zeigen.
-- Profil-Parameterreferenzen muessen auf vorhandene Parameter zeigen.
-- Feature-IDs muessen innerhalb des Dokuments eindeutig sein.
-- Feature-Eingabe-Sketches muessen auf vorhandene Sketches zeigen.
-- Additive-Extrude-Laengenparameter muessen auf vorhandene Parameter zeigen.
-- Subtractive-Extrude-Zielfeatures muessen auf vorhandene Features zeigen.
-- Parameter erzeugen Dependency-Graph-Knoten.
-- Sketches erzeugen Dependency-Graph-Knoten.
-- Profil-Parameterreferenzen erzeugen Graphkanten vom Parameter zum Sketch.
-- Features erzeugen Dependency-Graph-Knoten.
-- Feature-Referenzen erzeugen Graphkanten von Sketch, Parameter oder
-  Zielfeature zum Feature.
-- `PartDocument` synchronisiert seinen Invalidierungsstatus mit dem
-  Dependency Graph.
-- Parameteraenderungen koennen betroffene Knoten als `changed` und `dirty`
-  markieren.
-- `PartDocument` kann aus `dirty`-Knoten einen Recompute-Plan ableiten.
+- document ID must not be empty
+- document name must not be empty
+- parameter IDs must be unique within the document
+- parameter names must be unique within the document
+- parameters can be looked up by ID and name
+- insertion order of parameters is preserved
+- datum-plane IDs must be unique within the document
+- sketch IDs must be unique within the document
+- sketch workplanes must point to existing datum planes
+- profile parameter references must point to existing parameters
+- feature IDs must be unique within the document
+- feature input sketches must point to existing sketches
+- additive extrude length parameters must point to existing parameters
+- subtractive extrude target features must point to existing features
+- parameters, sketches, and features create dependency graph nodes
+- profile and feature references create dependency graph edges
+- `PartDocument` synchronizes its invalidation state with the dependency graph
+- parameter changes can mark affected nodes as `changed` and `dirty`
+- `PartDocument` can derive a recompute plan from `dirty` nodes
 
-`PartDocument` enthaelt noch keinen Shape-Cache.
+`PartDocument` intentionally does not contain OCCT geometry. The `ShapeCache` remains in the geometry layer.
 
 ### `DatumPlane`
 
-`DatumPlane` beschreibt eine Arbeitsebene. Aktuell gibt es nur die Standardebene
-`XY`:
+`DatumPlane` describes a workplane. Currently only the standard `XY` plane exists:
 
-- Ursprung `(0, 0, 0)`
-- X-Achse `(1, 0, 0)`
-- Y-Achse `(0, 1, 0)`
-- Normalenrichtung `(0, 0, 1)`
+- origin `(0, 0, 0)`
+- X axis `(1, 0, 0)`
+- Y axis `(0, 1, 0)`
+- normal direction `(0, 0, 1)`
 
-Die ID und der Name muessen nicht leer sein.
+The ID and name must not be empty.
 
 ### `RectangleProfile`
 
-`RectangleProfile` beschreibt ein zentriertes Rechteck in einer Skizze.
+`RectangleProfile` describes a centered rectangle in a sketch.
 
-Aktuell gespeichert:
+Currently stored:
 
 - `ProfileId`
-- Mittelpunkt als `Point2`
-- Parameterreferenz fuer Breite
-- Parameterreferenz fuer Hoehe
+- center as `Point2`
+- parameter reference for width
+- parameter reference for height
 
-Es werden nur Referenzen gespeichert. Die Parameterwerte werden noch nicht
-aufgeloest.
+Only references are stored. Parameter values are resolved later by the geometry execution layer.
 
 ### `CircleProfile`
 
-`CircleProfile` beschreibt einen zentrierten Kreis in einer Skizze.
+`CircleProfile` describes a centered circle in a sketch.
 
-Aktuell gespeichert:
+Currently stored:
 
 - `ProfileId`
-- Mittelpunkt als `Point2`
-- Parameterreferenz fuer Durchmesser
+- center as `Point2`
+- parameter reference for diameter
 
-Es wird noch nicht geprueft, ob der Kreis in das Rechteck passt.
+There is not yet a general fit check against the rectangle dimensions.
 
 ### `Sketch`
 
-`Sketch` speichert:
+`Sketch` stores:
 
 - `SketchId`
-- Name
-- Workplane-Referenz auf eine `DatumPlaneId`
-- Rechteckprofile
-- Kreisprofile
+- name
+- workplane reference to a `DatumPlaneId`
+- rectangle profiles
+- circle profiles
 
-Profil-IDs muessen innerhalb einer Skizze eindeutig sein, auch ueber
-Profiltypen hinweg.
+Profile IDs must be unique within one sketch, even across profile types.
 
 ### `Feature`
 
-`Feature` beschreibt aktuell nur Feature-Absicht, keine Geometrie.
+`Feature` currently describes feature intent, not geometry.
 
-Aktuelle Typen:
+Current types:
 
 - `AdditiveExtrude`
 - `SubtractiveExtrude`
 
-`AdditiveExtrude` speichert:
+`AdditiveExtrude` stores:
 
 - `FeatureId`
-- Name
-- Eingabe-Sketch
-- Laengenparameter
-- Richtung `+Z`
+- name
+- input sketch
+- length parameter
+- direction `+Z`
 
-`SubtractiveExtrude` speichert:
+`SubtractiveExtrude` stores:
 
 - `FeatureId`
-- Name
-- Eingabe-Sketch
-- Zielfeature
-- Tiefe `through_all`
-- Richtung `+Z`
+- name
+- input sketch
+- target feature
+- depth `through_all`
+- direction `+Z`
 
 ### `DependencyGraph`
 
-`DependencyGraph` beschreibt aktuell nur Abhaengigkeiten zwischen stabilen
-String-Knoten-IDs.
+`DependencyGraph` currently describes dependencies between stable string node IDs.
 
-Eine Kante:
+An edge:
 
 ```text
 A -> B
 ```
 
-bedeutet:
+means:
 
 ```text
-B haengt von A ab.
+B depends on A.
 ```
 
-Aktuell gespeichert:
+Currently stored:
 
-- Knoten-IDs
-- gerichtete Kanten
+- node IDs
+- directed edges
 
-Aktuelle Abfragen:
+Current queries:
 
-- direkte Abhaengige
-- transitive Abhaengige
-- topologische Ordnung
-- Zyklenerkennung
+- direct dependents
+- transitive dependents
+- topological order
+- cycle detection
 
-Der Graph fuehrt keine Invalidierung aus und startet keinen Recompute.
-
-`PartDocument` besitzt einen `DependencyGraph` und leitet Knoten und Kanten aus
-Parameter-, Sketch- und Feature-Referenzen ab.
+The graph does not execute invalidation and does not start recompute. `PartDocument` owns a `DependencyGraph` and derives nodes and edges from parameter, sketch, and feature references.
 
 ### `InvalidationState`
 
-`InvalidationState` beschreibt den aktuellen Invalidierungszustand von
-Dependency-Graph-Knoten.
+`InvalidationState` describes the current invalidation state of dependency graph nodes.
 
-Aktuelle Statuswerte:
+Current state values:
 
 - `clean`
 - `changed`
 - `dirty`
 - `error`
 
-Eine Parameteraenderung markiert den Parameter als `changed` und alle transitiv
-abhaengigen Knoten als `dirty`. Der Status startet keinen Recompute.
+A parameter change marks the parameter as `changed` and all transitively dependent nodes as `dirty`. The state itself does not start recompute.
 
 ### `RecomputePlan`
 
-`RecomputePlan` beschreibt, welche `dirty`-Knoten spaeter neu berechnet werden
-muessten.
+`RecomputePlan` describes which `dirty` nodes should later be recomputed.
 
-Regeln:
+Rules:
 
-- nur `dirty`-Knoten werden aufgenommen
-- `changed`-Knoten werden nicht aufgenommen
-- die Reihenfolge folgt der topologischen Ordnung des Dependency Graph
-- Graphzyklen werden als Dependency-Fehler gemeldet
+- only `dirty` nodes are included
+- `changed` nodes are not included
+- the order follows the dependency graph's topological order
+- graph cycles are reported as dependency errors
 
-Der Plan ist eine Aufgabenliste. Er fuehrt keine Features aus und erzeugt keine
-Geometrie.
+The plan is a task list. It does not execute features and does not create geometry.
 
-## Optionale Geometry-Schicht
+## Optional geometry layer
 
-`RectangleExtrusionAdapter` ist der erste konkrete OCCT-Pfad fuer MVP 1. Er
-liegt ausserhalb des Core-Skeletons im Target `blcad_geometry`.
+The geometry layer is intentionally outside the core. It uses OCCT behind adapter boundaries and keeps `PartDocument` free of OCCT headers and linking.
 
-Aktuelle Operation:
+Current geometry capabilities:
 
-```text
-make_extruded_rectangle(width, height, thickness)
-```
+- `RectangleExtrusionAdapter` creates a centered rectangular OCCT solid from validated width, height, and thickness values.
+- `CircularCutAdapter` cuts a centered through-hole from an existing `GeometryShape`.
+- `ShapeCache` stores feature shapes and the current final shape.
+- `GeometryRecomputeExecutor` executes `AdditiveExtrude` for a sketch with exactly one rectangle profile.
+- `GeometryRecomputeExecutor` executes `SubtractiveExtrude` for a sketch with exactly one circle profile if the target shape is already in the `ShapeCache`.
+- `execute_document` recomputes a complete `PartDocument` into a `ShapeCache` in topological order.
+- `StepExporter` writes the final shape as a STEP file.
 
-Eigenschaften:
+The cache is not integrated into `PartDocument`. It remains a computed result next to the document.
 
-- Eingaben sind validierte `Quantity`-Werte.
-- Das Rechteck liegt zentriert auf der XY-Ebene.
-- Die Extrusion laeuft fest in `+Z`.
-- Das Ergebnis ist ein opaker `GeometryShape`.
-- OCCT-Fehler werden als `ErrorCategory::Geometry` gemeldet.
+## Deliberate limitation
 
-Der Adapter liest kein `PartDocument` und fuehrt keinen `RecomputePlan` aus.
+This skeleton still does not implement:
 
-`ShapeCache` ist ein kleines Geometry-Datenmodell fuer berechnete Shapes.
-Aktuell speichert es Feature-Shapes nach `FeatureId`, einen finalen Shape und
-das Quellfeature dieses finalen Shapes.
-
-`GeometryRecomputeExecutor` fuehrt derzeit nur `AdditiveExtrude` fuer einen
-Sketch mit genau einem Rechteckprofil aus. Dabei werden die Parameter aus dem
-`PartDocument` gelesen, der `RectangleExtrusionAdapter` aufgerufen und das
-Ergebnis im `ShapeCache` abgelegt.
-
-Der Cache ist noch nicht in `PartDocument` integriert. `SubtractiveExtrude`,
-Boolean Cut und STEP-Export fehlen noch.
-
-## Bewusste Begrenzung
-
-Dieser Skeleton implementiert noch nicht:
-
-- vollstaendigen Feature-Recompute
-- `SubtractiveExtrude`
-- Boolean Cut
-- `ShapeCache` im `PartDocument`
-- OCCT-Geometrie im Core
-- STEP-Export
-- JSON-Serialisierung
+- JSON serialization
 - GUI
+- assemblies
+- general sketch constraints
+- general constraint solver
+- semantic face references beyond the current simple model
 
-Diese Reihenfolge ist Absicht. Der Core soll erst sichere Grundtypen und Tests
-haben, bevor die Geometrie- und Recompute-Schicht hinzukommt.
+This order is intentional. The core first needs safe data types, validation, dependency tracking, recompute planning, and a narrow geometry pipeline before larger CAD subsystems are added.
 
-## Standardbefehle
+## Standard commands
 
 ```bash
 cmake --preset dev
@@ -398,9 +359,9 @@ cmake --build --preset dev
 ctest --preset dev
 ```
 
-Die Tests muessen erfolgreich sein, bevor neue Core-Bausteine hinzukommen.
+The tests must pass before new core building blocks are added.
 
-Optionaler Geometry-Build:
+Optional geometry build:
 
 ```bash
 cmake --preset dev-geometry
@@ -408,26 +369,4 @@ cmake --build --preset dev-geometry
 ctest --preset dev-geometry
 ```
 
-Weitere Details zum Sketch-Datenmodell stehen in
-`docs/sketch-mvp1-data-model.md`.
-
-Weitere Details zum Feature-Datenmodell stehen in
-`docs/feature-mvp1-data-model.md`.
-
-Weitere Details zum Dependency-Graph-Datenmodell stehen in
-`docs/dependency-graph-mvp1-data-model.md`.
-
-Weitere Details zum Invalidierungsstatus stehen in
-`docs/invalidation-mvp1-data-model.md`.
-
-Weitere Details zum Recompute-Plan stehen in
-`docs/recompute-plan-mvp1-data-model.md`.
-
-Weitere Details zum Geometry-Adapter stehen in
-`docs/geometry-adapter-mvp1-rectangle-extrusion.md`.
-
-Weitere Details zum ShapeCache stehen in
-`docs/shape-cache-mvp1-data-model.md`.
-
-Weitere Details zur ersten Recompute-Ausfuehrung stehen in
-`docs/recompute-execution-mvp1-additive-extrude.md`.
+Further details are documented in the dedicated MVP-1 data-model and geometry documents in `docs/`.
