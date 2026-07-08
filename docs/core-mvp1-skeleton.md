@@ -1,8 +1,8 @@
-# MVP 1 Core Skeleton
+# Core Skeleton and MVP-2 Seed
 
-Status: implemented core skeleton for MVP-1 data models, recompute planning, JSON model-intent serialization, and `.blcad.json` file helpers.
+Status: implemented core skeleton for MVP-1 data models, recompute planning, JSON model-intent serialization, `.blcad.json` file helpers, and the first MVP-2 derived-workplane seed.
 
-This document describes the current MVP-1 core state. The core remains free of OCCT and Qt. Geometry is handled only in the optional `blcad_geometry` target. JSON serialization and `.blcad.json` file helpers stay in the core because they store model intent rather than computed shapes.
+The core remains free of OCCT and Qt. Geometry is handled only in the optional `blcad_geometry` target. JSON serialization and `.blcad.json` file helpers stay in the core because they store model intent rather than computed shapes.
 
 ## Goal of this step
 
@@ -12,14 +12,15 @@ The skeleton makes the first architecture decisions executable:
 - `Quantity` for millimeter lengths from `0003-units-and-quantities.md`
 - `Error` and `Result` from `0004-error-handling.md`
 - `Parameter` as the first building block of the part model
-- `PartDocument` as the first container for MVP-1 parameters, datum planes, sketches, features, dependency graph, invalidation state, and recompute plan
+- `PartDocument` as the first container for parameters, datum planes, derived workplanes, sketches, features, dependency graph, invalidation state, and recompute plan
 - `DatumPlane` and `Sketch` as pure data models for the first plate
+- `SemanticFaceReference` and `DerivedWorkplane` as the first semantic generated-face reference path
 - `RectangleProfile` and `CircleProfile` as the first sketch profiles
 - `Feature`, `AdditiveExtrude`, and `SubtractiveExtrude` as the first feature data models
 - `DependencyGraph` as a pure dependency structure
 - `InvalidationState` as a pure state model for changed and affected nodes
 - `RecomputePlan` as an ordered list of `dirty` nodes
-- `part_document_json` as schema-versioned JSON serialization for MVP-1 model intent
+- `part_document_json` as schema-versioned JSON serialization for model intent
 - `.blcad.json` read/write helpers for file-level persistence
 - `ShapeCache` as an optional geometry data model for computed shapes
 
@@ -60,6 +61,8 @@ Current test areas:
 - `PartDocument` JSON serialization
 - `.blcad.json` file read/write helpers
 - `DatumPlane`
+- `DerivedWorkplane`
+- `SemanticFaceReference`
 - `Sketch`
 - `RectangleProfile`
 - `CircleProfile`
@@ -108,6 +111,7 @@ Current test areas:
 - `StepExporter`
 - full reference-part recompute
 - recompute from a JSON-restored document
+- recompute from a sketch on a derived top-face workplane
 
 ## Core types
 
@@ -125,9 +129,11 @@ Currently prepared:
 - `ShapeCacheId`
 - `ProfileId`
 
+`DatumPlaneId` currently identifies both standard datum planes and derived workplanes. This is intentional for now because `Sketch` still stores one workplane reference field.
+
 ### `Quantity`
 
-`Quantity` represents only positive lengths in millimeters for MVP 1.
+`Quantity` represents only positive lengths in millimeters for the current scope.
 
 Rules:
 
@@ -136,40 +142,15 @@ Rules:
 - `0`, negative values, and non-finite values are invalid
 - creation runs through `Result<Quantity>`
 
-### `Error` and `Result<T>`
-
-`Error` describes expected errors in the core. `Result<T>` wraps either a successful value or an expected error.
-
-Current error categories:
-
-- `validation`
-- `dependency`
-- `geometry`
-- `export`
-- `internal`
-
-### `Parameter`
-
-`Parameter` currently represents only length parameters in part scope.
-
-Required:
-
-- non-empty `ParameterId`
-- non-empty name
-- positive `Quantity`
-- type `length`
-- scope `part`
-
-`Parameter::with_value` returns a copy with a new validated value while preserving identity.
-
 ### `PartDocument`
 
-`PartDocument` is the first document container for MVP 1. It currently contains:
+`PartDocument` currently contains:
 
 - `DocumentId`
 - name
 - parameters
 - datum planes
+- derived workplanes
 - sketches
 - features
 - dependency graph
@@ -179,25 +160,50 @@ Rules:
 
 - document ID and name must not be empty
 - parameter IDs and names must be unique
-- datum-plane, sketch, and feature IDs must be unique
-- sketch workplanes must point to existing datum planes
+- datum-plane, derived-workplane, sketch, and feature IDs must be unique
+- workplane IDs must be unique across standard datum planes and derived workplanes
+- sketch workplanes must point to an existing datum plane or derived workplane
 - profile parameter references must point to existing parameters
 - feature input sketches must point to existing sketches
 - additive extrude length parameters must point to existing parameters
 - subtractive extrude target features must point to existing features
-- parameters, sketches, and features create dependency graph nodes
-- profile and feature references create dependency graph edges
+- derived workplanes must point to an existing additive extrude source feature
+- parameters, sketches, features, and derived workplanes create dependency graph nodes
+- profile, feature, and derived-workplane references create dependency graph edges
 - `PartDocument` synchronizes its invalidation state with the dependency graph
 - parameter changes can mark affected nodes as `changed` and `dirty`
 - `PartDocument` can derive a recompute plan from `dirty` nodes
 
 `PartDocument` intentionally does not contain OCCT geometry. The `ShapeCache` remains in the geometry layer.
 
+### `SemanticFaceReference` and `DerivedWorkplane`
+
+The first semantic face reference supports:
+
+```text
+feature.base_extrude.top
+```
+
+A derived workplane exposes that generated top face as a sketch workplane:
+
+```text
+workplane.base_top -> feature.base_extrude.top
+```
+
+The dependency graph records:
+
+```text
+feature.base_extrude -> workplane.base_top -> sketch.top_hole
+```
+
+No raw OCCT face IDs are stored in the core.
+
 ### Sketch and feature model
 
-MVP 1 currently supports:
+The current model supports:
 
 - the standard `XY` datum plane
+- derived workplanes from a simple additive extrude's top face
 - centered rectangle profiles
 - centered circle profiles
 - additive extrude in `+Z`
@@ -205,44 +211,9 @@ MVP 1 currently supports:
 
 The data model stores intent and references. Parameter values are resolved by the geometry execution layer.
 
-### `DependencyGraph`
-
-`DependencyGraph` describes dependencies between stable string node IDs.
-
-An edge:
-
-```text
-A -> B
-```
-
-means:
-
-```text
-B depends on A.
-```
-
-The graph supports direct dependents, transitive dependents, topological order, and cycle detection. It does not execute invalidation and does not start recompute.
-
-### `InvalidationState`
-
-`InvalidationState` stores whether graph nodes are `clean`, `changed`, `dirty`, or `error`. A parameter change marks the parameter as `changed` and all transitively dependent nodes as `dirty`.
-
-### `RecomputePlan`
-
-`RecomputePlan` describes which `dirty` nodes should later be recomputed.
-
-Rules:
-
-- only `dirty` nodes are included
-- `changed` nodes are not included
-- the order follows the dependency graph's topological order
-- graph cycles are reported as dependency errors
-
-The plan is a task list. It does not execute features and does not create geometry.
-
 ## JSON serialization and file workflow
 
-`serialize_part_document_to_json` serializes MVP-1 model intent into a schema-versioned JSON document. `deserialize_part_document_from_json` rebuilds a `PartDocument` from that JSON through the normal validated construction APIs.
+`serialize_part_document_to_json` serializes model intent into a schema-versioned JSON document. `deserialize_part_document_from_json` rebuilds a `PartDocument` from that JSON through the normal validated construction APIs.
 
 `write_part_document_json_file` and `read_part_document_json_file` provide the file-level `.blcad.json` workflow.
 
@@ -253,6 +224,7 @@ The JSON contains:
 - document ID and name
 - length parameters
 - datum planes
+- derived workplanes
 - sketches and profiles
 - additive and subtractive extrude features
 
@@ -268,6 +240,7 @@ Details:
 
 - `docs/json-serialization-mvp1.md`
 - `docs/json-file-workflow-mvp1.md`
+- `docs/derived-workplane-mvp2-seed.md`
 
 ## Optional geometry layer
 
@@ -286,7 +259,7 @@ Current geometry capabilities:
 
 The cache is not integrated into `PartDocument`. It remains a computed result next to the document.
 
-## Reference model
+## Reference models
 
 The checked-in MVP-1 model is:
 
@@ -294,10 +267,16 @@ The checked-in MVP-1 model is:
 examples/reference_plate.blcad.json
 ```
 
-It can be exported with:
+The checked-in MVP-2 seed model is:
 
 ```text
-blcad_export_step examples/reference_plate.blcad.json <output.step>
+examples/top_face_cut.blcad.json
+```
+
+Both can be exported with:
+
+```text
+blcad_export_step <input.blcad.json> <output.step>
 ```
 
 ## Deliberate limitation
@@ -308,11 +287,12 @@ This skeleton still does not implement:
 - assemblies
 - general sketch constraints
 - general constraint solver
-- semantic face references beyond the current simple model
+- semantic face references beyond the top face of a simple additive extrude
+- geometric resolution of derived workplane origins and axes beyond the current seed
 - ShapeCache serialization
 - command-line argument parsing beyond the minimal example
 
-This order is intentional. The core first needs safe data types, validation, dependency tracking, recompute planning, serialization, file workflow, and a narrow geometry pipeline before larger CAD subsystems are added.
+This order is intentional. The core first needs safe data types, validation, dependency tracking, recompute planning, serialization, file workflow, a narrow geometry pipeline, and semantic face references before larger CAD subsystems are added.
 
 ## Standard commands
 
@@ -332,4 +312,4 @@ cmake --build --preset dev-geometry
 ctest --preset dev-geometry
 ```
 
-Further details are documented in the dedicated MVP-1 data-model, geometry, JSON, and file-workflow documents in `docs/`.
+Further details are documented in the dedicated data-model, geometry, JSON, file-workflow, and derived-workplane documents in `docs/`.
