@@ -11,6 +11,7 @@ namespace blcad {
 
 enum class SemanticFace {
   Top,
+  Bottom,
 };
 
 [[nodiscard]] std::string_view to_string(SemanticFace face) noexcept;
