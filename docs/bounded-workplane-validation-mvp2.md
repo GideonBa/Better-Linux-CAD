@@ -1,17 +1,18 @@
-# MVP 2 Bounded Top-Face Validation
+# MVP 2 Bounded Workplane Validation
 
-Status: minimal bounds validation for circle profiles on the derived top face of a simple additive rectangle extrude.
+Status: minimal bounds validation for circle profiles on derived top and bottom workplanes of a simple additive rectangle extrude.
 
-This document describes the next step after resolving `feature.base_extrude.top` into a concrete workplane frame. The geometry layer now also knows the rectangular support region of that resolved workplane and validates circle profiles before executing the cut.
+This document describes the validation step after resolving semantic generated faces into concrete workplane frames. The geometry layer knows the rectangular support region of the resolved workplane and validates circle profiles before executing the cut.
 
 ## Goal
 
 The goal is to reject invalid cuts before OCCT is asked to create geometry.
 
-For the current MVP-2 seed, the supported face is:
+For the current MVP-2 seed, the supported bounded faces are:
 
 ```text
 feature.base_extrude.top
+feature.base_extrude.bottom
 ```
 
 The resolved workplane carries a rectangular support region:
@@ -26,7 +27,7 @@ A circle profile on that workplane is valid only if the complete circle lies ins
 
 ## Data model
 
-`ResolvedWorkplane` now contains:
+`ResolvedWorkplane` contains:
 
 ```text
 id
@@ -53,7 +54,7 @@ Standard datum planes are unbounded:
 enabled = false
 ```
 
-The derived top-face workplane is bounded:
+Derived top and bottom workplanes are bounded:
 
 ```text
 enabled = true
@@ -103,7 +104,7 @@ The second circle exceeds the right face boundary by 5 mm.
 
 ## Recompute integration
 
-`GeometryRecomputeExecutor::execute_subtractive_extrude` now performs this sequence:
+`GeometryRecomputeExecutor::execute_subtractive_extrude` performs this sequence:
 
 1. Resolve the sketch workplane.
 2. Read the circle profile diameter.
@@ -119,7 +120,7 @@ object_id = profile id
 message = circle profile must lie fully inside resolved workplane bounds
 ```
 
-The already computed base shape remains in the `ShapeCache`, but no cut shape is stored.
+The already computed base shape remains in the `ShapeCache`, but no new cut shape is stored. During incremental recompute, stale cut shapes are removed before the dirty cut feature is executed.
 
 ## Test coverage
 
@@ -127,8 +128,9 @@ Geometry tests cover:
 
 - `datum.xy` has no rectangular bounds
 - `workplane.base_top` has rectangular bounds matching source width and height
+- `workplane.base_bottom` has rectangular bounds matching source width and height
 - a centered hole still recomputes
-- an off-center hole still recomputes
+- off-center top and bottom holes recompute
 - a near-edge hole at `(50, 30)` with diameter `20` is accepted
 - an out-of-bounds hole at `(55, 0)` with diameter `20` is rejected
 - after rejection, the base feature shape remains cached and the cut feature shape is not cached
@@ -138,7 +140,6 @@ Geometry tests cover:
 Not included yet:
 
 - side-face bounds
-- bottom-face bounds
 - arbitrary planar faces
 - non-rectangular faces
 - partial-overlap clipping
