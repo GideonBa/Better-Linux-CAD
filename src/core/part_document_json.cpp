@@ -60,6 +60,10 @@ constexpr int k_version = 1;
     return Result<SemanticFace>::success(SemanticFace::Right);
   }
 
+  if (face == "left") {
+    return Result<SemanticFace>::success(SemanticFace::Left);
+  }
+
   return Result<SemanticFace>::failure(json_error("unsupported semantic face in part document json"));
 }
 
