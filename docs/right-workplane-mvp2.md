@@ -19,12 +19,13 @@ The implementation still avoids raw OCCT face IDs in `PartDocument`.
 
 ## Core model
 
-`SemanticFace` now supports:
+`SemanticFace` supports the current controlled face set:
 
 ```text
 top
 bottom
 right
+left
 ```
 
 A right-face reference is represented as:
@@ -145,11 +146,10 @@ Geometry tests cover:
 
 Not included yet:
 
-- left face
 - front/back faces
 - arbitrary planar faces
 - face orientation derived from OCCT topology
 - full topological naming
 - GUI face selection
 
-The right-face path exists to prove one controlled side-face case before broadening to the remaining side faces.
+The right-face path proved the first controlled side-face case. The matching left-face case is documented separately in `docs/left-workplane-mvp2.md`.
