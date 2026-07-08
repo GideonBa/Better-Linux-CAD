@@ -40,7 +40,6 @@ The following topics explicitly do not belong to MVP 1:
 - no bolt circle
 - no formulas between parameters
 - no full constraint solver
-- no semantic face references beyond simple feature outputs
 - no material database
 - no standard-part library
 - no technical drawings
@@ -48,7 +47,7 @@ The following topics explicitly do not belong to MVP 1:
 - no required STL export
 - no ShapeCache serialization
 
-This limitation keeps MVP 1 focused on one robust vertical line through document, parameters, feature intent, dependency tracking, recompute, OCCT geometry, STEP export, and model-intent persistence.
+MVP 2 starts separately with `docs/derived-workplane-mvp2-seed.md`.
 
 ## Success criteria
 
@@ -224,8 +223,6 @@ For MVP 1, direction is fixed to `+Z` and subtractive depth is fixed to `through
 
 ## Dependency graph
 
-The dependency graph describes which objects depend on which other objects.
-
 For the reference part:
 
 ```text
@@ -240,20 +237,6 @@ feature.base_extrude  -> feature.center_hole_cut
 
 The graph supports stable node IDs, directed dependency edges, direct dependents, transitive dependents, topological order, and cycle detection. The graph itself does not recompute anything.
 
-## Invalidation and recompute plan
-
-When a parameter changes, the changed parameter is marked as `changed`. All transitively dependent nodes are marked as `dirty`.
-
-Example for `part.hole_diameter`:
-
-```text
-part.hole_diameter       changed
-sketch.hole              dirty
-feature.center_hole_cut  dirty
-```
-
-A `RecomputePlan` then lists only the `dirty` nodes in topological order. The changed parameter itself is not included because it is already the source of the change.
-
 ## Geometry execution
 
 Geometry execution lives in `blcad_geometry`, not in `blcad_core`.
@@ -266,18 +249,6 @@ Execution rules:
 - `execute_plan` executes only affected feature nodes from a recompute plan.
 
 The `ShapeCache` stores computed geometry, not model intent. It is deliberately not serialized.
-
-## STEP export
-
-`StepExporter` writes a computed `GeometryShape` to a STEP file.
-
-Rules:
-
-- export path must not be empty
-- shape must not be empty
-- expected export errors are reported as `ErrorCategory::Export`
-- the output file must be non-empty
-- the test checks the `ISO-10303-21` STEP header
 
 ## JSON serialization and file workflow
 
@@ -300,8 +271,6 @@ The JSON root contains:
 ```
 
 The JSON stores document ID and name, length parameters, datum planes, sketches and profiles, and additive/subtractive extrude features. It does not store OCCT shapes, `GeometryShape`, `ShapeCache`, STEP files, or GUI state.
-
-Deserialization rebuilds the document through the normal APIs. This revalidates references and rebuilds dependency graph and invalidation state instead of trusting serialized derived data.
 
 The checked-in reference model is:
 
@@ -383,12 +352,4 @@ The current implementation is covered by tests for:
 
 ## Next technical step
 
-The next technical step should start MVP 2 carefully: sketches on generated planar faces.
-
-1. Introduce minimal semantic face references for the MVP-1 generated body, starting with the top face of `feature.base_extrude`.
-2. Add a derived workplane representation that can reference that semantic face without storing raw OCCT face IDs in `PartDocument`.
-3. Allow a sketch to use the derived workplane as its workplane reference.
-4. Recompute a cut from a sketch placed on the generated top face.
-5. Keep the first implementation limited to planar faces from simple extrudes.
-6. Do not build a general topological naming system yet.
-7. Do not build a GUI yet.
+MVP 1 is complete for the current scope. The next technical step is documented in `docs/derived-workplane-mvp2-seed.md` and in the README.
