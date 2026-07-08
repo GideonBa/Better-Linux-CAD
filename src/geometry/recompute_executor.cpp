@@ -160,8 +160,8 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_subtractive_extrude(
     return Result<std::size_t>::failure(global_center.error());
   }
 
-  auto shape = circular_cut_adapter_.cut_circular_hole(
-      *target, diameter->value(), Point2{global_center.value().x, global_center.value().y});
+  auto shape = circular_cut_adapter_.cut_circular_hole_along_axis(
+      *target, diameter->value(), global_center.value(), resolved_workplane.value().normal);
   if (shape.has_error()) {
     return Result<std::size_t>::failure(shape.error());
   }
