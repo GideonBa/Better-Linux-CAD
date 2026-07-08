@@ -126,7 +126,16 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_subtractive_extrude(
         feature->target_feature().value(), "target feature shape must exist in the shape cache"));
   }
 
-  auto shape = circular_cut_adapter_.cut_circular_hole(*target, diameter->value(), circle.center());
+  auto resolved_workplane = workplane_resolver_.resolve(document, sketch->workplane());
+  if (resolved_workplane.has_error()) {
+    return Result<std::size_t>::failure(resolved_workplane.error());
+  }
+
+  const Point3 global_center =
+      workplane_resolver_.evaluate_point(resolved_workplane.value(), circle.center());
+
+  auto shape = circular_cut_adapter_.cut_circular_hole(*target, diameter->value(),
+                                                       Point2{global_center.x, global_center.y});
   if (shape.has_error()) {
     return Result<std::size_t>::failure(shape.error());
   }
