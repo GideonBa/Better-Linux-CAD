@@ -14,6 +14,7 @@ enum class SemanticFace {
   Bottom,
   Right,
   Left,
+  Front,
 };
 
 [[nodiscard]] std::string_view to_string(SemanticFace face) noexcept;
