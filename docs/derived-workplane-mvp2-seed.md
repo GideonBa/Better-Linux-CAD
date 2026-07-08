@@ -1,6 +1,6 @@
 # MVP 2 Seed: Derived Workplanes on Generated Planar Faces
 
-Status: minimal semantic-face and derived-workplane path for sketches on generated planar faces, with geometry-layer resolution documented separately in `docs/workplane-resolver-mvp2.md`.
+Status: minimal semantic-face and derived-workplane path for sketches on generated planar faces, with geometry-layer resolution and bounded validation documented separately.
 
 This document describes the first carefully limited step toward MVP 2. The implementation allows a sketch to reference a workplane derived from a generated planar face without storing raw OCCT face IDs in the core document.
 
@@ -20,7 +20,7 @@ The path is intentionally narrow:
 - only the top face of a simple `AdditiveExtrude` is supported
 - the reference is semantic, not an OCCT `TopoDS_Face`
 - the core remains free of OCCT
-- the geometry layer can resolve the workplane and recompute a cut from a sketch placed on it
+- the geometry layer can resolve the workplane, validate its bounds, and recompute a cut from a sketch placed on it
 - no general topological naming system is introduced yet
 - no GUI is introduced yet
 
@@ -126,7 +126,7 @@ The deserializer resolves dependent objects in multiple passes so that a model c
 
 The dependency graph and invalidation state are rebuilt from the model during deserialization.
 
-## Geometry resolution
+## Geometry resolution and validation
 
 `WorkplaneResolver` resolves the derived workplane into a concrete frame:
 
@@ -137,9 +137,20 @@ y_axis = (0, 1, 0)
 normal = (0, 0, 1)
 ```
 
-`GeometryRecomputeExecutor` uses this frame to map circle-profile centers from sketch-local coordinates to global coordinates before executing the circular cut.
+The resolved workplane also carries rectangular local bounds:
 
-Details: `docs/workplane-resolver-mvp2.md`.
+```text
+center = (0, 0)
+width = source rectangle width
+height = source rectangle height
+```
+
+`GeometryRecomputeExecutor` uses this frame to map circle-profile centers from sketch-local coordinates to global coordinates and rejects circle profiles that do not lie fully inside the bounds before executing the circular cut.
+
+Details:
+
+- `docs/workplane-resolver-mvp2.md`
+- `docs/bounded-workplane-validation-mvp2.md`
 
 ## Example model
 
@@ -193,12 +204,14 @@ Geometry tests cover:
 - mapping local sketch points through the resolved workplane
 - full document recompute for a cut whose sketch is placed on a derived top-face workplane
 - off-center cut volume after resolving the workplane
+- near-edge valid hole placement inside bounds
+- out-of-bounds invalid hole placement rejected before cutting
 
 ## Deliberate limitation
 
 Not included yet:
 
-- face-bound validation
+- incremental recompute tests through derived-workplane dependencies after source-dimension changes
 - arbitrary planar faces
 - side faces
 - bottom faces
