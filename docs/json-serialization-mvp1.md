@@ -1,8 +1,8 @@
 # MVP 1 JSON Serialization
 
-Status: core serialization for MVP-1 `PartDocument` model intent.
+Status: core serialization for MVP-1 `PartDocument` model intent, including file-level helpers.
 
-This document describes the JSON serialization step that completes the previous README next technical step. The implementation persists model intent only. It does not serialize OCCT shapes, `GeometryShape`, or `ShapeCache` contents.
+This document describes the JSON serialization layer. The implementation persists model intent only. It does not serialize OCCT shapes, `GeometryShape`, or `ShapeCache` contents.
 
 ## Goal
 
@@ -10,11 +10,12 @@ The goal is to make an MVP-1 `PartDocument` reproducible from a textual represen
 
 1. Build a `PartDocument` with parameters, datum planes, sketches, and features.
 2. Serialize that model intent to JSON.
-3. Rebuild the `PartDocument` from JSON through the normal validated construction APIs.
-4. Recompute the restored document into a fresh `ShapeCache`.
-5. Export the recomputed final shape as STEP.
+3. Optionally write the JSON as a `.blcad.json` model file.
+4. Rebuild the `PartDocument` from JSON through the normal validated construction APIs.
+5. Recompute the restored document into a fresh `ShapeCache`.
+6. Export the recomputed final shape as STEP.
 
-This proves that the JSON stores the CAD model intent, not only computed output geometry.
+This proves that the JSON stores CAD model intent, not computed output geometry.
 
 ## Public interface
 
@@ -24,11 +25,18 @@ Header:
 include/blcad/core/part_document_json.hpp
 ```
 
-Operations:
+In-memory operations:
 
 ```text
 serialize_part_document_to_json(document)
 deserialize_part_document_from_json(content)
+```
+
+File-level operations:
+
+```text
+write_part_document_json_file(document, path)
+read_part_document_json_file(path)
 ```
 
 The implementation lives in:
@@ -73,6 +81,16 @@ The root object contains a schema marker and a version:
 ```
 
 Unknown schemas and unsupported versions are rejected during deserialization.
+
+## Reference file
+
+The checked-in MVP-1 reference model is:
+
+```text
+examples/reference_plate.blcad.json
+```
+
+It describes a 120 x 80 x 8 mm plate with a centered 20 mm through-hole.
 
 ## Parameters
 
@@ -171,6 +189,14 @@ Deserialization intentionally goes through the normal construction path:
 
 This rebuilds the dependency graph and invalidation state from the model, instead of trusting serialized graph data. The dependency graph remains derived data.
 
+## File helpers
+
+`write_part_document_json_file` serializes a document and writes a UTF-8 JSON file. It returns the written file size.
+
+`read_part_document_json_file` reads a UTF-8 JSON file and rebuilds the document through `deserialize_part_document_from_json`.
+
+The helpers reject empty paths, unreadable files, unwritable files, and invalid JSON content.
+
 ## Validation behavior
 
 The deserializer rejects:
@@ -194,6 +220,8 @@ Core tests verify that:
 - the MVP-1 reference document round-trips through JSON
 - parameters, sketches, features, and dependency edges survive the roundtrip
 - a restored document starts clean and creates an empty recompute plan
+- `.blcad.json` files can be written and read again
+- empty file paths are rejected
 - unsupported schemas are rejected
 - unsupported feature types are rejected
 
@@ -207,11 +235,10 @@ Geometry tests verify that:
 
 Not included yet:
 
-- filesystem read/write helpers
-- a checked-in `.blcad.json` example model
 - JSON schema file generation
 - formula or expression serialization
 - assembly serialization
 - ShapeCache serialization
+- automatic parent-directory creation for model-file output
 
-The current implementation is enough to prove that MVP-1 model intent can be persisted and rebuilt independently of computed geometry.
+The current implementation is enough to prove that MVP-1 model intent can be persisted, stored as a file, loaded again, and rebuilt independently of computed geometry.
