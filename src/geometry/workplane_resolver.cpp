@@ -16,10 +16,9 @@ namespace {
 }
 
 [[nodiscard]] Result<ResolvedWorkplane> resolve_datum_plane(const DatumPlane& datum_plane) {
-  return Result<ResolvedWorkplane>::success(ResolvedWorkplane{datum_plane.id(), datum_plane.origin(),
-                                                              datum_plane.x_axis(),
-                                                              datum_plane.y_axis(),
-                                                              datum_plane.normal()});
+  return Result<ResolvedWorkplane>::success(
+      ResolvedWorkplane{datum_plane.id(), datum_plane.origin(), datum_plane.x_axis(),
+                        datum_plane.y_axis(), datum_plane.normal(), RectangularWorkplaneBounds{}});
 }
 
 [[nodiscard]] Result<ResolvedWorkplane> resolve_top_face_workplane(
@@ -75,11 +74,11 @@ namespace {
         "additive extrude length parameter must exist in part document"));
   }
 
-  // Width and height are intentionally resolved here even though the current
-  // top-face frame is axis-aligned. This validates that the workplane really is
-  // derived from the simple rectangular extrusion supported by this MVP-2 seed.
-  static_cast<void>(width);
-  static_cast<void>(height);
+  RectangularWorkplaneBounds bounds;
+  bounds.enabled = true;
+  bounds.center = Point2{0.0, 0.0};
+  bounds.width_mm = width->value().millimeters();
+  bounds.height_mm = height->value().millimeters();
 
   const Point2 rectangle_center = rectangle.center();
   return Result<ResolvedWorkplane>::success(
@@ -87,7 +86,7 @@ namespace {
                         Point3{rectangle_center.x, rectangle_center.y,
                                thickness->value().millimeters()},
                         Vector3{1.0, 0.0, 0.0}, Vector3{0.0, 1.0, 0.0},
-                        Vector3{0.0, 0.0, 1.0}});
+                        Vector3{0.0, 0.0, 1.0}, bounds});
 }
 
 } // namespace
