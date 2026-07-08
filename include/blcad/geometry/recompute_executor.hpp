@@ -6,6 +6,7 @@
 #include "blcad/geometry/circular_cut_adapter.hpp"
 #include "blcad/geometry/rectangle_extrusion_adapter.hpp"
 #include "blcad/geometry/shape_cache.hpp"
+#include "blcad/geometry/workplane_resolver.hpp"
 
 #include <cstddef>
 
@@ -39,6 +40,7 @@ private:
 
   RectangleExtrusionAdapter rectangle_extrusion_adapter_;
   CircularCutAdapter circular_cut_adapter_;
+  WorkplaneResolver workplane_resolver_;
 };
 
 } // namespace blcad::geometry
