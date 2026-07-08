@@ -143,6 +143,7 @@ if(BLCAD_BUILD_TESTS)
       blcad_geometry_tests
       tests/geometry/circular_cut_adapter_tests.cpp
       tests/geometry/derived_workplane_pipeline_tests.cpp
+      tests/geometry/front_workplane_pipeline_tests.cpp
       tests/geometry/left_workplane_pipeline_tests.cpp
       tests/geometry/recompute_executor_tests.cpp
       tests/geometry/rectangle_extrusion_adapter_tests.cpp
