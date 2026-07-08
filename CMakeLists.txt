@@ -146,6 +146,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/recompute_executor_tests.cpp
       tests/geometry/rectangle_extrusion_adapter_tests.cpp
       tests/geometry/reference_part_pipeline_tests.cpp
+      tests/geometry/right_workplane_pipeline_tests.cpp
       tests/geometry/shape_cache_tests.cpp
       tests/geometry/step_exporter_tests.cpp
       tests/geometry/workplane_resolver_tests.cpp
