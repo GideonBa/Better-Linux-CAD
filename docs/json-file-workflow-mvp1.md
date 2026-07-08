@@ -52,25 +52,26 @@ examples/reference_plate.blcad.json
 
 It describes a 120 x 80 x 8 mm rectangular plate with a centered 20 mm through-hole.
 
-The repository also contains the MVP-2 seed model:
+The repository also contains derived-workplane seed models:
 
 ```text
 examples/top_face_cut.blcad.json
+examples/bottom_face_cut.blcad.json
 ```
 
-It describes the same basic plate, but the hole sketch is placed on a derived workplane:
+The top example places the hole sketch on:
 
 ```text
 workplane.base_top -> feature.base_extrude.top
 ```
 
-The hole center in that sketch is intentionally off-center:
+The bottom example places the hole sketch on:
 
 ```text
-(25, -10)
+workplane.base_bottom -> feature.base_extrude.bottom
 ```
 
-This demonstrates that `.blcad.json` can store semantic generated-face references without storing OCCT face IDs, that the geometry layer can resolve the workplane before cutting, and that bounded top-face validation can reject invalid profile placement before OCCT execution.
+These examples demonstrate that `.blcad.json` can store semantic generated-face references without storing OCCT face IDs, that the geometry layer can resolve workplanes before cutting, and that bounded validation can reject invalid profile placement before OCCT execution.
 
 ## Headless export example
 
@@ -93,10 +94,16 @@ Usage for the MVP-1 reference model:
 ./build/dev-geometry/blcad_export_step examples/reference_plate.blcad.json build/reference_plate.step
 ```
 
-Usage for the MVP-2 seed model:
+Usage for the top-face derived-workplane model:
 
 ```bash
 ./build/dev-geometry/blcad_export_step examples/top_face_cut.blcad.json build/top_face_cut.step
+```
+
+Usage for the bottom-face derived-workplane model:
+
+```bash
+./build/dev-geometry/blcad_export_step examples/bottom_face_cut.blcad.json build/bottom_face_cut.step
 ```
 
 Depending on the exact CMake build directory, the binary may be located under the configured geometry build directory. The command accepts exactly two arguments:
@@ -134,7 +141,7 @@ The file helpers reject:
 - invalid references caught by `PartDocument`
 - unresolved dependency ordering, for example a derived workplane whose source feature never appears
 
-Geometry recompute additionally rejects circle profiles that do not lie fully inside the resolved top-face bounds.
+Geometry recompute additionally rejects circle profiles that do not lie fully inside resolved workplane bounds.
 
 The CLI exits with:
 
@@ -149,10 +156,11 @@ Core tests cover:
 - writing a `PartDocument` to a temporary `.blcad.json` file
 - reading that file back into a `PartDocument`
 - preserving model objects and dependency edges
-- derived workplane JSON roundtrip
+- top-face derived workplane JSON roundtrip
+- bottom-face derived workplane JSON roundtrip
 - rejecting empty file paths
 
-Geometry tests cover recompute and STEP export from a JSON-restored document, recompute from a sketch on a derived top-face workplane, workplane resolution, an off-center cut whose local sketch point is mapped through the resolved workplane, and bounded validation for near-edge valid and out-of-bounds invalid holes. The CLI itself is intentionally thin and currently covered indirectly through the same APIs.
+Geometry tests cover recompute and STEP export from a JSON-restored document, recompute from sketches on derived top and bottom workplanes, workplane resolution, off-center cuts whose local sketch points are mapped through the resolved workplanes, and bounded validation for near-edge valid and out-of-bounds invalid holes. The CLI itself is intentionally thin and currently covered indirectly through the same APIs.
 
 ## Deliberate limitation
 
@@ -166,6 +174,6 @@ Not included yet:
 - graphical loading of `.blcad.json`
 - ShapeCache serialization
 - full topological naming
-- arbitrary face support beyond the current top-face case
+- arbitrary face support beyond the current top/bottom cases
 
-The workflow is sufficient as the first real headless file-based CAD path and as a persistence path for the first semantic generated-face reference.
+The workflow is sufficient as the first real headless file-based CAD path and as a persistence path for semantic generated-face references.
