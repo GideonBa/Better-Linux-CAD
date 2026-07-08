@@ -1,113 +1,90 @@
-# MVP 1 Parameterwert-Update und numerischer Recompute
+# MVP 1 Parameter-Value Update and Numeric Recompute
 
-Status: Core-Operation fuer die Aenderung eines Parameterwerts
+Status: core operation for changing a parameter value.
 
-Dieses Dokument beschreibt den Schritt, der den inkrementellen Recompute
-inhaltlich vervollstaendigt: ein Parameterwert kann im `PartDocument` geaendert
-werden, und der abhaengige Teil des Modells wird daraufhin neu berechnet.
+This document describes the step that completes incremental recompute at the content level: a parameter value can be changed in `PartDocument`, and the dependent part of the model is recomputed afterward.
 
-## Ziel
+## Goal
 
-Bis zu diesem Schritt waren Parameter nach ihrer Erzeugung unveraenderlich. Der
-Recompute-Lebenszyklus konnte nur strukturell gezeigt werden. Jetzt kann ein
-Wert wirklich geaendert werden, sodass sich die berechnete Geometrie sichtbar
-aendert. Damit ist das MVP-1-Erfolgskriterium erfuellt, dass eine Aenderung von
-`hole_diameter` oder `thickness` die Shape neu berechnet.
+Until this step, parameters were immutable after creation. The recompute lifecycle could only be demonstrated structurally. Now a value can actually be changed, so the computed geometry changes visibly. This satisfies the MVP-1 success criterion that changing `hole_diameter` or `thickness` recomputes the shape.
 
-## Oeffentliche Schnittstelle
+## Public interface
 
-Core-Header:
+Core headers:
 
 ```text
 include/blcad/core/parameter.hpp
 include/blcad/core/part_document.hpp
 ```
 
-Neue Operationen:
+New operations:
 
 ```text
 Parameter::with_value(value)
 PartDocument::set_parameter_value(id, value)
 ```
 
-`Parameter::with_value` liefert eine Kopie des Parameters mit neuem Wert und
-derselben Identitaet. Der neue Wert durchlaeuft dieselbe Validierung wie bei der
-Erzeugung. `Parameter` bleibt damit unveraenderlich; eine Aenderung erzeugt einen
-neuen Wert statt einen bestehenden zu mutieren.
+`Parameter::with_value` returns a copy of the parameter with a new value and the same identity. The new value goes through the same validation as during creation. `Parameter` therefore remains immutable; a change creates a new value instead of mutating an existing one.
 
-`PartDocument::set_parameter_value` setzt den Wert eines vorhandenen Parameters
-neu und markiert den Parameter und seine Abhaengigen als geaendert. Die Methode
-gibt wie `mark_parameter_changed` die betroffenen Graphknoten zurueck.
+`PartDocument::set_parameter_value` sets the value of an existing parameter and marks the parameter and its dependents as changed. Like `mark_parameter_changed`, the method returns the affected graph nodes.
 
-## Ablauf
+## Flow
 
-`set_parameter_value` arbeitet in dieser Reihenfolge:
+`set_parameter_value` works in this order:
 
-1. Parameter-ID validieren.
-2. Parameter im `PartDocument` suchen.
-3. Neuen Wert ueber `Parameter::with_value` validieren.
-4. Den Parameter im Dokument durch den neuen Wert ersetzen.
-5. Den Parameter und seine transitiven Abhaengigen als `changed` bzw. `dirty`
-   markieren.
+1. Validate the parameter ID.
+2. Find the parameter in `PartDocument`.
+3. Validate the new value through `Parameter::with_value`.
+4. Replace the parameter in the document with the new value.
+5. Mark the parameter and its transitive dependents as `changed` or `dirty`.
 
-Der abhaengige Teil des Modells wird dadurch fuer den naechsten Recompute-Plan
-`dirty`. Der eigentliche geometrische Recompute bleibt in der Geometry-Schicht
-(`GeometryRecomputeExecutor::execute_plan`).
+The dependent part of the model thereby becomes `dirty` for the next recompute plan. The actual geometric recompute remains in the geometry layer (`GeometryRecomputeExecutor::execute_plan`).
 
-## Zusammenspiel mit dem Recompute
+## Interaction with recompute
 
-Ein typischer numerischer Ablauf fuer das Referenzbauteil:
+A typical numeric flow for the reference part:
 
-1. Dokument vollstaendig rechnen: `execute_document(document, cache)`.
-2. Dokument als sauber markieren: `document.mark_all_clean()`.
-3. Wert aendern: `set_parameter_value("part.hole_diameter", 40 mm)`.
-4. Aus dem `dirty`-Zustand einen `RecomputePlan` ableiten. Er enthaelt nur den
-   betroffenen Cut, nicht den Basiskoerper.
-5. Nur die betroffenen Features mit `execute_plan(...)` neu rechnen. Der Cut
-   liest den unveraenderten Basiskoerper aus dem `ShapeCache`.
-6. Danach erneut `mark_all_clean()` setzen.
+1. Fully compute the document: `execute_document(document, cache)`.
+2. Mark the document clean: `document.mark_all_clean()`.
+3. Change a value: `set_parameter_value("part.hole_diameter", 40 mm)`.
+4. Derive a `RecomputePlan` from the `dirty` state. It contains only the affected cut, not the base body.
+5. Recompute only the affected features with `execute_plan(...)`. The cut reads the unchanged base body from the `ShapeCache`.
+6. Call `mark_all_clean()` again afterward.
 
-Ein groesserer Bohrungsdurchmesser entfernt mehr Material, das finale Volumen
-wird also kleiner.
+A larger hole diameter removes more material, so the final volume becomes smaller.
 
-## Validierung
+## Validation
 
-Aktuelle Fehlerfaelle:
+Current error cases:
 
-- leere Parameter-ID
-- Parameter existiert nicht im Dokument
-- Wert verletzt die Parametervalidierung (fuer MVP 1 Laenge groesser als `0`)
+- empty parameter ID
+- parameter does not exist in the document
+- value violates parameter validation, which for MVP 1 means a length greater than `0`
 
-Ein nicht positiver Laengenwert kann fuer MVP 1 bereits bei der Erzeugung der
-`Quantity` nicht entstehen. Die Wertvalidierung in `with_value` bleibt trotzdem
-als einziger Validierungspfad erhalten, damit sie bei spaeteren Parametertypen
-weiterhin greift.
+For MVP 1, a non-positive length value cannot already be created at the `Quantity` level. Validation in `with_value` is still kept as the single validation path so it continues to apply to later parameter types.
 
-## Testabdeckung
+## Test coverage
 
-Aktuelle Tests pruefen:
+Current tests check:
 
-- `set_parameter_value` aktualisiert den Wert und markiert Sketch und Feature als
-  `dirty`, waehrend nicht betroffene Parameter `clean` bleiben
-- `set_parameter_value` lehnt fehlende und leere Parameter-IDs ab
-- das Referenzbauteil rechnet nach einer echten Durchmesseraenderung nur den Cut
-  neu, und das finale Volumen wird bei groesserer Bohrung kleiner
+- `set_parameter_value` updates the value and marks sketch and feature as `dirty`, while unaffected parameters remain `clean`
+- `set_parameter_value` rejects missing and empty parameter IDs
+- the reference part recomputes only the cut after a real diameter change, and the final volume becomes smaller when the hole grows
 
-## Bewusste Begrenzung
+## Deliberate limitation
 
-Noch nicht enthalten:
+Not included yet:
 
-- Formeln oder Expressions zwischen Parametern
-- automatischer geometrischer Recompute direkt aus `set_parameter_value`
-- Serialisierung des Dokuments als JSON oder eigenes Dateiformat
-- Parametertypen ausser `length`
+- formulas or expressions between parameters
+- automatic geometric recompute directly from `set_parameter_value`
+- document serialization as JSON or a custom file format
+- parameter types other than `length`
 
-## Naechster sinnvoller Schritt
+## Next useful step
 
-Der naechste kleine Schritt sollte die Modellabsicht persistierbar machen:
+The next small step should make model intent persistent:
 
-1. eine JSON-Serialisierung fuer `PartDocument` vorbereiten
-   (Parameter, Sketches, Features)
-2. das Dokument aus JSON wieder aufbauen und erneut rechnen
-3. den `ShapeCache` weiterhin nur als berechnetes Ergebnis behandeln
-4. weiter keinen allgemeinen Solver und keine GUI bauen
+1. prepare JSON serialization for `PartDocument`, including parameters, sketches, and features
+2. rebuild the document from JSON and recompute it
+3. continue to treat the `ShapeCache` only as a computed result
+4. continue not to build a general solver or GUI
