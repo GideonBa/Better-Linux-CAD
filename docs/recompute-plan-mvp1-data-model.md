@@ -1,53 +1,47 @@
-# MVP 1 Recompute-Plan-Datenmodell
+# MVP 1 Recompute Plan Data Model
 
-Status: reines Datenmodell mit PartDocument-Integration, keine Ausfuehrung
+Status: pure data model with `PartDocument` integration, no execution.
 
-Dieses Dokument beschreibt den aktuellen Stand von `RecomputePlan`.
+This document describes the current state of `RecomputePlan`.
 
-Der Stand ist bewusst begrenzt:
+The current scope is deliberately limited:
 
-- keine Geometrie
-- keine OCCT-Operationen im Recompute-Plan
-- kein ShapeCache-Update
-- kein Feature-Recompute
-- keine GUI
+- no geometry
+- no OCCT operations in the recompute plan
+- no ShapeCache update
+- no feature recompute
+- no GUI
 
-## Ziel
+## Goal
 
-`RecomputePlan` beschreibt, welche `dirty`-Knoten spaeter neu berechnet werden
-muessten und in welcher Reihenfolge.
+`RecomputePlan` describes which `dirty` nodes would need to be recomputed later and in which order.
 
-Der Plan ist keine Ausfuehrung. Er ruft keine Feature-Logik auf, erzeugt keine
-Shapes und schreibt keinen Cache. Er ist nur die geordnete Aufgabenliste fuer
-einen spaeteren Recompute.
+The plan is not execution. It does not call feature logic, create shapes, or write a cache. It is only the ordered task list for a later recompute.
 
-## Eingaben
+## Inputs
 
-Der Plan wird aus zwei bestehenden Datenmodellen abgeleitet:
+The plan is derived from two existing data models:
 
 - `DependencyGraph`
 - `InvalidationState`
 
-Der `DependencyGraph` liefert die topologische Ordnung. Der
-`InvalidationState` sagt, welche Knoten `dirty` sind.
+The `DependencyGraph` provides the topological order. The `InvalidationState` says which nodes are `dirty`.
 
-## Regeln
+## Rules
 
-`RecomputePlan::from_graph_and_invalidation_state(graph, invalidation_state)`
-arbeitet nach diesen Regeln:
+`RecomputePlan::from_graph_and_invalidation_state(graph, invalidation_state)` follows these rules:
 
-- Der Dependency Graph muss azyklisch sein.
-- Nur Knoten mit Status `dirty` werden in den Plan aufgenommen.
-- Knoten mit Status `changed` werden nicht aufgenommen.
-- Knoten mit Status `clean` werden nicht aufgenommen.
-- Die Reihenfolge folgt der topologischen Ordnung des Graphen.
+- the dependency graph must be acyclic
+- only nodes with status `dirty` are included in the plan
+- nodes with status `changed` are not included
+- nodes with status `clean` are not included
+- the order follows the graph's topological order
 
-Damit wird ein geaenderter Parameter nicht selbst recomputed. Stattdessen
-werden nur die davon abhaengigen Sketches und Features geplant.
+This means a changed parameter itself is not recomputed. Instead, only the sketches and features depending on it are planned.
 
-## Beispiel
+## Example
 
-Wenn `part.width` geaendert wurde, markiert der Invalidierungsstatus:
+If `part.width` was changed, the invalidation state marks:
 
 ```text
 part.width               changed
@@ -56,7 +50,7 @@ feature.base_extrude     dirty
 feature.center_hole_cut  dirty
 ```
 
-Der Recompute-Plan enthaelt:
+The recompute plan contains:
 
 ```text
 1. sketch.base
@@ -64,60 +58,52 @@ Der Recompute-Plan enthaelt:
 3. feature.center_hole_cut
 ```
 
-`part.width` ist nicht Teil des Plans, weil der Parameter bereits die Quelle der
-Aenderung ist.
+`part.width` is not part of the plan because the parameter is already the source of the change.
 
-## PartDocument-Integration
+## `PartDocument` integration
 
-`PartDocument::create_recompute_plan()` leitet den Plan aus dem internen
-Dependency Graph und dem internen Invalidierungsstatus ab.
+`PartDocument::create_recompute_plan()` derives the plan from its internal dependency graph and its internal invalidation state.
 
-Aktueller Ablauf:
+Current flow:
 
 ```text
 PartDocument::mark_parameter_changed(part.width)
   -> part.width changed
-  -> abhaengige Knoten dirty
+  -> dependent nodes dirty
 
 PartDocument::create_recompute_plan()
-  -> dirty-Knoten in topologischer Reihenfolge
+  -> dirty nodes in topological order
 ```
 
-`PartDocument::mark_all_clean()` leert die Planung indirekt, weil danach keine
-`dirty`-Knoten mehr vorhanden sind.
+`PartDocument::mark_all_clean()` indirectly clears the plan because no `dirty` nodes remain afterward.
 
-## Fehlerverhalten
+## Error behavior
 
-Wenn der Dependency Graph einen Zyklus enthaelt, kann keine topologische
-Reihenfolge erzeugt werden. In diesem Fall gibt `RecomputePlan` den
-Dependency-Fehler des Graphen zurueck.
+If the dependency graph contains a cycle, no topological order can be produced. In that case, `RecomputePlan` returns the graph's dependency error.
 
 ```text
 dependency graph contains a cycle
 ```
 
-## Testabdeckung
+## Test coverage
 
-Aktuelle Tests pruefen:
+Current tests check:
 
-- sauberer Invalidierungsstatus erzeugt einen leeren Plan
-- `dirty`-Knoten werden in topologischer Reihenfolge aufgenommen
-- `changed`-Knoten werden nicht in den Plan aufgenommen
-- unabhaengige Graphzweige bleiben aus dem Plan heraus
-- Graphzyklen werden als Dependency-Fehler gemeldet
-- `PartDocument` erzeugt einen Plan aus seinem internen Zustand
-- `PartDocument::mark_all_clean()` fuehrt zu einem leeren Plan
+- a clean invalidation state creates an empty plan
+- `dirty` nodes are included in topological order
+- `changed` nodes are not included in the plan
+- independent graph branches stay out of the plan
+- graph cycles are reported as dependency errors
+- `PartDocument` creates a plan from its internal state
+- `PartDocument::mark_all_clean()` leads to an empty plan
 
-## Anschluss an Geometrie
+## Connection to geometry
 
-Der erste Geometry-Adapter fuer eine Rechteckextrusion, ein kleiner
-`ShapeCache` und eine schmale `AdditiveExtrude`-Ausfuehrung liegen inzwischen
-im optionalen Target `blcad_geometry`. Der Recompute-Plan bleibt davon getrennt:
-Er beschreibt weiterhin nur die Reihenfolge der neu zu berechnenden Knoten.
+The first geometry adapter for rectangle extrusion, a small `ShapeCache`, and a narrow `AdditiveExtrude` execution now exist in the optional target `blcad_geometry`. The recompute plan remains separate from that: it still describes only the order of nodes that need recalculation.
 
-Naechste Schritte duerfen den Plan nutzen, sollten aber klein bleiben:
+Next steps may use the plan but should stay small:
 
-- `SubtractiveExtrude` aus einem Plan-Knoten ausfuehren
-- Ergebnis im bestehenden `ShapeCache` aktualisieren
-- OCCT weiter nur hinter `blcad_geometry` verwenden
-- noch keine GUI bauen
+- execute `SubtractiveExtrude` from a plan node
+- update the result in the existing `ShapeCache`
+- continue to use OCCT only behind `blcad_geometry`
+- do not build a GUI yet
