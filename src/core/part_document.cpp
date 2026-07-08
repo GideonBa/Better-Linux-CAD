@@ -16,6 +16,10 @@ Result<std::size_t> add_dependency_if_missing(DependencyGraph& graph, std::strin
   return graph.add_dependency(std::move(dependency), std::move(dependent));
 }
 
+[[nodiscard]] bool is_supported_derived_face(SemanticFace face) noexcept {
+  return face == SemanticFace::Top || face == SemanticFace::Bottom || face == SemanticFace::Right;
+}
+
 } // namespace
 
 Result<PartDocument> PartDocument::create(DocumentId id, std::string name) {
@@ -95,10 +99,9 @@ Result<std::size_t> PartDocument::add_derived_workplane(DerivedWorkplane workpla
         workplane.id().value(), "derived workplane source feature must be an additive extrude"));
   }
 
-  if (workplane.face_reference().face() != SemanticFace::Top &&
-      workplane.face_reference().face() != SemanticFace::Bottom) {
-    return Result<std::size_t>::failure(
-        Error::validation(workplane.id().value(), "only top and bottom semantic faces are supported"));
+  if (!is_supported_derived_face(workplane.face_reference().face())) {
+    return Result<std::size_t>::failure(Error::validation(
+        workplane.id().value(), "only top, bottom, and right semantic faces are supported"));
   }
 
   auto graph = dependency_graph_;
