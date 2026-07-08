@@ -63,6 +63,7 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/rectangle_extrusion_adapter.cpp
     src/geometry/shape_cache.cpp
     src/geometry/step_exporter.cpp
+    src/geometry/workplane_resolver.cpp
   )
   add_library(BLCAD::geometry ALIAS blcad_geometry)
 
@@ -147,6 +148,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/reference_part_pipeline_tests.cpp
       tests/geometry/shape_cache_tests.cpp
       tests/geometry/step_exporter_tests.cpp
+      tests/geometry/workplane_resolver_tests.cpp
     )
 
     target_link_libraries(blcad_geometry_tests PRIVATE BLCAD::geometry Catch2::Catch2WithMain)
