@@ -135,3 +135,35 @@ TEST_CASE("Derived top-face workplane cut follows an off-center sketch point",
   const double expected_removed_volume = std::numbers::pi * 10.0 * 10.0 * 8.0;
   CHECK(final_summary.volume_mm3 == Catch::Approx(base_volume - expected_removed_volume).margin(1.0));
 }
+
+TEST_CASE("Derived top-face workplane accepts a near-edge hole inside the face bounds",
+          "[geometry][workplane]") {
+  const PartDocument document = make_top_face_cut_document(Point2{50.0, 30.0});
+  ShapeCache cache = make_shape_cache();
+  const GeometryRecomputeExecutor executor;
+
+  const auto summary = executor.execute_document(document, cache);
+
+  REQUIRE(summary);
+  CHECK(summary.value().executed_feature_count == 2);
+  REQUIRE(cache.has_final_shape());
+  CHECK(cache.final_feature_id().value() == "feature.top_hole_cut");
+}
+
+TEST_CASE("Derived top-face workplane rejects holes outside the face bounds",
+          "[geometry][workplane]") {
+  const PartDocument document = make_top_face_cut_document(Point2{55.0, 0.0});
+  ShapeCache cache = make_shape_cache();
+  const GeometryRecomputeExecutor executor;
+
+  const auto summary = executor.execute_document(document, cache);
+
+  REQUIRE(summary.has_error());
+  CHECK(summary.error().category() == ErrorCategory::Validation);
+  CHECK(summary.error().object_id() == "profile.top_hole");
+  CHECK(summary.error().message() == "circle profile must lie fully inside resolved workplane bounds");
+
+  const GeometryShape* base_shape = cache.find_feature_shape(FeatureId("feature.base_extrude"));
+  REQUIRE(base_shape != nullptr);
+  CHECK_FALSE(cache.has_final_shape());
+}
