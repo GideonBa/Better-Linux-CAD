@@ -139,6 +139,7 @@ Current test coverage includes:
 - centered circular cut through OCCT in the optional geometry build
 - `ShapeCache` storage of feature shapes and final shapes
 - geometry-layer `WorkplaneResolver`
+- rectangular bounds on resolved top-face workplanes
 - mapping local sketch points through resolved workplanes
 - additive and subtractive recompute execution
 - full document recompute into a fresh `ShapeCache`
@@ -146,6 +147,7 @@ Current test coverage includes:
 - numeric incremental recompute after a real parameter change
 - recompute and STEP export from a JSON-restored document
 - recompute of an off-center cut whose sketch references a derived top-face workplane
+- bounded top-face validation for near-edge valid and out-of-bounds invalid holes
 
 ## Headless examples
 
@@ -155,7 +157,7 @@ After configuring and building the geometry preset, export the checked-in refere
 ./build/dev-geometry/blcad_export_step examples/reference_plate.blcad.json build/reference_plate.step
 ```
 
-Export the derived-workplane resolver example:
+Export the bounded derived-workplane example:
 
 ```bash
 ./build/dev-geometry/blcad_export_step examples/top_face_cut.blcad.json build/top_face_cut.step
@@ -190,6 +192,7 @@ Important documents:
 - `docs/json-file-workflow-mvp1.md`: `.blcad.json` file workflow and headless export example
 - `docs/derived-workplane-mvp2-seed.md`: semantic top-face workplanes and sketches on generated planar faces
 - `docs/workplane-resolver-mvp2.md`: geometry-layer resolver for derived top-face workplanes
+- `docs/bounded-workplane-validation-mvp2.md`: bounded circle validation on derived top-face workplanes
 - `docs/mvp-plan.md`: MVP sequence
 - `docs/mvp-1-specification.md`: detailed MVP-1 specification
 - `docs/decisions/`: architecture decision records
@@ -214,7 +217,7 @@ rm -rf build/
 
 LaTeX helper files are listed in `.gitignore`. Generated architecture PDFs may remain as working artifacts if needed.
 
-## Development rule after the workplane resolver
+## Development rule after bounded top-face validation
 
 The current code should still move carefully:
 
@@ -226,4 +229,4 @@ The current code should still move carefully:
 - no serialization of OCCT geometry
 - no full topological naming system yet
 
-The next technical step should add bounded top-face validation before broader face support is introduced.
+The next technical step should verify incremental recompute through derived-workplane dependencies before broader face support is introduced.
