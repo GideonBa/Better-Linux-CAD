@@ -54,24 +54,24 @@ Current test coverage includes:
 - `Parameter` creation and value updates
 - `PartDocument` identity, validation, lookup, and reference management
 - datum-plane, derived-workplane, sketch, rectangle-profile, and circle-profile data models
-- semantic top, bottom, right, and left face references for generated additive extrudes
+- semantic top, bottom, right, left, and front face references for generated additive extrudes
 - additive and subtractive feature-intent data models
 - dependency graph construction, topological ordering, and cycle detection
 - invalidation state and recompute-plan creation
-- JSON serialization/deserialization of model intent, including top, bottom, right, and left derived workplanes
+- JSON serialization/deserialization of model intent, including top, bottom, right, left, and front derived workplanes
 - `.blcad.json` file read/write helpers
 - rectangle extrusion through OCCT in the optional geometry build
 - centered and axis-directed circular cuts through OCCT in the optional geometry build
 - `ShapeCache` storage, replacement, removal, and final-shape tracking
 - geometry-layer `WorkplaneResolver`
-- rectangular bounds on resolved top, bottom, right, and left workplanes
+- rectangular bounds on resolved top, bottom, right, left, and front workplanes
 - mapping local sketch points through resolved workplanes
 - additive and subtractive recompute execution
 - full document recompute into a fresh `ShapeCache`
 - STEP export of the final shape
 - numeric incremental recompute after a real parameter change
 - recompute and STEP export from a JSON-restored document
-- recompute of off-center cuts whose sketches reference derived top, bottom, right, or left workplanes
+- recompute of off-center cuts whose sketches reference derived top, bottom, right, left, or front workplanes
 - bounded face validation for valid and out-of-bounds holes
 - incremental recompute through derived-workplane dependency paths
 - stale dirty feature-shape removal before incremental recompute
@@ -86,6 +86,7 @@ After configuring and building the geometry preset, export the checked-in models
 ./build/dev-geometry/blcad_export_step examples/bottom_face_cut.blcad.json build/bottom_face_cut.step
 ./build/dev-geometry/blcad_export_step examples/right_face_cut.blcad.json build/right_face_cut.step
 ./build/dev-geometry/blcad_export_step examples/left_face_cut.blcad.json build/left_face_cut.step
+./build/dev-geometry/blcad_export_step examples/front_face_cut.blcad.json build/front_face_cut.step
 ```
 
 Depending on the local CMake preset output directory, the executable path may differ. The command shape is:
@@ -123,6 +124,7 @@ Important documents:
 - `docs/bottom-workplane-mvp2.md`: bottom-face derived workplane for simple additive extrudes
 - `docs/right-workplane-mvp2.md`: right-face derived workplane for simple additive extrudes
 - `docs/left-workplane-mvp2.md`: left-face derived workplane for simple additive extrudes
+- `docs/front-workplane-mvp2.md`: front-face derived workplane for simple additive extrudes
 - `docs/mvp-plan.md`: MVP sequence
 - `docs/mvp-1-specification.md`: detailed MVP-1 specification
 - `docs/decisions/`: architecture decision records
@@ -145,7 +147,7 @@ CMake build directories are located under `build/`.
 rm -rf build/
 ```
 
-## Development rule after left-face workplanes
+## Development rule after front-face workplanes
 
 The current code should still move carefully:
 
@@ -157,4 +159,4 @@ The current code should still move carefully:
 - no serialization of OCCT geometry
 - no full topological naming system yet
 
-The next technical step should add exactly one Y-side semantic workplane, preferably the front `+Y` face, before broader topological naming is introduced.
+The next technical step should add the matching back `-Y` semantic workplane before broader topological naming is introduced.
