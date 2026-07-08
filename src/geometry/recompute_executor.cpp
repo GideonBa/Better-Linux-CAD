@@ -194,6 +194,11 @@ GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const Reco
       continue;
     }
 
+    auto removed_stale_shape = shape_cache.remove_feature_shape(feature->id());
+    if (removed_stale_shape.has_error()) {
+      return Result<GeometryRecomputeSummary>::failure(removed_stale_shape.error());
+    }
+
     auto executed = execute_feature(document, *feature, shape_cache);
     if (executed.has_error()) {
       return Result<GeometryRecomputeSummary>::failure(executed.error());
