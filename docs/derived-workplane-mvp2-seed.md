@@ -1,6 +1,6 @@
 # MVP 2 Seed: Derived Workplanes on Generated Planar Faces
 
-Status: minimal semantic-face and derived-workplane path for sketches on generated planar faces.
+Status: minimal semantic-face and derived-workplane path for sketches on generated planar faces, with geometry-layer resolution documented separately in `docs/workplane-resolver-mvp2.md`.
 
 This document describes the first carefully limited step toward MVP 2. The implementation allows a sketch to reference a workplane derived from a generated planar face without storing raw OCCT face IDs in the core document.
 
@@ -20,7 +20,7 @@ The path is intentionally narrow:
 - only the top face of a simple `AdditiveExtrude` is supported
 - the reference is semantic, not an OCCT `TopoDS_Face`
 - the core remains free of OCCT
-- the geometry layer can recompute a cut from a sketch placed on the derived workplane
+- the geometry layer can resolve the workplane and recompute a cut from a sketch placed on it
 - no general topological naming system is introduced yet
 - no GUI is introduced yet
 
@@ -46,7 +46,7 @@ SemanticFaceReference
   face = top
 ```
 
-The reference deliberately does not store OCCT face IDs. It describes model intent and can later be resolved by the geometry layer.
+The reference deliberately does not store OCCT face IDs. It describes model intent and is resolved by the geometry layer when needed.
 
 ### `DerivedWorkplane`
 
@@ -65,7 +65,7 @@ The ID reuses the current workplane reference type used by `Sketch`. A sketch ca
 
 ## `PartDocument` integration
 
-`PartDocument` now stores:
+`PartDocument` stores:
 
 - standard datum planes
 - derived workplanes
@@ -104,7 +104,7 @@ feature.base_extrude -> workplane.base_top -> sketch.top_hole -> feature.top_hol
 
 ## JSON model format
 
-The model-intent JSON now supports `derived_workplanes`:
+The model-intent JSON supports `derived_workplanes`:
 
 ```json
 {
@@ -126,6 +126,21 @@ The deserializer resolves dependent objects in multiple passes so that a model c
 
 The dependency graph and invalidation state are rebuilt from the model during deserialization.
 
+## Geometry resolution
+
+`WorkplaneResolver` resolves the derived workplane into a concrete frame:
+
+```text
+origin = (rectangle_center.x, rectangle_center.y, thickness)
+x_axis = (1, 0, 0)
+y_axis = (0, 1, 0)
+normal = (0, 0, 1)
+```
+
+`GeometryRecomputeExecutor` uses this frame to map circle-profile centers from sketch-local coordinates to global coordinates before executing the circular cut.
+
+Details: `docs/workplane-resolver-mvp2.md`.
+
 ## Example model
 
 The repository contains a derived-workplane example:
@@ -146,6 +161,12 @@ That workplane is derived from:
 feature.base_extrude.top
 ```
 
+The current example uses an off-center hole point:
+
+```text
+(25, -10)
+```
+
 ## Headless execution
 
 The existing headless exporter can load and export the derived-workplane example:
@@ -153,8 +174,6 @@ The existing headless exporter can load and export the derived-workplane example
 ```bash
 ./build/dev-geometry/blcad_export_step examples/top_face_cut.blcad.json build/top_face_cut.step
 ```
-
-The geometry recompute currently uses the same centered through-cut adapter as the MVP-1 reference model. The important architectural proof is that the sketch is now attached to a semantic generated face reference in the core model.
 
 ## Test coverage
 
@@ -170,20 +189,21 @@ Core tests cover:
 
 Geometry tests cover:
 
+- resolving a derived top-face workplane
+- mapping local sketch points through the resolved workplane
 - full document recompute for a cut whose sketch is placed on a derived top-face workplane
-- final shape remains one solid
-- final volume is smaller than the base extrude volume
+- off-center cut volume after resolving the workplane
 
 ## Deliberate limitation
 
 Not included yet:
 
+- face-bound validation
 - arbitrary planar faces
 - side faces
 - bottom faces
 - edge or vertex references
 - persistent topological naming
-- derived workplane orientation resolution beyond the current simple extrusion convention
 - GUI selection of faces
 
-This is only the first seed for MVP 2. It proves the semantic-reference architecture before broader face support is added.
+This is only the first seed for MVP 2. It proves the semantic-reference architecture and the geometry-layer resolution path before broader face support is added.
