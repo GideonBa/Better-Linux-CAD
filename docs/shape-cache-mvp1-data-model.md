@@ -1,19 +1,21 @@
-# MVP 1 ShapeCache Data Model
+# ShapeCache Data Model
 
-Status: optional geometry data model, usable by additive recompute.
+Status: optional geometry data model for computed feature shapes, final shape tracking, and stale-shape removal during incremental recompute.
 
-This document describes the first small `ShapeCache` for MVP 1. The cache lives in the optional target `blcad_geometry` because it contains `GeometryShape`. This keeps the core free of OCCT headers and geometry linking.
+This document describes the small `ShapeCache` used by the optional `blcad_geometry` target. The cache contains computed `GeometryShape` values. It remains outside `PartDocument`, which stores model intent only.
 
 ## Goal
 
-The `ShapeCache` stores computed geometry as the result of the parametric model. It is not the source of truth. The source of truth remains the document, parameters, sketches, features, dependency graph, and recompute plan.
+The `ShapeCache` stores computed geometry as the result of the parametric model. It is not the source of truth. The source of truth remains the document, parameters, sketches, features, dependency graph, invalidation state, and recompute plan.
 
-The current cache supports the first additive recompute step:
+The current cache supports:
 
-- store computed feature shapes by `FeatureId`
-- mark one final shape and its source feature
-- clear cache contents
-- reject empty IDs and empty shapes
+- storing computed feature shapes by `FeatureId`
+- replacing an existing feature shape when the same `FeatureId` is stored again
+- removing a cached feature shape before dirty-feature recompute
+- marking one final shape and its source feature
+- clearing all cache contents
+- rejecting empty IDs and empty shapes
 
 ## CMake target
 
@@ -64,19 +66,43 @@ store_feature_shape(feature.base_extrude, geometry_shape)
 The final shape is connected to the feature that currently produced it:
 
 ```text
-set_final_shape(feature.base_extrude, geometry_shape)
+set_final_shape(feature.top_hole_cut, geometry_shape)
 ```
 
+Dirty-feature recompute can remove a stale shape before re-executing the feature:
+
+```text
+remove_feature_shape(feature.top_hole_cut)
+```
+
+If the removed feature is also the current final-shape source, the final-shape marker is cleared. This prevents stale final geometry from surviving a failed incremental recompute.
+
 `clear()` removes all feature shapes and the final shape.
+
+## Incremental recompute rule
+
+`GeometryRecomputeExecutor::execute_plan` removes any cached shape for a dirty feature immediately before executing that feature.
+
+This matters for validation failures:
+
+1. A previous full recompute creates `feature.top_hole_cut`.
+2. A parameter update makes the top-face hole invalid.
+3. The incremental plan reaches `feature.top_hole_cut`.
+4. The old cut shape is removed before recompute.
+5. Bounds validation fails.
+6. No stale cut shape remains in the cache.
+
+If an earlier dirty feature such as `feature.base_extrude` was recomputed successfully, its shape can remain as the final valid shape.
 
 ## Validation
 
 Current rules:
 
 - cache ID must not be empty
-- feature ID must not be empty
+- feature ID must not be empty for store, set-final, and remove operations
 - empty `GeometryShape` handles must not be stored
 - storing the same feature ID again replaces the existing shape instead of creating a duplicate entry
+- removing a missing feature ID succeeds with `false`
 
 ## Test coverage
 
@@ -88,25 +114,21 @@ Current tests check:
 - a stored rectangle-extrusion shape contains exactly one solid
 - repeated storage of the same feature ID does not create a duplicate entry
 - final shape and source feature are stored
+- feature shapes can be removed
+- removing the final source feature clears the final-shape marker
+- removing a missing feature returns `false`
 - `clear()` clears feature and final shapes
 - empty feature IDs and empty shapes are rejected
-- `GeometryRecomputeExecutor` can store an executed `AdditiveExtrude` in the cache
+- `GeometryRecomputeExecutor` removes stale dirty feature shapes before incremental recompute
 
 ## Deliberate limitation
 
 Not included yet:
 
 - integration into `PartDocument`
-- `SubtractiveExtrude` and Boolean cut
-- STEP export
-- GUI
+- persistent cache metadata
+- partial cache invalidation records
+- cache serialization
+- GUI cache visualization
 
-## Next useful step
-
-The next step should create the centered cut for `SubtractiveExtrude`:
-
-1. read the target shape from the `ShapeCache`
-2. resolve the circle profile and diameter parameter from `PartDocument`
-3. execute the OCCT Boolean cut
-4. store the result in the `ShapeCache` as the new final shape
-5. continue not to build a general solver or GUI
+The cache remains a computed result container, not part of the model-intent layer.
