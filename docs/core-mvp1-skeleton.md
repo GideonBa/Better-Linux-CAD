@@ -1,6 +1,6 @@
 # Core Skeleton and MVP-2 Seed
 
-Status: implemented core skeleton for MVP-1 data models, recompute planning, JSON model-intent serialization, `.blcad.json` file helpers, semantic top-face workplanes, and geometry-layer workplane resolution.
+Status: implemented core skeleton for MVP-1 data models, recompute planning, JSON model-intent serialization, `.blcad.json` file helpers, semantic top-face workplanes, geometry-layer workplane resolution, and bounded top-face validation.
 
 The core remains free of OCCT and Qt. Geometry is handled only in the optional `blcad_geometry` target. JSON serialization and `.blcad.json` file helpers stay in the core because they store model intent rather than computed shapes.
 
@@ -23,7 +23,7 @@ The skeleton makes the first architecture decisions executable:
 - `part_document_json` as schema-versioned JSON serialization for model intent
 - `.blcad.json` read/write helpers for file-level persistence
 - `ShapeCache` as an optional geometry data model for computed shapes
-- `WorkplaneResolver` as the first geometry-layer bridge from semantic workplane intent to a concrete frame
+- `WorkplaneResolver` as the first geometry-layer bridge from semantic workplane intent to a concrete frame and bounded face region
 
 ## CMake targets
 
@@ -116,6 +116,7 @@ Current test areas:
 - recompute from a JSON-restored document
 - recompute from a sketch on a derived top-face workplane
 - off-center cut evaluation through a resolved derived workplane
+- near-edge valid and out-of-bounds invalid top-face holes
 
 ## Core types
 
@@ -218,7 +219,15 @@ y_axis = (0, 1, 0)
 normal = (0, 0, 1)
 ```
 
-`GeometryRecomputeExecutor` uses that frame to map local circle-profile centers into global cut centers before executing `CircularCutAdapter`.
+The same resolved workplane carries rectangular local bounds:
+
+```text
+center = (0, 0)
+width = source rectangle width
+height = source rectangle height
+```
+
+`GeometryRecomputeExecutor` uses the frame to map local circle-profile centers into global cut centers and uses the bounds to reject circles that do not lie fully inside the top face.
 
 ## JSON serialization and file workflow
 
@@ -251,6 +260,7 @@ Details:
 - `docs/json-file-workflow-mvp1.md`
 - `docs/derived-workplane-mvp2-seed.md`
 - `docs/workplane-resolver-mvp2.md`
+- `docs/bounded-workplane-validation-mvp2.md`
 
 ## Optional geometry layer
 
@@ -265,6 +275,7 @@ Current geometry capabilities:
 - `GeometryRecomputeExecutor` executes `AdditiveExtrude` for a sketch with exactly one rectangle profile.
 - `GeometryRecomputeExecutor` executes `SubtractiveExtrude` for a sketch with exactly one circle profile if the target shape is already in the `ShapeCache`.
 - `execute_document` recomputes a complete `PartDocument` into a `ShapeCache` in topological order.
+- Bounded top-face validation rejects out-of-bounds circle profiles before OCCT cutting.
 - `StepExporter` writes the final shape as a STEP file.
 - `blcad_export_step` wires `.blcad.json` input to recompute and STEP export.
 
@@ -299,11 +310,11 @@ This skeleton still does not implement:
 - general sketch constraints
 - general constraint solver
 - semantic face references beyond the top face of a simple additive extrude
-- face-bound validation for profiles on derived workplanes
+- incremental recompute tests through derived-workplane dependency paths after source-dimension changes
 - ShapeCache serialization
 - command-line argument parsing beyond the minimal example
 
-This order is intentional. The core first needs safe data types, validation, dependency tracking, recompute planning, serialization, file workflow, a narrow geometry pipeline, semantic face references, and workplane resolution before larger CAD subsystems are added.
+This order is intentional. The core first needs safe data types, validation, dependency tracking, recompute planning, serialization, file workflow, a narrow geometry pipeline, semantic face references, workplane resolution, and bounded validation before larger CAD subsystems are added.
 
 ## Standard commands
 
