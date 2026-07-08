@@ -35,20 +35,25 @@ PartDocument make_feature_face_cut_document(SemanticFace face, DatumPlaneId work
   REQUIRE(xy);
   REQUIRE(document.value().add_datum_plane(xy.value()));
 
-  auto base_sketch = Sketch::create(SketchId("sketch.base"), "Sketch_BaseRectangle", DatumPlaneId("datum.xy"));
+  auto base_sketch = Sketch::create(SketchId("sketch.base"), "Sketch_BaseRectangle",
+                                    DatumPlaneId("datum.xy"));
   REQUIRE(base_sketch);
-  auto rectangle = RectangleProfile::create(ProfileId("profile.base_rectangle"), ParameterId("part.width"), ParameterId("part.height"));
+  auto rectangle = RectangleProfile::create(ProfileId("profile.base_rectangle"),
+                                            ParameterId("part.width"), ParameterId("part.height"));
   REQUIRE(rectangle);
   REQUIRE(base_sketch.value().add_profile(rectangle.value()));
   REQUIRE(document.value().add_sketch(base_sketch.value()));
 
-  auto base = Feature::create_additive_extrude(FeatureId("feature.base_extrude"), "BaseExtrude", SketchId("sketch.base"), ParameterId("part.thickness"));
+  auto base = Feature::create_additive_extrude(FeatureId("feature.base_extrude"), "BaseExtrude",
+                                               SketchId("sketch.base"),
+                                               ParameterId("part.thickness"));
   REQUIRE(base);
   REQUIRE(document.value().add_feature(base.value()));
 
   auto face_reference = SemanticFaceReference::create(FeatureId("feature.base_extrude"), face);
   REQUIRE(face_reference);
-  auto workplane = DerivedWorkplane::create_on_feature_face(workplane_id, workplane_name, face_reference.value());
+  auto workplane = DerivedWorkplane::create_on_feature_face(workplane_id, workplane_name,
+                                                            face_reference.value());
   REQUIRE(workplane);
   REQUIRE(document.value().add_derived_workplane(workplane.value()));
 
@@ -59,7 +64,8 @@ PartDocument make_feature_face_cut_document(SemanticFace face, DatumPlaneId work
   REQUIRE(hole_sketch.value().add_profile(circle.value()));
   REQUIRE(document.value().add_sketch(hole_sketch.value()));
 
-  auto cut = Feature::create_subtractive_extrude(cut_feature_id, cut_name, hole_sketch_id, FeatureId("feature.base_extrude"));
+  auto cut = Feature::create_subtractive_extrude(cut_feature_id, cut_name, hole_sketch_id,
+                                                 FeatureId("feature.base_extrude"));
   REQUIRE(cut);
   REQUIRE(document.value().add_feature(cut.value()));
 
@@ -85,6 +91,13 @@ PartDocument make_right_face_cut_document() {
                                         "BaseRightFace", SketchId("sketch.right_hole"),
                                         "Sketch_RightHole", ProfileId("profile.right_hole"),
                                         FeatureId("feature.right_hole_cut"), "RightHoleCut", 4.0);
+}
+
+PartDocument make_left_face_cut_document() {
+  return make_feature_face_cut_document(SemanticFace::Left, DatumPlaneId("workplane.base_left"),
+                                        "BaseLeftFace", SketchId("sketch.left_hole"),
+                                        "Sketch_LeftHole", ProfileId("profile.left_hole"),
+                                        FeatureId("feature.left_hole_cut"), "LeftHoleCut", 4.0);
 }
 
 void check_roundtrip(const PartDocument& document, DatumPlaneId workplane_id, SemanticFace face,
@@ -130,4 +143,9 @@ TEST_CASE("PartDocument JSON round-trips bottom derived workplanes", "[core][jso
 TEST_CASE("PartDocument JSON round-trips right derived workplanes", "[core][json][workplane]") {
   check_roundtrip(make_right_face_cut_document(), DatumPlaneId("workplane.base_right"),
                   SemanticFace::Right, "right", "sketch.right_hole", "feature.right_hole_cut");
+}
+
+TEST_CASE("PartDocument JSON round-trips left derived workplanes", "[core][json][workplane]") {
+  check_roundtrip(make_left_face_cut_document(), DatumPlaneId("workplane.base_left"),
+                  SemanticFace::Left, "left", "sketch.left_hole", "feature.left_hole_cut");
 }
