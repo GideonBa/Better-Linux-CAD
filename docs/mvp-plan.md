@@ -40,20 +40,23 @@ Implemented seed:
 - semantic reference for the top face of `feature.base_extrude`
 - semantic reference for the bottom face of `feature.base_extrude`
 - semantic reference for the right `+X` face of `feature.base_extrude`
+- semantic reference for the left `-X` face of `feature.base_extrude`
 - `DerivedWorkplane` from those semantic faces
 - sketches can reference derived workplanes
-- dependency graph includes paths such as `feature.base_extrude -> workplane.base_right -> sketch.right_hole`
-- JSON serialization supports `derived_workplanes` with `top`, `bottom`, and `right` faces
+- dependency graph includes paths such as `feature.base_extrude -> workplane.base_left -> sketch.left_hole`
+- JSON serialization supports `derived_workplanes` with `top`, `bottom`, `right`, and `left` faces
 - checked-in `examples/top_face_cut.blcad.json`
 - checked-in `examples/bottom_face_cut.blcad.json`
 - checked-in `examples/right_face_cut.blcad.json`
+- checked-in `examples/left_face_cut.blcad.json`
 - geometry-layer `WorkplaneResolver`
 - top-face frame resolved from source rectangle sketch and thickness parameter
 - bottom-face frame resolved from source rectangle sketch at `z = 0` with negative normal
 - right-face frame resolved at `x = width / 2` with normal `+X`
+- left-face frame resolved at `x = -width / 2` with normal `-X`
 - subtractive recompute evaluates circle centers through the resolved workplane
 - axis-directed through-all circular cuts
-- rectangular bounds on resolved top, bottom, and right workplanes
+- rectangular bounds on resolved top, bottom, right, and left workplanes
 - near-edge valid hole test and out-of-bounds invalid hole test
 - incremental recompute through derived-workplane dependencies
 - stale dirty feature shapes are removed before incremental recompute
@@ -61,14 +64,14 @@ Implemented seed:
 
 Next narrow step:
 
-- add `SemanticFace::Left` for the `-X` face
-- allow `DerivedWorkplane` to reference `feature.base_extrude.left`
-- resolve the left face with a clear frame and rectangular bounds
-- keep local side-face coordinates consistent with the right face
-- add JSON roundtrip coverage for the left-face workplane
-- add geometry recompute coverage for a through-all X-axis circular cut from the left face
-- keep support limited to top, bottom, right, and left faces of simple additive extrudes
-- do not add front/back faces yet
+- add `SemanticFace::Front` for the `+Y` face
+- allow `DerivedWorkplane` to reference `feature.base_extrude.front`
+- resolve the front face with a clear frame and rectangular bounds
+- define local front-face coordinates consistently, such as local width along X and local height along Z
+- add JSON roundtrip coverage for the front-face workplane
+- add geometry recompute coverage for a through-all Y-axis circular cut from the front face
+- keep support limited to top, bottom, right, left, and front faces of simple additive extrudes
+- do not add the back face yet
 - do not build a full topological naming system yet
 - do not build a GUI yet
 
