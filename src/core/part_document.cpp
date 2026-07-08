@@ -8,7 +8,7 @@ namespace blcad {
 namespace {
 
 Result<std::size_t> add_dependency_if_missing(DependencyGraph& graph, std::string dependency,
-                                              std::string dependent) {
+                                               std::string dependent) {
   if (graph.has_dependency(dependency, dependent)) {
     return Result<std::size_t>::success(graph.dependency_count());
   }
@@ -64,13 +64,59 @@ Result<std::size_t> PartDocument::add_parameter(Parameter parameter) {
 }
 
 Result<std::size_t> PartDocument::add_datum_plane(DatumPlane datum_plane) {
-  if (has_datum_plane_id(datum_plane.id())) {
+  if (has_workplane_id(datum_plane.id())) {
     return Result<std::size_t>::failure(Error::validation(
-        datum_plane.id().value(), "datum plane id must be unique within part document"));
+        datum_plane.id().value(), "workplane id must be unique within part document"));
   }
 
   datum_planes_.push_back(std::move(datum_plane));
   return Result<std::size_t>::success(datum_planes_.size() - 1);
+}
+
+Result<std::size_t> PartDocument::add_derived_workplane(DerivedWorkplane workplane) {
+  if (has_workplane_id(workplane.id())) {
+    return Result<std::size_t>::failure(Error::validation(
+        workplane.id().value(), "workplane id must be unique within part document"));
+  }
+
+  const Feature* source_feature = find_feature(workplane.face_reference().source_feature());
+  if (source_feature == nullptr) {
+    return Result<std::size_t>::failure(Error::validation(
+        workplane.id().value(), "derived workplane source feature must exist in part document"));
+  }
+
+  if (source_feature->type() != FeatureType::AdditiveExtrude) {
+    return Result<std::size_t>::failure(Error::validation(
+        workplane.id().value(), "derived workplane source feature must be an additive extrude"));
+  }
+
+  if (workplane.face_reference().face() != SemanticFace::Top) {
+    return Result<std::size_t>::failure(
+        Error::validation(workplane.id().value(), "only top semantic face is supported"));
+  }
+
+  auto graph = dependency_graph_;
+  const auto added_node = graph.add_node(workplane.id().value());
+  if (added_node.has_error()) {
+    return Result<std::size_t>::failure(added_node.error());
+  }
+
+  auto source_dependency = add_dependency_if_missing(
+      graph, workplane.face_reference().source_feature().value(), workplane.id().value());
+  if (source_dependency.has_error()) {
+    return Result<std::size_t>::failure(source_dependency.error());
+  }
+
+  auto invalidation_state = invalidation_state_;
+  const auto synced_state = invalidation_state.sync_from_graph(graph);
+  if (synced_state.has_error()) {
+    return Result<std::size_t>::failure(synced_state.error());
+  }
+
+  dependency_graph_ = std::move(graph);
+  invalidation_state_ = std::move(invalidation_state);
+  derived_workplanes_.push_back(std::move(workplane));
+  return Result<std::size_t>::success(derived_workplanes_.size() - 1);
 }
 
 Result<std::size_t> PartDocument::add_sketch(Sketch sketch) {
@@ -79,7 +125,7 @@ Result<std::size_t> PartDocument::add_sketch(Sketch sketch) {
         Error::validation(sketch.id().value(), "sketch id must be unique within part document"));
   }
 
-  if (!has_datum_plane_id(sketch.workplane())) {
+  if (!has_workplane_id(sketch.workplane())) {
     return Result<std::size_t>::failure(
         Error::validation(sketch.id().value(), "sketch workplane must exist in part document"));
   }
@@ -107,6 +153,14 @@ Result<std::size_t> PartDocument::add_sketch(Sketch sketch) {
   const auto added_node = graph.add_node(sketch.id().value());
   if (added_node.has_error()) {
     return Result<std::size_t>::failure(added_node.error());
+  }
+
+  if (has_derived_workplane_id(sketch.workplane())) {
+    auto workplane_dependency =
+        add_dependency_if_missing(graph, sketch.workplane().value(), sketch.id().value());
+    if (workplane_dependency.has_error()) {
+      return Result<std::size_t>::failure(workplane_dependency.error());
+    }
   }
 
   for (const auto& profile : sketch.rectangle_profiles()) {
@@ -160,8 +214,7 @@ Result<std::size_t> PartDocument::add_feature(Feature feature) {
         feature.id().value(), "additive extrude length parameter must exist in part document"));
   }
 
-  if (feature.type() == FeatureType::SubtractiveExtrude &&
-      !has_feature_id(feature.target_feature())) {
+  if (feature.type() == FeatureType::SubtractiveExtrude && !has_feature_id(feature.target_feature())) {
     return Result<std::size_t>::failure(Error::validation(
         feature.id().value(), "subtractive extrude target feature must exist in part document"));
   }
@@ -271,6 +324,10 @@ const std::vector<DatumPlane>& PartDocument::datum_planes() const noexcept {
   return datum_planes_;
 }
 
+const std::vector<DerivedWorkplane>& PartDocument::derived_workplanes() const noexcept {
+  return derived_workplanes_;
+}
+
 const std::vector<Sketch>& PartDocument::sketches() const noexcept {
   return sketches_;
 }
@@ -293,6 +350,10 @@ std::size_t PartDocument::parameter_count() const noexcept {
 
 std::size_t PartDocument::datum_plane_count() const noexcept {
   return datum_planes_.size();
+}
+
+std::size_t PartDocument::derived_workplane_count() const noexcept {
+  return derived_workplanes_.size();
 }
 
 std::size_t PartDocument::sketch_count() const noexcept {
@@ -333,6 +394,16 @@ const DatumPlane* PartDocument::find_datum_plane(DatumPlaneId id) const noexcept
   return nullptr;
 }
 
+const DerivedWorkplane* PartDocument::find_derived_workplane(DatumPlaneId id) const noexcept {
+  for (const auto& workplane : derived_workplanes_) {
+    if (workplane.id() == id) {
+      return &workplane;
+    }
+  }
+
+  return nullptr;
+}
+
 const Sketch* PartDocument::find_sketch(SketchId id) const noexcept {
   for (const auto& sketch : sketches_) {
     if (sketch.id() == id) {
@@ -353,6 +424,10 @@ const Feature* PartDocument::find_feature(FeatureId id) const noexcept {
   return nullptr;
 }
 
+bool PartDocument::has_workplane_id(const DatumPlaneId& id) const noexcept {
+  return has_datum_plane_id(id) || has_derived_workplane_id(id);
+}
+
 PartDocument::PartDocument(DocumentId id, std::string name)
     : id_(std::move(id)), name_(std::move(name)) {}
 
@@ -366,6 +441,10 @@ bool PartDocument::has_parameter_name(std::string_view name) const noexcept {
 
 bool PartDocument::has_datum_plane_id(const DatumPlaneId& id) const noexcept {
   return find_datum_plane(id) != nullptr;
+}
+
+bool PartDocument::has_derived_workplane_id(const DatumPlaneId& id) const noexcept {
+  return find_derived_workplane(id) != nullptr;
 }
 
 bool PartDocument::has_sketch_id(const SketchId& id) const noexcept {
