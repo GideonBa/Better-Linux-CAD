@@ -66,13 +66,13 @@ The MVP-1 code implements the first narrow vertical slice:
 
 The MVP-2 seed introduces semantic generated-face references and resolves them in the geometry layer:
 
-- `SemanticFaceReference` can reference `feature.base_extrude.top`, `feature.base_extrude.bottom`, `feature.base_extrude.right`, and `feature.base_extrude.left`.
+- `SemanticFaceReference` can reference `feature.base_extrude.top`, `feature.base_extrude.bottom`, `feature.base_extrude.right`, `feature.base_extrude.left`, and `feature.base_extrude.front`.
 - `DerivedWorkplane` can expose those semantic faces as sketch workplanes.
 - `Sketch` can reference either a standard datum plane or a derived workplane.
 - The dependency graph connects source feature, derived workplane, sketch, and dependent cut feature.
-- JSON serialization supports `derived_workplanes` with `top`, `bottom`, `right`, and `left` faces.
-- `WorkplaneResolver` resolves `datum.xy`, `feature.base_extrude.top`, `feature.base_extrude.bottom`, `feature.base_extrude.right`, and `feature.base_extrude.left` into concrete workplane frames.
-- `ResolvedWorkplane` carries rectangular bounds for the derived top, bottom, right, and left faces.
+- JSON serialization supports `derived_workplanes` with `top`, `bottom`, `right`, `left`, and `front` faces.
+- `WorkplaneResolver` resolves `datum.xy`, `feature.base_extrude.top`, `feature.base_extrude.bottom`, `feature.base_extrude.right`, `feature.base_extrude.left`, and `feature.base_extrude.front` into concrete workplane frames.
+- `ResolvedWorkplane` carries rectangular bounds for the derived top, bottom, right, left, and front faces.
 - Subtractive recompute maps circle-profile centers through the resolved workplane before executing the cut.
 - The circular cut adapter supports axis-directed through-all cuts for the current principal-axis face cases.
 - The geometry layer rejects circle profiles that exceed resolved workplane bounds.
@@ -82,6 +82,7 @@ The MVP-2 seed introduces semantic generated-face references and resolves them i
 - `examples/bottom_face_cut.blcad.json` demonstrates an off-center cut on the derived bottom-face workplane.
 - `examples/right_face_cut.blcad.json` demonstrates a side cut on the derived right-face workplane.
 - `examples/left_face_cut.blcad.json` demonstrates a side cut on the derived left-face workplane.
+- `examples/front_face_cut.blcad.json` demonstrates a side cut on the derived front-face workplane.
 
 This is still intentionally not a full topological-naming system. No raw OCCT face IDs are stored in `PartDocument`.
 
@@ -92,12 +93,12 @@ This is still intentionally not a full topological-naming system. No raw OCCT fa
 - Recompute runs through a dependency graph.
 - Sketches on generated faces require stable semantic references.
 - OCCT shapes are a cache, not the primary model.
-- The OCCT path lives in an optional `blcad_geometry` target: adapters for rectangle extrusion and circular cut, a small ShapeCache, a WorkplaneResolver, recompute execution for `AdditiveExtrude` and `SubtractiveExtrude`, full document recompute, incremental recompute, bounds validation for the current top/bottom/right/left face cases, and STEP export of the final shape.
+- The OCCT path lives in an optional `blcad_geometry` target: adapters for rectangle extrusion and circular cut, a small ShapeCache, a WorkplaneResolver, recompute execution for `AdditiveExtrude` and `SubtractiveExtrude`, full document recompute, incremental recompute, bounds validation for the current top/bottom/right/left/front face cases, and STEP export of the final shape.
 - The ShapeCache remains in the geometry layer; `PartDocument` remains OCCT-free and is computed into the cache through `execute_document` and `execute_plan`.
 - JSON serialization stores model intent only; it does not serialize OCCT shapes or ShapeCache contents.
 - Parameter values can be changed through `PartDocument::set_parameter_value`; a change marks dependents and drives incremental recompute.
 - Derived workplanes are resolved geometrically without turning raw OCCT faces into core model references.
-- The next step should add one Y-side semantic workplane before broad generated-face support.
+- The next step should add the matching back semantic workplane before arbitrary planar faces or broad generated-face support.
 - Assembly parameters must later flow into parts in a controlled way.
 - Fillets and chamfers are their own parametric features with semantic edge references, not only late BRep corrections.
 - The assembly system will describe spatial relationships through constraints: a constraint graph and solver determine component positions and remaining degrees of freedom; joints later allow controlled motion.
