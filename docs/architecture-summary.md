@@ -4,7 +4,7 @@ Source: condensed from the current repository architecture documents.
 
 ## Goal
 
-BLCAD is intended to become an independent parametric CAD system for Linux. The model does not only store final BRep geometry, but the underlying design intent: parameters, sketches, features, dependencies, semantic references, and later assembly relationships.
+BLCAD is intended to become an independent parametric CAD system for Linux. The model does not only store final BRep geometry, but the underlying design intent: parameters, sketches, features, dependencies, semantic references, and later assembly relationships. The explicit long-term goal is also recorded in `docs/project-goal.md`.
 
 ## Fundamental decision
 
@@ -66,19 +66,21 @@ The MVP-1 code implements the first narrow vertical slice:
 
 The MVP-2 seed introduces semantic generated-face references and resolves them in the geometry layer:
 
-- `SemanticFaceReference` can reference `feature.base_extrude.top` and `feature.base_extrude.bottom`.
+- `SemanticFaceReference` can reference `feature.base_extrude.top`, `feature.base_extrude.bottom`, and `feature.base_extrude.right`.
 - `DerivedWorkplane` can expose those semantic faces as sketch workplanes.
 - `Sketch` can reference either a standard datum plane or a derived workplane.
 - The dependency graph connects source feature, derived workplane, sketch, and dependent cut feature.
-- JSON serialization supports `derived_workplanes` with `top` and `bottom` faces.
-- `WorkplaneResolver` resolves `datum.xy`, `feature.base_extrude.top`, and `feature.base_extrude.bottom` into concrete workplane frames.
-- `ResolvedWorkplane` carries rectangular bounds for the derived top and bottom faces.
+- JSON serialization supports `derived_workplanes` with `top`, `bottom`, and `right` faces.
+- `WorkplaneResolver` resolves `datum.xy`, `feature.base_extrude.top`, `feature.base_extrude.bottom`, and `feature.base_extrude.right` into concrete workplane frames.
+- `ResolvedWorkplane` carries rectangular bounds for the derived top, bottom, and right faces.
 - Subtractive recompute maps circle-profile centers through the resolved workplane before executing the cut.
+- The circular cut adapter supports axis-directed through-all cuts for the current principal-axis face cases.
 - The geometry layer rejects circle profiles that exceed resolved workplane bounds.
 - Incremental recompute follows the derived-workplane dependency path after source-dimension changes.
 - `ShapeCache` removes stale dirty feature shapes before incremental recompute, so failed recompute does not leave old cut geometry behind.
 - `examples/top_face_cut.blcad.json` demonstrates an off-center cut on the derived top-face workplane.
 - `examples/bottom_face_cut.blcad.json` demonstrates an off-center cut on the derived bottom-face workplane.
+- `examples/right_face_cut.blcad.json` demonstrates a side cut on the derived right-face workplane.
 
 This is still intentionally not a full topological-naming system. No raw OCCT face IDs are stored in `PartDocument`.
 
@@ -89,12 +91,12 @@ This is still intentionally not a full topological-naming system. No raw OCCT fa
 - Recompute runs through a dependency graph.
 - Sketches on generated faces require stable semantic references.
 - OCCT shapes are a cache, not the primary model.
-- The OCCT path lives in an optional `blcad_geometry` target: adapters for rectangle extrusion and circular cut, a small ShapeCache, a WorkplaneResolver, recompute execution for `AdditiveExtrude` and `SubtractiveExtrude`, full document recompute, incremental recompute, bounds validation for the current top/bottom face cases, and STEP export of the final shape.
+- The OCCT path lives in an optional `blcad_geometry` target: adapters for rectangle extrusion and circular cut, a small ShapeCache, a WorkplaneResolver, recompute execution for `AdditiveExtrude` and `SubtractiveExtrude`, full document recompute, incremental recompute, bounds validation for the current top/bottom/right face cases, and STEP export of the final shape.
 - The ShapeCache remains in the geometry layer; `PartDocument` remains OCCT-free and is computed into the cache through `execute_document` and `execute_plan`.
 - JSON serialization stores model intent only; it does not serialize OCCT shapes or ShapeCache contents.
 - Parameter values can be changed through `PartDocument::set_parameter_value`; a change marks dependents and drives incremental recompute.
 - Derived workplanes are resolved geometrically without turning raw OCCT faces into core model references.
-- The next step should add exactly one side-face semantic workplane before all side faces or broader generated-face support.
+- The next step should add the matching left side-face semantic workplane before front/back faces or broader generated-face support.
 - Assembly parameters must later flow into parts in a controlled way.
 - Fillets and chamfers are their own parametric features with semantic edge references, not only late BRep corrections.
 - The assembly system will describe spatial relationships through constraints: a constraint graph and solver determine component positions and remaining degrees of freedom; joints later allow controlled motion.
