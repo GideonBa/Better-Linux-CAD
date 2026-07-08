@@ -56,6 +56,7 @@ The optional `blcad_geometry` target contains OCCT adapters for rectangle extrus
 - `docs/right-workplane-mvp2.md`: right-face derived workplane for simple additive extrudes
 - `docs/left-workplane-mvp2.md`: left-face derived workplane for simple additive extrudes
 - `docs/front-workplane-mvp2.md`: front-face derived workplane for simple additive extrudes
+- `docs/general-closed-sketch-profile-mvp.md`: future block for arbitrary closed sketch profiles from line chains, arcs, splines, wires, and general OCCT faces
 - `docs/mvp-plan.md`: MVP sequence
 - `docs/mvp-1-specification.md`: detailed MVP-1 specification
 - `docs/decisions/`: architecture decision records
@@ -67,6 +68,8 @@ The current core skeleton covers `Quantity`, typed IDs, `Error`, `Result`, `Para
 MVP 2 has started with a minimal semantic-face path. `SemanticFaceReference` can point to `feature.base_extrude.top`, `feature.base_extrude.bottom`, `feature.base_extrude.right`, `feature.base_extrude.left`, and `feature.base_extrude.front`. `DerivedWorkplane` can expose those semantic faces as sketch workplanes, and a sketch can use a derived workplane as its workplane reference. The dependency graph represents this as `feature.base_extrude -> workplane -> sketch -> cut_feature`.
 
 The optional geometry build resolves sketch workplanes before executing subtractive cuts. `WorkplaneResolver` can resolve `datum.xy`, `feature.base_extrude.top`, `feature.base_extrude.bottom`, `feature.base_extrude.right`, `feature.base_extrude.left`, and `feature.base_extrude.front`. Top and bottom cuts are vertical through-all cuts. Right and left face cuts are X-axis through-all cuts. Front-face cuts are Y-axis through-all cuts. All currently supported generated-face workplanes carry rectangular bounds derived from the source rectangle sketch and extrude thickness.
+
+General closed sketch profiles are explicitly not implemented yet. The current sketch model does not support free line chains, polylines, arcs, splines, connected sketch entities, general closed loops, closed wires, multiple contours, inner holes in the same sketch profile, profile-region selection, or generic additive/subtractive extrusion from arbitrary `TopoDS_Wire` / `TopoDS_Face`. This future block is tracked in `docs/general-closed-sketch-profile-mvp.md`.
 
 Incremental recompute follows derived-workplane dependency paths. Updating `part.width`, `part.height`, or `part.thickness` can mark the base feature, derived workplane, dependent sketch, and cut feature as affected. `GeometryRecomputeExecutor::execute_plan` skips non-feature nodes while preserving their dependency-ordering role, removes stale cached feature shapes before recomputing dirty features, and can surface bounded-workplane validation errors after source-dimension changes.
 
@@ -117,5 +120,7 @@ The next technical step should add the final opposite Y-side semantic reference,
 8. Do not build arbitrary planar face support yet.
 9. Do not build a full topological naming system yet.
 10. Do not build a GUI yet.
+
+After the controlled semantic-face sequence is complete, the next larger sketch-modeling block should be `General closed sketch profiles`, documented in `docs/general-closed-sketch-profile-mvp.md`.
 
 The detailed MVP-1 specification is in `docs/mvp-1-specification.md`.
