@@ -78,6 +78,42 @@ Next narrow step:
 - do not build a full topological naming system yet
 - do not build a GUI yet
 
+## Future MVP: General closed sketch profiles
+
+Goal: support arbitrary closed sketch profiles instead of only rectangle and circle profile primitives.
+
+Detailed document: `docs/general-closed-sketch-profile-mvp.md`
+
+Explicitly not implemented yet:
+
+- free line chains
+- polylines
+- arcs
+- splines
+- connected sketch entities
+- general closed sketch loops
+- closed wires
+- multiple contours in one sketch
+- inner holes in the same sketch profile
+- profile selection from several closed regions
+- validation of closed loops and self-intersections
+- general OCCT face creation from arbitrary sketch wires
+- additive extrude from arbitrary `TopoDS_Wire` / `TopoDS_Face`
+- subtractive extrude from arbitrary `TopoDS_Wire` / `TopoDS_Face`
+
+Proposed first implementation sequence:
+
+- add `LineSegment`
+- add `SketchLoop` / `ClosedProfile`
+- validate closed and connected loops
+- reject self-intersections initially
+- create an OCCT `TopoDS_Wire` and `TopoDS_Face` in the geometry layer
+- support additive extrude for one closed profile
+- support subtractive through-all extrude for one closed profile
+- add JSON roundtrip and geometry tests for non-rectangular profiles
+
+This block should come after the controlled semantic-face workplane sequence, because arbitrary profiles still need reliable workplane placement, bounds handling, JSON persistence, recompute ordering, and STEP export.
+
 ## MVP 3: Parametric bolt circle
 
 Goal: first meaningful parametric feature test.
