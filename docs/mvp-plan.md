@@ -1,62 +1,58 @@
-# MVP-Plan
+# MVP Plan
 
-Quelle: `zielarchitektur-parametrisches-cad-system.tex`.
+Source: `zielarchitektur-parametrisches-cad-system.tex`.
 
-## MVP 1: Einzelteilmodellierung
+## MVP 1: Single-part modeling
 
-Ziel: ein einzelnes parametrisches Bauteil.
+Goal: one single parametric part.
 
-Detaildokument: `docs/mvp-1-specification.md`
+Detailed document: `docs/mvp-1-specification.md`
 
-- Part-Dokument
-- Parameter mit Einheiten
-- einfache 2D-Skizze auf Standardebene
-- Rechteck, Kreis, Linie
-- einfache Masse
-- Extrude
-- Cut
-- STEP-Export
+- part document
+- parameters with units
+- simple 2D sketch on a standard plane
+- rectangle, circle, line
+- simple dimensions
+- extrude
+- cut
+- STEP export
 
-Beispiel: rechteckige Platte mit Breite, Hoehe, Dicke und zentraler Bohrung.
+Example: rectangular plate with width, height, thickness, and a centered hole.
 
-Aktueller Stand: Der Core besitzt die noetigen Datenmodelle bis zum
-Recompute-Plan. Ein optionales `blcad_geometry`-Target erzeugt bereits eine
-zentrierte Rechteckextrusion als OCCT-Solid und besitzt einen kleinen
-`ShapeCache`. `AdditiveExtrude` kann fuer ein einzelnes Rechteckprofil bereits
-aus einem Recompute-Plan ausgefuehrt werden; Cut und STEP-Export fehlen noch.
+Current state: the core contains the required data models up to the recompute plan. An optional `blcad_geometry` target already creates a centered rectangle extrusion as an OCCT solid and provides a small `ShapeCache`. `AdditiveExtrude` can already be executed for one rectangle profile from a recompute plan. Centered cut, full document recompute, STEP export, and numeric parameter updates are also implemented in the optional geometry path.
 
-## MVP 2: Sketch auf planarer Flaeche
+## MVP 2: Sketch on planar face
 
-Ziel: Skizzen auf vorhandenen planaren Flaechen platzieren.
+Goal: place sketches on existing planar faces.
 
-- Flaeche auswaehlen
-- Workplane aus Flaeche erzeugen
-- Sketch auf Workplane starten
-- Cut durch vorhandenen Koerper
+- select face
+- create workplane from face
+- start sketch on workplane
+- cut through existing body
 
-## MVP 3: Parametrischer Lochkreis
+## MVP 3: Parametric bolt circle
 
-Ziel: erster aussagekraeftiger parametrischer Feature-Test.
+Goal: first meaningful parametric feature test.
 
-- Lochkreisradius als Parameter
-- Lochanzahl als Parameter
-- Bohrungsdurchmesser als Parameter
-- automatisches Recompute bei Aenderung
+- bolt circle radius as parameter
+- hole count as parameter
+- hole diameter as parameter
+- automatic recompute on change
 
-## MVP 4: Einfache Assembly-Parameter
+## MVP 4: Simple assembly parameters
 
-Ziel: bauteiluebergreifende Parametrik.
+Goal: cross-part parametrization.
 
-- Assembly-Dokument
-- zwei Part-Dokumente in einer Assembly
-- gemeinsamer Assembly-Parameter
-- beide Parts verwenden denselben Lochkreisparameter
+- assembly document
+- two part documents in one assembly
+- shared assembly parameter
+- both parts use the same bolt-circle parameter
 
-## MVP 5: Einfache Assembly Constraints
+## MVP 5: Simple assembly constraints
 
-Ziel: Bauteile ueber Constraints platzieren.
+Goal: place parts through constraints.
 
-- Component Instances
-- Achse-auf-Achse
-- Flaeche-auf-Flaeche
-- einfache Schraubenplatzierung
+- component instances
+- axis-to-axis
+- face-to-face
+- simple screw placement
