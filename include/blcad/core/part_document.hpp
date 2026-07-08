@@ -24,6 +24,7 @@ public:
 
   [[nodiscard]] Result<std::size_t> add_parameter(Parameter parameter);
   [[nodiscard]] Result<std::size_t> add_datum_plane(DatumPlane datum_plane);
+  [[nodiscard]] Result<std::size_t> add_derived_workplane(DerivedWorkplane workplane);
   [[nodiscard]] Result<std::size_t> add_sketch(Sketch sketch);
   [[nodiscard]] Result<std::size_t> add_feature(Feature feature);
   [[nodiscard]] Result<std::vector<std::string>> mark_parameter_changed(ParameterId id);
@@ -38,20 +39,24 @@ public:
   [[nodiscard]] const std::string& name() const noexcept;
   [[nodiscard]] const std::vector<Parameter>& parameters() const noexcept;
   [[nodiscard]] const std::vector<DatumPlane>& datum_planes() const noexcept;
+  [[nodiscard]] const std::vector<DerivedWorkplane>& derived_workplanes() const noexcept;
   [[nodiscard]] const std::vector<Sketch>& sketches() const noexcept;
   [[nodiscard]] const std::vector<Feature>& features() const noexcept;
   [[nodiscard]] const DependencyGraph& dependency_graph() const noexcept;
   [[nodiscard]] const InvalidationState& invalidation_state() const noexcept;
   [[nodiscard]] std::size_t parameter_count() const noexcept;
   [[nodiscard]] std::size_t datum_plane_count() const noexcept;
+  [[nodiscard]] std::size_t derived_workplane_count() const noexcept;
   [[nodiscard]] std::size_t sketch_count() const noexcept;
   [[nodiscard]] std::size_t feature_count() const noexcept;
 
   [[nodiscard]] const Parameter* find_parameter(ParameterId id) const noexcept;
   [[nodiscard]] const Parameter* find_parameter(std::string_view name) const noexcept;
   [[nodiscard]] const DatumPlane* find_datum_plane(DatumPlaneId id) const noexcept;
+  [[nodiscard]] const DerivedWorkplane* find_derived_workplane(DatumPlaneId id) const noexcept;
   [[nodiscard]] const Sketch* find_sketch(SketchId id) const noexcept;
   [[nodiscard]] const Feature* find_feature(FeatureId id) const noexcept;
+  [[nodiscard]] bool has_workplane_id(const DatumPlaneId& id) const noexcept;
 
 private:
   PartDocument(DocumentId id, std::string name);
@@ -59,6 +64,7 @@ private:
   [[nodiscard]] bool has_parameter_id(const ParameterId& id) const noexcept;
   [[nodiscard]] bool has_parameter_name(std::string_view name) const noexcept;
   [[nodiscard]] bool has_datum_plane_id(const DatumPlaneId& id) const noexcept;
+  [[nodiscard]] bool has_derived_workplane_id(const DatumPlaneId& id) const noexcept;
   [[nodiscard]] bool has_sketch_id(const SketchId& id) const noexcept;
   [[nodiscard]] bool has_feature_id(const FeatureId& id) const noexcept;
 
@@ -66,6 +72,7 @@ private:
   std::string name_;
   std::vector<Parameter> parameters_;
   std::vector<DatumPlane> datum_planes_;
+  std::vector<DerivedWorkplane> derived_workplanes_;
   std::vector<Sketch> sketches_;
   std::vector<Feature> features_;
   DependencyGraph dependency_graph_;
