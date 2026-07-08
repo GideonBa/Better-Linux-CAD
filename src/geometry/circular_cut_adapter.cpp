@@ -12,6 +12,7 @@
 #include <gp_Dir.hxx>
 #include <gp_Pnt.hxx>
 
+#include <cmath>
 #include <exception>
 #include <memory>
 #include <string>
@@ -25,6 +26,7 @@ constexpr const char* kCircularCutId = "geometry.circular_cut";
 // Ueberstand der Schneidgeometrie ueber die Zielgrenzen hinaus. Er stellt einen
 // sauberen `through_all`-Cut sicher, auch bei Rundungsfehlern an den Deckflaechen.
 constexpr double kThroughAllMargin = 1.0;
+constexpr double kAxisTolerance = 1.0e-9;
 
 [[nodiscard]] Error make_geometry_error(std::string message) {
   return Error::geometry(kCircularCutId, std::move(message));
@@ -39,11 +41,58 @@ constexpr double kThroughAllMargin = 1.0;
   return message;
 }
 
+struct CutAxisPlacement {
+  gp_Ax2 axis;
+  double height = 0.0;
+};
+
+[[nodiscard]] Result<CutAxisPlacement> make_cut_axis(Point3 center, Vector3 direction,
+                                                     double x_min, double y_min, double z_min,
+                                                     double x_max, double y_max, double z_max) {
+  const double abs_x = std::abs(direction.x);
+  const double abs_y = std::abs(direction.y);
+  const double abs_z = std::abs(direction.z);
+
+  if (abs_x > 1.0 - kAxisTolerance && abs_y < kAxisTolerance && abs_z < kAxisTolerance) {
+    const double sign = direction.x >= 0.0 ? 1.0 : -1.0;
+    const double base_x = sign > 0.0 ? x_min - kThroughAllMargin : x_max + kThroughAllMargin;
+    return Result<CutAxisPlacement>::success(CutAxisPlacement{
+        gp_Ax2(gp_Pnt(base_x, center.y, center.z), gp_Dir(sign, 0.0, 0.0)),
+        (x_max - x_min) + 2.0 * kThroughAllMargin});
+  }
+
+  if (abs_y > 1.0 - kAxisTolerance && abs_x < kAxisTolerance && abs_z < kAxisTolerance) {
+    const double sign = direction.y >= 0.0 ? 1.0 : -1.0;
+    const double base_y = sign > 0.0 ? y_min - kThroughAllMargin : y_max + kThroughAllMargin;
+    return Result<CutAxisPlacement>::success(CutAxisPlacement{
+        gp_Ax2(gp_Pnt(center.x, base_y, center.z), gp_Dir(0.0, sign, 0.0)),
+        (y_max - y_min) + 2.0 * kThroughAllMargin});
+  }
+
+  if (abs_z > 1.0 - kAxisTolerance && abs_x < kAxisTolerance && abs_y < kAxisTolerance) {
+    const double sign = direction.z >= 0.0 ? 1.0 : -1.0;
+    const double base_z = sign > 0.0 ? z_min - kThroughAllMargin : z_max + kThroughAllMargin;
+    return Result<CutAxisPlacement>::success(CutAxisPlacement{
+        gp_Ax2(gp_Pnt(center.x, center.y, base_z), gp_Dir(0.0, 0.0, sign)),
+        (z_max - z_min) + 2.0 * kThroughAllMargin});
+  }
+
+  return Result<CutAxisPlacement>::failure(
+      make_geometry_error("circular cut axis must be one of the principal axes"));
+}
+
 } // namespace
 
 Result<GeometryShape> CircularCutAdapter::cut_circular_hole(const GeometryShape& target,
                                                             const Quantity& diameter,
                                                             Point2 center) const {
+  return cut_circular_hole_along_axis(target, diameter, Point3{center.x, center.y, 0.0},
+                                      Vector3{0.0, 0.0, 1.0});
+}
+
+Result<GeometryShape> CircularCutAdapter::cut_circular_hole_along_axis(
+    const GeometryShape& target, const Quantity& diameter, Point3 center,
+    Vector3 axis_direction) const {
   if (target.empty()) {
     return Result<GeometryShape>::failure(
         make_geometry_error("circular cut requires a non-empty target shape"));
@@ -73,13 +122,15 @@ Result<GeometryShape> CircularCutAdapter::cut_circular_hole(const GeometryShape&
     double z_max = 0.0;
     bounds.Get(x_min, y_min, z_min, x_max, y_max, z_max);
 
-    const double base_z = z_min - kThroughAllMargin;
-    const double height = (z_max - z_min) + 2.0 * kThroughAllMargin;
+    const auto cut_axis = make_cut_axis(center, axis_direction, x_min, y_min, z_min, x_max, y_max,
+                                        z_max);
+    if (cut_axis.has_error()) {
+      return Result<GeometryShape>::failure(cut_axis.error());
+    }
+
     const double radius = diameter_mm / 2.0;
-
-    const gp_Ax2 axis(gp_Pnt(center.x, center.y, base_z), gp_Dir(0.0, 0.0, 1.0));
-
-    BRepPrimAPI_MakeCylinder cylinder_builder(axis, radius, height);
+    BRepPrimAPI_MakeCylinder cylinder_builder(cut_axis.value().axis, radius,
+                                              cut_axis.value().height);
     cylinder_builder.Build();
     if (!cylinder_builder.IsDone()) {
       return Result<GeometryShape>::failure(make_geometry_error("could not build cut cylinder"));
