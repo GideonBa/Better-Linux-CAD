@@ -76,6 +76,7 @@ TEST_CASE("WorkplaneResolver resolves standard datum planes", "[geometry][workpl
   CHECK(resolved.value().origin.y == Catch::Approx(0.0));
   CHECK(resolved.value().origin.z == Catch::Approx(0.0));
   CHECK(resolved.value().normal.z == Catch::Approx(1.0));
+  CHECK_FALSE(resolved.value().bounds.enabled);
 }
 
 TEST_CASE("WorkplaneResolver resolves additive-extrude top-face workplanes",
@@ -93,6 +94,11 @@ TEST_CASE("WorkplaneResolver resolves additive-extrude top-face workplanes",
   CHECK(resolved.value().x_axis.x == Catch::Approx(1.0));
   CHECK(resolved.value().y_axis.y == Catch::Approx(1.0));
   CHECK(resolved.value().normal.z == Catch::Approx(1.0));
+  REQUIRE(resolved.value().bounds.enabled);
+  CHECK(resolved.value().bounds.center.x == Catch::Approx(0.0));
+  CHECK(resolved.value().bounds.center.y == Catch::Approx(0.0));
+  CHECK(resolved.value().bounds.width_mm == Catch::Approx(120.0));
+  CHECK(resolved.value().bounds.height_mm == Catch::Approx(80.0));
 }
 
 TEST_CASE("WorkplaneResolver maps local sketch points through the resolved frame",
