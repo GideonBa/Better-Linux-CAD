@@ -6,12 +6,20 @@
 
 namespace blcad::geometry {
 
+struct RectangularWorkplaneBounds {
+  bool enabled = false;
+  Point2 center;
+  double width_mm = 0.0;
+  double height_mm = 0.0;
+};
+
 struct ResolvedWorkplane {
   DatumPlaneId id;
   Point3 origin;
   Vector3 x_axis;
   Vector3 y_axis;
   Vector3 normal;
+  RectangularWorkplaneBounds bounds;
 };
 
 class WorkplaneResolver {
