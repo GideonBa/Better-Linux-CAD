@@ -54,6 +54,31 @@ Result<std::size_t> ShapeCache::set_final_shape(FeatureId source_feature_id, Geo
   return store_feature_shape(std::move(source_feature_id), std::move(shape));
 }
 
+Result<bool> ShapeCache::remove_feature_shape(FeatureId feature_id) {
+  if (feature_id.empty()) {
+    return Result<bool>::failure(Error::validation(kShapeCacheObjectId, "feature id must not be empty"));
+  }
+
+  const auto existing = std::find_if(feature_shapes_.begin(), feature_shapes_.end(),
+                                     [&feature_id](const CachedFeatureShape& cached_shape) {
+                                       return cached_shape.feature_id == feature_id;
+                                     });
+
+  if (existing == feature_shapes_.end()) {
+    return Result<bool>::success(false);
+  }
+
+  feature_shapes_.erase(existing);
+
+  if (has_final_shape_ && final_feature_id_ == feature_id) {
+    has_final_shape_ = false;
+    final_feature_id_ = FeatureId();
+    final_shape_ = GeometryShape();
+  }
+
+  return Result<bool>::success(true);
+}
+
 void ShapeCache::clear() noexcept {
   feature_shapes_.clear();
   has_final_shape_ = false;
