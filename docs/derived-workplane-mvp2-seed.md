@@ -1,6 +1,6 @@
 # MVP 2 Seed: Derived Workplanes on Generated Planar Faces
 
-Status: semantic top, bottom, right, and left derived workplanes for sketches on generated planar faces, with geometry-layer resolution and bounded validation documented separately.
+Status: semantic top, bottom, right, left, and front derived workplanes for sketches on generated planar faces, with geometry-layer resolution and bounded validation documented separately.
 
 This document describes the first carefully limited path toward MVP 2. The implementation allows a sketch to reference a workplane derived from a generated planar face without storing raw OCCT face IDs in the core document.
 
@@ -16,10 +16,10 @@ feature.base_extrude.top
 ```
 
 ```text
-feature.base_extrude.left
-  -> workplane.base_left
-  -> sketch.left_hole
-  -> feature.left_hole_cut
+feature.base_extrude.front
+  -> workplane.base_front
+  -> sketch.front_hole
+  -> feature.front_hole_cut
 ```
 
 The paths are intentionally narrow:
@@ -40,6 +40,7 @@ top
 bottom
 right
 left
+front
 ```
 
 A semantic face reference points to a feature and a named semantic face role:
@@ -47,18 +48,18 @@ A semantic face reference points to a feature and a named semantic face role:
 ```text
 SemanticFaceReference
   source_feature = feature.base_extrude
-  face = top | bottom | right | left
+  face = top | bottom | right | left | front
 ```
 
 A derived workplane is a workplane created from a semantic face reference:
 
 ```text
 DerivedWorkplane
-  id = workplane.base_left
-  name = BaseLeftFace
+  id = workplane.base_front
+  name = BaseFrontFace
   kind = feature_face
   source_feature = feature.base_extrude
-  face = left
+  face = front
 ```
 
 The ID reuses the current workplane reference type used by `Sketch`. A sketch can therefore reference either a standard datum plane or a derived workplane through its existing `workplane` field.
@@ -72,24 +73,24 @@ When adding a derived workplane, `PartDocument` validates that:
 - the workplane ID is unique
 - the source feature exists
 - the source feature is an `AdditiveExtrude`
-- the semantic face is currently `top`, `bottom`, `right`, or `left`
+- the semantic face is currently `top`, `bottom`, `right`, `left`, or `front`
 
 If the sketch uses a derived workplane, the dependency graph receives an edge:
 
 ```text
-workplane.base_left -> sketch.left_hole
+workplane.base_front -> sketch.front_hole
 ```
 
 When the derived workplane is added, the dependency graph receives an edge:
 
 ```text
-feature.base_extrude -> workplane.base_left
+feature.base_extrude -> workplane.base_front
 ```
 
 This gives dependency paths such as:
 
 ```text
-feature.base_extrude -> workplane.base_left -> sketch.left_hole -> feature.left_hole_cut
+feature.base_extrude -> workplane.base_front -> sketch.front_hole -> feature.front_hole_cut
 ```
 
 ## JSON model format
@@ -98,27 +99,21 @@ The model-intent JSON supports `derived_workplanes`:
 
 ```json
 {
-  "id": "workplane.base_left",
-  "name": "BaseLeftFace",
+  "id": "workplane.base_front",
+  "name": "BaseFrontFace",
   "kind": "feature_face",
   "source_feature": "feature.base_extrude",
-  "face": "left"
+  "face": "front"
 }
 ```
 
-The deserializer resolves dependent objects in multiple passes so that a model can contain:
-
-- a base sketch
-- a base extrude
-- a derived workplane
-- a sketch on that derived workplane
-- a cut feature using that sketch
+The deserializer resolves dependent objects in multiple passes so that a model can contain a base sketch, a base extrude, a derived workplane, a sketch on that derived workplane, and a cut feature using that sketch.
 
 The dependency graph and invalidation state are rebuilt from the model during deserialization.
 
 ## Geometry resolution and validation
 
-`WorkplaneResolver` resolves derived workplanes into concrete frames. The current side-face frames are:
+`WorkplaneResolver` resolves derived workplanes into concrete frames. The current side-face frames include:
 
 Right face:
 
@@ -138,7 +133,16 @@ y_axis = (0, 0, 1)
 normal = (-1, 0, 0)
 ```
 
-The resolved workplane carries rectangular local bounds. Top and bottom use source rectangle width and height. Right and left use source rectangle height and extrude thickness.
+Front face:
+
+```text
+origin = (rectangle_center.x, rectangle_center.y + height / 2, thickness / 2)
+x_axis = (-1, 0, 0)
+y_axis = (0, 0, 1)
+normal = (0, 1, 0)
+```
+
+The resolved workplane carries rectangular local bounds. Top and bottom use source rectangle width and height. Right and left use source rectangle height and extrude thickness. Front uses source rectangle width and extrude thickness.
 
 `GeometryRecomputeExecutor` uses this frame to map circle-profile centers from sketch-local coordinates to global coordinates and rejects circle profiles that do not lie fully inside the bounds before executing the circular cut.
 
@@ -149,6 +153,7 @@ Details:
 - `docs/bottom-workplane-mvp2.md`
 - `docs/right-workplane-mvp2.md`
 - `docs/left-workplane-mvp2.md`
+- `docs/front-workplane-mvp2.md`
 
 ## Example models
 
@@ -157,6 +162,7 @@ examples/top_face_cut.blcad.json
 examples/bottom_face_cut.blcad.json
 examples/right_face_cut.blcad.json
 examples/left_face_cut.blcad.json
+examples/front_face_cut.blcad.json
 ```
 
 Headless export:
@@ -166,23 +172,24 @@ Headless export:
 ./build/dev-geometry/blcad_export_step examples/bottom_face_cut.blcad.json build/bottom_face_cut.step
 ./build/dev-geometry/blcad_export_step examples/right_face_cut.blcad.json build/right_face_cut.step
 ./build/dev-geometry/blcad_export_step examples/left_face_cut.blcad.json build/left_face_cut.step
+./build/dev-geometry/blcad_export_step examples/front_face_cut.blcad.json build/front_face_cut.step
 ```
 
 ## Test coverage
 
 Core tests cover:
 
-- semantic face references for top, bottom, right, and left
+- semantic face references for top, bottom, right, left, and front
 - rejecting empty source feature IDs
 - adding derived workplanes after an additive extrude
 - rejecting a derived workplane with a missing source feature
 - accepting sketches on derived workplanes
 - dependency graph edges through derived workplanes
-- JSON roundtrip for top, bottom, right, and left derived workplanes
+- JSON roundtrip for top, bottom, right, left, and front derived workplanes
 
 Geometry tests cover:
 
-- resolving derived top, bottom, right, and left workplanes
+- resolving derived top, bottom, right, left, and front workplanes
 - mapping local sketch points through resolved workplanes
 - full document recompute for cuts whose sketches are placed on derived workplanes
 - off-center cut volume after resolving workplanes
@@ -194,7 +201,7 @@ Geometry tests cover:
 
 Not included yet:
 
-- front/back side faces
+- back side face
 - arbitrary planar faces
 - edge or vertex references
 - persistent topological naming
