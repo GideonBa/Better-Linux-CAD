@@ -15,6 +15,15 @@ namespace {
   return document.find_parameter(parameter_id);
 }
 
+[[nodiscard]] RectangularWorkplaneBounds make_bounds(double width_mm, double height_mm) noexcept {
+  RectangularWorkplaneBounds bounds;
+  bounds.enabled = true;
+  bounds.center = Point2{0.0, 0.0};
+  bounds.width_mm = width_mm;
+  bounds.height_mm = height_mm;
+  return bounds;
+}
+
 [[nodiscard]] Result<ResolvedWorkplane> resolve_datum_plane(const DatumPlane& datum_plane) {
   return Result<ResolvedWorkplane>::success(
       ResolvedWorkplane{datum_plane.id(), datum_plane.origin(), datum_plane.x_axis(),
@@ -70,47 +79,35 @@ namespace {
   }
 
   const Point2 rectangle_center = rectangle.center();
+  const double width_mm = width->value().millimeters();
+  const double height_mm = height->value().millimeters();
+  const double thickness_mm = thickness->value().millimeters();
+
   switch (workplane.face_reference().face()) {
-  case SemanticFace::Top: {
-    RectangularWorkplaneBounds bounds;
-    bounds.enabled = true;
-    bounds.center = Point2{0.0, 0.0};
-    bounds.width_mm = width->value().millimeters();
-    bounds.height_mm = height->value().millimeters();
-
+  case SemanticFace::Top:
     return Result<ResolvedWorkplane>::success(
-        ResolvedWorkplane{workplane.id(),
-                          Point3{rectangle_center.x, rectangle_center.y,
-                                 thickness->value().millimeters()},
+        ResolvedWorkplane{workplane.id(), Point3{rectangle_center.x, rectangle_center.y, thickness_mm},
                           Vector3{1.0, 0.0, 0.0}, Vector3{0.0, 1.0, 0.0},
-                          Vector3{0.0, 0.0, 1.0}, bounds});
-  }
-  case SemanticFace::Bottom: {
-    RectangularWorkplaneBounds bounds;
-    bounds.enabled = true;
-    bounds.center = Point2{0.0, 0.0};
-    bounds.width_mm = width->value().millimeters();
-    bounds.height_mm = height->value().millimeters();
-
+                          Vector3{0.0, 0.0, 1.0}, make_bounds(width_mm, height_mm)});
+  case SemanticFace::Bottom:
     return Result<ResolvedWorkplane>::success(
         ResolvedWorkplane{workplane.id(), Point3{rectangle_center.x, rectangle_center.y, 0.0},
                           Vector3{1.0, 0.0, 0.0}, Vector3{0.0, 1.0, 0.0},
-                          Vector3{0.0, 0.0, -1.0}, bounds});
-  }
-  case SemanticFace::Right: {
-    RectangularWorkplaneBounds bounds;
-    bounds.enabled = true;
-    bounds.center = Point2{0.0, 0.0};
-    bounds.width_mm = height->value().millimeters();
-    bounds.height_mm = thickness->value().millimeters();
-
+                          Vector3{0.0, 0.0, -1.0}, make_bounds(width_mm, height_mm)});
+  case SemanticFace::Right:
     return Result<ResolvedWorkplane>::success(
         ResolvedWorkplane{workplane.id(),
-                          Point3{rectangle_center.x + width->value().millimeters() / 2.0,
-                                 rectangle_center.y, thickness->value().millimeters() / 2.0},
+                          Point3{rectangle_center.x + width_mm / 2.0, rectangle_center.y,
+                                 thickness_mm / 2.0},
                           Vector3{0.0, 1.0, 0.0}, Vector3{0.0, 0.0, 1.0},
-                          Vector3{1.0, 0.0, 0.0}, bounds});
-  }
+                          Vector3{1.0, 0.0, 0.0}, make_bounds(height_mm, thickness_mm)});
+  case SemanticFace::Left:
+    return Result<ResolvedWorkplane>::success(
+        ResolvedWorkplane{workplane.id(),
+                          Point3{rectangle_center.x - width_mm / 2.0, rectangle_center.y,
+                                 thickness_mm / 2.0},
+                          Vector3{0.0, -1.0, 0.0}, Vector3{0.0, 0.0, 1.0},
+                          Vector3{-1.0, 0.0, 0.0}, make_bounds(height_mm, thickness_mm)});
   }
 
   return Result<ResolvedWorkplane>::failure(
