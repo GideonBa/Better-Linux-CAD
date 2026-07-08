@@ -165,5 +165,7 @@ TEST_CASE("Derived top-face workplane rejects holes outside the face bounds",
 
   const GeometryShape* base_shape = cache.find_feature_shape(FeatureId("feature.base_extrude"));
   REQUIRE(base_shape != nullptr);
-  CHECK_FALSE(cache.has_final_shape());
+  REQUIRE(cache.has_final_shape());
+  CHECK(cache.final_feature_id().value() == "feature.base_extrude");
+  CHECK(cache.find_feature_shape(FeatureId("feature.top_hole_cut")) == nullptr);
 }
