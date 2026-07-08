@@ -1,8 +1,8 @@
-# Abhaengigkeiten fuer Ubuntu 24.04
+# Dependencies for Ubuntu 24.04
 
-Diese Pakete bereiten die Entwicklung vor, ohne bereits CAD-Code zu schreiben.
+These packages prepare the development environment without already adding CAD code.
 
-## Build-Werkzeuge
+## Build tools
 
 - `build-essential`
 - `cmake`
@@ -12,7 +12,7 @@ Diese Pakete bereiten die Entwicklung vor, ohne bereits CAD-Code zu schreiben.
 - `clang-format`
 - `clang-tidy`
 
-## CAD- und Geometrie-Bibliotheken
+## CAD and geometry libraries
 
 - `libocct-foundation-dev`
 - `libocct-modeling-data-dev`
@@ -22,7 +22,7 @@ Diese Pakete bereiten die Entwicklung vor, ohne bereits CAD-Code zu schreiben.
 - `libocct-ocaf-dev`
 - `libocct-draw-dev`
 
-## UI- und Hilfsbibliotheken
+## UI and helper libraries
 
 - `qt6-base-dev`
 - `libeigen3-dev`
@@ -32,7 +32,7 @@ Diese Pakete bereiten die Entwicklung vor, ohne bereits CAD-Code zu schreiben.
 - `libspdlog-dev`
 - `catch2`
 
-## Dokumentation
+## Documentation
 
 - `doxygen`
 - `graphviz`
@@ -48,19 +48,18 @@ sudo apt-get install -y build-essential cmake ninja-build pkg-config git clang-f
   doxygen graphviz
 ```
 
-## Lokaler Paket-Download
+## Local package download
 
-Die fuer diese Ubuntu-24.04-Umgebung aufgeloesten `.deb`-Pakete liegen unter:
+The `.deb` packages resolved for this Ubuntu 24.04 environment are located under:
 
 ```text
 downloads/apt/
 ```
 
-Installation aus dem lokalen Paketordner:
+Install from the local package directory:
 
 ```bash
 sudo apt-get install ./downloads/apt/*.deb
 ```
 
-Falls `apt` weitere Pakete nachfordert, sollte stattdessen der normale
-Repository-Befehl aus dem Abschnitt "Installation" genutzt werden.
+If `apt` requests additional packages, use the normal repository command from the installation section instead.
