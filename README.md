@@ -2,9 +2,9 @@
 
 BLCAD is planned as an independent parametric CAD system for Linux. The condensed target architecture is documented in `docs/architecture-summary.md`.
 
-The current state is a deliberately small MVP-1 vertical slice plus the first executable seed of MVP 2. It contains base types for parameters, length quantities, error handling, a pure `PartDocument` model, datum planes, derived workplanes, sketches, feature-intent data models, a dependency graph, invalidation state, recompute planning, JSON model persistence, optional OCCT geometry execution, workplane resolution, bounded top-face validation, and STEP export. There is no GUI yet.
+The current state is a deliberately small MVP-1 vertical slice plus the first executable seed of MVP 2. It contains base types for parameters, length quantities, error handling, a pure `PartDocument` model, datum planes, derived workplanes, sketches, feature-intent data models, a dependency graph, invalidation state, recompute planning, JSON model persistence, optional OCCT geometry execution, workplane resolution, bounded top-face validation, incremental derived-workplane recompute, and STEP export. There is no GUI yet.
 
-The optional `blcad_geometry` target contains OCCT adapters for rectangle extrusion and circular cuts, a small `ShapeCache`, recompute execution for `AdditiveExtrude` and `SubtractiveExtrude`, a `WorkplaneResolver`, full document recompute, and STEP export for the final shape. Model intent can be serialized to `.blcad.json`, loaded again, recomputed into a fresh `ShapeCache`, validated against derived top-face bounds, and exported as STEP through a small headless command-line example.
+The optional `blcad_geometry` target contains OCCT adapters for rectangle extrusion and circular cuts, a small `ShapeCache`, recompute execution for `AdditiveExtrude` and `SubtractiveExtrude`, a `WorkplaneResolver`, full document recompute, incremental recompute, and STEP export for the final shape. Model intent can be serialized to `.blcad.json`, loaded again, recomputed into a fresh `ShapeCache`, validated against derived top-face bounds, updated incrementally through derived-workplane dependencies, and exported as STEP through a small headless command-line example.
 
 ## Technical basis
 
@@ -50,6 +50,7 @@ The optional `blcad_geometry` target contains OCCT adapters for rectangle extrus
 - `docs/derived-workplane-mvp2-seed.md`: semantic top-face workplanes and sketches on generated planar faces
 - `docs/workplane-resolver-mvp2.md`: geometry-layer resolver for derived top-face workplanes
 - `docs/bounded-workplane-validation-mvp2.md`: bounded circle validation on derived top-face workplanes
+- `docs/incremental-derived-workplane-recompute-mvp2.md`: incremental recompute through derived-workplane dependencies
 - `docs/mvp-plan.md`: MVP sequence
 - `docs/mvp-1-specification.md`: detailed MVP-1 specification
 - `docs/decisions/`: architecture decision records
@@ -61,6 +62,8 @@ The current core skeleton covers `Quantity`, typed IDs, `Error`, `Result`, `Para
 MVP 2 has started with a minimal semantic-face path. `SemanticFaceReference` can point to `feature.base_extrude.top`, `DerivedWorkplane` can expose that semantic face as `workplane.base_top`, and a sketch can use that derived workplane as its workplane reference. The dependency graph represents this as `feature.base_extrude -> workplane.base_top -> sketch.top_hole -> feature.top_hole_cut`.
 
 The optional geometry build resolves sketch workplanes before executing subtractive cuts. `WorkplaneResolver` can resolve `datum.xy` and `feature.base_extrude.top`. For the top face of a simple additive rectangle extrusion, it derives the frame origin and axes from the source rectangle sketch and thickness parameter, then maps local sketch profile centers into global cut centers. It also carries rectangular bounds for the top face, so circle profiles can be rejected before OCCT execution if they exceed the face boundary.
+
+Incremental recompute now follows derived-workplane dependency paths. Updating `part.width`, `part.height`, or `part.thickness` can mark the base feature, derived workplane, dependent sketch, and cut feature as affected. `GeometryRecomputeExecutor::execute_plan` skips non-feature nodes while preserving their dependency-ordering role, removes stale cached feature shapes before recomputing dirty features, and can surface bounded-workplane validation errors after source-dimension changes.
 
 The persistence path is file-based: `serialize_part_document_to_json` and `deserialize_part_document_from_json` handle in-memory model-intent JSON, while `write_part_document_json_file` and `read_part_document_json_file` handle `.blcad.json` files. The checked-in `examples/reference_plate.blcad.json` model and the off-center derived-workplane example `examples/top_face_cut.blcad.json` can be loaded by `blcad_export_step`, recomputed through the geometry layer, validated, and exported as STEP.
 
@@ -93,14 +96,14 @@ blcad_export_step <input.blcad.json> <output.step>
 
 ## Next technical step
 
-The next technical step should verify incremental recompute through derived-workplane dependencies.
+The next technical step should add the first second-face semantic reference without broadening into arbitrary topology.
 
-1. Update a source dimension such as `part.width`, `part.height`, or `part.thickness` through `PartDocument::set_parameter_value`.
-2. Verify that the dependency graph marks the additive base feature, derived workplane, dependent sketch, and cut feature as affected.
-3. Ensure `RecomputePlan` includes the affected feature nodes in the correct order while skipping non-feature workplane and sketch nodes during execution.
-4. Execute the incremental plan and verify that the base feature and dependent cut are recomputed correctly.
-5. Add a case where shrinking the source rectangle makes an existing top-face hole invalid and returns the bounded-workplane validation error.
-6. Keep support limited to the top face of a simple `AdditiveExtrude`.
+1. Add `SemanticFace::Bottom` for the bottom face of a simple `AdditiveExtrude`.
+2. Allow `DerivedWorkplane` to reference `feature.base_extrude.bottom`.
+3. Resolve the bottom-face workplane in `WorkplaneResolver` with a clear origin, axes, normal, and rectangular bounds.
+4. Add JSON roundtrip coverage for bottom-face derived workplanes.
+5. Add geometry tests that place a sketch on the bottom face and execute a through-all circular cut.
+6. Keep support limited to top and bottom faces of a simple `AdditiveExtrude`.
 7. Do not add side faces yet.
 8. Do not build a full topological naming system yet.
 9. Do not build a GUI yet.
