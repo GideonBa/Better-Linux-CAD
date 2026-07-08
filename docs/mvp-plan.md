@@ -46,13 +46,16 @@ Implemented seed:
 - geometry-layer `WorkplaneResolver`
 - derived top-face frame resolved from source rectangle sketch and thickness parameter
 - subtractive recompute evaluates circle centers through the resolved workplane
-- off-center derived-workplane hole test
+- rectangular bounds on the resolved top-face workplane
+- near-edge valid hole test and out-of-bounds invalid hole test
 
 Next narrow step:
 
-- add a minimal rectangular support region to `ResolvedWorkplane`
-- validate that circle profiles lie fully inside the derived top face
-- return clear validation errors for out-of-bounds holes
+- verify incremental recompute through derived-workplane dependencies
+- update base dimensions through `PartDocument::set_parameter_value`
+- ensure the recompute plan marks base, derived workplane, dependent sketch, and cut as affected
+- execute the affected feature nodes in order
+- validate that shrinking the source rectangle can make an existing top-face hole invalid
 - keep support limited to the top face of simple additive extrudes
 - do not add side faces yet
 - do not build a full topological naming system yet
