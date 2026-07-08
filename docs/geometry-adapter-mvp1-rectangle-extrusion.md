@@ -1,40 +1,35 @@
-# MVP 1 Geometry-Adapter: Rechteck-Extrusion
+# MVP 1 Geometry Adapter: Rectangle Extrusion
 
-Status: optionaler OCCT-Adapter, noch nicht in Recompute integriert
+Status: optional OCCT adapter, not integrated into recompute yet.
 
-Dieses Dokument beschreibt den ersten kleinen Geometriepfad fuer MVP 1. Der
-Adapter erzeugt aus drei bereits validierten `Quantity`-Werten ein OCCT-Solid
-fuer eine zentrierte rechteckige Platte.
+This document describes the first small geometry path for MVP 1. The adapter creates an OCCT solid for a centered rectangular plate from three already validated `Quantity` values.
 
-## Ziel
+## Goal
 
-Der Schritt prueft die technische Grenze zwischen Core und OCCT:
+This step tests the technical boundary between the core and OCCT:
 
-- `blcad_core` bleibt frei von OCCT-Headern und OCCT-Linking.
-- `blcad_geometry` kapselt die konkrete OCCT-Erzeugung.
-- Tests fuer den Core laufen weiterhin ohne Geometrie-Target.
-- Geometry-Tests werden nur mit `BLCAD_BUILD_GEOMETRY=ON` gebaut.
+- `blcad_core` remains free of OCCT headers and OCCT linking.
+- `blcad_geometry` encapsulates concrete OCCT generation.
+- Core tests continue to run without the geometry target.
+- Geometry tests are built only with `BLCAD_BUILD_GEOMETRY=ON`.
 
-Der Adapter ist noch kein Feature-Recompute. Er liest kein `PartDocument` und
-fuehrt keinen `RecomputePlan` aus. Ein separater `ShapeCache` im selben
-Geometry-Target kann berechnete Shapes speichern.
+The adapter is not feature recompute yet. It does not read a `PartDocument` and does not execute a `RecomputePlan`. A separate `ShapeCache` in the same geometry target can store computed shapes.
 
-## CMake-Target
+## CMake target
 
-Das Target heisst:
+The target is named:
 
 ```text
 blcad_geometry
 ```
 
-Es wird nur gebaut, wenn diese CMake-Option aktiv ist:
+It is built only when this CMake option is active:
 
 ```text
 BLCAD_BUILD_GEOMETRY=ON
 ```
 
-Der Standard-Preset `dev` laesst diese Option aus. Fuer den Geometry-Pfad gibt
-es einen eigenen Preset:
+The default preset `dev` leaves this option disabled. The geometry path has its own preset:
 
 ```bash
 cmake --preset dev-geometry
@@ -42,61 +37,57 @@ cmake --build --preset dev-geometry
 ctest --preset dev-geometry
 ```
 
-## Oeffentliche Schnittstelle
+## Public interface
 
-Der oeffentliche Header ist:
+The public header is:
 
 ```text
 include/blcad/geometry/rectangle_extrusion_adapter.hpp
 ```
 
-Aktuelle Typen:
+Current types:
 
-- `GeometryShape`: opaker Handle fuer berechnete Geometrie
-- `ShapeSummary`: kleine Test- und Diagnosezusammenfassung
-- `RectangleExtrusionAdapter`: erster OCCT-Adapter
+- `GeometryShape`: opaque handle for computed geometry
+- `ShapeSummary`: small test and diagnostic summary
+- `RectangleExtrusionAdapter`: first OCCT adapter
 
-`GeometryShape` enthaelt keine oeffentlichen OCCT-Typen. Dadurch kann
-`ShapeCache` eine Geometrie halten, ohne den Core mit OCCT zu vermischen.
+`GeometryShape` contains no public OCCT types. This allows `ShapeCache` to hold geometry without mixing the core with OCCT.
 
 ## Operation
 
-Aktuell implementiert:
+Currently implemented:
 
 ```text
 make_extruded_rectangle(width, height, thickness)
 ```
 
-Regeln:
+Rules:
 
-- Breite, Hoehe und Dicke kommen als validierte `Quantity`.
-- Das Rechteck liegt zentriert um `(0, 0)` in der XY-Ebene.
-- Extrusionsrichtung ist fest `+Z`.
-- Das Ergebnis muss ein nicht-leerer OCCT-Shape sein.
-- Erwartbare OCCT-Fehler werden als `ErrorCategory::Geometry` gemeldet.
+- width, height, and thickness arrive as validated `Quantity` values.
+- the rectangle is centered around `(0, 0)` in the XY plane.
+- extrusion direction is fixed to `+Z`.
+- the result must be a non-empty OCCT shape.
+- expected OCCT errors are reported as `ErrorCategory::Geometry`.
 
-## Testabdeckung
+## Test coverage
 
-Aktuelle Geometry-Tests pruefen:
+Current geometry tests check:
 
-- positive Laengen erzeugen ein nicht-leeres Shape
-- die Rechteckextrusion erzeugt genau einen Solid
-- ein default-konstruierter `GeometryShape` ist leer
+- positive lengths create a non-empty shape
+- rectangle extrusion creates exactly one solid
+- a default-constructed `GeometryShape` is empty
 
-## Bewusste Begrenzung
+## Deliberate limitation
 
-Noch nicht enthalten:
+Not included yet:
 
-- Ausfuehrung von `AdditiveExtrude`
-- Ausfuehrung von `SubtractiveExtrude`
-- zentrischer Bohrungs-Cut
-- `SubtractiveExtrude`-Cut
-- STEP-Export
+- execution of `AdditiveExtrude`
+- execution of `SubtractiveExtrude`
+- centered hole cut
+- `SubtractiveExtrude` cut
+- STEP export
 - GUI
 
-## Naechster sinnvoller Schritt
+## Next useful step
 
-Nach diesem Adapter, dem ersten `ShapeCache` und der Additive-Ausfuehrung
-sollte als naechstes der zentrische Cut fuer `SubtractiveExtrude` vorbereitet
-werden. Das `PartDocument` bleibt Quelle der Modellabsicht, nicht die
-OCCT-Shape.
+After this adapter, the first `ShapeCache`, and additive execution, the next step should prepare the centered cut for `SubtractiveExtrude`. The `PartDocument` remains the source of model intent, not the OCCT shape.
