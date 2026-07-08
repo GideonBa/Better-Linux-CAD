@@ -1,6 +1,6 @@
 # Core Skeleton and MVP-2 Seed
 
-Status: implemented core skeleton for MVP-1 data models, recompute planning, JSON model-intent serialization, `.blcad.json` file helpers, semantic top-face workplanes, geometry-layer workplane resolution, bounded top-face validation, and incremental recompute through derived-workplane dependencies.
+Status: implemented core skeleton for MVP-1 data models, recompute planning, JSON model-intent serialization, `.blcad.json` file helpers, semantic top/bottom face workplanes, geometry-layer workplane resolution, bounded face validation, and incremental recompute through derived-workplane dependencies.
 
 The core remains free of OCCT and Qt. Geometry is handled only in the optional `blcad_geometry` target. JSON serialization and `.blcad.json` file helpers stay in the core because they store model intent rather than computed shapes.
 
@@ -14,7 +14,7 @@ The skeleton makes the first architecture decisions executable:
 - `Parameter` as the first building block of the part model
 - `PartDocument` as the first container for parameters, datum planes, derived workplanes, sketches, features, dependency graph, invalidation state, and recompute plan
 - `DatumPlane` and `Sketch` as pure data models for the first plate
-- `SemanticFaceReference` and `DerivedWorkplane` as the first semantic generated-face reference path
+- `SemanticFaceReference` and `DerivedWorkplane` as semantic generated-face references
 - `RectangleProfile` and `CircleProfile` as the first sketch profiles
 - `Feature`, `AdditiveExtrude`, and `SubtractiveExtrude` as the first feature data models
 - `DependencyGraph` as a pure dependency structure
@@ -29,9 +29,9 @@ The skeleton makes the first architecture decisions executable:
 
 ### `blcad_core`
 
-Static core library.
+Static core library. It contains the pure model layer and does not link against OCCT or Qt.
 
-Currently contains:
+Currently relevant public headers:
 
 - `blcad/core/id.hpp`
 - `blcad/core/spatial.hpp`
@@ -47,8 +47,6 @@ Currently contains:
 - `blcad/core/dependency_graph.hpp`
 - `blcad/core/invalidation_state.hpp`
 - `blcad/core/recompute_plan.hpp`
-
-This target does not link against OCCT or Qt.
 
 ### `blcad_core_tests`
 
@@ -114,9 +112,9 @@ Current test areas:
 - `WorkplaneResolver`
 - full reference-part recompute
 - recompute from a JSON-restored document
-- recompute from a sketch on a derived top-face workplane
-- off-center cut evaluation through a resolved derived workplane
-- near-edge valid and out-of-bounds invalid top-face holes
+- recompute from sketches on derived top and bottom workplanes
+- off-center cut evaluation through resolved derived workplanes
+- near-edge valid and out-of-bounds invalid face-bounded holes
 - incremental recompute through a derived-workplane dependency path
 - stale dirty feature-shape removal after failed incremental recompute
 
@@ -175,6 +173,7 @@ Rules:
 - additive extrude length parameters must point to existing parameters
 - subtractive extrude target features must point to existing features
 - derived workplanes must point to an existing additive extrude source feature
+- derived workplanes currently support `top` and `bottom` semantic faces
 - parameters, sketches, features, and derived workplanes create dependency graph nodes
 - profile, feature, and derived-workplane references create dependency graph edges
 - `PartDocument` synchronizes its invalidation state with the dependency graph
@@ -185,22 +184,24 @@ Rules:
 
 ### `SemanticFaceReference` and `DerivedWorkplane`
 
-The first semantic face reference supports:
+The current semantic face references support:
 
 ```text
 feature.base_extrude.top
+feature.base_extrude.bottom
 ```
 
-A derived workplane exposes that generated top face as a sketch workplane:
+A derived workplane exposes a generated face as a sketch workplane:
 
 ```text
 workplane.base_top -> feature.base_extrude.top
+workplane.base_bottom -> feature.base_extrude.bottom
 ```
 
-The dependency graph records:
+The dependency graph records paths such as:
 
 ```text
-feature.base_extrude -> workplane.base_top -> sketch.top_hole
+feature.base_extrude -> workplane.base_bottom -> sketch.bottom_hole -> feature.bottom_hole_cut
 ```
 
 When a source dimension such as `part.width` changes, this dependency path lets the derived workplane and its dependent sketch become dirty before the downstream cut is recomputed.
@@ -213,6 +214,7 @@ No raw OCCT face IDs are stored in the core.
 
 - `datum.xy` from a stored datum-plane frame
 - `workplane.base_top` from the source additive rectangle extrude
+- `workplane.base_bottom` from the source additive rectangle extrude
 
 For the supported top-face workplane, the resolved frame is:
 
@@ -223,7 +225,16 @@ y_axis = (0, 1, 0)
 normal = (0, 0, 1)
 ```
 
-The same resolved workplane carries rectangular local bounds:
+For the supported bottom-face workplane, the resolved frame is:
+
+```text
+origin = (rectangle_center.x, rectangle_center.y, 0)
+x_axis = (1, 0, 0)
+y_axis = (0, 1, 0)
+normal = (0, 0, -1)
+```
+
+Both resolved workplanes carry rectangular local bounds:
 
 ```text
 center = (0, 0)
@@ -231,7 +242,7 @@ width = source rectangle width
 height = source rectangle height
 ```
 
-`GeometryRecomputeExecutor` uses the frame to map local circle-profile centers into global cut centers and uses the bounds to reject circles that do not lie fully inside the top face.
+`GeometryRecomputeExecutor` uses the frame to map local circle-profile centers into global cut centers and uses the bounds to reject circles that do not lie fully inside the resolved face.
 
 ### Incremental geometry execution
 
@@ -272,6 +283,7 @@ Details:
 - `docs/workplane-resolver-mvp2.md`
 - `docs/bounded-workplane-validation-mvp2.md`
 - `docs/incremental-derived-workplane-recompute-mvp2.md`
+- `docs/bottom-workplane-mvp2.md`
 
 ## Optional geometry layer
 
@@ -282,12 +294,12 @@ Current geometry capabilities:
 - `RectangleExtrusionAdapter` creates a centered rectangular OCCT solid from validated width, height, and thickness values.
 - `CircularCutAdapter` cuts a through-hole from an existing `GeometryShape` using a resolved global center.
 - `ShapeCache` stores feature shapes, removes stale dirty feature shapes, and tracks the current final shape.
-- `WorkplaneResolver` resolves standard datum planes and the derived top face of a simple additive rectangle extrude.
+- `WorkplaneResolver` resolves standard datum planes and derived top/bottom faces of a simple additive rectangle extrude.
 - `GeometryRecomputeExecutor` executes `AdditiveExtrude` for a sketch with exactly one rectangle profile.
 - `GeometryRecomputeExecutor` executes `SubtractiveExtrude` for a sketch with exactly one circle profile if the target shape is already in the `ShapeCache`.
 - `execute_document` recomputes a complete `PartDocument` into a `ShapeCache` in topological order.
 - `execute_plan` recomputes affected feature nodes from an incremental plan and skips non-feature nodes.
-- Bounded top-face validation rejects out-of-bounds circle profiles before OCCT cutting.
+- Bounded validation rejects out-of-bounds circle profiles before OCCT cutting.
 - `StepExporter` writes the final shape as a STEP file.
 - `blcad_export_step` wires `.blcad.json` input to recompute and STEP export.
 
@@ -301,13 +313,14 @@ The checked-in MVP-1 model is:
 examples/reference_plate.blcad.json
 ```
 
-The checked-in MVP-2 seed model is:
+The checked-in MVP-2 seed models are:
 
 ```text
 examples/top_face_cut.blcad.json
+examples/bottom_face_cut.blcad.json
 ```
 
-Both can be exported with:
+All can be exported with:
 
 ```text
 blcad_export_step <input.blcad.json> <output.step>
@@ -321,9 +334,8 @@ This skeleton still does not implement:
 - assemblies
 - general sketch constraints
 - general constraint solver
-- semantic face references beyond the top face of a simple additive extrude
-- bottom-face derived workplanes
 - side-face derived workplanes
+- arbitrary planar faces
 - ShapeCache serialization
 - command-line argument parsing beyond the minimal example
 
