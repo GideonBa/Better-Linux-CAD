@@ -100,6 +100,13 @@ PartDocument make_left_face_cut_document() {
                                         FeatureId("feature.left_hole_cut"), "LeftHoleCut", 4.0);
 }
 
+PartDocument make_front_face_cut_document() {
+  return make_feature_face_cut_document(SemanticFace::Front, DatumPlaneId("workplane.base_front"),
+                                        "BaseFrontFace", SketchId("sketch.front_hole"),
+                                        "Sketch_FrontHole", ProfileId("profile.front_hole"),
+                                        FeatureId("feature.front_hole_cut"), "FrontHoleCut", 4.0);
+}
+
 void check_roundtrip(const PartDocument& document, DatumPlaneId workplane_id, SemanticFace face,
                      const char* serialized_face, const char* sketch_id, const char* cut_id) {
   const auto serialized = serialize_part_document_to_json(document);
@@ -148,4 +155,9 @@ TEST_CASE("PartDocument JSON round-trips right derived workplanes", "[core][json
 TEST_CASE("PartDocument JSON round-trips left derived workplanes", "[core][json][workplane]") {
   check_roundtrip(make_left_face_cut_document(), DatumPlaneId("workplane.base_left"),
                   SemanticFace::Left, "left", "sketch.left_hole", "feature.left_hole_cut");
+}
+
+TEST_CASE("PartDocument JSON round-trips front derived workplanes", "[core][json][workplane]") {
+  check_roundtrip(make_front_face_cut_document(), DatumPlaneId("workplane.base_front"),
+                  SemanticFace::Front, "front", "sketch.front_hole", "feature.front_hole_cut");
 }
