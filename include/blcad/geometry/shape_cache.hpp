@@ -21,6 +21,7 @@ public:
   [[nodiscard]] Result<std::size_t> store_feature_shape(FeatureId feature_id, GeometryShape shape);
   [[nodiscard]] Result<std::size_t> set_final_shape(FeatureId source_feature_id,
                                                     GeometryShape shape);
+  [[nodiscard]] Result<bool> remove_feature_shape(FeatureId feature_id);
 
   void clear() noexcept;
 
