@@ -1,0 +1,68 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "dev",
+      "displayName": "Development",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/dev",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "BLCAD_BUILD_GEOMETRY": "OFF",
+        "BLCAD_BUILD_GUI": "OFF",
+        "BLCAD_BUILD_TESTS": "ON"
+      }
+    },
+    {
+      "name": "dev-geometry",
+      "displayName": "Development with Geometry",
+      "inherits": "dev",
+      "binaryDir": "${sourceDir}/build/dev-geometry",
+      "cacheVariables": {
+        "BLCAD_BUILD_GEOMETRY": "ON"
+      }
+    },
+    {
+      "name": "release",
+      "displayName": "Release",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BLCAD_BUILD_GEOMETRY": "OFF",
+        "BLCAD_BUILD_GUI": "OFF",
+        "BLCAD_BUILD_TESTS": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "dev",
+      "configurePreset": "dev"
+    },
+    {
+      "name": "dev-geometry",
+      "configurePreset": "dev-geometry"
+    },
+    {
+      "name": "release",
+      "configurePreset": "release"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "dev",
+      "configurePreset": "dev",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "dev-geometry",
+      "configurePreset": "dev-geometry",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ]
+}

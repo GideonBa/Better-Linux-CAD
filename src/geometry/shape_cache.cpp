@@ -1,0 +1,122 @@
+#include "blcad/geometry/shape_cache.hpp"
+
+#include <algorithm>
+#include <iterator>
+#include <utility>
+
+namespace blcad::geometry {
+namespace {
+
+constexpr const char* kShapeCacheObjectId = "shape_cache";
+
+} // namespace
+
+Result<ShapeCache> ShapeCache::create(ShapeCacheId id) {
+  if (id.empty()) {
+    return Result<ShapeCache>::failure(
+        Error::validation(kShapeCacheObjectId, "shape cache id must not be empty"));
+  }
+
+  return Result<ShapeCache>::success(ShapeCache(std::move(id)));
+}
+
+Result<std::size_t> ShapeCache::store_feature_shape(FeatureId feature_id, GeometryShape shape) {
+  const auto validation = validate_cache_input(feature_id, shape);
+  if (validation.has_error()) {
+    return validation;
+  }
+
+  const auto existing = std::find_if(feature_shapes_.begin(), feature_shapes_.end(),
+                                     [&feature_id](const CachedFeatureShape& cached_shape) {
+                                       return cached_shape.feature_id == feature_id;
+                                     });
+
+  if (existing != feature_shapes_.end()) {
+    existing->shape = std::move(shape);
+    return Result<std::size_t>::success(
+        static_cast<std::size_t>(std::distance(feature_shapes_.begin(), existing)));
+  }
+
+  feature_shapes_.push_back(CachedFeatureShape{std::move(feature_id), std::move(shape)});
+  return Result<std::size_t>::success(feature_shapes_.size() - 1U);
+}
+
+Result<std::size_t> ShapeCache::set_final_shape(FeatureId source_feature_id, GeometryShape shape) {
+  const auto validation = validate_cache_input(source_feature_id, shape);
+  if (validation.has_error()) {
+    return validation;
+  }
+
+  final_feature_id_ = source_feature_id;
+  final_shape_ = shape;
+  has_final_shape_ = true;
+
+  return store_feature_shape(std::move(source_feature_id), std::move(shape));
+}
+
+void ShapeCache::clear() noexcept {
+  feature_shapes_.clear();
+  has_final_shape_ = false;
+  final_feature_id_ = FeatureId();
+  final_shape_ = GeometryShape();
+}
+
+const ShapeCacheId& ShapeCache::id() const noexcept {
+  return id_;
+}
+
+const std::vector<CachedFeatureShape>& ShapeCache::feature_shapes() const noexcept {
+  return feature_shapes_;
+}
+
+std::size_t ShapeCache::feature_shape_count() const noexcept {
+  return feature_shapes_.size();
+}
+
+const GeometryShape* ShapeCache::find_feature_shape(const FeatureId& feature_id) const noexcept {
+  const auto existing = std::find_if(feature_shapes_.begin(), feature_shapes_.end(),
+                                     [&feature_id](const CachedFeatureShape& cached_shape) {
+                                       return cached_shape.feature_id == feature_id;
+                                     });
+
+  if (existing == feature_shapes_.end()) {
+    return nullptr;
+  }
+
+  return &existing->shape;
+}
+
+bool ShapeCache::has_final_shape() const noexcept {
+  return has_final_shape_;
+}
+
+const FeatureId& ShapeCache::final_feature_id() const noexcept {
+  return final_feature_id_;
+}
+
+const GeometryShape* ShapeCache::final_shape() const noexcept {
+  if (!has_final_shape_) {
+    return nullptr;
+  }
+
+  return &final_shape_;
+}
+
+ShapeCache::ShapeCache(ShapeCacheId id) : id_(std::move(id)) {}
+
+Result<std::size_t> ShapeCache::validate_cache_input(const FeatureId& feature_id,
+                                                     const GeometryShape& shape) const {
+  if (feature_id.empty()) {
+    return Result<std::size_t>::failure(
+        Error::validation(kShapeCacheObjectId, "feature id must not be empty"));
+  }
+
+  if (shape.empty()) {
+    return Result<std::size_t>::failure(
+        Error::geometry(feature_id.value(), "shape cache cannot store an empty shape"));
+  }
+
+  return Result<std::size_t>::success(0U);
+}
+
+} // namespace blcad::geometry
