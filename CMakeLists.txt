@@ -116,10 +116,12 @@ if(BLCAD_BUILD_TESTS)
     blcad_core_tests
     tests/core/datum_plane_tests.cpp
     tests/core/dependency_graph_tests.cpp
+    tests/core/derived_workplane_tests.cpp
     tests/core/error_result_tests.cpp
     tests/core/feature_tests.cpp
     tests/core/invalidation_state_tests.cpp
     tests/core/part_document_json_tests.cpp
+    tests/core/part_document_json_workplane_tests.cpp
     tests/core/part_document_tests.cpp
     tests/core/parameter_tests.cpp
     tests/core/quantity_tests.cpp
@@ -139,6 +141,7 @@ if(BLCAD_BUILD_TESTS)
     add_executable(
       blcad_geometry_tests
       tests/geometry/circular_cut_adapter_tests.cpp
+      tests/geometry/derived_workplane_pipeline_tests.cpp
       tests/geometry/recompute_executor_tests.cpp
       tests/geometry/rectangle_extrusion_adapter_tests.cpp
       tests/geometry/reference_part_pipeline_tests.cpp
