@@ -3,8 +3,12 @@
 #include <nlohmann/json.hpp>
 
 #include <exception>
+#include <filesystem>
+#include <fstream>
+#include <sstream>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <utility>
 
 namespace blcad {
@@ -18,6 +22,11 @@ constexpr int k_version = 1;
 
 [[nodiscard]] Error json_error(std::string message) {
   return Error::validation("part_document_json", std::move(message));
+}
+
+[[nodiscard]] Error json_file_error(const std::filesystem::path& path, std::string message) {
+  const auto object_id = path.empty() ? std::string("part_document_json_file") : path.string();
+  return Error::validation(object_id, std::move(message));
 }
 
 [[nodiscard]] json point2_to_json(Point2 point) {
@@ -304,6 +313,68 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
     return Result<PartDocument>::failure(
         json_error(std::string("invalid part document json: ") + exception.what()));
   }
+}
+
+Result<std::uintmax_t> write_part_document_json_file(const PartDocument& document,
+                                                     const std::filesystem::path& path) {
+  if (path.empty()) {
+    return Result<std::uintmax_t>::failure(
+        json_file_error(path, "part document json file path must not be empty"));
+  }
+
+  const auto serialized = serialize_part_document_to_json(document);
+  if (serialized.has_error()) {
+    return Result<std::uintmax_t>::failure(serialized.error());
+  }
+
+  std::ofstream output(path, std::ios::binary | std::ios::trunc);
+  if (!output) {
+    return Result<std::uintmax_t>::failure(
+        json_file_error(path, "could not open part document json file for writing"));
+  }
+
+  output << serialized.value() << '\n';
+  if (!output) {
+    return Result<std::uintmax_t>::failure(
+        json_file_error(path, "could not write part document json file"));
+  }
+
+  output.close();
+  if (!output) {
+    return Result<std::uintmax_t>::failure(
+        json_file_error(path, "could not close part document json file after writing"));
+  }
+
+  std::error_code error_code;
+  const auto size = std::filesystem::file_size(path, error_code);
+  if (error_code) {
+    return Result<std::uintmax_t>::failure(
+        json_file_error(path, "could not determine written part document json file size"));
+  }
+
+  return Result<std::uintmax_t>::success(size);
+}
+
+Result<PartDocument> read_part_document_json_file(const std::filesystem::path& path) {
+  if (path.empty()) {
+    return Result<PartDocument>::failure(
+        json_file_error(path, "part document json file path must not be empty"));
+  }
+
+  std::ifstream input(path, std::ios::binary);
+  if (!input) {
+    return Result<PartDocument>::failure(
+        json_file_error(path, "could not open part document json file for reading"));
+  }
+
+  std::ostringstream buffer;
+  buffer << input.rdbuf();
+  if (!input.good() && !input.eof()) {
+    return Result<PartDocument>::failure(
+        json_file_error(path, "could not read part document json file"));
+  }
+
+  return deserialize_part_document_from_json(buffer.str());
 }
 
 } // namespace blcad
