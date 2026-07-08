@@ -10,6 +10,7 @@
 #include <string_view>
 #include <system_error>
 #include <utility>
+#include <vector>
 
 namespace blcad {
 
@@ -43,6 +44,15 @@ constexpr int k_version = 1;
 
 [[nodiscard]] json vector3_to_json(Vector3 vector) {
   return json{{"x", vector.x}, {"y", vector.y}, {"z", vector.z}};
+}
+
+[[nodiscard]] Result<SemanticFace> semantic_face_from_json(const json& value) {
+  const auto face = value.get<std::string>();
+  if (face == "top") {
+    return Result<SemanticFace>::success(SemanticFace::Top);
+  }
+
+  return Result<SemanticFace>::failure(json_error("unsupported semantic face in part document json"));
 }
 
 [[nodiscard]] Result<Quantity> quantity_from_json(const json& parameter_json,
@@ -81,6 +91,29 @@ constexpr int k_version = 1;
 
   return DatumPlane::xy(DatumPlaneId(datum_plane_json.at("id").get<std::string>()),
                         datum_plane_json.at("name").get<std::string>());
+}
+
+[[nodiscard]] Result<DerivedWorkplane> derived_workplane_from_json(
+    const json& derived_workplane_json) {
+  if (derived_workplane_json.at("kind").get<std::string>() != "feature_face") {
+    return Result<DerivedWorkplane>::failure(
+        json_error("only feature-face derived workplanes are supported"));
+  }
+
+  auto face = semantic_face_from_json(derived_workplane_json.at("face"));
+  if (face.has_error()) {
+    return Result<DerivedWorkplane>::failure(face.error());
+  }
+
+  auto face_reference = SemanticFaceReference::create(
+      FeatureId(derived_workplane_json.at("source_feature").get<std::string>()), face.value());
+  if (face_reference.has_error()) {
+    return Result<DerivedWorkplane>::failure(face_reference.error());
+  }
+
+  return DerivedWorkplane::create_on_feature_face(
+      DatumPlaneId(derived_workplane_json.at("id").get<std::string>()),
+      derived_workplane_json.at("name").get<std::string>(), face_reference.value());
 }
 
 [[nodiscard]] Result<Sketch> sketch_from_json(const json& sketch_json) {
@@ -185,6 +218,16 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
                                          {"normal", vector3_to_json(datum_plane.normal())}});
   }
 
+  root["derived_workplanes"] = json::array();
+  for (const auto& workplane : document.derived_workplanes()) {
+    root["derived_workplanes"].push_back(
+        json{{"id", workplane.id().value()},
+             {"name", workplane.name()},
+             {"kind", "feature_face"},
+             {"source_feature", workplane.face_reference().source_feature().value()},
+             {"face", std::string(to_string(workplane.face_reference().face()))}});
+  }
+
   root["sketches"] = json::array();
   for (const auto& sketch : document.sketches()) {
     json sketch_json{{"id", sketch.id().value()},
@@ -281,27 +324,105 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
       }
     }
 
-    for (const auto& sketch_json : root.at("sketches")) {
-      auto sketch = sketch_from_json(sketch_json);
-      if (sketch.has_error()) {
-        return Result<PartDocument>::failure(sketch.error());
+    const auto& sketch_array = root.at("sketches");
+    const auto& feature_array = root.at("features");
+    const json derived_workplane_array =
+        root.contains("derived_workplanes") ? root.at("derived_workplanes") : json::array();
+
+    std::vector<bool> added_sketch(sketch_array.size(), false);
+    std::vector<bool> added_feature(feature_array.size(), false);
+    std::vector<bool> added_workplane(derived_workplane_array.size(), false);
+    std::size_t remaining = sketch_array.size() + feature_array.size() + derived_workplane_array.size();
+
+    while (remaining > 0U) {
+      bool progress = false;
+
+      for (std::size_t index = 0; index < sketch_array.size(); ++index) {
+        if (added_sketch[index]) {
+          continue;
+        }
+
+        auto sketch = sketch_from_json(sketch_array.at(index));
+        if (sketch.has_error()) {
+          return Result<PartDocument>::failure(sketch.error());
+        }
+
+        if (!document.value().has_workplane_id(sketch.value().workplane())) {
+          continue;
+        }
+
+        auto added = document.value().add_sketch(sketch.value());
+        if (added.has_error()) {
+          return Result<PartDocument>::failure(added.error());
+        }
+
+        added_sketch[index] = true;
+        --remaining;
+        progress = true;
       }
 
-      auto added = document.value().add_sketch(sketch.value());
-      if (added.has_error()) {
-        return Result<PartDocument>::failure(added.error());
-      }
-    }
+      for (std::size_t index = 0; index < feature_array.size(); ++index) {
+        if (added_feature[index]) {
+          continue;
+        }
 
-    for (const auto& feature_json : root.at("features")) {
-      auto feature = feature_from_json(feature_json);
-      if (feature.has_error()) {
-        return Result<PartDocument>::failure(feature.error());
+        auto feature = feature_from_json(feature_array.at(index));
+        if (feature.has_error()) {
+          return Result<PartDocument>::failure(feature.error());
+        }
+
+        if (document.value().find_sketch(feature.value().input_sketch()) == nullptr) {
+          continue;
+        }
+
+        if (feature.value().type() == FeatureType::AdditiveExtrude &&
+            document.value().find_parameter(feature.value().length_parameter()) == nullptr) {
+          return Result<PartDocument>::failure(
+              json_error("additive extrude length parameter must exist in part document"));
+        }
+
+        if (feature.value().type() == FeatureType::SubtractiveExtrude &&
+            document.value().find_feature(feature.value().target_feature()) == nullptr) {
+          continue;
+        }
+
+        auto added = document.value().add_feature(feature.value());
+        if (added.has_error()) {
+          return Result<PartDocument>::failure(added.error());
+        }
+
+        added_feature[index] = true;
+        --remaining;
+        progress = true;
       }
 
-      auto added = document.value().add_feature(feature.value());
-      if (added.has_error()) {
-        return Result<PartDocument>::failure(added.error());
+      for (std::size_t index = 0; index < derived_workplane_array.size(); ++index) {
+        if (added_workplane[index]) {
+          continue;
+        }
+
+        auto workplane = derived_workplane_from_json(derived_workplane_array.at(index));
+        if (workplane.has_error()) {
+          return Result<PartDocument>::failure(workplane.error());
+        }
+
+        if (document.value().find_feature(workplane.value().face_reference().source_feature()) == nullptr) {
+          continue;
+        }
+
+        auto added = document.value().add_derived_workplane(workplane.value());
+        if (added.has_error()) {
+          return Result<PartDocument>::failure(added.error());
+        }
+
+        added_workplane[index] = true;
+        --remaining;
+        progress = true;
+      }
+
+      if (!progress) {
+        return Result<PartDocument>::failure(
+            json_error("could not resolve part document json dependencies"));
       }
     }
 
