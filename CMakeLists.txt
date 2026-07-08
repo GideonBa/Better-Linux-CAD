@@ -99,6 +99,13 @@ if(BLCAD_BUILD_GEOMETRY)
   if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(blcad_geometry PRIVATE -Wall -Wextra -Wpedantic)
   endif()
+
+  add_executable(blcad_export_step examples/blcad_export_step.cpp)
+  target_link_libraries(blcad_export_step PRIVATE BLCAD::geometry)
+
+  if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(blcad_export_step PRIVATE -Wall -Wextra -Wpedantic)
+  endif()
 endif()
 
 if(BLCAD_BUILD_TESTS)
