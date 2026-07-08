@@ -62,6 +62,8 @@ PartDocument make_face_document() {
                         SemanticFace::Right);
   add_derived_workplane(document.value(), DatumPlaneId("workplane.base_left"), "BaseLeftFace",
                         SemanticFace::Left);
+  add_derived_workplane(document.value(), DatumPlaneId("workplane.base_front"), "BaseFrontFace",
+                        SemanticFace::Front);
 
   return document.value();
 }
@@ -156,6 +158,24 @@ TEST_CASE("WorkplaneResolver resolves additive-extrude left-face workplanes", "[
   CHECK(resolved.value().bounds.height_mm == Catch::Approx(8.0));
 }
 
+TEST_CASE("WorkplaneResolver resolves additive-extrude front-face workplanes", "[geometry][workplane]") {
+  const PartDocument document = make_face_document();
+  const WorkplaneResolver resolver;
+
+  const auto resolved = resolver.resolve(document, DatumPlaneId("workplane.base_front"));
+
+  REQUIRE(resolved);
+  CHECK(resolved.value().origin.x == Catch::Approx(0.0));
+  CHECK(resolved.value().origin.y == Catch::Approx(40.0));
+  CHECK(resolved.value().origin.z == Catch::Approx(4.0));
+  CHECK(resolved.value().x_axis.x == Catch::Approx(-1.0));
+  CHECK(resolved.value().y_axis.z == Catch::Approx(1.0));
+  CHECK(resolved.value().normal.y == Catch::Approx(1.0));
+  REQUIRE(resolved.value().bounds.enabled);
+  CHECK(resolved.value().bounds.width_mm == Catch::Approx(120.0));
+  CHECK(resolved.value().bounds.height_mm == Catch::Approx(8.0));
+}
+
 TEST_CASE("WorkplaneResolver maps side-face local sketch points through resolved frames",
           "[geometry][workplane]") {
   const PartDocument document = make_face_document();
@@ -174,6 +194,13 @@ TEST_CASE("WorkplaneResolver maps side-face local sketch points through resolved
   CHECK(left_global.x == Catch::Approx(-60.0));
   CHECK(left_global.y == Catch::Approx(12.0));
   CHECK(left_global.z == Catch::Approx(5.5));
+
+  const auto front = resolver.resolve(document, DatumPlaneId("workplane.base_front"));
+  REQUIRE(front);
+  const Point3 front_global = resolver.evaluate_point(front.value(), Point2{-12.0, 1.5});
+  CHECK(front_global.x == Catch::Approx(12.0));
+  CHECK(front_global.y == Catch::Approx(40.0));
+  CHECK(front_global.z == Catch::Approx(5.5));
 }
 
 TEST_CASE("WorkplaneResolver rejects missing workplanes", "[geometry][workplane]") {
