@@ -26,8 +26,8 @@ public:
                                                        Quantity value,
                                                        ParameterScope scope = ParameterScope::Part);
 
-  // Liefert eine Kopie mit neuem Wert und derselben Identitaet. Der neue Wert
-  // durchlaeuft dieselbe Validierung wie bei der Erzeugung.
+  // Returns a copy with a new value and the same identity. The new value follows
+  // the same validation path as parameter creation.
   [[nodiscard]] Result<Parameter> with_value(Quantity value) const;
 
   [[nodiscard]] const ParameterId& id() const noexcept;
