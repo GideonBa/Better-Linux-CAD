@@ -1,10 +1,10 @@
 # BLCAD
 
-BLCAD is planned as an independent parametric CAD system for Linux. The target architecture is documented in `zielarchitektur-parametrisches-cad-system.tex`.
+BLCAD is planned as an independent parametric CAD system for Linux. The condensed target architecture is documented in `docs/architecture-summary.md`.
 
 The current state is a deliberately small MVP-1 core skeleton. It contains base types for parameters, length quantities, error handling, a pure `PartDocument` data model, integrated datum-plane and sketch data models, initial feature data models, a dependency graph integrated into `PartDocument`, an invalidation state, and a recompute plan as a data model.
 
-In addition, the repository contains an optional `blcad_geometry` target with OCCT adapters for rectangle extrusion and centered circular cuts, a small `ShapeCache`, recompute execution for `AdditiveExtrude` and `SubtractiveExtrude`, full document recompute, and STEP export for the final shape. Parameter values can be changed through `PartDocument`, so a change invalidates and incrementally recomputes the dependent geometry. This makes the MVP-1 reference part run as an end-to-end flow. There is no GUI yet.
+In addition, the repository contains an optional `blcad_geometry` target with OCCT adapters for rectangle extrusion and centered circular cuts, a small `ShapeCache`, recompute execution for `AdditiveExtrude` and `SubtractiveExtrude`, full document recompute, and STEP export for the final shape. Parameter values can be changed through `PartDocument`, so a change invalidates and incrementally recomputes the dependent geometry. MVP-1 model intent can now be serialized to JSON, restored through the normal validated `PartDocument` APIs, recomputed into a fresh `ShapeCache`, and exported again as STEP. There is no GUI yet.
 
 ## Technical basis
 
@@ -45,24 +45,30 @@ In addition, the repository contains an optional `blcad_geometry` target with OC
 - `docs/step-export-mvp1.md`: STEP export for the final shape
 - `docs/document-recompute-mvp1.md`: full document recompute and reference-part pipeline
 - `docs/parameter-update-mvp1.md`: parameter-value update and numeric incremental recompute
+- `docs/json-serialization-mvp1.md`: JSON serialization of MVP-1 model intent
 - `docs/mvp-plan.md`: MVP sequence
 - `docs/mvp-1-specification.md`: detailed MVP-1 specification
 - `docs/decisions/`: architecture decision records
 
-## Next technical step
+## Current technical state
 
-The current core skeleton covers `Quantity`, typed IDs, `Error`, `Result`, `Parameter`, `PartDocument`, `DatumPlane`, `Sketch`, `RectangleProfile`, and `CircleProfile`, as well as `Feature`, `AdditiveExtrude`, `SubtractiveExtrude`, `DependencyGraph`, `InvalidationState`, and `RecomputePlan`. `PartDocument` now validates workplane, profile, and feature references, creates graph nodes and graph edges from them, marks affected nodes after a parameter change, and derives an ordered recompute plan from that state.
+The current core skeleton covers `Quantity`, typed IDs, `Error`, `Result`, `Parameter`, `PartDocument`, `DatumPlane`, `Sketch`, `RectangleProfile`, and `CircleProfile`, as well as `Feature`, `AdditiveExtrude`, `SubtractiveExtrude`, `DependencyGraph`, `InvalidationState`, and `RecomputePlan`. `PartDocument` validates workplane, profile, and feature references, creates graph nodes and graph edges from them, marks affected nodes after a parameter change, and derives an ordered recompute plan from that state.
 
-The optional geometry build creates an OCCT solid for a centered rectangle extrusion from three length values and can store computed feature shapes in a `ShapeCache`. `GeometryRecomputeExecutor` can execute an `AdditiveExtrude` node from a `RecomputePlan` if the corresponding sketch contains exactly one rectangle profile. In addition, `CircularCutAdapter` cuts a centered through-hole from a cached base body, and the executor executes a `SubtractiveExtrude` node if the sketch contains exactly one circle profile and the target body already exists in the `ShapeCache`. `execute_document` recomputes a full `PartDocument` in topological order into the `ShapeCache`, and `StepExporter` writes the final shape as a STEP file.
+The optional geometry build creates an OCCT solid for a centered rectangle extrusion from three length values and can store computed feature shapes in a `ShapeCache`. `GeometryRecomputeExecutor` can execute an `AdditiveExtrude` node from a `RecomputePlan` if the corresponding sketch contains exactly one rectangle profile. `CircularCutAdapter` cuts a centered through-hole from a cached base body, and the executor executes a `SubtractiveExtrude` node if the sketch contains exactly one circle profile and the target body already exists in the `ShapeCache`. `execute_document` recomputes a full `PartDocument` in topological order into the `ShapeCache`, and `StepExporter` writes the final shape as a STEP file.
 
 An end-to-end test creates the MVP-1 reference part, a 120 x 80 x 8 mm plate with a centered 20 mm hole, and exports it as a valid STEP file. The `ShapeCache` remains in the geometry layer; `PartDocument` remains OCCT-free, and the caller invokes `mark_all_clean()` after recompute. `PartDocument::set_parameter_value` changes a parameter value, validates it, and marks dependents as changed. As a result, an incremental plan recomputes only the cut after an actual diameter change, and a larger hole reduces the final volume.
 
-The next technical step should stay small:
+The previous next step is now implemented: `serialize_part_document_to_json` writes MVP-1 model intent to a schema-versioned JSON document, and `deserialize_part_document_from_json` rebuilds a `PartDocument` from that JSON through the normal validation path. Core tests verify the roundtrip and validation behavior. Geometry tests verify that a restored document can be recomputed into a fresh `ShapeCache` and exported as STEP.
 
-1. Prepare JSON serialization of the model intent for `PartDocument`.
-2. Rebuild the document from JSON and recompute it.
-3. Continue to treat the `ShapeCache` only as a computed result.
-4. Do not build a general solver yet.
-5. Do not build a GUI yet.
+## Next technical step
+
+The next technical step should stay small and turn the in-memory JSON roundtrip into an actual file-level workflow:
+
+1. Add filesystem read/write helpers for `.blcad.json` model files.
+2. Add a checked-in reference model under `examples/`.
+3. Add a small non-GUI command-line example that loads the JSON model, recomputes it, and exports STEP.
+4. Keep the `ShapeCache` as a computed result and do not serialize OCCT geometry.
+5. Do not build a general solver yet.
+6. Do not build a GUI yet.
 
 The detailed MVP-1 specification is in `docs/mvp-1-specification.md`.
