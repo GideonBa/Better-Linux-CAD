@@ -23,19 +23,15 @@ The workflow remains deliberately narrow:
 
 ## Checked-in models
 
-The repository contains the MVP-1 reference model:
+The repository contains:
 
 ```text
 examples/reference_plate.blcad.json
-```
-
-It also contains derived-workplane seed models:
-
-```text
 examples/top_face_cut.blcad.json
 examples/bottom_face_cut.blcad.json
 examples/right_face_cut.blcad.json
 examples/left_face_cut.blcad.json
+examples/front_face_cut.blcad.json
 ```
 
 These examples demonstrate that `.blcad.json` can store semantic generated-face references without storing OCCT face IDs, that the geometry layer can resolve workplanes before cutting, and that bounded validation can reject invalid profile placement before OCCT execution.
@@ -63,6 +59,7 @@ Export commands:
 ./build/dev-geometry/blcad_export_step examples/bottom_face_cut.blcad.json build/bottom_face_cut.step
 ./build/dev-geometry/blcad_export_step examples/right_face_cut.blcad.json build/right_face_cut.step
 ./build/dev-geometry/blcad_export_step examples/left_face_cut.blcad.json build/left_face_cut.step
+./build/dev-geometry/blcad_export_step examples/front_face_cut.blcad.json build/front_face_cut.step
 ```
 
 Depending on the exact CMake build directory, the binary may be located under the configured geometry build directory. The command accepts exactly two arguments:
@@ -85,43 +82,9 @@ The CLI performs this sequence:
 8. Write the final shape through `StepExporter::write_step`.
 9. Print the number of exported bytes.
 
-This keeps the command-line example thin. It does not know how features are computed internally; it only wires the existing core and geometry services together.
-
-## Validation behavior
-
-The file helpers reject:
-
-- empty file paths
-- unreadable input files
-- unwritable output files
-- invalid JSON content
-- unsupported schema or version
-- unsupported constructs
-- invalid references caught by `PartDocument`
-- unresolved dependency ordering, for example a derived workplane whose source feature never appears
-
-Geometry recompute additionally rejects circle profiles that do not lie fully inside resolved workplane bounds.
-
-The CLI exits with:
-
-- `0` on successful STEP export
-- `1` on model, recompute, or export errors
-- `2` on invalid command-line usage
-
 ## Test coverage
 
-Core tests cover:
-
-- writing a `PartDocument` to a temporary `.blcad.json` file
-- reading that file back into a `PartDocument`
-- preserving model objects and dependency edges
-- top-face derived workplane JSON roundtrip
-- bottom-face derived workplane JSON roundtrip
-- right-face derived workplane JSON roundtrip
-- left-face derived workplane JSON roundtrip
-- rejecting empty file paths
-
-Geometry tests cover recompute and STEP export from JSON-restored documents, recompute from sketches on derived top, bottom, right, and left workplanes, workplane resolution, off-center cuts whose local sketch points are mapped through the resolved workplanes, and bounded validation for valid and out-of-bounds holes.
+Core tests cover file write/read and JSON roundtrip for top, bottom, right, left, and front derived workplanes. Geometry tests cover recompute and STEP export from JSON-restored documents, recompute from sketches on derived top, bottom, right, left, and front workplanes, and bounded validation for valid and out-of-bounds holes.
 
 ## Deliberate limitation
 
