@@ -38,15 +38,18 @@ Goal: place sketches on existing generated planar faces.
 Implemented seed:
 
 - semantic reference for the top face of `feature.base_extrude`
-- `DerivedWorkplane` from that semantic face
+- semantic reference for the bottom face of `feature.base_extrude`
+- `DerivedWorkplane` from those semantic faces
 - sketches can reference derived workplanes
-- dependency graph includes `feature.base_extrude -> workplane.base_top -> sketch.top_hole`
-- JSON serialization supports `derived_workplanes`
+- dependency graph includes paths such as `feature.base_extrude -> workplane.base_top -> sketch.top_hole`
+- JSON serialization supports `derived_workplanes` with `top` and `bottom` faces
 - checked-in `examples/top_face_cut.blcad.json`
+- checked-in `examples/bottom_face_cut.blcad.json`
 - geometry-layer `WorkplaneResolver`
-- derived top-face frame resolved from source rectangle sketch and thickness parameter
+- top-face frame resolved from source rectangle sketch and thickness parameter
+- bottom-face frame resolved from source rectangle sketch at `z = 0` with negative normal
 - subtractive recompute evaluates circle centers through the resolved workplane
-- rectangular bounds on the resolved top-face workplane
+- rectangular bounds on resolved top and bottom workplanes
 - near-edge valid hole test and out-of-bounds invalid hole test
 - incremental recompute through derived-workplane dependencies
 - stale dirty feature shapes are removed before incremental recompute
@@ -54,13 +57,14 @@ Implemented seed:
 
 Next narrow step:
 
-- add `SemanticFace::Bottom` for simple additive extrudes
-- allow `DerivedWorkplane` to reference `feature.base_extrude.bottom`
-- resolve the bottom face with a clear frame and rectangular bounds
-- add JSON roundtrip coverage for bottom-face workplanes
-- add geometry recompute coverage for a through-all circular cut from the bottom face
-- keep support limited to top and bottom faces of simple additive extrudes
-- do not add side faces yet
+- add one side-face enum value, preferably `SemanticFace::Right`, for the `+X` face
+- allow `DerivedWorkplane` to reference `feature.base_extrude.right`
+- resolve the right face with a clear frame and rectangular bounds
+- define local side-face coordinates consistently
+- add JSON roundtrip coverage for the right-face workplane
+- add geometry recompute coverage for a through-all circular cut from the right face
+- keep support limited to top, bottom, and right faces of simple additive extrudes
+- do not add all side faces yet
 - do not build a full topological naming system yet
 - do not build a GUI yet
 
