@@ -1,8 +1,8 @@
-# MVP 1 JSON File Workflow
+# JSON File Workflow
 
 Status: file-level workflow for `.blcad.json` model files and a headless JSON-to-STEP export example.
 
-This document describes the step after in-memory JSON serialization. The repository now contains a real `.blcad.json` model file, filesystem helpers for reading and writing model files, and a small command-line example that recomputes the model and exports STEP without a GUI.
+This document describes the file workflow after in-memory JSON serialization. The repository contains checked-in `.blcad.json` model files, filesystem helpers for reading and writing model files, and a small command-line example that recomputes the model and exports STEP without a GUI.
 
 ## Goal
 
@@ -42,7 +42,7 @@ read_part_document_json_file(path)
 
 Both helpers report expected errors through `Result<T>` and `ErrorCategory::Validation`.
 
-## Reference model
+## Checked-in models
 
 The repository contains the MVP-1 reference model:
 
@@ -50,24 +50,21 @@ The repository contains the MVP-1 reference model:
 examples/reference_plate.blcad.json
 ```
 
-It describes a 120 x 80 x 8 mm rectangular plate with a centered 20 mm through-hole:
+It describes a 120 x 80 x 8 mm rectangular plate with a centered 20 mm through-hole.
+
+The repository also contains the MVP-2 seed model:
 
 ```text
-width         = 120 mm
-height        = 80 mm
-thickness     = 8 mm
-hole_diameter = 20 mm
+examples/top_face_cut.blcad.json
 ```
 
-The file stores:
+It describes the same basic plate, but the hole sketch is placed on a derived workplane:
 
-- document identity
-- four length parameters
-- the standard XY datum plane
-- one rectangle sketch
-- one circle sketch
-- one additive extrude
-- one subtractive through-all cut
+```text
+workplane.base_top -> feature.base_extrude.top
+```
+
+This demonstrates that `.blcad.json` can store semantic generated-face references without storing OCCT face IDs.
 
 ## Headless export example
 
@@ -84,10 +81,16 @@ cmake --preset dev-geometry
 cmake --build --preset dev-geometry
 ```
 
-Usage:
+Usage for the MVP-1 reference model:
 
 ```bash
 ./build/dev-geometry/blcad_export_step examples/reference_plate.blcad.json build/reference_plate.step
+```
+
+Usage for the MVP-2 seed model:
+
+```bash
+./build/dev-geometry/blcad_export_step examples/top_face_cut.blcad.json build/top_face_cut.step
 ```
 
 Depending on the exact CMake build directory, the binary may be located under the configured geometry build directory. The command accepts exactly two arguments:
@@ -119,8 +122,9 @@ The file helpers reject:
 - unwritable output files
 - invalid JSON content
 - unsupported schema or version
-- unsupported MVP-1 constructs
+- unsupported constructs
 - invalid references caught by `PartDocument`
+- unresolved dependency ordering, for example a derived workplane whose source feature never appears
 
 The CLI exits with:
 
@@ -135,9 +139,10 @@ Core tests cover:
 - writing a `PartDocument` to a temporary `.blcad.json` file
 - reading that file back into a `PartDocument`
 - preserving model objects and dependency edges
+- derived workplane JSON roundtrip
 - rejecting empty file paths
 
-Geometry tests already cover recompute and STEP export from a JSON-restored document. The CLI itself is intentionally thin and currently covered indirectly through the same APIs.
+Geometry tests cover recompute and STEP export from a JSON-restored document, plus recompute from a sketch on a derived top-face workplane. The CLI itself is intentionally thin and currently covered indirectly through the same APIs.
 
 ## Deliberate limitation
 
@@ -150,5 +155,6 @@ Not included yet:
 - model validation report mode
 - graphical loading of `.blcad.json`
 - ShapeCache serialization
+- full topological naming
 
-The workflow is sufficient as the first real headless file-based CAD path.
+The workflow is sufficient as the first real headless file-based CAD path and as a persistence path for the first semantic generated-face reference.
