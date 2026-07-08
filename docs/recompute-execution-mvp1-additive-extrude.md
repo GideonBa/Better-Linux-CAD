@@ -1,14 +1,12 @@
-# MVP 1 Recompute-Ausfuehrung: AdditiveExtrude
+# MVP 1 Recompute Execution: AdditiveExtrude
 
-Status: optionale Geometry-Ausfuehrung fuer ein Rechteckprofil
+Status: optional geometry execution for one rectangle profile.
 
-Dieses Dokument beschreibt den ersten ausgefuehrten Recompute-Schritt fuer
-MVP 1. Der Code liegt im optionalen Target `blcad_geometry` und bleibt damit
-ausserhalb des reinen Core-Targets.
+This document describes the first executed recompute step for MVP 1. The code lives in the optional target `blcad_geometry`, so it remains outside the pure core target.
 
-## Ziel
+## Goal
 
-Der Schritt verbindet erstmals die vorhandenen Datenmodelle:
+This step connects the existing data models for the first time:
 
 - `PartDocument`
 - `RecomputePlan`
@@ -17,13 +15,11 @@ Der Schritt verbindet erstmals die vorhandenen Datenmodelle:
 - `RectangleExtrusionAdapter`
 - `ShapeCache`
 
-Die Ausfuehrung soll beweisen, dass ein `dirty`-Feature-Knoten aus einem
-Recompute-Plan in berechnete OCCT-Geometrie uebersetzt und im Cache abgelegt
-werden kann.
+The execution should prove that a `dirty` feature node from a recompute plan can be translated into computed OCCT geometry and stored in the cache.
 
-## CMake-Target
+## CMake target
 
-Die Ausfuehrung wird nur mit dem Geometry-Preset gebaut:
+Execution is built only with the geometry preset:
 
 ```bash
 cmake --preset dev-geometry
@@ -31,9 +27,9 @@ cmake --build --preset dev-geometry
 ctest --preset dev-geometry
 ```
 
-Der Standard-Preset `dev` bleibt Core-only.
+The default preset `dev` remains core-only.
 
-## Oeffentliche Schnittstelle
+## Public interface
 
 Header:
 
@@ -41,87 +37,79 @@ Header:
 include/blcad/geometry/recompute_executor.hpp
 ```
 
-Aktuelle Typen:
+Current types:
 
 - `GeometryRecomputeSummary`
 - `GeometryRecomputeExecutor`
 
-Aktuelle Operationen:
+Current operations:
 
 ```text
 execute_additive_extrude(document, feature_id, shape_cache)
 execute_plan(document, recompute_plan, shape_cache)
 ```
 
-## Ausfuehrungsmodell
+## Execution model
 
-`execute_additive_extrude` arbeitet in dieser Reihenfolge:
+`execute_additive_extrude` works in this order:
 
-1. Feature-ID validieren.
-2. Feature im `PartDocument` suchen.
-3. Feature-Typ muss `AdditiveExtrude` sein.
-4. Eingabe-Sketch suchen.
-5. Sketch muss genau ein Rechteckprofil und keine weiteren Profile enthalten.
-6. Breiten-, Hoehen- und Laengenparameter aufloesen.
-7. `RectangleExtrusionAdapter` aufrufen.
-8. Ergebnis im `ShapeCache` als Feature-Shape und finalen Shape speichern.
+1. Validate the feature ID.
+2. Find the feature in the `PartDocument`.
+3. The feature type must be `AdditiveExtrude`.
+4. Find the input sketch.
+5. The sketch must contain exactly one rectangle profile and no other profiles.
+6. Resolve width, height, and length parameters.
+7. Call `RectangleExtrusionAdapter`.
+8. Store the result in `ShapeCache` as a feature shape and final shape.
 
-`execute_plan` laeuft ueber die Schritte eines `RecomputePlan`. Nicht-Feature-
-Knoten, zum Beispiel Sketch-Knoten, werden uebersprungen. Feature-Knoten werden
-derzeit nur ausgefuehrt, wenn sie `AdditiveExtrude` sind.
+`execute_plan` iterates over the steps of a `RecomputePlan`. Non-feature nodes, such as sketch nodes, are skipped. Feature nodes are currently executed only if they are `AdditiveExtrude`.
 
-Der Plan wird vor der Ausfuehrung auf nicht unterstuetzte Feature-Typen
-geprueft. Dadurch wird der `ShapeCache` nicht teilweise beschrieben, wenn spaeter
-im selben Plan ein noch nicht implementierter `SubtractiveExtrude`-Knoten steht.
+Before execution, the plan is checked for unsupported feature types. This prevents partially writing the `ShapeCache` if a later node in the same plan is a not-yet-implemented `SubtractiveExtrude`.
 
-## Validierung
+## Validation
 
-Aktuelle Fehlerfaelle:
+Current error cases:
 
-- leere Feature-ID
-- Feature existiert nicht im Dokument
-- Feature ist kein `AdditiveExtrude`
-- Eingabe-Sketch existiert nicht
-- Sketch enthaelt nicht genau ein Rechteckprofil
-- Breiten-, Hoehen- oder Laengenparameter fehlen
-- Geometry-Adapter erzeugt einen Fehler
-- ShapeCache lehnt das Ergebnis ab
+- empty feature ID
+- feature does not exist in the document
+- feature is not an `AdditiveExtrude`
+- input sketch does not exist
+- sketch does not contain exactly one rectangle profile
+- width, height, or length parameter is missing
+- geometry adapter reports an error
+- ShapeCache rejects the result
 
-Unsupported Feature-Typen in einem Plan liefern einen Geometry-Fehler. Dadurch
-werden `SubtractiveExtrude`-Knoten nicht stillschweigend ignoriert.
+Unsupported feature types in a plan return a geometry error. This prevents silently ignoring `SubtractiveExtrude` nodes.
 
-## Testabdeckung
+## Test coverage
 
-Aktuelle Tests pruefen:
+Current tests check:
 
-- ein einzelnes `AdditiveExtrude` erzeugt ein nicht-leeres Shape im Cache
-- `execute_plan` ueberspringt Sketch-Knoten und fuehrt den Additive-Feature-
-  Knoten aus
-- fehlende Feature-IDs werden gemeldet
-- nicht-rechteckige Additive-Sketches werden abgelehnt
-- nicht unterstuetzte Feature-Typen im Plan erzeugen einen Fehler, ohne den
-  Cache teilweise zu beschreiben
+- a single `AdditiveExtrude` creates a non-empty shape in the cache
+- `execute_plan` skips sketch nodes and executes the additive feature node
+- missing feature IDs are reported
+- non-rectangular additive sketches are rejected
+- unsupported feature types in the plan create an error without partially writing the cache
 
-## Bewusste Begrenzung
+## Deliberate limitation
 
-Noch nicht enthalten:
+Not included yet:
 
 - `SubtractiveExtrude`
-- Boolean Cut
-- Kreisprofile als Bohrung
-- mehrere Rechteckprofile in einem Sketch
-- ShapeCache-Integration direkt in `PartDocument`
-- automatisches `mark_all_clean()` nach erfolgreichem Recompute
-- STEP-Export
+- Boolean cut
+- circle profiles as holes
+- multiple rectangle profiles in one sketch
+- ShapeCache integration directly into `PartDocument`
+- automatic `mark_all_clean()` after successful recompute
+- STEP export
 - GUI
 
-## Naechster sinnvoller Schritt
+## Next useful step
 
-Der naechste technische Schritt sollte der zentrische Cut fuer
-`SubtractiveExtrude` sein:
+The next technical step should be the centered cut for `SubtractiveExtrude`:
 
-1. aus einem Kreisprofil Durchmesser und Position aufloesen
-2. Zielshape aus dem `ShapeCache` lesen
-3. OCCT-Boolean-Cut ausfuehren
-4. neuen finalen Shape im `ShapeCache` speichern
-5. weiter keinen allgemeinen Solver und keine GUI bauen
+1. resolve diameter and position from a circle profile
+2. read the target shape from the `ShapeCache`
+3. execute the OCCT Boolean cut
+4. store the new final shape in the `ShapeCache`
+5. continue not to build a general solver or GUI
