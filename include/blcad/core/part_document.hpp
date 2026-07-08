@@ -27,8 +27,8 @@ public:
   [[nodiscard]] Result<std::size_t> add_sketch(Sketch sketch);
   [[nodiscard]] Result<std::size_t> add_feature(Feature feature);
   [[nodiscard]] Result<std::vector<std::string>> mark_parameter_changed(ParameterId id);
-  // Setzt einen Parameterwert neu, validiert ihn und markiert den Parameter und
-  // seine Abhaengigen als geaendert. Gibt die betroffenen Graphknoten zurueck.
+  // Sets a parameter value, validates it, and marks the parameter and its
+  // dependents as changed. Returns the affected graph nodes.
   [[nodiscard]] Result<std::vector<std::string>> set_parameter_value(ParameterId id,
                                                                      Quantity value);
   [[nodiscard]] Result<RecomputePlan> create_recompute_plan() const;
