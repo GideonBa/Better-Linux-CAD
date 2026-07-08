@@ -1,25 +1,21 @@
-# MVP 1 STEP-Export
+# MVP 1 STEP Export
 
-Status: optionaler OCCT-STEP-Export fuer den finalen Shape
+Status: optional OCCT STEP export for the final shape.
 
-Dieses Dokument beschreibt den STEP-Export fuer MVP 1. Der Code liegt im
-optionalen Target `blcad_geometry` und bleibt damit ausserhalb des reinen
-Core-Targets. Der Export schliesst die erste vertikale MVP-1-Linie ab: von
-Parameter, Sketch und Feature ueber die OCCT-Shape bis zur STEP-Datei.
+This document describes STEP export for MVP 1. The code lives in the optional target `blcad_geometry`, so it remains outside the pure core target. The export completes the first vertical MVP-1 line: from parameters, sketch, and feature through the OCCT shape to the STEP file.
 
-## Ziel
+## Goal
 
-Der Schritt schreibt einen berechneten `GeometryShape` als STEP-Datei:
+This step writes a computed `GeometryShape` as a STEP file:
 
-- Exportiert wird nur ein `GeometryShape`, in der Praxis der finale Shape aus
-  dem `ShapeCache`.
-- Der Exporter kapselt den OCCT-STEP-Writer hinter der Core/OCCT-Grenze.
-- `blcad_core` bleibt frei von OCCT und kennt keinen STEP-Writer.
-- Erwartbare Fehler werden als `ErrorCategory::Export` gemeldet.
+- only a `GeometryShape` is exported, in practice the final shape from the `ShapeCache`
+- the exporter encapsulates the OCCT STEP writer behind the core/OCCT boundary
+- `blcad_core` remains free of OCCT and knows no STEP writer
+- expected errors are reported as `ErrorCategory::Export`
 
-## CMake-Target
+## CMake target
 
-Der Export wird nur mit dem Geometry-Preset gebaut:
+The export is built only with the geometry preset:
 
 ```bash
 cmake --preset dev-geometry
@@ -27,80 +23,69 @@ cmake --build --preset dev-geometry
 ctest --preset dev-geometry
 ```
 
-Der STEP-Writer braucht zusaetzlich die OCCT-Toolkits `TKSTEP` und `TKXSBase`.
+The STEP writer additionally requires the OCCT toolkits `TKSTEP` and `TKXSBase`.
 
-## Oeffentliche Schnittstelle
+## Public interface
 
-Der oeffentliche Header ist:
+The public header is:
 
 ```text
 include/blcad/geometry/step_exporter.hpp
 ```
 
-Aktueller Typ:
+Current type:
 
-- `StepExporter`: OCCT-Adapter fuer den STEP-Export
+- `StepExporter`: OCCT adapter for STEP export
 
-Aktuelle Operation:
+Current operation:
 
 ```text
 write_step(shape, path)
 ```
 
-`write_step` liefert die Groesse der geschriebenen Datei in Bytes. Wie die
-anderen Adapter greift `StepExporter` als `friend` von `GeometryShape` ueber den
-nicht oeffentlichen Header `src/geometry/geometry_shape_internal.hpp` auf die
-OCCT-Shape zu.
+`write_step` returns the size of the written file in bytes. Like the other adapters, `StepExporter` accesses the OCCT shape as a `friend` of `GeometryShape` through the non-public header `src/geometry/geometry_shape_internal.hpp`.
 
 ## Operation
 
-Aktuell implementiert:
+Currently implemented:
 
 ```text
 write_step(shape, path)
 ```
 
-Regeln:
+Rules:
 
-- Der Zielpfad `path` darf nicht leer sein.
-- Der Shape muss ein nicht-leeres `GeometryShape` sein.
-- Das STEP-Schema ist fest `AP214`.
-- Der Shape wird als `STEPControl_AsIs` uebertragen.
-- Nach dem Schreiben wird die Dateigroesse geprueft; eine leere Datei ist ein
-  Fehler.
-- Erwartbare OCCT- und Dateisystemfehler werden als `ErrorCategory::Export`
-  gemeldet.
+- the target path `path` must not be empty
+- the shape must be a non-empty `GeometryShape`
+- the STEP schema is fixed to `AP214`
+- the shape is transferred as `STEPControl_AsIs`
+- after writing, the file size is checked; an empty file is an error
+- expected OCCT and filesystem errors are reported as `ErrorCategory::Export`
 
-## Testabdeckung
+## Test coverage
 
-Aktuelle Geometry-Tests pruefen:
+Current geometry tests check:
 
-- eine geschnittene Platte wird als nicht-leere STEP-Datei geschrieben, deren
-  Groesse der gemeldeten Byte-Zahl entspricht und die mit dem STEP-Header
-  `ISO-10303-21` beginnt
-- ein leerer Shape wird als Export-Fehler abgelehnt, ohne eine Datei zu
-  erzeugen
-- ein leerer Pfad wird als Export-Fehler abgelehnt
+- a cut plate is written as a non-empty STEP file whose size matches the reported byte count and whose content starts with the STEP header `ISO-10303-21`
+- an empty shape is rejected as an export error without creating a file
+- an empty path is rejected as an export error
 
-## Bewusste Begrenzung
+## Deliberate limitation
 
-Noch nicht enthalten:
+Not included yet:
 
-- STEP-Import
-- Metadaten-Roundtrip
-- Farben oder Materialien
-- Assembly-STEP
-- STL- oder anderer Export
-- Aufruf des Exports direkt aus `PartDocument` oder Recompute
+- STEP import
+- metadata roundtrip
+- colors or materials
+- assembly STEP
+- STL or other export
+- calling export directly from `PartDocument` or recompute
 
-## Naechster sinnvoller Schritt
+## Next useful step
 
-Mit dem Export ist die erste vertikale MVP-1-Linie technisch vollstaendig. Der
-naechste sinnvolle Schritt ist, diese Bausteine zu einem durchgaengigen
-Ablauf zu verbinden:
+With export implemented, the first vertical MVP-1 line is technically complete. The next useful step is to connect these building blocks into one end-to-end flow:
 
-1. den `ShapeCache` in `PartDocument` integrieren
-2. nach einem erfolgreichen Recompute automatisch `mark_all_clean()` setzen
-3. das Referenzbauteil aus der Spezifikation als Ende-zu-Ende-Test erzeugen und
-   exportieren
-4. weiter keinen allgemeinen Solver und keine GUI bauen
+1. integrate the `ShapeCache` into `PartDocument`
+2. automatically call `mark_all_clean()` after successful recompute
+3. create and export the reference part from the specification as an end-to-end test
+4. continue not to build a general solver or GUI
