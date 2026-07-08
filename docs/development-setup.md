@@ -107,6 +107,7 @@ The geometry build additionally builds:
 
 - `blcad_geometry`
 - `blcad_geometry_tests`
+- `blcad_export_step`
 
 ## Run tests
 
@@ -132,6 +133,7 @@ Current test coverage includes:
 - dependency graph construction, topological ordering, and cycle detection
 - invalidation state and recompute-plan creation
 - MVP-1 JSON serialization and deserialization of `PartDocument` model intent
+- `.blcad.json` file read/write helpers
 - rectangle extrusion through OCCT in the optional geometry build
 - centered circular cut through OCCT in the optional geometry build
 - `ShapeCache` storage of feature shapes and final shapes
@@ -140,6 +142,20 @@ Current test coverage includes:
 - STEP export of the final shape
 - numeric incremental recompute after a real parameter change
 - recompute and STEP export from a JSON-restored document
+
+## Headless example
+
+After configuring and building the geometry preset, export the checked-in reference model:
+
+```bash
+./build/dev-geometry/blcad_export_step examples/reference_plate.blcad.json build/reference_plate.step
+```
+
+Depending on the local CMake preset output directory, the executable path may differ. The command shape is:
+
+```text
+blcad_export_step <input.blcad.json> <output.step>
+```
 
 ## Documentation
 
@@ -161,6 +177,7 @@ Important documents:
 - `docs/document-recompute-mvp1.md`: full document recompute and reference-part pipeline
 - `docs/parameter-update-mvp1.md`: parameter update and numeric incremental recompute
 - `docs/json-serialization-mvp1.md`: JSON serialization of model intent
+- `docs/json-file-workflow-mvp1.md`: `.blcad.json` file workflow and headless export example
 - `docs/mvp-plan.md`: MVP sequence
 - `docs/mvp-1-specification.md`: detailed MVP-1 specification
 - `docs/decisions/`: architecture decision records
@@ -185,15 +202,15 @@ rm -rf build/
 
 LaTeX helper files are listed in `.gitignore`. Generated architecture PDFs may remain as working artifacts if needed.
 
-## Development rule for MVP 1
+## Development rule after MVP 1
 
-The current code should still stay on the MVP-1 path:
+The current code should now move carefully from MVP 1 toward MVP 2:
 
-- no GUI code
-- no assembly
-- no engineering assistants
-- no bolt circle
-- no general constraint solver
+- no GUI code yet
+- no assembly yet
+- no engineering assistants yet
+- no bolt circle yet
+- no general constraint solver yet
 - no serialization of OCCT geometry
 
-The next step should add file-level `.blcad.json` workflow support and a non-GUI command-line example before larger modeling features are introduced.
+The next technical step should introduce the smallest semantic-face/workplane path required for sketches on generated planar faces.
