@@ -72,7 +72,9 @@ The first MVP-2 seed introduces semantic generated-face references and resolves 
 - The dependency graph connects source feature, derived workplane, sketch, and dependent cut feature.
 - JSON serialization supports `derived_workplanes`.
 - `WorkplaneResolver` resolves `datum.xy` and `feature.base_extrude.top` into concrete workplane frames.
+- `ResolvedWorkplane` carries rectangular bounds for the derived top face.
 - Subtractive recompute maps circle-profile centers through the resolved workplane before executing the cut.
+- The geometry layer rejects circle profiles that exceed the resolved top-face bounds.
 - `examples/top_face_cut.blcad.json` demonstrates an off-center cut on the derived top-face workplane.
 
 This is still intentionally not a full topological-naming system. No raw OCCT face IDs are stored in `PartDocument`.
@@ -84,12 +86,12 @@ This is still intentionally not a full topological-naming system. No raw OCCT fa
 - Recompute runs through a dependency graph.
 - Sketches on generated faces require stable semantic references.
 - OCCT shapes are a cache, not the primary model.
-- The OCCT path lives in an optional `blcad_geometry` target: adapters for rectangle extrusion and circular cut, a small ShapeCache, a WorkplaneResolver, recompute execution for `AdditiveExtrude` and `SubtractiveExtrude`, full document recompute, and STEP export of the final shape.
+- The OCCT path lives in an optional `blcad_geometry` target: adapters for rectangle extrusion and circular cut, a small ShapeCache, a WorkplaneResolver, recompute execution for `AdditiveExtrude` and `SubtractiveExtrude`, full document recompute, bounds validation for the current top-face case, and STEP export of the final shape.
 - The ShapeCache remains in the geometry layer; `PartDocument` remains OCCT-free and is computed into the cache through `execute_document`.
 - JSON serialization stores model intent only; it does not serialize OCCT shapes or ShapeCache contents.
 - Parameter values can be changed through `PartDocument::set_parameter_value`; a change marks dependents and drives incremental recompute.
 - Derived workplanes are resolved geometrically without turning raw OCCT faces into core model references.
-- The next step should add bounded face validation before broader generated-face support.
+- The next step should verify incremental recompute through derived-workplane dependency paths before broader generated-face support.
 - Assembly parameters must later flow into parts in a controlled way.
 - Fillets and chamfers are their own parametric features with semantic edge references, not only late BRep corrections.
 - The assembly system will describe spatial relationships through constraints: a constraint graph and solver determine component positions and remaining degrees of freedom; joints later allow controlled motion.
