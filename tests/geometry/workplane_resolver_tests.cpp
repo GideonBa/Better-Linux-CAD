@@ -39,20 +39,29 @@ PartDocument make_face_document() {
   REQUIRE(xy);
   REQUIRE(document.value().add_datum_plane(xy.value()));
 
-  auto base_sketch = Sketch::create(SketchId("sketch.base"), "Sketch_BaseRectangle", DatumPlaneId("datum.xy"));
+  auto base_sketch =
+      Sketch::create(SketchId("sketch.base"), "Sketch_BaseRectangle", DatumPlaneId("datum.xy"));
   REQUIRE(base_sketch);
-  auto rectangle = RectangleProfile::create(ProfileId("profile.base_rectangle"), ParameterId("part.width"), ParameterId("part.height"));
+  auto rectangle = RectangleProfile::create(ProfileId("profile.base_rectangle"),
+                                            ParameterId("part.width"), ParameterId("part.height"));
   REQUIRE(rectangle);
   REQUIRE(base_sketch.value().add_profile(rectangle.value()));
   REQUIRE(document.value().add_sketch(base_sketch.value()));
 
-  auto base = Feature::create_additive_extrude(FeatureId("feature.base_extrude"), "BaseExtrude", SketchId("sketch.base"), ParameterId("part.thickness"));
+  auto base = Feature::create_additive_extrude(FeatureId("feature.base_extrude"), "BaseExtrude",
+                                               SketchId("sketch.base"),
+                                               ParameterId("part.thickness"));
   REQUIRE(base);
   REQUIRE(document.value().add_feature(base.value()));
 
-  add_derived_workplane(document.value(), DatumPlaneId("workplane.base_top"), "BaseTopFace", SemanticFace::Top);
-  add_derived_workplane(document.value(), DatumPlaneId("workplane.base_bottom"), "BaseBottomFace", SemanticFace::Bottom);
-  add_derived_workplane(document.value(), DatumPlaneId("workplane.base_right"), "BaseRightFace", SemanticFace::Right);
+  add_derived_workplane(document.value(), DatumPlaneId("workplane.base_top"), "BaseTopFace",
+                        SemanticFace::Top);
+  add_derived_workplane(document.value(), DatumPlaneId("workplane.base_bottom"), "BaseBottomFace",
+                        SemanticFace::Bottom);
+  add_derived_workplane(document.value(), DatumPlaneId("workplane.base_right"), "BaseRightFace",
+                        SemanticFace::Right);
+  add_derived_workplane(document.value(), DatumPlaneId("workplane.base_left"), "BaseLeftFace",
+                        SemanticFace::Left);
 
   return document.value();
 }
@@ -129,18 +138,42 @@ TEST_CASE("WorkplaneResolver resolves additive-extrude right-face workplanes", "
   CHECK(resolved.value().bounds.height_mm == Catch::Approx(8.0));
 }
 
-TEST_CASE("WorkplaneResolver maps right-face local sketch points through the resolved frame", "[geometry][workplane]") {
+TEST_CASE("WorkplaneResolver resolves additive-extrude left-face workplanes", "[geometry][workplane]") {
   const PartDocument document = make_face_document();
   const WorkplaneResolver resolver;
 
-  const auto resolved = resolver.resolve(document, DatumPlaneId("workplane.base_right"));
+  const auto resolved = resolver.resolve(document, DatumPlaneId("workplane.base_left"));
+
   REQUIRE(resolved);
+  CHECK(resolved.value().origin.x == Catch::Approx(-60.0));
+  CHECK(resolved.value().origin.y == Catch::Approx(0.0));
+  CHECK(resolved.value().origin.z == Catch::Approx(4.0));
+  CHECK(resolved.value().x_axis.y == Catch::Approx(-1.0));
+  CHECK(resolved.value().y_axis.z == Catch::Approx(1.0));
+  CHECK(resolved.value().normal.x == Catch::Approx(-1.0));
+  REQUIRE(resolved.value().bounds.enabled);
+  CHECK(resolved.value().bounds.width_mm == Catch::Approx(80.0));
+  CHECK(resolved.value().bounds.height_mm == Catch::Approx(8.0));
+}
 
-  const Point3 global = resolver.evaluate_point(resolved.value(), Point2{-12.0, 1.5});
+TEST_CASE("WorkplaneResolver maps side-face local sketch points through resolved frames",
+          "[geometry][workplane]") {
+  const PartDocument document = make_face_document();
+  const WorkplaneResolver resolver;
 
-  CHECK(global.x == Catch::Approx(60.0));
-  CHECK(global.y == Catch::Approx(-12.0));
-  CHECK(global.z == Catch::Approx(5.5));
+  const auto right = resolver.resolve(document, DatumPlaneId("workplane.base_right"));
+  REQUIRE(right);
+  const Point3 right_global = resolver.evaluate_point(right.value(), Point2{-12.0, 1.5});
+  CHECK(right_global.x == Catch::Approx(60.0));
+  CHECK(right_global.y == Catch::Approx(-12.0));
+  CHECK(right_global.z == Catch::Approx(5.5));
+
+  const auto left = resolver.resolve(document, DatumPlaneId("workplane.base_left"));
+  REQUIRE(left);
+  const Point3 left_global = resolver.evaluate_point(left.value(), Point2{-12.0, 1.5});
+  CHECK(left_global.x == Catch::Approx(-60.0));
+  CHECK(left_global.y == Catch::Approx(12.0));
+  CHECK(left_global.z == Catch::Approx(5.5));
 }
 
 TEST_CASE("WorkplaneResolver rejects missing workplanes", "[geometry][workplane]") {
