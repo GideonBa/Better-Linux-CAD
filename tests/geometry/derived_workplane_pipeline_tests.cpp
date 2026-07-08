@@ -6,7 +6,10 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <limits>
 #include <numbers>
+#include <string_view>
+#include <vector>
 
 using namespace blcad;
 using namespace blcad::geometry;
@@ -84,6 +87,26 @@ ShapeCache make_shape_cache() {
   REQUIRE(cache);
 
   return cache.value();
+}
+
+bool contains_node(const std::vector<std::string>& nodes, std::string_view node_id) {
+  for (const auto& node : nodes) {
+    if (node == node_id) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+std::size_t step_index(const RecomputePlan& plan, std::string_view node_id) {
+  for (std::size_t index = 0; index < plan.steps().size(); ++index) {
+    if (plan.steps()[index].node_id == node_id) {
+      return index;
+    }
+  }
+
+  return std::numeric_limits<std::size_t>::max();
 }
 
 } // namespace
@@ -168,4 +191,103 @@ TEST_CASE("Derived top-face workplane rejects holes outside the face bounds",
   REQUIRE(cache.has_final_shape());
   CHECK(cache.final_feature_id().value() == "feature.base_extrude");
   CHECK(cache.find_feature_shape(FeatureId("feature.top_hole_cut")) == nullptr);
+}
+
+TEST_CASE("Incremental recompute follows derived-workplane dependency paths",
+          "[geometry][workplane][incremental]") {
+  auto document = make_top_face_cut_document(Point2{25.0, -10.0});
+  ShapeCache cache = make_shape_cache();
+  const GeometryRecomputeExecutor executor;
+
+  REQUIRE(executor.execute_document(document, cache));
+  REQUIRE(cache.find_feature_shape(FeatureId("feature.base_extrude")) != nullptr);
+  REQUIRE(cache.find_feature_shape(FeatureId("feature.top_hole_cut")) != nullptr);
+
+  document.mark_all_clean();
+  const auto new_width = Quantity::length_mm(140.0, "part.width");
+  REQUIRE(new_width);
+  const auto affected = document.set_parameter_value(ParameterId("part.width"), new_width.value());
+  REQUIRE(affected);
+
+  CHECK(contains_node(affected.value(), "part.width"));
+  CHECK(contains_node(affected.value(), "sketch.base"));
+  CHECK(contains_node(affected.value(), "feature.base_extrude"));
+  CHECK(contains_node(affected.value(), "workplane.base_top"));
+  CHECK(contains_node(affected.value(), "sketch.top_hole"));
+  CHECK(contains_node(affected.value(), "feature.top_hole_cut"));
+
+  const auto plan = document.create_recompute_plan();
+  REQUIRE(plan);
+  CHECK(plan.value().contains("sketch.base"));
+  CHECK(plan.value().contains("feature.base_extrude"));
+  CHECK(plan.value().contains("workplane.base_top"));
+  CHECK(plan.value().contains("sketch.top_hole"));
+  CHECK(plan.value().contains("feature.top_hole_cut"));
+
+  const std::size_t base_index = step_index(plan.value(), "feature.base_extrude");
+  const std::size_t workplane_index = step_index(plan.value(), "workplane.base_top");
+  const std::size_t sketch_index = step_index(plan.value(), "sketch.top_hole");
+  const std::size_t cut_index = step_index(plan.value(), "feature.top_hole_cut");
+
+  REQUIRE(base_index != std::numeric_limits<std::size_t>::max());
+  REQUIRE(workplane_index != std::numeric_limits<std::size_t>::max());
+  REQUIRE(sketch_index != std::numeric_limits<std::size_t>::max());
+  REQUIRE(cut_index != std::numeric_limits<std::size_t>::max());
+  CHECK(base_index < workplane_index);
+  CHECK(workplane_index < sketch_index);
+  CHECK(sketch_index < cut_index);
+
+  const auto summary = executor.execute_plan(document, plan.value(), cache);
+
+  REQUIRE(summary);
+  CHECK(summary.value().executed_feature_count == 2);
+  REQUIRE(cache.has_final_shape());
+  CHECK(cache.final_feature_id().value() == "feature.top_hole_cut");
+
+  const RectangleExtrusionAdapter inspector;
+  const GeometryShape* base_shape = cache.find_feature_shape(FeatureId("feature.base_extrude"));
+  REQUIRE(base_shape != nullptr);
+  CHECK(inspector.summarize(*base_shape).volume_mm3 == Catch::Approx(140.0 * 80.0 * 8.0).margin(1.0));
+
+  REQUIRE(cache.final_shape() != nullptr);
+  const double expected_removed_volume = std::numbers::pi * 10.0 * 10.0 * 8.0;
+  CHECK(inspector.summarize(*cache.final_shape()).volume_mm3 ==
+        Catch::Approx(140.0 * 80.0 * 8.0 - expected_removed_volume).margin(1.0));
+}
+
+TEST_CASE("Incremental recompute rejects a previously valid derived-workplane hole after shrinking base",
+          "[geometry][workplane][incremental]") {
+  auto document = make_top_face_cut_document(Point2{50.0, 0.0});
+  ShapeCache cache = make_shape_cache();
+  const GeometryRecomputeExecutor executor;
+
+  REQUIRE(executor.execute_document(document, cache));
+  REQUIRE(cache.has_final_shape());
+  CHECK(cache.final_feature_id().value() == "feature.top_hole_cut");
+  REQUIRE(cache.find_feature_shape(FeatureId("feature.top_hole_cut")) != nullptr);
+
+  document.mark_all_clean();
+  const auto smaller_width = Quantity::length_mm(100.0, "part.width");
+  REQUIRE(smaller_width);
+  REQUIRE(document.set_parameter_value(ParameterId("part.width"), smaller_width.value()));
+
+  const auto plan = document.create_recompute_plan();
+  REQUIRE(plan);
+  CHECK(plan.value().contains("feature.base_extrude"));
+  CHECK(plan.value().contains("workplane.base_top"));
+  CHECK(plan.value().contains("sketch.top_hole"));
+  CHECK(plan.value().contains("feature.top_hole_cut"));
+
+  const auto summary = executor.execute_plan(document, plan.value(), cache);
+
+  REQUIRE(summary.has_error());
+  CHECK(summary.error().category() == ErrorCategory::Validation);
+  CHECK(summary.error().object_id() == "profile.top_hole");
+  CHECK(summary.error().message() == "circle profile must lie fully inside resolved workplane bounds");
+
+  const GeometryShape* base_shape = cache.find_feature_shape(FeatureId("feature.base_extrude"));
+  REQUIRE(base_shape != nullptr);
+  CHECK(cache.find_feature_shape(FeatureId("feature.top_hole_cut")) == nullptr);
+  REQUIRE(cache.has_final_shape());
+  CHECK(cache.final_feature_id().value() == "feature.base_extrude");
 }
