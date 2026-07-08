@@ -69,26 +69,48 @@ namespace {
         "additive extrude length parameter must exist in part document"));
   }
 
-  RectangularWorkplaneBounds bounds;
-  bounds.enabled = true;
-  bounds.center = Point2{0.0, 0.0};
-  bounds.width_mm = width->value().millimeters();
-  bounds.height_mm = height->value().millimeters();
-
   const Point2 rectangle_center = rectangle.center();
   switch (workplane.face_reference().face()) {
-  case SemanticFace::Top:
+  case SemanticFace::Top: {
+    RectangularWorkplaneBounds bounds;
+    bounds.enabled = true;
+    bounds.center = Point2{0.0, 0.0};
+    bounds.width_mm = width->value().millimeters();
+    bounds.height_mm = height->value().millimeters();
+
     return Result<ResolvedWorkplane>::success(
         ResolvedWorkplane{workplane.id(),
                           Point3{rectangle_center.x, rectangle_center.y,
                                  thickness->value().millimeters()},
                           Vector3{1.0, 0.0, 0.0}, Vector3{0.0, 1.0, 0.0},
                           Vector3{0.0, 0.0, 1.0}, bounds});
-  case SemanticFace::Bottom:
+  }
+  case SemanticFace::Bottom: {
+    RectangularWorkplaneBounds bounds;
+    bounds.enabled = true;
+    bounds.center = Point2{0.0, 0.0};
+    bounds.width_mm = width->value().millimeters();
+    bounds.height_mm = height->value().millimeters();
+
     return Result<ResolvedWorkplane>::success(
         ResolvedWorkplane{workplane.id(), Point3{rectangle_center.x, rectangle_center.y, 0.0},
                           Vector3{1.0, 0.0, 0.0}, Vector3{0.0, 1.0, 0.0},
                           Vector3{0.0, 0.0, -1.0}, bounds});
+  }
+  case SemanticFace::Right: {
+    RectangularWorkplaneBounds bounds;
+    bounds.enabled = true;
+    bounds.center = Point2{0.0, 0.0};
+    bounds.width_mm = height->value().millimeters();
+    bounds.height_mm = thickness->value().millimeters();
+
+    return Result<ResolvedWorkplane>::success(
+        ResolvedWorkplane{workplane.id(),
+                          Point3{rectangle_center.x + width->value().millimeters() / 2.0,
+                                 rectangle_center.y, thickness->value().millimeters() / 2.0},
+                          Vector3{0.0, 1.0, 0.0}, Vector3{0.0, 0.0, 1.0},
+                          Vector3{1.0, 0.0, 0.0}, bounds});
+  }
   }
 
   return Result<ResolvedWorkplane>::failure(
