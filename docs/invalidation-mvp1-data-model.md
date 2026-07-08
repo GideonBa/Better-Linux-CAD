@@ -1,34 +1,33 @@
-# MVP 1 Invalidierungsstatus-Datenmodell
+# MVP 1 Invalidation-State Data Model
 
-Status: reines Datenmodell mit PartDocument-Integration, kein Recompute
+Status: pure data model with `PartDocument` integration, no recompute.
 
-Dieses Dokument beschreibt den aktuellen Stand von `InvalidationState`.
+This document describes the current state of `InvalidationState`.
 
-Der Stand ist bewusst begrenzt:
+The current scope is deliberately limited:
 
-- keine Geometrie
-- keine OCCT-Operationen
-- kein ShapeCache in dieser Invalidierungsschicht
-- kein Recompute
-- keine GUI
+- no geometry
+- no OCCT operations
+- no ShapeCache in this invalidation layer
+- no recompute
+- no GUI
 
-## Ziel
+## Goal
 
-`InvalidationState` speichert, welche Knoten des `DependencyGraph` sauber,
-direkt geaendert oder durch eine Aenderung betroffen sind.
+`InvalidationState` stores which nodes of the `DependencyGraph` are clean, directly changed, or affected by a change.
 
-Damit kann MVP 1 bereits nachvollziehen:
+This allows MVP 1 to track:
 
-- welcher Parameter geaendert wurde
-- welche Sketches davon abhaengen
-- welche Features davon abhaengen
-- welche Knoten vor einem spaeteren Recompute nicht mehr als sauber gelten
+- which parameter was changed
+- which sketches depend on it
+- which features depend on it
+- which nodes should no longer be considered clean before a later recompute
 
-Das Modell fuehrt aber noch nichts aus. Es markiert nur Status.
+The model does not execute anything. It only marks state.
 
-## Statuswerte
+## Status values
 
-Aktuelle Statuswerte:
+Current status values:
 
 ```text
 clean
@@ -37,31 +36,27 @@ dirty
 error
 ```
 
-Bedeutung:
+Meaning:
 
-- `clean`: Knoten ist aktuell nicht als betroffen markiert.
-- `changed`: Knoten wurde direkt geaendert, zum Beispiel ein Parameter.
-- `dirty`: Knoten haengt transitiv von einem geaenderten Knoten ab.
-- `error`: reserviert fuer spaetere Recompute- oder Validierungsfehler.
+- `clean`: the node is currently not marked as affected
+- `changed`: the node was changed directly, for example a parameter
+- `dirty`: the node transitively depends on a changed node
+- `error`: reserved for later recompute or validation errors
 
-`dirty` bedeutet in diesem Schritt nur: Der Knoten waere vor einer
-Geometrieberechnung neu zu betrachten. Es bedeutet noch nicht, dass ein
-Recompute ausgefuehrt wurde oder fehlgeschlagen ist.
+In this step, `dirty` only means that the node should be reconsidered before geometry computation. It does not mean that recompute has been executed or has failed.
 
-## Graphbasierte Markierung
+## Graph-based marking
 
-`InvalidationState::mark_changed(graph, node_id)` verwendet den bestehenden
-`DependencyGraph`.
+`InvalidationState::mark_changed(graph, node_id)` uses the existing `DependencyGraph`.
 
-Ablauf:
+Process:
 
-1. Der geaenderte Knoten muss im Graphen existieren.
-2. Der geaenderte Knoten wird als `changed` markiert.
-3. Alle transitiv abhaengigen Knoten werden als `dirty` markiert.
-4. Die betroffenen Knoten werden in deterministischer Reihenfolge
-   zurueckgegeben.
+1. The changed node must exist in the graph.
+2. The changed node is marked as `changed`.
+3. All transitively dependent nodes are marked as `dirty`.
+4. The affected nodes are returned in deterministic order.
 
-Beispiel fuer `part.width`:
+Example for `part.width`:
 
 ```text
 part.width
@@ -70,7 +65,7 @@ part.width
   -> feature.center_hole_cut
 ```
 
-Nach der Markierung:
+After marking:
 
 ```text
 part.width               changed
@@ -79,17 +74,15 @@ feature.base_extrude     dirty
 feature.center_hole_cut  dirty
 ```
 
-Nicht betroffene Knoten bleiben `clean`.
+Unaffected nodes remain `clean`.
 
-## PartDocument-Integration
+## `PartDocument` integration
 
-`PartDocument` besitzt einen `InvalidationState`.
+`PartDocument` owns an `InvalidationState`.
 
-Beim erfolgreichen Hinzufuegen von Parametern, Sketches und Features wird der
-Invalidierungsstatus mit dem Dependency Graph synchronisiert. Neue Graphknoten
-starten als `clean`.
+After successfully adding parameters, sketches, and features, the invalidation state is synchronized with the dependency graph. New graph nodes start as `clean`.
 
-Aktuelle API:
+Current API:
 
 ```text
 PartDocument::invalidation_state()
@@ -98,55 +91,50 @@ PartDocument::create_recompute_plan()
 PartDocument::mark_all_clean()
 ```
 
-`mark_parameter_changed()` aendert keinen Parameterwert. Die Methode beschreibt
-nur den Zustand nach einer Parameteraenderung. Die eigentliche
-Parameterwert-Aenderung und der Recompute folgen spaeter.
+`mark_parameter_changed()` does not change a parameter value. The method only describes the state after a parameter change. The actual parameter-value update and recompute follow later.
 
-## Fehlerverhalten
+## Error behavior
 
-Leere Knoten-IDs sind Validierungsfehler.
+Empty node IDs are validation errors.
 
 ```text
 invalidation node id must not be empty
 changed node id must not be empty
 ```
 
-Ein geaenderter Knoten muss im Dependency Graph existieren.
+A changed node must exist in the dependency graph.
 
 ```text
 changed node must exist in dependency graph
 ```
 
-`PartDocument::mark_parameter_changed()` akzeptiert nur Parameter, die im
-Dokument existieren.
+`PartDocument::mark_parameter_changed()` accepts only parameters that exist in the document.
 
 ```text
 parameter must exist in part document
 ```
 
-## Testabdeckung
+## Test coverage
 
-Aktuelle Tests pruefen:
+Current tests check:
 
-- stabile Textnamen der Statuswerte
-- Graphknoten starten als `clean`
-- leere Invalidierungsknoten werden abgelehnt
-- geaenderte Knoten werden als `changed` markiert
-- transitive Abhaengige werden als `dirty` markiert
-- nicht betroffene Graphzweige bleiben `clean`
-- alle Knoten koennen wieder auf `clean` gesetzt werden
-- fehlende geaenderte Knoten werden abgelehnt
-- `PartDocument` synchronisiert den Invalidierungsstatus mit seinem Graphen
-- `PartDocument` markiert betroffene Knoten nach einer Parameteraenderung
-- `PartDocument` kann daraus einen Recompute-Plan ableiten
+- stable text names for status values
+- graph nodes start as `clean`
+- empty invalidation nodes are rejected
+- changed nodes are marked as `changed`
+- transitive dependents are marked as `dirty`
+- unaffected graph branches remain `clean`
+- all nodes can be reset to `clean`
+- missing changed nodes are rejected
+- `PartDocument` synchronizes invalidation state with its graph
+- `PartDocument` marks affected nodes after a parameter change
+- `PartDocument` can derive a recompute plan from that state
 
-## Naechster sinnvoller Schritt
+## Next useful step
 
-Der erste optionale Geometry-Adapter und die Additive-Ausfuehrung sind
-vorhanden. Die Invalidierung bleibt davon getrennt und markiert nur Knoten. Der
-naechste Schritt sollte klein bleiben:
+The first optional geometry adapter and additive execution already exist. Invalidation remains separate and only marks nodes. The next step should stay small:
 
-- `SubtractiveExtrude` aus einem Recompute-Plan-Knoten ausfuehren
-- bestehenden Geometry-`ShapeCache` als Eingabe und Ergebnis behandeln
-- OCCT nur hinter dieser Adaptergrenze verwenden
-- noch keine GUI bauen
+- execute `SubtractiveExtrude` from a recompute-plan node
+- treat the existing geometry `ShapeCache` as input and output
+- use OCCT only behind this adapter boundary
+- do not build a GUI yet
