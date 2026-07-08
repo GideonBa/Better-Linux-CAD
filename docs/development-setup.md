@@ -11,8 +11,9 @@ Current target environment:
 - CMake 3.28 or newer
 - Ninja
 - OCCT 7.6 from the Ubuntu packages
-- Qt 6 from the Ubuntu packages
-- Catch2 for later tests
+- Qt 6 from the Ubuntu packages for later GUI work
+- nlohmann-json for MVP-1 model-intent serialization
+- Catch2 for tests
 
 ## Install dependencies
 
@@ -47,13 +48,13 @@ g++ --version
 Optional:
 
 ```bash
-dpkg-query -W cmake ninja-build pkg-config qt6-base-dev libeigen3-dev catch2
+dpkg-query -W cmake ninja-build pkg-config qt6-base-dev libeigen3-dev catch2 nlohmann-json3-dev
 dpkg-query -W libocct-foundation-dev libocct-modeling-data-dev libocct-modeling-algorithms-dev libocct-data-exchange-dev
 ```
 
 ## Configure the project
 
-The project provides CMake presets. The default preset builds only the MVP-1 core and tests. OCCT and GUI targets are disabled by default.
+The project provides CMake presets. The default preset builds the MVP-1 core and core tests. OCCT and GUI targets are disabled by default.
 
 Debug configuration:
 
@@ -121,50 +122,29 @@ Geometry tests:
 ctest --preset dev-geometry
 ```
 
-Current tests:
+Current test coverage includes:
 
-- `Quantity` accepts positive millimeter lengths.
-- `Quantity` rejects `0`, negative, and non-finite values.
-- `Parameter` stores ID, name, scope, and value.
-- `Parameter` rejects empty IDs and names.
-- `PartDocument` stores ID and name.
-- `PartDocument` manages parameters with unique IDs and names.
-- `PartDocument` allows parameter lookup by ID and name.
-- `PartDocument` manages datum planes with unique IDs.
-- `PartDocument` manages sketches with unique IDs.
-- `PartDocument` validates sketch workplanes against existing datum planes.
-- `PartDocument` validates profile parameter references against existing parameters.
-- `PartDocument` manages features with unique IDs.
-- `PartDocument` validates feature sketch, feature parameter, and feature target references.
-- `DatumPlane` creates the standard `XY` plane.
-- `Sketch` stores a workplane reference.
-- `RectangleProfile` and `CircleProfile` store parameter references.
-- Profile IDs are unique within a sketch.
-- `AdditiveExtrude` and `SubtractiveExtrude` store feature intent without geometry.
-- `DependencyGraph` stores nodes and dependency edges.
-- `DependencyGraph` finds direct and transitive dependents.
-- `DependencyGraph` returns a topological order for the reference plate.
-- `DependencyGraph` detects cycles as dependency errors.
-- `PartDocument` creates dependency graph nodes for parameters, sketches, and features.
-- `PartDocument` creates dependency graph edges from profile and feature references.
-- `InvalidationState` stores `clean`, `changed`, `dirty`, and `error`.
-- `InvalidationState` marks transitive dependents through the `DependencyGraph`.
-- `PartDocument` marks affected nodes after a parameter change.
-- `RecomputePlan` lists `dirty` nodes in topological order.
-- `PartDocument` can derive a recompute plan from its state.
-- `RectangleExtrusionAdapter` creates a non-empty OCCT solid from positive lengths in the optional geometry build.
-- `GeometryShape` wraps a computed shape as an opaque handle.
-- `ShapeCache` stores feature shapes and a final shape in the optional geometry build.
-- `GeometryRecomputeExecutor` executes an `AdditiveExtrude` from a rectangle profile in the optional geometry build and writes to the `ShapeCache`.
-- `Error` and `Result` store expected errors and successful values.
-
-Later MVP-1 tests should add centered cut and STEP export.
+- `Quantity`, `Error`, and `Result`
+- `Parameter` creation and value updates
+- `PartDocument` identity, validation, lookup, and reference management
+- datum-plane, sketch, rectangle-profile, and circle-profile data models
+- additive and subtractive feature-intent data models
+- dependency graph construction, topological ordering, and cycle detection
+- invalidation state and recompute-plan creation
+- MVP-1 JSON serialization and deserialization of `PartDocument` model intent
+- rectangle extrusion through OCCT in the optional geometry build
+- centered circular cut through OCCT in the optional geometry build
+- `ShapeCache` storage of feature shapes and final shapes
+- additive and subtractive recompute execution
+- full document recompute into a fresh `ShapeCache`
+- STEP export of the final shape
+- numeric incremental recompute after a real parameter change
+- recompute and STEP export from a JSON-restored document
 
 ## Documentation
 
 Important documents:
 
-- `zielarchitektur-parametrisches-cad-system.tex`: original target architecture
 - `docs/architecture-summary.md`: condensed architecture overview
 - `docs/core-mvp1-skeleton.md`: current core skeleton
 - `docs/sketch-mvp1-data-model.md`: sketch and profile data model
@@ -173,8 +153,14 @@ Important documents:
 - `docs/invalidation-mvp1-data-model.md`: invalidation-state data model
 - `docs/recompute-plan-mvp1-data-model.md`: recompute-plan data model
 - `docs/geometry-adapter-mvp1-rectangle-extrusion.md`: first OCCT adapter
+- `docs/geometry-adapter-mvp1-circular-cut.md`: centered cut OCCT adapter
 - `docs/shape-cache-mvp1-data-model.md`: ShapeCache data model
-- `docs/recompute-execution-mvp1-additive-extrude.md`: first additive recompute execution
+- `docs/recompute-execution-mvp1-additive-extrude.md`: additive recompute execution
+- `docs/recompute-execution-mvp1-subtractive-cut.md`: subtractive recompute execution
+- `docs/step-export-mvp1.md`: STEP export
+- `docs/document-recompute-mvp1.md`: full document recompute and reference-part pipeline
+- `docs/parameter-update-mvp1.md`: parameter update and numeric incremental recompute
+- `docs/json-serialization-mvp1.md`: JSON serialization of model intent
 - `docs/mvp-plan.md`: MVP sequence
 - `docs/mvp-1-specification.md`: detailed MVP-1 specification
 - `docs/decisions/`: architecture decision records
@@ -197,16 +183,17 @@ CMake build directories are located under `build/`.
 rm -rf build/
 ```
 
-LaTeX helper files are listed in `.gitignore`. The generated target-architecture PDF may remain as a working artifact in the directory.
+LaTeX helper files are listed in `.gitignore`. Generated architecture PDFs may remain as working artifacts if needed.
 
 ## Development rule for MVP 1
 
-The first code should only affect the MVP-1 path:
+The current code should still stay on the MVP-1 path:
 
 - no GUI code
 - no assembly
 - no engineering assistants
 - no bolt circle
 - no general constraint solver
+- no serialization of OCCT geometry
 
-Only extend the scope after parameters, recompute, OCCT geometry, and STEP export work for the reference plate.
+The next step should add file-level `.blcad.json` workflow support and a non-GUI command-line example before larger modeling features are introduced.
