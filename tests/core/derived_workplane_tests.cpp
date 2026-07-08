@@ -29,14 +29,18 @@ PartDocument make_base_extrude_document() {
   REQUIRE(xy);
   REQUIRE(document.value().add_datum_plane(xy.value()));
 
-  auto base_sketch = Sketch::create(SketchId("sketch.base"), "Sketch_BaseRectangle", DatumPlaneId("datum.xy"));
+  auto base_sketch =
+      Sketch::create(SketchId("sketch.base"), "Sketch_BaseRectangle", DatumPlaneId("datum.xy"));
   REQUIRE(base_sketch);
-  auto rectangle = RectangleProfile::create(ProfileId("profile.base_rectangle"), ParameterId("part.width"), ParameterId("part.height"));
+  auto rectangle = RectangleProfile::create(ProfileId("profile.base_rectangle"),
+                                            ParameterId("part.width"), ParameterId("part.height"));
   REQUIRE(rectangle);
   REQUIRE(base_sketch.value().add_profile(rectangle.value()));
   REQUIRE(document.value().add_sketch(base_sketch.value()));
 
-  auto base = Feature::create_additive_extrude(FeatureId("feature.base_extrude"), "BaseExtrude", SketchId("sketch.base"), ParameterId("part.thickness"));
+  auto base = Feature::create_additive_extrude(FeatureId("feature.base_extrude"), "BaseExtrude",
+                                               SketchId("sketch.base"),
+                                               ParameterId("part.thickness"));
   REQUIRE(base);
   REQUIRE(document.value().add_feature(base.value()));
 
@@ -72,21 +76,30 @@ void add_hole_on_workplane(PartDocument& document, DatumPlaneId workplane_id, Sk
 } // namespace
 
 TEST_CASE("Semantic face references store feature and face role", "[core][workplane]") {
-  auto top_reference = SemanticFaceReference::create(FeatureId("feature.base_extrude"), SemanticFace::Top);
+  auto top_reference = SemanticFaceReference::create(FeatureId("feature.base_extrude"),
+                                                     SemanticFace::Top);
   REQUIRE(top_reference);
   CHECK(top_reference.value().source_feature().value() == "feature.base_extrude");
   CHECK(top_reference.value().face() == SemanticFace::Top);
   CHECK(to_string(top_reference.value().face()) == "top");
 
-  auto bottom_reference = SemanticFaceReference::create(FeatureId("feature.base_extrude"), SemanticFace::Bottom);
+  auto bottom_reference = SemanticFaceReference::create(FeatureId("feature.base_extrude"),
+                                                        SemanticFace::Bottom);
   REQUIRE(bottom_reference);
   CHECK(bottom_reference.value().face() == SemanticFace::Bottom);
   CHECK(to_string(bottom_reference.value().face()) == "bottom");
 
-  auto right_reference = SemanticFaceReference::create(FeatureId("feature.base_extrude"), SemanticFace::Right);
+  auto right_reference = SemanticFaceReference::create(FeatureId("feature.base_extrude"),
+                                                       SemanticFace::Right);
   REQUIRE(right_reference);
   CHECK(right_reference.value().face() == SemanticFace::Right);
   CHECK(to_string(right_reference.value().face()) == "right");
+
+  auto left_reference = SemanticFaceReference::create(FeatureId("feature.base_extrude"),
+                                                      SemanticFace::Left);
+  REQUIRE(left_reference);
+  CHECK(left_reference.value().face() == SemanticFace::Left);
+  CHECK(to_string(left_reference.value().face()) == "left");
 }
 
 TEST_CASE("Semantic face references reject empty source features", "[core][workplane]") {
@@ -97,37 +110,49 @@ TEST_CASE("Semantic face references reject empty source features", "[core][workp
   CHECK(reference.error().message() == "semantic face source feature id must not be empty");
 }
 
-TEST_CASE("PartDocument accepts sketches on derived top bottom and right workplanes", "[core][workplane]") {
+TEST_CASE("PartDocument accepts sketches on derived top bottom right and left workplanes",
+          "[core][workplane]") {
   auto document = make_base_extrude_document();
 
-  REQUIRE(document.add_derived_workplane(make_feature_face_workplane(DatumPlaneId("workplane.base_top"), "BaseTopFace", SemanticFace::Top)));
-  REQUIRE(document.add_derived_workplane(make_feature_face_workplane(DatumPlaneId("workplane.base_bottom"), "BaseBottomFace", SemanticFace::Bottom)));
-  REQUIRE(document.add_derived_workplane(make_feature_face_workplane(DatumPlaneId("workplane.base_right"), "BaseRightFace", SemanticFace::Right)));
-  CHECK(document.derived_workplane_count() == 3);
+  REQUIRE(document.add_derived_workplane(make_feature_face_workplane(
+      DatumPlaneId("workplane.base_top"), "BaseTopFace", SemanticFace::Top)));
+  REQUIRE(document.add_derived_workplane(make_feature_face_workplane(
+      DatumPlaneId("workplane.base_bottom"), "BaseBottomFace", SemanticFace::Bottom)));
+  REQUIRE(document.add_derived_workplane(make_feature_face_workplane(
+      DatumPlaneId("workplane.base_right"), "BaseRightFace", SemanticFace::Right)));
+  REQUIRE(document.add_derived_workplane(make_feature_face_workplane(
+      DatumPlaneId("workplane.base_left"), "BaseLeftFace", SemanticFace::Left)));
+  CHECK(document.derived_workplane_count() == 4);
 
   add_hole_on_workplane(document, DatumPlaneId("workplane.base_top"), SketchId("sketch.top_hole"),
                         ProfileId("profile.top_hole"), FeatureId("feature.top_hole_cut"),
                         "Sketch_TopHole", "TopHoleCut");
-  add_hole_on_workplane(document, DatumPlaneId("workplane.base_bottom"), SketchId("sketch.bottom_hole"),
-                        ProfileId("profile.bottom_hole"), FeatureId("feature.bottom_hole_cut"),
-                        "Sketch_BottomHole", "BottomHoleCut");
-  add_hole_on_workplane(document, DatumPlaneId("workplane.base_right"), SketchId("sketch.right_hole"),
-                        ProfileId("profile.right_hole"), FeatureId("feature.right_hole_cut"),
-                        "Sketch_RightHole", "RightHoleCut");
+  add_hole_on_workplane(document, DatumPlaneId("workplane.base_bottom"),
+                        SketchId("sketch.bottom_hole"), ProfileId("profile.bottom_hole"),
+                        FeatureId("feature.bottom_hole_cut"), "Sketch_BottomHole",
+                        "BottomHoleCut");
+  add_hole_on_workplane(document, DatumPlaneId("workplane.base_right"),
+                        SketchId("sketch.right_hole"), ProfileId("profile.right_hole"),
+                        FeatureId("feature.right_hole_cut"), "Sketch_RightHole", "RightHoleCut");
+  add_hole_on_workplane(document, DatumPlaneId("workplane.base_left"),
+                        SketchId("sketch.left_hole"), ProfileId("profile.left_hole"),
+                        FeatureId("feature.left_hole_cut"), "Sketch_LeftHole", "LeftHoleCut");
 
-  CHECK(document.dependency_graph().has_dependency("feature.base_extrude", "workplane.base_right"));
-  CHECK(document.dependency_graph().has_dependency("workplane.base_right", "sketch.right_hole"));
-  CHECK(document.dependency_graph().has_dependency("sketch.right_hole", "feature.right_hole_cut"));
-  CHECK(document.dependency_graph().has_dependency("feature.base_extrude", "feature.right_hole_cut"));
+  CHECK(document.dependency_graph().has_dependency("feature.base_extrude", "workplane.base_left"));
+  CHECK(document.dependency_graph().has_dependency("workplane.base_left", "sketch.left_hole"));
+  CHECK(document.dependency_graph().has_dependency("sketch.left_hole", "feature.left_hole_cut"));
+  CHECK(document.dependency_graph().has_dependency("feature.base_extrude", "feature.left_hole_cut"));
 }
 
 TEST_CASE("PartDocument rejects derived workplanes without source feature", "[core][workplane]") {
   auto document = PartDocument::create(DocumentId("part.empty"), "EmptyPart");
   REQUIRE(document);
 
-  auto face_reference = SemanticFaceReference::create(FeatureId("feature.missing"), SemanticFace::Right);
+  auto face_reference = SemanticFaceReference::create(FeatureId("feature.missing"),
+                                                      SemanticFace::Left);
   REQUIRE(face_reference);
-  auto workplane = DerivedWorkplane::create_on_feature_face(DatumPlaneId("workplane.missing_right"), "MissingRightFace", face_reference.value());
+  auto workplane = DerivedWorkplane::create_on_feature_face(
+      DatumPlaneId("workplane.missing_left"), "MissingLeftFace", face_reference.value());
   REQUIRE(workplane);
 
   auto added = document.value().add_derived_workplane(workplane.value());
