@@ -95,9 +95,10 @@ Result<std::size_t> PartDocument::add_derived_workplane(DerivedWorkplane workpla
         workplane.id().value(), "derived workplane source feature must be an additive extrude"));
   }
 
-  if (workplane.face_reference().face() != SemanticFace::Top) {
+  if (workplane.face_reference().face() != SemanticFace::Top &&
+      workplane.face_reference().face() != SemanticFace::Bottom) {
     return Result<std::size_t>::failure(
-        Error::validation(workplane.id().value(), "only top semantic face is supported"));
+        Error::validation(workplane.id().value(), "only top and bottom semantic faces are supported"));
   }
 
   auto graph = dependency_graph_;
