@@ -21,7 +21,7 @@ namespace {
                         datum_plane.y_axis(), datum_plane.normal(), RectangularWorkplaneBounds{}});
 }
 
-[[nodiscard]] Result<ResolvedWorkplane> resolve_top_face_workplane(
+[[nodiscard]] Result<ResolvedWorkplane> resolve_additive_extrude_face_workplane(
     const PartDocument& document, const DerivedWorkplane& workplane) {
   const FeatureId& source_feature_id = workplane.face_reference().source_feature();
   const Feature* source_feature = document.find_feature(source_feature_id);
@@ -35,11 +35,6 @@ namespace {
         workplane.id().value(), "derived workplane source feature must be an additive extrude"));
   }
 
-  if (workplane.face_reference().face() != SemanticFace::Top) {
-    return Result<ResolvedWorkplane>::failure(
-        validation_error(workplane.id().value(), "only top semantic face is supported"));
-  }
-
   const Sketch* source_sketch = document.find_sketch(source_feature->input_sketch());
   if (source_sketch == nullptr) {
     return Result<ResolvedWorkplane>::failure(validation_error(
@@ -50,7 +45,7 @@ namespace {
       !source_sketch->circle_profiles().empty()) {
     return Result<ResolvedWorkplane>::failure(validation_error(
         source_sketch->id().value(),
-        "top-face workplane resolution requires a source sketch with exactly one rectangle profile"));
+        "derived workplane resolution requires a source sketch with exactly one rectangle profile"));
   }
 
   const RectangleProfile& rectangle = source_sketch->rectangle_profiles().front();
@@ -81,12 +76,23 @@ namespace {
   bounds.height_mm = height->value().millimeters();
 
   const Point2 rectangle_center = rectangle.center();
-  return Result<ResolvedWorkplane>::success(
-      ResolvedWorkplane{workplane.id(),
-                        Point3{rectangle_center.x, rectangle_center.y,
-                               thickness->value().millimeters()},
-                        Vector3{1.0, 0.0, 0.0}, Vector3{0.0, 1.0, 0.0},
-                        Vector3{0.0, 0.0, 1.0}, bounds});
+  switch (workplane.face_reference().face()) {
+  case SemanticFace::Top:
+    return Result<ResolvedWorkplane>::success(
+        ResolvedWorkplane{workplane.id(),
+                          Point3{rectangle_center.x, rectangle_center.y,
+                                 thickness->value().millimeters()},
+                          Vector3{1.0, 0.0, 0.0}, Vector3{0.0, 1.0, 0.0},
+                          Vector3{0.0, 0.0, 1.0}, bounds});
+  case SemanticFace::Bottom:
+    return Result<ResolvedWorkplane>::success(
+        ResolvedWorkplane{workplane.id(), Point3{rectangle_center.x, rectangle_center.y, 0.0},
+                          Vector3{1.0, 0.0, 0.0}, Vector3{0.0, 1.0, 0.0},
+                          Vector3{0.0, 0.0, -1.0}, bounds});
+  }
+
+  return Result<ResolvedWorkplane>::failure(
+      validation_error(workplane.id().value(), "unsupported semantic face"));
 }
 
 } // namespace
@@ -105,7 +111,7 @@ Result<ResolvedWorkplane> WorkplaneResolver::resolve(const PartDocument& documen
 
   const DerivedWorkplane* derived_workplane = document.find_derived_workplane(workplane_id);
   if (derived_workplane != nullptr) {
-    return resolve_top_face_workplane(document, *derived_workplane);
+    return resolve_additive_extrude_face_workplane(document, *derived_workplane);
   }
 
   return Result<ResolvedWorkplane>::failure(
