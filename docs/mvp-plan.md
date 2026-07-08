@@ -48,15 +48,18 @@ Implemented seed:
 - subtractive recompute evaluates circle centers through the resolved workplane
 - rectangular bounds on the resolved top-face workplane
 - near-edge valid hole test and out-of-bounds invalid hole test
+- incremental recompute through derived-workplane dependencies
+- stale dirty feature shapes are removed before incremental recompute
+- shrinking the source rectangle can invalidate an existing top-face hole
 
 Next narrow step:
 
-- verify incremental recompute through derived-workplane dependencies
-- update base dimensions through `PartDocument::set_parameter_value`
-- ensure the recompute plan marks base, derived workplane, dependent sketch, and cut as affected
-- execute the affected feature nodes in order
-- validate that shrinking the source rectangle can make an existing top-face hole invalid
-- keep support limited to the top face of simple additive extrudes
+- add `SemanticFace::Bottom` for simple additive extrudes
+- allow `DerivedWorkplane` to reference `feature.base_extrude.bottom`
+- resolve the bottom face with a clear frame and rectangular bounds
+- add JSON roundtrip coverage for bottom-face workplanes
+- add geometry recompute coverage for a through-all circular cut from the bottom face
+- keep support limited to top and bottom faces of simple additive extrudes
 - do not add side faces yet
 - do not build a full topological naming system yet
 - do not build a GUI yet
