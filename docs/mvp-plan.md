@@ -1,7 +1,5 @@
 # MVP Plan
 
-Source: `zielarchitektur-parametrisches-cad-system.tex`.
-
 ## MVP 1: Single-part modeling
 
 Goal: one single parametric part.
@@ -16,10 +14,13 @@ Detailed document: `docs/mvp-1-specification.md`
 - extrude
 - cut
 - STEP export
+- JSON serialization of model intent
 
 Example: rectangular plate with width, height, thickness, and a centered hole.
 
-Current state: the core contains the required data models up to the recompute plan. An optional `blcad_geometry` target already creates a centered rectangle extrusion as an OCCT solid and provides a small `ShapeCache`. `AdditiveExtrude` can already be executed for one rectangle profile from a recompute plan. Centered cut, full document recompute, STEP export, and numeric parameter updates are also implemented in the optional geometry path.
+Current state: MVP 1 now has the required core data models, dependency graph, invalidation state, recompute plan, numeric parameter updates, JSON serialization of model intent, optional OCCT geometry execution, centered cut, full document recompute, and STEP export. A document restored from JSON can be recomputed into a fresh `ShapeCache` and exported again.
+
+Immediate next step before MVP 2: add filesystem-level `.blcad.json` read/write helpers, a checked-in reference model under `examples/`, and a small non-GUI command-line example that loads the JSON model and exports STEP.
 
 ## MVP 2: Sketch on planar face
 
