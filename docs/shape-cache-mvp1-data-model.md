@@ -1,28 +1,23 @@
-# MVP 1 ShapeCache-Datenmodell
+# MVP 1 ShapeCache Data Model
 
-Status: optionales Geometry-Datenmodell, von Additive-Recompute nutzbar
+Status: optional geometry data model, usable by additive recompute.
 
-Dieses Dokument beschreibt den ersten kleinen `ShapeCache` fuer MVP 1. Der
-Cache liegt im optionalen Target `blcad_geometry`, weil er `GeometryShape`
-enthaelt. Der Core bleibt dadurch frei von OCCT-Headern und frei von
-Geometry-Linking.
+This document describes the first small `ShapeCache` for MVP 1. The cache lives in the optional target `blcad_geometry` because it contains `GeometryShape`. This keeps the core free of OCCT headers and geometry linking.
 
-## Ziel
+## Goal
 
-Der `ShapeCache` speichert berechnete Geometrie als Ergebnis des parametrischen
-Modells. Er ist nicht die Quelle der Wahrheit. Quelle der Wahrheit bleiben
-Dokument, Parameter, Skizzen, Features, Dependency Graph und Recompute-Plan.
+The `ShapeCache` stores computed geometry as the result of the parametric model. It is not the source of truth. The source of truth remains the document, parameters, sketches, features, dependency graph, and recompute plan.
 
-Der aktuelle Cache unterstuetzt den ersten Additive-Recompute-Schritt:
+The current cache supports the first additive recompute step:
 
-- berechnete Feature-Shapes nach `FeatureId` speichern
-- einen finalen Shape und dessen Quellfeature markieren
-- Cache-Inhalte loeschen koennen
-- leere IDs und leere Shapes ablehnen
+- store computed feature shapes by `FeatureId`
+- mark one final shape and its source feature
+- clear cache contents
+- reject empty IDs and empty shapes
 
-## CMake-Target
+## CMake target
 
-Der Cache wird nur mit dem Geometry-Preset gebaut:
+The cache is built only with the geometry preset:
 
 ```bash
 cmake --preset dev-geometry
@@ -30,9 +25,9 @@ cmake --build --preset dev-geometry
 ctest --preset dev-geometry
 ```
 
-Der Standard-Preset `dev` bleibt Core-only.
+The default preset `dev` remains core-only.
 
-## Oeffentliche Schnittstelle
+## Public interface
 
 Header:
 
@@ -40,80 +35,78 @@ Header:
 include/blcad/geometry/shape_cache.hpp
 ```
 
-Aktuelle Typen:
+Current types:
 
 - `CachedFeatureShape`
 - `ShapeCache`
 
-`ShapeCache` verwendet:
+`ShapeCache` uses:
 
 - `ShapeCacheId`
 - `FeatureId`
 - `GeometryShape`
-- `Result<T>` und `Error`
+- `Result<T>` and `Error`
 
-## Verhalten
+## Behavior
 
-Ein Cache wird ueber eine nicht-leere `ShapeCacheId` erzeugt:
+A cache is created with a non-empty `ShapeCacheId`:
 
 ```text
 ShapeCache::create(shape_cache_id)
 ```
 
-Feature-Shapes werden nach Feature-ID abgelegt:
+Feature shapes are stored by feature ID:
 
 ```text
 store_feature_shape(feature.base_extrude, geometry_shape)
 ```
 
-Der finale Shape wird mit dem Feature verbunden, das ihn aktuell erzeugt:
+The final shape is connected to the feature that currently produced it:
 
 ```text
 set_final_shape(feature.base_extrude, geometry_shape)
 ```
 
-`clear()` entfernt alle Feature-Shapes und den finalen Shape.
+`clear()` removes all feature shapes and the final shape.
 
-## Validierung
+## Validation
 
-Aktuelle Regeln:
+Current rules:
 
-- Cache-ID darf nicht leer sein.
-- Feature-ID darf nicht leer sein.
-- Leere `GeometryShape`-Handles duerfen nicht gespeichert werden.
-- Erneutes Speichern derselben Feature-ID ersetzt den vorhandenen Shape statt
-  einen zweiten Eintrag anzulegen.
+- cache ID must not be empty
+- feature ID must not be empty
+- empty `GeometryShape` handles must not be stored
+- storing the same feature ID again replaces the existing shape instead of creating a duplicate entry
 
-## Testabdeckung
+## Test coverage
 
-Aktuelle Tests pruefen:
+Current tests check:
 
-- Cache startet leer mit stabiler ID.
-- Leere Cache-IDs werden abgelehnt.
-- Feature-Shapes koennen gespeichert und wiedergefunden werden.
-- Ein gespeicherter Rechteckextrusions-Shape enthaelt genau einen Solid.
-- Wiederholtes Speichern derselben Feature-ID erzeugt keinen Duplikateintrag.
-- Finaler Shape und Quellfeature werden gespeichert.
-- `clear()` leert Feature- und finalen Shape.
-- Leere Feature-IDs und leere Shapes werden abgelehnt.
-- `GeometryRecomputeExecutor` kann einen ausgefuehrten `AdditiveExtrude` im
-  Cache ablegen.
+- the cache starts empty with a stable ID
+- empty cache IDs are rejected
+- feature shapes can be stored and found again
+- a stored rectangle-extrusion shape contains exactly one solid
+- repeated storage of the same feature ID does not create a duplicate entry
+- final shape and source feature are stored
+- `clear()` clears feature and final shapes
+- empty feature IDs and empty shapes are rejected
+- `GeometryRecomputeExecutor` can store an executed `AdditiveExtrude` in the cache
 
-## Bewusste Begrenzung
+## Deliberate limitation
 
-Noch nicht enthalten:
+Not included yet:
 
-- Integration in `PartDocument`
-- `SubtractiveExtrude` und Boolean Cut
-- STEP-Export
+- integration into `PartDocument`
+- `SubtractiveExtrude` and Boolean cut
+- STEP export
 - GUI
 
-## Naechster sinnvoller Schritt
+## Next useful step
 
-Als naechstes sollte der zentrische Cut fuer `SubtractiveExtrude` entstehen:
+The next step should create the centered cut for `SubtractiveExtrude`:
 
-1. Zielshape aus dem `ShapeCache` lesen
-2. Kreisprofil und Durchmesserparameter aus `PartDocument` aufloesen
-3. OCCT-Boolean-Cut ausfuehren
-4. Ergebnis im `ShapeCache` als neuen finalen Shape speichern
-4. weiter keinen allgemeinen Solver und keine GUI bauen
+1. read the target shape from the `ShapeCache`
+2. resolve the circle profile and diameter parameter from `PartDocument`
+3. execute the OCCT Boolean cut
+4. store the result in the `ShapeCache` as the new final shape
+5. continue not to build a general solver or GUI
