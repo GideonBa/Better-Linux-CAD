@@ -1,8 +1,8 @@
 # MVP 2 Workplane Resolver
 
-Status: geometry-layer resolver for the derived top-face workplane of a simple additive extrude.
+Status: geometry-layer resolver for the derived top-face workplane of a simple additive extrude, including rectangular bounds.
 
-This document describes the next step after introducing `SemanticFaceReference` and `DerivedWorkplane` in the core model. The core still stores semantic model intent only. The geometry layer now resolves that semantic workplane into a concrete frame for recompute.
+This document describes the step after introducing `SemanticFaceReference` and `DerivedWorkplane` in the core model. The core still stores semantic model intent only. The geometry layer resolves that semantic workplane into a concrete frame for recompute.
 
 ## Goal
 
@@ -29,6 +29,7 @@ Main types:
 
 ```text
 ResolvedWorkplane
+RectangularWorkplaneBounds
 WorkplaneResolver
 ```
 
@@ -40,6 +41,7 @@ origin
 x_axis
 y_axis
 normal
+bounds
 ```
 
 The resolver exposes:
@@ -60,6 +62,7 @@ origin = (0, 0, 0)
 x_axis = (1, 0, 0)
 y_axis = (0, 1, 0)
 normal = (0, 0, 1)
+bounds.enabled = false
 ```
 
 ### Derived top-face workplane
@@ -95,11 +98,25 @@ For the current reference model this means:
 origin = (0, 0, 8)
 ```
 
-The width and height are intentionally resolved even though the current frame is axis-aligned. This keeps the resolver tied to the supported simple rectangular extrusion and prepares the next step: face-bound validation.
+The returned workplane also contains a rectangular bounds object:
+
+```text
+bounds.enabled = true
+bounds.center = (0, 0)
+bounds.width_mm = source rectangle width
+bounds.height_mm = source rectangle height
+```
+
+For the current reference model:
+
+```text
+bounds.width_mm = 120
+bounds.height_mm = 80
+```
 
 ## Recompute integration
 
-`GeometryRecomputeExecutor::execute_subtractive_extrude` now resolves the input sketch workplane before executing the circular cut.
+`GeometryRecomputeExecutor::execute_subtractive_extrude` resolves the input sketch workplane before executing the circular cut.
 
 The circle profile center is first evaluated as a local workplane point:
 
@@ -107,7 +124,9 @@ The circle profile center is first evaluated as a local workplane point:
 local = (25, -10)
 ```
 
-Then it is mapped into global coordinates:
+Before mapping the point into global coordinates, the executor validates the circle radius against rectangular bounds when bounds are enabled.
+
+Then the point is mapped into global coordinates:
 
 ```text
 global = origin + local.x * x_axis + local.y * y_axis
@@ -120,6 +139,16 @@ global = (25, -10, 8)
 ```
 
 The current circular cut adapter still performs a through-all vertical cut. It uses the resolved global X/Y center. The resolved Z value proves the workplane placement, even though the current through-all cutter spans the target's full Z bounds.
+
+## Bounds validation
+
+Bounds validation is documented in:
+
+```text
+docs/bounded-workplane-validation-mvp2.md
+```
+
+The current validation rejects a circle profile if its local center and radius do not fit fully inside the rectangular bounds.
 
 ## Example model
 
@@ -151,16 +180,20 @@ Geometry tests cover:
 - resolving `datum.xy`
 - resolving `workplane.base_top`
 - checking that the top-face origin is at `z = thickness`
+- checking that `datum.xy` is unbounded
+- checking that `workplane.base_top` has rectangular bounds
 - mapping an off-center sketch point through the resolved frame
 - rejecting missing workplanes
 - recomputing an off-center circular cut from a sketch on the derived top-face workplane
+- accepting a near-edge circle that still lies inside bounds
+- rejecting an out-of-bounds circle before executing the cut
 - verifying that the final volume matches the expected removed cylinder volume within tolerance
 
 ## Deliberate limitation
 
 Not included yet:
 
-- face-bound validation
+- incremental recompute tests through derived-workplane dependencies after parameter updates
 - arbitrary planar faces
 - side faces
 - flipped workplane orientation
