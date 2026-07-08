@@ -1,8 +1,8 @@
 # MVP 1 Core Skeleton
 
-Status: implemented core skeleton for the first MVP-1 data models.
+Status: implemented core skeleton for the MVP-1 data models, recompute planning, and JSON model-intent serialization.
 
-This document describes the current MVP-1 core state. The core itself remains free of OCCT and Qt. Geometry is handled only in the optional `blcad_geometry` target.
+This document describes the current MVP-1 core state. The core remains free of OCCT and Qt. Geometry is handled only in the optional `blcad_geometry` target, while JSON serialization stays in the core because it stores model intent rather than computed shapes.
 
 ## Goal of this step
 
@@ -19,6 +19,7 @@ The skeleton makes the first architecture decisions executable:
 - `DependencyGraph` as a pure dependency structure
 - `InvalidationState` as a pure state model for changed and affected nodes
 - `RecomputePlan` as an ordered list of `dirty` nodes
+- `part_document_json` as schema-versioned JSON serialization for MVP-1 model intent
 - `ShapeCache` as an optional geometry data model for computed shapes
 
 ## CMake targets
@@ -36,6 +37,7 @@ Currently contains:
 - `blcad/core/quantity.hpp`
 - `blcad/core/parameter.hpp`
 - `blcad/core/part_document.hpp`
+- `blcad/core/part_document_json.hpp`
 - `blcad/core/datum_plane.hpp`
 - `blcad/core/sketch.hpp`
 - `blcad/core/feature.hpp`
@@ -54,6 +56,7 @@ Current test areas:
 - `Quantity`
 - `Parameter`
 - `PartDocument`
+- `PartDocument` JSON serialization
 - `DatumPlane`
 - `Sketch`
 - `RectangleProfile`
@@ -91,6 +94,8 @@ Current test areas:
 - `GeometryRecomputeExecutor`
 - `ShapeCache`
 - `StepExporter`
+- full reference-part recompute
+- recompute from a JSON-restored document
 
 ## Core types
 
@@ -119,27 +124,17 @@ Rules:
 - `0`, negative values, and non-finite values are invalid
 - creation runs through `Result<Quantity>`
 
-### `Error`
+### `Error` and `Result<T>`
 
-`Error` describes expected errors in the core.
+`Error` describes expected errors in the core. `Result<T>` wraps either a successful value or an expected error.
 
-Minimum fields:
-
-- category
-- object ID
-- message
-
-Current categories:
+Current error categories:
 
 - `validation`
 - `dependency`
 - `geometry`
 - `export`
 - `internal`
-
-### `Result<T>`
-
-`Result<T>` wraps either a successful value or an expected error. It is the normal return type for validation and later core operations.
 
 ### `Parameter`
 
@@ -170,17 +165,11 @@ Required:
 
 Rules:
 
-- document ID must not be empty
-- document name must not be empty
-- parameter IDs must be unique within the document
-- parameter names must be unique within the document
-- parameters can be looked up by ID and name
-- insertion order of parameters is preserved
-- datum-plane IDs must be unique within the document
-- sketch IDs must be unique within the document
+- document ID and name must not be empty
+- parameter IDs and names must be unique
+- datum-plane, sketch, and feature IDs must be unique
 - sketch workplanes must point to existing datum planes
 - profile parameter references must point to existing parameters
-- feature IDs must be unique within the document
 - feature input sketches must point to existing sketches
 - additive extrude length parameters must point to existing parameters
 - subtractive extrude target features must point to existing features
@@ -192,83 +181,21 @@ Rules:
 
 `PartDocument` intentionally does not contain OCCT geometry. The `ShapeCache` remains in the geometry layer.
 
-### `DatumPlane`
+### Sketch and feature model
 
-`DatumPlane` describes a workplane. Currently only the standard `XY` plane exists:
+MVP 1 currently supports:
 
-- origin `(0, 0, 0)`
-- X axis `(1, 0, 0)`
-- Y axis `(0, 1, 0)`
-- normal direction `(0, 0, 1)`
+- the standard `XY` datum plane
+- centered rectangle profiles
+- centered circle profiles
+- additive extrude in `+Z`
+- subtractive extrude in `+Z` with `through_all`
 
-The ID and name must not be empty.
-
-### `RectangleProfile`
-
-`RectangleProfile` describes a centered rectangle in a sketch.
-
-Currently stored:
-
-- `ProfileId`
-- center as `Point2`
-- parameter reference for width
-- parameter reference for height
-
-Only references are stored. Parameter values are resolved later by the geometry execution layer.
-
-### `CircleProfile`
-
-`CircleProfile` describes a centered circle in a sketch.
-
-Currently stored:
-
-- `ProfileId`
-- center as `Point2`
-- parameter reference for diameter
-
-There is not yet a general fit check against the rectangle dimensions.
-
-### `Sketch`
-
-`Sketch` stores:
-
-- `SketchId`
-- name
-- workplane reference to a `DatumPlaneId`
-- rectangle profiles
-- circle profiles
-
-Profile IDs must be unique within one sketch, even across profile types.
-
-### `Feature`
-
-`Feature` currently describes feature intent, not geometry.
-
-Current types:
-
-- `AdditiveExtrude`
-- `SubtractiveExtrude`
-
-`AdditiveExtrude` stores:
-
-- `FeatureId`
-- name
-- input sketch
-- length parameter
-- direction `+Z`
-
-`SubtractiveExtrude` stores:
-
-- `FeatureId`
-- name
-- input sketch
-- target feature
-- depth `through_all`
-- direction `+Z`
+The data model stores intent and references. Parameter values are resolved by the geometry execution layer.
 
 ### `DependencyGraph`
 
-`DependencyGraph` currently describes dependencies between stable string node IDs.
+`DependencyGraph` describes dependencies between stable string node IDs.
 
 An edge:
 
@@ -282,32 +209,11 @@ means:
 B depends on A.
 ```
 
-Currently stored:
-
-- node IDs
-- directed edges
-
-Current queries:
-
-- direct dependents
-- transitive dependents
-- topological order
-- cycle detection
-
-The graph does not execute invalidation and does not start recompute. `PartDocument` owns a `DependencyGraph` and derives nodes and edges from parameter, sketch, and feature references.
+The graph supports direct dependents, transitive dependents, topological order, and cycle detection. It does not execute invalidation and does not start recompute.
 
 ### `InvalidationState`
 
-`InvalidationState` describes the current invalidation state of dependency graph nodes.
-
-Current state values:
-
-- `clean`
-- `changed`
-- `dirty`
-- `error`
-
-A parameter change marks the parameter as `changed` and all transitively dependent nodes as `dirty`. The state itself does not start recompute.
+`InvalidationState` stores whether graph nodes are `clean`, `changed`, `dirty`, or `error`. A parameter change marks the parameter as `changed` and all transitively dependent nodes as `dirty`.
 
 ### `RecomputePlan`
 
@@ -321,6 +227,30 @@ Rules:
 - graph cycles are reported as dependency errors
 
 The plan is a task list. It does not execute features and does not create geometry.
+
+## JSON serialization
+
+`serialize_part_document_to_json` serializes MVP-1 model intent into a schema-versioned JSON document. `deserialize_part_document_from_json` rebuilds a `PartDocument` from that JSON through the normal validated construction APIs.
+
+The JSON contains:
+
+- schema marker `blcad.part_document.mvp1`
+- version `1`
+- document ID and name
+- length parameters
+- datum planes
+- sketches and profiles
+- additive and subtractive extrude features
+
+The JSON deliberately does not contain:
+
+- OCCT shapes
+- `GeometryShape`
+- `ShapeCache` contents
+- STEP data
+- GUI state
+
+Details: `docs/json-serialization-mvp1.md`.
 
 ## Optional geometry layer
 
@@ -342,14 +272,15 @@ The cache is not integrated into `PartDocument`. It remains a computed result ne
 
 This skeleton still does not implement:
 
-- JSON serialization
+- filesystem read/write helpers for `.blcad.json`
+- a command-line export tool
 - GUI
 - assemblies
 - general sketch constraints
 - general constraint solver
 - semantic face references beyond the current simple model
 
-This order is intentional. The core first needs safe data types, validation, dependency tracking, recompute planning, and a narrow geometry pipeline before larger CAD subsystems are added.
+This order is intentional. The core first needs safe data types, validation, dependency tracking, recompute planning, serialization, and a narrow geometry pipeline before larger CAD subsystems are added.
 
 ## Standard commands
 
@@ -369,4 +300,4 @@ cmake --build --preset dev-geometry
 ctest --preset dev-geometry
 ```
 
-Further details are documented in the dedicated MVP-1 data-model and geometry documents in `docs/`.
+Further details are documented in the dedicated MVP-1 data-model, geometry, and JSON documents in `docs/`.
