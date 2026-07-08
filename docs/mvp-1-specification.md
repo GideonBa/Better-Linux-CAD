@@ -1,12 +1,12 @@
 # MVP 1 Specification: Single-Part Modeling
 
-Status: implemented MVP-1 vertical slice with core model intent, dependency tracking, recompute planning, optional OCCT geometry execution, STEP export, numeric parameter update, and JSON model-intent serialization.
+Status: implemented MVP-1 vertical slice with core model intent, dependency tracking, recompute planning, optional OCCT geometry execution, STEP export, numeric parameter update, JSON model-intent serialization, `.blcad.json` file workflow, and a headless JSON-to-STEP export example.
 
 ## Goal
 
 MVP 1 proves the smallest useful core of the CAD system:
 
-A `PartDocument` can describe a single parametric part, compute OCCT geometry from parameters and features, export that geometry as a STEP file, serialize the model intent to JSON, restore the document from JSON, and recompute the restored document into fresh geometry.
+A `PartDocument` can describe a single parametric part, compute OCCT geometry from parameters and features, export that geometry as a STEP file, serialize the model intent to JSON, write and read `.blcad.json` model files, restore the document from JSON, and recompute the restored document into fresh geometry.
 
 The reference part is a rectangular plate with a centered hole:
 
@@ -25,6 +25,7 @@ The most important proof is not graphical display. The most important proof is t
 - the dependency graph and recompute plan are derived from model references
 - the final OCCT shape is only a computed cache
 - JSON stores model intent, not computed BRep geometry
+- the checked-in reference model can be loaded and exported without a GUI
 
 ## Non-goals
 
@@ -51,7 +52,7 @@ This limitation keeps MVP 1 focused on one robust vertical line through document
 
 ## Success criteria
 
-MVP 1 is reached when automated tests prove that the system can:
+MVP 1 is reached when automated tests and the headless example prove that the system can:
 
 1. Create a `PartDocument` for a plate.
 2. Set the four parameters `width`, `height`, `thickness`, and `hole_diameter`.
@@ -65,6 +66,8 @@ MVP 1 is reached when automated tests prove that the system can:
 10. Restore the document from JSON through the normal validation path.
 11. Recompute the restored document into a fresh `ShapeCache`.
 12. Export the restored and recomputed model as STEP.
+13. Write and read `.blcad.json` model files.
+14. Load the checked-in reference model through `blcad_export_step` and export STEP without a GUI.
 
 ## Coordinates and units
 
@@ -121,15 +124,20 @@ Implemented geometry objects in the optional `blcad_geometry` target:
 - `GeometryRecomputeExecutor`
 - `StepExporter`
 
-Implemented persistence helpers:
+Implemented persistence and example helpers:
 
 - `serialize_part_document_to_json`
 - `deserialize_part_document_from_json`
+- `write_part_document_json_file`
+- `read_part_document_json_file`
+- `examples/reference_plate.blcad.json`
+- `blcad_export_step`
 
 Details:
 
 - `docs/core-mvp1-skeleton.md`
 - `docs/json-serialization-mvp1.md`
+- `docs/json-file-workflow-mvp1.md`
 
 ## `PartDocument`
 
@@ -271,13 +279,15 @@ Rules:
 - the output file must be non-empty
 - the test checks the `ISO-10303-21` STEP header
 
-## JSON serialization
+## JSON serialization and file workflow
 
-MVP 1 now supports JSON serialization of model intent through:
+MVP 1 supports JSON serialization of model intent through:
 
 ```text
 serialize_part_document_to_json(document)
 deserialize_part_document_from_json(content)
+write_part_document_json_file(document, path)
+read_part_document_json_file(path)
 ```
 
 The JSON root contains:
@@ -289,25 +299,26 @@ The JSON root contains:
 }
 ```
 
-The JSON stores:
-
-- document ID and name
-- length parameters
-- datum planes
-- sketches and profiles
-- additive and subtractive extrude features
-
-The JSON does not store:
-
-- OCCT shapes
-- `GeometryShape`
-- `ShapeCache`
-- STEP files
-- GUI state
+The JSON stores document ID and name, length parameters, datum planes, sketches and profiles, and additive/subtractive extrude features. It does not store OCCT shapes, `GeometryShape`, `ShapeCache`, STEP files, or GUI state.
 
 Deserialization rebuilds the document through the normal APIs. This revalidates references and rebuilds dependency graph and invalidation state instead of trusting serialized derived data.
 
-Details: `docs/json-serialization-mvp1.md`.
+The checked-in reference model is:
+
+```text
+examples/reference_plate.blcad.json
+```
+
+The headless exporter is:
+
+```text
+blcad_export_step <input.blcad.json> <output.step>
+```
+
+Details:
+
+- `docs/json-serialization-mvp1.md`
+- `docs/json-file-workflow-mvp1.md`
 
 ## End-to-end reference flow
 
@@ -322,10 +333,11 @@ The full MVP-1 flow is:
 7. Add a `SubtractiveExtrude` for the through-hole.
 8. Execute the complete document into a `ShapeCache`.
 9. Export the final shape as STEP.
-10. Serialize the document to JSON.
-11. Deserialize the document from JSON.
+10. Serialize the document to JSON or write it as `.blcad.json`.
+11. Deserialize the document from JSON or read it from `.blcad.json`.
 12. Recompute the restored document into a fresh `ShapeCache`.
 13. Export the restored model as STEP.
+14. Load `examples/reference_plate.blcad.json` with `blcad_export_step` and export STEP.
 
 ## Numeric incremental recompute
 
@@ -359,6 +371,7 @@ The current implementation is covered by tests for:
 - invalidation state
 - recompute plan creation
 - JSON roundtrip and JSON validation behavior
+- `.blcad.json` file read/write helpers
 - rectangle extrusion adapter
 - centered circular cut adapter
 - ShapeCache storage
@@ -370,11 +383,12 @@ The current implementation is covered by tests for:
 
 ## Next technical step
 
-The next technical step should stay small and turn the in-memory JSON roundtrip into an actual file-level workflow:
+The next technical step should start MVP 2 carefully: sketches on generated planar faces.
 
-1. Add filesystem read/write helpers for `.blcad.json` model files.
-2. Add a checked-in reference model under `examples/`.
-3. Add a small non-GUI command-line example that loads the JSON model, recomputes it, and exports STEP.
-4. Keep the `ShapeCache` as a computed result and do not serialize OCCT geometry.
-5. Do not build a general solver yet.
-6. Do not build a GUI yet.
+1. Introduce minimal semantic face references for the MVP-1 generated body, starting with the top face of `feature.base_extrude`.
+2. Add a derived workplane representation that can reference that semantic face without storing raw OCCT face IDs in `PartDocument`.
+3. Allow a sketch to use the derived workplane as its workplane reference.
+4. Recompute a cut from a sketch placed on the generated top face.
+5. Keep the first implementation limited to planar faces from simple extrudes.
+6. Do not build a general topological naming system yet.
+7. Do not build a GUI yet.
