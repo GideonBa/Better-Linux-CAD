@@ -1,15 +1,12 @@
-# MVP 1 Recompute-Ausfuehrung: SubtractiveExtrude
+# MVP 1 Recompute Execution: SubtractiveExtrude
 
-Status: optionale Geometry-Ausfuehrung fuer einen zentrischen Cut
+Status: optional geometry execution for a centered cut.
 
-Dieses Dokument beschreibt den zweiten ausgefuehrten Recompute-Schritt fuer
-MVP 1. Der Code liegt im optionalen Target `blcad_geometry` und bleibt damit
-ausserhalb des reinen Core-Targets.
+This document describes the second executed recompute step for MVP 1. The code lives in the optional target `blcad_geometry`, so it remains outside the pure core target.
 
-## Ziel
+## Goal
 
-Der Schritt baut auf der Additive-Ausfuehrung auf und schliesst den Boolean-Cut
-an denselben Pfad an:
+This step builds on additive execution and connects the Boolean cut to the same path:
 
 - `PartDocument`
 - `RecomputePlan`
@@ -18,13 +15,11 @@ an denselben Pfad an:
 - `CircularCutAdapter`
 - `ShapeCache`
 
-Die Ausfuehrung soll beweisen, dass ein zuvor berechneter Basiskoerper aus dem
-`ShapeCache` gelesen, mit einem zentrischen Cut versehen und als neuer finaler
-Shape zurueckgeschrieben werden kann.
+The execution should prove that a previously computed base body can be read from the `ShapeCache`, cut with a centered hole, and written back as the new final shape.
 
-## CMake-Target
+## CMake target
 
-Die Ausfuehrung wird nur mit dem Geometry-Preset gebaut:
+Execution is built only with the geometry preset:
 
 ```bash
 cmake --preset dev-geometry
@@ -32,9 +27,9 @@ cmake --build --preset dev-geometry
 ctest --preset dev-geometry
 ```
 
-Der Standard-Preset `dev` bleibt Core-only.
+The default preset `dev` remains core-only.
 
-## Oeffentliche Schnittstelle
+## Public interface
 
 Header:
 
@@ -42,7 +37,7 @@ Header:
 include/blcad/geometry/recompute_executor.hpp
 ```
 
-Aktuelle Operationen:
+Current operations:
 
 ```text
 execute_additive_extrude(document, feature_id, shape_cache)
@@ -50,80 +45,68 @@ execute_subtractive_extrude(document, feature_id, shape_cache)
 execute_plan(document, recompute_plan, shape_cache)
 ```
 
-## Ausfuehrungsmodell
+## Execution model
 
-`execute_subtractive_extrude` arbeitet in dieser Reihenfolge:
+`execute_subtractive_extrude` works in this order:
 
-1. Feature-ID validieren.
-2. Feature im `PartDocument` suchen.
-3. Feature-Typ muss `SubtractiveExtrude` sein.
-4. Eingabe-Sketch suchen.
-5. Sketch muss genau ein Kreisprofil und keine weiteren Profile enthalten.
-6. Durchmesserparameter aufloesen.
-7. Zielshape ueber `target_feature` aus dem `ShapeCache` lesen.
-8. `CircularCutAdapter` aufrufen.
-9. Ergebnis im `ShapeCache` als Feature-Shape und finalen Shape speichern.
+1. Validate the feature ID.
+2. Find the feature in the `PartDocument`.
+3. The feature type must be `SubtractiveExtrude`.
+4. Find the input sketch.
+5. The sketch must contain exactly one circle profile and no other profiles.
+6. Resolve the diameter parameter.
+7. Read the target shape from the `ShapeCache` through `target_feature`.
+8. Call `CircularCutAdapter`.
+9. Store the result in `ShapeCache` as a feature shape and final shape.
 
-`execute_plan` laeuft ueber die Schritte eines `RecomputePlan`. Nicht-Feature-
-Knoten, zum Beispiel Sketch-Knoten, werden uebersprungen. Feature-Knoten werden
-nach ihrem Typ verteilt: `AdditiveExtrude` geht an `execute_additive_extrude`,
-`SubtractiveExtrude` an `execute_subtractive_extrude`.
+`execute_plan` iterates over the steps of a `RecomputePlan`. Non-feature nodes, such as sketch nodes, are skipped. Feature nodes are dispatched by their type: `AdditiveExtrude` goes to `execute_additive_extrude`, and `SubtractiveExtrude` goes to `execute_subtractive_extrude`.
 
-Die topologische Ordnung des `RecomputePlan` stellt sicher, dass ein
-`AdditiveExtrude` vor dem darauf aufbauenden `SubtractiveExtrude` laeuft. Der Cut
-findet seinen Zielkoerper dadurch bereits im `ShapeCache`.
+The topological order of the `RecomputePlan` ensures that an `AdditiveExtrude` runs before the dependent `SubtractiveExtrude`. As a result, the cut finds its target body already present in the `ShapeCache`.
 
-## Abhaengigkeit vom Zielkoerper
+## Dependency on the target body
 
-Der Cut benoetigt den Shape seines `target_feature` im `ShapeCache`. In einem
-Teil-Plan, der nur `hole_diameter` betrifft, wird der Basiskoerper nicht neu
-berechnet. Er muss dann noch aus einem frueheren vollstaendigen Recompute im
-Cache liegen. Fehlt der Zielshape, meldet der Executor einen Geometry-Fehler und
-schreibt keinen finalen Shape.
+The cut needs the shape of its `target_feature` in the `ShapeCache`. In a partial plan that only affects `hole_diameter`, the base body is not recomputed. It must then still exist in the cache from an earlier full recompute. If the target shape is missing, the executor reports a geometry error and writes no final shape.
 
-## Validierung
+## Validation
 
-Aktuelle Fehlerfaelle:
+Current error cases:
 
-- leere Feature-ID
-- Feature existiert nicht im Dokument
-- Feature ist kein `SubtractiveExtrude`
-- Eingabe-Sketch existiert nicht
-- Sketch enthaelt nicht genau ein Kreisprofil
-- Durchmesserparameter fehlt
-- Zielshape fehlt im `ShapeCache`
-- Geometry-Adapter erzeugt einen Fehler
-- ShapeCache lehnt das Ergebnis ab
+- empty feature ID
+- feature does not exist in the document
+- feature is not a `SubtractiveExtrude`
+- input sketch does not exist
+- sketch does not contain exactly one circle profile
+- diameter parameter is missing
+- target shape is missing in the `ShapeCache`
+- geometry adapter reports an error
+- ShapeCache rejects the result
 
-## Testabdeckung
+## Test coverage
 
-Aktuelle Tests pruefen:
+Current tests check:
 
-- ein `SubtractiveExtrude` schneidet ein Loch in einen zuvor gecachten
-  Basiskoerper und verkleinert das Volumen
-- `execute_plan` fuehrt aus einem `width`-Plan zuerst den additiven, dann den
-  subtraktiven Feature-Knoten aus
-- ein fehlender Zielshape im Cache wird gemeldet
-- nicht-kreisfoermige Subtractive-Sketches werden abgelehnt
+- a `SubtractiveExtrude` cuts a hole into a previously cached base body and reduces the volume
+- `execute_plan` from a `width` plan first executes the additive feature node and then the subtractive feature node
+- a missing target shape in the cache is reported
+- non-circular subtractive sketches are rejected
 
-## Bewusste Begrenzung
+## Deliberate limitation
 
-Noch nicht enthalten:
+Not included yet:
 
-- mehrere Bohrungen oder Muster
-- begrenzte Cut-Tiefe statt `through_all`
-- ShapeCache-Integration direkt in `PartDocument`
-- automatisches `mark_all_clean()` nach erfolgreichem Recompute
-- STEP-Export
+- multiple holes or patterns
+- limited cut depth instead of `through_all`
+- ShapeCache integration directly into `PartDocument`
+- automatic `mark_all_clean()` after successful recompute
+- STEP export
 - GUI
 
-## Naechster sinnvoller Schritt
+## Next useful step
 
-Der naechste technische Schritt sollte der STEP-Export des finalen Shapes aus
-dem `ShapeCache` sein:
+The next technical step should be STEP export of the final shape from the `ShapeCache`:
 
-1. finalen Shape aus dem `ShapeCache` lesen
-2. ueber einen kleinen OCCT-STEP-Adapter exportieren
-3. Exportpfad vom Aufrufer uebernehmen
-4. Exportfehler als Fehlerobjekt melden
-5. weiter keinen allgemeinen Solver und keine GUI bauen
+1. read the final shape from the `ShapeCache`
+2. export through a small OCCT STEP adapter
+3. receive the export path from the caller
+4. report export errors as error objects
+5. continue not to build a general solver or GUI
