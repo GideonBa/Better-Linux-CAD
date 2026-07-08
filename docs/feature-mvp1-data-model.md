@@ -1,41 +1,38 @@
-# MVP 1 Feature-Datenmodell
+# MVP 1 Feature Data Model
 
-Status: reines Datenmodell mit PartDocument-Integration, keine Geometrieerzeugung
+Status: pure data model with `PartDocument` integration, no geometry generation.
 
-Dieses Dokument beschreibt den aktuellen Stand von `Feature`,
-`AdditiveExtrude` und `SubtractiveExtrude`.
+This document describes the current state of `Feature`, `AdditiveExtrude`, and `SubtractiveExtrude`.
 
-Der Stand ist bewusst begrenzt:
+The current scope is deliberately limited:
 
-- keine OCCT-Operationen
-- keine BRep-Geometrie
-- kein Boolean-Cut
-- kein Recompute
-- kein ShapeCache in dieser Feature-Datenmodellschicht
-- keine GUI
+- no OCCT operations
+- no BRep geometry
+- no Boolean cut
+- no recompute
+- no ShapeCache in this feature data-model layer
+- no GUI
 
-## Ziel
+## Goal
 
-Das Feature-Datenmodell bildet die naechste Schicht der Konstruktionsabsicht ab:
+The feature data model represents the next layer of design intent:
 
-- Ein `AdditiveExtrude` referenziert eine Skizze und einen Laengenparameter.
-- Ein `SubtractiveExtrude` referenziert eine Skizze und ein vorhandenes
-  Zielfeature.
-- `PartDocument` validiert, dass diese Referenzen im Dokument existieren.
+- an `AdditiveExtrude` references a sketch and a length parameter
+- a `SubtractiveExtrude` references a sketch and an existing target feature
+- `PartDocument` validates that these references exist in the document
 
-Damit ist noch keine Geometrie berechenbar. Es ist nur die Modellabsicht
-speicherbar.
+No geometry can be computed from this yet. Only the model intent can be stored.
 
 ## `Feature`
 
-`Feature` ist aktuell ein kompakter Datentyp mit einem Feature-Typ.
+`Feature` is currently a compact data type with a feature type.
 
-Aktuelle Feature-Typen:
+Current feature types:
 
 - `additive_extrude`
 - `subtractive_extrude`
 
-Gemeinsame Felder:
+Common fields:
 
 ```text
 Feature
@@ -46,7 +43,7 @@ Feature
   direction
 ```
 
-Die Richtung ist fuer MVP 1 nur:
+For MVP 1, the direction is only:
 
 ```text
 +Z
@@ -54,9 +51,9 @@ Die Richtung ist fuer MVP 1 nur:
 
 ## `AdditiveExtrude`
 
-Ein `AdditiveExtrude` erzeugt spaeter aus einer Skizze einen Koerper.
+An `AdditiveExtrude` will later create a body from a sketch.
 
-Aktuelle Felder:
+Current fields:
 
 ```text
 AdditiveExtrude
@@ -67,25 +64,24 @@ AdditiveExtrude
   direction = "+Z"
 ```
 
-Validierung im Feature:
+Validation in the feature:
 
-- Feature-ID darf nicht leer sein.
-- Name darf nicht leer sein.
-- Eingabe-Sketch-ID darf nicht leer sein.
-- Laengenparameter-ID darf nicht leer sein.
+- feature ID must not be empty
+- name must not be empty
+- input sketch ID must not be empty
+- length parameter ID must not be empty
 
-Validierung in `PartDocument`:
+Validation in `PartDocument`:
 
-- Feature-ID muss eindeutig sein.
-- Eingabe-Sketch muss im Dokument existieren.
-- Laengenparameter muss im Dokument existieren.
+- feature ID must be unique
+- input sketch must exist in the document
+- length parameter must exist in the document
 
 ## `SubtractiveExtrude`
 
-Ein `SubtractiveExtrude` schneidet spaeter Material aus einem vorhandenen
-Zielfeature.
+A `SubtractiveExtrude` will later remove material from an existing target feature.
 
-Aktuelle Felder:
+Current fields:
 
 ```text
 SubtractiveExtrude
@@ -97,65 +93,61 @@ SubtractiveExtrude
   direction = "+Z"
 ```
 
-Validierung im Feature:
+Validation in the feature:
 
-- Feature-ID darf nicht leer sein.
-- Name darf nicht leer sein.
-- Eingabe-Sketch-ID darf nicht leer sein.
-- Zielfeature-ID darf nicht leer sein.
+- feature ID must not be empty
+- name must not be empty
+- input sketch ID must not be empty
+- target feature ID must not be empty
 
-Validierung in `PartDocument`:
+Validation in `PartDocument`:
 
-- Feature-ID muss eindeutig sein.
-- Eingabe-Sketch muss im Dokument existieren.
-- Zielfeature muss bereits im Dokument existieren.
+- feature ID must be unique
+- input sketch must exist in the document
+- target feature must already exist in the document
 
-## Reihenfolge und Abhaengigkeiten
+## Order and dependencies
 
-MVP 1 erzwingt im `PartDocument` aktuell implizit eine einfache Reihenfolge:
+MVP 1 currently enforces a simple implicit order in `PartDocument`:
 
-1. Parameter hinzufuegen.
-2. Datum-Plane hinzufuegen.
-3. Sketches hinzufuegen.
-4. `AdditiveExtrude` hinzufuegen.
-5. `SubtractiveExtrude` mit Ziel auf das vorhandene `AdditiveExtrude`
-   hinzufuegen.
+1. Add parameters.
+2. Add a datum plane.
+3. Add sketches.
+4. Add an `AdditiveExtrude`.
+5. Add a `SubtractiveExtrude` targeting the existing `AdditiveExtrude`.
 
-Ein `DependencyGraph` existiert inzwischen als reines Datenmodell und ist in
-`PartDocument` integriert. Feature-Referenzen erzeugen Graphkanten:
+A `DependencyGraph` now exists as a pure data model and is integrated into `PartDocument`. Feature references create graph edges:
 
-- Eingabe-Sketch -> Feature
-- Laengenparameter -> `AdditiveExtrude`
-- Zielfeature -> `SubtractiveExtrude`
+- input sketch -> feature
+- length parameter -> `AdditiveExtrude`
+- target feature -> `SubtractiveExtrude`
 
-Die aktuelle Validierung verhindert weiterhin Referenzen auf fehlende Objekte.
+Current validation still prevents references to missing objects.
 
-## Testabdeckung
+## Test coverage
 
-Aktuelle Tests pruefen:
+Current tests check:
 
-- `AdditiveExtrude` speichert Sketch- und Laengenparameter-Referenz.
-- `AdditiveExtrude` lehnt fehlende Pflichtfelder ab.
-- `SubtractiveExtrude` speichert Sketch- und Zielfeature-Referenz.
-- `SubtractiveExtrude` lehnt fehlende Pflichtfelder ab.
-- `PartDocument` speichert Features.
-- `PartDocument` lehnt doppelte Feature-IDs ab.
-- `PartDocument` lehnt Features mit fehlenden Eingabe-Sketches ab.
-- `PartDocument` lehnt `AdditiveExtrude` mit fehlendem Laengenparameter ab.
-- `PartDocument` lehnt `SubtractiveExtrude` mit fehlendem Zielfeature ab.
-- `DependencyGraph` prueft die feste MVP-1-Abhaengigkeitsreihenfolge separat.
-- `PartDocument` erzeugt Feature-Knoten und Feature-Abhaengigkeitskanten.
-- `InvalidationState` kann abhaengige Features als `dirty` markieren.
-- `RecomputePlan` kann `dirty`-Features topologisch geordnet auflisten.
+- `AdditiveExtrude` stores sketch and length-parameter references.
+- `AdditiveExtrude` rejects missing required fields.
+- `SubtractiveExtrude` stores sketch and target-feature references.
+- `SubtractiveExtrude` rejects missing required fields.
+- `PartDocument` stores features.
+- `PartDocument` rejects duplicate feature IDs.
+- `PartDocument` rejects features with missing input sketches.
+- `PartDocument` rejects `AdditiveExtrude` with a missing length parameter.
+- `PartDocument` rejects `SubtractiveExtrude` with a missing target feature.
+- `DependencyGraph` separately checks the fixed MVP-1 dependency order.
+- `PartDocument` creates feature nodes and feature dependency edges.
+- `InvalidationState` can mark dependent features as `dirty`.
+- `RecomputePlan` can list `dirty` features in topological order.
 
-## Naechster sinnvoller Schritt
+## Next useful step
 
-Der erste optionale Geometry-Adapter und die Additive-Ausfuehrung fuer ein
-einzelnes Rechteckprofil sind vorhanden. Der naechste Schritt sollte den
-subtraktiven Pfad klein anbinden:
+The first optional geometry adapter and additive execution for a single rectangle profile already exist. The next step should connect the subtractive path in a small way:
 
-- `SubtractiveExtrude` aus einem Recompute-Plan-Knoten ausfuehren
-- Zielshape aus dem bestehenden Geometry-`ShapeCache` lesen
-- Ergebnis als neuen finalen Shape speichern
-- OCCT hinter der Geometry-Adaptergrenze halten
-- noch keine GUI bauen
+- execute `SubtractiveExtrude` from a recompute-plan node
+- read the target shape from the existing geometry `ShapeCache`
+- store the result as the new final shape
+- keep OCCT behind the geometry adapter boundary
+- do not build a GUI yet
