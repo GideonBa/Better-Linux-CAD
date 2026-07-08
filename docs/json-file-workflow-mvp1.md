@@ -64,7 +64,13 @@ It describes the same basic plate, but the hole sketch is placed on a derived wo
 workplane.base_top -> feature.base_extrude.top
 ```
 
-This demonstrates that `.blcad.json` can store semantic generated-face references without storing OCCT face IDs.
+The hole center in that sketch is intentionally off-center:
+
+```text
+(25, -10)
+```
+
+This demonstrates that `.blcad.json` can store semantic generated-face references without storing OCCT face IDs, and that the geometry layer can resolve the workplane before cutting.
 
 ## Headless export example
 
@@ -107,9 +113,10 @@ The CLI performs this sequence:
 2. Rebuild the `PartDocument` from JSON.
 3. Create a fresh `ShapeCache`.
 4. Execute `GeometryRecomputeExecutor::execute_document`.
-5. Read the final shape from the cache.
-6. Write the final shape through `StepExporter::write_step`.
-7. Print the number of exported bytes.
+5. Resolve sketch workplanes during subtractive recompute.
+6. Read the final shape from the cache.
+7. Write the final shape through `StepExporter::write_step`.
+8. Print the number of exported bytes.
 
 This keeps the command-line example thin. It does not know how features are computed internally; it only wires the existing core and geometry services together.
 
@@ -142,7 +149,7 @@ Core tests cover:
 - derived workplane JSON roundtrip
 - rejecting empty file paths
 
-Geometry tests cover recompute and STEP export from a JSON-restored document, plus recompute from a sketch on a derived top-face workplane. The CLI itself is intentionally thin and currently covered indirectly through the same APIs.
+Geometry tests cover recompute and STEP export from a JSON-restored document, recompute from a sketch on a derived top-face workplane, workplane resolution, and an off-center cut whose local sketch point is mapped through the resolved workplane. The CLI itself is intentionally thin and currently covered indirectly through the same APIs.
 
 ## Deliberate limitation
 
@@ -156,5 +163,6 @@ Not included yet:
 - graphical loading of `.blcad.json`
 - ShapeCache serialization
 - full topological naming
+- face-bound validation
 
 The workflow is sufficient as the first real headless file-based CAD path and as a persistence path for the first semantic generated-face reference.
