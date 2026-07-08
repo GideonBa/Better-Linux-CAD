@@ -12,7 +12,7 @@ Current target environment:
 - Ninja
 - OCCT 7.6 from the Ubuntu packages
 - Qt 6 from the Ubuntu packages for later GUI work
-- nlohmann-json for MVP-1 model-intent serialization
+- nlohmann-json for model-intent serialization
 - Catch2 for tests
 
 ## Install dependencies
@@ -54,7 +54,7 @@ dpkg-query -W libocct-foundation-dev libocct-modeling-data-dev libocct-modeling-
 
 ## Configure the project
 
-The project provides CMake presets. The default preset builds the MVP-1 core and core tests. OCCT and GUI targets are disabled by default.
+The project provides CMake presets. The default preset builds the core and core tests. OCCT and GUI targets are disabled by default.
 
 Debug configuration:
 
@@ -128,11 +128,12 @@ Current test coverage includes:
 - `Quantity`, `Error`, and `Result`
 - `Parameter` creation and value updates
 - `PartDocument` identity, validation, lookup, and reference management
-- datum-plane, sketch, rectangle-profile, and circle-profile data models
+- datum-plane, derived-workplane, sketch, rectangle-profile, and circle-profile data models
+- semantic top-face references for generated additive extrudes
 - additive and subtractive feature-intent data models
 - dependency graph construction, topological ordering, and cycle detection
 - invalidation state and recompute-plan creation
-- MVP-1 JSON serialization and deserialization of `PartDocument` model intent
+- JSON serialization/deserialization of model intent, including derived workplanes
 - `.blcad.json` file read/write helpers
 - rectangle extrusion through OCCT in the optional geometry build
 - centered circular cut through OCCT in the optional geometry build
@@ -142,13 +143,20 @@ Current test coverage includes:
 - STEP export of the final shape
 - numeric incremental recompute after a real parameter change
 - recompute and STEP export from a JSON-restored document
+- recompute of a cut whose sketch references a derived top-face workplane
 
-## Headless example
+## Headless examples
 
 After configuring and building the geometry preset, export the checked-in reference model:
 
 ```bash
 ./build/dev-geometry/blcad_export_step examples/reference_plate.blcad.json build/reference_plate.step
+```
+
+Export the derived-workplane example:
+
+```bash
+./build/dev-geometry/blcad_export_step examples/top_face_cut.blcad.json build/top_face_cut.step
 ```
 
 Depending on the local CMake preset output directory, the executable path may differ. The command shape is:
@@ -178,6 +186,7 @@ Important documents:
 - `docs/parameter-update-mvp1.md`: parameter update and numeric incremental recompute
 - `docs/json-serialization-mvp1.md`: JSON serialization of model intent
 - `docs/json-file-workflow-mvp1.md`: `.blcad.json` file workflow and headless export example
+- `docs/derived-workplane-mvp2-seed.md`: semantic top-face workplanes and sketches on generated planar faces
 - `docs/mvp-plan.md`: MVP sequence
 - `docs/mvp-1-specification.md`: detailed MVP-1 specification
 - `docs/decisions/`: architecture decision records
@@ -202,9 +211,9 @@ rm -rf build/
 
 LaTeX helper files are listed in `.gitignore`. Generated architecture PDFs may remain as working artifacts if needed.
 
-## Development rule after MVP 1
+## Development rule after the MVP-2 seed
 
-The current code should now move carefully from MVP 1 toward MVP 2:
+The current code should still move carefully:
 
 - no GUI code yet
 - no assembly yet
@@ -212,5 +221,6 @@ The current code should now move carefully from MVP 1 toward MVP 2:
 - no bolt circle yet
 - no general constraint solver yet
 - no serialization of OCCT geometry
+- no full topological naming system yet
 
-The next technical step should introduce the smallest semantic-face/workplane path required for sketches on generated planar faces.
+The next technical step should make the derived top-face workplane geometrically resolvable in the geometry layer before broader face support is introduced.
