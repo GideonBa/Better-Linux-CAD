@@ -29,19 +29,29 @@ Implemented scope:
 
 Example: rectangular plate with width, height, thickness, and a centered hole.
 
-Current state: MVP 1 now has the required core data models, dependency graph, invalidation state, recompute plan, numeric parameter updates, JSON serialization of model intent, `.blcad.json` file workflow, optional OCCT geometry execution, centered cut, full document recompute, and STEP export. The checked-in `examples/reference_plate.blcad.json` model can be loaded by `blcad_export_step`, recomputed into a fresh `ShapeCache`, and exported as STEP.
+Current state: MVP 1 has the required core data models, dependency graph, invalidation state, recompute plan, numeric parameter updates, JSON serialization of model intent, `.blcad.json` file workflow, optional OCCT geometry execution, centered cut, full document recompute, and STEP export. The checked-in `examples/reference_plate.blcad.json` model can be loaded by `blcad_export_step`, recomputed into a fresh `ShapeCache`, and exported as STEP.
 
 ## MVP 2: Sketch on planar face
 
 Goal: place sketches on existing generated planar faces.
 
-The first implementation should stay narrow:
+Implemented seed:
 
-- expose a minimal semantic reference for the top face of `feature.base_extrude`
-- create a derived workplane from that semantic face
-- allow a sketch to reference the derived workplane
-- execute a cut from that sketch through the existing body
-- keep the first implementation limited to simple extrude-generated planar faces
+- semantic reference for the top face of `feature.base_extrude`
+- `DerivedWorkplane` from that semantic face
+- sketches can reference derived workplanes
+- dependency graph includes `feature.base_extrude -> workplane.base_top -> sketch.top_hole`
+- JSON serialization supports `derived_workplanes`
+- checked-in `examples/top_face_cut.blcad.json`
+- geometry recompute can execute a cut whose sketch references the derived top-face workplane
+
+Next narrow step:
+
+- resolve the derived top-face workplane geometrically in the geometry layer
+- derive origin and axes from the additive extrude dimensions
+- use the resolved workplane when evaluating sketch profile centers
+- test an off-center hole on the derived workplane
+- keep support limited to the top face of simple additive extrudes
 - do not build a full topological naming system yet
 - do not build a GUI yet
 
