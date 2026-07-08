@@ -1,6 +1,6 @@
 # MVP 2 Workplane Resolver
 
-Status: geometry-layer resolver for derived top and bottom workplanes of a simple additive extrude, including rectangular bounds.
+Status: geometry-layer resolver for derived top, bottom, right, and left workplanes of a simple additive extrude, including rectangular bounds.
 
 This document describes the resolver after introducing `SemanticFaceReference` and `DerivedWorkplane` in the core model. The core still stores semantic model intent only. The geometry layer resolves that semantic workplane into a concrete frame for recompute.
 
@@ -16,9 +16,9 @@ feature.base_extrude.top
 ```
 
 ```text
-feature.base_extrude.bottom
-  -> workplane.base_bottom
-  -> sketch.bottom_hole local point
+feature.base_extrude.left
+  -> workplane.base_left
+  -> sketch.left_hole local point
   -> global cut center
 ```
 
@@ -74,22 +74,7 @@ bounds.enabled = false
 
 ### Derived top-face workplane
 
-For:
-
-```text
-workplane.base_top -> feature.base_extrude.top
-```
-
-the resolver validates that:
-
-- the source feature exists
-- the source feature is an `AdditiveExtrude`
-- the source sketch exists
-- the source sketch has exactly one rectangle profile
-- the rectangle width and height parameters exist
-- the additive extrude thickness parameter exists
-
-Then it returns the top-face frame:
+For `workplane.base_top -> feature.base_extrude.top`, the frame is:
 
 ```text
 origin = (rectangle_center.x, rectangle_center.y, thickness)
@@ -100,13 +85,7 @@ normal = (0, 0, 1)
 
 ### Derived bottom-face workplane
 
-For:
-
-```text
-workplane.base_bottom -> feature.base_extrude.bottom
-```
-
-the resolver uses the same source validation and returns the bottom-face frame:
+For `workplane.base_bottom -> feature.base_extrude.bottom`, the frame is:
 
 ```text
 origin = (rectangle_center.x, rectangle_center.y, 0)
@@ -115,24 +94,55 @@ y_axis = (0, 1, 0)
 normal = (0, 0, -1)
 ```
 
-The negative normal records that this is the bottom face. The current through-all cut still uses the global X/Y center and remains vertical.
+### Derived right-face workplane
+
+For `workplane.base_right -> feature.base_extrude.right`, the frame is:
+
+```text
+origin = (rectangle_center.x + width / 2, rectangle_center.y, thickness / 2)
+x_axis = (0, 1, 0)
+y_axis = (0, 0, 1)
+normal = (1, 0, 0)
+```
+
+### Derived left-face workplane
+
+For `workplane.base_left -> feature.base_extrude.left`, the frame is:
+
+```text
+origin = (rectangle_center.x - width / 2, rectangle_center.y, thickness / 2)
+x_axis = (0, -1, 0)
+y_axis = (0, 0, 1)
+normal = (-1, 0, 0)
+```
+
+The left side uses a right-handed local frame:
+
+```text
+x_axis cross y_axis = normal
+```
 
 ## Rectangular bounds
 
-Top and bottom derived workplanes both contain a rectangular bounds object:
+Top and bottom derived workplanes use source rectangle width and height:
 
 ```text
-bounds.enabled = true
-bounds.center = (0, 0)
 bounds.width_mm = source rectangle width
 bounds.height_mm = source rectangle height
 ```
 
-For the current reference dimensions:
+Right and left derived workplanes use source rectangle height and extrude thickness:
 
 ```text
-bounds.width_mm = 120
-bounds.height_mm = 80
+bounds.width_mm = source rectangle height
+bounds.height_mm = extrude thickness
+```
+
+For the current reference dimensions, side-face local ranges are:
+
+```text
+local x range = [-40, 40]
+local y range = [-4, 4]
 ```
 
 ## Recompute integration
@@ -147,19 +157,19 @@ Then the point is mapped into global coordinates:
 global = origin + local.x * x_axis + local.y * y_axis
 ```
 
-For `workplane.base_top` and local `(25, -10)`, this becomes:
+For `workplane.base_right` and local `(-12, 1.5)`, this becomes:
 
 ```text
-global = (25, -10, 8)
+global = (60, -12, 5.5)
 ```
 
-For `workplane.base_bottom` and local `(-20, 10)`, this becomes:
+For `workplane.base_left` and local `(-12, 1.5)`, this becomes:
 
 ```text
-global = (-20, 10, 0)
+global = (-60, 12, 5.5)
 ```
 
-The current circular cut adapter still performs a through-all vertical cut. It uses the resolved global X/Y center. The resolved Z value proves workplane placement, even though the current through-all cutter spans the target's full Z bounds.
+`GeometryRecomputeExecutor` passes the resolved workplane normal to the circular cut adapter. Top and bottom use Z-axis cuts. Right and left use X-axis cuts.
 
 ## Bounds validation
 
@@ -173,16 +183,11 @@ The current validation rejects a circle profile if its local center and radius d
 
 ## Example models
 
-Top-face example:
-
 ```text
 examples/top_face_cut.blcad.json
-```
-
-Bottom-face example:
-
-```text
 examples/bottom_face_cut.blcad.json
+examples/right_face_cut.blcad.json
+examples/left_face_cut.blcad.json
 ```
 
 Export commands:
@@ -190,6 +195,8 @@ Export commands:
 ```bash
 ./build/dev-geometry/blcad_export_step examples/top_face_cut.blcad.json build/top_face_cut.step
 ./build/dev-geometry/blcad_export_step examples/bottom_face_cut.blcad.json build/bottom_face_cut.step
+./build/dev-geometry/blcad_export_step examples/right_face_cut.blcad.json build/right_face_cut.step
+./build/dev-geometry/blcad_export_step examples/left_face_cut.blcad.json build/left_face_cut.step
 ```
 
 ## Test coverage
@@ -199,28 +206,27 @@ Geometry tests cover:
 - resolving `datum.xy`
 - resolving `workplane.base_top`
 - resolving `workplane.base_bottom`
-- checking that the top-face origin is at `z = thickness`
-- checking that the bottom-face origin is at `z = 0`
-- checking top normal `+Z` and bottom normal `-Z`
+- resolving `workplane.base_right`
+- resolving `workplane.base_left`
+- checking top/bottom/side origins and normals
 - checking that `datum.xy` is unbounded
-- checking that top and bottom derived workplanes have rectangular bounds
-- mapping top and bottom local sketch points through the resolved frames
+- checking rectangular bounds for resolved generated-face workplanes
+- mapping local sketch points through resolved frames
 - rejecting missing workplanes
-- recomputing circular cuts from sketches on top and bottom derived workplanes
-- accepting a near-edge circle that still lies inside bounds
-- rejecting an out-of-bounds circle before executing the cut
+- recomputing circular cuts from sketches on top, bottom, right, and left derived workplanes
+- accepting valid circles inside bounds
+- rejecting out-of-bounds circles before executing the cut
 - verifying that the final volume matches the expected removed cylinder volume within tolerance
 
 ## Deliberate limitation
 
 Not included yet:
 
-- right/left/front/back side faces
+- front/back side faces
 - arbitrary planar faces
-- side-face coordinate conventions
-- cutter direction derived from face normal
+- face orientation derived from OCCT topology
 - non-rectangular source faces
 - storing or matching raw OCCT face IDs
 - GUI face selection
 
-The resolver is intentionally limited to the top and bottom faces of a simple additive rectangle extrusion. This keeps MVP 2 incremental and avoids prematurely building a full topological-naming system.
+The resolver is intentionally limited to selected semantic faces of a simple additive rectangle extrusion. This keeps MVP 2 incremental and avoids prematurely building a full topological-naming system.
