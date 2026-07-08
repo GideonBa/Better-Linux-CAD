@@ -1,6 +1,6 @@
 # Core Skeleton and MVP-2 Seed
 
-Status: implemented core skeleton for MVP-1 data models, recompute planning, JSON model-intent serialization, `.blcad.json` file helpers, semantic top-face workplanes, geometry-layer workplane resolution, and bounded top-face validation.
+Status: implemented core skeleton for MVP-1 data models, recompute planning, JSON model-intent serialization, `.blcad.json` file helpers, semantic top-face workplanes, geometry-layer workplane resolution, bounded top-face validation, and incremental recompute through derived-workplane dependencies.
 
 The core remains free of OCCT and Qt. Geometry is handled only in the optional `blcad_geometry` target. JSON serialization and `.blcad.json` file helpers stay in the core because they store model intent rather than computed shapes.
 
@@ -22,7 +22,7 @@ The skeleton makes the first architecture decisions executable:
 - `RecomputePlan` as an ordered list of `dirty` nodes
 - `part_document_json` as schema-versioned JSON serialization for model intent
 - `.blcad.json` read/write helpers for file-level persistence
-- `ShapeCache` as an optional geometry data model for computed shapes
+- `ShapeCache` as an optional geometry data model for computed shapes and stale-shape removal
 - `WorkplaneResolver` as the first geometry-layer bridge from semantic workplane intent to a concrete frame and bounded face region
 
 ## CMake targets
@@ -117,6 +117,8 @@ Current test areas:
 - recompute from a sketch on a derived top-face workplane
 - off-center cut evaluation through a resolved derived workplane
 - near-edge valid and out-of-bounds invalid top-face holes
+- incremental recompute through a derived-workplane dependency path
+- stale dirty feature-shape removal after failed incremental recompute
 
 ## Core types
 
@@ -201,6 +203,8 @@ The dependency graph records:
 feature.base_extrude -> workplane.base_top -> sketch.top_hole
 ```
 
+When a source dimension such as `part.width` changes, this dependency path lets the derived workplane and its dependent sketch become dirty before the downstream cut is recomputed.
+
 No raw OCCT face IDs are stored in the core.
 
 ### Geometry workplane resolution
@@ -228,6 +232,12 @@ height = source rectangle height
 ```
 
 `GeometryRecomputeExecutor` uses the frame to map local circle-profile centers into global cut centers and uses the bounds to reject circles that do not lie fully inside the top face.
+
+### Incremental geometry execution
+
+`GeometryRecomputeExecutor::execute_plan` accepts a `RecomputePlan` that may contain non-feature nodes such as sketches and derived workplanes. The executor skips those nodes and executes only feature nodes.
+
+Before executing a dirty feature node, the executor removes any old cached shape for that feature. This prevents stale geometry from surviving failed recompute.
 
 ## JSON serialization and file workflow
 
@@ -261,6 +271,7 @@ Details:
 - `docs/derived-workplane-mvp2-seed.md`
 - `docs/workplane-resolver-mvp2.md`
 - `docs/bounded-workplane-validation-mvp2.md`
+- `docs/incremental-derived-workplane-recompute-mvp2.md`
 
 ## Optional geometry layer
 
@@ -270,11 +281,12 @@ Current geometry capabilities:
 
 - `RectangleExtrusionAdapter` creates a centered rectangular OCCT solid from validated width, height, and thickness values.
 - `CircularCutAdapter` cuts a through-hole from an existing `GeometryShape` using a resolved global center.
-- `ShapeCache` stores feature shapes and the current final shape.
+- `ShapeCache` stores feature shapes, removes stale dirty feature shapes, and tracks the current final shape.
 - `WorkplaneResolver` resolves standard datum planes and the derived top face of a simple additive rectangle extrude.
 - `GeometryRecomputeExecutor` executes `AdditiveExtrude` for a sketch with exactly one rectangle profile.
 - `GeometryRecomputeExecutor` executes `SubtractiveExtrude` for a sketch with exactly one circle profile if the target shape is already in the `ShapeCache`.
 - `execute_document` recomputes a complete `PartDocument` into a `ShapeCache` in topological order.
+- `execute_plan` recomputes affected feature nodes from an incremental plan and skips non-feature nodes.
 - Bounded top-face validation rejects out-of-bounds circle profiles before OCCT cutting.
 - `StepExporter` writes the final shape as a STEP file.
 - `blcad_export_step` wires `.blcad.json` input to recompute and STEP export.
@@ -310,11 +322,12 @@ This skeleton still does not implement:
 - general sketch constraints
 - general constraint solver
 - semantic face references beyond the top face of a simple additive extrude
-- incremental recompute tests through derived-workplane dependency paths after source-dimension changes
+- bottom-face derived workplanes
+- side-face derived workplanes
 - ShapeCache serialization
 - command-line argument parsing beyond the minimal example
 
-This order is intentional. The core first needs safe data types, validation, dependency tracking, recompute planning, serialization, file workflow, a narrow geometry pipeline, semantic face references, workplane resolution, and bounded validation before larger CAD subsystems are added.
+This order is intentional. The core first needs safe data types, validation, dependency tracking, recompute planning, serialization, file workflow, a narrow geometry pipeline, semantic face references, workplane resolution, bounded validation, and incremental recompute before larger CAD subsystems are added.
 
 ## Standard commands
 
