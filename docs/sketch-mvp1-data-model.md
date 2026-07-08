@@ -1,35 +1,33 @@
-# MVP 1 Sketch-Datenmodell
+# MVP 1 Sketch Data Model
 
-Status: reines Datenmodell mit PartDocument-Integration, keine Geometrieerzeugung
+Status: pure data model with `PartDocument` integration, no geometry generation.
 
-Dieses Dokument beschreibt den aktuellen Stand von `DatumPlane`, `Sketch`,
-`RectangleProfile` und `CircleProfile`.
+This document describes the current state of `DatumPlane`, `Sketch`, `RectangleProfile`, and `CircleProfile`.
 
-Der Stand ist bewusst begrenzt:
+The current scope is deliberately limited:
 
-- keine Features
-- keine Extrusion
-- kein Cut
-- kein Recompute
-- kein OCCT
-- keine GUI
+- no features
+- no extrusion
+- no cut
+- no recompute
+- no OCCT
+- no GUI
 
-## Ziel
+## Goal
 
-Das Sketch-Datenmodell bildet die Konstruktionsabsicht fuer die erste
-Referenzplatte ab:
+The sketch data model captures the design intent for the first reference plate:
 
-- eine feste XY-Arbeitsebene
-- ein zentriertes Rechteck fuer die Grundplatte
-- ein zentrierter Kreis fuer die spaetere Bohrung
-- Referenzen auf Parameter, aber noch keine Auswertung zu OCCT-Geometrie
-- Dokumentvalidierung fuer Workplane- und Parameterreferenzen
+- a fixed XY workplane
+- a centered rectangle for the base plate
+- a centered circle for the later hole
+- references to parameters, but no evaluation into OCCT geometry yet
+- document validation for workplane and parameter references
 
-## Typen
+## Types
 
 ### `Point2`
 
-Ein einfacher 2D-Punkt fuer Skizzenkoordinaten.
+A simple 2D point for sketch coordinates.
 
 ```text
 Point2
@@ -37,11 +35,11 @@ Point2
   y
 ```
 
-MVP-1-Profile verwenden aktuell `center = (0, 0)`.
+MVP-1 profiles currently use `center = (0, 0)`.
 
 ### `Point3`
 
-Ein einfacher 3D-Punkt fuer Datum-Plane-Urspruenge.
+A simple 3D point for datum-plane origins.
 
 ```text
 Point3
@@ -52,7 +50,7 @@ Point3
 
 ### `Vector3`
 
-Ein einfacher 3D-Vektor fuer Achsen und Normalen.
+A simple 3D vector for axes and normals.
 
 ```text
 Vector3
@@ -63,7 +61,7 @@ Vector3
 
 ## `DatumPlane`
 
-MVP 1 implementiert nur die Standardebene `XY`.
+MVP 1 implements only the standard `XY` plane.
 
 ```text
 DatumPlane XY
@@ -75,21 +73,21 @@ DatumPlane XY
   normal = (0, 0, 1)
 ```
 
-Validierung:
+Validation:
 
-- Datum-Plane-ID darf nicht leer sein.
-- Name darf nicht leer sein.
+- datum-plane ID must not be empty
+- name must not be empty
 
-Noch nicht enthalten:
+Not included yet:
 
-- frei definierte Ebenen
-- Offset-Ebenen
-- Ebenen aus Flaechenreferenzen
-- Validierung von Orthogonalitaet oder Normallaenge
+- freely defined planes
+- offset planes
+- planes derived from face references
+- validation of orthogonality or normal length
 
 ## `RectangleProfile`
 
-Das Rechteckprofil beschreibt die spaetere Grundplatte.
+The rectangle profile describes the later base plate.
 
 ```text
 RectangleProfile
@@ -99,19 +97,17 @@ RectangleProfile
   height_parameter = "part.height"
 ```
 
-Validierung:
+Validation:
 
-- Profil-ID darf nicht leer sein.
-- Breitenparameter-ID darf nicht leer sein.
-- Hoehenparameter-ID darf nicht leer sein.
+- profile ID must not be empty
+- width parameter ID must not be empty
+- height parameter ID must not be empty
 
-Das Profil selbst prueft nicht, ob die referenzierten Parameter im
-`PartDocument` existieren. Diese Pruefung geschieht beim Hinzufuegen eines
-Sketches zu `PartDocument`.
+The profile itself does not check whether the referenced parameters exist in the `PartDocument`. This check happens when a sketch is added to `PartDocument`.
 
 ## `CircleProfile`
 
-Das Kreisprofil beschreibt die spaetere zentrale Bohrung.
+The circle profile describes the later centered hole.
 
 ```text
 CircleProfile
@@ -120,21 +116,18 @@ CircleProfile
   diameter_parameter = "part.hole_diameter"
 ```
 
-Validierung:
+Validation:
 
-- Profil-ID darf nicht leer sein.
-- Durchmesserparameter-ID darf nicht leer sein.
+- profile ID must not be empty
+- diameter parameter ID must not be empty
 
-Das Profil selbst prueft nicht, ob der Durchmesserparameter im `PartDocument`
-existiert. Diese Pruefung geschieht beim Hinzufuegen eines Sketches zu
-`PartDocument`.
+The profile itself does not check whether the diameter parameter exists in `PartDocument`. This check happens when a sketch is added to `PartDocument`.
 
-Die Groessenvalidierung `hole_diameter < min(width, height)` braucht Zugriff auf
-Parameterwerte und folgt spaeter.
+The size validation `hole_diameter < min(width, height)` requires access to parameter values and follows later.
 
 ## `Sketch`
 
-Eine Skizze speichert ID, Name, Workplane-Referenz und Profile.
+A sketch stores ID, name, workplane reference, and profiles.
 
 ```text
 Sketch
@@ -145,72 +138,65 @@ Sketch
   circle_profiles
 ```
 
-Validierung:
+Validation:
 
-- Sketch-ID darf nicht leer sein.
-- Name darf nicht leer sein.
-- Workplane-ID darf nicht leer sein.
-- Profil-IDs muessen innerhalb einer Skizze eindeutig sein.
-- Profil-IDs muessen auch zwischen Rechteck- und Kreisprofilen eindeutig sein.
+- sketch ID must not be empty
+- name must not be empty
+- workplane ID must not be empty
+- profile IDs must be unique within a sketch
+- profile IDs must also be unique across rectangle and circle profiles
 
-Noch nicht enthalten:
+Not included yet:
 
-- allgemeine Sketch-Constraints
-- Linien, Boegen oder frei editierbare Entitaeten
-- automatische Profilableitung
-- Parameterwertauswertung
-- OCCT-Konvertierung
+- general sketch constraints
+- lines, arcs, or freely editable entities
+- automatic profile derivation
+- parameter value evaluation
+- OCCT conversion
 
-## Integration in `PartDocument`
+## Integration into `PartDocument`
 
-`PartDocument` speichert jetzt:
+`PartDocument` now stores:
 
-- Parameter
-- Datum-Planes
-- Sketches
+- parameters
+- datum planes
+- sketches
 
-Beim Hinzufuegen eines Sketches wird validiert:
+When a sketch is added, the document validates that:
 
-- Die `workplane` des Sketches muss als Datum-Plane im Dokument existieren.
-- Jeder `RectangleProfile.width_parameter` muss im Dokument existieren.
-- Jeder `RectangleProfile.height_parameter` muss im Dokument existieren.
-- Jeder `CircleProfile.diameter_parameter` muss im Dokument existieren.
-- Sketch-IDs muessen im Dokument eindeutig sein.
+- the sketch `workplane` exists as a datum plane in the document
+- every `RectangleProfile.width_parameter` exists in the document
+- every `RectangleProfile.height_parameter` exists in the document
+- every `CircleProfile.diameter_parameter` exists in the document
+- sketch IDs are unique in the document
 
-Diese Pruefung stellt sicher, dass eine Skizze nicht isoliert auf nicht
-existierende Dokumentobjekte zeigt.
+This check ensures that a sketch does not point to non-existing document objects.
 
-## Testabdeckung
+## Test coverage
 
-Aktuelle Tests pruefen:
+Current tests check:
 
-- XY-Ebene mit Ursprung, X-Achse, Y-Achse und Normalenrichtung
-- Datum-Plane-Validierung fuer ID und Name
-- Rechteckprofil mit Breiten- und Hoehenparameter
-- Kreisprofil mit Durchmesserparameter
-- Profilvalidierung fuer fehlende IDs und Parameterreferenzen
-- Sketch-Validierung fuer ID, Name und Workplane
-- Hinzufuegen von Rechteck- und Kreisprofilen
-- eindeutige Profil-IDs innerhalb einer Skizze
-- Datum-Planes im `PartDocument`
-- Sketches im `PartDocument`
-- fehlende Workplanes beim Hinzufuegen von Sketches
-- fehlende Breiten-, Hoehen- und Durchmesserparameter beim Hinzufuegen von
-  Sketches
+- XY plane with origin, X axis, Y axis, and normal direction
+- datum-plane validation for ID and name
+- rectangle profile with width and height parameters
+- circle profile with diameter parameter
+- profile validation for missing IDs and parameter references
+- sketch validation for ID, name, and workplane
+- adding rectangle and circle profiles
+- unique profile IDs within a sketch
+- datum planes in `PartDocument`
+- sketches in `PartDocument`
+- missing workplanes when adding sketches
+- missing width, height, and diameter parameters when adding sketches
 
-## Naechster Integrationsschritt
+## Next integration step
 
-Die naechsten Integrationsschritte sind erledigt: Features sind als reine
-Datenmodelle aufgenommen, und `PartDocument` erzeugt Dependency-Graph-Knoten
-und -Kanten aus Parameter-, Sketch- und Feature-Referenzen. Der
-Invalidierungsstatus markiert betroffene Sketches und Features nach einer
-Parameteraenderung. Der Recompute-Plan listet die betroffenen `dirty`-Knoten
-topologisch geordnet auf.
+The next integration steps are already done: features have been added as pure data models, and `PartDocument` creates dependency graph nodes and edges from parameter, sketch, and feature references. The invalidation state marks affected sketches and features after a parameter change. The recompute plan lists affected `dirty` nodes in topological order.
 
-Der naechste sinnvolle Schritt liegt nun oberhalb dieser Skizzen-Schicht:
+The next useful step now sits above this sketch layer:
 
-- Kreisprofil fuer `SubtractiveExtrude` auswerten
-- Zielshape aus dem bestehenden Geometry-`ShapeCache` lesen
-- zentrischen Cut als naechsten Geometry-Schritt erzeugen
-- OCCT weiter hinter der Adaptergrenze halten
-- noch keine GUI bauen
+- evaluate the circle profile for `SubtractiveExtrude`
+- read the target shape from the existing geometry `ShapeCache`
+- create the centered cut as the next geometry step
+- keep OCCT behind the adapter boundary
+- do not build a GUI yet
