@@ -43,15 +43,18 @@ Implemented seed:
 - dependency graph includes `feature.base_extrude -> workplane.base_top -> sketch.top_hole`
 - JSON serialization supports `derived_workplanes`
 - checked-in `examples/top_face_cut.blcad.json`
-- geometry recompute can execute a cut whose sketch references the derived top-face workplane
+- geometry-layer `WorkplaneResolver`
+- derived top-face frame resolved from source rectangle sketch and thickness parameter
+- subtractive recompute evaluates circle centers through the resolved workplane
+- off-center derived-workplane hole test
 
 Next narrow step:
 
-- resolve the derived top-face workplane geometrically in the geometry layer
-- derive origin and axes from the additive extrude dimensions
-- use the resolved workplane when evaluating sketch profile centers
-- test an off-center hole on the derived workplane
+- add a minimal rectangular support region to `ResolvedWorkplane`
+- validate that circle profiles lie fully inside the derived top face
+- return clear validation errors for out-of-bounds holes
 - keep support limited to the top face of simple additive extrudes
+- do not add side faces yet
 - do not build a full topological naming system yet
 - do not build a GUI yet
 
