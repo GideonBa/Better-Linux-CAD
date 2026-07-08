@@ -8,6 +8,8 @@ std::string_view to_string(SemanticFace face) noexcept {
   switch (face) {
   case SemanticFace::Top:
     return "top";
+  case SemanticFace::Bottom:
+    return "bottom";
   }
 
   return "top";
