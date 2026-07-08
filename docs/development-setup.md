@@ -129,24 +129,24 @@ Current test coverage includes:
 - `Parameter` creation and value updates
 - `PartDocument` identity, validation, lookup, and reference management
 - datum-plane, derived-workplane, sketch, rectangle-profile, and circle-profile data models
-- semantic top-face references for generated additive extrudes
+- semantic top and bottom face references for generated additive extrudes
 - additive and subtractive feature-intent data models
 - dependency graph construction, topological ordering, and cycle detection
 - invalidation state and recompute-plan creation
-- JSON serialization/deserialization of model intent, including derived workplanes
+- JSON serialization/deserialization of model intent, including top and bottom derived workplanes
 - `.blcad.json` file read/write helpers
 - rectangle extrusion through OCCT in the optional geometry build
 - centered circular cut through OCCT in the optional geometry build
 - `ShapeCache` storage, replacement, removal, and final-shape tracking
 - geometry-layer `WorkplaneResolver`
-- rectangular bounds on resolved top-face workplanes
+- rectangular bounds on resolved top and bottom workplanes
 - mapping local sketch points through resolved workplanes
 - additive and subtractive recompute execution
 - full document recompute into a fresh `ShapeCache`
 - STEP export of the final shape
 - numeric incremental recompute after a real parameter change
 - recompute and STEP export from a JSON-restored document
-- recompute of an off-center cut whose sketch references a derived top-face workplane
+- recompute of off-center cuts whose sketches reference derived top or bottom workplanes
 - bounded top-face validation for near-edge valid and out-of-bounds invalid holes
 - incremental recompute through derived-workplane dependency paths
 - stale dirty feature-shape removal before incremental recompute
@@ -160,10 +160,16 @@ After configuring and building the geometry preset, export the checked-in refere
 ./build/dev-geometry/blcad_export_step examples/reference_plate.blcad.json build/reference_plate.step
 ```
 
-Export the bounded derived-workplane example:
+Export the top-face derived-workplane example:
 
 ```bash
 ./build/dev-geometry/blcad_export_step examples/top_face_cut.blcad.json build/top_face_cut.step
+```
+
+Export the bottom-face derived-workplane example:
+
+```bash
+./build/dev-geometry/blcad_export_step examples/bottom_face_cut.blcad.json build/bottom_face_cut.step
 ```
 
 Depending on the local CMake preset output directory, the executable path may differ. The command shape is:
@@ -193,10 +199,11 @@ Important documents:
 - `docs/parameter-update-mvp1.md`: parameter update and numeric incremental recompute
 - `docs/json-serialization-mvp1.md`: JSON serialization of model intent
 - `docs/json-file-workflow-mvp1.md`: `.blcad.json` file workflow and headless export example
-- `docs/derived-workplane-mvp2-seed.md`: semantic top-face workplanes and sketches on generated planar faces
-- `docs/workplane-resolver-mvp2.md`: geometry-layer resolver for derived top-face workplanes
-- `docs/bounded-workplane-validation-mvp2.md`: bounded circle validation on derived top-face workplanes
+- `docs/derived-workplane-mvp2-seed.md`: semantic generated-face workplanes and sketches on generated planar faces
+- `docs/workplane-resolver-mvp2.md`: geometry-layer resolver for derived top/bottom workplanes
+- `docs/bounded-workplane-validation-mvp2.md`: bounded circle validation on derived workplanes
 - `docs/incremental-derived-workplane-recompute-mvp2.md`: incremental recompute through derived-workplane dependencies
+- `docs/bottom-workplane-mvp2.md`: bottom-face derived workplane for simple additive extrudes
 - `docs/mvp-plan.md`: MVP sequence
 - `docs/mvp-1-specification.md`: detailed MVP-1 specification
 - `docs/decisions/`: architecture decision records
@@ -221,7 +228,7 @@ rm -rf build/
 
 LaTeX helper files are listed in `.gitignore`. Generated architecture PDFs may remain as working artifacts if needed.
 
-## Development rule after incremental derived-workplane recompute
+## Development rule after bottom-face workplanes
 
 The current code should still move carefully:
 
@@ -233,4 +240,4 @@ The current code should still move carefully:
 - no serialization of OCCT geometry
 - no full topological naming system yet
 
-The next technical step should add a bottom-face semantic workplane for simple additive extrudes before side faces or broader topological naming are introduced.
+The next technical step should add exactly one side-face semantic workplane, preferably the right `+X` face, before all side faces or broader topological naming are introduced.
