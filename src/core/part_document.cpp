@@ -18,7 +18,7 @@ Result<std::size_t> add_dependency_if_missing(DependencyGraph& graph, std::strin
 
 [[nodiscard]] bool is_supported_derived_face(SemanticFace face) noexcept {
   return face == SemanticFace::Top || face == SemanticFace::Bottom || face == SemanticFace::Right ||
-         face == SemanticFace::Left;
+         face == SemanticFace::Left || face == SemanticFace::Front;
 }
 
 } // namespace
@@ -102,7 +102,8 @@ Result<std::size_t> PartDocument::add_derived_workplane(DerivedWorkplane workpla
 
   if (!is_supported_derived_face(workplane.face_reference().face())) {
     return Result<std::size_t>::failure(Error::validation(
-        workplane.id().value(), "only top, bottom, right, and left semantic faces are supported"));
+        workplane.id().value(),
+        "only top, bottom, right, left, and front semantic faces are supported"));
   }
 
   auto graph = dependency_graph_;
