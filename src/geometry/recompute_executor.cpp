@@ -19,6 +19,29 @@ namespace {
   return document.find_parameter(parameter_id);
 }
 
+[[nodiscard]] Result<Point3> evaluate_bounded_circle_center(const WorkplaneResolver& resolver,
+                                                            const ResolvedWorkplane& workplane,
+                                                            const CircleProfile& circle,
+                                                            const Quantity& diameter) {
+  if (workplane.bounds.enabled) {
+    constexpr double k_tolerance = 1.0e-9;
+    const double radius = diameter.millimeters() / 2.0;
+    const double min_x = workplane.bounds.center.x - workplane.bounds.width_mm / 2.0;
+    const double max_x = workplane.bounds.center.x + workplane.bounds.width_mm / 2.0;
+    const double min_y = workplane.bounds.center.y - workplane.bounds.height_mm / 2.0;
+    const double max_y = workplane.bounds.center.y + workplane.bounds.height_mm / 2.0;
+    const Point2 center = circle.center();
+
+    if (center.x - radius < min_x - k_tolerance || center.x + radius > max_x + k_tolerance ||
+        center.y - radius < min_y - k_tolerance || center.y + radius > max_y + k_tolerance) {
+      return Result<Point3>::failure(validation_error(
+          circle.id().value(), "circle profile must lie fully inside resolved workplane bounds"));
+    }
+  }
+
+  return Result<Point3>::success(resolver.evaluate_point(workplane, circle.center()));
+}
+
 } // namespace
 
 Result<std::size_t> GeometryRecomputeExecutor::execute_additive_extrude(
@@ -131,11 +154,14 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_subtractive_extrude(
     return Result<std::size_t>::failure(resolved_workplane.error());
   }
 
-  const Point3 global_center =
-      workplane_resolver_.evaluate_point(resolved_workplane.value(), circle.center());
+  const auto global_center = evaluate_bounded_circle_center(
+      workplane_resolver_, resolved_workplane.value(), circle, diameter->value());
+  if (global_center.has_error()) {
+    return Result<std::size_t>::failure(global_center.error());
+  }
 
-  auto shape = circular_cut_adapter_.cut_circular_hole(*target, diameter->value(),
-                                                       Point2{global_center.x, global_center.y});
+  auto shape = circular_cut_adapter_.cut_circular_hole(
+      *target, diameter->value(), Point2{global_center.value().x, global_center.value().y});
   if (shape.has_error()) {
     return Result<std::size_t>::failure(shape.error());
   }
