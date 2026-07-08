@@ -1,5 +1,6 @@
 #include "blcad/geometry/recompute_executor.hpp"
 
+#include "blcad/core/part_document_json.hpp"
 #include "blcad/geometry/rectangle_extrusion_adapter.hpp"
 #include "blcad/geometry/step_exporter.hpp"
 
@@ -24,8 +25,8 @@ Parameter make_length_parameter(const char* id, const char* name, double value_m
   return parameter.value();
 }
 
-// Baut das MVP-1-Referenzbauteil aus der Spezifikation: eine 120 x 80 x 8 mm
-// Platte mit zentraler Bohrung von 20 mm Durchmesser.
+// Build the MVP-1 reference part from the specification: a 120 x 80 x 8 mm
+// plate with a centered 20 mm through-hole.
 PartDocument make_reference_part_document() {
   auto document = PartDocument::create(DocumentId("part.rectangular_plate"), "RectangularPlate");
   REQUIRE(document);
@@ -59,9 +60,9 @@ PartDocument make_reference_part_document() {
   REQUIRE(hole_sketch.value().add_profile(circle.value()));
   REQUIRE(document.value().add_sketch(hole_sketch.value()));
 
-  auto base =
-      Feature::create_additive_extrude(FeatureId("feature.base_extrude"), "BaseExtrude",
-                                       SketchId("sketch.base"), ParameterId("part.thickness"));
+  auto base = Feature::create_additive_extrude(FeatureId("feature.base_extrude"), "BaseExtrude",
+                                               SketchId("sketch.base"),
+                                               ParameterId("part.thickness"));
   REQUIRE(base);
   REQUIRE(document.value().add_feature(base.value()));
 
@@ -136,14 +137,14 @@ TEST_CASE("MVP-1 reference part recomputes a larger hole incrementally", "[geome
   REQUIRE(cache.final_shape() != nullptr);
   const double small_hole_volume = inspector.summarize(*cache.final_shape()).volume_mm3;
 
-  // Nach dem vollen Recompute markiert der Aufrufer das Dokument als sauber.
+  // After a full recompute, the caller marks the document as clean.
   document.mark_all_clean();
   auto clean_plan = document.create_recompute_plan();
   REQUIRE(clean_plan);
   CHECK(clean_plan.value().step_count() == 0);
 
-  // Eine echte Wertaenderung erzeugt einen inkrementellen Plan, der nur den
-  // betroffenen Cut enthaelt. Der Basiskoerper bleibt sauber und im Cache.
+  // A real value change creates an incremental plan that contains only the
+  // affected cut. The base body remains clean and stays in the cache.
   const auto larger_diameter = Quantity::length_mm(40.0, "part.hole_diameter");
   REQUIRE(larger_diameter);
   REQUIRE(document.set_parameter_value(ParameterId("part.hole_diameter"), larger_diameter.value()));
@@ -158,14 +159,49 @@ TEST_CASE("MVP-1 reference part recomputes a larger hole incrementally", "[geome
   CHECK(incremental_summary.value().executed_feature_count == 1);
   CHECK(cache.final_feature_id().value() == "feature.center_hole_cut");
 
-  // Ein groesseres Loch entfernt mehr Material, das finale Volumen wird kleiner.
+  // A larger hole removes more material, so the final volume becomes smaller.
   REQUIRE(cache.final_shape() != nullptr);
   const double large_hole_volume = inspector.summarize(*cache.final_shape()).volume_mm3;
   CHECK(large_hole_volume < small_hole_volume);
 
-  // Der erneute Clean-Zustand leert den Recompute-Plan wieder.
+  // The clean state clears the recompute plan again.
   document.mark_all_clean();
   auto plan_after_clean = document.create_recompute_plan();
   REQUIRE(plan_after_clean);
   CHECK(plan_after_clean.value().step_count() == 0);
+}
+
+TEST_CASE("MVP-1 reference part can be restored from JSON and recomputed", "[geometry][pipeline]") {
+  const PartDocument original = make_reference_part_document();
+  const auto serialized = serialize_part_document_to_json(original);
+  REQUIRE(serialized);
+
+  auto restored = deserialize_part_document_from_json(serialized.value());
+  REQUIRE(restored);
+
+  ShapeCache cache = make_shape_cache();
+  const GeometryRecomputeExecutor executor;
+  const auto summary = executor.execute_document(restored.value(), cache);
+
+  REQUIRE(summary);
+  CHECK(summary.value().executed_feature_count == 2);
+  REQUIRE(cache.final_shape() != nullptr);
+  CHECK(cache.final_feature_id().value() == "feature.center_hole_cut");
+
+  const RectangleExtrusionAdapter inspector;
+  const ShapeSummary final_summary = inspector.summarize(*cache.final_shape());
+  CHECK(final_summary.solid_count == 1);
+
+  const std::filesystem::path path =
+      std::filesystem::temp_directory_path() / "blcad_reference_part_from_json.step";
+  std::filesystem::remove(path);
+
+  const StepExporter exporter;
+  const auto written = exporter.write_step(*cache.final_shape(), path.string());
+
+  REQUIRE(written);
+  CHECK(written.value() > 0U);
+  REQUIRE(std::filesystem::exists(path));
+
+  std::filesystem::remove(path);
 }
