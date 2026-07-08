@@ -70,7 +70,7 @@ The hole center in that sketch is intentionally off-center:
 (25, -10)
 ```
 
-This demonstrates that `.blcad.json` can store semantic generated-face references without storing OCCT face IDs, and that the geometry layer can resolve the workplane before cutting.
+This demonstrates that `.blcad.json` can store semantic generated-face references without storing OCCT face IDs, that the geometry layer can resolve the workplane before cutting, and that bounded top-face validation can reject invalid profile placement before OCCT execution.
 
 ## Headless export example
 
@@ -114,9 +114,10 @@ The CLI performs this sequence:
 3. Create a fresh `ShapeCache`.
 4. Execute `GeometryRecomputeExecutor::execute_document`.
 5. Resolve sketch workplanes during subtractive recompute.
-6. Read the final shape from the cache.
-7. Write the final shape through `StepExporter::write_step`.
-8. Print the number of exported bytes.
+6. Validate bounded profile placement when the workplane has bounds.
+7. Read the final shape from the cache.
+8. Write the final shape through `StepExporter::write_step`.
+9. Print the number of exported bytes.
 
 This keeps the command-line example thin. It does not know how features are computed internally; it only wires the existing core and geometry services together.
 
@@ -132,6 +133,8 @@ The file helpers reject:
 - unsupported constructs
 - invalid references caught by `PartDocument`
 - unresolved dependency ordering, for example a derived workplane whose source feature never appears
+
+Geometry recompute additionally rejects circle profiles that do not lie fully inside the resolved top-face bounds.
 
 The CLI exits with:
 
@@ -149,7 +152,7 @@ Core tests cover:
 - derived workplane JSON roundtrip
 - rejecting empty file paths
 
-Geometry tests cover recompute and STEP export from a JSON-restored document, recompute from a sketch on a derived top-face workplane, workplane resolution, and an off-center cut whose local sketch point is mapped through the resolved workplane. The CLI itself is intentionally thin and currently covered indirectly through the same APIs.
+Geometry tests cover recompute and STEP export from a JSON-restored document, recompute from a sketch on a derived top-face workplane, workplane resolution, an off-center cut whose local sketch point is mapped through the resolved workplane, and bounded validation for near-edge valid and out-of-bounds invalid holes. The CLI itself is intentionally thin and currently covered indirectly through the same APIs.
 
 ## Deliberate limitation
 
@@ -163,6 +166,6 @@ Not included yet:
 - graphical loading of `.blcad.json`
 - ShapeCache serialization
 - full topological naming
-- face-bound validation
+- arbitrary face support beyond the current top-face case
 
 The workflow is sufficient as the first real headless file-based CAD path and as a persistence path for the first semantic generated-face reference.
