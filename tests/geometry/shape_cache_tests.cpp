@@ -97,6 +97,48 @@ TEST_CASE("ShapeCache tracks the final shape and source feature", "[geometry][sh
   CHECK(cache.value().feature_shape_count() == 1);
 }
 
+TEST_CASE("ShapeCache removes cached feature shapes", "[geometry][shape_cache]") {
+  auto cache = ShapeCache::create(ShapeCacheId("shape_cache.part"));
+  REQUIRE(cache);
+
+  REQUIRE(cache.value().store_feature_shape(FeatureId("feature.base_extrude"), make_plate_shape()));
+  REQUIRE(cache.value().store_feature_shape(FeatureId("feature.cut"), make_plate_shape()));
+
+  const auto removed = cache.value().remove_feature_shape(FeatureId("feature.cut"));
+
+  REQUIRE(removed);
+  CHECK(removed.value());
+  CHECK(cache.value().feature_shape_count() == 1);
+  CHECK(cache.value().find_feature_shape(FeatureId("feature.cut")) == nullptr);
+  REQUIRE(cache.value().find_feature_shape(FeatureId("feature.base_extrude")) != nullptr);
+}
+
+TEST_CASE("ShapeCache removes the final shape when its source feature is removed",
+          "[geometry][shape_cache]") {
+  auto cache = ShapeCache::create(ShapeCacheId("shape_cache.part"));
+  REQUIRE(cache);
+
+  REQUIRE(cache.value().set_final_shape(FeatureId("feature.cut"), make_plate_shape()));
+
+  const auto removed = cache.value().remove_feature_shape(FeatureId("feature.cut"));
+
+  REQUIRE(removed);
+  CHECK(removed.value());
+  CHECK_FALSE(cache.value().has_final_shape());
+  CHECK(cache.value().final_feature_id().empty());
+  CHECK(cache.value().final_shape() == nullptr);
+}
+
+TEST_CASE("ShapeCache remove reports false for missing feature shapes", "[geometry][shape_cache]") {
+  auto cache = ShapeCache::create(ShapeCacheId("shape_cache.part"));
+  REQUIRE(cache);
+
+  const auto removed = cache.value().remove_feature_shape(FeatureId("feature.missing"));
+
+  REQUIRE(removed);
+  CHECK_FALSE(removed.value());
+}
+
 TEST_CASE("ShapeCache clear removes cached feature and final shapes", "[geometry][shape_cache]") {
   auto cache = ShapeCache::create(ShapeCacheId("shape_cache.part"));
   REQUIRE(cache);
@@ -120,6 +162,12 @@ TEST_CASE("ShapeCache rejects empty feature ids and empty shapes", "[geometry][s
   CHECK(missing_feature.error().category() == ErrorCategory::Validation);
   CHECK(missing_feature.error().object_id() == "shape_cache");
   CHECK(missing_feature.error().message() == "feature id must not be empty");
+
+  const auto remove_missing_feature = cache.value().remove_feature_shape(FeatureId());
+  REQUIRE(remove_missing_feature.has_error());
+  CHECK(remove_missing_feature.error().category() == ErrorCategory::Validation);
+  CHECK(remove_missing_feature.error().object_id() == "shape_cache");
+  CHECK(remove_missing_feature.error().message() == "feature id must not be empty");
 
   const auto empty_shape =
       cache.value().store_feature_shape(FeatureId("feature.base_extrude"), GeometryShape());
