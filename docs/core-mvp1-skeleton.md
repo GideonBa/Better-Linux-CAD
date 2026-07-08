@@ -1,8 +1,8 @@
 # MVP 1 Core Skeleton
 
-Status: implemented core skeleton for the MVP-1 data models, recompute planning, and JSON model-intent serialization.
+Status: implemented core skeleton for MVP-1 data models, recompute planning, JSON model-intent serialization, and `.blcad.json` file helpers.
 
-This document describes the current MVP-1 core state. The core remains free of OCCT and Qt. Geometry is handled only in the optional `blcad_geometry` target, while JSON serialization stays in the core because it stores model intent rather than computed shapes.
+This document describes the current MVP-1 core state. The core remains free of OCCT and Qt. Geometry is handled only in the optional `blcad_geometry` target. JSON serialization and `.blcad.json` file helpers stay in the core because they store model intent rather than computed shapes.
 
 ## Goal of this step
 
@@ -20,6 +20,7 @@ The skeleton makes the first architecture decisions executable:
 - `InvalidationState` as a pure state model for changed and affected nodes
 - `RecomputePlan` as an ordered list of `dirty` nodes
 - `part_document_json` as schema-versioned JSON serialization for MVP-1 model intent
+- `.blcad.json` read/write helpers for file-level persistence
 - `ShapeCache` as an optional geometry data model for computed shapes
 
 ## CMake targets
@@ -57,6 +58,7 @@ Current test areas:
 - `Parameter`
 - `PartDocument`
 - `PartDocument` JSON serialization
+- `.blcad.json` file read/write helpers
 - `DatumPlane`
 - `Sketch`
 - `RectangleProfile`
@@ -81,6 +83,16 @@ Currently contains:
 - `blcad/geometry/step_exporter.hpp`
 
 This target is built only when `BLCAD_BUILD_GEOMETRY=ON` is set. It links against OCCT, but not against Qt.
+
+### `blcad_export_step`
+
+Small non-GUI command-line example built with the geometry target.
+
+It loads a `.blcad.json` model, recomputes it through the geometry layer, and exports the final shape as STEP:
+
+```text
+blcad_export_step <input.blcad.json> <output.step>
+```
 
 ### `blcad_geometry_tests`
 
@@ -228,9 +240,11 @@ Rules:
 
 The plan is a task list. It does not execute features and does not create geometry.
 
-## JSON serialization
+## JSON serialization and file workflow
 
 `serialize_part_document_to_json` serializes MVP-1 model intent into a schema-versioned JSON document. `deserialize_part_document_from_json` rebuilds a `PartDocument` from that JSON through the normal validated construction APIs.
+
+`write_part_document_json_file` and `read_part_document_json_file` provide the file-level `.blcad.json` workflow.
 
 The JSON contains:
 
@@ -250,7 +264,10 @@ The JSON deliberately does not contain:
 - STEP data
 - GUI state
 
-Details: `docs/json-serialization-mvp1.md`.
+Details:
+
+- `docs/json-serialization-mvp1.md`
+- `docs/json-file-workflow-mvp1.md`
 
 ## Optional geometry layer
 
@@ -265,22 +282,37 @@ Current geometry capabilities:
 - `GeometryRecomputeExecutor` executes `SubtractiveExtrude` for a sketch with exactly one circle profile if the target shape is already in the `ShapeCache`.
 - `execute_document` recomputes a complete `PartDocument` into a `ShapeCache` in topological order.
 - `StepExporter` writes the final shape as a STEP file.
+- `blcad_export_step` wires `.blcad.json` input to recompute and STEP export.
 
 The cache is not integrated into `PartDocument`. It remains a computed result next to the document.
+
+## Reference model
+
+The checked-in MVP-1 model is:
+
+```text
+examples/reference_plate.blcad.json
+```
+
+It can be exported with:
+
+```text
+blcad_export_step examples/reference_plate.blcad.json <output.step>
+```
 
 ## Deliberate limitation
 
 This skeleton still does not implement:
 
-- filesystem read/write helpers for `.blcad.json`
-- a command-line export tool
 - GUI
 - assemblies
 - general sketch constraints
 - general constraint solver
 - semantic face references beyond the current simple model
+- ShapeCache serialization
+- command-line argument parsing beyond the minimal example
 
-This order is intentional. The core first needs safe data types, validation, dependency tracking, recompute planning, serialization, and a narrow geometry pipeline before larger CAD subsystems are added.
+This order is intentional. The core first needs safe data types, validation, dependency tracking, recompute planning, serialization, file workflow, and a narrow geometry pipeline before larger CAD subsystems are added.
 
 ## Standard commands
 
@@ -300,4 +332,4 @@ cmake --build --preset dev-geometry
 ctest --preset dev-geometry
 ```
 
-Further details are documented in the dedicated MVP-1 data-model, geometry, and JSON documents in `docs/`.
+Further details are documented in the dedicated MVP-1 data-model, geometry, JSON, and file-workflow documents in `docs/`.
