@@ -137,7 +137,7 @@ Current test coverage includes:
 - `.blcad.json` file read/write helpers
 - rectangle extrusion through OCCT in the optional geometry build
 - centered circular cut through OCCT in the optional geometry build
-- `ShapeCache` storage of feature shapes and final shapes
+- `ShapeCache` storage, replacement, removal, and final-shape tracking
 - geometry-layer `WorkplaneResolver`
 - rectangular bounds on resolved top-face workplanes
 - mapping local sketch points through resolved workplanes
@@ -148,6 +148,9 @@ Current test coverage includes:
 - recompute and STEP export from a JSON-restored document
 - recompute of an off-center cut whose sketch references a derived top-face workplane
 - bounded top-face validation for near-edge valid and out-of-bounds invalid holes
+- incremental recompute through derived-workplane dependency paths
+- stale dirty feature-shape removal before incremental recompute
+- incremental shrink failure when a previously valid top-face hole becomes out of bounds
 
 ## Headless examples
 
@@ -193,6 +196,7 @@ Important documents:
 - `docs/derived-workplane-mvp2-seed.md`: semantic top-face workplanes and sketches on generated planar faces
 - `docs/workplane-resolver-mvp2.md`: geometry-layer resolver for derived top-face workplanes
 - `docs/bounded-workplane-validation-mvp2.md`: bounded circle validation on derived top-face workplanes
+- `docs/incremental-derived-workplane-recompute-mvp2.md`: incremental recompute through derived-workplane dependencies
 - `docs/mvp-plan.md`: MVP sequence
 - `docs/mvp-1-specification.md`: detailed MVP-1 specification
 - `docs/decisions/`: architecture decision records
@@ -217,7 +221,7 @@ rm -rf build/
 
 LaTeX helper files are listed in `.gitignore`. Generated architecture PDFs may remain as working artifacts if needed.
 
-## Development rule after bounded top-face validation
+## Development rule after incremental derived-workplane recompute
 
 The current code should still move carefully:
 
@@ -229,4 +233,4 @@ The current code should still move carefully:
 - no serialization of OCCT geometry
 - no full topological naming system yet
 
-The next technical step should verify incremental recompute through derived-workplane dependencies before broader face support is introduced.
+The next technical step should add a bottom-face semantic workplane for simple additive extrudes before side faces or broader topological naming are introduced.
