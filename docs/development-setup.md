@@ -1,24 +1,24 @@
 # Development Setup
 
-Dieses Dokument beschreibt den lokalen Entwicklungsstart fuer BLCAD.
+This document describes the local development setup for BLCAD.
 
 ## System
 
-Aktueller Zielstand:
+Current target environment:
 
 - Ubuntu 24.04
 - C++20
-- CMake 3.28 oder neuer
+- CMake 3.28 or newer
 - Ninja
-- OCCT 7.6 aus den Ubuntu-Paketen
-- Qt 6 aus den Ubuntu-Paketen
-- Catch2 fuer spaetere Tests
+- OCCT 7.6 from the Ubuntu packages
+- Qt 6 from the Ubuntu packages
+- Catch2 for later tests
 
-## Abhaengigkeiten installieren
+## Install dependencies
 
-Die Paketliste steht ausfuehrlicher in `docs/dependencies-ubuntu-24.04.md`.
+The package list is described in more detail in `docs/dependencies-ubuntu-24.04.md`.
 
-Standardinstallation aus den Ubuntu-Repositories:
+Standard installation from the Ubuntu repositories:
 
 ```bash
 sudo apt-get update
@@ -29,13 +29,13 @@ sudo apt-get install -y build-essential cmake ninja-build pkg-config git clang-f
   doxygen graphviz
 ```
 
-Wenn die lokalen `.deb`-Pakete bereits im Projektordner liegen:
+If the local `.deb` packages already exist in the project directory:
 
 ```bash
 sudo apt-get install ./downloads/apt/*.deb
 ```
 
-## Installation pruefen
+## Verify installation
 
 ```bash
 cmake --version
@@ -51,24 +51,23 @@ dpkg-query -W cmake ninja-build pkg-config qt6-base-dev libeigen3-dev catch2
 dpkg-query -W libocct-foundation-dev libocct-modeling-data-dev libocct-modeling-algorithms-dev libocct-data-exchange-dev
 ```
 
-## Projekt konfigurieren
+## Configure the project
 
-Das Projekt besitzt CMake-Presets. Der Standard-Preset baut nur den MVP-1-Core
-und die Tests. OCCT- und GUI-Targets sind standardmaessig deaktiviert.
+The project provides CMake presets. The default preset builds only the MVP-1 core and tests. OCCT and GUI targets are disabled by default.
 
-Debug-Konfiguration:
+Debug configuration:
 
 ```bash
 cmake --preset dev
 ```
 
-Release-Konfiguration:
+Release configuration:
 
 ```bash
 cmake --preset release
 ```
 
-Erwartung fuer den aktuellen Stand:
+Expected output for the current state:
 
 ```text
 BLCAD MVP-1 core skeleton configured.
@@ -76,13 +75,13 @@ Geometry/OCCT targets enabled: OFF
 GUI/Qt targets enabled: OFF
 ```
 
-Optionaler Geometry-Build mit OCCT:
+Optional geometry build with OCCT:
 
 ```bash
 cmake --preset dev-geometry
 ```
 
-Erwartung:
+Expected output:
 
 ```text
 BLCAD MVP-1 core skeleton configured.
@@ -90,137 +89,124 @@ Geometry/OCCT targets enabled: ON
 GUI/Qt targets enabled: OFF
 ```
 
-## Build ausfuehren
+## Build
 
-Debug-Build:
+Debug build:
 
 ```bash
 cmake --build --preset dev
 ```
 
-Das baut aktuell:
+This currently builds:
 
 - `blcad_core`
 - `blcad_core_tests`
 
-Der Geometry-Build baut zusaetzlich:
+The geometry build additionally builds:
 
 - `blcad_geometry`
 - `blcad_geometry_tests`
 
-## Tests ausfuehren
+## Run tests
 
-Standardbefehl:
+Standard command:
 
 ```bash
 ctest --preset dev
 ```
 
-Geometry-Tests:
+Geometry tests:
 
 ```bash
 ctest --preset dev-geometry
 ```
 
-Aktuelle Tests:
+Current tests:
 
-- `Quantity` akzeptiert positive Millimeter-Laengen.
-- `Quantity` lehnt `0`, negative und nicht-endliche Werte ab.
-- `Parameter` speichert ID, Name, Scope und Wert.
-- `Parameter` lehnt leere IDs und Namen ab.
-- `PartDocument` speichert ID und Name.
-- `PartDocument` verwaltet Parameter mit eindeutigen IDs und Namen.
-- `PartDocument` erlaubt Parameterzugriff per ID und Name.
-- `PartDocument` verwaltet Datum-Planes mit eindeutigen IDs.
-- `PartDocument` verwaltet Sketches mit eindeutigen IDs.
-- `PartDocument` validiert Sketch-Workplanes gegen vorhandene Datum-Planes.
-- `PartDocument` validiert Profil-Parameterreferenzen gegen vorhandene
-  Parameter.
-- `PartDocument` verwaltet Features mit eindeutigen IDs.
-- `PartDocument` validiert Feature-Sketch-, Feature-Parameter- und
-  Feature-Zielfeature-Referenzen.
-- `DatumPlane` erzeugt die Standardebene `XY`.
-- `Sketch` speichert eine Workplane-Referenz.
-- `RectangleProfile` und `CircleProfile` speichern Parameterreferenzen.
-- Profil-IDs sind innerhalb einer Skizze eindeutig.
-- `AdditiveExtrude` und `SubtractiveExtrude` speichern Feature-Absicht ohne
-  Geometrie.
-- `DependencyGraph` speichert Knoten und Abhaengigkeitskanten.
-- `DependencyGraph` findet direkte und transitive Abhaengige.
-- `DependencyGraph` liefert eine topologische Ordnung fuer die Referenzplatte.
-- `DependencyGraph` erkennt Zyklen als Dependency-Fehler.
-- `PartDocument` erzeugt Dependency-Graph-Knoten fuer Parameter, Sketches und
-  Features.
-- `PartDocument` erzeugt Dependency-Graph-Kanten aus Profil- und
-  Feature-Referenzen.
-- `InvalidationState` speichert `clean`, `changed`, `dirty` und `error`.
-- `InvalidationState` markiert transitive Abhaengige ueber den
-  `DependencyGraph`.
-- `PartDocument` markiert betroffene Knoten nach einer Parameteraenderung.
-- `RecomputePlan` listet `dirty`-Knoten in topologischer Reihenfolge.
-- `PartDocument` kann aus seinem Zustand einen Recompute-Plan ableiten.
-- `RectangleExtrusionAdapter` erzeugt im optionalen Geometry-Build ein
-  nicht-leeres OCCT-Solid aus positiven Laengen.
-- `GeometryShape` kapselt eine berechnete Shape als opaken Handle.
-- `ShapeCache` speichert Feature-Shapes und einen finalen Shape im optionalen
-  Geometry-Build.
-- `GeometryRecomputeExecutor` fuehrt im optionalen Geometry-Build einen
-  `AdditiveExtrude` aus einem Rechteckprofil aus und schreibt in den
-  `ShapeCache`.
-- `Error` und `Result` speichern erwartbare Fehler und Erfolgswerte.
+- `Quantity` accepts positive millimeter lengths.
+- `Quantity` rejects `0`, negative, and non-finite values.
+- `Parameter` stores ID, name, scope, and value.
+- `Parameter` rejects empty IDs and names.
+- `PartDocument` stores ID and name.
+- `PartDocument` manages parameters with unique IDs and names.
+- `PartDocument` allows parameter lookup by ID and name.
+- `PartDocument` manages datum planes with unique IDs.
+- `PartDocument` manages sketches with unique IDs.
+- `PartDocument` validates sketch workplanes against existing datum planes.
+- `PartDocument` validates profile parameter references against existing parameters.
+- `PartDocument` manages features with unique IDs.
+- `PartDocument` validates feature sketch, feature parameter, and feature target references.
+- `DatumPlane` creates the standard `XY` plane.
+- `Sketch` stores a workplane reference.
+- `RectangleProfile` and `CircleProfile` store parameter references.
+- Profile IDs are unique within a sketch.
+- `AdditiveExtrude` and `SubtractiveExtrude` store feature intent without geometry.
+- `DependencyGraph` stores nodes and dependency edges.
+- `DependencyGraph` finds direct and transitive dependents.
+- `DependencyGraph` returns a topological order for the reference plate.
+- `DependencyGraph` detects cycles as dependency errors.
+- `PartDocument` creates dependency graph nodes for parameters, sketches, and features.
+- `PartDocument` creates dependency graph edges from profile and feature references.
+- `InvalidationState` stores `clean`, `changed`, `dirty`, and `error`.
+- `InvalidationState` marks transitive dependents through the `DependencyGraph`.
+- `PartDocument` marks affected nodes after a parameter change.
+- `RecomputePlan` lists `dirty` nodes in topological order.
+- `PartDocument` can derive a recompute plan from its state.
+- `RectangleExtrusionAdapter` creates a non-empty OCCT solid from positive lengths in the optional geometry build.
+- `GeometryShape` wraps a computed shape as an opaque handle.
+- `ShapeCache` stores feature shapes and a final shape in the optional geometry build.
+- `GeometryRecomputeExecutor` executes an `AdditiveExtrude` from a rectangle profile in the optional geometry build and writes to the `ShapeCache`.
+- `Error` and `Result` store expected errors and successful values.
 
-Spaetere MVP-1-Tests sollen zentrischen Cut und STEP-Export ergaenzen.
+Later MVP-1 tests should add centered cut and STEP export.
 
-## Dokumentation
+## Documentation
 
-Wichtige Dokumente:
+Important documents:
 
-- `zielarchitektur-parametrisches-cad-system.tex`: urspruengliche Zielarchitektur
-- `docs/architecture-summary.md`: verdichtete Architekturuebersicht
-- `docs/core-mvp1-skeleton.md`: aktueller Core-Skeleton
-- `docs/sketch-mvp1-data-model.md`: Sketch- und Profil-Datenmodell
-- `docs/feature-mvp1-data-model.md`: Feature-Datenmodell
-- `docs/dependency-graph-mvp1-data-model.md`: Dependency-Graph-Datenmodell
-- `docs/invalidation-mvp1-data-model.md`: Invalidierungsstatus-Datenmodell
-- `docs/recompute-plan-mvp1-data-model.md`: Recompute-Plan-Datenmodell
-- `docs/geometry-adapter-mvp1-rectangle-extrusion.md`: erster OCCT-Adapter
-- `docs/shape-cache-mvp1-data-model.md`: ShapeCache-Datenmodell
-- `docs/recompute-execution-mvp1-additive-extrude.md`: erste
-  Additive-Recompute-Ausfuehrung
-- `docs/mvp-plan.md`: Reihenfolge der MVPs
-- `docs/mvp-1-specification.md`: genaue MVP-1-Spezifikation
-- `docs/decisions/`: Architecture Decision Records
-- `docs/dependencies-ubuntu-24.04.md`: Paketliste fuer Ubuntu 24.04
+- `zielarchitektur-parametrisches-cad-system.tex`: original target architecture
+- `docs/architecture-summary.md`: condensed architecture overview
+- `docs/core-mvp1-skeleton.md`: current core skeleton
+- `docs/sketch-mvp1-data-model.md`: sketch and profile data model
+- `docs/feature-mvp1-data-model.md`: feature data model
+- `docs/dependency-graph-mvp1-data-model.md`: dependency graph data model
+- `docs/invalidation-mvp1-data-model.md`: invalidation-state data model
+- `docs/recompute-plan-mvp1-data-model.md`: recompute-plan data model
+- `docs/geometry-adapter-mvp1-rectangle-extrusion.md`: first OCCT adapter
+- `docs/shape-cache-mvp1-data-model.md`: ShapeCache data model
+- `docs/recompute-execution-mvp1-additive-extrude.md`: first additive recompute execution
+- `docs/mvp-plan.md`: MVP sequence
+- `docs/mvp-1-specification.md`: detailed MVP-1 specification
+- `docs/decisions/`: architecture decision records
+- `docs/dependencies-ubuntu-24.04.md`: package list for Ubuntu 24.04
 
-## Formatierung
+## Formatting
 
-Die Projektformatierung ist vorbereitet:
+Project formatting is prepared:
 
 - `.editorconfig`
 - `.clang-format`
 
-Vor Commits soll `clang-format` fuer C++-Dateien verwendet werden.
+Use `clang-format` for C++ files before committing.
 
-## Generierte Dateien aufraeumen
+## Clean generated files
 
-CMake-Buildordner liegen unter `build/`.
+CMake build directories are located under `build/`.
 
 ```bash
 rm -rf build/
 ```
 
-LaTeX-Hilfsdateien sind in `.gitignore` eingetragen. Das PDF der Zielarchitektur
-darf als Arbeitsartefakt im Ordner bleiben.
+LaTeX helper files are listed in `.gitignore`. The generated target-architecture PDF may remain as a working artifact in the directory.
 
-## Entwicklungsregel fuer MVP 1
+## Development rule for MVP 1
 
-Der erste Code soll nur den MVP-1-Pfad betreffen:
+The first code should only affect the MVP-1 path:
 
-- kein GUI-Code
-- keine Assembly
-- keine Engineering-Assistenten
-- kein Lochkreis
-- kein allgemeiner Constraint Solver
+- no GUI code
+- no assembly
+- no engineering assistants
+- no bolt circle
+- no general constraint solver
 
-Erst wenn Parameter, Recompute, OCCT-Geometrie und STEP-Export fuer die
-Referenzplatte funktionieren, wird der Umfang erweitert.
+Only extend the scope after parameters, recompute, OCCT geometry, and STEP export work for the reference plate.
