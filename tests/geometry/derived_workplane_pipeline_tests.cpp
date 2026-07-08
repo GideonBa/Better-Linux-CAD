@@ -26,8 +26,12 @@ Parameter make_length_parameter(const char* id, const char* name, double value_m
   return parameter.value();
 }
 
-PartDocument make_top_face_cut_document(Point2 hole_center = {}) {
-  auto document = PartDocument::create(DocumentId("part.top_face_plate"), "TopFacePlate");
+PartDocument make_face_cut_document(SemanticFace face, DatumPlaneId workplane_id,
+                                    const char* workplane_name, SketchId hole_sketch_id,
+                                    const char* hole_sketch_name, ProfileId hole_profile_id,
+                                    FeatureId cut_feature_id, const char* cut_name,
+                                    Point2 hole_center = {}) {
+  auto document = PartDocument::create(DocumentId("part.face_plate"), "FacePlate");
   REQUIRE(document);
 
   REQUIRE(document.value().add_parameter(make_length_parameter("part.width", "width", 120.0)));
@@ -35,7 +39,7 @@ PartDocument make_top_face_cut_document(Point2 hole_center = {}) {
   REQUIRE(
       document.value().add_parameter(make_length_parameter("part.thickness", "thickness", 8.0)));
   REQUIRE(document.value().add_parameter(
-      make_length_parameter("part.top_hole_diameter", "top_hole_diameter", 20.0)));
+      make_length_parameter("part.hole_diameter", "hole_diameter", 20.0)));
 
   auto xy = DatumPlane::xy();
   REQUIRE(xy);
@@ -56,25 +60,22 @@ PartDocument make_top_face_cut_document(Point2 hole_center = {}) {
   REQUIRE(base);
   REQUIRE(document.value().add_feature(base.value()));
 
-  auto face_reference = SemanticFaceReference::create(FeatureId("feature.base_extrude"),
-                                                      SemanticFace::Top);
+  auto face_reference = SemanticFaceReference::create(FeatureId("feature.base_extrude"), face);
   REQUIRE(face_reference);
-  auto workplane = DerivedWorkplane::create_on_feature_face(
-      DatumPlaneId("workplane.base_top"), "BaseTopFace", face_reference.value());
+  auto workplane = DerivedWorkplane::create_on_feature_face(workplane_id, workplane_name,
+                                                            face_reference.value());
   REQUIRE(workplane);
   REQUIRE(document.value().add_derived_workplane(workplane.value()));
 
-  auto top_hole_sketch = Sketch::create(SketchId("sketch.top_hole"), "Sketch_TopHole",
-                                        DatumPlaneId("workplane.base_top"));
-  REQUIRE(top_hole_sketch);
-  auto circle = CircleProfile::create(ProfileId("profile.top_hole"),
-                                      ParameterId("part.top_hole_diameter"), hole_center);
+  auto hole_sketch = Sketch::create(hole_sketch_id, hole_sketch_name, workplane_id);
+  REQUIRE(hole_sketch);
+  auto circle = CircleProfile::create(hole_profile_id, ParameterId("part.hole_diameter"),
+                                      hole_center);
   REQUIRE(circle);
-  REQUIRE(top_hole_sketch.value().add_profile(circle.value()));
-  REQUIRE(document.value().add_sketch(top_hole_sketch.value()));
+  REQUIRE(hole_sketch.value().add_profile(circle.value()));
+  REQUIRE(document.value().add_sketch(hole_sketch.value()));
 
-  auto cut = Feature::create_subtractive_extrude(FeatureId("feature.top_hole_cut"), "TopHoleCut",
-                                                 SketchId("sketch.top_hole"),
+  auto cut = Feature::create_subtractive_extrude(cut_feature_id, cut_name, hole_sketch_id,
                                                  FeatureId("feature.base_extrude"));
   REQUIRE(cut);
   REQUIRE(document.value().add_feature(cut.value()));
@@ -82,8 +83,23 @@ PartDocument make_top_face_cut_document(Point2 hole_center = {}) {
   return document.value();
 }
 
+PartDocument make_top_face_cut_document(Point2 hole_center = {}) {
+  return make_face_cut_document(SemanticFace::Top, DatumPlaneId("workplane.base_top"),
+                                "BaseTopFace", SketchId("sketch.top_hole"), "Sketch_TopHole",
+                                ProfileId("profile.top_hole"),
+                                FeatureId("feature.top_hole_cut"), "TopHoleCut", hole_center);
+}
+
+PartDocument make_bottom_face_cut_document(Point2 hole_center = {}) {
+  return make_face_cut_document(SemanticFace::Bottom, DatumPlaneId("workplane.base_bottom"),
+                                "BaseBottomFace", SketchId("sketch.bottom_hole"),
+                                "Sketch_BottomHole", ProfileId("profile.bottom_hole"),
+                                FeatureId("feature.bottom_hole_cut"), "BottomHoleCut",
+                                hole_center);
+}
+
 ShapeCache make_shape_cache() {
-  auto cache = ShapeCache::create(ShapeCacheId("shape_cache.top_face"));
+  auto cache = ShapeCache::create(ShapeCacheId("shape_cache.face"));
   REQUIRE(cache);
 
   return cache.value();
@@ -133,6 +149,32 @@ TEST_CASE("MVP-2 seed recomputes a cut from a sketch on a derived top-face workp
   const ShapeSummary final_summary = inspector.summarize(*cache.final_shape());
   CHECK(final_summary.solid_count == 1);
   CHECK(final_summary.volume_mm3 < base_volume);
+}
+
+TEST_CASE("MVP-2 seed recomputes a cut from a sketch on a derived bottom-face workplane",
+          "[geometry][workplane]") {
+  const PartDocument document = make_bottom_face_cut_document(Point2{-20.0, 10.0});
+  ShapeCache cache = make_shape_cache();
+  const GeometryRecomputeExecutor executor;
+
+  const auto summary = executor.execute_document(document, cache);
+
+  REQUIRE(summary);
+  CHECK(summary.value().executed_feature_count == 2);
+  REQUIRE(cache.has_final_shape());
+  CHECK(cache.final_feature_id().value() == "feature.bottom_hole_cut");
+
+  const RectangleExtrusionAdapter inspector;
+  const GeometryShape* base_shape = cache.find_feature_shape(FeatureId("feature.base_extrude"));
+  REQUIRE(base_shape != nullptr);
+  const double base_volume = inspector.summarize(*base_shape).volume_mm3;
+
+  REQUIRE(cache.final_shape() != nullptr);
+  const ShapeSummary final_summary = inspector.summarize(*cache.final_shape());
+  REQUIRE(final_summary.solid_count == 1);
+
+  const double expected_removed_volume = std::numbers::pi * 10.0 * 10.0 * 8.0;
+  CHECK(final_summary.volume_mm3 == Catch::Approx(base_volume - expected_removed_volume).margin(1.0));
 }
 
 TEST_CASE("Derived top-face workplane cut follows an off-center sketch point",
