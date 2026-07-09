@@ -26,7 +26,7 @@ The current JSON format stores:
 - document ID and name
 - length parameters
 - datum planes
-- derived workplanes with `top`, `bottom`, `right`, `left`, or `front` semantic face references
+- derived workplanes with `top`, `bottom`, `right`, `left`, `front`, or `back` semantic face references
 - rectangle and circle sketch profiles
 - additive and subtractive extrude features
 
@@ -42,12 +42,13 @@ examples/bottom_face_cut.blcad.json
 examples/right_face_cut.blcad.json
 examples/left_face_cut.blcad.json
 examples/front_face_cut.blcad.json
+examples/back_face_cut.blcad.json
 ```
 
 These files describe sketches placed on semantic generated-face workplanes such as:
 
 ```text
-workplane.base_front -> feature.base_extrude.front
+workplane.base_back -> feature.base_extrude.back
 ```
 
 No raw OCCT face IDs are stored.
@@ -58,11 +59,11 @@ A derived workplane stores a semantic feature-face reference:
 
 ```json
 {
-  "id": "workplane.base_front",
-  "name": "BaseFrontFace",
+  "id": "workplane.base_back",
+  "name": "BaseBackFace",
   "kind": "feature_face",
   "source_feature": "feature.base_extrude",
-  "face": "front"
+  "face": "back"
 }
 ```
 
@@ -74,6 +75,7 @@ bottom
 right
 left
 front
+back
 ```
 
 ## Sketches and features
@@ -98,7 +100,7 @@ This rebuilds the dependency graph and invalidation state from the model instead
 
 ## Test coverage
 
-Core tests verify JSON roundtrip for top, bottom, right, left, and front derived workplanes. Geometry tests verify that a document restored from JSON can be recomputed into a fresh `ShapeCache` and exported as STEP.
+Core tests verify JSON roundtrip for top, bottom, right, left, front, and back derived workplanes. Geometry tests verify that a document restored from JSON can be recomputed into a fresh `ShapeCache` and exported as STEP.
 
 ## Deliberate limitation
 
@@ -109,7 +111,7 @@ Not included yet:
 - assembly serialization
 - ShapeCache serialization
 - automatic parent-directory creation for model-file output
-- back semantic reference
 - arbitrary face references
+- general closed sketch profile serialization
 
 The current implementation is enough to prove that model intent can be persisted, stored as a file, loaded again, and rebuilt independently of computed geometry.
