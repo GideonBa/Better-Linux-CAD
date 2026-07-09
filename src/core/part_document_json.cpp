@@ -808,9 +808,16 @@ Result<std::uintmax_t> write_part_document_json_file(const PartDocument& documen
   }
 
   output << serialized.value();
+  output.flush();
   if (!output) {
     return Result<std::uintmax_t>::failure(
         json_file_error(path, "could not write part document json file"));
+  }
+
+  output.close();
+  if (!output) {
+    return Result<std::uintmax_t>::failure(
+        json_file_error(path, "could not close part document json file after writing"));
   }
 
   std::error_code error;
