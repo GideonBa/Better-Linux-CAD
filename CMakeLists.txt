@@ -68,6 +68,7 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/recompute_executor.cpp
     src/geometry/rectangle_extrusion_adapter.cpp
     src/geometry/reference_driven_sketch_helper.cpp
+    src/geometry/reference_generated_profile_resolver.cpp
     src/geometry/semantic_reference_evaluator.cpp
     src/geometry/shape_cache.cpp
     src/geometry/sketch_reference_projector.cpp
