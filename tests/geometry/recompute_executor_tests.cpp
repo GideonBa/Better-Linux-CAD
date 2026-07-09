@@ -211,7 +211,7 @@ TEST_CASE("GeometryRecomputeExecutor rejects missing feature ids", "[geometry][r
   CHECK_FALSE(cache.has_final_shape());
 }
 
-TEST_CASE("GeometryRecomputeExecutor rejects non-rectangle additive sketches",
+TEST_CASE("GeometryRecomputeExecutor rejects unsupported additive sketches",
           "[geometry][recompute]") {
   const PartDocument document = make_document_with_circle_only_additive_extrude();
   ShapeCache cache = make_shape_cache();
@@ -223,7 +223,8 @@ TEST_CASE("GeometryRecomputeExecutor rejects non-rectangle additive sketches",
   REQUIRE(executed.has_error());
   CHECK(executed.error().category() == ErrorCategory::Validation);
   CHECK(executed.error().object_id() == "sketch.base");
-  CHECK(executed.error().message() == "additive extrude requires exactly one rectangle profile");
+  CHECK(executed.error().message() ==
+        "additive extrude requires exactly one rectangle or closed profile");
   CHECK(cache.feature_shape_count() == 0);
   CHECK_FALSE(cache.has_final_shape());
 }
@@ -293,7 +294,7 @@ TEST_CASE("GeometryRecomputeExecutor requires the target body in the cache befor
   CHECK_FALSE(cache.has_final_shape());
 }
 
-TEST_CASE("GeometryRecomputeExecutor rejects non-circle subtractive sketches",
+TEST_CASE("GeometryRecomputeExecutor rejects unsupported subtractive sketches",
           "[geometry][recompute]") {
   auto document = PartDocument::create(DocumentId("part.base_plate"), "BasePlate");
   REQUIRE(document);
@@ -329,6 +330,7 @@ TEST_CASE("GeometryRecomputeExecutor rejects non-circle subtractive sketches",
   REQUIRE(executed.has_error());
   CHECK(executed.error().category() == ErrorCategory::Validation);
   CHECK(executed.error().object_id() == "sketch.base");
-  CHECK(executed.error().message() == "subtractive extrude requires exactly one circle profile");
+  CHECK(executed.error().message() ==
+        "subtractive extrude requires exactly one circle or closed profile");
   CHECK_FALSE(cache.has_final_shape());
 }
