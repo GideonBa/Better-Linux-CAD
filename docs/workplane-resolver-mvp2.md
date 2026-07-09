@@ -1,6 +1,6 @@
 # Workplane Resolver
 
-Status: geometry-layer resolver for standard datum planes, derived top/bottom/right/left/front/back workplanes of a simple additive extrude, explicit construction planes, offset construction planes, three-point construction planes, and planes parallel to another plane through a construction point. The resolved workplane frames are also used by `SketchReferenceProjector` to map projected reference geometry into sketch-local coordinates.
+Status: geometry-layer resolver for standard datum planes, derived top/bottom/right/left/front/back workplanes of a simple additive extrude, explicit construction planes, offset construction planes, three-point construction planes, and planes parallel to another plane through a construction point. The resolved workplane frames are used by recompute, by `SketchReferenceProjector`, and by sketch-origin override handling.
 
 The core stores semantic model intent only. The geometry layer resolves supported intent into concrete frames for recompute and projection. Raw OCCT topology IDs are not stored in `PartDocument` JSON.
 
@@ -72,6 +72,24 @@ bounds.enabled = false
 
 Generated-face workplanes for top, bottom, right, left, front, and back of a simple rectangular additive extrude keep the established right-handed frames and rectangular bounds.
 
+## Sketch origin override
+
+`resolve` returns the raw workplane frame.
+
+`resolve_for_sketch` first resolves the sketch workplane, then applies an optional `SketchOriginOverrideRecord` from the `PartDocument`.
+
+The origin override is a 2D local point in the resolved workplane frame:
+
+```text
+origin = resolved.origin
+       + override.x * resolved.x_axis
+       + override.y * resolved.y_axis
+```
+
+If the resolved workplane has rectangular bounds, the bounds center is shifted by `(-override.x, -override.y)` so the valid local bounded area remains correct in the shifted sketch coordinate system.
+
+`GeometryRecomputeExecutor` and `SketchReferenceProjector` use `resolve_for_sketch`, so closed-profile recompute, circular cut centers, and projected reference coordinates all see the same sketch-local frame.
+
 ## Rectangular bounds
 
 Generated-face derived workplanes keep rectangular bounds for top, bottom, right, left, front, and back faces. Construction planes remain unbounded in the current implementation because they represent infinite user reference planes.
@@ -100,7 +118,7 @@ global = (7, 9, 7)
 
 ## Projected sketch reference integration
 
-`SketchReferenceProjector` uses `WorkplaneResolver` to resolve the sketch workplane before projecting reference geometry. It then maps resolved 3D reference geometry into the local sketch frame:
+`SketchReferenceProjector` uses `WorkplaneResolver::resolve_for_sketch` before projecting reference geometry. It then maps resolved 3D reference geometry into the local sketch frame:
 
 ```text
 local.x = dot(global - origin, x_axis)
@@ -147,10 +165,12 @@ Geometry tests cover:
 - checking construction plane origins, axes, normals, and unbounded status
 - checking rectangular bounds for resolved generated-face workplanes
 - mapping local sketch points through resolved frames
+- applying sketch-origin overrides through `resolve_for_sketch`
 - rejecting missing workplanes
 - recomputing circular cuts and closed-profile operations from sketches on resolved workplanes
 - evaluating rectangular-additive-extrude semantic generated edges and vertices
 - evaluating deterministic construction points and construction lines derived from generated semantic references
 - projecting semantic generated vertices and edges into sketch-local reference geometry
 - projecting generated-reference construction points and construction lines into sketch-local reference geometry
+- checking generated-face workplane movement when source feature dimensions change
 - rejecting out-of-plane projected sketch references
