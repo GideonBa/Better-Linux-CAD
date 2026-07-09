@@ -209,17 +209,19 @@ Out of scope for the first version:
 - tangent planes to arbitrary NURBS surfaces
 - automatic repair of invalid reference chains
 - assembly-level construction geometry
+- 3D sketch splines, guide curves, lofts, sweeps, boundary surfaces, or surface stitching
 - exposing construction geometry as exported final solids or curves by default
 
 ## Relationship to existing roadmap
 
 The current MVP 2 semantic-face workplane seed proves that sketches can be placed on generated planar faces without storing raw OCCT face IDs.
 
-The construction-geometry block generalizes the workplane concept from generated faces to user-defined reference geometry. It should remain separate from the general closed sketch profile block:
+The construction-geometry block generalizes the workplane concept from generated faces to user-defined reference geometry. It should remain separate from the general closed sketch profile block and from the advanced surfacing block:
 
 ```text
-Construction geometry answers: where can a sketch live?
-General closed sketch profiles answer: what shape can a sketch describe?
+Construction geometry answers: where can a sketch or curve be placed?
+General closed sketch profiles answer: what planar shape can a sketch describe?
+Advanced surfacing answers: how can spatial curves, multiple sketches, guide curves, and surfaces form freeform geometry?
 ```
 
-Both are needed for a serious CAD system, but they should be implemented as separate, testable increments.
+All three are needed for a serious CAD system, but they should be implemented as separate, testable increments.
