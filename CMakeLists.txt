@@ -61,8 +61,10 @@ if(BLCAD_BUILD_GEOMETRY)
     blcad_geometry STATIC
     src/geometry/circular_cut_adapter.cpp
     src/geometry/closed_profile_adapter.cpp
+    src/geometry/construction_line_resolver.cpp
     src/geometry/recompute_executor.cpp
     src/geometry/rectangle_extrusion_adapter.cpp
+    src/geometry/semantic_reference_evaluator.cpp
     src/geometry/shape_cache.cpp
     src/geometry/step_exporter.cpp
     src/geometry/workplane_resolver.cpp
