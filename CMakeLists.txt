@@ -39,6 +39,7 @@ add_library(
   src/core/parameter.cpp
   src/core/quantity.cpp
   src/core/recompute_plan.cpp
+  src/core/reference_generated_line.cpp
   src/core/reference_recovery.cpp
   src/core/sketch.cpp
 )
