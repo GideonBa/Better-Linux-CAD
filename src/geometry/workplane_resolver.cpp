@@ -219,6 +219,23 @@ constexpr double k_tolerance = 1.0e-9;
         RectangularWorkplaneBounds{}});
   }
 
+  if (plane.kind() == ConstructionPlaneKind::ParallelToPlaneThroughPoint) {
+    auto source = resolver.resolve(document, relation.source_plane());
+    if (source.has_error()) {
+      return Result<ResolvedWorkplane>::failure(source.error());
+    }
+
+    const ConstructionPoint* point = document.find_construction_point(relation.first_point());
+    if (point == nullptr) {
+      return Result<ResolvedWorkplane>::failure(validation_error(
+          plane.id().value(), "plane parallel to plane through point reference point must exist"));
+    }
+
+    return Result<ResolvedWorkplane>::success(ResolvedWorkplane{
+        plane.workplane_id(), point->position(), source.value().x_axis, source.value().y_axis,
+        source.value().normal, RectangularWorkplaneBounds{}});
+  }
+
   return Result<ResolvedWorkplane>::failure(
       validation_error(plane.id().value(), "unsupported construction plane relation"));
 }
