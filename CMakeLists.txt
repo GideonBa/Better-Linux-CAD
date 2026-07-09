@@ -141,6 +141,7 @@ if(BLCAD_BUILD_TESTS)
   if(BLCAD_BUILD_GEOMETRY)
     add_executable(
       blcad_geometry_tests
+      tests/geometry/back_workplane_pipeline_tests.cpp
       tests/geometry/circular_cut_adapter_tests.cpp
       tests/geometry/derived_workplane_pipeline_tests.cpp
       tests/geometry/front_workplane_pipeline_tests.cpp
