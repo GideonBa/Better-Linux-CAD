@@ -116,6 +116,7 @@ if(BLCAD_BUILD_TESTS)
 
   add_executable(
     blcad_core_tests
+    tests/core/closed_profile_json_tests.cpp
     tests/core/datum_plane_tests.cpp
     tests/core/dependency_graph_tests.cpp
     tests/core/derived_workplane_tests.cpp
