@@ -1,6 +1,6 @@
 # MVP 2 Bounded Workplane Validation
 
-Status: minimal bounds validation for circle profiles on derived top, bottom, right, left, and front workplanes of a simple additive rectangle extrude.
+Status: minimal bounds validation for circle profiles on derived top, bottom, right, left, front, and back workplanes of a simple additive rectangle extrude.
 
 This document describes the validation step after resolving semantic generated faces into concrete workplane frames. The geometry layer knows the rectangular support region of the resolved workplane and validates circle profiles before executing the cut.
 
@@ -16,6 +16,7 @@ feature.base_extrude.bottom
 feature.base_extrude.right
 feature.base_extrude.left
 feature.base_extrude.front
+feature.base_extrude.back
 ```
 
 The resolved workplane carries a rectangular support region in local workplane coordinates. A circle profile on that workplane is valid only if the complete circle lies inside the rectangle.
@@ -70,7 +71,7 @@ width_mm = source rectangle height
 height_mm = extrude thickness
 ```
 
-Front uses source rectangle width and extrude thickness:
+Front and back use source rectangle width and extrude thickness:
 
 ```text
 width_mm = source rectangle width
@@ -119,7 +120,7 @@ Geometry tests cover:
 - `datum.xy` has no rectangular bounds
 - top and bottom workplanes have rectangular bounds matching source width and height
 - right and left workplanes have rectangular bounds matching source height and thickness
-- front workplanes have rectangular bounds matching source width and thickness
+- front and back workplanes have rectangular bounds matching source width and thickness
 - centered and off-center holes recompute
 - valid near-edge holes are accepted
 - out-of-bounds holes are rejected
@@ -129,12 +130,12 @@ Geometry tests cover:
 
 Not included yet:
 
-- back-face bounds
 - arbitrary planar faces
 - non-rectangular faces
 - partial-overlap clipping
 - automatic sketch repair
 - full topological naming
 - GUI face selection
+- general closed sketch profiles
 
 This step keeps validation in the geometry layer, because the core stores semantic model intent and does not own geometric face extents.
