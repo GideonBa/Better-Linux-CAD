@@ -1,11 +1,14 @@
 #include "blcad/core/part_document.hpp"
 
+#include <cmath>
 #include <string>
 #include <utility>
 
 namespace blcad {
 
 namespace {
+
+constexpr double k_tolerance = 1.0e-9;
 
 Result<std::size_t> add_dependency_if_missing(DependencyGraph& graph, std::string dependency,
                                                std::string dependent) {
@@ -14,6 +17,23 @@ Result<std::size_t> add_dependency_if_missing(DependencyGraph& graph, std::strin
   }
 
   return graph.add_dependency(std::move(dependency), std::move(dependent));
+}
+
+[[nodiscard]] Vector3 vector_between(Point3 from, Point3 to) noexcept {
+  return Vector3{to.x - from.x, to.y - from.y, to.z - from.z};
+}
+
+[[nodiscard]] Vector3 cross(Vector3 left, Vector3 right) noexcept {
+  return Vector3{left.y * right.z - left.z * right.y, left.z * right.x - left.x * right.z,
+                 left.x * right.y - left.y * right.x};
+}
+
+[[nodiscard]] double length(Vector3 vector) noexcept {
+  return std::sqrt(vector.x * vector.x + vector.y * vector.y + vector.z * vector.z);
+}
+
+[[nodiscard]] bool are_collinear(Point3 first, Point3 second, Point3 third) noexcept {
+  return length(cross(vector_between(first, second), vector_between(first, third))) <= k_tolerance;
 }
 
 [[nodiscard]] bool is_supported_derived_face(SemanticFace face) noexcept {
@@ -26,6 +46,19 @@ Result<std::size_t> add_dependency_if_missing(DependencyGraph& graph, std::strin
     const std::string& dependent_id) {
   for (const auto& parameter_id : parameter_dependencies) {
     auto dependency = add_dependency_if_missing(graph, parameter_id.value(), dependent_id);
+    if (dependency.has_error()) {
+      return dependency;
+    }
+  }
+
+  return Result<std::size_t>::success(graph.dependency_count());
+}
+
+[[nodiscard]] Result<std::size_t> add_relation_dependencies(DependencyGraph& graph,
+                                                            const ConstructionRelation& relation,
+                                                            const std::string& dependent_id) {
+  for (const std::string& referenced_node_id : relation.referenced_node_ids()) {
+    auto dependency = add_dependency_if_missing(graph, referenced_node_id, dependent_id);
     if (dependency.has_error()) {
       return dependency;
     }
@@ -147,6 +180,20 @@ Result<std::size_t> PartDocument::add_construction_line(ConstructionLine line) {
     }
   }
 
+  if (line.kind() == ConstructionLineKind::ThroughTwoPoints) {
+    if (!line.relation().has_value()) {
+      return Result<std::size_t>::failure(Error::validation(
+          line.id().value(), "relation-driven construction line must carry a relation"));
+    }
+
+    const ConstructionRelation& relation = line.relation().value();
+    if (find_construction_point(relation.first_point()) == nullptr ||
+        find_construction_point(relation.second_point()) == nullptr) {
+      return Result<std::size_t>::failure(Error::validation(
+          line.id().value(), "line through two points references must exist in part document"));
+    }
+  }
+
   auto graph = dependency_graph_;
   const auto added_node = graph.add_node(line.id().value());
   if (added_node.has_error()) {
@@ -157,6 +204,14 @@ Result<std::size_t> PartDocument::add_construction_line(ConstructionLine line) {
       add_parameter_dependencies(graph, line.parameter_dependencies(), line.id().value());
   if (parameter_dependencies.has_error()) {
     return Result<std::size_t>::failure(parameter_dependencies.error());
+  }
+
+  if (line.relation().has_value()) {
+    const auto relation_dependencies = add_relation_dependencies(graph, line.relation().value(),
+                                                                 line.id().value());
+    if (relation_dependencies.has_error()) {
+      return Result<std::size_t>::failure(relation_dependencies.error());
+    }
   }
 
   auto invalidation_state = invalidation_state_;
@@ -189,6 +244,45 @@ Result<std::size_t> PartDocument::add_construction_plane(ConstructionPlane plane
     }
   }
 
+  if (plane.kind() == ConstructionPlaneKind::OffsetFromPlane) {
+    if (!plane.relation().has_value()) {
+      return Result<std::size_t>::failure(Error::validation(
+          plane.id().value(), "relation-driven construction plane must carry a relation"));
+    }
+
+    const ConstructionRelation& relation = plane.relation().value();
+    if (!has_workplane_id(relation.source_plane())) {
+      return Result<std::size_t>::failure(Error::validation(
+          plane.id().value(), "plane offset source plane must exist in part document"));
+    }
+
+    if (!has_parameter_id(relation.offset_parameter())) {
+      return Result<std::size_t>::failure(Error::validation(
+          plane.id().value(), "plane offset parameter must exist in part document"));
+    }
+  }
+
+  if (plane.kind() == ConstructionPlaneKind::ThroughThreePoints) {
+    if (!plane.relation().has_value()) {
+      return Result<std::size_t>::failure(Error::validation(
+          plane.id().value(), "relation-driven construction plane must carry a relation"));
+    }
+
+    const ConstructionRelation& relation = plane.relation().value();
+    const ConstructionPoint* first = find_construction_point(relation.first_point());
+    const ConstructionPoint* second = find_construction_point(relation.second_point());
+    const ConstructionPoint* third = find_construction_point(relation.third_point());
+    if (first == nullptr || second == nullptr || third == nullptr) {
+      return Result<std::size_t>::failure(Error::validation(
+          plane.id().value(), "plane through three points references must exist in part document"));
+    }
+
+    if (are_collinear(first->position(), second->position(), third->position())) {
+      return Result<std::size_t>::failure(Error::validation(
+          plane.id().value(), "plane through three points requires non-collinear points"));
+    }
+  }
+
   auto graph = dependency_graph_;
   const auto added_node = graph.add_node(plane.id().value());
   if (added_node.has_error()) {
@@ -199,6 +293,14 @@ Result<std::size_t> PartDocument::add_construction_plane(ConstructionPlane plane
       add_parameter_dependencies(graph, plane.parameter_dependencies(), plane.id().value());
   if (parameter_dependencies.has_error()) {
     return Result<std::size_t>::failure(parameter_dependencies.error());
+  }
+
+  if (plane.relation().has_value()) {
+    const auto relation_dependencies = add_relation_dependencies(graph, plane.relation().value(),
+                                                                 plane.id().value());
+    if (relation_dependencies.has_error()) {
+      return Result<std::size_t>::failure(relation_dependencies.error());
+    }
   }
 
   auto invalidation_state = invalidation_state_;
