@@ -58,6 +58,7 @@ The optional `blcad_geometry` target contains OCCT adapters for rectangle extrus
 - `docs/front-workplane-mvp2.md`: front-face derived workplane for simple additive extrudes
 - `docs/back-workplane-mvp2.md`: back-face derived workplane for simple additive extrudes
 - `docs/general-closed-sketch-profile-mvp.md`: implemented first line-based closed-profile MVP and remaining future profile work
+- `docs/inventor-like-sketcher-and-feature-roadmap.md`: long-term Inventor-like sketcher and sketch-driven feature parity roadmap
 - `docs/construction-geometry-mvp.md`: future block for user-created construction planes, lines, points, and relation-driven datum geometry
 - `docs/advanced-surfacing-and-3d-sketch-mvp.md`: future block for 3D sketches, guide splines, sweeps, lofts, boundary surfaces, and closed-surface-to-solid workflows
 - `docs/semantic-references.md`: canonical rule for semantic (non-topological) references to faces, edges, axes, and points
@@ -85,7 +86,9 @@ The optional geometry build resolves sketch workplanes before executing subtract
 
 Line-based closed sketch profiles are implemented as the first general-profile step. A sketch can store `LineSegment` entities, build a `ClosedProfile` from ordered line-segment IDs, validate that the chain is connected and non-self-intersecting, serialize that intent to JSON, restore it from JSON, convert it to an OCCT wire and face in the geometry layer, and use it as one additive extrude profile or one subtractive through-all cut profile.
 
-Still not implemented: arcs, splines, trimmed curves, automatic region detection, multiple contours in one feature, inner holes in one profile, a full sketch constraint solver, GUI sketch editing, arbitrary non-planar sketch geometry, 3D guide curves, loft, sweep, boundary surfaces, surface stitching, or closed-shell-to-solid conversion.
+Still not implemented: arcs, splines, trimmed curves, automatic region detection, multiple contours in one feature, inner holes in one profile, a full sketch constraint solver, GUI sketch editing, arbitrary non-planar sketch geometry, revolve, revolve cut, 3D guide curves, loft, sweep, boundary surfaces, surface stitching, or closed-shell-to-solid conversion.
+
+The long-term sketcher and feature parity target is explicitly documented as a separate roadmap. It covers Inventor-like 2D sketch entities, sketch editing operations, constraints, dimensions, automatic profile and region detection, 3D sketching, revolve/revolve cut, sweep, loft, surfacing, and surface-to-solid conversion. This roadmap is tracked in `docs/inventor-like-sketcher-and-feature-roadmap.md`.
 
 Construction geometry is explicitly documented as a separate future block. The system should later support user-created construction planes, construction lines/axes, and construction points that can be placed freely in 3D, used as sketch references, and defined through relations such as parallelism, orthogonality, angles, offsets, point-on-line, point-on-plane, line-through-two-points, and plane-through-three-points. This future block is tracked in `docs/construction-geometry-mvp.md`.
 
@@ -156,6 +159,8 @@ The next technical step should start the construction-geometry MVP, without buil
 The detailed construction-geometry block is documented in `docs/construction-geometry-mvp.md`.
 
 The completed first line-based closed-profile block is documented in `docs/general-closed-sketch-profile-mvp.md`.
+
+The long-term Inventor-like sketcher and sketch-driven feature parity roadmap is documented in `docs/inventor-like-sketcher-and-feature-roadmap.md`.
 
 A separate later block for 3D sketches, guide splines, sweep, loft, boundary surfaces, surface stitching, and closed-shell-to-solid conversion is documented in `docs/advanced-surfacing-and-3d-sketch-mvp.md`.
 
