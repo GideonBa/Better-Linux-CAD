@@ -6,6 +6,7 @@
 #include "blcad/core/spatial.hpp"
 
 #include <cstddef>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -37,17 +38,18 @@ public:
   [[nodiscard]] const SketchEntityId& id() const noexcept;
   [[nodiscard]] ProjectedSketchPointSource source() const noexcept;
   [[nodiscard]] const ConstructionPointId& construction_point() const noexcept;
-  [[nodiscard]] const SemanticVertexReference& semantic_vertex() const noexcept;
+  [[nodiscard]] const std::optional<SemanticVertexReference>& semantic_vertex() const noexcept;
   [[nodiscard]] std::string referenced_node_id() const;
 
 private:
   ProjectedSketchPoint(SketchEntityId id, ProjectedSketchPointSource source,
-                       ConstructionPointId construction_point, SemanticVertexReference semantic_vertex);
+                       ConstructionPointId construction_point,
+                       std::optional<SemanticVertexReference> semantic_vertex);
 
   SketchEntityId id_;
   ProjectedSketchPointSource source_;
   ConstructionPointId construction_point_;
-  SemanticVertexReference semantic_vertex_;
+  std::optional<SemanticVertexReference> semantic_vertex_;
 };
 
 class ProjectedSketchLine {
@@ -61,17 +63,18 @@ public:
   [[nodiscard]] const SketchEntityId& id() const noexcept;
   [[nodiscard]] ProjectedSketchLineSource source() const noexcept;
   [[nodiscard]] const ConstructionLineId& construction_line() const noexcept;
-  [[nodiscard]] const SemanticEdgeReference& semantic_edge() const noexcept;
+  [[nodiscard]] const std::optional<SemanticEdgeReference>& semantic_edge() const noexcept;
   [[nodiscard]] std::string referenced_node_id() const;
 
 private:
   ProjectedSketchLine(SketchEntityId id, ProjectedSketchLineSource source,
-                      ConstructionLineId construction_line, SemanticEdgeReference semantic_edge);
+                      ConstructionLineId construction_line,
+                      std::optional<SemanticEdgeReference> semantic_edge);
 
   SketchEntityId id_;
   ProjectedSketchLineSource source_;
   ConstructionLineId construction_line_;
-  SemanticEdgeReference semantic_edge_;
+  std::optional<SemanticEdgeReference> semantic_edge_;
 };
 
 class LineSegment {
