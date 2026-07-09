@@ -36,8 +36,8 @@ Implemented seed:
 - semantic references for top, bottom, right, left, front, and back faces of a simple additive extrude
 - `DerivedWorkplane` from those semantic faces
 - sketches can reference derived workplanes
-- dependency graph includes paths such as `feature.base_extrude -> workplane.base_back -> sketch.back_hole`
-- JSON serialization supports `derived_workplanes` with `top`, `bottom`, `right`, `left`, `front`, and `back` faces
+- dependency graph paths from source feature to workplane, sketch, and dependent feature
+- JSON serialization for `derived_workplanes`
 - geometry-layer `WorkplaneResolver`
 - rectangular bounds on resolved generated-face workplanes
 - circular cut and closed-profile recompute through resolved workplanes
@@ -89,42 +89,23 @@ Implemented scope:
 - `ConstructionPointId`, `ConstructionLineId`, `ConstructionPlaneId`, and `ConstructionRelationId`
 - `ConstructionPoint`, `ConstructionLine`, `ConstructionPlane`, and `ConstructionRelation`
 - explicit placement definitions for point, line, and plane
-- `PartDocument` storage, validation, and dependency graph nodes
 - optional `parameter_dependencies` from construction geometry to parameters
 - sketches can reference construction planes as workplanes
-- JSON serialization and roundtrip tests for explicit construction geometry
-- `WorkplaneResolver` resolves construction planes into `ResolvedWorkplane` frames
-- geometry test for a feature driven by a closed-profile sketch on a construction plane
-- validation for invalid construction geometry such as zero-length lines and degenerate or non-orthonormal plane frames
-- invalidation tests proving parameter changes can mark construction geometry, dependent sketches, and dependent features dirty
-- checked-in `examples/construction_plane_prism.blcad.json`
-- `PlaneOffsetFromPlane` relation-driven construction plane
-- `LineThroughTwoPoints` relation-driven construction line
-- `PlaneThroughThreePoints` relation-driven construction plane
-- `PlaneParallelToPlaneThroughPoint` relation-driven construction plane
-- `LineParallelToLineThroughPoint` relation-driven construction line
-- `LineParallelToGeneratedEdgeThroughPoint` relation-driven construction line
+- JSON serialization and roundtrip tests for explicit and relation-driven construction geometry
+- `WorkplaneResolver` resolves explicit, offset, three-point, and parallel-through-point construction planes
 - relation-driven construction points on generated vertices and generated edge midpoints
 - semantic generated edge and vertex references similar to `SemanticFaceReference`
 - `SemanticReferenceEvaluator` for rectangular-additive-extrude generated edges and vertices
-- `ConstructionPointResolver` for explicit points, generated vertex points, and generated edge midpoint points
-- `ConstructionLineResolver` for explicit, two-point, line-parallel, and generated-edge-parallel construction lines
-- model-intent relation definitions for `PointOnPlane`, `PointOnLine`, `PointOnGeneratedEdge`, `PointOnGeneratedVertex`, and `LineOnPlane`
-- relation validation for generated edge/vertex references without storing raw OCCT topology IDs
-- dependency graph tests for chained construction relations
-- JSON roundtrip tests for chained relations and semantic generated references
+- `ConstructionPointResolver` and `ConstructionLineResolver`
+- chained construction-relation dependency and invalidation tests
 - JSON-backed `examples/generated_semantic_references.blcad.json`
-- `WorkplaneResolver` support for offset construction planes
-- `WorkplaneResolver` support for three-point construction planes
-- `WorkplaneResolver` support for planes parallel to another plane through a point
-- explicit construction geometry kept as the stable fallback path
 
 Still not implemented in this block:
 
 - generated semantic edge/vertex evaluation for arbitrary non-rectangular or non-extrude topology
 - point-on-generated-edge parameterization beyond deterministic midpoint
 - point-on-line, point-on-plane, and line-on-plane geometric solving
-- parallel, orthogonal, tangent, angle, or normal construction relations beyond the implemented seed
+- richer construction relations beyond the implemented seed
 - standalone relation collections independent from construction objects
 - GUI manipulators
 - full construction-geometry solver
@@ -139,32 +120,24 @@ Detailed document: `docs/projected-sketch-reference-geometry.md`
 Implemented scope:
 
 - `ProjectedSketchPoint` and `ProjectedSketchLine` as sketch-local reference entities
-- sketch-level projected reference IDs using `SketchEntityId`
 - model-intent references from projected point references to `ConstructionPointId` and `SemanticVertexReference`
 - model-intent references from projected line references to `ConstructionLineId` and `SemanticEdgeReference`
 - `SketchReferenceTarget` handles for line segments, line endpoints, projected points, and projected lines
 - `SketchConstraintId` and first `SketchConstraint` records
 - `coincident_to_projected_point`, `parallel_to_projected_line`, and `collinear_with_projected_line` constraint kinds
 - `projected_points`, `projected_lines`, and `constraints` JSON persistence on sketches
-- JSON roundtrip tests for construction-point, construction-line, semantic-vertex, semantic-edge, and projected-reference constraint records
 - `SketchReferenceProjector` in the optional geometry layer
-- projection of resolved construction points and semantic vertices into sketch-local `Point2` coordinates
-- projection of resolved construction lines and semantic edges into sketch-local point-plus-direction line references
 - `ReferenceDrivenSketchHelper` for deterministic evaluation of the first projected-reference constraints
-- deterministic profile-helper line generation from two fully resolved projected-point endpoint constraints
-- explicit out-of-plane validation errors for projected points and projected lines
+- deterministic helper-line generation from two fully resolved projected-point endpoint constraints
+- explicit out-of-plane validation errors
 - dependency graph edges from projected construction and semantic references to owning sketches
-- invalidation tests proving source feature and construction-relation changes dirty projected-reference sketches and dependent features
-- geometry tests for projected semantic generated vertices and edges on generated top-face workplanes
-- geometry tests for projected generated-reference construction points and generated-edge-parallel construction lines
-- geometry tests for the first reference-driven helper constraints
+- invalidation and geometry tests for projected references and first helper constraints
 - checked-in `examples/projected_sketch_references.blcad.json`
 
 Still not implemented in this block:
 
 - full sketch constraint solving
 - automatic region detection from projected references
-- automatic consumption of projected references as profile topology without explicit helper constraints
 - projected reference selection or display in a GUI
 - arbitrary generated topology beyond the current rectangular additive extrude seed
 
@@ -185,13 +158,9 @@ Implemented scope:
 - `PartDocument` storage, finders, counts, and dependency graph nodes for reference status, remap, and origin-override records
 - JSON persistence for `reference_statuses`, `reference_remaps`, and `sketch_origin_overrides`
 - `WorkplaneResolver::resolve_for_sketch` applying sketch-origin overrides to resolved frames and bounds
-- `SketchReferenceProjector` and `GeometryRecomputeExecutor` now use sketch-aware workplane resolution
+- `SketchReferenceProjector` and `GeometryRecomputeExecutor` use sketch-aware workplane resolution
 - checked-in recovery metadata in `examples/projected_sketch_references.blcad.json`
-- core tests for resolved/lost reference status and remap/origin storage
-- JSON roundtrip tests for reference recovery metadata
-- geometry tests for generated-face sketch movement under source dimension changes
-- geometry tests for lost-reference reporting instead of silent reassignment
-- geometry tests for sketch-origin override frame shifts
+- core, JSON, invalidation, and geometry tests for recovery behavior
 
 Still not implemented in this block:
 
@@ -201,19 +170,51 @@ Still not implemented in this block:
 - arbitrary generated topology beyond the current rectangular additive extrude seed
 - full sketch constraint solving or automatic region detection
 
-## Next MVP: Deterministic profile consumption from reference-driven sketch helpers
+## Implemented block: Deterministic profile consumption from reference-driven sketch helpers
 
 Goal: turn the first reference-driven helper geometry into reproducible profile input for feature operations without adding a full sketch solver or automatic region detector yet.
 
+Detailed document: `docs/reference-generated-profile-helpers-mvp.md`
+
+Implemented scope:
+
+- `ReferenceGeneratedLine` as first-class sketch helper-line model intent
+- `Sketch` storage for `reference_generated_lines`
+- JSON persistence for `reference_generated_lines`
+- sketch validation allowing constraints and closed profiles to target reference-generated helper-line IDs
+- `PartDocument` validation of endpoint constraints and optional projected-line direction constraints for helper lines
+- dependency graph nodes using `<sketch-id>.reference_generated_line.<helper-line-id>`
+- dependency edges from projected construction/semantic sources through helper-line nodes to sketches and dependent features
+- `ReferenceGeneratedProfileResolver` resolving helper lines from projected endpoint constraints
+- direction consistency validation against optional projected-line constraints
+- `GeometryRecomputeExecutor` consumption of reference-generated helper-line closed profiles
+- additive extrude recompute from one reference-generated helper profile
+- subtractive through-all cut recompute from one reference-generated helper profile
+- JSON roundtrip tests for reference-generated helper lines
+- invalidation tests for helper-line dirty propagation
+- geometry tests for resolver behavior, additive recompute, and subtractive recompute
+
+Still not implemented in this block:
+
+- mixed explicit-line and reference-generated-line profiles in one closed profile
+- full sketch constraint solving
+- automatic region detection from unordered projected references
+- GUI editing of reference-generated helper entities
+- arbitrary generated topology beyond the current rectangular additive extrude seed
+
+## Next MVP: Sketch constraints and dimensions seed
+
+Goal: add the next minimal non-solver sketch intent layer: explicit geometric constraints and first driving dimensions on line-segment geometry, while keeping deterministic validation and avoiding a full constraint solver.
+
 Proposed first implementation sequence:
 
-- add model-intent records for reference-generated helper line entities derived from projected endpoint constraints
-- validate helper-generated line endpoints and projected-line direction consistency before profile construction
-- allow a `ClosedProfile` to explicitly consume deterministic reference-generated helper line IDs where all helpers are fully resolved
-- add JSON roundtrip tests for reference-generated helper entity records
-- add geometry tests for an additive extrude and a subtractive cut whose closed profile uses deterministic projected-reference helper lines
-- add invalidation tests proving projected source changes dirty helper-generated profiles and dependent features
-- keep full sketch solving, automatic region detection, GUI editing, arbitrary generated topology, 3D sketches, sweep, loft, and surfacing deferred
+- add model-intent records for fixed, horizontal, vertical, parallel, perpendicular, and equal-length constraints on explicit line segments
+- add first driving dimension records for horizontal, vertical, aligned, and point-to-point distances backed by existing length parameters
+- validate dimensions against existing sketch entities and parameters
+- add JSON roundtrip tests for geometric constraints and driving dimensions
+- add invalidation graph edges from dimension parameters to sketches and dependent features
+- add geometry tests proving dimension parameter changes alter closed-profile recompute where deterministic
+- keep automatic solving, over/under-constrained diagnosis, GUI constraint display, automatic region detection, arcs, splines, 3D sketches, sweep, loft, and surfacing deferred
 
 ## Future roadmap: Inventor-like sketcher and sketch-driven features
 
@@ -221,17 +222,7 @@ Goal: eventually provide an Inventor-class sketch environment and sketch-driven 
 
 Detailed document: `docs/inventor-like-sketcher-and-feature-roadmap.md`
 
-Planned scope includes:
-
-- 2D sketch points, lines, construction lines, centerlines, rectangles, circles, arcs, ellipses, splines, polygons, slots, sketch fillets, sketch chamfers, sketch text, and projected geometry
-- sketch editing tools such as trim, extend, split, offset, mirror, rectangular/circular sketch pattern, move, copy, rotate, scale, stretch, and construction toggle
-- geometric constraints such as coincident, collinear, concentric, parallel, perpendicular, tangent, horizontal, vertical, equal, symmetric, midpoint, fix/ground, smooth, and point-on-curve
-- driving and driven/reference dimensions such as linear, aligned, horizontal, vertical, angular, radius, diameter, arc length, point-to-line, and point-to-point dimensions
-- automatic profile and region detection from unordered curves
-- multiple profile regions, inner loops, islands, and stable region selection
-- 3D sketch points, lines, polylines, arcs, splines, helices, projected curves, intersection curves, and guide curves
-- sketch-driven feature families such as richer extrude/cut, revolve, revolve cut, sweep, sweep cut, loft, loft cut, hole, thread, emboss, engrave, rib, web, shell, draft, patterns, and mirrors
-- surfacing features such as boundary surface, fill surface, network surface, patch surface, trim/extend surface, stitch/knit surfaces, and closed-shell-to-solid conversion
+Planned scope includes 2D sketch primitives, sketch editing tools, geometric constraints, driving and driven dimensions, automatic profile and region detection, 3D sketches, richer sketch-driven feature families, and surfacing features.
 
 This is a long-term parity target, not a single MVP. It should be implemented after construction geometry and in staged increments.
 
