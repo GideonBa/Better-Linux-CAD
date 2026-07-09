@@ -30,10 +30,7 @@
         "id": "relation.point.top_front_mid",
         "type": "point_on_generated_edge",
         "point": "point.top_front_mid",
-        "generated_edge": {
-          "source_feature": "feature.base",
-          "edge": "top_front"
-        }
+        "generated_edge": {"source_feature": "feature.base", "edge": "top_front"}
       }
     }
   ],
@@ -45,23 +42,14 @@
       "relation": {
         "id": "relation.line.top_front_axis",
         "type": "line_parallel_to_generated_edge_through_point",
-        "generated_edge": {
-          "source_feature": "feature.base",
-          "edge": "top_front"
-        },
+        "generated_edge": {"source_feature": "feature.base", "edge": "top_front"},
         "through_point": "point.top_front_mid"
       }
     }
   ],
   "construction_planes": [],
   "derived_workplanes": [
-    {
-      "id": "workplane.top",
-      "name": "Top Face",
-      "kind": "feature_face",
-      "source_feature": "feature.base",
-      "face": "top"
-    }
+    {"id": "workplane.top", "name": "Top Face", "kind": "feature_face", "source_feature": "feature.base", "face": "top"}
   ],
   "sketches": [
     {
@@ -73,12 +61,7 @@
       "projected_lines": [],
       "constraints": [],
       "rectangle_profiles": [
-        {
-          "id": "profile.base",
-          "center": {"x": 0.0, "y": 0.0},
-          "width_parameter": "part.width",
-          "height_parameter": "part.height"
-        }
+        {"id": "profile.base", "center": {"x": 0.0, "y": 0.0}, "width_parameter": "part.width", "height_parameter": "part.height"}
       ],
       "circle_profiles": [],
       "closed_profiles": []
@@ -88,40 +71,22 @@
       "name": "Top References",
       "workplane": "workplane.top",
       "line_segments": [
-        {
-          "id": "line.helper_top_front",
-          "start": {"x": -1.0, "y": 30.0},
-          "end": {"x": 1.0, "y": 30.0}
-        }
+        {"id": "line.helper_top_front", "start": {"x": -1.0, "y": 30.0}, "end": {"x": 1.0, "y": 30.0}}
       ],
       "projected_points": [
-        {
-          "id": "ref.point.top_front_mid",
-          "source": "construction_point",
-          "construction_point": "point.top_front_mid"
-        },
+        {"id": "ref.point.top_front_mid", "source": "construction_point", "construction_point": "point.top_front_mid"},
         {
           "id": "ref.vertex.top_front_right",
           "source": "semantic_vertex",
-          "semantic_vertex": {
-            "source_feature": "feature.base",
-            "vertex": "top_front_right"
-          }
+          "semantic_vertex": {"source_feature": "feature.base", "vertex": "top_front_right"}
         }
       ],
       "projected_lines": [
-        {
-          "id": "ref.line.top_front_axis",
-          "source": "construction_line",
-          "construction_line": "line.top_front_axis"
-        },
+        {"id": "ref.line.top_front_axis", "source": "construction_line", "construction_line": "line.top_front_axis"},
         {
           "id": "ref.edge.top_front",
           "source": "semantic_edge",
-          "semantic_edge": {
-            "source_feature": "feature.base",
-            "edge": "top_front"
-          }
+          "semantic_edge": {"source_feature": "feature.base", "edge": "top_front"}
         }
       ],
       "constraints": [
@@ -144,13 +109,25 @@
     }
   ],
   "features": [
+    {"id": "feature.base", "name": "BaseExtrude", "type": "additive_extrude", "input_sketch": "sketch.base", "direction": "+Z", "length_parameter": "part.depth"}
+  ],
+  "reference_statuses": [
     {
-      "id": "feature.base",
-      "name": "BaseExtrude",
-      "type": "additive_extrude",
-      "input_sketch": "sketch.base",
-      "direction": "+Z",
-      "length_parameter": "part.depth"
+      "id": "status.old_top_face",
+      "status": "lost",
+      "target": {"kind": "face", "source_feature": "feature.old", "face": "top"},
+      "message": "old source feature was removed before this model was saved"
     }
+  ],
+  "reference_remaps": [
+    {
+      "id": "remap.old_top_to_base_top",
+      "original": {"kind": "face", "source_feature": "feature.old", "face": "top"},
+      "replacement": {"kind": "face", "source_feature": "feature.base", "face": "top"},
+      "reason": "manual replacement selected by the user"
+    }
+  ],
+  "sketch_origin_overrides": [
+    {"sketch": "sketch.top_references", "local_origin": {"x": 0.0, "y": 0.0}}
   ]
 }
