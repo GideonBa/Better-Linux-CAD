@@ -42,6 +42,7 @@ add_library(
   src/core/reference_generated_line.cpp
   src/core/reference_recovery.cpp
   src/core/sketch.cpp
+  src/core/sketch_constraints.cpp
 )
 add_library(BLCAD::core ALIAS blcad_core)
 
@@ -65,6 +66,7 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/closed_profile_adapter.cpp
     src/geometry/construction_line_resolver.cpp
     src/geometry/construction_point_resolver.cpp
+    src/geometry/dimension_driven_profile_resolver.cpp
     src/geometry/recompute_executor.cpp
     src/geometry/rectangle_extrusion_adapter.cpp
     src/geometry/reference_driven_sketch_helper.cpp
