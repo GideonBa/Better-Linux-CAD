@@ -43,6 +43,9 @@ PartDocument make_top_face_document(double width_mm, double height_mm, double de
                                                             "Top", face.value());
   REQUIRE(workplane);
   REQUIRE(document.value().add_derived_workplane(workplane.value()));
+  auto top_sketch = Sketch::create(SketchId("sketch.top"), "Top", DatumPlaneId("workplane.top"));
+  REQUIRE(top_sketch);
+  REQUIRE(document.value().add_sketch(top_sketch.value()));
   return document.value();
 }
 
@@ -69,6 +72,26 @@ TEST_CASE("Generated-face sketch workplane origin follows source feature dimensi
   CHECK(moved.value().origin.x == Catch::Approx(0.0));
   CHECK(moved.value().origin.y == Catch::Approx(0.0));
   CHECK(moved.value().origin.z == Catch::Approx(25.0));
+}
+
+TEST_CASE("Sketch origin override shifts the resolved sketch-local frame",
+          "[geometry][workplane][recovery]") {
+  PartDocument document = make_top_face_document(100.0, 60.0, 10.0);
+  auto origin = SketchOriginOverrideRecord::create(SketchId("sketch.top"), Point2{5.0, 7.0});
+  REQUIRE(origin);
+  REQUIRE(document.add_sketch_origin_override(origin.value()));
+
+  const Sketch* sketch = document.find_sketch(SketchId("sketch.top"));
+  REQUIRE(sketch != nullptr);
+  const WorkplaneResolver resolver;
+  auto resolved = resolver.resolve_for_sketch(document, *sketch);
+  REQUIRE(resolved);
+  CHECK(resolved.value().origin.x == Catch::Approx(5.0));
+  CHECK(resolved.value().origin.y == Catch::Approx(7.0));
+  CHECK(resolved.value().origin.z == Catch::Approx(10.0));
+  REQUIRE(resolved.value().bounds.enabled);
+  CHECK(resolved.value().bounds.center.x == Catch::Approx(-5.0));
+  CHECK(resolved.value().bounds.center.y == Catch::Approx(-7.0));
 }
 
 TEST_CASE("Reference recovery evaluator reports missing generated source instead of remapping",
