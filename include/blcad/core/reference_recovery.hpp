@@ -3,6 +3,7 @@
 #include "blcad/core/datum_plane.hpp"
 #include "blcad/core/id.hpp"
 #include "blcad/core/result.hpp"
+#include "blcad/core/spatial.hpp"
 
 #include <optional>
 #include <string>
@@ -98,6 +99,21 @@ private:
   SemanticReferenceTarget original_;
   SemanticReferenceTarget replacement_;
   std::string reason_;
+};
+
+class SketchOriginOverrideRecord {
+public:
+  [[nodiscard]] static Result<SketchOriginOverrideRecord> create(SketchId sketch,
+                                                                 Point2 local_origin);
+
+  [[nodiscard]] const SketchId& sketch() const noexcept;
+  [[nodiscard]] Point2 local_origin() const noexcept;
+
+private:
+  SketchOriginOverrideRecord(SketchId sketch, Point2 local_origin);
+
+  SketchId sketch_;
+  Point2 local_origin_;
 };
 
 class ReferenceRecoveryEvaluator {
