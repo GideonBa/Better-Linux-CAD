@@ -1,0 +1,156 @@
+{
+  "schema": "blcad.part_document.mvp1",
+  "version": 1,
+  "document": {
+    "id": "part.projected_sketch_references",
+    "name": "Projected Sketch References"
+  },
+  "parameters": [
+    {
+      "id": "part.width",
+      "name": "width",
+      "type": "length",
+      "scope": "part",
+      "unit": "mm",
+      "value": 100.0
+    },
+    {
+      "id": "part.height",
+      "name": "height",
+      "type": "length",
+      "scope": "part",
+      "unit": "mm",
+      "value": 60.0
+    },
+    {
+      "id": "part.depth",
+      "name": "depth",
+      "type": "length",
+      "scope": "part",
+      "unit": "mm",
+      "value": 10.0
+    }
+  ],
+  "datum_planes": [
+    {
+      "id": "datum.xy",
+      "name": "XY",
+      "kind": "xy",
+      "origin": {"x": 0.0, "y": 0.0, "z": 0.0},
+      "x_axis": {"x": 1.0, "y": 0.0, "z": 0.0},
+      "y_axis": {"x": 0.0, "y": 1.0, "z": 0.0},
+      "normal": {"x": 0.0, "y": 0.0, "z": 1.0}
+    }
+  ],
+  "construction_points": [
+    {
+      "id": "point.top_front_mid",
+      "name": "TopFrontMid",
+      "kind": "on_generated_edge",
+      "relation": {
+        "id": "relation.point.top_front_mid",
+        "type": "point_on_generated_edge",
+        "point": "point.top_front_mid",
+        "generated_edge": {
+          "source_feature": "feature.base",
+          "edge": "top_front"
+        }
+      }
+    }
+  ],
+  "construction_lines": [
+    {
+      "id": "line.top_front_axis",
+      "name": "TopFrontAxis",
+      "kind": "parallel_to_generated_edge_through_point",
+      "relation": {
+        "id": "relation.line.top_front_axis",
+        "type": "line_parallel_to_generated_edge_through_point",
+        "generated_edge": {
+          "source_feature": "feature.base",
+          "edge": "top_front"
+        },
+        "through_point": "point.top_front_mid"
+      }
+    }
+  ],
+  "construction_planes": [],
+  "derived_workplanes": [
+    {
+      "id": "workplane.top",
+      "name": "Top Face",
+      "kind": "feature_face",
+      "source_feature": "feature.base",
+      "face": "top"
+    }
+  ],
+  "sketches": [
+    {
+      "id": "sketch.base",
+      "name": "Base Rectangle",
+      "workplane": "datum.xy",
+      "line_segments": [],
+      "projected_points": [],
+      "projected_lines": [],
+      "rectangle_profiles": [
+        {
+          "id": "profile.base",
+          "center": {"x": 0.0, "y": 0.0},
+          "width_parameter": "part.width",
+          "height_parameter": "part.height"
+        }
+      ],
+      "circle_profiles": [],
+      "closed_profiles": []
+    },
+    {
+      "id": "sketch.top_references",
+      "name": "Top References",
+      "workplane": "workplane.top",
+      "line_segments": [],
+      "projected_points": [
+        {
+          "id": "ref.point.top_front_mid",
+          "source": "construction_point",
+          "construction_point": "point.top_front_mid"
+        },
+        {
+          "id": "ref.vertex.top_front_right",
+          "source": "semantic_vertex",
+          "semantic_vertex": {
+            "source_feature": "feature.base",
+            "vertex": "top_front_right"
+          }
+        }
+      ],
+      "projected_lines": [
+        {
+          "id": "ref.line.top_front_axis",
+          "source": "construction_line",
+          "construction_line": "line.top_front_axis"
+        },
+        {
+          "id": "ref.edge.top_front",
+          "source": "semantic_edge",
+          "semantic_edge": {
+            "source_feature": "feature.base",
+            "edge": "top_front"
+          }
+        }
+      ],
+      "rectangle_profiles": [],
+      "circle_profiles": [],
+      "closed_profiles": []
+    }
+  ],
+  "features": [
+    {
+      "id": "feature.base",
+      "name": "BaseExtrude",
+      "type": "additive_extrude",
+      "input_sketch": "sketch.base",
+      "direction": "+Z",
+      "length_parameter": "part.depth"
+    }
+  ]
+}
