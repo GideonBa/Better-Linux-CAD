@@ -65,6 +65,7 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/construction_point_resolver.cpp
     src/geometry/recompute_executor.cpp
     src/geometry/rectangle_extrusion_adapter.cpp
+    src/geometry/reference_driven_sketch_helper.cpp
     src/geometry/semantic_reference_evaluator.cpp
     src/geometry/shape_cache.cpp
     src/geometry/sketch_reference_projector.cpp
@@ -135,10 +136,12 @@ if(BLCAD_BUILD_TESTS)
     tests/core/part_document_json_workplane_tests.cpp
     tests/core/part_document_tests.cpp
     tests/core/parameter_tests.cpp
+    tests/core/projected_reference_invalidation_tests.cpp
     tests/core/projected_sketch_reference_json_tests.cpp
     tests/core/projected_sketch_reference_tests.cpp
     tests/core/quantity_tests.cpp
     tests/core/recompute_plan_tests.cpp
+    tests/core/reference_driven_sketch_constraint_tests.cpp
     tests/core/semantic_reference_invalidation_tests.cpp
     tests/core/semantic_reference_json_tests.cpp
     tests/core/sketch_tests.cpp
@@ -165,6 +168,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/left_workplane_pipeline_tests.cpp
       tests/geometry/recompute_executor_tests.cpp
       tests/geometry/rectangle_extrusion_adapter_tests.cpp
+      tests/geometry/reference_driven_sketch_helper_tests.cpp
       tests/geometry/reference_part_pipeline_tests.cpp
       tests/geometry/right_workplane_pipeline_tests.cpp
       tests/geometry/semantic_reference_evaluator_tests.cpp
