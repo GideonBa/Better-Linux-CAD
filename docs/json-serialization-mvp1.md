@@ -1,14 +1,14 @@
 # JSON Serialization
 
-Status: core serialization for `PartDocument` model intent, including file-level helpers, derived workplanes, line-based closed sketch profiles, explicit construction geometry, relation-driven construction geometry, relation-driven construction points, chained construction relations, semantic generated edge/vertex references, projected sketch reference entities, first reference-driven sketch constraints, first-class reference-generated sketch helper lines, sketch geometric constraints, sketch driving dimensions, reference recovery metadata, reference remap records, and sketch-origin override records.
+Status: core serialization for `PartDocument` model intent, including file-level helpers, derived workplanes, line-based closed sketch profiles, explicit construction geometry, relation-driven construction geometry, relation-driven construction points, chained construction relations, semantic generated edge/vertex references, projected sketch reference entities, first reference-driven sketch constraints, first-class reference-generated sketch helper lines, sketch geometric constraints, sketch driving dimensions, generated-region profile selections, reference recovery metadata, reference remap records, and sketch-origin override records.
 
-The JSON serialization layer persists model intent only. It does not serialize OCCT shapes, `GeometryShape`, `ShapeCache` contents, raw face IDs, raw edge IDs, raw vertex IDs, BRep handles, resolved projected coordinates, solver state, or exported STEP data.
+The JSON serialization layer persists model intent only. It does not serialize OCCT shapes, `GeometryShape`, `ShapeCache` contents, raw face IDs, raw edge IDs, raw vertex IDs, BRep handles, resolved projected coordinates, solver state, automatic region-search caches, or exported STEP data.
 
 ## Goal
 
 The goal is to make a `PartDocument` reproducible from a textual representation:
 
-1. Build a `PartDocument` with parameters, datum planes, construction geometry, construction relations, derived workplanes, sketches, sketch entities, projected sketch reference entities, reference-generated sketch helper lines, reference-driven sketch constraints, sketch geometric constraints, sketch driving dimensions, reference recovery records, profiles, and features.
+1. Build a `PartDocument` with parameters, datum planes, construction geometry, construction relations, derived workplanes, sketches, sketch entities, projected sketch reference entities, reference-generated sketch helper lines, reference-driven sketch constraints, sketch geometric constraints, sketch driving dimensions, selected generated-region profiles, reference recovery records, profiles, and features.
 2. Serialize that model intent to JSON.
 3. Optionally write the JSON as a `.blcad.json` model file.
 4. Rebuild the `PartDocument` from JSON through the normal validated construction APIs.
@@ -37,6 +37,7 @@ The current JSON format stores:
 - reference-driven sketch constraints
 - sketch geometric constraints
 - sketch driving dimensions
+- selected generated-region profile intent as normal `closed_profiles`
 - reference status records
 - reference remap records
 - sketch-origin override records
@@ -45,7 +46,7 @@ The current JSON format stores:
 - line-based closed profiles
 - additive and subtractive extrude features
 
-The current JSON format does not store final BRep geometry, ShapeCache contents, exported STEP data, GUI state, full sketch solver state, resolved projection caches, automatic topology matching state, general relation collections independent from construction objects, or assembly data.
+The current JSON format does not store final BRep geometry, ShapeCache contents, exported STEP data, GUI state, full sketch solver state, resolved projection caches, automatic region-search caches, automatic topology matching state, general relation collections independent from construction objects, or assembly data.
 
 ## Construction geometry
 
@@ -123,7 +124,7 @@ Generated edge and vertex references are serialized semantically:
 
 Deserialization restores construction lines together with sketches, features, and derived workplanes so generated-edge line relations and projected construction-line references can validate once their source feature and construction point dependencies exist.
 
-## Projected sketch references, helper lines, constraints, and dimensions
+## Projected sketch references, helper lines, constraints, dimensions, and generated regions
 
 Sketches can store projected reference entities in `projected_points` and `projected_lines`. These are sketch-local model-intent references. They do not serialize resolved 2D coordinates, OCCT topology, or cached projection results.
 
@@ -149,9 +150,7 @@ Reference-generated helper lines are stored in `reference_generated_lines`:
 }
 ```
 
-`reference_generated_lines` are loaded before `constraints`. That order lets constraints target helper-line IDs without placeholder explicit line segments. The completed sketch is then validated by `PartDocument` to ensure the endpoint and optional direction constraints exist and match the helper line.
-
-Sketch geometric constraints are stored in `geometric_constraints`:
+Sketch geometric constraints are stored in `geometric_constraints`, and driving dimensions are stored in `driving_dimensions`:
 
 ```json
 {
@@ -160,21 +159,8 @@ Sketch geometric constraints are stored in `geometric_constraints`:
       "id": "constraint.bottom.horizontal",
       "kind": "horizontal",
       "first": {"kind": "line_segment", "entity": "line.bottom"}
-    },
-    {
-      "id": "constraint.width.equal",
-      "kind": "equal_length",
-      "first": {"kind": "line_segment", "entity": "line.bottom"},
-      "second": {"kind": "line_segment", "entity": "line.top"}
     }
-  ]
-}
-```
-
-Driving dimensions are stored in `driving_dimensions` and reference existing length parameters:
-
-```json
-{
+  ],
   "driving_dimensions": [
     {
       "id": "dim.width.bottom",
@@ -182,6 +168,19 @@ Driving dimensions are stored in `driving_dimensions` and reference existing len
       "first": {"kind": "line_segment_start", "entity": "line.bottom"},
       "second": {"kind": "line_segment_end", "entity": "line.bottom"},
       "parameter": "part.width"
+    }
+  ]
+}
+```
+
+Automatically detected regions are not serialized as solver caches. If the user selects a generated region candidate, it is persisted as a normal `closed_profiles` entry with a stable generated-region id and ordered line references:
+
+```json
+{
+  "closed_profiles": [
+    {
+      "id": "generated.region.sketch.main.0",
+      "line_segments": ["line.a", "line.b", "line.c", "line.d"]
     }
   ]
 }
