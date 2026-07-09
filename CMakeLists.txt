@@ -173,6 +173,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/recompute_executor_tests.cpp
       tests/geometry/rectangle_extrusion_adapter_tests.cpp
       tests/geometry/reference_driven_sketch_helper_tests.cpp
+      tests/geometry/reference_generated_profile_resolver_tests.cpp
       tests/geometry/reference_part_pipeline_tests.cpp
       tests/geometry/right_workplane_pipeline_tests.cpp
       tests/geometry/semantic_reference_evaluator_tests.cpp
