@@ -139,6 +139,26 @@ Proposed first implementation sequence:
 
 This block answers where a sketch can live. The line-based closed sketch profile block answers what planar shape a sketch can describe. They should remain separate, testable increments.
 
+## Future roadmap: Inventor-like sketcher and sketch-driven features
+
+Goal: eventually provide an Inventor-class sketch environment and sketch-driven feature set while keeping BLCAD's own core model and Linux-native architecture.
+
+Detailed document: `docs/inventor-like-sketcher-and-feature-roadmap.md`
+
+Planned scope includes:
+
+- 2D sketch points, lines, construction lines, centerlines, rectangles, circles, arcs, ellipses, splines, polygons, slots, sketch fillets, sketch chamfers, sketch text, and projected geometry
+- sketch editing tools such as trim, extend, split, offset, mirror, rectangular/circular sketch pattern, move, copy, rotate, scale, stretch, and construction toggle
+- geometric constraints such as coincident, collinear, concentric, parallel, perpendicular, tangent, horizontal, vertical, equal, symmetric, midpoint, fix/ground, smooth, and point-on-curve
+- driving and driven/reference dimensions such as linear, aligned, horizontal, vertical, angular, radius, diameter, arc length, point-to-line, and point-to-point dimensions
+- automatic profile and region detection from unordered curves
+- multiple profile regions, inner loops, islands, and stable region selection
+- 3D sketch points, lines, polylines, arcs, splines, helices, projected curves, intersection curves, and guide curves
+- sketch-driven feature families such as richer extrude/cut, revolve, revolve cut, sweep, sweep cut, loft, loft cut, hole, thread, emboss, engrave, rib, web, shell, draft, patterns, and mirrors
+- surfacing features such as boundary surface, fill surface, network surface, patch surface, trim/extend surface, stitch/knit surfaces, and closed-shell-to-solid conversion
+
+This is a long-term parity target, not a single MVP. It should be implemented after construction geometry and in staged increments: richer 2D entities, profile detection, constraints/dimensions, revolve, richer extrude/cut, 3D sketches, sweep/loft, surfacing, and finally GUI usability.
+
 ## Future MVP: Advanced surfacing and 3D sketching
 
 Goal: support spatial curves, guide splines, sweep, loft, boundary surfaces, surface stitching, and conversion of closed stitched surfaces into solids.
@@ -224,6 +244,7 @@ Detailed document: `docs/assembly-system.md`
 
 These are documented as incremental, testable blocks and are sequenced after the numbered MVPs above:
 
+- `docs/inventor-like-sketcher-and-feature-roadmap.md`: Inventor-like sketcher, constraints, dimensions, region detection, revolve, sweep, loft, and sketch-driven feature parity
 - `docs/fillet-chamfer-features.md`: fillets and chamfers as parametric features
 - `docs/pattern-and-mirror-features.md`: linear/circular patterns and mirror
 - `docs/hole-wizard.md`: semantic hole features and the standards database
