@@ -1,5 +1,6 @@
 #include "blcad/geometry/construction_line_resolver.hpp"
 
+#include "blcad/geometry/construction_point_resolver.hpp"
 #include "blcad/geometry/semantic_reference_evaluator.hpp"
 
 #include <cmath>
@@ -65,29 +66,33 @@ ConstructionLineResolver::resolve(const PartDocument& document, ConstructionLine
   }
 
   const ConstructionRelation& relation = line->relation().value();
+  const ConstructionPointResolver point_resolver;
 
   if (line->kind() == ConstructionLineKind::ThroughTwoPoints) {
-    const ConstructionPoint* first = document.find_construction_point(relation.first_point());
-    const ConstructionPoint* second = document.find_construction_point(relation.second_point());
-    if (first == nullptr || second == nullptr) {
-      return Result<ResolvedConstructionLine>::failure(validation_error(
-          line->id().value(), "line through two points references must exist in part document"));
+    auto first = point_resolver.resolve(document, relation.first_point());
+    if (first.has_error()) {
+      return Result<ResolvedConstructionLine>::failure(first.error());
     }
 
-    auto direction = direction_between(first->position(), second->position(), line->id().value());
+    auto second = point_resolver.resolve(document, relation.second_point());
+    if (second.has_error()) {
+      return Result<ResolvedConstructionLine>::failure(second.error());
+    }
+
+    auto direction = direction_between(first.value().position, second.value().position,
+                                       line->id().value());
     if (direction.has_error()) {
       return Result<ResolvedConstructionLine>::failure(direction.error());
     }
 
     return Result<ResolvedConstructionLine>::success(
-        ResolvedConstructionLine{line->id(), first->position(), direction.value()});
+        ResolvedConstructionLine{line->id(), first.value().position, direction.value()});
   }
 
   if (line->kind() == ConstructionLineKind::ParallelToLineThroughPoint) {
-    const ConstructionPoint* point = document.find_construction_point(relation.first_point());
-    if (point == nullptr) {
-      return Result<ResolvedConstructionLine>::failure(validation_error(
-          line->id().value(), "line parallel to line through point reference point must exist"));
+    auto point = point_resolver.resolve(document, relation.first_point());
+    if (point.has_error()) {
+      return Result<ResolvedConstructionLine>::failure(point.error());
     }
 
     auto source = resolve(document, relation.source_line());
@@ -96,14 +101,13 @@ ConstructionLineResolver::resolve(const PartDocument& document, ConstructionLine
     }
 
     return Result<ResolvedConstructionLine>::success(
-        ResolvedConstructionLine{line->id(), point->position(), source.value().direction});
+        ResolvedConstructionLine{line->id(), point.value().position, source.value().direction});
   }
 
   if (line->kind() == ConstructionLineKind::ParallelToGeneratedEdgeThroughPoint) {
-    const ConstructionPoint* point = document.find_construction_point(relation.first_point());
-    if (point == nullptr) {
-      return Result<ResolvedConstructionLine>::failure(validation_error(
-          line->id().value(), "line parallel to generated edge through point reference point must exist"));
+    auto point = point_resolver.resolve(document, relation.first_point());
+    if (point.has_error()) {
+      return Result<ResolvedConstructionLine>::failure(point.error());
     }
 
     if (!relation.generated_edge().has_value()) {
@@ -123,7 +127,7 @@ ConstructionLineResolver::resolve(const PartDocument& document, ConstructionLine
     }
 
     return Result<ResolvedConstructionLine>::success(
-        ResolvedConstructionLine{line->id(), point->position(), direction.value()});
+        ResolvedConstructionLine{line->id(), point.value().position, direction.value()});
   }
 
   return Result<ResolvedConstructionLine>::failure(
