@@ -59,6 +59,7 @@ The optional `blcad_geometry` target contains OCCT adapters for rectangle extrus
 - `docs/back-workplane-mvp2.md`: back-face derived workplane for simple additive extrudes
 - `docs/general-closed-sketch-profile-mvp.md`: future block for arbitrary closed sketch profiles from line chains, arcs, splines, wires, and general OCCT faces
 - `docs/construction-geometry-mvp.md`: future block for user-created construction planes, lines, points, and relation-driven datum geometry
+- `docs/advanced-surfacing-and-3d-sketch-mvp.md`: future block for 3D sketches, guide splines, sweeps, lofts, boundary surfaces, and closed-surface-to-solid workflows
 - `docs/semantic-references.md`: canonical rule for semantic (non-topological) references to faces, edges, axes, and points
 - `docs/parameter-model.md`: target parameter scopes, expressions, cross-part flow, and top-down design
 - `docs/feature-system.md`: target feature model, feature references, and the parametric bolt circle
@@ -85,6 +86,8 @@ The optional geometry build resolves sketch workplanes before executing subtract
 General closed sketch profiles are explicitly not implemented yet. The current sketch model does not support free line chains, polylines, arcs, splines, connected sketch entities, general closed loops, closed wires, multiple contours, inner holes in the same sketch profile, profile-region selection, or generic additive/subtractive extrusion from arbitrary `TopoDS_Wire` / `TopoDS_Face`. This future block is tracked in `docs/general-closed-sketch-profile-mvp.md`.
 
 Construction geometry is explicitly documented as a separate future block. The system should later support user-created construction planes, construction lines/axes, and construction points that can be placed freely in 3D, used as sketch references, and defined through relations such as parallelism, orthogonality, angles, offsets, point-on-line, point-on-plane, line-through-two-points, and plane-through-three-points. This future block is tracked in `docs/construction-geometry-mvp.md`.
+
+Advanced 3D sketching and surfacing are explicitly documented as a separate future block. The system should later support 3D sketch points, 3D lines, 3D splines, guide curves connecting points from sketches on different planes, sweeps along lines or splines, lofts between two or more sketches, smooth multi-section lofts, boundary surfaces, surface stitching, and conversion from a closed stitched shell into a solid. This future block is tracked in `docs/advanced-surfacing-and-3d-sketch-mvp.md`.
 
 Incremental recompute follows derived-workplane dependency paths. Updating `part.width`, `part.height`, or `part.thickness` can mark the base feature, derived workplane, dependent sketch, and cut feature as affected. `GeometryRecomputeExecutor::execute_plan` skips non-feature nodes while preserving their dependency-ordering role, removes stale cached feature shapes before recomputing dirty features, and can surface bounded-workplane validation errors after source-dimension changes.
 
@@ -146,5 +149,7 @@ The next technical step should start the larger sketch-modeling block for genera
 The detailed future block is documented in `docs/general-closed-sketch-profile-mvp.md`.
 
 A separate later block for construction planes, construction lines, construction points, and relation-driven datum geometry is documented in `docs/construction-geometry-mvp.md`.
+
+A separate later block for 3D sketches, guide splines, sweep, loft, boundary surfaces, surface stitching, and closed-shell-to-solid conversion is documented in `docs/advanced-surfacing-and-3d-sketch-mvp.md`.
 
 The detailed MVP-1 specification is in `docs/mvp-1-specification.md`.
