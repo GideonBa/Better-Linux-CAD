@@ -1,26 +1,27 @@
-# MVP 1 Sketch Data Model
+# Sketch Data Model
 
-Status: pure data model with `PartDocument` integration, no geometry generation.
+Status: pure core data model with `PartDocument` integration, primitive profiles, and the first line-based closed-profile sketch path.
 
-This document describes the current state of `DatumPlane`, `Sketch`, `RectangleProfile`, and `CircleProfile`.
+This document describes the current state of `DatumPlane`, `Sketch`, `LineSegment`, `RectangleProfile`, `CircleProfile`, and `ClosedProfile`.
 
-The current scope is deliberately limited:
+The current scope is still deliberately limited:
 
-- no features
-- no extrusion
-- no cut
-- no recompute
-- no OCCT
-- no GUI
+- no full sketch constraint solver
+- no arcs
+- no splines
+- no automatic profile-region detection
+- no multiple contours or inner holes in one profile
+- no GUI sketch editor
 
 ## Goal
 
-The sketch data model captures the design intent for the first reference plate:
+The sketch data model captures design intent for planar sketches:
 
-- a fixed XY workplane
-- a centered rectangle for the base plate
-- a centered circle for the later hole
-- references to parameters, but no evaluation into OCCT geometry yet
+- a workplane reference
+- primitive profiles for fast-path rectangle and circle cases
+- explicit line segments for the first general closed-profile path
+- ordered closed profiles that reference line-segment IDs
+- references to parameters where size is parameterized
 - document validation for workplane and parameter references
 
 ## Types
@@ -35,11 +36,9 @@ Point2
   y
 ```
 
-MVP-1 profiles currently use `center = (0, 0)`.
-
 ### `Point3`
 
-A simple 3D point for datum-plane origins.
+A simple 3D point for datum-plane origins and resolved geometry points.
 
 ```text
 Point3
@@ -61,7 +60,7 @@ Vector3
 
 ## `DatumPlane`
 
-MVP 1 implements only the standard `XY` plane.
+MVP 1 implements only the standard `XY` plane as a fixed datum plane.
 
 ```text
 DatumPlane XY
@@ -78,16 +77,30 @@ Validation:
 - datum-plane ID must not be empty
 - name must not be empty
 
-Not included yet:
+User-defined construction planes are tracked separately in `docs/construction-geometry-mvp.md`.
 
-- freely defined planes
-- offset planes
-- planes derived from face references
-- validation of orthogonality or normal length
+## `LineSegment`
+
+A line segment is the first explicit sketch entity.
+
+```text
+LineSegment
+  id = "line.a"
+  start = (0, 0)
+  end = (20, 0)
+```
+
+Validation:
+
+- line segment ID must not be empty
+- start and end must not be identical within tolerance
+- line segment IDs must be unique inside one sketch
+
+Line segments are model intent. They are not OCCT edges in the core.
 
 ## `RectangleProfile`
 
-The rectangle profile describes the later base plate.
+The rectangle profile is still supported as a fast-path primitive.
 
 ```text
 RectangleProfile
@@ -107,7 +120,7 @@ The profile itself does not check whether the referenced parameters exist in the
 
 ## `CircleProfile`
 
-The circle profile describes the later centered hole.
+The circle profile is still supported as a fast-path primitive.
 
 ```text
 CircleProfile
@@ -123,19 +136,42 @@ Validation:
 
 The profile itself does not check whether the diameter parameter exists in `PartDocument`. This check happens when a sketch is added to `PartDocument`.
 
-The size validation `hole_diameter < min(width, height)` requires access to parameter values and follows later.
+## `ClosedProfile`
+
+A closed profile references ordered line-segment IDs.
+
+```text
+ClosedProfile
+  id = "profile.triangle"
+  line_segments = ["line.a", "line.b", "line.c"]
+```
+
+Validation:
+
+- profile ID must not be empty
+- at least three line segments are required
+- line segment IDs must not be empty
+- line segment IDs must be unique inside the closed profile
+- referenced line segments must exist in the owning sketch
+- line segments must be ordered and connected
+- the last segment must close back to the first segment
+- non-adjacent line segments must not self-intersect
+
+`ClosedProfile` does not yet support arcs, splines, multiple contours, inner holes, or automatic region detection.
 
 ## `Sketch`
 
-A sketch stores ID, name, workplane reference, and profiles.
+A sketch stores ID, name, workplane reference, sketch entities, and profiles.
 
 ```text
 Sketch
-  id = "sketch.base"
-  name = "Sketch_BaseRectangle"
+  id = "sketch.triangle"
+  name = "Sketch_Triangle"
   workplane = "datum.xy"
+  line_segments
   rectangle_profiles
   circle_profiles
+  closed_profiles
 ```
 
 Validation:
@@ -143,34 +179,29 @@ Validation:
 - sketch ID must not be empty
 - name must not be empty
 - workplane ID must not be empty
-- profile IDs must be unique within a sketch
-- profile IDs must also be unique across rectangle and circle profiles
-
-Not included yet:
-
-- general sketch constraints
-- lines, arcs, or freely editable entities
-- automatic profile derivation
-- parameter value evaluation
-- OCCT conversion
+- line segment IDs must be unique within a sketch
+- profile IDs must be unique within a sketch across rectangle, circle, and closed profile types
+- closed profiles must reference existing line segments in ordered connected loops
 
 ## Integration into `PartDocument`
 
-`PartDocument` now stores:
+`PartDocument` stores:
 
 - parameters
 - datum planes
+- derived workplanes
 - sketches
+- features
 
 When a sketch is added, the document validates that:
 
-- the sketch `workplane` exists as a datum plane in the document
+- the sketch `workplane` exists as a datum plane or derived workplane in the document
 - every `RectangleProfile.width_parameter` exists in the document
 - every `RectangleProfile.height_parameter` exists in the document
 - every `CircleProfile.diameter_parameter` exists in the document
 - sketch IDs are unique in the document
 
-This check ensures that a sketch does not point to non-existing document objects.
+Line-based closed profiles do not introduce parameter dependencies yet because their current coordinates are explicit sketch-local values.
 
 ## Test coverage
 
@@ -178,25 +209,21 @@ Current tests check:
 
 - XY plane with origin, X axis, Y axis, and normal direction
 - datum-plane validation for ID and name
+- line segment endpoint storage
+- line segment validation for missing IDs and zero length
 - rectangle profile with width and height parameters
 - circle profile with diameter parameter
-- profile validation for missing IDs and parameter references
+- closed profile ordered line references
+- closed profile validation for too few segments and duplicate references
 - sketch validation for ID, name, and workplane
-- adding rectangle and circle profiles
+- adding rectangle, circle, and closed profiles
 - unique profile IDs within a sketch
-- datum planes in `PartDocument`
-- sketches in `PartDocument`
-- missing workplanes when adding sketches
-- missing width, height, and diameter parameters when adding sketches
+- ordered closed-loop validation
+- disconnected closed-loop rejection
+- self-intersecting closed-loop rejection
+- JSON roundtrip for line segments and closed profiles
+- geometry recompute for triangle prism and triangle through-all cut
 
 ## Next integration step
 
-The next integration steps are already done: features have been added as pure data models, and `PartDocument` creates dependency graph nodes and edges from parameter, sketch, and feature references. The invalidation state marks affected sketches and features after a parameter change. The recompute plan lists affected `dirty` nodes in topological order.
-
-The next useful step now sits above this sketch layer:
-
-- evaluate the circle profile for `SubtractiveExtrude`
-- read the target shape from the existing geometry `ShapeCache`
-- create the centered cut as the next geometry step
-- keep OCCT behind the adapter boundary
-- do not build a GUI yet
+The next useful sketch-adjacent step is not more line-loop scope. The first line-based closed-profile path is implemented. The next foundational block is construction geometry: user-created construction points, construction lines, and construction planes, so sketches can be placed on explicit user-defined planes instead of only fixed datum planes or semantic generated faces.
