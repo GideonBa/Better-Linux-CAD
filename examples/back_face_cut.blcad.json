@@ -1,0 +1,110 @@
+{
+  "schema": "blcad.part_document.mvp1",
+  "version": 1,
+  "document": {
+    "id": "part.back_face_plate",
+    "name": "BackFacePlate"
+  },
+  "parameters": [
+    {
+      "id": "part.width",
+      "name": "width",
+      "type": "length",
+      "scope": "part",
+      "unit": "mm",
+      "value": 120.0
+    },
+    {
+      "id": "part.height",
+      "name": "height",
+      "type": "length",
+      "scope": "part",
+      "unit": "mm",
+      "value": 80.0
+    },
+    {
+      "id": "part.thickness",
+      "name": "thickness",
+      "type": "length",
+      "scope": "part",
+      "unit": "mm",
+      "value": 8.0
+    },
+    {
+      "id": "part.side_hole_diameter",
+      "name": "side_hole_diameter",
+      "type": "length",
+      "scope": "part",
+      "unit": "mm",
+      "value": 4.0
+    }
+  ],
+  "datum_planes": [
+    {
+      "id": "datum.xy",
+      "name": "XY",
+      "kind": "xy",
+      "origin": { "x": 0.0, "y": 0.0, "z": 0.0 },
+      "x_axis": { "x": 1.0, "y": 0.0, "z": 0.0 },
+      "y_axis": { "x": 0.0, "y": 1.0, "z": 0.0 },
+      "normal": { "x": 0.0, "y": 0.0, "z": 1.0 }
+    }
+  ],
+  "derived_workplanes": [
+    {
+      "id": "workplane.base_back",
+      "name": "BaseBackFace",
+      "kind": "feature_face",
+      "source_feature": "feature.base_extrude",
+      "face": "back"
+    }
+  ],
+  "sketches": [
+    {
+      "id": "sketch.base",
+      "name": "Sketch_BaseRectangle",
+      "workplane": "datum.xy",
+      "rectangle_profiles": [
+        {
+          "id": "profile.base_rectangle",
+          "center": { "x": 0.0, "y": 0.0 },
+          "width_parameter": "part.width",
+          "height_parameter": "part.height"
+        }
+      ],
+      "circle_profiles": []
+    },
+    {
+      "id": "sketch.back_hole",
+      "name": "Sketch_BackHole",
+      "workplane": "workplane.base_back",
+      "rectangle_profiles": [],
+      "circle_profiles": [
+        {
+          "id": "profile.back_hole",
+          "center": { "x": -12.0, "y": 0.0 },
+          "diameter_parameter": "part.side_hole_diameter"
+        }
+      ]
+    }
+  ],
+  "features": [
+    {
+      "id": "feature.base_extrude",
+      "name": "BaseExtrude",
+      "type": "additive_extrude",
+      "input_sketch": "sketch.base",
+      "direction": "+Z",
+      "length_parameter": "part.thickness"
+    },
+    {
+      "id": "feature.back_hole_cut",
+      "name": "BackHoleCut",
+      "type": "subtractive_extrude",
+      "input_sketch": "sketch.back_hole",
+      "direction": "+Z",
+      "target_feature": "feature.base_extrude",
+      "depth": "through_all"
+    }
+  ]
+}
