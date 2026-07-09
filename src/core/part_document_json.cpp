@@ -42,8 +42,35 @@ constexpr int k_version = 1;
   return json{{"x", point.x}, {"y", point.y}, {"z", point.z}};
 }
 
+[[nodiscard]] Point3 point3_from_json(const json& value) {
+  return Point3{value.at("x").get<double>(), value.at("y").get<double>(),
+                value.at("z").get<double>()};
+}
+
 [[nodiscard]] json vector3_to_json(Vector3 vector) {
   return json{{"x", vector.x}, {"y", vector.y}, {"z", vector.z}};
+}
+
+[[nodiscard]] Vector3 vector3_from_json(const json& value) {
+  return Vector3{value.at("x").get<double>(), value.at("y").get<double>(),
+                 value.at("z").get<double>()};
+}
+
+[[nodiscard]] json parameter_ids_to_json(const std::vector<ParameterId>& ids) {
+  json result = json::array();
+  for (const auto& id : ids) {
+    result.push_back(id.value());
+  }
+  return result;
+}
+
+[[nodiscard]] std::vector<ParameterId> parameter_ids_from_json(const json& values) {
+  std::vector<ParameterId> ids;
+  ids.reserve(values.size());
+  for (const auto& value : values) {
+    ids.emplace_back(value.get<std::string>());
+  }
+  return ids;
 }
 
 [[nodiscard]] json sketch_entity_ids_to_json(const std::vector<SketchEntityId>& ids) {
@@ -128,6 +155,51 @@ constexpr int k_version = 1;
 
   return DatumPlane::xy(DatumPlaneId(datum_plane_json.at("id").get<std::string>()),
                         datum_plane_json.at("name").get<std::string>());
+}
+
+[[nodiscard]] std::vector<ParameterId> parameter_dependencies_from_object(const json& value) {
+  if (!value.contains("parameter_dependencies")) {
+    return {};
+  }
+
+  return parameter_ids_from_json(value.at("parameter_dependencies"));
+}
+
+[[nodiscard]] Result<ConstructionPoint> construction_point_from_json(const json& point_json) {
+  if (point_json.at("kind").get<std::string>() != "explicit") {
+    return Result<ConstructionPoint>::failure(
+        json_error("only explicit construction points are supported"));
+  }
+
+  return ConstructionPoint::create_explicit(
+      ConstructionPointId(point_json.at("id").get<std::string>()),
+      point_json.at("name").get<std::string>(), point3_from_json(point_json.at("position")),
+      parameter_dependencies_from_object(point_json));
+}
+
+[[nodiscard]] Result<ConstructionLine> construction_line_from_json(const json& line_json) {
+  if (line_json.at("kind").get<std::string>() != "explicit") {
+    return Result<ConstructionLine>::failure(
+        json_error("only explicit construction lines are supported"));
+  }
+
+  return ConstructionLine::create_explicit(
+      ConstructionLineId(line_json.at("id").get<std::string>()),
+      line_json.at("name").get<std::string>(), point3_from_json(line_json.at("point")),
+      vector3_from_json(line_json.at("direction")), parameter_dependencies_from_object(line_json));
+}
+
+[[nodiscard]] Result<ConstructionPlane> construction_plane_from_json(const json& plane_json) {
+  if (plane_json.at("kind").get<std::string>() != "explicit") {
+    return Result<ConstructionPlane>::failure(
+        json_error("only explicit construction planes are supported"));
+  }
+
+  return ConstructionPlane::create_explicit(
+      ConstructionPlaneId(plane_json.at("id").get<std::string>()),
+      plane_json.at("name").get<std::string>(), point3_from_json(plane_json.at("origin")),
+      vector3_from_json(plane_json.at("x_axis")), vector3_from_json(plane_json.at("y_axis")),
+      vector3_from_json(plane_json.at("normal")), parameter_dependencies_from_object(plane_json));
 }
 
 [[nodiscard]] Result<DerivedWorkplane> derived_workplane_from_json(
@@ -287,6 +359,40 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
                                          {"normal", vector3_to_json(datum_plane.normal())}});
   }
 
+  root["construction_points"] = json::array();
+  for (const auto& point : document.construction_points()) {
+    root["construction_points"].push_back(
+        json{{"id", point.id().value()},
+             {"name", point.name()},
+             {"kind", "explicit"},
+             {"position", point3_to_json(point.position())},
+             {"parameter_dependencies", parameter_ids_to_json(point.parameter_dependencies())}});
+  }
+
+  root["construction_lines"] = json::array();
+  for (const auto& line : document.construction_lines()) {
+    root["construction_lines"].push_back(
+        json{{"id", line.id().value()},
+             {"name", line.name()},
+             {"kind", "explicit"},
+             {"point", point3_to_json(line.point())},
+             {"direction", vector3_to_json(line.direction())},
+             {"parameter_dependencies", parameter_ids_to_json(line.parameter_dependencies())}});
+  }
+
+  root["construction_planes"] = json::array();
+  for (const auto& plane : document.construction_planes()) {
+    root["construction_planes"].push_back(
+        json{{"id", plane.id().value()},
+             {"name", plane.name()},
+             {"kind", "explicit"},
+             {"origin", point3_to_json(plane.origin())},
+             {"x_axis", vector3_to_json(plane.x_axis())},
+             {"y_axis", vector3_to_json(plane.y_axis())},
+             {"normal", vector3_to_json(plane.normal())},
+             {"parameter_dependencies", parameter_ids_to_json(plane.parameter_dependencies())}});
+  }
+
   root["derived_workplanes"] = json::array();
   for (const auto& workplane : document.derived_workplanes()) {
     root["derived_workplanes"].push_back(
@@ -402,6 +508,48 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
       }
 
       auto added = document.value().add_datum_plane(datum_plane.value());
+      if (added.has_error()) {
+        return Result<PartDocument>::failure(added.error());
+      }
+    }
+
+    const json construction_point_array =
+        root.contains("construction_points") ? root.at("construction_points") : json::array();
+    for (const auto& point_json : construction_point_array) {
+      auto point = construction_point_from_json(point_json);
+      if (point.has_error()) {
+        return Result<PartDocument>::failure(point.error());
+      }
+
+      auto added = document.value().add_construction_point(point.value());
+      if (added.has_error()) {
+        return Result<PartDocument>::failure(added.error());
+      }
+    }
+
+    const json construction_line_array =
+        root.contains("construction_lines") ? root.at("construction_lines") : json::array();
+    for (const auto& line_json : construction_line_array) {
+      auto line = construction_line_from_json(line_json);
+      if (line.has_error()) {
+        return Result<PartDocument>::failure(line.error());
+      }
+
+      auto added = document.value().add_construction_line(line.value());
+      if (added.has_error()) {
+        return Result<PartDocument>::failure(added.error());
+      }
+    }
+
+    const json construction_plane_array =
+        root.contains("construction_planes") ? root.at("construction_planes") : json::array();
+    for (const auto& plane_json : construction_plane_array) {
+      auto plane = construction_plane_from_json(plane_json);
+      if (plane.has_error()) {
+        return Result<PartDocument>::failure(plane.error());
+      }
+
+      auto added = document.value().add_construction_plane(plane.value());
       if (added.has_error()) {
         return Result<PartDocument>::failure(added.error());
       }
