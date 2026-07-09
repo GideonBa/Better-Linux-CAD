@@ -28,6 +28,7 @@ endif()
 
 add_library(
   blcad_core STATIC
+  src/core/construction_geometry.cpp
   src/core/datum_plane.cpp
   src/core/dependency_graph.cpp
   src/core/error.cpp
@@ -117,6 +118,8 @@ if(BLCAD_BUILD_TESTS)
   add_executable(
     blcad_core_tests
     tests/core/closed_profile_json_tests.cpp
+    tests/core/construction_geometry_tests.cpp
+    tests/core/construction_geometry_json_tests.cpp
     tests/core/datum_plane_tests.cpp
     tests/core/dependency_graph_tests.cpp
     tests/core/derived_workplane_tests.cpp
@@ -146,6 +149,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/back_workplane_pipeline_tests.cpp
       tests/geometry/circular_cut_adapter_tests.cpp
       tests/geometry/closed_profile_pipeline_tests.cpp
+      tests/geometry/construction_plane_pipeline_tests.cpp
       tests/geometry/derived_workplane_pipeline_tests.cpp
       tests/geometry/front_workplane_pipeline_tests.cpp
       tests/geometry/left_workplane_pipeline_tests.cpp
