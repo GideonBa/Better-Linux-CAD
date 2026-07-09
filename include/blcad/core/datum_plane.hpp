@@ -20,6 +20,36 @@ enum class SemanticFace {
 
 [[nodiscard]] std::string_view to_string(SemanticFace face) noexcept;
 
+enum class SemanticEdge {
+  TopFront,
+  TopBack,
+  TopRight,
+  TopLeft,
+  BottomFront,
+  BottomBack,
+  BottomRight,
+  BottomLeft,
+  FrontRight,
+  FrontLeft,
+  BackRight,
+  BackLeft,
+};
+
+[[nodiscard]] std::string_view to_string(SemanticEdge edge) noexcept;
+
+enum class SemanticVertex {
+  TopFrontRight,
+  TopFrontLeft,
+  TopBackRight,
+  TopBackLeft,
+  BottomFrontRight,
+  BottomFrontLeft,
+  BottomBackRight,
+  BottomBackLeft,
+};
+
+[[nodiscard]] std::string_view to_string(SemanticVertex vertex) noexcept;
+
 class SemanticFaceReference {
 public:
   [[nodiscard]] static Result<SemanticFaceReference> create(FeatureId source_feature,
@@ -33,6 +63,38 @@ private:
 
   FeatureId source_feature_;
   SemanticFace face_;
+};
+
+class SemanticEdgeReference {
+public:
+  [[nodiscard]] static Result<SemanticEdgeReference> create(FeatureId source_feature,
+                                                            SemanticEdge edge);
+
+  [[nodiscard]] const FeatureId& source_feature() const noexcept;
+  [[nodiscard]] SemanticEdge edge() const noexcept;
+  [[nodiscard]] std::string node_id() const;
+
+private:
+  SemanticEdgeReference(FeatureId source_feature, SemanticEdge edge);
+
+  FeatureId source_feature_;
+  SemanticEdge edge_;
+};
+
+class SemanticVertexReference {
+public:
+  [[nodiscard]] static Result<SemanticVertexReference> create(FeatureId source_feature,
+                                                              SemanticVertex vertex);
+
+  [[nodiscard]] const FeatureId& source_feature() const noexcept;
+  [[nodiscard]] SemanticVertex vertex() const noexcept;
+  [[nodiscard]] std::string node_id() const;
+
+private:
+  SemanticVertexReference(FeatureId source_feature, SemanticVertex vertex);
+
+  FeatureId source_feature_;
+  SemanticVertex vertex_;
 };
 
 class DatumPlane {
