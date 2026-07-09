@@ -82,7 +82,7 @@ PartDocument make_reference_generated_document(bool parameter_driven_points) {
   auto xy = DatumPlane::xy();
   REQUIRE(xy);
   REQUIRE(document.value().add_datum_plane(xy.value()));
-  REQUIRE(document.value().add_parameter(make_length_parameter("part.anchor", "anchor", 0.0)));
+  REQUIRE(document.value().add_parameter(make_length_parameter("part.anchor", "anchor", 1.0)));
   REQUIRE(document.value().add_parameter(make_length_parameter("part.depth", "depth", 5.0)));
 
   const std::vector<ParameterId> deps = parameter_driven_points
