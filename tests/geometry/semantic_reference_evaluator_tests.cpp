@@ -1,4 +1,5 @@
 #include "blcad/geometry/construction_line_resolver.hpp"
+#include "blcad/geometry/construction_point_resolver.hpp"
 #include "blcad/geometry/semantic_reference_evaluator.hpp"
 
 #include <catch2/catch_approx.hpp>
@@ -93,6 +94,47 @@ TEST_CASE("SemanticReferenceEvaluator resolves rectangular additive extrude edge
   CHECK(vertex.value().position.z == Catch::Approx(0.0));
 }
 
+TEST_CASE("ConstructionPointResolver resolves generated vertex points and generated edge midpoints",
+          "[geometry][construction-point]") {
+  PartDocument document = make_rectangular_additive_document();
+
+  auto vertex_ref = SemanticVertexReference::create(FeatureId("feature.base"),
+                                                    SemanticVertex::TopFrontRight);
+  REQUIRE(vertex_ref);
+  auto vertex_relation = ConstructionRelation::create_point_on_generated_vertex(
+      ConstructionRelationId("relation.point_on_vertex"), ConstructionPointId("point.vertex"),
+      vertex_ref.value());
+  REQUIRE(vertex_relation);
+  auto vertex_point = ConstructionPoint::create_on_generated_vertex(
+      ConstructionPointId("point.vertex"), "VertexPoint", vertex_relation.value());
+  REQUIRE(vertex_point);
+  REQUIRE(document.add_construction_point(vertex_point.value()));
+
+  auto edge_ref = SemanticEdgeReference::create(FeatureId("feature.base"), SemanticEdge::TopFront);
+  REQUIRE(edge_ref);
+  auto edge_relation = ConstructionRelation::create_point_on_generated_edge(
+      ConstructionRelationId("relation.point_on_edge"), ConstructionPointId("point.edge_mid"),
+      edge_ref.value());
+  REQUIRE(edge_relation);
+  auto edge_point = ConstructionPoint::create_on_generated_edge(
+      ConstructionPointId("point.edge_mid"), "EdgeMidpoint", edge_relation.value());
+  REQUIRE(edge_point);
+  REQUIRE(document.add_construction_point(edge_point.value()));
+
+  const ConstructionPointResolver resolver;
+  auto resolved_vertex = resolver.resolve(document, ConstructionPointId("point.vertex"));
+  REQUIRE(resolved_vertex);
+  CHECK(resolved_vertex.value().position.x == Catch::Approx(50.0));
+  CHECK(resolved_vertex.value().position.y == Catch::Approx(30.0));
+  CHECK(resolved_vertex.value().position.z == Catch::Approx(10.0));
+
+  auto resolved_edge = resolver.resolve(document, ConstructionPointId("point.edge_mid"));
+  REQUIRE(resolved_edge);
+  CHECK(resolved_edge.value().position.x == Catch::Approx(0.0));
+  CHECK(resolved_edge.value().position.y == Catch::Approx(30.0));
+  CHECK(resolved_edge.value().position.z == Catch::Approx(10.0));
+}
+
 TEST_CASE("ConstructionLineResolver resolves deterministic chained construction lines",
           "[geometry][construction-line]") {
   PartDocument document = make_rectangular_additive_document();
@@ -128,7 +170,6 @@ TEST_CASE("ConstructionLineResolver resolves deterministic chained construction 
   REQUIRE(document.add_construction_line(edge_line.value()));
 
   const ConstructionLineResolver resolver;
-
   auto resolved_base = resolver.resolve(document, ConstructionLineId("line.base"));
   REQUIRE(resolved_base);
   CHECK(resolved_base.value().point.x == Catch::Approx(0.0));
