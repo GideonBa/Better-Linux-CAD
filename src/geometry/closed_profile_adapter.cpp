@@ -98,6 +98,16 @@ constexpr double kAxisTolerance = 1.0e-9;
   return point.z;
 }
 
+[[nodiscard]] double axis_component(Vector3 axis) noexcept {
+  if (std::abs(axis.x) > 1.0 - kAxisTolerance) {
+    return axis.x;
+  }
+  if (std::abs(axis.y) > 1.0 - kAxisTolerance) {
+    return axis.y;
+  }
+  return axis.z;
+}
+
 [[nodiscard]] Point3 translate_along_axis(Point3 point, Vector3 axis, double delta) noexcept {
   return Point3{point.x + axis.x * delta, point.y + axis.y * delta,
                 point.z + axis.z * delta};
@@ -122,8 +132,7 @@ constexpr double kAxisTolerance = 1.0e-9;
     start_coordinate = axis.z > 0.0 ? min_z - kThroughAllMargin : max_z + kThroughAllMargin;
   }
 
-  const double delta = (start_coordinate - profile_coordinate) *
-                       (std::abs(axis.x) + std::abs(axis.y) + std::abs(axis.z));
+  const double delta = (start_coordinate - profile_coordinate) / axis_component(axis);
 
   std::vector<Point3> moved;
   moved.reserve(vertices.size());
