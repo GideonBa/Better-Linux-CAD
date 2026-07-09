@@ -10,6 +10,8 @@
 
 namespace blcad {
 
+class PartDocument;
+
 enum class SemanticReferenceKind {
   Face,
   Edge,
