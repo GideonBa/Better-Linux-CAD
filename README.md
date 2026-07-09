@@ -58,6 +58,7 @@ The optional `blcad_geometry` target contains OCCT adapters for rectangle extrus
 - `docs/front-workplane-mvp2.md`: front-face derived workplane for simple additive extrudes
 - `docs/back-workplane-mvp2.md`: back-face derived workplane for simple additive extrudes
 - `docs/general-closed-sketch-profile-mvp.md`: future block for arbitrary closed sketch profiles from line chains, arcs, splines, wires, and general OCCT faces
+- `docs/construction-geometry-mvp.md`: future block for user-created construction planes, lines, points, and relation-driven datum geometry
 - `docs/mvp-plan.md`: MVP sequence
 - `docs/mvp-1-specification.md`: detailed MVP-1 specification
 - `docs/decisions/`: architecture decision records
@@ -71,6 +72,8 @@ MVP 2 has a minimal semantic-face path for a simple `AdditiveExtrude`. `Semantic
 The optional geometry build resolves sketch workplanes before executing subtractive cuts. `WorkplaneResolver` can resolve `datum.xy`, `feature.base_extrude.top`, `feature.base_extrude.bottom`, `feature.base_extrude.right`, `feature.base_extrude.left`, `feature.base_extrude.front`, and `feature.base_extrude.back`. Top and bottom cuts are vertical through-all cuts. Right and left face cuts are X-axis through-all cuts. Front and back face cuts are Y-axis through-all cuts. All currently supported generated-face workplanes carry rectangular bounds derived from the source rectangle sketch and extrude thickness.
 
 General closed sketch profiles are explicitly not implemented yet. The current sketch model does not support free line chains, polylines, arcs, splines, connected sketch entities, general closed loops, closed wires, multiple contours, inner holes in the same sketch profile, profile-region selection, or generic additive/subtractive extrusion from arbitrary `TopoDS_Wire` / `TopoDS_Face`. This future block is tracked in `docs/general-closed-sketch-profile-mvp.md`.
+
+Construction geometry is explicitly documented as a separate future block. The system should later support user-created construction planes, construction lines/axes, and construction points that can be placed freely in 3D, used as sketch references, and defined through relations such as parallelism, orthogonality, angles, offsets, point-on-line, point-on-plane, line-through-two-points, and plane-through-three-points. This future block is tracked in `docs/construction-geometry-mvp.md`.
 
 Incremental recompute follows derived-workplane dependency paths. Updating `part.width`, `part.height`, or `part.thickness` can mark the base feature, derived workplane, dependent sketch, and cut feature as affected. `GeometryRecomputeExecutor::execute_plan` skips non-feature nodes while preserving their dependency-ordering role, removes stale cached feature shapes before recomputing dirty features, and can surface bounded-workplane validation errors after source-dimension changes.
 
@@ -130,5 +133,7 @@ The next technical step should start the larger sketch-modeling block for genera
 16. Do not build a GUI yet.
 
 The detailed future block is documented in `docs/general-closed-sketch-profile-mvp.md`.
+
+A separate later block for construction planes, construction lines, construction points, and relation-driven datum geometry is documented in `docs/construction-geometry-mvp.md`.
 
 The detailed MVP-1 specification is in `docs/mvp-1-specification.md`.
