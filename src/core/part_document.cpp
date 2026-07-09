@@ -311,6 +311,17 @@ Result<std::size_t> add_dependency_if_missing(DependencyGraph& graph, std::strin
   return Result<std::size_t>::success(0);
 }
 
+[[nodiscard]] Result<std::size_t> validate_driving_dimensions(const PartDocument& document,
+                                                              const Sketch& sketch) {
+  for (const auto& dimension : sketch.driving_dimensions()) {
+    if (document.find_parameter(dimension.parameter()) == nullptr) {
+      return Result<std::size_t>::failure(Error::validation(
+          dimension.id().value(), "driving dimension parameter must exist in part document"));
+    }
+  }
+  return Result<std::size_t>::success(0);
+}
+
 [[nodiscard]] Result<std::size_t> add_projected_reference_dependencies(DependencyGraph& graph,
                                                                        const Sketch& sketch) {
   for (const auto& point : sketch.projected_points()) {
@@ -350,6 +361,24 @@ Result<std::size_t> add_dependency_if_missing(DependencyGraph& graph, std::strin
   return Result<std::size_t>::success(graph.dependency_count());
 }
 
+[[nodiscard]] Result<std::size_t> add_driving_dimension_dependencies(DependencyGraph& graph,
+                                                                     const Sketch& sketch) {
+  for (const auto& dimension : sketch.driving_dimensions()) {
+    auto dependency = add_dependency_if_missing(graph, dimension.parameter().value(), sketch.id().value());
+    if (dependency.has_error()) return dependency;
+  }
+  return Result<std::size_t>::success(graph.dependency_count());
+}
+
+[[nodiscard]] Result<std::size_t> sync_graph(DependencyGraph graph,
+                                             InvalidationState& invalidation_state,
+                                             DependencyGraph& dependency_graph) {
+  auto synced_state = invalidation_state.sync_from_graph(graph);
+  if (synced_state.has_error()) return Result<std::size_t>::failure(synced_state.error());
+  dependency_graph = std::move(graph);
+  return Result<std::size_t>::success(dependency_graph.node_count());
+}
+
 } // namespace
 
 Result<PartDocument> PartDocument::create(DocumentId id, std::string name) {
@@ -359,17 +388,234 @@ Result<PartDocument> PartDocument::create(DocumentId id, std::string name) {
   return Result<PartDocument>::success(PartDocument(std::move(id), std::move(name)));
 }
 
-Result<std::size_t> PartDocument::add_parameter(Parameter parameter) { if (has_parameter_id(parameter.id())) return Result<std::size_t>::failure(Error::validation(parameter.id().value(), "parameter id must be unique within part document")); if (has_parameter_name(parameter.name())) return Result<std::size_t>::failure(Error::validation(parameter.id().value(), "parameter name must be unique within part document")); auto graph = dependency_graph_; const auto added_node = graph.add_node(parameter.id().value()); if (added_node.has_error()) return Result<std::size_t>::failure(added_node.error()); auto invalidation_state = invalidation_state_; const auto synced_state = invalidation_state.sync_from_graph(graph); if (synced_state.has_error()) return Result<std::size_t>::failure(synced_state.error()); dependency_graph_ = std::move(graph); invalidation_state_ = std::move(invalidation_state); parameters_.push_back(std::move(parameter)); return Result<std::size_t>::success(parameters_.size() - 1); }
-Result<std::size_t> PartDocument::add_datum_plane(DatumPlane datum_plane) { if (has_datum_plane_id(datum_plane.id())) return Result<std::size_t>::failure(Error::validation(datum_plane.id().value(), "datum plane id must be unique within part document")); if (has_derived_workplane_id(datum_plane.id()) || has_construction_plane_id(ConstructionPlaneId(datum_plane.id().value()))) return Result<std::size_t>::failure(Error::validation(datum_plane.id().value(), "workplane id must be unique within part document")); datum_planes_.push_back(std::move(datum_plane)); return Result<std::size_t>::success(datum_planes_.size() - 1); }
-Result<std::size_t> PartDocument::add_construction_point(ConstructionPoint point) { if (has_construction_point_id(point.id())) return Result<std::size_t>::failure(Error::validation(point.id().value(), "construction point id must be unique within part document")); for (const auto& parameter_id : point.parameter_dependencies()) if (!has_parameter_id(parameter_id)) return Result<std::size_t>::failure(Error::validation(point.id().value(), "construction point parameter dependency must exist in part document")); if (point.relation().has_value()) { auto valid_relation = validate_relation_references(*this, point.relation().value(), point.id().value()); if (valid_relation.has_error()) return Result<std::size_t>::failure(valid_relation.error()); } auto graph = dependency_graph_; const auto added_node = graph.add_node(point.id().value()); if (added_node.has_error()) return Result<std::size_t>::failure(added_node.error()); const auto parameter_dependencies = add_parameter_dependencies(graph, point.parameter_dependencies(), point.id().value()); if (parameter_dependencies.has_error()) return Result<std::size_t>::failure(parameter_dependencies.error()); if (point.relation().has_value()) { const auto relation_dependencies = add_relation_dependencies(graph, point.relation().value(), point.id().value()); if (relation_dependencies.has_error()) return Result<std::size_t>::failure(relation_dependencies.error()); } auto invalidation_state = invalidation_state_; const auto synced_state = invalidation_state.sync_from_graph(graph); if (synced_state.has_error()) return Result<std::size_t>::failure(synced_state.error()); dependency_graph_ = std::move(graph); invalidation_state_ = std::move(invalidation_state); construction_points_.push_back(std::move(point)); return Result<std::size_t>::success(construction_points_.size() - 1); }
-Result<std::size_t> PartDocument::add_construction_line(ConstructionLine line) { if (has_construction_line_id(line.id())) return Result<std::size_t>::failure(Error::validation(line.id().value(), "construction line id must be unique within part document")); for (const auto& parameter_id : line.parameter_dependencies()) if (!has_parameter_id(parameter_id)) return Result<std::size_t>::failure(Error::validation(line.id().value(), "construction line parameter dependency must exist in part document")); if (line.kind() != ConstructionLineKind::Explicit) { if (!line.relation().has_value()) return Result<std::size_t>::failure(Error::validation(line.id().value(), "relation-driven construction line must carry a relation")); const ConstructionRelation& relation = line.relation().value(); const bool expected_relation = (line.kind() == ConstructionLineKind::ThroughTwoPoints && relation.type() == ConstructionRelationType::LineThroughTwoPoints) || (line.kind() == ConstructionLineKind::ParallelToLineThroughPoint && relation.type() == ConstructionRelationType::LineParallelToLineThroughPoint) || (line.kind() == ConstructionLineKind::ParallelToGeneratedEdgeThroughPoint && relation.type() == ConstructionRelationType::LineParallelToGeneratedEdgeThroughPoint); if (!expected_relation) return Result<std::size_t>::failure(Error::validation(line.id().value(), "relation-driven construction line kind does not match relation type")); auto valid_relation = validate_relation_references(*this, relation, line.id().value()); if (valid_relation.has_error()) return Result<std::size_t>::failure(valid_relation.error()); } auto graph = dependency_graph_; const auto added_node = graph.add_node(line.id().value()); if (added_node.has_error()) return Result<std::size_t>::failure(added_node.error()); const auto parameter_dependencies = add_parameter_dependencies(graph, line.parameter_dependencies(), line.id().value()); if (parameter_dependencies.has_error()) return Result<std::size_t>::failure(parameter_dependencies.error()); if (line.relation().has_value()) { const auto relation_dependencies = add_relation_dependencies(graph, line.relation().value(), line.id().value()); if (relation_dependencies.has_error()) return Result<std::size_t>::failure(relation_dependencies.error()); } auto invalidation_state = invalidation_state_; const auto synced_state = invalidation_state.sync_from_graph(graph); if (synced_state.has_error()) return Result<std::size_t>::failure(synced_state.error()); dependency_graph_ = std::move(graph); invalidation_state_ = std::move(invalidation_state); construction_lines_.push_back(std::move(line)); return Result<std::size_t>::success(construction_lines_.size() - 1); }
-Result<std::size_t> PartDocument::add_construction_plane(ConstructionPlane plane) { if (has_construction_plane_id(plane.id())) return Result<std::size_t>::failure(Error::validation(plane.id().value(), "construction plane id must be unique within part document")); if (has_workplane_id(plane.workplane_id())) return Result<std::size_t>::failure(Error::validation(plane.id().value(), "workplane id must be unique within part document")); for (const auto& parameter_id : plane.parameter_dependencies()) if (!has_parameter_id(parameter_id)) return Result<std::size_t>::failure(Error::validation(plane.id().value(), "construction plane parameter dependency must exist in part document")); if (plane.kind() != ConstructionPlaneKind::Explicit) { if (!plane.relation().has_value()) return Result<std::size_t>::failure(Error::validation(plane.id().value(), "relation-driven construction plane must carry a relation")); const ConstructionRelation& relation = plane.relation().value(); const bool expected_relation = (plane.kind() == ConstructionPlaneKind::OffsetFromPlane && relation.type() == ConstructionRelationType::PlaneOffsetFromPlane) || (plane.kind() == ConstructionPlaneKind::ThroughThreePoints && relation.type() == ConstructionRelationType::PlaneThroughThreePoints) || (plane.kind() == ConstructionPlaneKind::ParallelToPlaneThroughPoint && relation.type() == ConstructionRelationType::PlaneParallelToPlaneThroughPoint); if (!expected_relation) return Result<std::size_t>::failure(Error::validation(plane.id().value(), "relation-driven construction plane kind does not match relation type")); auto valid_relation = validate_relation_references(*this, relation, plane.id().value()); if (valid_relation.has_error()) return Result<std::size_t>::failure(valid_relation.error()); } auto graph = dependency_graph_; const auto added_node = graph.add_node(plane.id().value()); if (added_node.has_error()) return Result<std::size_t>::failure(added_node.error()); const auto parameter_dependencies = add_parameter_dependencies(graph, plane.parameter_dependencies(), plane.id().value()); if (parameter_dependencies.has_error()) return Result<std::size_t>::failure(parameter_dependencies.error()); if (plane.relation().has_value()) { const auto relation_dependencies = add_relation_dependencies(graph, plane.relation().value(), plane.id().value()); if (relation_dependencies.has_error()) return Result<std::size_t>::failure(relation_dependencies.error()); } auto invalidation_state = invalidation_state_; const auto synced_state = invalidation_state.sync_from_graph(graph); if (synced_state.has_error()) return Result<std::size_t>::failure(synced_state.error()); dependency_graph_ = std::move(graph); invalidation_state_ = std::move(invalidation_state); construction_planes_.push_back(std::move(plane)); return Result<std::size_t>::success(construction_planes_.size() - 1); }
-Result<std::size_t> PartDocument::add_derived_workplane(DerivedWorkplane workplane) { if (has_workplane_id(workplane.id())) return Result<std::size_t>::failure(Error::validation(workplane.id().value(), "workplane id must be unique within part document")); const Feature* source_feature = find_feature(workplane.face_reference().source_feature()); if (source_feature == nullptr) return Result<std::size_t>::failure(Error::validation(workplane.id().value(), "derived workplane source feature must exist in part document")); if (source_feature->type() != FeatureType::AdditiveExtrude) return Result<std::size_t>::failure(Error::validation(workplane.id().value(), "derived workplane source feature must be an additive extrude")); if (!is_supported_derived_face(workplane.face_reference().face())) return Result<std::size_t>::failure(Error::validation(workplane.id().value(), "only top, bottom, right, left, front, and back semantic faces are supported")); auto graph = dependency_graph_; const auto added_node = graph.add_node(workplane.id().value()); if (added_node.has_error()) return Result<std::size_t>::failure(added_node.error()); auto source_dependency = add_dependency_if_missing(graph, workplane.face_reference().source_feature().value(), workplane.id().value()); if (source_dependency.has_error()) return Result<std::size_t>::failure(source_dependency.error()); auto invalidation_state = invalidation_state_; const auto synced_state = invalidation_state.sync_from_graph(graph); if (synced_state.has_error()) return Result<std::size_t>::failure(synced_state.error()); dependency_graph_ = std::move(graph); invalidation_state_ = std::move(invalidation_state); derived_workplanes_.push_back(std::move(workplane)); return Result<std::size_t>::success(derived_workplanes_.size() - 1); }
-Result<std::size_t> PartDocument::add_sketch(Sketch sketch) { if (has_sketch_id(sketch.id())) return Result<std::size_t>::failure(Error::validation(sketch.id().value(), "sketch id must be unique within part document")); if (!has_workplane_id(sketch.workplane())) return Result<std::size_t>::failure(Error::validation(sketch.id().value(), "sketch workplane must exist in part document")); auto valid_projected_references = validate_projected_sketch_references(*this, sketch); if (valid_projected_references.has_error()) return Result<std::size_t>::failure(valid_projected_references.error()); auto valid_reference_generated_lines = validate_reference_generated_lines(sketch); if (valid_reference_generated_lines.has_error()) return Result<std::size_t>::failure(valid_reference_generated_lines.error()); for (const auto& profile : sketch.rectangle_profiles()) { if (!has_parameter_id(profile.width_parameter())) return Result<std::size_t>::failure(Error::validation(profile.id().value(), "rectangle width parameter must exist in part document")); if (!has_parameter_id(profile.height_parameter())) return Result<std::size_t>::failure(Error::validation(profile.id().value(), "rectangle height parameter must exist in part document")); } for (const auto& profile : sketch.circle_profiles()) if (!has_parameter_id(profile.diameter_parameter())) return Result<std::size_t>::failure(Error::validation(profile.id().value(), "circle diameter parameter must exist in part document")); auto graph = dependency_graph_; const auto added_node = graph.add_node(sketch.id().value()); if (added_node.has_error()) return Result<std::size_t>::failure(added_node.error()); if (has_derived_workplane_id(sketch.workplane()) || has_construction_plane_id(ConstructionPlaneId(sketch.workplane().value()))) { auto workplane_dependency = add_dependency_if_missing(graph, sketch.workplane().value(), sketch.id().value()); if (workplane_dependency.has_error()) return Result<std::size_t>::failure(workplane_dependency.error()); } const auto projected_reference_dependencies = add_projected_reference_dependencies(graph, sketch); if (projected_reference_dependencies.has_error()) return Result<std::size_t>::failure(projected_reference_dependencies.error()); for (const auto& profile : sketch.rectangle_profiles()) { auto width_dependency = add_dependency_if_missing(graph, profile.width_parameter().value(), sketch.id().value()); if (width_dependency.has_error()) return Result<std::size_t>::failure(width_dependency.error()); auto height_dependency = add_dependency_if_missing(graph, profile.height_parameter().value(), sketch.id().value()); if (height_dependency.has_error()) return Result<std::size_t>::failure(height_dependency.error()); } for (const auto& profile : sketch.circle_profiles()) { auto diameter_dependency = add_dependency_if_missing(graph, profile.diameter_parameter().value(), sketch.id().value()); if (diameter_dependency.has_error()) return Result<std::size_t>::failure(diameter_dependency.error()); } auto invalidation_state = invalidation_state_; const auto synced_state = invalidation_state.sync_from_graph(graph); if (synced_state.has_error()) return Result<std::size_t>::failure(synced_state.error()); dependency_graph_ = std::move(graph); invalidation_state_ = std::move(invalidation_state); sketches_.push_back(std::move(sketch)); return Result<std::size_t>::success(sketches_.size() - 1); }
-Result<std::size_t> PartDocument::add_feature(Feature feature) { if (has_feature_id(feature.id())) return Result<std::size_t>::failure(Error::validation(feature.id().value(), "feature id must be unique within part document")); if (!has_sketch_id(feature.input_sketch())) return Result<std::size_t>::failure(Error::validation(feature.id().value(), "feature input sketch must exist in part document")); if (feature.type() == FeatureType::AdditiveExtrude && !has_parameter_id(feature.length_parameter())) return Result<std::size_t>::failure(Error::validation(feature.id().value(), "additive extrude length parameter must exist in part document")); if (feature.type() == FeatureType::SubtractiveExtrude && !has_feature_id(feature.target_feature())) return Result<std::size_t>::failure(Error::validation(feature.id().value(), "subtractive extrude target feature must exist in part document")); auto graph = dependency_graph_; const auto added_node = graph.add_node(feature.id().value()); if (added_node.has_error()) return Result<std::size_t>::failure(added_node.error()); auto sketch_dependency = add_dependency_if_missing(graph, feature.input_sketch().value(), feature.id().value()); if (sketch_dependency.has_error()) return Result<std::size_t>::failure(sketch_dependency.error()); if (feature.type() == FeatureType::AdditiveExtrude) { auto length_dependency = add_dependency_if_missing(graph, feature.length_parameter().value(), feature.id().value()); if (length_dependency.has_error()) return Result<std::size_t>::failure(length_dependency.error()); } if (feature.type() == FeatureType::SubtractiveExtrude) { auto target_dependency = add_dependency_if_missing(graph, feature.target_feature().value(), feature.id().value()); if (target_dependency.has_error()) return Result<std::size_t>::failure(target_dependency.error()); } auto invalidation_state = invalidation_state_; const auto synced_state = invalidation_state.sync_from_graph(graph); if (synced_state.has_error()) return Result<std::size_t>::failure(synced_state.error()); dependency_graph_ = std::move(graph); invalidation_state_ = std::move(invalidation_state); features_.push_back(std::move(feature)); return Result<std::size_t>::success(features_.size() - 1); }
-Result<std::size_t> PartDocument::add_reference_status(ReferenceStatusRecord status) { if (has_reference_status_id(status.id())) return Result<std::size_t>::failure(Error::validation(status.id().value(), "reference status id must be unique within part document")); if (status.status() == ReferenceStatusKind::Resolved) { auto valid_target = validate_semantic_reference_target(*this, status.target(), status.id().value()); if (valid_target.has_error()) return Result<std::size_t>::failure(valid_target.error()); } auto graph = dependency_graph_; const auto added_node = graph.add_node(status.id().value()); if (added_node.has_error()) return Result<std::size_t>::failure(added_node.error()); if (find_feature(status.target().source_feature()) != nullptr) { auto dependency = add_dependency_if_missing(graph, status.target().source_feature().value(), status.id().value()); if (dependency.has_error()) return Result<std::size_t>::failure(dependency.error()); } auto invalidation_state = invalidation_state_; const auto synced_state = invalidation_state.sync_from_graph(graph); if (synced_state.has_error()) return Result<std::size_t>::failure(synced_state.error()); dependency_graph_ = std::move(graph); invalidation_state_ = std::move(invalidation_state); reference_statuses_.push_back(std::move(status)); return Result<std::size_t>::success(reference_statuses_.size() - 1); }
-Result<std::size_t> PartDocument::add_reference_remap(ReferenceRemapRecord remap) { if (has_reference_remap_id(remap.id())) return Result<std::size_t>::failure(Error::validation(remap.id().value(), "reference remap id must be unique within part document")); auto valid_replacement = validate_semantic_reference_target(*this, remap.replacement(), remap.id().value()); if (valid_replacement.has_error()) return Result<std::size_t>::failure(valid_replacement.error()); auto graph = dependency_graph_; const auto added_node = graph.add_node(remap.id().value()); if (added_node.has_error()) return Result<std::size_t>::failure(added_node.error()); auto replacement_dependency = add_dependency_if_missing(graph, remap.replacement().source_feature().value(), remap.id().value()); if (replacement_dependency.has_error()) return Result<std::size_t>::failure(replacement_dependency.error()); if (find_feature(remap.original().source_feature()) != nullptr) { auto original_dependency = add_dependency_if_missing(graph, remap.original().source_feature().value(), remap.id().value()); if (original_dependency.has_error()) return Result<std::size_t>::failure(original_dependency.error()); } auto invalidation_state = invalidation_state_; const auto synced_state = invalidation_state.sync_from_graph(graph); if (synced_state.has_error()) return Result<std::size_t>::failure(synced_state.error()); dependency_graph_ = std::move(graph); invalidation_state_ = std::move(invalidation_state); reference_remaps_.push_back(std::move(remap)); return Result<std::size_t>::success(reference_remaps_.size() - 1); }
-Result<std::size_t> PartDocument::add_sketch_origin_override(SketchOriginOverrideRecord origin_override) { if (has_sketch_origin_override_id(origin_override.sketch())) return Result<std::size_t>::failure(Error::validation(origin_override.sketch().value(), "sketch origin override must be unique per sketch")); if (find_sketch(origin_override.sketch()) == nullptr) return Result<std::size_t>::failure(Error::validation(origin_override.sketch().value(), "sketch origin override sketch must exist in part document")); auto graph = dependency_graph_; const std::string node_id = origin_override.sketch().value() + ".origin_override"; const auto added_node = graph.add_node(node_id); if (added_node.has_error()) return Result<std::size_t>::failure(added_node.error()); auto dependency = add_dependency_if_missing(graph, origin_override.sketch().value(), node_id); if (dependency.has_error()) return Result<std::size_t>::failure(dependency.error()); auto invalidation_state = invalidation_state_; const auto synced_state = invalidation_state.sync_from_graph(graph); if (synced_state.has_error()) return Result<std::size_t>::failure(synced_state.error()); dependency_graph_ = std::move(graph); invalidation_state_ = std::move(invalidation_state); sketch_origin_overrides_.push_back(std::move(origin_override)); return Result<std::size_t>::success(sketch_origin_overrides_.size() - 1); }
+Result<std::size_t> PartDocument::add_parameter(Parameter parameter) {
+  if (has_parameter_id(parameter.id())) return Result<std::size_t>::failure(Error::validation(parameter.id().value(), "parameter id must be unique within part document"));
+  if (has_parameter_name(parameter.name())) return Result<std::size_t>::failure(Error::validation(parameter.id().value(), "parameter name must be unique within part document"));
+  auto graph = dependency_graph_;
+  auto added_node = graph.add_node(parameter.id().value());
+  if (added_node.has_error()) return Result<std::size_t>::failure(added_node.error());
+  auto invalidation_state = invalidation_state_;
+  auto synced = sync_graph(std::move(graph), invalidation_state, dependency_graph_);
+  if (synced.has_error()) return Result<std::size_t>::failure(synced.error());
+  invalidation_state_ = std::move(invalidation_state);
+  parameters_.push_back(std::move(parameter));
+  return Result<std::size_t>::success(parameters_.size() - 1U);
+}
+
+Result<std::size_t> PartDocument::add_datum_plane(DatumPlane datum_plane) {
+  if (has_datum_plane_id(datum_plane.id())) return Result<std::size_t>::failure(Error::validation(datum_plane.id().value(), "datum plane id must be unique within part document"));
+  if (has_derived_workplane_id(datum_plane.id()) || has_construction_plane_id(ConstructionPlaneId(datum_plane.id().value()))) return Result<std::size_t>::failure(Error::validation(datum_plane.id().value(), "workplane id must be unique within part document"));
+  datum_planes_.push_back(std::move(datum_plane));
+  return Result<std::size_t>::success(datum_planes_.size() - 1U);
+}
+
+Result<std::size_t> PartDocument::add_construction_point(ConstructionPoint point) {
+  if (has_construction_point_id(point.id())) return Result<std::size_t>::failure(Error::validation(point.id().value(), "construction point id must be unique within part document"));
+  for (const auto& parameter_id : point.parameter_dependencies()) if (!has_parameter_id(parameter_id)) return Result<std::size_t>::failure(Error::validation(point.id().value(), "construction point parameter dependency must exist in part document"));
+  if (point.relation().has_value()) { auto valid_relation = validate_relation_references(*this, point.relation().value(), point.id().value()); if (valid_relation.has_error()) return Result<std::size_t>::failure(valid_relation.error()); }
+  auto graph = dependency_graph_;
+  auto added_node = graph.add_node(point.id().value());
+  if (added_node.has_error()) return Result<std::size_t>::failure(added_node.error());
+  auto parameter_dependencies = add_parameter_dependencies(graph, point.parameter_dependencies(), point.id().value());
+  if (parameter_dependencies.has_error()) return Result<std::size_t>::failure(parameter_dependencies.error());
+  if (point.relation().has_value()) { auto relation_dependencies = add_relation_dependencies(graph, point.relation().value(), point.id().value()); if (relation_dependencies.has_error()) return Result<std::size_t>::failure(relation_dependencies.error()); }
+  auto invalidation_state = invalidation_state_;
+  auto synced = sync_graph(std::move(graph), invalidation_state, dependency_graph_);
+  if (synced.has_error()) return Result<std::size_t>::failure(synced.error());
+  invalidation_state_ = std::move(invalidation_state);
+  construction_points_.push_back(std::move(point));
+  return Result<std::size_t>::success(construction_points_.size() - 1U);
+}
+
+Result<std::size_t> PartDocument::add_construction_line(ConstructionLine line) {
+  if (has_construction_line_id(line.id())) return Result<std::size_t>::failure(Error::validation(line.id().value(), "construction line id must be unique within part document"));
+  for (const auto& parameter_id : line.parameter_dependencies()) if (!has_parameter_id(parameter_id)) return Result<std::size_t>::failure(Error::validation(line.id().value(), "construction line parameter dependency must exist in part document"));
+  if (line.kind() != ConstructionLineKind::Explicit) {
+    if (!line.relation().has_value()) return Result<std::size_t>::failure(Error::validation(line.id().value(), "relation-driven construction line must carry a relation"));
+    const ConstructionRelation& relation = line.relation().value();
+    const bool expected_relation = (line.kind() == ConstructionLineKind::ThroughTwoPoints && relation.type() == ConstructionRelationType::LineThroughTwoPoints) || (line.kind() == ConstructionLineKind::ParallelToLineThroughPoint && relation.type() == ConstructionRelationType::LineParallelToLineThroughPoint) || (line.kind() == ConstructionLineKind::ParallelToGeneratedEdgeThroughPoint && relation.type() == ConstructionRelationType::LineParallelToGeneratedEdgeThroughPoint);
+    if (!expected_relation) return Result<std::size_t>::failure(Error::validation(line.id().value(), "relation-driven construction line kind does not match relation type"));
+    auto valid_relation = validate_relation_references(*this, relation, line.id().value());
+    if (valid_relation.has_error()) return Result<std::size_t>::failure(valid_relation.error());
+  }
+  auto graph = dependency_graph_;
+  auto added_node = graph.add_node(line.id().value());
+  if (added_node.has_error()) return Result<std::size_t>::failure(added_node.error());
+  auto parameter_dependencies = add_parameter_dependencies(graph, line.parameter_dependencies(), line.id().value());
+  if (parameter_dependencies.has_error()) return Result<std::size_t>::failure(parameter_dependencies.error());
+  if (line.relation().has_value()) { auto relation_dependencies = add_relation_dependencies(graph, line.relation().value(), line.id().value()); if (relation_dependencies.has_error()) return Result<std::size_t>::failure(relation_dependencies.error()); }
+  auto invalidation_state = invalidation_state_;
+  auto synced = sync_graph(std::move(graph), invalidation_state, dependency_graph_);
+  if (synced.has_error()) return Result<std::size_t>::failure(synced.error());
+  invalidation_state_ = std::move(invalidation_state);
+  construction_lines_.push_back(std::move(line));
+  return Result<std::size_t>::success(construction_lines_.size() - 1U);
+}
+
+Result<std::size_t> PartDocument::add_construction_plane(ConstructionPlane plane) {
+  if (has_construction_plane_id(plane.id())) return Result<std::size_t>::failure(Error::validation(plane.id().value(), "construction plane id must be unique within part document"));
+  if (has_workplane_id(plane.workplane_id())) return Result<std::size_t>::failure(Error::validation(plane.id().value(), "workplane id must be unique within part document"));
+  for (const auto& parameter_id : plane.parameter_dependencies()) if (!has_parameter_id(parameter_id)) return Result<std::size_t>::failure(Error::validation(plane.id().value(), "construction plane parameter dependency must exist in part document"));
+  if (plane.kind() != ConstructionPlaneKind::Explicit) {
+    if (!plane.relation().has_value()) return Result<std::size_t>::failure(Error::validation(plane.id().value(), "relation-driven construction plane must carry a relation"));
+    const ConstructionRelation& relation = plane.relation().value();
+    const bool expected_relation = (plane.kind() == ConstructionPlaneKind::OffsetFromPlane && relation.type() == ConstructionRelationType::PlaneOffsetFromPlane) || (plane.kind() == ConstructionPlaneKind::ThroughThreePoints && relation.type() == ConstructionRelationType::PlaneThroughThreePoints) || (plane.kind() == ConstructionPlaneKind::ParallelToPlaneThroughPoint && relation.type() == ConstructionRelationType::PlaneParallelToPlaneThroughPoint);
+    if (!expected_relation) return Result<std::size_t>::failure(Error::validation(plane.id().value(), "relation-driven construction plane kind does not match relation type"));
+    auto valid_relation = validate_relation_references(*this, relation, plane.id().value());
+    if (valid_relation.has_error()) return Result<std::size_t>::failure(valid_relation.error());
+  }
+  auto graph = dependency_graph_;
+  auto added_node = graph.add_node(plane.id().value());
+  if (added_node.has_error()) return Result<std::size_t>::failure(added_node.error());
+  auto parameter_dependencies = add_parameter_dependencies(graph, plane.parameter_dependencies(), plane.id().value());
+  if (parameter_dependencies.has_error()) return Result<std::size_t>::failure(parameter_dependencies.error());
+  if (plane.relation().has_value()) { auto relation_dependencies = add_relation_dependencies(graph, plane.relation().value(), plane.id().value()); if (relation_dependencies.has_error()) return Result<std::size_t>::failure(relation_dependencies.error()); }
+  auto invalidation_state = invalidation_state_;
+  auto synced = sync_graph(std::move(graph), invalidation_state, dependency_graph_);
+  if (synced.has_error()) return Result<std::size_t>::failure(synced.error());
+  invalidation_state_ = std::move(invalidation_state);
+  construction_planes_.push_back(std::move(plane));
+  return Result<std::size_t>::success(construction_planes_.size() - 1U);
+}
+
+Result<std::size_t> PartDocument::add_derived_workplane(DerivedWorkplane workplane) {
+  if (has_workplane_id(workplane.id())) return Result<std::size_t>::failure(Error::validation(workplane.id().value(), "workplane id must be unique within part document"));
+  const Feature* source_feature = find_feature(workplane.face_reference().source_feature());
+  if (source_feature == nullptr) return Result<std::size_t>::failure(Error::validation(workplane.id().value(), "derived workplane source feature must exist in part document"));
+  if (source_feature->type() != FeatureType::AdditiveExtrude) return Result<std::size_t>::failure(Error::validation(workplane.id().value(), "derived workplane source feature must be an additive extrude"));
+  if (!is_supported_derived_face(workplane.face_reference().face())) return Result<std::size_t>::failure(Error::validation(workplane.id().value(), "only top, bottom, right, left, front, and back semantic faces are supported"));
+  auto graph = dependency_graph_;
+  auto added_node = graph.add_node(workplane.id().value());
+  if (added_node.has_error()) return Result<std::size_t>::failure(added_node.error());
+  auto source_dependency = add_dependency_if_missing(graph, workplane.face_reference().source_feature().value(), workplane.id().value());
+  if (source_dependency.has_error()) return Result<std::size_t>::failure(source_dependency.error());
+  auto invalidation_state = invalidation_state_;
+  auto synced = sync_graph(std::move(graph), invalidation_state, dependency_graph_);
+  if (synced.has_error()) return Result<std::size_t>::failure(synced.error());
+  invalidation_state_ = std::move(invalidation_state);
+  derived_workplanes_.push_back(std::move(workplane));
+  return Result<std::size_t>::success(derived_workplanes_.size() - 1U);
+}
+
+Result<std::size_t> PartDocument::add_sketch(Sketch sketch) {
+  if (has_sketch_id(sketch.id())) return Result<std::size_t>::failure(Error::validation(sketch.id().value(), "sketch id must be unique within part document"));
+  if (!has_workplane_id(sketch.workplane())) return Result<std::size_t>::failure(Error::validation(sketch.id().value(), "sketch workplane must exist in part document"));
+  auto valid_projected_references = validate_projected_sketch_references(*this, sketch);
+  if (valid_projected_references.has_error()) return Result<std::size_t>::failure(valid_projected_references.error());
+  auto valid_reference_generated_lines = validate_reference_generated_lines(sketch);
+  if (valid_reference_generated_lines.has_error()) return Result<std::size_t>::failure(valid_reference_generated_lines.error());
+  auto valid_dimensions = validate_driving_dimensions(*this, sketch);
+  if (valid_dimensions.has_error()) return Result<std::size_t>::failure(valid_dimensions.error());
+  for (const auto& profile : sketch.rectangle_profiles()) {
+    if (!has_parameter_id(profile.width_parameter())) return Result<std::size_t>::failure(Error::validation(profile.id().value(), "rectangle width parameter must exist in part document"));
+    if (!has_parameter_id(profile.height_parameter())) return Result<std::size_t>::failure(Error::validation(profile.id().value(), "rectangle height parameter must exist in part document"));
+  }
+  for (const auto& profile : sketch.circle_profiles()) if (!has_parameter_id(profile.diameter_parameter())) return Result<std::size_t>::failure(Error::validation(profile.id().value(), "circle diameter parameter must exist in part document"));
+  auto graph = dependency_graph_;
+  auto added_node = graph.add_node(sketch.id().value());
+  if (added_node.has_error()) return Result<std::size_t>::failure(added_node.error());
+  if (has_derived_workplane_id(sketch.workplane()) || has_construction_plane_id(ConstructionPlaneId(sketch.workplane().value()))) {
+    auto workplane_dependency = add_dependency_if_missing(graph, sketch.workplane().value(), sketch.id().value());
+    if (workplane_dependency.has_error()) return Result<std::size_t>::failure(workplane_dependency.error());
+  }
+  auto projected_reference_dependencies = add_projected_reference_dependencies(graph, sketch);
+  if (projected_reference_dependencies.has_error()) return Result<std::size_t>::failure(projected_reference_dependencies.error());
+  auto dimension_dependencies = add_driving_dimension_dependencies(graph, sketch);
+  if (dimension_dependencies.has_error()) return Result<std::size_t>::failure(dimension_dependencies.error());
+  for (const auto& profile : sketch.rectangle_profiles()) {
+    auto width_dependency = add_dependency_if_missing(graph, profile.width_parameter().value(), sketch.id().value());
+    if (width_dependency.has_error()) return Result<std::size_t>::failure(width_dependency.error());
+    auto height_dependency = add_dependency_if_missing(graph, profile.height_parameter().value(), sketch.id().value());
+    if (height_dependency.has_error()) return Result<std::size_t>::failure(height_dependency.error());
+  }
+  for (const auto& profile : sketch.circle_profiles()) {
+    auto diameter_dependency = add_dependency_if_missing(graph, profile.diameter_parameter().value(), sketch.id().value());
+    if (diameter_dependency.has_error()) return Result<std::size_t>::failure(diameter_dependency.error());
+  }
+  auto invalidation_state = invalidation_state_;
+  auto synced = sync_graph(std::move(graph), invalidation_state, dependency_graph_);
+  if (synced.has_error()) return Result<std::size_t>::failure(synced.error());
+  invalidation_state_ = std::move(invalidation_state);
+  sketches_.push_back(std::move(sketch));
+  return Result<std::size_t>::success(sketches_.size() - 1U);
+}
+
+Result<std::size_t> PartDocument::add_feature(Feature feature) {
+  if (has_feature_id(feature.id())) return Result<std::size_t>::failure(Error::validation(feature.id().value(), "feature id must be unique within part document"));
+  if (!has_sketch_id(feature.input_sketch())) return Result<std::size_t>::failure(Error::validation(feature.id().value(), "feature input sketch must exist in part document"));
+  if (feature.type() == FeatureType::AdditiveExtrude && !has_parameter_id(feature.length_parameter())) return Result<std::size_t>::failure(Error::validation(feature.id().value(), "additive extrude length parameter must exist in part document"));
+  if (feature.type() == FeatureType::SubtractiveExtrude && !has_feature_id(feature.target_feature())) return Result<std::size_t>::failure(Error::validation(feature.id().value(), "subtractive extrude target feature must exist in part document"));
+  auto graph = dependency_graph_;
+  auto added_node = graph.add_node(feature.id().value());
+  if (added_node.has_error()) return Result<std::size_t>::failure(added_node.error());
+  auto sketch_dependency = add_dependency_if_missing(graph, feature.input_sketch().value(), feature.id().value());
+  if (sketch_dependency.has_error()) return Result<std::size_t>::failure(sketch_dependency.error());
+  if (feature.type() == FeatureType::AdditiveExtrude) {
+    auto length_dependency = add_dependency_if_missing(graph, feature.length_parameter().value(), feature.id().value());
+    if (length_dependency.has_error()) return Result<std::size_t>::failure(length_dependency.error());
+  }
+  if (feature.type() == FeatureType::SubtractiveExtrude) {
+    auto target_dependency = add_dependency_if_missing(graph, feature.target_feature().value(), feature.id().value());
+    if (target_dependency.has_error()) return Result<std::size_t>::failure(target_dependency.error());
+  }
+  auto invalidation_state = invalidation_state_;
+  auto synced = sync_graph(std::move(graph), invalidation_state, dependency_graph_);
+  if (synced.has_error()) return Result<std::size_t>::failure(synced.error());
+  invalidation_state_ = std::move(invalidation_state);
+  features_.push_back(std::move(feature));
+  return Result<std::size_t>::success(features_.size() - 1U);
+}
+
+Result<std::size_t> PartDocument::add_reference_status(ReferenceStatusRecord status) {
+  if (has_reference_status_id(status.id())) return Result<std::size_t>::failure(Error::validation(status.id().value(), "reference status id must be unique within part document"));
+  if (status.status() == ReferenceStatusKind::Resolved) { auto valid_target = validate_semantic_reference_target(*this, status.target(), status.id().value()); if (valid_target.has_error()) return Result<std::size_t>::failure(valid_target.error()); }
+  auto graph = dependency_graph_;
+  auto added_node = graph.add_node(status.id().value());
+  if (added_node.has_error()) return Result<std::size_t>::failure(added_node.error());
+  if (find_feature(status.target().source_feature()) != nullptr) { auto dependency = add_dependency_if_missing(graph, status.target().source_feature().value(), status.id().value()); if (dependency.has_error()) return Result<std::size_t>::failure(dependency.error()); }
+  auto invalidation_state = invalidation_state_;
+  auto synced = sync_graph(std::move(graph), invalidation_state, dependency_graph_);
+  if (synced.has_error()) return Result<std::size_t>::failure(synced.error());
+  invalidation_state_ = std::move(invalidation_state);
+  reference_statuses_.push_back(std::move(status));
+  return Result<std::size_t>::success(reference_statuses_.size() - 1U);
+}
+
+Result<std::size_t> PartDocument::add_reference_remap(ReferenceRemapRecord remap) {
+  if (has_reference_remap_id(remap.id())) return Result<std::size_t>::failure(Error::validation(remap.id().value(), "reference remap id must be unique within part document"));
+  auto valid_replacement = validate_semantic_reference_target(*this, remap.replacement(), remap.id().value());
+  if (valid_replacement.has_error()) return Result<std::size_t>::failure(valid_replacement.error());
+  auto graph = dependency_graph_;
+  auto added_node = graph.add_node(remap.id().value());
+  if (added_node.has_error()) return Result<std::size_t>::failure(added_node.error());
+  auto replacement_dependency = add_dependency_if_missing(graph, remap.replacement().source_feature().value(), remap.id().value());
+  if (replacement_dependency.has_error()) return Result<std::size_t>::failure(replacement_dependency.error());
+  if (find_feature(remap.original().source_feature()) != nullptr) { auto original_dependency = add_dependency_if_missing(graph, remap.original().source_feature().value(), remap.id().value()); if (original_dependency.has_error()) return Result<std::size_t>::failure(original_dependency.error()); }
+  auto invalidation_state = invalidation_state_;
+  auto synced = sync_graph(std::move(graph), invalidation_state, dependency_graph_);
+  if (synced.has_error()) return Result<std::size_t>::failure(synced.error());
+  invalidation_state_ = std::move(invalidation_state);
+  reference_remaps_.push_back(std::move(remap));
+  return Result<std::size_t>::success(reference_remaps_.size() - 1U);
+}
+
+Result<std::size_t> PartDocument::add_sketch_origin_override(SketchOriginOverrideRecord origin_override) {
+  if (has_sketch_origin_override_id(origin_override.sketch())) return Result<std::size_t>::failure(Error::validation(origin_override.sketch().value(), "sketch origin override must be unique per sketch"));
+  if (find_sketch(origin_override.sketch()) == nullptr) return Result<std::size_t>::failure(Error::validation(origin_override.sketch().value(), "sketch origin override sketch must exist in part document"));
+  auto graph = dependency_graph_;
+  const std::string node_id = origin_override.sketch().value() + ".origin_override";
+  auto added_node = graph.add_node(node_id);
+  if (added_node.has_error()) return Result<std::size_t>::failure(added_node.error());
+  auto dependency = add_dependency_if_missing(graph, origin_override.sketch().value(), node_id);
+  if (dependency.has_error()) return Result<std::size_t>::failure(dependency.error());
+  auto invalidation_state = invalidation_state_;
+  auto synced = sync_graph(std::move(graph), invalidation_state, dependency_graph_);
+  if (synced.has_error()) return Result<std::size_t>::failure(synced.error());
+  invalidation_state_ = std::move(invalidation_state);
+  sketch_origin_overrides_.push_back(std::move(origin_override));
+  return Result<std::size_t>::success(sketch_origin_overrides_.size() - 1U);
+}
+
 Result<std::vector<std::string>> PartDocument::mark_parameter_changed(ParameterId id) { if (id.empty()) return Result<std::vector<std::string>>::failure(Error::validation("parameter", "parameter id must not be empty")); if (!has_parameter_id(id)) return Result<std::vector<std::string>>::failure(Error::validation(id.value(), "parameter must exist in part document")); return invalidation_state_.mark_changed(dependency_graph_, id.value()); }
 Result<std::vector<std::string>> PartDocument::set_parameter_value(ParameterId id, Quantity value) { if (id.empty()) return Result<std::vector<std::string>>::failure(Error::validation("parameter", "parameter id must not be empty")); const Parameter* existing = find_parameter(id); if (existing == nullptr) return Result<std::vector<std::string>>::failure(Error::validation(id.value(), "parameter must exist in part document")); auto updated = existing->with_value(value); if (updated.has_error()) return Result<std::vector<std::string>>::failure(updated.error()); for (auto& parameter : parameters_) if (parameter.id() == id) { parameter = std::move(updated.value()); break; } return invalidation_state_.mark_changed(dependency_graph_, id.value()); }
 Result<RecomputePlan> PartDocument::create_recompute_plan() const { return RecomputePlan::from_graph_and_invalidation_state(dependency_graph_, invalidation_state_); }
