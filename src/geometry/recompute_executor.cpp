@@ -200,6 +200,11 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_subtractive_extrude(
         feature->id().value(), "feature input sketch must exist in part document"));
   }
 
+  if (!has_exactly_one_circle_profile(*sketch) && !has_exactly_one_closed_profile(*sketch)) {
+    return Result<std::size_t>::failure(validation_error(
+        sketch->id().value(), "subtractive extrude requires exactly one circle or closed profile"));
+  }
+
   const GeometryShape* target = shape_cache.find_feature_shape(feature->target_feature());
   if (target == nullptr) {
     return Result<std::size_t>::failure(geometry_error(
@@ -236,25 +241,20 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_subtractive_extrude(
     return shape_cache.set_final_shape(feature->id(), std::move(shape.value()));
   }
 
-  if (has_exactly_one_closed_profile(*sketch)) {
-    const ClosedProfile& profile = sketch->closed_profiles().front();
-    auto vertices = evaluate_bounded_closed_profile_vertices(workplane_resolver_,
-                                                            resolved_workplane.value(), *sketch, profile);
-    if (vertices.has_error()) {
-      return Result<std::size_t>::failure(vertices.error());
-    }
-
-    auto shape = closed_profile_adapter_.cut_profile_through_all(
-        *target, vertices.value(), resolved_workplane.value().normal);
-    if (shape.has_error()) {
-      return Result<std::size_t>::failure(shape.error());
-    }
-
-    return shape_cache.set_final_shape(feature->id(), std::move(shape.value()));
+  const ClosedProfile& profile = sketch->closed_profiles().front();
+  auto vertices = evaluate_bounded_closed_profile_vertices(workplane_resolver_, resolved_workplane.value(),
+                                                          *sketch, profile);
+  if (vertices.has_error()) {
+    return Result<std::size_t>::failure(vertices.error());
   }
 
-  return Result<std::size_t>::failure(validation_error(
-      sketch->id().value(), "subtractive extrude requires exactly one circle or closed profile"));
+  auto shape = closed_profile_adapter_.cut_profile_through_all(
+      *target, vertices.value(), resolved_workplane.value().normal);
+  if (shape.has_error()) {
+    return Result<std::size_t>::failure(shape.error());
+  }
+
+  return shape_cache.set_final_shape(feature->id(), std::move(shape.value()));
 }
 
 Result<std::size_t> GeometryRecomputeExecutor::execute_feature(const PartDocument& document,
