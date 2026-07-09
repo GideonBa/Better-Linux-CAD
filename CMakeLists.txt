@@ -23,7 +23,7 @@ if(BLCAD_BUILD_GEOMETRY)
 endif()
 
 if(BLCAD_BUILD_GUI)
-  find_package(Qt6 COMPONENTS Widgets OpenGLWidgets REQUIRED)
+  find_package(Qt6 COMPONENTS Widgets REQUIRED)
 endif()
 
 add_library(
@@ -135,6 +135,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/parameter_tests.cpp
     tests/core/quantity_tests.cpp
     tests/core/recompute_plan_tests.cpp
+    tests/core/semantic_reference_invalidation_tests.cpp
     tests/core/sketch_tests.cpp
   )
 
@@ -161,6 +162,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/rectangle_extrusion_adapter_tests.cpp
       tests/geometry/reference_part_pipeline_tests.cpp
       tests/geometry/right_workplane_pipeline_tests.cpp
+      tests/geometry/semantic_reference_evaluator_tests.cpp
       tests/geometry/shape_cache_tests.cpp
       tests/geometry/step_exporter_tests.cpp
       tests/geometry/workplane_resolver_tests.cpp
