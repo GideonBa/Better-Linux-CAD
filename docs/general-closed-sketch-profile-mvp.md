@@ -41,6 +41,8 @@ The following are not implemented yet:
 - additive extrude from arbitrary `TopoDS_Wire` / `TopoDS_Face`
 - subtractive extrude from arbitrary `TopoDS_Wire` / `TopoDS_Face`
 
+Advanced 3D sketch curves, guide splines, sweep, loft, boundary surfaces, and closed-surface-to-solid workflows are intentionally tracked in `docs/advanced-surfacing-and-3d-sketch-mvp.md` rather than inside this first planar closed-profile MVP.
+
 ## Goal
 
 The future goal is to support arbitrary closed sketch profiles as feature input, while still keeping model intent in the core and OCCT geometry in the geometry layer.
@@ -123,6 +125,8 @@ Out of scope for the first closed-profile MVP:
 - offset profiles
 - sketch trimming UI
 - arbitrary non-planar sketch geometry
+- 3D sketch splines connecting points from sketches on different planes
+- loft, sweep, boundary surface, surface stitching, or closed-shell-to-solid features
 - GUI sketch editing
 
 ## Relationship to current MVP 2
@@ -141,3 +145,10 @@ back
 The closed-profile work should come after that controlled workplane sequence, because arbitrary profiles still need reliable workplane placement, bounds handling, JSON persistence, recompute ordering, and STEP export.
 
 The closed-profile MVP should not replace the current rectangle and circle primitives immediately. Rectangle and circle can remain fast-path primitives while general closed profiles are added as a broader feature path.
+
+This planar block remains separate from the later advanced surfacing block:
+
+```text
+Planar closed profiles answer: how does a single sketch define a closed 2D area?
+Advanced surfacing answers: how do spatial curves, multiple sketches, guide curves, and surfaces define freeform geometry?
+```
