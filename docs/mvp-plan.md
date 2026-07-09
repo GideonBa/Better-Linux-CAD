@@ -68,51 +68,48 @@ Implemented seed:
 - stale dirty feature shapes are removed before incremental recompute
 - shrinking the source rectangle can invalidate an existing top-face hole
 
-Next narrow step:
+Next narrow step after MVP 2 has been completed: move to the line-based closed-profile sketch block below while keeping the controlled six-face seed stable.
 
-- do not add arbitrary generated-face topology immediately
-- keep the controlled six-face seed stable while moving to the next sketch-modeling block
-- start the general closed sketch profile MVP documented below
+## Implemented block: Line-based general closed sketch profiles
 
-## Future MVP: General closed sketch profiles
-
-Goal: support arbitrary closed sketch profiles instead of only rectangle and circle profile primitives.
+Goal: support a first general closed-profile path instead of only rectangle and circle profile primitives.
 
 Detailed document: `docs/general-closed-sketch-profile-mvp.md`
 
-Explicitly not implemented yet:
+Implemented scope:
 
-- free line chains
-- polylines
+- `SketchEntityId`
+- `LineSegment`
+- `ClosedProfile`
+- ordered line-segment references
+- validation of closed and connected line loops
+- rejection of duplicate line references inside one profile
+- rejection of self-intersecting loops
+- JSON serialization and roundtrip tests for `line_segments` and `closed_profiles`
+- OCCT wire and face creation from ordered line vertices
+- additive extrude from one closed profile
+- subtractive through-all extrude from one closed profile
+- geometry tests for a non-rectangular triangle prism
+- geometry tests for a non-circular triangle cut
+- checked-in `examples/triangle_prism.blcad.json`
+- checked-in `examples/triangle_cut_plate.blcad.json`
+
+Still not implemented in this block:
+
 - arcs
 - splines
-- connected sketch entities
-- general closed sketch loops
-- closed wires
-- multiple contours in one sketch
-- inner holes in the same sketch profile
-- profile selection from several closed regions
-- validation of closed loops and self-intersections
-- general OCCT face creation from arbitrary sketch wires
-- additive extrude from arbitrary `TopoDS_Wire` / `TopoDS_Face`
-- subtractive extrude from arbitrary `TopoDS_Wire` / `TopoDS_Face`
+- trimmed curves
+- automatic region detection from unordered curves
+- multiple contours in one feature
+- inner holes in the same profile
+- full sketch constraint solver
+- GUI sketch editing
 
-Proposed first implementation sequence:
+This block proves what shape a single planar sketch can describe. It does not yet solve arbitrary sketch placement; that is the construction-geometry block below.
 
-- add `LineSegment`
-- add `SketchLoop` / `ClosedProfile`
-- validate closed and connected loops
-- reject self-intersections initially
-- create an OCCT `TopoDS_Wire` and `TopoDS_Face` in the geometry layer
-- support additive extrude for one closed profile
-- support subtractive through-all extrude for one closed profile
-- add JSON roundtrip and geometry tests for non-rectangular profiles
+## Next MVP: Construction geometry and relation-driven datum system
 
-This block comes after the controlled semantic-face workplane sequence, because arbitrary profiles still need reliable workplane placement, bounds handling, JSON persistence, recompute ordering, and STEP export.
-
-## Future MVP: Construction geometry and relation-driven datum system
-
-Goal: support user-created construction planes, construction lines/axes, and construction points that can be placed freely in 3D and can also be defined through geometric relationships.
+Goal: support user-created construction planes, construction lines/axes, and construction points that can be placed freely in 3D and can later be defined through geometric relationships.
 
 Detailed document: `docs/construction-geometry-mvp.md`
 
@@ -137,9 +134,10 @@ Proposed first implementation sequence:
 - add JSON roundtrip tests
 - resolve construction planes into `ResolvedWorkplane` frames in the geometry layer
 - add recompute tests for a feature driven by a sketch on a construction plane
-- add relation models for offset plane, line through two points, plane through three points, parallel, orthogonal, and angle-based construction
+- add validation for invalid construction geometry
+- defer parallel, orthogonal, angle, offset, and surface-reference relations until the explicit placement path is stable
 
-This block answers where a sketch can live. The general closed sketch profile block answers what shape a sketch can describe. They should remain separate, testable increments.
+This block answers where a sketch can live. The line-based closed sketch profile block answers what planar shape a sketch can describe. They should remain separate, testable increments.
 
 ## Future MVP: Advanced surfacing and 3D sketching
 
