@@ -1,8 +1,8 @@
-# MVP 2 Workplane Resolver
+# Workplane Resolver
 
-Status: geometry-layer resolver for derived top, bottom, right, left, front, and back workplanes of a simple additive extrude, including rectangular bounds.
+Status: geometry-layer resolver for standard datum planes, derived top/bottom/right/left/front/back workplanes of a simple additive extrude, and explicit construction planes.
 
-This document describes the resolver after introducing `SemanticFaceReference` and `DerivedWorkplane` in the core model. The core still stores semantic model intent only. The geometry layer resolves that semantic workplane into a concrete frame for recompute.
+This document describes the resolver after introducing `SemanticFaceReference`, `DerivedWorkplane`, and explicit `ConstructionPlane` in the core model. The core still stores semantic model intent only. The geometry layer resolves that intent into concrete frames for recompute.
 
 ## Goal
 
@@ -15,11 +15,29 @@ feature.base_extrude.back
   -> global cut center
 ```
 
-The resolver proves that sketches on generated planar faces can be evaluated without storing raw OCCT face IDs in `PartDocument`.
+and:
+
+```text
+construction_plane.offset_xy
+  -> sketch.closed_rectangle_on_plane local point
+  -> global profile vertex
+```
+
+The resolver proves that sketches on generated planar faces and user-created construction planes can be evaluated without storing raw OCCT face IDs in `PartDocument`.
 
 ## Supported workplanes
 
 For `datum.xy`, the resolver returns the stored datum-plane frame and leaves bounds disabled.
+
+For an explicit construction plane, the resolver returns the construction plane frame directly and leaves bounds disabled:
+
+```text
+origin = construction_plane.origin
+x_axis = construction_plane.x_axis
+y_axis = construction_plane.y_axis
+normal = construction_plane.normal
+bounds.enabled = false
+```
 
 For `workplane.base_top -> feature.base_extrude.top`, the frame is:
 
@@ -75,7 +93,7 @@ y_axis = (0, 0, 1)
 normal = (0, -1, 0)
 ```
 
-Side faces use right-handed local frames:
+Side faces and construction planes use right-handed local frames:
 
 ```text
 x_axis cross y_axis = normal
@@ -104,11 +122,19 @@ bounds.width_mm = source rectangle width
 bounds.height_mm = extrude thickness
 ```
 
+Explicit construction planes are unbounded in the first implementation:
+
+```text
+bounds.enabled = false
+```
+
 ## Recompute integration
 
 `GeometryRecomputeExecutor::execute_subtractive_extrude` resolves the input sketch workplane before executing the circular cut. Before mapping the point into global coordinates, the executor validates the circle radius against rectangular bounds when bounds are enabled.
 
-Then the point is mapped into global coordinates:
+Line-based closed-profile geometry also resolves the input sketch workplane before converting local vertices into global points. If the workplane has bounds, closed-profile vertices are validated against those bounds. If the workplane is an explicit construction plane, bounds are disabled and the profile is mapped through the construction plane frame.
+
+The mapping formula is:
 
 ```text
 global = origin + local.x * x_axis + local.y * y_axis
@@ -120,7 +146,13 @@ For `workplane.base_back` and local `(-12, 1.5)`, this becomes:
 global = (-12, -40, 5.5)
 ```
 
-`GeometryRecomputeExecutor` passes the resolved workplane normal to the circular cut adapter. Top and bottom use Z-axis cuts. Right and left use X-axis cuts. Front and back use Y-axis cuts.
+For `construction_plane.offset_xy` with origin `(0, 0, 25)` and local `(2, 3)`, this becomes:
+
+```text
+global = (2, 3, 25)
+```
+
+`GeometryRecomputeExecutor` passes the resolved workplane normal to circular cuts and closed-profile extrudes/cuts. Top and bottom use Z-axis cuts. Right and left use X-axis cuts. Front and back use Y-axis cuts. Explicit construction planes use their stored normal.
 
 ## Example models
 
@@ -131,6 +163,7 @@ examples/right_face_cut.blcad.json
 examples/left_face_cut.blcad.json
 examples/front_face_cut.blcad.json
 examples/back_face_cut.blcad.json
+examples/construction_plane_prism.blcad.json
 ```
 
 Export commands:
@@ -142,6 +175,7 @@ Export commands:
 ./build/dev-geometry/blcad_export_step examples/left_face_cut.blcad.json build/left_face_cut.step
 ./build/dev-geometry/blcad_export_step examples/front_face_cut.blcad.json build/front_face_cut.step
 ./build/dev-geometry/blcad_export_step examples/back_face_cut.blcad.json build/back_face_cut.step
+./build/dev-geometry/blcad_export_step examples/construction_plane_prism.blcad.json build/construction_plane_prism.step
 ```
 
 ## Test coverage
@@ -155,24 +189,28 @@ Geometry tests cover:
 - resolving `workplane.base_left`
 - resolving `workplane.base_front`
 - resolving `workplane.base_back`
+- resolving explicit construction planes
 - checking top/bottom/side origins and normals
+- checking construction plane origins, axes, normals, and unbounded status
 - checking rectangular bounds for resolved generated-face workplanes
 - mapping local sketch points through resolved frames
 - rejecting missing workplanes
 - recomputing circular cuts from sketches on top, bottom, right, left, front, and back derived workplanes
+- recomputing a closed profile from a sketch on an explicit construction plane
 - accepting valid circles inside bounds
 - rejecting out-of-bounds circles before executing the cut
-- verifying that the final volume matches the expected removed cylinder volume within tolerance
+- verifying that final volumes match expected values within tolerance
 
 ## Deliberate limitation
 
 Not included yet:
 
-- arbitrary planar faces
+- arbitrary generated planar faces
+- relation-driven construction planes
 - face orientation derived from OCCT topology
-- non-rectangular source faces
+- non-rectangular source faces for derived generated-face workplanes
 - storing or matching raw OCCT face IDs
 - GUI face selection
-- general closed sketch profiles
+- 3D sketch workplanes or spatial curve frames
 
-The resolver is intentionally limited to selected semantic faces of a simple additive rectangle extrusion. This keeps MVP 2 incremental and avoids prematurely building a full topological-naming system.
+The resolver is intentionally limited to selected semantic faces of a simple additive rectangle extrusion and explicit construction planes. This keeps the workplane system incremental and avoids prematurely building a full topological-naming system or construction-geometry solver.
