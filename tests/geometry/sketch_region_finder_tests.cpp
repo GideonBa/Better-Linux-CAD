@@ -129,7 +129,7 @@ TEST_CASE("SketchRegionFinder rejects branched regions", "[geometry][sketch-regi
   const SketchRegionFinder finder;
   auto region = finder.find_single_region(document.value(), *stored);
   REQUIRE_FALSE(region);
-  CHECK(region.error().message() == "automatic region detection supports one simple single-contour loop only");
+  CHECK(region.error().message() == "automatic region detection rejects gaps and branched regions");
 }
 
 TEST_CASE("Geometry recomputes additive extrude from detected sketch region",
