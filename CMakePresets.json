@@ -36,33 +36,38 @@
     }
   ],
   "buildPresets": [
-    {
-      "name": "dev",
-      "configurePreset": "dev"
-    },
-    {
-      "name": "dev-geometry",
-      "configurePreset": "dev-geometry"
-    },
-    {
-      "name": "release",
-      "configurePreset": "release"
-    }
+    {"name": "dev", "configurePreset": "dev"},
+    {"name": "dev-geometry", "configurePreset": "dev-geometry"},
+    {"name": "release", "configurePreset": "release"}
   ],
   "testPresets": [
     {
       "name": "dev",
       "configurePreset": "dev",
-      "output": {
-        "outputOnFailure": true
-      }
+      "output": {"outputOnFailure": true}
     },
     {
       "name": "dev-geometry",
       "configurePreset": "dev-geometry",
-      "output": {
-        "outputOnFailure": true
-      }
+      "output": {"outputOnFailure": true}
+    }
+  ],
+  "workflowPresets": [
+    {
+      "name": "dev-build-test",
+      "steps": [
+        {"type": "configure", "name": "dev"},
+        {"type": "build", "name": "dev"},
+        {"type": "test", "name": "dev"}
+      ]
+    },
+    {
+      "name": "dev-geometry-build-test",
+      "steps": [
+        {"type": "configure", "name": "dev-geometry"},
+        {"type": "build", "name": "dev-geometry"},
+        {"type": "test", "name": "dev-geometry"}
+      ]
     }
   ]
 }
