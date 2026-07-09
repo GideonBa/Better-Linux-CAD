@@ -49,14 +49,41 @@ constexpr double k_tolerance = 1.0e-9;
          (first == 0U && second + 1U == count) || (second == 0U && first + 1U == count);
 }
 
+[[nodiscard]] Result<SketchReferenceTarget> create_target(SketchReferenceTargetKind kind,
+                                                          SketchEntityId entity,
+                                                          std::string_view object_kind) {
+  const auto object_id = entity.empty() ? std::string(object_kind) : entity.value();
+  if (entity.empty()) {
+    return Result<SketchReferenceTarget>::failure(
+        Error::validation(object_id, std::string(object_kind) + " entity id must not be empty"));
+  }
+
+  return Result<SketchReferenceTarget>::success(SketchReferenceTarget(kind, std::move(entity)));
+}
+
+[[nodiscard]] bool is_endpoint_target(SketchReferenceTargetKind kind) noexcept {
+  return kind == SketchReferenceTargetKind::LineSegmentStart ||
+         kind == SketchReferenceTargetKind::LineSegmentEnd;
+}
+
+[[nodiscard]] bool is_line_target(SketchReferenceTargetKind kind) noexcept {
+  return kind == SketchReferenceTargetKind::LineSegment;
+}
+
+[[nodiscard]] bool is_projected_point_target(SketchReferenceTargetKind kind) noexcept {
+  return kind == SketchReferenceTargetKind::ProjectedPoint;
+}
+
+[[nodiscard]] bool is_projected_line_target(SketchReferenceTargetKind kind) noexcept {
+  return kind == SketchReferenceTargetKind::ProjectedLine;
+}
+
 } // namespace
 
 std::string_view to_string(ProjectedSketchPointSource source) noexcept {
   switch (source) {
-  case ProjectedSketchPointSource::ConstructionPoint:
-    return "construction_point";
-  case ProjectedSketchPointSource::SemanticVertex:
-    return "semantic_vertex";
+  case ProjectedSketchPointSource::ConstructionPoint: return "construction_point";
+  case ProjectedSketchPointSource::SemanticVertex: return "semantic_vertex";
   }
 
   return "unknown";
@@ -64,14 +91,160 @@ std::string_view to_string(ProjectedSketchPointSource source) noexcept {
 
 std::string_view to_string(ProjectedSketchLineSource source) noexcept {
   switch (source) {
-  case ProjectedSketchLineSource::ConstructionLine:
-    return "construction_line";
-  case ProjectedSketchLineSource::SemanticEdge:
-    return "semantic_edge";
+  case ProjectedSketchLineSource::ConstructionLine: return "construction_line";
+  case ProjectedSketchLineSource::SemanticEdge: return "semantic_edge";
   }
 
   return "unknown";
 }
+
+std::string_view to_string(SketchReferenceTargetKind kind) noexcept {
+  switch (kind) {
+  case SketchReferenceTargetKind::LineSegment: return "line_segment";
+  case SketchReferenceTargetKind::LineSegmentStart: return "line_segment_start";
+  case SketchReferenceTargetKind::LineSegmentEnd: return "line_segment_end";
+  case SketchReferenceTargetKind::ProjectedPoint: return "projected_point";
+  case SketchReferenceTargetKind::ProjectedLine: return "projected_line";
+  }
+
+  return "unknown";
+}
+
+std::string_view to_string(SketchConstraintKind kind) noexcept {
+  switch (kind) {
+  case SketchConstraintKind::CoincidentToProjectedPoint:
+    return "coincident_to_projected_point";
+  case SketchConstraintKind::ParallelToProjectedLine:
+    return "parallel_to_projected_line";
+  case SketchConstraintKind::CollinearWithProjectedLine:
+    return "collinear_with_projected_line";
+  }
+
+  return "unknown";
+}
+
+Result<SketchReferenceTarget> SketchReferenceTarget::create_line_segment(SketchEntityId entity) {
+  return create_target(SketchReferenceTargetKind::LineSegment, std::move(entity),
+                       "line segment reference target");
+}
+
+Result<SketchReferenceTarget>
+SketchReferenceTarget::create_line_segment_start(SketchEntityId entity) {
+  return create_target(SketchReferenceTargetKind::LineSegmentStart, std::move(entity),
+                       "line segment start reference target");
+}
+
+Result<SketchReferenceTarget> SketchReferenceTarget::create_line_segment_end(SketchEntityId entity) {
+  return create_target(SketchReferenceTargetKind::LineSegmentEnd, std::move(entity),
+                       "line segment end reference target");
+}
+
+Result<SketchReferenceTarget> SketchReferenceTarget::create_projected_point(SketchEntityId entity) {
+  return create_target(SketchReferenceTargetKind::ProjectedPoint, std::move(entity),
+                       "projected point reference target");
+}
+
+Result<SketchReferenceTarget> SketchReferenceTarget::create_projected_line(SketchEntityId entity) {
+  return create_target(SketchReferenceTargetKind::ProjectedLine, std::move(entity),
+                       "projected line reference target");
+}
+
+SketchReferenceTargetKind SketchReferenceTarget::kind() const noexcept {
+  return kind_;
+}
+
+const SketchEntityId& SketchReferenceTarget::entity() const noexcept {
+  return entity_;
+}
+
+SketchReferenceTarget::SketchReferenceTarget(SketchReferenceTargetKind kind, SketchEntityId entity)
+    : kind_(kind), entity_(std::move(entity)) {}
+
+Result<SketchConstraint> SketchConstraint::create_coincident_to_projected_point(
+    SketchConstraintId id, SketchReferenceTarget constrained_point,
+    SketchReferenceTarget projected_point) {
+  const auto object_id = id.empty() ? std::string("sketch_constraint") : id.value();
+  if (id.empty()) {
+    return Result<SketchConstraint>::failure(
+        Error::validation(object_id, "sketch constraint id must not be empty"));
+  }
+  if (!is_endpoint_target(constrained_point.kind())) {
+    return Result<SketchConstraint>::failure(Error::validation(
+        object_id, "coincident projected-point constraint requires a line endpoint target"));
+  }
+  if (!is_projected_point_target(projected_point.kind())) {
+    return Result<SketchConstraint>::failure(Error::validation(
+        object_id, "coincident projected-point constraint requires a projected point reference"));
+  }
+
+  return Result<SketchConstraint>::success(SketchConstraint(
+      std::move(id), SketchConstraintKind::CoincidentToProjectedPoint,
+      std::move(constrained_point), std::move(projected_point)));
+}
+
+Result<SketchConstraint> SketchConstraint::create_parallel_to_projected_line(
+    SketchConstraintId id, SketchReferenceTarget constrained_line, SketchReferenceTarget projected_line) {
+  const auto object_id = id.empty() ? std::string("sketch_constraint") : id.value();
+  if (id.empty()) {
+    return Result<SketchConstraint>::failure(
+        Error::validation(object_id, "sketch constraint id must not be empty"));
+  }
+  if (!is_line_target(constrained_line.kind())) {
+    return Result<SketchConstraint>::failure(Error::validation(
+        object_id, "parallel projected-line constraint requires a line segment target"));
+  }
+  if (!is_projected_line_target(projected_line.kind())) {
+    return Result<SketchConstraint>::failure(Error::validation(
+        object_id, "parallel projected-line constraint requires a projected line reference"));
+  }
+
+  return Result<SketchConstraint>::success(SketchConstraint(
+      std::move(id), SketchConstraintKind::ParallelToProjectedLine, std::move(constrained_line),
+      std::move(projected_line)));
+}
+
+Result<SketchConstraint> SketchConstraint::create_collinear_with_projected_line(
+    SketchConstraintId id, SketchReferenceTarget constrained_line, SketchReferenceTarget projected_line) {
+  const auto object_id = id.empty() ? std::string("sketch_constraint") : id.value();
+  if (id.empty()) {
+    return Result<SketchConstraint>::failure(
+        Error::validation(object_id, "sketch constraint id must not be empty"));
+  }
+  if (!is_line_target(constrained_line.kind())) {
+    return Result<SketchConstraint>::failure(Error::validation(
+        object_id, "collinear projected-line constraint requires a line segment target"));
+  }
+  if (!is_projected_line_target(projected_line.kind())) {
+    return Result<SketchConstraint>::failure(Error::validation(
+        object_id, "collinear projected-line constraint requires a projected line reference"));
+  }
+
+  return Result<SketchConstraint>::success(SketchConstraint(
+      std::move(id), SketchConstraintKind::CollinearWithProjectedLine, std::move(constrained_line),
+      std::move(projected_line)));
+}
+
+const SketchConstraintId& SketchConstraint::id() const noexcept {
+  return id_;
+}
+
+SketchConstraintKind SketchConstraint::kind() const noexcept {
+  return kind_;
+}
+
+const SketchReferenceTarget& SketchConstraint::constrained_target() const noexcept {
+  return constrained_target_;
+}
+
+const SketchReferenceTarget& SketchConstraint::reference_target() const noexcept {
+  return reference_target_;
+}
+
+SketchConstraint::SketchConstraint(SketchConstraintId id, SketchConstraintKind kind,
+                                   SketchReferenceTarget constrained_target,
+                                   SketchReferenceTarget reference_target)
+    : id_(std::move(id)), kind_(kind), constrained_target_(std::move(constrained_target)),
+      reference_target_(std::move(reference_target)) {}
 
 Result<ProjectedSketchPoint>
 ProjectedSketchPoint::create_from_construction_point(SketchEntityId id, ConstructionPointId point) {
@@ -398,6 +571,28 @@ Result<std::size_t> Sketch::add_reference(ProjectedSketchLine line_reference) {
   return Result<std::size_t>::success(projected_lines_.size() - 1U);
 }
 
+Result<std::size_t> Sketch::add_constraint(SketchConstraint constraint) {
+  if (has_constraint_id(constraint.id())) {
+    return Result<std::size_t>::failure(Error::validation(
+        constraint.id().value(), "sketch constraint id must be unique within sketch"));
+  }
+
+  auto constrained_target = validate_constraint_target(constraint.constrained_target(),
+                                                       constraint.id().value());
+  if (constrained_target.has_error()) {
+    return Result<std::size_t>::failure(constrained_target.error());
+  }
+
+  auto reference_target = validate_constraint_target(constraint.reference_target(),
+                                                     constraint.id().value());
+  if (reference_target.has_error()) {
+    return Result<std::size_t>::failure(reference_target.error());
+  }
+
+  constraints_.push_back(std::move(constraint));
+  return Result<std::size_t>::success(constraints_.size() - 1U);
+}
+
 Result<std::size_t> Sketch::add_profile(RectangleProfile profile) {
   if (has_profile_id(profile.id())) {
     return Result<std::size_t>::failure(
@@ -457,6 +652,10 @@ const std::vector<ProjectedSketchLine>& Sketch::projected_lines() const noexcept
   return projected_lines_;
 }
 
+const std::vector<SketchConstraint>& Sketch::constraints() const noexcept {
+  return constraints_;
+}
+
 const std::vector<RectangleProfile>& Sketch::rectangle_profiles() const noexcept {
   return rectangle_profiles_;
 }
@@ -497,6 +696,16 @@ const ProjectedSketchLine* Sketch::find_projected_line(SketchEntityId id) const 
   for (const auto& line : projected_lines_) {
     if (line.id() == id) {
       return &line;
+    }
+  }
+
+  return nullptr;
+}
+
+const SketchConstraint* Sketch::find_constraint(SketchConstraintId id) const noexcept {
+  for (const auto& constraint : constraints_) {
+    if (constraint.id() == id) {
+      return &constraint;
     }
   }
 
@@ -545,9 +754,41 @@ bool Sketch::has_entity_id(const SketchEntityId& id) const noexcept {
          find_projected_line(id) != nullptr;
 }
 
+bool Sketch::has_constraint_id(const SketchConstraintId& id) const noexcept {
+  return find_constraint(id) != nullptr;
+}
+
 bool Sketch::has_profile_id(const ProfileId& id) const noexcept {
   return find_rectangle_profile(id) != nullptr || find_circle_profile(id) != nullptr ||
          find_closed_profile(id) != nullptr;
+}
+
+Result<std::size_t> Sketch::validate_constraint_target(const SketchReferenceTarget& target,
+                                                       const std::string& object_id) const {
+  switch (target.kind()) {
+  case SketchReferenceTargetKind::LineSegment:
+  case SketchReferenceTargetKind::LineSegmentStart:
+  case SketchReferenceTargetKind::LineSegmentEnd:
+    if (find_line_segment(target.entity()) == nullptr) {
+      return Result<std::size_t>::failure(
+          Error::validation(object_id, "sketch constraint line segment target must exist"));
+    }
+    break;
+  case SketchReferenceTargetKind::ProjectedPoint:
+    if (find_projected_point(target.entity()) == nullptr) {
+      return Result<std::size_t>::failure(
+          Error::validation(object_id, "sketch constraint projected point target must exist"));
+    }
+    break;
+  case SketchReferenceTargetKind::ProjectedLine:
+    if (find_projected_line(target.entity()) == nullptr) {
+      return Result<std::size_t>::failure(
+          Error::validation(object_id, "sketch constraint projected line target must exist"));
+    }
+    break;
+  }
+
+  return Result<std::size_t>::success(0);
 }
 
 Result<std::vector<Point2>> Sketch::validate_closed_profile(const ClosedProfile& profile) const {
