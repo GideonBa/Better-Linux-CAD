@@ -67,6 +67,7 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/rectangle_extrusion_adapter.cpp
     src/geometry/semantic_reference_evaluator.cpp
     src/geometry/shape_cache.cpp
+    src/geometry/sketch_reference_projector.cpp
     src/geometry/step_exporter.cpp
     src/geometry/workplane_resolver.cpp
   )
@@ -134,6 +135,8 @@ if(BLCAD_BUILD_TESTS)
     tests/core/part_document_json_workplane_tests.cpp
     tests/core/part_document_tests.cpp
     tests/core/parameter_tests.cpp
+    tests/core/projected_sketch_reference_json_tests.cpp
+    tests/core/projected_sketch_reference_tests.cpp
     tests/core/quantity_tests.cpp
     tests/core/recompute_plan_tests.cpp
     tests/core/semantic_reference_invalidation_tests.cpp
@@ -166,6 +169,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/right_workplane_pipeline_tests.cpp
       tests/geometry/semantic_reference_evaluator_tests.cpp
       tests/geometry/shape_cache_tests.cpp
+      tests/geometry/sketch_reference_projector_tests.cpp
       tests/geometry/step_exporter_tests.cpp
       tests/geometry/workplane_resolver_tests.cpp
     )
