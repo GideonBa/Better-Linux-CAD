@@ -1,5 +1,7 @@
 #include "blcad/geometry/recompute_executor.hpp"
 
+#include "blcad/geometry/reference_generated_profile_resolver.hpp"
+
 #include <string>
 #include <utility>
 #include <vector>
@@ -43,10 +45,31 @@ namespace {
   return Result<Point3>::success(resolver.evaluate_point(workplane, circle.center()));
 }
 
+[[nodiscard]] bool closed_profile_uses_reference_generated_lines(const Sketch& sketch,
+                                                                 const ClosedProfile& profile) noexcept {
+  for (const auto& id : profile.line_segments()) {
+    if (sketch.find_reference_generated_line(id) != nullptr) {
+      return true;
+    }
+  }
+  return false;
+}
+
+[[nodiscard]] Result<std::vector<Point2>> evaluate_closed_profile_local_vertices(
+    const PartDocument& document, const Sketch& sketch, const ClosedProfile& profile) {
+  if (!closed_profile_uses_reference_generated_lines(sketch, profile)) {
+    return sketch.closed_profile_vertices(profile);
+  }
+
+  ReferenceGeneratedProfileResolver resolver;
+  return resolver.resolve_closed_profile_vertices(document, sketch, profile,
+                                                  sketch.reference_generated_lines());
+}
+
 [[nodiscard]] Result<std::vector<Point3>> evaluate_bounded_closed_profile_vertices(
-    const WorkplaneResolver& resolver, const ResolvedWorkplane& workplane, const Sketch& sketch,
-    const ClosedProfile& profile) {
-  auto local_vertices = sketch.closed_profile_vertices(profile);
+    const PartDocument& document, const WorkplaneResolver& resolver, const ResolvedWorkplane& workplane,
+    const Sketch& sketch, const ClosedProfile& profile) {
+  auto local_vertices = evaluate_closed_profile_local_vertices(document, sketch, profile);
   if (local_vertices.has_error()) {
     return Result<std::vector<Point3>>::failure(local_vertices.error());
   }
@@ -157,7 +180,7 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_additive_extrude(
     }
 
     const ClosedProfile& profile = sketch->closed_profiles().front();
-    auto vertices = evaluate_bounded_closed_profile_vertices(workplane_resolver_,
+    auto vertices = evaluate_bounded_closed_profile_vertices(document, workplane_resolver_,
                                                             resolved_workplane.value(), *sketch, profile);
     if (vertices.has_error()) {
       return Result<std::size_t>::failure(vertices.error());
@@ -242,8 +265,8 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_subtractive_extrude(
   }
 
   const ClosedProfile& profile = sketch->closed_profiles().front();
-  auto vertices = evaluate_bounded_closed_profile_vertices(workplane_resolver_, resolved_workplane.value(),
-                                                          *sketch, profile);
+  auto vertices = evaluate_bounded_closed_profile_vertices(document, workplane_resolver_,
+                                                          resolved_workplane.value(), *sketch, profile);
   if (vertices.has_error()) {
     return Result<std::size_t>::failure(vertices.error());
   }
