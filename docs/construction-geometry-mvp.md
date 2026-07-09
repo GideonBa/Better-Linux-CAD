@@ -1,8 +1,8 @@
 # Construction Geometry MVP
 
-Status: explicit construction geometry, relation-driven construction geometry, semantic generated edge/vertex references, and the first chained construction relations are implemented in the headless core.
+Status: explicit construction geometry, relation-driven construction geometry, semantic generated edge/vertex references, evaluated rectangular-extrude edge/vertex references, deterministic construction-point evaluation, deterministic construction-line evaluation, and the first chained construction relations are implemented in the headless core/geometry layers.
 
-This document records the construction-geometry layer for BLCAD. The implementation supports explicit construction points, explicit construction lines, explicit construction planes, relation-driven construction lines and planes, and semantic references to generated edges and vertices. These references are saved as model intent by source feature plus semantic enum, not as raw OCCT topology handles.
+This document records the construction-geometry layer for BLCAD. The implementation supports explicit construction points, lines, and planes; relation-driven construction points, lines, and planes; and semantic references to generated edges and vertices. Semantic generated references are saved as model intent by source feature plus semantic enum, not as raw OCCT topology handles.
 
 ## Goal
 
@@ -25,8 +25,8 @@ ConstructionRelation
 
 ```text
 Feature semantic edge/vertex reference
-  -> chained ConstructionRelation
-  -> dependency graph edge to the source feature
+  -> evaluated rectangular-extrude edge/vertex
+  -> relation-driven ConstructionPoint or ConstructionLine
 ```
 
 ## Implemented scope
@@ -35,12 +35,17 @@ The implementation contains:
 
 - `ConstructionPointId`, `ConstructionLineId`, `ConstructionPlaneId`, and `ConstructionRelationId`
 - `ConstructionPoint`, `ConstructionLine`, `ConstructionPlane`, and `ConstructionRelation`
+- `ConstructionPointKind`, `ConstructionLineKind`, and `ConstructionPlaneKind`
 - `SemanticFaceReference`, `SemanticEdgeReference`, and `SemanticVertexReference`
 - explicit 3D placement for construction points, lines, and planes
+- relation-driven construction points from `PointOnGeneratedVertex` and `PointOnGeneratedEdge`
 - relation-driven construction planes from `PlaneOffsetFromPlane`, `PlaneThroughThreePoints`, and `PlaneParallelToPlaneThroughPoint`
 - relation-driven construction lines from `LineThroughTwoPoints`, `LineParallelToLineThroughPoint`, and `LineParallelToGeneratedEdgeThroughPoint`
-- model-intent relation definitions for `PointOnPlane`, `PointOnLine`, `PointOnGeneratedEdge`, `PointOnGeneratedVertex`, and `LineOnPlane`
+- model-intent relation definitions for `PointOnPlane`, `PointOnLine`, and `LineOnPlane`
 - validation for generated edge/vertex references against additive-extrude source features without storing raw OCCT topology IDs
+- `SemanticReferenceEvaluator` for rectangular additive extrude generated edges and vertices
+- `ConstructionPointResolver` for explicit points, generated-vertex points, and generated-edge midpoint points
+- `ConstructionLineResolver` for explicit lines, two-point lines, line-parallel-through-point lines, and generated-edge-parallel-through-point lines
 - collinearity validation for `PlaneThroughThreePoints`
 - optional `parameter_dependencies` on explicit construction geometry
 - parameter dependency capture for offset-plane relations
@@ -48,10 +53,10 @@ The implementation contains:
 - dependency graph nodes for construction geometry
 - dependency graph edges from parameters to construction geometry
 - dependency graph edges from relation references to relation-driven construction geometry
-- dependency graph edges from generated-edge/generated-vertex relations to their source feature
-- dependency graph edges from construction planes to sketches
+- dependency graph edges from generated-edge/generated-vertex relations to their source feature where those relations are used by relation-driven construction objects
 - JSON serialization/deserialization of explicit, relation-driven, chained, and semantic-reference construction geometry
 - JSON roundtrip tests for chained construction relations and semantic generated references
+- JSON-backed example model `examples/generated_semantic_references.blcad.json`
 - `WorkplaneResolver` support for explicit construction planes
 - `WorkplaneResolver` support for offset construction planes
 - `WorkplaneResolver` support for construction planes through three points
@@ -82,13 +87,48 @@ feature.base_extrude.edge.top_front
 feature.base_extrude.vertex.bottom_back_left
 ```
 
-The current core validates that the source feature exists and is an additive extrude before accepting generated edge/vertex relation references. The saved JSON does not contain OCCT face, edge, vertex, `TopoDS_Shape`, `TShape`, or transient topology identity.
+The saved JSON does not contain OCCT face, edge, vertex, `TopoDS_Shape`, `TShape`, or transient topology identity.
+
+## Evaluated semantic references
+
+`SemanticReferenceEvaluator` resolves semantic edge and vertex references for the same controlled simple rectangular additive extrude topology already used by semantic face workplanes.
+
+The evaluator requires:
+
+- an additive extrude source feature
+- a source sketch with exactly one rectangle profile
+- valid width, height, and depth length parameters
+- a resolvable source sketch workplane
+
+For `feature.base` with a centered `100 mm x 60 mm` rectangle and `10 mm` depth, examples are:
+
+```text
+top_front edge:        (-50, 30, 10) -> (50, 30, 10)
+bottom_back_left vertex: (-50, -30, 0)
+```
+
+Construction-point evaluation currently supports:
+
+```text
+explicit point                       -> stored position
+point_on_generated_vertex            -> evaluated generated vertex position
+point_on_generated_edge              -> deterministic generated-edge midpoint
+```
+
+Construction-line evaluation currently supports:
+
+```text
+explicit line                                      -> stored point and direction
+line_through_two_points                            -> normalized vector between two resolved construction points
+line_parallel_to_line_through_point                -> source line direction through a construction point
+line_parallel_to_generated_edge_through_point      -> generated edge direction through a construction point
+```
+
+`point_on_generated_edge` deliberately resolves to the edge midpoint until the model has a richer point-on-curve parameter or constraint representation.
 
 ## Relation-driven placement
 
-Relation-driven construction geometry stores model intent as a typed relation object embedded in the construction object.
-
-Implemented relation types:
+Implemented relation type strings:
 
 ```text
 plane_offset_from_plane
@@ -110,25 +150,7 @@ Deterministically resolved construction planes:
 - `PlaneThroughThreePoints` resolves by using the first point as origin, the normalized first-to-second vector as x-axis, and the normalized cross product as normal.
 - `PlaneParallelToPlaneThroughPoint` resolves by resolving the source workplane and copying its frame axes to a new origin at the referenced construction point.
 
-`LineThroughTwoPoints`, `LineParallelToLineThroughPoint`, `LineParallelToGeneratedEdgeThroughPoint`, `PointOnPlane`, `PointOnLine`, `PointOnGeneratedEdge`, `PointOnGeneratedVertex`, and `LineOnPlane` are validated model-intent relations with dependency graph integration. They are not yet consumed by a downstream geometric line evaluator or sketch constraint solver.
-
-## Validation rules
-
-The implementation rejects:
-
-- empty construction object IDs and names
-- invalid explicit line or plane frames
-- empty construction relation IDs
-- empty relation references
-- duplicate point references in `LineThroughTwoPoints`
-- duplicate or collinear point references in `PlaneThroughThreePoints`
-- empty or duplicate parameter dependencies on one construction object
-- construction-geometry parameter dependencies that do not exist in the `PartDocument`
-- relation references that do not exist in the `PartDocument`
-- generated edge/vertex references whose source feature is missing
-- generated edge/vertex references whose source feature is not an additive extrude
-- duplicate construction plane workplane IDs
-- relation-driven line/plane objects whose kind does not match the embedded relation type
+`PointOnPlane`, `PointOnLine`, and `LineOnPlane` are currently validated model-intent relations. They are not yet solved geometrically because that would require a richer point/curve constraint model.
 
 ## Dependency graph integration
 
@@ -155,68 +177,60 @@ Construction geometry is serialized as model intent. Explicit geometry keeps num
 
 ```json
 {
+  "construction_points": [
+    {
+      "id": "point.top_front_right",
+      "name": "TopFrontRight",
+      "kind": "on_generated_vertex",
+      "relation": {
+        "id": "relation.point_top_front_right",
+        "type": "point_on_generated_vertex",
+        "point": "point.top_front_right",
+        "generated_vertex": {
+          "source_feature": "feature.base",
+          "vertex": "top_front_right"
+        }
+      }
+    }
+  ],
   "construction_lines": [
     {
-      "id": "line.edge_parallel",
-      "name": "GeneratedEdgeParallel",
+      "id": "line.top_front_axis",
+      "name": "TopFrontAxis",
       "kind": "parallel_to_generated_edge_through_point",
       "relation": {
-        "id": "relation.edge_parallel",
+        "id": "relation.top_front_axis",
         "type": "line_parallel_to_generated_edge_through_point",
         "generated_edge": {
           "source_feature": "feature.base",
           "edge": "top_front"
         },
-        "through_point": "point.z"
-      }
-    }
-  ],
-  "construction_planes": [
-    {
-      "id": "construction_plane.parallel_xy",
-      "name": "ParallelXY",
-      "kind": "parallel_to_plane_through_point",
-      "relation": {
-        "id": "relation.parallel_xy",
-        "type": "plane_parallel_to_plane_through_point",
-        "source_plane": "datum.xy",
-        "through_point": "point.z"
+        "through_point": "point.top_front_right"
       }
     }
   ]
 }
 ```
 
-Construction-plane deserialization resolves construction-plane dependencies iteratively. Construction-line deserialization runs after sketches and features so generated-edge references can validate against their source features.
-
 ## Geometry-layer behavior
 
-`WorkplaneResolver` resolves:
+`WorkplaneResolver` resolves construction-plane workplanes. `SemanticReferenceEvaluator`, `ConstructionPointResolver`, and `ConstructionLineResolver` resolve semantic generated references and construction point/line geometry.
 
-```text
-datum.xy
-feature.base_extrude.top/bottom/right/left/front/back
-explicit construction_plane.<id>
-offset_from_plane construction_plane.<id>
-through_three_points construction_plane.<id>
-parallel_to_plane_through_point construction_plane.<id>
-```
-
-A construction plane resolves into a `ResolvedWorkplane` frame with origin, x-axis, y-axis, and normal. Construction-plane bounds are currently disabled because these planes are treated as infinite user reference planes.
+Construction planes are treated as infinite user reference planes. Generated edge/vertex evaluation is deliberately limited to controlled rectangular additive extrudes and should be expanded by explicit, testable topology families.
 
 ## Test coverage
 
-Core tests cover explicit construction geometry, relation creation, relation validation, relation-driven construction objects, dependency graph edges, recompute-plan inclusion after parameter changes, semantic generated edge/vertex references, chained relation dependencies, and JSON roundtrips for semantic generated references.
+Core tests cover explicit construction geometry, relation creation, relation validation, relation-driven construction objects, dependency graph edges, recompute-plan inclusion after parameter changes, semantic generated edge/vertex references, chained relation dependencies, and JSON roundtrips for semantic generated references and relation-driven construction points.
 
-Geometry tests cover resolving explicit construction planes, offset construction planes, three-point construction planes, planes parallel to another plane through a point, mapping local sketch coordinates through construction plane frames, and recomputing closed profiles on explicit and offset construction planes.
+Geometry tests cover resolving explicit construction planes, offset construction planes, three-point construction planes, planes parallel to another plane through a point, semantic edge/vertex evaluation, construction-point evaluation, construction-line evaluation, mapping local sketch coordinates through construction plane frames, and recomputing closed profiles on explicit and offset construction planes.
 
 ## Not implemented yet
 
 The current construction-geometry layer does not implement:
 
 - evaluated expression-based explicit point/line/plane coordinates
-- geometric evaluation of generated edges or generated vertices into exact points/curves
-- a general construction-line resolver
+- general generated edge/vertex evaluation for arbitrary features
+- point-on-generated-edge parameterization other than deterministic midpoint
 - point-on-line, point-on-plane, and line-on-plane geometric solving
 - plane normal to a line
 - tangent or normal references to generated surfaces
@@ -228,8 +242,8 @@ The current construction-geometry layer does not implement:
 
 ## Next construction-geometry step
 
-The next construction-geometry increment should evaluate semantic generated edge and vertex references for the limited rectangular-additive-extrude topology already used by semantic face workplanes, then consume those evaluated references in deterministic construction-point and construction-line evaluators. It should not add a general constraint solver yet.
+The next construction-geometry increment should project evaluated semantic generated edges and vertices into sketch-space reference geometry so sketches can consume projected construction points and lines without storing raw OCCT topology. It should still avoid a full sketch constraint solver.
 
 ## Relationship to existing roadmap
 
-The semantic-face workplane seed proves that sketches can be placed on generated planar faces without storing raw OCCT face IDs. The chained-relation step extends the same principle to generated edge and vertex references while still keeping saved model intent independent from transient OCCT topology.
+The semantic-face workplane seed proves that sketches can be placed on generated planar faces without storing raw OCCT face IDs. The generated edge/vertex evaluator extends the same principle to edge and vertex references while keeping saved model intent independent from transient OCCT topology.
