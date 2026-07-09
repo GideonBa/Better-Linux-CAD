@@ -1,5 +1,6 @@
 #pragma once
 
+#include "blcad/core/datum_plane.hpp"
 #include "blcad/core/id.hpp"
 #include "blcad/core/result.hpp"
 #include "blcad/core/spatial.hpp"
@@ -15,6 +16,14 @@ enum class ConstructionRelationType {
   PlaneOffsetFromPlane,
   LineThroughTwoPoints,
   PlaneThroughThreePoints,
+  PointOnPlane,
+  PointOnLine,
+  PointOnGeneratedEdge,
+  PointOnGeneratedVertex,
+  LineOnPlane,
+  PlaneParallelToPlaneThroughPoint,
+  LineParallelToLineThroughPoint,
+  LineParallelToGeneratedEdgeThroughPoint,
 };
 
 [[nodiscard]] std::string_view to_string(ConstructionRelationType type) noexcept;
@@ -33,6 +42,40 @@ public:
   create_plane_through_three_points(ConstructionRelationId id, ConstructionPointId first_point,
                                     ConstructionPointId second_point, ConstructionPointId third_point);
 
+  [[nodiscard]] static Result<ConstructionRelation>
+  create_point_on_plane(ConstructionRelationId id, ConstructionPointId point,
+                        DatumPlaneId source_plane);
+
+  [[nodiscard]] static Result<ConstructionRelation>
+  create_point_on_line(ConstructionRelationId id, ConstructionPointId point,
+                       ConstructionLineId source_line);
+
+  [[nodiscard]] static Result<ConstructionRelation>
+  create_point_on_generated_edge(ConstructionRelationId id, ConstructionPointId point,
+                                 SemanticEdgeReference generated_edge);
+
+  [[nodiscard]] static Result<ConstructionRelation>
+  create_point_on_generated_vertex(ConstructionRelationId id, ConstructionPointId point,
+                                   SemanticVertexReference generated_vertex);
+
+  [[nodiscard]] static Result<ConstructionRelation>
+  create_line_on_plane(ConstructionRelationId id, ConstructionLineId source_line,
+                       DatumPlaneId source_plane);
+
+  [[nodiscard]] static Result<ConstructionRelation>
+  create_plane_parallel_to_plane_through_point(ConstructionRelationId id, DatumPlaneId source_plane,
+                                               ConstructionPointId through_point);
+
+  [[nodiscard]] static Result<ConstructionRelation>
+  create_line_parallel_to_line_through_point(ConstructionRelationId id,
+                                             ConstructionLineId source_line,
+                                             ConstructionPointId through_point);
+
+  [[nodiscard]] static Result<ConstructionRelation>
+  create_line_parallel_to_generated_edge_through_point(ConstructionRelationId id,
+                                                       SemanticEdgeReference generated_edge,
+                                                       ConstructionPointId through_point);
+
   [[nodiscard]] const ConstructionRelationId& id() const noexcept;
   [[nodiscard]] ConstructionRelationType type() const noexcept;
   [[nodiscard]] const DatumPlaneId& source_plane() const noexcept;
@@ -40,6 +83,9 @@ public:
   [[nodiscard]] const ConstructionPointId& first_point() const noexcept;
   [[nodiscard]] const ConstructionPointId& second_point() const noexcept;
   [[nodiscard]] const ConstructionPointId& third_point() const noexcept;
+  [[nodiscard]] const ConstructionLineId& source_line() const noexcept;
+  [[nodiscard]] const std::optional<SemanticEdgeReference>& generated_edge() const noexcept;
+  [[nodiscard]] const std::optional<SemanticVertexReference>& generated_vertex() const noexcept;
   [[nodiscard]] std::vector<std::string> referenced_node_ids() const;
   [[nodiscard]] std::vector<ParameterId> parameter_dependencies() const;
 
@@ -47,7 +93,9 @@ private:
   ConstructionRelation(ConstructionRelationId id, ConstructionRelationType type,
                        DatumPlaneId source_plane, ParameterId offset_parameter,
                        ConstructionPointId first_point, ConstructionPointId second_point,
-                       ConstructionPointId third_point);
+                       ConstructionPointId third_point, ConstructionLineId source_line,
+                       std::optional<SemanticEdgeReference> generated_edge,
+                       std::optional<SemanticVertexReference> generated_vertex);
 
   ConstructionRelationId id_;
   ConstructionRelationType type_;
@@ -56,11 +104,16 @@ private:
   ConstructionPointId first_point_;
   ConstructionPointId second_point_;
   ConstructionPointId third_point_;
+  ConstructionLineId source_line_;
+  std::optional<SemanticEdgeReference> generated_edge_;
+  std::optional<SemanticVertexReference> generated_vertex_;
 };
 
 enum class ConstructionLineKind {
   Explicit,
   ThroughTwoPoints,
+  ParallelToLineThroughPoint,
+  ParallelToGeneratedEdgeThroughPoint,
 };
 
 [[nodiscard]] std::string_view to_string(ConstructionLineKind kind) noexcept;
@@ -69,6 +122,7 @@ enum class ConstructionPlaneKind {
   Explicit,
   OffsetFromPlane,
   ThroughThreePoints,
+  ParallelToPlaneThroughPoint,
 };
 
 [[nodiscard]] std::string_view to_string(ConstructionPlaneKind kind) noexcept;
@@ -103,6 +157,14 @@ public:
   [[nodiscard]] static Result<ConstructionLine>
   create_through_two_points(ConstructionLineId id, std::string name,
                             ConstructionRelation relation);
+
+  [[nodiscard]] static Result<ConstructionLine>
+  create_parallel_to_line_through_point(ConstructionLineId id, std::string name,
+                                        ConstructionRelation relation);
+
+  [[nodiscard]] static Result<ConstructionLine>
+  create_parallel_to_generated_edge_through_point(ConstructionLineId id, std::string name,
+                                                  ConstructionRelation relation);
 
   [[nodiscard]] const ConstructionLineId& id() const noexcept;
   [[nodiscard]] const std::string& name() const noexcept;
@@ -139,6 +201,10 @@ public:
   [[nodiscard]] static Result<ConstructionPlane>
   create_through_three_points(ConstructionPlaneId id, std::string name,
                               ConstructionRelation relation);
+
+  [[nodiscard]] static Result<ConstructionPlane>
+  create_parallel_to_plane_through_point(ConstructionPlaneId id, std::string name,
+                                         ConstructionRelation relation);
 
   [[nodiscard]] const ConstructionPlaneId& id() const noexcept;
   [[nodiscard]] const std::string& name() const noexcept;
