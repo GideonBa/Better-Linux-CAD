@@ -130,19 +130,49 @@ Still not implemented in this block:
 - full construction-geometry solver
 - 3D sketch splines, sweep, loft, surface stitching, or closed-shell-to-solid conversion
 
-## Next MVP: Projected sketch reference geometry
+## Implemented block: Projected sketch reference geometry
 
 Goal: project evaluated semantic generated edges, generated vertices, construction points, and construction lines into sketch-local reference geometry so sketches can consume projected references without storing raw OCCT topology and without adding a full sketch constraint solver yet.
 
+Detailed document: `docs/projected-sketch-reference-geometry.md`
+
+Implemented scope:
+
+- `ProjectedSketchPoint` and `ProjectedSketchLine` as sketch-local reference entities
+- sketch-level projected reference IDs using `SketchEntityId`
+- model-intent references from projected point references to `ConstructionPointId` and `SemanticVertexReference`
+- model-intent references from projected line references to `ConstructionLineId` and `SemanticEdgeReference`
+- `projected_points` and `projected_lines` JSON persistence on sketches
+- JSON roundtrip tests for construction-point, construction-line, semantic-vertex, and semantic-edge projected references
+- `SketchReferenceProjector` in the optional geometry layer
+- projection of resolved construction points and semantic vertices into sketch-local `Point2` coordinates
+- projection of resolved construction lines and semantic edges into sketch-local point-plus-direction line references
+- explicit out-of-plane validation errors for projected points and projected lines
+- geometry tests for projected semantic generated vertices and edges on generated top-face workplanes
+- geometry tests for projected generated-reference construction points and generated-edge-parallel construction lines
+- checked-in `examples/projected_sketch_references.blcad.json`
+
+Still not implemented in this block:
+
+- automatic use of projected references as closed-profile segments
+- solver-backed sketch constraints against projected references
+- dependency graph edges from projected references to the owning sketch and downstream features
+- projected reference selection or display in a GUI
+- arbitrary generated topology beyond the current rectangular additive extrude seed
+
+## Next MVP: Reference-driven sketch constraints and profile consumption
+
+Goal: make projected sketch references usable as associative sketch targets instead of passive projected helper geometry.
+
 Proposed first implementation sequence:
 
-- add sketch-level reference entity IDs for projected construction points and projected construction lines
-- add model-intent references from sketch reference entities to `ConstructionPointId`, `ConstructionLineId`, `SemanticVertexReference`, and `SemanticEdgeReference`
-- project resolved 3D construction points and lines into a resolved sketch workplane when the reference lies on that workplane
-- validate out-of-plane projections with explicit errors
-- add JSON roundtrip tests for projected sketch reference entities
-- add geometry tests using projected references as closed-profile helper geometry where deterministic
-- keep GUI manipulators, full sketch constraint solving, 3D sketching, and advanced surfacing deferred
+- add dependency graph edges from projected sketch references to their source construction or semantic nodes, and from the sketch to downstream features
+- add sketch constraint/reference target handles for projected points and projected lines
+- implement deterministic reference-driven helper constraints such as coincident-to-projected-point and parallel-or-collinear-to-projected-line without introducing the full solver yet
+- allow deterministic profile helper generation from projected references only where endpoints and directions are fully resolved
+- add incremental invalidation tests proving source feature or construction-relation changes dirty projected-reference sketches and dependent features
+- add JSON roundtrip tests for the first projected-reference constraint target records
+- keep GUI manipulators, automatic region detection, full sketch solving, 3D sketches, sweep, loft, and surfacing deferred
 
 ## Future roadmap: Inventor-like sketcher and sketch-driven features
 
