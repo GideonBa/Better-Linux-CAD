@@ -64,65 +64,7 @@ normal = source.normal
 bounds.enabled = false
 ```
 
-For `workplane.base_top -> feature.base_extrude.top`, the frame is:
-
-```text
-origin = (rectangle_center.x, rectangle_center.y, thickness)
-x_axis = (1, 0, 0)
-y_axis = (0, 1, 0)
-normal = (0, 0, 1)
-```
-
-For `workplane.base_bottom -> feature.base_extrude.bottom`, the frame is:
-
-```text
-origin = (rectangle_center.x, rectangle_center.y, 0)
-x_axis = (1, 0, 0)
-y_axis = (0, 1, 0)
-normal = (0, 0, -1)
-```
-
-For `workplane.base_right -> feature.base_extrude.right`, the frame is:
-
-```text
-origin = (rectangle_center.x + width / 2, rectangle_center.y, thickness / 2)
-x_axis = (0, 1, 0)
-y_axis = (0, 0, 1)
-normal = (1, 0, 0)
-```
-
-For `workplane.base_left -> feature.base_extrude.left`, the frame is:
-
-```text
-origin = (rectangle_center.x - width / 2, rectangle_center.y, thickness / 2)
-x_axis = (0, -1, 0)
-y_axis = (0, 0, 1)
-normal = (-1, 0, 0)
-```
-
-For `workplane.base_front -> feature.base_extrude.front`, the frame is:
-
-```text
-origin = (rectangle_center.x, rectangle_center.y + height / 2, thickness / 2)
-x_axis = (-1, 0, 0)
-y_axis = (0, 0, 1)
-normal = (0, 1, 0)
-```
-
-For `workplane.base_back -> feature.base_extrude.back`, the frame is:
-
-```text
-origin = (rectangle_center.x, rectangle_center.y - height / 2, thickness / 2)
-x_axis = (1, 0, 0)
-y_axis = (0, 0, 1)
-normal = (0, -1, 0)
-```
-
-Side faces and construction planes use right-handed local frames:
-
-```text
-x_axis cross y_axis = normal
-```
+Generated-face workplanes for top, bottom, right, left, front, and back of a simple rectangular additive extrude keep the established right-handed frames and rectangular bounds.
 
 ## Rectangular bounds
 
@@ -152,14 +94,14 @@ global = (7, 9, 7)
 
 ## Relation scope
 
-The resolver intentionally supports only relations that can be evaluated from current headless model intent:
+`WorkplaneResolver` intentionally resolves only workplane-like relations that can be evaluated from current headless model intent:
 
 - explicit construction planes
 - `PlaneOffsetFromPlane`
 - `PlaneThroughThreePoints`
 - `PlaneParallelToPlaneThroughPoint`
 
-Semantic generated edge and vertex references are validated and serialized in the core, but they are not yet evaluated into exact points or curves by the geometry layer.
+Semantic generated edge and vertex references are evaluated by `SemanticReferenceEvaluator`, not by `WorkplaneResolver`. Deterministic construction points and construction lines are evaluated by `ConstructionPointResolver` and `ConstructionLineResolver`.
 
 ## Example models
 
@@ -171,6 +113,7 @@ examples/left_face_cut.blcad.json
 examples/front_face_cut.blcad.json
 examples/back_face_cut.blcad.json
 examples/construction_plane_prism.blcad.json
+examples/generated_semantic_references.blcad.json
 ```
 
 ## Test coverage
@@ -178,19 +121,15 @@ examples/construction_plane_prism.blcad.json
 Geometry tests cover:
 
 - resolving `datum.xy`
-- resolving `workplane.base_top`
-- resolving `workplane.base_bottom`
-- resolving `workplane.base_right`
-- resolving `workplane.base_left`
-- resolving `workplane.base_front`
-- resolving `workplane.base_back`
+- resolving generated-face derived workplanes
 - resolving explicit construction planes
 - resolving offset construction-plane relations
 - resolving three-point construction-plane relations
 - resolving planes parallel to another plane through a point
-- checking top/bottom/side origins and normals
 - checking construction plane origins, axes, normals, and unbounded status
 - checking rectangular bounds for resolved generated-face workplanes
 - mapping local sketch points through resolved frames
 - rejecting missing workplanes
 - recomputing circular cuts and closed-profile operations from sketches on resolved workplanes
+- evaluating rectangular-additive-extrude semantic generated edges and vertices
+- evaluating deterministic construction points and construction lines derived from generated semantic references
