@@ -109,6 +109,14 @@ private:
   std::optional<SemanticVertexReference> generated_vertex_;
 };
 
+enum class ConstructionPointKind {
+  Explicit,
+  OnGeneratedEdge,
+  OnGeneratedVertex,
+};
+
+[[nodiscard]] std::string_view to_string(ConstructionPointKind kind) noexcept;
+
 enum class ConstructionLineKind {
   Explicit,
   ThroughTwoPoints,
@@ -133,19 +141,30 @@ public:
   create_explicit(ConstructionPointId id, std::string name, Point3 position,
                   std::vector<ParameterId> parameter_dependencies = {});
 
+  [[nodiscard]] static Result<ConstructionPoint>
+  create_on_generated_edge(ConstructionPointId id, std::string name, ConstructionRelation relation);
+
+  [[nodiscard]] static Result<ConstructionPoint>
+  create_on_generated_vertex(ConstructionPointId id, std::string name, ConstructionRelation relation);
+
   [[nodiscard]] const ConstructionPointId& id() const noexcept;
   [[nodiscard]] const std::string& name() const noexcept;
+  [[nodiscard]] ConstructionPointKind kind() const noexcept;
   [[nodiscard]] Point3 position() const noexcept;
   [[nodiscard]] const std::vector<ParameterId>& parameter_dependencies() const noexcept;
+  [[nodiscard]] const std::optional<ConstructionRelation>& relation() const noexcept;
 
 private:
-  ConstructionPoint(ConstructionPointId id, std::string name, Point3 position,
-                    std::vector<ParameterId> parameter_dependencies);
+  ConstructionPoint(ConstructionPointId id, std::string name, ConstructionPointKind kind,
+                    Point3 position, std::vector<ParameterId> parameter_dependencies,
+                    std::optional<ConstructionRelation> relation);
 
   ConstructionPointId id_;
   std::string name_;
+  ConstructionPointKind kind_;
   Point3 position_;
   std::vector<ParameterId> parameter_dependencies_;
+  std::optional<ConstructionRelation> relation_;
 };
 
 class ConstructionLine {
