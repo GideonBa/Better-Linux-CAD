@@ -1,6 +1,6 @@
 # Core Skeleton and MVP-2 Seed
 
-Status: implemented core skeleton for MVP-1 data models, recompute planning, JSON model-intent serialization, `.blcad.json` file helpers, semantic top/bottom/right/left/front face workplanes, geometry-layer workplane resolution, bounded face validation, axis-directed cuts, and incremental recompute through derived-workplane dependencies.
+Status: implemented core skeleton for MVP-1 data models, recompute planning, JSON model-intent serialization, `.blcad.json` file helpers, semantic top/bottom/right/left/front/back face workplanes, geometry-layer workplane resolution, bounded face validation, axis-directed cuts, and incremental recompute through derived-workplane dependencies.
 
 The core remains free of OCCT and Qt. Geometry is handled only in the optional `blcad_geometry` target. JSON serialization and `.blcad.json` file helpers stay in the core because they store model intent rather than computed shapes.
 
@@ -42,18 +42,19 @@ feature.base_extrude.bottom
 feature.base_extrude.right
 feature.base_extrude.left
 feature.base_extrude.front
+feature.base_extrude.back
 ```
 
 A derived workplane exposes a generated face as a sketch workplane:
 
 ```text
-workplane.base_front -> feature.base_extrude.front
+workplane.base_back -> feature.base_extrude.back
 ```
 
 The dependency graph records paths such as:
 
 ```text
-feature.base_extrude -> workplane.base_front -> sketch.front_hole -> feature.front_hole_cut
+feature.base_extrude -> workplane.base_back -> sketch.back_hole -> feature.back_hole_cut
 ```
 
 No raw OCCT face IDs are stored in the core.
@@ -68,14 +69,15 @@ No raw OCCT face IDs are stored in the core.
 - `workplane.base_right`
 - `workplane.base_left`
 - `workplane.base_front`
+- `workplane.base_back`
 
-For side faces, local frames are explicit and tested. The front face uses:
+For side faces, local frames are explicit and tested. The back face uses:
 
 ```text
-origin = (rectangle_center.x, rectangle_center.y + height / 2, thickness / 2)
-x_axis = (-1, 0, 0)
+origin = (rectangle_center.x, rectangle_center.y - height / 2, thickness / 2)
+x_axis = (1, 0, 0)
 y_axis = (0, 0, 1)
-normal = (0, 1, 0)
+normal = (0, -1, 0)
 ```
 
 All currently supported generated-face workplanes carry rectangular local bounds.
@@ -123,6 +125,7 @@ examples/bottom_face_cut.blcad.json
 examples/right_face_cut.blcad.json
 examples/left_face_cut.blcad.json
 examples/front_face_cut.blcad.json
+examples/back_face_cut.blcad.json
 ```
 
 All can be exported with:
@@ -139,8 +142,8 @@ This skeleton still does not implement:
 - assemblies
 - general sketch constraints
 - general constraint solver
-- back derived workplane
 - arbitrary planar faces
+- general closed sketch profiles
 - ShapeCache serialization
 - command-line argument parsing beyond the minimal example
 
