@@ -59,6 +59,7 @@ if(BLCAD_BUILD_GEOMETRY)
   add_library(
     blcad_geometry STATIC
     src/geometry/circular_cut_adapter.cpp
+    src/geometry/closed_profile_adapter.cpp
     src/geometry/recompute_executor.cpp
     src/geometry/rectangle_extrusion_adapter.cpp
     src/geometry/shape_cache.cpp
@@ -143,6 +144,7 @@ if(BLCAD_BUILD_TESTS)
       blcad_geometry_tests
       tests/geometry/back_workplane_pipeline_tests.cpp
       tests/geometry/circular_cut_adapter_tests.cpp
+      tests/geometry/closed_profile_pipeline_tests.cpp
       tests/geometry/derived_workplane_pipeline_tests.cpp
       tests/geometry/front_workplane_pipeline_tests.cpp
       tests/geometry/left_workplane_pipeline_tests.cpp
