@@ -107,37 +107,55 @@ Still not implemented in this block:
 
 This block proves what shape a single planar sketch can describe. It does not yet solve arbitrary sketch placement; that is the construction-geometry block below.
 
-## Next MVP: Construction geometry and relation-driven datum system
+## Implemented block: Explicit construction geometry
 
-Goal: support user-created construction planes, construction lines/axes, and construction points that can be placed freely in 3D and can later be defined through geometric relationships.
+Goal: support user-created construction planes, construction lines/axes, and construction points that can be placed explicitly in 3D and used as stable sketch/reference geometry.
 
 Detailed document: `docs/construction-geometry-mvp.md`
 
-Explicitly not implemented yet:
+Implemented scope:
 
-- user-created construction planes beyond the current fixed `datum.xy` and semantic-face workplanes
-- user-created construction lines / datum axes
-- user-created construction points / datum points
-- arbitrary numeric 3D placement of construction geometry
-- sketches on user-created construction planes
-- relation-driven placement such as parallel, orthogonal, angle, offset, point-on-line, point-on-plane, line-through-two-points, and plane-through-three-points
-- relation-driven invalidation through the dependency graph
-- JSON persistence of construction geometry and construction relations
+- `ConstructionPointId`, `ConstructionLineId`, and `ConstructionPlaneId`
+- `ConstructionPoint`, `ConstructionLine`, and `ConstructionPlane` core model types
+- explicit placement definitions for point, line, and plane
+- `PartDocument` storage, validation, and dependency graph nodes
+- optional `parameter_dependencies` from construction geometry to parameters
+- sketches can reference construction planes as workplanes
+- JSON serialization and roundtrip tests for explicit construction geometry
+- `WorkplaneResolver` resolves construction planes into `ResolvedWorkplane` frames
+- geometry test for a feature driven by a closed-profile sketch on a construction plane
+- validation for invalid construction geometry such as zero-length lines and degenerate or non-orthonormal plane frames
+- invalidation tests proving parameter changes can mark construction geometry, dependent sketches, and dependent features dirty
+- checked-in `examples/construction_plane_prism.blcad.json`
+
+Still not implemented in this block:
+
+- expression-evaluated coordinate placement
+- relation-driven placement such as offset plane, line through two points, plane through three points, parallel, orthogonal, angle, point-on-line, or point-on-plane
 - references from construction geometry to generated semantic faces, edges, vertices, or analytic surfaces
+- GUI manipulators
+- 3D sketch splines, sweep, loft, surface stitching, or closed-shell-to-solid conversion
+
+## Next MVP: Relation-driven construction geometry
+
+Goal: extend the explicit construction-geometry path with stable relation-driven definitions.
+
+Detailed document: `docs/construction-geometry-mvp.md`
 
 Proposed first implementation sequence:
 
-- add `ConstructionPoint`, `ConstructionLine`, and `ConstructionPlane` IDs and core model types
-- add explicit placement definitions for point, line, and plane
-- add `PartDocument` storage, validation, and dependency graph nodes
-- allow sketches to reference construction planes as workplanes
-- add JSON roundtrip tests
-- resolve construction planes into `ResolvedWorkplane` frames in the geometry layer
-- add recompute tests for a feature driven by a sketch on a construction plane
-- add validation for invalid construction geometry
-- defer parallel, orthogonal, angle, offset, and surface-reference relations until the explicit placement path is stable
+- add a `ConstructionRelation` model
+- add `PlaneOffsetFromPlane` as the first relation-driven plane definition
+- add `LineThroughTwoPoints` as the first relation-driven line definition
+- add `PlaneThroughThreePoints` with collinearity validation
+- add dependency graph edges from referenced construction objects to relation-driven construction objects
+- add JSON roundtrip tests for relation-driven construction geometry
+- extend `WorkplaneResolver` so relation-driven construction planes resolve into `ResolvedWorkplane` frames
+- add invalidation tests for point/line/plane reference changes
+- keep explicit construction geometry as the stable fallback path
+- defer parallel, orthogonal, angle, generated semantic references, 3D sketching, and advanced surfacing until this relation path is stable
 
-This block answers where a sketch can live. The line-based closed sketch profile block answers what planar shape a sketch can describe. They should remain separate, testable increments.
+This block continues to answer where a sketch can live. The line-based closed sketch profile block answers what planar shape a sketch can describe. They should remain separate, testable increments.
 
 ## Future roadmap: Inventor-like sketcher and sketch-driven features
 
