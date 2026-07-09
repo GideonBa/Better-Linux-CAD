@@ -1,10 +1,8 @@
 # Construction Geometry MVP
 
-Status: explicit construction geometry plus the first relation-driven construction-geometry seed implemented.
+Status: explicit construction geometry, relation-driven construction geometry, semantic generated edge/vertex references, and the first chained construction relations are implemented in the headless core.
 
-This document records the construction-geometry layer for BLCAD. The implementation supports explicit construction points, explicit construction lines, explicit construction planes, and the first relation-driven construction objects. Sketches can reference user-created construction planes as workplanes.
-
-The current relation path is deliberately small. It supports `PlaneOffsetFromPlane`, `LineThroughTwoPoints`, and `PlaneThroughThreePoints`. It does not yet implement parallel/orthogonal/angle relations, generated semantic edge/vertex references, analytic generated-surface references, GUI manipulators, or expression-based coordinate solving for arbitrary point placement.
+This document records the construction-geometry layer for BLCAD. The implementation supports explicit construction points, explicit construction lines, explicit construction planes, relation-driven construction lines and planes, and semantic references to generated edges and vertices. These references are saved as model intent by source feature plus semantic enum, not as raw OCCT topology handles.
 
 ## Goal
 
@@ -25,265 +23,175 @@ ConstructionRelation
   -> Feature using that sketch
 ```
 
-Implemented reference geometry:
-
 ```text
-ConstructionPoint
-ConstructionLine / ConstructionAxis
-ConstructionPlane
-ConstructionRelation
+Feature semantic edge/vertex reference
+  -> chained ConstructionRelation
+  -> dependency graph edge to the source feature
 ```
-
-These objects are model-intent objects, not temporary UI artifacts and not OCCT topology handles.
 
 ## Implemented scope
 
 The implementation contains:
 
-- `ConstructionPointId`
-- `ConstructionLineId`
-- `ConstructionPlaneId`
-- `ConstructionRelationId`
-- `ConstructionPoint`
-- `ConstructionLine`
-- `ConstructionPlane`
-- `ConstructionRelation`
-- explicit 3D placement for construction points
-- explicit 3D placement for construction lines
-- explicit 3D placement for construction planes
-- `PlaneOffsetFromPlane` relation-driven construction planes
-- `LineThroughTwoPoints` relation-driven construction lines
-- `PlaneThroughThreePoints` relation-driven construction planes
+- `ConstructionPointId`, `ConstructionLineId`, `ConstructionPlaneId`, and `ConstructionRelationId`
+- `ConstructionPoint`, `ConstructionLine`, `ConstructionPlane`, and `ConstructionRelation`
+- `SemanticFaceReference`, `SemanticEdgeReference`, and `SemanticVertexReference`
+- explicit 3D placement for construction points, lines, and planes
+- relation-driven construction planes from `PlaneOffsetFromPlane`, `PlaneThroughThreePoints`, and `PlaneParallelToPlaneThroughPoint`
+- relation-driven construction lines from `LineThroughTwoPoints`, `LineParallelToLineThroughPoint`, and `LineParallelToGeneratedEdgeThroughPoint`
+- model-intent relation definitions for `PointOnPlane`, `PointOnLine`, `PointOnGeneratedEdge`, `PointOnGeneratedVertex`, and `LineOnPlane`
+- validation for generated edge/vertex references against additive-extrude source features without storing raw OCCT topology IDs
 - collinearity validation for `PlaneThroughThreePoints`
 - optional `parameter_dependencies` on explicit construction geometry
 - parameter dependency capture for offset-plane relations
-- `PartDocument` storage for construction geometry
-- `PartDocument` validation for missing construction-geometry parameter dependencies
-- `PartDocument` validation for missing relation references
+- `PartDocument` storage and validation for construction geometry and relation references
 - dependency graph nodes for construction geometry
 - dependency graph edges from parameters to construction geometry
 - dependency graph edges from relation references to relation-driven construction geometry
+- dependency graph edges from generated-edge/generated-vertex relations to their source feature
 - dependency graph edges from construction planes to sketches
-- sketches can reference construction planes through their workplane ID
-- JSON serialization/deserialization of explicit and relation-driven construction geometry
-- JSON roundtrip tests for explicit and relation-driven construction geometry
+- JSON serialization/deserialization of explicit, relation-driven, chained, and semantic-reference construction geometry
+- JSON roundtrip tests for chained construction relations and semantic generated references
 - `WorkplaneResolver` support for explicit construction planes
 - `WorkplaneResolver` support for offset construction planes
 - `WorkplaneResolver` support for construction planes through three points
+- `WorkplaneResolver` support for planes parallel to another plane through a construction point
 - geometry recompute tests for closed profiles sketched on explicit and offset construction planes
 - checked-in example model `examples/construction_plane_prism.blcad.json`
 
-## Explicit placement
+## Semantic generated references
 
-The explicit path allows construction geometry to be placed directly by numeric coordinates and unit vectors.
+Generated references are stable semantic model-intent references.
 
 ```text
-ConstructionPoint
-  id
-  name
-  position = (x, y, z)
-  parameter_dependencies = [...]
+SemanticEdgeReference
+  source_feature = feature.base_extrude
+  edge = top_front | top_back | top_right | ...
 ```
 
 ```text
-ConstructionLine
-  id
-  name
-  kind = explicit
-  point = (x, y, z)
-  direction = unit vector
-  parameter_dependencies = [...]
+SemanticVertexReference
+  source_feature = feature.base_extrude
+  vertex = top_front_right | bottom_back_left | ...
 ```
+
+The reference node identity is derived from the source feature and semantic enum, for example:
 
 ```text
-ConstructionPlane
-  id
-  name
-  kind = explicit
-  origin = (x, y, z)
-  x_axis = unit vector
-  y_axis = unit vector
-  normal = unit vector
-  parameter_dependencies = [...]
+feature.base_extrude.edge.top_front
+feature.base_extrude.vertex.bottom_back_left
 ```
 
-The numeric placement itself is explicit. The `parameter_dependencies` field is an invalidation hook: it records that the construction object depends on one or more parameters, so changing such a parameter marks the construction object, dependent sketches, and dependent features dirty. It does not yet evaluate expressions into new explicit coordinates.
+The current core validates that the source feature exists and is an additive extrude before accepting generated edge/vertex relation references. The saved JSON does not contain OCCT face, edge, vertex, `TopoDS_Shape`, `TShape`, or transient topology identity.
 
 ## Relation-driven placement
 
-Relation-driven construction geometry stores model intent as a typed relation object.
+Relation-driven construction geometry stores model intent as a typed relation object embedded in the construction object.
+
+Implemented relation types:
 
 ```text
-ConstructionRelation
-  id
-  type = plane_offset_from_plane
-  source_plane = datum.xy | construction_plane.* | derived workplane id
-  offset_parameter = part.offset
+plane_offset_from_plane
+line_through_two_points
+plane_through_three_points
+point_on_plane
+point_on_line
+point_on_generated_edge
+point_on_generated_vertex
+line_on_plane
+plane_parallel_to_plane_through_point
+line_parallel_to_line_through_point
+line_parallel_to_generated_edge_through_point
 ```
 
-```text
-ConstructionRelation
-  id
-  type = line_through_two_points
-  first_point = construction_point.a
-  second_point = construction_point.b
-```
+Deterministically resolved construction planes:
 
-```text
-ConstructionRelation
-  id
-  type = plane_through_three_points
-  first_point = construction_point.a
-  second_point = construction_point.b
-  third_point = construction_point.c
-```
+- `PlaneOffsetFromPlane` resolves by resolving the source workplane, translating the origin along the source normal by the offset parameter, and preserving the frame axes.
+- `PlaneThroughThreePoints` resolves by using the first point as origin, the normalized first-to-second vector as x-axis, and the normalized cross product as normal.
+- `PlaneParallelToPlaneThroughPoint` resolves by resolving the source workplane and copying its frame axes to a new origin at the referenced construction point.
 
-The first implementation embeds the relation object directly in the relation-driven construction line or construction plane. There is no separate relation collection in `PartDocument` yet. This keeps the API and JSON shape smaller while still making the relation explicit in the model.
-
-`PlaneOffsetFromPlane` resolves by resolving its source workplane, translating the source origin along the source normal by the offset parameter value, and preserving the source x-axis, y-axis, and normal.
-
-`PlaneThroughThreePoints` resolves by using the first point as origin, the normalized vector from the first point to the second point as the x-axis, and the normalized cross product of the first-to-second and first-to-third vectors as the normal. The y-axis is derived from `normal cross x_axis`.
-
-`LineThroughTwoPoints` is currently a validated model-intent relation with dependency graph integration. It is not yet consumed by a downstream geometry feature.
+`LineThroughTwoPoints`, `LineParallelToLineThroughPoint`, `LineParallelToGeneratedEdgeThroughPoint`, `PointOnPlane`, `PointOnLine`, `PointOnGeneratedEdge`, `PointOnGeneratedVertex`, and `LineOnPlane` are validated model-intent relations with dependency graph integration. They are not yet consumed by a downstream geometric line evaluator or sketch constraint solver.
 
 ## Validation rules
 
 The implementation rejects:
 
-- empty construction point IDs
-- empty construction point names
-- empty construction line IDs
-- empty construction line names
-- zero-length explicit construction line directions
-- non-unit explicit construction line directions
-- empty construction plane IDs
-- empty construction plane names
-- zero-length explicit construction plane axes or normals
-- non-unit explicit construction plane axes or normals
-- non-orthogonal explicit construction plane axes and normals
-- explicit construction plane normals that do not match `x_axis cross y_axis`
+- empty construction object IDs and names
+- invalid explicit line or plane frames
 - empty construction relation IDs
 - empty relation references
 - duplicate point references in `LineThroughTwoPoints`
-- duplicate point references in `PlaneThroughThreePoints`
-- collinear point references in `PlaneThroughThreePoints`
-- empty parameter dependencies
-- duplicate parameter dependencies on the same construction object
+- duplicate or collinear point references in `PlaneThroughThreePoints`
+- empty or duplicate parameter dependencies on one construction object
 - construction-geometry parameter dependencies that do not exist in the `PartDocument`
 - relation references that do not exist in the `PartDocument`
+- generated edge/vertex references whose source feature is missing
+- generated edge/vertex references whose source feature is not an additive extrude
 - duplicate construction plane workplane IDs
+- relation-driven line/plane objects whose kind does not match the embedded relation type
 
 ## Dependency graph integration
 
 Construction geometry contributes nodes and dependency edges to the model graph.
 
-Explicit parameter hook:
-
 ```text
 parameter -> construction_geometry
-```
-
-Offset plane relation:
-
-```text
 source_plane -> construction_plane.offset
 parameter.offset -> construction_plane.offset
-```
-
-Line through two points:
-
-```text
 construction_point.a -> construction_line.axis_ab
 construction_point.b -> construction_line.axis_ab
-```
-
-Plane through three points:
-
-```text
-construction_point.a -> construction_plane.abc
-construction_point.b -> construction_plane.abc
-construction_point.c -> construction_plane.abc
-```
-
-Sketch integration:
-
-```text
+construction_point.p -> construction_plane.parallel
+source_plane -> construction_plane.parallel
+feature.base -> construction_line.parallel_to_generated_edge
+construction_point.p -> construction_line.parallel_to_generated_edge
 construction_plane -> sketch -> feature
 ```
 
-If a parameter listed in an offset-plane relation changes, the recompute plan includes the construction plane, dependent sketch, and dependent feature.
+If a parameter listed in an offset-plane relation changes, the recompute plan includes the construction plane, dependent sketch, and dependent feature. If a generated-edge relation references a feature, the relation-driven construction object depends on that source feature.
 
 ## JSON shape
 
-Construction geometry is serialized as model intent. Explicit geometry keeps the original shape:
-
-```json
-{
-  "construction_planes": [
-    {
-      "id": "construction_plane.explicit_xy",
-      "name": "ExplicitXY",
-      "kind": "explicit",
-      "origin": {"x": 0.0, "y": 0.0, "z": 25.0},
-      "x_axis": {"x": 1.0, "y": 0.0, "z": 0.0},
-      "y_axis": {"x": 0.0, "y": 1.0, "z": 0.0},
-      "normal": {"x": 0.0, "y": 0.0, "z": 1.0},
-      "parameter_dependencies": ["part.plane_offset"]
-    }
-  ]
-}
-```
-
-Relation-driven geometry stores an embedded `relation` object:
+Construction geometry is serialized as model intent. Explicit geometry keeps numeric placement. Relation-driven geometry embeds a `relation` object.
 
 ```json
 {
   "construction_lines": [
     {
-      "id": "construction_line.axis_ab",
-      "name": "AxisAB",
-      "kind": "through_two_points",
+      "id": "line.edge_parallel",
+      "name": "GeneratedEdgeParallel",
+      "kind": "parallel_to_generated_edge_through_point",
       "relation": {
-        "id": "relation.axis_ab",
-        "type": "line_through_two_points",
-        "first_point": "construction_point.a",
-        "second_point": "construction_point.b"
+        "id": "relation.edge_parallel",
+        "type": "line_parallel_to_generated_edge_through_point",
+        "generated_edge": {
+          "source_feature": "feature.base",
+          "edge": "top_front"
+        },
+        "through_point": "point.z"
       }
     }
   ],
   "construction_planes": [
     {
-      "id": "construction_plane.offset_xy",
-      "name": "OffsetXY",
-      "kind": "offset_from_plane",
+      "id": "construction_plane.parallel_xy",
+      "name": "ParallelXY",
+      "kind": "parallel_to_plane_through_point",
       "relation": {
-        "id": "relation.offset_xy",
-        "type": "plane_offset_from_plane",
+        "id": "relation.parallel_xy",
+        "type": "plane_parallel_to_plane_through_point",
         "source_plane": "datum.xy",
-        "offset_parameter": "part.plane_offset"
-      }
-    },
-    {
-      "id": "construction_plane.abc",
-      "name": "PlaneABC",
-      "kind": "through_three_points",
-      "relation": {
-        "id": "relation.plane_abc",
-        "type": "plane_through_three_points",
-        "first_point": "construction_point.a",
-        "second_point": "construction_point.b",
-        "third_point": "construction_point.c"
+        "through_point": "point.z"
       }
     }
   ]
 }
 ```
 
-Construction-plane deserialization resolves construction-plane dependencies iteratively, so an offset construction plane can reference an earlier construction plane in the same file.
+Construction-plane deserialization resolves construction-plane dependencies iteratively. Construction-line deserialization runs after sketches and features so generated-edge references can validate against their source features.
 
 ## Geometry-layer behavior
 
-`WorkplaneResolver` now resolves:
+`WorkplaneResolver` resolves:
 
 ```text
 datum.xy
@@ -291,71 +199,26 @@ feature.base_extrude.top/bottom/right/left/front/back
 explicit construction_plane.<id>
 offset_from_plane construction_plane.<id>
 through_three_points construction_plane.<id>
+parallel_to_plane_through_point construction_plane.<id>
 ```
 
 A construction plane resolves into a `ResolvedWorkplane` frame with origin, x-axis, y-axis, and normal. Construction-plane bounds are currently disabled because these planes are treated as infinite user reference planes.
 
-## Example
-
-The repository contains:
-
-```text
-examples/construction_plane_prism.blcad.json
-```
-
-This model defines a construction plane, places a closed-profile sketch on it, recomputes the profile through the geometry layer, and can be exported through the normal headless STEP workflow.
-
 ## Test coverage
 
-Core tests cover:
+Core tests cover explicit construction geometry, relation creation, relation validation, relation-driven construction objects, dependency graph edges, recompute-plan inclusion after parameter changes, semantic generated edge/vertex references, chained relation dependencies, and JSON roundtrips for semantic generated references.
 
-- explicit construction point creation
-- construction relation creation
-- relation validation for duplicate point references
-- explicit construction line creation
-- zero-length construction line rejection
-- non-unit construction line rejection
-- line-through-two-points construction line creation
-- explicit construction plane creation
-- relation-driven construction plane creation
-- zero-length plane frame rejection
-- non-orthogonal plane frame rejection
-- wrong normal orientation rejection
-- `PartDocument` storage for points, lines, and planes
-- construction planes acting as sketch workplanes
-- dependency graph edges from parameters to construction planes
-- dependency graph edges from construction points to relation-driven lines and planes
-- dependency graph edges from source workplanes and offset parameters to offset construction planes
-- dependency graph edges from construction planes to sketches
-- recompute-plan inclusion after an offset parameter changes
-- missing parameter-dependency rejection
-- missing relation-reference rejection
-- collinear three-point plane rejection
-- JSON roundtrip for explicit construction geometry
-- JSON roundtrip for relation-driven construction geometry
-
-Geometry tests cover:
-
-- resolving an explicit construction plane into a `ResolvedWorkplane`
-- resolving an offset construction plane relation into a `ResolvedWorkplane`
-- resolving a three-point construction plane relation into a `ResolvedWorkplane`
-- mapping local sketch coordinates through explicit and relation-driven construction plane frames
-- recomputing a closed profile sketched on an explicit construction plane
-- recomputing a closed profile sketched on an offset construction plane relation
+Geometry tests cover resolving explicit construction planes, offset construction planes, three-point construction planes, planes parallel to another plane through a point, mapping local sketch coordinates through construction plane frames, and recomputing closed profiles on explicit and offset construction planes.
 
 ## Not implemented yet
 
-The current construction-geometry seed does not implement:
+The current construction-geometry layer does not implement:
 
 - evaluated expression-based explicit point/line/plane coordinates
-- plane parallel to another plane through a point
-- line parallel to another line through a point
+- geometric evaluation of generated edges or generated vertices into exact points/curves
+- a general construction-line resolver
+- point-on-line, point-on-plane, and line-on-plane geometric solving
 - plane normal to a line
-- point-on-line relation
-- point-on-plane relation
-- line-on-plane relation
-- parallel, orthogonal, or angle relations
-- references to generated semantic edges or vertices
 - tangent or normal references to generated surfaces
 - relation collection management independent from construction objects
 - GUI manipulators
@@ -365,30 +228,8 @@ The current construction-geometry seed does not implement:
 
 ## Next construction-geometry step
 
-The next construction-geometry increment should stabilize construction relations into a more general reference system instead of adding GUI editing immediately.
-
-Recommended next sequence:
-
-1. Add semantic generated edge and vertex reference IDs similar to `SemanticFaceReference`.
-2. Add relation validation for generated edge/vertex references without storing raw OCCT topology IDs.
-3. Add `PointOnPlane`, `PointOnLine`, and `LineOnPlane` relation definitions.
-4. Add `PlaneParallelToPlaneThroughPoint` and `LineParallelToLineThroughPoint`.
-5. Add relation dependency tests covering chained relations.
-6. Add JSON roundtrip tests for chained relations and semantic references.
-7. Add resolver support only where a relation can be evaluated deterministically from existing model intent.
-8. Keep GUI manipulators, constraint solving, and 3D sketch splines out of this step.
+The next construction-geometry increment should evaluate semantic generated edge and vertex references for the limited rectangular-additive-extrude topology already used by semantic face workplanes, then consume those evaluated references in deterministic construction-point and construction-line evaluators. It should not add a general constraint solver yet.
 
 ## Relationship to existing roadmap
 
-The current MVP 2 semantic-face workplane seed proves that sketches can be placed on generated planar faces without storing raw OCCT face IDs.
-
-The line-based closed-profile block proves that a planar sketch can define a non-rectangular area from explicit line loops.
-
-This construction-geometry block generalizes workplane placement from fixed datum planes and controlled generated faces to user-defined and relation-driven reference planes.
-
-```text
-Construction geometry answers: where can a sketch or curve be placed?
-General closed sketch profiles answer: what planar shape can a sketch describe?
-Inventor-like sketcher roadmap answers: how should sketch entities, constraints, dimensions, and profile detection eventually behave?
-Advanced surfacing answers: how can spatial curves, multiple sketches, guide curves, and surfaces form freeform geometry?
-```
+The semantic-face workplane seed proves that sketches can be placed on generated planar faces without storing raw OCCT face IDs. The chained-relation step extends the same principle to generated edge and vertex references while still keeping saved model intent independent from transient OCCT topology.
