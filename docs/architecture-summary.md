@@ -35,6 +35,9 @@ BLCAD is intended to become an independent parametric CAD system for Linux. The 
 - `Parameter`
 - `Expression`
 - `Sketch`
+- `SketchEntityId`
+- `LineSegment`
+- `ClosedProfile`
 - `DatumPlane`
 - `DerivedWorkplane`
 - `SemanticFaceReference`
@@ -95,6 +98,24 @@ The MVP-2 seed introduces semantic generated-face references and resolves them i
 
 This is still intentionally not a full topological-naming system. No raw OCCT face IDs are stored in `PartDocument`.
 
+## Implemented line-based closed profiles
+
+The first general closed-profile step is implemented:
+
+- `SketchEntityId` identifies sketch entities.
+- `LineSegment` stores ordered 2D endpoints in sketch-local coordinates.
+- `ClosedProfile` references ordered line-segment IDs.
+- The sketch model validates connected loops, duplicate line references, and self-intersections.
+- JSON serialization stores `line_segments` and `closed_profiles` as model intent.
+- The geometry layer converts closed-profile vertices into an OCCT polygon wire and face.
+- `AdditiveExtrude` supports exactly one rectangle profile or exactly one closed profile.
+- `SubtractiveExtrude` supports exactly one circle profile or exactly one closed profile.
+- Closed-profile geometry uses resolved workplanes, so it works with the existing datum and semantic-face workplane paths.
+- `examples/triangle_prism.blcad.json` demonstrates a non-rectangular additive prism.
+- `examples/triangle_cut_plate.blcad.json` demonstrates a non-circular through-all cut.
+
+Still intentionally missing: arcs, splines, automatic region detection, multiple contours, inner holes in one profile, a full sketch constraint solver, and GUI sketch editing.
+
 ## Future construction geometry
 
 Construction geometry is a planned datum-system layer, not yet implemented. It should introduce user-created construction points, construction lines/axes, and construction planes that are part of model intent.
@@ -139,13 +160,13 @@ The detailed roadmap is in `docs/advanced-surfacing-and-3d-sketch-mvp.md`.
 - Construction planes answer where sketches live; sketch profiles answer what shape sketches describe.
 - 3D sketches and surfacing answer how spatial curves, multiple profile sections, guide curves, and surfaces form freeform geometry.
 - OCCT shapes are a cache, not the primary model.
-- The OCCT path lives in an optional `blcad_geometry` target: adapters for rectangle extrusion and circular cut, a small ShapeCache, a WorkplaneResolver, recompute execution for `AdditiveExtrude` and `SubtractiveExtrude`, full document recompute, incremental recompute, bounds validation for the current top/bottom/right/left/front/back face cases, and STEP export of the final shape.
+- The OCCT path lives in an optional `blcad_geometry` target: adapters for rectangle extrusion, circular cut, line-based closed-profile extrusion/cut, a small ShapeCache, a WorkplaneResolver, recompute execution for `AdditiveExtrude` and `SubtractiveExtrude`, full document recompute, incremental recompute, bounds validation for the current top/bottom/right/left/front/back face cases, and STEP export of the final shape.
 - The ShapeCache remains in the geometry layer; `PartDocument` remains OCCT-free and is computed into the cache through `execute_document` and `execute_plan`.
 - JSON serialization stores model intent only; it does not serialize OCCT shapes or ShapeCache contents.
 - Parameter values can be changed through `PartDocument::set_parameter_value`; a change marks dependents and drives incremental recompute.
 - Derived workplanes are resolved geometrically without turning raw OCCT faces into core model references.
-- General closed sketch profiles are documented as the next larger sketch-modeling block and remain separate from topological naming.
-- Construction geometry and relation-driven datum placement are documented as a separate future block and remain separate from the full sketch constraint solver.
+- Line-based closed sketch profiles are implemented as a first planar general-profile path and remain separate from topological naming.
+- Construction geometry and relation-driven datum placement are documented as the next future block and remain separate from the full sketch constraint solver.
 - Advanced surfacing, sweep, loft, 3D sketch, and surface-to-solid workflows are documented as a separate future block and remain separate from the first planar closed-profile MVP.
 - Assembly parameters must later flow into parts in a controlled way.
 - Fillets and chamfers are their own parametric features with semantic edge references, not only late BRep corrections.
