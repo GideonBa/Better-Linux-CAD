@@ -448,9 +448,10 @@ Result<ConstructionPlane> ConstructionPlane::create_offset_from_plane(Constructi
         object_id, "construction plane offset requires plane-offset-from-plane relation"));
   }
 
+  auto parameter_dependencies = relation.parameter_dependencies();
   return Result<ConstructionPlane>::success(ConstructionPlane(
       std::move(id), std::move(name), ConstructionPlaneKind::OffsetFromPlane, Point3{}, Vector3{},
-      Vector3{}, Vector3{}, relation.parameter_dependencies(), std::move(relation)));
+      Vector3{}, Vector3{}, std::move(parameter_dependencies), std::move(relation)));
 }
 
 Result<ConstructionPlane> ConstructionPlane::create_through_three_points(
