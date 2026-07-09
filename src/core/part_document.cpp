@@ -82,7 +82,13 @@ Result<std::size_t> PartDocument::add_parameter(Parameter parameter) {
 }
 
 Result<std::size_t> PartDocument::add_datum_plane(DatumPlane datum_plane) {
-  if (has_workplane_id(datum_plane.id())) {
+  if (has_datum_plane_id(datum_plane.id())) {
+    return Result<std::size_t>::failure(Error::validation(
+        datum_plane.id().value(), "datum plane id must be unique within part document"));
+  }
+
+  if (has_derived_workplane_id(datum_plane.id()) ||
+      has_construction_plane_id(ConstructionPlaneId(datum_plane.id().value()))) {
     return Result<std::size_t>::failure(Error::validation(
         datum_plane.id().value(), "workplane id must be unique within part document"));
   }
