@@ -32,6 +32,7 @@ examples/bottom_face_cut.blcad.json
 examples/right_face_cut.blcad.json
 examples/left_face_cut.blcad.json
 examples/front_face_cut.blcad.json
+examples/back_face_cut.blcad.json
 ```
 
 These examples demonstrate that `.blcad.json` can store semantic generated-face references without storing OCCT face IDs, that the geometry layer can resolve workplanes before cutting, and that bounded validation can reject invalid profile placement before OCCT execution.
@@ -60,6 +61,7 @@ Export commands:
 ./build/dev-geometry/blcad_export_step examples/right_face_cut.blcad.json build/right_face_cut.step
 ./build/dev-geometry/blcad_export_step examples/left_face_cut.blcad.json build/left_face_cut.step
 ./build/dev-geometry/blcad_export_step examples/front_face_cut.blcad.json build/front_face_cut.step
+./build/dev-geometry/blcad_export_step examples/back_face_cut.blcad.json build/back_face_cut.step
 ```
 
 Depending on the exact CMake build directory, the binary may be located under the configured geometry build directory. The command accepts exactly two arguments:
@@ -84,7 +86,7 @@ The CLI performs this sequence:
 
 ## Test coverage
 
-Core tests cover file write/read and JSON roundtrip for top, bottom, right, left, and front derived workplanes. Geometry tests cover recompute and STEP export from JSON-restored documents, recompute from sketches on derived top, bottom, right, left, and front workplanes, and bounded validation for valid and out-of-bounds holes.
+Core tests cover file write/read and JSON roundtrip for top, bottom, right, left, front, and back derived workplanes. Geometry tests cover recompute and STEP export from JSON-restored documents, recompute from sketches on derived top, bottom, right, left, front, and back workplanes, and bounded validation for valid and out-of-bounds holes.
 
 ## Deliberate limitation
 
@@ -99,5 +101,6 @@ Not included yet:
 - ShapeCache serialization
 - full topological naming
 - arbitrary face support beyond the current selected semantic face cases
+- general closed sketch profile file workflow
 
 The workflow is sufficient as the first real headless file-based CAD path and as a persistence path for semantic generated-face references.
