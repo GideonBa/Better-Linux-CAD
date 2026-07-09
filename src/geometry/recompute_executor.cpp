@@ -1,5 +1,6 @@
 #include "blcad/geometry/recompute_executor.hpp"
 
+#include "blcad/geometry/dimension_driven_profile_resolver.hpp"
 #include "blcad/geometry/reference_generated_profile_resolver.hpp"
 
 #include <string>
@@ -57,13 +58,18 @@ namespace {
 
 [[nodiscard]] Result<std::vector<Point2>> evaluate_closed_profile_local_vertices(
     const PartDocument& document, const Sketch& sketch, const ClosedProfile& profile) {
-  if (!closed_profile_uses_reference_generated_lines(sketch, profile)) {
-    return sketch.closed_profile_vertices(profile);
+  if (closed_profile_uses_reference_generated_lines(sketch, profile)) {
+    ReferenceGeneratedProfileResolver resolver;
+    return resolver.resolve_closed_profile_vertices(document, sketch, profile,
+                                                    sketch.reference_generated_lines());
   }
 
-  ReferenceGeneratedProfileResolver resolver;
-  return resolver.resolve_closed_profile_vertices(document, sketch, profile,
-                                                  sketch.reference_generated_lines());
+  if (!sketch.driving_dimensions().empty()) {
+    DimensionDrivenProfileResolver resolver;
+    return resolver.resolve_closed_profile_vertices(document, sketch, profile);
+  }
+
+  return sketch.closed_profile_vertices(profile);
 }
 
 [[nodiscard]] Result<std::vector<Point3>> evaluate_bounded_closed_profile_vertices(
