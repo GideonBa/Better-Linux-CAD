@@ -110,6 +110,37 @@ Proposed first implementation sequence:
 
 This block comes after the controlled semantic-face workplane sequence, because arbitrary profiles still need reliable workplane placement, bounds handling, JSON persistence, recompute ordering, and STEP export.
 
+## Future MVP: Construction geometry and relation-driven datum system
+
+Goal: support user-created construction planes, construction lines/axes, and construction points that can be placed freely in 3D and can also be defined through geometric relationships.
+
+Detailed document: `docs/construction-geometry-mvp.md`
+
+Explicitly not implemented yet:
+
+- user-created construction planes beyond the current fixed `datum.xy` and semantic-face workplanes
+- user-created construction lines / datum axes
+- user-created construction points / datum points
+- arbitrary numeric 3D placement of construction geometry
+- sketches on user-created construction planes
+- relation-driven placement such as parallel, orthogonal, angle, offset, point-on-line, point-on-plane, line-through-two-points, and plane-through-three-points
+- relation-driven invalidation through the dependency graph
+- JSON persistence of construction geometry and construction relations
+- references from construction geometry to generated semantic faces, edges, vertices, or analytic surfaces
+
+Proposed first implementation sequence:
+
+- add `ConstructionPoint`, `ConstructionLine`, and `ConstructionPlane` IDs and core model types
+- add explicit placement definitions for point, line, and plane
+- add `PartDocument` storage, validation, and dependency graph nodes
+- allow sketches to reference construction planes as workplanes
+- add JSON roundtrip tests
+- resolve construction planes into `ResolvedWorkplane` frames in the geometry layer
+- add recompute tests for a feature driven by a sketch on a construction plane
+- add relation models for offset plane, line through two points, plane through three points, parallel, orthogonal, and angle-based construction
+
+This block answers where a sketch can live. The general closed sketch profile block answers what shape a sketch can describe. They should remain separate, testable increments.
+
 ## MVP 3: Parametric bolt circle
 
 Goal: first meaningful parametric feature test.
