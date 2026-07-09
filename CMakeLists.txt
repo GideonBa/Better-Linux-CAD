@@ -137,6 +137,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/quantity_tests.cpp
     tests/core/recompute_plan_tests.cpp
     tests/core/semantic_reference_invalidation_tests.cpp
+    tests/core/semantic_reference_json_tests.cpp
     tests/core/sketch_tests.cpp
   )
 
