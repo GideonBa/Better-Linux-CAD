@@ -115,6 +115,13 @@ namespace {
                                  thickness_mm / 2.0},
                           Vector3{-1.0, 0.0, 0.0}, Vector3{0.0, 0.0, 1.0},
                           Vector3{0.0, 1.0, 0.0}, make_bounds(width_mm, thickness_mm)});
+  case SemanticFace::Back:
+    return Result<ResolvedWorkplane>::success(
+        ResolvedWorkplane{workplane.id(),
+                          Point3{rectangle_center.x, rectangle_center.y - height_mm / 2.0,
+                                 thickness_mm / 2.0},
+                          Vector3{1.0, 0.0, 0.0}, Vector3{0.0, 0.0, 1.0},
+                          Vector3{0.0, -1.0, 0.0}, make_bounds(width_mm, thickness_mm)});
   }
 
   return Result<ResolvedWorkplane>::failure(
