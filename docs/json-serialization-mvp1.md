@@ -1,6 +1,6 @@
 # JSON Serialization
 
-Status: core serialization for `PartDocument` model intent, including file-level helpers, derived workplanes, line-based closed sketch profiles, explicit construction geometry, relation-driven construction geometry, relation-driven construction points, chained construction relations, semantic generated edge/vertex references, projected sketch reference entities, first reference-driven sketch constraints, reference recovery metadata, reference remap records, and sketch-origin override records.
+Status: core serialization for `PartDocument` model intent, including file-level helpers, derived workplanes, line-based closed sketch profiles, explicit construction geometry, relation-driven construction geometry, relation-driven construction points, chained construction relations, semantic generated edge/vertex references, projected sketch reference entities, first reference-driven sketch constraints, first-class reference-generated sketch helper lines, reference recovery metadata, reference remap records, and sketch-origin override records.
 
 The JSON serialization layer persists model intent only. It does not serialize OCCT shapes, `GeometryShape`, `ShapeCache` contents, raw face IDs, raw edge IDs, raw vertex IDs, BRep handles, resolved projected coordinates, solver state, or exported STEP data.
 
@@ -8,7 +8,7 @@ The JSON serialization layer persists model intent only. It does not serialize O
 
 The goal is to make a `PartDocument` reproducible from a textual representation:
 
-1. Build a `PartDocument` with parameters, datum planes, construction geometry, construction relations, derived workplanes, sketches, sketch entities, projected sketch reference entities, reference-driven sketch constraints, reference recovery records, profiles, and features.
+1. Build a `PartDocument` with parameters, datum planes, construction geometry, construction relations, derived workplanes, sketches, sketch entities, projected sketch reference entities, reference-generated sketch helper lines, reference-driven sketch constraints, reference recovery records, profiles, and features.
 2. Serialize that model intent to JSON.
 3. Optionally write the JSON as a `.blcad.json` model file.
 4. Rebuild the `PartDocument` from JSON through the normal validated construction APIs.
@@ -33,6 +33,7 @@ The current JSON format stores:
 - line-segment sketch entities
 - projected sketch point references
 - projected sketch line references
+- reference-generated sketch helper lines
 - reference-driven sketch constraints
 - reference status records
 - reference remap records
@@ -85,29 +86,6 @@ Relation-driven construction points store embedded relation intent:
 }
 ```
 
-Relation-driven construction lines and planes use the same embedded relation shape:
-
-```json
-{
-  "construction_lines": [
-    {
-      "id": "line.edge_parallel",
-      "name": "GeneratedEdgeParallel",
-      "kind": "parallel_to_generated_edge_through_point",
-      "relation": {
-        "id": "relation.edge_parallel",
-        "type": "line_parallel_to_generated_edge_through_point",
-        "generated_edge": {
-          "source_feature": "feature.base",
-          "edge": "top_front"
-        },
-        "through_point": "point.top_front_mid"
-      }
-    }
-  ]
-}
-```
-
 Supported relation type strings are:
 
 ```text
@@ -143,11 +121,33 @@ Generated edge and vertex references are serialized semantically:
 
 Deserialization restores construction lines together with sketches, features, and derived workplanes so generated-edge line relations and projected construction-line references can validate once their source feature and construction point dependencies exist.
 
-## Projected sketch references and constraints
+## Projected sketch references, helper lines, and constraints
 
 Sketches can store projected reference entities in `projected_points` and `projected_lines`. These are sketch-local model-intent references. They do not serialize resolved 2D coordinates, OCCT topology, or cached projection results.
 
 Projected point references support construction points and semantic generated vertices. Projected line references support construction lines and semantic generated edges. Reference-driven constraints are stored in a sketch-level `constraints` array.
+
+Reference-generated helper lines are stored in `reference_generated_lines`:
+
+```json
+{
+  "reference_generated_lines": [
+    {
+      "id": "helper.ab",
+      "start_constraint": "constraint.ab.start",
+      "end_constraint": "constraint.ab.end",
+      "direction_constraint": "constraint.ab.parallel_x"
+    },
+    {
+      "id": "helper.bc",
+      "start_constraint": "constraint.bc.start",
+      "end_constraint": "constraint.bc.end"
+    }
+  ]
+}
+```
+
+`reference_generated_lines` are loaded before `constraints`. That order lets constraints target helper-line IDs without placeholder explicit line segments. The completed sketch is then validated by `PartDocument` to ensure the endpoint and optional direction constraints exist and match the helper line.
 
 Supported reference target kinds are:
 
@@ -188,28 +188,7 @@ Reference status records are stored at document level:
 }
 ```
 
-Reference remap records are explicit model intent. They do not silently rewrite sketches during JSON load:
-
-```json
-{
-  "reference_remaps": [
-    {
-      "id": "remap.old_top_to_base_top",
-      "original": {
-        "kind": "face",
-        "source_feature": "feature.old",
-        "face": "top"
-      },
-      "replacement": {
-        "kind": "face",
-        "source_feature": "feature.base",
-        "face": "top"
-      },
-      "reason": "manual replacement selected by the user"
-    }
-  ]
-}
-```
+Reference remap records are explicit model intent. They do not silently rewrite sketches during JSON load.
 
 Sketch-origin overrides are stored as local 2D coordinates in the sketch's resolved workplane frame:
 
@@ -280,11 +259,11 @@ back
 
 ## Sketches and features
 
-A sketch stores its identity, workplane reference, sketch entities, projected reference entities, reference-driven constraints, and profiles. The workplane reference may point to a standard datum plane, a derived workplane, an explicit construction plane, or a relation-driven construction plane.
+A sketch stores its identity, workplane reference, sketch entities, projected reference entities, reference-generated helper lines, reference-driven constraints, and profiles. The workplane reference may point to a standard datum plane, a derived workplane, an explicit construction plane, or a relation-driven construction plane.
 
-Line-based closed profiles are serialized as ordered references to line-segment sketch entities. The line order is significant. Deserialization rebuilds the `Sketch`, validates that the line chain is connected and non-self-intersecting, and then adds the closed profile through the normal construction API.
+Line-based closed profiles are serialized as ordered references to line-segment or reference-generated helper-line sketch entities. The line order is significant. Explicit line loops are validated directly by `Sketch`; reference-generated helper-line loops are resolved and validated by the geometry layer before feature recompute.
 
-Projected sketch references are stored alongside sketch entities. First reference-driven constraints are stored as model intent and evaluated by the geometry layer through `ReferenceDrivenSketchHelper`. They are not a full serialized solver state.
+Projected sketch references are stored alongside sketch entities. First reference-driven constraints are stored as model intent and evaluated by the geometry layer through `ReferenceDrivenSketchHelper`. Reference-generated helper lines are evaluated through `ReferenceGeneratedProfileResolver`. They are not a full serialized solver state.
 
 Reference recovery records are stored after features and sketches have been restored. A lost reference may name a missing source feature so the document can preserve broken intent for later user-controlled repair.
 
@@ -309,5 +288,6 @@ Core JSON tests cover:
 - relation-driven generated edge/vertex construction point roundtrips
 - projected sketch reference roundtrips
 - reference-driven sketch constraint roundtrips
+- reference-generated sketch helper-line roundtrips
 - reference recovery metadata roundtrips
 - unsupported schema and unsupported feature rejection
