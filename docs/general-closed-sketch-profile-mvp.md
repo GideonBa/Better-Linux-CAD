@@ -4,6 +4,8 @@ Status: first line-based closed-profile MVP implemented.
 
 This document records the implemented first step from primitive-only sketches toward general CAD sketch profiles. The implementation is intentionally narrow: it supports ordered line-segment loops and uses them as one closed planar profile for additive or subtractive extrudes. Arcs, splines, profile-region detection, multiple contours, inner holes, and GUI editing remain later work.
 
+The larger Inventor-like sketcher and sketch-driven feature roadmap is documented in `docs/inventor-like-sketcher-and-feature-roadmap.md`.
+
 ## Implemented scope
 
 The first implementation adds:
@@ -140,9 +142,17 @@ Geometry tests cover:
 The first closed-profile MVP does not implement:
 
 - arcs
+- circles as general sketch entities
+- rectangles as generated constrained sketch entities
+- ellipses
 - splines
+- polygons
+- slots
+- sketch text
+- projected geometry
 - trimmed curves
 - offset profiles
+- sketch fillets or sketch chamfers
 - sketch constraints
 - tangent, parallel, perpendicular, or dimensional sketch constraints
 - automatic region detection from unordered curves
@@ -150,11 +160,12 @@ The first closed-profile MVP does not implement:
 - inner holes in one profile
 - profile selection from multiple regions
 - arbitrary non-planar sketch geometry
+- revolve or revolve cut features
 - 3D sketch splines connecting points from sketches on different planes
 - loft, sweep, boundary surface, surface stitching, or closed-shell-to-solid features
 - GUI sketch editing
 
-These are intentionally tracked as later roadmap blocks.
+These are intentionally tracked in the broader Inventor-like sketcher and feature roadmap.
 
 ## Relationship to other roadmap blocks
 
@@ -163,5 +174,7 @@ The current MVP 2 semantic-face workplane seed proves where sketches can be plac
 This closed-profile MVP proves that a single planar sketch can define a non-rectangular closed area from explicit line segments.
 
 Construction geometry remains the next foundational block for placing user-defined planes, lines, and points freely in 3D.
+
+The Inventor-like sketcher roadmap is the long-term target for full 2D sketch entities, editing tools, constraints, dimensions, automatic region detection, revolve/revolve cut, richer feature creation, and GUI sketch editing.
 
 Advanced surfacing remains a later block for 3D curves, guide splines, sweeps, lofts, boundary surfaces, surface stitching, and closed-shell-to-solid conversion.
