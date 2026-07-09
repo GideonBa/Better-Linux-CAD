@@ -43,11 +43,11 @@ public:
   [[nodiscard]] const std::optional<SemanticVertex>& vertex() const noexcept;
   [[nodiscard]] std::string node_id() const;
 
-private:
   SemanticReferenceTarget(FeatureId source_feature, SemanticReferenceKind kind,
                           std::optional<SemanticFace> face, std::optional<SemanticEdge> edge,
                           std::optional<SemanticVertex> vertex);
 
+private:
   FeatureId source_feature_;
   SemanticReferenceKind kind_;
   std::optional<SemanticFace> face_;
