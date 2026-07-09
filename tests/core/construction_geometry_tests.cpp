@@ -2,6 +2,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <utility>
+
 using namespace blcad;
 
 namespace {
@@ -138,7 +140,6 @@ TEST_CASE("PartDocument stores construction geometry and exposes construction pl
   CHECK(document.value().dependency_graph().has_dependency("sketch.on_construction_plane",
                                                            "feature.construction_plane_prism"));
 
-  REQUIRE(document.value().mark_all_clean, true);
   document.value().mark_all_clean();
   const auto affected = document.value().mark_parameter_changed(ParameterId("part.depth"));
   REQUIRE(affected);
