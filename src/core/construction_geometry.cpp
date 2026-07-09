@@ -3,6 +3,7 @@
 #include <cmath>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace blcad {
 namespace {
@@ -70,6 +71,36 @@ constexpr double k_tolerance = 1.0e-9;
   return Result<std::size_t>::success(0);
 }
 
+[[nodiscard]] Result<std::size_t> validate_point_reference(const std::string& object_id,
+                                                          const ConstructionPointId& point,
+                                                          std::string_view message) {
+  if (point.empty()) {
+    return Result<std::size_t>::failure(Error::validation(object_id, std::string(message)));
+  }
+
+  return Result<std::size_t>::success(0);
+}
+
+[[nodiscard]] Result<std::size_t> validate_line_reference(const std::string& object_id,
+                                                         const ConstructionLineId& line,
+                                                         std::string_view message) {
+  if (line.empty()) {
+    return Result<std::size_t>::failure(Error::validation(object_id, std::string(message)));
+  }
+
+  return Result<std::size_t>::success(0);
+}
+
+[[nodiscard]] Result<std::size_t> validate_plane_reference(const std::string& object_id,
+                                                          const DatumPlaneId& plane,
+                                                          std::string_view message) {
+  if (plane.empty()) {
+    return Result<std::size_t>::failure(Error::validation(object_id, std::string(message)));
+  }
+
+  return Result<std::size_t>::success(0);
+}
+
 } // namespace
 
 std::string_view to_string(ConstructionRelationType type) noexcept {
@@ -80,6 +111,22 @@ std::string_view to_string(ConstructionRelationType type) noexcept {
     return "line_through_two_points";
   case ConstructionRelationType::PlaneThroughThreePoints:
     return "plane_through_three_points";
+  case ConstructionRelationType::PointOnPlane:
+    return "point_on_plane";
+  case ConstructionRelationType::PointOnLine:
+    return "point_on_line";
+  case ConstructionRelationType::PointOnGeneratedEdge:
+    return "point_on_generated_edge";
+  case ConstructionRelationType::PointOnGeneratedVertex:
+    return "point_on_generated_vertex";
+  case ConstructionRelationType::LineOnPlane:
+    return "line_on_plane";
+  case ConstructionRelationType::PlaneParallelToPlaneThroughPoint:
+    return "plane_parallel_to_plane_through_point";
+  case ConstructionRelationType::LineParallelToLineThroughPoint:
+    return "line_parallel_to_line_through_point";
+  case ConstructionRelationType::LineParallelToGeneratedEdgeThroughPoint:
+    return "line_parallel_to_generated_edge_through_point";
   }
 
   return "plane_offset_from_plane";
@@ -91,6 +138,10 @@ std::string_view to_string(ConstructionLineKind kind) noexcept {
     return "explicit";
   case ConstructionLineKind::ThroughTwoPoints:
     return "through_two_points";
+  case ConstructionLineKind::ParallelToLineThroughPoint:
+    return "parallel_to_line_through_point";
+  case ConstructionLineKind::ParallelToGeneratedEdgeThroughPoint:
+    return "parallel_to_generated_edge_through_point";
   }
 
   return "explicit";
@@ -104,6 +155,8 @@ std::string_view to_string(ConstructionPlaneKind kind) noexcept {
     return "offset_from_plane";
   case ConstructionPlaneKind::ThroughThreePoints:
     return "through_three_points";
+  case ConstructionPlaneKind::ParallelToPlaneThroughPoint:
+    return "parallel_to_plane_through_point";
   }
 
   return "explicit";
@@ -118,9 +171,10 @@ Result<ConstructionRelation> ConstructionRelation::create_plane_offset_from_plan
     return Result<ConstructionRelation>::failure(valid_id.error());
   }
 
-  if (source_plane.empty()) {
-    return Result<ConstructionRelation>::failure(
-        Error::validation(object_id, "plane offset source plane must not be empty"));
+  auto valid_plane =
+      validate_plane_reference(object_id, source_plane, "plane offset source plane must not be empty");
+  if (valid_plane.has_error()) {
+    return Result<ConstructionRelation>::failure(valid_plane.error());
   }
 
   if (offset_parameter.empty()) {
@@ -131,7 +185,7 @@ Result<ConstructionRelation> ConstructionRelation::create_plane_offset_from_plan
   return Result<ConstructionRelation>::success(ConstructionRelation(
       std::move(id), ConstructionRelationType::PlaneOffsetFromPlane, std::move(source_plane),
       std::move(offset_parameter), ConstructionPointId(), ConstructionPointId(),
-      ConstructionPointId()));
+      ConstructionPointId(), ConstructionLineId(), std::nullopt, std::nullopt));
 }
 
 Result<ConstructionRelation> ConstructionRelation::create_line_through_two_points(
@@ -155,7 +209,8 @@ Result<ConstructionRelation> ConstructionRelation::create_line_through_two_point
 
   return Result<ConstructionRelation>::success(ConstructionRelation(
       std::move(id), ConstructionRelationType::LineThroughTwoPoints, DatumPlaneId(), ParameterId(),
-      std::move(first_point), std::move(second_point), ConstructionPointId()));
+      std::move(first_point), std::move(second_point), ConstructionPointId(), ConstructionLineId(),
+      std::nullopt, std::nullopt));
 }
 
 Result<ConstructionRelation> ConstructionRelation::create_plane_through_three_points(
@@ -180,7 +235,202 @@ Result<ConstructionRelation> ConstructionRelation::create_plane_through_three_po
 
   return Result<ConstructionRelation>::success(ConstructionRelation(
       std::move(id), ConstructionRelationType::PlaneThroughThreePoints, DatumPlaneId(), ParameterId(),
-      std::move(first_point), std::move(second_point), std::move(third_point)));
+      std::move(first_point), std::move(second_point), std::move(third_point), ConstructionLineId(),
+      std::nullopt, std::nullopt));
+}
+
+Result<ConstructionRelation> ConstructionRelation::create_point_on_plane(ConstructionRelationId id,
+                                                                         ConstructionPointId point,
+                                                                         DatumPlaneId source_plane) {
+  const auto object_id = id.empty() ? std::string("construction_relation") : id.value();
+  auto valid_id = validate_relation_id(id, object_id);
+  if (valid_id.has_error()) {
+    return Result<ConstructionRelation>::failure(valid_id.error());
+  }
+
+  auto valid_point =
+      validate_point_reference(object_id, point, "point-on-plane relation point must not be empty");
+  if (valid_point.has_error()) {
+    return Result<ConstructionRelation>::failure(valid_point.error());
+  }
+
+  auto valid_plane = validate_plane_reference(object_id, source_plane,
+                                              "point-on-plane relation plane must not be empty");
+  if (valid_plane.has_error()) {
+    return Result<ConstructionRelation>::failure(valid_plane.error());
+  }
+
+  return Result<ConstructionRelation>::success(ConstructionRelation(
+      std::move(id), ConstructionRelationType::PointOnPlane, std::move(source_plane), ParameterId(),
+      std::move(point), ConstructionPointId(), ConstructionPointId(), ConstructionLineId(),
+      std::nullopt, std::nullopt));
+}
+
+Result<ConstructionRelation> ConstructionRelation::create_point_on_line(ConstructionRelationId id,
+                                                                        ConstructionPointId point,
+                                                                        ConstructionLineId source_line) {
+  const auto object_id = id.empty() ? std::string("construction_relation") : id.value();
+  auto valid_id = validate_relation_id(id, object_id);
+  if (valid_id.has_error()) {
+    return Result<ConstructionRelation>::failure(valid_id.error());
+  }
+
+  auto valid_point =
+      validate_point_reference(object_id, point, "point-on-line relation point must not be empty");
+  if (valid_point.has_error()) {
+    return Result<ConstructionRelation>::failure(valid_point.error());
+  }
+
+  auto valid_line =
+      validate_line_reference(object_id, source_line, "point-on-line relation line must not be empty");
+  if (valid_line.has_error()) {
+    return Result<ConstructionRelation>::failure(valid_line.error());
+  }
+
+  return Result<ConstructionRelation>::success(ConstructionRelation(
+      std::move(id), ConstructionRelationType::PointOnLine, DatumPlaneId(), ParameterId(),
+      std::move(point), ConstructionPointId(), ConstructionPointId(), std::move(source_line),
+      std::nullopt, std::nullopt));
+}
+
+Result<ConstructionRelation> ConstructionRelation::create_point_on_generated_edge(
+    ConstructionRelationId id, ConstructionPointId point, SemanticEdgeReference generated_edge) {
+  const auto object_id = id.empty() ? std::string("construction_relation") : id.value();
+  auto valid_id = validate_relation_id(id, object_id);
+  if (valid_id.has_error()) {
+    return Result<ConstructionRelation>::failure(valid_id.error());
+  }
+
+  auto valid_point = validate_point_reference(object_id, point,
+                                              "point-on-generated-edge relation point must not be empty");
+  if (valid_point.has_error()) {
+    return Result<ConstructionRelation>::failure(valid_point.error());
+  }
+
+  return Result<ConstructionRelation>::success(ConstructionRelation(
+      std::move(id), ConstructionRelationType::PointOnGeneratedEdge, DatumPlaneId(), ParameterId(),
+      std::move(point), ConstructionPointId(), ConstructionPointId(), ConstructionLineId(),
+      std::move(generated_edge), std::nullopt));
+}
+
+Result<ConstructionRelation> ConstructionRelation::create_point_on_generated_vertex(
+    ConstructionRelationId id, ConstructionPointId point, SemanticVertexReference generated_vertex) {
+  const auto object_id = id.empty() ? std::string("construction_relation") : id.value();
+  auto valid_id = validate_relation_id(id, object_id);
+  if (valid_id.has_error()) {
+    return Result<ConstructionRelation>::failure(valid_id.error());
+  }
+
+  auto valid_point = validate_point_reference(
+      object_id, point, "point-on-generated-vertex relation point must not be empty");
+  if (valid_point.has_error()) {
+    return Result<ConstructionRelation>::failure(valid_point.error());
+  }
+
+  return Result<ConstructionRelation>::success(ConstructionRelation(
+      std::move(id), ConstructionRelationType::PointOnGeneratedVertex, DatumPlaneId(), ParameterId(),
+      std::move(point), ConstructionPointId(), ConstructionPointId(), ConstructionLineId(),
+      std::nullopt, std::move(generated_vertex)));
+}
+
+Result<ConstructionRelation> ConstructionRelation::create_line_on_plane(ConstructionRelationId id,
+                                                                        ConstructionLineId source_line,
+                                                                        DatumPlaneId source_plane) {
+  const auto object_id = id.empty() ? std::string("construction_relation") : id.value();
+  auto valid_id = validate_relation_id(id, object_id);
+  if (valid_id.has_error()) {
+    return Result<ConstructionRelation>::failure(valid_id.error());
+  }
+
+  auto valid_line =
+      validate_line_reference(object_id, source_line, "line-on-plane relation line must not be empty");
+  if (valid_line.has_error()) {
+    return Result<ConstructionRelation>::failure(valid_line.error());
+  }
+
+  auto valid_plane =
+      validate_plane_reference(object_id, source_plane, "line-on-plane relation plane must not be empty");
+  if (valid_plane.has_error()) {
+    return Result<ConstructionRelation>::failure(valid_plane.error());
+  }
+
+  return Result<ConstructionRelation>::success(ConstructionRelation(
+      std::move(id), ConstructionRelationType::LineOnPlane, std::move(source_plane), ParameterId(),
+      ConstructionPointId(), ConstructionPointId(), ConstructionPointId(), std::move(source_line),
+      std::nullopt, std::nullopt));
+}
+
+Result<ConstructionRelation> ConstructionRelation::create_plane_parallel_to_plane_through_point(
+    ConstructionRelationId id, DatumPlaneId source_plane, ConstructionPointId through_point) {
+  const auto object_id = id.empty() ? std::string("construction_relation") : id.value();
+  auto valid_id = validate_relation_id(id, object_id);
+  if (valid_id.has_error()) {
+    return Result<ConstructionRelation>::failure(valid_id.error());
+  }
+
+  auto valid_plane = validate_plane_reference(
+      object_id, source_plane, "plane parallel to plane through point source plane must not be empty");
+  if (valid_plane.has_error()) {
+    return Result<ConstructionRelation>::failure(valid_plane.error());
+  }
+
+  auto valid_point = validate_point_reference(
+      object_id, through_point, "plane parallel to plane through point reference point must not be empty");
+  if (valid_point.has_error()) {
+    return Result<ConstructionRelation>::failure(valid_point.error());
+  }
+
+  return Result<ConstructionRelation>::success(ConstructionRelation(
+      std::move(id), ConstructionRelationType::PlaneParallelToPlaneThroughPoint,
+      std::move(source_plane), ParameterId(), std::move(through_point), ConstructionPointId(),
+      ConstructionPointId(), ConstructionLineId(), std::nullopt, std::nullopt));
+}
+
+Result<ConstructionRelation> ConstructionRelation::create_line_parallel_to_line_through_point(
+    ConstructionRelationId id, ConstructionLineId source_line, ConstructionPointId through_point) {
+  const auto object_id = id.empty() ? std::string("construction_relation") : id.value();
+  auto valid_id = validate_relation_id(id, object_id);
+  if (valid_id.has_error()) {
+    return Result<ConstructionRelation>::failure(valid_id.error());
+  }
+
+  auto valid_line = validate_line_reference(
+      object_id, source_line, "line parallel to line through point source line must not be empty");
+  if (valid_line.has_error()) {
+    return Result<ConstructionRelation>::failure(valid_line.error());
+  }
+
+  auto valid_point = validate_point_reference(
+      object_id, through_point, "line parallel to line through point reference point must not be empty");
+  if (valid_point.has_error()) {
+    return Result<ConstructionRelation>::failure(valid_point.error());
+  }
+
+  return Result<ConstructionRelation>::success(ConstructionRelation(
+      std::move(id), ConstructionRelationType::LineParallelToLineThroughPoint, DatumPlaneId(),
+      ParameterId(), std::move(through_point), ConstructionPointId(), ConstructionPointId(),
+      std::move(source_line), std::nullopt, std::nullopt));
+}
+
+Result<ConstructionRelation> ConstructionRelation::create_line_parallel_to_generated_edge_through_point(
+    ConstructionRelationId id, SemanticEdgeReference generated_edge, ConstructionPointId through_point) {
+  const auto object_id = id.empty() ? std::string("construction_relation") : id.value();
+  auto valid_id = validate_relation_id(id, object_id);
+  if (valid_id.has_error()) {
+    return Result<ConstructionRelation>::failure(valid_id.error());
+  }
+
+  auto valid_point = validate_point_reference(
+      object_id, through_point,
+      "line parallel to generated edge through point reference point must not be empty");
+  if (valid_point.has_error()) {
+    return Result<ConstructionRelation>::failure(valid_point.error());
+  }
+
+  return Result<ConstructionRelation>::success(ConstructionRelation(
+      std::move(id), ConstructionRelationType::LineParallelToGeneratedEdgeThroughPoint,
+      DatumPlaneId(), ParameterId(), std::move(through_point), ConstructionPointId(),
+      ConstructionPointId(), ConstructionLineId(), std::move(generated_edge), std::nullopt));
 }
 
 const ConstructionRelationId& ConstructionRelation::id() const noexcept {
@@ -211,6 +461,18 @@ const ConstructionPointId& ConstructionRelation::third_point() const noexcept {
   return third_point_;
 }
 
+const ConstructionLineId& ConstructionRelation::source_line() const noexcept {
+  return source_line_;
+}
+
+const std::optional<SemanticEdgeReference>& ConstructionRelation::generated_edge() const noexcept {
+  return generated_edge_;
+}
+
+const std::optional<SemanticVertexReference>& ConstructionRelation::generated_vertex() const noexcept {
+  return generated_vertex_;
+}
+
 std::vector<std::string> ConstructionRelation::referenced_node_ids() const {
   switch (type_) {
   case ConstructionRelationType::PlaneOffsetFromPlane:
@@ -219,6 +481,22 @@ std::vector<std::string> ConstructionRelation::referenced_node_ids() const {
     return {first_point_.value(), second_point_.value()};
   case ConstructionRelationType::PlaneThroughThreePoints:
     return {first_point_.value(), second_point_.value(), third_point_.value()};
+  case ConstructionRelationType::PointOnPlane:
+    return {first_point_.value(), source_plane_.value()};
+  case ConstructionRelationType::PointOnLine:
+    return {first_point_.value(), source_line_.value()};
+  case ConstructionRelationType::PointOnGeneratedEdge:
+    return {first_point_.value(), generated_edge_.value().source_feature().value()};
+  case ConstructionRelationType::PointOnGeneratedVertex:
+    return {first_point_.value(), generated_vertex_.value().source_feature().value()};
+  case ConstructionRelationType::LineOnPlane:
+    return {source_line_.value(), source_plane_.value()};
+  case ConstructionRelationType::PlaneParallelToPlaneThroughPoint:
+    return {source_plane_.value(), first_point_.value()};
+  case ConstructionRelationType::LineParallelToLineThroughPoint:
+    return {source_line_.value(), first_point_.value()};
+  case ConstructionRelationType::LineParallelToGeneratedEdgeThroughPoint:
+    return {generated_edge_.value().source_feature().value(), first_point_.value()};
   }
 
   return {};
@@ -232,14 +510,17 @@ std::vector<ParameterId> ConstructionRelation::parameter_dependencies() const {
   return {};
 }
 
-ConstructionRelation::ConstructionRelation(ConstructionRelationId id, ConstructionRelationType type,
-                                           DatumPlaneId source_plane, ParameterId offset_parameter,
-                                           ConstructionPointId first_point,
-                                           ConstructionPointId second_point,
-                                           ConstructionPointId third_point)
+ConstructionRelation::ConstructionRelation(
+    ConstructionRelationId id, ConstructionRelationType type, DatumPlaneId source_plane,
+    ParameterId offset_parameter, ConstructionPointId first_point, ConstructionPointId second_point,
+    ConstructionPointId third_point, ConstructionLineId source_line,
+    std::optional<SemanticEdgeReference> generated_edge,
+    std::optional<SemanticVertexReference> generated_vertex)
     : id_(std::move(id)), type_(type), source_plane_(std::move(source_plane)),
       offset_parameter_(std::move(offset_parameter)), first_point_(std::move(first_point)),
-      second_point_(std::move(second_point)), third_point_(std::move(third_point)) {}
+      second_point_(std::move(second_point)), third_point_(std::move(third_point)),
+      source_line_(std::move(source_line)), generated_edge_(std::move(generated_edge)),
+      generated_vertex_(std::move(generated_vertex)) {}
 
 Result<ConstructionPoint> ConstructionPoint::create_explicit(
     ConstructionPointId id, std::string name, Point3 position,
@@ -344,6 +625,56 @@ Result<ConstructionLine> ConstructionLine::create_through_two_points(Constructio
   return Result<ConstructionLine>::success(ConstructionLine(
       std::move(id), std::move(name), ConstructionLineKind::ThroughTwoPoints, Point3{}, Vector3{}, {},
       std::move(relation)));
+}
+
+Result<ConstructionLine> ConstructionLine::create_parallel_to_line_through_point(
+    ConstructionLineId id, std::string name, ConstructionRelation relation) {
+  const auto object_id = id.empty() ? std::string("construction_line") : id.value();
+
+  if (id.empty()) {
+    return Result<ConstructionLine>::failure(
+        Error::validation(object_id, "construction line id must not be empty"));
+  }
+
+  if (name.empty()) {
+    return Result<ConstructionLine>::failure(
+        Error::validation(object_id, "construction line name must not be empty"));
+  }
+
+  if (relation.type() != ConstructionRelationType::LineParallelToLineThroughPoint) {
+    return Result<ConstructionLine>::failure(Error::validation(
+        object_id,
+        "construction line parallel to line through point requires line-parallel-to-line-through-point relation"));
+  }
+
+  return Result<ConstructionLine>::success(ConstructionLine(
+      std::move(id), std::move(name), ConstructionLineKind::ParallelToLineThroughPoint, Point3{},
+      Vector3{}, {}, std::move(relation)));
+}
+
+Result<ConstructionLine> ConstructionLine::create_parallel_to_generated_edge_through_point(
+    ConstructionLineId id, std::string name, ConstructionRelation relation) {
+  const auto object_id = id.empty() ? std::string("construction_line") : id.value();
+
+  if (id.empty()) {
+    return Result<ConstructionLine>::failure(
+        Error::validation(object_id, "construction line id must not be empty"));
+  }
+
+  if (name.empty()) {
+    return Result<ConstructionLine>::failure(
+        Error::validation(object_id, "construction line name must not be empty"));
+  }
+
+  if (relation.type() != ConstructionRelationType::LineParallelToGeneratedEdgeThroughPoint) {
+    return Result<ConstructionLine>::failure(Error::validation(
+        object_id,
+        "construction line parallel to generated edge through point requires line-parallel-to-generated-edge-through-point relation"));
+  }
+
+  return Result<ConstructionLine>::success(ConstructionLine(
+      std::move(id), std::move(name), ConstructionLineKind::ParallelToGeneratedEdgeThroughPoint,
+      Point3{}, Vector3{}, {}, std::move(relation)));
 }
 
 const ConstructionLineId& ConstructionLine::id() const noexcept {
@@ -476,6 +807,31 @@ Result<ConstructionPlane> ConstructionPlane::create_through_three_points(
   return Result<ConstructionPlane>::success(ConstructionPlane(
       std::move(id), std::move(name), ConstructionPlaneKind::ThroughThreePoints, Point3{}, Vector3{},
       Vector3{}, Vector3{}, {}, std::move(relation)));
+}
+
+Result<ConstructionPlane> ConstructionPlane::create_parallel_to_plane_through_point(
+    ConstructionPlaneId id, std::string name, ConstructionRelation relation) {
+  const auto object_id = id.empty() ? std::string("construction_plane") : id.value();
+
+  if (id.empty()) {
+    return Result<ConstructionPlane>::failure(
+        Error::validation(object_id, "construction plane id must not be empty"));
+  }
+
+  if (name.empty()) {
+    return Result<ConstructionPlane>::failure(
+        Error::validation(object_id, "construction plane name must not be empty"));
+  }
+
+  if (relation.type() != ConstructionRelationType::PlaneParallelToPlaneThroughPoint) {
+    return Result<ConstructionPlane>::failure(Error::validation(
+        object_id,
+        "construction plane parallel to plane through point requires plane-parallel-to-plane-through-point relation"));
+  }
+
+  return Result<ConstructionPlane>::success(ConstructionPlane(
+      std::move(id), std::move(name), ConstructionPlaneKind::ParallelToPlaneThroughPoint, Point3{},
+      Vector3{}, Vector3{}, Vector3{}, {}, std::move(relation)));
 }
 
 const ConstructionPlaneId& ConstructionPlane::id() const noexcept {
