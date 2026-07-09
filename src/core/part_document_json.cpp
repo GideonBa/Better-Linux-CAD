@@ -165,6 +165,55 @@ constexpr int k_version = 1;
   return parameter_ids_from_json(value.at("parameter_dependencies"));
 }
 
+[[nodiscard]] json construction_relation_to_json(const ConstructionRelation& relation) {
+  json relation_json{{"id", relation.id().value()}, {"type", std::string(to_string(relation.type()))}};
+
+  if (relation.type() == ConstructionRelationType::PlaneOffsetFromPlane) {
+    relation_json["source_plane"] = relation.source_plane().value();
+    relation_json["offset_parameter"] = relation.offset_parameter().value();
+  }
+
+  if (relation.type() == ConstructionRelationType::LineThroughTwoPoints) {
+    relation_json["first_point"] = relation.first_point().value();
+    relation_json["second_point"] = relation.second_point().value();
+  }
+
+  if (relation.type() == ConstructionRelationType::PlaneThroughThreePoints) {
+    relation_json["first_point"] = relation.first_point().value();
+    relation_json["second_point"] = relation.second_point().value();
+    relation_json["third_point"] = relation.third_point().value();
+  }
+
+  return relation_json;
+}
+
+[[nodiscard]] Result<ConstructionRelation> construction_relation_from_json(const json& relation_json) {
+  const auto type = relation_json.at("type").get<std::string>();
+  const auto id = ConstructionRelationId(relation_json.at("id").get<std::string>());
+
+  if (type == "plane_offset_from_plane") {
+    return ConstructionRelation::create_plane_offset_from_plane(
+        id, DatumPlaneId(relation_json.at("source_plane").get<std::string>()),
+        ParameterId(relation_json.at("offset_parameter").get<std::string>()));
+  }
+
+  if (type == "line_through_two_points") {
+    return ConstructionRelation::create_line_through_two_points(
+        id, ConstructionPointId(relation_json.at("first_point").get<std::string>()),
+        ConstructionPointId(relation_json.at("second_point").get<std::string>()));
+  }
+
+  if (type == "plane_through_three_points") {
+    return ConstructionRelation::create_plane_through_three_points(
+        id, ConstructionPointId(relation_json.at("first_point").get<std::string>()),
+        ConstructionPointId(relation_json.at("second_point").get<std::string>()),
+        ConstructionPointId(relation_json.at("third_point").get<std::string>()));
+  }
+
+  return Result<ConstructionRelation>::failure(
+      json_error("unsupported construction relation type in part document json"));
+}
+
 [[nodiscard]] Result<ConstructionPoint> construction_point_from_json(const json& point_json) {
   if (point_json.at("kind").get<std::string>() != "explicit") {
     return Result<ConstructionPoint>::failure(
@@ -178,28 +227,65 @@ constexpr int k_version = 1;
 }
 
 [[nodiscard]] Result<ConstructionLine> construction_line_from_json(const json& line_json) {
-  if (line_json.at("kind").get<std::string>() != "explicit") {
-    return Result<ConstructionLine>::failure(
-        json_error("only explicit construction lines are supported"));
+  const auto kind = line_json.at("kind").get<std::string>();
+
+  if (kind == "explicit") {
+    return ConstructionLine::create_explicit(
+        ConstructionLineId(line_json.at("id").get<std::string>()),
+        line_json.at("name").get<std::string>(), point3_from_json(line_json.at("point")),
+        vector3_from_json(line_json.at("direction")), parameter_dependencies_from_object(line_json));
   }
 
-  return ConstructionLine::create_explicit(
-      ConstructionLineId(line_json.at("id").get<std::string>()),
-      line_json.at("name").get<std::string>(), point3_from_json(line_json.at("point")),
-      vector3_from_json(line_json.at("direction")), parameter_dependencies_from_object(line_json));
+  if (kind == "through_two_points") {
+    auto relation = construction_relation_from_json(line_json.at("relation"));
+    if (relation.has_error()) {
+      return Result<ConstructionLine>::failure(relation.error());
+    }
+
+    return ConstructionLine::create_through_two_points(
+        ConstructionLineId(line_json.at("id").get<std::string>()),
+        line_json.at("name").get<std::string>(), relation.value());
+  }
+
+  return Result<ConstructionLine>::failure(
+      json_error("unsupported construction line kind in part document json"));
 }
 
 [[nodiscard]] Result<ConstructionPlane> construction_plane_from_json(const json& plane_json) {
-  if (plane_json.at("kind").get<std::string>() != "explicit") {
-    return Result<ConstructionPlane>::failure(
-        json_error("only explicit construction planes are supported"));
+  const auto kind = plane_json.at("kind").get<std::string>();
+
+  if (kind == "explicit") {
+    return ConstructionPlane::create_explicit(
+        ConstructionPlaneId(plane_json.at("id").get<std::string>()),
+        plane_json.at("name").get<std::string>(), point3_from_json(plane_json.at("origin")),
+        vector3_from_json(plane_json.at("x_axis")), vector3_from_json(plane_json.at("y_axis")),
+        vector3_from_json(plane_json.at("normal")), parameter_dependencies_from_object(plane_json));
   }
 
-  return ConstructionPlane::create_explicit(
-      ConstructionPlaneId(plane_json.at("id").get<std::string>()),
-      plane_json.at("name").get<std::string>(), point3_from_json(plane_json.at("origin")),
-      vector3_from_json(plane_json.at("x_axis")), vector3_from_json(plane_json.at("y_axis")),
-      vector3_from_json(plane_json.at("normal")), parameter_dependencies_from_object(plane_json));
+  if (kind == "offset_from_plane") {
+    auto relation = construction_relation_from_json(plane_json.at("relation"));
+    if (relation.has_error()) {
+      return Result<ConstructionPlane>::failure(relation.error());
+    }
+
+    return ConstructionPlane::create_offset_from_plane(
+        ConstructionPlaneId(plane_json.at("id").get<std::string>()),
+        plane_json.at("name").get<std::string>(), relation.value());
+  }
+
+  if (kind == "through_three_points") {
+    auto relation = construction_relation_from_json(plane_json.at("relation"));
+    if (relation.has_error()) {
+      return Result<ConstructionPlane>::failure(relation.error());
+    }
+
+    return ConstructionPlane::create_through_three_points(
+        ConstructionPlaneId(plane_json.at("id").get<std::string>()),
+        plane_json.at("name").get<std::string>(), relation.value());
+  }
+
+  return Result<ConstructionPlane>::failure(
+      json_error("unsupported construction plane kind in part document json"));
 }
 
 [[nodiscard]] Result<DerivedWorkplane> derived_workplane_from_json(
@@ -371,26 +457,38 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
 
   root["construction_lines"] = json::array();
   for (const auto& line : document.construction_lines()) {
-    root["construction_lines"].push_back(
-        json{{"id", line.id().value()},
-             {"name", line.name()},
-             {"kind", "explicit"},
-             {"point", point3_to_json(line.point())},
-             {"direction", vector3_to_json(line.direction())},
-             {"parameter_dependencies", parameter_ids_to_json(line.parameter_dependencies())}});
+    json line_json{{"id", line.id().value()},
+                   {"name", line.name()},
+                   {"kind", std::string(to_string(line.kind()))}};
+
+    if (line.kind() == ConstructionLineKind::Explicit) {
+      line_json["point"] = point3_to_json(line.point());
+      line_json["direction"] = vector3_to_json(line.direction());
+      line_json["parameter_dependencies"] = parameter_ids_to_json(line.parameter_dependencies());
+    } else if (line.relation().has_value()) {
+      line_json["relation"] = construction_relation_to_json(line.relation().value());
+    }
+
+    root["construction_lines"].push_back(std::move(line_json));
   }
 
   root["construction_planes"] = json::array();
   for (const auto& plane : document.construction_planes()) {
-    root["construction_planes"].push_back(
-        json{{"id", plane.id().value()},
-             {"name", plane.name()},
-             {"kind", "explicit"},
-             {"origin", point3_to_json(plane.origin())},
-             {"x_axis", vector3_to_json(plane.x_axis())},
-             {"y_axis", vector3_to_json(plane.y_axis())},
-             {"normal", vector3_to_json(plane.normal())},
-             {"parameter_dependencies", parameter_ids_to_json(plane.parameter_dependencies())}});
+    json plane_json{{"id", plane.id().value()},
+                    {"name", plane.name()},
+                    {"kind", std::string(to_string(plane.kind()))}};
+
+    if (plane.kind() == ConstructionPlaneKind::Explicit) {
+      plane_json["origin"] = point3_to_json(plane.origin());
+      plane_json["x_axis"] = vector3_to_json(plane.x_axis());
+      plane_json["y_axis"] = vector3_to_json(plane.y_axis());
+      plane_json["normal"] = vector3_to_json(plane.normal());
+      plane_json["parameter_dependencies"] = parameter_ids_to_json(plane.parameter_dependencies());
+    } else if (plane.relation().has_value()) {
+      plane_json["relation"] = construction_relation_to_json(plane.relation().value());
+    }
+
+    root["construction_planes"].push_back(std::move(plane_json));
   }
 
   root["derived_workplanes"] = json::array();
@@ -543,15 +641,39 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
 
     const json construction_plane_array =
         root.contains("construction_planes") ? root.at("construction_planes") : json::array();
-    for (const auto& plane_json : construction_plane_array) {
-      auto plane = construction_plane_from_json(plane_json);
-      if (plane.has_error()) {
-        return Result<PartDocument>::failure(plane.error());
+    std::vector<bool> added_construction_plane(construction_plane_array.size(), false);
+    std::size_t remaining_construction_planes = construction_plane_array.size();
+    while (remaining_construction_planes > 0U) {
+      bool progress = false;
+
+      for (std::size_t index = 0; index < construction_plane_array.size(); ++index) {
+        if (added_construction_plane[index]) {
+          continue;
+        }
+
+        auto plane = construction_plane_from_json(construction_plane_array.at(index));
+        if (plane.has_error()) {
+          return Result<PartDocument>::failure(plane.error());
+        }
+
+        auto added = document.value().add_construction_plane(plane.value());
+        if (added.has_error()) {
+          const auto message = added.error().message();
+          if (message == "plane offset source plane must exist in part document") {
+            continue;
+          }
+
+          return Result<PartDocument>::failure(added.error());
+        }
+
+        added_construction_plane[index] = true;
+        --remaining_construction_planes;
+        progress = true;
       }
 
-      auto added = document.value().add_construction_plane(plane.value());
-      if (added.has_error()) {
-        return Result<PartDocument>::failure(added.error());
+      if (!progress) {
+        return Result<PartDocument>::failure(
+            json_error("could not resolve construction plane json dependencies"));
       }
     }
 
@@ -685,23 +807,17 @@ Result<std::uintmax_t> write_part_document_json_file(const PartDocument& documen
         json_file_error(path, "could not open part document json file for writing"));
   }
 
-  output << serialized.value() << '\n';
+  output << serialized.value();
   if (!output) {
     return Result<std::uintmax_t>::failure(
         json_file_error(path, "could not write part document json file"));
   }
 
-  output.close();
-  if (!output) {
+  std::error_code error;
+  const auto size = std::filesystem::file_size(path, error);
+  if (error) {
     return Result<std::uintmax_t>::failure(
-        json_file_error(path, "could not close part document json file after writing"));
-  }
-
-  std::error_code error_code;
-  const auto size = std::filesystem::file_size(path, error_code);
-  if (error_code) {
-    return Result<std::uintmax_t>::failure(
-        json_file_error(path, "could not determine written part document json file size"));
+        json_file_error(path, "could not stat written part document json file"));
   }
 
   return Result<std::uintmax_t>::success(size);
