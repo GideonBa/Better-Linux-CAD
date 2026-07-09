@@ -59,6 +59,17 @@ The optional `blcad_geometry` target contains OCCT adapters for rectangle extrus
 - `docs/back-workplane-mvp2.md`: back-face derived workplane for simple additive extrudes
 - `docs/general-closed-sketch-profile-mvp.md`: future block for arbitrary closed sketch profiles from line chains, arcs, splines, wires, and general OCCT faces
 - `docs/construction-geometry-mvp.md`: future block for user-created construction planes, lines, points, and relation-driven datum geometry
+- `docs/semantic-references.md`: canonical rule for semantic (non-topological) references to faces, edges, axes, and points
+- `docs/parameter-model.md`: target parameter scopes, expressions, cross-part flow, and top-down design
+- `docs/feature-system.md`: target feature model, feature references, and the parametric bolt circle
+- `docs/file-format.md`: target project and save file format
+- `docs/fillet-chamfer-features.md`: target fillet and chamfer features
+- `docs/pattern-and-mirror-features.md`: target linear/circular pattern and mirror features
+- `docs/hole-wizard.md`: target hole wizard and semantic hole features
+- `docs/shaft-wizard.md`: target shaft assistant (calculation plus geometry generation)
+- `docs/assembly-system.md`: target assembly system with constraints, solver, joints, and motion
+- `docs/engineering-modules.md`: target engineering modules (bolt, bearing, gear, material, standard parts)
+- `docs/user-interface.md`: target UI architecture over the core
 - `docs/mvp-plan.md`: MVP sequence
 - `docs/mvp-1-specification.md`: detailed MVP-1 specification
 - `docs/decisions/`: architecture decision records

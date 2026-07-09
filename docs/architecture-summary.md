@@ -126,3 +126,23 @@ The detailed roadmap is in `docs/construction-geometry-mvp.md`.
 - Fillets and chamfers are their own parametric features with semantic edge references, not only late BRep corrections.
 - The assembly system will describe spatial relationships through constraints: a constraint graph and solver determine component positions and remaining degrees of freedom; joints later allow controlled motion.
 - Edge and assembly references should remain semantic so they can survive model changes.
+- Parameters have scopes (global, assembly, part, sketch, feature) and optional expressions; assembly parameters flow into parts for top-down design.
+- Engineering assistants (hole wizard, shaft, bolt, bearing, gear) must size deterministically and traceably; AI is a later helper, never the sizing authority.
+- The UI only operates the core and holds no CAD logic; it is built after the internal models work.
+- The save file stores model intent; OCCT shapes are a regenerable cache and never the primary persisted data.
+
+## Detailed target-architecture documents
+
+The condensed points above are expanded in dedicated documents. Each is written as an incremental, testable block (goal, data model, dependency-graph integration, MVP scope, implementation sequence, out-of-scope):
+
+- `docs/semantic-references.md` — the non-topological reference rule shared by all feature and assembly documents
+- `docs/parameter-model.md` — scopes, expressions, cross-part flow, top-down design
+- `docs/feature-system.md` — general feature model and the parametric bolt circle
+- `docs/file-format.md` — project and save format
+- `docs/fillet-chamfer-features.md` — fillets and chamfers
+- `docs/pattern-and-mirror-features.md` — linear/circular patterns and mirror
+- `docs/hole-wizard.md` — semantic hole features and the standards database
+- `docs/shaft-wizard.md` — shaft calculation and geometry generation
+- `docs/assembly-system.md` — constraints, solver, joints, motion
+- `docs/engineering-modules.md` — bolt, bearing, gear, material, standard-parts modules
+- `docs/user-interface.md` — UI architecture over the core

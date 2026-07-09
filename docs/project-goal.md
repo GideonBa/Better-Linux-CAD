@@ -30,6 +30,25 @@ The project should grow in controlled vertical slices:
 
 The current development rule is to keep every step narrow enough to test in the headless pipeline before adding UI or broad topology support.
 
+## Long-term scope
+
+The system should eventually cover:
+
+- parametric part modeling
+- robust sketches with constraints
+- sketches on datum planes and generated planar faces
+- stable semantic references
+- feature history
+- assembly modeling with constraints and joints
+- top-down design with cross-part parameters
+- engineering assistants (bolt, hole, shaft, bearing, gear)
+- standard-parts libraries and a material database
+- STEP import and export, STL export
+- technical drawings and bills of materials
+- later CAM or FEM coupling
+
+The aim is not just another open-source CAD, but a modern, engineering-oriented CAD system for Linux that combines the strengths of classic parametric CAD with better interaction logic and strong technical assistants. The detailed target architecture is split across the documents listed in `docs/architecture-summary.md`.
+
 ## Non-goals for the current phase
 
 The current phase should not build:

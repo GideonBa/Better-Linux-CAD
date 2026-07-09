@@ -145,6 +145,8 @@ This block answers where a sketch can live. The general closed sketch profile bl
 
 Goal: first meaningful parametric feature test.
 
+Detailed documents: `docs/feature-system.md`, `docs/hole-wizard.md`, `docs/pattern-and-mirror-features.md`
+
 - bolt circle radius as parameter
 - hole count as parameter
 - hole diameter as parameter
@@ -153,6 +155,8 @@ Goal: first meaningful parametric feature test.
 ## MVP 4: Simple assembly parameters
 
 Goal: cross-part parametrization.
+
+Detailed documents: `docs/parameter-model.md`, `docs/file-format.md`
 
 - assembly document
 - two part documents in one assembly
@@ -163,7 +167,23 @@ Goal: cross-part parametrization.
 
 Goal: place parts through constraints.
 
+Detailed document: `docs/assembly-system.md`
+
 - component instances
 - axis-to-axis
 - face-to-face
 - simple screw placement
+
+## Later target-architecture blocks
+
+These are documented as incremental, testable blocks and are sequenced after the numbered MVPs above:
+
+- `docs/fillet-chamfer-features.md`: fillets and chamfers as parametric features
+- `docs/pattern-and-mirror-features.md`: linear/circular patterns and mirror
+- `docs/hole-wizard.md`: semantic hole features and the standards database
+- `docs/shaft-wizard.md`: shaft assistant (calculation plus geometry generation)
+- `docs/assembly-system.md`: full constraint solver, joints, motion, subassemblies
+- `docs/engineering-modules.md`: bolt, bearing, gear, material, and standard-parts modules
+- `docs/user-interface.md`: UI over the core
+
+The cross-cutting rules they all rely on are in `docs/semantic-references.md` and `docs/parameter-model.md`.
