@@ -9,6 +9,13 @@ struct Point2 {
   friend bool operator==(const Point2&, const Point2&) = default;
 };
 
+struct Vector2 {
+  double x = 0.0;
+  double y = 0.0;
+
+  friend bool operator==(const Vector2&, const Vector2&) = default;
+};
+
 struct Point3 {
   double x = 0.0;
   double y = 0.0;
