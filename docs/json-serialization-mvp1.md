@@ -1,6 +1,6 @@
 # JSON Serialization
 
-Status: core serialization for `PartDocument` model intent, including file-level helpers, derived workplanes, line-based closed sketch profiles, explicit construction geometry, relation-driven construction geometry, relation-driven construction points, chained construction relations, and semantic generated edge/vertex references.
+Status: core serialization for `PartDocument` model intent, including file-level helpers, derived workplanes, line-based closed sketch profiles, explicit construction geometry, relation-driven construction geometry, relation-driven construction points, chained construction relations, semantic generated edge/vertex references, and projected sketch reference entities.
 
 The JSON serialization layer persists model intent only. It does not serialize OCCT shapes, `GeometryShape`, `ShapeCache` contents, raw face IDs, raw edge IDs, raw vertex IDs, BRep handles, or exported STEP data.
 
@@ -8,7 +8,7 @@ The JSON serialization layer persists model intent only. It does not serialize O
 
 The goal is to make a `PartDocument` reproducible from a textual representation:
 
-1. Build a `PartDocument` with parameters, datum planes, construction geometry, construction relations, derived workplanes, sketches, sketch entities, profiles, and features.
+1. Build a `PartDocument` with parameters, datum planes, construction geometry, construction relations, derived workplanes, sketches, sketch entities, projected sketch reference entities, profiles, and features.
 2. Serialize that model intent to JSON.
 3. Optionally write the JSON as a `.blcad.json` model file.
 4. Rebuild the `PartDocument` from JSON through the normal validated construction APIs.
@@ -31,12 +31,14 @@ The current JSON format stores:
 - construction-geometry parameter dependencies
 - derived workplanes with `top`, `bottom`, `right`, `left`, `front`, or `back` semantic face references
 - line-segment sketch entities
+- projected sketch point references
+- projected sketch line references
 - rectangle profiles
 - circle profiles
 - line-based closed profiles
 - additive and subtractive extrude features
 
-The current JSON format does not store final BRep geometry, ShapeCache contents, exported STEP data, GUI state, sketch solver state, general relation collections independent from construction objects, or assembly data.
+The current JSON format does not store final BRep geometry, ShapeCache contents, exported STEP data, GUI state, sketch solver state, projected-reference constraint solving state, general relation collections independent from construction objects, or assembly data.
 
 ## Construction geometry
 
@@ -164,6 +166,60 @@ Generated edge and vertex references are serialized semantically:
 
 For relation-driven construction lines, deserialization restores construction lines after sketches and features so generated-edge line relations can validate their source feature. Relation-driven construction points are serialized as model intent and are evaluated by the geometry layer through `ConstructionPointResolver`.
 
+## Projected sketch references
+
+Sketches can store projected reference entities in `projected_points` and `projected_lines`. These are sketch-local model-intent references. They do not serialize resolved 2D coordinates, OCCT topology, or cached projection results.
+
+Projected point references support construction points and semantic generated vertices:
+
+```json
+{
+  "projected_points": [
+    {
+      "id": "ref.point.top_front_mid",
+      "source": "construction_point",
+      "construction_point": "point.top_front_mid"
+    },
+    {
+      "id": "ref.vertex.top_front_right",
+      "source": "semantic_vertex",
+      "semantic_vertex": {
+        "source_feature": "feature.base",
+        "vertex": "top_front_right"
+      }
+    }
+  ]
+}
+```
+
+Projected line references support construction lines and semantic generated edges:
+
+```json
+{
+  "projected_lines": [
+    {
+      "id": "ref.line.top_front_axis",
+      "source": "construction_line",
+      "construction_line": "line.top_front_axis"
+    },
+    {
+      "id": "ref.edge.top_front",
+      "source": "semantic_edge",
+      "semantic_edge": {
+        "source_feature": "feature.base",
+        "edge": "top_front"
+      }
+    }
+  ]
+}
+```
+
+The projected-reference example model is:
+
+```text
+examples/projected_sketch_references.blcad.json
+```
+
 ## Reference files
 
 The generated-reference example model is:
@@ -201,9 +257,11 @@ back
 
 ## Sketches and features
 
-A sketch stores its identity, workplane reference, sketch entities, and profiles. The workplane reference may point to a standard datum plane, a derived workplane, an explicit construction plane, or a relation-driven construction plane.
+A sketch stores its identity, workplane reference, sketch entities, projected reference entities, and profiles. The workplane reference may point to a standard datum plane, a derived workplane, an explicit construction plane, or a relation-driven construction plane.
 
 Line-based closed profiles are serialized as ordered references to line-segment sketch entities. The line order is significant. Deserialization rebuilds the `Sketch`, validates that the line chain is connected and non-self-intersecting, and then adds the closed profile through the normal construction API.
+
+Projected sketch references are stored alongside sketch entities but are not currently consumed automatically as profile segments. The geometry layer resolves them separately through `SketchReferenceProjector`.
 
 Features are serialized as model intent: additive extrudes reference input sketches and length parameters; subtractive extrudes reference input sketches and target features. The final generated shape is not serialized.
 
@@ -224,4 +282,5 @@ Core JSON tests cover:
 - chained construction relation roundtrips
 - semantic generated edge reference roundtrips
 - relation-driven generated edge/vertex construction point roundtrips
+- projected sketch reference roundtrips
 - unsupported schema and unsupported feature rejection
