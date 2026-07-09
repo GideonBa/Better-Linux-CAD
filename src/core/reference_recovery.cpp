@@ -164,6 +164,23 @@ ReferenceRemapRecord::ReferenceRemapRecord(ReferenceRemapId id, SemanticReferenc
     : id_(std::move(id)), original_(std::move(original)), replacement_(std::move(replacement)),
       reason_(std::move(reason)) {}
 
+Result<SketchOriginOverrideRecord> SketchOriginOverrideRecord::create(SketchId sketch,
+                                                                      Point2 local_origin) {
+  const auto object_id = sketch.empty() ? std::string("sketch_origin_override") : sketch.value();
+  if (sketch.empty()) {
+    return Result<SketchOriginOverrideRecord>::failure(
+        validation_error(object_id, "sketch origin override sketch id must not be empty"));
+  }
+  return Result<SketchOriginOverrideRecord>::success(
+      SketchOriginOverrideRecord(std::move(sketch), local_origin));
+}
+
+const SketchId& SketchOriginOverrideRecord::sketch() const noexcept { return sketch_; }
+Point2 SketchOriginOverrideRecord::local_origin() const noexcept { return local_origin_; }
+
+SketchOriginOverrideRecord::SketchOriginOverrideRecord(SketchId sketch, Point2 local_origin)
+    : sketch_(std::move(sketch)), local_origin_(local_origin) {}
+
 Result<ReferenceStatusRecord> ReferenceRecoveryEvaluator::evaluate(
     ReferenceStatusId id, const PartDocument& document, SemanticReferenceTarget target) const {
   if (!target_exists_in_current_seed(document, target)) {
