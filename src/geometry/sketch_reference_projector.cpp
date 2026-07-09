@@ -94,7 +94,7 @@ Result<ResolvedSketchPointReference>
 SketchReferenceProjector::resolve_point(const PartDocument& document, const Sketch& sketch,
                                         const ProjectedSketchPoint& reference) const {
   WorkplaneResolver workplane_resolver;
-  auto workplane = workplane_resolver.resolve(document, sketch.workplane());
+  auto workplane = workplane_resolver.resolve_for_sketch(document, sketch);
   if (workplane.has_error()) {
     return Result<ResolvedSketchPointReference>::failure(workplane.error());
   }
@@ -129,7 +129,7 @@ Result<ResolvedSketchLineReference>
 SketchReferenceProjector::resolve_line(const PartDocument& document, const Sketch& sketch,
                                        const ProjectedSketchLine& reference) const {
   WorkplaneResolver workplane_resolver;
-  auto workplane = workplane_resolver.resolve(document, sketch.workplane());
+  auto workplane = workplane_resolver.resolve_for_sketch(document, sketch);
   if (workplane.has_error()) {
     return Result<ResolvedSketchLineReference>::failure(workplane.error());
   }
