@@ -128,34 +128,62 @@ Implemented scope:
 - invalidation tests proving parameter changes can mark construction geometry, dependent sketches, and dependent features dirty
 - checked-in `examples/construction_plane_prism.blcad.json`
 
-Still not implemented in this block:
+This block remains the stable fallback path for relation-driven construction geometry.
 
-- expression-evaluated coordinate placement
-- relation-driven placement such as offset plane, line through two points, plane through three points, parallel, orthogonal, angle, point-on-line, or point-on-plane
-- references from construction geometry to generated semantic faces, edges, vertices, or analytic surfaces
-- GUI manipulators
-- 3D sketch splines, sweep, loft, surface stitching, or closed-shell-to-solid conversion
-
-## Next MVP: Relation-driven construction geometry
+## Implemented block: Relation-driven construction geometry
 
 Goal: extend the explicit construction-geometry path with stable relation-driven definitions.
 
 Detailed document: `docs/construction-geometry-mvp.md`
 
+Implemented scope:
+
+- `ConstructionRelationId`
+- `ConstructionRelation`
+- `ConstructionRelationType`
+- `ConstructionLineKind`
+- `ConstructionPlaneKind`
+- `PlaneOffsetFromPlane` relation-driven construction plane
+- `LineThroughTwoPoints` relation-driven construction line
+- `PlaneThroughThreePoints` relation-driven construction plane
+- collinearity validation for `PlaneThroughThreePoints`
+- dependency graph edges from referenced construction objects to relation-driven construction objects
+- dependency graph edges from source workplanes and offset parameters to offset construction planes
+- JSON serialization and roundtrip tests for relation-driven construction geometry
+- `WorkplaneResolver` support for offset construction planes
+- `WorkplaneResolver` support for three-point construction planes
+- geometry tests for closed profiles sketched on offset construction planes
+- invalidation tests proving parameter changes can mark relation-driven construction planes and dependent sketches dirty
+- explicit construction geometry kept as the stable fallback path
+
+Still not implemented in this block:
+
+- generated semantic edge and vertex references
+- point-on-line, point-on-plane, and line-on-plane relations
+- plane-parallel-through-point and line-parallel-through-point relations
+- parallel, orthogonal, tangent, angle, or normal construction relations
+- standalone relation collections independent from construction objects
+- GUI manipulators
+- full construction-geometry solver
+- 3D sketch splines, sweep, loft, surface stitching, or closed-shell-to-solid conversion
+
+This block continues to answer where a sketch can live. The line-based closed sketch profile block answers what planar shape a sketch can describe. They remain separate, testable increments.
+
+## Next MVP: Semantic references and chained construction relations
+
+Goal: generalize the construction-relation seed into a semantic reference system for generated edges, generated vertices, and chained construction relations while keeping raw OCCT topology out of saved model intent.
+
 Proposed first implementation sequence:
 
-- add a `ConstructionRelation` model
-- add `PlaneOffsetFromPlane` as the first relation-driven plane definition
-- add `LineThroughTwoPoints` as the first relation-driven line definition
-- add `PlaneThroughThreePoints` with collinearity validation
-- add dependency graph edges from referenced construction objects to relation-driven construction objects
-- add JSON roundtrip tests for relation-driven construction geometry
-- extend `WorkplaneResolver` so relation-driven construction planes resolve into `ResolvedWorkplane` frames
-- add invalidation tests for point/line/plane reference changes
-- keep explicit construction geometry as the stable fallback path
-- defer parallel, orthogonal, angle, generated semantic references, 3D sketching, and advanced surfacing until this relation path is stable
-
-This block continues to answer where a sketch can live. The line-based closed sketch profile block answers what planar shape a sketch can describe. They should remain separate, testable increments.
+- add semantic generated edge and vertex reference IDs similar to `SemanticFaceReference`
+- add relation validation for generated edge/vertex references without storing raw OCCT topology IDs
+- add `PointOnPlane`, `PointOnLine`, and `LineOnPlane` relation definitions
+- add `PlaneParallelToPlaneThroughPoint` and `LineParallelToLineThroughPoint` relation definitions
+- add dependency graph tests for chained construction relations
+- add JSON roundtrip tests for chained relations and semantic generated references
+- extend `WorkplaneResolver` only for relations that can be evaluated deterministically from existing model intent
+- keep explicit construction geometry and the current relation-driven path as stable fallback paths
+- defer GUI manipulators, sketch constraint solving, 3D sketching, and advanced surfacing
 
 ## Future roadmap: Inventor-like sketcher and sketch-driven features
 
