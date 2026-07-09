@@ -46,6 +46,23 @@ constexpr int k_version = 1;
   return json{{"x", vector.x}, {"y", vector.y}, {"z", vector.z}};
 }
 
+[[nodiscard]] json sketch_entity_ids_to_json(const std::vector<SketchEntityId>& ids) {
+  json result = json::array();
+  for (const auto& id : ids) {
+    result.push_back(id.value());
+  }
+  return result;
+}
+
+[[nodiscard]] std::vector<SketchEntityId> sketch_entity_ids_from_json(const json& values) {
+  std::vector<SketchEntityId> ids;
+  ids.reserve(values.size());
+  for (const auto& value : values) {
+    ids.emplace_back(value.get<std::string>());
+  }
+  return ids;
+}
+
 [[nodiscard]] Result<SemanticFace> semantic_face_from_json(const json& value) {
   const auto face = value.get<std::string>();
   if (face == "top") {
@@ -144,6 +161,22 @@ constexpr int k_version = 1;
     return sketch;
   }
 
+  const json line_segments =
+      sketch_json.contains("line_segments") ? sketch_json.at("line_segments") : json::array();
+  for (const auto& line_json : line_segments) {
+    auto line = LineSegment::create(SketchEntityId(line_json.at("id").get<std::string>()),
+                                    point2_from_json(line_json.at("start")),
+                                    point2_from_json(line_json.at("end")));
+    if (line.has_error()) {
+      return Result<Sketch>::failure(line.error());
+    }
+
+    auto added = sketch.value().add_entity(line.value());
+    if (added.has_error()) {
+      return Result<Sketch>::failure(added.error());
+    }
+  }
+
   for (const auto& rectangle_json : sketch_json.at("rectangle_profiles")) {
     auto rectangle = RectangleProfile::create(
         ProfileId(rectangle_json.at("id").get<std::string>()),
@@ -170,6 +203,22 @@ constexpr int k_version = 1;
     }
 
     auto added = sketch.value().add_profile(circle.value());
+    if (added.has_error()) {
+      return Result<Sketch>::failure(added.error());
+    }
+  }
+
+  const json closed_profiles =
+      sketch_json.contains("closed_profiles") ? sketch_json.at("closed_profiles") : json::array();
+  for (const auto& profile_json : closed_profiles) {
+    auto profile = ClosedProfile::create(
+        ProfileId(profile_json.at("id").get<std::string>()),
+        sketch_entity_ids_from_json(profile_json.at("line_segments")));
+    if (profile.has_error()) {
+      return Result<Sketch>::failure(profile.error());
+    }
+
+    auto added = sketch.value().add_profile(profile.value());
     if (added.has_error()) {
       return Result<Sketch>::failure(added.error());
     }
@@ -253,8 +302,16 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
     json sketch_json{{"id", sketch.id().value()},
                      {"name", sketch.name()},
                      {"workplane", sketch.workplane().value()},
+                     {"line_segments", json::array()},
                      {"rectangle_profiles", json::array()},
-                     {"circle_profiles", json::array()}};
+                     {"circle_profiles", json::array()},
+                     {"closed_profiles", json::array()}};
+
+    for (const auto& line : sketch.line_segments()) {
+      sketch_json["line_segments"].push_back(json{{"id", line.id().value()},
+                                                    {"start", point2_to_json(line.start())},
+                                                    {"end", point2_to_json(line.end())}});
+    }
 
     for (const auto& profile : sketch.rectangle_profiles()) {
       sketch_json["rectangle_profiles"].push_back(
@@ -269,6 +326,12 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
           json{{"id", profile.id().value()},
                {"center", point2_to_json(profile.center())},
                {"diameter_parameter", profile.diameter_parameter().value()}});
+    }
+
+    for (const auto& profile : sketch.closed_profiles()) {
+      sketch_json["closed_profiles"].push_back(
+          json{{"id", profile.id().value()},
+               {"line_segments", sketch_entity_ids_to_json(profile.line_segments())}});
     }
 
     root["sketches"].push_back(std::move(sketch_json));
