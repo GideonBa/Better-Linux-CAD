@@ -2,6 +2,7 @@
 
 #include "blcad/geometry/dimension_driven_profile_resolver.hpp"
 #include "blcad/geometry/reference_generated_profile_resolver.hpp"
+#include "blcad/geometry/sketch_region_finder.hpp"
 
 #include <string>
 #include <utility>
@@ -21,6 +22,11 @@ namespace {
 [[nodiscard]] const Parameter* find_required_parameter(const PartDocument& document,
                                                        const ParameterId& parameter_id) noexcept {
   return document.find_parameter(parameter_id);
+}
+
+[[nodiscard]] bool has_no_profiles(const Sketch& sketch) noexcept {
+  return sketch.rectangle_profiles().empty() && sketch.circle_profiles().empty() &&
+         sketch.closed_profiles().empty();
 }
 
 [[nodiscard]] Result<Point3> evaluate_bounded_circle_center(const WorkplaneResolver& resolver,
@@ -72,6 +78,34 @@ namespace {
   return sketch.closed_profile_vertices(profile);
 }
 
+[[nodiscard]] Result<std::vector<Point3>> map_bounded_local_vertices(
+    const WorkplaneResolver& resolver, const ResolvedWorkplane& workplane,
+    const std::string& object_id, const std::vector<Point2>& local_vertices) {
+  if (workplane.bounds.enabled) {
+    constexpr double k_tolerance = 1.0e-9;
+    const double min_x = workplane.bounds.center.x - workplane.bounds.width_mm / 2.0;
+    const double max_x = workplane.bounds.center.x + workplane.bounds.width_mm / 2.0;
+    const double min_y = workplane.bounds.center.y - workplane.bounds.height_mm / 2.0;
+    const double max_y = workplane.bounds.center.y + workplane.bounds.height_mm / 2.0;
+
+    for (const Point2 vertex : local_vertices) {
+      if (vertex.x < min_x - k_tolerance || vertex.x > max_x + k_tolerance ||
+          vertex.y < min_y - k_tolerance || vertex.y > max_y + k_tolerance) {
+        return Result<std::vector<Point3>>::failure(validation_error(
+            object_id, "closed profile vertices must lie inside resolved workplane bounds"));
+      }
+    }
+  }
+
+  std::vector<Point3> global_vertices;
+  global_vertices.reserve(local_vertices.size());
+  for (const Point2 vertex : local_vertices) {
+    global_vertices.push_back(resolver.evaluate_point(workplane, vertex));
+  }
+
+  return Result<std::vector<Point3>>::success(std::move(global_vertices));
+}
+
 [[nodiscard]] Result<std::vector<Point3>> evaluate_bounded_closed_profile_vertices(
     const PartDocument& document, const WorkplaneResolver& resolver, const ResolvedWorkplane& workplane,
     const Sketch& sketch, const ClosedProfile& profile) {
@@ -80,29 +114,20 @@ namespace {
     return Result<std::vector<Point3>>::failure(local_vertices.error());
   }
 
-  if (workplane.bounds.enabled) {
-    constexpr double k_tolerance = 1.0e-9;
-    const double min_x = workplane.bounds.center.x - workplane.bounds.width_mm / 2.0;
-    const double max_x = workplane.bounds.center.x + workplane.bounds.width_mm / 2.0;
-    const double min_y = workplane.bounds.center.y - workplane.bounds.height_mm / 2.0;
-    const double max_y = workplane.bounds.center.y + workplane.bounds.height_mm / 2.0;
+  return map_bounded_local_vertices(resolver, workplane, profile.id().value(), local_vertices.value());
+}
 
-    for (const Point2 vertex : local_vertices.value()) {
-      if (vertex.x < min_x - k_tolerance || vertex.x > max_x + k_tolerance ||
-          vertex.y < min_y - k_tolerance || vertex.y > max_y + k_tolerance) {
-        return Result<std::vector<Point3>>::failure(validation_error(
-            profile.id().value(), "closed profile vertices must lie inside resolved workplane bounds"));
-      }
-    }
+[[nodiscard]] Result<std::vector<Point3>> evaluate_bounded_detected_region_vertices(
+    const PartDocument& document, const WorkplaneResolver& resolver, const ResolvedWorkplane& workplane,
+    const Sketch& sketch) {
+  SketchRegionFinder finder;
+  auto region = finder.find_single_region(document, sketch);
+  if (region.has_error()) {
+    return Result<std::vector<Point3>>::failure(region.error());
   }
 
-  std::vector<Point3> global_vertices;
-  global_vertices.reserve(local_vertices.value().size());
-  for (const Point2 vertex : local_vertices.value()) {
-    global_vertices.push_back(resolver.evaluate_point(workplane, vertex));
-  }
-
-  return Result<std::vector<Point3>>::success(std::move(global_vertices));
+  return map_bounded_local_vertices(resolver, workplane, region.value().id.value(),
+                                    region.value().vertices);
 }
 
 [[nodiscard]] bool has_exactly_one_rectangle_profile(const Sketch& sketch) noexcept {
@@ -179,15 +204,19 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_additive_extrude(
     return shape_cache.set_final_shape(feature->id(), std::move(shape.value()));
   }
 
-  if (has_exactly_one_closed_profile(*sketch)) {
+  if (has_exactly_one_closed_profile(*sketch) || has_no_profiles(*sketch)) {
     auto resolved_workplane = workplane_resolver_.resolve_for_sketch(document, *sketch);
     if (resolved_workplane.has_error()) {
       return Result<std::size_t>::failure(resolved_workplane.error());
     }
 
-    const ClosedProfile& profile = sketch->closed_profiles().front();
-    auto vertices = evaluate_bounded_closed_profile_vertices(document, workplane_resolver_,
-                                                            resolved_workplane.value(), *sketch, profile);
+    Result<std::vector<Point3>> vertices = has_exactly_one_closed_profile(*sketch)
+                                               ? evaluate_bounded_closed_profile_vertices(
+                                                     document, workplane_resolver_, resolved_workplane.value(),
+                                                     *sketch, sketch->closed_profiles().front())
+                                               : evaluate_bounded_detected_region_vertices(
+                                                     document, workplane_resolver_, resolved_workplane.value(),
+                                                     *sketch);
     if (vertices.has_error()) {
       return Result<std::size_t>::failure(vertices.error());
     }
@@ -202,7 +231,7 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_additive_extrude(
   }
 
   return Result<std::size_t>::failure(validation_error(
-      sketch->id().value(), "additive extrude requires exactly one rectangle or closed profile"));
+      sketch->id().value(), "additive extrude requires exactly one rectangle, closed profile, or detected simple region"));
 }
 
 Result<std::size_t> GeometryRecomputeExecutor::execute_subtractive_extrude(
@@ -229,9 +258,10 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_subtractive_extrude(
         feature->id().value(), "feature input sketch must exist in part document"));
   }
 
-  if (!has_exactly_one_circle_profile(*sketch) && !has_exactly_one_closed_profile(*sketch)) {
+  if (!has_exactly_one_circle_profile(*sketch) && !has_exactly_one_closed_profile(*sketch) &&
+      !has_no_profiles(*sketch)) {
     return Result<std::size_t>::failure(validation_error(
-        sketch->id().value(), "subtractive extrude requires exactly one circle or closed profile"));
+        sketch->id().value(), "subtractive extrude requires exactly one circle, closed profile, or detected simple region"));
   }
 
   const GeometryShape* target = shape_cache.find_feature_shape(feature->target_feature());
@@ -270,9 +300,13 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_subtractive_extrude(
     return shape_cache.set_final_shape(feature->id(), std::move(shape.value()));
   }
 
-  const ClosedProfile& profile = sketch->closed_profiles().front();
-  auto vertices = evaluate_bounded_closed_profile_vertices(document, workplane_resolver_,
-                                                          resolved_workplane.value(), *sketch, profile);
+  Result<std::vector<Point3>> vertices = has_exactly_one_closed_profile(*sketch)
+                                             ? evaluate_bounded_closed_profile_vertices(
+                                                   document, workplane_resolver_, resolved_workplane.value(),
+                                                   *sketch, sketch->closed_profiles().front())
+                                             : evaluate_bounded_detected_region_vertices(
+                                                   document, workplane_resolver_, resolved_workplane.value(),
+                                                   *sketch);
   if (vertices.has_error()) {
     return Result<std::size_t>::failure(vertices.error());
   }
