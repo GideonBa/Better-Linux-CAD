@@ -130,9 +130,9 @@ Still not implemented in this block:
 - full construction-geometry solver
 - 3D sketch splines, sweep, loft, surface stitching, or closed-shell-to-solid conversion
 
-## Implemented block: Projected sketch reference geometry
+## Implemented block: Projected sketch references and first reference-driven constraints
 
-Goal: project evaluated semantic generated edges, generated vertices, construction points, and construction lines into sketch-local reference geometry so sketches can consume projected references without storing raw OCCT topology and without adding a full sketch constraint solver yet.
+Goal: project evaluated semantic generated edges, generated vertices, construction points, and construction lines into sketch-local reference geometry, then make those projected references usable as first associative sketch targets without storing raw OCCT topology and without adding a full sketch constraint solver yet.
 
 Detailed document: `docs/projected-sketch-reference-geometry.md`
 
@@ -142,37 +142,46 @@ Implemented scope:
 - sketch-level projected reference IDs using `SketchEntityId`
 - model-intent references from projected point references to `ConstructionPointId` and `SemanticVertexReference`
 - model-intent references from projected line references to `ConstructionLineId` and `SemanticEdgeReference`
-- `projected_points` and `projected_lines` JSON persistence on sketches
-- JSON roundtrip tests for construction-point, construction-line, semantic-vertex, and semantic-edge projected references
+- `SketchReferenceTarget` handles for line segments, line endpoints, projected points, and projected lines
+- `SketchConstraintId` and first `SketchConstraint` records
+- `coincident_to_projected_point`, `parallel_to_projected_line`, and `collinear_with_projected_line` constraint kinds
+- `projected_points`, `projected_lines`, and `constraints` JSON persistence on sketches
+- JSON roundtrip tests for construction-point, construction-line, semantic-vertex, semantic-edge, and projected-reference constraint records
 - `SketchReferenceProjector` in the optional geometry layer
 - projection of resolved construction points and semantic vertices into sketch-local `Point2` coordinates
 - projection of resolved construction lines and semantic edges into sketch-local point-plus-direction line references
+- `ReferenceDrivenSketchHelper` for deterministic evaluation of the first projected-reference constraints
+- deterministic profile-helper line generation from two fully resolved projected-point endpoint constraints
 - explicit out-of-plane validation errors for projected points and projected lines
+- dependency graph edges from projected construction and semantic references to owning sketches
+- invalidation tests proving source feature and construction-relation changes dirty projected-reference sketches and dependent features
 - geometry tests for projected semantic generated vertices and edges on generated top-face workplanes
 - geometry tests for projected generated-reference construction points and generated-edge-parallel construction lines
+- geometry tests for the first reference-driven helper constraints
 - checked-in `examples/projected_sketch_references.blcad.json`
 
 Still not implemented in this block:
 
-- automatic use of projected references as closed-profile segments
-- solver-backed sketch constraints against projected references
-- dependency graph edges from projected references to the owning sketch and downstream features
+- full sketch constraint solving
+- automatic region detection from projected references
+- automatic consumption of projected references as profile topology without explicit helper constraints
+- interactive reference repair when a source face/edge/vertex disappears
 - projected reference selection or display in a GUI
 - arbitrary generated topology beyond the current rectangular additive extrude seed
 
-## Next MVP: Reference-driven sketch constraints and profile consumption
+## Next MVP: Robust reference remapping and sketch placement recovery
 
-Goal: make projected sketch references usable as associative sketch targets instead of passive projected helper geometry.
+Goal: make sketch placement and projected references robust when a source face, edge, or vertex changes or disappears after feature edits.
 
 Proposed first implementation sequence:
 
-- add dependency graph edges from projected sketch references to their source construction or semantic nodes, and from the sketch to downstream features
-- add sketch constraint/reference target handles for projected points and projected lines
-- implement deterministic reference-driven helper constraints such as coincident-to-projected-point and parallel-or-collinear-to-projected-line without introducing the full solver yet
-- allow deterministic profile helper generation from projected references only where endpoints and directions are fully resolved
-- add incremental invalidation tests proving source feature or construction-relation changes dirty projected-reference sketches and dependent features
-- add JSON roundtrip tests for the first projected-reference constraint target records
-- keep GUI manipulators, automatic region detection, full sketch solving, 3D sketches, sweep, loft, and surfacing deferred
+- add explicit lost-reference status records for semantic face, edge, and vertex references
+- add stable remap records that can move a sketch or projected reference from one valid semantic source to another without silently changing model intent
+- add optional sketch-origin override metadata for workplane-based sketches while keeping the default origin equal to the resolved workplane origin
+- add tests for generated-face sketches moving correctly when source dimensions change
+- add tests for source topology removal producing explicit lost-reference errors instead of arbitrary reassignment
+- add JSON roundtrip tests for lost-reference/remap metadata
+- keep GUI remapping dialogs, full solver integration, automatic region detection, 3D sketches, sweep, loft, and surfacing deferred
 
 ## Future roadmap: Inventor-like sketcher and sketch-driven features
 
