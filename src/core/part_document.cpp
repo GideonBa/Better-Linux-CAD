@@ -41,6 +41,130 @@ Result<std::size_t> add_dependency_if_missing(DependencyGraph& graph, std::strin
          face == SemanticFace::Left || face == SemanticFace::Front || face == SemanticFace::Back;
 }
 
+[[nodiscard]] bool has_additive_source_feature(const PartDocument& document, FeatureId feature_id) {
+  const Feature* feature = document.find_feature(feature_id);
+  return feature != nullptr && feature->type() == FeatureType::AdditiveExtrude;
+}
+
+[[nodiscard]] Result<std::size_t> validate_generated_edge_reference(
+    const PartDocument& document, const SemanticEdgeReference& reference,
+    const std::string& object_id) {
+  if (!has_additive_source_feature(document, reference.source_feature())) {
+    return Result<std::size_t>::failure(Error::validation(
+        object_id, "semantic edge source feature must be an additive extrude in part document"));
+  }
+
+  return Result<std::size_t>::success(0);
+}
+
+[[nodiscard]] Result<std::size_t> validate_generated_vertex_reference(
+    const PartDocument& document, const SemanticVertexReference& reference,
+    const std::string& object_id) {
+  if (!has_additive_source_feature(document, reference.source_feature())) {
+    return Result<std::size_t>::failure(Error::validation(
+        object_id, "semantic vertex source feature must be an additive extrude in part document"));
+  }
+
+  return Result<std::size_t>::success(0);
+}
+
+[[nodiscard]] Result<std::size_t> validate_relation_references(const PartDocument& document,
+                                                               const ConstructionRelation& relation,
+                                                               const std::string& object_id) {
+  switch (relation.type()) {
+  case ConstructionRelationType::PlaneOffsetFromPlane:
+    if (!document.has_workplane_id(relation.source_plane())) {
+      return Result<std::size_t>::failure(
+          Error::validation(object_id, "plane offset source plane must exist in part document"));
+    }
+    if (document.find_parameter(relation.offset_parameter()) == nullptr) {
+      return Result<std::size_t>::failure(
+          Error::validation(object_id, "plane offset parameter must exist in part document"));
+    }
+    break;
+  case ConstructionRelationType::LineThroughTwoPoints:
+    if (document.find_construction_point(relation.first_point()) == nullptr ||
+        document.find_construction_point(relation.second_point()) == nullptr) {
+      return Result<std::size_t>::failure(
+          Error::validation(object_id, "line through two points references must exist in part document"));
+    }
+    break;
+  case ConstructionRelationType::PlaneThroughThreePoints: {
+    const ConstructionPoint* first = document.find_construction_point(relation.first_point());
+    const ConstructionPoint* second = document.find_construction_point(relation.second_point());
+    const ConstructionPoint* third = document.find_construction_point(relation.third_point());
+    if (first == nullptr || second == nullptr || third == nullptr) {
+      return Result<std::size_t>::failure(Error::validation(
+          object_id, "plane through three points references must exist in part document"));
+    }
+    if (are_collinear(first->position(), second->position(), third->position())) {
+      return Result<std::size_t>::failure(Error::validation(
+          object_id, "plane through three points requires non-collinear points"));
+    }
+    break;
+  }
+  case ConstructionRelationType::PointOnPlane:
+    if (document.find_construction_point(relation.first_point()) == nullptr ||
+        !document.has_workplane_id(relation.source_plane())) {
+      return Result<std::size_t>::failure(
+          Error::validation(object_id, "point-on-plane relation references must exist in part document"));
+    }
+    break;
+  case ConstructionRelationType::PointOnLine:
+    if (document.find_construction_point(relation.first_point()) == nullptr ||
+        document.find_construction_line(relation.source_line()) == nullptr) {
+      return Result<std::size_t>::failure(
+          Error::validation(object_id, "point-on-line relation references must exist in part document"));
+    }
+    break;
+  case ConstructionRelationType::PointOnGeneratedEdge:
+    if (document.find_construction_point(relation.first_point()) == nullptr ||
+        !relation.generated_edge().has_value()) {
+      return Result<std::size_t>::failure(Error::validation(
+          object_id, "point-on-generated-edge relation references must exist in part document"));
+    }
+    return validate_generated_edge_reference(document, relation.generated_edge().value(), object_id);
+  case ConstructionRelationType::PointOnGeneratedVertex:
+    if (document.find_construction_point(relation.first_point()) == nullptr ||
+        !relation.generated_vertex().has_value()) {
+      return Result<std::size_t>::failure(Error::validation(
+          object_id, "point-on-generated-vertex relation references must exist in part document"));
+    }
+    return validate_generated_vertex_reference(document, relation.generated_vertex().value(), object_id);
+  case ConstructionRelationType::LineOnPlane:
+    if (document.find_construction_line(relation.source_line()) == nullptr ||
+        !document.has_workplane_id(relation.source_plane())) {
+      return Result<std::size_t>::failure(
+          Error::validation(object_id, "line-on-plane relation references must exist in part document"));
+    }
+    break;
+  case ConstructionRelationType::PlaneParallelToPlaneThroughPoint:
+    if (!document.has_workplane_id(relation.source_plane()) ||
+        document.find_construction_point(relation.first_point()) == nullptr) {
+      return Result<std::size_t>::failure(Error::validation(
+          object_id, "plane parallel to plane through point references must exist in part document"));
+    }
+    break;
+  case ConstructionRelationType::LineParallelToLineThroughPoint:
+    if (document.find_construction_line(relation.source_line()) == nullptr ||
+        document.find_construction_point(relation.first_point()) == nullptr) {
+      return Result<std::size_t>::failure(Error::validation(
+          object_id, "line parallel to line through point references must exist in part document"));
+    }
+    break;
+  case ConstructionRelationType::LineParallelToGeneratedEdgeThroughPoint:
+    if (document.find_construction_point(relation.first_point()) == nullptr ||
+        !relation.generated_edge().has_value()) {
+      return Result<std::size_t>::failure(Error::validation(
+          object_id,
+          "line parallel to generated edge through point references must exist in part document"));
+    }
+    return validate_generated_edge_reference(document, relation.generated_edge().value(), object_id);
+  }
+
+  return Result<std::size_t>::success(0);
+}
+
 [[nodiscard]] Result<std::size_t> add_parameter_dependencies(
     DependencyGraph& graph, const std::vector<ParameterId>& parameter_dependencies,
     const std::string& dependent_id) {
@@ -180,17 +304,28 @@ Result<std::size_t> PartDocument::add_construction_line(ConstructionLine line) {
     }
   }
 
-  if (line.kind() == ConstructionLineKind::ThroughTwoPoints) {
+  if (line.kind() != ConstructionLineKind::Explicit) {
     if (!line.relation().has_value()) {
       return Result<std::size_t>::failure(Error::validation(
           line.id().value(), "relation-driven construction line must carry a relation"));
     }
 
     const ConstructionRelation& relation = line.relation().value();
-    if (find_construction_point(relation.first_point()) == nullptr ||
-        find_construction_point(relation.second_point()) == nullptr) {
+    const bool expected_relation =
+        (line.kind() == ConstructionLineKind::ThroughTwoPoints &&
+         relation.type() == ConstructionRelationType::LineThroughTwoPoints) ||
+        (line.kind() == ConstructionLineKind::ParallelToLineThroughPoint &&
+         relation.type() == ConstructionRelationType::LineParallelToLineThroughPoint) ||
+        (line.kind() == ConstructionLineKind::ParallelToGeneratedEdgeThroughPoint &&
+         relation.type() == ConstructionRelationType::LineParallelToGeneratedEdgeThroughPoint);
+    if (!expected_relation) {
       return Result<std::size_t>::failure(Error::validation(
-          line.id().value(), "line through two points references must exist in part document"));
+          line.id().value(), "relation-driven construction line kind does not match relation type"));
+    }
+
+    auto valid_relation = validate_relation_references(*this, relation, line.id().value());
+    if (valid_relation.has_error()) {
+      return Result<std::size_t>::failure(valid_relation.error());
     }
   }
 
@@ -244,42 +379,28 @@ Result<std::size_t> PartDocument::add_construction_plane(ConstructionPlane plane
     }
   }
 
-  if (plane.kind() == ConstructionPlaneKind::OffsetFromPlane) {
+  if (plane.kind() != ConstructionPlaneKind::Explicit) {
     if (!plane.relation().has_value()) {
       return Result<std::size_t>::failure(Error::validation(
           plane.id().value(), "relation-driven construction plane must carry a relation"));
     }
 
     const ConstructionRelation& relation = plane.relation().value();
-    if (!has_workplane_id(relation.source_plane())) {
+    const bool expected_relation =
+        (plane.kind() == ConstructionPlaneKind::OffsetFromPlane &&
+         relation.type() == ConstructionRelationType::PlaneOffsetFromPlane) ||
+        (plane.kind() == ConstructionPlaneKind::ThroughThreePoints &&
+         relation.type() == ConstructionRelationType::PlaneThroughThreePoints) ||
+        (plane.kind() == ConstructionPlaneKind::ParallelToPlaneThroughPoint &&
+         relation.type() == ConstructionRelationType::PlaneParallelToPlaneThroughPoint);
+    if (!expected_relation) {
       return Result<std::size_t>::failure(Error::validation(
-          plane.id().value(), "plane offset source plane must exist in part document"));
+          plane.id().value(), "relation-driven construction plane kind does not match relation type"));
     }
 
-    if (!has_parameter_id(relation.offset_parameter())) {
-      return Result<std::size_t>::failure(Error::validation(
-          plane.id().value(), "plane offset parameter must exist in part document"));
-    }
-  }
-
-  if (plane.kind() == ConstructionPlaneKind::ThroughThreePoints) {
-    if (!plane.relation().has_value()) {
-      return Result<std::size_t>::failure(Error::validation(
-          plane.id().value(), "relation-driven construction plane must carry a relation"));
-    }
-
-    const ConstructionRelation& relation = plane.relation().value();
-    const ConstructionPoint* first = find_construction_point(relation.first_point());
-    const ConstructionPoint* second = find_construction_point(relation.second_point());
-    const ConstructionPoint* third = find_construction_point(relation.third_point());
-    if (first == nullptr || second == nullptr || third == nullptr) {
-      return Result<std::size_t>::failure(Error::validation(
-          plane.id().value(), "plane through three points references must exist in part document"));
-    }
-
-    if (are_collinear(first->position(), second->position(), third->position())) {
-      return Result<std::size_t>::failure(Error::validation(
-          plane.id().value(), "plane through three points requires non-collinear points"));
+    auto valid_relation = validate_relation_references(*this, relation, plane.id().value());
+    if (valid_relation.has_error()) {
+      return Result<std::size_t>::failure(valid_relation.error());
     }
   }
 
