@@ -1,8 +1,8 @@
 # Workplane Resolver
 
-Status: geometry-layer resolver for standard datum planes, derived top/bottom/right/left/front/back workplanes of a simple additive extrude, explicit construction planes, offset construction planes, three-point construction planes, and planes parallel to another plane through a construction point.
+Status: geometry-layer resolver for standard datum planes, derived top/bottom/right/left/front/back workplanes of a simple additive extrude, explicit construction planes, offset construction planes, three-point construction planes, and planes parallel to another plane through a construction point. The resolved workplane frames are also used by `SketchReferenceProjector` to map projected reference geometry into sketch-local coordinates.
 
-The core stores semantic model intent only. The geometry layer resolves supported intent into concrete frames for recompute. Raw OCCT topology IDs are not stored in `PartDocument` JSON.
+The core stores semantic model intent only. The geometry layer resolves supported intent into concrete frames for recompute and projection. Raw OCCT topology IDs are not stored in `PartDocument` JSON.
 
 ## Goal
 
@@ -26,6 +26,12 @@ construction_plane.parallel_xy
   -> source workplane datum.xy
   -> construction point through_point
   -> resolved parallel plane frame
+```
+
+```text
+feature.base_extrude.top_front
+  -> projected sketch reference
+  -> sketch-local point-plus-direction helper line
 ```
 
 ## Supported workplanes
@@ -92,6 +98,17 @@ global = (7, 9, 7)
 
 `GeometryRecomputeExecutor` passes the resolved workplane normal to circular cuts and closed-profile extrudes/cuts. Top and bottom use Z-axis cuts. Right and left use X-axis cuts. Front and back use Y-axis cuts. Construction planes use their explicit or relation-resolved normal.
 
+## Projected sketch reference integration
+
+`SketchReferenceProjector` uses `WorkplaneResolver` to resolve the sketch workplane before projecting reference geometry. It then maps resolved 3D reference geometry into the local sketch frame:
+
+```text
+local.x = dot(global - origin, x_axis)
+local.y = dot(global - origin, y_axis)
+```
+
+Projected points are accepted only when their signed distance to the sketch workplane is within tolerance. Projected lines are accepted only when their anchor point lies on the workplane and their direction is parallel to the workplane.
+
 ## Relation scope
 
 `WorkplaneResolver` intentionally resolves only workplane-like relations that can be evaluated from current headless model intent:
@@ -101,7 +118,7 @@ global = (7, 9, 7)
 - `PlaneThroughThreePoints`
 - `PlaneParallelToPlaneThroughPoint`
 
-Semantic generated edge and vertex references are evaluated by `SemanticReferenceEvaluator`, not by `WorkplaneResolver`. Deterministic construction points and construction lines are evaluated by `ConstructionPointResolver` and `ConstructionLineResolver`.
+Semantic generated edge and vertex references are evaluated by `SemanticReferenceEvaluator`, not by `WorkplaneResolver`. Deterministic construction points and construction lines are evaluated by `ConstructionPointResolver` and `ConstructionLineResolver`. Projected sketch references combine those resolvers with resolved workplane frames through `SketchReferenceProjector`.
 
 ## Example models
 
@@ -114,6 +131,7 @@ examples/front_face_cut.blcad.json
 examples/back_face_cut.blcad.json
 examples/construction_plane_prism.blcad.json
 examples/generated_semantic_references.blcad.json
+examples/projected_sketch_references.blcad.json
 ```
 
 ## Test coverage
@@ -133,3 +151,6 @@ Geometry tests cover:
 - recomputing circular cuts and closed-profile operations from sketches on resolved workplanes
 - evaluating rectangular-additive-extrude semantic generated edges and vertices
 - evaluating deterministic construction points and construction lines derived from generated semantic references
+- projecting semantic generated vertices and edges into sketch-local reference geometry
+- projecting generated-reference construction points and construction lines into sketch-local reference geometry
+- rejecting out-of-plane projected sketch references
