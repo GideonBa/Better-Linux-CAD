@@ -1,10 +1,13 @@
 #include "blcad/geometry/workplane_resolver.hpp"
 
+#include <cmath>
 #include <string>
 #include <utility>
 
 namespace blcad::geometry {
 namespace {
+
+constexpr double k_tolerance = 1.0e-9;
 
 [[nodiscard]] Error validation_error(std::string object_id, std::string message) {
   return Error::validation(std::move(object_id), std::move(message));
@@ -24,13 +27,40 @@ namespace {
   return bounds;
 }
 
+[[nodiscard]] Vector3 vector_between(Point3 from, Point3 to) noexcept {
+  return Vector3{to.x - from.x, to.y - from.y, to.z - from.z};
+}
+
+[[nodiscard]] double dot(Vector3 left, Vector3 right) noexcept {
+  return left.x * right.x + left.y * right.y + left.z * right.z;
+}
+
+[[nodiscard]] double length(Vector3 vector) noexcept {
+  return std::sqrt(dot(vector, vector));
+}
+
+[[nodiscard]] Vector3 normalize(Vector3 vector) noexcept {
+  const double vector_length = length(vector);
+  return Vector3{vector.x / vector_length, vector.y / vector_length, vector.z / vector_length};
+}
+
+[[nodiscard]] Vector3 cross(Vector3 left, Vector3 right) noexcept {
+  return Vector3{left.y * right.z - left.z * right.y, left.z * right.x - left.x * right.z,
+                 left.x * right.y - left.y * right.x};
+}
+
+[[nodiscard]] Point3 translated(Point3 point, Vector3 direction, double distance) noexcept {
+  return Point3{point.x + direction.x * distance, point.y + direction.y * distance,
+                point.z + direction.z * distance};
+}
+
 [[nodiscard]] Result<ResolvedWorkplane> resolve_datum_plane(const DatumPlane& datum_plane) {
   return Result<ResolvedWorkplane>::success(
       ResolvedWorkplane{datum_plane.id(), datum_plane.origin(), datum_plane.x_axis(),
                         datum_plane.y_axis(), datum_plane.normal(), RectangularWorkplaneBounds{}});
 }
 
-[[nodiscard]] Result<ResolvedWorkplane> resolve_construction_plane(
+[[nodiscard]] Result<ResolvedWorkplane> resolve_explicit_construction_plane(
     const ConstructionPlane& plane) {
   return Result<ResolvedWorkplane>::success(
       ResolvedWorkplane{plane.workplane_id(), plane.origin(), plane.x_axis(), plane.y_axis(),
@@ -135,6 +165,74 @@ namespace {
       validation_error(workplane.id().value(), "unsupported semantic face"));
 }
 
+[[nodiscard]] Result<ResolvedWorkplane> resolve_relation_driven_construction_plane(
+    const PartDocument& document, const WorkplaneResolver& resolver, const ConstructionPlane& plane) {
+  if (!plane.relation().has_value()) {
+    return Result<ResolvedWorkplane>::failure(validation_error(
+        plane.id().value(), "relation-driven construction plane must carry a relation"));
+  }
+
+  const ConstructionRelation& relation = plane.relation().value();
+
+  if (plane.kind() == ConstructionPlaneKind::OffsetFromPlane) {
+    auto source = resolver.resolve(document, relation.source_plane());
+    if (source.has_error()) {
+      return Result<ResolvedWorkplane>::failure(source.error());
+    }
+
+    const Parameter* offset = find_parameter(document, relation.offset_parameter());
+    if (offset == nullptr) {
+      return Result<ResolvedWorkplane>::failure(validation_error(
+          relation.offset_parameter().value(), "plane offset parameter must exist in part document"));
+    }
+
+    return Result<ResolvedWorkplane>::success(ResolvedWorkplane{
+        plane.workplane_id(),
+        translated(source.value().origin, source.value().normal, offset->value().millimeters()),
+        source.value().x_axis, source.value().y_axis, source.value().normal,
+        RectangularWorkplaneBounds{}});
+  }
+
+  if (plane.kind() == ConstructionPlaneKind::ThroughThreePoints) {
+    const ConstructionPoint* first = document.find_construction_point(relation.first_point());
+    const ConstructionPoint* second = document.find_construction_point(relation.second_point());
+    const ConstructionPoint* third = document.find_construction_point(relation.third_point());
+    if (first == nullptr || second == nullptr || third == nullptr) {
+      return Result<ResolvedWorkplane>::failure(validation_error(
+          plane.id().value(), "plane through three points references must exist in part document"));
+    }
+
+    const Vector3 first_to_second = vector_between(first->position(), second->position());
+    const Vector3 first_to_third = vector_between(first->position(), third->position());
+    const Vector3 normal_seed = cross(first_to_second, first_to_third);
+    if (length(first_to_second) <= k_tolerance || length(normal_seed) <= k_tolerance) {
+      return Result<ResolvedWorkplane>::failure(validation_error(
+          plane.id().value(), "plane through three points requires non-collinear points"));
+    }
+
+    const Vector3 x_axis = normalize(first_to_second);
+    const Vector3 normal = normalize(normal_seed);
+    const Vector3 y_axis = normalize(cross(normal, x_axis));
+
+    return Result<ResolvedWorkplane>::success(ResolvedWorkplane{
+        plane.workplane_id(), first->position(), x_axis, y_axis, normal,
+        RectangularWorkplaneBounds{}});
+  }
+
+  return Result<ResolvedWorkplane>::failure(
+      validation_error(plane.id().value(), "unsupported construction plane relation"));
+}
+
+[[nodiscard]] Result<ResolvedWorkplane> resolve_construction_plane(const PartDocument& document,
+                                                                   const WorkplaneResolver& resolver,
+                                                                   const ConstructionPlane& plane) {
+  if (plane.kind() == ConstructionPlaneKind::Explicit) {
+    return resolve_explicit_construction_plane(plane);
+  }
+
+  return resolve_relation_driven_construction_plane(document, resolver, plane);
+}
+
 } // namespace
 
 Result<ResolvedWorkplane> WorkplaneResolver::resolve(const PartDocument& document,
@@ -152,7 +250,7 @@ Result<ResolvedWorkplane> WorkplaneResolver::resolve(const PartDocument& documen
   const ConstructionPlane* construction_plane =
       document.find_construction_plane(ConstructionPlaneId(workplane_id.value()));
   if (construction_plane != nullptr) {
-    return resolve_construction_plane(*construction_plane);
+    return resolve_construction_plane(document, *this, *construction_plane);
   }
 
   const DerivedWorkplane* derived_workplane = document.find_derived_workplane(workplane_id);
