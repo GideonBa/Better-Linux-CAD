@@ -31,6 +31,7 @@ private:
 struct DocumentIdTag;
 struct ParameterIdTag;
 struct DatumPlaneIdTag;
+struct SketchEntityIdTag;
 struct ProfileIdTag;
 struct SketchIdTag;
 struct FeatureIdTag;
@@ -39,6 +40,7 @@ struct ShapeCacheIdTag;
 using DocumentId = TypedId<DocumentIdTag>;
 using ParameterId = TypedId<ParameterIdTag>;
 using DatumPlaneId = TypedId<DatumPlaneIdTag>;
+using SketchEntityId = TypedId<SketchEntityIdTag>;
 using ProfileId = TypedId<ProfileIdTag>;
 using SketchId = TypedId<SketchIdTag>;
 using FeatureId = TypedId<FeatureIdTag>;
