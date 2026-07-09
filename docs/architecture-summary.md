@@ -4,7 +4,7 @@ Source: condensed from the current repository architecture documents.
 
 ## Goal
 
-BLCAD is intended to become an independent parametric CAD system for Linux. The model does not only store final BRep geometry, but the underlying design intent: parameters, sketches, features, dependencies, semantic references, construction geometry, and later assembly relationships. The explicit long-term goal is also recorded in `docs/project-goal.md`.
+BLCAD is intended to become an independent parametric CAD system for Linux. The model does not only store final BRep geometry, but the underlying design intent: parameters, sketches, features, dependencies, semantic references, construction geometry, 3D curves, surfaces, and later assembly relationships. The explicit long-term goal is also recorded in `docs/project-goal.md`.
 
 ## Fundamental decision
 
@@ -21,6 +21,7 @@ BLCAD is intended to become an independent parametric CAD system for Linux. The 
 - Parametric core
 - Sketch and constraint layer
 - Construction geometry and datum-relation layer
+- 3D sketch and surfacing layer
 - Assembly layer
 - Engineering modules
 - OCCT geometry kernel
@@ -41,7 +42,10 @@ BLCAD is intended to become an independent parametric CAD system for Linux. The 
 - `ConstructionLine` / `DatumAxis`
 - `ConstructionPlane`
 - `ConstructionRelation`
-- `Feature`, including `FilletFeature` and `ChamferFeature`
+- `SketchPoint3D`
+- `SketchCurve3D`
+- `GuideCurve`
+- `Feature`, including `LoftFeature`, `SweepFeature`, `SurfaceStitchFeature`, `FilletFeature`, and `ChamferFeature`
 - `FeatureReference`
 - `DependencyGraph`
 - `ShapeCache`
@@ -106,6 +110,25 @@ The intended capability is:
 
 The detailed roadmap is in `docs/construction-geometry-mvp.md`.
 
+## Future 3D sketching and surfacing
+
+Advanced surfacing is a planned freeform-modeling layer, not yet implemented. It should introduce 3D sketch points, 3D lines, 3D splines, guide curves, sweeps, lofts, boundary surfaces, surface stitching, and closed-shell-to-solid conversion.
+
+The intended capability is:
+
+- connect points from different sketches on different planes with a 3D spline
+- use those splines as guide curves for lofts, sweeps, or surface generation
+- create sweeps along lines, polylines, arcs, or splines
+- loft between two, three, or arbitrary many profile sketches
+- use a middle profile as a smooth transition control without forcing a hard transition edge when smooth continuity is requested
+- support continuity settings such as C0, G1, and G2 in later versions
+- generate surfaces from arbitrary curves in space across several sketches
+- stitch or knit several generated surfaces into a shell
+- convert a closed stitched shell into a solid body
+- support use cases such as turbine blades, propeller blades, wings, duct transitions, and pipe-to-pipe transitions
+
+The detailed roadmap is in `docs/advanced-surfacing-and-3d-sketch-mvp.md`.
+
 ## Critical architecture topics
 
 - Parameters must be first-class objects.
@@ -114,6 +137,7 @@ The detailed roadmap is in `docs/construction-geometry-mvp.md`.
 - Sketches on generated faces require stable semantic references.
 - User-created construction geometry should be model intent, not temporary UI state.
 - Construction planes answer where sketches live; sketch profiles answer what shape sketches describe.
+- 3D sketches and surfacing answer how spatial curves, multiple profile sections, guide curves, and surfaces form freeform geometry.
 - OCCT shapes are a cache, not the primary model.
 - The OCCT path lives in an optional `blcad_geometry` target: adapters for rectangle extrusion and circular cut, a small ShapeCache, a WorkplaneResolver, recompute execution for `AdditiveExtrude` and `SubtractiveExtrude`, full document recompute, incremental recompute, bounds validation for the current top/bottom/right/left/front/back face cases, and STEP export of the final shape.
 - The ShapeCache remains in the geometry layer; `PartDocument` remains OCCT-free and is computed into the cache through `execute_document` and `execute_plan`.
@@ -122,6 +146,7 @@ The detailed roadmap is in `docs/construction-geometry-mvp.md`.
 - Derived workplanes are resolved geometrically without turning raw OCCT faces into core model references.
 - General closed sketch profiles are documented as the next larger sketch-modeling block and remain separate from topological naming.
 - Construction geometry and relation-driven datum placement are documented as a separate future block and remain separate from the full sketch constraint solver.
+- Advanced surfacing, sweep, loft, 3D sketch, and surface-to-solid workflows are documented as a separate future block and remain separate from the first planar closed-profile MVP.
 - Assembly parameters must later flow into parts in a controlled way.
 - Fillets and chamfers are their own parametric features with semantic edge references, not only late BRep corrections.
 - The assembly system will describe spatial relationships through constraints: a constraint graph and solver determine component positions and remaining degrees of freedom; joints later allow controlled motion.
@@ -145,4 +170,5 @@ The condensed points above are expanded in dedicated documents. Each is written 
 - `docs/shaft-wizard.md` — shaft calculation and geometry generation
 - `docs/assembly-system.md` — constraints, solver, joints, motion
 - `docs/engineering-modules.md` — bolt, bearing, gear, material, standard-parts modules
+- `docs/advanced-surfacing-and-3d-sketch-mvp.md` — 3D sketches, guide curves, sweep, loft, boundary surfaces, surface stitching, and closed-shell-to-solid conversion
 - `docs/user-interface.md` — UI architecture over the core
