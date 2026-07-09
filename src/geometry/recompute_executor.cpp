@@ -151,7 +151,7 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_additive_extrude(
   }
 
   if (has_exactly_one_closed_profile(*sketch)) {
-    auto resolved_workplane = workplane_resolver_.resolve(document, sketch->workplane());
+    auto resolved_workplane = workplane_resolver_.resolve_for_sketch(document, *sketch);
     if (resolved_workplane.has_error()) {
       return Result<std::size_t>::failure(resolved_workplane.error());
     }
@@ -211,7 +211,7 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_subtractive_extrude(
         feature->target_feature().value(), "target feature shape must exist in the shape cache"));
   }
 
-  auto resolved_workplane = workplane_resolver_.resolve(document, sketch->workplane());
+  auto resolved_workplane = workplane_resolver_.resolve_for_sketch(document, *sketch);
   if (resolved_workplane.has_error()) {
     return Result<std::size_t>::failure(resolved_workplane.error());
   }
@@ -285,33 +285,6 @@ GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const Reco
     auto removed_stale_shape = shape_cache.remove_feature_shape(feature->id());
     if (removed_stale_shape.has_error()) {
       return Result<GeometryRecomputeSummary>::failure(removed_stale_shape.error());
-    }
-
-    auto executed = execute_feature(document, *feature, shape_cache);
-    if (executed.has_error()) {
-      return Result<GeometryRecomputeSummary>::failure(executed.error());
-    }
-
-    ++summary.executed_feature_count;
-  }
-
-  return Result<GeometryRecomputeSummary>::success(summary);
-}
-
-Result<GeometryRecomputeSummary>
-GeometryRecomputeExecutor::execute_document(const PartDocument& document,
-                                            ShapeCache& shape_cache) const {
-  const auto order = document.dependency_graph().topological_order();
-  if (order.has_error()) {
-    return Result<GeometryRecomputeSummary>::failure(order.error());
-  }
-
-  GeometryRecomputeSummary summary;
-
-  for (const std::string& node_id : order.value()) {
-    const Feature* feature = document.find_feature(FeatureId(node_id));
-    if (feature == nullptr) {
-      continue;
     }
 
     auto executed = execute_feature(document, *feature, shape_cache);
