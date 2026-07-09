@@ -165,23 +165,55 @@ Still not implemented in this block:
 - full sketch constraint solving
 - automatic region detection from projected references
 - automatic consumption of projected references as profile topology without explicit helper constraints
-- interactive reference repair when a source face/edge/vertex disappears
 - projected reference selection or display in a GUI
 - arbitrary generated topology beyond the current rectangular additive extrude seed
 
-## Next MVP: Robust reference remapping and sketch placement recovery
+## Implemented block: Robust reference remapping and sketch placement recovery
 
 Goal: make sketch placement and projected references robust when a source face, edge, or vertex changes or disappears after feature edits.
 
+Detailed document: `docs/reference-recovery-mvp.md`
+
+Implemented scope:
+
+- `ReferenceStatusId` and `ReferenceRemapId`
+- `SemanticReferenceTarget` as a uniform target for semantic faces, edges, and vertices
+- `ReferenceStatusRecord` with `resolved` and `lost` states
+- `ReferenceRemapRecord` for explicit same-kind semantic remap intent
+- `SketchOriginOverrideRecord` for optional sketch-local origin overrides
+- `ReferenceRecoveryEvaluator` for conservative resolved/lost checks against the current rectangular additive-extrude semantic topology seed
+- `PartDocument` storage, finders, counts, and dependency graph nodes for reference status, remap, and origin-override records
+- JSON persistence for `reference_statuses`, `reference_remaps`, and `sketch_origin_overrides`
+- `WorkplaneResolver::resolve_for_sketch` applying sketch-origin overrides to resolved frames and bounds
+- `SketchReferenceProjector` and `GeometryRecomputeExecutor` now use sketch-aware workplane resolution
+- checked-in recovery metadata in `examples/projected_sketch_references.blcad.json`
+- core tests for resolved/lost reference status and remap/origin storage
+- JSON roundtrip tests for reference recovery metadata
+- geometry tests for generated-face sketch movement under source dimension changes
+- geometry tests for lost-reference reporting instead of silent reassignment
+- geometry tests for sketch-origin override frame shifts
+
+Still not implemented in this block:
+
+- GUI repair/remapping dialogs
+- automatic topology matching after arbitrary edits
+- automatic application of remap records to rewrite sketches or projected references
+- arbitrary generated topology beyond the current rectangular additive extrude seed
+- full sketch constraint solving or automatic region detection
+
+## Next MVP: Deterministic profile consumption from reference-driven sketch helpers
+
+Goal: turn the first reference-driven helper geometry into reproducible profile input for feature operations without adding a full sketch solver or automatic region detector yet.
+
 Proposed first implementation sequence:
 
-- add explicit lost-reference status records for semantic face, edge, and vertex references
-- add stable remap records that can move a sketch or projected reference from one valid semantic source to another without silently changing model intent
-- add optional sketch-origin override metadata for workplane-based sketches while keeping the default origin equal to the resolved workplane origin
-- add tests for generated-face sketches moving correctly when source dimensions change
-- add tests for source topology removal producing explicit lost-reference errors instead of arbitrary reassignment
-- add JSON roundtrip tests for lost-reference/remap metadata
-- keep GUI remapping dialogs, full solver integration, automatic region detection, 3D sketches, sweep, loft, and surfacing deferred
+- add model-intent records for reference-generated helper line entities derived from projected endpoint constraints
+- validate helper-generated line endpoints and projected-line direction consistency before profile construction
+- allow a `ClosedProfile` to explicitly consume deterministic reference-generated helper line IDs where all helpers are fully resolved
+- add JSON roundtrip tests for reference-generated helper entity records
+- add geometry tests for an additive extrude and a subtractive cut whose closed profile uses deterministic projected-reference helper lines
+- add invalidation tests proving projected source changes dirty helper-generated profiles and dependent features
+- keep full sketch solving, automatic region detection, GUI editing, arbitrary generated topology, 3D sketches, sweep, loft, and surfacing deferred
 
 ## Future roadmap: Inventor-like sketcher and sketch-driven features
 
