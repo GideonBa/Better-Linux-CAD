@@ -39,6 +39,7 @@ add_library(
   src/core/parameter.cpp
   src/core/quantity.cpp
   src/core/recompute_plan.cpp
+  src/core/reference_recovery.cpp
   src/core/sketch.cpp
 )
 add_library(BLCAD::core ALIAS blcad_core)
@@ -142,6 +143,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/quantity_tests.cpp
     tests/core/recompute_plan_tests.cpp
     tests/core/reference_driven_sketch_constraint_tests.cpp
+    tests/core/reference_recovery_tests.cpp
     tests/core/semantic_reference_invalidation_tests.cpp
     tests/core/semantic_reference_json_tests.cpp
     tests/core/sketch_tests.cpp
@@ -176,6 +178,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/sketch_reference_projector_tests.cpp
       tests/geometry/step_exporter_tests.cpp
       tests/geometry/workplane_resolver_tests.cpp
+      tests/geometry/workplane_resolver_recovery_tests.cpp
     )
 
     target_link_libraries(blcad_geometry_tests PRIVATE BLCAD::geometry Catch2::Catch2WithMain)
