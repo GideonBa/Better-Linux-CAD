@@ -1,14 +1,16 @@
-# Future MVP: Construction Geometry and Relation-Driven Datum System
+# Construction Geometry MVP
 
-Status: planned future block. This is not implemented yet.
+Status: first explicit construction-geometry MVP implemented.
 
-This document records the requirement that BLCAD must support construction geometry: auxiliary planes, axes/lines, and points that can be placed freely in 3D and can also be defined through geometric relationships to existing model elements.
+This document records the construction-geometry layer for BLCAD. The first implementation supports explicit construction points, explicit construction lines, and explicit construction planes. It also lets sketches reference user-created construction planes as workplanes.
+
+The current implementation is intentionally narrower than the full relation-driven datum system. It does not yet implement offset-plane relations, line-through-two-points relations, plane-through-three-points relations, parallel/orthogonal/angle relations, generated edge/vertex references, or GUI manipulators.
 
 ## Goal
 
-The future goal is to let users create explicit helper geometry and use it as stable parametric reference geometry.
+Construction geometry gives users stable helper geometry that is part of model intent.
 
-The target user path should include:
+Implemented user path:
 
 ```text
 ConstructionPlane
@@ -16,7 +18,7 @@ ConstructionPlane
   -> Feature using that sketch
 ```
 
-It should also include reference geometry such as:
+Implemented reference geometry:
 
 ```text
 ConstructionPoint
@@ -24,204 +26,244 @@ ConstructionLine / ConstructionAxis
 ConstructionPlane
 ```
 
-These objects must be part of model intent, not only temporary UI artifacts.
+These objects are model-intent objects, not temporary UI artifacts and not OCCT topology handles.
 
-## Required capabilities
+## Implemented scope
 
-BLCAD should eventually support:
+The first implementation adds:
 
-- auxiliary planes / construction planes / datum planes created by the user
-- auxiliary lines / construction lines / datum axes created by the user
-- auxiliary points / construction points / datum points created by the user
-- free placement of those objects in 3D space
-- sketches on user-created construction planes
-- parametric dependencies between construction geometry and other model objects
-- recompute of dependent sketches and features when construction geometry changes
-- JSON persistence of construction geometry and its defining relationships
-- STEP export through normal recompute, without serializing construction geometry as final BRep unless explicitly requested later
+- `ConstructionPointId`
+- `ConstructionLineId`
+- `ConstructionPlaneId`
+- `ConstructionPoint`
+- `ConstructionLine`
+- `ConstructionPlane`
+- explicit 3D placement for construction points
+- explicit 3D placement for construction lines
+- explicit 3D placement for construction planes
+- optional `parameter_dependencies` on construction geometry
+- `PartDocument` storage for construction geometry
+- `PartDocument` validation for missing construction-geometry parameter dependencies
+- dependency graph nodes for construction geometry
+- dependency graph edges from parameters to construction geometry
+- dependency graph edges from construction planes to sketches
+- sketches can reference construction planes through their workplane ID
+- JSON serialization/deserialization of construction points, lines, and planes
+- JSON roundtrip tests for explicit construction geometry
+- `WorkplaneResolver` support for explicit construction planes
+- geometry recompute test for a closed profile sketched on a construction plane
+- checked-in example model `examples/construction_plane_prism.blcad.json`
 
-## Free placement
+## Explicit placement
 
-The first useful version should allow construction geometry to be placed directly by numeric parameters.
-
-Examples:
+The first useful version allows construction geometry to be placed directly by numeric coordinates and unit vectors.
 
 ```text
 ConstructionPoint
-  origin = (x, y, z)
+  id
+  name
+  position = (x, y, z)
+  parameter_dependencies = [...]
 ```
 
 ```text
 ConstructionLine
-  point = p
-  direction = d
+  id
+  name
+  point = (x, y, z)
+  direction = unit vector
+  parameter_dependencies = [...]
 ```
 
 ```text
 ConstructionPlane
-  origin = p
-  x_axis = u
-  y_axis = v
-  normal = n
+  id
+  name
+  origin = (x, y, z)
+  x_axis = unit vector
+  y_axis = unit vector
+  normal = unit vector
+  parameter_dependencies = [...]
 ```
 
-The direct placement path is important because it gives deterministic tests before relation solving is introduced.
+The numeric placement itself is currently explicit. The `parameter_dependencies` field is an invalidation hook: it records that the construction object depends on one or more parameters, so changing such a parameter marks the construction object, dependent sketches, and dependent features dirty. It does not yet evaluate expressions into new coordinates.
 
-## Relationship-based placement
+## Validation rules
 
-After direct placement works, construction geometry should be definable by relationships to other reference objects.
+The current implementation rejects:
 
-The required relationship types include at least:
-
-- parallelism
-- orthogonality / perpendicularity
-- angle constraints
-- coincident point-on-point relationships
-- point-on-line relationships
-- point-on-plane relationships
-- line-on-plane relationships
-- plane-through-point relationships
-- plane-through-line relationships
-- line-through-two-points construction
-- plane-through-three-points construction
-- plane offset from another plane
-- line parallel to another line through a point
-- plane parallel to another plane through a point
-- plane normal to a line
-- plane tangent or normal to a generated surface in later stages
-
-These relationships should become part of model intent and should create dependency graph edges.
-
-## Relation targets
-
-Construction geometry relationships should eventually be able to reference:
-
-- standard datum planes
-- user-created construction planes
-- user-created construction lines / axes
-- user-created construction points
-- generated semantic faces
-- generated semantic edges
-- generated vertices
-- later, selected surfaces or analytic surface references
-
-References to generated topology must remain semantic. The core must not store raw OCCT `TopoDS_Face`, `TopoDS_Edge`, or `TopoDS_Vertex` handles.
+- empty construction point IDs
+- empty construction point names
+- empty construction line IDs
+- empty construction line names
+- zero-length construction line directions
+- non-unit construction line directions
+- empty construction plane IDs
+- empty construction plane names
+- zero-length construction plane axes or normals
+- non-unit construction plane axes or normals
+- non-orthogonal construction plane axes and normals
+- construction plane normals that do not match `x_axis cross y_axis`
+- empty parameter dependencies
+- duplicate parameter dependencies on the same construction object
+- construction-geometry parameter dependencies that do not exist in the `PartDocument`
+- duplicate construction plane workplane IDs
 
 ## Sketch integration
 
-A sketch should be able to reference a construction plane exactly as it can reference a standard datum plane or a derived semantic-face workplane.
-
-Target path:
+A sketch can reference a construction plane as its workplane:
 
 ```text
-construction_plane.offset_front
-  -> sketch.profile_on_offset_plane
-  -> additive or subtractive feature
+construction_plane.offset_xy
+  -> sketch.closed_rectangle_on_plane
+  -> feature.closed_rectangle_prism
 ```
 
-A construction plane used by a sketch must participate in recompute ordering:
+The dependency graph stores this explicitly:
 
 ```text
-reference object -> construction plane -> sketch -> feature
+parameter -> construction_plane -> sketch -> feature
 ```
 
-If a construction plane moves because a referenced point, line, face, or parameter changes, dependent sketches and features must be invalidated and recomputed.
+If a parameter listed in a construction plane's `parameter_dependencies` changes, the recompute plan includes the construction plane, the sketch, and the dependent feature.
 
-## Proposed model concepts
+## JSON shape
 
-A minimal first version should introduce these core model concepts:
+Construction geometry is serialized as model intent:
+
+```json
+{
+  "construction_points": [
+    {
+      "id": "construction_point.anchor",
+      "name": "Anchor",
+      "kind": "explicit",
+      "position": {"x": 0.0, "y": 0.0, "z": 25.0},
+      "parameter_dependencies": ["part.plane_offset"]
+    }
+  ],
+  "construction_lines": [
+    {
+      "id": "construction_line.axis_z",
+      "name": "AxisZ",
+      "kind": "explicit",
+      "point": {"x": 0.0, "y": 0.0, "z": 0.0},
+      "direction": {"x": 0.0, "y": 0.0, "z": 1.0},
+      "parameter_dependencies": []
+    }
+  ],
+  "construction_planes": [
+    {
+      "id": "construction_plane.offset_xy",
+      "name": "OffsetXY",
+      "kind": "explicit",
+      "origin": {"x": 0.0, "y": 0.0, "z": 25.0},
+      "x_axis": {"x": 1.0, "y": 0.0, "z": 0.0},
+      "y_axis": {"x": 0.0, "y": 1.0, "z": 0.0},
+      "normal": {"x": 0.0, "y": 0.0, "z": 1.0},
+      "parameter_dependencies": ["part.plane_offset"]
+    }
+  ]
+}
+```
+
+## Geometry-layer behavior
+
+`WorkplaneResolver` now resolves:
 
 ```text
-ConstructionPoint
-ConstructionLine
-ConstructionPlane
-ConstructionRelation
-ConstructionGeometryId
+datum.xy
+feature.base_extrude.top/bottom/right/left/front/back
+construction_plane.<id>
 ```
 
-Possible placement definitions:
+A construction plane resolves directly into a `ResolvedWorkplane` frame with origin, x-axis, y-axis, and normal. Construction-plane bounds are currently disabled because the plane is an infinite user reference plane in the first MVP.
+
+## Example
+
+The repository contains:
 
 ```text
-ExplicitPoint3
-ExplicitLine3
-ExplicitPlane3
-PlaneOffsetFromPlane
-PlaneThroughThreePoints
-LineThroughTwoPoints
-PlaneParallelToPlaneThroughPoint
-LineParallelToLineThroughPoint
-PlaneNormalToLineThroughPoint
+examples/construction_plane_prism.blcad.json
 ```
 
-Later versions may add:
+This model defines an explicit construction plane, places a closed-profile sketch on it, recomputes the profile through the geometry layer, and can be exported through the normal headless STEP workflow.
 
-```text
-SurfaceTangentPlane
-SurfaceNormalLine
-EdgeReferenceLine
-MidpointPoint
-IntersectionPoint
-IntersectionLine
-```
+## Test coverage
 
-## Proposed implementation sequence
+Core tests cover:
 
-1. Add stable typed IDs for construction points, construction lines, and construction planes.
-2. Add explicit 3D placement models for point, line, and plane.
-3. Add `PartDocument` storage and validation for construction geometry.
-4. Add dependency graph nodes for construction geometry.
-5. Allow sketches to reference construction planes as workplanes.
-6. Add JSON serialization and roundtrip tests for explicit construction geometry.
-7. Add geometry-layer resolution from construction planes into `ResolvedWorkplane` frames.
-8. Add recompute tests proving that a sketch on an explicit construction plane can drive a feature.
-9. Add relation objects for simple dependencies such as plane offset, line through two points, and plane through three points.
-10. Add validation for degenerate definitions: identical points, zero-length directions, parallel vectors where an intersection is required, or non-orthonormal plane frames.
-11. Add relation-driven invalidation so changes to a referenced point, line, plane, parameter, or semantic face mark dependent construction geometry dirty.
-12. Add relationship types for parallel, orthogonal, and angle-based construction.
-13. Only after that, add relations to generated semantic faces, edges, vertices, or analytic surfaces.
+- explicit construction point creation
+- explicit construction line creation
+- zero-length construction line rejection
+- non-unit construction line rejection
+- explicit construction plane creation
+- zero-length plane frame rejection
+- non-orthogonal plane frame rejection
+- wrong normal orientation rejection
+- `PartDocument` storage for points, lines, and planes
+- construction planes acting as sketch workplanes
+- dependency graph edges from parameters to construction planes
+- dependency graph edges from construction planes to sketches
+- recompute-plan inclusion after a construction dependency parameter changes
+- missing parameter-dependency rejection
+- JSON roundtrip for points, lines, planes, dependencies, sketches, and features
 
-## First useful acceptance tests
+Geometry tests cover:
 
-A minimal implementation should prove:
+- resolving an explicit construction plane into a `ResolvedWorkplane`
+- mapping local sketch coordinates through a construction plane frame
+- recomputing a closed profile sketched on a construction plane
 
-- an explicit construction point can be stored in `PartDocument`
-- an explicit construction line can be stored in `PartDocument`
-- an explicit construction plane can be stored in `PartDocument`
-- a sketch can use a construction plane as its workplane
-- the construction plane survives JSON roundtrip
-- a document restored from JSON can recompute a feature whose sketch is placed on a construction plane
-- a construction plane depending on parameters invalidates dependent sketches when those parameters change
-- invalid plane frames are rejected
-- invalid zero-length construction lines are rejected
-- a plane-through-three-points definition rejects collinear points
+## Not implemented yet
 
-## Deliberate limitations for the first version
+The first construction-geometry MVP does not implement:
 
-The first construction-geometry MVP should not attempt to implement everything at once.
-
-Out of scope for the first version:
-
-- full 3D geometric constraint solver
+- evaluated expression-based placement
+- offset plane from another plane
+- line through two points
+- plane through three points
+- plane parallel to another plane through a point
+- line parallel to another line through a point
+- plane normal to a line
+- point-on-line relation
+- point-on-plane relation
+- line-on-plane relation
+- parallel, orthogonal, or angle relations
+- references to generated semantic edges or vertices
+- tangent or normal references to generated surfaces
 - GUI manipulators
-- automatic face/edge/vertex picking UI
-- raw OCCT topological references in the core
-- arbitrary surface relationships
-- tangent planes to arbitrary NURBS surfaces
-- automatic repair of invalid reference chains
 - assembly-level construction geometry
 - 3D sketch splines, guide curves, lofts, sweeps, boundary surfaces, or surface stitching
-- exposing construction geometry as exported final solids or curves by default
+- exporting construction geometry as final STEP curves or surfaces by default
+
+## Next construction-geometry step
+
+The next construction-geometry increment should add relation-driven construction definitions while keeping the explicit placement path stable.
+
+Recommended next sequence:
+
+1. Add a `ConstructionRelation` model.
+2. Add `PlaneOffsetFromPlane` as the first relation-driven plane definition.
+3. Add `LineThroughTwoPoints` as the first relation-driven line definition.
+4. Add `PlaneThroughThreePoints` with collinearity validation.
+5. Add dependency graph edges from referenced construction objects to relation-driven construction objects.
+6. Add JSON roundtrip tests for each relation type.
+7. Add `WorkplaneResolver` support for relation-driven construction planes.
+8. Add invalidation tests for point/line/plane reference changes.
+9. Only after that, add parallel, orthogonal, angle, and semantic face/edge/vertex references.
 
 ## Relationship to existing roadmap
 
 The current MVP 2 semantic-face workplane seed proves that sketches can be placed on generated planar faces without storing raw OCCT face IDs.
 
-The construction-geometry block generalizes the workplane concept from generated faces to user-defined reference geometry. It should remain separate from the general closed sketch profile block and from the advanced surfacing block:
+The line-based closed-profile block proves that a planar sketch can define a non-rectangular area from explicit line loops.
+
+This construction-geometry block generalizes workplane placement from fixed datum planes and controlled generated faces to user-defined reference planes.
 
 ```text
 Construction geometry answers: where can a sketch or curve be placed?
 General closed sketch profiles answer: what planar shape can a sketch describe?
+Inventor-like sketcher roadmap answers: how should sketch entities, constraints, dimensions, and profile detection eventually behave?
 Advanced surfacing answers: how can spatial curves, multiple sketches, guide curves, and surfaces form freeform geometry?
 ```
-
-All three are needed for a serious CAD system, but they should be implemented as separate, testable increments.
