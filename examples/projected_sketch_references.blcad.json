@@ -6,30 +6,9 @@
     "name": "Projected Sketch References"
   },
   "parameters": [
-    {
-      "id": "part.width",
-      "name": "width",
-      "type": "length",
-      "scope": "part",
-      "unit": "mm",
-      "value": 100.0
-    },
-    {
-      "id": "part.height",
-      "name": "height",
-      "type": "length",
-      "scope": "part",
-      "unit": "mm",
-      "value": 60.0
-    },
-    {
-      "id": "part.depth",
-      "name": "depth",
-      "type": "length",
-      "scope": "part",
-      "unit": "mm",
-      "value": 10.0
-    }
+    {"id": "part.width", "name": "width", "type": "length", "scope": "part", "unit": "mm", "value": 100.0},
+    {"id": "part.height", "name": "height", "type": "length", "scope": "part", "unit": "mm", "value": 60.0},
+    {"id": "part.depth", "name": "depth", "type": "length", "scope": "part", "unit": "mm", "value": 10.0}
   ],
   "datum_planes": [
     {
@@ -92,6 +71,7 @@
       "line_segments": [],
       "projected_points": [],
       "projected_lines": [],
+      "constraints": [],
       "rectangle_profiles": [
         {
           "id": "profile.base",
@@ -107,7 +87,13 @@
       "id": "sketch.top_references",
       "name": "Top References",
       "workplane": "workplane.top",
-      "line_segments": [],
+      "line_segments": [
+        {
+          "id": "line.helper_top_front",
+          "start": {"x": -1.0, "y": 30.0},
+          "end": {"x": 1.0, "y": 30.0}
+        }
+      ],
       "projected_points": [
         {
           "id": "ref.point.top_front_mid",
@@ -136,6 +122,20 @@
             "source_feature": "feature.base",
             "edge": "top_front"
           }
+        }
+      ],
+      "constraints": [
+        {
+          "id": "constraint.helper_start_on_mid",
+          "kind": "coincident_to_projected_point",
+          "constrained": {"kind": "line_segment_start", "entity": "line.helper_top_front"},
+          "reference": {"kind": "projected_point", "entity": "ref.point.top_front_mid"}
+        },
+        {
+          "id": "constraint.helper_parallel_top_front",
+          "kind": "parallel_to_projected_line",
+          "constrained": {"kind": "line_segment", "entity": "line.helper_top_front"},
+          "reference": {"kind": "projected_line", "entity": "ref.line.top_front_axis"}
         }
       ],
       "rectangle_profiles": [],
