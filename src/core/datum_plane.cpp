@@ -16,6 +16,8 @@ std::string_view to_string(SemanticFace face) noexcept {
     return "left";
   case SemanticFace::Front:
     return "front";
+  case SemanticFace::Back:
+    return "back";
   }
 
   return "top";
