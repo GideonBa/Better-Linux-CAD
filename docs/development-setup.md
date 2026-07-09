@@ -53,15 +53,19 @@ Current test coverage includes:
 - `Quantity`, `Error`, and `Result`
 - `Parameter` creation and value updates
 - `PartDocument` identity, validation, lookup, and reference management
-- datum-plane, derived-workplane, sketch, rectangle-profile, and circle-profile data models
+- datum-plane, derived-workplane, sketch, line-segment, rectangle-profile, circle-profile, and closed-profile data models
+- closed-profile validation for ordered connected loops and self-intersection rejection
 - semantic top, bottom, right, left, front, and back face references for generated additive extrudes
 - additive and subtractive feature-intent data models
 - dependency graph construction, topological ordering, and cycle detection
 - invalidation state and recompute-plan creation
 - JSON serialization/deserialization of model intent, including top, bottom, right, left, front, and back derived workplanes
+- JSON serialization/deserialization of line segments and line-based closed profiles
 - `.blcad.json` file read/write helpers
 - rectangle extrusion through OCCT in the optional geometry build
 - centered and axis-directed circular cuts through OCCT in the optional geometry build
+- line-based closed-profile extrusion through OCCT in the optional geometry build
+- line-based closed-profile through-all cuts through OCCT in the optional geometry build
 - `ShapeCache` storage, replacement, removal, and final-shape tracking
 - geometry-layer `WorkplaneResolver`
 - rectangular bounds on resolved top, bottom, right, left, front, and back workplanes
@@ -72,7 +76,8 @@ Current test coverage includes:
 - numeric incremental recompute after a real parameter change
 - recompute and STEP export from a JSON-restored document
 - recompute of off-center cuts whose sketches reference derived top, bottom, right, left, front, or back workplanes
-- bounded face validation for valid and out-of-bounds holes
+- recompute of triangle closed-profile prisms and triangle closed-profile through-all cuts
+- bounded face validation for valid and out-of-bounds holes and closed-profile vertices
 - incremental recompute through derived-workplane dependency paths
 - stale dirty feature-shape removal before incremental recompute
 
@@ -88,6 +93,8 @@ After configuring and building the geometry preset, export the checked-in models
 ./build/dev-geometry/blcad_export_step examples/left_face_cut.blcad.json build/left_face_cut.step
 ./build/dev-geometry/blcad_export_step examples/front_face_cut.blcad.json build/front_face_cut.step
 ./build/dev-geometry/blcad_export_step examples/back_face_cut.blcad.json build/back_face_cut.step
+./build/dev-geometry/blcad_export_step examples/triangle_prism.blcad.json build/triangle_prism.step
+./build/dev-geometry/blcad_export_step examples/triangle_cut_plate.blcad.json build/triangle_cut_plate.step
 ```
 
 Depending on the local CMake preset output directory, the executable path may differ. The command shape is:
@@ -120,14 +127,16 @@ Important documents:
 - `docs/json-file-workflow-mvp1.md`: `.blcad.json` file workflow and headless export example
 - `docs/derived-workplane-mvp2-seed.md`: semantic generated-face workplanes and sketches on generated planar faces
 - `docs/workplane-resolver-mvp2.md`: geometry-layer resolver for derived workplanes
-- `docs/bounded-workplane-validation-mvp2.md`: bounded circle validation on derived workplanes
+- `docs/bounded-workplane-validation-mvp2.md`: bounded circle and closed-profile validation on derived workplanes
 - `docs/incremental-derived-workplane-recompute-mvp2.md`: incremental recompute through derived-workplane dependencies
 - `docs/bottom-workplane-mvp2.md`: bottom-face derived workplane for simple additive extrudes
 - `docs/right-workplane-mvp2.md`: right-face derived workplane for simple additive extrudes
 - `docs/left-workplane-mvp2.md`: left-face derived workplane for simple additive extrudes
 - `docs/front-workplane-mvp2.md`: front-face derived workplane for simple additive extrudes
 - `docs/back-workplane-mvp2.md`: back-face derived workplane for simple additive extrudes
-- `docs/general-closed-sketch-profile-mvp.md`: future general closed sketch profile block
+- `docs/general-closed-sketch-profile-mvp.md`: implemented first line-based closed profile block
+- `docs/construction-geometry-mvp.md`: future construction geometry block
+- `docs/advanced-surfacing-and-3d-sketch-mvp.md`: future 3D sketch and surfacing block
 - `docs/mvp-plan.md`: MVP sequence
 - `docs/mvp-1-specification.md`: detailed MVP-1 specification
 - `docs/decisions/`: architecture decision records
@@ -150,7 +159,7 @@ CMake build directories are located under `build/`.
 rm -rf build/
 ```
 
-## Development rule after back-face workplanes
+## Development rule after line-based closed profiles
 
 The current code should still move carefully:
 
@@ -162,5 +171,7 @@ The current code should still move carefully:
 - no serialization of OCCT geometry
 - no full topological naming system yet
 - no arbitrary generated-face topology yet
+- no arcs, splines, multiple contours, inner holes, or automatic profile-region detection yet
+- no 3D sketching, sweep, loft, surfacing, or closed-shell-to-solid conversion yet
 
-The next technical step should start the documented general closed sketch profile block without adding a full constraint solver, automatic region detection, multiple contours, inner holes, arcs, splines, or GUI editing yet.
+The next technical step should start the documented construction-geometry block with explicit construction points, lines, and planes before adding relation solving, 3D sketching, or advanced surfacing.
