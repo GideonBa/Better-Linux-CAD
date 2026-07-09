@@ -1,8 +1,8 @@
 # Workplane Resolver
 
-Status: geometry-layer resolver for standard datum planes, derived top/bottom/right/left/front/back workplanes of a simple additive extrude, and explicit construction planes.
+Status: geometry-layer resolver for standard datum planes, derived top/bottom/right/left/front/back workplanes of a simple additive extrude, explicit construction planes, and the first relation-driven construction planes.
 
-This document describes the resolver after introducing `SemanticFaceReference`, `DerivedWorkplane`, and explicit `ConstructionPlane` in the core model. The core still stores semantic model intent only. The geometry layer resolves that intent into concrete frames for recompute.
+This document describes the resolver after introducing `SemanticFaceReference`, `DerivedWorkplane`, `ConstructionPlane`, and `ConstructionRelation` in the core model. The core stores semantic model intent only. The geometry layer resolves that intent into concrete frames for recompute.
 
 ## Goal
 
@@ -36,6 +36,26 @@ origin = construction_plane.origin
 x_axis = construction_plane.x_axis
 y_axis = construction_plane.y_axis
 normal = construction_plane.normal
+bounds.enabled = false
+```
+
+For an offset construction-plane relation, the resolver first resolves the source workplane, then translates the source origin along the source normal by the offset parameter value:
+
+```text
+origin = source.origin + offset_mm * source.normal
+x_axis = source.x_axis
+y_axis = source.y_axis
+normal = source.normal
+bounds.enabled = false
+```
+
+For a three-point construction-plane relation, the resolver builds a right-handed frame from the referenced construction points:
+
+```text
+origin = first_point.position
+x_axis = normalize(second_point.position - first_point.position)
+normal = normalize(cross(second - first, third - first))
+y_axis = normalize(cross(normal, x_axis))
 bounds.enabled = false
 ```
 
@@ -122,7 +142,7 @@ bounds.width_mm = source rectangle width
 bounds.height_mm = extrude thickness
 ```
 
-Explicit construction planes are unbounded in the first implementation:
+Construction planes are unbounded in the current implementation:
 
 ```text
 bounds.enabled = false
@@ -132,7 +152,7 @@ bounds.enabled = false
 
 `GeometryRecomputeExecutor::execute_subtractive_extrude` resolves the input sketch workplane before executing the circular cut. Before mapping the point into global coordinates, the executor validates the circle radius against rectangular bounds when bounds are enabled.
 
-Line-based closed-profile geometry also resolves the input sketch workplane before converting local vertices into global points. If the workplane has bounds, closed-profile vertices are validated against those bounds. If the workplane is an explicit construction plane, bounds are disabled and the profile is mapped through the construction plane frame.
+Line-based closed-profile geometry also resolves the input sketch workplane before converting local vertices into global points. If the workplane has bounds, closed-profile vertices are validated against those bounds. If the workplane is a construction plane, bounds are disabled and the profile is mapped through the construction plane frame.
 
 The mapping formula is:
 
@@ -146,13 +166,13 @@ For `workplane.base_back` and local `(-12, 1.5)`, this becomes:
 global = (-12, -40, 5.5)
 ```
 
-For `construction_plane.offset_xy` with origin `(0, 0, 25)` and local `(2, 3)`, this becomes:
+For `construction_plane.offset_xy` with resolved origin `(0, 0, 25)` and local `(2, 3)`, this becomes:
 
 ```text
 global = (2, 3, 25)
 ```
 
-`GeometryRecomputeExecutor` passes the resolved workplane normal to circular cuts and closed-profile extrudes/cuts. Top and bottom use Z-axis cuts. Right and left use X-axis cuts. Front and back use Y-axis cuts. Explicit construction planes use their stored normal.
+`GeometryRecomputeExecutor` passes the resolved workplane normal to circular cuts and closed-profile extrudes/cuts. Top and bottom use Z-axis cuts. Right and left use X-axis cuts. Front and back use Y-axis cuts. Construction planes use their stored or relation-resolved normal.
 
 ## Example models
 
@@ -190,6 +210,8 @@ Geometry tests cover:
 - resolving `workplane.base_front`
 - resolving `workplane.base_back`
 - resolving explicit construction planes
+- resolving offset construction-plane relations
+- resolving three-point construction-plane relations
 - checking top/bottom/side origins and normals
 - checking construction plane origins, axes, normals, and unbounded status
 - checking rectangular bounds for resolved generated-face workplanes
@@ -197,6 +219,7 @@ Geometry tests cover:
 - rejecting missing workplanes
 - recomputing circular cuts from sketches on top, bottom, right, left, front, and back derived workplanes
 - recomputing a closed profile from a sketch on an explicit construction plane
+- recomputing a closed profile from a sketch on an offset construction-plane relation
 - accepting valid circles inside bounds
 - rejecting out-of-bounds circles before executing the cut
 - verifying that final volumes match expected values within tolerance
@@ -206,11 +229,12 @@ Geometry tests cover:
 Not included yet:
 
 - arbitrary generated planar faces
-- relation-driven construction planes
+- generated semantic edge or vertex references
 - face orientation derived from OCCT topology
 - non-rectangular source faces for derived generated-face workplanes
 - storing or matching raw OCCT face IDs
 - GUI face selection
 - 3D sketch workplanes or spatial curve frames
+- parallel, orthogonal, angle, tangent, or normal construction relations
 
-The resolver is intentionally limited to selected semantic faces of a simple additive rectangle extrusion and explicit construction planes. This keeps the workplane system incremental and avoids prematurely building a full topological-naming system or construction-geometry solver.
+The resolver is intentionally limited to selected semantic faces of a simple additive rectangle extrusion and deterministic construction-plane relations. This keeps the workplane system incremental and avoids prematurely building a full topological-naming system or construction-geometry solver.
