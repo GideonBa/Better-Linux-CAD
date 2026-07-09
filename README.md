@@ -2,7 +2,7 @@
 
 BLCAD is planned as an independent parametric CAD system for Linux. The end goal is to store and recompute CAD model intent: parameters, sketches, features, semantic generated-face references, dependencies, and later assembly relationships. OCCT is used as the geometry kernel, but OCCT shapes are treated as computed cache data, not as the primary model. The condensed target architecture is documented in `docs/architecture-summary.md`, and the explicit project goal is documented in `docs/project-goal.md`.
 
-The current state is a deliberately small MVP-1 vertical slice plus the first executable seed of MVP 2. It contains base types for parameters, length quantities, error handling, a pure `PartDocument` model, datum planes, derived workplanes, sketches, feature-intent data models, a dependency graph, invalidation state, recompute planning, JSON model persistence, optional OCCT geometry execution, top/bottom/right/left/front workplane resolution, bounded face validation, incremental derived-workplane recompute, and STEP export. There is no GUI yet.
+The current state is a deliberately small MVP-1 vertical slice plus the first executable seed of MVP 2. It contains base types for parameters, length quantities, error handling, a pure `PartDocument` model, datum planes, derived workplanes, sketches, feature-intent data models, a dependency graph, invalidation state, recompute planning, JSON model persistence, optional OCCT geometry execution, top/bottom/right/left/front/back workplane resolution, bounded face validation, incremental derived-workplane recompute, and STEP export. There is no GUI yet.
 
 The optional `blcad_geometry` target contains OCCT adapters for rectangle extrusion and circular cuts, a small `ShapeCache`, recompute execution for `AdditiveExtrude` and `SubtractiveExtrude`, a `WorkplaneResolver`, full document recompute, incremental recompute, axis-directed through-all circular cuts, and STEP export for the final shape. Model intent can be serialized to `.blcad.json`, loaded again, recomputed into a fresh `ShapeCache`, validated against derived face bounds, updated incrementally through derived-workplane dependencies, and exported as STEP through a small headless command-line example.
 
@@ -56,6 +56,7 @@ The optional `blcad_geometry` target contains OCCT adapters for rectangle extrus
 - `docs/right-workplane-mvp2.md`: right-face derived workplane for simple additive extrudes
 - `docs/left-workplane-mvp2.md`: left-face derived workplane for simple additive extrudes
 - `docs/front-workplane-mvp2.md`: front-face derived workplane for simple additive extrudes
+- `docs/back-workplane-mvp2.md`: back-face derived workplane for simple additive extrudes
 - `docs/general-closed-sketch-profile-mvp.md`: future block for arbitrary closed sketch profiles from line chains, arcs, splines, wires, and general OCCT faces
 - `docs/mvp-plan.md`: MVP sequence
 - `docs/mvp-1-specification.md`: detailed MVP-1 specification
@@ -65,15 +66,15 @@ The optional `blcad_geometry` target contains OCCT adapters for rectangle extrus
 
 The current core skeleton covers `Quantity`, typed IDs, `Error`, `Result`, `Parameter`, `PartDocument`, `DatumPlane`, `DerivedWorkplane`, `Sketch`, `RectangleProfile`, and `CircleProfile`, as well as `Feature`, `AdditiveExtrude`, `SubtractiveExtrude`, `DependencyGraph`, `InvalidationState`, and `RecomputePlan`. `PartDocument` validates workplane, profile, and feature references, creates graph nodes and graph edges from them, marks affected nodes after a parameter change, and derives an ordered recompute plan from that state.
 
-MVP 2 has started with a minimal semantic-face path. `SemanticFaceReference` can point to `feature.base_extrude.top`, `feature.base_extrude.bottom`, `feature.base_extrude.right`, `feature.base_extrude.left`, and `feature.base_extrude.front`. `DerivedWorkplane` can expose those semantic faces as sketch workplanes, and a sketch can use a derived workplane as its workplane reference. The dependency graph represents this as `feature.base_extrude -> workplane -> sketch -> cut_feature`.
+MVP 2 has a minimal semantic-face path for a simple `AdditiveExtrude`. `SemanticFaceReference` can point to `feature.base_extrude.top`, `feature.base_extrude.bottom`, `feature.base_extrude.right`, `feature.base_extrude.left`, `feature.base_extrude.front`, and `feature.base_extrude.back`. `DerivedWorkplane` can expose those semantic faces as sketch workplanes, and a sketch can use a derived workplane as its workplane reference. The dependency graph represents this as `feature.base_extrude -> workplane -> sketch -> cut_feature`.
 
-The optional geometry build resolves sketch workplanes before executing subtractive cuts. `WorkplaneResolver` can resolve `datum.xy`, `feature.base_extrude.top`, `feature.base_extrude.bottom`, `feature.base_extrude.right`, `feature.base_extrude.left`, and `feature.base_extrude.front`. Top and bottom cuts are vertical through-all cuts. Right and left face cuts are X-axis through-all cuts. Front-face cuts are Y-axis through-all cuts. All currently supported generated-face workplanes carry rectangular bounds derived from the source rectangle sketch and extrude thickness.
+The optional geometry build resolves sketch workplanes before executing subtractive cuts. `WorkplaneResolver` can resolve `datum.xy`, `feature.base_extrude.top`, `feature.base_extrude.bottom`, `feature.base_extrude.right`, `feature.base_extrude.left`, `feature.base_extrude.front`, and `feature.base_extrude.back`. Top and bottom cuts are vertical through-all cuts. Right and left face cuts are X-axis through-all cuts. Front and back face cuts are Y-axis through-all cuts. All currently supported generated-face workplanes carry rectangular bounds derived from the source rectangle sketch and extrude thickness.
 
 General closed sketch profiles are explicitly not implemented yet. The current sketch model does not support free line chains, polylines, arcs, splines, connected sketch entities, general closed loops, closed wires, multiple contours, inner holes in the same sketch profile, profile-region selection, or generic additive/subtractive extrusion from arbitrary `TopoDS_Wire` / `TopoDS_Face`. This future block is tracked in `docs/general-closed-sketch-profile-mvp.md`.
 
 Incremental recompute follows derived-workplane dependency paths. Updating `part.width`, `part.height`, or `part.thickness` can mark the base feature, derived workplane, dependent sketch, and cut feature as affected. `GeometryRecomputeExecutor::execute_plan` skips non-feature nodes while preserving their dependency-ordering role, removes stale cached feature shapes before recomputing dirty features, and can surface bounded-workplane validation errors after source-dimension changes.
 
-The persistence path is file-based: `serialize_part_document_to_json` and `deserialize_part_document_from_json` handle in-memory model-intent JSON, while `write_part_document_json_file` and `read_part_document_json_file` handle `.blcad.json` files. The checked-in `examples/reference_plate.blcad.json`, `examples/top_face_cut.blcad.json`, `examples/bottom_face_cut.blcad.json`, `examples/right_face_cut.blcad.json`, `examples/left_face_cut.blcad.json`, and `examples/front_face_cut.blcad.json` models can be loaded by `blcad_export_step`, recomputed through the geometry layer, validated, and exported as STEP.
+The persistence path is file-based: `serialize_part_document_to_json` and `deserialize_part_document_from_json` handle in-memory model-intent JSON, while `write_part_document_json_file` and `read_part_document_json_file` handle `.blcad.json` files. The checked-in `examples/reference_plate.blcad.json`, `examples/top_face_cut.blcad.json`, `examples/bottom_face_cut.blcad.json`, `examples/right_face_cut.blcad.json`, `examples/left_face_cut.blcad.json`, `examples/front_face_cut.blcad.json`, and `examples/back_face_cut.blcad.json` models can be loaded by `blcad_export_step`, recomputed through the geometry layer, validated, and exported as STEP.
 
 ## Headless examples
 
@@ -98,6 +99,7 @@ Export the derived-workplane models:
 ./build/dev-geometry/blcad_export_step examples/right_face_cut.blcad.json build/right_face_cut.step
 ./build/dev-geometry/blcad_export_step examples/left_face_cut.blcad.json build/left_face_cut.step
 ./build/dev-geometry/blcad_export_step examples/front_face_cut.blcad.json build/front_face_cut.step
+./build/dev-geometry/blcad_export_step examples/back_face_cut.blcad.json build/back_face_cut.step
 ```
 
 Depending on the local CMake preset output directory, the executable path may differ. The command shape is:
@@ -108,19 +110,25 @@ blcad_export_step <input.blcad.json> <output.step>
 
 ## Next technical step
 
-The next technical step should add the final opposite Y-side semantic reference, still without broadening into arbitrary topology.
+The next technical step should start the larger sketch-modeling block for general closed profiles, without immediately building a full constraint solver or GUI.
 
-1. Add `SemanticFace::Back` for the `-Y` face of a simple `AdditiveExtrude`.
-2. Allow `DerivedWorkplane` to reference `feature.base_extrude.back`.
-3. Resolve the back-face workplane with a clear origin, axes, normal, and rectangular bounds.
-4. Keep the local back-face frame right-handed and consistent with the front face.
-5. Add JSON roundtrip coverage for the back-face derived workplane.
-6. Add geometry tests that place a sketch on the back face and execute a through-all Y-axis circular cut.
-7. Keep support limited to top, bottom, right, left, front, and back faces of a simple `AdditiveExtrude`.
-8. Do not build arbitrary planar face support yet.
-9. Do not build a full topological naming system yet.
-10. Do not build a GUI yet.
+1. Add a `LineSegment` sketch entity with stable IDs and endpoint coordinates.
+2. Add a `SketchLoop` or `ClosedProfile` model that references ordered sketch entities.
+3. Validate that the loop is closed within tolerance.
+4. Validate that consecutive entity endpoints connect.
+5. Reject self-intersecting loops in the first implementation.
+6. Convert the closed loop into an OCCT `TopoDS_Wire` in the geometry layer.
+7. Convert the wire into an OCCT `TopoDS_Face`.
+8. Add additive extrude support for one closed profile.
+9. Add subtractive through-all extrude support for one closed profile.
+10. Add JSON serialization and roundtrip tests for the new sketch entities and closed profile.
+11. Add geometry tests for a non-rectangular polygon extrude.
+12. Add geometry tests for a non-circular closed-profile cut.
+13. Do not build automatic region detection yet.
+14. Do not build multiple contours or inner holes yet.
+15. Do not build arcs, splines, or a full sketch constraint solver yet.
+16. Do not build a GUI yet.
 
-After the controlled semantic-face sequence is complete, the next larger sketch-modeling block should be `General closed sketch profiles`, documented in `docs/general-closed-sketch-profile-mvp.md`.
+The detailed future block is documented in `docs/general-closed-sketch-profile-mvp.md`.
 
 The detailed MVP-1 specification is in `docs/mvp-1-specification.md`.
