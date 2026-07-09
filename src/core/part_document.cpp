@@ -21,6 +21,19 @@ Result<std::size_t> add_dependency_if_missing(DependencyGraph& graph, std::strin
          face == SemanticFace::Left || face == SemanticFace::Front || face == SemanticFace::Back;
 }
 
+[[nodiscard]] Result<std::size_t> add_parameter_dependencies(
+    DependencyGraph& graph, const std::vector<ParameterId>& parameter_dependencies,
+    const std::string& dependent_id) {
+  for (const auto& parameter_id : parameter_dependencies) {
+    auto dependency = add_dependency_if_missing(graph, parameter_id.value(), dependent_id);
+    if (dependency.has_error()) {
+      return dependency;
+    }
+  }
+
+  return Result<std::size_t>::success(graph.dependency_count());
+}
+
 } // namespace
 
 Result<PartDocument> PartDocument::create(DocumentId id, std::string name) {
@@ -69,18 +82,129 @@ Result<std::size_t> PartDocument::add_parameter(Parameter parameter) {
 }
 
 Result<std::size_t> PartDocument::add_datum_plane(DatumPlane datum_plane) {
-  if (has_datum_plane_id(datum_plane.id())) {
-    return Result<std::size_t>::failure(Error::validation(
-        datum_plane.id().value(), "datum plane id must be unique within part document"));
-  }
-
-  if (has_derived_workplane_id(datum_plane.id())) {
+  if (has_workplane_id(datum_plane.id())) {
     return Result<std::size_t>::failure(Error::validation(
         datum_plane.id().value(), "workplane id must be unique within part document"));
   }
 
   datum_planes_.push_back(std::move(datum_plane));
   return Result<std::size_t>::success(datum_planes_.size() - 1);
+}
+
+Result<std::size_t> PartDocument::add_construction_point(ConstructionPoint point) {
+  if (has_construction_point_id(point.id())) {
+    return Result<std::size_t>::failure(Error::validation(
+        point.id().value(), "construction point id must be unique within part document"));
+  }
+
+  for (const auto& parameter_id : point.parameter_dependencies()) {
+    if (!has_parameter_id(parameter_id)) {
+      return Result<std::size_t>::failure(Error::validation(
+          point.id().value(), "construction point parameter dependency must exist in part document"));
+    }
+  }
+
+  auto graph = dependency_graph_;
+  const auto added_node = graph.add_node(point.id().value());
+  if (added_node.has_error()) {
+    return Result<std::size_t>::failure(added_node.error());
+  }
+
+  const auto parameter_dependencies =
+      add_parameter_dependencies(graph, point.parameter_dependencies(), point.id().value());
+  if (parameter_dependencies.has_error()) {
+    return Result<std::size_t>::failure(parameter_dependencies.error());
+  }
+
+  auto invalidation_state = invalidation_state_;
+  const auto synced_state = invalidation_state.sync_from_graph(graph);
+  if (synced_state.has_error()) {
+    return Result<std::size_t>::failure(synced_state.error());
+  }
+
+  dependency_graph_ = std::move(graph);
+  invalidation_state_ = std::move(invalidation_state);
+  construction_points_.push_back(std::move(point));
+  return Result<std::size_t>::success(construction_points_.size() - 1);
+}
+
+Result<std::size_t> PartDocument::add_construction_line(ConstructionLine line) {
+  if (has_construction_line_id(line.id())) {
+    return Result<std::size_t>::failure(Error::validation(
+        line.id().value(), "construction line id must be unique within part document"));
+  }
+
+  for (const auto& parameter_id : line.parameter_dependencies()) {
+    if (!has_parameter_id(parameter_id)) {
+      return Result<std::size_t>::failure(Error::validation(
+          line.id().value(), "construction line parameter dependency must exist in part document"));
+    }
+  }
+
+  auto graph = dependency_graph_;
+  const auto added_node = graph.add_node(line.id().value());
+  if (added_node.has_error()) {
+    return Result<std::size_t>::failure(added_node.error());
+  }
+
+  const auto parameter_dependencies =
+      add_parameter_dependencies(graph, line.parameter_dependencies(), line.id().value());
+  if (parameter_dependencies.has_error()) {
+    return Result<std::size_t>::failure(parameter_dependencies.error());
+  }
+
+  auto invalidation_state = invalidation_state_;
+  const auto synced_state = invalidation_state.sync_from_graph(graph);
+  if (synced_state.has_error()) {
+    return Result<std::size_t>::failure(synced_state.error());
+  }
+
+  dependency_graph_ = std::move(graph);
+  invalidation_state_ = std::move(invalidation_state);
+  construction_lines_.push_back(std::move(line));
+  return Result<std::size_t>::success(construction_lines_.size() - 1);
+}
+
+Result<std::size_t> PartDocument::add_construction_plane(ConstructionPlane plane) {
+  if (has_construction_plane_id(plane.id())) {
+    return Result<std::size_t>::failure(Error::validation(
+        plane.id().value(), "construction plane id must be unique within part document"));
+  }
+
+  if (has_workplane_id(plane.workplane_id())) {
+    return Result<std::size_t>::failure(Error::validation(
+        plane.id().value(), "workplane id must be unique within part document"));
+  }
+
+  for (const auto& parameter_id : plane.parameter_dependencies()) {
+    if (!has_parameter_id(parameter_id)) {
+      return Result<std::size_t>::failure(Error::validation(
+          plane.id().value(), "construction plane parameter dependency must exist in part document"));
+    }
+  }
+
+  auto graph = dependency_graph_;
+  const auto added_node = graph.add_node(plane.id().value());
+  if (added_node.has_error()) {
+    return Result<std::size_t>::failure(added_node.error());
+  }
+
+  const auto parameter_dependencies =
+      add_parameter_dependencies(graph, plane.parameter_dependencies(), plane.id().value());
+  if (parameter_dependencies.has_error()) {
+    return Result<std::size_t>::failure(parameter_dependencies.error());
+  }
+
+  auto invalidation_state = invalidation_state_;
+  const auto synced_state = invalidation_state.sync_from_graph(graph);
+  if (synced_state.has_error()) {
+    return Result<std::size_t>::failure(synced_state.error());
+  }
+
+  dependency_graph_ = std::move(graph);
+  invalidation_state_ = std::move(invalidation_state);
+  construction_planes_.push_back(std::move(plane));
+  return Result<std::size_t>::success(construction_planes_.size() - 1);
 }
 
 Result<std::size_t> PartDocument::add_derived_workplane(DerivedWorkplane workplane) {
@@ -166,7 +290,8 @@ Result<std::size_t> PartDocument::add_sketch(Sketch sketch) {
     return Result<std::size_t>::failure(added_node.error());
   }
 
-  if (has_derived_workplane_id(sketch.workplane())) {
+  if (has_derived_workplane_id(sketch.workplane()) ||
+      has_construction_plane_id(ConstructionPlaneId(sketch.workplane().value()))) {
     auto workplane_dependency =
         add_dependency_if_missing(graph, sketch.workplane().value(), sketch.id().value());
     if (workplane_dependency.has_error()) {
@@ -335,6 +460,18 @@ const std::vector<DatumPlane>& PartDocument::datum_planes() const noexcept {
   return datum_planes_;
 }
 
+const std::vector<ConstructionPoint>& PartDocument::construction_points() const noexcept {
+  return construction_points_;
+}
+
+const std::vector<ConstructionLine>& PartDocument::construction_lines() const noexcept {
+  return construction_lines_;
+}
+
+const std::vector<ConstructionPlane>& PartDocument::construction_planes() const noexcept {
+  return construction_planes_;
+}
+
 const std::vector<DerivedWorkplane>& PartDocument::derived_workplanes() const noexcept {
   return derived_workplanes_;
 }
@@ -361,6 +498,18 @@ std::size_t PartDocument::parameter_count() const noexcept {
 
 std::size_t PartDocument::datum_plane_count() const noexcept {
   return datum_planes_.size();
+}
+
+std::size_t PartDocument::construction_point_count() const noexcept {
+  return construction_points_.size();
+}
+
+std::size_t PartDocument::construction_line_count() const noexcept {
+  return construction_lines_.size();
+}
+
+std::size_t PartDocument::construction_plane_count() const noexcept {
+  return construction_planes_.size();
 }
 
 std::size_t PartDocument::derived_workplane_count() const noexcept {
@@ -405,6 +554,36 @@ const DatumPlane* PartDocument::find_datum_plane(DatumPlaneId id) const noexcept
   return nullptr;
 }
 
+const ConstructionPoint* PartDocument::find_construction_point(ConstructionPointId id) const noexcept {
+  for (const auto& point : construction_points_) {
+    if (point.id() == id) {
+      return &point;
+    }
+  }
+
+  return nullptr;
+}
+
+const ConstructionLine* PartDocument::find_construction_line(ConstructionLineId id) const noexcept {
+  for (const auto& line : construction_lines_) {
+    if (line.id() == id) {
+      return &line;
+    }
+  }
+
+  return nullptr;
+}
+
+const ConstructionPlane* PartDocument::find_construction_plane(ConstructionPlaneId id) const noexcept {
+  for (const auto& plane : construction_planes_) {
+    if (plane.id() == id) {
+      return &plane;
+    }
+  }
+
+  return nullptr;
+}
+
 const DerivedWorkplane* PartDocument::find_derived_workplane(DatumPlaneId id) const noexcept {
   for (const auto& workplane : derived_workplanes_) {
     if (workplane.id() == id) {
@@ -436,7 +615,8 @@ const Feature* PartDocument::find_feature(FeatureId id) const noexcept {
 }
 
 bool PartDocument::has_workplane_id(const DatumPlaneId& id) const noexcept {
-  return has_datum_plane_id(id) || has_derived_workplane_id(id);
+  return has_datum_plane_id(id) || has_derived_workplane_id(id) ||
+         has_construction_plane_id(ConstructionPlaneId(id.value()));
 }
 
 PartDocument::PartDocument(DocumentId id, std::string name)
@@ -452,6 +632,18 @@ bool PartDocument::has_parameter_name(std::string_view name) const noexcept {
 
 bool PartDocument::has_datum_plane_id(const DatumPlaneId& id) const noexcept {
   return find_datum_plane(id) != nullptr;
+}
+
+bool PartDocument::has_construction_point_id(const ConstructionPointId& id) const noexcept {
+  return find_construction_point(id) != nullptr;
+}
+
+bool PartDocument::has_construction_line_id(const ConstructionLineId& id) const noexcept {
+  return find_construction_line(id) != nullptr;
+}
+
+bool PartDocument::has_construction_plane_id(const ConstructionPlaneId& id) const noexcept {
+  return find_construction_plane(id) != nullptr;
 }
 
 bool PartDocument::has_derived_workplane_id(const DatumPlaneId& id) const noexcept {
