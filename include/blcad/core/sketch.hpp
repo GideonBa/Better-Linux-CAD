@@ -57,9 +57,9 @@ public:
   [[nodiscard]] SketchReferenceTargetKind kind() const noexcept;
   [[nodiscard]] const SketchEntityId& entity() const noexcept;
 
-private:
   SketchReferenceTarget(SketchReferenceTargetKind kind, SketchEntityId entity);
 
+private:
   SketchReferenceTargetKind kind_;
   SketchEntityId entity_;
 };
