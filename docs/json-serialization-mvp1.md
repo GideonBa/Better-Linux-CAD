@@ -1,8 +1,8 @@
 # JSON Serialization
 
-Status: core serialization for `PartDocument` model intent, including file-level helpers, derived workplanes for the current controlled semantic faces, line-based closed sketch profiles, explicit construction geometry, and the first relation-driven construction geometry.
+Status: core serialization for `PartDocument` model intent, including file-level helpers, derived workplanes, line-based closed sketch profiles, explicit construction geometry, relation-driven construction geometry, chained construction relations, and semantic generated edge/vertex references.
 
-This document describes the JSON serialization layer. The implementation persists model intent only. It does not serialize OCCT shapes, `GeometryShape`, or `ShapeCache` contents.
+The JSON serialization layer persists model intent only. It does not serialize OCCT shapes, `GeometryShape`, `ShapeCache` contents, raw face IDs, raw edge IDs, raw vertex IDs, BRep handles, or exported STEP data.
 
 ## Goal
 
@@ -15,23 +15,19 @@ The goal is to make a `PartDocument` reproducible from a textual representation:
 5. Recompute the restored document into a fresh `ShapeCache`.
 6. Export the recomputed final shape as STEP.
 
-This proves that the JSON stores CAD model intent, not computed output geometry.
-
 ## JSON scope
 
 The current JSON format stores:
 
-- schema identifier
-- schema version
+- schema identifier and version
 - document ID and name
 - length parameters
 - datum planes
-- explicit construction points
-- explicit construction lines
-- explicit construction planes
-- relation-driven construction lines
-- relation-driven construction planes
+- explicit construction points, lines, and planes
+- relation-driven construction lines and planes
 - embedded construction relation intent for supported relation-driven construction objects
+- semantic generated edge references as `{source_feature, edge}`
+- semantic generated vertex references as `{source_feature, vertex}`
 - construction-geometry parameter dependencies
 - derived workplanes with `top`, `bottom`, `right`, `left`, `front`, or `back` semantic face references
 - line-segment sketch entities
@@ -40,70 +36,20 @@ The current JSON format stores:
 - line-based closed profiles
 - additive and subtractive extrude features
 
-The current JSON format does not store OCCT shapes, final BRep geometry, ShapeCache contents, exported STEP data, GUI state, sketch solver state, general relation collections independent from construction objects, or assembly data.
-
-## Reference files
-
-The derived-workplane seed models are:
-
-```text
-examples/top_face_cut.blcad.json
-examples/bottom_face_cut.blcad.json
-examples/right_face_cut.blcad.json
-examples/left_face_cut.blcad.json
-examples/front_face_cut.blcad.json
-examples/back_face_cut.blcad.json
-```
-
-The line-based closed-profile models are:
-
-```text
-examples/triangle_prism.blcad.json
-examples/triangle_cut_plate.blcad.json
-```
-
-The construction-geometry model is:
-
-```text
-examples/construction_plane_prism.blcad.json
-```
-
-These files describe model intent such as sketches placed on semantic generated-face workplanes, sketches containing line segments plus closed profiles, and sketches placed on construction planes. No raw OCCT face IDs, wires, faces, shapes, or BRep handles are stored.
+The current JSON format does not store final BRep geometry, ShapeCache contents, exported STEP data, GUI state, sketch solver state, general relation collections independent from construction objects, or assembly data.
 
 ## Construction geometry
 
-Explicit construction geometry is serialized as model intent:
+Explicit construction geometry is serialized as numeric model intent:
 
 ```json
 {
   "construction_points": [
     {
-      "id": "construction_point.anchor",
+      "id": "point.anchor",
       "name": "Anchor",
       "kind": "explicit",
       "position": {"x": 0.0, "y": 0.0, "z": 25.0},
-      "parameter_dependencies": ["part.plane_offset"]
-    }
-  ],
-  "construction_lines": [
-    {
-      "id": "construction_line.axis_z",
-      "name": "AxisZ",
-      "kind": "explicit",
-      "point": {"x": 0.0, "y": 0.0, "z": 0.0},
-      "direction": {"x": 0.0, "y": 0.0, "z": 1.0},
-      "parameter_dependencies": []
-    }
-  ],
-  "construction_planes": [
-    {
-      "id": "construction_plane.explicit_xy",
-      "name": "ExplicitXY",
-      "kind": "explicit",
-      "origin": {"x": 0.0, "y": 0.0, "z": 25.0},
-      "x_axis": {"x": 1.0, "y": 0.0, "z": 0.0},
-      "y_axis": {"x": 0.0, "y": 1.0, "z": 0.0},
-      "normal": {"x": 0.0, "y": 0.0, "z": 1.0},
       "parameter_dependencies": ["part.plane_offset"]
     }
   ]
@@ -116,52 +62,81 @@ Relation-driven construction geometry stores an embedded relation object:
 {
   "construction_lines": [
     {
-      "id": "construction_line.axis_ab",
+      "id": "line.axis_ab",
       "name": "AxisAB",
       "kind": "through_two_points",
       "relation": {
         "id": "relation.axis_ab",
         "type": "line_through_two_points",
-        "first_point": "construction_point.a",
-        "second_point": "construction_point.b"
+        "first_point": "point.a",
+        "second_point": "point.b"
+      }
+    },
+    {
+      "id": "line.edge_parallel",
+      "name": "GeneratedEdgeParallel",
+      "kind": "parallel_to_generated_edge_through_point",
+      "relation": {
+        "id": "relation.edge_parallel",
+        "type": "line_parallel_to_generated_edge_through_point",
+        "generated_edge": {
+          "source_feature": "feature.base",
+          "edge": "top_front"
+        },
+        "through_point": "point.z"
       }
     }
   ],
   "construction_planes": [
     {
-      "id": "construction_plane.offset_xy",
-      "name": "OffsetXY",
-      "kind": "offset_from_plane",
+      "id": "construction_plane.parallel_xy",
+      "name": "ParallelXY",
+      "kind": "parallel_to_plane_through_point",
       "relation": {
-        "id": "relation.offset_xy",
-        "type": "plane_offset_from_plane",
+        "id": "relation.parallel_xy",
+        "type": "plane_parallel_to_plane_through_point",
         "source_plane": "datum.xy",
-        "offset_parameter": "part.plane_offset"
-      }
-    },
-    {
-      "id": "construction_plane.abc",
-      "name": "PlaneABC",
-      "kind": "through_three_points",
-      "relation": {
-        "id": "relation.plane_abc",
-        "type": "plane_through_three_points",
-        "first_point": "construction_point.a",
-        "second_point": "construction_point.b",
-        "third_point": "construction_point.c"
+        "through_point": "point.z"
       }
     }
   ]
 }
 ```
 
-Supported relation types are currently:
+Supported relation type strings are:
 
 ```text
 plane_offset_from_plane
 line_through_two_points
 plane_through_three_points
+point_on_plane
+point_on_line
+point_on_generated_edge
+point_on_generated_vertex
+line_on_plane
+plane_parallel_to_plane_through_point
+line_parallel_to_line_through_point
+line_parallel_to_generated_edge_through_point
 ```
+
+## Semantic generated references
+
+Generated edge and vertex references are serialized semantically:
+
+```json
+{
+  "generated_edge": {
+    "source_feature": "feature.base",
+    "edge": "top_front"
+  },
+  "generated_vertex": {
+    "source_feature": "feature.base",
+    "vertex": "bottom_back_left"
+  }
+}
+```
+
+The source feature must restore to an additive extrude before the relation is accepted by `PartDocument`. Deserialization therefore restores construction lines after sketches and features so generated-edge line relations can validate their source feature.
 
 ## Derived workplanes
 
@@ -192,68 +167,24 @@ back
 
 A sketch stores its identity, workplane reference, sketch entities, and profiles. The workplane reference may point to a standard datum plane, a derived workplane, an explicit construction plane, or a relation-driven construction plane.
 
-Line-based closed profiles are serialized as ordered references to line-segment sketch entities:
+Line-based closed profiles are serialized as ordered references to line-segment sketch entities. The line order is significant. Deserialization rebuilds the `Sketch`, validates that the line chain is connected and non-self-intersecting, and then adds the closed profile through the normal construction API.
 
-```json
-{
-  "id": "sketch.triangle",
-  "name": "Sketch_Triangle",
-  "workplane": "datum.xy",
-  "line_segments": [
-    {
-      "id": "line.triangle_a",
-      "start": {"x": 0.0, "y": 0.0},
-      "end": {"x": 40.0, "y": 0.0}
-    }
-  ],
-  "rectangle_profiles": [],
-  "circle_profiles": [],
-  "closed_profiles": [
-    {
-      "id": "profile.triangle",
-      "line_segments": ["line.triangle_a", "line.triangle_b", "line.triangle_c"]
-    }
-  ]
-}
-```
+Features are serialized as model intent: additive extrudes reference input sketches and length parameters; subtractive extrudes reference input sketches and target features. The final generated shape is not serialized.
 
-The line order is significant. Deserialization rebuilds the `Sketch`, validates that the line chain is connected and non-self-intersecting, and then adds the closed profile through the normal construction API.
+## File helpers
 
-For now, only `+Z` and `through_all` are supported in feature intent. The geometry layer determines the actual cut axis from the resolved workplane normal.
-
-## Deserialization model
-
-Deserialization goes through the normal construction path. Because relation-driven construction planes, derived workplanes, dependent sketches, and features may refer to objects that appear later in the file, the loader resolves some objects in multiple passes:
-
-1. Create `PartDocument`.
-2. Add parameters.
-3. Add datum planes.
-4. Add construction points and construction lines.
-5. Add construction planes, resolving offset-plane chains iteratively if needed.
-6. Add any sketches whose workplane already exists.
-7. Add any features whose sketch and target feature dependencies already exist.
-8. Add any derived workplanes whose source feature exists.
-9. Repeat until all sketches, features, and derived workplanes are resolved.
-
-This rebuilds the dependency graph and invalidation state from the model instead of trusting serialized graph data.
+`write_part_document_json_file` serializes the document, writes it to disk, flushes and closes the stream, and then returns the final file size. `read_part_document_json_file` reads the file and deserializes it through the same validated APIs as string deserialization.
 
 ## Test coverage
 
-Core tests verify JSON roundtrip for top, bottom, right, left, front, and back derived workplanes. Core tests also verify JSON roundtrip for line segments, line-based closed profiles, explicit construction points, explicit construction lines, explicit construction planes, relation-driven construction lines, relation-driven construction planes, embedded construction relations, and construction-geometry parameter dependencies. Geometry tests verify that restored and checked-in JSON documents can be recomputed into a fresh `ShapeCache` and exported as STEP.
+Core JSON tests cover:
 
-## Deliberate limitation
-
-Not included yet:
-
-- JSON schema file generation
-- formula or expression serialization
-- standalone relation collections independent from construction objects
-- generated edge or vertex semantic references
-- assembly serialization
-- ShapeCache serialization
-- automatic parent-directory creation for model-file output
-- arbitrary face references
-- arcs, splines, multiple contours, inner holes, or profile-region selection
-- 3D sketch and surfacing serialization
-
-The current implementation is enough to prove that model intent can be persisted, stored as a file, loaded again, and rebuilt independently of computed geometry.
+- MVP-1 rectangular plate roundtrip
+- JSON file helper write/read behavior
+- derived workplane roundtrips
+- line-based closed-profile roundtrips
+- explicit construction geometry roundtrips
+- relation-driven construction geometry roundtrips
+- chained construction relation roundtrips
+- semantic generated edge reference roundtrips
+- unsupported schema and unsupported feature rejection
