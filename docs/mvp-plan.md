@@ -202,19 +202,50 @@ Still not implemented in this block:
 - GUI editing of reference-generated helper entities
 - arbitrary generated topology beyond the current rectangular additive extrude seed
 
-## Next MVP: Sketch constraints and dimensions seed
+## Implemented block: Sketch constraints and dimensions seed
 
 Goal: add the next minimal non-solver sketch intent layer: explicit geometric constraints and first driving dimensions on line-segment geometry, while keeping deterministic validation and avoiding a full constraint solver.
 
+Detailed document: `docs/sketch-constraints-and-dimensions-mvp.md`
+
+Implemented scope:
+
+- `SketchGeometricConstraint` records for fixed, horizontal, vertical, parallel, perpendicular, and equal-length constraints
+- `SketchDrivingDimension` records for horizontal, vertical, aligned, and point-to-point distances
+- `SketchDimensionId`
+- `geometric_constraints` and `driving_dimensions` JSON persistence
+- validation of geometric constraints against explicit line segments and endpoints
+- validation of driving dimensions against explicit line endpoints and existing length parameters
+- dependency graph edges from driving dimension parameters to sketches and dependent features
+- `DimensionDrivenProfileResolver` for deterministic dimension-driven closed-profile vertices
+- `GeometryRecomputeExecutor` integration for dimension-driven closed-profile additive extrudes and subtractive cuts
+- JSON roundtrip and invalidation tests
+- geometry tests proving dimension parameter changes alter resolved profile vertices
+
+Still not implemented in this block:
+
+- full sketch constraint solving
+- over- or under-constrained diagnosis
+- driven dimensions
+- automatic constraint inference
+- GUI constraint display or editing
+- automatic region detection
+- arcs, splines, 3D sketches, sweep, loft, and surfacing
+
+## Next MVP: Automatic profile region detection seed
+
+Goal: detect deterministic closed regions from explicit sketch lines and resolved helper lines without requiring users or JSON to predeclare every `ClosedProfile` manually.
+
 Proposed first implementation sequence:
 
-- add model-intent records for fixed, horizontal, vertical, parallel, perpendicular, and equal-length constraints on explicit line segments
-- add first driving dimension records for horizontal, vertical, aligned, and point-to-point distances backed by existing length parameters
-- validate dimensions against existing sketch entities and parameters
-- add JSON roundtrip tests for geometric constraints and driving dimensions
-- add invalidation graph edges from dimension parameters to sketches and dependent features
-- add geometry tests proving dimension parameter changes alter closed-profile recompute where deterministic
-- keep automatic solving, over/under-constrained diagnosis, GUI constraint display, automatic region detection, arcs, splines, 3D sketches, sweep, loft, and surfacing deferred
+- add a deterministic sketch-region finder for unordered explicit line segments on one sketch
+- support simple single-contour loops with no branches and no self-intersections
+- allow projected/reference-generated helper lines to participate only after they resolve to explicit local line segments
+- create stable generated `ClosedProfile` candidates with deterministic IDs
+- add validation errors for ambiguous, branched, duplicate, or self-intersecting regions
+- add JSON metadata only for user-selected/generated-region intent, not raw solver state
+- add geometry tests for additive and subtractive recompute from detected simple regions
+- keep full sketch solving, multiple regions, inner loops, trim/extend, arcs, splines, GUI selection, 3D sketches, sweep, loft, and surfacing deferred
 
 ## Future roadmap: Inventor-like sketcher and sketch-driven features
 
