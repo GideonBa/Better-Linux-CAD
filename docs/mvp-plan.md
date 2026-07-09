@@ -27,10 +27,6 @@ Implemented scope:
 - checked-in reference model under `examples/`
 - headless JSON-to-STEP command-line example
 
-Example: rectangular plate with width, height, thickness, and a centered hole.
-
-Current state: MVP 1 has the required core data models, dependency graph, invalidation state, recompute plan, numeric parameter updates, JSON serialization of model intent, `.blcad.json` file workflow, optional OCCT geometry execution, centered cut, full document recompute, and STEP export.
-
 ## MVP 2: Sketch on planar face
 
 Goal: place sketches on existing generated planar faces while preserving semantic model intent instead of storing raw OCCT face IDs.
@@ -82,9 +78,9 @@ Still not implemented in this block:
 - full sketch constraint solver
 - GUI sketch editing
 
-## Implemented block: Construction geometry and relations
+## Implemented block: Construction geometry, chained relations, and evaluated semantic references
 
-Goal: support user-created and relation-driven construction planes, construction lines/axes, and construction points as stable sketch/reference geometry.
+Goal: support user-created and relation-driven construction planes, construction lines/axes, and construction points as stable sketch/reference geometry without storing raw OCCT topology.
 
 Detailed document: `docs/construction-geometry-mvp.md`
 
@@ -108,11 +104,16 @@ Implemented scope:
 - `PlaneParallelToPlaneThroughPoint` relation-driven construction plane
 - `LineParallelToLineThroughPoint` relation-driven construction line
 - `LineParallelToGeneratedEdgeThroughPoint` relation-driven construction line
+- relation-driven construction points on generated vertices and generated edge midpoints
 - semantic generated edge and vertex references similar to `SemanticFaceReference`
+- `SemanticReferenceEvaluator` for rectangular-additive-extrude generated edges and vertices
+- `ConstructionPointResolver` for explicit points, generated vertex points, and generated edge midpoint points
+- `ConstructionLineResolver` for explicit, two-point, line-parallel, and generated-edge-parallel construction lines
 - model-intent relation definitions for `PointOnPlane`, `PointOnLine`, `PointOnGeneratedEdge`, `PointOnGeneratedVertex`, and `LineOnPlane`
 - relation validation for generated edge/vertex references without storing raw OCCT topology IDs
 - dependency graph tests for chained construction relations
 - JSON roundtrip tests for chained relations and semantic generated references
+- JSON-backed `examples/generated_semantic_references.blcad.json`
 - `WorkplaneResolver` support for offset construction planes
 - `WorkplaneResolver` support for three-point construction planes
 - `WorkplaneResolver` support for planes parallel to another plane through a point
@@ -120,8 +121,8 @@ Implemented scope:
 
 Still not implemented in this block:
 
-- geometric evaluation of generated semantic edges and vertices into exact points or curves
-- a general construction-line resolver
+- generated semantic edge/vertex evaluation for arbitrary non-rectangular or non-extrude topology
+- point-on-generated-edge parameterization beyond deterministic midpoint
 - point-on-line, point-on-plane, and line-on-plane geometric solving
 - parallel, orthogonal, tangent, angle, or normal construction relations beyond the implemented seed
 - standalone relation collections independent from construction objects
@@ -129,18 +130,18 @@ Still not implemented in this block:
 - full construction-geometry solver
 - 3D sketch splines, sweep, loft, surface stitching, or closed-shell-to-solid conversion
 
-## Next MVP: Evaluated semantic generated references
+## Next MVP: Projected sketch reference geometry
 
-Goal: evaluate semantic generated edge and vertex references for the controlled rectangular-additive-extrude topology already used by semantic face workplanes, then consume those evaluated references in deterministic construction-point and construction-line evaluators while still keeping raw OCCT topology out of saved model intent.
+Goal: project evaluated semantic generated edges, generated vertices, construction points, and construction lines into sketch-local reference geometry so sketches can consume projected references without storing raw OCCT topology and without adding a full sketch constraint solver yet.
 
 Proposed first implementation sequence:
 
-- add geometry-layer evaluators for `SemanticEdgeReference` on simple additive rectangular extrudes
-- add geometry-layer evaluators for `SemanticVertexReference` on simple additive rectangular extrudes
-- add a deterministic construction-line resolver for explicit lines, two-point lines, line-parallel-to-line-through-point, and line-parallel-to-generated-edge-through-point
-- add deterministic construction-point evaluation for generated-vertex references and point-on-generated-edge references where unambiguous
-- add dependency/invalidation tests from source feature changes through semantic generated references
-- add JSON-backed example models using generated-edge and generated-vertex construction references
+- add sketch-level reference entity IDs for projected construction points and projected construction lines
+- add model-intent references from sketch reference entities to `ConstructionPointId`, `ConstructionLineId`, `SemanticVertexReference`, and `SemanticEdgeReference`
+- project resolved 3D construction points and lines into a resolved sketch workplane when the reference lies on that workplane
+- validate out-of-plane projections with explicit errors
+- add JSON roundtrip tests for projected sketch reference entities
+- add geometry tests using projected references as closed-profile helper geometry where deterministic
 - keep GUI manipulators, full sketch constraint solving, 3D sketching, and advanced surfacing deferred
 
 ## Future roadmap: Inventor-like sketcher and sketch-driven features
