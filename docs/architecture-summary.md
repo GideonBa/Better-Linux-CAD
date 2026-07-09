@@ -38,6 +38,8 @@ BLCAD is intended to become an independent parametric CAD system for Linux. The 
 - `SketchEntityId`
 - `LineSegment`
 - `ClosedProfile`
+- future sketch entities such as arcs, circles, ellipses, splines, polygons, slots, text, and projected geometry
+- future `SketchConstraint`, `SketchDimension`, `SketchRegion`, and `ProfileRegion`
 - `DatumPlane`
 - `DerivedWorkplane`
 - `SemanticFaceReference`
@@ -48,7 +50,7 @@ BLCAD is intended to become an independent parametric CAD system for Linux. The 
 - `SketchPoint3D`
 - `SketchCurve3D`
 - `GuideCurve`
-- `Feature`, including `LoftFeature`, `SweepFeature`, `SurfaceStitchFeature`, `FilletFeature`, and `ChamferFeature`
+- `Feature`, including `RevolveFeature`, `RevolveCutFeature`, `LoftFeature`, `SweepFeature`, `SurfaceStitchFeature`, `FilletFeature`, and `ChamferFeature`
 - `FeatureReference`
 - `DependencyGraph`
 - `ShapeCache`
@@ -116,6 +118,21 @@ The first general closed-profile step is implemented:
 
 Still intentionally missing: arcs, splines, automatic region detection, multiple contours, inner holes in one profile, a full sketch constraint solver, and GUI sketch editing.
 
+## Future Inventor-like sketcher and feature parity
+
+The long-term sketcher roadmap is an Inventor-like parity target, not an immediate implementation target. It is documented in `docs/inventor-like-sketcher-and-feature-roadmap.md`.
+
+The intended capability is:
+
+- 2D sketch entities: points, lines, centerlines, rectangles, circles, arcs, ellipses, splines, polygons, slots, sketch fillets/chamfers, text, projected geometry, and included geometry
+- sketch editing tools: trim, extend, split, break, offset, mirror, sketch patterns, move, copy, rotate, scale, stretch, and construction-geometry toggling
+- sketch constraints: coincident, collinear, concentric, parallel, perpendicular, tangent, horizontal, vertical, equal, symmetric, midpoint, fix/ground, smooth, and point-on-curve relations
+- sketch dimensions: linear, aligned, horizontal, vertical, angular, radius, diameter, arc length, point-to-line, point-to-point, driving, and driven/reference dimensions
+- automatic region detection from unordered curves, including multiple regions, inner loops, islands, and profile-region selection
+- feature families: richer extrude/cut, revolve, revolve cut, sweep, sweep cut, loft, loft cut, hole, thread, emboss, engrave, rib, web, shell, draft, patterns, mirrors, and surface workflows
+
+This target depends on construction geometry, a stronger sketch entity model, profile-region detection, and eventually a constraint solver.
+
 ## Future construction geometry
 
 Construction geometry is a planned datum-system layer, not yet implemented. It should introduce user-created construction points, construction lines/axes, and construction planes that are part of model intent.
@@ -158,6 +175,7 @@ The detailed roadmap is in `docs/advanced-surfacing-and-3d-sketch-mvp.md`.
 - Sketches on generated faces require stable semantic references.
 - User-created construction geometry should be model intent, not temporary UI state.
 - Construction planes answer where sketches live; sketch profiles answer what shape sketches describe.
+- Inventor-like sketching requires explicit sketch entities, constraints, dimensions, automatic profile detection, and stable region selection.
 - 3D sketches and surfacing answer how spatial curves, multiple profile sections, guide curves, and surfaces form freeform geometry.
 - OCCT shapes are a cache, not the primary model.
 - The OCCT path lives in an optional `blcad_geometry` target: adapters for rectangle extrusion, circular cut, line-based closed-profile extrusion/cut, a small ShapeCache, a WorkplaneResolver, recompute execution for `AdditiveExtrude` and `SubtractiveExtrude`, full document recompute, incremental recompute, bounds validation for the current top/bottom/right/left/front/back face cases, and STEP export of the final shape.
@@ -167,7 +185,7 @@ The detailed roadmap is in `docs/advanced-surfacing-and-3d-sketch-mvp.md`.
 - Derived workplanes are resolved geometrically without turning raw OCCT faces into core model references.
 - Line-based closed sketch profiles are implemented as a first planar general-profile path and remain separate from topological naming.
 - Construction geometry and relation-driven datum placement are documented as the next future block and remain separate from the full sketch constraint solver.
-- Advanced surfacing, sweep, loft, 3D sketch, and surface-to-solid workflows are documented as a separate future block and remain separate from the first planar closed-profile MVP.
+- Revolve, revolve cut, sweep, loft, 3D sketch, surfacing, and surface-to-solid workflows are documented as future feature families and must remain semantic feature-tree operations, not raw BRep edits.
 - Assembly parameters must later flow into parts in a controlled way.
 - Fillets and chamfers are their own parametric features with semantic edge references, not only late BRep corrections.
 - The assembly system will describe spatial relationships through constraints: a constraint graph and solver determine component positions and remaining degrees of freedom; joints later allow controlled motion.
@@ -183,7 +201,8 @@ The condensed points above are expanded in dedicated documents. Each is written 
 
 - `docs/semantic-references.md` — the non-topological reference rule shared by all feature and assembly documents
 - `docs/parameter-model.md` — scopes, expressions, cross-part flow, top-down design
-- `docs/feature-system.md` — general feature model and the parametric bolt circle
+- `docs/feature-system.md` — general feature model and sketch-driven feature families
+- `docs/inventor-like-sketcher-and-feature-roadmap.md` — Inventor-like 2D/3D sketcher, constraints, dimensions, profile detection, revolve, sweep, loft, and sketch-driven feature parity
 - `docs/file-format.md` — project and save format
 - `docs/fillet-chamfer-features.md` — fillets and chamfers
 - `docs/pattern-and-mirror-features.md` — linear/circular patterns and mirror
