@@ -151,6 +151,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/reference_recovery_tests.cpp
     tests/core/semantic_reference_invalidation_tests.cpp
     tests/core/semantic_reference_json_tests.cpp
+    tests/core/sketch_dimension_tests.cpp
     tests/core/sketch_tests.cpp
   )
 
@@ -171,6 +172,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/closed_profile_pipeline_tests.cpp
       tests/geometry/construction_plane_pipeline_tests.cpp
       tests/geometry/derived_workplane_pipeline_tests.cpp
+      tests/geometry/dimension_driven_profile_resolver_tests.cpp
       tests/geometry/front_workplane_pipeline_tests.cpp
       tests/geometry/left_workplane_pipeline_tests.cpp
       tests/geometry/recompute_executor_tests.cpp
