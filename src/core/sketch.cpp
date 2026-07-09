@@ -51,6 +51,151 @@ constexpr double k_tolerance = 1.0e-9;
 
 } // namespace
 
+std::string_view to_string(ProjectedSketchPointSource source) noexcept {
+  switch (source) {
+  case ProjectedSketchPointSource::ConstructionPoint:
+    return "construction_point";
+  case ProjectedSketchPointSource::SemanticVertex:
+    return "semantic_vertex";
+  }
+
+  return "unknown";
+}
+
+std::string_view to_string(ProjectedSketchLineSource source) noexcept {
+  switch (source) {
+  case ProjectedSketchLineSource::ConstructionLine:
+    return "construction_line";
+  case ProjectedSketchLineSource::SemanticEdge:
+    return "semantic_edge";
+  }
+
+  return "unknown";
+}
+
+Result<ProjectedSketchPoint>
+ProjectedSketchPoint::create_from_construction_point(SketchEntityId id, ConstructionPointId point) {
+  const auto object_id = id.empty() ? std::string("projected_sketch_point") : id.value();
+
+  if (id.empty()) {
+    return Result<ProjectedSketchPoint>::failure(
+        Error::validation(object_id, "projected sketch point id must not be empty"));
+  }
+
+  if (point.empty()) {
+    return Result<ProjectedSketchPoint>::failure(
+        Error::validation(object_id, "projected construction point reference must not be empty"));
+  }
+
+  return Result<ProjectedSketchPoint>::success(ProjectedSketchPoint(
+      std::move(id), ProjectedSketchPointSource::ConstructionPoint, std::move(point), std::nullopt));
+}
+
+Result<ProjectedSketchPoint>
+ProjectedSketchPoint::create_from_semantic_vertex(SketchEntityId id,
+                                                  SemanticVertexReference vertex) {
+  const auto object_id = id.empty() ? std::string("projected_sketch_point") : id.value();
+
+  if (id.empty()) {
+    return Result<ProjectedSketchPoint>::failure(
+        Error::validation(object_id, "projected sketch point id must not be empty"));
+  }
+
+  return Result<ProjectedSketchPoint>::success(ProjectedSketchPoint(
+      std::move(id), ProjectedSketchPointSource::SemanticVertex, ConstructionPointId{}, vertex));
+}
+
+const SketchEntityId& ProjectedSketchPoint::id() const noexcept {
+  return id_;
+}
+
+ProjectedSketchPointSource ProjectedSketchPoint::source() const noexcept {
+  return source_;
+}
+
+const ConstructionPointId& ProjectedSketchPoint::construction_point() const noexcept {
+  return construction_point_;
+}
+
+const std::optional<SemanticVertexReference>& ProjectedSketchPoint::semantic_vertex() const noexcept {
+  return semantic_vertex_;
+}
+
+std::string ProjectedSketchPoint::referenced_node_id() const {
+  if (source_ == ProjectedSketchPointSource::ConstructionPoint) {
+    return construction_point_.value();
+  }
+
+  return semantic_vertex_.value().node_id();
+}
+
+ProjectedSketchPoint::ProjectedSketchPoint(SketchEntityId id, ProjectedSketchPointSource source,
+                                           ConstructionPointId construction_point,
+                                           std::optional<SemanticVertexReference> semantic_vertex)
+    : id_(std::move(id)), source_(source), construction_point_(std::move(construction_point)),
+      semantic_vertex_(std::move(semantic_vertex)) {}
+
+Result<ProjectedSketchLine>
+ProjectedSketchLine::create_from_construction_line(SketchEntityId id, ConstructionLineId line) {
+  const auto object_id = id.empty() ? std::string("projected_sketch_line") : id.value();
+
+  if (id.empty()) {
+    return Result<ProjectedSketchLine>::failure(
+        Error::validation(object_id, "projected sketch line id must not be empty"));
+  }
+
+  if (line.empty()) {
+    return Result<ProjectedSketchLine>::failure(
+        Error::validation(object_id, "projected construction line reference must not be empty"));
+  }
+
+  return Result<ProjectedSketchLine>::success(ProjectedSketchLine(
+      std::move(id), ProjectedSketchLineSource::ConstructionLine, std::move(line), std::nullopt));
+}
+
+Result<ProjectedSketchLine>
+ProjectedSketchLine::create_from_semantic_edge(SketchEntityId id, SemanticEdgeReference edge) {
+  const auto object_id = id.empty() ? std::string("projected_sketch_line") : id.value();
+
+  if (id.empty()) {
+    return Result<ProjectedSketchLine>::failure(
+        Error::validation(object_id, "projected sketch line id must not be empty"));
+  }
+
+  return Result<ProjectedSketchLine>::success(ProjectedSketchLine(
+      std::move(id), ProjectedSketchLineSource::SemanticEdge, ConstructionLineId{}, edge));
+}
+
+const SketchEntityId& ProjectedSketchLine::id() const noexcept {
+  return id_;
+}
+
+ProjectedSketchLineSource ProjectedSketchLine::source() const noexcept {
+  return source_;
+}
+
+const ConstructionLineId& ProjectedSketchLine::construction_line() const noexcept {
+  return construction_line_;
+}
+
+const std::optional<SemanticEdgeReference>& ProjectedSketchLine::semantic_edge() const noexcept {
+  return semantic_edge_;
+}
+
+std::string ProjectedSketchLine::referenced_node_id() const {
+  if (source_ == ProjectedSketchLineSource::ConstructionLine) {
+    return construction_line_.value();
+  }
+
+  return semantic_edge_.value().node_id();
+}
+
+ProjectedSketchLine::ProjectedSketchLine(SketchEntityId id, ProjectedSketchLineSource source,
+                                         ConstructionLineId construction_line,
+                                         std::optional<SemanticEdgeReference> semantic_edge)
+    : id_(std::move(id)), source_(source), construction_line_(std::move(construction_line)),
+      semantic_edge_(std::move(semantic_edge)) {}
+
 Result<LineSegment> LineSegment::create(SketchEntityId id, Point2 start, Point2 end) {
   const auto object_id = id.empty() ? std::string("line_segment") : id.value();
 
@@ -233,6 +378,26 @@ Result<std::size_t> Sketch::add_entity(LineSegment line_segment) {
   return Result<std::size_t>::success(line_segments_.size() - 1U);
 }
 
+Result<std::size_t> Sketch::add_reference(ProjectedSketchPoint point_reference) {
+  if (has_entity_id(point_reference.id())) {
+    return Result<std::size_t>::failure(Error::validation(
+        point_reference.id().value(), "sketch reference id must be unique within sketch"));
+  }
+
+  projected_points_.push_back(std::move(point_reference));
+  return Result<std::size_t>::success(projected_points_.size() - 1U);
+}
+
+Result<std::size_t> Sketch::add_reference(ProjectedSketchLine line_reference) {
+  if (has_entity_id(line_reference.id())) {
+    return Result<std::size_t>::failure(Error::validation(
+        line_reference.id().value(), "sketch reference id must be unique within sketch"));
+  }
+
+  projected_lines_.push_back(std::move(line_reference));
+  return Result<std::size_t>::success(projected_lines_.size() - 1U);
+}
+
 Result<std::size_t> Sketch::add_profile(RectangleProfile profile) {
   if (has_profile_id(profile.id())) {
     return Result<std::size_t>::failure(
@@ -284,6 +449,14 @@ const std::vector<LineSegment>& Sketch::line_segments() const noexcept {
   return line_segments_;
 }
 
+const std::vector<ProjectedSketchPoint>& Sketch::projected_points() const noexcept {
+  return projected_points_;
+}
+
+const std::vector<ProjectedSketchLine>& Sketch::projected_lines() const noexcept {
+  return projected_lines_;
+}
+
 const std::vector<RectangleProfile>& Sketch::rectangle_profiles() const noexcept {
   return rectangle_profiles_;
 }
@@ -304,6 +477,26 @@ const LineSegment* Sketch::find_line_segment(SketchEntityId id) const noexcept {
   for (const auto& line_segment : line_segments_) {
     if (line_segment.id() == id) {
       return &line_segment;
+    }
+  }
+
+  return nullptr;
+}
+
+const ProjectedSketchPoint* Sketch::find_projected_point(SketchEntityId id) const noexcept {
+  for (const auto& point : projected_points_) {
+    if (point.id() == id) {
+      return &point;
+    }
+  }
+
+  return nullptr;
+}
+
+const ProjectedSketchLine* Sketch::find_projected_line(SketchEntityId id) const noexcept {
+  for (const auto& line : projected_lines_) {
+    if (line.id() == id) {
+      return &line;
     }
   }
 
@@ -348,7 +541,8 @@ Sketch::Sketch(SketchId id, std::string name, DatumPlaneId workplane)
     : id_(std::move(id)), name_(std::move(name)), workplane_(std::move(workplane)) {}
 
 bool Sketch::has_entity_id(const SketchEntityId& id) const noexcept {
-  return find_line_segment(id) != nullptr;
+  return find_line_segment(id) != nullptr || find_projected_point(id) != nullptr ||
+         find_projected_line(id) != nullptr;
 }
 
 bool Sketch::has_profile_id(const ProfileId& id) const noexcept {
