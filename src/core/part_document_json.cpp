@@ -95,28 +95,80 @@ constexpr int k_version = 1;
   if (face == "top") {
     return Result<SemanticFace>::success(SemanticFace::Top);
   }
-
   if (face == "bottom") {
     return Result<SemanticFace>::success(SemanticFace::Bottom);
   }
-
   if (face == "right") {
     return Result<SemanticFace>::success(SemanticFace::Right);
   }
-
   if (face == "left") {
     return Result<SemanticFace>::success(SemanticFace::Left);
   }
-
   if (face == "front") {
     return Result<SemanticFace>::success(SemanticFace::Front);
   }
-
   if (face == "back") {
     return Result<SemanticFace>::success(SemanticFace::Back);
   }
-
   return Result<SemanticFace>::failure(json_error("unsupported semantic face in part document json"));
+}
+
+[[nodiscard]] Result<SemanticEdge> semantic_edge_from_json(const json& value) {
+  const auto edge = value.get<std::string>();
+  if (edge == "top_front") return Result<SemanticEdge>::success(SemanticEdge::TopFront);
+  if (edge == "top_back") return Result<SemanticEdge>::success(SemanticEdge::TopBack);
+  if (edge == "top_right") return Result<SemanticEdge>::success(SemanticEdge::TopRight);
+  if (edge == "top_left") return Result<SemanticEdge>::success(SemanticEdge::TopLeft);
+  if (edge == "bottom_front") return Result<SemanticEdge>::success(SemanticEdge::BottomFront);
+  if (edge == "bottom_back") return Result<SemanticEdge>::success(SemanticEdge::BottomBack);
+  if (edge == "bottom_right") return Result<SemanticEdge>::success(SemanticEdge::BottomRight);
+  if (edge == "bottom_left") return Result<SemanticEdge>::success(SemanticEdge::BottomLeft);
+  if (edge == "front_right") return Result<SemanticEdge>::success(SemanticEdge::FrontRight);
+  if (edge == "front_left") return Result<SemanticEdge>::success(SemanticEdge::FrontLeft);
+  if (edge == "back_right") return Result<SemanticEdge>::success(SemanticEdge::BackRight);
+  if (edge == "back_left") return Result<SemanticEdge>::success(SemanticEdge::BackLeft);
+  return Result<SemanticEdge>::failure(json_error("unsupported semantic edge in part document json"));
+}
+
+[[nodiscard]] Result<SemanticVertex> semantic_vertex_from_json(const json& value) {
+  const auto vertex = value.get<std::string>();
+  if (vertex == "top_front_right") return Result<SemanticVertex>::success(SemanticVertex::TopFrontRight);
+  if (vertex == "top_front_left") return Result<SemanticVertex>::success(SemanticVertex::TopFrontLeft);
+  if (vertex == "top_back_right") return Result<SemanticVertex>::success(SemanticVertex::TopBackRight);
+  if (vertex == "top_back_left") return Result<SemanticVertex>::success(SemanticVertex::TopBackLeft);
+  if (vertex == "bottom_front_right") return Result<SemanticVertex>::success(SemanticVertex::BottomFrontRight);
+  if (vertex == "bottom_front_left") return Result<SemanticVertex>::success(SemanticVertex::BottomFrontLeft);
+  if (vertex == "bottom_back_right") return Result<SemanticVertex>::success(SemanticVertex::BottomBackRight);
+  if (vertex == "bottom_back_left") return Result<SemanticVertex>::success(SemanticVertex::BottomBackLeft);
+  return Result<SemanticVertex>::failure(json_error("unsupported semantic vertex in part document json"));
+}
+
+[[nodiscard]] json semantic_edge_reference_to_json(const SemanticEdgeReference& reference) {
+  return json{{"source_feature", reference.source_feature().value()},
+              {"edge", std::string(to_string(reference.edge()))}};
+}
+
+[[nodiscard]] Result<SemanticEdgeReference> semantic_edge_reference_from_json(const json& value) {
+  auto edge = semantic_edge_from_json(value.at("edge"));
+  if (edge.has_error()) {
+    return Result<SemanticEdgeReference>::failure(edge.error());
+  }
+  return SemanticEdgeReference::create(
+      FeatureId(value.at("source_feature").get<std::string>()), edge.value());
+}
+
+[[nodiscard]] json semantic_vertex_reference_to_json(const SemanticVertexReference& reference) {
+  return json{{"source_feature", reference.source_feature().value()},
+              {"vertex", std::string(to_string(reference.vertex()))}};
+}
+
+[[nodiscard]] Result<SemanticVertexReference> semantic_vertex_reference_from_json(const json& value) {
+  auto vertex = semantic_vertex_from_json(value.at("vertex"));
+  if (vertex.has_error()) {
+    return Result<SemanticVertexReference>::failure(vertex.error());
+  }
+  return SemanticVertexReference::create(
+      FeatureId(value.at("source_feature").get<std::string>()), vertex.value());
 }
 
 [[nodiscard]] Result<Quantity> quantity_from_json(const json& parameter_json,
@@ -168,20 +220,53 @@ constexpr int k_version = 1;
 [[nodiscard]] json construction_relation_to_json(const ConstructionRelation& relation) {
   json relation_json{{"id", relation.id().value()}, {"type", std::string(to_string(relation.type()))}};
 
-  if (relation.type() == ConstructionRelationType::PlaneOffsetFromPlane) {
+  switch (relation.type()) {
+  case ConstructionRelationType::PlaneOffsetFromPlane:
     relation_json["source_plane"] = relation.source_plane().value();
     relation_json["offset_parameter"] = relation.offset_parameter().value();
-  }
-
-  if (relation.type() == ConstructionRelationType::LineThroughTwoPoints) {
+    break;
+  case ConstructionRelationType::LineThroughTwoPoints:
     relation_json["first_point"] = relation.first_point().value();
     relation_json["second_point"] = relation.second_point().value();
-  }
-
-  if (relation.type() == ConstructionRelationType::PlaneThroughThreePoints) {
+    break;
+  case ConstructionRelationType::PlaneThroughThreePoints:
     relation_json["first_point"] = relation.first_point().value();
     relation_json["second_point"] = relation.second_point().value();
     relation_json["third_point"] = relation.third_point().value();
+    break;
+  case ConstructionRelationType::PointOnPlane:
+    relation_json["point"] = relation.first_point().value();
+    relation_json["plane"] = relation.source_plane().value();
+    break;
+  case ConstructionRelationType::PointOnLine:
+    relation_json["point"] = relation.first_point().value();
+    relation_json["line"] = relation.source_line().value();
+    break;
+  case ConstructionRelationType::PointOnGeneratedEdge:
+    relation_json["point"] = relation.first_point().value();
+    relation_json["generated_edge"] = semantic_edge_reference_to_json(relation.generated_edge().value());
+    break;
+  case ConstructionRelationType::PointOnGeneratedVertex:
+    relation_json["point"] = relation.first_point().value();
+    relation_json["generated_vertex"] =
+        semantic_vertex_reference_to_json(relation.generated_vertex().value());
+    break;
+  case ConstructionRelationType::LineOnPlane:
+    relation_json["line"] = relation.source_line().value();
+    relation_json["plane"] = relation.source_plane().value();
+    break;
+  case ConstructionRelationType::PlaneParallelToPlaneThroughPoint:
+    relation_json["source_plane"] = relation.source_plane().value();
+    relation_json["through_point"] = relation.first_point().value();
+    break;
+  case ConstructionRelationType::LineParallelToLineThroughPoint:
+    relation_json["source_line"] = relation.source_line().value();
+    relation_json["through_point"] = relation.first_point().value();
+    break;
+  case ConstructionRelationType::LineParallelToGeneratedEdgeThroughPoint:
+    relation_json["generated_edge"] = semantic_edge_reference_to_json(relation.generated_edge().value());
+    relation_json["through_point"] = relation.first_point().value();
+    break;
   }
 
   return relation_json;
@@ -208,6 +293,63 @@ constexpr int k_version = 1;
         id, ConstructionPointId(relation_json.at("first_point").get<std::string>()),
         ConstructionPointId(relation_json.at("second_point").get<std::string>()),
         ConstructionPointId(relation_json.at("third_point").get<std::string>()));
+  }
+
+  if (type == "point_on_plane") {
+    return ConstructionRelation::create_point_on_plane(
+        id, ConstructionPointId(relation_json.at("point").get<std::string>()),
+        DatumPlaneId(relation_json.at("plane").get<std::string>()));
+  }
+
+  if (type == "point_on_line") {
+    return ConstructionRelation::create_point_on_line(
+        id, ConstructionPointId(relation_json.at("point").get<std::string>()),
+        ConstructionLineId(relation_json.at("line").get<std::string>()));
+  }
+
+  if (type == "point_on_generated_edge") {
+    auto edge = semantic_edge_reference_from_json(relation_json.at("generated_edge"));
+    if (edge.has_error()) {
+      return Result<ConstructionRelation>::failure(edge.error());
+    }
+    return ConstructionRelation::create_point_on_generated_edge(
+        id, ConstructionPointId(relation_json.at("point").get<std::string>()), edge.value());
+  }
+
+  if (type == "point_on_generated_vertex") {
+    auto vertex = semantic_vertex_reference_from_json(relation_json.at("generated_vertex"));
+    if (vertex.has_error()) {
+      return Result<ConstructionRelation>::failure(vertex.error());
+    }
+    return ConstructionRelation::create_point_on_generated_vertex(
+        id, ConstructionPointId(relation_json.at("point").get<std::string>()), vertex.value());
+  }
+
+  if (type == "line_on_plane") {
+    return ConstructionRelation::create_line_on_plane(
+        id, ConstructionLineId(relation_json.at("line").get<std::string>()),
+        DatumPlaneId(relation_json.at("plane").get<std::string>()));
+  }
+
+  if (type == "plane_parallel_to_plane_through_point") {
+    return ConstructionRelation::create_plane_parallel_to_plane_through_point(
+        id, DatumPlaneId(relation_json.at("source_plane").get<std::string>()),
+        ConstructionPointId(relation_json.at("through_point").get<std::string>()));
+  }
+
+  if (type == "line_parallel_to_line_through_point") {
+    return ConstructionRelation::create_line_parallel_to_line_through_point(
+        id, ConstructionLineId(relation_json.at("source_line").get<std::string>()),
+        ConstructionPointId(relation_json.at("through_point").get<std::string>()));
+  }
+
+  if (type == "line_parallel_to_generated_edge_through_point") {
+    auto edge = semantic_edge_reference_from_json(relation_json.at("generated_edge"));
+    if (edge.has_error()) {
+      return Result<ConstructionRelation>::failure(edge.error());
+    }
+    return ConstructionRelation::create_line_parallel_to_generated_edge_through_point(
+        id, edge.value(), ConstructionPointId(relation_json.at("through_point").get<std::string>()));
   }
 
   return Result<ConstructionRelation>::failure(
@@ -241,8 +383,27 @@ constexpr int k_version = 1;
     if (relation.has_error()) {
       return Result<ConstructionLine>::failure(relation.error());
     }
-
     return ConstructionLine::create_through_two_points(
+        ConstructionLineId(line_json.at("id").get<std::string>()),
+        line_json.at("name").get<std::string>(), relation.value());
+  }
+
+  if (kind == "parallel_to_line_through_point") {
+    auto relation = construction_relation_from_json(line_json.at("relation"));
+    if (relation.has_error()) {
+      return Result<ConstructionLine>::failure(relation.error());
+    }
+    return ConstructionLine::create_parallel_to_line_through_point(
+        ConstructionLineId(line_json.at("id").get<std::string>()),
+        line_json.at("name").get<std::string>(), relation.value());
+  }
+
+  if (kind == "parallel_to_generated_edge_through_point") {
+    auto relation = construction_relation_from_json(line_json.at("relation"));
+    if (relation.has_error()) {
+      return Result<ConstructionLine>::failure(relation.error());
+    }
+    return ConstructionLine::create_parallel_to_generated_edge_through_point(
         ConstructionLineId(line_json.at("id").get<std::string>()),
         line_json.at("name").get<std::string>(), relation.value());
   }
@@ -267,7 +428,6 @@ constexpr int k_version = 1;
     if (relation.has_error()) {
       return Result<ConstructionPlane>::failure(relation.error());
     }
-
     return ConstructionPlane::create_offset_from_plane(
         ConstructionPlaneId(plane_json.at("id").get<std::string>()),
         plane_json.at("name").get<std::string>(), relation.value());
@@ -278,8 +438,17 @@ constexpr int k_version = 1;
     if (relation.has_error()) {
       return Result<ConstructionPlane>::failure(relation.error());
     }
-
     return ConstructionPlane::create_through_three_points(
+        ConstructionPlaneId(plane_json.at("id").get<std::string>()),
+        plane_json.at("name").get<std::string>(), relation.value());
+  }
+
+  if (kind == "parallel_to_plane_through_point") {
+    auto relation = construction_relation_from_json(plane_json.at("relation"));
+    if (relation.has_error()) {
+      return Result<ConstructionPlane>::failure(relation.error());
+    }
+    return ConstructionPlane::create_parallel_to_plane_through_point(
         ConstructionPlaneId(plane_json.at("id").get<std::string>()),
         plane_json.at("name").get<std::string>(), relation.value());
   }
@@ -659,7 +828,8 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
         auto added = document.value().add_construction_plane(plane.value());
         if (added.has_error()) {
           const auto message = added.error().message();
-          if (message == "plane offset source plane must exist in part document") {
+          if (message == "plane offset source plane must exist in part document" ||
+              message == "plane parallel to plane through point references must exist in part document") {
             continue;
           }
 
