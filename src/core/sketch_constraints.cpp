@@ -268,12 +268,18 @@ const SketchDrivingDimension* Sketch::find_driving_dimension(SketchDimensionId i
 }
 
 Result<std::size_t> Sketch::add_constraint(SketchGeometricConstraint constraint) {
-  if (has_constraint_id(constraint.id())) {
+  if (find_constraint(constraint.id()) != nullptr || find_geometric_constraint(constraint.id()) != nullptr) {
     return Result<std::size_t>::failure(Error::validation(
         constraint.id().value(), "sketch constraint id must be unique within sketch"));
   }
-  auto first = validate_explicit_line_target(constraint.first_target(), constraint.id().value());
-  if (first.has_error()) return Result<std::size_t>::failure(first.error());
+  if (constraint.kind() == SketchGeometricConstraintKind::Fixed &&
+      constraint.first_target().kind() != SketchReferenceTargetKind::LineSegment) {
+    auto target = validate_point_target(constraint.first_target(), constraint.id().value());
+    if (target.has_error()) return Result<std::size_t>::failure(target.error());
+  } else {
+    auto first = validate_explicit_line_target(constraint.first_target(), constraint.id().value());
+    if (first.has_error()) return Result<std::size_t>::failure(first.error());
+  }
   if (constraint.second_target().has_value()) {
     auto second = validate_explicit_line_target(constraint.second_target().value(),
                                                 constraint.id().value());
@@ -294,6 +300,37 @@ Result<std::size_t> Sketch::add_dimension(SketchDrivingDimension dimension) {
   if (second.has_error()) return Result<std::size_t>::failure(second.error());
   driving_dimensions_.push_back(std::move(dimension));
   return Result<std::size_t>::success(driving_dimensions_.size() - 1U);
+}
+
+bool Sketch::has_dimension_id(const SketchDimensionId& id) const noexcept {
+  return find_driving_dimension(id) != nullptr;
+}
+
+Result<std::size_t> Sketch::validate_point_target(const SketchReferenceTarget& target,
+                                                  const std::string& object_id) const {
+  if (target.kind() != SketchReferenceTargetKind::LineSegmentStart &&
+      target.kind() != SketchReferenceTargetKind::LineSegmentEnd) {
+    return Result<std::size_t>::failure(
+        validation_error(object_id, "sketch dimension target must be an explicit line endpoint"));
+  }
+  if (find_line_segment(target.entity()) == nullptr) {
+    return Result<std::size_t>::failure(
+        validation_error(object_id, "sketch dimension endpoint target must exist"));
+  }
+  return Result<std::size_t>::success(0);
+}
+
+Result<std::size_t> Sketch::validate_explicit_line_target(const SketchReferenceTarget& target,
+                                                          const std::string& object_id) const {
+  if (target.kind() != SketchReferenceTargetKind::LineSegment) {
+    return Result<std::size_t>::failure(
+        validation_error(object_id, "sketch geometric constraint target must be an explicit line"));
+  }
+  if (find_line_segment(target.entity()) == nullptr) {
+    return Result<std::size_t>::failure(
+        validation_error(object_id, "sketch geometric constraint line target must exist"));
+  }
+  return Result<std::size_t>::success(0);
 }
 
 } // namespace blcad
