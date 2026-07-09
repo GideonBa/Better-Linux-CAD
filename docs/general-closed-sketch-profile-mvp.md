@@ -1,154 +1,167 @@
-# Future MVP: General Closed Sketch Profiles
+# General Closed Sketch Profiles MVP
 
-Status: planned future block after the current controlled semantic-face workplane sequence.
+Status: first line-based closed-profile MVP implemented.
 
-This document records a deliberately missing capability so it does not get lost while MVP 2 focuses on semantic generated-face workplanes.
+This document records the implemented first step from primitive-only sketches toward general CAD sketch profiles. The implementation is intentionally narrow: it supports ordered line-segment loops and uses them as one closed planar profile for additive or subtractive extrudes. Arcs, splines, profile-region detection, multiple contours, inner holes, and GUI editing remain later work.
 
-## Current state
+## Implemented scope
 
-The current sketch model supports only primitive profiles:
+The first implementation adds:
+
+- `SketchEntityId` as a stable typed ID for sketch entities
+- `LineSegment` sketch entities with stable IDs and endpoint coordinates
+- `ClosedProfile` objects referencing ordered `LineSegment` IDs
+- validation that a closed profile has at least three line segments
+- validation that referenced line segments exist in the owning sketch
+- validation that line segments are ordered and connected
+- validation that line-segment IDs are unique inside the closed profile
+- validation that a closed profile does not self-intersect initially
+- JSON serialization and deserialization for `line_segments` and `closed_profiles`
+- geometry-layer conversion from closed profile vertices to an OCCT wire and face
+- additive extrude support for exactly one closed profile
+- subtractive through-all extrude support for exactly one closed profile
+- workplane resolution before closed-profile geometry execution
+- bounds validation for closed-profile vertices on bounded derived workplanes
+- geometry tests for a non-rectangular triangle prism
+- geometry tests for a non-circular triangle through-all cut
+- checked-in `.blcad.json` examples for a triangle prism and triangle cut plate
+
+## Current model path
+
+The implemented path is:
 
 ```text
-RectangleProfile
-CircleProfile
+LineSegment[]
+  -> ClosedProfile
+  -> ordered local vertices
+  -> resolved workplane points
+  -> OCCT polygon wire
+  -> OCCT face
+  -> AdditiveExtrude or SubtractiveExtrude
 ```
 
-The current geometry recompute path is intentionally narrow:
+For additive extrudes, the closed profile is extruded along the resolved workplane normal by the feature length parameter.
 
-- `AdditiveExtrude` requires exactly one rectangle profile.
-- `SubtractiveExtrude` requires exactly one circle profile.
-- Sketches can be placed on standard datum planes or on the currently supported derived face workplanes.
+For subtractive through-all extrudes, the closed profile is converted into a through-all prism along the resolved workplane normal and then used as a Boolean cut tool.
 
-This means the system does not yet support a general CAD sketch made from connected curve entities.
+## JSON shape
 
-## Explicitly not implemented yet
+Sketch JSON now supports these fields in addition to the existing rectangle and circle profile arrays:
 
-The following are not implemented yet:
+```json
+{
+  "line_segments": [
+    {
+      "id": "line.a",
+      "start": {"x": 0.0, "y": 0.0},
+      "end": {"x": 20.0, "y": 0.0}
+    }
+  ],
+  "closed_profiles": [
+    {
+      "id": "profile.triangle",
+      "line_segments": ["line.a", "line.b", "line.c"]
+    }
+  ]
+}
+```
 
-- free line chains
-- polylines
+The line segment order is significant. The end point of each line must match the start point of the next line. The final line must connect back to the first line.
+
+## Examples
+
+The repository contains two line-based closed-profile examples:
+
+```text
+examples/triangle_prism.blcad.json
+examples/triangle_cut_plate.blcad.json
+```
+
+The triangle prism example demonstrates additive extrusion from a non-rectangular closed profile.
+
+The triangle cut plate example demonstrates subtractive through-all extrusion from a non-circular closed profile.
+
+## Validation rules
+
+The current validation rejects:
+
+- empty line segment IDs
+- zero-length line segments
+- duplicate sketch entity IDs inside one sketch
+- closed profiles with fewer than three line segments
+- duplicate line-segment references inside one closed profile
+- closed profiles that reference missing line segments
+- line chains whose consecutive endpoints do not connect
+- line chains whose final endpoint does not close back to the first start point
+- self-intersecting line loops
+- closed-profile vertices outside a bounded resolved workplane
+
+## Recompute behavior
+
+The recompute executor now accepts:
+
+```text
+AdditiveExtrude:
+  exactly one RectangleProfile
+  or exactly one ClosedProfile
+```
+
+and:
+
+```text
+SubtractiveExtrude:
+  exactly one CircleProfile
+  or exactly one ClosedProfile
+```
+
+Rectangle and circle remain fast-path primitives. Closed profiles are an additional broader path, not a replacement.
+
+## Test coverage
+
+Core tests cover:
+
+- line segment construction
+- zero-length line rejection
+- closed profile construction
+- duplicate closed-profile line references
+- ordered-loop validation
+- disconnected-loop rejection
+- self-intersection rejection
+- JSON roundtrip for line segments and closed profiles
+
+Geometry tests cover:
+
+- additive triangle prism recompute
+- subtractive triangle through-all cut recompute
+- updated additive/subtractive profile validation messages
+
+## Deliberate limitations
+
+The first closed-profile MVP does not implement:
+
 - arcs
 - splines
-- connected sketch entities
-- general closed sketch loops
-- closed wires
-- multiple contours in one sketch
-- inner holes in the same sketch profile
-- profile selection from several closed regions
-- validation of closed loops
-- validation against self-intersections
-- general OCCT face creation from arbitrary sketch wires
-- additive extrude from arbitrary `TopoDS_Wire` / `TopoDS_Face`
-- subtractive extrude from arbitrary `TopoDS_Wire` / `TopoDS_Face`
-
-Advanced 3D sketch curves, guide splines, sweep, loft, boundary surfaces, and closed-surface-to-solid workflows are intentionally tracked in `docs/advanced-surfacing-and-3d-sketch-mvp.md` rather than inside this first planar closed-profile MVP.
-
-## Goal
-
-The future goal is to support arbitrary closed sketch profiles as feature input, while still keeping model intent in the core and OCCT geometry in the geometry layer.
-
-The target user path should become:
-
-```text
-Sketch entities
-  -> SketchLoop / ClosedProfile
-  -> validated planar wire
-  -> OCCT face
-  -> additive or subtractive extrude
-```
-
-This should allow a user to draw a closed 2D profile from sketch entities and use it as an extrude profile, instead of being limited to the current rectangle and circle special cases.
-
-## Proposed model concepts
-
-A minimal first version should introduce explicit sketch entities before full constraints:
-
-```text
-LineSegment
-ArcSegment
-SketchLoop
-ClosedProfile
-```
-
-Later versions may add:
-
-```text
-SplineSegment
-TrimmedCurveSegment
-ConstructionGeometry
-SketchConstraint
-ProfileRegion
-```
-
-The first version should keep the scope small and testable.
-
-## Proposed implementation sequence
-
-1. Add a `LineSegment` sketch entity with stable IDs and endpoint coordinates.
-2. Add a `SketchLoop` or `ClosedProfile` model that references ordered sketch entities.
-3. Validate that the loop is closed within tolerance.
-4. Validate that consecutive entity endpoints connect.
-5. Reject self-intersecting loops in the first implementation.
-6. Convert the closed loop into an OCCT `TopoDS_Wire` in the geometry layer.
-7. Convert the wire into an OCCT `TopoDS_Face`.
-8. Add additive extrude support for one closed profile.
-9. Add subtractive through-all extrude support for one closed profile.
-10. Add JSON serialization and roundtrip tests for the new sketch entities and closed profile.
-11. Add geometry tests for a non-rectangular polygon extrude.
-12. Add geometry tests for a non-circular closed-profile cut.
-
-## First useful acceptance tests
-
-A minimal implementation should prove:
-
-- a triangle sketch loop can be stored in `PartDocument`
-- the triangle loop survives JSON roundtrip
-- a triangle loop can be converted into an OCCT face
-- an additive triangle prism can be recomputed and exported as STEP
-- a pentagon or L-shaped loop can be used as a through-all cut
-- an open loop is rejected before OCCT execution
-- a self-intersecting loop is rejected before OCCT execution
-- a loop with duplicate profile/entity IDs is rejected by the core model
-
-## Deliberate limitations for the first version
-
-The first version should not attempt to implement everything at once.
-
-Out of scope for the first closed-profile MVP:
-
-- full sketch constraint solver
-- automatic region detection from unordered lines
-- multiple independent closed profiles in one feature
-- inner holes in the same profile
-- spline support
-- tangent/parallel/perpendicular constraints
+- trimmed curves
 - offset profiles
-- sketch trimming UI
+- sketch constraints
+- tangent, parallel, perpendicular, or dimensional sketch constraints
+- automatic region detection from unordered curves
+- multiple independent closed profiles in one feature
+- inner holes in one profile
+- profile selection from multiple regions
 - arbitrary non-planar sketch geometry
 - 3D sketch splines connecting points from sketches on different planes
 - loft, sweep, boundary surface, surface stitching, or closed-shell-to-solid features
 - GUI sketch editing
 
-## Relationship to current MVP 2
+These are intentionally tracked as later roadmap blocks.
 
-The current MVP 2 work is about semantic generated-face workplanes:
+## Relationship to other roadmap blocks
 
-```text
-top
-bottom
-right
-left
-front
-back
-```
+The current MVP 2 semantic-face workplane seed proves where sketches can be placed on generated planar faces.
 
-The closed-profile work should come after that controlled workplane sequence, because arbitrary profiles still need reliable workplane placement, bounds handling, JSON persistence, recompute ordering, and STEP export.
+This closed-profile MVP proves that a single planar sketch can define a non-rectangular closed area from explicit line segments.
 
-The closed-profile MVP should not replace the current rectangle and circle primitives immediately. Rectangle and circle can remain fast-path primitives while general closed profiles are added as a broader feature path.
+Construction geometry remains the next foundational block for placing user-defined planes, lines, and points freely in 3D.
 
-This planar block remains separate from the later advanced surfacing block:
-
-```text
-Planar closed profiles answer: how does a single sketch define a closed 2D area?
-Advanced surfacing answers: how do spatial curves, multiple sketches, guide curves, and surfaces define freeform geometry?
-```
+Advanced surfacing remains a later block for 3D curves, guide splines, sweeps, lofts, boundary surfaces, surface stitching, and closed-shell-to-solid conversion.
