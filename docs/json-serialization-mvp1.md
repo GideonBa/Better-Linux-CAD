@@ -1,6 +1,6 @@
 # JSON Serialization
 
-Status: core serialization for `PartDocument` model intent, including file-level helpers, derived workplanes, line-based closed sketch profiles, explicit construction geometry, relation-driven construction geometry, chained construction relations, and semantic generated edge/vertex references.
+Status: core serialization for `PartDocument` model intent, including file-level helpers, derived workplanes, line-based closed sketch profiles, explicit construction geometry, relation-driven construction geometry, relation-driven construction points, chained construction relations, and semantic generated edge/vertex references.
 
 The JSON serialization layer persists model intent only. It does not serialize OCCT shapes, `GeometryShape`, `ShapeCache` contents, raw face IDs, raw edge IDs, raw vertex IDs, BRep handles, or exported STEP data.
 
@@ -24,7 +24,7 @@ The current JSON format stores:
 - length parameters
 - datum planes
 - explicit construction points, lines, and planes
-- relation-driven construction lines and planes
+- relation-driven construction points, lines, and planes
 - embedded construction relation intent for supported relation-driven construction objects
 - semantic generated edge references as `{source_feature, edge}`
 - semantic generated vertex references as `{source_feature, vertex}`
@@ -56,22 +56,48 @@ Explicit construction geometry is serialized as numeric model intent:
 }
 ```
 
-Relation-driven construction geometry stores an embedded relation object:
+Relation-driven construction points store embedded relation intent:
+
+```json
+{
+  "construction_points": [
+    {
+      "id": "point.top_front_right",
+      "name": "TopFrontRight",
+      "kind": "on_generated_vertex",
+      "relation": {
+        "id": "relation.point_top_front_right",
+        "type": "point_on_generated_vertex",
+        "point": "point.top_front_right",
+        "generated_vertex": {
+          "source_feature": "feature.base",
+          "vertex": "top_front_right"
+        }
+      }
+    },
+    {
+      "id": "point.top_front_mid",
+      "name": "TopFrontMidpoint",
+      "kind": "on_generated_edge",
+      "relation": {
+        "id": "relation.point_top_front_mid",
+        "type": "point_on_generated_edge",
+        "point": "point.top_front_mid",
+        "generated_edge": {
+          "source_feature": "feature.base",
+          "edge": "top_front"
+        }
+      }
+    }
+  ]
+}
+```
+
+Relation-driven construction lines and planes use the same embedded relation shape:
 
 ```json
 {
   "construction_lines": [
-    {
-      "id": "line.axis_ab",
-      "name": "AxisAB",
-      "kind": "through_two_points",
-      "relation": {
-        "id": "relation.axis_ab",
-        "type": "line_through_two_points",
-        "first_point": "point.a",
-        "second_point": "point.b"
-      }
-    },
     {
       "id": "line.edge_parallel",
       "name": "GeneratedEdgeParallel",
@@ -83,7 +109,7 @@ Relation-driven construction geometry stores an embedded relation object:
           "source_feature": "feature.base",
           "edge": "top_front"
         },
-        "through_point": "point.z"
+        "through_point": "point.top_front_mid"
       }
     }
   ],
@@ -136,7 +162,17 @@ Generated edge and vertex references are serialized semantically:
 }
 ```
 
-The source feature must restore to an additive extrude before the relation is accepted by `PartDocument`. Deserialization therefore restores construction lines after sketches and features so generated-edge line relations can validate their source feature.
+For relation-driven construction lines, deserialization restores construction lines after sketches and features so generated-edge line relations can validate their source feature. Relation-driven construction points are serialized as model intent and are evaluated by the geometry layer through `ConstructionPointResolver`.
+
+## Reference files
+
+The generated-reference example model is:
+
+```text
+examples/generated_semantic_references.blcad.json
+```
+
+It stores a rectangular additive extrude, a generated-vertex construction point, a generated-edge midpoint construction point, and a construction line parallel to a generated edge. The final generated CAD shape is still the feature result, not the construction references.
 
 ## Derived workplanes
 
@@ -187,4 +223,5 @@ Core JSON tests cover:
 - relation-driven construction geometry roundtrips
 - chained construction relation roundtrips
 - semantic generated edge reference roundtrips
+- relation-driven generated edge/vertex construction point roundtrips
 - unsupported schema and unsupported feature rejection
