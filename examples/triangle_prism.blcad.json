@@ -1,0 +1,110 @@
+{
+  "schema": "blcad.part_document.mvp1",
+  "version": 1,
+  "document": {
+    "id": "part.triangle_prism",
+    "name": "TrianglePrism"
+  },
+  "parameters": [
+    {
+      "id": "part.depth",
+      "name": "depth",
+      "type": "length",
+      "scope": "part",
+      "unit": "mm",
+      "value": 10.0
+    }
+  ],
+  "datum_planes": [
+    {
+      "id": "datum.xy",
+      "name": "XY",
+      "kind": "xy",
+      "origin": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "x_axis": {
+        "x": 1.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "y_axis": {
+        "x": 0.0,
+        "y": 1.0,
+        "z": 0.0
+      },
+      "normal": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 1.0
+      }
+    }
+  ],
+  "derived_workplanes": [],
+  "sketches": [
+    {
+      "id": "sketch.triangle",
+      "name": "Sketch_Triangle",
+      "workplane": "datum.xy",
+      "line_segments": [
+        {
+          "id": "line.triangle_a",
+          "start": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "end": {
+            "x": 40.0,
+            "y": 0.0
+          }
+        },
+        {
+          "id": "line.triangle_b",
+          "start": {
+            "x": 40.0,
+            "y": 0.0
+          },
+          "end": {
+            "x": 0.0,
+            "y": 30.0
+          }
+        },
+        {
+          "id": "line.triangle_c",
+          "start": {
+            "x": 0.0,
+            "y": 30.0
+          },
+          "end": {
+            "x": 0.0,
+            "y": 0.0
+          }
+        }
+      ],
+      "rectangle_profiles": [],
+      "circle_profiles": [],
+      "closed_profiles": [
+        {
+          "id": "profile.triangle",
+          "line_segments": [
+            "line.triangle_a",
+            "line.triangle_b",
+            "line.triangle_c"
+          ]
+        }
+      ]
+    }
+  ],
+  "features": [
+    {
+      "id": "feature.triangle_prism",
+      "name": "TrianglePrism",
+      "type": "additive_extrude",
+      "input_sketch": "sketch.triangle",
+      "direction": "+Z",
+      "length_parameter": "part.depth"
+    }
+  ]
+}
