@@ -35,11 +35,14 @@ examples/front_face_cut.blcad.json
 examples/back_face_cut.blcad.json
 examples/triangle_prism.blcad.json
 examples/triangle_cut_plate.blcad.json
+examples/construction_plane_prism.blcad.json
 ```
 
 The face-cut examples demonstrate that `.blcad.json` can store semantic generated-face references without storing OCCT face IDs, that the geometry layer can resolve workplanes before cutting, and that bounded validation can reject invalid profile placement before OCCT execution.
 
 The closed-profile examples demonstrate that `.blcad.json` can store line-segment sketch entities, ordered closed-profile references, non-rectangular additive extrudes, and non-circular through-all cuts.
+
+The construction-plane example demonstrates that `.blcad.json` can store explicit construction points, lines, and planes, place a closed-profile sketch on a user-created construction plane, and recompute it through the same headless geometry path.
 
 ## Headless export example
 
@@ -68,6 +71,7 @@ Export commands:
 ./build/dev-geometry/blcad_export_step examples/back_face_cut.blcad.json build/back_face_cut.step
 ./build/dev-geometry/blcad_export_step examples/triangle_prism.blcad.json build/triangle_prism.step
 ./build/dev-geometry/blcad_export_step examples/triangle_cut_plate.blcad.json build/triangle_cut_plate.step
+./build/dev-geometry/blcad_export_step examples/construction_plane_prism.blcad.json build/construction_plane_prism.step
 ```
 
 Depending on the exact CMake build directory, the binary may be located under the configured geometry build directory. The command accepts exactly two arguments:
@@ -85,14 +89,15 @@ The CLI performs this sequence:
 3. Create a fresh `ShapeCache`.
 4. Execute `GeometryRecomputeExecutor::execute_document`.
 5. Resolve sketch workplanes during subtractive recompute and closed-profile recompute.
-6. Validate bounded circle or closed-profile placement when the workplane has bounds.
-7. Read the final shape from the cache.
-8. Write the final shape through `StepExporter::write_step`.
-9. Print the number of exported bytes.
+6. Resolve explicit construction planes into `ResolvedWorkplane` frames when sketches use them.
+7. Validate bounded circle or closed-profile placement when the workplane has bounds.
+8. Read the final shape from the cache.
+9. Write the final shape through `StepExporter::write_step`.
+10. Print the number of exported bytes.
 
 ## Test coverage
 
-Core tests cover file write/read, JSON roundtrip for top, bottom, right, left, front, and back derived workplanes, and JSON roundtrip for line segments plus closed profiles. Geometry tests cover recompute and STEP export from JSON-restored documents, recompute from sketches on derived top, bottom, right, left, front, and back workplanes, closed-profile triangle prism recompute, closed-profile triangle cut recompute, and bounded validation for valid and out-of-bounds profiles.
+Core tests cover file write/read, JSON roundtrip for top, bottom, right, left, front, and back derived workplanes, JSON roundtrip for line segments plus closed profiles, and JSON roundtrip for explicit construction geometry. Geometry tests cover recompute and STEP export from JSON-restored documents, recompute from sketches on derived top, bottom, right, left, front, and back workplanes, closed-profile triangle prism recompute, closed-profile triangle cut recompute, construction-plane closed-profile recompute, and bounded validation for valid and out-of-bounds profiles.
 
 ## Deliberate limitation
 
@@ -108,7 +113,7 @@ Not included yet:
 - full topological naming
 - arbitrary face support beyond the current selected semantic face cases
 - arcs, splines, multiple contours, inner holes, or profile-region selection
-- construction geometry file workflow
+- relation-driven construction geometry file workflow
 - 3D sketch and surfacing file workflow
 
-The workflow is sufficient as the first real headless file-based CAD path and as a persistence path for semantic generated-face references and line-based closed profiles.
+The workflow is sufficient as the first real headless file-based CAD path and as a persistence path for semantic generated-face references, line-based closed profiles, and explicit construction geometry.
