@@ -1,6 +1,6 @@
 # MVP 2 Workplane Resolver
 
-Status: geometry-layer resolver for derived top, bottom, right, left, and front workplanes of a simple additive extrude, including rectangular bounds.
+Status: geometry-layer resolver for derived top, bottom, right, left, front, and back workplanes of a simple additive extrude, including rectangular bounds.
 
 This document describes the resolver after introducing `SemanticFaceReference` and `DerivedWorkplane` in the core model. The core still stores semantic model intent only. The geometry layer resolves that semantic workplane into a concrete frame for recompute.
 
@@ -9,9 +9,9 @@ This document describes the resolver after introducing `SemanticFaceReference` a
 The resolver makes paths such as these geometrically meaningful:
 
 ```text
-feature.base_extrude.front
-  -> workplane.base_front
-  -> sketch.front_hole local point
+feature.base_extrude.back
+  -> workplane.base_back
+  -> sketch.back_hole local point
   -> global cut center
 ```
 
@@ -66,6 +66,15 @@ y_axis = (0, 0, 1)
 normal = (0, 1, 0)
 ```
 
+For `workplane.base_back -> feature.base_extrude.back`, the frame is:
+
+```text
+origin = (rectangle_center.x, rectangle_center.y - height / 2, thickness / 2)
+x_axis = (1, 0, 0)
+y_axis = (0, 0, 1)
+normal = (0, -1, 0)
+```
+
 Side faces use right-handed local frames:
 
 ```text
@@ -88,7 +97,7 @@ bounds.width_mm = source rectangle height
 bounds.height_mm = extrude thickness
 ```
 
-Front uses source rectangle width and extrude thickness:
+Front and back use source rectangle width and extrude thickness:
 
 ```text
 bounds.width_mm = source rectangle width
@@ -105,13 +114,13 @@ Then the point is mapped into global coordinates:
 global = origin + local.x * x_axis + local.y * y_axis
 ```
 
-For `workplane.base_front` and local `(-12, 1.5)`, this becomes:
+For `workplane.base_back` and local `(-12, 1.5)`, this becomes:
 
 ```text
-global = (12, 40, 5.5)
+global = (-12, -40, 5.5)
 ```
 
-`GeometryRecomputeExecutor` passes the resolved workplane normal to the circular cut adapter. Top and bottom use Z-axis cuts. Right and left use X-axis cuts. Front uses a Y-axis cut.
+`GeometryRecomputeExecutor` passes the resolved workplane normal to the circular cut adapter. Top and bottom use Z-axis cuts. Right and left use X-axis cuts. Front and back use Y-axis cuts.
 
 ## Example models
 
@@ -121,6 +130,7 @@ examples/bottom_face_cut.blcad.json
 examples/right_face_cut.blcad.json
 examples/left_face_cut.blcad.json
 examples/front_face_cut.blcad.json
+examples/back_face_cut.blcad.json
 ```
 
 Export commands:
@@ -131,6 +141,7 @@ Export commands:
 ./build/dev-geometry/blcad_export_step examples/right_face_cut.blcad.json build/right_face_cut.step
 ./build/dev-geometry/blcad_export_step examples/left_face_cut.blcad.json build/left_face_cut.step
 ./build/dev-geometry/blcad_export_step examples/front_face_cut.blcad.json build/front_face_cut.step
+./build/dev-geometry/blcad_export_step examples/back_face_cut.blcad.json build/back_face_cut.step
 ```
 
 ## Test coverage
@@ -143,11 +154,12 @@ Geometry tests cover:
 - resolving `workplane.base_right`
 - resolving `workplane.base_left`
 - resolving `workplane.base_front`
+- resolving `workplane.base_back`
 - checking top/bottom/side origins and normals
 - checking rectangular bounds for resolved generated-face workplanes
 - mapping local sketch points through resolved frames
 - rejecting missing workplanes
-- recomputing circular cuts from sketches on top, bottom, right, left, and front derived workplanes
+- recomputing circular cuts from sketches on top, bottom, right, left, front, and back derived workplanes
 - accepting valid circles inside bounds
 - rejecting out-of-bounds circles before executing the cut
 - verifying that the final volume matches the expected removed cylinder volume within tolerance
@@ -156,11 +168,11 @@ Geometry tests cover:
 
 Not included yet:
 
-- back side face
 - arbitrary planar faces
 - face orientation derived from OCCT topology
 - non-rectangular source faces
 - storing or matching raw OCCT face IDs
 - GUI face selection
+- general closed sketch profiles
 
 The resolver is intentionally limited to selected semantic faces of a simple additive rectangle extrusion. This keeps MVP 2 incremental and avoids prematurely building a full topological-naming system.
