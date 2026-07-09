@@ -1,0 +1,167 @@
+{
+  "schema": "blcad.part_document.mvp1",
+  "version": 1,
+  "document": {
+    "id": "part.construction_plane_prism",
+    "name": "ConstructionPlanePrism"
+  },
+  "parameters": [
+    {
+      "id": "part.depth",
+      "name": "depth",
+      "type": "length",
+      "scope": "part",
+      "unit": "mm",
+      "value": 7.0
+    },
+    {
+      "id": "part.plane_offset",
+      "name": "plane_offset",
+      "type": "length",
+      "scope": "part",
+      "unit": "mm",
+      "value": 25.0
+    }
+  ],
+  "datum_planes": [],
+  "construction_points": [
+    {
+      "id": "construction_point.anchor",
+      "name": "Anchor",
+      "kind": "explicit",
+      "position": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 25.0
+      },
+      "parameter_dependencies": [
+        "part.plane_offset"
+      ]
+    }
+  ],
+  "construction_lines": [
+    {
+      "id": "construction_line.axis_z",
+      "name": "AxisZ",
+      "kind": "explicit",
+      "point": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "direction": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 1.0
+      },
+      "parameter_dependencies": []
+    }
+  ],
+  "construction_planes": [
+    {
+      "id": "construction_plane.offset_xy",
+      "name": "OffsetXY",
+      "kind": "explicit",
+      "origin": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 25.0
+      },
+      "x_axis": {
+        "x": 1.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "y_axis": {
+        "x": 0.0,
+        "y": 1.0,
+        "z": 0.0
+      },
+      "normal": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 1.0
+      },
+      "parameter_dependencies": [
+        "part.plane_offset"
+      ]
+    }
+  ],
+  "derived_workplanes": [],
+  "sketches": [
+    {
+      "id": "sketch.closed_rectangle_on_plane",
+      "name": "Sketch_ClosedRectangleOnConstructionPlane",
+      "workplane": "construction_plane.offset_xy",
+      "line_segments": [
+        {
+          "id": "line.a",
+          "start": {
+            "x": -10.0,
+            "y": -5.0
+          },
+          "end": {
+            "x": 10.0,
+            "y": -5.0
+          }
+        },
+        {
+          "id": "line.b",
+          "start": {
+            "x": 10.0,
+            "y": -5.0
+          },
+          "end": {
+            "x": 10.0,
+            "y": 5.0
+          }
+        },
+        {
+          "id": "line.c",
+          "start": {
+            "x": 10.0,
+            "y": 5.0
+          },
+          "end": {
+            "x": -10.0,
+            "y": 5.0
+          }
+        },
+        {
+          "id": "line.d",
+          "start": {
+            "x": -10.0,
+            "y": 5.0
+          },
+          "end": {
+            "x": -10.0,
+            "y": -5.0
+          }
+        }
+      ],
+      "rectangle_profiles": [],
+      "circle_profiles": [],
+      "closed_profiles": [
+        {
+          "id": "profile.closed_rectangle",
+          "line_segments": [
+            "line.a",
+            "line.b",
+            "line.c",
+            "line.d"
+          ]
+        }
+      ]
+    }
+  ],
+  "features": [
+    {
+      "id": "feature.closed_rectangle_prism",
+      "name": "ClosedRectanglePrism",
+      "type": "additive_extrude",
+      "input_sketch": "sketch.closed_rectangle_on_plane",
+      "direction": "+Z",
+      "length_parameter": "part.depth"
+    }
+  ]
+}
