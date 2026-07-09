@@ -85,8 +85,8 @@ Result<std::size_t> add_dependency_if_missing(DependencyGraph& graph, std::strin
   case ConstructionRelationType::LineThroughTwoPoints:
     if (document.find_construction_point(relation.first_point()) == nullptr ||
         document.find_construction_point(relation.second_point()) == nullptr) {
-      return Result<std::size_t>::failure(
-          Error::validation(object_id, "line through two points references must exist in part document"));
+      return Result<std::size_t>::failure(Error::validation(
+          object_id, "line through two points references must exist in part document"));
     }
     break;
   case ConstructionRelationType::PlaneThroughThreePoints: {
@@ -98,8 +98,8 @@ Result<std::size_t> add_dependency_if_missing(DependencyGraph& graph, std::strin
           object_id, "plane through three points references must exist in part document"));
     }
     if (are_collinear(first->position(), second->position(), third->position())) {
-      return Result<std::size_t>::failure(Error::validation(
-          object_id, "plane through three points requires non-collinear points"));
+      return Result<std::size_t>::failure(
+          Error::validation(object_id, "plane through three points requires non-collinear points"));
     }
     break;
   }
@@ -185,6 +185,93 @@ Result<std::size_t> add_dependency_if_missing(DependencyGraph& graph, std::strin
     auto dependency = add_dependency_if_missing(graph, referenced_node_id, dependent_id);
     if (dependency.has_error()) {
       return dependency;
+    }
+  }
+
+  return Result<std::size_t>::success(graph.dependency_count());
+}
+
+[[nodiscard]] Result<std::size_t> validate_projected_sketch_references(
+    const PartDocument& document, const Sketch& sketch) {
+  for (const auto& point : sketch.projected_points()) {
+    if (point.source() == ProjectedSketchPointSource::ConstructionPoint) {
+      if (document.find_construction_point(point.construction_point()) == nullptr) {
+        return Result<std::size_t>::failure(Error::validation(
+            point.id().value(), "projected construction point must exist in part document"));
+      }
+    } else if (point.semantic_vertex().has_value()) {
+      auto valid_vertex = validate_generated_vertex_reference(document, point.semantic_vertex().value(),
+                                                              point.id().value());
+      if (valid_vertex.has_error()) {
+        return valid_vertex;
+      }
+    }
+  }
+
+  for (const auto& line : sketch.projected_lines()) {
+    if (line.source() == ProjectedSketchLineSource::ConstructionLine) {
+      if (document.find_construction_line(line.construction_line()) == nullptr) {
+        return Result<std::size_t>::failure(Error::validation(
+            line.id().value(), "projected construction line must exist in part document"));
+      }
+    } else if (line.semantic_edge().has_value()) {
+      auto valid_edge = validate_generated_edge_reference(document, line.semantic_edge().value(),
+                                                          line.id().value());
+      if (valid_edge.has_error()) {
+        return valid_edge;
+      }
+    }
+  }
+
+  return Result<std::size_t>::success(0);
+}
+
+[[nodiscard]] Result<std::size_t> add_semantic_reference_dependency(DependencyGraph& graph,
+                                                                    const FeatureId& source_feature,
+                                                                    const std::string& reference_node_id,
+                                                                    const std::string& sketch_id) {
+  auto source_to_reference =
+      add_dependency_if_missing(graph, source_feature.value(), reference_node_id);
+  if (source_to_reference.has_error()) {
+    return source_to_reference;
+  }
+
+  return add_dependency_if_missing(graph, reference_node_id, sketch_id);
+}
+
+[[nodiscard]] Result<std::size_t> add_projected_reference_dependencies(DependencyGraph& graph,
+                                                                       const Sketch& sketch) {
+  for (const auto& point : sketch.projected_points()) {
+    if (point.source() == ProjectedSketchPointSource::ConstructionPoint) {
+      auto dependency = add_dependency_if_missing(graph, point.construction_point().value(),
+                                                  sketch.id().value());
+      if (dependency.has_error()) {
+        return dependency;
+      }
+    } else {
+      const auto& reference = point.semantic_vertex().value();
+      auto dependency = add_semantic_reference_dependency(
+          graph, reference.source_feature(), reference.node_id(), sketch.id().value());
+      if (dependency.has_error()) {
+        return dependency;
+      }
+    }
+  }
+
+  for (const auto& line : sketch.projected_lines()) {
+    if (line.source() == ProjectedSketchLineSource::ConstructionLine) {
+      auto dependency = add_dependency_if_missing(graph, line.construction_line().value(),
+                                                  sketch.id().value());
+      if (dependency.has_error()) {
+        return dependency;
+      }
+    } else {
+      const auto& reference = line.semantic_edge().value();
+      auto dependency = add_semantic_reference_dependency(
+          graph, reference.source_feature(), reference.node_id(), sketch.id().value());
+      if (dependency.has_error()) {
+        return dependency;
+      }
     }
   }
 
@@ -279,6 +366,14 @@ Result<std::size_t> PartDocument::add_construction_point(ConstructionPoint point
     return Result<std::size_t>::failure(parameter_dependencies.error());
   }
 
+  if (point.relation().has_value()) {
+    const auto relation_dependencies =
+        add_relation_dependencies(graph, point.relation().value(), point.id().value());
+    if (relation_dependencies.has_error()) {
+      return Result<std::size_t>::failure(relation_dependencies.error());
+    }
+  }
+
   auto invalidation_state = invalidation_state_;
   const auto synced_state = invalidation_state.sync_from_graph(graph);
   if (synced_state.has_error()) {
@@ -342,8 +437,8 @@ Result<std::size_t> PartDocument::add_construction_line(ConstructionLine line) {
   }
 
   if (line.relation().has_value()) {
-    const auto relation_dependencies = add_relation_dependencies(graph, line.relation().value(),
-                                                                 line.id().value());
+    const auto relation_dependencies =
+        add_relation_dependencies(graph, line.relation().value(), line.id().value());
     if (relation_dependencies.has_error()) {
       return Result<std::size_t>::failure(relation_dependencies.error());
     }
@@ -417,8 +512,8 @@ Result<std::size_t> PartDocument::add_construction_plane(ConstructionPlane plane
   }
 
   if (plane.relation().has_value()) {
-    const auto relation_dependencies = add_relation_dependencies(graph, plane.relation().value(),
-                                                                 plane.id().value());
+    const auto relation_dependencies =
+        add_relation_dependencies(graph, plane.relation().value(), plane.id().value());
     if (relation_dependencies.has_error()) {
       return Result<std::size_t>::failure(relation_dependencies.error());
     }
@@ -494,6 +589,11 @@ Result<std::size_t> PartDocument::add_sketch(Sketch sketch) {
         Error::validation(sketch.id().value(), "sketch workplane must exist in part document"));
   }
 
+  auto valid_projected_references = validate_projected_sketch_references(*this, sketch);
+  if (valid_projected_references.has_error()) {
+    return Result<std::size_t>::failure(valid_projected_references.error());
+  }
+
   for (const auto& profile : sketch.rectangle_profiles()) {
     if (!has_parameter_id(profile.width_parameter())) {
       return Result<std::size_t>::failure(Error::validation(
@@ -526,6 +626,11 @@ Result<std::size_t> PartDocument::add_sketch(Sketch sketch) {
     if (workplane_dependency.has_error()) {
       return Result<std::size_t>::failure(workplane_dependency.error());
     }
+  }
+
+  const auto projected_reference_dependencies = add_projected_reference_dependencies(graph, sketch);
+  if (projected_reference_dependencies.has_error()) {
+    return Result<std::size_t>::failure(projected_reference_dependencies.error());
   }
 
   for (const auto& profile : sketch.rectangle_profiles()) {
