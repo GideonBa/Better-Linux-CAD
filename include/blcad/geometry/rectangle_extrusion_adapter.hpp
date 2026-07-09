@@ -16,6 +16,7 @@ struct ShapeSummary {
 
 class RectangleExtrusionAdapter;
 class CircularCutAdapter;
+class ClosedProfileAdapter;
 class StepExporter;
 
 class GeometryShape {
@@ -35,6 +36,7 @@ private:
 
   friend class RectangleExtrusionAdapter;
   friend class CircularCutAdapter;
+  friend class ClosedProfileAdapter;
   friend class StepExporter;
 
   explicit GeometryShape(std::shared_ptr<Impl> impl);
