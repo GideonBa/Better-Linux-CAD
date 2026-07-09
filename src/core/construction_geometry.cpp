@@ -97,20 +97,6 @@ constexpr double k_tolerance = 1.0e-9;
   return Result<std::size_t>::success(0);
 }
 
-[[nodiscard]] Result<std::size_t> validate_named_object_id(std::string_view object_kind,
-                                                          const std::string& object_id,
-                                                          std::string_view name) {
-  if (object_id.empty()) {
-    return Result<std::size_t>::failure(
-        Error::validation(std::string(object_kind), std::string(object_kind) + " id must not be empty"));
-  }
-  if (name.empty()) {
-    return Result<std::size_t>::failure(
-        Error::validation(object_id, std::string(object_kind) + " name must not be empty"));
-  }
-  return Result<std::size_t>::success(0);
-}
-
 } // namespace
 
 std::string_view to_string(ConstructionRelationType type) noexcept {
