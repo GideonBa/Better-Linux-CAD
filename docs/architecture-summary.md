@@ -46,7 +46,7 @@ BLCAD is intended to become an independent parametric CAD system for Linux. The 
 - `ConstructionPoint`
 - `ConstructionLine` / `DatumAxis`
 - `ConstructionPlane`
-- `ConstructionRelation`
+- future `ConstructionRelation`
 - `SketchPoint3D`
 - `SketchCurve3D`
 - `GuideCurve`
@@ -118,6 +118,25 @@ The first general closed-profile step is implemented:
 
 Still intentionally missing: arcs, splines, automatic region detection, multiple contours, inner holes in one profile, a full sketch constraint solver, and GUI sketch editing.
 
+## Implemented explicit construction geometry
+
+The first construction-geometry step is implemented:
+
+- `ConstructionPointId`, `ConstructionLineId`, and `ConstructionPlaneId` identify construction geometry.
+- `ConstructionPoint`, `ConstructionLine`, and `ConstructionPlane` are core model-intent objects.
+- Construction geometry supports explicit numeric placement.
+- Construction geometry can carry optional `parameter_dependencies` for invalidation.
+- `PartDocument` stores construction points, construction lines, and construction planes.
+- Construction geometry receives dependency graph nodes.
+- Parameter dependencies create graph edges from parameters to construction geometry.
+- A sketch can reference a construction plane as its workplane.
+- A construction plane used as a sketch workplane creates a graph edge from construction plane to sketch.
+- JSON serialization supports `construction_points`, `construction_lines`, and `construction_planes`.
+- `WorkplaneResolver` resolves explicit construction planes into `ResolvedWorkplane` frames.
+- `examples/construction_plane_prism.blcad.json` demonstrates a closed-profile sketch on a construction plane.
+
+Still intentionally missing: relation-driven construction definitions, expression-evaluated coordinate placement, references to generated semantic edges/vertices, GUI manipulators, assembly-level construction geometry, and surface-based construction geometry.
+
 ## Future Inventor-like sketcher and feature parity
 
 The long-term sketcher roadmap is an Inventor-like parity target, not an immediate implementation target. It is documented in `docs/inventor-like-sketcher-and-feature-roadmap.md`.
@@ -133,18 +152,20 @@ The intended capability is:
 
 This target depends on construction geometry, a stronger sketch entity model, profile-region detection, and eventually a constraint solver.
 
-## Future construction geometry
+## Next construction geometry block
 
-Construction geometry is a planned datum-system layer, not yet implemented. It should introduce user-created construction points, construction lines/axes, and construction planes that are part of model intent.
+The next construction-geometry block is relation-driven datum geometry.
 
 The intended capability is:
 
-- construction points, lines, and planes can be placed freely in 3D
-- sketches can use construction planes as workplanes
-- construction geometry can depend on parameters and other reference geometry
-- construction geometry can be defined by relations such as parallelism, orthogonality, angle, offset, point-on-line, point-on-plane, line-through-two-points, and plane-through-three-points
-- later construction geometry can reference generated semantic faces, edges, vertices, or analytic surfaces without storing raw OCCT topology in the core
-- dependency graph edges connect referenced objects to construction geometry and construction geometry to sketches/features
+- `ConstructionRelation` model objects
+- `PlaneOffsetFromPlane`
+- `LineThroughTwoPoints`
+- `PlaneThroughThreePoints`
+- dependency graph edges from referenced construction objects to relation-driven construction objects
+- JSON persistence for relation-driven construction definitions
+- `WorkplaneResolver` support for relation-driven planes
+- invalidation through point, line, plane, and parameter references
 
 The detailed roadmap is in `docs/construction-geometry-mvp.md`.
 
@@ -175,16 +196,16 @@ The detailed roadmap is in `docs/advanced-surfacing-and-3d-sketch-mvp.md`.
 - Sketches on generated faces require stable semantic references.
 - User-created construction geometry should be model intent, not temporary UI state.
 - Construction planes answer where sketches live; sketch profiles answer what shape sketches describe.
+- Explicit construction geometry is now implemented; relation-driven construction geometry is the next datum-system block.
 - Inventor-like sketching requires explicit sketch entities, constraints, dimensions, automatic profile detection, and stable region selection.
 - 3D sketches and surfacing answer how spatial curves, multiple profile sections, guide curves, and surfaces form freeform geometry.
 - OCCT shapes are a cache, not the primary model.
-- The OCCT path lives in an optional `blcad_geometry` target: adapters for rectangle extrusion, circular cut, line-based closed-profile extrusion/cut, a small ShapeCache, a WorkplaneResolver, recompute execution for `AdditiveExtrude` and `SubtractiveExtrude`, full document recompute, incremental recompute, bounds validation for the current top/bottom/right/left/front/back face cases, and STEP export of the final shape.
+- The OCCT path lives in an optional `blcad_geometry` target: adapters for rectangle extrusion, circular cut, line-based closed-profile extrusion/cut, a small ShapeCache, a WorkplaneResolver, recompute execution for `AdditiveExtrude` and `SubtractiveExtrude`, full document recompute, incremental recompute, bounds validation for the current top/bottom/right/left/front/back face cases, explicit construction-plane resolution, and STEP export of the final shape.
 - The ShapeCache remains in the geometry layer; `PartDocument` remains OCCT-free and is computed into the cache through `execute_document` and `execute_plan`.
 - JSON serialization stores model intent only; it does not serialize OCCT shapes or ShapeCache contents.
 - Parameter values can be changed through `PartDocument::set_parameter_value`; a change marks dependents and drives incremental recompute.
-- Derived workplanes are resolved geometrically without turning raw OCCT faces into core model references.
+- Derived workplanes and construction planes are resolved geometrically without turning raw OCCT faces into core model references.
 - Line-based closed sketch profiles are implemented as a first planar general-profile path and remain separate from topological naming.
-- Construction geometry and relation-driven datum placement are documented as the next future block and remain separate from the full sketch constraint solver.
 - Revolve, revolve cut, sweep, loft, 3D sketch, surfacing, and surface-to-solid workflows are documented as future feature families and must remain semantic feature-tree operations, not raw BRep edits.
 - Assembly parameters must later flow into parts in a controlled way.
 - Fillets and chamfers are their own parametric features with semantic edge references, not only late BRep corrections.
@@ -203,6 +224,7 @@ The condensed points above are expanded in dedicated documents. Each is written 
 - `docs/parameter-model.md` — scopes, expressions, cross-part flow, top-down design
 - `docs/feature-system.md` — general feature model and sketch-driven feature families
 - `docs/inventor-like-sketcher-and-feature-roadmap.md` — Inventor-like 2D/3D sketcher, constraints, dimensions, profile detection, revolve, sweep, loft, and sketch-driven feature parity
+- `docs/construction-geometry-mvp.md` — explicit construction geometry and next relation-driven construction geometry
 - `docs/file-format.md` — project and save format
 - `docs/fillet-chamfer-features.md` — fillets and chamfers
 - `docs/pattern-and-mirror-features.md` — linear/circular patterns and mirror
