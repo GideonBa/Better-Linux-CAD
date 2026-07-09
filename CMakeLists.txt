@@ -9,7 +9,7 @@ project(
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_CXX_STANDARD_EXTENSIONS OFF)
 
 option(BLCAD_BUILD_GEOMETRY "Build future OCCT geometry targets" OFF)
 option(BLCAD_BUILD_GUI "Build future Qt GUI targets" OFF)
@@ -74,6 +74,7 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/semantic_reference_evaluator.cpp
     src/geometry/shape_cache.cpp
     src/geometry/sketch_reference_projector.cpp
+    src/geometry/sketch_region_finder.cpp
     src/geometry/step_exporter.cpp
     src/geometry/workplane_resolver.cpp
   )
