@@ -27,6 +27,70 @@ enum class ProjectedSketchLineSource {
 
 [[nodiscard]] std::string_view to_string(ProjectedSketchLineSource source) noexcept;
 
+enum class SketchReferenceTargetKind {
+  LineSegment,
+  LineSegmentStart,
+  LineSegmentEnd,
+  ProjectedPoint,
+  ProjectedLine,
+};
+
+[[nodiscard]] std::string_view to_string(SketchReferenceTargetKind kind) noexcept;
+
+enum class SketchConstraintKind {
+  CoincidentToProjectedPoint,
+  ParallelToProjectedLine,
+  CollinearWithProjectedLine,
+};
+
+[[nodiscard]] std::string_view to_string(SketchConstraintKind kind) noexcept;
+
+class SketchReferenceTarget {
+public:
+  [[nodiscard]] static Result<SketchReferenceTarget> create_line_segment(SketchEntityId entity);
+  [[nodiscard]] static Result<SketchReferenceTarget> create_line_segment_start(
+      SketchEntityId entity);
+  [[nodiscard]] static Result<SketchReferenceTarget> create_line_segment_end(SketchEntityId entity);
+  [[nodiscard]] static Result<SketchReferenceTarget> create_projected_point(SketchEntityId entity);
+  [[nodiscard]] static Result<SketchReferenceTarget> create_projected_line(SketchEntityId entity);
+
+  [[nodiscard]] SketchReferenceTargetKind kind() const noexcept;
+  [[nodiscard]] const SketchEntityId& entity() const noexcept;
+
+private:
+  SketchReferenceTarget(SketchReferenceTargetKind kind, SketchEntityId entity);
+
+  SketchReferenceTargetKind kind_;
+  SketchEntityId entity_;
+};
+
+class SketchConstraint {
+public:
+  [[nodiscard]] static Result<SketchConstraint> create_coincident_to_projected_point(
+      SketchConstraintId id, SketchReferenceTarget constrained_point,
+      SketchReferenceTarget projected_point);
+
+  [[nodiscard]] static Result<SketchConstraint> create_parallel_to_projected_line(
+      SketchConstraintId id, SketchReferenceTarget constrained_line, SketchReferenceTarget projected_line);
+
+  [[nodiscard]] static Result<SketchConstraint> create_collinear_with_projected_line(
+      SketchConstraintId id, SketchReferenceTarget constrained_line, SketchReferenceTarget projected_line);
+
+  [[nodiscard]] const SketchConstraintId& id() const noexcept;
+  [[nodiscard]] SketchConstraintKind kind() const noexcept;
+  [[nodiscard]] const SketchReferenceTarget& constrained_target() const noexcept;
+  [[nodiscard]] const SketchReferenceTarget& reference_target() const noexcept;
+
+private:
+  SketchConstraint(SketchConstraintId id, SketchConstraintKind kind,
+                   SketchReferenceTarget constrained_target, SketchReferenceTarget reference_target);
+
+  SketchConstraintId id_;
+  SketchConstraintKind kind_;
+  SketchReferenceTarget constrained_target_;
+  SketchReferenceTarget reference_target_;
+};
+
 class ProjectedSketchPoint {
 public:
   [[nodiscard]] static Result<ProjectedSketchPoint>
@@ -153,6 +217,7 @@ public:
   [[nodiscard]] Result<std::size_t> add_entity(LineSegment line_segment);
   [[nodiscard]] Result<std::size_t> add_reference(ProjectedSketchPoint point_reference);
   [[nodiscard]] Result<std::size_t> add_reference(ProjectedSketchLine line_reference);
+  [[nodiscard]] Result<std::size_t> add_constraint(SketchConstraint constraint);
   [[nodiscard]] Result<std::size_t> add_profile(RectangleProfile profile);
   [[nodiscard]] Result<std::size_t> add_profile(CircleProfile profile);
   [[nodiscard]] Result<std::size_t> add_profile(ClosedProfile profile);
@@ -163,6 +228,7 @@ public:
   [[nodiscard]] const std::vector<LineSegment>& line_segments() const noexcept;
   [[nodiscard]] const std::vector<ProjectedSketchPoint>& projected_points() const noexcept;
   [[nodiscard]] const std::vector<ProjectedSketchLine>& projected_lines() const noexcept;
+  [[nodiscard]] const std::vector<SketchConstraint>& constraints() const noexcept;
   [[nodiscard]] const std::vector<RectangleProfile>& rectangle_profiles() const noexcept;
   [[nodiscard]] const std::vector<CircleProfile>& circle_profiles() const noexcept;
   [[nodiscard]] const std::vector<ClosedProfile>& closed_profiles() const noexcept;
@@ -171,6 +237,7 @@ public:
   [[nodiscard]] const LineSegment* find_line_segment(SketchEntityId id) const noexcept;
   [[nodiscard]] const ProjectedSketchPoint* find_projected_point(SketchEntityId id) const noexcept;
   [[nodiscard]] const ProjectedSketchLine* find_projected_line(SketchEntityId id) const noexcept;
+  [[nodiscard]] const SketchConstraint* find_constraint(SketchConstraintId id) const noexcept;
   [[nodiscard]] const RectangleProfile* find_rectangle_profile(ProfileId id) const noexcept;
   [[nodiscard]] const CircleProfile* find_circle_profile(ProfileId id) const noexcept;
   [[nodiscard]] const ClosedProfile* find_closed_profile(ProfileId id) const noexcept;
@@ -181,7 +248,10 @@ private:
   Sketch(SketchId id, std::string name, DatumPlaneId workplane);
 
   [[nodiscard]] bool has_entity_id(const SketchEntityId& id) const noexcept;
+  [[nodiscard]] bool has_constraint_id(const SketchConstraintId& id) const noexcept;
   [[nodiscard]] bool has_profile_id(const ProfileId& id) const noexcept;
+  [[nodiscard]] Result<std::size_t> validate_constraint_target(
+      const SketchReferenceTarget& target, const std::string& object_id) const;
   [[nodiscard]] Result<std::vector<Point2>> validate_closed_profile(
       const ClosedProfile& profile) const;
 
@@ -191,6 +261,7 @@ private:
   std::vector<LineSegment> line_segments_;
   std::vector<ProjectedSketchPoint> projected_points_;
   std::vector<ProjectedSketchLine> projected_lines_;
+  std::vector<SketchConstraint> constraints_;
   std::vector<RectangleProfile> rectangle_profiles_;
   std::vector<CircleProfile> circle_profiles_;
   std::vector<ClosedProfile> closed_profiles_;
