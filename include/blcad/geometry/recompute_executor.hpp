@@ -4,6 +4,7 @@
 #include "blcad/core/recompute_plan.hpp"
 #include "blcad/core/result.hpp"
 #include "blcad/geometry/circular_cut_adapter.hpp"
+#include "blcad/geometry/closed_profile_adapter.hpp"
 #include "blcad/geometry/rectangle_extrusion_adapter.hpp"
 #include "blcad/geometry/shape_cache.hpp"
 #include "blcad/geometry/workplane_resolver.hpp"
@@ -40,6 +41,7 @@ private:
 
   RectangleExtrusionAdapter rectangle_extrusion_adapter_;
   CircularCutAdapter circular_cut_adapter_;
+  ClosedProfileAdapter closed_profile_adapter_;
   WorkplaneResolver workplane_resolver_;
 };
 
