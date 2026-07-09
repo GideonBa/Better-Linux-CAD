@@ -9,6 +9,7 @@
 #include "blcad/core/parameter.hpp"
 #include "blcad/core/quantity.hpp"
 #include "blcad/core/recompute_plan.hpp"
+#include "blcad/core/reference_recovery.hpp"
 #include "blcad/core/result.hpp"
 #include "blcad/core/sketch.hpp"
 
@@ -31,6 +32,9 @@ public:
   [[nodiscard]] Result<std::size_t> add_derived_workplane(DerivedWorkplane workplane);
   [[nodiscard]] Result<std::size_t> add_sketch(Sketch sketch);
   [[nodiscard]] Result<std::size_t> add_feature(Feature feature);
+  [[nodiscard]] Result<std::size_t> add_reference_status(ReferenceStatusRecord status);
+  [[nodiscard]] Result<std::size_t> add_reference_remap(ReferenceRemapRecord remap);
+  [[nodiscard]] Result<std::size_t> add_sketch_origin_override(SketchOriginOverrideRecord origin_override);
   [[nodiscard]] Result<std::vector<std::string>> mark_parameter_changed(ParameterId id);
   // Sets a parameter value, validates it, and marks the parameter and its
   // dependents as changed. Returns the affected graph nodes.
@@ -49,6 +53,9 @@ public:
   [[nodiscard]] const std::vector<DerivedWorkplane>& derived_workplanes() const noexcept;
   [[nodiscard]] const std::vector<Sketch>& sketches() const noexcept;
   [[nodiscard]] const std::vector<Feature>& features() const noexcept;
+  [[nodiscard]] const std::vector<ReferenceStatusRecord>& reference_statuses() const noexcept;
+  [[nodiscard]] const std::vector<ReferenceRemapRecord>& reference_remaps() const noexcept;
+  [[nodiscard]] const std::vector<SketchOriginOverrideRecord>& sketch_origin_overrides() const noexcept;
   [[nodiscard]] const DependencyGraph& dependency_graph() const noexcept;
   [[nodiscard]] const InvalidationState& invalidation_state() const noexcept;
   [[nodiscard]] std::size_t parameter_count() const noexcept;
@@ -59,6 +66,9 @@ public:
   [[nodiscard]] std::size_t derived_workplane_count() const noexcept;
   [[nodiscard]] std::size_t sketch_count() const noexcept;
   [[nodiscard]] std::size_t feature_count() const noexcept;
+  [[nodiscard]] std::size_t reference_status_count() const noexcept;
+  [[nodiscard]] std::size_t reference_remap_count() const noexcept;
+  [[nodiscard]] std::size_t sketch_origin_override_count() const noexcept;
 
   [[nodiscard]] const Parameter* find_parameter(ParameterId id) const noexcept;
   [[nodiscard]] const Parameter* find_parameter(std::string_view name) const noexcept;
@@ -69,6 +79,9 @@ public:
   [[nodiscard]] const DerivedWorkplane* find_derived_workplane(DatumPlaneId id) const noexcept;
   [[nodiscard]] const Sketch* find_sketch(SketchId id) const noexcept;
   [[nodiscard]] const Feature* find_feature(FeatureId id) const noexcept;
+  [[nodiscard]] const ReferenceStatusRecord* find_reference_status(ReferenceStatusId id) const noexcept;
+  [[nodiscard]] const ReferenceRemapRecord* find_reference_remap(ReferenceRemapId id) const noexcept;
+  [[nodiscard]] const SketchOriginOverrideRecord* find_sketch_origin_override(SketchId id) const noexcept;
   [[nodiscard]] bool has_workplane_id(const DatumPlaneId& id) const noexcept;
 
 private:
@@ -83,6 +96,9 @@ private:
   [[nodiscard]] bool has_derived_workplane_id(const DatumPlaneId& id) const noexcept;
   [[nodiscard]] bool has_sketch_id(const SketchId& id) const noexcept;
   [[nodiscard]] bool has_feature_id(const FeatureId& id) const noexcept;
+  [[nodiscard]] bool has_reference_status_id(const ReferenceStatusId& id) const noexcept;
+  [[nodiscard]] bool has_reference_remap_id(const ReferenceRemapId& id) const noexcept;
+  [[nodiscard]] bool has_sketch_origin_override_id(const SketchId& id) const noexcept;
 
   DocumentId id_;
   std::string name_;
@@ -94,6 +110,9 @@ private:
   std::vector<DerivedWorkplane> derived_workplanes_;
   std::vector<Sketch> sketches_;
   std::vector<Feature> features_;
+  std::vector<ReferenceStatusRecord> reference_statuses_;
+  std::vector<ReferenceRemapRecord> reference_remaps_;
+  std::vector<SketchOriginOverrideRecord> sketch_origin_overrides_;
   DependencyGraph dependency_graph_;
   InvalidationState invalidation_state_;
 };
