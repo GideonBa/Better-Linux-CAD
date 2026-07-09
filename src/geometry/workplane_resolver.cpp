@@ -30,6 +30,13 @@ namespace {
                         datum_plane.y_axis(), datum_plane.normal(), RectangularWorkplaneBounds{}});
 }
 
+[[nodiscard]] Result<ResolvedWorkplane> resolve_construction_plane(
+    const ConstructionPlane& plane) {
+  return Result<ResolvedWorkplane>::success(
+      ResolvedWorkplane{plane.workplane_id(), plane.origin(), plane.x_axis(), plane.y_axis(),
+                        plane.normal(), RectangularWorkplaneBounds{}});
+}
+
 [[nodiscard]] Result<ResolvedWorkplane> resolve_additive_extrude_face_workplane(
     const PartDocument& document, const DerivedWorkplane& workplane) {
   const FeatureId& source_feature_id = workplane.face_reference().source_feature();
@@ -51,7 +58,7 @@ namespace {
   }
 
   if (source_sketch->rectangle_profiles().size() != 1U ||
-      !source_sketch->circle_profiles().empty()) {
+      !source_sketch->circle_profiles().empty() || !source_sketch->closed_profiles().empty()) {
     return Result<ResolvedWorkplane>::failure(validation_error(
         source_sketch->id().value(),
         "derived workplane resolution requires a source sketch with exactly one rectangle profile"));
@@ -140,6 +147,12 @@ Result<ResolvedWorkplane> WorkplaneResolver::resolve(const PartDocument& documen
   const DatumPlane* datum_plane = document.find_datum_plane(workplane_id);
   if (datum_plane != nullptr) {
     return resolve_datum_plane(*datum_plane);
+  }
+
+  const ConstructionPlane* construction_plane =
+      document.find_construction_plane(ConstructionPlaneId(workplane_id.value()));
+  if (construction_plane != nullptr) {
+    return resolve_construction_plane(*construction_plane);
   }
 
   const DerivedWorkplane* derived_workplane = document.find_derived_workplane(workplane_id);
