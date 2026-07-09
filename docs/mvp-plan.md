@@ -72,7 +72,6 @@ Still not implemented in this block:
 - arcs
 - splines
 - trimmed curves
-- automatic region detection from unordered curves
 - multiple contours in one feature
 - inner holes in the same profile
 - full sketch constraint solver
@@ -229,23 +228,50 @@ Still not implemented in this block:
 - driven dimensions
 - automatic constraint inference
 - GUI constraint display or editing
-- automatic region detection
 - arcs, splines, 3D sketches, sweep, loft, and surfacing
 
-## Next MVP: Automatic profile region detection seed
+## Implemented block: Automatic profile region detection seed
 
 Goal: detect deterministic closed regions from explicit sketch lines and resolved helper lines without requiring users or JSON to predeclare every `ClosedProfile` manually.
 
+Detailed document: `docs/automatic-profile-region-detection-mvp.md`
+
+Implemented scope:
+
+- `SketchRegionFinder` in the optional geometry layer
+- deterministic single-region detection from unordered explicit sketch lines
+- local-line collection from explicit lines, dimension-resolved explicit lines, and resolved reference-generated helper lines
+- validation errors for duplicate edges, degenerate edges, gaps, branches, ambiguous continuations, non-closing loops, self-intersections, and multiple/simple-contour violations
+- stable generated `ClosedProfile` candidate IDs of the form `generated.region.<sketch-id>.0`
+- conversion of a generated candidate into a persistable `ClosedProfile`
+- `GeometryRecomputeExecutor` fallback to detected regions when a sketch has no rectangle, circle, or explicit closed profile
+- additive extrude recompute from one detected region
+- subtractive through-all cut recompute from one detected region
+- geometry tests for deterministic detection, branch rejection, additive recompute, and subtractive recompute
+
+Still not implemented in this block:
+
+- multiple regions
+- inner loops and holes
+- nested contours
+- trim/extend
+- arcs, splines, 3D sketches, sweep, loft, and surfacing
+- full sketch solving or GUI region selection
+
+## Next MVP: Multi-contour profiles and holes seed
+
+Goal: allow one profile operation to consume an outer contour plus one or more inner contours for holes, while keeping contour selection explicit and deterministic.
+
 Proposed first implementation sequence:
 
-- add a deterministic sketch-region finder for unordered explicit line segments on one sketch
-- support simple single-contour loops with no branches and no self-intersections
-- allow projected/reference-generated helper lines to participate only after they resolve to explicit local line segments
-- create stable generated `ClosedProfile` candidates with deterministic IDs
-- add validation errors for ambiguous, branched, duplicate, or self-intersecting regions
-- add JSON metadata only for user-selected/generated-region intent, not raw solver state
-- add geometry tests for additive and subtractive recompute from detected simple regions
-- keep full sketch solving, multiple regions, inner loops, trim/extend, arcs, splines, GUI selection, 3D sketches, sweep, loft, and surfacing deferred
+- add a `CompositeClosedProfile` or equivalent model-intent record with one outer contour and ordered inner contours
+- allow each contour to reference explicit line segments, reference-generated helper lines, or generated region candidates after deterministic resolution
+- validate contour closure, non-self-intersection, and no overlap between inner contours
+- validate that each inner contour lies strictly inside the outer contour
+- persist composite profile intent to JSON without storing solved BRep or region-search caches
+- extend closed-profile OCCT adapter to create faces with inner wires
+- add additive extrude and subtractive cut tests for one outer contour with one inner hole
+- keep automatic multi-region selection, trim/extend, arcs, splines, GUI profile picking, 3D sketches, sweep, loft, and surfacing deferred
 
 ## Future roadmap: Inventor-like sketcher and sketch-driven features
 
