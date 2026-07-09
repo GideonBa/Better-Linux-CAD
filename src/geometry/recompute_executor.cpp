@@ -298,4 +298,26 @@ GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const Reco
   return Result<GeometryRecomputeSummary>::success(summary);
 }
 
+Result<GeometryRecomputeSummary>
+GeometryRecomputeExecutor::execute_document(const PartDocument& document,
+                                            ShapeCache& shape_cache) const {
+  GeometryRecomputeSummary summary;
+
+  for (const Feature& feature : document.features()) {
+    auto removed_stale_shape = shape_cache.remove_feature_shape(feature.id());
+    if (removed_stale_shape.has_error()) {
+      return Result<GeometryRecomputeSummary>::failure(removed_stale_shape.error());
+    }
+
+    auto executed = execute_feature(document, feature, shape_cache);
+    if (executed.has_error()) {
+      return Result<GeometryRecomputeSummary>::failure(executed.error());
+    }
+
+    ++summary.executed_feature_count;
+  }
+
+  return Result<GeometryRecomputeSummary>::success(summary);
+}
+
 } // namespace blcad::geometry
