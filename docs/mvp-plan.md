@@ -141,6 +141,54 @@ Proposed first implementation sequence:
 
 This block answers where a sketch can live. The general closed sketch profile block answers what shape a sketch can describe. They should remain separate, testable increments.
 
+## Future MVP: Advanced surfacing and 3D sketching
+
+Goal: support spatial curves, guide splines, sweep, loft, boundary surfaces, surface stitching, and conversion of closed stitched surfaces into solids.
+
+Detailed document: `docs/advanced-surfacing-and-3d-sketch-mvp.md`
+
+Explicitly not implemented yet:
+
+- 3D sketch points, 3D lines, 3D polylines, and 3D splines
+- splines connecting points from different sketches on different planes
+- guide curves for loft and sweep features
+- sweep along lines, polylines, arcs, or splines
+- loft between two or more sketches
+- smooth multi-section lofts through arbitrary many parallel sketches
+- continuity modes such as C0, G1, and G2
+- using a middle sketch as a smooth transition control without an unwanted hard edge
+- boundary surfaces from spatial curves
+- surfaces from arbitrary curves across multiple sketches
+- surface stitching / knitting
+- conversion from a closed stitched shell into a solid body
+
+Target use cases:
+
+- turbine blades
+- propeller blades
+- wings and airfoils
+- smooth duct transitions
+- pipe-to-pipe transitions
+- organic fairings
+
+Proposed first implementation sequence:
+
+- add explicit 3D points and 3D line segments
+- add 3D spline curves with control or interpolation points
+- allow 3D splines to reference points from sketches on different planes
+- add JSON roundtrip tests for 3D sketch curves
+- convert 3D curves into OCCT edge/wire representations
+- add simple sweep along a straight construction line
+- add sweep along a 3D polyline or spline path
+- add simple loft between two closed planar profile sketches
+- add multi-section loft through three or more profiles
+- add explicit continuity settings for smooth intermediate sections
+- add guide-curve lofts using one or more 3D splines
+- add boundary surfaces from spatial curves
+- add surface stitching and closed-shell-to-solid conversion
+
+This block depends on construction geometry and closed sketch profiles. It answers how spatial curves, multiple profiles, and surfaces can form freeform geometry.
+
 ## MVP 3: Parametric bolt circle
 
 Goal: first meaningful parametric feature test.
@@ -184,6 +232,7 @@ These are documented as incremental, testable blocks and are sequenced after the
 - `docs/shaft-wizard.md`: shaft assistant (calculation plus geometry generation)
 - `docs/assembly-system.md`: full constraint solver, joints, motion, subassemblies
 - `docs/engineering-modules.md`: bolt, bearing, gear, material, and standard-parts modules
+- `docs/advanced-surfacing-and-3d-sketch-mvp.md`: 3D sketching, guide curves, sweep, loft, boundary surfaces, surface stitching, and closed-shell-to-solid conversion
 - `docs/user-interface.md`: UI over the core
 
 The cross-cutting rules they all rely on are in `docs/semantic-references.md` and `docs/parameter-model.md`.
