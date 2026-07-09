@@ -68,6 +68,16 @@ Result<std::size_t> add_dependency_if_missing(DependencyGraph& graph, std::strin
   return Result<std::size_t>::success(0);
 }
 
+[[nodiscard]] Result<std::size_t> validate_semantic_reference_target(
+    const PartDocument& document, const SemanticReferenceTarget& target,
+    const std::string& object_id) {
+  if (!has_additive_source_feature(document, target.source_feature())) {
+    return Result<std::size_t>::failure(Error::validation(
+        object_id, "semantic reference source feature must be an additive extrude in part document"));
+  }
+  return Result<std::size_t>::success(0);
+}
+
 [[nodiscard]] Result<std::size_t> validate_relation_references(const PartDocument& document,
                                                                const ConstructionRelation& relation,
                                                                const std::string& object_id) {
@@ -118,17 +128,15 @@ Result<std::size_t> add_dependency_if_missing(DependencyGraph& graph, std::strin
     }
     break;
   case ConstructionRelationType::PointOnGeneratedEdge:
-    if (document.find_construction_point(relation.first_point()) == nullptr ||
-        !relation.generated_edge().has_value()) {
+    if (!relation.generated_edge().has_value()) {
       return Result<std::size_t>::failure(Error::validation(
-          object_id, "point-on-generated-edge relation references must exist in part document"));
+          object_id, "point-on-generated-edge relation must carry a generated edge reference"));
     }
     return validate_generated_edge_reference(document, relation.generated_edge().value(), object_id);
   case ConstructionRelationType::PointOnGeneratedVertex:
-    if (document.find_construction_point(relation.first_point()) == nullptr ||
-        !relation.generated_vertex().has_value()) {
+    if (!relation.generated_vertex().has_value()) {
       return Result<std::size_t>::failure(Error::validation(
-          object_id, "point-on-generated-vertex relation references must exist in part document"));
+          object_id, "point-on-generated-vertex relation must carry a generated vertex reference"));
     }
     return validate_generated_vertex_reference(document, relation.generated_vertex().value(), object_id);
   case ConstructionRelationType::LineOnPlane:
@@ -351,6 +359,13 @@ Result<std::size_t> PartDocument::add_construction_point(ConstructionPoint point
     if (!has_parameter_id(parameter_id)) {
       return Result<std::size_t>::failure(Error::validation(
           point.id().value(), "construction point parameter dependency must exist in part document"));
+    }
+  }
+
+  if (point.relation().has_value()) {
+    auto valid_relation = validate_relation_references(*this, point.relation().value(), point.id().value());
+    if (valid_relation.has_error()) {
+      return Result<std::size_t>::failure(valid_relation.error());
     }
   }
 
@@ -729,6 +744,113 @@ Result<std::size_t> PartDocument::add_feature(Feature feature) {
   return Result<std::size_t>::success(features_.size() - 1);
 }
 
+Result<std::size_t> PartDocument::add_reference_status(ReferenceStatusRecord status) {
+  if (has_reference_status_id(status.id())) {
+    return Result<std::size_t>::failure(Error::validation(
+        status.id().value(), "reference status id must be unique within part document"));
+  }
+  if (status.status() == ReferenceStatusKind::Resolved) {
+    auto valid_target = validate_semantic_reference_target(*this, status.target(), status.id().value());
+    if (valid_target.has_error()) {
+      return Result<std::size_t>::failure(valid_target.error());
+    }
+  }
+
+  auto graph = dependency_graph_;
+  const auto added_node = graph.add_node(status.id().value());
+  if (added_node.has_error()) {
+    return Result<std::size_t>::failure(added_node.error());
+  }
+  if (find_feature(status.target().source_feature()) != nullptr) {
+    auto dependency = add_dependency_if_missing(graph, status.target().source_feature().value(),
+                                                status.id().value());
+    if (dependency.has_error()) {
+      return Result<std::size_t>::failure(dependency.error());
+    }
+  }
+  auto invalidation_state = invalidation_state_;
+  const auto synced_state = invalidation_state.sync_from_graph(graph);
+  if (synced_state.has_error()) {
+    return Result<std::size_t>::failure(synced_state.error());
+  }
+  dependency_graph_ = std::move(graph);
+  invalidation_state_ = std::move(invalidation_state);
+  reference_statuses_.push_back(std::move(status));
+  return Result<std::size_t>::success(reference_statuses_.size() - 1);
+}
+
+Result<std::size_t> PartDocument::add_reference_remap(ReferenceRemapRecord remap) {
+  if (has_reference_remap_id(remap.id())) {
+    return Result<std::size_t>::failure(Error::validation(
+        remap.id().value(), "reference remap id must be unique within part document"));
+  }
+  auto valid_replacement = validate_semantic_reference_target(*this, remap.replacement(),
+                                                              remap.id().value());
+  if (valid_replacement.has_error()) {
+    return Result<std::size_t>::failure(valid_replacement.error());
+  }
+
+  auto graph = dependency_graph_;
+  const auto added_node = graph.add_node(remap.id().value());
+  if (added_node.has_error()) {
+    return Result<std::size_t>::failure(added_node.error());
+  }
+  auto replacement_dependency = add_dependency_if_missing(graph,
+                                                         remap.replacement().source_feature().value(),
+                                                         remap.id().value());
+  if (replacement_dependency.has_error()) {
+    return Result<std::size_t>::failure(replacement_dependency.error());
+  }
+  if (find_feature(remap.original().source_feature()) != nullptr) {
+    auto original_dependency = add_dependency_if_missing(graph, remap.original().source_feature().value(),
+                                                        remap.id().value());
+    if (original_dependency.has_error()) {
+      return Result<std::size_t>::failure(original_dependency.error());
+    }
+  }
+  auto invalidation_state = invalidation_state_;
+  const auto synced_state = invalidation_state.sync_from_graph(graph);
+  if (synced_state.has_error()) {
+    return Result<std::size_t>::failure(synced_state.error());
+  }
+  dependency_graph_ = std::move(graph);
+  invalidation_state_ = std::move(invalidation_state);
+  reference_remaps_.push_back(std::move(remap));
+  return Result<std::size_t>::success(reference_remaps_.size() - 1);
+}
+
+Result<std::size_t> PartDocument::add_sketch_origin_override(
+    SketchOriginOverrideRecord origin_override) {
+  if (has_sketch_origin_override_id(origin_override.sketch())) {
+    return Result<std::size_t>::failure(Error::validation(
+        origin_override.sketch().value(), "sketch origin override must be unique per sketch"));
+  }
+  if (find_sketch(origin_override.sketch()) == nullptr) {
+    return Result<std::size_t>::failure(Error::validation(
+        origin_override.sketch().value(), "sketch origin override sketch must exist in part document"));
+  }
+
+  auto graph = dependency_graph_;
+  const std::string node_id = origin_override.sketch().value() + ".origin_override";
+  const auto added_node = graph.add_node(node_id);
+  if (added_node.has_error()) {
+    return Result<std::size_t>::failure(added_node.error());
+  }
+  auto dependency = add_dependency_if_missing(graph, origin_override.sketch().value(), node_id);
+  if (dependency.has_error()) {
+    return Result<std::size_t>::failure(dependency.error());
+  }
+  auto invalidation_state = invalidation_state_;
+  const auto synced_state = invalidation_state.sync_from_graph(graph);
+  if (synced_state.has_error()) {
+    return Result<std::size_t>::failure(synced_state.error());
+  }
+  dependency_graph_ = std::move(graph);
+  invalidation_state_ = std::move(invalidation_state);
+  sketch_origin_overrides_.push_back(std::move(origin_override));
+  return Result<std::size_t>::success(sketch_origin_overrides_.size() - 1);
+}
+
 Result<std::vector<std::string>> PartDocument::mark_parameter_changed(ParameterId id) {
   if (id.empty()) {
     return Result<std::vector<std::string>>::failure(
@@ -774,177 +896,92 @@ Result<RecomputePlan> PartDocument::create_recompute_plan() const {
   return RecomputePlan::from_graph_and_invalidation_state(dependency_graph_, invalidation_state_);
 }
 
-void PartDocument::mark_all_clean() noexcept {
-  invalidation_state_.mark_all_clean();
-}
+void PartDocument::mark_all_clean() noexcept { invalidation_state_.mark_all_clean(); }
 
-const DocumentId& PartDocument::id() const noexcept {
-  return id_;
-}
-
-const std::string& PartDocument::name() const noexcept {
-  return name_;
-}
-
-const std::vector<Parameter>& PartDocument::parameters() const noexcept {
-  return parameters_;
-}
-
-const std::vector<DatumPlane>& PartDocument::datum_planes() const noexcept {
-  return datum_planes_;
-}
-
-const std::vector<ConstructionPoint>& PartDocument::construction_points() const noexcept {
-  return construction_points_;
-}
-
-const std::vector<ConstructionLine>& PartDocument::construction_lines() const noexcept {
-  return construction_lines_;
-}
-
-const std::vector<ConstructionPlane>& PartDocument::construction_planes() const noexcept {
-  return construction_planes_;
-}
-
-const std::vector<DerivedWorkplane>& PartDocument::derived_workplanes() const noexcept {
-  return derived_workplanes_;
-}
-
-const std::vector<Sketch>& PartDocument::sketches() const noexcept {
-  return sketches_;
-}
-
-const std::vector<Feature>& PartDocument::features() const noexcept {
-  return features_;
-}
-
-const DependencyGraph& PartDocument::dependency_graph() const noexcept {
-  return dependency_graph_;
-}
-
-const InvalidationState& PartDocument::invalidation_state() const noexcept {
-  return invalidation_state_;
-}
-
-std::size_t PartDocument::parameter_count() const noexcept {
-  return parameters_.size();
-}
-
-std::size_t PartDocument::datum_plane_count() const noexcept {
-  return datum_planes_.size();
-}
-
-std::size_t PartDocument::construction_point_count() const noexcept {
-  return construction_points_.size();
-}
-
-std::size_t PartDocument::construction_line_count() const noexcept {
-  return construction_lines_.size();
-}
-
-std::size_t PartDocument::construction_plane_count() const noexcept {
-  return construction_planes_.size();
-}
-
-std::size_t PartDocument::derived_workplane_count() const noexcept {
-  return derived_workplanes_.size();
-}
-
-std::size_t PartDocument::sketch_count() const noexcept {
-  return sketches_.size();
-}
-
-std::size_t PartDocument::feature_count() const noexcept {
-  return features_.size();
-}
+const DocumentId& PartDocument::id() const noexcept { return id_; }
+const std::string& PartDocument::name() const noexcept { return name_; }
+const std::vector<Parameter>& PartDocument::parameters() const noexcept { return parameters_; }
+const std::vector<DatumPlane>& PartDocument::datum_planes() const noexcept { return datum_planes_; }
+const std::vector<ConstructionPoint>& PartDocument::construction_points() const noexcept { return construction_points_; }
+const std::vector<ConstructionLine>& PartDocument::construction_lines() const noexcept { return construction_lines_; }
+const std::vector<ConstructionPlane>& PartDocument::construction_planes() const noexcept { return construction_planes_; }
+const std::vector<DerivedWorkplane>& PartDocument::derived_workplanes() const noexcept { return derived_workplanes_; }
+const std::vector<Sketch>& PartDocument::sketches() const noexcept { return sketches_; }
+const std::vector<Feature>& PartDocument::features() const noexcept { return features_; }
+const std::vector<ReferenceStatusRecord>& PartDocument::reference_statuses() const noexcept { return reference_statuses_; }
+const std::vector<ReferenceRemapRecord>& PartDocument::reference_remaps() const noexcept { return reference_remaps_; }
+const std::vector<SketchOriginOverrideRecord>& PartDocument::sketch_origin_overrides() const noexcept { return sketch_origin_overrides_; }
+const DependencyGraph& PartDocument::dependency_graph() const noexcept { return dependency_graph_; }
+const InvalidationState& PartDocument::invalidation_state() const noexcept { return invalidation_state_; }
+std::size_t PartDocument::parameter_count() const noexcept { return parameters_.size(); }
+std::size_t PartDocument::datum_plane_count() const noexcept { return datum_planes_.size(); }
+std::size_t PartDocument::construction_point_count() const noexcept { return construction_points_.size(); }
+std::size_t PartDocument::construction_line_count() const noexcept { return construction_lines_.size(); }
+std::size_t PartDocument::construction_plane_count() const noexcept { return construction_planes_.size(); }
+std::size_t PartDocument::derived_workplane_count() const noexcept { return derived_workplanes_.size(); }
+std::size_t PartDocument::sketch_count() const noexcept { return sketches_.size(); }
+std::size_t PartDocument::feature_count() const noexcept { return features_.size(); }
+std::size_t PartDocument::reference_status_count() const noexcept { return reference_statuses_.size(); }
+std::size_t PartDocument::reference_remap_count() const noexcept { return reference_remaps_.size(); }
+std::size_t PartDocument::sketch_origin_override_count() const noexcept { return sketch_origin_overrides_.size(); }
 
 const Parameter* PartDocument::find_parameter(ParameterId id) const noexcept {
-  for (const auto& parameter : parameters_) {
-    if (parameter.id() == id) {
-      return &parameter;
-    }
-  }
-
+  for (const auto& parameter : parameters_) if (parameter.id() == id) return &parameter;
   return nullptr;
 }
 
 const Parameter* PartDocument::find_parameter(std::string_view name) const noexcept {
-  for (const auto& parameter : parameters_) {
-    if (parameter.name() == name) {
-      return &parameter;
-    }
-  }
-
+  for (const auto& parameter : parameters_) if (parameter.name() == name) return &parameter;
   return nullptr;
 }
 
 const DatumPlane* PartDocument::find_datum_plane(DatumPlaneId id) const noexcept {
-  for (const auto& datum_plane : datum_planes_) {
-    if (datum_plane.id() == id) {
-      return &datum_plane;
-    }
-  }
-
+  for (const auto& datum_plane : datum_planes_) if (datum_plane.id() == id) return &datum_plane;
   return nullptr;
 }
 
 const ConstructionPoint* PartDocument::find_construction_point(ConstructionPointId id) const noexcept {
-  for (const auto& point : construction_points_) {
-    if (point.id() == id) {
-      return &point;
-    }
-  }
-
+  for (const auto& point : construction_points_) if (point.id() == id) return &point;
   return nullptr;
 }
 
 const ConstructionLine* PartDocument::find_construction_line(ConstructionLineId id) const noexcept {
-  for (const auto& line : construction_lines_) {
-    if (line.id() == id) {
-      return &line;
-    }
-  }
-
+  for (const auto& line : construction_lines_) if (line.id() == id) return &line;
   return nullptr;
 }
 
 const ConstructionPlane* PartDocument::find_construction_plane(ConstructionPlaneId id) const noexcept {
-  for (const auto& plane : construction_planes_) {
-    if (plane.id() == id) {
-      return &plane;
-    }
-  }
-
+  for (const auto& plane : construction_planes_) if (plane.id() == id) return &plane;
   return nullptr;
 }
 
 const DerivedWorkplane* PartDocument::find_derived_workplane(DatumPlaneId id) const noexcept {
-  for (const auto& workplane : derived_workplanes_) {
-    if (workplane.id() == id) {
-      return &workplane;
-    }
-  }
-
+  for (const auto& workplane : derived_workplanes_) if (workplane.id() == id) return &workplane;
   return nullptr;
 }
 
 const Sketch* PartDocument::find_sketch(SketchId id) const noexcept {
-  for (const auto& sketch : sketches_) {
-    if (sketch.id() == id) {
-      return &sketch;
-    }
-  }
-
+  for (const auto& sketch : sketches_) if (sketch.id() == id) return &sketch;
   return nullptr;
 }
 
 const Feature* PartDocument::find_feature(FeatureId id) const noexcept {
-  for (const auto& feature : features_) {
-    if (feature.id() == id) {
-      return &feature;
-    }
-  }
+  for (const auto& feature : features_) if (feature.id() == id) return &feature;
+  return nullptr;
+}
 
+const ReferenceStatusRecord* PartDocument::find_reference_status(ReferenceStatusId id) const noexcept {
+  for (const auto& status : reference_statuses_) if (status.id() == id) return &status;
+  return nullptr;
+}
+
+const ReferenceRemapRecord* PartDocument::find_reference_remap(ReferenceRemapId id) const noexcept {
+  for (const auto& remap : reference_remaps_) if (remap.id() == id) return &remap;
+  return nullptr;
+}
+
+const SketchOriginOverrideRecord* PartDocument::find_sketch_origin_override(SketchId id) const noexcept {
+  for (const auto& origin : sketch_origin_overrides_) if (origin.sketch() == id) return &origin;
   return nullptr;
 }
 
@@ -956,40 +993,17 @@ bool PartDocument::has_workplane_id(const DatumPlaneId& id) const noexcept {
 PartDocument::PartDocument(DocumentId id, std::string name)
     : id_(std::move(id)), name_(std::move(name)) {}
 
-bool PartDocument::has_parameter_id(const ParameterId& id) const noexcept {
-  return find_parameter(id) != nullptr;
-}
-
-bool PartDocument::has_parameter_name(std::string_view name) const noexcept {
-  return find_parameter(name) != nullptr;
-}
-
-bool PartDocument::has_datum_plane_id(const DatumPlaneId& id) const noexcept {
-  return find_datum_plane(id) != nullptr;
-}
-
-bool PartDocument::has_construction_point_id(const ConstructionPointId& id) const noexcept {
-  return find_construction_point(id) != nullptr;
-}
-
-bool PartDocument::has_construction_line_id(const ConstructionLineId& id) const noexcept {
-  return find_construction_line(id) != nullptr;
-}
-
-bool PartDocument::has_construction_plane_id(const ConstructionPlaneId& id) const noexcept {
-  return find_construction_plane(id) != nullptr;
-}
-
-bool PartDocument::has_derived_workplane_id(const DatumPlaneId& id) const noexcept {
-  return find_derived_workplane(id) != nullptr;
-}
-
-bool PartDocument::has_sketch_id(const SketchId& id) const noexcept {
-  return find_sketch(id) != nullptr;
-}
-
-bool PartDocument::has_feature_id(const FeatureId& id) const noexcept {
-  return find_feature(id) != nullptr;
-}
+bool PartDocument::has_parameter_id(const ParameterId& id) const noexcept { return find_parameter(id) != nullptr; }
+bool PartDocument::has_parameter_name(std::string_view name) const noexcept { return find_parameter(name) != nullptr; }
+bool PartDocument::has_datum_plane_id(const DatumPlaneId& id) const noexcept { return find_datum_plane(id) != nullptr; }
+bool PartDocument::has_construction_point_id(const ConstructionPointId& id) const noexcept { return find_construction_point(id) != nullptr; }
+bool PartDocument::has_construction_line_id(const ConstructionLineId& id) const noexcept { return find_construction_line(id) != nullptr; }
+bool PartDocument::has_construction_plane_id(const ConstructionPlaneId& id) const noexcept { return find_construction_plane(id) != nullptr; }
+bool PartDocument::has_derived_workplane_id(const DatumPlaneId& id) const noexcept { return find_derived_workplane(id) != nullptr; }
+bool PartDocument::has_sketch_id(const SketchId& id) const noexcept { return find_sketch(id) != nullptr; }
+bool PartDocument::has_feature_id(const FeatureId& id) const noexcept { return find_feature(id) != nullptr; }
+bool PartDocument::has_reference_status_id(const ReferenceStatusId& id) const noexcept { return find_reference_status(id) != nullptr; }
+bool PartDocument::has_reference_remap_id(const ReferenceRemapId& id) const noexcept { return find_reference_remap(id) != nullptr; }
+bool PartDocument::has_sketch_origin_override_id(const SketchId& id) const noexcept { return find_sketch_origin_override(id) != nullptr; }
 
 } // namespace blcad
