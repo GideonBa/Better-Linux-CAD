@@ -1,5 +1,6 @@
 #include "blcad/core/sketch.hpp"
 
+#include <algorithm>
 #include <optional>
 #include <string>
 #include <utility>
@@ -356,6 +357,36 @@ Result<std::size_t> Sketch::add_dimension(SketchDrivingDimension dimension) {
   if (second.has_error()) return Result<std::size_t>::failure(second.error());
   driving_dimensions_.push_back(std::move(dimension));
   return Result<std::size_t>::success(driving_dimensions_.size() - 1U);
+}
+
+Result<std::size_t> Sketch::remove_geometric_constraint(SketchConstraintId id) {
+  const auto previous_size = geometric_constraints_.size();
+  geometric_constraints_.erase(std::remove_if(geometric_constraints_.begin(), geometric_constraints_.end(),
+                                              [&id](const SketchGeometricConstraint& constraint) {
+                                                return constraint.id() == id;
+                                              }),
+                               geometric_constraints_.end());
+  const auto removed = previous_size - geometric_constraints_.size();
+  if (removed == 0U) {
+    return Result<std::size_t>::failure(
+        validation_error(id.value(), "sketch geometric constraint must exist before removal"));
+  }
+  return Result<std::size_t>::success(removed);
+}
+
+Result<std::size_t> Sketch::remove_driving_dimension(SketchDimensionId id) {
+  const auto previous_size = driving_dimensions_.size();
+  driving_dimensions_.erase(std::remove_if(driving_dimensions_.begin(), driving_dimensions_.end(),
+                                           [&id](const SketchDrivingDimension& dimension) {
+                                             return dimension.id() == id;
+                                           }),
+                            driving_dimensions_.end());
+  const auto removed = previous_size - driving_dimensions_.size();
+  if (removed == 0U) {
+    return Result<std::size_t>::failure(
+        validation_error(id.value(), "sketch driving dimension must exist before removal"));
+  }
+  return Result<std::size_t>::success(removed);
 }
 
 bool Sketch::has_dimension_id(const SketchDimensionId& id) const noexcept {
