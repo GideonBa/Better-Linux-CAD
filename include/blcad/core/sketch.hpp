@@ -65,6 +65,13 @@ enum class SketchDrivingDimensionKind {
 
 [[nodiscard]] std::string_view to_string(SketchDrivingDimensionKind kind) noexcept;
 
+enum class SketchTrimExtendOperationKind {
+  Trim,
+  Extend,
+};
+
+[[nodiscard]] std::string_view to_string(SketchTrimExtendOperationKind kind) noexcept;
+
 class SketchReferenceTarget {
 public:
   [[nodiscard]] static Result<SketchReferenceTarget> create_line_segment(SketchEntityId entity);
@@ -266,6 +273,47 @@ private:
   Point2 end_;
 };
 
+class ArcSegment {
+public:
+  [[nodiscard]] static Result<ArcSegment> create_three_point(SketchEntityId id, Point2 start,
+                                                             Point2 mid, Point2 end);
+
+  [[nodiscard]] const SketchEntityId& id() const noexcept;
+  [[nodiscard]] Point2 start() const noexcept;
+  [[nodiscard]] Point2 mid() const noexcept;
+  [[nodiscard]] Point2 end() const noexcept;
+
+private:
+  ArcSegment(SketchEntityId id, Point2 start, Point2 mid, Point2 end);
+
+  SketchEntityId id_;
+  Point2 start_;
+  Point2 mid_;
+  Point2 end_;
+};
+
+class SketchTrimExtendOperation {
+public:
+  [[nodiscard]] static Result<SketchTrimExtendOperation> create_trim(
+      SketchTrimOperationId id, SketchEntityId target_entity, Point2 replacement_endpoint);
+  [[nodiscard]] static Result<SketchTrimExtendOperation> create_extend(
+      SketchTrimOperationId id, SketchEntityId target_entity, Point2 replacement_endpoint);
+
+  [[nodiscard]] const SketchTrimOperationId& id() const noexcept;
+  [[nodiscard]] SketchTrimExtendOperationKind kind() const noexcept;
+  [[nodiscard]] const SketchEntityId& target_entity() const noexcept;
+  [[nodiscard]] Point2 replacement_endpoint() const noexcept;
+
+private:
+  SketchTrimExtendOperation(SketchTrimOperationId id, SketchTrimExtendOperationKind kind,
+                            SketchEntityId target_entity, Point2 replacement_endpoint);
+
+  SketchTrimOperationId id_;
+  SketchTrimExtendOperationKind kind_;
+  SketchEntityId target_entity_;
+  Point2 replacement_endpoint_;
+};
+
 class RectangleProfile {
 public:
   [[nodiscard]] static Result<RectangleProfile> create(ProfileId id, ParameterId width_parameter,
@@ -319,6 +367,21 @@ private:
   std::vector<SketchEntityId> line_segments_;
 };
 
+class ArcClosedProfile {
+public:
+  [[nodiscard]] static Result<ArcClosedProfile> create(ProfileId id,
+                                                       std::vector<SketchEntityId> curve_segments);
+
+  [[nodiscard]] const ProfileId& id() const noexcept;
+  [[nodiscard]] const std::vector<SketchEntityId>& curve_segments() const noexcept;
+
+private:
+  ArcClosedProfile(ProfileId id, std::vector<SketchEntityId> curve_segments);
+
+  ProfileId id_;
+  std::vector<SketchEntityId> curve_segments_;
+};
+
 class CompositeClosedProfile {
 public:
   [[nodiscard]] static Result<CompositeClosedProfile> create(
@@ -343,46 +406,57 @@ public:
   [[nodiscard]] static Result<Sketch> create(SketchId id, std::string name, DatumPlaneId workplane);
 
   [[nodiscard]] Result<std::size_t> add_entity(LineSegment line_segment);
+  [[nodiscard]] Result<std::size_t> add_entity(ArcSegment arc_segment);
   [[nodiscard]] Result<std::size_t> add_reference(ProjectedSketchPoint point_reference);
   [[nodiscard]] Result<std::size_t> add_reference(ProjectedSketchLine line_reference);
   [[nodiscard]] Result<std::size_t> add_reference(ReferenceGeneratedLine line_reference);
   [[nodiscard]] Result<std::size_t> add_constraint(SketchConstraint constraint);
   [[nodiscard]] Result<std::size_t> add_constraint(SketchGeometricConstraint constraint);
   [[nodiscard]] Result<std::size_t> add_dimension(SketchDrivingDimension dimension);
+  [[nodiscard]] Result<std::size_t> add_trim_extend_operation(SketchTrimExtendOperation operation);
   [[nodiscard]] Result<std::size_t> add_profile(RectangleProfile profile);
   [[nodiscard]] Result<std::size_t> add_profile(CircleProfile profile);
   [[nodiscard]] Result<std::size_t> add_profile(ClosedProfile profile);
+  [[nodiscard]] Result<std::size_t> add_profile(ArcClosedProfile profile);
   [[nodiscard]] Result<std::size_t> add_profile(CompositeClosedProfile profile);
 
   [[nodiscard]] const SketchId& id() const noexcept;
   [[nodiscard]] const std::string& name() const noexcept;
   [[nodiscard]] const DatumPlaneId& workplane() const noexcept;
   [[nodiscard]] const std::vector<LineSegment>& line_segments() const noexcept;
+  [[nodiscard]] const std::vector<ArcSegment>& arc_segments() const noexcept;
   [[nodiscard]] const std::vector<ProjectedSketchPoint>& projected_points() const noexcept;
   [[nodiscard]] const std::vector<ProjectedSketchLine>& projected_lines() const noexcept;
   [[nodiscard]] const std::vector<ReferenceGeneratedLine>& reference_generated_lines() const noexcept;
   [[nodiscard]] const std::vector<SketchConstraint>& constraints() const noexcept;
   [[nodiscard]] const std::vector<SketchGeometricConstraint>& geometric_constraints() const noexcept;
   [[nodiscard]] const std::vector<SketchDrivingDimension>& driving_dimensions() const noexcept;
+  [[nodiscard]] const std::vector<SketchTrimExtendOperation>& trim_extend_operations() const noexcept;
   [[nodiscard]] const std::vector<RectangleProfile>& rectangle_profiles() const noexcept;
   [[nodiscard]] const std::vector<CircleProfile>& circle_profiles() const noexcept;
   [[nodiscard]] const std::vector<ClosedProfile>& closed_profiles() const noexcept;
+  [[nodiscard]] const std::vector<ArcClosedProfile>& arc_closed_profiles() const noexcept;
   [[nodiscard]] const std::vector<CompositeClosedProfile>& composite_closed_profiles() const noexcept;
   [[nodiscard]] std::size_t profile_count() const noexcept;
 
   [[nodiscard]] const LineSegment* find_line_segment(SketchEntityId id) const noexcept;
+  [[nodiscard]] const ArcSegment* find_arc_segment(SketchEntityId id) const noexcept;
   [[nodiscard]] const ProjectedSketchPoint* find_projected_point(SketchEntityId id) const noexcept;
   [[nodiscard]] const ProjectedSketchLine* find_projected_line(SketchEntityId id) const noexcept;
   [[nodiscard]] const ReferenceGeneratedLine* find_reference_generated_line(SketchEntityId id) const noexcept;
   [[nodiscard]] const SketchConstraint* find_constraint(SketchConstraintId id) const noexcept;
   [[nodiscard]] const SketchGeometricConstraint* find_geometric_constraint(SketchConstraintId id) const noexcept;
   [[nodiscard]] const SketchDrivingDimension* find_driving_dimension(SketchDimensionId id) const noexcept;
+  [[nodiscard]] const SketchTrimExtendOperation* find_trim_extend_operation(SketchTrimOperationId id) const noexcept;
   [[nodiscard]] const RectangleProfile* find_rectangle_profile(ProfileId id) const noexcept;
   [[nodiscard]] const CircleProfile* find_circle_profile(ProfileId id) const noexcept;
   [[nodiscard]] const ClosedProfile* find_closed_profile(ProfileId id) const noexcept;
+  [[nodiscard]] const ArcClosedProfile* find_arc_closed_profile(ProfileId id) const noexcept;
   [[nodiscard]] const CompositeClosedProfile* find_composite_closed_profile(ProfileId id) const noexcept;
   [[nodiscard]] Result<std::vector<Point2>> closed_profile_vertices(
       const ClosedProfile& profile) const;
+  [[nodiscard]] Result<std::vector<Point2>> arc_closed_profile_vertices(
+      const ArcClosedProfile& profile) const;
 
 private:
   Sketch(SketchId id, std::string name, DatumPlaneId workplane);
@@ -399,6 +473,8 @@ private:
       const SketchReferenceTarget& target, const std::string& object_id) const;
   [[nodiscard]] Result<std::vector<Point2>> validate_closed_profile(
       const ClosedProfile& profile) const;
+  [[nodiscard]] Result<std::vector<Point2>> validate_arc_closed_profile(
+      const ArcClosedProfile& profile) const;
   [[nodiscard]] Result<std::size_t> validate_composite_closed_profile(
       const CompositeClosedProfile& profile) const;
 
@@ -406,15 +482,18 @@ private:
   std::string name_;
   DatumPlaneId workplane_;
   std::vector<LineSegment> line_segments_;
+  std::vector<ArcSegment> arc_segments_;
   std::vector<ProjectedSketchPoint> projected_points_;
   std::vector<ProjectedSketchLine> projected_lines_;
   std::vector<ReferenceGeneratedLine> reference_generated_lines_;
   std::vector<SketchConstraint> constraints_;
   std::vector<SketchGeometricConstraint> geometric_constraints_;
   std::vector<SketchDrivingDimension> driving_dimensions_;
+  std::vector<SketchTrimExtendOperation> trim_extend_operations_;
   std::vector<RectangleProfile> rectangle_profiles_;
   std::vector<CircleProfile> circle_profiles_;
   std::vector<ClosedProfile> closed_profiles_;
+  std::vector<ArcClosedProfile> arc_closed_profiles_;
   std::vector<CompositeClosedProfile> composite_closed_profiles_;
 };
 
