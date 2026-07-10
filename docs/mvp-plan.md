@@ -72,8 +72,6 @@ Still not implemented in this block:
 - arcs
 - splines
 - trimmed curves
-- multiple contours in one feature
-- inner holes in the same profile
 - full sketch constraint solver
 - GUI sketch editing
 
@@ -252,26 +250,51 @@ Implemented scope:
 Still not implemented in this block:
 
 - multiple regions
-- inner loops and holes
 - nested contours
 - trim/extend
 - arcs, splines, 3D sketches, sweep, loft, and surfacing
 - full sketch solving or GUI region selection
 
-## Next MVP: Multi-contour profiles and holes seed
+## Implemented block: Multi-contour profiles and holes seed
 
 Goal: allow one profile operation to consume an outer contour plus one or more inner contours for holes, while keeping contour selection explicit and deterministic.
 
+Detailed document: `docs/composite-closed-profile-holes-mvp.md`
+
+Implemented scope:
+
+- `CompositeClosedProfile` model-intent record with one ordered outer contour and ordered inner contours
+- core validation for non-empty ids, at least one inner contour, contour sizes, duplicate line ids, and shared line ids across contours
+- sketch-level validation that each contour is an ordered, connected, non-self-intersecting closed loop
+- geometry validation that inner contours lie strictly inside the outer contour
+- geometry validation that inner contours do not intersect the outer contour or each other
+- `ClosedProfileAdapter` support for OCCT faces with inner wires
+- additive extrude recompute from one composite closed profile with a hole
+- subtractive through-all cut recompute from one composite closed profile with a hole
+- core tests for composite contour intent and validation
+- geometry tests for additive and subtractive recompute from composite profiles
+
+Still not implemented in this block:
+
+- automatic multi-region selection
+- trim/extend
+- arcs and splines
+- GUI profile picking
+- full sketch constraint solving
+- 3D sketches, sweep, loft, and surfacing
+
+## Next MVP: Arc and trim/extend sketch profile seed
+
+Goal: support first non-linear 2D sketch contours by adding circular arcs and explicit trim/extend endpoint intent.
+
 Proposed first implementation sequence:
 
-- add a `CompositeClosedProfile` or equivalent model-intent record with one outer contour and ordered inner contours
-- allow each contour to reference explicit line segments, reference-generated helper lines, or generated region candidates after deterministic resolution
-- validate contour closure, non-self-intersection, and no overlap between inner contours
-- validate that each inner contour lies strictly inside the outer contour
-- persist composite profile intent to JSON without storing solved BRep or region-search caches
-- extend closed-profile OCCT adapter to create faces with inner wires
-- add additive extrude and subtractive cut tests for one outer contour with one inner hole
-- keep automatic multi-region selection, trim/extend, arcs, splines, GUI profile picking, 3D sketches, sweep, loft, and surfacing deferred
+- add a sketch arc entity with stable IDs, center/radius or three-point construction, and deterministic JSON intent
+- add contour validation that supports ordered line/arc loops without converting arcs to raw tessellation as model intent
+- extend the geometry adapter to build OCCT wires containing line and circular-arc edges
+- add trim/extend metadata for line/arc endpoints as explicit model intent, not as GUI-only state
+- add additive extrude and subtractive cut tests for one profile containing a circular arc
+- keep splines, tangent constraint solving, automatic fillets, full GUI editing, 3D sketches, sweep, loft, surface stitching, and closed-shell-to-solid conversion deferred
 
 ## Future roadmap: Inventor-like sketcher and sketch-driven features
 
