@@ -59,3 +59,20 @@ TEST_CASE("Sketch validates ordered line and arc closed profiles", "[core][sketc
   REQUIRE(vertices);
   CHECK(vertices.value().size() == 4U);
 }
+
+TEST_CASE("Sketch rejects self-intersecting line and arc closed profiles", "[core][sketch][arc]") {
+  auto sketch = Sketch::create(SketchId("sketch.arc.cross"), "ArcCross", DatumPlaneId("datum.xy"));
+  REQUIRE(sketch);
+  add_line(sketch.value(), "line.bottom", Point2{0.0, 0.0}, Point2{10.0, 0.0});
+  add_line(sketch.value(), "line.right", Point2{10.0, 0.0}, Point2{10.0, 10.0});
+  add_arc(sketch.value(), "arc.crossing", Point2{10.0, 10.0}, Point2{5.0, -5.0}, Point2{0.0, 10.0});
+  add_line(sketch.value(), "line.left", Point2{0.0, 10.0}, Point2{0.0, 0.0});
+
+  auto profile = ArcClosedProfile::create(
+      ProfileId("profile.crossing"), {SketchEntityId("line.bottom"), SketchEntityId("line.right"),
+                                       SketchEntityId("arc.crossing"), SketchEntityId("line.left")});
+  REQUIRE(profile);
+  auto added = sketch.value().add_profile(profile.value());
+  REQUIRE_FALSE(added);
+  CHECK(added.error().message() == "arc closed profile curve segments must not self-intersect");
+}
