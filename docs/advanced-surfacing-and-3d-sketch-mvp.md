@@ -17,8 +17,10 @@ Target use cases include:
 - transitions between two or more pipes
 - organic fairings
 - bodies defined by multiple cross sections
+- path-following extrudes and cuts where a profile follows a connected route
+- lofts through two or more arbitrarily oriented sketch planes
 
-This requires more than planar 2D sketches and simple extrudes.
+This requires more than planar 2D sketches and simple straight extrudes.
 
 ## Required capabilities
 
@@ -29,14 +31,16 @@ BLCAD should eventually support:
 - 3D polylines
 - 3D splines
 - 3D guide curves
+- reusable connected `PathCurve` records
 - connecting points from different sketches on different planes with a spline
 - curves whose control points come from multiple sketches or construction points
 - surfaces generated from arbitrary spatial curves
 - surfaces generated between two or more sketches
-- surfaces generated between many parallel sketches
+- surfaces generated between many non-parallel or arbitrarily oriented sketches
 - sweep-style features along lines, polylines, arcs, or splines
-- loft-style features between profile sketches
-- guide-curve lofts where a spline controls the transition between profiles
+- extrude-style features that optionally follow a connected path curve
+- loft-style features between two or more profile sketches
+- path- or guide-controlled lofts where a connected path/rail controls transition flow
 - smooth multi-section lofts with tangent or curvature continuity through intermediate profiles
 - surface filling from boundary curves
 - surface stitching / knitting from multiple faces
@@ -54,6 +58,7 @@ SketchLine3D
 SketchPolyline3D
 SketchSpline3D
 SketchGuideCurve3D
+PathCurve
 ```
 
 A 3D spline should be able to reference:
@@ -74,6 +79,30 @@ sketch.airfoil_tip.point.leading_edge
 ```
 
 This lets a user define several sketches on different planes and connect corresponding points with smooth 3D guide splines.
+
+## Path curves
+
+A `PathCurve` should represent a connected route composed from multiple semantic curve segments.
+
+Target model:
+
+```text
+PathCurve
+  id
+  segments[]
+    sketch line / sketch arc / sketch spline / projected curve / construction line / 3D sketch curve / semantic edge
+  closure = open | closed
+  orientation_rule = profile_normal | minimum_twist | fixed_up_vector | guide_curve_later
+```
+
+Rules:
+
+- path segments must be ordered and connected within tolerance
+- branches are rejected in the first implementation
+- self-intersection may be rejected in the first implementation
+- path segments are semantic references, not raw OCCT edges
+- the orientation rule must be explicit before profile-swept geometry is generated
+- the same `PathCurve` concept should be reusable by sweep, path-extrude, path-cut, loft, and surface features
 
 ## Multi-sketch lofting
 
@@ -104,6 +133,8 @@ profile[0], profile[1], ..., profile[n]
   -> smooth loft
 ```
 
+For arbitrarily oriented sketches, every section must be resolved through its own workplane frame and mapped into model space before lofting.
+
 If there are three sketches, the middle sketch should act as an intermediate section that shapes the transition. The transition through the middle sketch should be smooth when requested and should not force an unwanted hard edge at the middle section.
 
 The continuity mode should eventually be explicit:
@@ -116,9 +147,9 @@ G2 = curvature continuity, smoother surface flow
 
 The first implementation may start with simpler C0 or G1 behavior, but the model intent should leave room for explicit continuity settings later.
 
-## Guide curves
+## Guide curves and path-controlled lofts
 
-Lofting should eventually accept guide curves.
+Lofting should eventually accept guide curves and optional path curves.
 
 Example:
 
@@ -139,8 +170,20 @@ Guide curves may come from:
 - splines connecting points from multiple planar sketches
 - construction points and construction lines
 - semantic edge references in later stages
+- connected `PathCurve` chains
 
-## Sweep features
+A future path-controlled loft should accept:
+
+```text
+LoftFeature
+  sections[]
+  path_curve optional
+  guide_curves[] optional
+```
+
+This supports duct/pipe transitions where the section profiles are distributed along a route instead of only linearly interpolated.
+
+## Sweep and path-following extrude features
 
 A sweep feature should move a profile along a path.
 
@@ -148,7 +191,7 @@ Target path:
 
 ```text
 profile sketch
-path line / polyline / arc / spline
+path line / polyline / arc / spline / connected PathCurve
   -> SweepSolid / SweepSurface
 ```
 
@@ -158,6 +201,7 @@ Required sweep paths include:
 - 3D sketch lines
 - 3D polylines
 - 3D splines
+- connected line/arc/spline path curves
 - later, semantic edges or projected curves
 
 Sweep should support at least:
@@ -168,7 +212,22 @@ Sweep should support at least:
 - optional twist control
 - optional guide or rail curves in later stages
 
-This covers features such as pipes, hoses, ribs, blade edges, and swept transitions.
+Extrude and extruded cut should also be able to use a path-following mode:
+
+```text
+AdditiveExtrude
+  input_profile
+  direction_mode = sketch_normal | opposite_sketch_normal | vector | path
+  path_curve = optional PathCurveId
+
+SubtractiveExtrude
+  input_profile
+  target_body
+  direction_mode = sketch_normal | opposite_sketch_normal | vector | path
+  path_curve = optional PathCurveId
+```
+
+This covers features such as pipes, hoses, ribs, blade edges, swept transitions, and extruded cuts following a routed path.
 
 ## Surface generation from spatial curves
 
@@ -199,6 +258,7 @@ Supported inputs should eventually include:
 - projected curves
 - construction geometry
 - generated semantic edges in later stages
+- connected `PathCurve` records
 
 ## Surface-to-solid conversion
 
@@ -244,8 +304,13 @@ SketchPoint3D
 SketchCurve3D
 SketchSpline3D
 GuideCurve
+PathCurve
+PathSegmentReference
+ProfileSectionReference
 LoftFeature
 SweepFeature
+PathExtrudeFeature
+PathCutFeature
 BoundarySurfaceFeature
 FillSurfaceFeature
 SurfaceStitchFeature
@@ -280,17 +345,20 @@ This is a large feature family and should be built in stages.
 3. Allow a 3D spline to reference points from multiple sketches on different planes.
 4. Add JSON serialization and roundtrip tests for 3D sketch curves.
 5. Add geometry-layer conversion from 3D curves to OCCT edge/wire representations.
-6. Add a simple sweep along a straight construction line.
-7. Add sweep along a 3D polyline or spline path.
-8. Add a simple loft between two closed planar profile sketches.
-9. Add multi-section loft through three or more profiles.
-10. Add explicit continuity settings so intermediate sketches can be smooth transition controls instead of hard section edges.
-11. Add guide-curve lofts using one or more 3D splines.
-12. Add surface generation from boundary curves.
-13. Add surface stitching / knitting for multiple generated surfaces.
-14. Add closed-shell validation and conversion to a solid.
-15. Add tests using airfoil-like or blade-like section sketches.
-16. Add tests for pipe-to-pipe transition lofts.
+6. Add reusable `PathCurve` records for connected line/arc/spline chains.
+7. Add a simple sweep along a straight construction line.
+8. Add sweep along a 3D polyline or spline path.
+9. Add path-following extrude and extruded cut along a connected path curve.
+10. Add a simple loft between two closed planar profile sketches.
+11. Add loft support for non-parallel or arbitrarily oriented sketch planes.
+12. Add multi-section loft through three or more profiles.
+13. Add explicit continuity settings so intermediate sketches can be smooth transition controls instead of hard section edges.
+14. Add guide-curve and path-controlled lofts using one or more 3D splines or `PathCurve` records.
+15. Add surface generation from boundary curves.
+16. Add surface stitching / knitting for multiple generated surfaces.
+17. Add closed-shell validation and conversion to a solid.
+18. Add tests using airfoil-like or blade-like section sketches.
+19. Add tests for pipe-to-pipe transition lofts.
 
 ## First useful acceptance tests
 
@@ -298,12 +366,16 @@ A minimal implementation path should eventually prove:
 
 - a 3D spline can connect points from three sketches on three different planes
 - the 3D spline survives JSON roundtrip
+- a connected `PathCurve` can be composed from several line/arc/spline segments
 - a sweep can create a solid along a straight construction line
 - a sweep can create a solid along a 3D spline path
+- an extrude can create a solid along a connected path curve
+- an extruded cut can remove material along a connected path curve
 - a loft can create a body between two closed profile sketches
-- a multi-section loft can use three parallel profile sketches
+- a loft can create a body between two profile sketches on non-parallel planes
+- a multi-section loft can use three or more profile sketches
 - a middle profile can control a smooth transition without creating an unwanted hard edge when smooth continuity is requested
-- guide splines can influence a loft between root, mid, and tip profiles
+- guide splines or a path curve can influence a loft between root, mid, and tip profiles
 - several generated surfaces can be stitched into a shell
 - a closed stitched shell can be converted into a solid
 - a non-closed surface set is rejected with a clear validation error
@@ -324,6 +396,7 @@ Out of scope for the first surfacing increment:
 - CFD-specific blade design tools
 - GUI control cages
 - assembly-level surfacing
+- body-level transforms and body booleans, which are tracked separately in `docs/multi-body-transform-and-path-features-roadmap.md`
 
 ## Relationship to other roadmap blocks
 
@@ -333,6 +406,9 @@ This block depends on earlier foundations:
 Construction geometry answers: where can sketches and curves be placed?
 General closed sketch profiles answer: what planar profile can be used?
 3D sketch and surfacing answers: how can spatial curves, multiple profiles, and surfaces form freeform geometry?
+Multi-body transforms answer: how can generated bodies be moved, combined, and kept associated with owning sketches?
 ```
 
 This block should not replace simpler extrude/cut features. Simple features remain important fast paths. Advanced surfacing is a later layer for forms that cannot be expressed cleanly by planar extrudes alone.
+
+The multi-body, body-transform, body-boolean, and path-feature target is documented in `docs/multi-body-transform-and-path-features-roadmap.md`.
