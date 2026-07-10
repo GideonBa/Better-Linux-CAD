@@ -17,11 +17,13 @@ std::string_view to_string(FeatureType type) noexcept {
 
 std::string_view to_string(ExtrudeDirection direction) noexcept {
   switch (direction) {
-  case ExtrudeDirection::PositiveZ:
-    return "+Z";
+  case ExtrudeDirection::SketchNormal:
+    return "sketch_normal";
+  case ExtrudeDirection::OppositeSketchNormal:
+    return "opposite_sketch_normal";
   }
 
-  return "+Z";
+  return "sketch_normal";
 }
 
 std::string_view to_string(SubtractiveExtrudeDepth depth) noexcept {
