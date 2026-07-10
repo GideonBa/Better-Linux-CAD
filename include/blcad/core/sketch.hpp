@@ -253,6 +253,8 @@ public:
   [[nodiscard]] Result<std::size_t> add_constraint(SketchConstraint constraint);
   [[nodiscard]] Result<std::size_t> add_constraint(SketchGeometricConstraint constraint);
   [[nodiscard]] Result<std::size_t> add_dimension(SketchDrivingDimension dimension);
+  [[nodiscard]] Result<std::size_t> remove_geometric_constraint(SketchConstraintId id);
+  [[nodiscard]] Result<std::size_t> remove_driving_dimension(SketchDimensionId id);
   [[nodiscard]] Result<std::size_t> add_trim_extend_operation(SketchTrimExtendOperation operation);
   [[nodiscard]] Result<std::size_t> add_tangent_continuity(SketchTangentContinuity continuity);
   [[nodiscard]] Result<std::size_t> add_profile(RectangleProfile profile);
