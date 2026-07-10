@@ -1,6 +1,7 @@
 #include "blcad/core/sketch_repair_undo_stack_summary.hpp"
 
 #include "blcad/core/sketch_repair_command_labels.hpp"
+#include "blcad/core/sketch_repair_presentation_metadata.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -46,6 +47,13 @@ using json = nlohmann::json;
   json values = json::array();
   for (const auto& id : ids) values.push_back(id.value());
   return values;
+}
+
+[[nodiscard]] json affected_counts_to_json(const SketchRepairAffectedCounts& counts) {
+  return json{{"added_constraints", counts.added_constraints()},
+              {"removed_constraints", counts.removed_constraints()},
+              {"removed_dimensions", counts.removed_dimensions()},
+              {"total", counts.total()}};
 }
 
 } // namespace
@@ -115,9 +123,11 @@ SketchRepairUndoStackSummary SketchRepairUndoStackSummarizer::summarize(
 Result<std::string> serialize_sketch_repair_undo_stack_summary_to_json(
     const SketchRepairUndoStackSummary& summary) {
   const SketchRepairCommandLabeler labeler;
+  const SketchRepairPresentationMetadataProvider metadata_provider;
   json entries = json::array();
   for (const auto& entry : summary.entries()) {
     const auto label = labeler.label_for(entry);
+    const auto metadata = metadata_provider.metadata_for(entry);
     entries.push_back(json{{"index", entry.index()},
                            {"latest", entry.latest()},
                            {"transaction_status", std::string(to_string(entry.transaction_status()))},
@@ -126,6 +136,11 @@ Result<std::string> serialize_sketch_repair_undo_stack_summary_to_json(
                            {"undoable", entry.undoable()},
                            {"title", label.title()},
                            {"description", label.description()},
+                           {"label_id", metadata.label_id()},
+                           {"display_category", std::string(to_string(metadata.category()))},
+                           {"display_priority", std::string(to_string(metadata.priority()))},
+                           {"affected_counts", affected_counts_to_json(metadata.affected_counts())},
+                           {"affected_summary", metadata.affected_summary()},
                            {"added_constraint_ids", constraint_ids_to_json(entry.added_constraint_ids())},
                            {"removed_constraint_ids", constraint_ids_to_json(entry.removed_constraint_ids())},
                            {"removed_dimension_ids", dimension_ids_to_json(entry.removed_dimension_ids())}});
