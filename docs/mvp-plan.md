@@ -253,25 +253,51 @@ Still not implemented in this block:
 
 - full constraint solving
 - exact degrees-of-freedom counting
-- automatic repair
+- automatic repair application
 - GUI highlighting
 - spline-handle solving
 - parametric solve iteration
 
-## Next MVP: Sketch repair suggestion seed
+## Implemented block: Sketch repair suggestion seed
 
 Goal: convert diagnostics into explicit non-mutating repair suggestions so the UI or CLI can show candidate actions without changing the model automatically.
 
+Detailed document: `docs/sketch-repair-suggestions-mvp.md`
+
+Implemented scope:
+
+- `SketchRepairSuggestionAction`
+- `SketchRepairSuggestion`
+- `SketchRepairSuggestionReport`
+- `SketchRepairSuggester::suggest` as a pure report generator that consumes `SketchDiagnosticReport`
+- deterministic suggestion mapping for unconstrained endpoints, horizontal/vertical conflicts, duplicate fixed endpoints, duplicate driving dimensions, and undimensioned profile sketches
+- links from each suggestion to the originating diagnostic kind and target
+- debug JSON output through `serialize_sketch_repair_suggestion_report_to_json`
+- core tests for deterministic suggestions and debug JSON reports
+
+Still not implemented in this block:
+
+- automatic application
+- GUI editing workflows
+- full solve iteration
+- exact DOF counting
+- spline-handle solving
+- automatic parameter creation
+- model rewriting
+
+## Next MVP: Sketch repair application command seed
+
+Goal: allow selected safe repair suggestions to be applied explicitly through commands without running automatic repairs during diagnostics or suggestion generation.
+
 Proposed first implementation sequence:
 
-- add a `SketchRepairSuggestion` report type linked to diagnostic kinds and targets
-- suggest fixed endpoint constraints for unconstrained line endpoints
-- suggest removing one side of a horizontal/vertical contradiction
-- suggest removing duplicate fixed endpoint constraints and duplicate driving dimensions
-- suggest adding a driving dimension to profile sketches with no dimension intent
-- serialize suggestion reports as debug/output artifacts only, not as `.blcad.json` model intent
-- add core tests that suggestions are deterministic and reference the originating diagnostics
-- keep automatic application, GUI editing workflows, full solve iteration, exact DOF counting, spline-handle solving, and model rewriting deferred
+- add a `SketchRepairCommand` or equivalent explicit command type referencing one selected `SketchRepairSuggestion`
+- support applying only the safest first command subset: remove duplicate fixed endpoint constraints, remove duplicate driving dimensions, and add fixed endpoint constraints with generated deterministic IDs
+- require caller intent: commands must be invoked explicitly and must never run automatically during diagnostics or repair suggestion generation
+- return a structured command result with changed IDs and skipped/unsupported suggestions
+- keep adding driving dimensions as a suggestion-only action until parameter creation and UI value selection exist
+- add core tests that applying a selected safe suggestion mutates only the intended sketch records
+- keep full solve iteration, exact DOF counting, spline-handle solving, automatic parameter creation, GUI workflows, and arbitrary model rewriting deferred
 
 ## Future roadmap: Multi-body transforms and path features
 
