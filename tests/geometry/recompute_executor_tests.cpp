@@ -224,7 +224,7 @@ TEST_CASE("GeometryRecomputeExecutor rejects unsupported additive sketches",
   CHECK(executed.error().category() == ErrorCategory::Validation);
   CHECK(executed.error().object_id() == "sketch.base");
   CHECK(executed.error().message() ==
-        "additive extrude requires exactly one rectangle, closed profile, or detected simple region");
+        "additive extrude requires exactly one rectangle, closed profile, composite closed profile, or detected simple region");
   CHECK(cache.feature_shape_count() == 0);
   CHECK_FALSE(cache.has_final_shape());
 }
@@ -259,7 +259,6 @@ TEST_CASE("GeometryRecomputeExecutor cuts a central hole into a cached base body
 TEST_CASE("GeometryRecomputeExecutor runs additive then subtractive nodes from a plan",
           "[geometry][recompute]") {
   auto document = make_document_with_base_plate_and_hole_cut();
-  // A width change recomputes the base body and, through the target edge, the cut.
   REQUIRE(document.mark_parameter_changed(ParameterId("part.width")));
 
   auto plan = document.create_recompute_plan();
@@ -331,6 +330,6 @@ TEST_CASE("GeometryRecomputeExecutor rejects unsupported subtractive sketches",
   CHECK(executed.error().category() == ErrorCategory::Validation);
   CHECK(executed.error().object_id() == "sketch.base");
   CHECK(executed.error().message() ==
-        "subtractive extrude requires exactly one circle, closed profile, or detected simple region");
+        "subtractive extrude requires exactly one circle, closed profile, composite closed profile, or detected simple region");
   CHECK_FALSE(cache.has_final_shape());
 }
