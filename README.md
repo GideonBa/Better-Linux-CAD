@@ -6,7 +6,7 @@ Detailed architecture and feature status live in `docs/`. This README is intenti
 
 ## Status
 
-Current state: MVP-1 core skeleton plus staged MVP-2 seeds for sketches, workplanes, profile geometry, recompute, STEP export, reference recovery, sketch diagnostics, and repair-command infrastructure.
+Current state: MVP-1 core skeleton, staged MVP-2 seeds for sketches, workplanes, profile geometry, recompute, STEP export, reference recovery, sketch diagnostics, and repair-command infrastructure, the MVP-3 parametric bolt circle (count parameters and `CircularHolePattern`), and the MVP-4 seed for assembly parameters shared across parts (`AssemblyDocument` and `ParameterBinding`).
 
 There is no GUI yet.
 
@@ -52,10 +52,11 @@ cmake --build --preset dev-geometry
 blcad_export_step <input.blcad.json> <output.step>
 ```
 
-Example:
+Examples:
 
 ```bash
 ./build/dev-geometry/blcad_export_step examples/reference_plate.blcad.json build/reference_plate.step
+./build/dev-geometry/blcad_export_step examples/bolt_circle_plate.blcad.json build/bolt_circle_plate.step
 ```
 
 ## Repository structure
@@ -79,6 +80,8 @@ Start here:
 
 Implemented feature blocks:
 
+- `docs/bolt-circle-pattern-mvp3.md`
+- `docs/assembly-parameters-mvp4.md`
 - `docs/general-closed-sketch-profile-mvp.md`
 - `docs/composite-closed-profile-holes-mvp.md`
 - `docs/arc-and-trim-extend-sketch-profile-mvp.md`
@@ -111,16 +114,17 @@ Future roadmaps:
 
 ## Next technical step
 
-The next technical step should add a sketch repair presentation snapshot grouping seed.
+The sketch-repair presentation chain is frozen until a GUI or CLI consumer exists (see the frozen block in `docs/mvp-plan.md`). Development follows the numbered core-CAD MVP sequence.
 
-1. Add a `SketchRepairPresentationSnapshotGroup` and `SketchRepairPresentationSnapshotGrouping` or equivalent read-only records.
-2. Add a `SketchRepairPresentationSnapshotGroupingEngine` that consumes an unfiltered or queried snapshot and groups entries without mutating the source.
-3. Support grouping by display category and display priority.
-4. Preserve deterministic within-group ordering from the source snapshot.
-5. Expose group counts, group labels, first/latest entry metadata, and empty-group handling for CLI/GUI badges.
-6. Add debug JSON output for grouped snapshots with a distinct schema marker and grouping metadata.
-7. Keep query/filter helpers separate from grouping helpers so callers can filter first, group second.
-8. Add core tests for category grouping, priority grouping, deterministic order, empty groups, group counts, grouped latest entries, and JSON output.
-9. Keep localization, icons, GUI widgets, custom sorting, persistent history, redo, multi-sketch grouping, timestamps, parameter-creating repairs, full solve iteration, exact DOF counting, and arbitrary model rewriting deferred.
+The next technical step is a project container for the assembly and its member parts.
 
-The completed snapshot query block is documented in `docs/sketch-repair-presentation-snapshot-query-mvp.md`.
+1. Add a `Project` model owning one `AssemblyDocument` and its member `PartDocument`s.
+2. Validate that every assembly member id resolves to an owned part document.
+3. Auto-apply parameter bindings to affected member parts after an assembly parameter change.
+4. Surface per-part recompute plans from one project-level update call.
+5. Add JSON persistence for the project (embedded documents or a manifest referencing part files).
+6. Extend the headless example: load a project, update an assembly parameter, recompute, export all member parts to STEP.
+7. Add tests for membership validation, automatic propagation, per-part invalidation, JSON roundtrip, and headless export.
+8. Keep component instances and constraints out of scope (MVP 5, `docs/assembly-system.md`).
+
+The completed MVP-3 bolt circle block is documented in `docs/bolt-circle-pattern-mvp3.md`. The completed MVP-4 seed is documented in `docs/assembly-parameters-mvp4.md`.

@@ -34,9 +34,8 @@ PartDocument make_reference_recovery_document() {
   REQUIRE(rectangle);
   REQUIRE(sketch.value().add_profile(rectangle.value()));
   REQUIRE(document.value().add_sketch(sketch.value()));
-  auto feature = Feature::create_additive_extrude(FeatureId("feature.base"), "BaseExtrude",
-                                                  SketchId("sketch.base"),
-                                                  ParameterId("part.depth"));
+  auto feature = Feature::create_additive_extrude(
+      FeatureId("feature.base"), "BaseExtrude", SketchId("sketch.base"), ParameterId("part.depth"));
   REQUIRE(feature);
   REQUIRE(document.value().add_feature(feature.value()));
   return document.value();
@@ -44,21 +43,22 @@ PartDocument make_reference_recovery_document() {
 
 } // namespace
 
-TEST_CASE("ReferenceRecoveryEvaluator reports resolved and lost semantic references", "[core][recovery]") {
+TEST_CASE("ReferenceRecoveryEvaluator reports resolved and lost semantic references",
+          "[core][recovery]") {
   PartDocument document = make_reference_recovery_document();
   const ReferenceRecoveryEvaluator evaluator;
 
-  auto resolved_target = SemanticReferenceTarget::create_face(FeatureId("feature.base"),
-                                                              SemanticFace::Top);
+  auto resolved_target =
+      SemanticReferenceTarget::create_face(FeatureId("feature.base"), SemanticFace::Top);
   REQUIRE(resolved_target);
-  auto resolved = evaluator.evaluate(ReferenceStatusId("status.base_top"), document,
-                                     resolved_target.value());
+  auto resolved =
+      evaluator.evaluate(ReferenceStatusId("status.base_top"), document, resolved_target.value());
   REQUIRE(resolved);
   CHECK(resolved.value().status() == ReferenceStatusKind::Resolved);
   CHECK(resolved.value().target().node_id() == "feature.base.face.top");
 
-  auto missing_target = SemanticReferenceTarget::create_edge(FeatureId("feature.deleted"),
-                                                             SemanticEdge::TopFront);
+  auto missing_target =
+      SemanticReferenceTarget::create_edge(FeatureId("feature.deleted"), SemanticEdge::TopFront);
   REQUIRE(missing_target);
   auto lost = evaluator.evaluate(ReferenceStatusId("status.deleted_edge"), document,
                                  missing_target.value());
@@ -68,18 +68,21 @@ TEST_CASE("ReferenceRecoveryEvaluator reports resolved and lost semantic referen
         "semantic reference source is not available in the current generated topology");
 }
 
-TEST_CASE("PartDocument stores explicit reference status, remap, and sketch origin override records",
-          "[core][recovery]") {
+TEST_CASE(
+    "PartDocument stores explicit reference status, remap, and sketch origin override records",
+    "[core][recovery]") {
   PartDocument document = make_reference_recovery_document();
 
-  auto lost_target = SemanticReferenceTarget::create_face(FeatureId("feature.old"), SemanticFace::Top);
+  auto lost_target =
+      SemanticReferenceTarget::create_face(FeatureId("feature.old"), SemanticFace::Top);
   REQUIRE(lost_target);
   auto lost = ReferenceStatusRecord::create_lost(ReferenceStatusId("status.old_top"),
                                                  lost_target.value(), "source feature was removed");
   REQUIRE(lost);
   REQUIRE(document.add_reference_status(lost.value()));
 
-  auto replacement = SemanticReferenceTarget::create_face(FeatureId("feature.base"), SemanticFace::Top);
+  auto replacement =
+      SemanticReferenceTarget::create_face(FeatureId("feature.base"), SemanticFace::Top);
   REQUIRE(replacement);
   auto remap = ReferenceRemapRecord::create(ReferenceRemapId("remap.old_top_to_base_top"),
                                             lost_target.value(), replacement.value(),

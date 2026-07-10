@@ -20,8 +20,8 @@ struct ResolvedSemanticVertex {
 
 class SemanticReferenceEvaluator {
 public:
-  [[nodiscard]] Result<ResolvedSemanticEdge>
-  resolve_edge(const PartDocument& document, SemanticEdgeReference reference) const;
+  [[nodiscard]] Result<ResolvedSemanticEdge> resolve_edge(const PartDocument& document,
+                                                          SemanticEdgeReference reference) const;
 
   [[nodiscard]] Result<ResolvedSemanticVertex>
   resolve_vertex(const PartDocument& document, SemanticVertexReference reference) const;

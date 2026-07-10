@@ -34,10 +34,9 @@ SketchReferenceTarget line_end(const char* id) {
 
 const SketchRepairSuggestion* find_action(const SketchRepairSuggestionReport& report,
                                           SketchRepairSuggestionAction action) {
-  const auto found = std::find_if(report.suggestions().begin(), report.suggestions().end(),
-                                  [action](const SketchRepairSuggestion& suggestion) {
-                                    return suggestion.action() == action;
-                                  });
+  const auto found = std::find_if(
+      report.suggestions().begin(), report.suggestions().end(),
+      [action](const SketchRepairSuggestion& suggestion) { return suggestion.action() == action; });
   return found == report.suggestions().end() ? nullptr : &*found;
 }
 
@@ -109,7 +108,8 @@ TEST_CASE("Sketch repair presentation snapshot combines summary labels and metad
   const auto* fixed_suggestion = find_action(
       fixed_suggestions, SketchRepairSuggestionAction::RemoveDuplicateFixedEndpointConstraint);
   REQUIRE(fixed_suggestion != nullptr);
-  auto fixed_transaction = transaction_executor.apply(sketch.value(), SketchRepairCommand(*fixed_suggestion));
+  auto fixed_transaction =
+      transaction_executor.apply(sketch.value(), SketchRepairCommand(*fixed_suggestion));
   REQUIRE(fixed_transaction);
   REQUIRE(fixed_transaction.value().undoable());
   REQUIRE(stack.push(fixed_transaction.value()));
@@ -118,8 +118,8 @@ TEST_CASE("Sketch repair presentation snapshot combines summary labels and metad
   const auto* dimension_suggestion = find_action(
       dimension_suggestions, SketchRepairSuggestionAction::RemoveDuplicateDrivingDimension);
   REQUIRE(dimension_suggestion != nullptr);
-  auto dimension_transaction = transaction_executor.apply(sketch.value(),
-                                                          SketchRepairCommand(*dimension_suggestion));
+  auto dimension_transaction =
+      transaction_executor.apply(sketch.value(), SketchRepairCommand(*dimension_suggestion));
   REQUIRE(dimension_transaction);
   REQUIRE(dimension_transaction.value().undoable());
   REQUIRE(stack.push(dimension_transaction.value()));
@@ -131,7 +131,8 @@ TEST_CASE("Sketch repair presentation snapshot combines summary labels and metad
   REQUIRE(snapshot.entry_count() == 2U);
   REQUIRE(snapshot.latest() != nullptr);
   CHECK(snapshot.latest()->latest());
-  CHECK(snapshot.latest()->action() == SketchRepairSuggestionAction::RemoveDuplicateDrivingDimension);
+  CHECK(snapshot.latest()->action() ==
+        SketchRepairSuggestionAction::RemoveDuplicateDrivingDimension);
   CHECK(snapshot.latest()->title() == "Undo remove duplicate driving dimension");
   CHECK(snapshot.latest()->label_id() == "undo.remove_duplicate_driving_dimension");
   CHECK(snapshot.latest()->category() == SketchRepairDisplayCategory::UndoEntry);
@@ -154,6 +155,5 @@ TEST_CASE("Sketch repair presentation snapshot combines summary labels and metad
         std::string::npos);
   CHECK(json.value().find("\"label_id\": \"undo.remove_duplicate_driving_dimension\"") !=
         std::string::npos);
-  CHECK(json.value().find("\"affected_summary\": \"1 dimension removed\"") !=
-        std::string::npos);
+  CHECK(json.value().find("\"affected_summary\": \"1 dimension removed\"") != std::string::npos);
 }

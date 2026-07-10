@@ -1,0 +1,143 @@
+{
+  "schema": "blcad.part_document.mvp1",
+  "version": 1,
+  "document": {
+    "id": "part.bolt_circle_plate",
+    "name": "BoltCirclePlate"
+  },
+  "parameters": [
+    {
+      "id": "part.width",
+      "name": "width",
+      "type": "length",
+      "scope": "part",
+      "unit": "mm",
+      "value": 120.0
+    },
+    {
+      "id": "part.height",
+      "name": "height",
+      "type": "length",
+      "scope": "part",
+      "unit": "mm",
+      "value": 80.0
+    },
+    {
+      "id": "part.thickness",
+      "name": "thickness",
+      "type": "length",
+      "scope": "part",
+      "unit": "mm",
+      "value": 8.0
+    },
+    {
+      "id": "part.bolt_circle_radius",
+      "name": "bolt_circle_radius",
+      "type": "length",
+      "scope": "part",
+      "unit": "mm",
+      "value": 30.0
+    },
+    {
+      "id": "part.bolt_count",
+      "name": "bolt_count",
+      "type": "count",
+      "scope": "part",
+      "unit": "1",
+      "value": 6
+    },
+    {
+      "id": "part.bolt_hole_diameter",
+      "name": "bolt_hole_diameter",
+      "type": "length",
+      "scope": "part",
+      "unit": "mm",
+      "value": 6.6
+    }
+  ],
+  "datum_planes": [
+    {
+      "id": "datum.xy",
+      "name": "XY",
+      "kind": "xy",
+      "origin": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "x_axis": {
+        "x": 1.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "y_axis": {
+        "x": 0.0,
+        "y": 1.0,
+        "z": 0.0
+      },
+      "normal": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 1.0
+      }
+    }
+  ],
+  "sketches": [
+    {
+      "id": "sketch.base",
+      "name": "Sketch_BaseRectangle",
+      "workplane": "datum.xy",
+      "rectangle_profiles": [
+        {
+          "id": "profile.base_rectangle",
+          "center": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "width_parameter": "part.width",
+          "height_parameter": "part.height"
+        }
+      ],
+      "circle_profiles": []
+    },
+    {
+      "id": "sketch.bolt_circle",
+      "name": "Sketch_BoltCircle",
+      "workplane": "datum.xy",
+      "rectangle_profiles": [],
+      "circle_profiles": [],
+      "circular_hole_patterns": [
+        {
+          "id": "pattern.bolt_circle",
+          "center": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "angle_offset_deg": 0.0,
+          "radius_parameter": "part.bolt_circle_radius",
+          "count_parameter": "part.bolt_count",
+          "hole_diameter_parameter": "part.bolt_hole_diameter"
+        }
+      ]
+    }
+  ],
+  "features": [
+    {
+      "id": "feature.base_extrude",
+      "name": "BaseExtrude",
+      "type": "additive_extrude",
+      "input_sketch": "sketch.base",
+      "direction": "+Z",
+      "length_parameter": "part.thickness"
+    },
+    {
+      "id": "feature.bolt_circle_cut",
+      "name": "BoltCircleCut",
+      "type": "subtractive_extrude",
+      "input_sketch": "sketch.bolt_circle",
+      "direction": "+Z",
+      "target_feature": "feature.base_extrude",
+      "depth": "through_all"
+    }
+  ]
+}

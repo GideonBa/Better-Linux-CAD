@@ -28,15 +28,17 @@ PartDocument make_feature_face_cut_document(SemanticFace face, DatumPlaneId work
 
   REQUIRE(document.value().add_parameter(make_length_parameter("part.width", "width", 120.0)));
   REQUIRE(document.value().add_parameter(make_length_parameter("part.height", "height", 80.0)));
-  REQUIRE(document.value().add_parameter(make_length_parameter("part.thickness", "thickness", 8.0)));
-  REQUIRE(document.value().add_parameter(make_length_parameter("part.hole_diameter", "hole_diameter", hole_diameter)));
+  REQUIRE(
+      document.value().add_parameter(make_length_parameter("part.thickness", "thickness", 8.0)));
+  REQUIRE(document.value().add_parameter(
+      make_length_parameter("part.hole_diameter", "hole_diameter", hole_diameter)));
 
   auto xy = DatumPlane::xy();
   REQUIRE(xy);
   REQUIRE(document.value().add_datum_plane(xy.value()));
 
-  auto base_sketch = Sketch::create(SketchId("sketch.base"), "Sketch_BaseRectangle",
-                                    DatumPlaneId("datum.xy"));
+  auto base_sketch =
+      Sketch::create(SketchId("sketch.base"), "Sketch_BaseRectangle", DatumPlaneId("datum.xy"));
   REQUIRE(base_sketch);
   auto rectangle = RectangleProfile::create(ProfileId("profile.base_rectangle"),
                                             ParameterId("part.width"), ParameterId("part.height"));
@@ -44,9 +46,9 @@ PartDocument make_feature_face_cut_document(SemanticFace face, DatumPlaneId work
   REQUIRE(base_sketch.value().add_profile(rectangle.value()));
   REQUIRE(document.value().add_sketch(base_sketch.value()));
 
-  auto base = Feature::create_additive_extrude(FeatureId("feature.base_extrude"), "BaseExtrude",
-                                               SketchId("sketch.base"),
-                                               ParameterId("part.thickness"));
+  auto base =
+      Feature::create_additive_extrude(FeatureId("feature.base_extrude"), "BaseExtrude",
+                                       SketchId("sketch.base"), ParameterId("part.thickness"));
   REQUIRE(base);
   REQUIRE(document.value().add_feature(base.value()));
 
@@ -80,10 +82,10 @@ PartDocument make_top_face_cut_document() {
 }
 
 PartDocument make_bottom_face_cut_document() {
-  return make_feature_face_cut_document(SemanticFace::Bottom, DatumPlaneId("workplane.base_bottom"),
-                                        "BaseBottomFace", SketchId("sketch.bottom_hole"),
-                                        "Sketch_BottomHole", ProfileId("profile.bottom_hole"),
-                                        FeatureId("feature.bottom_hole_cut"), "BottomHoleCut", 20.0);
+  return make_feature_face_cut_document(
+      SemanticFace::Bottom, DatumPlaneId("workplane.base_bottom"), "BaseBottomFace",
+      SketchId("sketch.bottom_hole"), "Sketch_BottomHole", ProfileId("profile.bottom_hole"),
+      FeatureId("feature.bottom_hole_cut"), "BottomHoleCut", 20.0);
 }
 
 PartDocument make_right_face_cut_document() {
@@ -136,7 +138,7 @@ void check_roundtrip(const PartDocument& document, DatumPlaneId workplane_id, Se
   CHECK(workplane->face_reference().face() == face);
 
   CHECK(restored.value().dependency_graph().has_dependency("feature.base_extrude",
-                                                          workplane_id.value()));
+                                                           workplane_id.value()));
   CHECK(restored.value().dependency_graph().has_dependency(workplane_id.value(), sketch_id));
   CHECK(restored.value().dependency_graph().has_dependency(sketch_id, cut_id));
 }
@@ -150,8 +152,7 @@ TEST_CASE("PartDocument JSON round-trips top derived workplanes", "[core][json][
 
 TEST_CASE("PartDocument JSON round-trips bottom derived workplanes", "[core][json][workplane]") {
   check_roundtrip(make_bottom_face_cut_document(), DatumPlaneId("workplane.base_bottom"),
-                  SemanticFace::Bottom, "bottom", "sketch.bottom_hole",
-                  "feature.bottom_hole_cut");
+                  SemanticFace::Bottom, "bottom", "sketch.bottom_hole", "feature.bottom_hole_cut");
 }
 
 TEST_CASE("PartDocument JSON round-trips right derived workplanes", "[core][json][workplane]") {

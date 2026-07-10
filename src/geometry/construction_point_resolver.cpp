@@ -13,14 +13,14 @@ namespace {
 }
 
 [[nodiscard]] Point3 midpoint(Point3 first, Point3 second) noexcept {
-  return Point3{(first.x + second.x) / 2.0, (first.y + second.y) / 2.0,
-                (first.z + second.z) / 2.0};
+  return Point3{(first.x + second.x) / 2.0, (first.y + second.y) / 2.0, (first.z + second.z) / 2.0};
 }
 
 } // namespace
 
 Result<ResolvedConstructionPoint>
-ConstructionPointResolver::resolve(const PartDocument& document, ConstructionPointId point_id) const {
+ConstructionPointResolver::resolve(const PartDocument& document,
+                                   ConstructionPointId point_id) const {
   if (point_id.empty()) {
     return Result<ResolvedConstructionPoint>::failure(
         validation_error("construction_point", "construction point id must not be empty"));
@@ -47,8 +47,9 @@ ConstructionPointResolver::resolve(const PartDocument& document, ConstructionPoi
 
   if (point->kind() == ConstructionPointKind::OnGeneratedVertex) {
     if (!relation.generated_vertex().has_value()) {
-      return Result<ResolvedConstructionPoint>::failure(validation_error(
-          point->id().value(), "construction point on generated vertex must carry a vertex reference"));
+      return Result<ResolvedConstructionPoint>::failure(
+          validation_error(point->id().value(),
+                           "construction point on generated vertex must carry a vertex reference"));
     }
 
     auto vertex = evaluator.resolve_vertex(document, relation.generated_vertex().value());
@@ -62,8 +63,9 @@ ConstructionPointResolver::resolve(const PartDocument& document, ConstructionPoi
 
   if (point->kind() == ConstructionPointKind::OnGeneratedEdge) {
     if (!relation.generated_edge().has_value()) {
-      return Result<ResolvedConstructionPoint>::failure(validation_error(
-          point->id().value(), "construction point on generated edge must carry an edge reference"));
+      return Result<ResolvedConstructionPoint>::failure(
+          validation_error(point->id().value(),
+                           "construction point on generated edge must carry an edge reference"));
     }
 
     auto edge = evaluator.resolve_edge(document, relation.generated_edge().value());

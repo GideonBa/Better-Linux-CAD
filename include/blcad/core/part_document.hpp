@@ -34,7 +34,8 @@ public:
   [[nodiscard]] Result<std::size_t> add_feature(Feature feature);
   [[nodiscard]] Result<std::size_t> add_reference_status(ReferenceStatusRecord status);
   [[nodiscard]] Result<std::size_t> add_reference_remap(ReferenceRemapRecord remap);
-  [[nodiscard]] Result<std::size_t> add_sketch_origin_override(SketchOriginOverrideRecord origin_override);
+  [[nodiscard]] Result<std::size_t>
+  add_sketch_origin_override(SketchOriginOverrideRecord origin_override);
   [[nodiscard]] Result<std::vector<std::string>> mark_parameter_changed(ParameterId id);
   // Sets a parameter value, validates it, and marks the parameter and its
   // dependents as changed. Returns the affected graph nodes.
@@ -55,7 +56,8 @@ public:
   [[nodiscard]] const std::vector<Feature>& features() const noexcept;
   [[nodiscard]] const std::vector<ReferenceStatusRecord>& reference_statuses() const noexcept;
   [[nodiscard]] const std::vector<ReferenceRemapRecord>& reference_remaps() const noexcept;
-  [[nodiscard]] const std::vector<SketchOriginOverrideRecord>& sketch_origin_overrides() const noexcept;
+  [[nodiscard]] const std::vector<SketchOriginOverrideRecord>&
+  sketch_origin_overrides() const noexcept;
   [[nodiscard]] const DependencyGraph& dependency_graph() const noexcept;
   [[nodiscard]] const InvalidationState& invalidation_state() const noexcept;
   [[nodiscard]] std::size_t parameter_count() const noexcept;
@@ -73,15 +75,21 @@ public:
   [[nodiscard]] const Parameter* find_parameter(ParameterId id) const noexcept;
   [[nodiscard]] const Parameter* find_parameter(std::string_view name) const noexcept;
   [[nodiscard]] const DatumPlane* find_datum_plane(DatumPlaneId id) const noexcept;
-  [[nodiscard]] const ConstructionPoint* find_construction_point(ConstructionPointId id) const noexcept;
-  [[nodiscard]] const ConstructionLine* find_construction_line(ConstructionLineId id) const noexcept;
-  [[nodiscard]] const ConstructionPlane* find_construction_plane(ConstructionPlaneId id) const noexcept;
+  [[nodiscard]] const ConstructionPoint*
+  find_construction_point(ConstructionPointId id) const noexcept;
+  [[nodiscard]] const ConstructionLine*
+  find_construction_line(ConstructionLineId id) const noexcept;
+  [[nodiscard]] const ConstructionPlane*
+  find_construction_plane(ConstructionPlaneId id) const noexcept;
   [[nodiscard]] const DerivedWorkplane* find_derived_workplane(DatumPlaneId id) const noexcept;
   [[nodiscard]] const Sketch* find_sketch(SketchId id) const noexcept;
   [[nodiscard]] const Feature* find_feature(FeatureId id) const noexcept;
-  [[nodiscard]] const ReferenceStatusRecord* find_reference_status(ReferenceStatusId id) const noexcept;
-  [[nodiscard]] const ReferenceRemapRecord* find_reference_remap(ReferenceRemapId id) const noexcept;
-  [[nodiscard]] const SketchOriginOverrideRecord* find_sketch_origin_override(SketchId id) const noexcept;
+  [[nodiscard]] const ReferenceStatusRecord*
+  find_reference_status(ReferenceStatusId id) const noexcept;
+  [[nodiscard]] const ReferenceRemapRecord*
+  find_reference_remap(ReferenceRemapId id) const noexcept;
+  [[nodiscard]] const SketchOriginOverrideRecord*
+  find_sketch_origin_override(SketchId id) const noexcept;
   [[nodiscard]] bool has_workplane_id(const DatumPlaneId& id) const noexcept;
 
 private:

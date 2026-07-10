@@ -17,7 +17,8 @@ Parameter make_length_parameter(const char* id, const char* name, double value_m
 }
 
 PartDocument make_projected_reference_document() {
-  auto document = PartDocument::create(DocumentId("part.projected_refs"), "Projected reference part");
+  auto document =
+      PartDocument::create(DocumentId("part.projected_refs"), "Projected reference part");
   REQUIRE(document);
 
   REQUIRE(document.value().add_parameter(make_length_parameter("part.width", "width", 100.0)));
@@ -28,7 +29,8 @@ PartDocument make_projected_reference_document() {
   REQUIRE(datum);
   REQUIRE(document.value().add_datum_plane(datum.value()));
 
-  auto base_sketch = Sketch::create(SketchId("sketch.base"), "Sketch_Base", DatumPlaneId("datum.xy"));
+  auto base_sketch =
+      Sketch::create(SketchId("sketch.base"), "Sketch_Base", DatumPlaneId("datum.xy"));
   REQUIRE(base_sketch);
   auto rectangle = RectangleProfile::create(ProfileId("profile.base"), ParameterId("part.width"),
                                             ParameterId("part.height"));
@@ -36,14 +38,13 @@ PartDocument make_projected_reference_document() {
   REQUIRE(base_sketch.value().add_profile(rectangle.value()));
   REQUIRE(document.value().add_sketch(base_sketch.value()));
 
-  auto feature = Feature::create_additive_extrude(FeatureId("feature.base"), "BaseExtrude",
-                                                  SketchId("sketch.base"),
-                                                  ParameterId("part.depth"));
+  auto feature = Feature::create_additive_extrude(
+      FeatureId("feature.base"), "BaseExtrude", SketchId("sketch.base"), ParameterId("part.depth"));
   REQUIRE(feature);
   REQUIRE(document.value().add_feature(feature.value()));
 
-  auto construction_point = ConstructionPoint::create_explicit(
-      ConstructionPointId("point.mid"), "Mid", Point3{0.0, 0.0, 0.0});
+  auto construction_point = ConstructionPoint::create_explicit(ConstructionPointId("point.mid"),
+                                                               "Mid", Point3{0.0, 0.0, 0.0});
   REQUIRE(construction_point);
   REQUIRE(document.value().add_construction_point(construction_point.value()));
 
@@ -64,9 +65,11 @@ TEST_CASE("Projected sketch references and constraints roundtrip through part do
   auto sketch = Sketch::create(SketchId("sketch.top"), "Sketch_Top", DatumPlaneId("datum.xy"));
   REQUIRE(sketch);
   REQUIRE(sketch.value().add_entity(
-      LineSegment::create(SketchEntityId("line.helper"), Point2{-1.0, 0.0}, Point2{1.0, 0.0}).value()));
+      LineSegment::create(SketchEntityId("line.helper"), Point2{-1.0, 0.0}, Point2{1.0, 0.0})
+          .value()));
 
-  auto vertex = SemanticVertexReference::create(FeatureId("feature.base"), SemanticVertex::TopFrontRight);
+  auto vertex =
+      SemanticVertexReference::create(FeatureId("feature.base"), SemanticVertex::TopFrontRight);
   REQUIRE(vertex);
   auto edge = SemanticEdgeReference::create(FeatureId("feature.base"), SemanticEdge::TopFront);
   REQUIRE(edge);
@@ -86,14 +89,16 @@ TEST_CASE("Projected sketch references and constraints roundtrip through part do
   REQUIRE(projected_line);
   REQUIRE(sketch.value().add_reference(projected_line.value()));
 
-  auto projected_edge =
-      ProjectedSketchLine::create_from_semantic_edge(SketchEntityId("ref.edge.top_front"), edge.value());
+  auto projected_edge = ProjectedSketchLine::create_from_semantic_edge(
+      SketchEntityId("ref.edge.top_front"), edge.value());
   REQUIRE(projected_edge);
   REQUIRE(sketch.value().add_reference(projected_edge.value()));
 
-  auto start_target = SketchReferenceTarget::create_line_segment_start(SketchEntityId("line.helper"));
+  auto start_target =
+      SketchReferenceTarget::create_line_segment_start(SketchEntityId("line.helper"));
   REQUIRE(start_target);
-  auto point_target = SketchReferenceTarget::create_projected_point(SketchEntityId("ref.point.mid"));
+  auto point_target =
+      SketchReferenceTarget::create_projected_point(SketchEntityId("ref.point.mid"));
   REQUIRE(point_target);
   auto coincident = SketchConstraint::create_coincident_to_projected_point(
       SketchConstraintId("constraint.start_on_mid"), start_target.value(), point_target.value());
@@ -102,10 +107,12 @@ TEST_CASE("Projected sketch references and constraints roundtrip through part do
 
   auto line_target = SketchReferenceTarget::create_line_segment(SketchEntityId("line.helper"));
   REQUIRE(line_target);
-  auto projected_line_target = SketchReferenceTarget::create_projected_line(SketchEntityId("ref.line.axis"));
+  auto projected_line_target =
+      SketchReferenceTarget::create_projected_line(SketchEntityId("ref.line.axis"));
   REQUIRE(projected_line_target);
   auto parallel = SketchConstraint::create_parallel_to_projected_line(
-      SketchConstraintId("constraint.parallel_axis"), line_target.value(), projected_line_target.value());
+      SketchConstraintId("constraint.parallel_axis"), line_target.value(),
+      projected_line_target.value());
   REQUIRE(parallel);
   REQUIRE(sketch.value().add_constraint(parallel.value()));
 
@@ -134,7 +141,8 @@ TEST_CASE("Projected sketch references and constraints roundtrip through part do
         "feature.base.vertex.top_front_right");
   CHECK(restored_sketch->projected_lines()[0].construction_line().value() == "line.axis");
   REQUIRE(restored_sketch->projected_lines()[1].semantic_edge().has_value());
-  CHECK(restored_sketch->projected_lines()[1].referenced_node_id() == "feature.base.edge.top_front");
+  CHECK(restored_sketch->projected_lines()[1].referenced_node_id() ==
+        "feature.base.edge.top_front");
   CHECK(restored_sketch->constraints()[0].id().value() == "constraint.start_on_mid");
   CHECK(restored_sketch->constraints()[1].id().value() == "constraint.parallel_axis");
 }

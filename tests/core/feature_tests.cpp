@@ -69,7 +69,8 @@ TEST_CASE("SubtractiveExtrude feature stores sketch and target feature reference
   CHECK(feature.value().direction() == ExtrudeDirection::SketchNormal);
 }
 
-TEST_CASE("SubtractiveExtrude feature supports opposite sketch-normal direction", "[core][feature]") {
+TEST_CASE("SubtractiveExtrude feature supports opposite sketch-normal direction",
+          "[core][feature]") {
   const auto feature = Feature::create_subtractive_extrude(
       FeatureId("feature.back_cut"), "BackCut", SketchId("sketch.back"),
       FeatureId("feature.base_extrude"), SubtractiveExtrudeDepth::ThroughAll,

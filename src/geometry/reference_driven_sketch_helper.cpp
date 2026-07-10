@@ -10,8 +10,9 @@ namespace {
   return Error::validation(std::move(object_id), std::move(message));
 }
 
-[[nodiscard]] Result<const ProjectedSketchPoint*> find_projected_point_reference(
-    const Sketch& sketch, const SketchReferenceTarget& target, const std::string& object_id) {
+[[nodiscard]] Result<const ProjectedSketchPoint*>
+find_projected_point_reference(const Sketch& sketch, const SketchReferenceTarget& target,
+                               const std::string& object_id) {
   if (target.kind() != SketchReferenceTargetKind::ProjectedPoint) {
     return Result<const ProjectedSketchPoint*>::failure(
         validation_error(object_id, "constraint reference target must be a projected point"));
@@ -26,8 +27,9 @@ namespace {
   return Result<const ProjectedSketchPoint*>::success(point);
 }
 
-[[nodiscard]] Result<const ProjectedSketchLine*> find_projected_line_reference(
-    const Sketch& sketch, const SketchReferenceTarget& target, const std::string& object_id) {
+[[nodiscard]] Result<const ProjectedSketchLine*>
+find_projected_line_reference(const Sketch& sketch, const SketchReferenceTarget& target,
+                              const std::string& object_id) {
   if (target.kind() != SketchReferenceTargetKind::ProjectedLine) {
     return Result<const ProjectedSketchLine*>::failure(
         validation_error(object_id, "constraint reference target must be a projected line"));
@@ -54,8 +56,8 @@ ReferenceDrivenSketchHelper::resolve_coincident_point_constraint(
     const PartDocument& document, const Sketch& sketch, const SketchConstraint& constraint) const {
   const std::string object_id = constraint.id().value();
   if (constraint.kind() != SketchConstraintKind::CoincidentToProjectedPoint) {
-    return Result<ResolvedCoincidentProjectedPointConstraint>::failure(validation_error(
-        object_id, "expected coincident-to-projected-point sketch constraint"));
+    return Result<ResolvedCoincidentProjectedPointConstraint>::failure(
+        validation_error(object_id, "expected coincident-to-projected-point sketch constraint"));
   }
 
   if (!is_line_endpoint_target(constraint.constrained_target().kind())) {
@@ -63,7 +65,8 @@ ReferenceDrivenSketchHelper::resolve_coincident_point_constraint(
         object_id, "coincident projected-point constraint must constrain a line endpoint"));
   }
 
-  auto projected_point = find_projected_point_reference(sketch, constraint.reference_target(), object_id);
+  auto projected_point =
+      find_projected_point_reference(sketch, constraint.reference_target(), object_id);
   if (projected_point.has_error()) {
     return Result<ResolvedCoincidentProjectedPointConstraint>::failure(projected_point.error());
   }
@@ -75,9 +78,8 @@ ReferenceDrivenSketchHelper::resolve_coincident_point_constraint(
   }
 
   return Result<ResolvedCoincidentProjectedPointConstraint>::success(
-      ResolvedCoincidentProjectedPointConstraint{constraint.id(),
-                                                constraint.constrained_target().entity(),
-                                                resolved.value().position});
+      ResolvedCoincidentProjectedPointConstraint{
+          constraint.id(), constraint.constrained_target().entity(), resolved.value().position});
 }
 
 Result<ResolvedProjectedLineConstraint>
@@ -91,11 +93,12 @@ ReferenceDrivenSketchHelper::resolve_projected_line_constraint(
   }
 
   if (constraint.constrained_target().kind() != SketchReferenceTargetKind::LineSegment) {
-    return Result<ResolvedProjectedLineConstraint>::failure(validation_error(
-        object_id, "projected-line constraint must constrain a line segment"));
+    return Result<ResolvedProjectedLineConstraint>::failure(
+        validation_error(object_id, "projected-line constraint must constrain a line segment"));
   }
 
-  auto projected_line = find_projected_line_reference(sketch, constraint.reference_target(), object_id);
+  auto projected_line =
+      find_projected_line_reference(sketch, constraint.reference_target(), object_id);
   if (projected_line.has_error()) {
     return Result<ResolvedProjectedLineConstraint>::failure(projected_line.error());
   }
@@ -106,16 +109,17 @@ ReferenceDrivenSketchHelper::resolve_projected_line_constraint(
     return Result<ResolvedProjectedLineConstraint>::failure(resolved.error());
   }
 
-  return Result<ResolvedProjectedLineConstraint>::success(ResolvedProjectedLineConstraint{
-      constraint.id(), constraint.constrained_target().entity(), resolved.value().point,
-      resolved.value().direction});
+  return Result<ResolvedProjectedLineConstraint>::success(
+      ResolvedProjectedLineConstraint{constraint.id(), constraint.constrained_target().entity(),
+                                      resolved.value().point, resolved.value().direction});
 }
 
 Result<LineSegment>
 ReferenceDrivenSketchHelper::create_profile_helper_line_from_projected_point_constraints(
     const PartDocument& document, const Sketch& sketch, SketchEntityId line_id,
     const SketchConstraint& start_constraint, const SketchConstraint& end_constraint) const {
-  const std::string object_id = line_id.empty() ? std::string("reference_profile_helper") : line_id.value();
+  const std::string object_id =
+      line_id.empty() ? std::string("reference_profile_helper") : line_id.value();
   if (line_id.empty()) {
     return Result<LineSegment>::failure(
         validation_error(object_id, "profile helper line id must not be empty"));

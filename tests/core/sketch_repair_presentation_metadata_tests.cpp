@@ -34,10 +34,9 @@ SketchReferenceTarget line_end(const char* id) {
 
 const SketchRepairSuggestion* find_action(const SketchRepairSuggestionReport& report,
                                           SketchRepairSuggestionAction action) {
-  const auto found = std::find_if(report.suggestions().begin(), report.suggestions().end(),
-                                  [action](const SketchRepairSuggestion& suggestion) {
-                                    return suggestion.action() == action;
-                                  });
+  const auto found = std::find_if(
+      report.suggestions().begin(), report.suggestions().end(),
+      [action](const SketchRepairSuggestion& suggestion) { return suggestion.action() == action; });
   return found == report.suggestions().end() ? nullptr : &*found;
 }
 
@@ -54,8 +53,8 @@ TEST_CASE("Sketch repair presentation metadata classifies repair actions",
           "[core][sketch-repair-presentation-metadata]") {
   const SketchRepairPresentationMetadataProvider metadata_provider;
 
-  const auto safe = metadata_provider.metadata_for(
-      SketchRepairSuggestionAction::RemoveDuplicateDrivingDimension);
+  const auto safe =
+      metadata_provider.metadata_for(SketchRepairSuggestionAction::RemoveDuplicateDrivingDimension);
   CHECK(safe.label_id() == "repair.remove_duplicate_driving_dimension");
   CHECK(safe.category() == SketchRepairDisplayCategory::SafeApply);
   CHECK(safe.priority() == SketchRepairDisplayPriority::Normal);
@@ -68,8 +67,8 @@ TEST_CASE("Sketch repair presentation metadata classifies repair actions",
   CHECK(choice.category() == SketchRepairDisplayCategory::RequiresUserChoice);
   CHECK(choice.priority() == SketchRepairDisplayPriority::High);
 
-  const auto parameter = metadata_provider.metadata_for(
-      SketchRepairSuggestionAction::AddDrivingDimension);
+  const auto parameter =
+      metadata_provider.metadata_for(SketchRepairSuggestionAction::AddDrivingDimension);
   CHECK(parameter.label_id() == "repair.add_driving_dimension");
   CHECK(parameter.category() == SketchRepairDisplayCategory::RequiresParameterValue);
   CHECK(parameter.priority() == SketchRepairDisplayPriority::Low);
@@ -83,17 +82,19 @@ TEST_CASE("Sketch repair presentation metadata summarizes undo stack affected re
   add_line(sketch.value(), "line.a", Point2{0.0, 0.0}, Point2{10.0, 0.0});
 
   auto dim_a = SketchDrivingDimension::create_horizontal_distance(
-      SketchDimensionId("dim.a"), line_start("line.a"), line_end("line.a"), ParameterId("part.width"));
+      SketchDimensionId("dim.a"), line_start("line.a"), line_end("line.a"),
+      ParameterId("part.width"));
   auto dim_b = SketchDrivingDimension::create_horizontal_distance(
-      SketchDimensionId("dim.b"), line_start("line.a"), line_end("line.a"), ParameterId("part.width.b"));
+      SketchDimensionId("dim.b"), line_start("line.a"), line_end("line.a"),
+      ParameterId("part.width.b"));
   REQUIRE(dim_a);
   REQUIRE(dim_b);
   REQUIRE(sketch.value().add_dimension(dim_b.value()));
   REQUIRE(sketch.value().add_dimension(dim_a.value()));
 
   const auto suggestions = suggestions_for(sketch.value());
-  const auto* suggestion = find_action(suggestions,
-                                       SketchRepairSuggestionAction::RemoveDuplicateDrivingDimension);
+  const auto* suggestion =
+      find_action(suggestions, SketchRepairSuggestionAction::RemoveDuplicateDrivingDimension);
   REQUIRE(suggestion != nullptr);
 
   const SketchRepairTransactionExecutor transaction_executor;

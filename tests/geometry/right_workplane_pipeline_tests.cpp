@@ -29,38 +29,50 @@ PartDocument make_right_face_cut_document(Point2 hole_center = {}) {
 
   REQUIRE(document.value().add_parameter(make_length_parameter("part.width", "width", 120.0)));
   REQUIRE(document.value().add_parameter(make_length_parameter("part.height", "height", 80.0)));
-  REQUIRE(document.value().add_parameter(make_length_parameter("part.thickness", "thickness", 8.0)));
-  REQUIRE(document.value().add_parameter(make_length_parameter("part.side_hole_diameter", "side_hole_diameter", 4.0)));
+  REQUIRE(
+      document.value().add_parameter(make_length_parameter("part.thickness", "thickness", 8.0)));
+  REQUIRE(document.value().add_parameter(
+      make_length_parameter("part.side_hole_diameter", "side_hole_diameter", 4.0)));
 
   auto xy = DatumPlane::xy();
   REQUIRE(xy);
   REQUIRE(document.value().add_datum_plane(xy.value()));
 
-  auto base_sketch = Sketch::create(SketchId("sketch.base"), "Sketch_BaseRectangle", DatumPlaneId("datum.xy"));
+  auto base_sketch =
+      Sketch::create(SketchId("sketch.base"), "Sketch_BaseRectangle", DatumPlaneId("datum.xy"));
   REQUIRE(base_sketch);
-  auto rectangle = RectangleProfile::create(ProfileId("profile.base_rectangle"), ParameterId("part.width"), ParameterId("part.height"));
+  auto rectangle = RectangleProfile::create(ProfileId("profile.base_rectangle"),
+                                            ParameterId("part.width"), ParameterId("part.height"));
   REQUIRE(rectangle);
   REQUIRE(base_sketch.value().add_profile(rectangle.value()));
   REQUIRE(document.value().add_sketch(base_sketch.value()));
 
-  auto base = Feature::create_additive_extrude(FeatureId("feature.base_extrude"), "BaseExtrude", SketchId("sketch.base"), ParameterId("part.thickness"));
+  auto base =
+      Feature::create_additive_extrude(FeatureId("feature.base_extrude"), "BaseExtrude",
+                                       SketchId("sketch.base"), ParameterId("part.thickness"));
   REQUIRE(base);
   REQUIRE(document.value().add_feature(base.value()));
 
-  auto face_reference = SemanticFaceReference::create(FeatureId("feature.base_extrude"), SemanticFace::Right);
+  auto face_reference =
+      SemanticFaceReference::create(FeatureId("feature.base_extrude"), SemanticFace::Right);
   REQUIRE(face_reference);
-  auto workplane = DerivedWorkplane::create_on_feature_face(DatumPlaneId("workplane.base_right"), "BaseRightFace", face_reference.value());
+  auto workplane = DerivedWorkplane::create_on_feature_face(
+      DatumPlaneId("workplane.base_right"), "BaseRightFace", face_reference.value());
   REQUIRE(workplane);
   REQUIRE(document.value().add_derived_workplane(workplane.value()));
 
-  auto side_hole_sketch = Sketch::create(SketchId("sketch.right_hole"), "Sketch_RightHole", DatumPlaneId("workplane.base_right"));
+  auto side_hole_sketch = Sketch::create(SketchId("sketch.right_hole"), "Sketch_RightHole",
+                                         DatumPlaneId("workplane.base_right"));
   REQUIRE(side_hole_sketch);
-  auto circle = CircleProfile::create(ProfileId("profile.right_hole"), ParameterId("part.side_hole_diameter"), hole_center);
+  auto circle = CircleProfile::create(ProfileId("profile.right_hole"),
+                                      ParameterId("part.side_hole_diameter"), hole_center);
   REQUIRE(circle);
   REQUIRE(side_hole_sketch.value().add_profile(circle.value()));
   REQUIRE(document.value().add_sketch(side_hole_sketch.value()));
 
-  auto cut = Feature::create_subtractive_extrude(FeatureId("feature.right_hole_cut"), "RightHoleCut", SketchId("sketch.right_hole"), FeatureId("feature.base_extrude"));
+  auto cut = Feature::create_subtractive_extrude(FeatureId("feature.right_hole_cut"),
+                                                 "RightHoleCut", SketchId("sketch.right_hole"),
+                                                 FeatureId("feature.base_extrude"));
   REQUIRE(cut);
   REQUIRE(document.value().add_feature(cut.value()));
 
@@ -76,7 +88,8 @@ ShapeCache make_shape_cache() {
 
 } // namespace
 
-TEST_CASE("Right-face workplane recomputes an axis-directed through-all circular cut", "[geometry][workplane]") {
+TEST_CASE("Right-face workplane recomputes an axis-directed through-all circular cut",
+          "[geometry][workplane]") {
   const PartDocument document = make_right_face_cut_document(Point2{-12.0, 0.0});
   ShapeCache cache = make_shape_cache();
   const GeometryRecomputeExecutor executor;
@@ -98,7 +111,8 @@ TEST_CASE("Right-face workplane recomputes an axis-directed through-all circular
   REQUIRE(final_summary.solid_count == 1);
 
   const double expected_removed_volume = std::numbers::pi * 2.0 * 2.0 * 120.0;
-  CHECK(final_summary.volume_mm3 == Catch::Approx(base_volume - expected_removed_volume).margin(2.0));
+  CHECK(final_summary.volume_mm3 ==
+        Catch::Approx(base_volume - expected_removed_volume).margin(2.0));
 }
 
 TEST_CASE("Right-face workplane rejects holes outside side-face bounds", "[geometry][workplane]") {
@@ -111,7 +125,8 @@ TEST_CASE("Right-face workplane rejects holes outside side-face bounds", "[geome
   REQUIRE(summary.has_error());
   CHECK(summary.error().category() == ErrorCategory::Validation);
   CHECK(summary.error().object_id() == "profile.right_hole");
-  CHECK(summary.error().message() == "circle profile must lie fully inside resolved workplane bounds");
+  CHECK(summary.error().message() ==
+        "circle profile must lie fully inside resolved workplane bounds");
 
   REQUIRE(cache.find_feature_shape(FeatureId("feature.base_extrude")) != nullptr);
   CHECK(cache.find_feature_shape(FeatureId("feature.right_hole_cut")) == nullptr);

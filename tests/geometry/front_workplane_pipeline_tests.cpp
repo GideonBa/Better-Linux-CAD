@@ -29,7 +29,8 @@ PartDocument make_front_face_cut_document(Point2 hole_center = {}) {
 
   REQUIRE(document.value().add_parameter(make_length_parameter("part.width", "width", 120.0)));
   REQUIRE(document.value().add_parameter(make_length_parameter("part.height", "height", 80.0)));
-  REQUIRE(document.value().add_parameter(make_length_parameter("part.thickness", "thickness", 8.0)));
+  REQUIRE(
+      document.value().add_parameter(make_length_parameter("part.thickness", "thickness", 8.0)));
   REQUIRE(document.value().add_parameter(
       make_length_parameter("part.side_hole_diameter", "side_hole_diameter", 4.0)));
 
@@ -46,9 +47,9 @@ PartDocument make_front_face_cut_document(Point2 hole_center = {}) {
   REQUIRE(base_sketch.value().add_profile(rectangle.value()));
   REQUIRE(document.value().add_sketch(base_sketch.value()));
 
-  auto base = Feature::create_additive_extrude(FeatureId("feature.base_extrude"), "BaseExtrude",
-                                               SketchId("sketch.base"),
-                                               ParameterId("part.thickness"));
+  auto base =
+      Feature::create_additive_extrude(FeatureId("feature.base_extrude"), "BaseExtrude",
+                                       SketchId("sketch.base"), ParameterId("part.thickness"));
   REQUIRE(base);
   REQUIRE(document.value().add_feature(base.value()));
 
@@ -110,7 +111,8 @@ TEST_CASE("Front-face workplane recomputes an axis-directed through-all circular
   REQUIRE(final_summary.solid_count == 1);
 
   const double expected_removed_volume = std::numbers::pi * 2.0 * 2.0 * 80.0;
-  CHECK(final_summary.volume_mm3 == Catch::Approx(base_volume - expected_removed_volume).margin(2.0));
+  CHECK(final_summary.volume_mm3 ==
+        Catch::Approx(base_volume - expected_removed_volume).margin(2.0));
 }
 
 TEST_CASE("Front-face workplane rejects holes outside side-face bounds", "[geometry][workplane]") {
@@ -123,7 +125,8 @@ TEST_CASE("Front-face workplane rejects holes outside side-face bounds", "[geome
   REQUIRE(summary.has_error());
   CHECK(summary.error().category() == ErrorCategory::Validation);
   CHECK(summary.error().object_id() == "profile.front_hole");
-  CHECK(summary.error().message() == "circle profile must lie fully inside resolved workplane bounds");
+  CHECK(summary.error().message() ==
+        "circle profile must lie fully inside resolved workplane bounds");
 
   REQUIRE(cache.find_feature_shape(FeatureId("feature.base_extrude")) != nullptr);
   CHECK(cache.find_feature_shape(FeatureId("feature.front_hole_cut")) == nullptr);

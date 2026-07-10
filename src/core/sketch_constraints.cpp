@@ -66,31 +66,42 @@ namespace {
 
 std::string_view to_string(SketchGeometricConstraintKind kind) noexcept {
   switch (kind) {
-  case SketchGeometricConstraintKind::Fixed: return "fixed";
-  case SketchGeometricConstraintKind::Horizontal: return "horizontal";
-  case SketchGeometricConstraintKind::Vertical: return "vertical";
-  case SketchGeometricConstraintKind::Parallel: return "parallel";
-  case SketchGeometricConstraintKind::Perpendicular: return "perpendicular";
-  case SketchGeometricConstraintKind::EqualLength: return "equal_length";
+  case SketchGeometricConstraintKind::Fixed:
+    return "fixed";
+  case SketchGeometricConstraintKind::Horizontal:
+    return "horizontal";
+  case SketchGeometricConstraintKind::Vertical:
+    return "vertical";
+  case SketchGeometricConstraintKind::Parallel:
+    return "parallel";
+  case SketchGeometricConstraintKind::Perpendicular:
+    return "perpendicular";
+  case SketchGeometricConstraintKind::EqualLength:
+    return "equal_length";
   }
   return "fixed";
 }
 
 std::string_view to_string(SketchDrivingDimensionKind kind) noexcept {
   switch (kind) {
-  case SketchDrivingDimensionKind::HorizontalDistance: return "horizontal_distance";
-  case SketchDrivingDimensionKind::VerticalDistance: return "vertical_distance";
-  case SketchDrivingDimensionKind::AlignedDistance: return "aligned_distance";
-  case SketchDrivingDimensionKind::PointToPointDistance: return "point_to_point_distance";
+  case SketchDrivingDimensionKind::HorizontalDistance:
+    return "horizontal_distance";
+  case SketchDrivingDimensionKind::VerticalDistance:
+    return "vertical_distance";
+  case SketchDrivingDimensionKind::AlignedDistance:
+    return "aligned_distance";
+  case SketchDrivingDimensionKind::PointToPointDistance:
+    return "point_to_point_distance";
   }
   return "horizontal_distance";
 }
 
-Result<SketchGeometricConstraint> SketchGeometricConstraint::create_fixed(
-    SketchConstraintId id, SketchReferenceTarget target) {
+Result<SketchGeometricConstraint>
+SketchGeometricConstraint::create_fixed(SketchConstraintId id, SketchReferenceTarget target) {
   const auto object_id = id.empty() ? std::string("sketch_geometric_constraint") : id.value();
   auto valid_id = validate_constraint_id(id, object_id);
-  if (valid_id.has_error()) return Result<SketchGeometricConstraint>::failure(valid_id.error());
+  if (valid_id.has_error())
+    return Result<SketchGeometricConstraint>::failure(valid_id.error());
   if (target.kind() != SketchReferenceTargetKind::LineSegment &&
       target.kind() != SketchReferenceTargetKind::LineSegmentStart &&
       target.kind() != SketchReferenceTargetKind::LineSegmentEnd) {
@@ -101,11 +112,12 @@ Result<SketchGeometricConstraint> SketchGeometricConstraint::create_fixed(
       std::move(id), SketchGeometricConstraintKind::Fixed, std::move(target), std::nullopt));
 }
 
-Result<SketchGeometricConstraint> SketchGeometricConstraint::create_horizontal(
-    SketchConstraintId id, SketchReferenceTarget line) {
+Result<SketchGeometricConstraint>
+SketchGeometricConstraint::create_horizontal(SketchConstraintId id, SketchReferenceTarget line) {
   const auto object_id = id.empty() ? std::string("sketch_geometric_constraint") : id.value();
   auto valid_id = validate_constraint_id(id, object_id);
-  if (valid_id.has_error()) return Result<SketchGeometricConstraint>::failure(valid_id.error());
+  if (valid_id.has_error())
+    return Result<SketchGeometricConstraint>::failure(valid_id.error());
   auto valid_target = validate_line_target(
       object_id, line, "horizontal sketch constraint requires a line segment target");
   if (valid_target.has_error()) {
@@ -115,11 +127,12 @@ Result<SketchGeometricConstraint> SketchGeometricConstraint::create_horizontal(
       std::move(id), SketchGeometricConstraintKind::Horizontal, std::move(line), std::nullopt));
 }
 
-Result<SketchGeometricConstraint> SketchGeometricConstraint::create_vertical(
-    SketchConstraintId id, SketchReferenceTarget line) {
+Result<SketchGeometricConstraint>
+SketchGeometricConstraint::create_vertical(SketchConstraintId id, SketchReferenceTarget line) {
   const auto object_id = id.empty() ? std::string("sketch_geometric_constraint") : id.value();
   auto valid_id = validate_constraint_id(id, object_id);
-  if (valid_id.has_error()) return Result<SketchGeometricConstraint>::failure(valid_id.error());
+  if (valid_id.has_error())
+    return Result<SketchGeometricConstraint>::failure(valid_id.error());
   auto valid_target = validate_line_target(
       object_id, line, "vertical sketch constraint requires a line segment target");
   if (valid_target.has_error()) {
@@ -129,11 +142,13 @@ Result<SketchGeometricConstraint> SketchGeometricConstraint::create_vertical(
       std::move(id), SketchGeometricConstraintKind::Vertical, std::move(line), std::nullopt));
 }
 
-Result<SketchGeometricConstraint> SketchGeometricConstraint::create_parallel(
-    SketchConstraintId id, SketchReferenceTarget first_line, SketchReferenceTarget second_line) {
+Result<SketchGeometricConstraint>
+SketchGeometricConstraint::create_parallel(SketchConstraintId id, SketchReferenceTarget first_line,
+                                           SketchReferenceTarget second_line) {
   const auto object_id = id.empty() ? std::string("sketch_geometric_constraint") : id.value();
   auto valid_id = validate_constraint_id(id, object_id);
-  if (valid_id.has_error()) return Result<SketchGeometricConstraint>::failure(valid_id.error());
+  if (valid_id.has_error())
+    return Result<SketchGeometricConstraint>::failure(valid_id.error());
   auto valid_first = validate_line_target(
       object_id, first_line, "parallel sketch constraint requires line segment targets");
   if (valid_first.has_error()) {
@@ -145,19 +160,20 @@ Result<SketchGeometricConstraint> SketchGeometricConstraint::create_parallel(
     return Result<SketchGeometricConstraint>::failure(valid_second.error());
   }
   if (first_line.entity() == second_line.entity()) {
-    return Result<SketchGeometricConstraint>::failure(
-        validation_error(object_id, "two-line sketch constraint requires two distinct line targets"));
+    return Result<SketchGeometricConstraint>::failure(validation_error(
+        object_id, "two-line sketch constraint requires two distinct line targets"));
   }
-  return Result<SketchGeometricConstraint>::success(SketchGeometricConstraint(
-      std::move(id), SketchGeometricConstraintKind::Parallel, std::move(first_line),
-      std::move(second_line)));
+  return Result<SketchGeometricConstraint>::success(
+      SketchGeometricConstraint(std::move(id), SketchGeometricConstraintKind::Parallel,
+                                std::move(first_line), std::move(second_line)));
 }
 
 Result<SketchGeometricConstraint> SketchGeometricConstraint::create_perpendicular(
     SketchConstraintId id, SketchReferenceTarget first_line, SketchReferenceTarget second_line) {
   const auto object_id = id.empty() ? std::string("sketch_geometric_constraint") : id.value();
   auto valid_id = validate_constraint_id(id, object_id);
-  if (valid_id.has_error()) return Result<SketchGeometricConstraint>::failure(valid_id.error());
+  if (valid_id.has_error())
+    return Result<SketchGeometricConstraint>::failure(valid_id.error());
   auto valid_first = validate_line_target(
       object_id, first_line, "perpendicular sketch constraint requires line segment targets");
   if (valid_first.has_error()) {
@@ -169,19 +185,20 @@ Result<SketchGeometricConstraint> SketchGeometricConstraint::create_perpendicula
     return Result<SketchGeometricConstraint>::failure(valid_second.error());
   }
   if (first_line.entity() == second_line.entity()) {
-    return Result<SketchGeometricConstraint>::failure(
-        validation_error(object_id, "two-line sketch constraint requires two distinct line targets"));
+    return Result<SketchGeometricConstraint>::failure(validation_error(
+        object_id, "two-line sketch constraint requires two distinct line targets"));
   }
-  return Result<SketchGeometricConstraint>::success(SketchGeometricConstraint(
-      std::move(id), SketchGeometricConstraintKind::Perpendicular, std::move(first_line),
-      std::move(second_line)));
+  return Result<SketchGeometricConstraint>::success(
+      SketchGeometricConstraint(std::move(id), SketchGeometricConstraintKind::Perpendicular,
+                                std::move(first_line), std::move(second_line)));
 }
 
 Result<SketchGeometricConstraint> SketchGeometricConstraint::create_equal_length(
     SketchConstraintId id, SketchReferenceTarget first_line, SketchReferenceTarget second_line) {
   const auto object_id = id.empty() ? std::string("sketch_geometric_constraint") : id.value();
   auto valid_id = validate_constraint_id(id, object_id);
-  if (valid_id.has_error()) return Result<SketchGeometricConstraint>::failure(valid_id.error());
+  if (valid_id.has_error())
+    return Result<SketchGeometricConstraint>::failure(valid_id.error());
   auto valid_first = validate_line_target(
       object_id, first_line, "equal-length sketch constraint requires line segment targets");
   if (valid_first.has_error()) {
@@ -193,20 +210,25 @@ Result<SketchGeometricConstraint> SketchGeometricConstraint::create_equal_length
     return Result<SketchGeometricConstraint>::failure(valid_second.error());
   }
   if (first_line.entity() == second_line.entity()) {
-    return Result<SketchGeometricConstraint>::failure(
-        validation_error(object_id, "two-line sketch constraint requires two distinct line targets"));
+    return Result<SketchGeometricConstraint>::failure(validation_error(
+        object_id, "two-line sketch constraint requires two distinct line targets"));
   }
-  return Result<SketchGeometricConstraint>::success(SketchGeometricConstraint(
-      std::move(id), SketchGeometricConstraintKind::EqualLength, std::move(first_line),
-      std::move(second_line)));
+  return Result<SketchGeometricConstraint>::success(
+      SketchGeometricConstraint(std::move(id), SketchGeometricConstraintKind::EqualLength,
+                                std::move(first_line), std::move(second_line)));
 }
 
-const SketchConstraintId& SketchGeometricConstraint::id() const noexcept { return id_; }
-SketchGeometricConstraintKind SketchGeometricConstraint::kind() const noexcept { return kind_; }
+const SketchConstraintId& SketchGeometricConstraint::id() const noexcept {
+  return id_;
+}
+SketchGeometricConstraintKind SketchGeometricConstraint::kind() const noexcept {
+  return kind_;
+}
 const SketchReferenceTarget& SketchGeometricConstraint::first_target() const noexcept {
   return first_target_;
 }
-const std::optional<SketchReferenceTarget>& SketchGeometricConstraint::second_target() const noexcept {
+const std::optional<SketchReferenceTarget>&
+SketchGeometricConstraint::second_target() const noexcept {
   return second_target_;
 }
 
@@ -221,9 +243,11 @@ Result<SketchDrivingDimension> SketchDrivingDimension::create_horizontal_distanc
     ParameterId parameter) {
   const auto object_id = id.empty() ? std::string("sketch_driving_dimension") : id.value();
   auto valid_id = validate_dimension_id(id, object_id);
-  if (valid_id.has_error()) return Result<SketchDrivingDimension>::failure(valid_id.error());
+  if (valid_id.has_error())
+    return Result<SketchDrivingDimension>::failure(valid_id.error());
   auto valid_targets = validate_point_pair(object_id, first_point, second_point);
-  if (valid_targets.has_error()) return Result<SketchDrivingDimension>::failure(valid_targets.error());
+  if (valid_targets.has_error())
+    return Result<SketchDrivingDimension>::failure(valid_targets.error());
   if (parameter.empty()) {
     return Result<SketchDrivingDimension>::failure(
         validation_error(object_id, "driving dimension parameter must not be empty"));
@@ -238,9 +262,11 @@ Result<SketchDrivingDimension> SketchDrivingDimension::create_vertical_distance(
     ParameterId parameter) {
   const auto object_id = id.empty() ? std::string("sketch_driving_dimension") : id.value();
   auto valid_id = validate_dimension_id(id, object_id);
-  if (valid_id.has_error()) return Result<SketchDrivingDimension>::failure(valid_id.error());
+  if (valid_id.has_error())
+    return Result<SketchDrivingDimension>::failure(valid_id.error());
   auto valid_targets = validate_point_pair(object_id, first_point, second_point);
-  if (valid_targets.has_error()) return Result<SketchDrivingDimension>::failure(valid_targets.error());
+  if (valid_targets.has_error())
+    return Result<SketchDrivingDimension>::failure(valid_targets.error());
   if (parameter.empty()) {
     return Result<SketchDrivingDimension>::failure(
         validation_error(object_id, "driving dimension parameter must not be empty"));
@@ -255,9 +281,11 @@ Result<SketchDrivingDimension> SketchDrivingDimension::create_aligned_distance(
     ParameterId parameter) {
   const auto object_id = id.empty() ? std::string("sketch_driving_dimension") : id.value();
   auto valid_id = validate_dimension_id(id, object_id);
-  if (valid_id.has_error()) return Result<SketchDrivingDimension>::failure(valid_id.error());
+  if (valid_id.has_error())
+    return Result<SketchDrivingDimension>::failure(valid_id.error());
   auto valid_targets = validate_point_pair(object_id, first_point, second_point);
-  if (valid_targets.has_error()) return Result<SketchDrivingDimension>::failure(valid_targets.error());
+  if (valid_targets.has_error())
+    return Result<SketchDrivingDimension>::failure(valid_targets.error());
   if (parameter.empty()) {
     return Result<SketchDrivingDimension>::failure(
         validation_error(object_id, "driving dimension parameter must not be empty"));
@@ -272,9 +300,11 @@ Result<SketchDrivingDimension> SketchDrivingDimension::create_point_to_point_dis
     ParameterId parameter) {
   const auto object_id = id.empty() ? std::string("sketch_driving_dimension") : id.value();
   auto valid_id = validate_dimension_id(id, object_id);
-  if (valid_id.has_error()) return Result<SketchDrivingDimension>::failure(valid_id.error());
+  if (valid_id.has_error())
+    return Result<SketchDrivingDimension>::failure(valid_id.error());
   auto valid_targets = validate_point_pair(object_id, first_point, second_point);
-  if (valid_targets.has_error()) return Result<SketchDrivingDimension>::failure(valid_targets.error());
+  if (valid_targets.has_error())
+    return Result<SketchDrivingDimension>::failure(valid_targets.error());
   if (parameter.empty()) {
     return Result<SketchDrivingDimension>::failure(
         validation_error(object_id, "driving dimension parameter must not be empty"));
@@ -284,15 +314,21 @@ Result<SketchDrivingDimension> SketchDrivingDimension::create_point_to_point_dis
       std::move(second_point), std::move(parameter)));
 }
 
-const SketchDimensionId& SketchDrivingDimension::id() const noexcept { return id_; }
-SketchDrivingDimensionKind SketchDrivingDimension::kind() const noexcept { return kind_; }
+const SketchDimensionId& SketchDrivingDimension::id() const noexcept {
+  return id_;
+}
+SketchDrivingDimensionKind SketchDrivingDimension::kind() const noexcept {
+  return kind_;
+}
 const SketchReferenceTarget& SketchDrivingDimension::first_target() const noexcept {
   return first_target_;
 }
 const SketchReferenceTarget& SketchDrivingDimension::second_target() const noexcept {
   return second_target_;
 }
-const ParameterId& SketchDrivingDimension::parameter() const noexcept { return parameter_; }
+const ParameterId& SketchDrivingDimension::parameter() const noexcept {
+  return parameter_;
+}
 
 SketchDrivingDimension::SketchDrivingDimension(SketchDimensionId id,
                                                SketchDrivingDimensionKind kind,
@@ -310,37 +346,44 @@ const std::vector<SketchDrivingDimension>& Sketch::driving_dimensions() const no
   return driving_dimensions_;
 }
 
-const SketchGeometricConstraint* Sketch::find_geometric_constraint(SketchConstraintId id) const noexcept {
+const SketchGeometricConstraint*
+Sketch::find_geometric_constraint(SketchConstraintId id) const noexcept {
   for (const auto& constraint : geometric_constraints_) {
-    if (constraint.id() == id) return &constraint;
+    if (constraint.id() == id)
+      return &constraint;
   }
   return nullptr;
 }
 
 const SketchDrivingDimension* Sketch::find_driving_dimension(SketchDimensionId id) const noexcept {
   for (const auto& dimension : driving_dimensions_) {
-    if (dimension.id() == id) return &dimension;
+    if (dimension.id() == id)
+      return &dimension;
   }
   return nullptr;
 }
 
 Result<std::size_t> Sketch::add_constraint(SketchGeometricConstraint constraint) {
-  if (find_constraint(constraint.id()) != nullptr || find_geometric_constraint(constraint.id()) != nullptr) {
+  if (find_constraint(constraint.id()) != nullptr ||
+      find_geometric_constraint(constraint.id()) != nullptr) {
     return Result<std::size_t>::failure(Error::validation(
         constraint.id().value(), "sketch constraint id must be unique within sketch"));
   }
   if (constraint.kind() == SketchGeometricConstraintKind::Fixed &&
       constraint.first_target().kind() != SketchReferenceTargetKind::LineSegment) {
     auto target = validate_point_target(constraint.first_target(), constraint.id().value());
-    if (target.has_error()) return Result<std::size_t>::failure(target.error());
+    if (target.has_error())
+      return Result<std::size_t>::failure(target.error());
   } else {
     auto first = validate_explicit_line_target(constraint.first_target(), constraint.id().value());
-    if (first.has_error()) return Result<std::size_t>::failure(first.error());
+    if (first.has_error())
+      return Result<std::size_t>::failure(first.error());
   }
   if (constraint.second_target().has_value()) {
-    auto second = validate_explicit_line_target(constraint.second_target().value(),
-                                                constraint.id().value());
-    if (second.has_error()) return Result<std::size_t>::failure(second.error());
+    auto second =
+        validate_explicit_line_target(constraint.second_target().value(), constraint.id().value());
+    if (second.has_error())
+      return Result<std::size_t>::failure(second.error());
   }
   geometric_constraints_.push_back(std::move(constraint));
   return Result<std::size_t>::success(geometric_constraints_.size() - 1U);
@@ -352,16 +395,19 @@ Result<std::size_t> Sketch::add_dimension(SketchDrivingDimension dimension) {
         dimension.id().value(), "sketch dimension id must be unique within sketch"));
   }
   auto first = validate_point_target(dimension.first_target(), dimension.id().value());
-  if (first.has_error()) return Result<std::size_t>::failure(first.error());
+  if (first.has_error())
+    return Result<std::size_t>::failure(first.error());
   auto second = validate_point_target(dimension.second_target(), dimension.id().value());
-  if (second.has_error()) return Result<std::size_t>::failure(second.error());
+  if (second.has_error())
+    return Result<std::size_t>::failure(second.error());
   driving_dimensions_.push_back(std::move(dimension));
   return Result<std::size_t>::success(driving_dimensions_.size() - 1U);
 }
 
 Result<std::size_t> Sketch::remove_geometric_constraint(SketchConstraintId id) {
   const auto previous_size = geometric_constraints_.size();
-  geometric_constraints_.erase(std::remove_if(geometric_constraints_.begin(), geometric_constraints_.end(),
+  geometric_constraints_.erase(std::remove_if(geometric_constraints_.begin(),
+                                              geometric_constraints_.end(),
                                               [&id](const SketchGeometricConstraint& constraint) {
                                                 return constraint.id() == id;
                                               }),

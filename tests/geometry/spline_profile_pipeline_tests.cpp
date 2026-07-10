@@ -26,23 +26,23 @@ Sketch make_spline_profile_sketch(SketchId sketch_id, DatumPlaneId workplane_id)
   REQUIRE(sketch);
 
   add_line(sketch.value(), "line.bottom", Point2{-10.0, -8.0}, Point2{10.0, -8.0});
-  auto spline = SplineSegment::create_cubic_bezier(SketchEntityId("spline.right"),
-                                                   Point2{10.0, -8.0}, Point2{18.0, -4.0},
-                                                   Point2{18.0, 4.0}, Point2{10.0, 8.0});
+  auto spline =
+      SplineSegment::create_cubic_bezier(SketchEntityId("spline.right"), Point2{10.0, -8.0},
+                                         Point2{18.0, -4.0}, Point2{18.0, 4.0}, Point2{10.0, 8.0});
   REQUIRE(spline);
   REQUIRE(sketch.value().add_entity(spline.value()));
   add_line(sketch.value(), "line.top", Point2{10.0, 8.0}, Point2{-10.0, 8.0});
   add_line(sketch.value(), "line.left", Point2{-10.0, 8.0}, Point2{-10.0, -8.0});
 
-  auto tangent = SketchTangentContinuity::create_tangent(SketchConstraintId("tangent.bottom_spline"),
-                                                         SketchEntityId("line.bottom"),
-                                                         SketchEntityId("spline.right"));
+  auto tangent = SketchTangentContinuity::create_tangent(
+      SketchConstraintId("tangent.bottom_spline"), SketchEntityId("line.bottom"),
+      SketchEntityId("spline.right"));
   REQUIRE(tangent);
   REQUIRE(sketch.value().add_tangent_continuity(tangent.value()));
 
-  auto profile = ArcClosedProfile::create(ProfileId("profile.spline"),
-                                          {SketchEntityId("line.bottom"), SketchEntityId("spline.right"),
-                                           SketchEntityId("line.top"), SketchEntityId("line.left")});
+  auto profile = ArcClosedProfile::create(
+      ProfileId("profile.spline"), {SketchEntityId("line.bottom"), SketchEntityId("spline.right"),
+                                    SketchEntityId("line.top"), SketchEntityId("line.left")});
   REQUIRE(profile);
   REQUIRE(sketch.value().add_profile(profile.value()));
   return sketch.value();
@@ -55,9 +55,11 @@ PartDocument make_additive_spline_document() {
   auto datum = DatumPlane::xy();
   REQUIRE(datum);
   REQUIRE(document.value().add_datum_plane(datum.value()));
-  REQUIRE(document.value().add_sketch(make_spline_profile_sketch(SketchId("sketch.spline"), DatumPlaneId("datum.xy"))));
-  auto feature = Feature::create_additive_extrude(FeatureId("feature.spline"), "SplineExtrude",
-                                                  SketchId("sketch.spline"), ParameterId("part.depth"));
+  REQUIRE(document.value().add_sketch(
+      make_spline_profile_sketch(SketchId("sketch.spline"), DatumPlaneId("datum.xy"))));
+  auto feature =
+      Feature::create_additive_extrude(FeatureId("feature.spline"), "SplineExtrude",
+                                       SketchId("sketch.spline"), ParameterId("part.depth"));
   REQUIRE(feature);
   REQUIRE(document.value().add_feature(feature.value()));
   return document.value();
@@ -85,7 +87,8 @@ PartDocument make_subtractive_spline_document() {
   REQUIRE(base);
   REQUIRE(document.value().add_feature(base.value()));
 
-  REQUIRE(document.value().add_sketch(make_spline_profile_sketch(SketchId("sketch.cut"), DatumPlaneId("datum.xy"))));
+  REQUIRE(document.value().add_sketch(
+      make_spline_profile_sketch(SketchId("sketch.cut"), DatumPlaneId("datum.xy"))));
   auto cut = Feature::create_subtractive_extrude(FeatureId("feature.cut"), "SplineCut",
                                                  SketchId("sketch.cut"), FeatureId("feature.base"));
   REQUIRE(cut);

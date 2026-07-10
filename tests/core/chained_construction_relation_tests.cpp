@@ -34,9 +34,8 @@ PartDocument make_document_with_base_feature() {
   REQUIRE(sketch.value().add_profile(rectangle.value()));
   REQUIRE(document.value().add_sketch(sketch.value()));
 
-  auto feature = Feature::create_additive_extrude(FeatureId("feature.base"), "BaseExtrude",
-                                                  SketchId("sketch.base"),
-                                                  ParameterId("part.depth"));
+  auto feature = Feature::create_additive_extrude(
+      FeatureId("feature.base"), "BaseExtrude", SketchId("sketch.base"), ParameterId("part.depth"));
   REQUIRE(feature);
   REQUIRE(document.value().add_feature(feature.value()));
 
@@ -67,15 +66,16 @@ void add_reference_points(PartDocument& document) {
 
 } // namespace
 
-TEST_CASE("Semantic generated edge and vertex references are stable model intent", "[core][construction]") {
+TEST_CASE("Semantic generated edge and vertex references are stable model intent",
+          "[core][construction]") {
   auto edge = SemanticEdgeReference::create(FeatureId("feature.base"), SemanticEdge::TopFront);
   REQUIRE(edge);
   CHECK(edge.value().source_feature().value() == "feature.base");
   CHECK(edge.value().edge() == SemanticEdge::TopFront);
   CHECK(edge.value().node_id() == "feature.base.edge.top_front");
 
-  auto vertex = SemanticVertexReference::create(FeatureId("feature.base"),
-                                                SemanticVertex::BottomBackLeft);
+  auto vertex =
+      SemanticVertexReference::create(FeatureId("feature.base"), SemanticVertex::BottomBackLeft);
   REQUIRE(vertex);
   CHECK(vertex.value().source_feature().value() == "feature.base");
   CHECK(vertex.value().vertex() == SemanticVertex::BottomBackLeft);
@@ -102,15 +102,17 @@ TEST_CASE("ConstructionRelation stores chained relation definitions", "[core][co
 
   auto edge = SemanticEdgeReference::create(FeatureId("feature.base"), SemanticEdge::TopFront);
   REQUIRE(edge);
-  auto generated_edge_relation = ConstructionRelation::create_line_parallel_to_generated_edge_through_point(
-      ConstructionRelationId("relation.parallel_to_edge"), edge.value(),
-      ConstructionPointId("point.origin"));
+  auto generated_edge_relation =
+      ConstructionRelation::create_line_parallel_to_generated_edge_through_point(
+          ConstructionRelationId("relation.parallel_to_edge"), edge.value(),
+          ConstructionPointId("point.origin"));
   REQUIRE(generated_edge_relation);
   CHECK(generated_edge_relation.value().generated_edge().has_value());
   CHECK(generated_edge_relation.value().generated_edge().value().edge() == SemanticEdge::TopFront);
 }
 
-TEST_CASE("PartDocument stores chained construction relation dependencies", "[core][construction]") {
+TEST_CASE("PartDocument stores chained construction relation dependencies",
+          "[core][construction]") {
   PartDocument document = make_document_with_base_feature();
   add_reference_points(document);
 
@@ -143,11 +145,14 @@ TEST_CASE("PartDocument stores chained construction relation dependencies", "[co
 
   auto edge = SemanticEdgeReference::create(FeatureId("feature.base"), SemanticEdge::TopFront);
   REQUIRE(edge);
-  auto generated_edge_relation = ConstructionRelation::create_line_parallel_to_generated_edge_through_point(
-      ConstructionRelationId("relation.edge_parallel"), edge.value(), ConstructionPointId("point.z"));
+  auto generated_edge_relation =
+      ConstructionRelation::create_line_parallel_to_generated_edge_through_point(
+          ConstructionRelationId("relation.edge_parallel"), edge.value(),
+          ConstructionPointId("point.z"));
   REQUIRE(generated_edge_relation);
   auto edge_line = ConstructionLine::create_parallel_to_generated_edge_through_point(
-      ConstructionLineId("line.edge_parallel"), "GeneratedEdgeParallel", generated_edge_relation.value());
+      ConstructionLineId("line.edge_parallel"), "GeneratedEdgeParallel",
+      generated_edge_relation.value());
   REQUIRE(edge_line);
   REQUIRE(document.add_construction_line(edge_line.value()));
 
@@ -159,7 +164,8 @@ TEST_CASE("PartDocument stores chained construction relation dependencies", "[co
   CHECK(document.dependency_graph().has_dependency("point.z", "line.edge_parallel"));
 }
 
-TEST_CASE("PartDocument JSON round-trips chained relations and semantic generated refs", "[core][json]") {
+TEST_CASE("PartDocument JSON round-trips chained relations and semantic generated refs",
+          "[core][json]") {
   PartDocument document = make_document_with_base_feature();
   add_reference_points(document);
 
@@ -175,7 +181,8 @@ TEST_CASE("PartDocument JSON round-trips chained relations and semantic generate
   auto edge = SemanticEdgeReference::create(FeatureId("feature.base"), SemanticEdge::TopFront);
   REQUIRE(edge);
   auto edge_relation = ConstructionRelation::create_line_parallel_to_generated_edge_through_point(
-      ConstructionRelationId("relation.edge_parallel"), edge.value(), ConstructionPointId("point.z"));
+      ConstructionRelationId("relation.edge_parallel"), edge.value(),
+      ConstructionPointId("point.z"));
   REQUIRE(edge_relation);
   auto edge_line = ConstructionLine::create_parallel_to_generated_edge_through_point(
       ConstructionLineId("line.edge_parallel"), "GeneratedEdgeParallel", edge_relation.value());
@@ -194,7 +201,8 @@ TEST_CASE("PartDocument JSON round-trips chained relations and semantic generate
   auto serialized = serialize_part_document_to_json(document);
   REQUIRE(serialized);
   CHECK(serialized.value().find("generated_edge") != std::string::npos);
-  CHECK(serialized.value().find("line_parallel_to_generated_edge_through_point") != std::string::npos);
+  CHECK(serialized.value().find("line_parallel_to_generated_edge_through_point") !=
+        std::string::npos);
   CHECK(serialized.value().find("plane_parallel_to_plane_through_point") != std::string::npos);
 
   auto restored = deserialize_part_document_from_json(serialized.value());
@@ -207,5 +215,6 @@ TEST_CASE("PartDocument JSON round-trips chained relations and semantic generate
   REQUIRE(restored_edge_line != nullptr);
   REQUIRE(restored_edge_line->relation().has_value());
   CHECK(restored_edge_line->relation().value().generated_edge().has_value());
-  CHECK(restored_edge_line->relation().value().generated_edge().value().edge() == SemanticEdge::TopFront);
+  CHECK(restored_edge_line->relation().value().generated_edge().value().edge() ==
+        SemanticEdge::TopFront);
 }

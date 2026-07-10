@@ -58,11 +58,10 @@ private:
 
 class ReferenceStatusRecord {
 public:
-  [[nodiscard]] static Result<ReferenceStatusRecord> create_resolved(ReferenceStatusId id,
-                                                                     SemanticReferenceTarget target);
-  [[nodiscard]] static Result<ReferenceStatusRecord> create_lost(ReferenceStatusId id,
-                                                                 SemanticReferenceTarget target,
-                                                                 std::string message);
+  [[nodiscard]] static Result<ReferenceStatusRecord>
+  create_resolved(ReferenceStatusId id, SemanticReferenceTarget target);
+  [[nodiscard]] static Result<ReferenceStatusRecord>
+  create_lost(ReferenceStatusId id, SemanticReferenceTarget target, std::string message);
 
   [[nodiscard]] const ReferenceStatusId& id() const noexcept;
   [[nodiscard]] ReferenceStatusKind status() const noexcept;

@@ -63,7 +63,7 @@ public:
   [[nodiscard]] SketchDiagnosticReport analyze(const Sketch& sketch) const;
 };
 
-[[nodiscard]] Result<std::string> serialize_sketch_diagnostic_report_to_json(
-    const SketchDiagnosticReport& report);
+[[nodiscard]] Result<std::string>
+serialize_sketch_diagnostic_report_to_json(const SketchDiagnosticReport& report);
 
 } // namespace blcad

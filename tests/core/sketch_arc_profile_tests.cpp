@@ -37,10 +37,11 @@ TEST_CASE("ArcSegment rejects collinear three-point arcs", "[core][sketch][arc]"
   CHECK(arc.error().message() == "arc segment three-point definition must not be collinear");
 }
 
-TEST_CASE("Sketch stores trim and extend metadata for explicit curve entities", "[core][sketch][arc]") {
+TEST_CASE("Sketch stores trim and extend metadata for explicit curve entities",
+          "[core][sketch][arc]") {
   Sketch sketch = make_arc_sketch();
-  auto trim = SketchTrimExtendOperation::create_trim(
-      SketchTrimOperationId("trim.arc.top"), SketchEntityId("arc.top"), Point2{8.0, 1.0});
+  auto trim = SketchTrimExtendOperation::create_trim(SketchTrimOperationId("trim.arc.top"),
+                                                     SketchEntityId("arc.top"), Point2{8.0, 1.0});
   REQUIRE(trim);
   REQUIRE(sketch.add_trim_extend_operation(trim.value()));
   CHECK(sketch.trim_extend_operations().size() == 1U);
@@ -51,7 +52,7 @@ TEST_CASE("Sketch validates ordered line and arc closed profiles", "[core][sketc
   Sketch sketch = make_arc_sketch();
   auto profile = ArcClosedProfile::create(
       ProfileId("profile.arc"), {SketchEntityId("line.left"), SketchEntityId("line.bottom"),
-                                  SketchEntityId("line.right"), SketchEntityId("arc.top")});
+                                 SketchEntityId("line.right"), SketchEntityId("arc.top")});
   REQUIRE(profile);
   REQUIRE(sketch.add_profile(profile.value()));
   CHECK(sketch.arc_closed_profiles().size() == 1U);
@@ -70,7 +71,7 @@ TEST_CASE("Sketch rejects self-intersecting line and arc closed profiles", "[cor
 
   auto profile = ArcClosedProfile::create(
       ProfileId("profile.crossing"), {SketchEntityId("line.bottom"), SketchEntityId("line.right"),
-                                       SketchEntityId("arc.crossing"), SketchEntityId("line.left")});
+                                      SketchEntityId("arc.crossing"), SketchEntityId("line.left")});
   REQUIRE(profile);
   auto added = sketch.value().add_profile(profile.value());
   REQUIRE_FALSE(added);

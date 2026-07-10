@@ -20,7 +20,8 @@ bool contains_node(const std::vector<std::string>& nodes, const char* node) {
 }
 
 PartDocument make_document_with_generated_edge_line() {
-  auto document = PartDocument::create(DocumentId("part.semantic_invalidation"), "SemanticInvalidation");
+  auto document =
+      PartDocument::create(DocumentId("part.semantic_invalidation"), "SemanticInvalidation");
   REQUIRE(document);
 
   REQUIRE(document.value().add_parameter(make_length_parameter("part.width", "width", 100.0)));
@@ -39,9 +40,8 @@ PartDocument make_document_with_generated_edge_line() {
   REQUIRE(sketch.value().add_profile(rectangle.value()));
   REQUIRE(document.value().add_sketch(sketch.value()));
 
-  auto feature = Feature::create_additive_extrude(FeatureId("feature.base"), "BaseExtrude",
-                                                  SketchId("sketch.base"),
-                                                  ParameterId("part.depth"));
+  auto feature = Feature::create_additive_extrude(
+      FeatureId("feature.base"), "BaseExtrude", SketchId("sketch.base"), ParameterId("part.depth"));
   REQUIRE(feature);
   REQUIRE(document.value().add_feature(feature.value()));
 
@@ -53,7 +53,8 @@ PartDocument make_document_with_generated_edge_line() {
   auto edge = SemanticEdgeReference::create(FeatureId("feature.base"), SemanticEdge::TopFront);
   REQUIRE(edge);
   auto relation = ConstructionRelation::create_line_parallel_to_generated_edge_through_point(
-      ConstructionRelationId("relation.edge_parallel"), edge.value(), ConstructionPointId("point.offset"));
+      ConstructionRelationId("relation.edge_parallel"), edge.value(),
+      ConstructionPointId("point.offset"));
   REQUIRE(relation);
 
   auto line = ConstructionLine::create_parallel_to_generated_edge_through_point(

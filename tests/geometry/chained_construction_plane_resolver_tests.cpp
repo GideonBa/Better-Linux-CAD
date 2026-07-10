@@ -15,8 +15,8 @@ TEST_CASE("WorkplaneResolver resolves construction planes parallel to planes thr
   REQUIRE(xy);
   REQUIRE(document.value().add_datum_plane(xy.value()));
 
-  auto point = ConstructionPoint::create_explicit(ConstructionPointId("point.offset"), "OffsetPoint",
-                                                  Point3{5.0, 6.0, 7.0});
+  auto point = ConstructionPoint::create_explicit(ConstructionPointId("point.offset"),
+                                                  "OffsetPoint", Point3{5.0, 6.0, 7.0});
   REQUIRE(point);
   REQUIRE(document.value().add_construction_point(point.value()));
 
@@ -31,7 +31,8 @@ TEST_CASE("WorkplaneResolver resolves construction planes parallel to planes thr
   REQUIRE(document.value().add_construction_plane(plane.value()));
 
   const WorkplaneResolver resolver;
-  const auto resolved = resolver.resolve(document.value(), DatumPlaneId("construction_plane.parallel_xy"));
+  const auto resolved =
+      resolver.resolve(document.value(), DatumPlaneId("construction_plane.parallel_xy"));
 
   REQUIRE(resolved);
   CHECK(resolved.value().origin.x == Catch::Approx(5.0));

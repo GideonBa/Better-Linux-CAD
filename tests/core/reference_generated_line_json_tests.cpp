@@ -20,10 +20,11 @@ Parameter make_length_parameter(const char* id, const char* name, double value_m
   return parameter.value();
 }
 
-void add_projected_point_constraint(Sketch& sketch, const char* id, const char* line_id,
-                                    bool start, const char* point_id) {
-  auto constrained = start ? SketchReferenceTarget::create_line_segment_start(SketchEntityId(line_id))
-                           : SketchReferenceTarget::create_line_segment_end(SketchEntityId(line_id));
+void add_projected_point_constraint(Sketch& sketch, const char* id, const char* line_id, bool start,
+                                    const char* point_id) {
+  auto constrained = start
+                         ? SketchReferenceTarget::create_line_segment_start(SketchEntityId(line_id))
+                         : SketchReferenceTarget::create_line_segment_end(SketchEntityId(line_id));
   REQUIRE(constrained);
   auto projected = SketchReferenceTarget::create_projected_point(SketchEntityId(point_id));
   REQUIRE(projected);
@@ -34,7 +35,8 @@ void add_projected_point_constraint(Sketch& sketch, const char* id, const char* 
 }
 
 Sketch make_reference_generated_sketch() {
-  auto sketch = Sketch::create(SketchId("sketch.profile"), "ReferenceProfile", DatumPlaneId("datum.xy"));
+  auto sketch =
+      Sketch::create(SketchId("sketch.profile"), "ReferenceProfile", DatumPlaneId("datum.xy"));
   REQUIRE(sketch);
   for (const auto& pair : {std::pair{"ref.a", "point.a"}, std::pair{"ref.b", "point.b"},
                            std::pair{"ref.c", "point.c"}}) {
@@ -67,17 +69,17 @@ Sketch make_reference_generated_sketch() {
   add_projected_point_constraint(sketch.value(), "constraint.ca.start", "helper.ca", true, "ref.c");
   add_projected_point_constraint(sketch.value(), "constraint.ca.end", "helper.ca", false, "ref.a");
 
-  auto profile = ClosedProfile::create(ProfileId("profile.reference_triangle"),
-                                       {SketchEntityId("helper.ab"), SketchEntityId("helper.bc"),
-                                        SketchEntityId("helper.ca")});
+  auto profile = ClosedProfile::create(
+      ProfileId("profile.reference_triangle"),
+      {SketchEntityId("helper.ab"), SketchEntityId("helper.bc"), SketchEntityId("helper.ca")});
   REQUIRE(profile);
   REQUIRE(sketch.value().add_profile(profile.value()));
   return sketch.value();
 }
 
 PartDocument make_reference_generated_document(bool parameter_driven_points) {
-  auto document = PartDocument::create(DocumentId("part.reference_generated_lines"),
-                                       "ReferenceGeneratedLines");
+  auto document =
+      PartDocument::create(DocumentId("part.reference_generated_lines"), "ReferenceGeneratedLines");
   REQUIRE(document);
   auto xy = DatumPlane::xy();
   REQUIRE(xy);
@@ -103,10 +105,9 @@ PartDocument make_reference_generated_document(bool parameter_driven_points) {
 
   auto sketch = make_reference_generated_sketch();
   REQUIRE(document.value().add_sketch(sketch));
-  auto feature = Feature::create_additive_extrude(FeatureId("feature.reference_triangle"),
-                                                  "ReferenceTriangle",
-                                                  SketchId("sketch.profile"),
-                                                  ParameterId("part.depth"));
+  auto feature =
+      Feature::create_additive_extrude(FeatureId("feature.reference_triangle"), "ReferenceTriangle",
+                                       SketchId("sketch.profile"), ParameterId("part.depth"));
   REQUIRE(feature);
   REQUIRE(document.value().add_feature(feature.value()));
   return document.value();
@@ -118,7 +119,8 @@ bool contains(const std::vector<std::string>& values, const std::string& needle)
 
 } // namespace
 
-TEST_CASE("Reference-generated sketch lines roundtrip through JSON", "[core][json][reference-generated]") {
+TEST_CASE("Reference-generated sketch lines roundtrip through JSON",
+          "[core][json][reference-generated]") {
   PartDocument document = make_reference_generated_document(false);
   auto serialized = serialize_part_document_to_json(document);
   REQUIRE(serialized);

@@ -54,9 +54,9 @@ PartDocument make_face_cut_document(SemanticFace face, DatumPlaneId workplane_id
   REQUIRE(base_sketch.value().add_profile(rectangle.value()));
   REQUIRE(document.value().add_sketch(base_sketch.value()));
 
-  auto base = Feature::create_additive_extrude(FeatureId("feature.base_extrude"), "BaseExtrude",
-                                               SketchId("sketch.base"),
-                                               ParameterId("part.thickness"));
+  auto base =
+      Feature::create_additive_extrude(FeatureId("feature.base_extrude"), "BaseExtrude",
+                                       SketchId("sketch.base"), ParameterId("part.thickness"));
   REQUIRE(base);
   REQUIRE(document.value().add_feature(base.value()));
 
@@ -69,8 +69,8 @@ PartDocument make_face_cut_document(SemanticFace face, DatumPlaneId workplane_id
 
   auto hole_sketch = Sketch::create(hole_sketch_id, hole_sketch_name, workplane_id);
   REQUIRE(hole_sketch);
-  auto circle = CircleProfile::create(hole_profile_id, ParameterId("part.hole_diameter"),
-                                      hole_center);
+  auto circle =
+      CircleProfile::create(hole_profile_id, ParameterId("part.hole_diameter"), hole_center);
   REQUIRE(circle);
   REQUIRE(hole_sketch.value().add_profile(circle.value()));
   REQUIRE(document.value().add_sketch(hole_sketch.value()));
@@ -86,16 +86,15 @@ PartDocument make_face_cut_document(SemanticFace face, DatumPlaneId workplane_id
 PartDocument make_top_face_cut_document(Point2 hole_center = {}) {
   return make_face_cut_document(SemanticFace::Top, DatumPlaneId("workplane.base_top"),
                                 "BaseTopFace", SketchId("sketch.top_hole"), "Sketch_TopHole",
-                                ProfileId("profile.top_hole"),
-                                FeatureId("feature.top_hole_cut"), "TopHoleCut", hole_center);
+                                ProfileId("profile.top_hole"), FeatureId("feature.top_hole_cut"),
+                                "TopHoleCut", hole_center);
 }
 
 PartDocument make_bottom_face_cut_document(Point2 hole_center = {}) {
   return make_face_cut_document(SemanticFace::Bottom, DatumPlaneId("workplane.base_bottom"),
                                 "BaseBottomFace", SketchId("sketch.bottom_hole"),
                                 "Sketch_BottomHole", ProfileId("profile.bottom_hole"),
-                                FeatureId("feature.bottom_hole_cut"), "BottomHoleCut",
-                                hole_center);
+                                FeatureId("feature.bottom_hole_cut"), "BottomHoleCut", hole_center);
 }
 
 ShapeCache make_shape_cache() {
@@ -174,7 +173,8 @@ TEST_CASE("MVP-2 seed recomputes a cut from a sketch on a derived bottom-face wo
   REQUIRE(final_summary.solid_count == 1);
 
   const double expected_removed_volume = std::numbers::pi * 10.0 * 10.0 * 8.0;
-  CHECK(final_summary.volume_mm3 == Catch::Approx(base_volume - expected_removed_volume).margin(1.0));
+  CHECK(final_summary.volume_mm3 ==
+        Catch::Approx(base_volume - expected_removed_volume).margin(1.0));
 }
 
 TEST_CASE("Derived top-face workplane cut follows an off-center sketch point",
@@ -198,7 +198,8 @@ TEST_CASE("Derived top-face workplane cut follows an off-center sketch point",
   REQUIRE(final_summary.solid_count == 1);
 
   const double expected_removed_volume = std::numbers::pi * 10.0 * 10.0 * 8.0;
-  CHECK(final_summary.volume_mm3 == Catch::Approx(base_volume - expected_removed_volume).margin(1.0));
+  CHECK(final_summary.volume_mm3 ==
+        Catch::Approx(base_volume - expected_removed_volume).margin(1.0));
 }
 
 TEST_CASE("Derived top-face workplane accepts a near-edge hole inside the face bounds",
@@ -226,7 +227,8 @@ TEST_CASE("Derived top-face workplane rejects holes outside the face bounds",
   REQUIRE(summary.has_error());
   CHECK(summary.error().category() == ErrorCategory::Validation);
   CHECK(summary.error().object_id() == "profile.top_hole");
-  CHECK(summary.error().message() == "circle profile must lie fully inside resolved workplane bounds");
+  CHECK(summary.error().message() ==
+        "circle profile must lie fully inside resolved workplane bounds");
 
   const GeometryShape* base_shape = cache.find_feature_shape(FeatureId("feature.base_extrude"));
   REQUIRE(base_shape != nullptr);
@@ -289,7 +291,8 @@ TEST_CASE("Incremental recompute follows derived-workplane dependency paths",
   const RectangleExtrusionAdapter inspector;
   const GeometryShape* base_shape = cache.find_feature_shape(FeatureId("feature.base_extrude"));
   REQUIRE(base_shape != nullptr);
-  CHECK(inspector.summarize(*base_shape).volume_mm3 == Catch::Approx(140.0 * 80.0 * 8.0).margin(1.0));
+  CHECK(inspector.summarize(*base_shape).volume_mm3 ==
+        Catch::Approx(140.0 * 80.0 * 8.0).margin(1.0));
 
   REQUIRE(cache.final_shape() != nullptr);
   const double expected_removed_volume = std::numbers::pi * 10.0 * 10.0 * 8.0;
@@ -297,8 +300,9 @@ TEST_CASE("Incremental recompute follows derived-workplane dependency paths",
         Catch::Approx(140.0 * 80.0 * 8.0 - expected_removed_volume).margin(1.0));
 }
 
-TEST_CASE("Incremental recompute rejects a previously valid derived-workplane hole after shrinking base",
-          "[geometry][workplane][incremental]") {
+TEST_CASE(
+    "Incremental recompute rejects a previously valid derived-workplane hole after shrinking base",
+    "[geometry][workplane][incremental]") {
   auto document = make_top_face_cut_document(Point2{50.0, 0.0});
   ShapeCache cache = make_shape_cache();
   const GeometryRecomputeExecutor executor;
@@ -325,7 +329,8 @@ TEST_CASE("Incremental recompute rejects a previously valid derived-workplane ho
   REQUIRE(summary.has_error());
   CHECK(summary.error().category() == ErrorCategory::Validation);
   CHECK(summary.error().object_id() == "profile.top_hole");
-  CHECK(summary.error().message() == "circle profile must lie fully inside resolved workplane bounds");
+  CHECK(summary.error().message() ==
+        "circle profile must lie fully inside resolved workplane bounds");
 
   const GeometryShape* base_shape = cache.find_feature_shape(FeatureId("feature.base_extrude"));
   REQUIRE(base_shape != nullptr);

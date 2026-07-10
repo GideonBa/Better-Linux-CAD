@@ -53,9 +53,9 @@ PartDocument make_reference_part_document() {
   REQUIRE(hole_sketch.value().add_profile(circle.value()));
   REQUIRE(document.value().add_sketch(hole_sketch.value()));
 
-  auto base = Feature::create_additive_extrude(FeatureId("feature.base_extrude"), "BaseExtrude",
-                                               SketchId("sketch.base"),
-                                               ParameterId("part.thickness"));
+  auto base =
+      Feature::create_additive_extrude(FeatureId("feature.base_extrude"), "BaseExtrude",
+                                       SketchId("sketch.base"), ParameterId("part.thickness"));
   REQUIRE(base);
   REQUIRE(document.value().add_feature(base.value()));
 
@@ -113,7 +113,7 @@ TEST_CASE("PartDocument JSON round-trips MVP-1 model intent", "[core][json]") {
   CHECK(restored.value().dependency_graph().has_dependency("part.width", "sketch.base"));
   CHECK(restored.value().dependency_graph().has_dependency("sketch.base", "feature.base_extrude"));
   CHECK(restored.value().dependency_graph().has_dependency("feature.base_extrude",
-                                                          "feature.center_hole_cut"));
+                                                           "feature.center_hole_cut"));
 
   const auto clean_plan = restored.value().create_recompute_plan();
   REQUIRE(clean_plan);
@@ -122,7 +122,8 @@ TEST_CASE("PartDocument JSON round-trips MVP-1 model intent", "[core][json]") {
 
 TEST_CASE("PartDocument JSON file helpers write and read MVP-1 model files", "[core][json]") {
   const PartDocument document = make_reference_part_document();
-  const auto path = std::filesystem::temp_directory_path() / "blcad_reference_plate_test.blcad.json";
+  const auto path =
+      std::filesystem::temp_directory_path() / "blcad_reference_plate_test.blcad.json";
   std::filesystem::remove(path);
 
   const auto written = write_part_document_json_file(document, path);
@@ -138,7 +139,7 @@ TEST_CASE("PartDocument JSON file helpers write and read MVP-1 model files", "[c
   CHECK(restored.value().parameter_count() == 4);
   CHECK(restored.value().feature_count() == 2);
   CHECK(restored.value().dependency_graph().has_dependency("feature.base_extrude",
-                                                          "feature.center_hole_cut"));
+                                                           "feature.center_hole_cut"));
 
   std::filesystem::remove(path);
 }

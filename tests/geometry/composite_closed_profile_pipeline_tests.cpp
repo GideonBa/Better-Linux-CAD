@@ -51,9 +51,9 @@ PartDocument make_additive_document() {
   REQUIRE(xy);
   REQUIRE(document.value().add_datum_plane(xy.value()));
   REQUIRE(document.value().add_sketch(make_composite_sketch(SketchId("sketch.composite"))));
-  auto feature = Feature::create_additive_extrude(FeatureId("feature.composite"), "Composite",
-                                                  SketchId("sketch.composite"),
-                                                  ParameterId("part.depth"));
+  auto feature =
+      Feature::create_additive_extrude(FeatureId("feature.composite"), "Composite",
+                                       SketchId("sketch.composite"), ParameterId("part.depth"));
   REQUIRE(feature);
   REQUIRE(document.value().add_feature(feature.value()));
   return document.value();
@@ -76,16 +76,15 @@ PartDocument make_subtractive_document() {
   REQUIRE(base_profile);
   REQUIRE(base_sketch.value().add_profile(base_profile.value()));
   REQUIRE(document.value().add_sketch(base_sketch.value()));
-  auto base_feature = Feature::create_additive_extrude(FeatureId("feature.base"), "Base",
-                                                       SketchId("sketch.base"),
-                                                       ParameterId("part.depth"));
+  auto base_feature = Feature::create_additive_extrude(
+      FeatureId("feature.base"), "Base", SketchId("sketch.base"), ParameterId("part.depth"));
   REQUIRE(base_feature);
   REQUIRE(document.value().add_feature(base_feature.value()));
 
   REQUIRE(document.value().add_sketch(make_composite_sketch(SketchId("sketch.composite"))));
-  auto cut_feature = Feature::create_subtractive_extrude(FeatureId("feature.composite_cut"), "Cut",
-                                                         SketchId("sketch.composite"),
-                                                         FeatureId("feature.base"));
+  auto cut_feature =
+      Feature::create_subtractive_extrude(FeatureId("feature.composite_cut"), "Cut",
+                                          SketchId("sketch.composite"), FeatureId("feature.base"));
   REQUIRE(cut_feature);
   REQUIRE(document.value().add_feature(cut_feature.value()));
   return document.value();

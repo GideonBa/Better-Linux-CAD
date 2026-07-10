@@ -22,8 +22,7 @@ enum class SketchRepairDisplayPriority { Low, Normal, High };
 
 class SketchRepairAffectedCounts {
 public:
-  SketchRepairAffectedCounts(std::size_t added_constraints,
-                             std::size_t removed_constraints,
+  SketchRepairAffectedCounts(std::size_t added_constraints, std::size_t removed_constraints,
                              std::size_t removed_dimensions);
 
   [[nodiscard]] std::size_t added_constraints() const noexcept;
@@ -40,8 +39,7 @@ private:
 
 class SketchRepairPresentationMetadata {
 public:
-  SketchRepairPresentationMetadata(std::string label_id,
-                                   SketchRepairDisplayCategory category,
+  SketchRepairPresentationMetadata(std::string label_id, SketchRepairDisplayCategory category,
                                    SketchRepairDisplayPriority priority,
                                    SketchRepairAffectedCounts affected_counts,
                                    std::string affected_summary);
@@ -62,10 +60,10 @@ private:
 
 class SketchRepairPresentationMetadataProvider {
 public:
-  [[nodiscard]] SketchRepairPresentationMetadata metadata_for(
-      SketchRepairSuggestionAction action) const;
-  [[nodiscard]] SketchRepairPresentationMetadata metadata_for(
-      const SketchRepairUndoStackSummaryEntry& entry) const;
+  [[nodiscard]] SketchRepairPresentationMetadata
+  metadata_for(SketchRepairSuggestionAction action) const;
+  [[nodiscard]] SketchRepairPresentationMetadata
+  metadata_for(const SketchRepairUndoStackSummaryEntry& entry) const;
 };
 
 } // namespace blcad

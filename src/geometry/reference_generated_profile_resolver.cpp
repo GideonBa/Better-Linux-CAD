@@ -40,8 +40,9 @@ constexpr double k_tolerance = 1.0e-9;
   return std::abs(cross(normalize(left), normalize(right))) <= k_tolerance;
 }
 
-[[nodiscard]] const ReferenceGeneratedLine* find_reference_generated_line(
-    const std::vector<ReferenceGeneratedLine>& lines, SketchEntityId id) noexcept {
+[[nodiscard]] const ReferenceGeneratedLine*
+find_reference_generated_line(const std::vector<ReferenceGeneratedLine>& lines,
+                              SketchEntityId id) noexcept {
   for (const auto& line : lines) {
     if (line.id() == id) {
       return &line;
@@ -52,8 +53,9 @@ constexpr double k_tolerance = 1.0e-9;
 
 } // namespace
 
-Result<LineSegment> ReferenceGeneratedProfileResolver::resolve_line(
-    const PartDocument& document, const Sketch& sketch, const ReferenceGeneratedLine& line) const {
+Result<LineSegment>
+ReferenceGeneratedProfileResolver::resolve_line(const PartDocument& document, const Sketch& sketch,
+                                                const ReferenceGeneratedLine& line) const {
   const SketchConstraint* start_constraint = sketch.find_constraint(line.start_constraint());
   if (start_constraint == nullptr) {
     return Result<LineSegment>::failure(validation_error(
@@ -73,14 +75,15 @@ Result<LineSegment> ReferenceGeneratedProfileResolver::resolve_line(
   }
 
   if (line.direction_constraint().has_value()) {
-    const SketchConstraint* direction_constraint = sketch.find_constraint(line.direction_constraint().value());
+    const SketchConstraint* direction_constraint =
+        sketch.find_constraint(line.direction_constraint().value());
     if (direction_constraint == nullptr) {
       return Result<LineSegment>::failure(validation_error(
           line.id().value(), "reference-generated line direction constraint must exist in sketch"));
     }
 
-    auto projected_direction = helper.resolve_projected_line_constraint(document, sketch,
-                                                                        *direction_constraint);
+    auto projected_direction =
+        helper.resolve_projected_line_constraint(document, sketch, *direction_constraint);
     if (projected_direction.has_error()) {
       return Result<LineSegment>::failure(projected_direction.error());
     }
@@ -88,12 +91,13 @@ Result<LineSegment> ReferenceGeneratedProfileResolver::resolve_line(
     const Vector2 line_direction = vector_between(resolved.value().start(), resolved.value().end());
     if (!same_direction(line_direction, projected_direction.value().direction)) {
       return Result<LineSegment>::failure(validation_error(
-          line.id().value(), "reference-generated line direction must match projected-line constraint"));
+          line.id().value(),
+          "reference-generated line direction must match projected-line constraint"));
     }
 
     if (direction_constraint->kind() == SketchConstraintKind::CollinearWithProjectedLine) {
-      const Vector2 anchor_to_line = vector_between(projected_direction.value().point,
-                                                    resolved.value().start());
+      const Vector2 anchor_to_line =
+          vector_between(projected_direction.value().point, resolved.value().start());
       if (std::abs(cross(anchor_to_line, projected_direction.value().direction)) > k_tolerance) {
         return Result<LineSegment>::failure(validation_error(
             line.id().value(), "reference-generated line must be collinear with projected line"));
@@ -124,7 +128,8 @@ Result<std::vector<Point2>> ReferenceGeneratedProfileResolver::resolve_closed_pr
     const LineSegment* explicit_line = sketch.find_line_segment(id);
     if (explicit_line == nullptr) {
       return Result<std::vector<Point2>>::failure(validation_error(
-          profile.id().value(), "closed profile line id must resolve to an explicit or reference-generated line"));
+          profile.id().value(),
+          "closed profile line id must resolve to an explicit or reference-generated line"));
     }
     resolved_lines.push_back(*explicit_line);
   }
@@ -134,7 +139,8 @@ Result<std::vector<Point2>> ReferenceGeneratedProfileResolver::resolve_closed_pr
     const LineSegment& next = resolved_lines[(index + 1U) % resolved_lines.size()];
     if (!same_point(current.end(), next.start())) {
       return Result<std::vector<Point2>>::failure(validation_error(
-          profile.id().value(), "reference-generated closed profile lines must be ordered and connected"));
+          profile.id().value(),
+          "reference-generated closed profile lines must be ordered and connected"));
     }
   }
 

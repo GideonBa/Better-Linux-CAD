@@ -49,11 +49,12 @@ constexpr double k_tolerance = 1.0e-9;
   const Vector3 relative = vector_between(workplane.origin, point);
   const double distance = dot(relative, workplane.normal);
   if (std::abs(distance) > k_tolerance) {
-    return Result<Point2>::failure(validation_error(
-        object_id, "projected sketch reference must lie on the sketch workplane"));
+    return Result<Point2>::failure(
+        validation_error(object_id, "projected sketch reference must lie on the sketch workplane"));
   }
 
-  return Result<Point2>::success(Point2{dot(relative, workplane.x_axis), dot(relative, workplane.y_axis)});
+  return Result<Point2>::success(
+      Point2{dot(relative, workplane.x_axis), dot(relative, workplane.y_axis)});
 }
 
 [[nodiscard]] Result<ResolvedSketchLineReference>
@@ -62,8 +63,8 @@ make_projected_line(SketchEntityId id, const ResolvedWorkplane& workplane, Point
   const std::string object_id = id.value();
   if (std::abs(signed_distance_to_workplane(workplane, point)) > k_tolerance ||
       std::abs(dot(direction, workplane.normal)) > k_tolerance) {
-    return Result<ResolvedSketchLineReference>::failure(validation_error(
-        object_id, "projected sketch line must lie on the sketch workplane"));
+    return Result<ResolvedSketchLineReference>::failure(
+        validation_error(object_id, "projected sketch line must lie on the sketch workplane"));
   }
 
   auto local_point = project_point_to_workplane(workplane, point, object_id);
@@ -116,7 +117,8 @@ SketchReferenceProjector::resolve_point(const PartDocument& document, const Sket
     source_point = resolved.value().position;
   }
 
-  auto local_point = project_point_to_workplane(workplane.value(), source_point, reference.id().value());
+  auto local_point =
+      project_point_to_workplane(workplane.value(), source_point, reference.id().value());
   if (local_point.has_error()) {
     return Result<ResolvedSketchPointReference>::failure(local_point.error());
   }

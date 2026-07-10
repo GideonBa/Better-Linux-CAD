@@ -48,14 +48,17 @@ Result<ReferenceGeneratedLine> ReferenceGeneratedLine::create_with_projected_lin
   return line;
 }
 
-const SketchEntityId& ReferenceGeneratedLine::id() const noexcept { return id_; }
+const SketchEntityId& ReferenceGeneratedLine::id() const noexcept {
+  return id_;
+}
 const SketchConstraintId& ReferenceGeneratedLine::start_constraint() const noexcept {
   return start_constraint_;
 }
 const SketchConstraintId& ReferenceGeneratedLine::end_constraint() const noexcept {
   return end_constraint_;
 }
-const std::optional<SketchConstraintId>& ReferenceGeneratedLine::direction_constraint() const noexcept {
+const std::optional<SketchConstraintId>&
+ReferenceGeneratedLine::direction_constraint() const noexcept {
   return direction_constraint_;
 }
 
@@ -63,13 +66,15 @@ ReferenceGeneratedLine::ReferenceGeneratedLine(
     SketchEntityId id, SketchConstraintId start_constraint, SketchConstraintId end_constraint,
     std::optional<SketchConstraintId> direction_constraint)
     : id_(std::move(id)), start_constraint_(std::move(start_constraint)),
-      end_constraint_(std::move(end_constraint)), direction_constraint_(std::move(direction_constraint)) {}
+      end_constraint_(std::move(end_constraint)),
+      direction_constraint_(std::move(direction_constraint)) {}
 
 const std::vector<ReferenceGeneratedLine>& Sketch::reference_generated_lines() const noexcept {
   return reference_generated_lines_;
 }
 
-const ReferenceGeneratedLine* Sketch::find_reference_generated_line(SketchEntityId id) const noexcept {
+const ReferenceGeneratedLine*
+Sketch::find_reference_generated_line(SketchEntityId id) const noexcept {
   for (const auto& line : reference_generated_lines_) {
     if (line.id() == id) {
       return &line;

@@ -36,10 +36,9 @@ SketchReferenceTarget line_end(const char* id) {
 
 const SketchRepairSuggestion* find_action(const SketchRepairSuggestionReport& report,
                                           SketchRepairSuggestionAction action) {
-  const auto found = std::find_if(report.suggestions().begin(), report.suggestions().end(),
-                                  [action](const SketchRepairSuggestion& suggestion) {
-                                    return suggestion.action() == action;
-                                  });
+  const auto found = std::find_if(
+      report.suggestions().begin(), report.suggestions().end(),
+      [action](const SketchRepairSuggestion& suggestion) { return suggestion.action() == action; });
   return found == report.suggestions().end() ? nullptr : &*found;
 }
 
@@ -54,12 +53,14 @@ SketchRepairSuggestionReport suggestions_for(const Sketch& sketch) {
 
 TEST_CASE("Sketch repair transaction undoes added fixed endpoint constraints",
           "[core][sketch-repair-transaction]") {
-  auto sketch = Sketch::create(SketchId("sketch.transaction.fixed"), "Fixed", DatumPlaneId("datum.xy"));
+  auto sketch =
+      Sketch::create(SketchId("sketch.transaction.fixed"), "Fixed", DatumPlaneId("datum.xy"));
   REQUIRE(sketch);
   add_line(sketch.value(), "line.free", Point2{0.0, 0.0}, Point2{10.0, 0.0});
 
   const auto suggestions = suggestions_for(sketch.value());
-  const auto* suggestion = find_action(suggestions, SketchRepairSuggestionAction::AddFixedEndpointConstraint);
+  const auto* suggestion =
+      find_action(suggestions, SketchRepairSuggestionAction::AddFixedEndpointConstraint);
   REQUIRE(suggestion != nullptr);
 
   const SketchRepairTransactionExecutor executor;
@@ -68,14 +69,17 @@ TEST_CASE("Sketch repair transaction undoes added fixed endpoint constraints",
   CHECK(transaction.value().applied());
   CHECK(transaction.value().undoable());
   REQUIRE(transaction.value().added_geometric_constraints().size() == 1U);
-  CHECK(sketch.value().find_geometric_constraint(SketchConstraintId("repair.fixed.line.free.start")) != nullptr);
+  CHECK(sketch.value().find_geometric_constraint(
+            SketchConstraintId("repair.fixed.line.free.start")) != nullptr);
 
   auto undo = executor.undo(sketch.value(), transaction.value());
   REQUIRE(undo);
   CHECK(undo.value().undone());
   REQUIRE(undo.value().removed_constraint_ids().size() == 1U);
-  CHECK(undo.value().removed_constraint_ids().front() == SketchConstraintId("repair.fixed.line.free.start"));
-  CHECK(sketch.value().find_geometric_constraint(SketchConstraintId("repair.fixed.line.free.start")) == nullptr);
+  CHECK(undo.value().removed_constraint_ids().front() ==
+        SketchConstraintId("repair.fixed.line.free.start"));
+  CHECK(sketch.value().find_geometric_constraint(
+            SketchConstraintId("repair.fixed.line.free.start")) == nullptr);
 }
 
 TEST_CASE("Sketch repair transaction undoes removed duplicate fixed endpoint constraints",
@@ -104,7 +108,8 @@ TEST_CASE("Sketch repair transaction undoes removed duplicate fixed endpoint con
   REQUIRE(transaction);
   CHECK(transaction.value().applied());
   REQUIRE(transaction.value().removed_geometric_constraints().size() == 1U);
-  CHECK(transaction.value().removed_geometric_constraints().front().id() == SketchConstraintId("constraint.b"));
+  CHECK(transaction.value().removed_geometric_constraints().front().id() ==
+        SketchConstraintId("constraint.b"));
   CHECK(sketch.value().find_geometric_constraint(SketchConstraintId("constraint.a")) != nullptr);
   CHECK(sketch.value().find_geometric_constraint(SketchConstraintId("constraint.b")) == nullptr);
 
@@ -125,17 +130,19 @@ TEST_CASE("Sketch repair transaction undoes removed duplicate driving dimensions
   add_line(sketch.value(), "line.a", Point2{0.0, 0.0}, Point2{10.0, 0.0});
 
   auto dim_a = SketchDrivingDimension::create_horizontal_distance(
-      SketchDimensionId("dim.a"), line_start("line.a"), line_end("line.a"), ParameterId("part.width"));
+      SketchDimensionId("dim.a"), line_start("line.a"), line_end("line.a"),
+      ParameterId("part.width"));
   auto dim_b = SketchDrivingDimension::create_horizontal_distance(
-      SketchDimensionId("dim.b"), line_start("line.a"), line_end("line.a"), ParameterId("part.width.b"));
+      SketchDimensionId("dim.b"), line_start("line.a"), line_end("line.a"),
+      ParameterId("part.width.b"));
   REQUIRE(dim_a);
   REQUIRE(dim_b);
   REQUIRE(sketch.value().add_dimension(dim_b.value()));
   REQUIRE(sketch.value().add_dimension(dim_a.value()));
 
   const auto suggestions = suggestions_for(sketch.value());
-  const auto* suggestion = find_action(suggestions,
-                                       SketchRepairSuggestionAction::RemoveDuplicateDrivingDimension);
+  const auto* suggestion =
+      find_action(suggestions, SketchRepairSuggestionAction::RemoveDuplicateDrivingDimension);
   REQUIRE(suggestion != nullptr);
 
   const SketchRepairTransactionExecutor executor;
@@ -143,7 +150,8 @@ TEST_CASE("Sketch repair transaction undoes removed duplicate driving dimensions
   REQUIRE(transaction);
   CHECK(transaction.value().applied());
   REQUIRE(transaction.value().removed_driving_dimensions().size() == 1U);
-  CHECK(transaction.value().removed_driving_dimensions().front().id() == SketchDimensionId("dim.b"));
+  CHECK(transaction.value().removed_driving_dimensions().front().id() ==
+        SketchDimensionId("dim.b"));
   CHECK(sketch.value().find_driving_dimension(SketchDimensionId("dim.a")) != nullptr);
   CHECK(sketch.value().find_driving_dimension(SketchDimensionId("dim.b")) == nullptr);
 
@@ -185,6 +193,8 @@ TEST_CASE("Sketch repair transaction skips undo for unsupported command results"
   auto undo = executor.undo(sketch.value(), transaction.value());
   REQUIRE(undo);
   CHECK(undo.value().status() == SketchRepairTransactionStatus::SkippedUnsupported);
-  CHECK(sketch.value().find_geometric_constraint(SketchConstraintId("constraint.horizontal")) != nullptr);
-  CHECK(sketch.value().find_geometric_constraint(SketchConstraintId("constraint.vertical")) != nullptr);
+  CHECK(sketch.value().find_geometric_constraint(SketchConstraintId("constraint.horizontal")) !=
+        nullptr);
+  CHECK(sketch.value().find_geometric_constraint(SketchConstraintId("constraint.vertical")) !=
+        nullptr);
 }

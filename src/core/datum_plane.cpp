@@ -80,8 +80,9 @@ std::string_view to_string(SemanticVertex vertex) noexcept {
 
 Result<SemanticFaceReference> SemanticFaceReference::create(FeatureId source_feature,
                                                             SemanticFace face) {
-  const auto object_id = source_feature.empty() ? std::string("semantic_face")
-                                                : source_feature.value() + "." + std::string(to_string(face));
+  const auto object_id = source_feature.empty()
+                             ? std::string("semantic_face")
+                             : source_feature.value() + "." + std::string(to_string(face));
 
   if (source_feature.empty()) {
     return Result<SemanticFaceReference>::failure(
@@ -210,8 +211,9 @@ DatumPlane::DatumPlane(DatumPlaneId id, std::string name, Point3 origin, Vector3
     : id_(std::move(id)), name_(std::move(name)), origin_(origin), x_axis_(x_axis), y_axis_(y_axis),
       normal_(normal) {}
 
-Result<DerivedWorkplane> DerivedWorkplane::create_on_feature_face(
-    DatumPlaneId id, std::string name, SemanticFaceReference face_reference) {
+Result<DerivedWorkplane>
+DerivedWorkplane::create_on_feature_face(DatumPlaneId id, std::string name,
+                                         SemanticFaceReference face_reference) {
   const auto object_id = id.empty() ? std::string("derived_workplane") : id.value();
 
   if (id.empty()) {

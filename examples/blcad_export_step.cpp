@@ -14,8 +14,8 @@ void print_usage(std::string_view program_name) {
 }
 
 void print_error(const blcad::Error& error) {
-  std::cerr << "error[" << blcad::to_string(error.category()) << "] " << error.object_id()
-            << ": " << error.message() << '\n';
+  std::cerr << "error[" << blcad::to_string(error.category()) << "] " << error.object_id() << ": "
+            << error.message() << '\n';
 }
 
 } // namespace
@@ -47,7 +47,8 @@ int main(int argc, char** argv) {
 
   const blcad::geometry::GeometryShape* final_shape = cache.value().final_shape();
   if (final_shape == nullptr) {
-    print_error(blcad::Error::geometry("shape_cache.cli_export", "recompute produced no final shape"));
+    print_error(
+        blcad::Error::geometry("shape_cache.cli_export", "recompute produced no final shape"));
     return 1;
   }
 

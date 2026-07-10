@@ -326,21 +326,73 @@ Still not implemented in this block:
 - parameter-creating repairs
 - full solve iteration or exact DOF counting
 
-## Next MVP: Sketch repair presentation snapshot grouping seed
+## Frozen block: Sketch repair presentation helpers
 
-Goal: add read-only grouping helpers for presentation snapshots so CLI and future GUI code can display deterministic grouped repair-history sections after optional filtering.
+The sketch-repair presentation chain (commands, transactions, undo stack, summaries, labels, metadata, snapshots, snapshot queries) is complete enough for the current headless stage. It has no consumers outside its own tests yet, and `docs/user-interface.md` keeps GUI work out of scope until the core model path is reliable.
+
+Decision: no further presentation-layer increments (grouping, sorting, localization, icons, widgets) until a first GUI or CLI consumer exists. Development returns to the numbered core-CAD MVP sequence.
+
+## Implemented block: MVP 3 parametric bolt circle pattern
+
+Detailed document: `docs/bolt-circle-pattern-mvp3.md`
+
+Implemented scope:
+
+- `QuantityKind` with `LengthMm` and `Count`, `Quantity::count`, and `Quantity::count_value`
+- `ParameterType::Count` and `Parameter::create_count` for whole-number parameters
+- JSON parameter type `count` with unit `"1"`
+- `CircularHolePattern` sketch record with center, angle offset, radius parameter, count parameter, and hole diameter parameter
+- parameter existence and type validation in `PartDocument::add_sketch`
+- dependency edges from all three pattern parameters to the owning sketch
+- subtractive recompute expands the pattern into sequential through-all circular cuts with per-hole bounds validation
+- JSON roundtrip for count parameters and `circular_hole_patterns`
+- checked-in `examples/bolt_circle_plate.blcad.json` with headless STEP export
+- incremental recompute tests: changing `bolt_count` from 6 to 12 and changing `bolt_circle_radius` recompute the affected features only
+- cross-kind profile-id uniqueness fix: `has_profile_id` now covers rectangle, circle, closed, arc, composite, and pattern profiles
+
+Still not implemented in this block:
+
+- assembly-scoped parameters shared across parts (MVP 4)
+- hole semantics such as clearance class, threads, and countersinks (`docs/hole-wizard.md`)
+- skip instances and partial-angle patterns (`docs/pattern-and-mirror-features.md`)
+- seed-feature patterns that repeat arbitrary features
+
+## Implemented block: MVP 4 seed, assembly parameters shared across parts
+
+Detailed document: `docs/assembly-parameters-mvp4.md`
+
+Implemented scope:
+
+- `AssemblyDocument` with assembly-scoped parameters (`ParameterScope::Assembly`)
+- member part registration by `DocumentId`
+- `ParameterBinding` records: a part parameter follows an assembly parameter
+- binding validation: membership, existing assembly parameter, one binding per part parameter
+- `apply_bindings_to(PartDocument&)` propagates values through `PartDocument::set_parameter_value`, so part invalidation and recompute planning work unchanged
+- length/count type agreement is enforced at application time
+- JSON schema `blcad.assembly_document.mvp4` with roundtrip tests
+- checked-in `examples/flange_assembly.blcad.json` binding the bolt-circle plate example
+- geometry end-to-end test: changing `assembly.bolt_count` from 6 to 8 recomputes two member plates to the expected volumes
+
+Still not implemented in this block:
+
+- a project container that owns assembly and parts and auto-propagates after assembly edits
+- component instances, transforms, and assembly constraints (MVP 5, `docs/assembly-system.md`)
+- expressions over assembly parameters and a global/project scope (`docs/parameter-model.md`)
+
+## Next MVP: Project container for assembly and member parts
+
+Goal: one on-disk project that owns an assembly document and its member part documents, so assembly edits propagate without manual per-part calls and the whole model round-trips through one file set.
 
 Proposed first implementation sequence:
 
-- add `SketchRepairPresentationSnapshotGroup` and `SketchRepairPresentationSnapshotGrouping` or equivalent records
-- add a `SketchRepairPresentationSnapshotGroupingEngine` that consumes unfiltered or queried snapshots
-- support grouping by display category and display priority
-- preserve deterministic within-group ordering from the source snapshot
-- expose group counts, group labels, first/latest entry metadata, and empty-group handling
-- add a distinct grouped snapshot debug JSON schema with grouping metadata
-- keep query/filter helpers separate from grouping helpers so callers can filter first and group second
-- add core tests for category grouping, priority grouping, deterministic order, empty groups, group counts, grouped latest entries, and JSON output
-- keep localization, icons, GUI widgets, custom sorting, persistent history, redo, multi-sketch grouping, timestamps, parameter-creating repairs, full solve iteration, exact DOF counting, and arbitrary model rewriting deferred
+- add a `Project` (or `ProjectFile`) model owning one `AssemblyDocument` and its member `PartDocument`s
+- validate that every assembly member id resolves to an owned part document
+- after `set_parameter_value` on the assembly, apply bindings to all affected member parts automatically
+- surface per-part recompute plans (or one combined plan summary) from a single project-level update call
+- add JSON persistence: either one project file embedding the documents or a manifest referencing part files (`docs/file-format.md`)
+- extend the headless example so one command loads a project, updates an assembly parameter, recomputes, and exports all member parts to STEP
+- add tests: membership validation, automatic propagation, per-part invalidation, JSON roundtrip, headless export
+- keep component instances and constraints out of scope (MVP 5)
 
 ## Future roadmap: Multi-body transforms and path features
 

@@ -28,13 +28,13 @@ Sketch make_arc_sketch() {
   add_line(sketch.value(), "line.bottom", Point2{-10.0, -10.0}, Point2{10.0, -10.0});
   add_line(sketch.value(), "line.right", Point2{10.0, -10.0}, Point2{10.0, 0.0});
   add_arc(sketch.value(), "arc.top", Point2{10.0, 0.0}, Point2{0.0, 10.0}, Point2{-10.0, 0.0});
-  auto trim = SketchTrimExtendOperation::create_trim(
-      SketchTrimOperationId("trim.arc.top"), SketchEntityId("arc.top"), Point2{8.0, 1.0});
+  auto trim = SketchTrimExtendOperation::create_trim(SketchTrimOperationId("trim.arc.top"),
+                                                     SketchEntityId("arc.top"), Point2{8.0, 1.0});
   REQUIRE(trim);
   REQUIRE(sketch.value().add_trim_extend_operation(trim.value()));
   auto profile = ArcClosedProfile::create(
       ProfileId("profile.arc"), {SketchEntityId("line.left"), SketchEntityId("line.bottom"),
-                                  SketchEntityId("line.right"), SketchEntityId("arc.top")});
+                                 SketchEntityId("line.right"), SketchEntityId("arc.top")});
   REQUIRE(profile);
   REQUIRE(sketch.value().add_profile(profile.value()));
   return sketch.value();

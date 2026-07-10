@@ -14,10 +14,10 @@ public:
   SketchRepairPresentationSnapshotQuery();
 
   [[nodiscard]] static SketchRepairPresentationSnapshotQuery all();
-  [[nodiscard]] static SketchRepairPresentationSnapshotQuery with_category(
-      SketchRepairDisplayCategory category);
-  [[nodiscard]] static SketchRepairPresentationSnapshotQuery with_priority(
-      SketchRepairDisplayPriority priority);
+  [[nodiscard]] static SketchRepairPresentationSnapshotQuery
+  with_category(SketchRepairDisplayCategory category);
+  [[nodiscard]] static SketchRepairPresentationSnapshotQuery
+  with_priority(SketchRepairDisplayPriority priority);
 
   void set_category_filter(SketchRepairDisplayCategory category);
   void clear_category_filter() noexcept;
@@ -81,12 +81,13 @@ private:
 
 class SketchRepairPresentationSnapshotQueryEngine {
 public:
-  [[nodiscard]] SketchRepairPresentationSnapshotQueryResult execute(
-      const SketchRepairPresentationSnapshot& snapshot,
-      const SketchRepairPresentationSnapshotQuery& query) const;
+  [[nodiscard]] SketchRepairPresentationSnapshotQueryResult
+  execute(const SketchRepairPresentationSnapshot& snapshot,
+          const SketchRepairPresentationSnapshotQuery& query) const;
 };
 
-[[nodiscard]] Result<std::string> serialize_sketch_repair_presentation_snapshot_query_result_to_json(
+[[nodiscard]] Result<std::string>
+serialize_sketch_repair_presentation_snapshot_query_result_to_json(
     const SketchRepairPresentationSnapshotQueryResult& result);
 
 } // namespace blcad

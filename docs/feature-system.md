@@ -134,6 +134,8 @@ Sketch_HoleCircle
 
 Changing `Assembly.bolt_count` from 8 to 12 produces twelve holes; changing `Assembly.bolt_circle_radius` moves the holes outward in every dependent part. The bolt circle is produced in practice by the hole wizard plus a circular pattern.
 
+A first part-scoped seed of this pattern is implemented: `CircularHolePattern` with count parameters, dependency edges, recompute expansion into circular cuts, and JSON persistence. See `docs/bolt-circle-pattern-mvp3.md`. Assembly-scoped sharing has a first seed too: `AssemblyDocument` parameter bindings can drive the pattern parameters of several parts (`docs/assembly-parameters-mvp4.md`).
+
 ## Dependency-graph integration
 
 A feature depends on its input sketch, selected profile region, parameters, target body, consumed construction geometry, body transform stack, path curve, guide curves, profile sections, and every semantic reference it consumes. When any of these change, the feature or body is marked invalid and recomputed in topological order. See `docs/dependency-graph-mvp1-data-model.md` and `docs/recompute-plan-mvp1-data-model.md`.
@@ -149,7 +151,7 @@ A feature depends on its input sketch, selected profile region, parameters, targ
 7. Add sketch ownership records so body transforms can move owned sketch workplanes when requested.
 8. Add body boolean features for add/subtract/intersect.
 9. Add `RevolveFeature` and `RevolveCutFeature`.
-10. Add the parametric bolt-circle / circular-hole-pattern feature.
+10. Extend the implemented circular-hole-pattern seed (`docs/bolt-circle-pattern-mvp3.md`) with assembly-scoped parameters, skip instances, and hole semantics.
 11. Add richer extrude/cut extents: symmetric, two-sided, to-object, to-next, taper/draft, and thin features.
 12. Add path curve records and path-following extrude/cut.
 13. Add sweep, loft, and surfacing features after 3D sketch curves, arbitrary sketch-plane section mapping, and construction geometry are stable.

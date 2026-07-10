@@ -63,6 +63,8 @@ Cyclic parameter dependencies must be detected and rejected (for example part A 
 ## Current implemented scope
 
 - typed, named, validated parameters on a single `PartDocument`.
+- two parameter types: `Length` (unit `mm`) and `Count` (dimensionless whole numbers, unit `"1"`, used by the bolt-circle pattern, see `docs/bolt-circle-pattern-mvp3.md`).
+- two scopes: `part` and `assembly`; `AssemblyDocument` owns assembly-scoped parameters and pushes them into member parts through explicit `ParameterBinding` records (`docs/assembly-parameters-mvp4.md`).
 - `PartDocument::set_parameter_value` marks dependents and drives incremental recompute (`docs/parameter-update-mvp1.md`).
 
 ## Proposed implementation sequence

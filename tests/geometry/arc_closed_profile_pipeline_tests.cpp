@@ -36,7 +36,7 @@ Sketch make_arc_profile_sketch(SketchId id) {
   add_arc(sketch.value(), "arc.top", Point2{10.0, 0.0}, Point2{0.0, 10.0}, Point2{-10.0, 0.0});
   auto profile = ArcClosedProfile::create(
       ProfileId("profile.arc"), {SketchEntityId("line.left"), SketchEntityId("line.bottom"),
-                                  SketchEntityId("line.right"), SketchEntityId("arc.top")});
+                                 SketchEntityId("line.right"), SketchEntityId("arc.top")});
   REQUIRE(profile);
   REQUIRE(sketch.value().add_profile(profile.value()));
   return sketch.value();
@@ -50,9 +50,8 @@ PartDocument make_additive_document() {
   REQUIRE(xy);
   REQUIRE(document.value().add_datum_plane(xy.value()));
   REQUIRE(document.value().add_sketch(make_arc_profile_sketch(SketchId("sketch.arc"))));
-  auto feature = Feature::create_additive_extrude(FeatureId("feature.arc"), "Arc",
-                                                  SketchId("sketch.arc"),
-                                                  ParameterId("part.depth"));
+  auto feature = Feature::create_additive_extrude(
+      FeatureId("feature.arc"), "Arc", SketchId("sketch.arc"), ParameterId("part.depth"));
   REQUIRE(feature);
   REQUIRE(document.value().add_feature(feature.value()));
   return document.value();
@@ -75,16 +74,14 @@ PartDocument make_subtractive_document() {
   REQUIRE(base_profile);
   REQUIRE(base_sketch.value().add_profile(base_profile.value()));
   REQUIRE(document.value().add_sketch(base_sketch.value()));
-  auto base_feature = Feature::create_additive_extrude(FeatureId("feature.base"), "Base",
-                                                       SketchId("sketch.base"),
-                                                       ParameterId("part.depth"));
+  auto base_feature = Feature::create_additive_extrude(
+      FeatureId("feature.base"), "Base", SketchId("sketch.base"), ParameterId("part.depth"));
   REQUIRE(base_feature);
   REQUIRE(document.value().add_feature(base_feature.value()));
 
   REQUIRE(document.value().add_sketch(make_arc_profile_sketch(SketchId("sketch.arc"))));
-  auto cut_feature = Feature::create_subtractive_extrude(FeatureId("feature.arc_cut"), "ArcCut",
-                                                         SketchId("sketch.arc"),
-                                                         FeatureId("feature.base"));
+  auto cut_feature = Feature::create_subtractive_extrude(
+      FeatureId("feature.arc_cut"), "ArcCut", SketchId("sketch.arc"), FeatureId("feature.base"));
   REQUIRE(cut_feature);
   REQUIRE(document.value().add_feature(cut_feature.value()));
   return document.value();

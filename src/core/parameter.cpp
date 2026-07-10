@@ -8,6 +8,8 @@ std::string_view to_string(ParameterType type) noexcept {
   switch (type) {
   case ParameterType::Length:
     return "length";
+  case ParameterType::Count:
+    return "count";
   }
 
   return "length";
@@ -17,6 +19,8 @@ std::string_view to_string(ParameterScope scope) noexcept {
   switch (scope) {
   case ParameterScope::Part:
     return "part";
+  case ParameterScope::Assembly:
+    return "assembly";
   }
 
   return "part";
@@ -45,10 +49,35 @@ Result<Parameter> Parameter::create_length(ParameterId id, std::string name, Qua
       Parameter(std::move(id), std::move(name), ParameterType::Length, value, scope));
 }
 
+Result<Parameter> Parameter::create_count(ParameterId id, std::string name, Quantity value,
+                                          ParameterScope scope) {
+  const auto object_id = id.empty() ? std::string("parameter") : id.value();
+
+  if (id.empty()) {
+    return Result<Parameter>::failure(
+        Error::validation(object_id, "parameter id must not be empty"));
+  }
+
+  if (name.empty()) {
+    return Result<Parameter>::failure(
+        Error::validation(object_id, "parameter name must not be empty"));
+  }
+
+  if (!value.is_valid_count()) {
+    return Result<Parameter>::failure(
+        Error::validation(object_id, "count must be a whole number of at least 1"));
+  }
+
+  return Result<Parameter>::success(
+      Parameter(std::move(id), std::move(name), ParameterType::Count, value, scope));
+}
+
 Result<Parameter> Parameter::with_value(Quantity value) const {
   switch (type_) {
   case ParameterType::Length:
     return create_length(id_, name_, value, scope_);
+  case ParameterType::Count:
+    return create_count(id_, name_, value, scope_);
   }
 
   return create_length(id_, name_, value, scope_);

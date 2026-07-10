@@ -47,7 +47,8 @@ TEST_CASE("ConstructionPoint stores explicit placement", "[core][construction_ge
   CHECK(point.value().parameter_dependencies().empty());
 }
 
-TEST_CASE("ConstructionRelation stores relation-driven definitions", "[core][construction_geometry]") {
+TEST_CASE("ConstructionRelation stores relation-driven definitions",
+          "[core][construction_geometry]") {
   const auto offset = ConstructionRelation::create_plane_offset_from_plane(
       ConstructionRelationId("relation.offset_xy"), DatumPlaneId("datum.xy"),
       ParameterId("part.offset"));
@@ -75,9 +76,9 @@ TEST_CASE("ConstructionRelation stores relation-driven definitions", "[core][con
 }
 
 TEST_CASE("ConstructionLine validates explicit direction", "[core][construction_geometry]") {
-  const auto line = ConstructionLine::create_explicit(
-      ConstructionLineId("construction_line.axis_z"), "AxisZ", Point3{0.0, 0.0, 0.0},
-      Vector3{0.0, 0.0, 1.0});
+  const auto line =
+      ConstructionLine::create_explicit(ConstructionLineId("construction_line.axis_z"), "AxisZ",
+                                        Point3{0.0, 0.0, 0.0}, Vector3{0.0, 0.0, 1.0});
 
   REQUIRE(line);
   CHECK(line.value().id().value() == "construction_line.axis_z");
@@ -85,20 +86,21 @@ TEST_CASE("ConstructionLine validates explicit direction", "[core][construction_
   CHECK(line.value().point() == Point3{0.0, 0.0, 0.0});
   CHECK(line.value().direction() == Vector3{0.0, 0.0, 1.0});
 
-  const auto zero = ConstructionLine::create_explicit(
-      ConstructionLineId("construction_line.bad"), "Bad", Point3{0.0, 0.0, 0.0},
-      Vector3{0.0, 0.0, 0.0});
+  const auto zero =
+      ConstructionLine::create_explicit(ConstructionLineId("construction_line.bad"), "Bad",
+                                        Point3{0.0, 0.0, 0.0}, Vector3{0.0, 0.0, 0.0});
   REQUIRE(zero.has_error());
   CHECK(zero.error().message() == "construction line direction must not be zero length");
 
-  const auto non_unit = ConstructionLine::create_explicit(
-      ConstructionLineId("construction_line.bad"), "Bad", Point3{0.0, 0.0, 0.0},
-      Vector3{0.0, 0.0, 2.0});
+  const auto non_unit =
+      ConstructionLine::create_explicit(ConstructionLineId("construction_line.bad"), "Bad",
+                                        Point3{0.0, 0.0, 0.0}, Vector3{0.0, 0.0, 2.0});
   REQUIRE(non_unit.has_error());
   CHECK(non_unit.error().message() == "construction line direction must be unit length");
 }
 
-TEST_CASE("ConstructionLine stores line-through-two-points relation", "[core][construction_geometry]") {
+TEST_CASE("ConstructionLine stores line-through-two-points relation",
+          "[core][construction_geometry]") {
   auto relation = ConstructionRelation::create_line_through_two_points(
       ConstructionRelationId("relation.axis_ab"), ConstructionPointId("construction_point.a"),
       ConstructionPointId("construction_point.b"));
@@ -189,13 +191,14 @@ TEST_CASE("PartDocument stores construction geometry and exposes construction pl
       ConstructionLine::create_explicit(ConstructionLineId("construction_line.axis_z"), "AxisZ",
                                         Point3{0.0, 0.0, 0.0}, Vector3{0.0, 0.0, 1.0})
           .value()));
-  REQUIRE(document.value().add_construction_plane(make_xy_offset_plane({ParameterId("part.depth")})));
+  REQUIRE(
+      document.value().add_construction_plane(make_xy_offset_plane({ParameterId("part.depth")})));
 
   auto sketch = Sketch::create(SketchId("sketch.on_construction_plane"), "OnConstructionPlane",
                                DatumPlaneId("construction_plane.offset_xy"));
   REQUIRE(sketch);
-  auto rectangle = RectangleProfile::create(ProfileId("profile.rectangle"), ParameterId("part.width"),
-                                            ParameterId("part.height"));
+  auto rectangle = RectangleProfile::create(ProfileId("profile.rectangle"),
+                                            ParameterId("part.width"), ParameterId("part.height"));
   REQUIRE(rectangle);
   REQUIRE(sketch.value().add_profile(rectangle.value()));
   REQUIRE(document.value().add_sketch(sketch.value()));
@@ -229,7 +232,8 @@ TEST_CASE("PartDocument stores construction geometry and exposes construction pl
 
 TEST_CASE("PartDocument stores relation-driven construction geometry dependencies",
           "[core][construction_geometry]") {
-  auto document = PartDocument::create(DocumentId("part.relation_construction"), "RelationConstruction");
+  auto document =
+      PartDocument::create(DocumentId("part.relation_construction"), "RelationConstruction");
   REQUIRE(document);
 
   REQUIRE(document.value().add_parameter(make_length_parameter("part.width", "width", 20.0)));
@@ -239,9 +243,12 @@ TEST_CASE("PartDocument stores relation-driven construction geometry dependencie
   REQUIRE(xy);
   REQUIRE(document.value().add_datum_plane(xy.value()));
 
-  REQUIRE(document.value().add_construction_point(make_point("construction_point.a", Point3{0.0, 0.0, 0.0})));
-  REQUIRE(document.value().add_construction_point(make_point("construction_point.b", Point3{10.0, 0.0, 0.0})));
-  REQUIRE(document.value().add_construction_point(make_point("construction_point.c", Point3{0.0, 10.0, 0.0})));
+  REQUIRE(document.value().add_construction_point(
+      make_point("construction_point.a", Point3{0.0, 0.0, 0.0})));
+  REQUIRE(document.value().add_construction_point(
+      make_point("construction_point.b", Point3{10.0, 0.0, 0.0})));
+  REQUIRE(document.value().add_construction_point(
+      make_point("construction_point.c", Point3{0.0, 10.0, 0.0})));
 
   auto line_relation = ConstructionRelation::create_line_through_two_points(
       ConstructionRelationId("relation.axis_ab"), ConstructionPointId("construction_point.a"),
@@ -324,9 +331,12 @@ TEST_CASE("PartDocument rejects invalid relation-driven construction geometry re
   auto xy = DatumPlane::xy();
   REQUIRE(xy);
   REQUIRE(document.value().add_datum_plane(xy.value()));
-  REQUIRE(document.value().add_construction_point(make_point("construction_point.a", Point3{0.0, 0.0, 0.0})));
-  REQUIRE(document.value().add_construction_point(make_point("construction_point.b", Point3{1.0, 1.0, 1.0})));
-  REQUIRE(document.value().add_construction_point(make_point("construction_point.c", Point3{2.0, 2.0, 2.0})));
+  REQUIRE(document.value().add_construction_point(
+      make_point("construction_point.a", Point3{0.0, 0.0, 0.0})));
+  REQUIRE(document.value().add_construction_point(
+      make_point("construction_point.b", Point3{1.0, 1.0, 1.0})));
+  REQUIRE(document.value().add_construction_point(
+      make_point("construction_point.c", Point3{2.0, 2.0, 2.0})));
 
   auto collinear_relation = ConstructionRelation::create_plane_through_three_points(
       ConstructionRelationId("relation.collinear"), ConstructionPointId("construction_point.a"),
@@ -337,7 +347,8 @@ TEST_CASE("PartDocument rejects invalid relation-driven construction geometry re
   REQUIRE(collinear_plane);
   const auto added_plane = document.value().add_construction_plane(collinear_plane.value());
   REQUIRE(added_plane.has_error());
-  CHECK(added_plane.error().message() == "plane through three points requires non-collinear points");
+  CHECK(added_plane.error().message() ==
+        "plane through three points requires non-collinear points");
 }
 
 TEST_CASE("PartDocument rejects missing construction-geometry parameter dependencies",

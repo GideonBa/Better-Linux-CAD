@@ -15,7 +15,8 @@ Parameter make_length_parameter(const char* id, const char* name, double value_m
 }
 
 PartDocument make_document_with_semantic_reference_points() {
-  auto document = PartDocument::create(DocumentId("part.semantic_reference_json"), "SemanticReferenceJson");
+  auto document =
+      PartDocument::create(DocumentId("part.semantic_reference_json"), "SemanticReferenceJson");
   REQUIRE(document);
 
   REQUIRE(document.value().add_parameter(make_length_parameter("part.width", "width", 100.0)));
@@ -34,14 +35,13 @@ PartDocument make_document_with_semantic_reference_points() {
   REQUIRE(sketch.value().add_profile(rectangle.value()));
   REQUIRE(document.value().add_sketch(sketch.value()));
 
-  auto feature = Feature::create_additive_extrude(FeatureId("feature.base"), "BaseExtrude",
-                                                  SketchId("sketch.base"),
-                                                  ParameterId("part.depth"));
+  auto feature = Feature::create_additive_extrude(
+      FeatureId("feature.base"), "BaseExtrude", SketchId("sketch.base"), ParameterId("part.depth"));
   REQUIRE(feature);
   REQUIRE(document.value().add_feature(feature.value()));
 
-  auto vertex_ref = SemanticVertexReference::create(FeatureId("feature.base"),
-                                                    SemanticVertex::TopFrontRight);
+  auto vertex_ref =
+      SemanticVertexReference::create(FeatureId("feature.base"), SemanticVertex::TopFrontRight);
   REQUIRE(vertex_ref);
   auto vertex_relation = ConstructionRelation::create_point_on_generated_vertex(
       ConstructionRelationId("relation.point_vertex"), ConstructionPointId("point.vertex"),
@@ -68,7 +68,8 @@ PartDocument make_document_with_semantic_reference_points() {
 
 } // namespace
 
-TEST_CASE("PartDocument JSON round-trips relation-driven generated reference points", "[core][json]") {
+TEST_CASE("PartDocument JSON round-trips relation-driven generated reference points",
+          "[core][json]") {
   auto document = make_document_with_semantic_reference_points();
 
   auto serialized = serialize_part_document_to_json(document);

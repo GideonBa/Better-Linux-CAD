@@ -18,8 +18,8 @@ namespace {
                                                             std::optional<SemanticFace> face,
                                                             std::optional<SemanticEdge> edge,
                                                             std::optional<SemanticVertex> vertex) {
-  const auto object_id = source_feature.empty() ? std::string("semantic_reference")
-                                                : source_feature.value();
+  const auto object_id =
+      source_feature.empty() ? std::string("semantic_reference") : source_feature.value();
   if (source_feature.empty()) {
     return Result<SemanticReferenceTarget>::failure(
         validation_error(object_id, "semantic reference source feature id must not be empty"));
@@ -39,17 +39,22 @@ namespace {
 
 std::string_view to_string(SemanticReferenceKind kind) noexcept {
   switch (kind) {
-  case SemanticReferenceKind::Face: return "face";
-  case SemanticReferenceKind::Edge: return "edge";
-  case SemanticReferenceKind::Vertex: return "vertex";
+  case SemanticReferenceKind::Face:
+    return "face";
+  case SemanticReferenceKind::Edge:
+    return "edge";
+  case SemanticReferenceKind::Vertex:
+    return "vertex";
   }
   return "unknown";
 }
 
 std::string_view to_string(ReferenceStatusKind status) noexcept {
   switch (status) {
-  case ReferenceStatusKind::Resolved: return "resolved";
-  case ReferenceStatusKind::Lost: return "lost";
+  case ReferenceStatusKind::Resolved:
+    return "resolved";
+  case ReferenceStatusKind::Lost:
+    return "lost";
   }
   return "unknown";
 }
@@ -72,11 +77,21 @@ Result<SemanticReferenceTarget> SemanticReferenceTarget::create_vertex(FeatureId
                        std::nullopt, vertex);
 }
 
-SemanticReferenceKind SemanticReferenceTarget::kind() const noexcept { return kind_; }
-const FeatureId& SemanticReferenceTarget::source_feature() const noexcept { return source_feature_; }
-const std::optional<SemanticFace>& SemanticReferenceTarget::face() const noexcept { return face_; }
-const std::optional<SemanticEdge>& SemanticReferenceTarget::edge() const noexcept { return edge_; }
-const std::optional<SemanticVertex>& SemanticReferenceTarget::vertex() const noexcept { return vertex_; }
+SemanticReferenceKind SemanticReferenceTarget::kind() const noexcept {
+  return kind_;
+}
+const FeatureId& SemanticReferenceTarget::source_feature() const noexcept {
+  return source_feature_;
+}
+const std::optional<SemanticFace>& SemanticReferenceTarget::face() const noexcept {
+  return face_;
+}
+const std::optional<SemanticEdge>& SemanticReferenceTarget::edge() const noexcept {
+  return edge_;
+}
+const std::optional<SemanticVertex>& SemanticReferenceTarget::vertex() const noexcept {
+  return vertex_;
+}
 
 std::string SemanticReferenceTarget::node_id() const {
   switch (kind_) {
@@ -90,27 +105,28 @@ std::string SemanticReferenceTarget::node_id() const {
   return source_feature_.value() + ".unknown";
 }
 
-SemanticReferenceTarget::SemanticReferenceTarget(FeatureId source_feature, SemanticReferenceKind kind,
+SemanticReferenceTarget::SemanticReferenceTarget(FeatureId source_feature,
+                                                 SemanticReferenceKind kind,
                                                  std::optional<SemanticFace> face,
                                                  std::optional<SemanticEdge> edge,
                                                  std::optional<SemanticVertex> vertex)
     : source_feature_(std::move(source_feature)), kind_(kind), face_(face), edge_(edge),
       vertex_(vertex) {}
 
-Result<ReferenceStatusRecord> ReferenceStatusRecord::create_resolved(ReferenceStatusId id,
-                                                                      SemanticReferenceTarget target) {
+Result<ReferenceStatusRecord>
+ReferenceStatusRecord::create_resolved(ReferenceStatusId id, SemanticReferenceTarget target) {
   const auto object_id = id.empty() ? std::string("reference_status") : id.value();
   if (id.empty()) {
     return Result<ReferenceStatusRecord>::failure(
         validation_error(object_id, "reference status id must not be empty"));
   }
-  return Result<ReferenceStatusRecord>::success(ReferenceStatusRecord(
-      std::move(id), std::move(target), ReferenceStatusKind::Resolved, {}));
+  return Result<ReferenceStatusRecord>::success(
+      ReferenceStatusRecord(std::move(id), std::move(target), ReferenceStatusKind::Resolved, {}));
 }
 
 Result<ReferenceStatusRecord> ReferenceStatusRecord::create_lost(ReferenceStatusId id,
-                                                                  SemanticReferenceTarget target,
-                                                                  std::string message) {
+                                                                 SemanticReferenceTarget target,
+                                                                 std::string message) {
   const auto object_id = id.empty() ? std::string("reference_status") : id.value();
   if (id.empty()) {
     return Result<ReferenceStatusRecord>::failure(
@@ -124,27 +140,36 @@ Result<ReferenceStatusRecord> ReferenceStatusRecord::create_lost(ReferenceStatus
       std::move(id), std::move(target), ReferenceStatusKind::Lost, std::move(message)));
 }
 
-const ReferenceStatusId& ReferenceStatusRecord::id() const noexcept { return id_; }
-ReferenceStatusKind ReferenceStatusRecord::status() const noexcept { return status_; }
-const SemanticReferenceTarget& ReferenceStatusRecord::target() const noexcept { return target_; }
-const std::string& ReferenceStatusRecord::message() const noexcept { return message_; }
+const ReferenceStatusId& ReferenceStatusRecord::id() const noexcept {
+  return id_;
+}
+ReferenceStatusKind ReferenceStatusRecord::status() const noexcept {
+  return status_;
+}
+const SemanticReferenceTarget& ReferenceStatusRecord::target() const noexcept {
+  return target_;
+}
+const std::string& ReferenceStatusRecord::message() const noexcept {
+  return message_;
+}
 
 ReferenceStatusRecord::ReferenceStatusRecord(ReferenceStatusId id, SemanticReferenceTarget target,
                                              ReferenceStatusKind status, std::string message)
-    : id_(std::move(id)), target_(std::move(target)), status_(status), message_(std::move(message)) {}
+    : id_(std::move(id)), target_(std::move(target)), status_(status),
+      message_(std::move(message)) {}
 
 Result<ReferenceRemapRecord> ReferenceRemapRecord::create(ReferenceRemapId id,
-                                                           SemanticReferenceTarget original,
-                                                           SemanticReferenceTarget replacement,
-                                                           std::string reason) {
+                                                          SemanticReferenceTarget original,
+                                                          SemanticReferenceTarget replacement,
+                                                          std::string reason) {
   const auto object_id = id.empty() ? std::string("reference_remap") : id.value();
   if (id.empty()) {
     return Result<ReferenceRemapRecord>::failure(
         validation_error(object_id, "reference remap id must not be empty"));
   }
   if (original.kind() != replacement.kind()) {
-    return Result<ReferenceRemapRecord>::failure(
-        validation_error(object_id, "reference remap replacement must have the same semantic kind"));
+    return Result<ReferenceRemapRecord>::failure(validation_error(
+        object_id, "reference remap replacement must have the same semantic kind"));
   }
   if (reason.empty()) {
     return Result<ReferenceRemapRecord>::failure(
@@ -154,10 +179,18 @@ Result<ReferenceRemapRecord> ReferenceRemapRecord::create(ReferenceRemapId id,
       std::move(id), std::move(original), std::move(replacement), std::move(reason)));
 }
 
-const ReferenceRemapId& ReferenceRemapRecord::id() const noexcept { return id_; }
-const SemanticReferenceTarget& ReferenceRemapRecord::original() const noexcept { return original_; }
-const SemanticReferenceTarget& ReferenceRemapRecord::replacement() const noexcept { return replacement_; }
-const std::string& ReferenceRemapRecord::reason() const noexcept { return reason_; }
+const ReferenceRemapId& ReferenceRemapRecord::id() const noexcept {
+  return id_;
+}
+const SemanticReferenceTarget& ReferenceRemapRecord::original() const noexcept {
+  return original_;
+}
+const SemanticReferenceTarget& ReferenceRemapRecord::replacement() const noexcept {
+  return replacement_;
+}
+const std::string& ReferenceRemapRecord::reason() const noexcept {
+  return reason_;
+}
 
 ReferenceRemapRecord::ReferenceRemapRecord(ReferenceRemapId id, SemanticReferenceTarget original,
                                            SemanticReferenceTarget replacement, std::string reason)
@@ -175,14 +208,19 @@ Result<SketchOriginOverrideRecord> SketchOriginOverrideRecord::create(SketchId s
       SketchOriginOverrideRecord(std::move(sketch), local_origin));
 }
 
-const SketchId& SketchOriginOverrideRecord::sketch() const noexcept { return sketch_; }
-Point2 SketchOriginOverrideRecord::local_origin() const noexcept { return local_origin_; }
+const SketchId& SketchOriginOverrideRecord::sketch() const noexcept {
+  return sketch_;
+}
+Point2 SketchOriginOverrideRecord::local_origin() const noexcept {
+  return local_origin_;
+}
 
 SketchOriginOverrideRecord::SketchOriginOverrideRecord(SketchId sketch, Point2 local_origin)
     : sketch_(std::move(sketch)), local_origin_(local_origin) {}
 
-Result<ReferenceStatusRecord> ReferenceRecoveryEvaluator::evaluate(
-    ReferenceStatusId id, const PartDocument& document, SemanticReferenceTarget target) const {
+Result<ReferenceStatusRecord>
+ReferenceRecoveryEvaluator::evaluate(ReferenceStatusId id, const PartDocument& document,
+                                     SemanticReferenceTarget target) const {
   if (!target_exists_in_current_seed(document, target)) {
     return ReferenceStatusRecord::create_lost(
         std::move(id), std::move(target),

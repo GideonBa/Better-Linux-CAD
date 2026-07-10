@@ -43,9 +43,9 @@ Sketch make_closed_rectangle_sketch_on_construction_plane() {
       LineSegment::create(SketchEntityId("line.d"), Point2{-10.0, 5.0}, Point2{-10.0, -5.0})
           .value()));
 
-  auto profile = ClosedProfile::create(
-      ProfileId("profile.closed_rectangle"), {SketchEntityId("line.a"), SketchEntityId("line.b"),
-                                               SketchEntityId("line.c"), SketchEntityId("line.d")});
+  auto profile = ClosedProfile::create(ProfileId("profile.closed_rectangle"),
+                                       {SketchEntityId("line.a"), SketchEntityId("line.b"),
+                                        SketchEntityId("line.c"), SketchEntityId("line.d")});
   REQUIRE(profile);
   REQUIRE(sketch.value().add_profile(profile.value()));
 
@@ -53,9 +53,9 @@ Sketch make_closed_rectangle_sketch_on_construction_plane() {
 }
 
 Sketch make_rectangle_profile_sketch_on_angled_plane() {
-  auto sketch = Sketch::create(SketchId("sketch.rectangle_on_angled_plane"),
-                               "Sketch_RectangleOnAngledPlane",
-                               DatumPlaneId("construction_plane.angled"));
+  auto sketch =
+      Sketch::create(SketchId("sketch.rectangle_on_angled_plane"), "Sketch_RectangleOnAngledPlane",
+                     DatumPlaneId("construction_plane.angled"));
   REQUIRE(sketch);
   auto profile = RectangleProfile::create(ProfileId("profile.rectangle"), ParameterId("part.width"),
                                           ParameterId("part.height"));
@@ -65,11 +65,12 @@ Sketch make_rectangle_profile_sketch_on_angled_plane() {
 }
 
 Sketch make_circle_cut_sketch_on_angled_plane() {
-  auto sketch = Sketch::create(SketchId("sketch.circle_cut_on_angled_plane"),
-                               "Sketch_CircleCutOnAngledPlane",
-                               DatumPlaneId("construction_plane.angled_cut"));
+  auto sketch =
+      Sketch::create(SketchId("sketch.circle_cut_on_angled_plane"), "Sketch_CircleCutOnAngledPlane",
+                     DatumPlaneId("construction_plane.angled_cut"));
   REQUIRE(sketch);
-  auto profile = CircleProfile::create(ProfileId("profile.circle_cut"), ParameterId("part.hole_diameter"));
+  auto profile =
+      CircleProfile::create(ProfileId("profile.circle_cut"), ParameterId("part.hole_diameter"));
   REQUIRE(profile);
   REQUIRE(sketch.value().add_profile(profile.value()));
   return sketch.value();
@@ -85,12 +86,13 @@ ConstructionPlane make_angled_plane(const char* id, const char* name, Point3 ori
 }
 
 PartDocument make_explicit_construction_plane_document() {
-  auto document = PartDocument::create(DocumentId("part.construction_plane_prism"),
-                                       "ConstructionPlanePrism");
+  auto document =
+      PartDocument::create(DocumentId("part.construction_plane_prism"), "ConstructionPlanePrism");
   REQUIRE(document);
 
   REQUIRE(document.value().add_parameter(make_length_parameter("part.depth", "depth", 7.0)));
-  REQUIRE(document.value().add_parameter(make_length_parameter("part.plane_offset", "plane_offset", 25.0)));
+  REQUIRE(document.value().add_parameter(
+      make_length_parameter("part.plane_offset", "plane_offset", 25.0)));
 
   auto plane = ConstructionPlane::create_explicit(
       ConstructionPlaneId("construction_plane.offset_xy"), "OffsetXY", Point3{0.0, 0.0, 25.0},
@@ -111,8 +113,8 @@ PartDocument make_explicit_construction_plane_document() {
 }
 
 PartDocument make_angled_rectangle_profile_document() {
-  auto document = PartDocument::create(DocumentId("part.angled_rectangle_prism"),
-                                       "AngledRectanglePrism");
+  auto document =
+      PartDocument::create(DocumentId("part.angled_rectangle_prism"), "AngledRectanglePrism");
   REQUIRE(document);
   REQUIRE(document.value().add_parameter(make_length_parameter("part.width", "width", 20.0)));
   REQUIRE(document.value().add_parameter(make_length_parameter("part.height", "height", 10.0)));
@@ -134,7 +136,8 @@ PartDocument make_angled_circle_cut_document() {
   REQUIRE(document.value().add_parameter(make_length_parameter("part.width", "width", 60.0)));
   REQUIRE(document.value().add_parameter(make_length_parameter("part.height", "height", 40.0)));
   REQUIRE(document.value().add_parameter(make_length_parameter("part.depth", "depth", 12.0)));
-  REQUIRE(document.value().add_parameter(make_length_parameter("part.hole_diameter", "hole_diameter", 8.0)));
+  REQUIRE(document.value().add_parameter(
+      make_length_parameter("part.hole_diameter", "hole_diameter", 8.0)));
   auto xy = DatumPlane::xy();
   REQUIRE(xy);
   REQUIRE(document.value().add_datum_plane(xy.value()));
@@ -146,18 +149,17 @@ PartDocument make_angled_circle_cut_document() {
   REQUIRE(base_profile);
   REQUIRE(base_sketch.value().add_profile(base_profile.value()));
   REQUIRE(document.value().add_sketch(base_sketch.value()));
-  auto base_feature = Feature::create_additive_extrude(FeatureId("feature.base"), "Base",
-                                                       SketchId("sketch.base"),
-                                                       ParameterId("part.depth"));
+  auto base_feature = Feature::create_additive_extrude(
+      FeatureId("feature.base"), "Base", SketchId("sketch.base"), ParameterId("part.depth"));
   REQUIRE(base_feature);
   REQUIRE(document.value().add_feature(base_feature.value()));
 
   REQUIRE(document.value().add_construction_plane(
       make_angled_plane("construction_plane.angled_cut", "AngledCut", Point3{0.0, 0.0, 6.0})));
   REQUIRE(document.value().add_sketch(make_circle_cut_sketch_on_angled_plane()));
-  auto cut_feature = Feature::create_subtractive_extrude(FeatureId("feature.angled_cut"), "AngledCut",
-                                                         SketchId("sketch.circle_cut_on_angled_plane"),
-                                                         FeatureId("feature.base"));
+  auto cut_feature = Feature::create_subtractive_extrude(
+      FeatureId("feature.angled_cut"), "AngledCut", SketchId("sketch.circle_cut_on_angled_plane"),
+      FeatureId("feature.base"));
   REQUIRE(cut_feature);
   REQUIRE(document.value().add_feature(cut_feature.value()));
   return document.value();
@@ -169,7 +171,8 @@ PartDocument make_relation_offset_construction_plane_document() {
   REQUIRE(document);
 
   REQUIRE(document.value().add_parameter(make_length_parameter("part.depth", "depth", 7.0)));
-  REQUIRE(document.value().add_parameter(make_length_parameter("part.plane_offset", "plane_offset", 25.0)));
+  REQUIRE(document.value().add_parameter(
+      make_length_parameter("part.plane_offset", "plane_offset", 25.0)));
 
   auto xy = DatumPlane::xy();
   REQUIRE(xy);
@@ -196,8 +199,8 @@ PartDocument make_relation_offset_construction_plane_document() {
 }
 
 PartDocument make_plane_through_points_document() {
-  auto document = PartDocument::create(DocumentId("part.through_points_plane"),
-                                       "ThroughPointsPlane");
+  auto document =
+      PartDocument::create(DocumentId("part.through_points_plane"), "ThroughPointsPlane");
   REQUIRE(document);
 
   REQUIRE(document.value().add_construction_point(

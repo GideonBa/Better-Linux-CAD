@@ -56,7 +56,8 @@ Result<std::size_t> ShapeCache::set_final_shape(FeatureId source_feature_id, Geo
 
 Result<bool> ShapeCache::remove_feature_shape(FeatureId feature_id) {
   if (feature_id.empty()) {
-    return Result<bool>::failure(Error::validation(kShapeCacheObjectId, "feature id must not be empty"));
+    return Result<bool>::failure(
+        Error::validation(kShapeCacheObjectId, "feature id must not be empty"));
   }
 
   const auto existing = std::find_if(feature_shapes_.begin(), feature_shapes_.end(),

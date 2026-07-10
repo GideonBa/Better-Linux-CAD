@@ -36,16 +36,15 @@ PartDocument make_rectangular_additive_document() {
   REQUIRE(base_sketch.value().add_profile(rectangle.value()));
   REQUIRE(document.value().add_sketch(base_sketch.value()));
 
-  auto feature = Feature::create_additive_extrude(FeatureId("feature.base"), "BaseExtrude",
-                                                  SketchId("sketch.base"),
-                                                  ParameterId("part.depth"));
+  auto feature = Feature::create_additive_extrude(
+      FeatureId("feature.base"), "BaseExtrude", SketchId("sketch.base"), ParameterId("part.depth"));
   REQUIRE(feature);
   REQUIRE(document.value().add_feature(feature.value()));
 
   auto top_face = SemanticFaceReference::create(FeatureId("feature.base"), SemanticFace::Top);
   REQUIRE(top_face);
-  auto top_workplane = DerivedWorkplane::create_on_feature_face(
-      DatumPlaneId("workplane.top"), "TopWorkplane", top_face.value());
+  auto top_workplane = DerivedWorkplane::create_on_feature_face(DatumPlaneId("workplane.top"),
+                                                                "TopWorkplane", top_face.value());
   REQUIRE(top_workplane);
   REQUIRE(document.value().add_derived_workplane(top_workplane.value()));
 
@@ -57,11 +56,11 @@ void add_generated_top_front_midpoint_and_axis(PartDocument& document) {
   REQUIRE(edge_ref);
 
   auto point_relation = ConstructionRelation::create_point_on_generated_edge(
-      ConstructionRelationId("relation.point.top_front_mid"), ConstructionPointId("point.top_front_mid"),
-      edge_ref.value());
+      ConstructionRelationId("relation.point.top_front_mid"),
+      ConstructionPointId("point.top_front_mid"), edge_ref.value());
   REQUIRE(point_relation);
-  auto point = ConstructionPoint::create_on_generated_edge(ConstructionPointId("point.top_front_mid"),
-                                                           "TopFrontMid", point_relation.value());
+  auto point = ConstructionPoint::create_on_generated_edge(
+      ConstructionPointId("point.top_front_mid"), "TopFrontMid", point_relation.value());
   REQUIRE(point);
   REQUIRE(document.add_construction_point(point.value()));
 
@@ -76,7 +75,8 @@ void add_generated_top_front_midpoint_and_axis(PartDocument& document) {
 }
 
 Sketch make_top_reference_sketch() {
-  auto sketch = Sketch::create(SketchId("sketch.top_refs"), "TopRefs", DatumPlaneId("workplane.top"));
+  auto sketch =
+      Sketch::create(SketchId("sketch.top_refs"), "TopRefs", DatumPlaneId("workplane.top"));
   REQUIRE(sketch);
   return sketch.value();
 }
@@ -88,8 +88,8 @@ TEST_CASE("SketchReferenceProjector projects semantic generated refs into sketch
   PartDocument document = make_rectangular_additive_document();
   Sketch sketch = make_top_reference_sketch();
 
-  auto vertex_ref = SemanticVertexReference::create(FeatureId("feature.base"),
-                                                    SemanticVertex::TopFrontRight);
+  auto vertex_ref =
+      SemanticVertexReference::create(FeatureId("feature.base"), SemanticVertex::TopFrontRight);
   REQUIRE(vertex_ref);
   auto projected_vertex = ProjectedSketchPoint::create_from_semantic_vertex(
       SketchEntityId("ref.vertex.top_front_right"), vertex_ref.value());
@@ -97,8 +97,8 @@ TEST_CASE("SketchReferenceProjector projects semantic generated refs into sketch
 
   auto edge_ref = SemanticEdgeReference::create(FeatureId("feature.base"), SemanticEdge::TopFront);
   REQUIRE(edge_ref);
-  auto projected_edge =
-      ProjectedSketchLine::create_from_semantic_edge(SketchEntityId("ref.edge.top_front"), edge_ref.value());
+  auto projected_edge = ProjectedSketchLine::create_from_semantic_edge(
+      SketchEntityId("ref.edge.top_front"), edge_ref.value());
   REQUIRE(projected_edge);
 
   const SketchReferenceProjector projector;
@@ -147,8 +147,8 @@ TEST_CASE("SketchReferenceProjector rejects out-of-plane projected points",
   PartDocument document = make_rectangular_additive_document();
   Sketch sketch = make_top_reference_sketch();
 
-  auto bottom_vertex = SemanticVertexReference::create(FeatureId("feature.base"),
-                                                       SemanticVertex::BottomFrontRight);
+  auto bottom_vertex =
+      SemanticVertexReference::create(FeatureId("feature.base"), SemanticVertex::BottomFrontRight);
   REQUIRE(bottom_vertex);
   auto projected_vertex = ProjectedSketchPoint::create_from_semantic_vertex(
       SketchEntityId("ref.vertex.bottom_front_right"), bottom_vertex.value());
@@ -157,5 +157,6 @@ TEST_CASE("SketchReferenceProjector rejects out-of-plane projected points",
   const SketchReferenceProjector projector;
   auto resolved = projector.resolve_point(document, sketch, projected_vertex.value());
   REQUIRE(resolved.has_error());
-  CHECK(resolved.error().message() == "projected sketch reference must lie on the sketch workplane");
+  CHECK(resolved.error().message() ==
+        "projected sketch reference must lie on the sketch workplane");
 }

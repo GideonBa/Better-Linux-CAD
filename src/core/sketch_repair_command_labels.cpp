@@ -17,9 +17,9 @@ namespace {
         "Resolve horizontal/vertical conflict",
         "Choose which conflicting orientation constraint should be removed before solving.");
   case SketchRepairSuggestionAction::RemoveDuplicateFixedEndpointConstraint:
-    return SketchRepairCommandLabel(
-        "Remove duplicate fixed endpoint constraints",
-        "Remove duplicate fixed endpoint constraints while keeping the deterministic first record.");
+    return SketchRepairCommandLabel("Remove duplicate fixed endpoint constraints",
+                                    "Remove duplicate fixed endpoint constraints while keeping the "
+                                    "deterministic first record.");
   case SketchRepairSuggestionAction::RemoveDuplicateDrivingDimension:
     return SketchRepairCommandLabel(
         "Remove duplicate driving dimension",
@@ -59,8 +59,8 @@ namespace {
     return "Restore the duplicate fixed endpoint constraints that were removed for target " +
            entry.target() + ".";
   case SketchRepairSuggestionAction::RemoveDuplicateDrivingDimension:
-    return "Restore the duplicate driving dimensions that were removed for target " + entry.target() +
-           ".";
+    return "Restore the duplicate driving dimensions that were removed for target " +
+           entry.target() + ".";
   case SketchRepairSuggestionAction::AddDrivingDimension:
     return "Remove the driving dimension added for target " + entry.target() + ".";
   }
@@ -72,16 +72,20 @@ namespace {
 SketchRepairCommandLabel::SketchRepairCommandLabel(std::string title, std::string description)
     : title_(std::move(title)), description_(std::move(description)) {}
 
-const std::string& SketchRepairCommandLabel::title() const noexcept { return title_; }
-const std::string& SketchRepairCommandLabel::description() const noexcept { return description_; }
+const std::string& SketchRepairCommandLabel::title() const noexcept {
+  return title_;
+}
+const std::string& SketchRepairCommandLabel::description() const noexcept {
+  return description_;
+}
 
-SketchRepairCommandLabel SketchRepairCommandLabeler::label_for(
-    SketchRepairSuggestionAction action) const {
+SketchRepairCommandLabel
+SketchRepairCommandLabeler::label_for(SketchRepairSuggestionAction action) const {
   return label_for_action(action);
 }
 
-SketchRepairCommandLabel SketchRepairCommandLabeler::label_for(
-    const SketchRepairUndoStackSummaryEntry& entry) const {
+SketchRepairCommandLabel
+SketchRepairCommandLabeler::label_for(const SketchRepairUndoStackSummaryEntry& entry) const {
   return SketchRepairCommandLabel(undo_title_for(entry.action()), undo_description_for(entry));
 }
 

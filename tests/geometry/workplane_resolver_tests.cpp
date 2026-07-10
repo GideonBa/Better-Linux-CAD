@@ -33,7 +33,8 @@ PartDocument make_face_document() {
 
   REQUIRE(document.value().add_parameter(make_length_parameter("part.width", "width", 120.0)));
   REQUIRE(document.value().add_parameter(make_length_parameter("part.height", "height", 80.0)));
-  REQUIRE(document.value().add_parameter(make_length_parameter("part.thickness", "thickness", 8.0)));
+  REQUIRE(
+      document.value().add_parameter(make_length_parameter("part.thickness", "thickness", 8.0)));
 
   auto xy = DatumPlane::xy();
   REQUIRE(xy);
@@ -48,9 +49,9 @@ PartDocument make_face_document() {
   REQUIRE(base_sketch.value().add_profile(rectangle.value()));
   REQUIRE(document.value().add_sketch(base_sketch.value()));
 
-  auto base = Feature::create_additive_extrude(FeatureId("feature.base_extrude"), "BaseExtrude",
-                                               SketchId("sketch.base"),
-                                               ParameterId("part.thickness"));
+  auto base =
+      Feature::create_additive_extrude(FeatureId("feature.base_extrude"), "BaseExtrude",
+                                       SketchId("sketch.base"), ParameterId("part.thickness"));
   REQUIRE(base);
   REQUIRE(document.value().add_feature(base.value()));
 
@@ -92,7 +93,8 @@ TEST_CASE("WorkplaneResolver resolves standard datum planes", "[geometry][workpl
   CHECK_FALSE(resolved.value().bounds.enabled);
 }
 
-TEST_CASE("WorkplaneResolver resolves additive-extrude top-face workplanes", "[geometry][workplane]") {
+TEST_CASE("WorkplaneResolver resolves additive-extrude top-face workplanes",
+          "[geometry][workplane]") {
   const PartDocument document = make_face_document();
   const WorkplaneResolver resolver;
 
@@ -108,7 +110,8 @@ TEST_CASE("WorkplaneResolver resolves additive-extrude top-face workplanes", "[g
   CHECK(resolved.value().bounds.height_mm == Catch::Approx(80.0));
 }
 
-TEST_CASE("WorkplaneResolver resolves additive-extrude bottom-face workplanes", "[geometry][workplane]") {
+TEST_CASE("WorkplaneResolver resolves additive-extrude bottom-face workplanes",
+          "[geometry][workplane]") {
   const PartDocument document = make_face_document();
   const WorkplaneResolver resolver;
 
@@ -124,7 +127,8 @@ TEST_CASE("WorkplaneResolver resolves additive-extrude bottom-face workplanes", 
   CHECK(resolved.value().bounds.height_mm == Catch::Approx(80.0));
 }
 
-TEST_CASE("WorkplaneResolver resolves additive-extrude right-face workplanes", "[geometry][workplane]") {
+TEST_CASE("WorkplaneResolver resolves additive-extrude right-face workplanes",
+          "[geometry][workplane]") {
   const PartDocument document = make_face_document();
   const WorkplaneResolver resolver;
 
@@ -142,7 +146,8 @@ TEST_CASE("WorkplaneResolver resolves additive-extrude right-face workplanes", "
   CHECK(resolved.value().bounds.height_mm == Catch::Approx(8.0));
 }
 
-TEST_CASE("WorkplaneResolver resolves additive-extrude left-face workplanes", "[geometry][workplane]") {
+TEST_CASE("WorkplaneResolver resolves additive-extrude left-face workplanes",
+          "[geometry][workplane]") {
   const PartDocument document = make_face_document();
   const WorkplaneResolver resolver;
 
@@ -160,7 +165,8 @@ TEST_CASE("WorkplaneResolver resolves additive-extrude left-face workplanes", "[
   CHECK(resolved.value().bounds.height_mm == Catch::Approx(8.0));
 }
 
-TEST_CASE("WorkplaneResolver resolves additive-extrude front-face workplanes", "[geometry][workplane]") {
+TEST_CASE("WorkplaneResolver resolves additive-extrude front-face workplanes",
+          "[geometry][workplane]") {
   const PartDocument document = make_face_document();
   const WorkplaneResolver resolver;
 
@@ -178,7 +184,8 @@ TEST_CASE("WorkplaneResolver resolves additive-extrude front-face workplanes", "
   CHECK(resolved.value().bounds.height_mm == Catch::Approx(8.0));
 }
 
-TEST_CASE("WorkplaneResolver resolves additive-extrude back-face workplanes", "[geometry][workplane]") {
+TEST_CASE("WorkplaneResolver resolves additive-extrude back-face workplanes",
+          "[geometry][workplane]") {
   const PartDocument document = make_face_document();
   const WorkplaneResolver resolver;
 

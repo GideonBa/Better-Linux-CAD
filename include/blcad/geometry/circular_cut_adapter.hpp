@@ -17,9 +17,10 @@ public:
                                                         const Quantity& diameter,
                                                         Point2 center = {}) const;
 
-  [[nodiscard]] Result<GeometryShape> cut_circular_hole_along_axis(
-      const GeometryShape& target, const Quantity& diameter, Point3 center,
-      Vector3 axis_direction) const;
+  [[nodiscard]] Result<GeometryShape> cut_circular_hole_along_axis(const GeometryShape& target,
+                                                                   const Quantity& diameter,
+                                                                   Point3 center,
+                                                                   Vector3 axis_direction) const;
 };
 
 } // namespace blcad::geometry

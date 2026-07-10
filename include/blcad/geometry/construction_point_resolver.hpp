@@ -14,8 +14,8 @@ struct ResolvedConstructionPoint {
 
 class ConstructionPointResolver {
 public:
-  [[nodiscard]] Result<ResolvedConstructionPoint>
-  resolve(const PartDocument& document, ConstructionPointId point_id) const;
+  [[nodiscard]] Result<ResolvedConstructionPoint> resolve(const PartDocument& document,
+                                                          ConstructionPointId point_id) const;
 };
 
 } // namespace blcad::geometry

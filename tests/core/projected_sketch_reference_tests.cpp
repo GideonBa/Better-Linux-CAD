@@ -5,7 +5,8 @@
 using namespace blcad;
 
 TEST_CASE("Projected sketch references store construction and semantic sources", "[core][sketch]") {
-  auto vertex = SemanticVertexReference::create(FeatureId("feature.base"), SemanticVertex::TopFrontRight);
+  auto vertex =
+      SemanticVertexReference::create(FeatureId("feature.base"), SemanticVertex::TopFrontRight);
   REQUIRE(vertex);
   auto edge = SemanticEdgeReference::create(FeatureId("feature.base"), SemanticEdge::TopFront);
   REQUIRE(edge);
@@ -32,8 +33,8 @@ TEST_CASE("Projected sketch references store construction and semantic sources",
   CHECK(line_from_construction.value().construction_line().value() == "line.axis");
   CHECK(line_from_construction.value().referenced_node_id() == "line.axis");
 
-  auto line_from_edge =
-      ProjectedSketchLine::create_from_semantic_edge(SketchEntityId("ref.edge.top_front"), edge.value());
+  auto line_from_edge = ProjectedSketchLine::create_from_semantic_edge(
+      SketchEntityId("ref.edge.top_front"), edge.value());
   REQUIRE(line_from_edge);
   CHECK(line_from_edge.value().source() == ProjectedSketchLineSource::SemanticEdge);
   REQUIRE(line_from_edge.value().semantic_edge().has_value());

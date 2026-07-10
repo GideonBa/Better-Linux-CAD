@@ -26,6 +26,10 @@ Dieser Ordner enthaelt Architekturentscheidungen fuer BLCAD.
 - `0016-document-recompute-and-shape-cache-boundary.md`: Dokument-Recompute und
   ShapeCache-Grenze
 - `0017-parameter-value-update.md`: Parameterwert-Update im PartDocument
+- `0018-count-parameters-and-bolt-circle-pattern.md`: Count-Parameter und
+  parametrischer Lochkreis
+- `0019-assembly-parameter-binding.md`: Assembly-Parameter-Binding fuer
+  bauteiluebergreifende Parametrik
 
 ## Statuswerte
 

@@ -14,8 +14,8 @@ namespace blcad {
 
 [[nodiscard]] Result<PartDocument> deserialize_part_document_from_json(std::string_view content);
 
-[[nodiscard]] Result<std::uintmax_t> write_part_document_json_file(
-    const PartDocument& document, const std::filesystem::path& path);
+[[nodiscard]] Result<std::uintmax_t>
+write_part_document_json_file(const PartDocument& document, const std::filesystem::path& path);
 
 [[nodiscard]] Result<PartDocument> read_part_document_json_file(const std::filesystem::path& path);
 

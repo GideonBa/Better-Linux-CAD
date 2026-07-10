@@ -28,29 +28,27 @@ PartDocument make_triangle_prism_document() {
   REQUIRE(xy);
   REQUIRE(document.value().add_datum_plane(xy.value()));
 
-  auto sketch = Sketch::create(SketchId("sketch.triangle"), "Sketch_Triangle", DatumPlaneId("datum.xy"));
+  auto sketch =
+      Sketch::create(SketchId("sketch.triangle"), "Sketch_Triangle", DatumPlaneId("datum.xy"));
   REQUIRE(sketch);
 
-  REQUIRE(sketch.value().add_entity(LineSegment::create(SketchEntityId("line.a"), Point2{0.0, 0.0},
-                                                        Point2{20.0, 0.0})
-                                        .value()));
-  REQUIRE(sketch.value().add_entity(LineSegment::create(SketchEntityId("line.b"), Point2{20.0, 0.0},
-                                                        Point2{0.0, 20.0})
-                                        .value()));
-  REQUIRE(sketch.value().add_entity(LineSegment::create(SketchEntityId("line.c"), Point2{0.0, 20.0},
-                                                        Point2{0.0, 0.0})
-                                        .value()));
+  REQUIRE(sketch.value().add_entity(
+      LineSegment::create(SketchEntityId("line.a"), Point2{0.0, 0.0}, Point2{20.0, 0.0}).value()));
+  REQUIRE(sketch.value().add_entity(
+      LineSegment::create(SketchEntityId("line.b"), Point2{20.0, 0.0}, Point2{0.0, 20.0}).value()));
+  REQUIRE(sketch.value().add_entity(
+      LineSegment::create(SketchEntityId("line.c"), Point2{0.0, 20.0}, Point2{0.0, 0.0}).value()));
 
-  auto profile = ClosedProfile::create(ProfileId("profile.triangle"),
-                                       {SketchEntityId("line.a"), SketchEntityId("line.b"),
-                                        SketchEntityId("line.c")});
+  auto profile = ClosedProfile::create(
+      ProfileId("profile.triangle"),
+      {SketchEntityId("line.a"), SketchEntityId("line.b"), SketchEntityId("line.c")});
   REQUIRE(profile);
   REQUIRE(sketch.value().add_profile(profile.value()));
   REQUIRE(document.value().add_sketch(sketch.value()));
 
-  auto feature = Feature::create_additive_extrude(FeatureId("feature.triangle_prism"),
-                                                  "TrianglePrism", SketchId("sketch.triangle"),
-                                                  ParameterId("part.depth"));
+  auto feature =
+      Feature::create_additive_extrude(FeatureId("feature.triangle_prism"), "TrianglePrism",
+                                       SketchId("sketch.triangle"), ParameterId("part.depth"));
   REQUIRE(feature);
   REQUIRE(document.value().add_feature(feature.value()));
 
@@ -59,7 +57,8 @@ PartDocument make_triangle_prism_document() {
 
 } // namespace
 
-TEST_CASE("PartDocument JSON round-trips line-based closed profiles", "[core][json][closed_profile]") {
+TEST_CASE("PartDocument JSON round-trips line-based closed profiles",
+          "[core][json][closed_profile]") {
   const PartDocument document = make_triangle_prism_document();
 
   const auto serialized = serialize_part_document_to_json(document);
@@ -85,6 +84,6 @@ TEST_CASE("PartDocument JSON round-trips line-based closed profiles", "[core][js
   CHECK(vertices.value().size() == 3);
 
   CHECK(restored.value().dependency_graph().has_dependency("sketch.triangle",
-                                                          "feature.triangle_prism"));
+                                                           "feature.triangle_prism"));
   CHECK(restored.value().dependency_graph().has_dependency("part.depth", "feature.triangle_prism"));
 }

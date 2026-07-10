@@ -10,18 +10,11 @@ using namespace blcad;
 
 namespace {
 
-SketchRepairPresentationSnapshotEntry make_entry(
-    std::size_t index,
-    bool latest,
-    SketchRepairSuggestionAction action,
-    bool undoable,
-    std::string target,
-    std::string title,
-    std::string label_id,
-    SketchRepairDisplayCategory category,
-    SketchRepairDisplayPriority priority,
-    SketchRepairAffectedCounts counts,
-    std::string affected_summary) {
+SketchRepairPresentationSnapshotEntry
+make_entry(std::size_t index, bool latest, SketchRepairSuggestionAction action, bool undoable,
+           std::string target, std::string title, std::string label_id,
+           SketchRepairDisplayCategory category, SketchRepairDisplayPriority priority,
+           SketchRepairAffectedCounts counts, std::string affected_summary) {
   return SketchRepairPresentationSnapshotEntry(
       index, latest, SketchRepairTransactionStatus::Applied, action, std::move(target), undoable,
       std::move(title), "description", std::move(label_id), category, priority, counts,
@@ -30,29 +23,24 @@ SketchRepairPresentationSnapshotEntry make_entry(
 
 SketchRepairPresentationSnapshot sample_snapshot() {
   std::vector<SketchRepairPresentationSnapshotEntry> entries;
-  entries.push_back(make_entry(0U, false,
-                               SketchRepairSuggestionAction::RemoveDuplicateFixedEndpointConstraint,
-                               true, "line.a:start", "Undo remove duplicate fixed endpoint constraints",
-                               "undo.remove_duplicate_fixed_endpoint_constraint",
-                               SketchRepairDisplayCategory::UndoEntry,
-                               SketchRepairDisplayPriority::Normal,
-                               SketchRepairAffectedCounts(0U, 1U, 0U), "1 constraint removed"));
-  entries.push_back(make_entry(1U, false,
-                               SketchRepairSuggestionAction::RemoveConflictingOrientationConstraint,
-                               false, "line.locked", "Resolve horizontal/vertical conflict",
-                               "repair.remove_conflicting_orientation_constraint",
-                               SketchRepairDisplayCategory::RequiresUserChoice,
-                               SketchRepairDisplayPriority::High,
-                               SketchRepairAffectedCounts(0U, 0U, 0U),
-                               "No affected sketch records"));
-  entries.push_back(make_entry(2U, true,
-                               SketchRepairSuggestionAction::RemoveDuplicateDrivingDimension,
-                               true, "line.a:start|line.a:end",
-                               "Undo remove duplicate driving dimension",
-                               "undo.remove_duplicate_driving_dimension",
-                               SketchRepairDisplayCategory::UndoEntry,
-                               SketchRepairDisplayPriority::Normal,
-                               SketchRepairAffectedCounts(0U, 0U, 1U), "1 dimension removed"));
+  entries.push_back(
+      make_entry(0U, false, SketchRepairSuggestionAction::RemoveDuplicateFixedEndpointConstraint,
+                 true, "line.a:start", "Undo remove duplicate fixed endpoint constraints",
+                 "undo.remove_duplicate_fixed_endpoint_constraint",
+                 SketchRepairDisplayCategory::UndoEntry, SketchRepairDisplayPriority::Normal,
+                 SketchRepairAffectedCounts(0U, 1U, 0U), "1 constraint removed"));
+  entries.push_back(
+      make_entry(1U, false, SketchRepairSuggestionAction::RemoveConflictingOrientationConstraint,
+                 false, "line.locked", "Resolve horizontal/vertical conflict",
+                 "repair.remove_conflicting_orientation_constraint",
+                 SketchRepairDisplayCategory::RequiresUserChoice, SketchRepairDisplayPriority::High,
+                 SketchRepairAffectedCounts(0U, 0U, 0U), "No affected sketch records"));
+  entries.push_back(
+      make_entry(2U, true, SketchRepairSuggestionAction::RemoveDuplicateDrivingDimension, true,
+                 "line.a:start|line.a:end", "Undo remove duplicate driving dimension",
+                 "undo.remove_duplicate_driving_dimension", SketchRepairDisplayCategory::UndoEntry,
+                 SketchRepairDisplayPriority::Normal, SketchRepairAffectedCounts(0U, 0U, 1U),
+                 "1 dimension removed"));
   return SketchRepairPresentationSnapshot(std::move(entries));
 }
 
@@ -81,9 +69,8 @@ TEST_CASE("Sketch repair presentation snapshot query filters by category and pre
   const auto snapshot = sample_snapshot();
   const SketchRepairPresentationSnapshotQueryEngine engine;
 
-  const auto result = engine.execute(
-      snapshot, SketchRepairPresentationSnapshotQuery::with_category(
-                    SketchRepairDisplayCategory::UndoEntry));
+  const auto result = engine.execute(snapshot, SketchRepairPresentationSnapshotQuery::with_category(
+                                                   SketchRepairDisplayCategory::UndoEntry));
 
   REQUIRE(result.snapshot().entry_count() == 2U);
   CHECK(result.snapshot().entries()[0].index() == 0U);
@@ -98,9 +85,8 @@ TEST_CASE("Sketch repair presentation snapshot query filters by priority",
   const auto snapshot = sample_snapshot();
   const SketchRepairPresentationSnapshotQueryEngine engine;
 
-  const auto result = engine.execute(
-      snapshot, SketchRepairPresentationSnapshotQuery::with_priority(
-                    SketchRepairDisplayPriority::High));
+  const auto result = engine.execute(snapshot, SketchRepairPresentationSnapshotQuery::with_priority(
+                                                   SketchRepairDisplayPriority::High));
 
   REQUIRE(result.snapshot().entry_count() == 1U);
   CHECK(result.snapshot().entries().front().index() == 1U);

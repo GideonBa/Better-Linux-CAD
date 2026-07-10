@@ -40,7 +40,8 @@ public:
 
   [[nodiscard]] static Result<ConstructionRelation>
   create_plane_through_three_points(ConstructionRelationId id, ConstructionPointId first_point,
-                                    ConstructionPointId second_point, ConstructionPointId third_point);
+                                    ConstructionPointId second_point,
+                                    ConstructionPointId third_point);
 
   [[nodiscard]] static Result<ConstructionRelation>
   create_point_on_plane(ConstructionRelationId id, ConstructionPointId point,
@@ -66,10 +67,8 @@ public:
   create_plane_parallel_to_plane_through_point(ConstructionRelationId id, DatumPlaneId source_plane,
                                                ConstructionPointId through_point);
 
-  [[nodiscard]] static Result<ConstructionRelation>
-  create_line_parallel_to_line_through_point(ConstructionRelationId id,
-                                             ConstructionLineId source_line,
-                                             ConstructionPointId through_point);
+  [[nodiscard]] static Result<ConstructionRelation> create_line_parallel_to_line_through_point(
+      ConstructionRelationId id, ConstructionLineId source_line, ConstructionPointId through_point);
 
   [[nodiscard]] static Result<ConstructionRelation>
   create_line_parallel_to_generated_edge_through_point(ConstructionRelationId id,
@@ -145,7 +144,8 @@ public:
   create_on_generated_edge(ConstructionPointId id, std::string name, ConstructionRelation relation);
 
   [[nodiscard]] static Result<ConstructionPoint>
-  create_on_generated_vertex(ConstructionPointId id, std::string name, ConstructionRelation relation);
+  create_on_generated_vertex(ConstructionPointId id, std::string name,
+                             ConstructionRelation relation);
 
   [[nodiscard]] const ConstructionPointId& id() const noexcept;
   [[nodiscard]] const std::string& name() const noexcept;
@@ -174,8 +174,7 @@ public:
                   std::vector<ParameterId> parameter_dependencies = {});
 
   [[nodiscard]] static Result<ConstructionLine>
-  create_through_two_points(ConstructionLineId id, std::string name,
-                            ConstructionRelation relation);
+  create_through_two_points(ConstructionLineId id, std::string name, ConstructionRelation relation);
 
   [[nodiscard]] static Result<ConstructionLine>
   create_parallel_to_line_through_point(ConstructionLineId id, std::string name,

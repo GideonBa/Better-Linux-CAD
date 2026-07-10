@@ -1,0 +1,43 @@
+{
+  "schema": "blcad.assembly_document.mvp4",
+  "version": 1,
+  "document": {
+    "id": "assembly.flange",
+    "name": "FlangeAssembly"
+  },
+  "parameters": [
+    {
+      "id": "assembly.bolt_circle_radius",
+      "name": "bolt_circle_radius",
+      "type": "length",
+      "scope": "assembly",
+      "unit": "mm",
+      "value": 30.0
+    },
+    {
+      "id": "assembly.bolt_count",
+      "name": "bolt_count",
+      "type": "count",
+      "scope": "assembly",
+      "unit": "1",
+      "value": 6
+    }
+  ],
+  "member_parts": [
+    "part.bolt_circle_plate"
+  ],
+  "parameter_bindings": [
+    {
+      "id": "binding.plate.radius",
+      "part_document": "part.bolt_circle_plate",
+      "part_parameter": "part.bolt_circle_radius",
+      "assembly_parameter": "assembly.bolt_circle_radius"
+    },
+    {
+      "id": "binding.plate.count",
+      "part_document": "part.bolt_circle_plate",
+      "part_parameter": "part.bolt_count",
+      "assembly_parameter": "assembly.bolt_count"
+    }
+  ]
+}

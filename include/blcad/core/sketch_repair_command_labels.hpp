@@ -22,8 +22,8 @@ private:
 class SketchRepairCommandLabeler {
 public:
   [[nodiscard]] SketchRepairCommandLabel label_for(SketchRepairSuggestionAction action) const;
-  [[nodiscard]] SketchRepairCommandLabel label_for(
-      const SketchRepairUndoStackSummaryEntry& entry) const;
+  [[nodiscard]] SketchRepairCommandLabel
+  label_for(const SketchRepairUndoStackSummaryEntry& entry) const;
 };
 
 } // namespace blcad

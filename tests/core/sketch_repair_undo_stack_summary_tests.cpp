@@ -33,10 +33,9 @@ SketchReferenceTarget line_end(const char* id) {
 
 const SketchRepairSuggestion* find_action(const SketchRepairSuggestionReport& report,
                                           SketchRepairSuggestionAction action) {
-  const auto found = std::find_if(report.suggestions().begin(), report.suggestions().end(),
-                                  [action](const SketchRepairSuggestion& suggestion) {
-                                    return suggestion.action() == action;
-                                  });
+  const auto found = std::find_if(
+      report.suggestions().begin(), report.suggestions().end(),
+      [action](const SketchRepairSuggestion& suggestion) { return suggestion.action() == action; });
   return found == report.suggestions().end() ? nullptr : &*found;
 }
 
@@ -60,9 +59,11 @@ void add_duplicate_fixed_constraints(Sketch& sketch) {
 
 void add_duplicate_dimensions(Sketch& sketch) {
   auto dim_a = SketchDrivingDimension::create_horizontal_distance(
-      SketchDimensionId("dim.a"), line_start("line.a"), line_end("line.a"), ParameterId("part.width"));
+      SketchDimensionId("dim.a"), line_start("line.a"), line_end("line.a"),
+      ParameterId("part.width"));
   auto dim_b = SketchDrivingDimension::create_horizontal_distance(
-      SketchDimensionId("dim.b"), line_start("line.a"), line_end("line.a"), ParameterId("part.width.b"));
+      SketchDimensionId("dim.b"), line_start("line.a"), line_end("line.a"),
+      ParameterId("part.width.b"));
   REQUIRE(dim_a);
   REQUIRE(dim_b);
   REQUIRE(sketch.add_dimension(dim_b.value()));
@@ -89,7 +90,8 @@ TEST_CASE("Sketch repair undo stack summary reports an empty stack",
 
 TEST_CASE("Sketch repair undo stack summary exposes transactions in stack order",
           "[core][sketch-repair-undo-stack-summary]") {
-  auto sketch = Sketch::create(SketchId("sketch.summary.lifo"), "Summary", DatumPlaneId("datum.xy"));
+  auto sketch =
+      Sketch::create(SketchId("sketch.summary.lifo"), "Summary", DatumPlaneId("datum.xy"));
   REQUIRE(sketch);
   add_line(sketch.value(), "line.a", Point2{0.0, 0.0}, Point2{10.0, 0.0});
   add_duplicate_fixed_constraints(sketch.value());
@@ -102,7 +104,8 @@ TEST_CASE("Sketch repair undo stack summary exposes transactions in stack order"
   const auto* fixed_suggestion = find_action(
       fixed_suggestions, SketchRepairSuggestionAction::RemoveDuplicateFixedEndpointConstraint);
   REQUIRE(fixed_suggestion != nullptr);
-  auto fixed_transaction = transaction_executor.apply(sketch.value(), SketchRepairCommand(*fixed_suggestion));
+  auto fixed_transaction =
+      transaction_executor.apply(sketch.value(), SketchRepairCommand(*fixed_suggestion));
   REQUIRE(fixed_transaction);
   REQUIRE(stack.push(fixed_transaction.value()));
 
@@ -110,8 +113,8 @@ TEST_CASE("Sketch repair undo stack summary exposes transactions in stack order"
   const auto* dimension_suggestion = find_action(
       dimension_suggestions, SketchRepairSuggestionAction::RemoveDuplicateDrivingDimension);
   REQUIRE(dimension_suggestion != nullptr);
-  auto dimension_transaction = transaction_executor.apply(sketch.value(),
-                                                          SketchRepairCommand(*dimension_suggestion));
+  auto dimension_transaction =
+      transaction_executor.apply(sketch.value(), SketchRepairCommand(*dimension_suggestion));
   REQUIRE(dimension_transaction);
   REQUIRE(stack.push(dimension_transaction.value()));
 
@@ -119,7 +122,8 @@ TEST_CASE("Sketch repair undo stack summary exposes transactions in stack order"
   const auto summary = summarizer.summarize(stack);
   REQUIRE(summary.stack_size() == 2U);
   REQUIRE(summary.latest() != nullptr);
-  CHECK(summary.latest()->action() == SketchRepairSuggestionAction::RemoveDuplicateDrivingDimension);
+  CHECK(summary.latest()->action() ==
+        SketchRepairSuggestionAction::RemoveDuplicateDrivingDimension);
 
   const auto& first = summary.entries().front();
   CHECK(first.index() == 0U);

@@ -33,8 +33,8 @@ constexpr double k_tolerance = 1.0e-9;
                                                 const std::string& object_id) {
   const Vector3 direction = vector_between(start, end);
   if (length(direction) <= k_tolerance) {
-    return Result<Vector3>::failure(
-        validation_error(object_id, "construction line relation resolves to a zero-length direction"));
+    return Result<Vector3>::failure(validation_error(
+        object_id, "construction line relation resolves to a zero-length direction"));
   }
 
   return Result<Vector3>::success(normalize(direction));
@@ -79,8 +79,8 @@ ConstructionLineResolver::resolve(const PartDocument& document, ConstructionLine
       return Result<ResolvedConstructionLine>::failure(second.error());
     }
 
-    auto direction = direction_between(first.value().position, second.value().position,
-                                       line->id().value());
+    auto direction =
+        direction_between(first.value().position, second.value().position, line->id().value());
     if (direction.has_error()) {
       return Result<ResolvedConstructionLine>::failure(direction.error());
     }
@@ -112,7 +112,8 @@ ConstructionLineResolver::resolve(const PartDocument& document, ConstructionLine
 
     if (!relation.generated_edge().has_value()) {
       return Result<ResolvedConstructionLine>::failure(validation_error(
-          line->id().value(), "line parallel to generated edge must carry a generated edge reference"));
+          line->id().value(),
+          "line parallel to generated edge must carry a generated edge reference"));
     }
 
     const SemanticReferenceEvaluator evaluator;

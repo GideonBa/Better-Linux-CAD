@@ -147,6 +147,34 @@ The first construction-geometry step is implemented:
 
 Still intentionally missing: expression-evaluated coordinate placement, surface-based construction geometry, GUI manipulators, and assembly-level construction geometry.
 
+## Implemented MVP-3 parametric bolt circle
+
+The first meaningful parametric feature test is implemented (`docs/bolt-circle-pattern-mvp3.md`):
+
+- `Quantity` distinguishes `LengthMm` and dimensionless `Count` values.
+- `ParameterType::Count` stores whole-number parameters such as a hole count.
+- `CircularHolePattern` is a sketch-level model-intent record: center, angle offset, and radius/count/hole-diameter parameter references.
+- `PartDocument` validates pattern parameter existence and types and creates parameter-to-sketch dependency edges.
+- Subtractive recompute expands the pattern into sequential through-all circular cuts with per-hole bounds validation.
+- Changing `bolt_count` or `bolt_circle_radius` drives incremental recompute of only the affected features.
+- JSON persists count parameters (`"type": "count"`, `"unit": "1"`) and `circular_hole_patterns`.
+- `examples/bolt_circle_plate.blcad.json` exports a six-hole plate to STEP headlessly.
+
+Still intentionally missing: hole semantics (`docs/hole-wizard.md`), skip instances, and seed-feature patterns (`docs/pattern-and-mirror-features.md`).
+
+## Implemented MVP-4 seed: shared assembly parameters
+
+The first cross-part parametrization step is implemented (`docs/assembly-parameters-mvp4.md`):
+
+- `ParameterScope` distinguishes `part` and `assembly`.
+- `AssemblyDocument` owns assembly-scoped parameters, registers member parts by `DocumentId`, and stores explicit `ParameterBinding` records.
+- `apply_bindings_to(PartDocument&)` pushes bound values through `PartDocument::set_parameter_value`, reusing part invalidation and recompute planning unchanged.
+- Type agreement (length/count) is enforced when bindings are applied.
+- Assembly documents serialize separately as `blcad.assembly_document.mvp4`.
+- `examples/flange_assembly.blcad.json` binds the bolt-circle plate example; an end-to-end test drives two plates from one shared `bolt_count`.
+
+Still intentionally missing: a project container with automatic propagation, component instances, constraints (MVP 5), and expressions over assembly parameters.
+
 ## Future multi-body part modeling, transforms, and path features
 
 The target multi-body feature layer is documented in `docs/multi-body-transform-and-path-features-roadmap.md`.

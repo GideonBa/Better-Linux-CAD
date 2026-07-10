@@ -24,8 +24,7 @@ class SketchRepairSuggestion {
 public:
   SketchRepairSuggestion(SketchRepairSuggestionAction action, std::string target,
                          SketchDiagnosticKind originating_diagnostic_kind,
-                         std::string originating_diagnostic_target,
-                         std::string message);
+                         std::string originating_diagnostic_target, std::string message);
 
   [[nodiscard]] SketchRepairSuggestionAction action() const noexcept;
   [[nodiscard]] const std::string& target() const noexcept;
@@ -59,10 +58,11 @@ private:
 
 class SketchRepairSuggester {
 public:
-  [[nodiscard]] SketchRepairSuggestionReport suggest(const SketchDiagnosticReport& diagnostics) const;
+  [[nodiscard]] SketchRepairSuggestionReport
+  suggest(const SketchDiagnosticReport& diagnostics) const;
 };
 
-[[nodiscard]] Result<std::string> serialize_sketch_repair_suggestion_report_to_json(
-    const SketchRepairSuggestionReport& report);
+[[nodiscard]] Result<std::string>
+serialize_sketch_repair_suggestion_report_to_json(const SketchRepairSuggestionReport& report);
 
 } // namespace blcad

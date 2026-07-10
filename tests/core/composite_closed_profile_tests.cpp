@@ -28,7 +28,8 @@ Sketch make_profile_sketch() {
 
 } // namespace
 
-TEST_CASE("CompositeClosedProfile stores outer and inner contour intent", "[core][composite-profile]") {
+TEST_CASE("CompositeClosedProfile stores outer and inner contour intent",
+          "[core][composite-profile]") {
   auto profile = CompositeClosedProfile::create(
       ProfileId("profile.composite"),
       {SketchEntityId("outer.bottom"), SketchEntityId("outer.right"), SketchEntityId("outer.top"),
@@ -60,7 +61,9 @@ TEST_CASE("CompositeClosedProfile rejects shared contour line ids", "[core][comp
   auto profile = CompositeClosedProfile::create(
       ProfileId("profile.invalid"),
       {SketchEntityId("outer.bottom"), SketchEntityId("outer.right"), SketchEntityId("outer.top")},
-      {{SketchEntityId("outer.bottom"), SketchEntityId("inner.right"), SketchEntityId("inner.top")}});
+      {{SketchEntityId("outer.bottom"), SketchEntityId("inner.right"),
+        SketchEntityId("inner.top")}});
   REQUIRE_FALSE(profile);
-  CHECK(profile.error().message() == "composite closed profile contours must not share line segment ids");
+  CHECK(profile.error().message() ==
+        "composite closed profile contours must not share line segment ids");
 }

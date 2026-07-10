@@ -12,30 +12,31 @@ Sketch make_spline_profile_sketch() {
   auto sketch = Sketch::create(SketchId("sketch.spline"), "SplineSketch", DatumPlaneId("datum.xy"));
   REQUIRE(sketch);
 
-  auto bottom = LineSegment::create(SketchEntityId("line.bottom"), Point2{0.0, 0.0}, Point2{20.0, 0.0});
+  auto bottom =
+      LineSegment::create(SketchEntityId("line.bottom"), Point2{0.0, 0.0}, Point2{20.0, 0.0});
   REQUIRE(bottom);
   REQUIRE(sketch.value().add_entity(bottom.value()));
 
-  auto spline = SplineSegment::create_cubic_bezier(SketchEntityId("spline.right"), Point2{20.0, 0.0},
-                                                   Point2{30.0, 5.0}, Point2{30.0, 15.0},
-                                                   Point2{20.0, 20.0});
+  auto spline =
+      SplineSegment::create_cubic_bezier(SketchEntityId("spline.right"), Point2{20.0, 0.0},
+                                         Point2{30.0, 5.0}, Point2{30.0, 15.0}, Point2{20.0, 20.0});
   REQUIRE(spline);
   REQUIRE(sketch.value().add_entity(spline.value()));
 
-  auto left = LineSegment::create(SketchEntityId("line.left"), Point2{20.0, 20.0}, Point2{0.0, 0.0});
+  auto left =
+      LineSegment::create(SketchEntityId("line.left"), Point2{20.0, 20.0}, Point2{0.0, 0.0});
   REQUIRE(left);
   REQUIRE(sketch.value().add_entity(left.value()));
 
-  auto tangent = SketchTangentContinuity::create_tangent(SketchConstraintId("tangent.bottom_spline"),
-                                                         SketchEntityId("line.bottom"),
-                                                         SketchEntityId("spline.right"));
+  auto tangent = SketchTangentContinuity::create_tangent(
+      SketchConstraintId("tangent.bottom_spline"), SketchEntityId("line.bottom"),
+      SketchEntityId("spline.right"));
   REQUIRE(tangent);
   REQUIRE(sketch.value().add_tangent_continuity(tangent.value()));
 
-  auto profile = ArcClosedProfile::create(ProfileId("profile.spline"),
-                                          {SketchEntityId("line.bottom"),
-                                           SketchEntityId("spline.right"),
-                                           SketchEntityId("line.left")});
+  auto profile = ArcClosedProfile::create(
+      ProfileId("profile.spline"),
+      {SketchEntityId("line.bottom"), SketchEntityId("spline.right"), SketchEntityId("line.left")});
   REQUIRE(profile);
   REQUIRE(sketch.value().add_profile(profile.value()));
 
@@ -54,7 +55,8 @@ PartDocument make_document() {
 
 } // namespace
 
-TEST_CASE("Spline sketch profile and tangent metadata roundtrip through JSON", "[core][json][spline]") {
+TEST_CASE("Spline sketch profile and tangent metadata roundtrip through JSON",
+          "[core][json][spline]") {
   PartDocument document = make_document();
 
   auto serialized = serialize_part_document_to_json(document);

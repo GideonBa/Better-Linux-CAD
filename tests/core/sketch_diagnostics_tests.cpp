@@ -34,10 +34,9 @@ SketchReferenceTarget line_end(const char* id) {
 }
 
 bool has_kind(const SketchDiagnosticReport& report, SketchDiagnosticKind kind) {
-  return std::any_of(report.diagnostics().begin(), report.diagnostics().end(),
-                     [kind](const SketchConstraintDiagnostic& diagnostic) {
-                       return diagnostic.kind() == kind;
-                     });
+  return std::any_of(
+      report.diagnostics().begin(), report.diagnostics().end(),
+      [kind](const SketchConstraintDiagnostic& diagnostic) { return diagnostic.kind() == kind; });
 }
 
 bool has_target(const SketchDiagnosticReport& report, std::string target) {
@@ -68,12 +67,12 @@ TEST_CASE("Sketch diagnostics reports simple under-constrained line endpoints",
 
 TEST_CASE("Sketch diagnostics reports free spline control points and undimensioned profiles",
           "[core][sketch-diagnostics]") {
-  auto sketch = Sketch::create(SketchId("sketch.diagnostics.spline"), "Spline",
-                               DatumPlaneId("datum.xy"));
+  auto sketch =
+      Sketch::create(SketchId("sketch.diagnostics.spline"), "Spline", DatumPlaneId("datum.xy"));
   REQUIRE(sketch);
-  auto spline = SplineSegment::create_cubic_bezier(SketchEntityId("spline.a"), Point2{0.0, 0.0},
-                                                  Point2{2.0, 4.0}, Point2{8.0, 4.0},
-                                                  Point2{10.0, 0.0});
+  auto spline =
+      SplineSegment::create_cubic_bezier(SketchEntityId("spline.a"), Point2{0.0, 0.0},
+                                         Point2{2.0, 4.0}, Point2{8.0, 4.0}, Point2{10.0, 0.0});
   REQUIRE(spline);
   REQUIRE(sketch.value().add_entity(spline.value()));
   auto rectangle = RectangleProfile::create(ProfileId("profile.spline"), ParameterId("part.width"),
@@ -92,8 +91,8 @@ TEST_CASE("Sketch diagnostics reports free spline control points and undimension
 
 TEST_CASE("Sketch diagnostics reports conflicting horizontal and vertical constraints",
           "[core][sketch-diagnostics]") {
-  auto sketch = Sketch::create(SketchId("sketch.diagnostics.conflict"), "Conflict",
-                               DatumPlaneId("datum.xy"));
+  auto sketch =
+      Sketch::create(SketchId("sketch.diagnostics.conflict"), "Conflict", DatumPlaneId("datum.xy"));
   REQUIRE(sketch);
   add_line(sketch.value(), "line.locked", Point2{0.0, 0.0}, Point2{10.0, 0.0});
 
@@ -130,9 +129,11 @@ TEST_CASE("Sketch diagnostics reports duplicate fixed endpoints and duplicate di
   REQUIRE(sketch.value().add_constraint(fixed_b.value()));
 
   auto dimension_a = SketchDrivingDimension::create_horizontal_distance(
-      SketchDimensionId("dim.a"), line_start("line.a"), line_end("line.a"), ParameterId("part.width"));
+      SketchDimensionId("dim.a"), line_start("line.a"), line_end("line.a"),
+      ParameterId("part.width"));
   auto dimension_b = SketchDrivingDimension::create_horizontal_distance(
-      SketchDimensionId("dim.b"), line_start("line.a"), line_end("line.a"), ParameterId("part.width.duplicate"));
+      SketchDimensionId("dim.b"), line_start("line.a"), line_end("line.a"),
+      ParameterId("part.width.duplicate"));
   REQUIRE(dimension_a);
   REQUIRE(dimension_b);
   REQUIRE(sketch.value().add_dimension(dimension_a.value()));
@@ -147,8 +148,8 @@ TEST_CASE("Sketch diagnostics reports duplicate fixed endpoints and duplicate di
 
 TEST_CASE("Sketch diagnostics serialize to debug JSON outside model intent",
           "[core][sketch-diagnostics][json]") {
-  auto sketch = Sketch::create(SketchId("sketch.diagnostics.json"), "Json",
-                               DatumPlaneId("datum.xy"));
+  auto sketch =
+      Sketch::create(SketchId("sketch.diagnostics.json"), "Json", DatumPlaneId("datum.xy"));
   REQUIRE(sketch);
   add_line(sketch.value(), "line.free", Point2{0.0, 0.0}, Point2{10.0, 0.0});
 

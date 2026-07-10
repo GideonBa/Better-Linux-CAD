@@ -48,9 +48,8 @@ PartDocument make_additive_region_document() {
   REQUIRE(document.value().add_datum_plane(xy.value()));
   auto sketch = make_unordered_square_sketch();
   REQUIRE(document.value().add_sketch(sketch));
-  auto feature = Feature::create_additive_extrude(FeatureId("feature.region"), "Region",
-                                                  SketchId("sketch.region"),
-                                                  ParameterId("part.depth"));
+  auto feature = Feature::create_additive_extrude(
+      FeatureId("feature.region"), "Region", SketchId("sketch.region"), ParameterId("part.depth"));
   REQUIRE(feature);
   REQUIRE(document.value().add_feature(feature.value()));
   return document.value();
@@ -73,21 +72,20 @@ PartDocument make_subtractive_region_document() {
   REQUIRE(base_profile);
   REQUIRE(base_sketch.value().add_profile(base_profile.value()));
   REQUIRE(document.value().add_sketch(base_sketch.value()));
-  auto base_feature = Feature::create_additive_extrude(FeatureId("feature.base"), "Base",
-                                                       SketchId("sketch.base"),
-                                                       ParameterId("part.depth"));
+  auto base_feature = Feature::create_additive_extrude(
+      FeatureId("feature.base"), "Base", SketchId("sketch.base"), ParameterId("part.depth"));
   REQUIRE(base_feature);
   REQUIRE(document.value().add_feature(base_feature.value()));
 
-  auto cut_sketch = Sketch::create(SketchId("sketch.cut_region"), "CutRegion", DatumPlaneId("datum.xy"));
+  auto cut_sketch =
+      Sketch::create(SketchId("sketch.cut_region"), "CutRegion", DatumPlaneId("datum.xy"));
   REQUIRE(cut_sketch);
   add_line(cut_sketch.value(), "line.cut.b", Point2{-5.0, -5.0}, Point2{5.0, -5.0});
   add_line(cut_sketch.value(), "line.cut.c", Point2{-5.0, 5.0}, Point2{-5.0, -5.0});
   add_line(cut_sketch.value(), "line.cut.a", Point2{5.0, -5.0}, Point2{-5.0, 5.0});
   REQUIRE(document.value().add_sketch(cut_sketch.value()));
-  auto cut_feature = Feature::create_subtractive_extrude(FeatureId("feature.cut"), "Cut",
-                                                         SketchId("sketch.cut_region"),
-                                                         FeatureId("feature.base"));
+  auto cut_feature = Feature::create_subtractive_extrude(
+      FeatureId("feature.cut"), "Cut", SketchId("sketch.cut_region"), FeatureId("feature.base"));
   REQUIRE(cut_feature);
   REQUIRE(document.value().add_feature(cut_feature.value()));
   return document.value();

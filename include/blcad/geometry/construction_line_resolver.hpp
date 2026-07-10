@@ -15,8 +15,8 @@ struct ResolvedConstructionLine {
 
 class ConstructionLineResolver {
 public:
-  [[nodiscard]] Result<ResolvedConstructionLine>
-  resolve(const PartDocument& document, ConstructionLineId line_id) const;
+  [[nodiscard]] Result<ResolvedConstructionLine> resolve(const PartDocument& document,
+                                                         ConstructionLineId line_id) const;
 };
 
 } // namespace blcad::geometry

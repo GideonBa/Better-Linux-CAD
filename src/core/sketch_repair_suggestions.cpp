@@ -18,11 +18,13 @@ using json = nlohmann::json;
   case SketchRepairSuggestionAction::RemoveConflictingOrientationConstraint:
     return "remove either the horizontal or vertical constraint on this line before solving";
   case SketchRepairSuggestionAction::RemoveDuplicateFixedEndpointConstraint:
-    return "remove duplicate fixed endpoint constraints and keep one deterministic fixed endpoint constraint";
+    return "remove duplicate fixed endpoint constraints and keep one deterministic fixed endpoint "
+           "constraint";
   case SketchRepairSuggestionAction::RemoveDuplicateDrivingDimension:
     return "remove duplicate driving dimensions targeting the same endpoint pair";
   case SketchRepairSuggestionAction::AddDrivingDimension:
-    return "add at least one driving dimension to make this profile sketch parametrically controlled";
+    return "add at least one driving dimension to make this profile sketch parametrically "
+           "controlled";
   }
   return diagnostic.message();
 }
@@ -80,55 +82,67 @@ SketchRepairSuggestion::SketchRepairSuggestion(SketchRepairSuggestionAction acti
       originating_diagnostic_target_(std::move(originating_diagnostic_target)),
       message_(std::move(message)) {}
 
-SketchRepairSuggestionAction SketchRepairSuggestion::action() const noexcept { return action_; }
-const std::string& SketchRepairSuggestion::target() const noexcept { return target_; }
+SketchRepairSuggestionAction SketchRepairSuggestion::action() const noexcept {
+  return action_;
+}
+const std::string& SketchRepairSuggestion::target() const noexcept {
+  return target_;
+}
 SketchDiagnosticKind SketchRepairSuggestion::originating_diagnostic_kind() const noexcept {
   return originating_diagnostic_kind_;
 }
 const std::string& SketchRepairSuggestion::originating_diagnostic_target() const noexcept {
   return originating_diagnostic_target_;
 }
-const std::string& SketchRepairSuggestion::message() const noexcept { return message_; }
+const std::string& SketchRepairSuggestion::message() const noexcept {
+  return message_;
+}
 
 SketchRepairSuggestionReport::SketchRepairSuggestionReport(SketchId sketch_id)
     : sketch_id_(std::move(sketch_id)) {}
 
-const SketchId& SketchRepairSuggestionReport::sketch_id() const noexcept { return sketch_id_; }
-const std::vector<SketchRepairSuggestion>& SketchRepairSuggestionReport::suggestions() const noexcept {
+const SketchId& SketchRepairSuggestionReport::sketch_id() const noexcept {
+  return sketch_id_;
+}
+const std::vector<SketchRepairSuggestion>&
+SketchRepairSuggestionReport::suggestions() const noexcept {
   return suggestions_;
 }
 std::size_t SketchRepairSuggestionReport::suggestion_count() const noexcept {
   return suggestions_.size();
 }
-bool SketchRepairSuggestionReport::empty() const noexcept { return suggestions_.empty(); }
+bool SketchRepairSuggestionReport::empty() const noexcept {
+  return suggestions_.empty();
+}
 void SketchRepairSuggestionReport::add(SketchRepairSuggestion suggestion) {
   suggestions_.push_back(std::move(suggestion));
 }
 
-SketchRepairSuggestionReport SketchRepairSuggester::suggest(
-    const SketchDiagnosticReport& diagnostics) const {
+SketchRepairSuggestionReport
+SketchRepairSuggester::suggest(const SketchDiagnosticReport& diagnostics) const {
   SketchRepairSuggestionReport report(diagnostics.sketch_id());
   for (const auto& diagnostic : diagnostics.diagnostics()) {
     SketchRepairSuggestionAction action{};
-    if (!suggestion_for_diagnostic(diagnostic, action)) continue;
-    report.add(SketchRepairSuggestion(action, diagnostic.target(), diagnostic.kind(), diagnostic.target(),
-                                      repair_message_for(diagnostic, action)));
+    if (!suggestion_for_diagnostic(diagnostic, action))
+      continue;
+    report.add(SketchRepairSuggestion(action, diagnostic.target(), diagnostic.kind(),
+                                      diagnostic.target(), repair_message_for(diagnostic, action)));
   }
   return report;
 }
 
-Result<std::string> serialize_sketch_repair_suggestion_report_to_json(
-    const SketchRepairSuggestionReport& report) {
+Result<std::string>
+serialize_sketch_repair_suggestion_report_to_json(const SketchRepairSuggestionReport& report) {
   json suggestions = json::array();
   for (const auto& suggestion : report.suggestions()) {
-    suggestions.push_back(json{{"action", std::string(to_string(suggestion.action()))},
-                               {"target", suggestion.target()},
-                               {"originating_diagnostic_kind",
-                                std::string(to_string(suggestion.originating_diagnostic_kind()))},
-                               {"originating_diagnostic_target",
-                                suggestion.originating_diagnostic_target()},
-                               {"message", suggestion.message()},
-                               {"mutates_model", false}});
+    suggestions.push_back(
+        json{{"action", std::string(to_string(suggestion.action()))},
+             {"target", suggestion.target()},
+             {"originating_diagnostic_kind",
+              std::string(to_string(suggestion.originating_diagnostic_kind()))},
+             {"originating_diagnostic_target", suggestion.originating_diagnostic_target()},
+             {"message", suggestion.message()},
+             {"mutates_model", false}});
   }
 
   json root{{"schema", "blcad.sketch_repair_suggestions.debug"},

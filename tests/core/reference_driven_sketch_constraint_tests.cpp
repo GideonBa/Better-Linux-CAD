@@ -4,7 +4,8 @@
 
 using namespace blcad;
 
-TEST_CASE("Sketch reference targets and constraints store projected reference intent", "[core][sketch]") {
+TEST_CASE("Sketch reference targets and constraints store projected reference intent",
+          "[core][sketch]") {
   auto line = SketchReferenceTarget::create_line_segment(SketchEntityId("line.helper"));
   REQUIRE(line);
   CHECK(line.value().kind() == SketchReferenceTargetKind::LineSegment);
@@ -12,7 +13,8 @@ TEST_CASE("Sketch reference targets and constraints store projected reference in
 
   auto line_start = SketchReferenceTarget::create_line_segment_start(SketchEntityId("line.helper"));
   REQUIRE(line_start);
-  auto projected_point = SketchReferenceTarget::create_projected_point(SketchEntityId("ref.point.a"));
+  auto projected_point =
+      SketchReferenceTarget::create_projected_point(SketchEntityId("ref.point.a"));
   REQUIRE(projected_point);
   auto coincident = SketchConstraint::create_coincident_to_projected_point(
       SketchConstraintId("constraint.a"), line_start.value(), projected_point.value());
@@ -21,7 +23,8 @@ TEST_CASE("Sketch reference targets and constraints store projected reference in
   CHECK(coincident.value().constrained_target().entity().value() == "line.helper");
   CHECK(coincident.value().reference_target().entity().value() == "ref.point.a");
 
-  auto projected_line = SketchReferenceTarget::create_projected_line(SketchEntityId("ref.line.axis"));
+  auto projected_line =
+      SketchReferenceTarget::create_projected_line(SketchEntityId("ref.line.axis"));
   REQUIRE(projected_line);
   auto parallel = SketchConstraint::create_parallel_to_projected_line(
       SketchConstraintId("constraint.parallel"), line.value(), projected_line.value());
@@ -37,9 +40,11 @@ TEST_CASE("Sketch reference targets and constraints store projected reference in
 TEST_CASE("Sketch constraints reject incompatible target shapes", "[core][sketch]") {
   auto line = SketchReferenceTarget::create_line_segment(SketchEntityId("line.helper"));
   REQUIRE(line);
-  auto projected_point = SketchReferenceTarget::create_projected_point(SketchEntityId("ref.point.a"));
+  auto projected_point =
+      SketchReferenceTarget::create_projected_point(SketchEntityId("ref.point.a"));
   REQUIRE(projected_point);
-  auto projected_line = SketchReferenceTarget::create_projected_line(SketchEntityId("ref.line.axis"));
+  auto projected_line =
+      SketchReferenceTarget::create_projected_line(SketchEntityId("ref.line.axis"));
   REQUIRE(projected_line);
 
   auto invalid_coincident = SketchConstraint::create_coincident_to_projected_point(
@@ -61,23 +66,25 @@ TEST_CASE("Sketch stores validated projected reference constraints", "[core][ske
   auto sketch = Sketch::create(SketchId("sketch.refs"), "Sketch_Refs", DatumPlaneId("datum.xy"));
   REQUIRE(sketch);
 
-  auto helper = LineSegment::create(SketchEntityId("line.helper"), Point2{0.0, 0.0}, Point2{1.0, 0.0});
+  auto helper =
+      LineSegment::create(SketchEntityId("line.helper"), Point2{0.0, 0.0}, Point2{1.0, 0.0});
   REQUIRE(helper);
   REQUIRE(sketch.value().add_entity(helper.value()));
 
-  auto point = ProjectedSketchPoint::create_from_construction_point(
-      SketchEntityId("ref.point.a"), ConstructionPointId("point.a"));
+  auto point = ProjectedSketchPoint::create_from_construction_point(SketchEntityId("ref.point.a"),
+                                                                    ConstructionPointId("point.a"));
   REQUIRE(point);
   REQUIRE(sketch.value().add_reference(point.value()));
 
-  auto line = ProjectedSketchLine::create_from_construction_line(
-      SketchEntityId("ref.line.axis"), ConstructionLineId("line.axis"));
+  auto line = ProjectedSketchLine::create_from_construction_line(SketchEntityId("ref.line.axis"),
+                                                                 ConstructionLineId("line.axis"));
   REQUIRE(line);
   REQUIRE(sketch.value().add_reference(line.value()));
 
   auto line_start = SketchReferenceTarget::create_line_segment_start(SketchEntityId("line.helper"));
   REQUIRE(line_start);
-  auto projected_point = SketchReferenceTarget::create_projected_point(SketchEntityId("ref.point.a"));
+  auto projected_point =
+      SketchReferenceTarget::create_projected_point(SketchEntityId("ref.point.a"));
   REQUIRE(projected_point);
   auto coincident = SketchConstraint::create_coincident_to_projected_point(
       SketchConstraintId("constraint.start"), line_start.value(), projected_point.value());
@@ -88,7 +95,8 @@ TEST_CASE("Sketch stores validated projected reference constraints", "[core][ske
   REQUIRE(duplicate.has_error());
   CHECK(duplicate.error().message() == "sketch constraint id must be unique within sketch");
 
-  auto missing_target = SketchReferenceTarget::create_projected_point(SketchEntityId("ref.missing"));
+  auto missing_target =
+      SketchReferenceTarget::create_projected_point(SketchEntityId("ref.missing"));
   REQUIRE(missing_target);
   auto invalid = SketchConstraint::create_coincident_to_projected_point(
       SketchConstraintId("constraint.missing"), line_start.value(), missing_target.value());

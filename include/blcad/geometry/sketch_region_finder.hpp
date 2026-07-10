@@ -23,11 +23,11 @@ struct GeneratedClosedProfileCandidate {
 
 class SketchRegionFinder {
 public:
-  [[nodiscard]] Result<GeneratedClosedProfileCandidate> find_single_region(
-      const PartDocument& document, const Sketch& sketch) const;
+  [[nodiscard]] Result<GeneratedClosedProfileCandidate>
+  find_single_region(const PartDocument& document, const Sketch& sketch) const;
 
-  [[nodiscard]] Result<ClosedProfile> make_closed_profile(
-      const GeneratedClosedProfileCandidate& candidate) const;
+  [[nodiscard]] Result<ClosedProfile>
+  make_closed_profile(const GeneratedClosedProfileCandidate& candidate) const;
 };
 
 } // namespace blcad::geometry

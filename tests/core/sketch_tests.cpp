@@ -5,7 +5,8 @@
 using namespace blcad;
 
 TEST_CASE("LineSegment stores endpoints", "[core][sketch]") {
-  const auto line = LineSegment::create(SketchEntityId("line.a"), Point2{0.0, 0.0}, Point2{1.0, 0.0});
+  const auto line =
+      LineSegment::create(SketchEntityId("line.a"), Point2{0.0, 0.0}, Point2{1.0, 0.0});
 
   REQUIRE(line);
   CHECK(line.value().id().value() == "line.a");
@@ -85,9 +86,9 @@ TEST_CASE("CircleProfile rejects missing ids and diameter references", "[core][s
 }
 
 TEST_CASE("ClosedProfile stores ordered line segment references", "[core][sketch]") {
-  auto profile = ClosedProfile::create(ProfileId("profile.triangle"),
-                                       {SketchEntityId("line.a"), SketchEntityId("line.b"),
-                                        SketchEntityId("line.c")});
+  auto profile = ClosedProfile::create(
+      ProfileId("profile.triangle"),
+      {SketchEntityId("line.a"), SketchEntityId("line.b"), SketchEntityId("line.c")});
 
   REQUIRE(profile);
   CHECK(profile.value().id().value() == "profile.triangle");
@@ -108,8 +109,8 @@ TEST_CASE("ClosedProfile rejects invalid references", "[core][sketch]") {
   CHECK(too_few.error().message() == "closed profile requires at least three line segments");
 
   const auto duplicate = ClosedProfile::create(
-      ProfileId("profile.bad"), {SketchEntityId("line.a"), SketchEntityId("line.b"),
-                                  SketchEntityId("line.a")});
+      ProfileId("profile.bad"),
+      {SketchEntityId("line.a"), SketchEntityId("line.b"), SketchEntityId("line.a")});
   REQUIRE(duplicate.has_error());
   CHECK(duplicate.error().message() ==
         "closed profile line segment ids must be unique within profile");
@@ -203,7 +204,8 @@ TEST_CASE("Sketch rejects duplicate profile ids across profile types", "[core][s
   REQUIRE(rectangle);
   REQUIRE(sketch.value().add_profile(rectangle.value()));
 
-  auto circle = CircleProfile::create(ProfileId("profile.shared"), ParameterId("part.hole_diameter"));
+  auto circle =
+      CircleProfile::create(ProfileId("profile.shared"), ParameterId("part.hole_diameter"));
   REQUIRE(circle);
 
   const auto duplicate = sketch.value().add_profile(circle.value());
@@ -214,7 +216,8 @@ TEST_CASE("Sketch rejects duplicate profile ids across profile types", "[core][s
 }
 
 TEST_CASE("Sketch validates ordered closed profile loops", "[core][sketch]") {
-  auto sketch = Sketch::create(SketchId("sketch.triangle"), "Sketch_Triangle", DatumPlaneId("datum.xy"));
+  auto sketch =
+      Sketch::create(SketchId("sketch.triangle"), "Sketch_Triangle", DatumPlaneId("datum.xy"));
   REQUIRE(sketch);
 
   REQUIRE(sketch.value().add_entity(
@@ -224,9 +227,9 @@ TEST_CASE("Sketch validates ordered closed profile loops", "[core][sketch]") {
   REQUIRE(sketch.value().add_entity(
       LineSegment::create(SketchEntityId("line.c"), Point2{0.0, 2.0}, Point2{0.0, 0.0}).value()));
 
-  auto profile = ClosedProfile::create(ProfileId("profile.triangle"),
-                                       {SketchEntityId("line.a"), SketchEntityId("line.b"),
-                                        SketchEntityId("line.c")});
+  auto profile = ClosedProfile::create(
+      ProfileId("profile.triangle"),
+      {SketchEntityId("line.a"), SketchEntityId("line.b"), SketchEntityId("line.c")});
   REQUIRE(profile);
 
   REQUIRE(sketch.value().add_profile(profile.value()));
@@ -236,8 +239,8 @@ TEST_CASE("Sketch validates ordered closed profile loops", "[core][sketch]") {
 }
 
 TEST_CASE("Sketch rejects disconnected and self-intersecting closed profiles", "[core][sketch]") {
-  auto disconnected =
-      Sketch::create(SketchId("sketch.disconnected"), "Sketch_Disconnected", DatumPlaneId("datum.xy"));
+  auto disconnected = Sketch::create(SketchId("sketch.disconnected"), "Sketch_Disconnected",
+                                     DatumPlaneId("datum.xy"));
   REQUIRE(disconnected);
   REQUIRE(disconnected.value().add_entity(
       LineSegment::create(SketchEntityId("line.a"), Point2{0.0, 0.0}, Point2{1.0, 0.0}).value()));
@@ -254,7 +257,8 @@ TEST_CASE("Sketch rejects disconnected and self-intersecting closed profiles", "
   CHECK(disconnected_added.error().message() ==
         "closed profile line segments must be ordered and connected");
 
-  auto bowtie = Sketch::create(SketchId("sketch.bowtie"), "Sketch_Bowtie", DatumPlaneId("datum.xy"));
+  auto bowtie =
+      Sketch::create(SketchId("sketch.bowtie"), "Sketch_Bowtie", DatumPlaneId("datum.xy"));
   REQUIRE(bowtie);
   REQUIRE(bowtie.value().add_entity(
       LineSegment::create(SketchEntityId("line.a"), Point2{0.0, 0.0}, Point2{2.0, 2.0}).value()));
@@ -264,9 +268,9 @@ TEST_CASE("Sketch rejects disconnected and self-intersecting closed profiles", "
       LineSegment::create(SketchEntityId("line.c"), Point2{0.0, 2.0}, Point2{2.0, 0.0}).value()));
   REQUIRE(bowtie.value().add_entity(
       LineSegment::create(SketchEntityId("line.d"), Point2{2.0, 0.0}, Point2{0.0, 0.0}).value()));
-  auto bowtie_profile = ClosedProfile::create(
-      ProfileId("profile.bowtie"), {SketchEntityId("line.a"), SketchEntityId("line.b"),
-                                     SketchEntityId("line.c"), SketchEntityId("line.d")});
+  auto bowtie_profile = ClosedProfile::create(ProfileId("profile.bowtie"),
+                                              {SketchEntityId("line.a"), SketchEntityId("line.b"),
+                                               SketchEntityId("line.c"), SketchEntityId("line.d")});
   REQUIRE(bowtie_profile);
   const auto bowtie_added = bowtie.value().add_profile(bowtie_profile.value());
   REQUIRE(bowtie_added.has_error());

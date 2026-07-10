@@ -38,9 +38,8 @@ PartDocument make_rectangular_additive_document() {
   REQUIRE(sketch.value().add_profile(rectangle.value()));
   REQUIRE(document.value().add_sketch(sketch.value()));
 
-  auto feature = Feature::create_additive_extrude(FeatureId("feature.base"), "BaseExtrude",
-                                                  SketchId("sketch.base"),
-                                                  ParameterId("part.depth"));
+  auto feature = Feature::create_additive_extrude(
+      FeatureId("feature.base"), "BaseExtrude", SketchId("sketch.base"), ParameterId("part.depth"));
   REQUIRE(feature);
   REQUIRE(document.value().add_feature(feature.value()));
 
@@ -83,8 +82,8 @@ TEST_CASE("SemanticReferenceEvaluator resolves rectangular additive extrude edge
   CHECK(edge.value().end.y == Catch::Approx(30.0));
   CHECK(edge.value().end.z == Catch::Approx(10.0));
 
-  auto vertex_ref = SemanticVertexReference::create(FeatureId("feature.base"),
-                                                    SemanticVertex::BottomBackLeft);
+  auto vertex_ref =
+      SemanticVertexReference::create(FeatureId("feature.base"), SemanticVertex::BottomBackLeft);
   REQUIRE(vertex_ref);
   auto vertex = evaluator.resolve_vertex(document, vertex_ref.value());
   REQUIRE(vertex);
@@ -98,8 +97,8 @@ TEST_CASE("ConstructionPointResolver resolves generated vertex points and genera
           "[geometry][construction-point]") {
   PartDocument document = make_rectangular_additive_document();
 
-  auto vertex_ref = SemanticVertexReference::create(FeatureId("feature.base"),
-                                                    SemanticVertex::TopFrontRight);
+  auto vertex_ref =
+      SemanticVertexReference::create(FeatureId("feature.base"), SemanticVertex::TopFrontRight);
   REQUIRE(vertex_ref);
   auto vertex_relation = ConstructionRelation::create_point_on_generated_vertex(
       ConstructionRelationId("relation.point_on_vertex"), ConstructionPointId("point.vertex"),
@@ -182,7 +181,8 @@ TEST_CASE("ConstructionLineResolver resolves deterministic chained construction 
   CHECK(resolved_parallel.value().point.z == Catch::Approx(20.0));
   CHECK(resolved_parallel.value().direction.x == Catch::Approx(1.0));
 
-  auto resolved_edge_parallel = resolver.resolve(document, ConstructionLineId("line.edge_parallel"));
+  auto resolved_edge_parallel =
+      resolver.resolve(document, ConstructionLineId("line.edge_parallel"));
   REQUIRE(resolved_edge_parallel);
   CHECK(resolved_edge_parallel.value().point.z == Catch::Approx(20.0));
   CHECK(resolved_edge_parallel.value().direction.x == Catch::Approx(1.0));

@@ -53,9 +53,9 @@ PartDocument make_document() {
   REQUIRE(xy);
   REQUIRE(document.value().add_datum_plane(xy.value()));
   REQUIRE(document.value().add_sketch(make_composite_sketch()));
-  auto feature = Feature::create_additive_extrude(FeatureId("feature.composite"), "Composite",
-                                                  SketchId("sketch.composite"),
-                                                  ParameterId("part.depth"));
+  auto feature =
+      Feature::create_additive_extrude(FeatureId("feature.composite"), "Composite",
+                                       SketchId("sketch.composite"), ParameterId("part.depth"));
   REQUIRE(feature);
   REQUIRE(document.value().add_feature(feature.value()));
   return document.value();

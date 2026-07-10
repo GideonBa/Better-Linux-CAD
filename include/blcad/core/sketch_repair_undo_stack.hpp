@@ -17,8 +17,8 @@ enum class SketchRepairUndoStackStatus { Pushed, RejectedNotUndoable, Undone, Em
 class SketchRepairUndoStackResult {
 public:
   SketchRepairUndoStackResult(SketchRepairUndoStackStatus status,
-                              SketchRepairTransactionStatus transaction_status,
-                              std::string message, std::size_t remaining_stack_size,
+                              SketchRepairTransactionStatus transaction_status, std::string message,
+                              std::size_t remaining_stack_size,
                               std::vector<SketchConstraintId> restored_constraint_ids,
                               std::vector<SketchDimensionId> restored_dimension_ids,
                               std::vector<SketchConstraintId> removed_constraint_ids);

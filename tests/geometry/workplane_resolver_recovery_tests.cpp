@@ -20,7 +20,8 @@ PartDocument make_top_face_document(double width_mm, double height_mm, double de
   auto document = PartDocument::create(DocumentId("part.top_face_motion"), "Top Face Motion");
   REQUIRE(document);
   REQUIRE(document.value().add_parameter(make_length_parameter("part.width", "width", width_mm)));
-  REQUIRE(document.value().add_parameter(make_length_parameter("part.height", "height", height_mm)));
+  REQUIRE(
+      document.value().add_parameter(make_length_parameter("part.height", "height", height_mm)));
   REQUIRE(document.value().add_parameter(make_length_parameter("part.depth", "depth", depth_mm)));
   auto datum = DatumPlane::xy();
   REQUIRE(datum);
@@ -32,15 +33,14 @@ PartDocument make_top_face_document(double width_mm, double height_mm, double de
   REQUIRE(rectangle);
   REQUIRE(sketch.value().add_profile(rectangle.value()));
   REQUIRE(document.value().add_sketch(sketch.value()));
-  auto feature = Feature::create_additive_extrude(FeatureId("feature.base"), "BaseExtrude",
-                                                  SketchId("sketch.base"),
-                                                  ParameterId("part.depth"));
+  auto feature = Feature::create_additive_extrude(
+      FeatureId("feature.base"), "BaseExtrude", SketchId("sketch.base"), ParameterId("part.depth"));
   REQUIRE(feature);
   REQUIRE(document.value().add_feature(feature.value()));
   auto face = SemanticFaceReference::create(FeatureId("feature.base"), SemanticFace::Top);
   REQUIRE(face);
-  auto workplane = DerivedWorkplane::create_on_feature_face(DatumPlaneId("workplane.top"),
-                                                            "Top", face.value());
+  auto workplane =
+      DerivedWorkplane::create_on_feature_face(DatumPlaneId("workplane.top"), "Top", face.value());
   REQUIRE(workplane);
   REQUIRE(document.value().add_derived_workplane(workplane.value()));
   auto top_sketch = Sketch::create(SketchId("sketch.top"), "Top", DatumPlaneId("workplane.top"));
@@ -98,12 +98,12 @@ TEST_CASE("Reference recovery evaluator reports missing generated source instead
           "[geometry][workplane][recovery]") {
   PartDocument document = make_top_face_document(100.0, 60.0, 10.0);
   const ReferenceRecoveryEvaluator evaluator;
-  auto missing_face = SemanticReferenceTarget::create_face(FeatureId("feature.deleted"),
-                                                           SemanticFace::Top);
+  auto missing_face =
+      SemanticReferenceTarget::create_face(FeatureId("feature.deleted"), SemanticFace::Top);
   REQUIRE(missing_face);
 
-  auto status = evaluator.evaluate(ReferenceStatusId("status.deleted_top"), document,
-                                   missing_face.value());
+  auto status =
+      evaluator.evaluate(ReferenceStatusId("status.deleted_top"), document, missing_face.value());
   REQUIRE(status);
   CHECK(status.value().status() == ReferenceStatusKind::Lost);
   CHECK(status.value().target().node_id() == "feature.deleted.face.top");

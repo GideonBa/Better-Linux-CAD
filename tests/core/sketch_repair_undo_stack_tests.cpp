@@ -37,10 +37,9 @@ SketchReferenceTarget line_end(const char* id) {
 
 const SketchRepairSuggestion* find_action(const SketchRepairSuggestionReport& report,
                                           SketchRepairSuggestionAction action) {
-  const auto found = std::find_if(report.suggestions().begin(), report.suggestions().end(),
-                                  [action](const SketchRepairSuggestion& suggestion) {
-                                    return suggestion.action() == action;
-                                  });
+  const auto found = std::find_if(
+      report.suggestions().begin(), report.suggestions().end(),
+      [action](const SketchRepairSuggestion& suggestion) { return suggestion.action() == action; });
   return found == report.suggestions().end() ? nullptr : &*found;
 }
 
@@ -113,8 +112,8 @@ TEST_CASE("Sketch repair undo stack rejects non-undoable transactions",
 
 TEST_CASE("Sketch repair undo stack undoes transactions in strict LIFO order",
           "[core][sketch-repair-undo-stack]") {
-  auto sketch = Sketch::create(SketchId("sketch.undo_stack.lifo"), "Lifo",
-                               DatumPlaneId("datum.xy"));
+  auto sketch =
+      Sketch::create(SketchId("sketch.undo_stack.lifo"), "Lifo", DatumPlaneId("datum.xy"));
   REQUIRE(sketch);
   add_line(sketch.value(), "line.a", Point2{0.0, 0.0}, Point2{10.0, 0.0});
   add_duplicate_fixed_constraints(sketch.value());
@@ -124,11 +123,12 @@ TEST_CASE("Sketch repair undo stack undoes transactions in strict LIFO order",
   SketchRepairUndoStack stack;
 
   auto duplicate_fixed_suggestions = suggestions_for(sketch.value());
-  const auto* fixed_suggestion = find_action(
-      duplicate_fixed_suggestions, SketchRepairSuggestionAction::RemoveDuplicateFixedEndpointConstraint);
+  const auto* fixed_suggestion =
+      find_action(duplicate_fixed_suggestions,
+                  SketchRepairSuggestionAction::RemoveDuplicateFixedEndpointConstraint);
   REQUIRE(fixed_suggestion != nullptr);
-  auto fixed_transaction = transaction_executor.apply(sketch.value(),
-                                                      SketchRepairCommand(*fixed_suggestion));
+  auto fixed_transaction =
+      transaction_executor.apply(sketch.value(), SketchRepairCommand(*fixed_suggestion));
   REQUIRE(fixed_transaction);
   REQUIRE(fixed_transaction.value().undoable());
   auto pushed_fixed = stack.push(fixed_transaction.value());
@@ -139,11 +139,12 @@ TEST_CASE("Sketch repair undo stack undoes transactions in strict LIFO order",
   CHECK(sketch.value().find_geometric_constraint(SketchConstraintId("constraint.b")) == nullptr);
 
   auto duplicate_dimension_suggestions = suggestions_for(sketch.value());
-  const auto* dimension_suggestion = find_action(
-      duplicate_dimension_suggestions, SketchRepairSuggestionAction::RemoveDuplicateDrivingDimension);
+  const auto* dimension_suggestion =
+      find_action(duplicate_dimension_suggestions,
+                  SketchRepairSuggestionAction::RemoveDuplicateDrivingDimension);
   REQUIRE(dimension_suggestion != nullptr);
-  auto dimension_transaction = transaction_executor.apply(
-      sketch.value(), SketchRepairCommand(*dimension_suggestion));
+  auto dimension_transaction =
+      transaction_executor.apply(sketch.value(), SketchRepairCommand(*dimension_suggestion));
   REQUIRE(dimension_transaction);
   REQUIRE(dimension_transaction.value().undoable());
   auto pushed_dimension = stack.push(dimension_transaction.value());
@@ -174,8 +175,8 @@ TEST_CASE("Sketch repair undo stack undoes transactions in strict LIFO order",
 
 TEST_CASE("Sketch repair undo stack reports empty undo without mutation",
           "[core][sketch-repair-undo-stack]") {
-  auto sketch = Sketch::create(SketchId("sketch.undo_stack.empty"), "Empty",
-                               DatumPlaneId("datum.xy"));
+  auto sketch =
+      Sketch::create(SketchId("sketch.undo_stack.empty"), "Empty", DatumPlaneId("datum.xy"));
   REQUIRE(sketch);
 
   SketchRepairUndoStack stack;

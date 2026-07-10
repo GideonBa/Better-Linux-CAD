@@ -34,10 +34,9 @@ SketchReferenceTarget line_end(const char* id) {
 
 const SketchRepairSuggestion* find_action(const SketchRepairSuggestionReport& report,
                                           SketchRepairSuggestionAction action) {
-  const auto found = std::find_if(report.suggestions().begin(), report.suggestions().end(),
-                                  [action](const SketchRepairSuggestion& suggestion) {
-                                    return suggestion.action() == action;
-                                  });
+  const auto found = std::find_if(
+      report.suggestions().begin(), report.suggestions().end(),
+      [action](const SketchRepairSuggestion& suggestion) { return suggestion.action() == action; });
   return found == report.suggestions().end() ? nullptr : &*found;
 }
 
@@ -67,33 +66,37 @@ TEST_CASE("Sketch repair command labeler returns deterministic labels for all ac
 
   CHECK(labeler.label_for(SketchRepairSuggestionAction::AddFixedEndpointConstraint).title() ==
         "Add fixed endpoint constraint");
-  CHECK(labeler.label_for(SketchRepairSuggestionAction::RemoveConflictingOrientationConstraint).title() ==
-        "Resolve horizontal/vertical conflict");
-  CHECK(labeler.label_for(SketchRepairSuggestionAction::RemoveDuplicateFixedEndpointConstraint).title() ==
-        "Remove duplicate fixed endpoint constraints");
+  CHECK(labeler.label_for(SketchRepairSuggestionAction::RemoveConflictingOrientationConstraint)
+            .title() == "Resolve horizontal/vertical conflict");
+  CHECK(labeler.label_for(SketchRepairSuggestionAction::RemoveDuplicateFixedEndpointConstraint)
+            .title() == "Remove duplicate fixed endpoint constraints");
   CHECK(labeler.label_for(SketchRepairSuggestionAction::RemoveDuplicateDrivingDimension).title() ==
         "Remove duplicate driving dimension");
   CHECK(labeler.label_for(SketchRepairSuggestionAction::AddDrivingDimension).title() ==
         "Add driving dimension");
 }
 
-TEST_CASE("Sketch repair undo stack summary labels are deterministic", "[core][sketch-repair-labels]") {
-  auto sketch = Sketch::create(SketchId("sketch.labels.summary"), "Labels", DatumPlaneId("datum.xy"));
+TEST_CASE("Sketch repair undo stack summary labels are deterministic",
+          "[core][sketch-repair-labels]") {
+  auto sketch =
+      Sketch::create(SketchId("sketch.labels.summary"), "Labels", DatumPlaneId("datum.xy"));
   REQUIRE(sketch);
   add_line(sketch.value(), "line.a", Point2{0.0, 0.0}, Point2{10.0, 0.0});
 
   auto dim_a = SketchDrivingDimension::create_horizontal_distance(
-      SketchDimensionId("dim.a"), line_start("line.a"), line_end("line.a"), ParameterId("part.width"));
+      SketchDimensionId("dim.a"), line_start("line.a"), line_end("line.a"),
+      ParameterId("part.width"));
   auto dim_b = SketchDrivingDimension::create_horizontal_distance(
-      SketchDimensionId("dim.b"), line_start("line.a"), line_end("line.a"), ParameterId("part.width.b"));
+      SketchDimensionId("dim.b"), line_start("line.a"), line_end("line.a"),
+      ParameterId("part.width.b"));
   REQUIRE(dim_a);
   REQUIRE(dim_b);
   REQUIRE(sketch.value().add_dimension(dim_b.value()));
   REQUIRE(sketch.value().add_dimension(dim_a.value()));
 
   const auto suggestions = suggestions_for(sketch.value());
-  const auto* suggestion = find_action(suggestions,
-                                       SketchRepairSuggestionAction::RemoveDuplicateDrivingDimension);
+  const auto* suggestion =
+      find_action(suggestions, SketchRepairSuggestionAction::RemoveDuplicateDrivingDimension);
   REQUIRE(suggestion != nullptr);
 
   const SketchRepairTransactionExecutor transaction_executor;

@@ -25,21 +25,22 @@ PartDocument make_construction_geometry_document() {
   REQUIRE(document.value().add_parameter(make_length_parameter("part.width", "width", 40.0)));
   REQUIRE(document.value().add_parameter(make_length_parameter("part.height", "height", 20.0)));
   REQUIRE(document.value().add_parameter(make_length_parameter("part.depth", "depth", 10.0)));
-  REQUIRE(document.value().add_parameter(make_length_parameter("part.plane_offset", "plane_offset", 25.0)));
+  REQUIRE(document.value().add_parameter(
+      make_length_parameter("part.plane_offset", "plane_offset", 25.0)));
 
   auto xy = DatumPlane::xy();
   REQUIRE(xy);
   REQUIRE(document.value().add_datum_plane(xy.value()));
 
-  auto point = ConstructionPoint::create_explicit(
-      ConstructionPointId("construction_point.anchor"), "Anchor", Point3{0.0, 0.0, 25.0},
-      {ParameterId("part.plane_offset")});
+  auto point = ConstructionPoint::create_explicit(ConstructionPointId("construction_point.anchor"),
+                                                  "Anchor", Point3{0.0, 0.0, 25.0},
+                                                  {ParameterId("part.plane_offset")});
   REQUIRE(point);
   REQUIRE(document.value().add_construction_point(point.value()));
 
-  auto line = ConstructionLine::create_explicit(
-      ConstructionLineId("construction_line.axis_z"), "AxisZ", Point3{0.0, 0.0, 0.0},
-      Vector3{0.0, 0.0, 1.0});
+  auto line =
+      ConstructionLine::create_explicit(ConstructionLineId("construction_line.axis_z"), "AxisZ",
+                                        Point3{0.0, 0.0, 0.0}, Vector3{0.0, 0.0, 1.0});
   REQUIRE(line);
   REQUIRE(document.value().add_construction_line(line.value()));
 
@@ -53,8 +54,8 @@ PartDocument make_construction_geometry_document() {
   auto sketch = Sketch::create(SketchId("sketch.on_construction_plane"), "OnConstructionPlane",
                                DatumPlaneId("construction_plane.offset_xy"));
   REQUIRE(sketch);
-  auto rectangle = RectangleProfile::create(ProfileId("profile.rectangle"), ParameterId("part.width"),
-                                            ParameterId("part.height"));
+  auto rectangle = RectangleProfile::create(ProfileId("profile.rectangle"),
+                                            ParameterId("part.width"), ParameterId("part.height"));
   REQUIRE(rectangle);
   REQUIRE(sketch.value().add_profile(rectangle.value()));
   REQUIRE(document.value().add_sketch(sketch.value()));
@@ -156,11 +157,11 @@ TEST_CASE("PartDocument JSON round-trips explicit construction geometry",
   CHECK(plane->parameter_dependencies().front().value() == "part.plane_offset");
 
   CHECK(restored.value().dependency_graph().has_dependency("part.plane_offset",
-                                                          "construction_plane.offset_xy"));
+                                                           "construction_plane.offset_xy"));
   CHECK(restored.value().dependency_graph().has_dependency("construction_plane.offset_xy",
-                                                          "sketch.on_construction_plane"));
+                                                           "sketch.on_construction_plane"));
   CHECK(restored.value().dependency_graph().has_dependency("sketch.on_construction_plane",
-                                                          "feature.construction_plane_prism"));
+                                                           "feature.construction_plane_prism"));
 }
 
 TEST_CASE("PartDocument JSON round-trips relation-driven construction geometry",
@@ -206,9 +207,9 @@ TEST_CASE("PartDocument JSON round-trips relation-driven construction geometry",
   CHECK(points_plane->relation().value().third_point().value() == "construction_point.c");
 
   CHECK(restored.value().dependency_graph().has_dependency("construction_point.a",
-                                                          "construction_line.axis_ab"));
+                                                           "construction_line.axis_ab"));
   CHECK(restored.value().dependency_graph().has_dependency("part.offset",
-                                                          "construction_plane.offset_xy"));
+                                                           "construction_plane.offset_xy"));
   CHECK(restored.value().dependency_graph().has_dependency("construction_point.c",
-                                                          "construction_plane.abc"));
+                                                           "construction_plane.abc"));
 }

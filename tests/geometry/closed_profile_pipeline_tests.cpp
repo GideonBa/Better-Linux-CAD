@@ -35,9 +35,9 @@ Sketch make_triangle_sketch(SketchId id, const char* name, DatumPlaneId workplan
   REQUIRE(sketch.value().add_entity(
       LineSegment::create(SketchEntityId("line.c"), Point2{0.0, 20.0}, Point2{0.0, 0.0}).value()));
 
-  auto profile = ClosedProfile::create(ProfileId("profile.triangle"),
-                                       {SketchEntityId("line.a"), SketchEntityId("line.b"),
-                                        SketchEntityId("line.c")});
+  auto profile = ClosedProfile::create(
+      ProfileId("profile.triangle"),
+      {SketchEntityId("line.a"), SketchEntityId("line.b"), SketchEntityId("line.c")});
   REQUIRE(profile);
   REQUIRE(sketch.value().add_profile(profile.value()));
 
@@ -45,23 +45,23 @@ Sketch make_triangle_sketch(SketchId id, const char* name, DatumPlaneId workplan
 }
 
 Sketch make_small_triangle_cut_sketch() {
-  auto sketch =
-      Sketch::create(SketchId("sketch.triangle_cut"), "Sketch_TriangleCut", DatumPlaneId("datum.xy"));
+  auto sketch = Sketch::create(SketchId("sketch.triangle_cut"), "Sketch_TriangleCut",
+                               DatumPlaneId("datum.xy"));
   REQUIRE(sketch);
 
-  REQUIRE(sketch.value().add_entity(LineSegment::create(SketchEntityId("line.cut_a"), Point2{-10.0, -10.0},
-                                                        Point2{10.0, -10.0})
-                                        .value()));
-  REQUIRE(sketch.value().add_entity(LineSegment::create(SketchEntityId("line.cut_b"), Point2{10.0, -10.0},
-                                                        Point2{-10.0, 10.0})
-                                        .value()));
-  REQUIRE(sketch.value().add_entity(LineSegment::create(SketchEntityId("line.cut_c"), Point2{-10.0, 10.0},
-                                                        Point2{-10.0, -10.0})
-                                        .value()));
+  REQUIRE(sketch.value().add_entity(
+      LineSegment::create(SketchEntityId("line.cut_a"), Point2{-10.0, -10.0}, Point2{10.0, -10.0})
+          .value()));
+  REQUIRE(sketch.value().add_entity(
+      LineSegment::create(SketchEntityId("line.cut_b"), Point2{10.0, -10.0}, Point2{-10.0, 10.0})
+          .value()));
+  REQUIRE(sketch.value().add_entity(
+      LineSegment::create(SketchEntityId("line.cut_c"), Point2{-10.0, 10.0}, Point2{-10.0, -10.0})
+          .value()));
 
-  auto profile = ClosedProfile::create(ProfileId("profile.triangle_cut"),
-                                       {SketchEntityId("line.cut_a"), SketchEntityId("line.cut_b"),
-                                        SketchEntityId("line.cut_c")});
+  auto profile = ClosedProfile::create(
+      ProfileId("profile.triangle_cut"),
+      {SketchEntityId("line.cut_a"), SketchEntityId("line.cut_b"), SketchEntityId("line.cut_c")});
   REQUIRE(profile);
   REQUIRE(sketch.value().add_profile(profile.value()));
 
@@ -77,12 +77,12 @@ PartDocument make_triangle_prism_document() {
   auto xy = DatumPlane::xy();
   REQUIRE(xy);
   REQUIRE(document.value().add_datum_plane(xy.value()));
-  REQUIRE(document.value().add_sketch(
-      make_triangle_sketch(SketchId("sketch.triangle"), "Sketch_Triangle", DatumPlaneId("datum.xy"))));
+  REQUIRE(document.value().add_sketch(make_triangle_sketch(
+      SketchId("sketch.triangle"), "Sketch_Triangle", DatumPlaneId("datum.xy"))));
 
-  auto feature = Feature::create_additive_extrude(FeatureId("feature.triangle_prism"),
-                                                  "TrianglePrism", SketchId("sketch.triangle"),
-                                                  ParameterId("part.depth"));
+  auto feature =
+      Feature::create_additive_extrude(FeatureId("feature.triangle_prism"), "TrianglePrism",
+                                       SketchId("sketch.triangle"), ParameterId("part.depth"));
   REQUIRE(feature);
   REQUIRE(document.value().add_feature(feature.value()));
 
@@ -95,7 +95,8 @@ PartDocument make_rectangle_with_triangle_cut_document() {
 
   REQUIRE(document.value().add_parameter(make_length_parameter("part.width", "width", 120.0)));
   REQUIRE(document.value().add_parameter(make_length_parameter("part.height", "height", 80.0)));
-  REQUIRE(document.value().add_parameter(make_length_parameter("part.thickness", "thickness", 8.0)));
+  REQUIRE(
+      document.value().add_parameter(make_length_parameter("part.thickness", "thickness", 8.0)));
 
   auto xy = DatumPlane::xy();
   REQUIRE(xy);
@@ -104,15 +105,16 @@ PartDocument make_rectangle_with_triangle_cut_document() {
   auto base_sketch =
       Sketch::create(SketchId("sketch.base"), "Sketch_BaseRectangle", DatumPlaneId("datum.xy"));
   REQUIRE(base_sketch);
-  auto rectangle = RectangleProfile::create(ProfileId("profile.base_rectangle"), ParameterId("part.width"),
-                                            ParameterId("part.height"));
+  auto rectangle = RectangleProfile::create(ProfileId("profile.base_rectangle"),
+                                            ParameterId("part.width"), ParameterId("part.height"));
   REQUIRE(rectangle);
   REQUIRE(base_sketch.value().add_profile(rectangle.value()));
   REQUIRE(document.value().add_sketch(base_sketch.value()));
   REQUIRE(document.value().add_sketch(make_small_triangle_cut_sketch()));
 
-  auto base = Feature::create_additive_extrude(FeatureId("feature.base_extrude"), "BaseExtrude",
-                                               SketchId("sketch.base"), ParameterId("part.thickness"));
+  auto base =
+      Feature::create_additive_extrude(FeatureId("feature.base_extrude"), "BaseExtrude",
+                                       SketchId("sketch.base"), ParameterId("part.thickness"));
   REQUIRE(base);
   REQUIRE(document.value().add_feature(base.value()));
 
@@ -145,7 +147,8 @@ TEST_CASE("Geometry recomputes an additive closed triangle profile", "[geometry]
   CHECK(shape.volume_mm3 == Catch::Approx(2000.0).margin(1.0));
 }
 
-TEST_CASE("Geometry recomputes a subtractive through-all closed profile cut", "[geometry][closed_profile]") {
+TEST_CASE("Geometry recomputes a subtractive through-all closed profile cut",
+          "[geometry][closed_profile]") {
   const PartDocument document = make_rectangle_with_triangle_cut_document();
   ShapeCache cache = make_shape_cache();
   const GeometryRecomputeExecutor executor;

@@ -20,10 +20,11 @@ Parameter make_length_parameter(const char* id, const char* name, double value_m
   return parameter.value();
 }
 
-void add_projected_point_constraint(Sketch& sketch, const char* id, const char* line_id,
-                                    bool start, const char* point_id) {
-  auto constrained = start ? SketchReferenceTarget::create_line_segment_start(SketchEntityId(line_id))
-                           : SketchReferenceTarget::create_line_segment_end(SketchEntityId(line_id));
+void add_projected_point_constraint(Sketch& sketch, const char* id, const char* line_id, bool start,
+                                    const char* point_id) {
+  auto constrained = start
+                         ? SketchReferenceTarget::create_line_segment_start(SketchEntityId(line_id))
+                         : SketchReferenceTarget::create_line_segment_end(SketchEntityId(line_id));
   REQUIRE(constrained);
   auto projected = SketchReferenceTarget::create_projected_point(SketchEntityId(point_id));
   REQUIRE(projected);
@@ -34,14 +35,16 @@ void add_projected_point_constraint(Sketch& sketch, const char* id, const char* 
 }
 
 void add_reference_generated_line(Sketch& sketch, const char* line_id, const char* start_constraint,
-                                  const char* end_constraint, const char* direction_constraint = nullptr) {
-  auto line = direction_constraint == nullptr
-                  ? ReferenceGeneratedLine::create_from_projected_point_constraints(
-                        SketchEntityId(line_id), SketchConstraintId(start_constraint),
-                        SketchConstraintId(end_constraint))
-                  : ReferenceGeneratedLine::create_with_projected_line_direction(
-                        SketchEntityId(line_id), SketchConstraintId(start_constraint),
-                        SketchConstraintId(end_constraint), SketchConstraintId(direction_constraint));
+                                  const char* end_constraint,
+                                  const char* direction_constraint = nullptr) {
+  auto line =
+      direction_constraint == nullptr
+          ? ReferenceGeneratedLine::create_from_projected_point_constraints(
+                SketchEntityId(line_id), SketchConstraintId(start_constraint),
+                SketchConstraintId(end_constraint))
+          : ReferenceGeneratedLine::create_with_projected_line_direction(
+                SketchEntityId(line_id), SketchConstraintId(start_constraint),
+                SketchConstraintId(end_constraint), SketchConstraintId(direction_constraint));
   REQUIRE(line);
   REQUIRE(sketch.add_reference(line.value()));
 }
@@ -70,10 +73,9 @@ Sketch make_reference_triangle_sketch(bool add_mismatched_direction) {
     REQUIRE(sketch.value().add_reference(projected_axis_y.value()));
   }
 
-  add_reference_generated_line(sketch.value(), "helper.ab", "constraint.ab.start",
-                               "constraint.ab.end",
-                               add_mismatched_direction ? "constraint.ab.parallel_y"
-                                                        : "constraint.ab.parallel_x");
+  add_reference_generated_line(
+      sketch.value(), "helper.ab", "constraint.ab.start", "constraint.ab.end",
+      add_mismatched_direction ? "constraint.ab.parallel_y" : "constraint.ab.parallel_x");
   add_reference_generated_line(sketch.value(), "helper.bc", "constraint.bc.start",
                                "constraint.bc.end");
   add_reference_generated_line(sketch.value(), "helper.ca", "constraint.ca.start",
@@ -106,9 +108,9 @@ Sketch make_reference_triangle_sketch(bool add_mismatched_direction) {
     REQUIRE(sketch.value().add_constraint(parallel_y.value()));
   }
 
-  auto profile = ClosedProfile::create(ProfileId("profile.reference_triangle"),
-                                       {SketchEntityId("helper.ab"), SketchEntityId("helper.bc"),
-                                        SketchEntityId("helper.ca")});
+  auto profile = ClosedProfile::create(
+      ProfileId("profile.reference_triangle"),
+      {SketchEntityId("helper.ab"), SketchEntityId("helper.bc"), SketchEntityId("helper.ca")});
   REQUIRE(profile);
   REQUIRE(sketch.value().add_profile(profile.value()));
   return sketch.value();
@@ -154,18 +156,17 @@ PartDocument make_reference_generated_profile_document(bool add_mismatched_direc
 PartDocument make_reference_generated_additive_document() {
   PartDocument document = make_reference_generated_profile_document(false);
   REQUIRE(document.add_parameter(make_length_parameter("part.depth", "depth", 5.0)));
-  auto feature = Feature::create_additive_extrude(FeatureId("feature.reference_triangle"),
-                                                  "ReferenceTriangle",
-                                                  SketchId("sketch.profile"),
-                                                  ParameterId("part.depth"));
+  auto feature =
+      Feature::create_additive_extrude(FeatureId("feature.reference_triangle"), "ReferenceTriangle",
+                                       SketchId("sketch.profile"), ParameterId("part.depth"));
   REQUIRE(feature);
   REQUIRE(document.add_feature(feature.value()));
   return document;
 }
 
 PartDocument make_reference_generated_subtractive_document() {
-  auto document = PartDocument::create(DocumentId("part.reference_generated_cut"),
-                                       "ReferenceGeneratedCut");
+  auto document =
+      PartDocument::create(DocumentId("part.reference_generated_cut"), "ReferenceGeneratedCut");
   REQUIRE(document);
   REQUIRE(document.value().add_parameter(make_length_parameter("part.width", "width", 40.0)));
   REQUIRE(document.value().add_parameter(make_length_parameter("part.height", "height", 40.0)));
@@ -181,9 +182,8 @@ PartDocument make_reference_generated_subtractive_document() {
   REQUIRE(base_profile);
   REQUIRE(base_sketch.value().add_profile(base_profile.value()));
   REQUIRE(document.value().add_sketch(base_sketch.value()));
-  auto base_feature = Feature::create_additive_extrude(FeatureId("feature.base"), "Base",
-                                                       SketchId("sketch.base"),
-                                                       ParameterId("part.depth"));
+  auto base_feature = Feature::create_additive_extrude(
+      FeatureId("feature.base"), "Base", SketchId("sketch.base"), ParameterId("part.depth"));
   REQUIRE(base_feature);
   REQUIRE(document.value().add_feature(base_feature.value()));
 
@@ -206,9 +206,8 @@ PartDocument make_reference_generated_subtractive_document() {
 
   auto cut_sketch = make_reference_triangle_sketch(false);
   REQUIRE(document.value().add_sketch(cut_sketch));
-  auto cut_feature = Feature::create_subtractive_extrude(FeatureId("feature.cut"), "Cut",
-                                                         SketchId("sketch.profile"),
-                                                         FeatureId("feature.base"));
+  auto cut_feature = Feature::create_subtractive_extrude(
+      FeatureId("feature.cut"), "Cut", SketchId("sketch.profile"), FeatureId("feature.base"));
   REQUIRE(cut_feature);
   REQUIRE(document.value().add_feature(cut_feature.value()));
   return document.value();
@@ -221,7 +220,8 @@ TEST_CASE("ReferenceGeneratedProfileResolver resolves first-class helper profile
   PartDocument document = make_reference_generated_profile_document(false);
   const Sketch* sketch = document.find_sketch(SketchId("sketch.profile"));
   REQUIRE(sketch != nullptr);
-  const ClosedProfile* profile = sketch->find_closed_profile(ProfileId("profile.reference_triangle"));
+  const ClosedProfile* profile =
+      sketch->find_closed_profile(ProfileId("profile.reference_triangle"));
   REQUIRE(profile != nullptr);
 
   const ReferenceGeneratedProfileResolver resolver;
@@ -242,7 +242,8 @@ TEST_CASE("ReferenceGeneratedProfileResolver rejects mismatched projected-line d
   PartDocument document = make_reference_generated_profile_document(true);
   const Sketch* sketch = document.find_sketch(SketchId("sketch.profile"));
   REQUIRE(sketch != nullptr);
-  const ClosedProfile* profile = sketch->find_closed_profile(ProfileId("profile.reference_triangle"));
+  const ClosedProfile* profile =
+      sketch->find_closed_profile(ProfileId("profile.reference_triangle"));
   REQUIRE(profile != nullptr);
 
   const ReferenceGeneratedProfileResolver resolver;

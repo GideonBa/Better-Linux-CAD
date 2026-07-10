@@ -30,10 +30,11 @@ constexpr double k_tolerance = 1.0e-9;
   return Vector2{vector.x / vector_length, vector.y / vector_length};
 }
 
-[[nodiscard]] const SketchDrivingDimension* find_dimension_for_segment(
-    const Sketch& sketch, const SketchEntityId& line_id) noexcept {
+[[nodiscard]] const SketchDrivingDimension*
+find_dimension_for_segment(const Sketch& sketch, const SketchEntityId& line_id) noexcept {
   for (const auto& dimension : sketch.driving_dimensions()) {
-    if (dimension.first_target().entity() == line_id && dimension.second_target().entity() == line_id &&
+    if (dimension.first_target().entity() == line_id &&
+        dimension.second_target().entity() == line_id &&
         dimension.first_target().kind() == SketchReferenceTargetKind::LineSegmentStart &&
         dimension.second_target().kind() == SketchReferenceTargetKind::LineSegmentEnd) {
       return &dimension;
@@ -71,12 +72,13 @@ constexpr double k_tolerance = 1.0e-9;
   case SketchDrivingDimensionKind::AlignedDistance:
   case SketchDrivingDimensionKind::PointToPointDistance: {
     const Vector2 direction = normalize(original_direction);
-    return Result<Point2>::success(Point2{start.x + direction.x * value, start.y + direction.y * value});
+    return Result<Point2>::success(
+        Point2{start.x + direction.x * value, start.y + direction.y * value});
   }
   }
 
-  return Result<Point2>::failure(validation_error(dimension.id().value(),
-                                                  "unsupported driving dimension kind"));
+  return Result<Point2>::failure(
+      validation_error(dimension.id().value(), "unsupported driving dimension kind"));
 }
 
 } // namespace
@@ -84,8 +86,8 @@ constexpr double k_tolerance = 1.0e-9;
 Result<std::vector<Point2>> DimensionDrivenProfileResolver::resolve_closed_profile_vertices(
     const PartDocument& document, const Sketch& sketch, const ClosedProfile& profile) const {
   if (profile.line_segments().empty()) {
-    return Result<std::vector<Point2>>::failure(validation_error(profile.id().value(),
-                                                                 "closed profile must contain lines"));
+    return Result<std::vector<Point2>>::failure(
+        validation_error(profile.id().value(), "closed profile must contain lines"));
   }
 
   bool has_dimension = false;
@@ -130,7 +132,8 @@ Result<std::vector<Point2>> DimensionDrivenProfileResolver::resolve_closed_profi
     if (line_id == profile.line_segments().back()) {
       if (!same_point(end, vertices.front())) {
         return Result<std::vector<Point2>>::failure(validation_error(
-            profile.id().value(), "dimension-driven closed profile must resolve back to its first vertex"));
+            profile.id().value(),
+            "dimension-driven closed profile must resolve back to its first vertex"));
       }
     } else {
       vertices.push_back(end);

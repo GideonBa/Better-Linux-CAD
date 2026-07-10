@@ -36,10 +36,9 @@ SketchReferenceTarget line_end(const char* id) {
 
 const SketchRepairSuggestion* find_action(const SketchRepairSuggestionReport& report,
                                           SketchRepairSuggestionAction action) {
-  const auto found = std::find_if(report.suggestions().begin(), report.suggestions().end(),
-                                  [action](const SketchRepairSuggestion& suggestion) {
-                                    return suggestion.action() == action;
-                                  });
+  const auto found = std::find_if(
+      report.suggestions().begin(), report.suggestions().end(),
+      [action](const SketchRepairSuggestion& suggestion) { return suggestion.action() == action; });
   return found == report.suggestions().end() ? nullptr : &*found;
 }
 
@@ -59,7 +58,8 @@ TEST_CASE("Sketch repair command adds a deterministic fixed endpoint constraint"
   add_line(sketch.value(), "line.free", Point2{0.0, 0.0}, Point2{10.0, 0.0});
 
   const auto suggestions = suggestions_for(sketch.value());
-  const auto* suggestion = find_action(suggestions, SketchRepairSuggestionAction::AddFixedEndpointConstraint);
+  const auto* suggestion =
+      find_action(suggestions, SketchRepairSuggestionAction::AddFixedEndpointConstraint);
   REQUIRE(suggestion != nullptr);
 
   const SketchRepairCommandExecutor executor;
@@ -67,8 +67,10 @@ TEST_CASE("Sketch repair command adds a deterministic fixed endpoint constraint"
   REQUIRE(result);
   CHECK(result.value().applied());
   REQUIRE(result.value().changed_constraint_ids().size() == 1U);
-  CHECK(result.value().changed_constraint_ids().front() == SketchConstraintId("repair.fixed.line.free.start"));
-  REQUIRE(sketch.value().find_geometric_constraint(SketchConstraintId("repair.fixed.line.free.start")) != nullptr);
+  CHECK(result.value().changed_constraint_ids().front() ==
+        SketchConstraintId("repair.fixed.line.free.start"));
+  REQUIRE(sketch.value().find_geometric_constraint(
+              SketchConstraintId("repair.fixed.line.free.start")) != nullptr);
 }
 
 TEST_CASE("Sketch repair command removes duplicate fixed endpoint constraints deterministically",
@@ -115,17 +117,19 @@ TEST_CASE("Sketch repair command removes duplicate driving dimensions determinis
   add_line(sketch.value(), "line.a", Point2{0.0, 0.0}, Point2{10.0, 0.0});
 
   auto dim_a = SketchDrivingDimension::create_horizontal_distance(
-      SketchDimensionId("dim.a"), line_start("line.a"), line_end("line.a"), ParameterId("part.width"));
+      SketchDimensionId("dim.a"), line_start("line.a"), line_end("line.a"),
+      ParameterId("part.width"));
   auto dim_b = SketchDrivingDimension::create_horizontal_distance(
-      SketchDimensionId("dim.b"), line_start("line.a"), line_end("line.a"), ParameterId("part.width.b"));
+      SketchDimensionId("dim.b"), line_start("line.a"), line_end("line.a"),
+      ParameterId("part.width.b"));
   REQUIRE(dim_a);
   REQUIRE(dim_b);
   REQUIRE(sketch.value().add_dimension(dim_b.value()));
   REQUIRE(sketch.value().add_dimension(dim_a.value()));
 
   const auto suggestions = suggestions_for(sketch.value());
-  const auto* suggestion = find_action(suggestions,
-                                       SketchRepairSuggestionAction::RemoveDuplicateDrivingDimension);
+  const auto* suggestion =
+      find_action(suggestions, SketchRepairSuggestionAction::RemoveDuplicateDrivingDimension);
   REQUIRE(suggestion != nullptr);
 
   const SketchRepairCommandExecutor executor;
@@ -163,6 +167,8 @@ TEST_CASE("Sketch repair command skips unsupported explicit suggestions",
   REQUIRE(result);
   CHECK(result.value().status() == SketchRepairCommandStatus::SkippedUnsupported);
   CHECK(result.value().changed_constraint_ids().empty());
-  CHECK(sketch.value().find_geometric_constraint(SketchConstraintId("constraint.horizontal")) != nullptr);
-  CHECK(sketch.value().find_geometric_constraint(SketchConstraintId("constraint.vertical")) != nullptr);
+  CHECK(sketch.value().find_geometric_constraint(SketchConstraintId("constraint.horizontal")) !=
+        nullptr);
+  CHECK(sketch.value().find_geometric_constraint(SketchConstraintId("constraint.vertical")) !=
+        nullptr);
 }

@@ -59,7 +59,7 @@ public:
   [[nodiscard]] SketchRepairUndoStackSummary summarize(const SketchRepairUndoStack& stack) const;
 };
 
-[[nodiscard]] Result<std::string> serialize_sketch_repair_undo_stack_summary_to_json(
-    const SketchRepairUndoStackSummary& summary);
+[[nodiscard]] Result<std::string>
+serialize_sketch_repair_undo_stack_summary_to_json(const SketchRepairUndoStackSummary& summary);
 
 } // namespace blcad

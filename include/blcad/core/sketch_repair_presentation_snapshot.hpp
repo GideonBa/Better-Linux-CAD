@@ -13,16 +13,11 @@ namespace blcad {
 
 class SketchRepairPresentationSnapshotEntry {
 public:
-  SketchRepairPresentationSnapshotEntry(std::size_t index,
-                                        bool latest,
+  SketchRepairPresentationSnapshotEntry(std::size_t index, bool latest,
                                         SketchRepairTransactionStatus transaction_status,
-                                        SketchRepairSuggestionAction action,
-                                        std::string target,
-                                        bool undoable,
-                                        std::string title,
-                                        std::string description,
-                                        std::string label_id,
-                                        SketchRepairDisplayCategory category,
+                                        SketchRepairSuggestionAction action, std::string target,
+                                        bool undoable, std::string title, std::string description,
+                                        std::string label_id, SketchRepairDisplayCategory category,
                                         SketchRepairDisplayPriority priority,
                                         SketchRepairAffectedCounts affected_counts,
                                         std::string affected_summary);
@@ -59,7 +54,8 @@ private:
 
 class SketchRepairPresentationSnapshot {
 public:
-  explicit SketchRepairPresentationSnapshot(std::vector<SketchRepairPresentationSnapshotEntry> entries);
+  explicit SketchRepairPresentationSnapshot(
+      std::vector<SketchRepairPresentationSnapshotEntry> entries);
 
   [[nodiscard]] const std::vector<SketchRepairPresentationSnapshotEntry>& entries() const noexcept;
   [[nodiscard]] std::size_t entry_count() const noexcept;
@@ -72,8 +68,8 @@ private:
 
 class SketchRepairPresentationSnapshotBuilder {
 public:
-  [[nodiscard]] SketchRepairPresentationSnapshot build(
-      const SketchRepairUndoStackSummary& summary) const;
+  [[nodiscard]] SketchRepairPresentationSnapshot
+  build(const SketchRepairUndoStackSummary& summary) const;
 };
 
 [[nodiscard]] Result<std::string> serialize_sketch_repair_presentation_snapshot_to_json(

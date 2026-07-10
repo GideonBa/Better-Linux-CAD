@@ -70,8 +70,8 @@ void add_dimensioned_rectangle(Sketch& sketch) {
 }
 
 PartDocument make_dimensioned_document() {
-  auto document = PartDocument::create(DocumentId("part.dimensioned.geometry"),
-                                       "DimensionedGeometry");
+  auto document =
+      PartDocument::create(DocumentId("part.dimensioned.geometry"), "DimensionedGeometry");
   REQUIRE(document);
   REQUIRE(document.value().add_parameter(make_length_parameter("part.width", "width", 40.0)));
   REQUIRE(document.value().add_parameter(make_length_parameter("part.height", "height", 20.0)));
@@ -79,13 +79,14 @@ PartDocument make_dimensioned_document() {
   auto xy = DatumPlane::xy();
   REQUIRE(xy);
   REQUIRE(document.value().add_datum_plane(xy.value()));
-  auto sketch = Sketch::create(SketchId("sketch.dimensioned"), "Dimensioned", DatumPlaneId("datum.xy"));
+  auto sketch =
+      Sketch::create(SketchId("sketch.dimensioned"), "Dimensioned", DatumPlaneId("datum.xy"));
   REQUIRE(sketch);
   add_dimensioned_rectangle(sketch.value());
   REQUIRE(document.value().add_sketch(sketch.value()));
-  auto feature = Feature::create_additive_extrude(FeatureId("feature.dimensioned"), "Dimensioned",
-                                                  SketchId("sketch.dimensioned"),
-                                                  ParameterId("part.depth"));
+  auto feature =
+      Feature::create_additive_extrude(FeatureId("feature.dimensioned"), "Dimensioned",
+                                       SketchId("sketch.dimensioned"), ParameterId("part.depth"));
   REQUIRE(feature);
   REQUIRE(document.value().add_feature(feature.value()));
   return document.value();

@@ -11,10 +11,12 @@ namespace blcad {
 
 enum class ParameterType {
   Length,
+  Count,
 };
 
 enum class ParameterScope {
   Part,
+  Assembly,
 };
 
 [[nodiscard]] std::string_view to_string(ParameterType type) noexcept;
@@ -25,6 +27,10 @@ public:
   [[nodiscard]] static Result<Parameter> create_length(ParameterId id, std::string name,
                                                        Quantity value,
                                                        ParameterScope scope = ParameterScope::Part);
+  // A dimensionless positive integer parameter, for example a hole count.
+  [[nodiscard]] static Result<Parameter> create_count(ParameterId id, std::string name,
+                                                      Quantity value,
+                                                      ParameterScope scope = ParameterScope::Part);
 
   // Returns a copy with a new value and the same identity. The new value follows
   // the same validation path as parameter creation.

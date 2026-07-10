@@ -30,10 +30,8 @@ constexpr double k_tolerance = 1.0e-9;
   const double o3 = orientation(b1, b2, a1);
   const double o4 = orientation(b1, b2, a2);
 
-  if (((o1 > k_tolerance && o2 < -k_tolerance) ||
-       (o1 < -k_tolerance && o2 > k_tolerance)) &&
-      ((o3 > k_tolerance && o4 < -k_tolerance) ||
-       (o3 < -k_tolerance && o4 > k_tolerance))) {
+  if (((o1 > k_tolerance && o2 < -k_tolerance) || (o1 < -k_tolerance && o2 > k_tolerance)) &&
+      ((o3 > k_tolerance && o4 < -k_tolerance) || (o3 < -k_tolerance && o4 > k_tolerance))) {
     return true;
   }
 
@@ -45,13 +43,12 @@ constexpr double k_tolerance = 1.0e-9;
 
 [[nodiscard]] bool are_adjacent_segments(std::size_t first, std::size_t second,
                                          std::size_t count) noexcept {
-  return first + 1U == second || second + 1U == first ||
-         (first == 0U && second + 1U == count) || (second == 0U && first + 1U == count);
+  return first + 1U == second || second + 1U == first || (first == 0U && second + 1U == count) ||
+         (second == 0U && first + 1U == count);
 }
 
-[[nodiscard]] Result<SketchReferenceTarget> create_target(SketchReferenceTargetKind kind,
-                                                          SketchEntityId entity,
-                                                          std::string_view object_kind) {
+[[nodiscard]] Result<SketchReferenceTarget>
+create_target(SketchReferenceTargetKind kind, SketchEntityId entity, std::string_view object_kind) {
   const auto object_id = entity.empty() ? std::string(object_kind) : entity.value();
   if (entity.empty()) {
     return Result<SketchReferenceTarget>::failure(
@@ -82,8 +79,10 @@ constexpr double k_tolerance = 1.0e-9;
 
 std::string_view to_string(ProjectedSketchPointSource source) noexcept {
   switch (source) {
-  case ProjectedSketchPointSource::ConstructionPoint: return "construction_point";
-  case ProjectedSketchPointSource::SemanticVertex: return "semantic_vertex";
+  case ProjectedSketchPointSource::ConstructionPoint:
+    return "construction_point";
+  case ProjectedSketchPointSource::SemanticVertex:
+    return "semantic_vertex";
   }
 
   return "unknown";
@@ -91,8 +90,10 @@ std::string_view to_string(ProjectedSketchPointSource source) noexcept {
 
 std::string_view to_string(ProjectedSketchLineSource source) noexcept {
   switch (source) {
-  case ProjectedSketchLineSource::ConstructionLine: return "construction_line";
-  case ProjectedSketchLineSource::SemanticEdge: return "semantic_edge";
+  case ProjectedSketchLineSource::ConstructionLine:
+    return "construction_line";
+  case ProjectedSketchLineSource::SemanticEdge:
+    return "semantic_edge";
   }
 
   return "unknown";
@@ -100,11 +101,16 @@ std::string_view to_string(ProjectedSketchLineSource source) noexcept {
 
 std::string_view to_string(SketchReferenceTargetKind kind) noexcept {
   switch (kind) {
-  case SketchReferenceTargetKind::LineSegment: return "line_segment";
-  case SketchReferenceTargetKind::LineSegmentStart: return "line_segment_start";
-  case SketchReferenceTargetKind::LineSegmentEnd: return "line_segment_end";
-  case SketchReferenceTargetKind::ProjectedPoint: return "projected_point";
-  case SketchReferenceTargetKind::ProjectedLine: return "projected_line";
+  case SketchReferenceTargetKind::LineSegment:
+    return "line_segment";
+  case SketchReferenceTargetKind::LineSegmentStart:
+    return "line_segment_start";
+  case SketchReferenceTargetKind::LineSegmentEnd:
+    return "line_segment_end";
+  case SketchReferenceTargetKind::ProjectedPoint:
+    return "projected_point";
+  case SketchReferenceTargetKind::ProjectedLine:
+    return "projected_line";
   }
 
   return "unknown";
@@ -134,7 +140,8 @@ SketchReferenceTarget::create_line_segment_start(SketchEntityId entity) {
                        "line segment start reference target");
 }
 
-Result<SketchReferenceTarget> SketchReferenceTarget::create_line_segment_end(SketchEntityId entity) {
+Result<SketchReferenceTarget>
+SketchReferenceTarget::create_line_segment_end(SketchEntityId entity) {
   return create_target(SketchReferenceTargetKind::LineSegmentEnd, std::move(entity),
                        "line segment end reference target");
 }
@@ -160,9 +167,10 @@ const SketchEntityId& SketchReferenceTarget::entity() const noexcept {
 SketchReferenceTarget::SketchReferenceTarget(SketchReferenceTargetKind kind, SketchEntityId entity)
     : kind_(kind), entity_(std::move(entity)) {}
 
-Result<SketchConstraint> SketchConstraint::create_coincident_to_projected_point(
-    SketchConstraintId id, SketchReferenceTarget constrained_point,
-    SketchReferenceTarget projected_point) {
+Result<SketchConstraint>
+SketchConstraint::create_coincident_to_projected_point(SketchConstraintId id,
+                                                       SketchReferenceTarget constrained_point,
+                                                       SketchReferenceTarget projected_point) {
   const auto object_id = id.empty() ? std::string("sketch_constraint") : id.value();
   if (id.empty()) {
     return Result<SketchConstraint>::failure(
@@ -177,13 +185,15 @@ Result<SketchConstraint> SketchConstraint::create_coincident_to_projected_point(
         object_id, "coincident projected-point constraint requires a projected point reference"));
   }
 
-  return Result<SketchConstraint>::success(SketchConstraint(
-      std::move(id), SketchConstraintKind::CoincidentToProjectedPoint,
-      std::move(constrained_point), std::move(projected_point)));
+  return Result<SketchConstraint>::success(
+      SketchConstraint(std::move(id), SketchConstraintKind::CoincidentToProjectedPoint,
+                       std::move(constrained_point), std::move(projected_point)));
 }
 
-Result<SketchConstraint> SketchConstraint::create_parallel_to_projected_line(
-    SketchConstraintId id, SketchReferenceTarget constrained_line, SketchReferenceTarget projected_line) {
+Result<SketchConstraint>
+SketchConstraint::create_parallel_to_projected_line(SketchConstraintId id,
+                                                    SketchReferenceTarget constrained_line,
+                                                    SketchReferenceTarget projected_line) {
   const auto object_id = id.empty() ? std::string("sketch_constraint") : id.value();
   if (id.empty()) {
     return Result<SketchConstraint>::failure(
@@ -198,13 +208,15 @@ Result<SketchConstraint> SketchConstraint::create_parallel_to_projected_line(
         object_id, "parallel projected-line constraint requires a projected line reference"));
   }
 
-  return Result<SketchConstraint>::success(SketchConstraint(
-      std::move(id), SketchConstraintKind::ParallelToProjectedLine, std::move(constrained_line),
-      std::move(projected_line)));
+  return Result<SketchConstraint>::success(
+      SketchConstraint(std::move(id), SketchConstraintKind::ParallelToProjectedLine,
+                       std::move(constrained_line), std::move(projected_line)));
 }
 
-Result<SketchConstraint> SketchConstraint::create_collinear_with_projected_line(
-    SketchConstraintId id, SketchReferenceTarget constrained_line, SketchReferenceTarget projected_line) {
+Result<SketchConstraint>
+SketchConstraint::create_collinear_with_projected_line(SketchConstraintId id,
+                                                       SketchReferenceTarget constrained_line,
+                                                       SketchReferenceTarget projected_line) {
   const auto object_id = id.empty() ? std::string("sketch_constraint") : id.value();
   if (id.empty()) {
     return Result<SketchConstraint>::failure(
@@ -219,9 +231,9 @@ Result<SketchConstraint> SketchConstraint::create_collinear_with_projected_line(
         object_id, "collinear projected-line constraint requires a projected line reference"));
   }
 
-  return Result<SketchConstraint>::success(SketchConstraint(
-      std::move(id), SketchConstraintKind::CollinearWithProjectedLine, std::move(constrained_line),
-      std::move(projected_line)));
+  return Result<SketchConstraint>::success(
+      SketchConstraint(std::move(id), SketchConstraintKind::CollinearWithProjectedLine,
+                       std::move(constrained_line), std::move(projected_line)));
 }
 
 const SketchConstraintId& SketchConstraint::id() const noexcept {
@@ -260,8 +272,9 @@ ProjectedSketchPoint::create_from_construction_point(SketchEntityId id, Construc
         Error::validation(object_id, "projected construction point reference must not be empty"));
   }
 
-  return Result<ProjectedSketchPoint>::success(ProjectedSketchPoint(
-      std::move(id), ProjectedSketchPointSource::ConstructionPoint, std::move(point), std::nullopt));
+  return Result<ProjectedSketchPoint>::success(
+      ProjectedSketchPoint(std::move(id), ProjectedSketchPointSource::ConstructionPoint,
+                           std::move(point), std::nullopt));
 }
 
 Result<ProjectedSketchPoint>
@@ -290,7 +303,8 @@ const ConstructionPointId& ProjectedSketchPoint::construction_point() const noex
   return construction_point_;
 }
 
-const std::optional<SemanticVertexReference>& ProjectedSketchPoint::semantic_vertex() const noexcept {
+const std::optional<SemanticVertexReference>&
+ProjectedSketchPoint::semantic_vertex() const noexcept {
   return semantic_vertex_;
 }
 
@@ -501,9 +515,8 @@ Result<ClosedProfile> ClosedProfile::create(ProfileId id,
   for (std::size_t i = 0; i < line_segments.size(); ++i) {
     for (std::size_t j = i + 1U; j < line_segments.size(); ++j) {
       if (line_segments[i] == line_segments[j]) {
-        return Result<ClosedProfile>::failure(
-            Error::validation(object_id,
-                              "closed profile line segment ids must be unique within profile"));
+        return Result<ClosedProfile>::failure(Error::validation(
+            object_id, "closed profile line segment ids must be unique within profile"));
       }
     }
   }
@@ -543,8 +556,8 @@ Result<Sketch> Sketch::create(SketchId id, std::string name, DatumPlaneId workpl
 
 Result<std::size_t> Sketch::add_entity(LineSegment line_segment) {
   if (has_entity_id(line_segment.id())) {
-    return Result<std::size_t>::failure(
-        Error::validation(line_segment.id().value(), "sketch entity id must be unique within sketch"));
+    return Result<std::size_t>::failure(Error::validation(
+        line_segment.id().value(), "sketch entity id must be unique within sketch"));
   }
 
   line_segments_.push_back(std::move(line_segment));
@@ -577,14 +590,14 @@ Result<std::size_t> Sketch::add_constraint(SketchConstraint constraint) {
         constraint.id().value(), "sketch constraint id must be unique within sketch"));
   }
 
-  auto constrained_target = validate_constraint_target(constraint.constrained_target(),
-                                                       constraint.id().value());
+  auto constrained_target =
+      validate_constraint_target(constraint.constrained_target(), constraint.id().value());
   if (constrained_target.has_error()) {
     return Result<std::size_t>::failure(constrained_target.error());
   }
 
-  auto reference_target = validate_constraint_target(constraint.reference_target(),
-                                                     constraint.id().value());
+  auto reference_target =
+      validate_constraint_target(constraint.reference_target(), constraint.id().value());
   if (reference_target.has_error()) {
     return Result<std::size_t>::failure(reference_target.error());
   }
@@ -628,66 +641,175 @@ Result<std::size_t> Sketch::add_profile(ClosedProfile profile) {
   return Result<std::size_t>::success(profile_count() - 1U);
 }
 
-const SketchId& Sketch::id() const noexcept { return id_; }
-const std::string& Sketch::name() const noexcept { return name_; }
-const DatumPlaneId& Sketch::workplane() const noexcept { return workplane_; }
-const std::vector<LineSegment>& Sketch::line_segments() const noexcept { return line_segments_; }
-const std::vector<ProjectedSketchPoint>& Sketch::projected_points() const noexcept { return projected_points_; }
-const std::vector<ProjectedSketchLine>& Sketch::projected_lines() const noexcept { return projected_lines_; }
-const std::vector<SketchConstraint>& Sketch::constraints() const noexcept { return constraints_; }
-const std::vector<RectangleProfile>& Sketch::rectangle_profiles() const noexcept { return rectangle_profiles_; }
-const std::vector<CircleProfile>& Sketch::circle_profiles() const noexcept { return circle_profiles_; }
-const std::vector<ClosedProfile>& Sketch::closed_profiles() const noexcept { return closed_profiles_; }
+Result<CircularHolePattern> CircularHolePattern::create(ProfileId id, ParameterId radius_parameter,
+                                                        ParameterId count_parameter,
+                                                        ParameterId hole_diameter_parameter,
+                                                        Point2 center, double angle_offset_deg) {
+  const auto object_id = id.empty() ? std::string("circular_hole_pattern") : id.value();
+  if (id.empty()) {
+    return Result<CircularHolePattern>::failure(
+        Error::validation(object_id, "circular hole pattern id must not be empty"));
+  }
+  if (radius_parameter.empty()) {
+    return Result<CircularHolePattern>::failure(
+        Error::validation(object_id, "circular hole pattern radius parameter must not be empty"));
+  }
+  if (count_parameter.empty()) {
+    return Result<CircularHolePattern>::failure(
+        Error::validation(object_id, "circular hole pattern count parameter must not be empty"));
+  }
+  if (hole_diameter_parameter.empty()) {
+    return Result<CircularHolePattern>::failure(Error::validation(
+        object_id, "circular hole pattern hole diameter parameter must not be empty"));
+  }
+  if (!std::isfinite(angle_offset_deg)) {
+    return Result<CircularHolePattern>::failure(
+        Error::validation(object_id, "circular hole pattern angle offset must be finite"));
+  }
+  return Result<CircularHolePattern>::success(
+      CircularHolePattern(std::move(id), std::move(radius_parameter), std::move(count_parameter),
+                          std::move(hole_diameter_parameter), center, angle_offset_deg));
+}
+
+CircularHolePattern::CircularHolePattern(ProfileId id, ParameterId radius_parameter,
+                                         ParameterId count_parameter,
+                                         ParameterId hole_diameter_parameter, Point2 center,
+                                         double angle_offset_deg)
+    : id_(std::move(id)), radius_parameter_(std::move(radius_parameter)),
+      count_parameter_(std::move(count_parameter)),
+      hole_diameter_parameter_(std::move(hole_diameter_parameter)), center_(center),
+      angle_offset_deg_(angle_offset_deg) {}
+
+const ProfileId& CircularHolePattern::id() const noexcept {
+  return id_;
+}
+Point2 CircularHolePattern::center() const noexcept {
+  return center_;
+}
+double CircularHolePattern::angle_offset_deg() const noexcept {
+  return angle_offset_deg_;
+}
+const ParameterId& CircularHolePattern::radius_parameter() const noexcept {
+  return radius_parameter_;
+}
+const ParameterId& CircularHolePattern::count_parameter() const noexcept {
+  return count_parameter_;
+}
+const ParameterId& CircularHolePattern::hole_diameter_parameter() const noexcept {
+  return hole_diameter_parameter_;
+}
+
+Result<std::size_t> Sketch::add_profile(CircularHolePattern pattern) {
+  if (has_profile_id(pattern.id())) {
+    return Result<std::size_t>::failure(
+        Error::validation(pattern.id().value(), "profile id must be unique within sketch"));
+  }
+
+  circular_hole_patterns_.push_back(std::move(pattern));
+  return Result<std::size_t>::success(circular_hole_patterns_.size() - 1U);
+}
+
+const std::vector<CircularHolePattern>& Sketch::circular_hole_patterns() const noexcept {
+  return circular_hole_patterns_;
+}
+
+const CircularHolePattern* Sketch::find_circular_hole_pattern(ProfileId id) const noexcept {
+  for (const auto& pattern : circular_hole_patterns_) {
+    if (pattern.id() == id)
+      return &pattern;
+  }
+  return nullptr;
+}
+
+const SketchId& Sketch::id() const noexcept {
+  return id_;
+}
+const std::string& Sketch::name() const noexcept {
+  return name_;
+}
+const DatumPlaneId& Sketch::workplane() const noexcept {
+  return workplane_;
+}
+const std::vector<LineSegment>& Sketch::line_segments() const noexcept {
+  return line_segments_;
+}
+const std::vector<ProjectedSketchPoint>& Sketch::projected_points() const noexcept {
+  return projected_points_;
+}
+const std::vector<ProjectedSketchLine>& Sketch::projected_lines() const noexcept {
+  return projected_lines_;
+}
+const std::vector<SketchConstraint>& Sketch::constraints() const noexcept {
+  return constraints_;
+}
+const std::vector<RectangleProfile>& Sketch::rectangle_profiles() const noexcept {
+  return rectangle_profiles_;
+}
+const std::vector<CircleProfile>& Sketch::circle_profiles() const noexcept {
+  return circle_profiles_;
+}
+const std::vector<ClosedProfile>& Sketch::closed_profiles() const noexcept {
+  return closed_profiles_;
+}
 
 std::size_t Sketch::profile_count() const noexcept {
-  return rectangle_profiles_.size() + circle_profiles_.size() + closed_profiles_.size();
+  return rectangle_profiles_.size() + circle_profiles_.size() + closed_profiles_.size() +
+         arc_closed_profiles_.size() + composite_closed_profiles_.size() +
+         circular_hole_patterns_.size();
 }
 
 const LineSegment* Sketch::find_line_segment(SketchEntityId id) const noexcept {
   for (const auto& line_segment : line_segments_) {
-    if (line_segment.id() == id) return &line_segment;
+    if (line_segment.id() == id)
+      return &line_segment;
   }
   return nullptr;
 }
 
 const ProjectedSketchPoint* Sketch::find_projected_point(SketchEntityId id) const noexcept {
   for (const auto& point : projected_points_) {
-    if (point.id() == id) return &point;
+    if (point.id() == id)
+      return &point;
   }
   return nullptr;
 }
 
 const ProjectedSketchLine* Sketch::find_projected_line(SketchEntityId id) const noexcept {
   for (const auto& line : projected_lines_) {
-    if (line.id() == id) return &line;
+    if (line.id() == id)
+      return &line;
   }
   return nullptr;
 }
 
 const SketchConstraint* Sketch::find_constraint(SketchConstraintId id) const noexcept {
   for (const auto& constraint : constraints_) {
-    if (constraint.id() == id) return &constraint;
+    if (constraint.id() == id)
+      return &constraint;
   }
   return nullptr;
 }
 
 const RectangleProfile* Sketch::find_rectangle_profile(ProfileId id) const noexcept {
   for (const auto& profile : rectangle_profiles_) {
-    if (profile.id() == id) return &profile;
+    if (profile.id() == id)
+      return &profile;
   }
   return nullptr;
 }
 
 const CircleProfile* Sketch::find_circle_profile(ProfileId id) const noexcept {
   for (const auto& profile : circle_profiles_) {
-    if (profile.id() == id) return &profile;
+    if (profile.id() == id)
+      return &profile;
   }
   return nullptr;
 }
 
 const ClosedProfile* Sketch::find_closed_profile(ProfileId id) const noexcept {
   for (const auto& profile : closed_profiles_) {
-    if (profile.id() == id) return &profile;
+    if (profile.id() == id)
+      return &profile;
   }
   return nullptr;
 }
@@ -710,7 +832,8 @@ bool Sketch::has_constraint_id(const SketchConstraintId& id) const noexcept {
 
 bool Sketch::has_profile_id(const ProfileId& id) const noexcept {
   return find_rectangle_profile(id) != nullptr || find_circle_profile(id) != nullptr ||
-         find_closed_profile(id) != nullptr;
+         find_closed_profile(id) != nullptr || find_arc_closed_profile(id) != nullptr ||
+         find_composite_closed_profile(id) != nullptr || find_circular_hole_pattern(id) != nullptr;
 }
 
 Result<std::size_t> Sketch::validate_constraint_target(const SketchReferenceTarget& target,
@@ -752,7 +875,8 @@ Result<std::vector<Point2>> Sketch::validate_closed_profile(const ClosedProfile&
     if (line_segment != nullptr) {
       if (contains_reference_generated_line) {
         return Result<std::vector<Point2>>::failure(Error::validation(
-            profile.id().value(), "closed profile must not mix explicit and reference-generated lines"));
+            profile.id().value(),
+            "closed profile must not mix explicit and reference-generated lines"));
       }
       segments.push_back(line_segment);
       continue;
@@ -761,7 +885,8 @@ Result<std::vector<Point2>> Sketch::validate_closed_profile(const ClosedProfile&
     if (find_reference_generated_line(line_segment_id) != nullptr) {
       if (!segments.empty()) {
         return Result<std::vector<Point2>>::failure(Error::validation(
-            profile.id().value(), "closed profile must not mix explicit and reference-generated lines"));
+            profile.id().value(),
+            "closed profile must not mix explicit and reference-generated lines"));
       }
       contains_reference_generated_line = true;
       continue;
@@ -792,12 +917,12 @@ Result<std::vector<Point2>> Sketch::validate_closed_profile(const ClosedProfile&
 
   for (std::size_t i = 0; i < segments.size(); ++i) {
     for (std::size_t j = i + 1U; j < segments.size(); ++j) {
-      if (are_adjacent_segments(i, j, segments.size())) continue;
+      if (are_adjacent_segments(i, j, segments.size()))
+        continue;
       if (segments_intersect(segments[i]->start(), segments[i]->end(), segments[j]->start(),
                              segments[j]->end())) {
-        return Result<std::vector<Point2>>::failure(
-            Error::validation(profile.id().value(),
-                              "closed profile line segments must not self-intersect"));
+        return Result<std::vector<Point2>>::failure(Error::validation(
+            profile.id().value(), "closed profile line segments must not self-intersect"));
       }
     }
   }

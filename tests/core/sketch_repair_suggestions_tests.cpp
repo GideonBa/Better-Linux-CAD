@@ -34,18 +34,16 @@ SketchReferenceTarget line_end(const char* id) {
 }
 
 bool has_action(const SketchRepairSuggestionReport& report, SketchRepairSuggestionAction action) {
-  return std::any_of(report.suggestions().begin(), report.suggestions().end(),
-                     [action](const SketchRepairSuggestion& suggestion) {
-                       return suggestion.action() == action;
-                     });
+  return std::any_of(
+      report.suggestions().begin(), report.suggestions().end(),
+      [action](const SketchRepairSuggestion& suggestion) { return suggestion.action() == action; });
 }
 
 const SketchRepairSuggestion* find_action(const SketchRepairSuggestionReport& report,
                                           SketchRepairSuggestionAction action) {
-  const auto found = std::find_if(report.suggestions().begin(), report.suggestions().end(),
-                                  [action](const SketchRepairSuggestion& suggestion) {
-                                    return suggestion.action() == action;
-                                  });
+  const auto found = std::find_if(
+      report.suggestions().begin(), report.suggestions().end(),
+      [action](const SketchRepairSuggestion& suggestion) { return suggestion.action() == action; });
   return found == report.suggestions().end() ? nullptr : &*found;
 }
 
@@ -53,8 +51,8 @@ const SketchRepairSuggestion* find_action(const SketchRepairSuggestionReport& re
 
 TEST_CASE("Sketch repair suggestions propose fixed constraints for unconstrained endpoints",
           "[core][sketch-repair]") {
-  auto sketch = Sketch::create(SketchId("sketch.repair.free_line"), "FreeLine",
-                               DatumPlaneId("datum.xy"));
+  auto sketch =
+      Sketch::create(SketchId("sketch.repair.free_line"), "FreeLine", DatumPlaneId("datum.xy"));
   REQUIRE(sketch);
   add_line(sketch.value(), "line.free", Point2{0.0, 0.0}, Point2{10.0, 0.0});
 
@@ -74,8 +72,8 @@ TEST_CASE("Sketch repair suggestions propose fixed constraints for unconstrained
 
 TEST_CASE("Sketch repair suggestions propose removing orientation conflicts",
           "[core][sketch-repair]") {
-  auto sketch = Sketch::create(SketchId("sketch.repair.conflict"), "Conflict",
-                               DatumPlaneId("datum.xy"));
+  auto sketch =
+      Sketch::create(SketchId("sketch.repair.conflict"), "Conflict", DatumPlaneId("datum.xy"));
   REQUIRE(sketch);
   add_line(sketch.value(), "line.locked", Point2{0.0, 0.0}, Point2{10.0, 0.0});
 
@@ -103,8 +101,8 @@ TEST_CASE("Sketch repair suggestions propose removing orientation conflicts",
 
 TEST_CASE("Sketch repair suggestions propose removing duplicate fixed and dimension records",
           "[core][sketch-repair]") {
-  auto sketch = Sketch::create(SketchId("sketch.repair.duplicates"), "Duplicates",
-                               DatumPlaneId("datum.xy"));
+  auto sketch =
+      Sketch::create(SketchId("sketch.repair.duplicates"), "Duplicates", DatumPlaneId("datum.xy"));
   REQUIRE(sketch);
   add_line(sketch.value(), "line.a", Point2{0.0, 0.0}, Point2{10.0, 0.0});
 
@@ -118,9 +116,11 @@ TEST_CASE("Sketch repair suggestions propose removing duplicate fixed and dimens
   REQUIRE(sketch.value().add_constraint(fixed_b.value()));
 
   auto dimension_a = SketchDrivingDimension::create_horizontal_distance(
-      SketchDimensionId("dim.a"), line_start("line.a"), line_end("line.a"), ParameterId("part.width"));
+      SketchDimensionId("dim.a"), line_start("line.a"), line_end("line.a"),
+      ParameterId("part.width"));
   auto dimension_b = SketchDrivingDimension::create_horizontal_distance(
-      SketchDimensionId("dim.b"), line_start("line.a"), line_end("line.a"), ParameterId("part.width.duplicate"));
+      SketchDimensionId("dim.b"), line_start("line.a"), line_end("line.a"),
+      ParameterId("part.width.duplicate"));
   REQUIRE(dimension_a);
   REQUIRE(dimension_b);
   REQUIRE(sketch.value().add_dimension(dimension_a.value()));
@@ -131,17 +131,18 @@ TEST_CASE("Sketch repair suggestions propose removing duplicate fixed and dimens
   const SketchRepairSuggester suggester;
   const auto suggestions = suggester.suggest(diagnostic_report);
 
-  CHECK(has_action(suggestions, SketchRepairSuggestionAction::RemoveDuplicateFixedEndpointConstraint));
+  CHECK(has_action(suggestions,
+                   SketchRepairSuggestionAction::RemoveDuplicateFixedEndpointConstraint));
   CHECK(has_action(suggestions, SketchRepairSuggestionAction::RemoveDuplicateDrivingDimension));
 }
 
 TEST_CASE("Sketch repair suggestions propose adding dimensions to undimensioned profile sketches",
           "[core][sketch-repair]") {
-  auto sketch = Sketch::create(SketchId("sketch.repair.profile"), "Profile",
-                               DatumPlaneId("datum.xy"));
+  auto sketch =
+      Sketch::create(SketchId("sketch.repair.profile"), "Profile", DatumPlaneId("datum.xy"));
   REQUIRE(sketch);
-  auto rectangle = RectangleProfile::create(ProfileId("profile.rectangle"), ParameterId("part.width"),
-                                            ParameterId("part.height"));
+  auto rectangle = RectangleProfile::create(ProfileId("profile.rectangle"),
+                                            ParameterId("part.width"), ParameterId("part.height"));
   REQUIRE(rectangle);
   REQUIRE(sketch.value().add_profile(rectangle.value()));
 
@@ -150,7 +151,8 @@ TEST_CASE("Sketch repair suggestions propose adding dimensions to undimensioned 
   const SketchRepairSuggester suggester;
   const auto suggestions = suggester.suggest(diagnostic_report);
 
-  const auto* suggestion = find_action(suggestions, SketchRepairSuggestionAction::AddDrivingDimension);
+  const auto* suggestion =
+      find_action(suggestions, SketchRepairSuggestionAction::AddDrivingDimension);
   REQUIRE(suggestion != nullptr);
   CHECK(suggestion->target() == "sketch.repair.profile");
   CHECK(suggestion->originating_diagnostic_kind() ==

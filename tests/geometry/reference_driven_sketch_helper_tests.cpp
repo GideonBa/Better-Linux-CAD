@@ -33,8 +33,8 @@ PartDocument make_reference_helper_document() {
 
   auto sketch = Sketch::create(SketchId("sketch.refs"), "Refs", DatumPlaneId("datum.xy"));
   REQUIRE(sketch);
-  auto helper_line = LineSegment::create(SketchEntityId("line.helper"), Point2{-1.0, 0.0},
-                                         Point2{1.0, 0.0});
+  auto helper_line =
+      LineSegment::create(SketchEntityId("line.helper"), Point2{-1.0, 0.0}, Point2{1.0, 0.0});
   REQUIRE(helper_line);
   REQUIRE(sketch.value().add_entity(helper_line.value()));
 
@@ -57,9 +57,11 @@ PartDocument make_reference_helper_document() {
   REQUIRE(start);
   auto end = SketchReferenceTarget::create_line_segment_end(SketchEntityId("line.helper"));
   REQUIRE(end);
-  auto point_a_target = SketchReferenceTarget::create_projected_point(SketchEntityId("ref.point.a"));
+  auto point_a_target =
+      SketchReferenceTarget::create_projected_point(SketchEntityId("ref.point.a"));
   REQUIRE(point_a_target);
-  auto point_b_target = SketchReferenceTarget::create_projected_point(SketchEntityId("ref.point.b"));
+  auto point_b_target =
+      SketchReferenceTarget::create_projected_point(SketchEntityId("ref.point.b"));
   REQUIRE(point_b_target);
 
   auto start_constraint = SketchConstraint::create_coincident_to_projected_point(
@@ -74,10 +76,12 @@ PartDocument make_reference_helper_document() {
 
   auto line_target = SketchReferenceTarget::create_line_segment(SketchEntityId("line.helper"));
   REQUIRE(line_target);
-  auto projected_line_target = SketchReferenceTarget::create_projected_line(SketchEntityId("ref.line.axis"));
+  auto projected_line_target =
+      SketchReferenceTarget::create_projected_line(SketchEntityId("ref.line.axis"));
   REQUIRE(projected_line_target);
   auto parallel = SketchConstraint::create_parallel_to_projected_line(
-      SketchConstraintId("constraint.parallel_axis"), line_target.value(), projected_line_target.value());
+      SketchConstraintId("constraint.parallel_axis"), line_target.value(),
+      projected_line_target.value());
   REQUIRE(parallel);
   REQUIRE(sketch.value().add_constraint(parallel.value()));
 
@@ -93,9 +97,11 @@ TEST_CASE("ReferenceDrivenSketchHelper resolves projected-point and projected-li
   const Sketch* sketch = document.find_sketch(SketchId("sketch.refs"));
   REQUIRE(sketch != nullptr);
 
-  const SketchConstraint* start = sketch->find_constraint(SketchConstraintId("constraint.start_on_a"));
+  const SketchConstraint* start =
+      sketch->find_constraint(SketchConstraintId("constraint.start_on_a"));
   REQUIRE(start != nullptr);
-  const SketchConstraint* parallel = sketch->find_constraint(SketchConstraintId("constraint.parallel_axis"));
+  const SketchConstraint* parallel =
+      sketch->find_constraint(SketchConstraintId("constraint.parallel_axis"));
   REQUIRE(parallel != nullptr);
 
   const ReferenceDrivenSketchHelper helper;
@@ -112,13 +118,15 @@ TEST_CASE("ReferenceDrivenSketchHelper resolves projected-point and projected-li
   CHECK(resolved_parallel.value().direction.y == Catch::Approx(0.0));
 }
 
-TEST_CASE("ReferenceDrivenSketchHelper creates deterministic profile helper lines from projected points",
-          "[geometry][sketch-reference]") {
+TEST_CASE(
+    "ReferenceDrivenSketchHelper creates deterministic profile helper lines from projected points",
+    "[geometry][sketch-reference]") {
   PartDocument document = make_reference_helper_document();
   const Sketch* sketch = document.find_sketch(SketchId("sketch.refs"));
   REQUIRE(sketch != nullptr);
 
-  const SketchConstraint* start = sketch->find_constraint(SketchConstraintId("constraint.start_on_a"));
+  const SketchConstraint* start =
+      sketch->find_constraint(SketchConstraintId("constraint.start_on_a"));
   REQUIRE(start != nullptr);
   const SketchConstraint* end = sketch->find_constraint(SketchConstraintId("constraint.end_on_b"));
   REQUIRE(end != nullptr);

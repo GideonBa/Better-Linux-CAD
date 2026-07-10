@@ -24,9 +24,12 @@ public:
   [[nodiscard]] SketchRepairTransactionStatus status() const noexcept;
   [[nodiscard]] const SketchRepairCommand& command() const noexcept;
   [[nodiscard]] const SketchRepairCommandResult& command_result() const noexcept;
-  [[nodiscard]] const std::vector<SketchGeometricConstraint>& added_geometric_constraints() const noexcept;
-  [[nodiscard]] const std::vector<SketchGeometricConstraint>& removed_geometric_constraints() const noexcept;
-  [[nodiscard]] const std::vector<SketchDrivingDimension>& removed_driving_dimensions() const noexcept;
+  [[nodiscard]] const std::vector<SketchGeometricConstraint>&
+  added_geometric_constraints() const noexcept;
+  [[nodiscard]] const std::vector<SketchGeometricConstraint>&
+  removed_geometric_constraints() const noexcept;
+  [[nodiscard]] const std::vector<SketchDrivingDimension>&
+  removed_driving_dimensions() const noexcept;
   [[nodiscard]] bool applied() const noexcept;
   [[nodiscard]] bool undoable() const noexcept;
 
@@ -65,8 +68,8 @@ class SketchRepairTransactionExecutor {
 public:
   [[nodiscard]] Result<SketchRepairTransaction> apply(Sketch& sketch,
                                                       const SketchRepairCommand& command) const;
-  [[nodiscard]] Result<SketchRepairTransactionUndoResult> undo(
-      Sketch& sketch, const SketchRepairTransaction& transaction) const;
+  [[nodiscard]] Result<SketchRepairTransactionUndoResult>
+  undo(Sketch& sketch, const SketchRepairTransaction& transaction) const;
 };
 
 } // namespace blcad

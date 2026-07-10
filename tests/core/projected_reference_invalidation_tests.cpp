@@ -23,7 +23,8 @@ bool contains_node(const std::vector<std::string>& nodes, const char* node) {
 }
 
 PartDocument make_base_document() {
-  auto document = PartDocument::create(DocumentId("part.projected_invalidations"), "Projected invalidations");
+  auto document =
+      PartDocument::create(DocumentId("part.projected_invalidations"), "Projected invalidations");
   REQUIRE(document);
 
   REQUIRE(document.value().add_parameter(make_length_parameter("part.width", "width", 100.0)));
@@ -42,9 +43,8 @@ PartDocument make_base_document() {
   REQUIRE(base_sketch.value().add_profile(rectangle.value()));
   REQUIRE(document.value().add_sketch(base_sketch.value()));
 
-  auto feature = Feature::create_additive_extrude(FeatureId("feature.base"), "BaseExtrude",
-                                                  SketchId("sketch.base"),
-                                                  ParameterId("part.depth"));
+  auto feature = Feature::create_additive_extrude(
+      FeatureId("feature.base"), "BaseExtrude", SketchId("sketch.base"), ParameterId("part.depth"));
   REQUIRE(feature);
   REQUIRE(document.value().add_feature(feature.value()));
 
@@ -53,7 +53,8 @@ PartDocument make_base_document() {
 
 } // namespace
 
-TEST_CASE("Projected semantic references invalidate sketches and dependent features", "[core][dependency]") {
+TEST_CASE("Projected semantic references invalidate sketches and dependent features",
+          "[core][dependency]") {
   PartDocument document = make_base_document();
 
   auto top_face = SemanticFaceReference::create(FeatureId("feature.base"), SemanticFace::Top);
@@ -63,12 +64,15 @@ TEST_CASE("Projected semantic references invalidate sketches and dependent featu
   REQUIRE(top_workplane);
   REQUIRE(document.add_derived_workplane(top_workplane.value()));
 
-  auto sketch = Sketch::create(SketchId("sketch.top_refs"), "TopRefs", DatumPlaneId("workplane.top"));
+  auto sketch =
+      Sketch::create(SketchId("sketch.top_refs"), "TopRefs", DatumPlaneId("workplane.top"));
   REQUIRE(sketch);
   REQUIRE(sketch.value().add_entity(
-      LineSegment::create(SketchEntityId("line.helper"), Point2{0.0, 0.0}, Point2{1.0, 0.0}).value()));
+      LineSegment::create(SketchEntityId("line.helper"), Point2{0.0, 0.0}, Point2{1.0, 0.0})
+          .value()));
 
-  auto vertex = SemanticVertexReference::create(FeatureId("feature.base"), SemanticVertex::TopFrontRight);
+  auto vertex =
+      SemanticVertexReference::create(FeatureId("feature.base"), SemanticVertex::TopFrontRight);
   REQUIRE(vertex);
   auto projected_vertex = ProjectedSketchPoint::create_from_semantic_vertex(
       SketchEntityId("ref.vertex.top_front_right"), vertex.value());
@@ -77,25 +81,27 @@ TEST_CASE("Projected semantic references invalidate sketches and dependent featu
 
   auto edge = SemanticEdgeReference::create(FeatureId("feature.base"), SemanticEdge::TopFront);
   REQUIRE(edge);
-  auto projected_edge =
-      ProjectedSketchLine::create_from_semantic_edge(SketchEntityId("ref.edge.top_front"), edge.value());
+  auto projected_edge = ProjectedSketchLine::create_from_semantic_edge(
+      SketchEntityId("ref.edge.top_front"), edge.value());
   REQUIRE(projected_edge);
   REQUIRE(sketch.value().add_reference(projected_edge.value()));
 
   REQUIRE(document.add_sketch(sketch.value()));
 
-  auto marker = Feature::create_additive_extrude(FeatureId("feature.top_marker"), "TopMarker",
-                                                 SketchId("sketch.top_refs"),
-                                                 ParameterId("part.depth"));
+  auto marker =
+      Feature::create_additive_extrude(FeatureId("feature.top_marker"), "TopMarker",
+                                       SketchId("sketch.top_refs"), ParameterId("part.depth"));
   REQUIRE(marker);
   REQUIRE(document.add_feature(marker.value()));
 
   CHECK(document.dependency_graph().has_dependency("feature.base", "workplane.top"));
-  CHECK(document.dependency_graph().has_dependency("feature.base", "feature.base.vertex.top_front_right"));
+  CHECK(document.dependency_graph().has_dependency("feature.base",
+                                                   "feature.base.vertex.top_front_right"));
   CHECK(document.dependency_graph().has_dependency("feature.base.vertex.top_front_right",
-                                                  "sketch.top_refs"));
+                                                   "sketch.top_refs"));
   CHECK(document.dependency_graph().has_dependency("feature.base", "feature.base.edge.top_front"));
-  CHECK(document.dependency_graph().has_dependency("feature.base.edge.top_front", "sketch.top_refs"));
+  CHECK(
+      document.dependency_graph().has_dependency("feature.base.edge.top_front", "sketch.top_refs"));
   CHECK(document.dependency_graph().has_dependency("sketch.top_refs", "feature.top_marker"));
 
   auto affected = document.mark_parameter_changed(ParameterId("part.depth"));
@@ -107,22 +113,24 @@ TEST_CASE("Projected semantic references invalidate sketches and dependent featu
   CHECK(contains_node(affected.value(), "feature.top_marker"));
 }
 
-TEST_CASE("Projected construction references invalidate sketches through generated construction relations",
+TEST_CASE("Projected construction references invalidate sketches through generated construction "
+          "relations",
           "[core][dependency]") {
   PartDocument document = make_base_document();
 
   auto edge = SemanticEdgeReference::create(FeatureId("feature.base"), SemanticEdge::TopFront);
   REQUIRE(edge);
   auto relation = ConstructionRelation::create_point_on_generated_edge(
-      ConstructionRelationId("relation.point.top_front_mid"), ConstructionPointId("point.top_front_mid"),
-      edge.value());
+      ConstructionRelationId("relation.point.top_front_mid"),
+      ConstructionPointId("point.top_front_mid"), edge.value());
   REQUIRE(relation);
-  auto point = ConstructionPoint::create_on_generated_edge(ConstructionPointId("point.top_front_mid"),
-                                                           "TopFrontMid", relation.value());
+  auto point = ConstructionPoint::create_on_generated_edge(
+      ConstructionPointId("point.top_front_mid"), "TopFrontMid", relation.value());
   REQUIRE(point);
   REQUIRE(document.add_construction_point(point.value()));
 
-  auto sketch = Sketch::create(SketchId("sketch.projected_point"), "ProjectedPoint", DatumPlaneId("datum.xy"));
+  auto sketch = Sketch::create(SketchId("sketch.projected_point"), "ProjectedPoint",
+                               DatumPlaneId("datum.xy"));
   REQUIRE(sketch);
   auto projected = ProjectedSketchPoint::create_from_construction_point(
       SketchEntityId("ref.point.top_front_mid"), ConstructionPointId("point.top_front_mid"));
@@ -131,7 +139,8 @@ TEST_CASE("Projected construction references invalidate sketches through generat
   REQUIRE(document.add_sketch(sketch.value()));
 
   CHECK(document.dependency_graph().has_dependency("feature.base", "point.top_front_mid"));
-  CHECK(document.dependency_graph().has_dependency("point.top_front_mid", "sketch.projected_point"));
+  CHECK(
+      document.dependency_graph().has_dependency("point.top_front_mid", "sketch.projected_point"));
 
   auto affected = document.mark_parameter_changed(ParameterId("part.depth"));
   REQUIRE(affected);

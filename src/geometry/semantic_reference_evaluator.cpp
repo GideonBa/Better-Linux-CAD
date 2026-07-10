@@ -49,9 +49,9 @@ resolve_rectangular_additive_extrude_corners(const PartDocument& document, Featu
 
   if (sketch->rectangle_profiles().size() != 1U || !sketch->circle_profiles().empty() ||
       !sketch->closed_profiles().empty()) {
-    return Result<RectangularExtrudeCorners>::failure(validation_error(
-        sketch->id().value(),
-        "semantic edge and vertex evaluation requires a source sketch with exactly one rectangle profile"));
+    return Result<RectangularExtrudeCorners>::failure(
+        validation_error(sketch->id().value(), "semantic edge and vertex evaluation requires a "
+                                               "source sketch with exactly one rectangle profile"));
   }
 
   const RectangleProfile& rectangle = sketch->rectangle_profiles().front();
@@ -74,20 +74,17 @@ resolve_rectangular_additive_extrude_corners(const PartDocument& document, Featu
   const double half_height = height->value().millimeters() / 2.0;
   const double depth_mm = depth->value().millimeters();
 
-  const Point3 bottom_front_right =
-      resolver.evaluate_point(workplane.value(), Point2{center.x + half_width, center.y + half_height});
-  const Point3 bottom_front_left =
-      resolver.evaluate_point(workplane.value(), Point2{center.x - half_width, center.y + half_height});
-  const Point3 bottom_back_right =
-      resolver.evaluate_point(workplane.value(), Point2{center.x + half_width, center.y - half_height});
-  const Point3 bottom_back_left =
-      resolver.evaluate_point(workplane.value(), Point2{center.x - half_width, center.y - half_height});
+  const Point3 bottom_front_right = resolver.evaluate_point(
+      workplane.value(), Point2{center.x + half_width, center.y + half_height});
+  const Point3 bottom_front_left = resolver.evaluate_point(
+      workplane.value(), Point2{center.x - half_width, center.y + half_height});
+  const Point3 bottom_back_right = resolver.evaluate_point(
+      workplane.value(), Point2{center.x + half_width, center.y - half_height});
+  const Point3 bottom_back_left = resolver.evaluate_point(
+      workplane.value(), Point2{center.x - half_width, center.y - half_height});
 
   return Result<RectangularExtrudeCorners>::success(RectangularExtrudeCorners{
-      bottom_front_right,
-      bottom_front_left,
-      bottom_back_right,
-      bottom_back_left,
+      bottom_front_right, bottom_front_left, bottom_back_right, bottom_back_left,
       translated(bottom_front_right, workplane.value().normal, depth_mm),
       translated(bottom_front_left, workplane.value().normal, depth_mm),
       translated(bottom_back_right, workplane.value().normal, depth_mm),

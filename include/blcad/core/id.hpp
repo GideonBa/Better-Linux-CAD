@@ -45,6 +45,7 @@ struct ProfileIdTag;
 struct SketchIdTag;
 struct FeatureIdTag;
 struct ShapeCacheIdTag;
+struct ParameterBindingIdTag;
 
 using DocumentId = TypedId<DocumentIdTag>;
 using ParameterId = TypedId<ParameterIdTag>;
@@ -63,5 +64,6 @@ using ProfileId = TypedId<ProfileIdTag>;
 using SketchId = TypedId<SketchIdTag>;
 using FeatureId = TypedId<FeatureIdTag>;
 using ShapeCacheId = TypedId<ShapeCacheIdTag>;
+using ParameterBindingId = TypedId<ParameterBindingIdTag>;
 
 } // namespace blcad

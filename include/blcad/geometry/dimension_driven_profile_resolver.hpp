@@ -11,8 +11,9 @@ namespace blcad::geometry {
 
 class DimensionDrivenProfileResolver {
 public:
-  [[nodiscard]] Result<std::vector<Point2>> resolve_closed_profile_vertices(
-      const PartDocument& document, const Sketch& sketch, const ClosedProfile& profile) const;
+  [[nodiscard]] Result<std::vector<Point2>>
+  resolve_closed_profile_vertices(const PartDocument& document, const Sketch& sketch,
+                                  const ClosedProfile& profile) const;
 };
 
 } // namespace blcad::geometry
