@@ -28,6 +28,7 @@ endif()
 
 add_library(
   blcad_core STATIC
+  src/core/composite_closed_profile.cpp
   src/core/construction_geometry.cpp
   src/core/datum_plane.cpp
   src/core/dependency_graph.cpp
