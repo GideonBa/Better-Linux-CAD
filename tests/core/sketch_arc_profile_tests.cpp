@@ -65,7 +65,7 @@ TEST_CASE("Sketch rejects self-intersecting line and arc closed profiles", "[cor
   REQUIRE(sketch);
   add_line(sketch.value(), "line.bottom", Point2{0.0, 0.0}, Point2{10.0, 0.0});
   add_line(sketch.value(), "line.right", Point2{10.0, 0.0}, Point2{10.0, 10.0});
-  add_arc(sketch.value(), "arc.crossing", Point2{10.0, 10.0}, Point2{5.0, -5.0}, Point2{0.0, 10.0});
+  add_arc(sketch.value(), "arc.crossing", Point2{10.0, 10.0}, Point2{5.0, -1.0}, Point2{0.0, 10.0});
   add_line(sketch.value(), "line.left", Point2{0.0, 10.0}, Point2{0.0, 0.0});
 
   auto profile = ArcClosedProfile::create(
