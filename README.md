@@ -6,7 +6,7 @@ Detailed architecture and feature status live in `docs/`. This README is intenti
 
 ## Status
 
-Current state: MVP-1 core skeleton, staged MVP-2 seeds for sketches, workplanes, profile geometry, recompute, STEP export, reference recovery, sketch diagnostics, and repair-command infrastructure, the MVP-3 parametric bolt circle (count parameters and `CircularHolePattern`), and the MVP-4 seed for assembly parameters shared across parts (`AssemblyDocument` and `ParameterBinding`).
+Current state: MVP-1 core skeleton, staged MVP-2 seeds for sketches, workplanes, profile geometry, recompute, STEP export, reference recovery, sketch diagnostics, and repair-command infrastructure, the MVP-3 parametric bolt circle, the MVP-4 seed for assembly parameters shared across parts, and a project container that owns one assembly plus embedded member parts.
 
 There is no GUI yet.
 
@@ -50,6 +50,7 @@ cmake --build --preset dev-geometry
 
 ```text
 blcad_export_step <input.blcad.json> <output.step>
+blcad_export_project <input.blcad.project.json> <assembly-parameter-id> <value> <output-dir>
 ```
 
 Examples:
@@ -64,7 +65,7 @@ Examples:
 - `include/blcad/`: public headers
 - `src/`: core and optional geometry implementation
 - `tests/`: Catch2 tests
-- `examples/`: `.blcad.json` example models and headless export example
+- `examples/`: `.blcad.json` example models and headless export examples
 - `docs/`: architecture, MVP, and roadmap documents
 
 ## Key documents
@@ -82,6 +83,7 @@ Implemented feature blocks:
 
 - `docs/bolt-circle-pattern-mvp3.md`
 - `docs/assembly-parameters-mvp4.md`
+- `docs/project-container-mvp4.md`
 - `docs/general-closed-sketch-profile-mvp.md`
 - `docs/composite-closed-profile-holes-mvp.md`
 - `docs/arc-and-trim-extend-sketch-profile-mvp.md`
@@ -114,17 +116,15 @@ Future roadmaps:
 
 ## Next technical step
 
-The sketch-repair presentation chain is frozen until a GUI or CLI consumer exists (see the frozen block in `docs/mvp-plan.md`). Development follows the numbered core-CAD MVP sequence.
+The next technical step should add the first MVP-5 component instance seed.
 
-The next technical step is a project container for the assembly and its member parts.
+1. Add a `ComponentInstance` record owned by `AssemblyDocument` or a closely related assembly-structure model.
+2. Store stable instance id, display name, referenced project part document id, visibility, suppression state, and grounded/fixed state.
+3. Add an initial rigid transform record for free placement, but do not solve constraints yet.
+4. Validate that every component instance references an assembly member part and an owned project part.
+5. Add JSON persistence for component instances inside the assembly/project structure.
+6. Add project-level tests proving two instances can reference the same part document without duplicating part geometry.
+7. Add a minimal headless inspection/export hook that lists component instances and their referenced part documents.
+8. Keep mate/concentric/distance constraints, solver, DOF display, collision checks, subassemblies, and assembly-level STEP export deferred.
 
-1. Add a `Project` model owning one `AssemblyDocument` and its member `PartDocument`s.
-2. Validate that every assembly member id resolves to an owned part document.
-3. Auto-apply parameter bindings to affected member parts after an assembly parameter change.
-4. Surface per-part recompute plans from one project-level update call.
-5. Add JSON persistence for the project (embedded documents or a manifest referencing part files).
-6. Extend the headless example: load a project, update an assembly parameter, recompute, export all member parts to STEP.
-7. Add tests for membership validation, automatic propagation, per-part invalidation, JSON roundtrip, and headless export.
-8. Keep component instances and constraints out of scope (MVP 5, `docs/assembly-system.md`).
-
-The completed MVP-3 bolt circle block is documented in `docs/bolt-circle-pattern-mvp3.md`. The completed MVP-4 seed is documented in `docs/assembly-parameters-mvp4.md`.
+The completed project-container block is documented in `docs/project-container-mvp4.md`.
