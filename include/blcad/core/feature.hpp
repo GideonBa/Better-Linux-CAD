@@ -14,7 +14,8 @@ enum class FeatureType {
 };
 
 enum class ExtrudeDirection {
-  PositiveZ,
+  SketchNormal,
+  OppositeSketchNormal,
 };
 
 enum class SubtractiveExtrudeDepth {
@@ -30,13 +31,13 @@ public:
   [[nodiscard]] static Result<Feature>
   create_additive_extrude(FeatureId id, std::string name, SketchId input_sketch,
                           ParameterId length_parameter,
-                          ExtrudeDirection direction = ExtrudeDirection::PositiveZ);
+                          ExtrudeDirection direction = ExtrudeDirection::SketchNormal);
 
   [[nodiscard]] static Result<Feature>
   create_subtractive_extrude(FeatureId id, std::string name, SketchId input_sketch,
                              FeatureId target_feature,
                              SubtractiveExtrudeDepth depth = SubtractiveExtrudeDepth::ThroughAll,
-                             ExtrudeDirection direction = ExtrudeDirection::PositiveZ);
+                             ExtrudeDirection direction = ExtrudeDirection::SketchNormal);
 
   [[nodiscard]] const FeatureId& id() const noexcept;
   [[nodiscard]] const std::string& name() const noexcept;
