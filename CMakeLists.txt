@@ -13,6 +13,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(BLCAD_BUILD_GEOMETRY "Build future OCCT geometry targets" OFF)
 option(BLCAD_BUILD_GUI "Build future Qt GUI targets" OFF)
+
 option(BLCAD_BUILD_TESTS "Build unit tests" ON)
 
 include(CTest)
@@ -49,6 +50,7 @@ add_library(
   src/core/sketch_repair_commands.cpp
   src/core/sketch_repair_suggestions.cpp
   src/core/sketch_repair_transactions.cpp
+  src/core/sketch_repair_undo_stack.cpp
 )
 add_library(BLCAD::core ALIAS blcad_core)
 
