@@ -230,28 +230,42 @@ Implemented scope:
 - skipped non-undoable transactions for unsupported command results
 - core tests proving apply plus undo restores exact affected records for the safe subset
 
+## Implemented block: Sketch repair undo stack seed
+
+Detailed document: `docs/sketch-repair-undo-stack-mvp.md`
+
+Implemented scope:
+
+- `SketchRepairUndoStackStatus`, `SketchRepairUndoStackResult`, and `SketchRepairUndoStack`
+- in-memory storage of applied undoable `SketchRepairTransaction` records
+- rejection of non-undoable transactions without changing stack depth
+- strict LIFO undo by delegating to `SketchRepairTransactionExecutor::undo`
+- structured stack results with transaction status, remaining stack size, and affected record IDs
+- core tests proving multiple safe repair transactions undo in reverse application order
+- empty-stack undo returning a non-mutating `Empty` result
+
 Still not implemented in this block:
 
 - redo
-- in-memory undo stacks
 - persistent transaction journals
-- multi-sketch transaction grouping
+- multi-sketch stacks
+- stack summaries for CLI/GUI inspection
 - GUI command workflows
 - parameter-creating repairs
 - full solve iteration or exact DOF counting
 
-## Next MVP: Sketch repair undo stack seed
+## Next MVP: Sketch repair undo stack summary seed
 
-Goal: provide a small in-memory LIFO undo stack for safe repair transactions without implementing a persistent journal or GUI undo framework.
+Goal: provide non-mutating inspection output for the current in-memory repair undo stack so CLI and future GUI code can display what is currently undoable.
 
 Proposed first implementation sequence:
 
-- add a `SketchRepairUndoStack` or equivalent in-memory helper that stores applied `SketchRepairTransaction` records in application order
-- support pushing only applied and undoable repair transactions
-- support undoing the most recent transaction first by delegating to `SketchRepairTransactionExecutor::undo`
-- return a structured stack result with transaction status and remaining stack size
-- add core tests that push multiple safe repair transactions and undo them in strict LIFO order
-- keep redo, persistent transaction journals, multi-sketch stacks, GUI integration, parameter-creating repairs, full solve iteration, exact DOF counting, and arbitrary model rewriting deferred
+- add a `SketchRepairUndoStackSummary` or equivalent read-only report for current stack contents
+- expose stack depth, latest transaction action, latest target, and per-entry transaction status/action/target
+- keep summaries independent from `.blcad.json`; they are UI/CLI inspection output, not model intent
+- add optional debug JSON output for stack summaries, similar to diagnostics and repair suggestions
+- add core tests that push multiple transactions and verify stable summary ordering without undoing
+- keep redo, persistent journals, multi-sketch stack coordination, GUI widgets, command grouping, transaction squashing, parameter-creating repairs, full solve iteration, exact DOF counting, and arbitrary model rewriting deferred
 
 ## Future roadmap: Multi-body transforms and path features
 
