@@ -4,12 +4,25 @@
 #include "blcad/geometry/reference_generated_profile_resolver.hpp"
 #include "blcad/geometry/sketch_region_finder.hpp"
 
+#include <cmath>
 #include <string>
 #include <utility>
 #include <vector>
 
 namespace blcad::geometry {
 namespace {
+
+constexpr double k_tolerance = 1.0e-9;
+
+struct LocalCompositeProfileVertices {
+  std::vector<Point2> outer;
+  std::vector<std::vector<Point2>> inner;
+};
+
+struct GlobalCompositeProfileVertices {
+  std::vector<Point3> outer;
+  std::vector<std::vector<Point3>> inner;
+};
 
 [[nodiscard]] Error validation_error(std::string object_id, std::string message) {
   return Error::validation(std::move(object_id), std::move(message));
@@ -26,7 +39,63 @@ namespace {
 
 [[nodiscard]] bool has_no_profiles(const Sketch& sketch) noexcept {
   return sketch.rectangle_profiles().empty() && sketch.circle_profiles().empty() &&
-         sketch.closed_profiles().empty();
+         sketch.closed_profiles().empty() && sketch.composite_closed_profiles().empty();
+}
+
+[[nodiscard]] double orientation(Point2 a, Point2 b, Point2 c) noexcept {
+  return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+}
+
+[[nodiscard]] bool on_segment(Point2 a, Point2 b, Point2 p) noexcept {
+  return std::min(a.x, b.x) - k_tolerance <= p.x && p.x <= std::max(a.x, b.x) + k_tolerance &&
+         std::min(a.y, b.y) - k_tolerance <= p.y && p.y <= std::max(a.y, b.y) + k_tolerance &&
+         std::abs(orientation(a, b, p)) <= k_tolerance;
+}
+
+[[nodiscard]] bool segments_intersect(Point2 a1, Point2 a2, Point2 b1, Point2 b2) noexcept {
+  const double o1 = orientation(a1, a2, b1);
+  const double o2 = orientation(a1, a2, b2);
+  const double o3 = orientation(b1, b2, a1);
+  const double o4 = orientation(b1, b2, a2);
+
+  if (((o1 > k_tolerance && o2 < -k_tolerance) ||
+       (o1 < -k_tolerance && o2 > k_tolerance)) &&
+      ((o3 > k_tolerance && o4 < -k_tolerance) ||
+       (o3 < -k_tolerance && o4 > k_tolerance))) {
+    return true;
+  }
+
+  return (std::abs(o1) <= k_tolerance && on_segment(a1, a2, b1)) ||
+         (std::abs(o2) <= k_tolerance && on_segment(a1, a2, b2)) ||
+         (std::abs(o3) <= k_tolerance && on_segment(b1, b2, a1)) ||
+         (std::abs(o4) <= k_tolerance && on_segment(b1, b2, a2));
+}
+
+[[nodiscard]] bool point_inside_polygon(Point2 point, const std::vector<Point2>& polygon) noexcept {
+  bool inside = false;
+  for (std::size_t i = 0U, j = polygon.size() - 1U; i < polygon.size(); j = i++) {
+    const Point2 a = polygon[i];
+    const Point2 b = polygon[j];
+    if (on_segment(a, b, point)) return false;
+    const bool crosses = ((a.y > point.y) != (b.y > point.y)) &&
+                         (point.x < (b.x - a.x) * (point.y - a.y) / (b.y - a.y) + a.x);
+    if (crosses) inside = !inside;
+  }
+  return inside;
+}
+
+[[nodiscard]] bool contours_intersect(const std::vector<Point2>& left,
+                                      const std::vector<Point2>& right) noexcept {
+  for (std::size_t i = 0; i < left.size(); ++i) {
+    const Point2 a1 = left[i];
+    const Point2 a2 = left[(i + 1U) % left.size()];
+    for (std::size_t j = 0; j < right.size(); ++j) {
+      const Point2 b1 = right[j];
+      const Point2 b2 = right[(j + 1U) % right.size()];
+      if (segments_intersect(a1, a2, b1, b2)) return true;
+    }
+  }
+  return false;
 }
 
 [[nodiscard]] Result<Point3> evaluate_bounded_circle_center(const WorkplaneResolver& resolver,
@@ -34,7 +103,6 @@ namespace {
                                                             const CircleProfile& circle,
                                                             const Quantity& diameter) {
   if (workplane.bounds.enabled) {
-    constexpr double k_tolerance = 1.0e-9;
     const double radius = diameter.millimeters() / 2.0;
     const double min_x = workplane.bounds.center.x - workplane.bounds.width_mm / 2.0;
     const double max_x = workplane.bounds.center.x + workplane.bounds.width_mm / 2.0;
@@ -82,7 +150,6 @@ namespace {
     const WorkplaneResolver& resolver, const ResolvedWorkplane& workplane,
     const std::string& object_id, const std::vector<Point2>& local_vertices) {
   if (workplane.bounds.enabled) {
-    constexpr double k_tolerance = 1.0e-9;
     const double min_x = workplane.bounds.center.x - workplane.bounds.width_mm / 2.0;
     const double max_x = workplane.bounds.center.x + workplane.bounds.width_mm / 2.0;
     const double min_y = workplane.bounds.center.y - workplane.bounds.height_mm / 2.0;
@@ -117,6 +184,79 @@ namespace {
   return map_bounded_local_vertices(resolver, workplane, profile.id().value(), local_vertices.value());
 }
 
+[[nodiscard]] Result<std::vector<Point2>> evaluate_contour_local_vertices(
+    const PartDocument& document, const Sketch& sketch, const ProfileId& id,
+    std::string_view suffix, const std::vector<SketchEntityId>& contour) {
+  auto profile = ClosedProfile::create(ProfileId(id.value() + std::string(suffix)), contour);
+  if (profile.has_error()) return Result<std::vector<Point2>>::failure(profile.error());
+  return evaluate_closed_profile_local_vertices(document, sketch, profile.value());
+}
+
+[[nodiscard]] Result<LocalCompositeProfileVertices> evaluate_composite_local_vertices(
+    const PartDocument& document, const Sketch& sketch, const CompositeClosedProfile& profile) {
+  LocalCompositeProfileVertices result;
+  auto outer = evaluate_contour_local_vertices(document, sketch, profile.id(), ".outer",
+                                               profile.outer_contour());
+  if (outer.has_error()) return Result<LocalCompositeProfileVertices>::failure(outer.error());
+  result.outer = std::move(outer.value());
+
+  result.inner.reserve(profile.inner_contours().size());
+  for (std::size_t index = 0; index < profile.inner_contours().size(); ++index) {
+    auto inner = evaluate_contour_local_vertices(document, sketch, profile.id(),
+                                                 ".inner." + std::to_string(index),
+                                                 profile.inner_contours()[index]);
+    if (inner.has_error()) return Result<LocalCompositeProfileVertices>::failure(inner.error());
+    result.inner.push_back(std::move(inner.value()));
+  }
+
+  for (const auto& inner : result.inner) {
+    for (const Point2 vertex : inner) {
+      if (!point_inside_polygon(vertex, result.outer)) {
+        return Result<LocalCompositeProfileVertices>::failure(validation_error(
+            profile.id().value(), "composite closed profile inner contours must lie strictly inside the outer contour"));
+      }
+    }
+    if (contours_intersect(result.outer, inner)) {
+      return Result<LocalCompositeProfileVertices>::failure(validation_error(
+          profile.id().value(), "composite closed profile inner contours must not intersect the outer contour"));
+    }
+  }
+
+  for (std::size_t i = 0; i < result.inner.size(); ++i) {
+    for (std::size_t j = i + 1U; j < result.inner.size(); ++j) {
+      if (contours_intersect(result.inner[i], result.inner[j]) ||
+          point_inside_polygon(result.inner[i].front(), result.inner[j]) ||
+          point_inside_polygon(result.inner[j].front(), result.inner[i])) {
+        return Result<LocalCompositeProfileVertices>::failure(validation_error(
+            profile.id().value(), "composite closed profile inner contours must not overlap"));
+      }
+    }
+  }
+
+  return Result<LocalCompositeProfileVertices>::success(std::move(result));
+}
+
+[[nodiscard]] Result<GlobalCompositeProfileVertices> evaluate_bounded_composite_profile_vertices(
+    const PartDocument& document, const WorkplaneResolver& resolver, const ResolvedWorkplane& workplane,
+    const Sketch& sketch, const CompositeClosedProfile& profile) {
+  auto local = evaluate_composite_local_vertices(document, sketch, profile);
+  if (local.has_error()) return Result<GlobalCompositeProfileVertices>::failure(local.error());
+
+  auto outer = map_bounded_local_vertices(resolver, workplane, profile.id().value(), local.value().outer);
+  if (outer.has_error()) return Result<GlobalCompositeProfileVertices>::failure(outer.error());
+
+  GlobalCompositeProfileVertices global;
+  global.outer = std::move(outer.value());
+  global.inner.reserve(local.value().inner.size());
+  for (const auto& inner : local.value().inner) {
+    auto mapped = map_bounded_local_vertices(resolver, workplane, profile.id().value(), inner);
+    if (mapped.has_error()) return Result<GlobalCompositeProfileVertices>::failure(mapped.error());
+    global.inner.push_back(std::move(mapped.value()));
+  }
+
+  return Result<GlobalCompositeProfileVertices>::success(std::move(global));
+}
+
 [[nodiscard]] Result<std::vector<Point3>> evaluate_bounded_detected_region_vertices(
     const PartDocument& document, const WorkplaneResolver& resolver, const ResolvedWorkplane& workplane,
     const Sketch& sketch) {
@@ -132,17 +272,22 @@ namespace {
 
 [[nodiscard]] bool has_exactly_one_rectangle_profile(const Sketch& sketch) noexcept {
   return sketch.rectangle_profiles().size() == 1U && sketch.circle_profiles().empty() &&
-         sketch.closed_profiles().empty();
+         sketch.closed_profiles().empty() && sketch.composite_closed_profiles().empty();
 }
 
 [[nodiscard]] bool has_exactly_one_closed_profile(const Sketch& sketch) noexcept {
   return sketch.closed_profiles().size() == 1U && sketch.rectangle_profiles().empty() &&
-         sketch.circle_profiles().empty();
+         sketch.circle_profiles().empty() && sketch.composite_closed_profiles().empty();
+}
+
+[[nodiscard]] bool has_exactly_one_composite_closed_profile(const Sketch& sketch) noexcept {
+  return sketch.composite_closed_profiles().size() == 1U && sketch.rectangle_profiles().empty() &&
+         sketch.circle_profiles().empty() && sketch.closed_profiles().empty();
 }
 
 [[nodiscard]] bool has_exactly_one_circle_profile(const Sketch& sketch) noexcept {
   return sketch.circle_profiles().size() == 1U && sketch.rectangle_profiles().empty() &&
-         sketch.closed_profiles().empty();
+         sketch.closed_profiles().empty() && sketch.composite_closed_profiles().empty();
 }
 
 } // namespace
@@ -204,10 +349,23 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_additive_extrude(
     return shape_cache.set_final_shape(feature->id(), std::move(shape.value()));
   }
 
-  if (has_exactly_one_closed_profile(*sketch) || has_no_profiles(*sketch)) {
+  if (has_exactly_one_closed_profile(*sketch) || has_no_profiles(*sketch) ||
+      has_exactly_one_composite_closed_profile(*sketch)) {
     auto resolved_workplane = workplane_resolver_.resolve_for_sketch(document, *sketch);
     if (resolved_workplane.has_error()) {
       return Result<std::size_t>::failure(resolved_workplane.error());
+    }
+
+    if (has_exactly_one_composite_closed_profile(*sketch)) {
+      auto vertices = evaluate_bounded_composite_profile_vertices(
+          document, workplane_resolver_, resolved_workplane.value(), *sketch,
+          sketch->composite_closed_profiles().front());
+      if (vertices.has_error()) return Result<std::size_t>::failure(vertices.error());
+      auto shape = closed_profile_adapter_.make_extruded_profile_with_holes(
+          vertices.value().outer, vertices.value().inner, resolved_workplane.value().normal,
+          thickness->value());
+      if (shape.has_error()) return Result<std::size_t>::failure(shape.error());
+      return shape_cache.set_final_shape(feature->id(), std::move(shape.value()));
     }
 
     Result<std::vector<Point3>> vertices = has_exactly_one_closed_profile(*sketch)
@@ -231,7 +389,7 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_additive_extrude(
   }
 
   return Result<std::size_t>::failure(validation_error(
-      sketch->id().value(), "additive extrude requires exactly one rectangle, closed profile, or detected simple region"));
+      sketch->id().value(), "additive extrude requires exactly one rectangle, closed profile, composite closed profile, or detected simple region"));
 }
 
 Result<std::size_t> GeometryRecomputeExecutor::execute_subtractive_extrude(
@@ -259,9 +417,9 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_subtractive_extrude(
   }
 
   if (!has_exactly_one_circle_profile(*sketch) && !has_exactly_one_closed_profile(*sketch) &&
-      !has_no_profiles(*sketch)) {
+      !has_exactly_one_composite_closed_profile(*sketch) && !has_no_profiles(*sketch)) {
     return Result<std::size_t>::failure(validation_error(
-        sketch->id().value(), "subtractive extrude requires exactly one circle, closed profile, or detected simple region"));
+        sketch->id().value(), "subtractive extrude requires exactly one circle, closed profile, composite closed profile, or detected simple region"));
   }
 
   const GeometryShape* target = shape_cache.find_feature_shape(feature->target_feature());
@@ -297,6 +455,17 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_subtractive_extrude(
       return Result<std::size_t>::failure(shape.error());
     }
 
+    return shape_cache.set_final_shape(feature->id(), std::move(shape.value()));
+  }
+
+  if (has_exactly_one_composite_closed_profile(*sketch)) {
+    auto vertices = evaluate_bounded_composite_profile_vertices(
+        document, workplane_resolver_, resolved_workplane.value(), *sketch,
+        sketch->composite_closed_profiles().front());
+    if (vertices.has_error()) return Result<std::size_t>::failure(vertices.error());
+    auto shape = closed_profile_adapter_.cut_profile_with_holes_through_all(
+        *target, vertices.value().outer, vertices.value().inner, resolved_workplane.value().normal);
+    if (shape.has_error()) return Result<std::size_t>::failure(shape.error());
     return shape_cache.set_final_shape(feature->id(), std::move(shape.value()));
   }
 
