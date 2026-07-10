@@ -157,6 +157,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/reference_recovery_tests.cpp
     tests/core/semantic_reference_invalidation_tests.cpp
     tests/core/semantic_reference_json_tests.cpp
+    tests/core/sketch_arc_profile_tests.cpp
     tests/core/sketch_dimension_tests.cpp
     tests/core/sketch_tests.cpp
   )
@@ -172,6 +173,7 @@ if(BLCAD_BUILD_TESTS)
   if(BLCAD_BUILD_GEOMETRY)
     add_executable(
       blcad_geometry_tests
+      tests/geometry/arc_closed_profile_pipeline_tests.cpp
       tests/geometry/back_workplane_pipeline_tests.cpp
       tests/geometry/chained_construction_plane_resolver_tests.cpp
       tests/geometry/circular_cut_adapter_tests.cpp
