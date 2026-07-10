@@ -46,6 +46,7 @@ add_library(
   src/core/sketch_arc_profile.cpp
   src/core/sketch_constraints.cpp
   src/core/sketch_diagnostics.cpp
+  src/core/sketch_repair_command_labels.cpp
   src/core/sketch_repair_commands.cpp
   src/core/sketch_repair_suggestions.cpp
   src/core/sketch_repair_transactions.cpp
@@ -167,6 +168,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/sketch_arc_profile_tests.cpp
     tests/core/sketch_diagnostics_tests.cpp
     tests/core/sketch_dimension_tests.cpp
+    tests/core/sketch_repair_command_labels_tests.cpp
     tests/core/sketch_repair_commands_tests.cpp
     tests/core/sketch_repair_suggestions_tests.cpp
     tests/core/sketch_repair_transactions_tests.cpp
