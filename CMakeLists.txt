@@ -174,6 +174,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/sketch_repair_command_labels_tests.cpp
     tests/core/sketch_repair_commands_tests.cpp
     tests/core/sketch_repair_presentation_metadata_tests.cpp
+    tests/core/sketch_repair_presentation_snapshot_query_tests.cpp
     tests/core/sketch_repair_presentation_snapshot_tests.cpp
     tests/core/sketch_repair_suggestions_tests.cpp
     tests/core/sketch_repair_transactions_tests.cpp
