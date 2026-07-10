@@ -348,6 +348,22 @@ constexpr int k_version = 1;
   return json{{"id", arc.id().value()}, {"start", point2_to_json(arc.start())}, {"mid", point2_to_json(arc.mid())}, {"end", point2_to_json(arc.end())}};
 }
 
+[[nodiscard]] Result<SplineSegment> spline_segment_from_json(const json& spline_json) {
+  if (spline_json.value("kind", std::string("cubic_bezier")) != "cubic_bezier") {
+    return Result<SplineSegment>::failure(json_error("only cubic_bezier spline segments are supported"));
+  }
+  return SplineSegment::create_cubic_bezier(
+      SketchEntityId(spline_json.at("id").get<std::string>()), point2_from_json(spline_json.at("start")),
+      point2_from_json(spline_json.at("control1")), point2_from_json(spline_json.at("control2")),
+      point2_from_json(spline_json.at("end")));
+}
+
+[[nodiscard]] json spline_segment_to_json(const SplineSegment& spline) {
+  return json{{"id", spline.id().value()}, {"kind", "cubic_bezier"}, {"start", point2_to_json(spline.start())},
+              {"control1", point2_to_json(spline.control1())}, {"control2", point2_to_json(spline.control2())},
+              {"end", point2_to_json(spline.end())}};
+}
+
 [[nodiscard]] Result<SketchTrimExtendOperation> trim_extend_operation_from_json(const json& operation_json) {
   const auto kind = operation_json.at("kind").get<std::string>();
   const auto id = SketchTrimOperationId(operation_json.at("id").get<std::string>());
@@ -360,6 +376,22 @@ constexpr int k_version = 1;
 
 [[nodiscard]] json trim_extend_operation_to_json(const SketchTrimExtendOperation& operation) {
   return json{{"id", operation.id().value()}, {"kind", std::string(to_string(operation.kind()))}, {"target_entity", operation.target_entity().value()}, {"replacement_endpoint", point2_to_json(operation.replacement_endpoint())}};
+}
+
+[[nodiscard]] Result<SketchTangentContinuity> tangent_continuity_from_json(const json& continuity_json) {
+  const auto kind = continuity_json.at("kind").get<std::string>();
+  if (kind != "tangent") {
+    return Result<SketchTangentContinuity>::failure(json_error("unsupported sketch tangent continuity kind in part document json"));
+  }
+  return SketchTangentContinuity::create_tangent(
+      SketchConstraintId(continuity_json.at("id").get<std::string>()),
+      SketchEntityId(continuity_json.at("first_entity").get<std::string>()),
+      SketchEntityId(continuity_json.at("second_entity").get<std::string>()));
+}
+
+[[nodiscard]] json tangent_continuity_to_json(const SketchTangentContinuity& continuity) {
+  return json{{"id", continuity.id().value()}, {"kind", std::string(to_string(continuity.kind()))},
+              {"first_entity", continuity.first_entity().value()}, {"second_entity", continuity.second_entity().value()}};
 }
 
 [[nodiscard]] Result<SketchReferenceTarget> reference_target_from_json(const json& target_json) {
@@ -459,16 +491,13 @@ constexpr int k_version = 1;
     auto added = sketch.value().add_entity(line.value());
     if (added.has_error()) return Result<Sketch>::failure(added.error());
   }
-  for (const auto& arc_json : sketch_json.value("arc_segments", json::array())) {
-    auto arc = arc_segment_from_json(arc_json);
-    if (arc.has_error()) return Result<Sketch>::failure(arc.error());
-    auto added = sketch.value().add_entity(arc.value());
-    if (added.has_error()) return Result<Sketch>::failure(added.error());
-  }
+  for (const auto& arc_json : sketch_json.value("arc_segments", json::array())) { auto arc = arc_segment_from_json(arc_json); if (arc.has_error()) return Result<Sketch>::failure(arc.error()); auto added = sketch.value().add_entity(arc.value()); if (added.has_error()) return Result<Sketch>::failure(added.error()); }
+  for (const auto& spline_json : sketch_json.value("spline_segments", json::array())) { auto spline = spline_segment_from_json(spline_json); if (spline.has_error()) return Result<Sketch>::failure(spline.error()); auto added = sketch.value().add_entity(spline.value()); if (added.has_error()) return Result<Sketch>::failure(added.error()); }
   for (const auto& point_json : sketch_json.value("projected_points", json::array())) { auto point = projected_point_from_json(point_json); if (point.has_error()) return Result<Sketch>::failure(point.error()); auto added = sketch.value().add_reference(point.value()); if (added.has_error()) return Result<Sketch>::failure(added.error()); }
   for (const auto& line_json : sketch_json.value("projected_lines", json::array())) { auto line = projected_line_from_json(line_json); if (line.has_error()) return Result<Sketch>::failure(line.error()); auto added = sketch.value().add_reference(line.value()); if (added.has_error()) return Result<Sketch>::failure(added.error()); }
   for (const auto& line_json : sketch_json.value("reference_generated_lines", json::array())) { auto line = reference_generated_line_from_json(line_json); if (line.has_error()) return Result<Sketch>::failure(line.error()); auto added = sketch.value().add_reference(line.value()); if (added.has_error()) return Result<Sketch>::failure(added.error()); }
   for (const auto& operation_json : sketch_json.value("trim_extend_operations", json::array())) { auto operation = trim_extend_operation_from_json(operation_json); if (operation.has_error()) return Result<Sketch>::failure(operation.error()); auto added = sketch.value().add_trim_extend_operation(operation.value()); if (added.has_error()) return Result<Sketch>::failure(added.error()); }
+  for (const auto& continuity_json : sketch_json.value("tangent_continuities", json::array())) { auto continuity = tangent_continuity_from_json(continuity_json); if (continuity.has_error()) return Result<Sketch>::failure(continuity.error()); auto added = sketch.value().add_tangent_continuity(continuity.value()); if (added.has_error()) return Result<Sketch>::failure(added.error()); }
   for (const auto& constraint_json : sketch_json.value("constraints", json::array())) { auto constraint = sketch_constraint_from_json(constraint_json); if (constraint.has_error()) return Result<Sketch>::failure(constraint.error()); auto added = sketch.value().add_constraint(constraint.value()); if (added.has_error()) return Result<Sketch>::failure(added.error()); }
   for (const auto& constraint_json : sketch_json.value("geometric_constraints", json::array())) { auto constraint = geometric_constraint_from_json(constraint_json); if (constraint.has_error()) return Result<Sketch>::failure(constraint.error()); auto added = sketch.value().add_constraint(constraint.value()); if (added.has_error()) return Result<Sketch>::failure(added.error()); }
   for (const auto& dimension_json : sketch_json.value("driving_dimensions", json::array())) { auto dimension = driving_dimension_from_json(dimension_json); if (dimension.has_error()) return Result<Sketch>::failure(dimension.error()); auto added = sketch.value().add_dimension(dimension.value()); if (added.has_error()) return Result<Sketch>::failure(added.error()); }
@@ -480,11 +509,19 @@ constexpr int k_version = 1;
   return sketch;
 }
 
+[[nodiscard]] Result<ExtrudeDirection> extrude_direction_from_json(const json& value) {
+  const auto direction = value.get<std::string>();
+  if (direction == "+Z" || direction == "sketch_normal") return Result<ExtrudeDirection>::success(ExtrudeDirection::SketchNormal);
+  if (direction == "opposite_sketch_normal") return Result<ExtrudeDirection>::success(ExtrudeDirection::OppositeSketchNormal);
+  return Result<ExtrudeDirection>::failure(json_error("unsupported extrude direction in part document json"));
+}
+
 [[nodiscard]] Result<Feature> feature_from_json(const json& feature_json) {
   const auto type = feature_json.at("type").get<std::string>();
-  if (feature_json.at("direction").get<std::string>() != "+Z") return Result<Feature>::failure(json_error("only +Z extrude direction is supported"));
-  if (type == "additive_extrude") return Feature::create_additive_extrude(FeatureId(feature_json.at("id").get<std::string>()), feature_json.at("name").get<std::string>(), SketchId(feature_json.at("input_sketch").get<std::string>()), ParameterId(feature_json.at("length_parameter").get<std::string>()));
-  if (type == "subtractive_extrude") { if (feature_json.at("depth").get<std::string>() != "through_all") return Result<Feature>::failure(json_error("only through_all subtractive extrude depth is supported")); return Feature::create_subtractive_extrude(FeatureId(feature_json.at("id").get<std::string>()), feature_json.at("name").get<std::string>(), SketchId(feature_json.at("input_sketch").get<std::string>()), FeatureId(feature_json.at("target_feature").get<std::string>())); }
+  auto direction = extrude_direction_from_json(feature_json.at("direction"));
+  if (direction.has_error()) return Result<Feature>::failure(direction.error());
+  if (type == "additive_extrude") return Feature::create_additive_extrude(FeatureId(feature_json.at("id").get<std::string>()), feature_json.at("name").get<std::string>(), SketchId(feature_json.at("input_sketch").get<std::string>()), ParameterId(feature_json.at("length_parameter").get<std::string>()), direction.value());
+  if (type == "subtractive_extrude") { if (feature_json.at("depth").get<std::string>() != "through_all") return Result<Feature>::failure(json_error("only through_all subtractive extrude depth is supported")); return Feature::create_subtractive_extrude(FeatureId(feature_json.at("id").get<std::string>()), feature_json.at("name").get<std::string>(), SketchId(feature_json.at("input_sketch").get<std::string>()), FeatureId(feature_json.at("target_feature").get<std::string>()), SubtractiveExtrudeDepth::ThroughAll, direction.value()); }
   return Result<Feature>::failure(json_error("unsupported feature type in part document json"));
 }
 
@@ -517,13 +554,15 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
   for (const auto& workplane : document.derived_workplanes()) root["derived_workplanes"].push_back(json{{"id", workplane.id().value()}, {"name", workplane.name()}, {"kind", "feature_face"}, {"source_feature", workplane.face_reference().source_feature().value()}, {"face", std::string(to_string(workplane.face_reference().face()))}});
   root["sketches"] = json::array();
   for (const auto& sketch : document.sketches()) {
-    json sketch_json{{"id", sketch.id().value()}, {"name", sketch.name()}, {"workplane", sketch.workplane().value()}, {"line_segments", json::array()}, {"arc_segments", json::array()}, {"projected_points", json::array()}, {"projected_lines", json::array()}, {"reference_generated_lines", json::array()}, {"trim_extend_operations", json::array()}, {"constraints", json::array()}, {"geometric_constraints", json::array()}, {"driving_dimensions", json::array()}, {"rectangle_profiles", json::array()}, {"circle_profiles", json::array()}, {"closed_profiles", json::array()}, {"arc_closed_profiles", json::array()}, {"composite_closed_profiles", json::array()}};
+    json sketch_json{{"id", sketch.id().value()}, {"name", sketch.name()}, {"workplane", sketch.workplane().value()}, {"line_segments", json::array()}, {"arc_segments", json::array()}, {"spline_segments", json::array()}, {"projected_points", json::array()}, {"projected_lines", json::array()}, {"reference_generated_lines", json::array()}, {"trim_extend_operations", json::array()}, {"tangent_continuities", json::array()}, {"constraints", json::array()}, {"geometric_constraints", json::array()}, {"driving_dimensions", json::array()}, {"rectangle_profiles", json::array()}, {"circle_profiles", json::array()}, {"closed_profiles", json::array()}, {"arc_closed_profiles", json::array()}, {"composite_closed_profiles", json::array()}};
     for (const auto& line : sketch.line_segments()) sketch_json["line_segments"].push_back(json{{"id", line.id().value()}, {"start", point2_to_json(line.start())}, {"end", point2_to_json(line.end())}});
     for (const auto& arc : sketch.arc_segments()) sketch_json["arc_segments"].push_back(arc_segment_to_json(arc));
+    for (const auto& spline : sketch.spline_segments()) sketch_json["spline_segments"].push_back(spline_segment_to_json(spline));
     for (const auto& point : sketch.projected_points()) sketch_json["projected_points"].push_back(projected_point_to_json(point));
     for (const auto& line : sketch.projected_lines()) sketch_json["projected_lines"].push_back(projected_line_to_json(line));
     for (const auto& line : sketch.reference_generated_lines()) sketch_json["reference_generated_lines"].push_back(reference_generated_line_to_json(line));
     for (const auto& operation : sketch.trim_extend_operations()) sketch_json["trim_extend_operations"].push_back(trim_extend_operation_to_json(operation));
+    for (const auto& continuity : sketch.tangent_continuities()) sketch_json["tangent_continuities"].push_back(tangent_continuity_to_json(continuity));
     for (const auto& constraint : sketch.constraints()) sketch_json["constraints"].push_back(sketch_constraint_to_json(constraint));
     for (const auto& constraint : sketch.geometric_constraints()) sketch_json["geometric_constraints"].push_back(geometric_constraint_to_json(constraint));
     for (const auto& dimension : sketch.driving_dimensions()) sketch_json["driving_dimensions"].push_back(driving_dimension_to_json(dimension));
