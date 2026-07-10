@@ -4,6 +4,7 @@
 #include "blcad/geometry/shape_cache.hpp"
 #include "blcad/geometry/step_exporter.hpp"
 
+#include <exception>
 #include <filesystem>
 #include <iostream>
 #include <string>
@@ -109,7 +110,7 @@ int main(int argc, char** argv) {
     }
 
     const auto output_path = output_path_for_part(output_dir, part);
-    const auto written = exporter.write_step(*final_shape, output_path);
+    const auto written = exporter.write_step(*final_shape, output_path.string());
     if (written.has_error()) {
       print_error(written.error());
       return 1;
