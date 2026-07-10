@@ -131,6 +131,7 @@ if(BLCAD_BUILD_TESTS)
     blcad_core_tests
     tests/core/chained_construction_relation_tests.cpp
     tests/core/closed_profile_json_tests.cpp
+    tests/core/composite_closed_profile_json_tests.cpp
     tests/core/composite_closed_profile_tests.cpp
     tests/core/construction_geometry_tests.cpp
     tests/core/construction_geometry_json_tests.cpp
