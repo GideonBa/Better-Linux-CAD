@@ -1,5 +1,7 @@
 #include "blcad/core/sketch_repair_undo_stack_summary.hpp"
 
+#include "blcad/core/sketch_repair_command_labels.hpp"
+
 #include <nlohmann/json.hpp>
 
 #include <string>
@@ -112,14 +114,18 @@ SketchRepairUndoStackSummary SketchRepairUndoStackSummarizer::summarize(
 
 Result<std::string> serialize_sketch_repair_undo_stack_summary_to_json(
     const SketchRepairUndoStackSummary& summary) {
+  const SketchRepairCommandLabeler labeler;
   json entries = json::array();
   for (const auto& entry : summary.entries()) {
+    const auto label = labeler.label_for(entry);
     entries.push_back(json{{"index", entry.index()},
                            {"latest", entry.latest()},
                            {"transaction_status", std::string(to_string(entry.transaction_status()))},
                            {"action", std::string(to_string(entry.action()))},
                            {"target", entry.target()},
                            {"undoable", entry.undoable()},
+                           {"title", label.title()},
+                           {"description", label.description()},
                            {"added_constraint_ids", constraint_ids_to_json(entry.added_constraint_ids())},
                            {"removed_constraint_ids", constraint_ids_to_json(entry.removed_constraint_ids())},
                            {"removed_dimension_ids", dimension_ids_to_json(entry.removed_dimension_ids())}});
