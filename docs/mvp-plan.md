@@ -263,25 +263,74 @@ Implemented scope:
 Still not implemented in this block:
 
 - trim/extend solving or geometry rewriting
-- splines
 - tangent constraint solving
 - automatic fillets
 - GUI curve editing
 - 3D sketches, sweep, loft, and surfacing
 
-## Next MVP: Spline and tangent-continuity sketch profile seed
+## Implemented block: Sketch-plane extrude direction seed
+
+Goal: make feature direction explicit relative to the sketch workplane and support non-axis-aligned construction-plane profile operations.
+
+Detailed document: `docs/sketch-plane-extrude-direction-mvp.md`
+
+Implemented scope:
+
+- `ExtrudeDirection::SketchNormal`
+- `ExtrudeDirection::OppositeSketchNormal`
+- legacy `+Z` JSON loading as `sketch_normal`
+- rectangle additive extrudes mapped through the resolved sketch workplane instead of the old global rectangle path
+- arbitrary-axis through-all placement for circular and profile cuts using target bounding-box projection
+- tests for slanted construction-plane additive extrude and opposite sketch-normal storage
+
+Still not implemented in this block:
+
+- two-sided extrudes
+- draft angles
+- start offsets
+- up-to-next/up-to-face end conditions
+- generated topology beyond the current rectangular seed
+
+## Implemented block: Spline and tangent-continuity sketch profile seed
 
 Goal: add the next non-linear sketch-curve seed beyond circular arcs while keeping spline model intent explicit and deterministic.
 
+Detailed document: `docs/spline-and-tangent-continuity-mvp.md`
+
+Implemented scope:
+
+- `SplineSegment` as an explicit cubic-Bezier sketch entity
+- `SketchTangentContinuity` tangent metadata between two explicit sketch curve entities
+- ordered line/arc/spline profile support through the existing `ArcClosedProfile` record
+- JSON persistence for `spline_segments` and `tangent_continuities`
+- OCCT Bezier-edge construction from four spline poles
+- additive recompute from one line/spline closed profile
+- subtractive through-all cut recompute from one line/spline closed profile
+- checked-in `examples/spline_profile_prism.blcad.json`
+- core JSON tests and geometry pipeline tests
+
+Still not implemented in this block:
+
+- full spline editing
+- NURBS weights or knots
+- tangent constraint solving
+- exact spline/spline and spline/arc self-intersection solving
+- GUI spline handles
+- 3D splines, sweep, loft, and surfacing
+
+## Next MVP: Sketch solver diagnostics seed
+
+Goal: add the first non-solving diagnostic layer so the model can report simple under-constrained and over-constrained sketch states.
+
 Proposed first implementation sequence:
 
-- add a first `SplineSegment` model-intent record, preferably a cubic Bezier or small control-point spline seed
-- add ordered line/arc/spline closed-profile support without mixing in solver state
-- add first tangent-continuity metadata between adjacent line/arc/spline entities
-- serialize spline segments and tangent metadata to JSON
-- add OCCT edge construction for the first spline representation
-- add additive and subtractive recompute tests for one simple line/arc/spline profile
-- keep full spline editing, NURBS weights, automatic fillets, tangent constraint solving, GUI curve editing, 3D sketches, sweep, loft, surface stitching, and closed-shell-to-solid conversion deferred
+- add a lightweight `SketchConstraintDiagnostic` report type
+- detect unconstrained line endpoints, free spline control points, and profiles without driving dimensions
+- detect duplicate or contradictory horizontal/vertical/fixed constraints in the current deterministic subset
+- detect duplicate driving dimensions on the same reference targets
+- keep diagnostics as recomputable output, not persistent model intent
+- add core tests for under-constrained and over-constrained reports
+- keep full constraint solving, automatic repair, GUI highlighting, degrees-of-freedom counting, spline-handle solving, and parametric solve iteration deferred
 
 ## Future roadmap: Inventor-like sketcher and sketch-driven features
 
