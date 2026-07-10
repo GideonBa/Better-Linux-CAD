@@ -319,6 +319,25 @@ private:
   std::vector<SketchEntityId> line_segments_;
 };
 
+class CompositeClosedProfile {
+public:
+  [[nodiscard]] static Result<CompositeClosedProfile> create(
+      ProfileId id, std::vector<SketchEntityId> outer_contour,
+      std::vector<std::vector<SketchEntityId>> inner_contours);
+
+  [[nodiscard]] const ProfileId& id() const noexcept;
+  [[nodiscard]] const std::vector<SketchEntityId>& outer_contour() const noexcept;
+  [[nodiscard]] const std::vector<std::vector<SketchEntityId>>& inner_contours() const noexcept;
+
+private:
+  CompositeClosedProfile(ProfileId id, std::vector<SketchEntityId> outer_contour,
+                         std::vector<std::vector<SketchEntityId>> inner_contours);
+
+  ProfileId id_;
+  std::vector<SketchEntityId> outer_contour_;
+  std::vector<std::vector<SketchEntityId>> inner_contours_;
+};
+
 class Sketch {
 public:
   [[nodiscard]] static Result<Sketch> create(SketchId id, std::string name, DatumPlaneId workplane);
@@ -333,6 +352,7 @@ public:
   [[nodiscard]] Result<std::size_t> add_profile(RectangleProfile profile);
   [[nodiscard]] Result<std::size_t> add_profile(CircleProfile profile);
   [[nodiscard]] Result<std::size_t> add_profile(ClosedProfile profile);
+  [[nodiscard]] Result<std::size_t> add_profile(CompositeClosedProfile profile);
 
   [[nodiscard]] const SketchId& id() const noexcept;
   [[nodiscard]] const std::string& name() const noexcept;
@@ -347,6 +367,7 @@ public:
   [[nodiscard]] const std::vector<RectangleProfile>& rectangle_profiles() const noexcept;
   [[nodiscard]] const std::vector<CircleProfile>& circle_profiles() const noexcept;
   [[nodiscard]] const std::vector<ClosedProfile>& closed_profiles() const noexcept;
+  [[nodiscard]] const std::vector<CompositeClosedProfile>& composite_closed_profiles() const noexcept;
   [[nodiscard]] std::size_t profile_count() const noexcept;
 
   [[nodiscard]] const LineSegment* find_line_segment(SketchEntityId id) const noexcept;
@@ -359,6 +380,7 @@ public:
   [[nodiscard]] const RectangleProfile* find_rectangle_profile(ProfileId id) const noexcept;
   [[nodiscard]] const CircleProfile* find_circle_profile(ProfileId id) const noexcept;
   [[nodiscard]] const ClosedProfile* find_closed_profile(ProfileId id) const noexcept;
+  [[nodiscard]] const CompositeClosedProfile* find_composite_closed_profile(ProfileId id) const noexcept;
   [[nodiscard]] Result<std::vector<Point2>> closed_profile_vertices(
       const ClosedProfile& profile) const;
 
@@ -377,6 +399,8 @@ private:
       const SketchReferenceTarget& target, const std::string& object_id) const;
   [[nodiscard]] Result<std::vector<Point2>> validate_closed_profile(
       const ClosedProfile& profile) const;
+  [[nodiscard]] Result<std::size_t> validate_composite_closed_profile(
+      const CompositeClosedProfile& profile) const;
 
   SketchId id_;
   std::string name_;
@@ -391,6 +415,7 @@ private:
   std::vector<RectangleProfile> rectangle_profiles_;
   std::vector<CircleProfile> circle_profiles_;
   std::vector<ClosedProfile> closed_profiles_;
+  std::vector<CompositeClosedProfile> composite_closed_profiles_;
 };
 
 } // namespace blcad
