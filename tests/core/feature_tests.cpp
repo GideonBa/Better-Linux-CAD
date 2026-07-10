@@ -19,7 +19,7 @@ TEST_CASE("AdditiveExtrude feature stores sketch and length parameter references
   CHECK(feature.value().length_parameter().value() == "part.thickness");
   CHECK(feature.value().target_feature().empty());
   CHECK(feature.value().direction() == ExtrudeDirection::SketchNormal);
-  CHECK(to_string(feature.value().direction()) == "sketch_normal");
+  CHECK(to_string(feature.value().direction()) == "+Z");
 }
 
 TEST_CASE("AdditiveExtrude feature rejects missing required references", "[core][feature]") {
