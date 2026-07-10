@@ -5,6 +5,7 @@
 #include "blcad/core/spatial.hpp"
 #include "blcad/geometry/rectangle_extrusion_adapter.hpp"
 
+#include <string_view>
 #include <vector>
 
 namespace blcad::geometry {
