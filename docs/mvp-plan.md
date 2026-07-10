@@ -244,28 +244,42 @@ Implemented scope:
 - core tests proving multiple safe repair transactions undo in reverse application order
 - empty-stack undo returning a non-mutating `Empty` result
 
+## Implemented block: Sketch repair undo stack summary seed
+
+Detailed document: `docs/sketch-repair-undo-stack-summary-mvp.md`
+
+Implemented scope:
+
+- `SketchRepairUndoStackSummaryEntry`, `SketchRepairUndoStackSummary`, and `SketchRepairUndoStackSummarizer`
+- read-only stack inspection ordered from oldest transaction to newest transaction
+- latest-transaction marker for the entry that `undo_latest` would undo next
+- exposure of transaction status, action, target, undoable flag, and affected record IDs
+- debug JSON output through `serialize_sketch_repair_undo_stack_summary_to_json`
+- core tests for empty summaries, stable ordering, latest marker, affected IDs, and debug JSON
+
 Still not implemented in this block:
 
 - redo
 - persistent transaction journals
-- multi-sketch stacks
-- stack summaries for CLI/GUI inspection
-- GUI command workflows
+- GUI command history widgets
+- user-facing command labels
+- timestamps
+- multi-sketch stack coordination
 - parameter-creating repairs
 - full solve iteration or exact DOF counting
 
-## Next MVP: Sketch repair undo stack summary seed
+## Next MVP: Sketch repair command label seed
 
-Goal: provide non-mutating inspection output for the current in-memory repair undo stack so CLI and future GUI code can display what is currently undoable.
+Goal: add stable user-facing labels and short descriptions for repair suggestions, commands, transactions, and undo-stack summary entries.
 
 Proposed first implementation sequence:
 
-- add a `SketchRepairUndoStackSummary` or equivalent read-only report for current stack contents
-- expose stack depth, latest transaction action, latest target, and per-entry transaction status/action/target
-- keep summaries independent from `.blcad.json`; they are UI/CLI inspection output, not model intent
-- add optional debug JSON output for stack summaries, similar to diagnostics and repair suggestions
-- add core tests that push multiple transactions and verify stable summary ordering without undoing
-- keep redo, persistent journals, multi-sketch stack coordination, GUI widgets, command grouping, transaction squashing, parameter-creating repairs, full solve iteration, exact DOF counting, and arbitrary model rewriting deferred
+- add a `SketchRepairCommandLabeler` or equivalent non-mutating helper
+- map repair actions and transaction summary entries to stable titles and short descriptions
+- keep labels separate from model intent and `.blcad.json`
+- include labels in stack summary debug JSON without changing undo behavior
+- add core tests for deterministic labels for all current safe and unsupported repair actions
+- keep localization, GUI widgets, redo, persistent history, timestamps, parameter-creating repairs, full solve iteration, exact DOF counting, and arbitrary model rewriting deferred
 
 ## Future roadmap: Multi-body transforms and path features
 
