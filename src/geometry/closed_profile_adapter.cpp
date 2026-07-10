@@ -18,6 +18,7 @@
 #include <exception>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -37,7 +38,6 @@ constexpr double kAxisTolerance = 1.0e-9;
   if (message == nullptr || *message == '\0') {
     return "OCCT operation failed";
   }
-
   return message;
 }
 
@@ -46,7 +46,7 @@ constexpr double kAxisTolerance = 1.0e-9;
 }
 
 [[nodiscard]] Result<TopoDS_Wire> make_profile_wire(const std::vector<Point3>& vertices,
-                                                    std::string_view contour_kind) {
+                                                     std::string_view contour_kind) {
   if (vertices.size() < 3U) {
     return Result<TopoDS_Wire>::failure(make_geometry_error(
         std::string(contour_kind) + " closed profile requires at least three vertices"));
@@ -59,8 +59,8 @@ constexpr double kAxisTolerance = 1.0e-9;
   polygon.Close();
 
   if (!polygon.IsDone()) {
-    return Result<TopoDS_Wire>::failure(
-        make_geometry_error(std::string("could not build ") + std::string(contour_kind) + " closed profile wire"));
+    return Result<TopoDS_Wire>::failure(make_geometry_error(
+        std::string("could not build ") + std::string(contour_kind) + " closed profile wire"));
   }
 
   return Result<TopoDS_Wire>::success(polygon.Wire());
@@ -102,7 +102,8 @@ constexpr double kAxisTolerance = 1.0e-9;
   }
 
   if (!face_builder.IsDone()) {
-    return Result<TopoDS_Shape>::failure(make_geometry_error("could not build closed profile face with holes"));
+    return Result<TopoDS_Shape>::failure(
+        make_geometry_error("could not build closed profile face with holes"));
   }
 
   return Result<TopoDS_Shape>::success(face_builder.Face());
@@ -116,11 +117,9 @@ constexpr double kAxisTolerance = 1.0e-9;
   if (abs_x > 1.0 - kAxisTolerance && abs_y < kAxisTolerance && abs_z < kAxisTolerance) {
     return Result<Vector3>::success(Vector3{direction.x >= 0.0 ? 1.0 : -1.0, 0.0, 0.0});
   }
-
   if (abs_y > 1.0 - kAxisTolerance && abs_x < kAxisTolerance && abs_z < kAxisTolerance) {
     return Result<Vector3>::success(Vector3{0.0, direction.y >= 0.0 ? 1.0 : -1.0, 0.0});
   }
-
   if (abs_z > 1.0 - kAxisTolerance && abs_x < kAxisTolerance && abs_y < kAxisTolerance) {
     return Result<Vector3>::success(Vector3{0.0, 0.0, direction.z >= 0.0 ? 1.0 : -1.0});
   }
@@ -130,22 +129,14 @@ constexpr double kAxisTolerance = 1.0e-9;
 }
 
 [[nodiscard]] double coordinate_along_axis(Point3 point, Vector3 axis) noexcept {
-  if (std::abs(axis.x) > 1.0 - kAxisTolerance) {
-    return point.x;
-  }
-  if (std::abs(axis.y) > 1.0 - kAxisTolerance) {
-    return point.y;
-  }
+  if (std::abs(axis.x) > 1.0 - kAxisTolerance) return point.x;
+  if (std::abs(axis.y) > 1.0 - kAxisTolerance) return point.y;
   return point.z;
 }
 
 [[nodiscard]] double axis_component(Vector3 axis) noexcept {
-  if (std::abs(axis.x) > 1.0 - kAxisTolerance) {
-    return axis.x;
-  }
-  if (std::abs(axis.y) > 1.0 - kAxisTolerance) {
-    return axis.y;
-  }
+  if (std::abs(axis.x) > 1.0 - kAxisTolerance) return axis.x;
+  if (std::abs(axis.y) > 1.0 - kAxisTolerance) return axis.y;
   return axis.z;
 }
 
@@ -158,13 +149,11 @@ constexpr double kAxisTolerance = 1.0e-9;
     const std::vector<Point3>& vertices, Vector3 axis, double min_x, double min_y, double min_z,
     double max_x, double max_y, double max_z) {
   if (vertices.empty()) {
-    return Result<std::vector<Point3>>::failure(
-        make_geometry_error("closed profile requires vertices"));
+    return Result<std::vector<Point3>>::failure(make_geometry_error("closed profile requires vertices"));
   }
 
   const double profile_coordinate = coordinate_along_axis(vertices.front(), axis);
   double start_coordinate = 0.0;
-
   if (std::abs(axis.x) > 1.0 - kAxisTolerance) {
     start_coordinate = axis.x > 0.0 ? min_x - kThroughAllMargin : max_x + kThroughAllMargin;
   } else if (std::abs(axis.y) > 1.0 - kAxisTolerance) {
@@ -174,7 +163,6 @@ constexpr double kAxisTolerance = 1.0e-9;
   }
 
   const double delta = (start_coordinate - profile_coordinate) / axis_component(axis);
-
   std::vector<Point3> moved;
   moved.reserve(vertices.size());
   for (Point3 vertex : vertices) {
@@ -191,8 +179,10 @@ constexpr double kAxisTolerance = 1.0e-9;
   moved.reserve(contours.size());
   for (const auto& contour : contours) {
     auto moved_contour = move_profile_to_through_all_start(contour, axis, min_x, min_y, min_z,
-                                                          max_x, max_y, max_z);
-    if (moved_contour.has_error()) return Result<std::vector<std::vector<Point3>>>::failure(moved_contour.error());
+                                                           max_x, max_y, max_z);
+    if (moved_contour.has_error()) {
+      return Result<std::vector<std::vector<Point3>>>::failure(moved_contour.error());
+    }
     moved.push_back(std::move(moved_contour.value()));
   }
   return Result<std::vector<std::vector<Point3>>>::success(std::move(moved));
@@ -200,34 +190,30 @@ constexpr double kAxisTolerance = 1.0e-9;
 
 [[nodiscard]] double through_all_length(Vector3 axis, double min_x, double min_y, double min_z,
                                         double max_x, double max_y, double max_z) noexcept {
-  if (std::abs(axis.x) > 1.0 - kAxisTolerance) {
-    return (max_x - min_x) + 2.0 * kThroughAllMargin;
-  }
-  if (std::abs(axis.y) > 1.0 - kAxisTolerance) {
-    return (max_y - min_y) + 2.0 * kThroughAllMargin;
-  }
+  if (std::abs(axis.x) > 1.0 - kAxisTolerance) return (max_x - min_x) + 2.0 * kThroughAllMargin;
+  if (std::abs(axis.y) > 1.0 - kAxisTolerance) return (max_y - min_y) + 2.0 * kThroughAllMargin;
   return (max_z - min_z) + 2.0 * kThroughAllMargin;
 }
 
-[[nodiscard]] Result<GeometryShape> make_prism_from_face(TopoDS_Shape face, Vector3 direction,
-                                                         const Quantity& depth) {
+[[nodiscard]] Result<TopoDS_Shape> make_prism_shape_from_face(TopoDS_Shape face,
+                                                              Vector3 direction,
+                                                              const Quantity& depth) {
   BRepPrimAPI_MakePrism prism_builder(
       face, gp_Vec(direction.x * depth.millimeters(), direction.y * depth.millimeters(),
                    direction.z * depth.millimeters()));
   prism_builder.Build();
 
   if (!prism_builder.IsDone()) {
-    return Result<GeometryShape>::failure(make_geometry_error("could not extrude closed profile"));
+    return Result<TopoDS_Shape>::failure(make_geometry_error("could not extrude closed profile"));
   }
 
   TopoDS_Shape shape = prism_builder.Shape();
   if (shape.IsNull()) {
-    return Result<GeometryShape>::failure(
+    return Result<TopoDS_Shape>::failure(
         make_geometry_error("closed profile extrusion produced an empty shape"));
   }
 
-  return Result<GeometryShape>::success(
-      GeometryShape(std::make_shared<GeometryShape::Impl>(std::move(shape))));
+  return Result<TopoDS_Shape>::success(std::move(shape));
 }
 
 } // namespace
@@ -244,7 +230,12 @@ Result<GeometryShape> ClosedProfileAdapter::make_extruded_profile(
     if (face.has_error()) {
       return Result<GeometryShape>::failure(face.error());
     }
-    return make_prism_from_face(face.value(), direction, depth);
+    auto shape = make_prism_shape_from_face(face.value(), direction, depth);
+    if (shape.has_error()) {
+      return Result<GeometryShape>::failure(shape.error());
+    }
+    return Result<GeometryShape>::success(
+        GeometryShape(std::make_shared<GeometryShape::Impl>(std::move(shape.value()))));
   } catch (const Standard_Failure& failure) {
     return Result<GeometryShape>::failure(make_geometry_error(standard_failure_message(failure)));
   } catch (const std::exception& exception) {
@@ -272,7 +263,12 @@ Result<GeometryShape> ClosedProfileAdapter::make_extruded_profile_with_holes(
     if (face.has_error()) {
       return Result<GeometryShape>::failure(face.error());
     }
-    return make_prism_from_face(face.value(), direction, depth);
+    auto shape = make_prism_shape_from_face(face.value(), direction, depth);
+    if (shape.has_error()) {
+      return Result<GeometryShape>::failure(shape.error());
+    }
+    return Result<GeometryShape>::success(
+        GeometryShape(std::make_shared<GeometryShape::Impl>(std::move(shape.value()))));
   } catch (const Standard_Failure& failure) {
     return Result<GeometryShape>::failure(make_geometry_error(standard_failure_message(failure)));
   } catch (const std::exception& exception) {
