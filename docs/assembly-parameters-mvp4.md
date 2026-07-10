@@ -31,13 +31,15 @@ The binding is explicit model intent: a part parameter declares that it follows 
 - each applied binding runs through `PartDocument::set_parameter_value`, so the part's dependency graph marks the affected sketches and features exactly as a direct parameter edit would.
 - the returned `BindingApplication` reports the applied binding count and the affected part graph nodes.
 
-Propagation is an explicit call, not a hidden side effect. The controlled flow is:
+Propagation is an explicit call, not a hidden side effect. The low-level flow is:
 
 ```text
 assembly.set_parameter_value(...)
   -> assembly.apply_bindings_to(part_a) -> part_a recompute plan -> geometry recompute
   -> assembly.apply_bindings_to(part_b) -> part_b recompute plan -> geometry recompute
 ```
+
+The project-level container in `docs/project-container-mvp4.md` now wraps this flow so callers can update one assembly parameter and receive per-part recompute plans from one project-level call.
 
 ## JSON
 
@@ -77,7 +79,7 @@ Schema `blcad.assembly_document.mvp4`, version 1:
 
 ## Deliberate limitations
 
-- propagation is pull/apply-based; there is no automatic cross-document notification yet. A project container that owns assembly and parts together is the natural place for that (`docs/file-format.md`).
+- `AssemblyDocument` itself remains an explicit low-level model. Automatic cross-document propagation is implemented by `Project`, not by hidden assembly side effects.
 - no component instances, transforms, or constraints (MVP 5, `docs/assembly-system.md`).
 - no expressions over assembly parameters yet (`docs/parameter-model.md`).
-- no global/project scope yet.
+- no global/project parameter scope yet.
