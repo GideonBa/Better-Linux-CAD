@@ -98,6 +98,7 @@ Implemented feature blocks:
 - `docs/sketch-repair-transactions-mvp.md`
 - `docs/sketch-repair-undo-stack-mvp.md`
 - `docs/sketch-repair-undo-stack-summary-mvp.md`
+- `docs/sketch-repair-command-labels-mvp.md`
 
 Future roadmaps:
 
@@ -107,13 +108,16 @@ Future roadmaps:
 
 ## Next technical step
 
-The next technical step should add a sketch repair command label seed.
+The next technical step should add a sketch repair presentation metadata seed.
 
-1. Add a `SketchRepairCommandLabeler` or equivalent non-mutating helper.
-2. Map repair actions and undo-stack summary entries to stable titles and short descriptions.
-3. Keep labels separate from model intent and `.blcad.json`; labels are UI/CLI presentation data.
-4. Include labels in stack summary debug JSON without changing undo behavior.
-5. Add core tests for deterministic labels for all current safe and unsupported repair actions.
-6. Keep localization, GUI widgets, redo, persistent history, timestamps, parameter-creating repairs, full solve iteration, exact DOF counting, and arbitrary model rewriting deferred.
+1. Add a `SketchRepairPresentationMetadata` or equivalent read-only record with stable machine-readable label IDs.
+2. Add display categories such as `safe_apply`, `requires_user_choice`, `requires_parameter_value`, and `undo_entry`.
+3. Add a lightweight severity or display-priority enum for repair actions and undo entries.
+4. Compute affected-record counts for added constraints, removed constraints, and removed dimensions.
+5. Expose a concise `affected_summary` string for undo-stack summary entries without changing undo semantics.
+6. Include the metadata fields in undo-stack summary debug JSON next to the existing title and description.
+7. Keep all presentation metadata separate from model intent and `.blcad.json` persistence.
+8. Add core tests and documentation for stable IDs, categories, priorities, affected counts, summaries, and JSON output.
+9. Keep localization, icons, GUI widgets, redo, persistent journals, timestamps, multi-sketch grouping, parameter-creating repairs, full solve iteration, exact DOF counting, and arbitrary model rewriting deferred.
 
-The completed undo stack summary block is documented in `docs/sketch-repair-undo-stack-summary-mvp.md`.
+The completed command label block is documented in `docs/sketch-repair-command-labels-mvp.md`.
