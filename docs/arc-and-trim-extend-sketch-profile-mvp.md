@@ -6,7 +6,7 @@ The goal is to support one deterministic sketch profile containing circular arcs
 
 ## Implemented scope
 
-The core model now has:
+The core model has:
 
 - `ArcSegment`
 - `ArcClosedProfile`
@@ -34,7 +34,7 @@ This metadata is persisted in the model as sketch intent, but it does not yet so
 
 ## Validation behavior
 
-The first validation seed checks:
+The validation seed checks:
 
 - arc IDs are non-empty
 - arc points are distinct
@@ -44,19 +44,20 @@ The first validation seed checks:
 - arc closed profiles contain at least three curve segments
 - arc closed profiles reference existing explicit line or arc entities
 - ordered line/arc profile segments are connected end-to-start and close back to the first segment
+- line/line, line/arc, and arc/arc intersections are rejected when they are not the expected adjacent shared endpoint
 
-The seed does not yet check curved self-intersections exactly. It also does not infer tangent continuity or solve constraints.
+This is still not a full sketch solver. It does not infer tangent continuity, solve constraints, trim curves automatically, or prove all advanced curve-topology cases.
 
 ## Geometry behavior
 
-The optional geometry layer now supports `ArcClosedProfile` through `ClosedProfileAdapter` curve APIs:
+The optional geometry layer supports `ArcClosedProfile` through `ClosedProfileAdapter` curve APIs:
 
 - `make_extruded_profile_from_curves`
 - `cut_profile_curves_through_all`
 
 The adapter builds OCCT wires from explicit line edges and circular-arc edges. Circular arcs are created from the three-point arc definition using OCCT arc construction rather than storing tessellated arc points as model intent.
 
-`GeometryRecomputeExecutor` now accepts exactly one `ArcClosedProfile` for:
+`GeometryRecomputeExecutor` accepts exactly one `ArcClosedProfile` for:
 
 - additive extrude
 - subtractive through-all cut
@@ -65,14 +66,13 @@ The arc profile is resolved through the current sketch workplane, checked agains
 
 ## JSON intent
 
-The intended stable JSON shape for this block is:
+Arc sketch entities, trim/extend metadata, and arc closed profiles now roundtrip through source-level `.blcad.json` serialization:
 
 ```json
 {
   "arc_segments": [
     {
       "id": "arc.top",
-      "kind": "three_point",
       "start": {"x": 10.0, "y": 0.0},
       "mid": {"x": 0.0, "y": 10.0},
       "end": {"x": -10.0, "y": 0.0}
@@ -95,7 +95,9 @@ The intended stable JSON shape for this block is:
 }
 ```
 
-The source-level JSON serializer still needs to be extended in a follow-up pass before arc profiles roundtrip through `.blcad.json`. The model shape above is the intended persisted representation; it deliberately stores model intent, not tessellated arc caches or raw OCCT edges.
+The JSON stores model intent only. It does not store tessellated arc caches, resolved OCCT edges, or trim-solver state.
+
+A checked-in example model is available at `examples/arc_profile_prism.blcad.json`.
 
 ## Test coverage
 
@@ -104,9 +106,11 @@ The tests cover:
 - rejection of collinear three-point arcs
 - storing trim metadata on explicit arc entities
 - ordered line/arc profile validation
+- rejection of self-intersecting line/arc closed profiles
+- JSON roundtrip for arc segments, trim/extend operations, and arc closed profiles
 - additive recompute from one arc closed profile
 - subtractive through-all recompute from one arc closed profile
 
 ## Deliberate limitations
 
-This block does not implement splines, tangent constraint solving, automatic fillets, trim/extend solving, GUI curve editing, exact curved self-intersection checks, 3D sketches, sweep, loft, surface stitching, or closed-shell-to-solid conversion.
+This block does not implement splines, tangent constraint solving, automatic fillets, trim/extend solving, GUI curve editing, full advanced curved-topology validation, 3D sketches, sweep, loft, surface stitching, or closed-shell-to-solid conversion.
