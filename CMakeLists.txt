@@ -45,6 +45,7 @@ add_library(
   src/core/sketch.cpp
   src/core/sketch_arc_profile.cpp
   src/core/sketch_constraints.cpp
+  src/core/sketch_diagnostics.cpp
 )
 add_library(BLCAD::core ALIAS blcad_core)
 
@@ -159,6 +160,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/semantic_reference_json_tests.cpp
     tests/core/sketch_arc_profile_json_tests.cpp
     tests/core/sketch_arc_profile_tests.cpp
+    tests/core/sketch_diagnostics_tests.cpp
     tests/core/sketch_dimension_tests.cpp
     tests/core/sketch_spline_profile_json_tests.cpp
     tests/core/sketch_tests.cpp
