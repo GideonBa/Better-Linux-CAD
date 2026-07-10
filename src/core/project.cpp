@@ -67,14 +67,14 @@ Result<std::size_t> Project::validate_member_parts() const {
 }
 
 Result<ProjectUpdateResult> Project::set_assembly_parameter_value(ParameterId id, Quantity value) {
-  auto updated = assembly_.set_parameter_value(id, value);
-  if (updated.has_error()) {
-    return Result<ProjectUpdateResult>::failure(updated.error());
-  }
-
   auto valid_members = validate_member_parts();
   if (valid_members.has_error()) {
     return Result<ProjectUpdateResult>::failure(valid_members.error());
+  }
+
+  auto updated = assembly_.set_parameter_value(id, value);
+  if (updated.has_error()) {
+    return Result<ProjectUpdateResult>::failure(updated.error());
   }
 
   std::vector<ProjectPartUpdate> part_updates;
