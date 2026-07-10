@@ -298,31 +298,48 @@ Implemented scope:
 - distinct snapshot debug JSON through `serialize_sketch_repair_presentation_snapshot_to_json`
 - core tests for empty snapshots, multi-entry snapshots, latest metadata, affected-count propagation, and JSON output
 
+## Implemented block: Sketch repair presentation snapshot query seed
+
+Detailed document: `docs/sketch-repair-presentation-snapshot-query-mvp.md`
+
+Implemented scope:
+
+- `SketchRepairPresentationSnapshotQuery`, `SketchRepairPresentationSnapshotQueryCounts`, and `SketchRepairPresentationSnapshotQueryResult`
+- `SketchRepairPresentationSnapshotQueryEngine` for read-only filtering of presentation snapshots
+- filtering by display category, display priority, latest-only, and undoable-only
+- AND semantics when multiple filters are enabled
+- preservation of source snapshot order in every filtered output
+- category and priority count helpers computed from the filtered result
+- distinct query debug JSON through `serialize_sketch_repair_presentation_snapshot_query_result_to_json`
+- core tests for empty queries, category filtering, priority filtering, latest-only filtering, undoable-only filtering, combined filters, ordering, count helpers, and JSON output
+
 Still not implemented in this block:
 
 - localization
 - icons or GUI widgets
 - timestamps
-- snapshot filtering, sorting, or grouping
+- snapshot grouping helpers
+- custom sorting or saved filters
+- label-id/text search filters
 - redo snapshots or persistent command history
 - multi-sketch stack coordination
 - parameter-creating repairs
 - full solve iteration or exact DOF counting
 
-## Next MVP: Sketch repair presentation snapshot query seed
+## Next MVP: Sketch repair presentation snapshot grouping seed
 
-Goal: add read-only query/filter helpers for presentation snapshots so CLI and future GUI code can show focused repair-history views without mutating the source snapshot.
+Goal: add read-only grouping helpers for presentation snapshots so CLI and future GUI code can display deterministic grouped repair-history sections after optional filtering.
 
 Proposed first implementation sequence:
 
-- add `SketchRepairPresentationSnapshotQuery` and `SketchRepairPresentationSnapshotQueryResult` or equivalent records
-- add a `SketchRepairPresentationSnapshotQueryEngine` that consumes a snapshot and returns filtered snapshot rows
-- support filtering by display category, display priority, latest-only, and undoable-only
-- preserve original stack order for every filtered result
-- add category and priority count helpers for compact CLI/GUI badges
-- add a distinct debug JSON schema that includes query metadata and filtered rows
-- keep the unfiltered snapshot JSON as the default presentation export
-- add core tests for empty queries, category filtering, priority filtering, latest-only filtering, undoable-only filtering, ordering, count helpers, and JSON output
+- add `SketchRepairPresentationSnapshotGroup` and `SketchRepairPresentationSnapshotGrouping` or equivalent records
+- add a `SketchRepairPresentationSnapshotGroupingEngine` that consumes unfiltered or queried snapshots
+- support grouping by display category and display priority
+- preserve deterministic within-group ordering from the source snapshot
+- expose group counts, group labels, first/latest entry metadata, and empty-group handling
+- add a distinct grouped snapshot debug JSON schema with grouping metadata
+- keep query/filter helpers separate from grouping helpers so callers can filter first and group second
+- add core tests for category grouping, priority grouping, deterministic order, empty groups, group counts, grouped latest entries, and JSON output
 - keep localization, icons, GUI widgets, custom sorting, persistent history, redo, multi-sketch grouping, timestamps, parameter-creating repairs, full solve iteration, exact DOF counting, and arbitrary model rewriting deferred
 
 ## Future roadmap: Multi-body transforms and path features
