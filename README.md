@@ -100,6 +100,7 @@ Implemented feature blocks:
 - `docs/sketch-repair-undo-stack-summary-mvp.md`
 - `docs/sketch-repair-command-labels-mvp.md`
 - `docs/sketch-repair-presentation-metadata-mvp.md`
+- `docs/sketch-repair-presentation-snapshot-mvp.md`
 
 Future roadmaps:
 
@@ -109,14 +110,16 @@ Future roadmaps:
 
 ## Next technical step
 
-The next technical step should add a sketch repair presentation snapshot seed.
+The next technical step should add a sketch repair presentation snapshot query seed.
 
-1. Add a `SketchRepairPresentationSnapshot` or equivalent read-only record that combines summary entry data, labels, and presentation metadata into one CLI/GUI-facing row.
-2. Add a `SketchRepairPresentationSnapshotBuilder` that consumes `SketchRepairUndoStackSummary` and produces ordered snapshot entries without mutating the stack.
-3. Include title, description, label id, category, priority, affected counts, affected summary, action, target, latest marker, and undoable flag in each snapshot entry.
-4. Add debug JSON output for presentation snapshots with a schema distinct from `.blcad.json` model intent.
-5. Keep the existing summary JSON intact for lower-level debugging while exposing snapshot JSON as the preferred presentation output.
-6. Add core tests for empty snapshots, multi-entry stack snapshots, latest-entry metadata, affected-count propagation, and JSON output.
-7. Keep localization, icons, GUI widgets, redo, persistent journals, timestamps, multi-sketch grouping, parameter-creating repairs, full solve iteration, exact DOF counting, and arbitrary model rewriting deferred.
+1. Add a `SketchRepairPresentationSnapshotQuery` or equivalent read-only filter/options record.
+2. Add a `SketchRepairPresentationSnapshotQueryEngine` that consumes a snapshot and returns a filtered snapshot without mutating the original.
+3. Support filtering by display category, display priority, latest-only, and undoable-only.
+4. Preserve the original stack order for all filtered outputs.
+5. Add optional count helpers for category totals and priority totals so CLI/GUI code can show compact badges.
+6. Add debug JSON output for queried snapshots with a distinct schema marker and query metadata.
+7. Keep the unfiltered snapshot JSON intact as the default presentation export.
+8. Add core tests for empty queries, category filtering, priority filtering, latest-only filtering, undoable-only filtering, preserved ordering, count helpers, and JSON output.
+9. Keep localization, icons, GUI widgets, custom sorting, persistent history, redo, multi-sketch grouping, timestamps, parameter-creating repairs, full solve iteration, exact DOF counting, and arbitrary model rewriting deferred.
 
-The completed presentation metadata block is documented in `docs/sketch-repair-presentation-metadata-mvp.md`.
+The completed presentation snapshot block is documented in `docs/sketch-repair-presentation-snapshot-mvp.md`.
