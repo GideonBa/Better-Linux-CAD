@@ -252,16 +252,16 @@ Implemented scope:
 - `SketchTrimOperationId`
 - `SketchTrimExtendOperation` records for explicit trim/extend endpoint metadata
 - core validation for non-empty arc IDs, distinct arc points, non-collinear arc definitions, ordered line/arc contour closure, and trim/extend target existence
+- first curved-contour self-intersection validation for line/line, line/arc, and arc/arc pairs
+- source-level JSON roundtrip for `arc_segments`, `trim_extend_operations`, and `arc_closed_profiles`
+- checked-in `examples/arc_profile_prism.blcad.json`
 - `ClosedProfileAdapter` curve APIs for OCCT wires with line and circular-arc edges
 - additive extrude recompute from one arc closed profile
 - subtractive through-all cut recompute from one arc closed profile
-- core tests for arc validation, trim metadata, and line/arc profile validation
-- geometry tests for additive and subtractive recompute from one arc profile
+- core, JSON, and geometry tests for arc records and arc-profile recompute
 
 Still not implemented in this block:
 
-- source-level JSON roundtrip for arc profile records
-- exact curved self-intersection validation
 - trim/extend solving or geometry rewriting
 - splines
 - tangent constraint solving
@@ -269,17 +269,19 @@ Still not implemented in this block:
 - GUI curve editing
 - 3D sketches, sweep, loft, and surfacing
 
-## Next MVP: Arc JSON roundtrip and curved-contour validation seed
+## Next MVP: Spline and tangent-continuity sketch profile seed
 
-Goal: make arc/trim profile intent fully persistent and add the first exact curved-contour validation pass.
+Goal: add the next non-linear sketch-curve seed beyond circular arcs while keeping spline model intent explicit and deterministic.
 
 Proposed first implementation sequence:
 
-- extend `part_document_json.cpp` to serialize and deserialize `arc_segments`, `trim_extend_operations`, and `arc_closed_profiles`
-- add JSON roundtrip tests for one line/arc profile and one trim/extend metadata record
-- add an exact curved self-intersection check for simple line/arc profiles
-- add a checked-in `.blcad.json` example for an arc-profile additive extrude
-- keep splines, tangent constraint solving, automatic fillets, GUI trim/extend solving, 3D sketches, sweep, loft, surface stitching, and closed-shell-to-solid conversion deferred
+- add a first `SplineSegment` model-intent record, preferably a cubic Bezier or small control-point spline seed
+- add ordered line/arc/spline closed-profile support without mixing in solver state
+- add first tangent-continuity metadata between adjacent line/arc/spline entities
+- serialize spline segments and tangent metadata to JSON
+- add OCCT edge construction for the first spline representation
+- add additive and subtractive recompute tests for one simple line/arc/spline profile
+- keep full spline editing, NURBS weights, automatic fillets, tangent constraint solving, GUI curve editing, 3D sketches, sweep, loft, surface stitching, and closed-shell-to-solid conversion deferred
 
 ## Future roadmap: Inventor-like sketcher and sketch-driven features
 
