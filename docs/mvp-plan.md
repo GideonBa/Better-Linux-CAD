@@ -51,26 +51,13 @@ Detailed document: `docs/general-closed-sketch-profile-mvp.md`
 
 Implemented scope:
 
-- `SketchEntityId`
-- `LineSegment`
-- `ClosedProfile`
+- `SketchEntityId`, `LineSegment`, and `ClosedProfile`
 - ordered line-segment references
-- validation of closed and connected line loops
-- rejection of duplicate line references inside one profile
-- rejection of self-intersecting loops
+- validation of closed, connected, non-self-intersecting line loops
 - JSON serialization and roundtrip tests for `line_segments` and `closed_profiles`
 - OCCT wire and face creation from ordered line vertices
-- additive extrude from one closed profile
-- subtractive through-all extrude from one closed profile
-- geometry tests for non-rectangular and non-circular profile operations
+- additive and subtractive recompute from one closed profile
 - checked-in closed-profile examples under `examples/`
-
-Still not implemented in this block:
-
-- splines
-- trimmed curves
-- full sketch constraint solver
-- GUI sketch editing
 
 ## Implemented block: Construction geometry, chained relations, and evaluated semantic references
 
@@ -89,14 +76,6 @@ Implemented scope:
 - `ConstructionPointResolver` and `ConstructionLineResolver`
 - chained construction-relation dependency and invalidation tests
 - JSON-backed generated semantic reference example
-
-Still not implemented in this block:
-
-- generated semantic edge/vertex evaluation for arbitrary non-rectangular or non-extrude topology
-- point-on-generated-edge parameterization beyond deterministic midpoint
-- full construction-geometry solver
-- GUI manipulators
-- 3D sketch splines, sweep, loft, surface stitching, or closed-shell-to-solid conversion
 
 ## Implemented block: Projected sketch references and first reference-driven constraints
 
@@ -118,12 +97,6 @@ Implemented scope:
 - out-of-plane validation errors
 - dependency graph edges from projected references to owning sketches
 
-Still not implemented in this block:
-
-- full sketch constraint solving
-- projected reference selection or display in a GUI
-- arbitrary generated topology beyond the current rectangular additive extrude seed
-
 ## Implemented block: Robust reference remapping and sketch placement recovery
 
 Goal: make sketch placement and projected references robust when a source face, edge, or vertex changes or disappears after feature edits.
@@ -139,12 +112,6 @@ Implemented scope:
 - JSON persistence for recovery metadata
 - sketch-aware workplane resolution using origin overrides
 - recovery tests across core, JSON, invalidation, and geometry paths
-
-Still not implemented in this block:
-
-- GUI repair/remapping dialogs
-- automatic topology matching after arbitrary edits
-- automatic application of remap records to rewrite sketches or projected references
 
 ## Implemented block: Deterministic profile consumption from reference-driven sketch helpers
 
@@ -162,12 +129,6 @@ Implemented scope:
 - additive and subtractive recompute from reference-generated helper profiles
 - core, invalidation, JSON, and geometry tests
 
-Still not implemented in this block:
-
-- mixed explicit-line and reference-generated-line profiles in one closed profile
-- full sketch constraint solving
-- GUI editing of reference-generated helper entities
-
 ## Implemented block: Sketch constraints and dimensions seed
 
 Goal: add the next minimal non-solver sketch intent layer: explicit geometric constraints and first driving dimensions on line-segment geometry.
@@ -183,14 +144,6 @@ Implemented scope:
 - dependency graph edges from driving dimension parameters to sketches and dependent features
 - `DimensionDrivenProfileResolver`
 - additive and subtractive recompute from deterministic dimension-driven profiles
-
-Still not implemented in this block:
-
-- full sketch constraint solving
-- over- or under-constrained diagnosis
-- driven dimensions
-- automatic constraint inference
-- GUI constraint display or editing
 
 ## Implemented block: Automatic profile region detection seed
 
@@ -208,13 +161,6 @@ Implemented scope:
 - conversion of a generated candidate into a persistable `ClosedProfile`
 - additive and subtractive recompute from one detected region
 
-Still not implemented in this block:
-
-- multiple regions
-- nested contours
-- trim/extend solving
-- full sketch solving or GUI region selection
-
 ## Implemented block: Multi-contour profiles and holes seed
 
 Goal: allow one profile operation to consume an outer contour plus one or more inner contours for holes, while keeping contour selection explicit and deterministic.
@@ -230,14 +176,6 @@ Implemented scope:
 - `ClosedProfileAdapter` support for OCCT faces with inner wires
 - additive and subtractive recompute from composite profiles with holes
 - core, JSON, and geometry tests
-
-Still not implemented in this block:
-
-- automatic multi-region selection
-- trim/extend solving
-- arcs and splines inside composite contours
-- GUI profile picking
-- 3D sketches, sweep, loft, and surfacing
 
 ## Implemented block: Arc and trim/extend sketch profile seed
 
@@ -256,17 +194,8 @@ Implemented scope:
 - source-level JSON roundtrip for `arc_segments`, `trim_extend_operations`, and `arc_closed_profiles`
 - checked-in `examples/arc_profile_prism.blcad.json`
 - `ClosedProfileAdapter` curve APIs for OCCT wires with line and circular-arc edges
-- additive extrude recompute from one arc closed profile
-- subtractive through-all cut recompute from one arc closed profile
+- additive and subtractive recompute from one arc closed profile
 - core, JSON, and geometry tests for arc records and arc-profile recompute
-
-Still not implemented in this block:
-
-- trim/extend solving or geometry rewriting
-- tangent constraint solving
-- automatic fillets
-- GUI curve editing
-- 3D sketches, sweep, loft, and surfacing
 
 ## Implemented block: Sketch-plane extrude direction seed
 
@@ -283,14 +212,6 @@ Implemented scope:
 - arbitrary-axis through-all placement for circular and profile cuts using target bounding-box projection
 - tests for slanted construction-plane additive extrude and opposite sketch-normal storage
 
-Still not implemented in this block:
-
-- two-sided extrudes
-- draft angles
-- start offsets
-- up-to-next/up-to-face end conditions
-- generated topology beyond the current rectangular seed
-
 ## Implemented block: Spline and tangent-continuity sketch profile seed
 
 Goal: add the next non-linear sketch-curve seed beyond circular arcs while keeping spline model intent explicit and deterministic.
@@ -304,33 +225,53 @@ Implemented scope:
 - ordered line/arc/spline profile support through the existing `ArcClosedProfile` record
 - JSON persistence for `spline_segments` and `tangent_continuities`
 - OCCT Bezier-edge construction from four spline poles
-- additive recompute from one line/spline closed profile
-- subtractive through-all cut recompute from one line/spline closed profile
+- additive and subtractive recompute from one line/spline closed profile
 - checked-in `examples/spline_profile_prism.blcad.json`
 - core JSON tests and geometry pipeline tests
 
-Still not implemented in this block:
-
-- full spline editing
-- NURBS weights or knots
-- tangent constraint solving
-- exact spline/spline and spline/arc self-intersection solving
-- GUI spline handles
-- 3D splines, sweep, loft, and surfacing
-
-## Next MVP: Sketch solver diagnostics seed
+## Implemented block: Sketch solver diagnostics seed
 
 Goal: add the first non-solving diagnostic layer so the model can report simple under-constrained and over-constrained sketch states.
 
+Detailed document: `docs/sketch-solver-diagnostics-mvp.md`
+
+Implemented scope:
+
+- `SketchDiagnosticSeverity`, `SketchDiagnosticKind`, `SketchConstraintDiagnostic`, and `SketchDiagnosticReport`
+- `SketchConstraintDiagnostics::analyze` as a pure report generator that does not mutate model intent
+- warnings for unconstrained explicit line endpoints in the current deterministic subset
+- warnings for free cubic-Bezier spline control handles
+- warnings for sketches with profile intent but no driving dimensions
+- errors for conflicting horizontal plus vertical constraints on one line
+- errors for duplicate fixed endpoint constraints
+- errors for duplicate driving dimensions on the same endpoint pair
+- warning-level redundant duplicate horizontal or vertical orientation constraints
+- debug JSON output through `serialize_sketch_diagnostic_report_to_json`
+- core tests for under-constrained, over-constrained, duplicate, and debug JSON reports
+
+Still not implemented in this block:
+
+- full constraint solving
+- exact degrees-of-freedom counting
+- automatic repair
+- GUI highlighting
+- spline-handle solving
+- parametric solve iteration
+
+## Next MVP: Sketch repair suggestion seed
+
+Goal: convert diagnostics into explicit non-mutating repair suggestions so the UI or CLI can show candidate actions without changing the model automatically.
+
 Proposed first implementation sequence:
 
-- add a lightweight `SketchConstraintDiagnostic` report type
-- detect unconstrained line endpoints, free spline control points, and profiles without driving dimensions
-- detect duplicate or contradictory horizontal/vertical/fixed constraints in the current deterministic subset
-- detect duplicate driving dimensions on the same reference targets
-- keep diagnostics as recomputable output, not persistent model intent
-- add core tests for under-constrained and over-constrained reports
-- keep full constraint solving, automatic repair, GUI highlighting, degrees-of-freedom counting, spline-handle solving, and parametric solve iteration deferred
+- add a `SketchRepairSuggestion` report type linked to diagnostic kinds and targets
+- suggest fixed endpoint constraints for unconstrained line endpoints
+- suggest removing one side of a horizontal/vertical contradiction
+- suggest removing duplicate fixed endpoint constraints and duplicate driving dimensions
+- suggest adding a driving dimension to profile sketches with no dimension intent
+- serialize suggestion reports as debug/output artifacts only, not as `.blcad.json` model intent
+- add core tests that suggestions are deterministic and reference the originating diagnostics
+- keep automatic application, GUI editing workflows, full solve iteration, exact DOF counting, spline-handle solving, and model rewriting deferred
 
 ## Future roadmap: Inventor-like sketcher and sketch-driven features
 
