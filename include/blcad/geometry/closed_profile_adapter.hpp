@@ -10,6 +10,18 @@
 
 namespace blcad::geometry {
 
+enum class ClosedProfileCurveKind {
+  Line,
+  CircularArc,
+};
+
+struct ClosedProfileCurveSegment {
+  ClosedProfileCurveKind kind;
+  Point3 start;
+  Point3 mid;
+  Point3 end;
+};
+
 class ClosedProfileAdapter {
 public:
   [[nodiscard]] Result<GeometryShape> make_extruded_profile(
@@ -20,6 +32,10 @@ public:
       const std::vector<std::vector<Point3>>& inner_vertices,
       Vector3 direction, const Quantity& depth) const;
 
+  [[nodiscard]] Result<GeometryShape> make_extruded_profile_from_curves(
+      const std::vector<ClosedProfileCurveSegment>& curves, Vector3 direction,
+      const Quantity& depth) const;
+
   [[nodiscard]] Result<GeometryShape> cut_profile_through_all(const GeometryShape& target,
                                                               const std::vector<Point3>& vertices,
                                                               Vector3 axis_direction) const;
@@ -27,6 +43,10 @@ public:
   [[nodiscard]] Result<GeometryShape> cut_profile_with_holes_through_all(
       const GeometryShape& target, const std::vector<Point3>& outer_vertices,
       const std::vector<std::vector<Point3>>& inner_vertices, Vector3 axis_direction) const;
+
+  [[nodiscard]] Result<GeometryShape> cut_profile_curves_through_all(
+      const GeometryShape& target, const std::vector<ClosedProfileCurveSegment>& curves,
+      Vector3 axis_direction) const;
 };
 
 } // namespace blcad::geometry
