@@ -1,14 +1,14 @@
 # JSON Serialization
 
-Status: core serialization for `PartDocument` model intent, including file-level helpers, derived workplanes, line-based closed sketch profiles, composite closed profiles with inner contours, explicit construction geometry, relation-driven construction geometry, relation-driven construction points, chained construction relations, semantic generated edge/vertex references, projected sketch reference entities, first reference-driven sketch constraints, first-class reference-generated sketch helper lines, sketch geometric constraints, sketch driving dimensions, generated-region profile selections, reference recovery metadata, reference remap records, and sketch-origin override records.
+Status: core serialization for `PartDocument` model intent, including file-level helpers, derived workplanes, line-based closed sketch profiles, arc closed profiles, composite closed profiles with inner contours, explicit construction geometry, relation-driven construction geometry, chained construction relations, semantic generated edge/vertex references, projected sketch reference entities, reference-driven sketch constraints, reference-generated sketch helper lines, sketch geometric constraints, sketch driving dimensions, generated-region profile selections, reference recovery metadata, reference remap records, and sketch-origin override records.
 
-The JSON serialization layer persists model intent only. It does not serialize OCCT shapes, `GeometryShape`, `ShapeCache` contents, raw face IDs, raw edge IDs, raw vertex IDs, BRep handles, resolved projected coordinates, solver state, automatic region-search caches, or exported STEP data.
+The JSON serialization layer persists model intent only. It does not serialize OCCT shapes, `GeometryShape`, `ShapeCache` contents, raw face IDs, raw edge IDs, raw vertex IDs, BRep handles, resolved projected coordinates, solver state, automatic region-search caches, trim-solver caches, tessellated arc caches, or exported STEP data.
 
 ## Goal
 
 The goal is to make a `PartDocument` reproducible from a textual representation:
 
-1. Build a `PartDocument` with parameters, datum planes, construction geometry, construction relations, derived workplanes, sketches, sketch entities, projected sketch reference entities, reference-generated sketch helper lines, reference-driven sketch constraints, sketch geometric constraints, sketch driving dimensions, selected generated-region profiles, composite closed profiles, reference recovery records, profiles, and features.
+1. Build a `PartDocument` with parameters, datum planes, construction geometry, construction relations, derived workplanes, sketches, sketch entities, projected sketch reference entities, reference-generated sketch helper lines, reference-driven sketch constraints, sketch geometric constraints, sketch driving dimensions, selected generated-region profiles, arc closed profiles, composite closed profiles, reference recovery records, profiles, and features.
 2. Serialize that model intent to JSON.
 3. Optionally write the JSON as a `.blcad.json` model file.
 4. Rebuild the `PartDocument` from JSON through the normal validated construction APIs.
@@ -31,6 +31,8 @@ The current JSON format stores:
 - construction-geometry parameter dependencies
 - derived workplanes with `top`, `bottom`, `right`, `left`, `front`, or `back` semantic face references
 - line-segment sketch entities
+- three-point arc sketch entities
+- trim/extend metadata records
 - projected sketch point references
 - projected sketch line references
 - reference-generated sketch helper lines
@@ -38,6 +40,7 @@ The current JSON format stores:
 - sketch geometric constraints
 - sketch driving dimensions
 - selected generated-region profile intent as normal `closed_profiles`
+- arc closed profiles with ordered `curve_segments`
 - composite closed profiles with `outer_contour` and `inner_contours`
 - reference status records
 - reference remap records
@@ -67,28 +70,7 @@ Explicit construction geometry is serialized as numeric model intent:
 }
 ```
 
-Relation-driven construction points store embedded relation intent:
-
-```json
-{
-  "construction_points": [
-    {
-      "id": "point.top_front_mid",
-      "name": "TopFrontMidpoint",
-      "kind": "on_generated_edge",
-      "relation": {
-        "id": "relation.point_top_front_mid",
-        "type": "point_on_generated_edge",
-        "point": "point.top_front_mid",
-        "generated_edge": {
-          "source_feature": "feature.base",
-          "edge": "top_front"
-        }
-      }
-    }
-  ]
-}
-```
+Relation-driven construction points store embedded relation intent, including semantic generated edge and vertex references where needed.
 
 Supported relation type strings are:
 
@@ -129,50 +111,9 @@ Deserialization restores construction lines together with sketches, features, an
 
 Sketches can store projected reference entities in `projected_points` and `projected_lines`. These are sketch-local model-intent references. They do not serialize resolved 2D coordinates, OCCT topology, or cached projection results.
 
-Projected point references support construction points and semantic generated vertices. Projected line references support construction lines and semantic generated edges. Reference-driven constraints are stored in a sketch-level `constraints` array.
+Reference-generated helper lines are stored in `reference_generated_lines`. Reference-driven constraints are stored in a sketch-level `constraints` array.
 
-Reference-generated helper lines are stored in `reference_generated_lines`:
-
-```json
-{
-  "reference_generated_lines": [
-    {
-      "id": "helper.ab",
-      "start_constraint": "constraint.ab.start",
-      "end_constraint": "constraint.ab.end",
-      "direction_constraint": "constraint.ab.parallel_x"
-    },
-    {
-      "id": "helper.bc",
-      "start_constraint": "constraint.bc.start",
-      "end_constraint": "constraint.bc.end"
-    }
-  ]
-}
-```
-
-Sketch geometric constraints are stored in `geometric_constraints`, and driving dimensions are stored in `driving_dimensions`:
-
-```json
-{
-  "geometric_constraints": [
-    {
-      "id": "constraint.bottom.horizontal",
-      "kind": "horizontal",
-      "first": {"kind": "line_segment", "entity": "line.bottom"}
-    }
-  ],
-  "driving_dimensions": [
-    {
-      "id": "dim.width.bottom",
-      "kind": "horizontal_distance",
-      "first": {"kind": "line_segment_start", "entity": "line.bottom"},
-      "second": {"kind": "line_segment_end", "entity": "line.bottom"},
-      "parameter": "part.width"
-    }
-  ]
-}
-```
+Sketch geometric constraints are stored in `geometric_constraints`, and driving dimensions are stored in `driving_dimensions`.
 
 Automatically detected regions are not serialized as solver caches. If the user selects a generated region candidate, it is persisted as a normal `closed_profiles` entry with a stable generated-region id and ordered line references:
 
@@ -186,6 +127,53 @@ Automatically detected regions are not serialized as solver caches. If the user 
   ]
 }
 ```
+
+## Arc sketch records
+
+Arc sketch entities are serialized in `arc_segments` using the stable three-point definition:
+
+```json
+{
+  "arc_segments": [
+    {
+      "id": "arc.top",
+      "start": {"x": 10.0, "y": 0.0},
+      "mid": {"x": 0.0, "y": 10.0},
+      "end": {"x": -10.0, "y": 0.0}
+    }
+  ]
+}
+```
+
+Trim/extend metadata is serialized in `trim_extend_operations`:
+
+```json
+{
+  "trim_extend_operations": [
+    {
+      "id": "trim.arc.top",
+      "kind": "trim",
+      "target_entity": "arc.top",
+      "replacement_endpoint": {"x": 8.0, "y": 1.0}
+    }
+  ]
+}
+```
+
+Arc-capable profiles are serialized in `arc_closed_profiles` as ordered curve references. Each curve reference points to either a `line_segments` entry or an `arc_segments` entry:
+
+```json
+{
+  "arc_closed_profiles": [
+    {
+      "id": "profile.arc",
+      "curve_segments": ["line.left", "line.bottom", "line.right", "arc.top"]
+    }
+  ]
+}
+```
+
+## Composite profiles
 
 Composite closed profiles are stored as explicit contour intent. The JSON stores one ordered `outer_contour` plus one or more ordered `inner_contours`:
 
@@ -201,44 +189,6 @@ Composite closed profiles are stored as explicit contour intent. The JSON stores
     }
   ]
 }
-```
-
-Supported reference target kinds are:
-
-```text
-line_segment
-line_segment_start
-line_segment_end
-projected_point
-projected_line
-```
-
-Supported first projected-reference constraint kinds are:
-
-```text
-coincident_to_projected_point
-parallel_to_projected_line
-collinear_with_projected_line
-```
-
-Supported first geometric constraint kinds are:
-
-```text
-fixed
-horizontal
-vertical
-parallel
-perpendicular
-equal_length
-```
-
-Supported first driving dimension kinds are:
-
-```text
-horizontal_distance
-vertical_distance
-aligned_distance
-point_to_point_distance
 ```
 
 ## Reference recovery metadata
@@ -264,18 +214,7 @@ Reference status records are stored at document level:
 
 Reference remap records are explicit model intent. They do not silently rewrite sketches during JSON load.
 
-Sketch-origin overrides are stored as local 2D coordinates in the sketch's resolved workplane frame:
-
-```json
-{
-  "sketch_origin_overrides": [
-    {
-      "sketch": "sketch.top_references",
-      "local_origin": {"x": 0.0, "y": 0.0}
-    }
-  ]
-}
-```
+Sketch-origin overrides are stored as local 2D coordinates in the sketch's resolved workplane frame.
 
 Supported semantic target kinds are:
 
