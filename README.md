@@ -1,200 +1,119 @@
 # BLCAD
 
-BLCAD is planned as an independent parametric CAD system for Linux. The end goal is to store and recompute CAD model intent: parameters, sketches, features, semantic generated-face/edge/vertex references, projected sketch references, reference-driven sketch constraints, robust reference recovery metadata, dependencies, construction geometry, future multi-body part records, future body transforms, future path features, and later assembly relationships. OCCT is used as the geometry kernel, but OCCT shapes are treated as computed cache data, not as the primary model. The condensed target architecture is documented in `docs/architecture-summary.md`, and the explicit project goal is documented in `docs/project-goal.md`.
+BLCAD is a planned independent parametric CAD system for Linux. The project stores CAD model intent in BLCAD data structures and uses OCCT/Open CASCADE as the computed geometry kernel cache, not as the primary model.
 
-The current state is a deliberately small MVP-1 vertical slice plus executable MVP-2 seeds: sketch-plane-relative extrude directions, arbitrary construction-plane profile extrudes for supported profiles, derived workplanes, line-based closed profiles, composite closed profiles with inner holes, arc closed profiles, cubic-Bezier spline sketch segments, tangent-continuity metadata records, trim/extend metadata records, automatic single-region detection, explicit construction geometry, relation-driven construction geometry, semantic generated edge/vertex references, evaluated rectangular-extrude semantic references, deterministic construction-point and construction-line resolvers, projected sketch reference entities, first reference-driven sketch constraints, deterministic projected-reference helper evaluation, explicit reference status/remap records, sketch-origin override records, first-class reference-generated helper-line records, reference-generated helper-profile recompute, first sketch geometric constraints, first sketch driving dimensions, first non-solving sketch diagnostics, first non-mutating sketch repair suggestions, first explicit sketch repair commands for a safe subset, first in-memory sketch repair transactions with undo for the safe subset, first in-memory sketch repair undo stack, dimension-driven profile recompute, and the first chained construction-relation path. It contains base types for parameters, length quantities, error handling, a pure `PartDocument` model, datum planes, derived workplanes, construction points, construction lines, construction planes, construction relations, semantic face/edge/vertex references, semantic recovery targets, reference status records, reference remap records, sketches, sketch origin overrides, line segments, arc segments, spline segments, projected sketch points, projected sketch lines, sketch reference targets, sketch constraints, sketch geometric constraints, sketch driving dimensions, sketch diagnostics, sketch repair suggestion reports, sketch repair commands, sketch repair transactions, sketch repair undo stack results, sketch trim/extend operations, sketch tangent-continuity records, reference-generated lines, rectangle profiles, circle profiles, closed profiles, arc/spline-capable closed profiles, composite closed profiles, feature-intent data models, a dependency graph, invalidation state, recompute planning, JSON model persistence for line, arc, spline, tangent, composite, projected-reference, dimension, recovery, and construction records, debug JSON output for diagnostic and repair suggestion reports, optional OCCT geometry execution, top/bottom/right/left/front/back workplane resolution, sketch-aware workplane resolution, construction-plane workplane resolution, bounded face validation, incremental derived-workplane recompute, construction-geometry invalidation, projected-reference invalidation, reference-generated helper-line invalidation, driving-dimension invalidation, chained relation validation, line-based closed-profile additive/subtractive extrudes, arc/spline-profile additive/subtractive extrudes, reference-generated helper-profile additive/subtractive extrudes, dimension-driven closed-profile additive/subtractive extrudes, composite-profile additive/subtractive extrudes with holes, automatic-region additive/subtractive extrudes, and STEP export. There is no GUI yet.
+Detailed architecture and feature status live in `docs/`. This README is intentionally kept short.
 
-The optional `blcad_geometry` target contains OCCT adapters for rectangle extrusion, circular cuts, line-based closed-profile prism geometry, arc-profile prism geometry, Bezier-spline profile geometry, and faces with inner wires, a small `ShapeCache`, recompute execution for `AdditiveExtrude` and `SubtractiveExtrude`, a `WorkplaneResolver`, `SemanticReferenceEvaluator`, `ConstructionPointResolver`, `ConstructionLineResolver`, `SketchReferenceProjector`, `ReferenceDrivenSketchHelper`, `ReferenceGeneratedProfileResolver`, `DimensionDrivenProfileResolver`, `SketchRegionFinder`, full document recompute, incremental recompute, arbitrary-axis through-all circular cuts, arbitrary-axis closed-profile through-all cuts, arbitrary-axis arc/spline-profile through-all cuts, composite closed-profile extrudes/cuts with inner contours, explicit construction-plane resolution, offset construction-plane resolution, three-point construction-plane resolution, plane-parallel-through-point construction-plane resolution, sketch-origin override resolution through `resolve_for_sketch`, rectangular-extrude semantic generated edge/vertex evaluation, deterministic generated-reference point evaluation, deterministic construction-line evaluation, projected reference geometry evaluation, first projected-reference constraint evaluation, deterministic helper-line generation from two projected point constraints, reference-generated helper-line profile vertex resolution, driving-dimension profile vertex resolution, automatic simple-region detection from unordered local lines, direct additive/subtractive feature recompute from arc/spline profiles, direct additive/subtractive feature recompute from reference-generated helper profiles, direct additive/subtractive feature recompute from dimension-driven helper profiles, direct additive/subtractive feature recompute from composite profiles with holes, direct additive/subtractive feature recompute from detected simple regions, and STEP export for the final shape. Model intent can be serialized to `.blcad.json`, loaded again, recomputed into a fresh `ShapeCache`, validated against derived face bounds, updated incrementally through derived-workplane, construction-geometry, projected-reference, reference-generated helper-line, driving-dimension, and recovery-record dependencies, diagnosed through non-mutating sketch diagnostic reports, turned into non-mutating sketch repair suggestion reports, selectively repaired through explicit safe sketch repair commands, grouped into in-memory repair transactions, undone through an in-memory repair undo stack, and exported as STEP through a small headless command-line example.
+## Status
+
+Current state: MVP-1 core skeleton plus staged MVP-2 seeds for sketches, workplanes, profile geometry, recompute, STEP export, reference recovery, sketch diagnostics, and repair-command infrastructure.
+
+There is no GUI yet.
+
+For the full implementation sequence, see:
+
+```text
+docs/mvp-plan.md
+```
 
 ## Technical basis
 
-- Language: C++20
-- Build system: CMake with Ninja
-- Geometry kernel: OCCT / Open CASCADE Technology
-- Future GUI base: Qt 6
-- Math helper library: Eigen
-- File-format prototyping: nlohmann-json
-- Logging and formatting: spdlog, fmt
-- Tests: Catch2
+- C++20
+- CMake + Ninja
+- OCCT / Open CASCADE Technology
+- nlohmann-json
+- Catch2
+- Qt 6 planned for the future GUI
 
-## Project structure
+## Build and test
 
-- `docs/` contains architecture, MVP, and setup documents.
-- `include/blcad/` contains the public headers of the core skeleton.
-- `src/` contains the initial core and geometry implementation.
-- `tests/` contains Catch2 tests for the core and geometry layer.
-- `examples/` contains checked-in `.blcad.json` models and the headless export example.
-- `cmake/` is reserved for later CMake helper modules.
-- `assets/` is reserved for later UI and example resources.
-
-## Documentation
-
-- `docs/project-goal.md`: explicit long-term project goal
-- `docs/development-setup.md`: local setup and standard commands
-- `docs/architecture-summary.md`: architecture overview
-- `docs/json-serialization-mvp1.md`: JSON serialization of model intent, including arc, spline, tangent, direction, sketch dimensions, generated-region selections, composite profiles, reference-generated helper lines, and reference recovery metadata
-- `docs/json-file-workflow-mvp1.md`: `.blcad.json` file workflow and headless export example
-- `docs/derived-workplane-mvp2-seed.md`: semantic generated-face workplanes and sketches on generated planar faces
-- `docs/workplane-resolver-mvp2.md`: geometry-layer resolver for derived and construction workplanes, including sketch-origin overrides and projected sketch reference projection
-- `docs/sketch-plane-extrude-direction-mvp.md`: sketch-plane-relative feature direction, arbitrary construction-plane extrudes, and arbitrary-axis through-all cuts
-- `docs/general-closed-sketch-profile-mvp.md`: implemented first line-based closed-profile MVP and remaining future profile work
-- `docs/composite-closed-profile-holes-mvp.md`: composite closed profiles, inner contours, holes, and inner-wire geometry
-- `docs/arc-and-trim-extend-sketch-profile-mvp.md`: explicit arc segments, arc closed profiles, trim/extend metadata, JSON roundtrip, curved-contour validation, and arc-profile recompute
-- `docs/spline-and-tangent-continuity-mvp.md`: cubic-Bezier spline segments, tangent-continuity metadata, JSON roundtrip, and spline-profile recompute
-- `docs/sketch-solver-diagnostics-mvp.md`: first non-solving sketch diagnostics, warning/error report records, and debug JSON snapshots
-- `docs/sketch-repair-suggestions-mvp.md`: first non-mutating repair suggestions derived from sketch diagnostics
-- `docs/sketch-repair-commands-mvp.md`: first explicit safe repair application commands for selected repair suggestions
-- `docs/sketch-repair-transactions-mvp.md`: first in-memory repair transactions and undo support for the safe repair command subset
-- `docs/sketch-repair-undo-stack-mvp.md`: first in-memory LIFO repair undo stack for undoable repair transactions
-- `docs/multi-body-transform-and-path-features-roadmap.md`: future multi-body part files, body transforms, body booleans, sketch ownership during body transforms, path-following extrudes/cuts, and path/loft features
-- `docs/construction-geometry-mvp.md`: explicit construction geometry, relation-driven construction geometry, evaluated semantic generated edge/vertex refs, deterministic point/line resolvers, and chained relations
-- `docs/projected-sketch-reference-geometry.md`: projected construction and semantic references, first reference-driven sketch constraints, and sketch origin behavior
-- `docs/reference-recovery-mvp.md`: explicit lost-reference status, semantic remap intent, sketch-origin overrides, and recovery behavior
-- `docs/reference-generated-profile-helpers-mvp.md`: first-class reference-generated helper-line records, JSON, invalidation, profile resolver, and feature recompute integration
-- `docs/sketch-constraints-and-dimensions-mvp.md`: first explicit sketch constraints, driving dimensions, invalidation, and dimension-driven profile recompute
-- `docs/automatic-profile-region-detection-mvp.md`: deterministic single-region detection, generated profile candidates, and automatic-region recompute
-- `docs/mvp-plan.md`: MVP sequence
-- `docs/mvp-1-specification.md`: detailed MVP-1 specification
-- `docs/inventor-like-sketcher-and-feature-roadmap.md`: long-term Inventor-like sketcher and sketch-driven feature parity roadmap
-- `docs/advanced-surfacing-and-3d-sketch-mvp.md`: future block for 3D sketches, guide splines, sweeps, lofts, boundary surfaces, surface stitching, and closed-surface-to-solid workflows
-- `docs/semantic-references.md`: canonical rule for semantic non-topological references
-- `docs/parameter-model.md`, `docs/feature-system.md`, `docs/file-format.md`, `docs/user-interface.md`: long-term target model documents
-- `docs/decisions/`: architecture decision records
-
-## Current technical state
-
-The current core skeleton covers `Quantity`, typed IDs, `Error`, `Result`, `Parameter`, `PartDocument`, `DatumPlane`, `DerivedWorkplane`, `ConstructionPoint`, `ConstructionLine`, `ConstructionPlane`, `ConstructionRelation`, `SemanticFaceReference`, `SemanticEdgeReference`, `SemanticVertexReference`, `SemanticReferenceTarget`, `ReferenceStatusRecord`, `ReferenceRemapRecord`, `SketchOriginOverrideRecord`, `Sketch`, `LineSegment`, `ArcSegment`, `SplineSegment`, `ProjectedSketchPoint`, `ProjectedSketchLine`, `ReferenceGeneratedLine`, `SketchReferenceTarget`, `SketchConstraint`, `SketchGeometricConstraint`, `SketchDrivingDimension`, `SketchConstraintDiagnostic`, `SketchDiagnosticReport`, `SketchRepairSuggestion`, `SketchRepairSuggestionReport`, `SketchRepairCommand`, `SketchRepairCommandResult`, `SketchRepairTransaction`, `SketchRepairTransactionUndoResult`, `SketchRepairUndoStack`, `SketchRepairUndoStackResult`, `SketchTrimExtendOperation`, `SketchTangentContinuity`, `RectangleProfile`, `CircleProfile`, `ClosedProfile`, `ArcClosedProfile`, and `CompositeClosedProfile`, as well as `Feature`, `AdditiveExtrude`, `SubtractiveExtrude`, `DependencyGraph`, `InvalidationState`, and `RecomputePlan`. `PartDocument` validates workplane, profile, construction-geometry, construction-relation, generated edge/vertex, projected-reference, reference-generated helper-line, sketch-dimension, recovery-record, and feature references, creates graph nodes and graph edges from them, marks affected nodes after a parameter change, and derives an ordered recompute plan from that state.
-
-`ExtrudeDirection` is sketch-plane-relative. `sketch_normal` uses the resolved workplane normal; `opposite_sketch_normal` uses the inverse resolved normal. Legacy JSON `+Z` still loads as `sketch_normal`.
-
-`ArcSegment` stores a first explicit circular arc through three sketch-local points. `SplineSegment` stores a first explicit cubic-Bezier segment with two control points. `ArcClosedProfile` stores ordered explicit line/arc/spline curve IDs and validates deterministic end-to-start closure plus first line/line, line/arc, and arc/arc self-intersection cases. Spline interaction validation is conservative and currently uses chord-level approximation for unsupported exact spline intersections. `SketchTrimExtendOperation` stores explicit trim/extend metadata for line/arc/spline endpoints, and `SketchTangentContinuity` stores tangent intent between explicit sketch curves. These records serialize and deserialize through `.blcad.json`.
-
-`SketchConstraintDiagnostics` reports first non-solving sketch diagnostics. It emits warnings for unconstrained line endpoints, free spline control points, and profile sketches without driving dimensions. It emits errors for horizontal/vertical conflicts, duplicate fixed endpoint constraints, and duplicate driving dimensions on the same endpoint pair. Diagnostic reports can be serialized as debug/output JSON through `serialize_sketch_diagnostic_report_to_json`; they are not persisted as `PartDocument` model intent.
-
-`SketchRepairSuggester` converts supported diagnostics into first non-mutating repair suggestions. It can suggest adding fixed endpoint constraints, removing one side of horizontal/vertical conflicts, removing duplicate fixed endpoint constraints, removing duplicate driving dimensions, and adding a driving dimension to profile sketches with no dimension intent. Suggestion reports can be serialized as debug/output JSON through `serialize_sketch_repair_suggestion_report_to_json`; they are not persisted as `PartDocument` model intent and do not mutate sketches automatically.
-
-`SketchRepairCommandExecutor` applies one explicitly selected safe repair command. The implemented safe subset adds deterministic fixed endpoint constraints, removes duplicate fixed endpoint constraints, and removes duplicate driving dimensions. Unsupported suggestions such as add-driving-dimension and choose-a-side orientation conflict removal are skipped with a structured command result. Commands never run automatically during diagnostics or suggestion generation.
-
-`SketchRepairTransactionExecutor` wraps an explicit repair command application in an in-memory transaction. It records only affected before/after records, not a full sketch snapshot, and can undo the safe command subset: remove a fixed endpoint constraint that was added by a repair, restore removed duplicate fixed endpoint constraints, and restore removed duplicate driving dimensions. Transactions are not serialized to `.blcad.json` and are not run automatically.
-
-`SketchRepairUndoStack` stores undoable repair transactions in memory and undoes them in strict LIFO order through `SketchRepairTransactionExecutor::undo`. It rejects non-undoable transactions, reports empty-stack undo without mutation, and returns structured stack results with remaining stack size. It is not a persistent journal, redo stack, or GUI history model.
-
-Future multi-body and path-feature model intent is documented but not implemented. The target includes multiple `Body` records inside one `PartDocument`, translate/rotate/scale `BodyTransform` records, body booleans, optional movement of owned sketch workplanes when a body is transformed, connected `PathCurve` records, path-following extrude/cut, and lofts through two or more sketches on arbitrary planes.
-
-The optional geometry build resolves sketch workplanes before executing subtractive cuts and before executing line-based, arc-based, or spline-based closed-profile geometry. `ClosedProfileAdapter` can build OCCT wires from straight line edges, circular-arc edges, and cubic-Bezier edges and can use those wires for additive extrudes and subtractive through-all cuts.
-
-Still not implemented: multiple bodies in one part file, body transforms, body booleans, path-following extrude/cut, loft, full spline editing, NURBS weights, tangent constraint solving, automatic fillets, trim/extend solving or geometry rewriting, mixed explicit-line/reference-generated-line closed profiles, full automatic multi-region selection, a full sketch constraint solver, exact degrees-of-freedom counting, redo for repair transactions, persistent transaction journals, undo-stack summaries, GUI diagnostic highlighting, automatic profile topology from projected references without helper constraints, GUI reference-remapping dialogs, automatic topology matching after arbitrary edits, GUI sketch editing, arbitrary non-planar sketch geometry, arbitrary generated edge/vertex topology evaluation, analytic generated-surface construction references, revolve, revolve cut, 3D guide curves, boundary surfaces, surface stitching, or closed-shell-to-solid conversion.
-
-The persistence path is file-based: `serialize_part_document_to_json` and `deserialize_part_document_from_json` handle in-memory model-intent JSON, while `write_part_document_json_file` and `read_part_document_json_file` handle `.blcad.json` files. The checked-in example models can be loaded by `blcad_export_step`, recomputed through the geometry layer, validated, and exported as STEP.
-
-## Headless examples
-
-Run core configure, build, and tests in one command:
+Run core configure, build, and tests:
 
 ```bash
 cmake --workflow --preset dev-build-test
 ```
 
-Run geometry configure, build, and tests in one command:
+Run geometry configure, build, and tests:
 
 ```bash
 cmake --workflow --preset dev-geometry-build-test
 ```
 
-Build the geometry preset manually:
+Manual geometry build:
 
 ```bash
 cmake --preset dev-geometry
 cmake --build --preset dev-geometry
 ```
 
-Export the MVP-1 reference model:
-
-```bash
-./build/dev-geometry/blcad_export_step examples/reference_plate.blcad.json build/reference_plate.step
-```
-
-Export the derived-workplane models:
-
-```bash
-./build/dev-geometry/blcad_export_step examples/top_face_cut.blcad.json build/top_face_cut.step
-./build/dev-geometry/blcad_export_step examples/bottom_face_cut.blcad.json build/bottom_face_cut.step
-./build/dev-geometry/blcad_export_step examples/right_face_cut.blcad.json build/right_face_cut.step
-./build/dev-geometry/blcad_export_step examples/left_face_cut.blcad.json build/left_face_cut.step
-./build/dev-geometry/blcad_export_step examples/front_face_cut.blcad.json build/front_face_cut.step
-./build/dev-geometry/blcad_export_step examples/back_face_cut.blcad.json build/back_face_cut.step
-```
-
-Export the closed-profile, composite-profile, construction-plane, arc, and spline models:
-
-```bash
-./build/dev-geometry/blcad_export_step examples/triangle_prism.blcad.json build/triangle_prism.step
-./build/dev-geometry/blcad_export_step examples/triangle_cut_plate.blcad.json build/triangle_cut_plate.step
-./build/dev-geometry/blcad_export_step examples/construction_plane_prism.blcad.json build/construction_plane_prism.step
-./build/dev-geometry/blcad_export_step examples/arc_profile_prism.blcad.json build/arc_profile_prism.step
-./build/dev-geometry/blcad_export_step examples/spline_profile_prism.blcad.json build/spline_profile_prism.step
-```
-
-Load the generated-reference and projected-reference example models:
-
-```bash
-./build/dev-geometry/blcad_export_step examples/generated_semantic_references.blcad.json build/generated_semantic_references.step
-./build/dev-geometry/blcad_export_step examples/projected_sketch_references.blcad.json build/projected_sketch_references.step
-```
-
-Depending on the local CMake preset output directory, the executable path may differ. The command shape is:
+## Headless STEP export
 
 ```text
 blcad_export_step <input.blcad.json> <output.step>
 ```
 
+Example:
+
+```bash
+./build/dev-geometry/blcad_export_step examples/reference_plate.blcad.json build/reference_plate.step
+```
+
+## Repository structure
+
+- `include/blcad/`: public headers
+- `src/`: core and optional geometry implementation
+- `tests/`: Catch2 tests
+- `examples/`: `.blcad.json` example models and headless export example
+- `docs/`: architecture, MVP, and roadmap documents
+
+## Key documents
+
+Start here:
+
+- `docs/project-goal.md`
+- `docs/architecture-summary.md`
+- `docs/mvp-plan.md`
+- `docs/development-setup.md`
+- `docs/json-serialization-mvp1.md`
+- `docs/json-file-workflow-mvp1.md`
+
+Implemented feature blocks:
+
+- `docs/general-closed-sketch-profile-mvp.md`
+- `docs/composite-closed-profile-holes-mvp.md`
+- `docs/arc-and-trim-extend-sketch-profile-mvp.md`
+- `docs/spline-and-tangent-continuity-mvp.md`
+- `docs/sketch-plane-extrude-direction-mvp.md`
+- `docs/derived-workplane-mvp2-seed.md`
+- `docs/workplane-resolver-mvp2.md`
+- `docs/construction-geometry-mvp.md`
+- `docs/projected-sketch-reference-geometry.md`
+- `docs/reference-recovery-mvp.md`
+- `docs/reference-generated-profile-helpers-mvp.md`
+- `docs/sketch-constraints-and-dimensions-mvp.md`
+- `docs/automatic-profile-region-detection-mvp.md`
+- `docs/sketch-solver-diagnostics-mvp.md`
+- `docs/sketch-repair-suggestions-mvp.md`
+- `docs/sketch-repair-commands-mvp.md`
+- `docs/sketch-repair-transactions-mvp.md`
+- `docs/sketch-repair-undo-stack-mvp.md`
+- `docs/sketch-repair-undo-stack-summary-mvp.md`
+
+Future roadmaps:
+
+- `docs/multi-body-transform-and-path-features-roadmap.md`
+- `docs/inventor-like-sketcher-and-feature-roadmap.md`
+- `docs/advanced-surfacing-and-3d-sketch-mvp.md`
+
 ## Next technical step
 
-The next technical step should add non-mutating sketch repair undo-stack summaries.
+The next technical step should add a sketch repair command label seed.
 
-1. Add a `SketchRepairUndoStackSummary` or equivalent read-only report for current stack contents.
-2. Expose stack depth, latest transaction action, latest target, and per-entry transaction status/action/target.
-3. Keep summaries independent from `.blcad.json`; they are UI/CLI inspection output, not model intent.
-4. Add optional debug JSON output for stack summaries, similar to diagnostics and repair suggestions.
-5. Add core tests that push multiple transactions and verify stable summary ordering without undoing.
-6. Keep redo, persistent journals, multi-sketch stack coordination, GUI widgets, command grouping, transaction squashing, parameter-creating repairs, full solve iteration, exact DOF counting, and arbitrary model rewriting deferred.
+1. Add a `SketchRepairCommandLabeler` or equivalent non-mutating helper.
+2. Map repair actions and undo-stack summary entries to stable titles and short descriptions.
+3. Keep labels separate from model intent and `.blcad.json`; labels are UI/CLI presentation data.
+4. Include labels in stack summary debug JSON without changing undo behavior.
+5. Add core tests for deterministic labels for all current safe and unsupported repair actions.
+6. Keep localization, GUI widgets, redo, persistent history, timestamps, parameter-creating repairs, full solve iteration, exact DOF counting, and arbitrary model rewriting deferred.
 
-The completed sketch repair undo stack block is documented in `docs/sketch-repair-undo-stack-mvp.md`.
-
-The completed sketch repair transaction and undo block is documented in `docs/sketch-repair-transactions-mvp.md`.
-
-The completed sketch repair command block is documented in `docs/sketch-repair-commands-mvp.md`.
-
-The completed sketch repair suggestion block is documented in `docs/sketch-repair-suggestions-mvp.md`.
-
-The completed sketch solver diagnostics block is documented in `docs/sketch-solver-diagnostics-mvp.md`.
-
-The completed spline and tangent-continuity block is documented in `docs/spline-and-tangent-continuity-mvp.md`.
-
-The completed sketch-plane extrude direction block is documented in `docs/sketch-plane-extrude-direction-mvp.md`.
-
-The completed arc and trim/extend sketch profile block is documented in `docs/arc-and-trim-extend-sketch-profile-mvp.md`.
-
-The completed composite closed profile and holes block is documented in `docs/composite-closed-profile-holes-mvp.md`.
-
-The completed automatic profile region detection block is documented in `docs/automatic-profile-region-detection-mvp.md`.
-
-The completed sketch constraints and dimensions block is documented in `docs/sketch-constraints-and-dimensions-mvp.md`.
-
-The completed reference-generated profile helper block is documented in `docs/reference-generated-profile-helpers-mvp.md`.
-
-The completed robust reference recovery block is documented in `docs/reference-recovery-mvp.md`.
-
-The completed projected sketch reference and first reference-driven constraint block is documented in `docs/projected-sketch-reference-geometry.md`.
-
-The completed construction-geometry and semantic-reference block is documented in `docs/construction-geometry-mvp.md`.
-
-The completed first line-based closed-profile block is documented in `docs/general-closed-sketch-profile-mvp.md`.
-
-The future multi-body, body-transform, body-boolean, path-extrude, and loft target is documented in `docs/multi-body-transform-and-path-features-roadmap.md`.
-
-The long-term Inventor-like sketcher and sketch-driven feature parity roadmap is documented in `docs/inventor-like-sketcher-and-feature-roadmap.md`.
-
-A separate later block for 3D sketches, guide splines, sweep, loft, boundary surfaces, surface stitching, and closed-surface-to-solid conversion is documented in `docs/advanced-surfacing-and-3d-sketch-mvp.md`.
-
-The detailed MVP-1 specification is in `docs/mvp-1-specification.md`.
+The completed undo stack summary block is documented in `docs/sketch-repair-undo-stack-summary-mvp.md`.
