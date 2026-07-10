@@ -1,6 +1,6 @@
 # JSON Serialization
 
-Status: core serialization for `PartDocument` model intent, including file-level helpers, derived workplanes, line-based closed sketch profiles, explicit construction geometry, relation-driven construction geometry, relation-driven construction points, chained construction relations, semantic generated edge/vertex references, projected sketch reference entities, first reference-driven sketch constraints, first-class reference-generated sketch helper lines, sketch geometric constraints, sketch driving dimensions, generated-region profile selections, reference recovery metadata, reference remap records, and sketch-origin override records.
+Status: core serialization for `PartDocument` model intent, including file-level helpers, derived workplanes, line-based closed sketch profiles, composite closed profiles with inner contours, explicit construction geometry, relation-driven construction geometry, relation-driven construction points, chained construction relations, semantic generated edge/vertex references, projected sketch reference entities, first reference-driven sketch constraints, first-class reference-generated sketch helper lines, sketch geometric constraints, sketch driving dimensions, generated-region profile selections, reference recovery metadata, reference remap records, and sketch-origin override records.
 
 The JSON serialization layer persists model intent only. It does not serialize OCCT shapes, `GeometryShape`, `ShapeCache` contents, raw face IDs, raw edge IDs, raw vertex IDs, BRep handles, resolved projected coordinates, solver state, automatic region-search caches, or exported STEP data.
 
@@ -8,7 +8,7 @@ The JSON serialization layer persists model intent only. It does not serialize O
 
 The goal is to make a `PartDocument` reproducible from a textual representation:
 
-1. Build a `PartDocument` with parameters, datum planes, construction geometry, construction relations, derived workplanes, sketches, sketch entities, projected sketch reference entities, reference-generated sketch helper lines, reference-driven sketch constraints, sketch geometric constraints, sketch driving dimensions, selected generated-region profiles, reference recovery records, profiles, and features.
+1. Build a `PartDocument` with parameters, datum planes, construction geometry, construction relations, derived workplanes, sketches, sketch entities, projected sketch reference entities, reference-generated sketch helper lines, reference-driven sketch constraints, sketch geometric constraints, sketch driving dimensions, selected generated-region profiles, composite closed profiles, reference recovery records, profiles, and features.
 2. Serialize that model intent to JSON.
 3. Optionally write the JSON as a `.blcad.json` model file.
 4. Rebuild the `PartDocument` from JSON through the normal validated construction APIs.
@@ -38,6 +38,7 @@ The current JSON format stores:
 - sketch geometric constraints
 - sketch driving dimensions
 - selected generated-region profile intent as normal `closed_profiles`
+- composite closed profiles with `outer_contour` and `inner_contours`
 - reference status records
 - reference remap records
 - sketch-origin override records
@@ -181,6 +182,22 @@ Automatically detected regions are not serialized as solver caches. If the user 
     {
       "id": "generated.region.sketch.main.0",
       "line_segments": ["line.a", "line.b", "line.c", "line.d"]
+    }
+  ]
+}
+```
+
+Composite closed profiles are stored as explicit contour intent. The JSON stores one ordered `outer_contour` plus one or more ordered `inner_contours`:
+
+```json
+{
+  "composite_closed_profiles": [
+    {
+      "id": "profile.plate_with_hole",
+      "outer_contour": ["outer.bottom", "outer.right", "outer.top", "outer.left"],
+      "inner_contours": [
+        ["hole.bottom", "hole.right", "hole.top", "hole.left"]
+      ]
     }
   ]
 }
