@@ -224,7 +224,7 @@ TEST_CASE("GeometryRecomputeExecutor rejects unsupported additive sketches",
   CHECK(executed.error().category() == ErrorCategory::Validation);
   CHECK(executed.error().object_id() == "sketch.base");
   CHECK(executed.error().message() ==
-        "additive extrude requires exactly one rectangle or closed profile");
+        "additive extrude requires exactly one rectangle, closed profile, or detected simple region");
   CHECK(cache.feature_shape_count() == 0);
   CHECK_FALSE(cache.has_final_shape());
 }
@@ -331,6 +331,6 @@ TEST_CASE("GeometryRecomputeExecutor rejects unsupported subtractive sketches",
   CHECK(executed.error().category() == ErrorCategory::Validation);
   CHECK(executed.error().object_id() == "sketch.base");
   CHECK(executed.error().message() ==
-        "subtractive extrude requires exactly one circle or closed profile");
+        "subtractive extrude requires exactly one circle, closed profile, or detected simple region");
   CHECK_FALSE(cache.has_final_shape());
 }
