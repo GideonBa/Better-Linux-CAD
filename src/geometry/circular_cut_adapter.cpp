@@ -17,14 +17,12 @@
 #include <memory>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace blcad::geometry {
 namespace {
 
 constexpr const char* kCircularCutId = "geometry.circular_cut";
-
-// Ueberstand der Schneidgeometrie ueber die Zielgrenzen hinaus. Er stellt einen
-// sauberen `through_all`-Cut sicher, auch bei Rundungsfehlern an den Deckflaechen.
 constexpr double kThroughAllMargin = 1.0;
 constexpr double kAxisTolerance = 1.0e-9;
 
@@ -34,10 +32,7 @@ constexpr double kAxisTolerance = 1.0e-9;
 
 [[nodiscard]] std::string standard_failure_message(const Standard_Failure& failure) {
   const char* const message = failure.GetMessageString();
-  if (message == nullptr || *message == '\0') {
-    return "OCCT operation failed";
-  }
-
+  if (message == nullptr || *message == '\0') return "OCCT operation failed";
   return message;
 }
 
@@ -46,39 +41,62 @@ struct CutAxisPlacement {
   double height = 0.0;
 };
 
+[[nodiscard]] double dot(Point3 point, Vector3 axis) noexcept {
+  return point.x * axis.x + point.y * axis.y + point.z * axis.z;
+}
+
+[[nodiscard]] double length(Vector3 vector) noexcept {
+  return std::sqrt(vector.x * vector.x + vector.y * vector.y + vector.z * vector.z);
+}
+
+[[nodiscard]] Result<Vector3> normalize_axis(Vector3 direction) {
+  const double axis_length = length(direction);
+  if (axis_length <= kAxisTolerance) {
+    return Result<Vector3>::failure(make_geometry_error("circular cut axis must not be zero length"));
+  }
+  return Result<Vector3>::success(Vector3{direction.x / axis_length, direction.y / axis_length,
+                                          direction.z / axis_length});
+}
+
+[[nodiscard]] std::vector<Point3> bounding_box_corners(double x_min, double y_min, double z_min,
+                                                       double x_max, double y_max, double z_max) {
+  return {Point3{x_min, y_min, z_min}, Point3{x_min, y_min, z_max},
+          Point3{x_min, y_max, z_min}, Point3{x_min, y_max, z_max},
+          Point3{x_max, y_min, z_min}, Point3{x_max, y_min, z_max},
+          Point3{x_max, y_max, z_min}, Point3{x_max, y_max, z_max}};
+}
+
 [[nodiscard]] Result<CutAxisPlacement> make_cut_axis(Point3 center, Vector3 direction,
                                                      double x_min, double y_min, double z_min,
                                                      double x_max, double y_max, double z_max) {
-  const double abs_x = std::abs(direction.x);
-  const double abs_y = std::abs(direction.y);
-  const double abs_z = std::abs(direction.z);
+  auto axis = normalize_axis(direction);
+  if (axis.has_error()) return Result<CutAxisPlacement>::failure(axis.error());
 
-  if (abs_x > 1.0 - kAxisTolerance && abs_y < kAxisTolerance && abs_z < kAxisTolerance) {
-    const double sign = direction.x >= 0.0 ? 1.0 : -1.0;
-    const double base_x = sign > 0.0 ? x_min - kThroughAllMargin : x_max + kThroughAllMargin;
-    return Result<CutAxisPlacement>::success(CutAxisPlacement{
-        gp_Ax2(gp_Pnt(base_x, center.y, center.z), gp_Dir(sign, 0.0, 0.0)),
-        (x_max - x_min) + 2.0 * kThroughAllMargin});
+  double min_projection = 0.0;
+  double max_projection = 0.0;
+  bool first = true;
+  for (const Point3 corner : bounding_box_corners(x_min, y_min, z_min, x_max, y_max, z_max)) {
+    const double projection = dot(corner, axis.value());
+    if (first) {
+      min_projection = projection;
+      max_projection = projection;
+      first = false;
+    } else {
+      min_projection = std::min(min_projection, projection);
+      max_projection = std::max(max_projection, projection);
+    }
   }
 
-  if (abs_y > 1.0 - kAxisTolerance && abs_x < kAxisTolerance && abs_z < kAxisTolerance) {
-    const double sign = direction.y >= 0.0 ? 1.0 : -1.0;
-    const double base_y = sign > 0.0 ? y_min - kThroughAllMargin : y_max + kThroughAllMargin;
-    return Result<CutAxisPlacement>::success(CutAxisPlacement{
-        gp_Ax2(gp_Pnt(center.x, base_y, center.z), gp_Dir(0.0, sign, 0.0)),
-        (y_max - y_min) + 2.0 * kThroughAllMargin});
-  }
+  const double center_projection = dot(center, axis.value());
+  const double base_projection = min_projection - kThroughAllMargin;
+  const double delta = base_projection - center_projection;
+  const Point3 base{center.x + axis.value().x * delta, center.y + axis.value().y * delta,
+                    center.z + axis.value().z * delta};
 
-  if (abs_z > 1.0 - kAxisTolerance && abs_x < kAxisTolerance && abs_y < kAxisTolerance) {
-    const double sign = direction.z >= 0.0 ? 1.0 : -1.0;
-    const double base_z = sign > 0.0 ? z_min - kThroughAllMargin : z_max + kThroughAllMargin;
-    return Result<CutAxisPlacement>::success(CutAxisPlacement{
-        gp_Ax2(gp_Pnt(center.x, center.y, base_z), gp_Dir(0.0, 0.0, sign)),
-        (z_max - z_min) + 2.0 * kThroughAllMargin});
-  }
-
-  return Result<CutAxisPlacement>::failure(
-      make_geometry_error("circular cut axis must be one of the principal axes"));
+  return Result<CutAxisPlacement>::success(CutAxisPlacement{
+      gp_Ax2(gp_Pnt(base.x, base.y, base.z),
+             gp_Dir(axis.value().x, axis.value().y, axis.value().z)),
+      (max_projection - min_projection) + 2.0 * kThroughAllMargin});
 }
 
 } // namespace
@@ -124,9 +142,7 @@ Result<GeometryShape> CircularCutAdapter::cut_circular_hole_along_axis(
 
     const auto cut_axis = make_cut_axis(center, axis_direction, x_min, y_min, z_min, x_max, y_max,
                                         z_max);
-    if (cut_axis.has_error()) {
-      return Result<GeometryShape>::failure(cut_axis.error());
-    }
+    if (cut_axis.has_error()) return Result<GeometryShape>::failure(cut_axis.error());
 
     const double radius = diameter_mm / 2.0;
     BRepPrimAPI_MakeCylinder cylinder_builder(cut_axis.value().axis, radius,
@@ -143,9 +159,7 @@ Result<GeometryShape> CircularCutAdapter::cut_circular_hole_along_axis(
     }
 
     TopoDS_Shape shape = cut_builder.Shape();
-    if (shape.IsNull()) {
-      return Result<GeometryShape>::failure(make_geometry_error("cut produced an empty shape"));
-    }
+    if (shape.IsNull()) return Result<GeometryShape>::failure(make_geometry_error("cut produced an empty shape"));
 
     return Result<GeometryShape>::success(
         GeometryShape(std::make_shared<GeometryShape::Impl>(std::move(shape))));
