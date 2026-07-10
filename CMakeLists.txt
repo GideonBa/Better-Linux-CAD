@@ -64,6 +64,7 @@ endif()
 if(BLCAD_BUILD_GEOMETRY)
   add_library(
     blcad_geometry STATIC
+    src/geometry/arc_closed_profile_adapter.cpp
     src/geometry/circular_cut_adapter.cpp
     src/geometry/closed_profile_adapter.cpp
     src/geometry/construction_line_resolver.cpp
