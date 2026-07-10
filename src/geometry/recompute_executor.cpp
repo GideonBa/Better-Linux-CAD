@@ -38,6 +38,14 @@ struct GlobalCompositeProfileVertices {
   return document.find_parameter(parameter_id);
 }
 
+[[nodiscard]] Vector3 extrude_direction_vector(const ResolvedWorkplane& workplane,
+                                               ExtrudeDirection direction) noexcept {
+  if (direction == ExtrudeDirection::OppositeSketchNormal) {
+    return Vector3{-workplane.normal.x, -workplane.normal.y, -workplane.normal.z};
+  }
+  return workplane.normal;
+}
+
 [[nodiscard]] bool has_no_profiles(const Sketch& sketch) noexcept {
   return sketch.rectangle_profiles().empty() && sketch.circle_profiles().empty() &&
          sketch.closed_profiles().empty() && sketch.arc_closed_profiles().empty() &&
@@ -111,6 +119,18 @@ struct GlobalCompositeProfileVertices {
         object_id, "closed profile vertices must lie inside resolved workplane bounds"));
   }
   return Result<std::size_t>::success(0);
+}
+
+[[nodiscard]] std::vector<Point2> rectangle_local_vertices(const RectangleProfile& rectangle,
+                                                           const Quantity& width,
+                                                           const Quantity& height) {
+  const Point2 center = rectangle.center();
+  const double half_width = width.millimeters() / 2.0;
+  const double half_height = height.millimeters() / 2.0;
+  return {Point2{center.x - half_width, center.y - half_height},
+          Point2{center.x + half_width, center.y - half_height},
+          Point2{center.x + half_width, center.y + half_height},
+          Point2{center.x - half_width, center.y + half_height}};
 }
 
 [[nodiscard]] Result<Point3> evaluate_bounded_circle_center(const WorkplaneResolver& resolver,
@@ -343,7 +363,12 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_additive_extrude(
     if (width == nullptr) return Result<std::size_t>::failure(validation_error(rectangle.width_parameter().value(), "rectangle width parameter must exist in part document"));
     const Parameter* height = find_required_parameter(document, rectangle.height_parameter());
     if (height == nullptr) return Result<std::size_t>::failure(validation_error(rectangle.height_parameter().value(), "rectangle height parameter must exist in part document"));
-    auto shape = rectangle_extrusion_adapter_.make_extruded_rectangle(width->value(), height->value(), thickness->value());
+    auto resolved_workplane = workplane_resolver_.resolve_for_sketch(document, *sketch);
+    if (resolved_workplane.has_error()) return Result<std::size_t>::failure(resolved_workplane.error());
+    auto vertices = map_bounded_local_vertices(workplane_resolver_, resolved_workplane.value(), rectangle.id().value(), rectangle_local_vertices(rectangle, width->value(), height->value()));
+    if (vertices.has_error()) return Result<std::size_t>::failure(vertices.error());
+    auto shape = closed_profile_adapter_.make_extruded_profile(
+        vertices.value(), extrude_direction_vector(resolved_workplane.value(), feature->direction()), thickness->value());
     if (shape.has_error()) return Result<std::size_t>::failure(shape.error());
     return shape_cache.set_final_shape(feature->id(), std::move(shape.value()));
   }
@@ -352,24 +377,21 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_additive_extrude(
       has_exactly_one_arc_closed_profile(*sketch) || has_exactly_one_composite_closed_profile(*sketch)) {
     auto resolved_workplane = workplane_resolver_.resolve_for_sketch(document, *sketch);
     if (resolved_workplane.has_error()) return Result<std::size_t>::failure(resolved_workplane.error());
+    const Vector3 direction = extrude_direction_vector(resolved_workplane.value(), feature->direction());
 
     if (has_exactly_one_arc_closed_profile(*sketch)) {
       auto curves = evaluate_bounded_arc_profile_curves(workplane_resolver_, resolved_workplane.value(), *sketch,
                                                         sketch->arc_closed_profiles().front());
       if (curves.has_error()) return Result<std::size_t>::failure(curves.error());
-      auto shape = closed_profile_adapter_.make_extruded_profile_from_curves(
-          curves.value(), resolved_workplane.value().normal, thickness->value());
+      auto shape = closed_profile_adapter_.make_extruded_profile_from_curves(curves.value(), direction, thickness->value());
       if (shape.has_error()) return Result<std::size_t>::failure(shape.error());
       return shape_cache.set_final_shape(feature->id(), std::move(shape.value()));
     }
 
     if (has_exactly_one_composite_closed_profile(*sketch)) {
-      auto vertices = evaluate_bounded_composite_profile_vertices(document, workplane_resolver_,
-                                                                  resolved_workplane.value(), *sketch,
-                                                                  sketch->composite_closed_profiles().front());
+      auto vertices = evaluate_bounded_composite_profile_vertices(document, workplane_resolver_, resolved_workplane.value(), *sketch, sketch->composite_closed_profiles().front());
       if (vertices.has_error()) return Result<std::size_t>::failure(vertices.error());
-      auto shape = closed_profile_adapter_.make_extruded_profile_with_holes(
-          vertices.value().outer, vertices.value().inner, resolved_workplane.value().normal, thickness->value());
+      auto shape = closed_profile_adapter_.make_extruded_profile_with_holes(vertices.value().outer, vertices.value().inner, direction, thickness->value());
       if (shape.has_error()) return Result<std::size_t>::failure(shape.error());
       return shape_cache.set_final_shape(feature->id(), std::move(shape.value()));
     }
@@ -378,8 +400,7 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_additive_extrude(
                                                ? evaluate_bounded_closed_profile_vertices(document, workplane_resolver_, resolved_workplane.value(), *sketch, sketch->closed_profiles().front())
                                                : evaluate_bounded_detected_region_vertices(document, workplane_resolver_, resolved_workplane.value(), *sketch);
     if (vertices.has_error()) return Result<std::size_t>::failure(vertices.error());
-    auto shape = closed_profile_adapter_.make_extruded_profile(vertices.value(), resolved_workplane.value().normal,
-                                                               thickness->value());
+    auto shape = closed_profile_adapter_.make_extruded_profile(vertices.value(), direction, thickness->value());
     if (shape.has_error()) return Result<std::size_t>::failure(shape.error());
     return shape_cache.set_final_shape(feature->id(), std::move(shape.value()));
   }
@@ -404,6 +425,7 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_subtractive_extrude(
   if (target == nullptr) return Result<std::size_t>::failure(geometry_error(feature->target_feature().value(), "target feature shape must exist in the shape cache"));
   auto resolved_workplane = workplane_resolver_.resolve_for_sketch(document, *sketch);
   if (resolved_workplane.has_error()) return Result<std::size_t>::failure(resolved_workplane.error());
+  const Vector3 direction = extrude_direction_vector(resolved_workplane.value(), feature->direction());
 
   if (has_exactly_one_circle_profile(*sketch)) {
     const CircleProfile& circle = sketch->circle_profiles().front();
@@ -411,7 +433,7 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_subtractive_extrude(
     if (diameter == nullptr) return Result<std::size_t>::failure(validation_error(circle.diameter_parameter().value(), "circle diameter parameter must exist in part document"));
     auto global_center = evaluate_bounded_circle_center(workplane_resolver_, resolved_workplane.value(), circle, diameter->value());
     if (global_center.has_error()) return Result<std::size_t>::failure(global_center.error());
-    auto shape = circular_cut_adapter_.cut_circular_hole_along_axis(*target, diameter->value(), global_center.value(), resolved_workplane.value().normal);
+    auto shape = circular_cut_adapter_.cut_circular_hole_along_axis(*target, diameter->value(), global_center.value(), direction);
     if (shape.has_error()) return Result<std::size_t>::failure(shape.error());
     return shape_cache.set_final_shape(feature->id(), std::move(shape.value()));
   }
@@ -420,7 +442,7 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_subtractive_extrude(
     auto curves = evaluate_bounded_arc_profile_curves(workplane_resolver_, resolved_workplane.value(), *sketch,
                                                       sketch->arc_closed_profiles().front());
     if (curves.has_error()) return Result<std::size_t>::failure(curves.error());
-    auto shape = closed_profile_adapter_.cut_profile_curves_through_all(*target, curves.value(), resolved_workplane.value().normal);
+    auto shape = closed_profile_adapter_.cut_profile_curves_through_all(*target, curves.value(), direction);
     if (shape.has_error()) return Result<std::size_t>::failure(shape.error());
     return shape_cache.set_final_shape(feature->id(), std::move(shape.value()));
   }
@@ -428,7 +450,7 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_subtractive_extrude(
   if (has_exactly_one_composite_closed_profile(*sketch)) {
     auto vertices = evaluate_bounded_composite_profile_vertices(document, workplane_resolver_, resolved_workplane.value(), *sketch, sketch->composite_closed_profiles().front());
     if (vertices.has_error()) return Result<std::size_t>::failure(vertices.error());
-    auto shape = closed_profile_adapter_.cut_profile_with_holes_through_all(*target, vertices.value().outer, vertices.value().inner, resolved_workplane.value().normal);
+    auto shape = closed_profile_adapter_.cut_profile_with_holes_through_all(*target, vertices.value().outer, vertices.value().inner, direction);
     if (shape.has_error()) return Result<std::size_t>::failure(shape.error());
     return shape_cache.set_final_shape(feature->id(), std::move(shape.value()));
   }
@@ -437,7 +459,7 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_subtractive_extrude(
                                              ? evaluate_bounded_closed_profile_vertices(document, workplane_resolver_, resolved_workplane.value(), *sketch, sketch->closed_profiles().front())
                                              : evaluate_bounded_detected_region_vertices(document, workplane_resolver_, resolved_workplane.value(), *sketch);
   if (vertices.has_error()) return Result<std::size_t>::failure(vertices.error());
-  auto shape = closed_profile_adapter_.cut_profile_through_all(*target, vertices.value(), resolved_workplane.value().normal);
+  auto shape = closed_profile_adapter_.cut_profile_through_all(*target, vertices.value(), direction);
   if (shape.has_error()) return Result<std::size_t>::failure(shape.error());
   return shape_cache.set_final_shape(feature->id(), std::move(shape.value()));
 }
