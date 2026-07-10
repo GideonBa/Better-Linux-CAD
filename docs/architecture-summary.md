@@ -4,7 +4,7 @@ Source: condensed from the current repository architecture documents.
 
 ## Goal
 
-BLCAD is intended to become an independent parametric CAD system for Linux. The model does not only store final BRep geometry, but the underlying design intent: parameters, sketches, features, dependencies, semantic references, construction geometry, 3D curves, surfaces, and later assembly relationships. The explicit long-term goal is also recorded in `docs/project-goal.md`.
+BLCAD is intended to become an independent parametric CAD system for Linux. The model does not only store final BRep geometry, but the underlying design intent: parameters, sketches, features, dependencies, semantic references, construction geometry, 3D curves, surfaces, multi-body part records, body transforms, body booleans, and later assembly relationships. The explicit long-term goal is also recorded in `docs/project-goal.md`.
 
 ## Fundamental decision
 
@@ -21,6 +21,7 @@ BLCAD is intended to become an independent parametric CAD system for Linux. The 
 - Parametric core
 - Sketch and constraint layer
 - Construction geometry and datum-relation layer
+- Multi-body part layer
 - 3D sketch and surfacing layer
 - Assembly layer
 - Engineering modules
@@ -47,10 +48,19 @@ BLCAD is intended to become an independent parametric CAD system for Linux. The 
 - `ConstructionLine` / `DatumAxis`
 - `ConstructionPlane`
 - future `ConstructionRelation`
+- `BodyId`
+- `Body`
+- `BodyTransform`
+- `BodyTransformStack`
+- `BodyBooleanFeature`
+- `SketchOwnership`
+- `PathCurve`
+- `PathSegmentReference`
+- `ProfileSectionReference`
 - `SketchPoint3D`
 - `SketchCurve3D`
 - `GuideCurve`
-- `Feature`, including `RevolveFeature`, `RevolveCutFeature`, `LoftFeature`, `SweepFeature`, `SurfaceStitchFeature`, `FilletFeature`, and `ChamferFeature`
+- `Feature`, including `RevolveFeature`, `RevolveCutFeature`, `PathExtrudeFeature`, `PathCutFeature`, `SweepFeature`, `LoftFeature`, `LoftCutFeature`, `SurfaceStitchFeature`, `FilletFeature`, and `ChamferFeature`
 - `FeatureReference`
 - `DependencyGraph`
 - `ShapeCache`
@@ -116,7 +126,7 @@ The first general closed-profile step is implemented:
 - `examples/triangle_prism.blcad.json` demonstrates a non-rectangular additive prism.
 - `examples/triangle_cut_plate.blcad.json` demonstrates a non-circular through-all cut.
 
-Still intentionally missing: arcs, splines, automatic region detection, multiple contours, inner holes in one profile, a full sketch constraint solver, and GUI sketch editing.
+Still intentionally missing: automatic multi-body inference, full automatic region detection for complex profiles, a full sketch constraint solver, and GUI sketch editing.
 
 ## Implemented explicit construction geometry
 
@@ -135,7 +145,27 @@ The first construction-geometry step is implemented:
 - `WorkplaneResolver` resolves explicit construction planes into `ResolvedWorkplane` frames.
 - `examples/construction_plane_prism.blcad.json` demonstrates a closed-profile sketch on a construction plane.
 
-Still intentionally missing: relation-driven construction definitions, expression-evaluated coordinate placement, references to generated semantic edges/vertices, GUI manipulators, assembly-level construction geometry, and surface-based construction geometry.
+Still intentionally missing: expression-evaluated coordinate placement, surface-based construction geometry, GUI manipulators, and assembly-level construction geometry.
+
+## Future multi-body part modeling, transforms, and path features
+
+The target multi-body feature layer is documented in `docs/multi-body-transform-and-path-features-roadmap.md`.
+
+The intended capability is:
+
+- one `PartDocument` can contain multiple `Body` records
+- each body has stable `BodyId` identity independent from transient OCCT shapes
+- features can create a new body, join into a target body, cut a target body, or intersect with a target body
+- body-level transform features can translate, rotate, and scale bodies
+- transform stacks preserve operation order
+- transforming a body can optionally transform sketches and construction geometry owned by that body
+- body boolean features add, subtract, or intersect semantic body references
+- path curves can be composed from connected line, arc, spline, projected, construction, 3D-sketch, or semantic curve segments
+- extrude and extruded cut can later follow a connected path curve
+- loft can later use two or more profile sketches on arbitrarily oriented planes
+- loft can later follow path or guide curves
+
+Critical rule: body transforms and booleans are model intent. They must update through recompute and must not be represented as destructive raw BRep edits.
 
 ## Future Inventor-like sketcher and feature parity
 
@@ -177,9 +207,12 @@ The intended capability is:
 
 - connect points from different sketches on different planes with a 3D spline
 - use those splines as guide curves for lofts, sweeps, or surface generation
-- create sweeps along lines, polylines, arcs, or splines
+- create sweeps along lines, polylines, arcs, splines, or reusable connected path curves
+- create path-following extrudes and cuts along a connected path curve
 - loft between two, three, or arbitrary many profile sketches
+- loft between sketches on non-parallel or otherwise arbitrarily oriented planes
 - use a middle profile as a smooth transition control without forcing a hard transition edge when smooth continuity is requested
+- allow path/guide curves to control loft flow
 - support continuity settings such as C0, G1, and G2 in later versions
 - generate surfaces from arbitrary curves in space across several sketches
 - stitch or knit several generated surfaces into a shell
@@ -197,8 +230,13 @@ The detailed roadmap is in `docs/advanced-surfacing-and-3d-sketch-mvp.md`.
 - User-created construction geometry should be model intent, not temporary UI state.
 - Construction planes answer where sketches live; sketch profiles answer what shape sketches describe.
 - Explicit construction geometry is now implemented; relation-driven construction geometry is the next datum-system block.
+- A future `PartDocument` may contain multiple bodies; each body needs stable semantic identity and cache output.
+- Body transforms must be feature-tree operations with dependency graph participation, not destructive geometry edits.
+- If a transformed body owns sketches, sketch workplane frames should be transformable with the body while preserving sketch-local coordinates.
+- Body booleans must reference semantic `BodyId` values and explicit tool/target body roles.
 - Inventor-like sketching requires explicit sketch entities, constraints, dimensions, automatic profile detection, and stable region selection.
 - 3D sketches and surfacing answer how spatial curves, multiple profile sections, guide curves, and surfaces form freeform geometry.
+- Path curves provide reusable connected curve chains for sweep, path-extrude, path-cut, loft, and surfacing features.
 - OCCT shapes are a cache, not the primary model.
 - The OCCT path lives in an optional `blcad_geometry` target: adapters for rectangle extrusion, circular cut, line-based closed-profile extrusion/cut, a small ShapeCache, a WorkplaneResolver, recompute execution for `AdditiveExtrude` and `SubtractiveExtrude`, full document recompute, incremental recompute, bounds validation for the current top/bottom/right/left/front/back face cases, explicit construction-plane resolution, and STEP export of the final shape.
 - The ShapeCache remains in the geometry layer; `PartDocument` remains OCCT-free and is computed into the cache through `execute_document` and `execute_plan`.
@@ -206,7 +244,7 @@ The detailed roadmap is in `docs/advanced-surfacing-and-3d-sketch-mvp.md`.
 - Parameter values can be changed through `PartDocument::set_parameter_value`; a change marks dependents and drives incremental recompute.
 - Derived workplanes and construction planes are resolved geometrically without turning raw OCCT faces into core model references.
 - Line-based closed sketch profiles are implemented as a first planar general-profile path and remain separate from topological naming.
-- Revolve, revolve cut, sweep, loft, 3D sketch, surfacing, and surface-to-solid workflows are documented as future feature families and must remain semantic feature-tree operations, not raw BRep edits.
+- Revolve, revolve cut, sweep, loft, path-following extrude, path-following cut, 3D sketch, surfacing, and surface-to-solid workflows are documented as future feature families and must remain semantic feature-tree operations, not raw BRep edits.
 - Assembly parameters must later flow into parts in a controlled way.
 - Fillets and chamfers are their own parametric features with semantic edge references, not only late BRep corrections.
 - The assembly system will describe spatial relationships through constraints: a constraint graph and solver determine component positions and remaining degrees of freedom; joints later allow controlled motion.
@@ -223,6 +261,7 @@ The condensed points above are expanded in dedicated documents. Each is written 
 - `docs/semantic-references.md` — the non-topological reference rule shared by all feature and assembly documents
 - `docs/parameter-model.md` — scopes, expressions, cross-part flow, top-down design
 - `docs/feature-system.md` — general feature model and sketch-driven feature families
+- `docs/multi-body-transform-and-path-features-roadmap.md` — multi-body part files, body transforms, body booleans, path-following extrudes/cuts, and path/loft features
 - `docs/inventor-like-sketcher-and-feature-roadmap.md` — Inventor-like 2D/3D sketcher, constraints, dimensions, profile detection, revolve, sweep, loft, and sketch-driven feature parity
 - `docs/construction-geometry-mvp.md` — explicit construction geometry and next relation-driven construction geometry
 - `docs/file-format.md` — project and save format
