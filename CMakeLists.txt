@@ -43,6 +43,7 @@ add_library(
   src/core/reference_generated_line.cpp
   src/core/reference_recovery.cpp
   src/core/sketch.cpp
+  src/core/sketch_arc_profile.cpp
   src/core/sketch_constraints.cpp
 )
 add_library(BLCAD::core ALIAS blcad_core)
