@@ -40,6 +40,8 @@ add_library(
   src/core/part_document.cpp
   src/core/part_document_json.cpp
   src/core/parameter.cpp
+  src/core/project.cpp
+  src/core/project_json.cpp
   src/core/quantity.cpp
   src/core/recompute_plan.cpp
   src/core/reference_generated_line.cpp
@@ -161,6 +163,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/part_document_json_workplane_tests.cpp
     tests/core/part_document_tests.cpp
     tests/core/parameter_tests.cpp
+    tests/core/project_tests.cpp
     tests/core/projected_reference_invalidation_tests.cpp
     tests/core/projected_sketch_reference_json_tests.cpp
     tests/core/projected_sketch_reference_tests.cpp
