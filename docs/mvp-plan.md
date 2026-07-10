@@ -285,31 +285,45 @@ Implemented scope:
 - presentation metadata fields in undo-stack summary debug JSON
 - core tests for categories, priorities, stable ids, affected counts, summaries, and JSON output
 
+## Implemented block: Sketch repair presentation snapshot seed
+
+Detailed document: `docs/sketch-repair-presentation-snapshot-mvp.md`
+
+Implemented scope:
+
+- `SketchRepairPresentationSnapshotEntry`, `SketchRepairPresentationSnapshot`, and `SketchRepairPresentationSnapshotBuilder`
+- read-only row model that combines summary entry data, labels, and presentation metadata
+- preservation of undo-stack ordering and latest-entry semantics
+- snapshot rows with action, target, undoable flag, title, description, label id, display category, display priority, affected counts, and affected summary
+- distinct snapshot debug JSON through `serialize_sketch_repair_presentation_snapshot_to_json`
+- core tests for empty snapshots, multi-entry snapshots, latest metadata, affected-count propagation, and JSON output
+
 Still not implemented in this block:
 
 - localization
 - icons or GUI widgets
 - timestamps
-- presentation snapshot rows
-- redo metadata or persistent command history
+- snapshot filtering, sorting, or grouping
+- redo snapshots or persistent command history
 - multi-sketch stack coordination
 - parameter-creating repairs
 - full solve iteration or exact DOF counting
 
-## Next MVP: Sketch repair presentation snapshot seed
+## Next MVP: Sketch repair presentation snapshot query seed
 
-Goal: provide one combined read-only row model for CLI and future GUI code so callers do not need to manually merge summary entries, labels, and metadata.
+Goal: add read-only query/filter helpers for presentation snapshots so CLI and future GUI code can show focused repair-history views without mutating the source snapshot.
 
 Proposed first implementation sequence:
 
-- add `SketchRepairPresentationSnapshotEntry` and `SketchRepairPresentationSnapshot` records
-- add a `SketchRepairPresentationSnapshotBuilder` that consumes `SketchRepairUndoStackSummary`
-- include summary data, title, description, label id, category, priority, affected counts, and affected summary in each snapshot entry
-- preserve stack ordering and latest-entry semantics from `SketchRepairUndoStackSummary`
-- add a distinct debug JSON schema for presentation snapshots
-- keep lower-level summary JSON unchanged for debugging
-- add core tests for empty snapshots, multi-entry snapshots, latest-entry metadata, affected-count propagation, and JSON output
-- keep localization, icons, GUI widgets, redo, persistent journals, timestamps, multi-sketch grouping, parameter-creating repairs, full solve iteration, exact DOF counting, and arbitrary model rewriting deferred
+- add `SketchRepairPresentationSnapshotQuery` and `SketchRepairPresentationSnapshotQueryResult` or equivalent records
+- add a `SketchRepairPresentationSnapshotQueryEngine` that consumes a snapshot and returns filtered snapshot rows
+- support filtering by display category, display priority, latest-only, and undoable-only
+- preserve original stack order for every filtered result
+- add category and priority count helpers for compact CLI/GUI badges
+- add a distinct debug JSON schema that includes query metadata and filtered rows
+- keep the unfiltered snapshot JSON as the default presentation export
+- add core tests for empty queries, category filtering, priority filtering, latest-only filtering, undoable-only filtering, ordering, count helpers, and JSON output
+- keep localization, icons, GUI widgets, custom sorting, persistent history, redo, multi-sketch grouping, timestamps, parameter-creating repairs, full solve iteration, exact DOF counting, and arbitrary model rewriting deferred
 
 ## Future roadmap: Multi-body transforms and path features
 
