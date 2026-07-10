@@ -160,6 +160,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/sketch_arc_profile_json_tests.cpp
     tests/core/sketch_arc_profile_tests.cpp
     tests/core/sketch_dimension_tests.cpp
+    tests/core/sketch_spline_profile_json_tests.cpp
     tests/core/sketch_tests.cpp
   )
 
@@ -195,6 +196,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/shape_cache_tests.cpp
       tests/geometry/sketch_reference_projector_tests.cpp
       tests/geometry/sketch_region_finder_tests.cpp
+      tests/geometry/spline_profile_pipeline_tests.cpp
       tests/geometry/step_exporter_tests.cpp
       tests/geometry/workplane_resolver_tests.cpp
       tests/geometry/workplane_resolver_recovery_tests.cpp
