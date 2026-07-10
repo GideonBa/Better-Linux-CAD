@@ -131,6 +131,7 @@ if(BLCAD_BUILD_TESTS)
     blcad_core_tests
     tests/core/chained_construction_relation_tests.cpp
     tests/core/closed_profile_json_tests.cpp
+    tests/core/composite_closed_profile_tests.cpp
     tests/core/construction_geometry_tests.cpp
     tests/core/construction_geometry_json_tests.cpp
     tests/core/datum_plane_tests.cpp
@@ -172,6 +173,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/chained_construction_plane_resolver_tests.cpp
       tests/geometry/circular_cut_adapter_tests.cpp
       tests/geometry/closed_profile_pipeline_tests.cpp
+      tests/geometry/composite_closed_profile_pipeline_tests.cpp
       tests/geometry/construction_plane_pipeline_tests.cpp
       tests/geometry/derived_workplane_pipeline_tests.cpp
       tests/geometry/dimension_driven_profile_resolver_tests.cpp
