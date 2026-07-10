@@ -48,6 +48,7 @@ add_library(
   src/core/sketch_diagnostics.cpp
   src/core/sketch_repair_commands.cpp
   src/core/sketch_repair_suggestions.cpp
+  src/core/sketch_repair_transactions.cpp
 )
 add_library(BLCAD::core ALIAS blcad_core)
 
