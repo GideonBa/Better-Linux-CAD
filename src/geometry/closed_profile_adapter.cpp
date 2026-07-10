@@ -75,8 +75,9 @@ struct ThroughAllPlacement {
   double start_projection = 0.0;
 };
 
-[[nodiscard]] ThroughAllPlacement make_through_all_placement(Vector3 axis, double x_min, double y_min,
-                                                             double z_min, double x_max, double y_max,
+[[nodiscard]] ThroughAllPlacement make_through_all_placement(Vector3 axis, double x_min,
+                                                             double y_min, double z_min,
+                                                             double x_max, double y_max,
                                                              double z_max) {
   double min_projection = 0.0;
   double max_projection = 0.0;
@@ -203,12 +204,11 @@ struct ThroughAllPlacement {
   return Result<TopoDS_Shape>::success(std::move(shape));
 }
 
-[[nodiscard]] Result<ThroughAllPlacement> make_placement_from_target(const GeometryShape& target,
-                                                                     Vector3 axis_direction) {
+[[nodiscard]] Result<ThroughAllPlacement> make_placement_from_target_shape(
+    const TopoDS_Shape& target_shape, Vector3 axis_direction) {
   auto axis = normalize_axis(axis_direction);
   if (axis.has_error()) return Result<ThroughAllPlacement>::failure(axis.error());
 
-  const TopoDS_Shape& target_shape = target.impl_->shape;
   Bnd_Box bounds;
   BRepBndLib::Add(target_shape, bounds);
   if (bounds.IsVoid()) {
@@ -288,7 +288,8 @@ Result<GeometryShape> ClosedProfileAdapter::cut_profile_through_all(
   }
 
   try {
-    auto placement = make_placement_from_target(target, axis_direction);
+    const TopoDS_Shape& target_shape = target.impl_->shape;
+    auto placement = make_placement_from_target_shape(target_shape, axis_direction);
     if (placement.has_error()) return Result<GeometryShape>::failure(placement.error());
 
     const auto moved_vertices = move_profile_to_through_all_start(vertices, placement.value());
@@ -306,7 +307,6 @@ Result<GeometryShape> ClosedProfileAdapter::cut_profile_through_all(
       return Result<GeometryShape>::failure(make_geometry_error("could not build closed profile cut prism"));
     }
 
-    const TopoDS_Shape& target_shape = target.impl_->shape;
     BRepAlgoAPI_Cut cut_builder(target_shape, prism_builder.Shape());
     cut_builder.Build();
     if (!cut_builder.IsDone() || cut_builder.HasErrors()) {
@@ -314,7 +314,9 @@ Result<GeometryShape> ClosedProfileAdapter::cut_profile_through_all(
     }
 
     TopoDS_Shape shape = cut_builder.Shape();
-    if (shape.IsNull()) return Result<GeometryShape>::failure(make_geometry_error("closed profile cut produced an empty shape"));
+    if (shape.IsNull()) {
+      return Result<GeometryShape>::failure(make_geometry_error("closed profile cut produced an empty shape"));
+    }
 
     return Result<GeometryShape>::success(
         GeometryShape(std::make_shared<GeometryShape::Impl>(std::move(shape))));
@@ -340,7 +342,8 @@ Result<GeometryShape> ClosedProfileAdapter::cut_profile_with_holes_through_all(
   }
 
   try {
-    auto placement = make_placement_from_target(target, axis_direction);
+    const TopoDS_Shape& target_shape = target.impl_->shape;
+    auto placement = make_placement_from_target_shape(target_shape, axis_direction);
     if (placement.has_error()) return Result<GeometryShape>::failure(placement.error());
 
     auto moved_outer = move_profile_to_through_all_start(outer_vertices, placement.value());
@@ -360,7 +363,6 @@ Result<GeometryShape> ClosedProfileAdapter::cut_profile_with_holes_through_all(
       return Result<GeometryShape>::failure(make_geometry_error("could not build closed profile cut prism"));
     }
 
-    const TopoDS_Shape& target_shape = target.impl_->shape;
     BRepAlgoAPI_Cut cut_builder(target_shape, prism_builder.Shape());
     cut_builder.Build();
     if (!cut_builder.IsDone() || cut_builder.HasErrors()) {
@@ -368,7 +370,9 @@ Result<GeometryShape> ClosedProfileAdapter::cut_profile_with_holes_through_all(
     }
 
     TopoDS_Shape shape = cut_builder.Shape();
-    if (shape.IsNull()) return Result<GeometryShape>::failure(make_geometry_error("closed profile cut produced an empty shape"));
+    if (shape.IsNull()) {
+      return Result<GeometryShape>::failure(make_geometry_error("closed profile cut produced an empty shape"));
+    }
 
     return Result<GeometryShape>::success(
         GeometryShape(std::make_shared<GeometryShape::Impl>(std::move(shape))));
