@@ -173,6 +173,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/sketch_repair_command_labels_tests.cpp
     tests/core/sketch_repair_commands_tests.cpp
     tests/core/sketch_repair_presentation_metadata_tests.cpp
+    tests/core/sketch_repair_presentation_snapshot_tests.cpp
     tests/core/sketch_repair_suggestions_tests.cpp
     tests/core/sketch_repair_transactions_tests.cpp
     tests/core/sketch_repair_undo_stack_summary_tests.cpp
@@ -206,7 +207,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/recompute_executor_tests.cpp
       tests/geometry/rectangle_extrusion_adapter_tests.cpp
       tests/geometry/reference_driven_sketch_helper_tests.cpp
-      tests/geometry/reference_generated_profile_resolver_tests.cpp
+      tests/geometry/reference_generated_profile_resolver.cpp
       tests/geometry/reference_part_pipeline_tests.cpp
       tests/geometry/right_workplane_pipeline_tests.cpp
       tests/geometry/semantic_reference_evaluator_tests.cpp
