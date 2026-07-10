@@ -273,6 +273,16 @@ Proposed first implementation sequence:
 - add core tests that suggestions are deterministic and reference the originating diagnostics
 - keep automatic application, GUI editing workflows, full solve iteration, exact DOF counting, spline-handle solving, and model rewriting deferred
 
+## Future roadmap: Multi-body transforms and path features
+
+Goal: allow one part file to contain multiple bodies, transform bodies, combine bodies with booleans, and support path-following extrudes/cuts plus lofts through arbitrarily oriented profile sketches.
+
+Detailed document: `docs/multi-body-transform-and-path-features-roadmap.md`
+
+Planned scope includes `BodyId`, `Body`, `BodyTransform`, `BodyBooleanFeature`, `SketchOwnership`, `PathCurve`, `ProfileSectionReference`, path-following extrude/cut, two-section loft, multi-section loft, path/guide-curve loft, and associated JSON/project-file records.
+
+This is a future feature-tree and geometry-cache block, not part of the current MVP. It should be implemented after the current sketch/profile foundations and before or alongside richer sweep/loft surfacing work.
+
 ## Future roadmap: Inventor-like sketcher and sketch-driven features
 
 Goal: eventually provide an Inventor-class sketch environment and sketch-driven feature set while keeping BLCAD's own core model and Linux-native architecture.
