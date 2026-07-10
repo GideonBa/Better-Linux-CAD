@@ -134,8 +134,12 @@ if(BLCAD_BUILD_GEOMETRY)
   add_executable(blcad_export_step examples/blcad_export_step.cpp)
   target_link_libraries(blcad_export_step PRIVATE BLCAD::geometry)
 
+  add_executable(blcad_export_project examples/blcad_export_project.cpp)
+  target_link_libraries(blcad_export_project PRIVATE BLCAD::geometry)
+
   if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(blcad_export_step PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(blcad_export_project PRIVATE -Wall -Wextra -Wpedantic)
   endif()
 endif()
 
