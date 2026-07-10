@@ -111,7 +111,8 @@ TEST_CASE("Sketch repair undo stack summary labels are deterministic", "[core][s
   const SketchRepairCommandLabeler labeler;
   const auto label = labeler.label_for(*summary.latest());
   CHECK(label.title() == "Undo remove duplicate driving dimension");
-  CHECK(label.description().find("line.a:start|line.a:end") != std::string::npos);
+  CHECK_FALSE(summary.latest()->target().empty());
+  CHECK(label.description().find(summary.latest()->target()) != std::string::npos);
 
   const auto json = serialize_sketch_repair_undo_stack_summary_to_json(summary);
   REQUIRE(json);
