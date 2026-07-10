@@ -1,14 +1,14 @@
 # JSON Serialization
 
-Status: core serialization for `PartDocument` model intent, including file-level helpers, derived workplanes, line-based closed sketch profiles, arc closed profiles, composite closed profiles with inner contours, explicit construction geometry, relation-driven construction geometry, chained construction relations, semantic generated edge/vertex references, projected sketch reference entities, reference-driven sketch constraints, reference-generated sketch helper lines, sketch geometric constraints, sketch driving dimensions, generated-region profile selections, reference recovery metadata, reference remap records, and sketch-origin override records.
+Status: core serialization for `PartDocument` model intent, including file-level helpers, derived workplanes, line-based closed sketch profiles, arc closed profiles, spline curve segments, tangent-continuity metadata, composite closed profiles with inner contours, explicit construction geometry, relation-driven construction geometry, chained construction relations, semantic generated edge/vertex references, projected sketch reference entities, reference-driven sketch constraints, reference-generated sketch helper lines, sketch geometric constraints, sketch driving dimensions, generated-region profile selections, reference recovery metadata, reference remap records, and sketch-origin override records.
 
-The JSON serialization layer persists model intent only. It does not serialize OCCT shapes, `GeometryShape`, `ShapeCache` contents, raw face IDs, raw edge IDs, raw vertex IDs, BRep handles, resolved projected coordinates, solver state, automatic region-search caches, trim-solver caches, tessellated arc caches, or exported STEP data.
+The JSON serialization layer persists model intent only. It does not serialize OCCT shapes, `GeometryShape`, `ShapeCache` contents, raw face IDs, raw edge IDs, raw vertex IDs, BRep handles, resolved projected coordinates, solver state, automatic region-search caches, trim-solver caches, tessellated arc caches, tessellated spline caches, tangent-solver caches, or exported STEP data.
 
 ## Goal
 
 The goal is to make a `PartDocument` reproducible from a textual representation:
 
-1. Build a `PartDocument` with parameters, datum planes, construction geometry, construction relations, derived workplanes, sketches, sketch entities, projected sketch reference entities, reference-generated sketch helper lines, reference-driven sketch constraints, sketch geometric constraints, sketch driving dimensions, selected generated-region profiles, arc closed profiles, composite closed profiles, reference recovery records, profiles, and features.
+1. Build a `PartDocument` with parameters, datum planes, construction geometry, construction relations, derived workplanes, sketches, sketch entities, projected sketch reference entities, reference-generated sketch helper lines, reference-driven sketch constraints, sketch geometric constraints, sketch driving dimensions, selected generated-region profiles, arc/spline closed profiles, composite closed profiles, reference recovery records, profiles, and features.
 2. Serialize that model intent to JSON.
 3. Optionally write the JSON as a `.blcad.json` model file.
 4. Rebuild the `PartDocument` from JSON through the normal validated construction APIs.
@@ -32,7 +32,9 @@ The current JSON format stores:
 - derived workplanes with `top`, `bottom`, `right`, `left`, `front`, or `back` semantic face references
 - line-segment sketch entities
 - three-point arc sketch entities
+- cubic Bezier spline sketch entities
 - trim/extend metadata records
+- tangent-continuity metadata records
 - projected sketch point references
 - projected sketch line references
 - reference-generated sketch helper lines
@@ -40,7 +42,7 @@ The current JSON format stores:
 - sketch geometric constraints
 - sketch driving dimensions
 - selected generated-region profile intent as normal `closed_profiles`
-- arc closed profiles with ordered `curve_segments`
+- arc/spline-capable closed profiles with ordered `curve_segments`
 - composite closed profiles with `outer_contour` and `inner_contours`
 - reference status records
 - reference remap records
@@ -128,7 +130,7 @@ Automatically detected regions are not serialized as solver caches. If the user 
 }
 ```
 
-## Arc sketch records
+## Arc, spline, trim, and tangent records
 
 Arc sketch entities are serialized in `arc_segments` using the stable three-point definition:
 
@@ -140,6 +142,23 @@ Arc sketch entities are serialized in `arc_segments` using the stable three-poin
       "start": {"x": 10.0, "y": 0.0},
       "mid": {"x": 0.0, "y": 10.0},
       "end": {"x": -10.0, "y": 0.0}
+    }
+  ]
+}
+```
+
+Cubic Bezier spline sketch entities are serialized in `spline_segments`:
+
+```json
+{
+  "spline_segments": [
+    {
+      "id": "spline.right",
+      "kind": "cubic_bezier",
+      "start": {"x": 10.0, "y": -8.0},
+      "control1": {"x": 18.0, "y": -4.0},
+      "control2": {"x": 18.0, "y": 4.0},
+      "end": {"x": 10.0, "y": 8.0}
     }
   ]
 }
@@ -160,18 +179,44 @@ Trim/extend metadata is serialized in `trim_extend_operations`:
 }
 ```
 
-Arc-capable profiles are serialized in `arc_closed_profiles` as ordered curve references. Each curve reference points to either a `line_segments` entry or an `arc_segments` entry:
+Tangent-continuity intent is serialized in `tangent_continuities`:
+
+```json
+{
+  "tangent_continuities": [
+    {
+      "id": "tangent.bottom_spline",
+      "kind": "tangent",
+      "first_entity": "line.bottom",
+      "second_entity": "spline.right"
+    }
+  ]
+}
+```
+
+Arc/spline-capable profiles are serialized in `arc_closed_profiles` as ordered curve references. Each curve reference points to a `line_segments`, `arc_segments`, or `spline_segments` entry:
 
 ```json
 {
   "arc_closed_profiles": [
     {
-      "id": "profile.arc",
-      "curve_segments": ["line.left", "line.bottom", "line.right", "arc.top"]
+      "id": "profile.curved",
+      "curve_segments": ["line.bottom", "spline.right", "line.top", "arc.left"]
     }
   ]
 }
 ```
+
+## Feature directions
+
+Extrude direction is serialized as sketch-plane-relative intent:
+
+```text
+sketch_normal
+opposite_sketch_normal
+```
+
+Legacy `+Z` is still accepted on load and maps to `sketch_normal`.
 
 ## Composite profiles
 
