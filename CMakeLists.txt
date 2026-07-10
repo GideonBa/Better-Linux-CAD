@@ -13,7 +13,6 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(BLCAD_BUILD_GEOMETRY "Build future OCCT geometry targets" OFF)
 option(BLCAD_BUILD_GUI "Build future Qt GUI targets" OFF)
-
 option(BLCAD_BUILD_TESTS "Build unit tests" ON)
 
 include(CTest)
@@ -170,6 +169,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/sketch_repair_commands_tests.cpp
     tests/core/sketch_repair_suggestions_tests.cpp
     tests/core/sketch_repair_transactions_tests.cpp
+    tests/core/sketch_repair_undo_stack_tests.cpp
     tests/core/sketch_spline_profile_json_tests.cpp
     tests/core/sketch_tests.cpp
   )
