@@ -101,6 +101,7 @@ Implemented feature blocks:
 - `docs/sketch-repair-command-labels-mvp.md`
 - `docs/sketch-repair-presentation-metadata-mvp.md`
 - `docs/sketch-repair-presentation-snapshot-mvp.md`
+- `docs/sketch-repair-presentation-snapshot-query-mvp.md`
 
 Future roadmaps:
 
@@ -110,16 +111,16 @@ Future roadmaps:
 
 ## Next technical step
 
-The next technical step should add a sketch repair presentation snapshot query seed.
+The next technical step should add a sketch repair presentation snapshot grouping seed.
 
-1. Add a `SketchRepairPresentationSnapshotQuery` or equivalent read-only filter/options record.
-2. Add a `SketchRepairPresentationSnapshotQueryEngine` that consumes a snapshot and returns a filtered snapshot without mutating the original.
-3. Support filtering by display category, display priority, latest-only, and undoable-only.
-4. Preserve the original stack order for all filtered outputs.
-5. Add optional count helpers for category totals and priority totals so CLI/GUI code can show compact badges.
-6. Add debug JSON output for queried snapshots with a distinct schema marker and query metadata.
-7. Keep the unfiltered snapshot JSON intact as the default presentation export.
-8. Add core tests for empty queries, category filtering, priority filtering, latest-only filtering, undoable-only filtering, preserved ordering, count helpers, and JSON output.
+1. Add a `SketchRepairPresentationSnapshotGroup` and `SketchRepairPresentationSnapshotGrouping` or equivalent read-only records.
+2. Add a `SketchRepairPresentationSnapshotGroupingEngine` that consumes an unfiltered or queried snapshot and groups entries without mutating the source.
+3. Support grouping by display category and display priority.
+4. Preserve deterministic within-group ordering from the source snapshot.
+5. Expose group counts, group labels, first/latest entry metadata, and empty-group handling for CLI/GUI badges.
+6. Add debug JSON output for grouped snapshots with a distinct schema marker and grouping metadata.
+7. Keep query/filter helpers separate from grouping helpers so callers can filter first, group second.
+8. Add core tests for category grouping, priority grouping, deterministic order, empty groups, group counts, grouped latest entries, and JSON output.
 9. Keep localization, icons, GUI widgets, custom sorting, persistent history, redo, multi-sketch grouping, timestamps, parameter-creating repairs, full solve iteration, exact DOF counting, and arbitrary model rewriting deferred.
 
-The completed presentation snapshot block is documented in `docs/sketch-repair-presentation-snapshot-mvp.md`.
+The completed snapshot query block is documented in `docs/sketch-repair-presentation-snapshot-query-mvp.md`.
