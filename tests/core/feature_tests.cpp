@@ -18,8 +18,8 @@ TEST_CASE("AdditiveExtrude feature stores sketch and length parameter references
   CHECK(feature.value().input_sketch().value() == "sketch.base");
   CHECK(feature.value().length_parameter().value() == "part.thickness");
   CHECK(feature.value().target_feature().empty());
-  CHECK(feature.value().direction() == ExtrudeDirection::PositiveZ);
-  CHECK(to_string(feature.value().direction()) == "+Z");
+  CHECK(feature.value().direction() == ExtrudeDirection::SketchNormal);
+  CHECK(to_string(feature.value().direction()) == "sketch_normal");
 }
 
 TEST_CASE("AdditiveExtrude feature rejects missing required references", "[core][feature]") {
@@ -66,7 +66,18 @@ TEST_CASE("SubtractiveExtrude feature stores sketch and target feature reference
   CHECK(feature.value().target_feature().value() == "feature.base_extrude");
   CHECK(feature.value().subtractive_depth() == SubtractiveExtrudeDepth::ThroughAll);
   CHECK(to_string(feature.value().subtractive_depth()) == "through_all");
-  CHECK(feature.value().direction() == ExtrudeDirection::PositiveZ);
+  CHECK(feature.value().direction() == ExtrudeDirection::SketchNormal);
+}
+
+TEST_CASE("SubtractiveExtrude feature supports opposite sketch-normal direction", "[core][feature]") {
+  const auto feature = Feature::create_subtractive_extrude(
+      FeatureId("feature.back_cut"), "BackCut", SketchId("sketch.back"),
+      FeatureId("feature.base_extrude"), SubtractiveExtrudeDepth::ThroughAll,
+      ExtrudeDirection::OppositeSketchNormal);
+
+  REQUIRE(feature);
+  CHECK(feature.value().direction() == ExtrudeDirection::OppositeSketchNormal);
+  CHECK(to_string(feature.value().direction()) == "opposite_sketch_normal");
 }
 
 TEST_CASE("SubtractiveExtrude feature rejects missing required references", "[core][feature]") {
