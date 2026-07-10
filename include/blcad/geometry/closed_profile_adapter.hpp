@@ -13,6 +13,7 @@ namespace blcad::geometry {
 enum class ClosedProfileCurveKind {
   Line,
   CircularArc,
+  CubicBezierSpline,
 };
 
 struct ClosedProfileCurveSegment {
@@ -20,6 +21,7 @@ struct ClosedProfileCurveSegment {
   Point3 start;
   Point3 mid;
   Point3 end;
+  Point3 control2{};
 };
 
 class ClosedProfileAdapter {
