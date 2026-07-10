@@ -50,6 +50,7 @@ add_library(
   src/core/sketch_repair_suggestions.cpp
   src/core/sketch_repair_transactions.cpp
   src/core/sketch_repair_undo_stack.cpp
+  src/core/sketch_repair_undo_stack_summary.cpp
 )
 add_library(BLCAD::core ALIAS blcad_core)
 
