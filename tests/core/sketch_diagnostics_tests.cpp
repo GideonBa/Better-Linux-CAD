@@ -76,15 +76,16 @@ TEST_CASE("Sketch diagnostics reports free spline control points and undimension
                                                   Point2{10.0, 0.0});
   REQUIRE(spline);
   REQUIRE(sketch.value().add_entity(spline.value()));
-  auto arc_profile = ArcClosedProfile::create(ProfileId("profile.spline"),
-                                              {SketchEntityId("spline.a"), SketchEntityId("spline.a"),
-                                               SketchEntityId("spline.a")});
-  REQUIRE(arc_profile);
+  auto rectangle = RectangleProfile::create(ProfileId("profile.spline"), ParameterId("part.width"),
+                                            ParameterId("part.height"));
+  REQUIRE(rectangle);
+  REQUIRE(sketch.value().add_profile(rectangle.value()));
 
   const SketchConstraintDiagnostics diagnostics;
   const auto report = diagnostics.analyze(sketch.value());
 
   CHECK(has_kind(report, SketchDiagnosticKind::FreeSplineControlPoint));
+  CHECK(has_kind(report, SketchDiagnosticKind::ProfileWithoutDrivingDimensions));
   CHECK(has_target(report, "spline.a:control1"));
   CHECK(has_target(report, "spline.a:control2"));
 }
