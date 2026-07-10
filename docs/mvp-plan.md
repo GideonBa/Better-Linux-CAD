@@ -257,29 +257,47 @@ Implemented scope:
 - debug JSON output through `serialize_sketch_repair_undo_stack_summary_to_json`
 - core tests for empty summaries, stable ordering, latest marker, affected IDs, and debug JSON
 
+## Implemented block: Sketch repair command label seed
+
+Detailed document: `docs/sketch-repair-command-labels-mvp.md`
+
+Implemented scope:
+
+- `SketchRepairCommandLabel` and `SketchRepairCommandLabeler`
+- deterministic action labels for all current safe and unsupported repair actions
+- undo-oriented labels for `SketchRepairUndoStackSummaryEntry` records
+- presentation-only label data kept separate from model intent and `.blcad.json`
+- title and description fields in undo-stack summary debug JSON
+- core tests for deterministic action labels and summary-entry label JSON
+
 Still not implemented in this block:
 
-- redo
-- persistent transaction journals
-- GUI command history widgets
-- user-facing command labels
+- localization
+- GUI widgets
+- icons, severity colors, or display categories
+- stable machine-readable label IDs
 - timestamps
-- multi-sketch stack coordination
+- affected-record count summaries
+- redo labels or persistent command history
 - parameter-creating repairs
 - full solve iteration or exact DOF counting
 
-## Next MVP: Sketch repair command label seed
+## Next MVP: Sketch repair presentation metadata seed
 
-Goal: add stable user-facing labels and short descriptions for repair suggestions, commands, transactions, and undo-stack summary entries.
+Goal: add richer read-only presentation metadata for repair actions and undo-stack entries so CLI and future GUI code can display stable, compact command-history rows without inspecting low-level vectors directly.
 
 Proposed first implementation sequence:
 
-- add a `SketchRepairCommandLabeler` or equivalent non-mutating helper
-- map repair actions and transaction summary entries to stable titles and short descriptions
-- keep labels separate from model intent and `.blcad.json`
-- include labels in stack summary debug JSON without changing undo behavior
-- add core tests for deterministic labels for all current safe and unsupported repair actions
-- keep localization, GUI widgets, redo, persistent history, timestamps, parameter-creating repairs, full solve iteration, exact DOF counting, and arbitrary model rewriting deferred
+- add a `SketchRepairPresentationMetadata` or equivalent record with stable machine-readable label IDs
+- add display categories such as `safe_apply`, `requires_user_choice`, `requires_parameter_value`, and `undo_entry`
+- add a lightweight severity/display-priority enum for repair actions and undo entries
+- compute affected-record counts for added constraints, removed constraints, and removed dimensions
+- expose a concise `affected_summary` string for undo-stack summary entries without changing undo semantics
+- include the new metadata fields in undo-stack summary debug JSON next to the existing title and description
+- keep all metadata read-only and separate from `.blcad.json` model intent
+- add core tests for stable metadata IDs, categories, priorities, affected counts, and JSON output
+- document how CLI/GUI code should prefer metadata fields over parsing action names or target strings
+- keep localization, icons, GUI widgets, redo, persistent journals, timestamps, multi-sketch grouping, parameter-creating repairs, full solve iteration, exact DOF counting, and arbitrary model rewriting deferred
 
 ## Future roadmap: Multi-body transforms and path features
 
