@@ -270,33 +270,45 @@ Implemented scope:
 - title and description fields in undo-stack summary debug JSON
 - core tests for deterministic action labels and summary-entry label JSON
 
+## Implemented block: Sketch repair presentation metadata seed
+
+Detailed document: `docs/sketch-repair-presentation-metadata-mvp.md`
+
+Implemented scope:
+
+- `SketchRepairDisplayCategory` with `safe_apply`, `requires_user_choice`, `requires_parameter_value`, and `undo_entry`
+- `SketchRepairDisplayPriority` with `low`, `normal`, and `high`
+- `SketchRepairAffectedCounts` for added constraints, removed constraints, removed dimensions, and total count
+- `SketchRepairPresentationMetadata` and `SketchRepairPresentationMetadataProvider`
+- stable machine-readable `label_id` values for repair actions and undo-stack entries
+- concise `affected_summary` generation for undo-stack summary entries
+- presentation metadata fields in undo-stack summary debug JSON
+- core tests for categories, priorities, stable ids, affected counts, summaries, and JSON output
+
 Still not implemented in this block:
 
 - localization
-- GUI widgets
-- icons, severity colors, or display categories
-- stable machine-readable label IDs
+- icons or GUI widgets
 - timestamps
-- affected-record count summaries
-- redo labels or persistent command history
+- presentation snapshot rows
+- redo metadata or persistent command history
+- multi-sketch stack coordination
 - parameter-creating repairs
 - full solve iteration or exact DOF counting
 
-## Next MVP: Sketch repair presentation metadata seed
+## Next MVP: Sketch repair presentation snapshot seed
 
-Goal: add richer read-only presentation metadata for repair actions and undo-stack entries so CLI and future GUI code can display stable, compact command-history rows without inspecting low-level vectors directly.
+Goal: provide one combined read-only row model for CLI and future GUI code so callers do not need to manually merge summary entries, labels, and metadata.
 
 Proposed first implementation sequence:
 
-- add a `SketchRepairPresentationMetadata` or equivalent record with stable machine-readable label IDs
-- add display categories such as `safe_apply`, `requires_user_choice`, `requires_parameter_value`, and `undo_entry`
-- add a lightweight severity/display-priority enum for repair actions and undo entries
-- compute affected-record counts for added constraints, removed constraints, and removed dimensions
-- expose a concise `affected_summary` string for undo-stack summary entries without changing undo semantics
-- include the new metadata fields in undo-stack summary debug JSON next to the existing title and description
-- keep all metadata read-only and separate from `.blcad.json` model intent
-- add core tests for stable metadata IDs, categories, priorities, affected counts, and JSON output
-- document how CLI/GUI code should prefer metadata fields over parsing action names or target strings
+- add `SketchRepairPresentationSnapshotEntry` and `SketchRepairPresentationSnapshot` records
+- add a `SketchRepairPresentationSnapshotBuilder` that consumes `SketchRepairUndoStackSummary`
+- include summary data, title, description, label id, category, priority, affected counts, and affected summary in each snapshot entry
+- preserve stack ordering and latest-entry semantics from `SketchRepairUndoStackSummary`
+- add a distinct debug JSON schema for presentation snapshots
+- keep lower-level summary JSON unchanged for debugging
+- add core tests for empty snapshots, multi-entry snapshots, latest-entry metadata, affected-count propagation, and JSON output
 - keep localization, icons, GUI widgets, redo, persistent journals, timestamps, multi-sketch grouping, parameter-creating repairs, full solve iteration, exact DOF counting, and arbitrary model rewriting deferred
 
 ## Future roadmap: Multi-body transforms and path features
