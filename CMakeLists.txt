@@ -157,6 +157,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/reference_recovery_tests.cpp
     tests/core/semantic_reference_invalidation_tests.cpp
     tests/core/semantic_reference_json_tests.cpp
+    tests/core/sketch_arc_profile_json_tests.cpp
     tests/core/sketch_arc_profile_tests.cpp
     tests/core/sketch_dimension_tests.cpp
     tests/core/sketch_tests.cpp
