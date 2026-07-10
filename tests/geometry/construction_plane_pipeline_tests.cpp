@@ -52,6 +52,38 @@ Sketch make_closed_rectangle_sketch_on_construction_plane() {
   return sketch.value();
 }
 
+Sketch make_rectangle_profile_sketch_on_angled_plane() {
+  auto sketch = Sketch::create(SketchId("sketch.rectangle_on_angled_plane"),
+                               "Sketch_RectangleOnAngledPlane",
+                               DatumPlaneId("construction_plane.angled"));
+  REQUIRE(sketch);
+  auto profile = RectangleProfile::create(ProfileId("profile.rectangle"), ParameterId("part.width"),
+                                          ParameterId("part.height"));
+  REQUIRE(profile);
+  REQUIRE(sketch.value().add_profile(profile.value()));
+  return sketch.value();
+}
+
+Sketch make_circle_cut_sketch_on_angled_plane() {
+  auto sketch = Sketch::create(SketchId("sketch.circle_cut_on_angled_plane"),
+                               "Sketch_CircleCutOnAngledPlane",
+                               DatumPlaneId("construction_plane.angled_cut"));
+  REQUIRE(sketch);
+  auto profile = CircleProfile::create(ProfileId("profile.circle_cut"), ParameterId("part.hole_diameter"));
+  REQUIRE(profile);
+  REQUIRE(sketch.value().add_profile(profile.value()));
+  return sketch.value();
+}
+
+ConstructionPlane make_angled_plane(const char* id, const char* name, Point3 origin) {
+  auto plane = ConstructionPlane::create_explicit(
+      ConstructionPlaneId(id), name, origin, Vector3{1.0, 0.0, 0.0},
+      Vector3{0.0, 0.7071067811865475, 0.7071067811865475},
+      Vector3{0.0, -0.7071067811865475, 0.7071067811865475});
+  REQUIRE(plane);
+  return plane.value();
+}
+
 PartDocument make_explicit_construction_plane_document() {
   auto document = PartDocument::create(DocumentId("part.construction_plane_prism"),
                                        "ConstructionPlanePrism");
@@ -75,6 +107,59 @@ PartDocument make_explicit_construction_plane_document() {
   REQUIRE(feature);
   REQUIRE(document.value().add_feature(feature.value()));
 
+  return document.value();
+}
+
+PartDocument make_angled_rectangle_profile_document() {
+  auto document = PartDocument::create(DocumentId("part.angled_rectangle_prism"),
+                                       "AngledRectanglePrism");
+  REQUIRE(document);
+  REQUIRE(document.value().add_parameter(make_length_parameter("part.width", "width", 20.0)));
+  REQUIRE(document.value().add_parameter(make_length_parameter("part.height", "height", 10.0)));
+  REQUIRE(document.value().add_parameter(make_length_parameter("part.depth", "depth", 7.0)));
+  REQUIRE(document.value().add_construction_plane(
+      make_angled_plane("construction_plane.angled", "Angled", Point3{0.0, 0.0, 0.0})));
+  REQUIRE(document.value().add_sketch(make_rectangle_profile_sketch_on_angled_plane()));
+  auto feature = Feature::create_additive_extrude(
+      FeatureId("feature.angled_rectangle_prism"), "AngledRectanglePrism",
+      SketchId("sketch.rectangle_on_angled_plane"), ParameterId("part.depth"));
+  REQUIRE(feature);
+  REQUIRE(document.value().add_feature(feature.value()));
+  return document.value();
+}
+
+PartDocument make_angled_circle_cut_document() {
+  auto document = PartDocument::create(DocumentId("part.angled_circle_cut"), "AngledCircleCut");
+  REQUIRE(document);
+  REQUIRE(document.value().add_parameter(make_length_parameter("part.width", "width", 60.0)));
+  REQUIRE(document.value().add_parameter(make_length_parameter("part.height", "height", 40.0)));
+  REQUIRE(document.value().add_parameter(make_length_parameter("part.depth", "depth", 12.0)));
+  REQUIRE(document.value().add_parameter(make_length_parameter("part.hole_diameter", "hole_diameter", 8.0)));
+  auto xy = DatumPlane::xy();
+  REQUIRE(xy);
+  REQUIRE(document.value().add_datum_plane(xy.value()));
+
+  auto base_sketch = Sketch::create(SketchId("sketch.base"), "Base", DatumPlaneId("datum.xy"));
+  REQUIRE(base_sketch);
+  auto base_profile = RectangleProfile::create(ProfileId("profile.base"), ParameterId("part.width"),
+                                               ParameterId("part.height"));
+  REQUIRE(base_profile);
+  REQUIRE(base_sketch.value().add_profile(base_profile.value()));
+  REQUIRE(document.value().add_sketch(base_sketch.value()));
+  auto base_feature = Feature::create_additive_extrude(FeatureId("feature.base"), "Base",
+                                                       SketchId("sketch.base"),
+                                                       ParameterId("part.depth"));
+  REQUIRE(base_feature);
+  REQUIRE(document.value().add_feature(base_feature.value()));
+
+  REQUIRE(document.value().add_construction_plane(
+      make_angled_plane("construction_plane.angled_cut", "AngledCut", Point3{0.0, 0.0, 6.0})));
+  REQUIRE(document.value().add_sketch(make_circle_cut_sketch_on_angled_plane()));
+  auto cut_feature = Feature::create_subtractive_extrude(FeatureId("feature.angled_cut"), "AngledCut",
+                                                         SketchId("sketch.circle_cut_on_angled_plane"),
+                                                         FeatureId("feature.base"));
+  REQUIRE(cut_feature);
+  REQUIRE(document.value().add_feature(cut_feature.value()));
   return document.value();
 }
 
@@ -160,6 +245,44 @@ TEST_CASE("Geometry recomputes a closed profile on an explicit construction plan
   CHECK_FALSE(shape.is_null);
   CHECK(shape.solid_count == 1);
   CHECK(shape.volume_mm3 == Catch::Approx(20.0 * 10.0 * 7.0).margin(1.0));
+}
+
+TEST_CASE("Geometry recomputes a rectangle profile on an angled construction plane",
+          "[geometry][construction_plane]") {
+  const PartDocument document = make_angled_rectangle_profile_document();
+  ShapeCache cache = make_shape_cache();
+  const GeometryRecomputeExecutor executor;
+
+  const auto summary = executor.execute_document(document, cache);
+
+  REQUIRE(summary);
+  CHECK(summary.value().executed_feature_count == 1);
+  REQUIRE(cache.final_shape() != nullptr);
+
+  const RectangleExtrusionAdapter inspector;
+  const ShapeSummary shape = inspector.summarize(*cache.final_shape());
+  CHECK_FALSE(shape.is_null);
+  CHECK(shape.solid_count == 1);
+  CHECK(shape.volume_mm3 == Catch::Approx(20.0 * 10.0 * 7.0).margin(1.0));
+}
+
+TEST_CASE("Geometry recomputes a circular through-all cut on an angled construction plane",
+          "[geometry][construction_plane]") {
+  const PartDocument document = make_angled_circle_cut_document();
+  ShapeCache cache = make_shape_cache();
+  const GeometryRecomputeExecutor executor;
+
+  const auto summary = executor.execute_document(document, cache);
+
+  REQUIRE(summary);
+  CHECK(summary.value().executed_feature_count == 2);
+  REQUIRE(cache.final_shape() != nullptr);
+  CHECK(cache.final_feature_id() == FeatureId("feature.angled_cut"));
+
+  const RectangleExtrusionAdapter inspector;
+  const ShapeSummary shape = inspector.summarize(*cache.final_shape());
+  CHECK_FALSE(shape.is_null);
+  CHECK(shape.solid_count == 1);
 }
 
 TEST_CASE("Geometry recomputes a closed profile on an offset construction plane relation",
