@@ -167,6 +167,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/sketch_dimension_tests.cpp
     tests/core/sketch_repair_commands_tests.cpp
     tests/core/sketch_repair_suggestions_tests.cpp
+    tests/core/sketch_repair_transactions_tests.cpp
     tests/core/sketch_spline_profile_json_tests.cpp
     tests/core/sketch_tests.cpp
   )
