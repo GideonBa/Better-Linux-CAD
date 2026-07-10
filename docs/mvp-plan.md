@@ -215,27 +215,43 @@ Implemented scope:
 - skipped structured results for unsupported actions such as add-driving-dimension and choose-a-side orientation-conflict removal
 - core tests proving selected safe commands mutate only intended sketch records
 
+## Implemented block: Sketch repair transaction and undo seed
+
+Detailed document: `docs/sketch-repair-transactions-mvp.md`
+
+Implemented scope:
+
+- `SketchRepairTransactionStatus`, `SketchRepairTransaction`, and `SketchRepairTransactionUndoResult`
+- `SketchRepairTransactionExecutor::apply` wrapping one explicit repair command application
+- minimal affected-record capture instead of full sketch snapshots
+- undo for deterministic fixed endpoint constraints added by repair commands
+- undo for removed duplicate fixed endpoint constraints by restoring captured `SketchGeometricConstraint` records
+- undo for removed duplicate driving dimensions by restoring captured `SketchDrivingDimension` records
+- skipped non-undoable transactions for unsupported command results
+- core tests proving apply plus undo restores exact affected records for the safe subset
+
 Still not implemented in this block:
 
-- automatic command execution during diagnostics or suggestion generation
-- undo/redo or transaction grouping
-- add-driving-dimension application with parameter creation
-- user-driven orientation conflict side selection
+- redo
+- in-memory undo stacks
+- persistent transaction journals
+- multi-sketch transaction grouping
 - GUI command workflows
+- parameter-creating repairs
 - full solve iteration or exact DOF counting
 
-## Next MVP: Sketch repair transaction and undo seed
+## Next MVP: Sketch repair undo stack seed
 
-Goal: group applied repair commands into reversible transactions so safe repairs can be previewed, applied, and undone without full sketch snapshots.
+Goal: provide a small in-memory LIFO undo stack for safe repair transactions without implementing a persistent journal or GUI undo framework.
 
 Proposed first implementation sequence:
 
-- add a `SketchRepairTransaction` or equivalent record that groups one or more applied `SketchRepairCommand` results
-- record enough before/after metadata to undo the safe command subset without serializing full sketch snapshots
-- support undo for added fixed endpoint constraints, removed duplicate fixed endpoint constraints, and removed duplicate driving dimensions
-- require explicit caller intent for both apply and undo; transactions must never run automatically during diagnostics or suggestion generation
-- add core tests that apply plus undo restores the exact affected sketch records for the safe subset
-- keep GUI undo stacks, persistent transaction journals, multi-sketch transactions, parameter-creating repairs, full solve iteration, exact DOF counting, and arbitrary model rewriting deferred
+- add a `SketchRepairUndoStack` or equivalent in-memory helper that stores applied `SketchRepairTransaction` records in application order
+- support pushing only applied and undoable repair transactions
+- support undoing the most recent transaction first by delegating to `SketchRepairTransactionExecutor::undo`
+- return a structured stack result with transaction status and remaining stack size
+- add core tests that push multiple safe repair transactions and undo them in strict LIFO order
+- keep redo, persistent transaction journals, multi-sketch stacks, GUI integration, parameter-creating repairs, full solve iteration, exact DOF counting, and arbitrary model rewriting deferred
 
 ## Future roadmap: Multi-body transforms and path features
 
