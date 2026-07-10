@@ -50,6 +50,7 @@ add_library(
   src/core/sketch_repair_commands.cpp
   src/core/sketch_repair_presentation_metadata.cpp
   src/core/sketch_repair_presentation_snapshot.cpp
+  src/core/sketch_repair_presentation_snapshot_query.cpp
   src/core/sketch_repair_suggestions.cpp
   src/core/sketch_repair_transactions.cpp
   src/core/sketch_repair_undo_stack.cpp
