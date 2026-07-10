@@ -99,6 +99,7 @@ Implemented feature blocks:
 - `docs/sketch-repair-undo-stack-mvp.md`
 - `docs/sketch-repair-undo-stack-summary-mvp.md`
 - `docs/sketch-repair-command-labels-mvp.md`
+- `docs/sketch-repair-presentation-metadata-mvp.md`
 
 Future roadmaps:
 
@@ -108,16 +109,14 @@ Future roadmaps:
 
 ## Next technical step
 
-The next technical step should add a sketch repair presentation metadata seed.
+The next technical step should add a sketch repair presentation snapshot seed.
 
-1. Add a `SketchRepairPresentationMetadata` or equivalent read-only record with stable machine-readable label IDs.
-2. Add display categories such as `safe_apply`, `requires_user_choice`, `requires_parameter_value`, and `undo_entry`.
-3. Add a lightweight severity or display-priority enum for repair actions and undo entries.
-4. Compute affected-record counts for added constraints, removed constraints, and removed dimensions.
-5. Expose a concise `affected_summary` string for undo-stack summary entries without changing undo semantics.
-6. Include the metadata fields in undo-stack summary debug JSON next to the existing title and description.
-7. Keep all presentation metadata separate from model intent and `.blcad.json` persistence.
-8. Add core tests and documentation for stable IDs, categories, priorities, affected counts, summaries, and JSON output.
-9. Keep localization, icons, GUI widgets, redo, persistent journals, timestamps, multi-sketch grouping, parameter-creating repairs, full solve iteration, exact DOF counting, and arbitrary model rewriting deferred.
+1. Add a `SketchRepairPresentationSnapshot` or equivalent read-only record that combines summary entry data, labels, and presentation metadata into one CLI/GUI-facing row.
+2. Add a `SketchRepairPresentationSnapshotBuilder` that consumes `SketchRepairUndoStackSummary` and produces ordered snapshot entries without mutating the stack.
+3. Include title, description, label id, category, priority, affected counts, affected summary, action, target, latest marker, and undoable flag in each snapshot entry.
+4. Add debug JSON output for presentation snapshots with a schema distinct from `.blcad.json` model intent.
+5. Keep the existing summary JSON intact for lower-level debugging while exposing snapshot JSON as the preferred presentation output.
+6. Add core tests for empty snapshots, multi-entry stack snapshots, latest-entry metadata, affected-count propagation, and JSON output.
+7. Keep localization, icons, GUI widgets, redo, persistent journals, timestamps, multi-sketch grouping, parameter-creating repairs, full solve iteration, exact DOF counting, and arbitrary model rewriting deferred.
 
-The completed command label block is documented in `docs/sketch-repair-command-labels-mvp.md`.
+The completed presentation metadata block is documented in `docs/sketch-repair-presentation-metadata-mvp.md`.
