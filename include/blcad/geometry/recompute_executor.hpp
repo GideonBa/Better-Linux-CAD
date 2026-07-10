@@ -9,7 +9,9 @@
 #include "blcad/geometry/shape_cache.hpp"
 #include "blcad/geometry/workplane_resolver.hpp"
 
+#include <algorithm>
 #include <cstddef>
+#include <string_view>
 
 namespace blcad::geometry {
 
