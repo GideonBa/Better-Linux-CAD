@@ -112,6 +112,8 @@ A representative entry has this shape:
 
 `SketchRepairPresentationSnapshot` is the preferred output when callers want one row per displayed command without performing their own merge of summary, label, and metadata data.
 
+Read-only filtering for snapshots is implemented separately in `docs/sketch-repair-presentation-snapshot-query-mvp.md`. The unfiltered snapshot JSON remains the default presentation export.
+
 ## Test coverage
 
 The tests cover:
@@ -129,8 +131,8 @@ The tests cover:
 
 This block does not implement localization.
 
-It does not add icons, GUI widgets, selection state, timestamps, redo snapshots, persistent command history, multi-sketch grouping, filtering, sorting, or grouping controls.
+It does not add icons, GUI widgets, selection state, timestamps, redo snapshots, persistent command history, multi-sketch grouping, sorting, or grouping controls.
 
 It does not change repair suggestions, repair commands, transactions, undo behavior, stack summaries, or model validation.
 
-A later block should add read-only filtering and grouping helpers for presentation snapshots, such as filtering by display category, priority, latest entry, or undoable state, while keeping snapshot generation deterministic and non-mutating.
+A later block should add read-only grouping helpers for presentation snapshots while keeping snapshot generation and query filtering deterministic and non-mutating.
