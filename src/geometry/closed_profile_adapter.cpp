@@ -9,6 +9,7 @@
 #include <BRepPrimAPI_MakePrism.hxx>
 #include <Bnd_Box.hxx>
 #include <Standard_Failure.hxx>
+#include <TopoDS.hxx>
 #include <TopoDS_Shape.hxx>
 #include <TopoDS_Wire.hxx>
 #include <gp_Pnt.hxx>
@@ -41,9 +42,7 @@ constexpr double kAxisTolerance = 1.0e-9;
   return message;
 }
 
-[[nodiscard]] gp_Pnt to_gp_point(Point3 point) noexcept {
-  return gp_Pnt(point.x, point.y, point.z);
-}
+[[nodiscard]] gp_Pnt to_gp_point(Point3 point) noexcept { return gp_Pnt(point.x, point.y, point.z); }
 
 [[nodiscard]] Result<TopoDS_Wire> make_profile_wire(const std::vector<Point3>& vertices,
                                                      std::string_view contour_kind) {
@@ -98,7 +97,8 @@ constexpr double kAxisTolerance = 1.0e-9;
     if (inner_wire.has_error()) {
       return Result<TopoDS_Shape>::failure(inner_wire.error());
     }
-    face_builder.Add(inner_wire.value());
+    const TopoDS_Wire reversed_inner_wire = TopoDS::Wire(inner_wire.value().Reversed());
+    face_builder.Add(reversed_inner_wire);
   }
 
   if (!face_builder.IsDone()) {
@@ -141,8 +141,7 @@ constexpr double kAxisTolerance = 1.0e-9;
 }
 
 [[nodiscard]] Point3 translate_along_axis(Point3 point, Vector3 axis, double delta) noexcept {
-  return Point3{point.x + axis.x * delta, point.y + axis.y * delta,
-                point.z + axis.z * delta};
+  return Point3{point.x + axis.x * delta, point.y + axis.y * delta, point.z + axis.z * delta};
 }
 
 [[nodiscard]] Result<std::vector<Point3>> move_profile_to_through_all_start(
@@ -227,13 +226,9 @@ Result<GeometryShape> ClosedProfileAdapter::make_extruded_profile(
 
   try {
     auto face = make_profile_face(vertices);
-    if (face.has_error()) {
-      return Result<GeometryShape>::failure(face.error());
-    }
+    if (face.has_error()) return Result<GeometryShape>::failure(face.error());
     auto shape = make_prism_shape_from_face(face.value(), direction, depth);
-    if (shape.has_error()) {
-      return Result<GeometryShape>::failure(shape.error());
-    }
+    if (shape.has_error()) return Result<GeometryShape>::failure(shape.error());
     return Result<GeometryShape>::success(
         GeometryShape(std::make_shared<GeometryShape::Impl>(std::move(shape.value()))));
   } catch (const Standard_Failure& failure) {
@@ -260,13 +255,9 @@ Result<GeometryShape> ClosedProfileAdapter::make_extruded_profile_with_holes(
 
   try {
     auto face = make_profile_face_with_holes(outer_vertices, inner_vertices);
-    if (face.has_error()) {
-      return Result<GeometryShape>::failure(face.error());
-    }
+    if (face.has_error()) return Result<GeometryShape>::failure(face.error());
     auto shape = make_prism_shape_from_face(face.value(), direction, depth);
-    if (shape.has_error()) {
-      return Result<GeometryShape>::failure(shape.error());
-    }
+    if (shape.has_error()) return Result<GeometryShape>::failure(shape.error());
     return Result<GeometryShape>::success(
         GeometryShape(std::make_shared<GeometryShape::Impl>(std::move(shape.value()))));
   } catch (const Standard_Failure& failure) {
@@ -287,9 +278,7 @@ Result<GeometryShape> ClosedProfileAdapter::cut_profile_through_all(
 
   try {
     const auto axis = normalize_principal_axis(axis_direction);
-    if (axis.has_error()) {
-      return Result<GeometryShape>::failure(axis.error());
-    }
+    if (axis.has_error()) return Result<GeometryShape>::failure(axis.error());
 
     const TopoDS_Shape& target_shape = target.impl_->shape;
 
@@ -309,14 +298,10 @@ Result<GeometryShape> ClosedProfileAdapter::cut_profile_through_all(
 
     const auto moved_vertices = move_profile_to_through_all_start(
         vertices, axis.value(), x_min, y_min, z_min, x_max, y_max, z_max);
-    if (moved_vertices.has_error()) {
-      return Result<GeometryShape>::failure(moved_vertices.error());
-    }
+    if (moved_vertices.has_error()) return Result<GeometryShape>::failure(moved_vertices.error());
 
     auto face = make_profile_face(moved_vertices.value());
-    if (face.has_error()) {
-      return Result<GeometryShape>::failure(face.error());
-    }
+    if (face.has_error()) return Result<GeometryShape>::failure(face.error());
 
     const double length = through_all_length(axis.value(), x_min, y_min, z_min, x_max, y_max, z_max);
     BRepPrimAPI_MakePrism prism_builder(
@@ -363,9 +348,7 @@ Result<GeometryShape> ClosedProfileAdapter::cut_profile_with_holes_through_all(
 
   try {
     const auto axis = normalize_principal_axis(axis_direction);
-    if (axis.has_error()) {
-      return Result<GeometryShape>::failure(axis.error());
-    }
+    if (axis.has_error()) return Result<GeometryShape>::failure(axis.error());
 
     const TopoDS_Shape& target_shape = target.impl_->shape;
 
@@ -385,19 +368,13 @@ Result<GeometryShape> ClosedProfileAdapter::cut_profile_with_holes_through_all(
 
     auto moved_outer = move_profile_to_through_all_start(
         outer_vertices, axis.value(), x_min, y_min, z_min, x_max, y_max, z_max);
-    if (moved_outer.has_error()) {
-      return Result<GeometryShape>::failure(moved_outer.error());
-    }
+    if (moved_outer.has_error()) return Result<GeometryShape>::failure(moved_outer.error());
     auto moved_inner = move_inner_profiles_to_through_all_start(
         inner_vertices, axis.value(), x_min, y_min, z_min, x_max, y_max, z_max);
-    if (moved_inner.has_error()) {
-      return Result<GeometryShape>::failure(moved_inner.error());
-    }
+    if (moved_inner.has_error()) return Result<GeometryShape>::failure(moved_inner.error());
 
     auto face = make_profile_face_with_holes(moved_outer.value(), moved_inner.value());
-    if (face.has_error()) {
-      return Result<GeometryShape>::failure(face.error());
-    }
+    if (face.has_error()) return Result<GeometryShape>::failure(face.error());
 
     const double length = through_all_length(axis.value(), x_min, y_min, z_min, x_max, y_max, z_max);
     BRepPrimAPI_MakePrism prism_builder(
