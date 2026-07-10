@@ -1,5 +1,7 @@
 # MVP Plan
 
+This document tracks the current implementation sequence. Detailed technical scope lives in the referenced documents.
+
 ## MVP 1: Single-part modeling
 
 Goal: one single parametric part with a headless file-based export path.
@@ -8,329 +10,71 @@ Detailed document: `docs/mvp-1-specification.md`
 
 Implemented scope:
 
-- part document, parameters with units, datum planes, sketches, and feature-intent records
+- `PartDocument`, parameters with units, datum planes, sketches, and feature-intent records
 - rectangle and circle profile seeds
 - additive extrude and subtractive through-all cut seeds
-- dependency graph, invalidation state, recompute plan, and numeric parameter update
+- dependency graph, invalidation state, recompute plan, and numeric parameter updates
 - optional OCCT geometry execution through `ShapeCache`
 - STEP export and headless JSON-to-STEP example
 - JSON serialization of the currently JSON-backed model-intent records
 
-## MVP 2: Sketch on planar face
-
-Goal: place sketches on existing generated planar faces while preserving semantic model intent instead of storing raw OCCT face IDs.
-
-Implemented seed:
-
-- semantic references for top, bottom, right, left, front, and back faces of a simple additive extrude
-- `DerivedWorkplane` from those semantic faces
-- sketches can reference derived workplanes
-- dependency graph paths from source feature to workplane, sketch, and dependent feature
-- JSON serialization for `derived_workplanes`
-- geometry-layer `WorkplaneResolver`
-- rectangular bounds on resolved generated-face workplanes
-- circular cut and closed-profile recompute through resolved workplanes
-
-## Implemented block: Line-based general closed sketch profiles
-
-Detailed document: `docs/general-closed-sketch-profile-mvp.md`
-
-Implemented scope:
-
-- `SketchEntityId`, `LineSegment`, and `ClosedProfile`
-- ordered line-segment references
-- validation of closed, connected, non-self-intersecting line loops
-- JSON serialization and roundtrip tests for `line_segments` and `closed_profiles`
-- OCCT wire and face creation from ordered line vertices
-- additive and subtractive recompute from one closed profile
-
-## Implemented block: Construction geometry, chained relations, and evaluated semantic references
-
-Detailed document: `docs/construction-geometry-mvp.md`
-
-Implemented scope:
-
-- explicit and relation-driven construction points, lines, and planes
-- construction relation IDs and relation intent records
-- optional construction-geometry parameter dependencies
-- construction planes as sketch workplanes
-- semantic generated edge and vertex references
-- `SemanticReferenceEvaluator` for the rectangular-additive-extrude seed
-- `ConstructionPointResolver` and `ConstructionLineResolver`
-- chained construction-relation dependency and invalidation tests
-
-## Implemented block: Projected sketch references and first reference-driven constraints
-
-Detailed document: `docs/projected-sketch-reference-geometry.md`
-
-Implemented scope:
-
-- `ProjectedSketchPoint` and `ProjectedSketchLine`
-- model-intent references to construction geometry and semantic generated references
-- `SketchReferenceTarget` handles for line segments, line endpoints, projected points, and projected lines
-- first `SketchConstraint` records
-- `coincident_to_projected_point`, `parallel_to_projected_line`, and `collinear_with_projected_line`
-- projected-reference JSON persistence
-- `SketchReferenceProjector`, `ReferenceDrivenSketchHelper`, and deterministic helper-line generation
-- dependency graph edges from projected references to owning sketches
-
-## Implemented block: Robust reference remapping and sketch placement recovery
-
-Detailed document: `docs/reference-recovery-mvp.md`
-
-Implemented scope:
-
-- `ReferenceStatusRecord` with `resolved` and `lost` states
-- `ReferenceRemapRecord` for explicit same-kind semantic remap intent
-- `SketchOriginOverrideRecord`
-- `ReferenceRecoveryEvaluator`
-- JSON persistence for recovery metadata
-- sketch-aware workplane resolution using origin overrides
-
-## Implemented block: Deterministic profile consumption from reference-driven sketch helpers
-
-Detailed document: `docs/reference-generated-profile-helpers-mvp.md`
-
-Implemented scope:
-
-- `ReferenceGeneratedLine`
-- JSON persistence for `reference_generated_lines`
-- validation of endpoint and optional projected-line direction constraints
-- helper-line dependency graph nodes
-- `ReferenceGeneratedProfileResolver`
-- additive and subtractive recompute from reference-generated helper profiles
-
-## Implemented block: Sketch constraints and dimensions seed
-
-Detailed document: `docs/sketch-constraints-and-dimensions-mvp.md`
-
-Implemented scope:
-
-- `SketchGeometricConstraint` records for fixed, horizontal, vertical, parallel, perpendicular, and equal-length constraints
-- `SketchDrivingDimension` records for horizontal, vertical, aligned, and point-to-point distances
-- JSON persistence for geometric constraints and driving dimensions
-- dependency graph edges from driving dimension parameters to sketches and dependent features
-- `DimensionDrivenProfileResolver`
-- additive and subtractive recompute from deterministic dimension-driven profiles
-
-## Implemented block: Automatic profile region detection seed
-
-Detailed document: `docs/automatic-profile-region-detection-mvp.md`
-
-Implemented scope:
-
-- `SketchRegionFinder`
-- deterministic single-region detection from unordered explicit sketch lines
-- local-line collection from explicit lines, dimension-resolved explicit lines, and resolved reference-generated helper lines
-- stable generated `ClosedProfile` candidate IDs
-- additive and subtractive recompute from one detected region
-
-## Implemented block: Multi-contour profiles and holes seed
-
-Detailed document: `docs/composite-closed-profile-holes-mvp.md`
-
-Implemented scope:
-
-- `CompositeClosedProfile` with one ordered outer contour and ordered inner contours
-- core validation for contour sizes, duplicate line ids, and shared line ids across contours
-- sketch-level validation for ordered, connected, non-self-intersecting contours
-- geometry validation that inner contours lie strictly inside the outer contour and do not overlap
-- `ClosedProfileAdapter` support for OCCT faces with inner wires
-- additive and subtractive recompute from composite profiles with holes
-
-## Implemented block: Arc and trim/extend sketch profile seed
-
-Detailed document: `docs/arc-and-trim-extend-sketch-profile-mvp.md`
-
-Implemented scope:
-
-- `ArcSegment` as a three-point circular-arc sketch entity
-- `ArcClosedProfile` as an ordered line/arc contour profile record
-- `SketchTrimExtendOperation` records for explicit trim/extend endpoint metadata
-- first curved-contour self-intersection validation for line/line, line/arc, and arc/arc pairs
-- JSON roundtrip for `arc_segments`, `trim_extend_operations`, and `arc_closed_profiles`
-- `ClosedProfileAdapter` curve APIs for OCCT wires with line and circular-arc edges
-- additive and subtractive recompute from one arc closed profile
-
-## Implemented block: Sketch-plane extrude direction seed
-
-Detailed document: `docs/sketch-plane-extrude-direction-mvp.md`
-
-Implemented scope:
-
-- `ExtrudeDirection::SketchNormal`
-- `ExtrudeDirection::OppositeSketchNormal`
-- legacy `+Z` JSON loading as `sketch_normal`
-- rectangle additive extrudes mapped through the resolved sketch workplane instead of the old global rectangle path
-- arbitrary-axis through-all placement for circular and profile cuts using target bounding-box projection
-- tests for slanted construction-plane additive extrude and opposite sketch-normal storage
-
-## Implemented block: Spline and tangent-continuity sketch profile seed
-
-Detailed document: `docs/spline-and-tangent-continuity-mvp.md`
-
-Implemented scope:
-
-- `SplineSegment` as an explicit cubic-Bezier sketch entity
-- `SketchTangentContinuity` tangent metadata between two explicit sketch curve entities
-- ordered line/arc/spline profile support through the existing `ArcClosedProfile` record
-- JSON persistence for `spline_segments` and `tangent_continuities`
-- OCCT Bezier-edge construction from four spline poles
-- additive and subtractive recompute from one line/spline closed profile
-
-## Implemented block: Sketch solver diagnostics seed
-
-Detailed document: `docs/sketch-solver-diagnostics-mvp.md`
-
-Implemented scope:
-
-- `SketchDiagnosticSeverity`, `SketchDiagnosticKind`, `SketchConstraintDiagnostic`, and `SketchDiagnosticReport`
-- `SketchConstraintDiagnostics::analyze` as a pure report generator that does not mutate model intent
-- warnings for unconstrained endpoints, free spline handles, and profile sketches without driving dimensions
-- errors for horizontal/vertical conflicts, duplicate fixed endpoint constraints, and duplicate driving dimensions
-- debug JSON output through `serialize_sketch_diagnostic_report_to_json`
-
-## Implemented block: Sketch repair suggestion seed
-
-Detailed document: `docs/sketch-repair-suggestions-mvp.md`
-
-Implemented scope:
-
-- `SketchRepairSuggestionAction`, `SketchRepairSuggestion`, and `SketchRepairSuggestionReport`
-- `SketchRepairSuggester::suggest` as a pure report generator that consumes `SketchDiagnosticReport`
-- deterministic suggestion mapping for unconstrained endpoints, horizontal/vertical conflicts, duplicate fixed endpoints, duplicate driving dimensions, and undimensioned profile sketches
-- links from each suggestion to the originating diagnostic kind and target
-- debug JSON output through `serialize_sketch_repair_suggestion_report_to_json`
-
-## Implemented block: Sketch repair application command seed
-
-Detailed document: `docs/sketch-repair-commands-mvp.md`
-
-Implemented scope:
-
-- `SketchRepairCommandStatus`, `SketchRepairCommand`, and `SketchRepairCommandResult`
-- `SketchRepairCommandExecutor::apply` for explicitly selected repair suggestions
-- narrow mutation hooks on `Sketch` for removing one geometric constraint or one driving dimension by ID
-- safe apply subset: add deterministic fixed endpoint constraint, remove duplicate fixed endpoint constraints, and remove duplicate driving dimensions
-- skipped structured results for unsupported actions such as add-driving-dimension and choose-a-side orientation-conflict removal
-- core tests proving selected safe commands mutate only intended sketch records
-
-## Implemented block: Sketch repair transaction and undo seed
-
-Detailed document: `docs/sketch-repair-transactions-mvp.md`
-
-Implemented scope:
-
-- `SketchRepairTransactionStatus`, `SketchRepairTransaction`, and `SketchRepairTransactionUndoResult`
-- `SketchRepairTransactionExecutor::apply` wrapping one explicit repair command application
-- minimal affected-record capture instead of full sketch snapshots
-- undo for deterministic fixed endpoint constraints added by repair commands
-- undo for removed duplicate fixed endpoint constraints by restoring captured `SketchGeometricConstraint` records
-- undo for removed duplicate driving dimensions by restoring captured `SketchDrivingDimension` records
-- skipped non-undoable transactions for unsupported command results
-- core tests proving apply plus undo restores exact affected records for the safe subset
-
-## Implemented block: Sketch repair undo stack seed
-
-Detailed document: `docs/sketch-repair-undo-stack-mvp.md`
-
-Implemented scope:
-
-- `SketchRepairUndoStackStatus`, `SketchRepairUndoStackResult`, and `SketchRepairUndoStack`
-- in-memory storage of applied undoable `SketchRepairTransaction` records
-- rejection of non-undoable transactions without changing stack depth
-- strict LIFO undo by delegating to `SketchRepairTransactionExecutor::undo`
-- structured stack results with transaction status, remaining stack size, and affected record IDs
-- core tests proving multiple safe repair transactions undo in reverse application order
-- empty-stack undo returning a non-mutating `Empty` result
-
-## Implemented block: Sketch repair undo stack summary seed
-
-Detailed document: `docs/sketch-repair-undo-stack-summary-mvp.md`
-
-Implemented scope:
-
-- `SketchRepairUndoStackSummaryEntry`, `SketchRepairUndoStackSummary`, and `SketchRepairUndoStackSummarizer`
-- read-only stack inspection ordered from oldest transaction to newest transaction
-- latest-transaction marker for the entry that `undo_latest` would undo next
-- exposure of transaction status, action, target, undoable flag, and affected record IDs
-- debug JSON output through `serialize_sketch_repair_undo_stack_summary_to_json`
-- core tests for empty summaries, stable ordering, latest marker, affected IDs, and debug JSON
-
-## Implemented block: Sketch repair command label seed
-
-Detailed document: `docs/sketch-repair-command-labels-mvp.md`
-
-Implemented scope:
-
-- `SketchRepairCommandLabel` and `SketchRepairCommandLabeler`
-- deterministic action labels for all current safe and unsupported repair actions
-- undo-oriented labels for `SketchRepairUndoStackSummaryEntry` records
-- presentation-only label data kept separate from model intent and `.blcad.json`
-- title and description fields in undo-stack summary debug JSON
-- core tests for deterministic action labels and summary-entry label JSON
-
-## Implemented block: Sketch repair presentation metadata seed
-
-Detailed document: `docs/sketch-repair-presentation-metadata-mvp.md`
-
-Implemented scope:
-
-- `SketchRepairDisplayCategory` with `safe_apply`, `requires_user_choice`, `requires_parameter_value`, and `undo_entry`
-- `SketchRepairDisplayPriority` with `low`, `normal`, and `high`
-- `SketchRepairAffectedCounts` for added constraints, removed constraints, removed dimensions, and total count
-- `SketchRepairPresentationMetadata` and `SketchRepairPresentationMetadataProvider`
-- stable machine-readable `label_id` values for repair actions and undo-stack entries
-- concise `affected_summary` generation for undo-stack summary entries
-- presentation metadata fields in undo-stack summary debug JSON
-- core tests for categories, priorities, stable ids, affected counts, summaries, and JSON output
-
-## Implemented block: Sketch repair presentation snapshot seed
-
-Detailed document: `docs/sketch-repair-presentation-snapshot-mvp.md`
-
-Implemented scope:
-
-- `SketchRepairPresentationSnapshotEntry`, `SketchRepairPresentationSnapshot`, and `SketchRepairPresentationSnapshotBuilder`
-- read-only row model that combines summary entry data, labels, and presentation metadata
-- preservation of undo-stack ordering and latest-entry semantics
-- snapshot rows with action, target, undoable flag, title, description, label id, display category, display priority, affected counts, and affected summary
-- distinct snapshot debug JSON through `serialize_sketch_repair_presentation_snapshot_to_json`
-- core tests for empty snapshots, multi-entry snapshots, latest metadata, affected-count propagation, and JSON output
-
-## Implemented block: Sketch repair presentation snapshot query seed
-
-Detailed document: `docs/sketch-repair-presentation-snapshot-query-mvp.md`
-
-Implemented scope:
-
-- `SketchRepairPresentationSnapshotQuery`, `SketchRepairPresentationSnapshotQueryCounts`, and `SketchRepairPresentationSnapshotQueryResult`
-- `SketchRepairPresentationSnapshotQueryEngine` for read-only filtering of presentation snapshots
-- filtering by display category, display priority, latest-only, and undoable-only
-- AND semantics when multiple filters are enabled
-- preservation of source snapshot order in every filtered output
-- category and priority count helpers computed from the filtered result
-- distinct query debug JSON through `serialize_sketch_repair_presentation_snapshot_query_result_to_json`
-- core tests for empty queries, category filtering, priority filtering, latest-only filtering, undoable-only filtering, combined filters, ordering, count helpers, and JSON output
-
-Still not implemented in this block:
-
-- localization
-- icons or GUI widgets
-- timestamps
-- snapshot grouping helpers
-- custom sorting or saved filters
-- label-id/text search filters
-- redo snapshots or persistent command history
-- multi-sketch stack coordination
-- parameter-creating repairs
-- full solve iteration or exact DOF counting
+## MVP 2: Sketch on planar face and richer sketch-driven profiles
+
+Goal: preserve semantic model intent while sketches, workplanes, references, and profiles become richer.
+
+Implemented feature documents:
+
+- `docs/derived-workplane-mvp2-seed.md`
+- `docs/workplane-resolver-mvp2.md`
+- `docs/general-closed-sketch-profile-mvp.md`
+- `docs/construction-geometry-mvp.md`
+- `docs/projected-sketch-reference-geometry.md`
+- `docs/reference-recovery-mvp.md`
+- `docs/reference-generated-profile-helpers-mvp.md`
+- `docs/sketch-constraints-and-dimensions-mvp.md`
+- `docs/automatic-profile-region-detection-mvp.md`
+- `docs/composite-closed-profile-holes-mvp.md`
+- `docs/arc-and-trim-extend-sketch-profile-mvp.md`
+- `docs/sketch-plane-extrude-direction-mvp.md`
+- `docs/spline-and-tangent-continuity-mvp.md`
+
+Implemented scope summary:
+
+- semantic face-derived workplanes and sketch placement recovery
+- reference-driven projected sketch geometry
+- construction geometry and chained relations
+- line, arc, spline, composite, and automatically detected profile regions
+- first sketch constraints and driving dimensions
+- sketch-plane-relative extrude direction and geometry recompute support
+
+## Implemented block: Sketch diagnostics, repair, and presentation helpers
+
+Detailed documents:
+
+- `docs/sketch-solver-diagnostics-mvp.md`
+- `docs/sketch-repair-suggestions-mvp.md`
+- `docs/sketch-repair-commands-mvp.md`
+- `docs/sketch-repair-transactions-mvp.md`
+- `docs/sketch-repair-undo-stack-mvp.md`
+- `docs/sketch-repair-undo-stack-summary-mvp.md`
+- `docs/sketch-repair-command-labels-mvp.md`
+- `docs/sketch-repair-presentation-metadata-mvp.md`
+- `docs/sketch-repair-presentation-snapshot-mvp.md`
+- `docs/sketch-repair-presentation-snapshot-query-mvp.md`
+
+Implemented scope summary:
+
+- read-only sketch diagnostics and deterministic repair suggestions
+- explicit safe repair commands for selected suggestions
+- transaction capture and undo for the safe subset
+- in-memory undo stack and stack summaries
+- read-only labels, presentation metadata, snapshots, and snapshot queries for future CLI/GUI consumers
 
 ## Frozen block: Sketch repair presentation helpers
 
-The sketch-repair presentation chain (commands, transactions, undo stack, summaries, labels, metadata, snapshots, snapshot queries) is complete enough for the current headless stage. It has no consumers outside its own tests yet, and `docs/user-interface.md` keeps GUI work out of scope until the core model path is reliable.
+The sketch-repair presentation chain is complete enough for the current headless stage. It has no consumers outside its own tests yet, and `docs/user-interface.md` keeps GUI work out of scope until the core model path is reliable.
 
-Decision: no further presentation-layer increments (grouping, sorting, localization, icons, widgets) until a first GUI or CLI consumer exists. Development returns to the numbered core-CAD MVP sequence.
+Decision: no further presentation-layer increments such as grouping, sorting, localization, icons, or widgets until a first GUI or CLI consumer exists. Development follows the numbered core-CAD MVP sequence.
 
 ## Implemented block: MVP 3 parametric bolt circle pattern
 
@@ -338,23 +82,17 @@ Detailed document: `docs/bolt-circle-pattern-mvp3.md`
 
 Implemented scope:
 
-- `QuantityKind` with `LengthMm` and `Count`, `Quantity::count`, and `Quantity::count_value`
-- `ParameterType::Count` and `Parameter::create_count` for whole-number parameters
-- JSON parameter type `count` with unit `"1"`
-- `CircularHolePattern` sketch record with center, angle offset, radius parameter, count parameter, and hole diameter parameter
-- parameter existence and type validation in `PartDocument::add_sketch`
-- dependency edges from all three pattern parameters to the owning sketch
-- subtractive recompute expands the pattern into sequential through-all circular cuts with per-hole bounds validation
-- JSON roundtrip for count parameters and `circular_hole_patterns`
-- checked-in `examples/bolt_circle_plate.blcad.json` with headless STEP export
-- incremental recompute tests: changing `bolt_count` from 6 to 12 and changing `bolt_circle_radius` recompute the affected features only
-- cross-kind profile-id uniqueness fix: `has_profile_id` now covers rectangle, circle, closed, arc, composite, and pattern profiles
+- `QuantityKind::Count`, `ParameterType::Count`, and count JSON support
+- `CircularHolePattern` sketch record with radius, count, and hole-diameter parameters
+- dependency edges from pattern parameters to sketches and dependent features
+- subtractive geometry recompute that expands the pattern into per-hole through-all cuts
+- JSON roundtrip and checked-in `examples/bolt_circle_plate.blcad.json`
+- incremental recompute tests for pattern count and radius changes
 
-Still not implemented in this block:
+Still deferred:
 
-- assembly-scoped parameters shared across parts (MVP 4)
-- hole semantics such as clearance class, threads, and countersinks (`docs/hole-wizard.md`)
-- skip instances and partial-angle patterns (`docs/pattern-and-mirror-features.md`)
+- hole wizard semantics such as clearance class, threads, and countersinks
+- partial-angle and skipped-instance patterns
 - seed-feature patterns that repeat arbitrary features
 
 ## Implemented block: MVP 4 seed, assembly parameters shared across parts
@@ -363,36 +101,52 @@ Detailed document: `docs/assembly-parameters-mvp4.md`
 
 Implemented scope:
 
-- `AssemblyDocument` with assembly-scoped parameters (`ParameterScope::Assembly`)
+- `AssemblyDocument` with assembly-scoped parameters
 - member part registration by `DocumentId`
-- `ParameterBinding` records: a part parameter follows an assembly parameter
-- binding validation: membership, existing assembly parameter, one binding per part parameter
-- `apply_bindings_to(PartDocument&)` propagates values through `PartDocument::set_parameter_value`, so part invalidation and recompute planning work unchanged
-- length/count type agreement is enforced at application time
-- JSON schema `blcad.assembly_document.mvp4` with roundtrip tests
-- checked-in `examples/flange_assembly.blcad.json` binding the bolt-circle plate example
-- geometry end-to-end test: changing `assembly.bolt_count` from 6 to 8 recomputes two member plates to the expected volumes
+- `ParameterBinding` records so part parameters can follow assembly parameters
+- binding validation for membership, existing assembly parameter, and one binding per part parameter
+- `apply_bindings_to(PartDocument&)` using normal `PartDocument::set_parameter_value`
+- length/count type agreement at application time
+- JSON schema `blcad.assembly_document.mvp4`
+- checked-in `examples/flange_assembly.blcad.json`
+- geometry end-to-end test for one assembly parameter driving two member plates
 
-Still not implemented in this block:
+## Implemented block: MVP 4 project container for assembly and member parts
 
-- a project container that owns assembly and parts and auto-propagates after assembly edits
-- component instances, transforms, and assembly constraints (MVP 5, `docs/assembly-system.md`)
-- expressions over assembly parameters and a global/project scope (`docs/parameter-model.md`)
+Detailed document: `docs/project-container-mvp4.md`
 
-## Next MVP: Project container for assembly and member parts
+Implemented scope:
 
-Goal: one on-disk project that owns an assembly document and its member part documents, so assembly edits propagate without manual per-part calls and the whole model round-trips through one file set.
+- `Project` model owning one `AssemblyDocument` and embedded `PartDocument`s
+- validation that every assembly member id resolves to an owned project part document
+- automatic binding propagation to affected member parts after a project-level assembly parameter update
+- `ProjectPartUpdate` and `ProjectUpdateResult` with per-part recompute plans
+- JSON schema `blcad.project.mvp4` using embedded assembly and part documents
+- file helpers for reading and writing project JSON
+- headless `blcad_export_project` example that loads a project, updates one assembly parameter, recomputes owned parts, and exports each part to STEP
+- tests for membership validation, automatic propagation, per-part invalidation, JSON roundtrip, and missing-member rejection
+
+Still deferred:
+
+- component instances, transforms, and assembly constraints
+- assembly-level STEP export
+- manifest-based project files and external part references
+- lazy part loading and dirty-file tracking
+
+## Next MVP: First component instance seed
+
+Goal: start MVP 5 by introducing assembly component instances that reference owned project part documents without duplicating part geometry.
 
 Proposed first implementation sequence:
 
-- add a `Project` (or `ProjectFile`) model owning one `AssemblyDocument` and its member `PartDocument`s
-- validate that every assembly member id resolves to an owned part document
-- after `set_parameter_value` on the assembly, apply bindings to all affected member parts automatically
-- surface per-part recompute plans (or one combined plan summary) from a single project-level update call
-- add JSON persistence: either one project file embedding the documents or a manifest referencing part files (`docs/file-format.md`)
-- extend the headless example so one command loads a project, updates an assembly parameter, recomputes, and exports all member parts to STEP
-- add tests: membership validation, automatic propagation, per-part invalidation, JSON roundtrip, headless export
-- keep component instances and constraints out of scope (MVP 5)
+- add a `ComponentInstance` record owned by `AssemblyDocument` or a closely related assembly-structure model
+- store stable instance id, display name, referenced project part document id, visibility, suppression state, and grounded/fixed state
+- add an initial rigid transform record for free placement, but do not solve constraints yet
+- validate that every component instance references an assembly member part and an owned project part
+- add JSON persistence for component instances inside the assembly/project structure
+- add project-level tests proving two instances can reference the same part document without duplicating part geometry
+- add a minimal headless inspection/export hook that lists component instances and their referenced part documents
+- keep mate/concentric/distance constraints, solver, DOF display, collision checks, subassemblies, and assembly-level STEP export deferred
 
 ## Future roadmap: Multi-body transforms and path features
 
