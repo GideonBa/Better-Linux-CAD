@@ -18,12 +18,12 @@ std::string_view to_string(FeatureType type) noexcept {
 std::string_view to_string(ExtrudeDirection direction) noexcept {
   switch (direction) {
   case ExtrudeDirection::SketchNormal:
-    return "sketch_normal";
+    return "+Z";
   case ExtrudeDirection::OppositeSketchNormal:
     return "opposite_sketch_normal";
   }
 
-  return "sketch_normal";
+  return "+Z";
 }
 
 std::string_view to_string(SubtractiveExtrudeDepth depth) noexcept {
@@ -93,37 +93,14 @@ Result<Feature> Feature::create_subtractive_extrude(FeatureId id, std::string na
               std::move(input_sketch), ParameterId(), std::move(target_feature), direction, depth));
 }
 
-const FeatureId& Feature::id() const noexcept {
-  return id_;
-}
-
-const std::string& Feature::name() const noexcept {
-  return name_;
-}
-
-FeatureType Feature::type() const noexcept {
-  return type_;
-}
-
-const SketchId& Feature::input_sketch() const noexcept {
-  return input_sketch_;
-}
-
-const ParameterId& Feature::length_parameter() const noexcept {
-  return length_parameter_;
-}
-
-const FeatureId& Feature::target_feature() const noexcept {
-  return target_feature_;
-}
-
-ExtrudeDirection Feature::direction() const noexcept {
-  return direction_;
-}
-
-SubtractiveExtrudeDepth Feature::subtractive_depth() const noexcept {
-  return subtractive_depth_;
-}
+const FeatureId& Feature::id() const noexcept { return id_; }
+const std::string& Feature::name() const noexcept { return name_; }
+FeatureType Feature::type() const noexcept { return type_; }
+const SketchId& Feature::input_sketch() const noexcept { return input_sketch_; }
+const ParameterId& Feature::length_parameter() const noexcept { return length_parameter_; }
+const FeatureId& Feature::target_feature() const noexcept { return target_feature_; }
+ExtrudeDirection Feature::direction() const noexcept { return direction_; }
+SubtractiveExtrudeDepth Feature::subtractive_depth() const noexcept { return subtractive_depth_; }
 
 Feature::Feature(FeatureId id, std::string name, FeatureType type, SketchId input_sketch,
                  ParameterId length_parameter, FeatureId target_feature, ExtrudeDirection direction,
