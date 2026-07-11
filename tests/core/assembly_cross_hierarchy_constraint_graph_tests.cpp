@@ -5,6 +5,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <iterator>
 #include <optional>
 #include <string_view>
 #include <utility>
