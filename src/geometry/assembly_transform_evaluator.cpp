@@ -66,4 +66,11 @@ AssemblySpacePlanarDescriptor AssemblyTransformEvaluator::evaluate_plane(
       evaluate_vector(transform, component_local_plane.normal)};
 }
 
+AssemblySpaceAxisDescriptor AssemblyTransformEvaluator::evaluate_axis(
+    const RigidTransform& transform,
+    const ComponentLocalAxisDescriptor& component_local_axis) const noexcept {
+  return AssemblySpaceAxisDescriptor{evaluate_point(transform, component_local_axis.origin),
+                                     evaluate_vector(transform, component_local_axis.direction)};
+}
+
 } // namespace blcad::geometry
