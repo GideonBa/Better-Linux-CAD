@@ -6,7 +6,7 @@ Detailed architecture and feature status live in `docs/`. This README is intenti
 
 ## Status
 
-Current state: MVP-1 core skeleton, staged MVP-2 seeds for sketches, workplanes, profile geometry, recompute, STEP export, reference recovery, sketch diagnostics, and repair-command infrastructure, the MVP-3 parametric bolt circle, the MVP-4 assembly/project container path, and MVP-5 component instances with explicit free-placement/state updates, solver-independent Mate/Concentric/Distance constraint model intent, a deterministic read-only active-constraint graph, read-only generated-face assembly target resolution, and explicit read-only component-local-to-assembly-space rigid-transform evaluation.
+Current state: MVP-1 core skeleton, staged MVP-2 seeds for sketches, workplanes, profile geometry, recompute, STEP export, reference recovery, sketch diagnostics, and repair-command infrastructure, the MVP-3 parametric bolt circle, the MVP-4 assembly/project container path, and MVP-5 component instances with explicit free-placement/state updates, solver-independent Mate/Concentric/Distance constraint intent, a deterministic read-only active-constraint graph, generated-face assembly target resolution, explicit rigid-transform evaluation, and read-only planar Mate/Distance equation-residual construction.
 
 There is no GUI yet.
 
@@ -91,6 +91,7 @@ Implemented feature blocks:
 - `docs/assembly-constraint-graph-mvp5.md`
 - `docs/assembly-constraint-target-resolution-mvp5.md`
 - `docs/assembly-rigid-transform-evaluation-mvp5.md`
+- `docs/assembly-planar-constraint-equations-mvp5.md`
 - `docs/general-closed-sketch-profile-mvp.md`
 - `docs/composite-closed-profile-holes-mvp.md`
 - `docs/arc-and-trim-extend-sketch-profile-mvp.md`
@@ -123,6 +124,6 @@ Future roadmaps:
 
 ## Next technical step
 
-The next technical step is a first read-only planar Mate/Distance constraint equation-construction seed. Consume active constraint records, resolve the currently supported generated-face targets, evaluate both target planes into assembly space, and construct deterministic equation/residual data without solving for or mutating component transforms.
+The next technical step is a first rigid-body assembly solver seed over the implemented active-constraint graph and planar Mate/Distance residual descriptors. Define fixed versus variable component participation, consume the documented residual conventions, solve supported connected groups, and produce explicit transform-update results.
 
-Do not run a rigid-body solver, compute remaining degrees of freedom, enforce grounding, or add semantic axis references in this block. Concentric equation construction remains deferred until a stable semantic axis-reference family exists. The completed transform-evaluation block is documented in `docs/assembly-rigid-transform-evaluation-mvp5.md`; the detailed next-step scope remains in `docs/mvp-plan.md` and `docs/assembly-system.md`.
+The solver must define grounding participation, variable transform representation, convergence/failure behavior, and the transform mutation boundary before component placement is changed. Concentric remains deferred until semantic axis targets and Concentric residual construction exist; no DOF-state persistence or richer constraint families belong in the first solver seed.
