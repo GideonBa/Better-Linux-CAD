@@ -6,7 +6,6 @@
 #include "blcad/core/result.hpp"
 
 #include <cstddef>
-#include <optional>
 #include <vector>
 
 namespace blcad::geometry::detail {
@@ -31,14 +30,14 @@ struct AssemblyRevoluteJointDrive {
 };
 
 // Derived numeric relationship selection. Persistent assembly constraints remain
-// distinct from persistent joint intent; a motion query may append one transient
-// revolute drive to the same residual/Jacobian system.
+// distinct from persistent joint intent; a motion query may append deterministic
+// revolute drives to the same residual/Jacobian system.
 struct AssemblyNumericRelationshipSet {
   std::vector<AssemblyConstraintId> constraint_ids;
-  std::optional<AssemblyRevoluteJointDrive> revolute_drive;
+  std::vector<AssemblyRevoluteJointDrive> revolute_drives;
 
   [[nodiscard]] bool empty() const noexcept {
-    return constraint_ids.empty() && !revolute_drive.has_value();
+    return constraint_ids.empty() && revolute_drives.empty();
   }
 };
 
