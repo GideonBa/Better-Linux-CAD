@@ -332,7 +332,7 @@ TEST_CASE("Rigid-body solver defines grounded, suppressed, and connected-group p
   }
 }
 
-TEST_CASE("Rigid-body solver exposes validation and unsupported residual failures",
+TEST_CASE("Rigid-body solver exposes validation and semantic target failures",
           "[geometry][assembly-solver]") {
   Project project = make_project(
       {{"component.a", identity_rigid_transform(), ComponentGroundingState::Grounded},
@@ -350,13 +350,13 @@ TEST_CASE("Rigid-body solver exposes validation and unsupported residual failure
           "solver length residual scale must be finite and positive");
   }
 
-  SECTION("Concentric remains unsupported") {
+  SECTION("unsupported Concentric semantic axis family is rejected") {
     add_constraint(project, "constraint.concentric", AssemblyConstraintType::Concentric,
                    "component.a", "bolt.main_axis", "component.b", "bolt.main_axis");
     const auto solved = solver.solve(project, group({"component.a", "component.b"}));
     REQUIRE(solved.has_error());
     CHECK(solved.error().message() ==
-          "concentric equation construction requires semantic axis target support");
+          "unsupported assembly semantic axis reference family");
   }
 }
 
