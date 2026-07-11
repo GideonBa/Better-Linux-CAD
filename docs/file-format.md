@@ -1,8 +1,8 @@
 # Project and Save File Format
 
-Status: implemented seeds exist for single-part `.blcad.json`, assembly parameters, embedded project JSON, component instances, Mate/Concentric/Distance relationship intent, and the derived assembly graph/target-resolution/transform/residual pipeline. Multi-body part records, body transforms, body booleans, solver state, solved transform caches, and path-feature records remain future blocks.
+Status: implemented seeds exist for single-part `.blcad.json`, assembly parameters, embedded project JSON, component instances, Mate/Concentric/Distance relationship intent, and the derived assembly graph/target-resolution/transform/residual/solver pipeline. Multi-body part records, body transforms, body booleans, persistent DOF/solve caches, and path-feature records remain future blocks.
 
-The file format stores parametric model intent, not only computed geometry. OCCT geometry and later solve products may be cached separately, but they must never replace the persistent model relationships required to regenerate them.
+The file format stores parametric model intent, not only computed geometry. OCCT geometry and solve products may later be cached separately, but they must never replace the persistent model relationships required to regenerate them.
 
 ## Implemented project structure
 
@@ -24,7 +24,7 @@ blcad.project.mvp4
 
 Component instances, placement/state values, and assembly constraint model intent are persisted inside the embedded assembly document.
 
-Derived graph connectivity, resolved targets, assembly-space frames, and Mate/Distance residual descriptors are rebuilt from persisted model intent and are not stored.
+Derived graph connectivity, resolved targets, assembly-space frames, Mate/Distance residual descriptors, numeric Jacobians, and `AssemblySolveResult` values are rebuilt from persisted model intent and are not stored.
 
 ## Target project structure
 
@@ -121,10 +121,12 @@ Assembly persistence rules:
 - `rotation_deg` is stored in degrees
 - transform evaluation uses active right-handed fixed-axis X-then-Y-then-Z rotation, equivalent to `Rz * Ry * Rx` for column vectors
 - the evaluator does not persist a matrix, quaternion, or evaluated frame
-- `grounded` is model intent but does not yet prevent direct explicit transform updates
-- visibility and suppression remain stored state until assembly consumers define participation rules
+- `grounded` is persisted model intent; storage-level direct transform edits remain legal
+- the rigid-body solver is the first consumer that treats grounded components as fixed solve references
+- visibility remains stored state and does not affect the first solver
+- suppressed components remain stored state; the first solver rejects selected groups containing them
 - assembly constraints use typed ids and semantic target tokens, not raw OCCT topology ids
-- Mate and Concentric omit `distance`; Distance requires a millimeter length quantity
+- Mate and Concentric omit `distance`; Distance requires a positive millimeter length quantity
 - constraint state is `active` or `inactive`
 - adding or loading constraints does not mutate component transforms
 - project structure validation includes constraint component targets
@@ -133,22 +135,30 @@ The exact transform convention is canonicalized in `docs/assembly-rigid-transfor
 
 ## Derived assembly data is not persisted
 
-The current assembly path has four derived layers:
+The implemented assembly derivation/solve path is:
 
 ```text
 AssemblyConstraintGraph
 AssemblyConstraintTargetResolver
 AssemblyTransformEvaluator
 AssemblyConstraintEquationBuilder
+AssemblyRigidBodySolver
 ```
 
-Their outputs include:
+Derived outputs include:
 
 ```text
 constraint graph nodes/edges/groups
 component-local resolved target descriptors
 assembly-space evaluated points/vectors/planar frames
 planar Mate/Distance equation-residual descriptors
+flattened weighted residual vectors
+central finite-difference Jacobians
+normal-equation matrices and damping attempts
+AssemblySolveResult values
+component input snapshots
+proposed component transforms
+residual summaries and iteration counts
 ```
 
 None is persisted.
@@ -176,11 +186,27 @@ signed_separation_mm = dot(oB - oA, nA)
 distance_residual_mm = signed_separation_mm - target_distance_mm
 ```
 
-The signed Distance convention is target-order dependent. Target A/B order is therefore part of persistent relationship intent and must not be reordered by a cache or solver layer.
+The signed Distance convention is target-order dependent. Target A/B order is part of persistent relationship intent and must not be reordered by a cache or solver layer.
 
-No graph field, resolved-target field, evaluated-frame field, or residual field is added to the current schema.
+`AssemblyRigidBodySolver` regenerates its deterministic variable/residual ordering and numeric Jacobian from the selected exact graph group and current project state.
 
-Canonical residual semantics are documented in `docs/assembly-planar-constraint-equations-mvp5.md`.
+The solver changes transforms only on a private `Project` copy and returns proposed transforms in an unpersisted `AssemblySolveResult`.
+
+`AssemblySolveResultApplier` is the explicit mutation boundary. After a fresh converged result passes snapshot/proposal validation, the proposed transforms are applied through the normal assembly transform update path to a project copy and then committed by replacing the caller's `Project` value.
+
+Therefore no new solved-transform JSON field exists. A successful explicit application changes the already-existing persisted field:
+
+```text
+component_instances[].transform
+```
+
+A later save serializes those current component transforms exactly as any other explicit transform edit would.
+
+The file format does not record whether a transform originated from a user placement edit or a successful solver-result application.
+
+No graph field, resolved-target field, evaluated-frame field, residual field, Jacobian field, solve-result field, proposal field, damping field, or residual-summary field is added to the current schema.
+
+Canonical residual semantics are documented in `docs/assembly-planar-constraint-equations-mvp5.md`. Solver semantics and the explicit application boundary are documented in `docs/assembly-rigid-body-solver-mvp5.md`.
 
 ## Part document target
 
@@ -333,11 +359,13 @@ The detailed target is in `docs/multi-body-transform-and-path-features-roadmap.m
 - `serialize_assembly_document_to_json` / `deserialize_assembly_document_from_json` for assembly parameters, members, bindings, component placement/state, and constraint records.
 - `serialize_project_to_json` / `deserialize_project_from_json` for embedded assembly plus embedded parts.
 - `write_project_json_file` / `read_project_json_file` for `.blcad.project.json` files.
-- serialization stores model intent only; it does not serialize OCCT shapes, `ShapeCache`, graph connectivity, resolved targets, evaluated assembly-space frames, residual descriptors, solved transforms, or DOF state.
+- serialization stores model intent only; it does not serialize OCCT shapes, `ShapeCache`, graph connectivity, resolved targets, evaluated assembly-space frames, residual descriptors, numeric Jacobians, solver results, proposals, iteration state, or DOF state.
 - `AssemblyConstraintGraph` rebuilds relationship connectivity.
 - `AssemblyConstraintTargetResolver` rebuilds supported component-local generated-face descriptors.
 - `AssemblyTransformEvaluator` derives assembly-space points, vectors, and planar frames using the documented transform convention.
 - `AssemblyConstraintEquationBuilder` derives active planar Mate/Distance residual descriptors using the documented target-order conventions.
+- `AssemblyRigidBodySolver` derives proposed free-component transforms and solve diagnostics from one exact graph-connected group without mutating source project state.
+- `AssemblySolveResultApplier` explicitly applies fresh converged proposals to the existing persistent component transform fields.
 - `derived_workplanes` with supported semantic faces are persisted as model intent.
 
 See the feature-specific assembly documents and `docs/mvp-plan.md` for exact status.
@@ -354,14 +382,16 @@ See the feature-specific assembly documents and `docs/mvp-plan.md` for exact sta
 8. Add `path_curves` as ordered semantic path chains.
 9. Add path-following extrude/cut and loft feature serialization.
 10. Extend project files from embedded documents to optional manifest/external-file references.
-11. Assembly constraint model-intent records are implemented; keep them independent from solver/cache state.
+11. Assembly constraint model-intent records are implemented; keep them independent from derived solve state.
 12. Constraint graph connectivity is implemented and unpersisted.
 13. Generated-face target descriptors are implemented and unpersisted.
 14. Rigid-transform evaluation is implemented and evaluated frames are unpersisted.
 15. Planar Mate/Distance residual construction is implemented and residual descriptors are unpersisted.
-16. Add solver/cache records only after a rigid-body solver exists, and persist only data that is not safely derivable.
-17. Add project-level `resources` for engineering modules.
-18. Optionally add an out-of-band `cached_shapes` store separated from model intent.
+16. The first rigid-body solver and explicit application boundary are implemented; solver products remain unpersisted and only applied transforms use existing component placement fields.
+17. Keep the next DOF/rank diagnostic descriptors regenerable and unpersisted.
+18. Add persistent solver/DOF cache records only if later consumers require data that cannot be safely regenerated.
+19. Add project-level `resources` for engineering modules.
+20. Optionally add an out-of-band `cached_shapes` store separated from model intent.
 
 ## Rules
 
@@ -373,9 +403,12 @@ See the feature-specific assembly documents and `docs/mvp-plan.md` for exact sta
 - resolved assembly targets remain derived data.
 - evaluated assembly-space geometry remains derived data.
 - planar Mate/Distance residual descriptors remain derived data.
+- numeric Jacobians and solver iteration products remain derived data.
+- `AssemblySolveResult` and proposed transforms remain derived data.
+- a fresh converged result changes persistent placement only through explicit application to existing `component_instances[].transform` fields.
 - persisted target A/B order must be preserved because signed Distance residual semantics depend on it.
 - `rotation_deg` uses the exact convention documented in `docs/assembly-rigid-transform-evaluation-mvp5.md`; changing that convention is a model-format semantic compatibility change even if JSON shape is unchanged.
-- future solver result/cache persistence requires an explicit design and must not replace persistent relationship intent.
+- future persistent DOF or solver-cache data requires an explicit cache design and must not replace relationship intent.
 
 ## Out of scope for the first versions
 
