@@ -49,6 +49,100 @@ const ParameterId& ParameterBinding::assembly_parameter() const noexcept {
   return assembly_parameter_;
 }
 
+RigidTransform identity_rigid_transform() noexcept {
+  return RigidTransform{};
+}
+
+std::string_view to_string(ComponentVisibility visibility) noexcept {
+  switch (visibility) {
+  case ComponentVisibility::Visible: return "visible";
+  case ComponentVisibility::Hidden: return "hidden";
+  }
+  return "visible";
+}
+
+std::string_view to_string(ComponentSuppressionState state) noexcept {
+  switch (state) {
+  case ComponentSuppressionState::Active: return "active";
+  case ComponentSuppressionState::Suppressed: return "suppressed";
+  }
+  return "active";
+}
+
+std::string_view to_string(ComponentGroundingState state) noexcept {
+  switch (state) {
+  case ComponentGroundingState::Free: return "free";
+  case ComponentGroundingState::Grounded: return "grounded";
+  }
+  return "free";
+}
+
+Result<ComponentInstance> ComponentInstance::create(
+    ComponentInstanceId id,
+    std::string name,
+    DocumentId referenced_part_document,
+    ComponentVisibility visibility,
+    ComponentSuppressionState suppression_state,
+    ComponentGroundingState grounding_state,
+    RigidTransform transform) {
+  const auto object_id = id.empty() ? std::string("component_instance") : id.value();
+  if (id.empty()) {
+    return Result<ComponentInstance>::failure(
+        Error::validation(object_id, "component instance id must not be empty"));
+  }
+  if (name.empty()) {
+    return Result<ComponentInstance>::failure(
+        Error::validation(object_id, "component instance name must not be empty"));
+  }
+  if (referenced_part_document.empty()) {
+    return Result<ComponentInstance>::failure(
+        Error::validation(object_id, "component instance referenced part document must not be empty"));
+  }
+  return Result<ComponentInstance>::success(ComponentInstance(
+      std::move(id), std::move(name), std::move(referenced_part_document), visibility,
+      suppression_state, grounding_state, transform));
+}
+
+ComponentInstance::ComponentInstance(ComponentInstanceId id,
+                                     std::string name,
+                                     DocumentId referenced_part_document,
+                                     ComponentVisibility visibility,
+                                     ComponentSuppressionState suppression_state,
+                                     ComponentGroundingState grounding_state,
+                                     RigidTransform transform)
+    : id_(std::move(id)), name_(std::move(name)),
+      referenced_part_document_(std::move(referenced_part_document)), visibility_(visibility),
+      suppression_state_(suppression_state), grounding_state_(grounding_state),
+      transform_(transform) {}
+
+const ComponentInstanceId& ComponentInstance::id() const noexcept {
+  return id_;
+}
+
+const std::string& ComponentInstance::name() const noexcept {
+  return name_;
+}
+
+const DocumentId& ComponentInstance::referenced_part_document() const noexcept {
+  return referenced_part_document_;
+}
+
+ComponentVisibility ComponentInstance::visibility() const noexcept {
+  return visibility_;
+}
+
+ComponentSuppressionState ComponentInstance::suppression_state() const noexcept {
+  return suppression_state_;
+}
+
+ComponentGroundingState ComponentInstance::grounding_state() const noexcept {
+  return grounding_state_;
+}
+
+const RigidTransform& ComponentInstance::transform() const noexcept {
+  return transform_;
+}
+
 Result<AssemblyDocument> AssemblyDocument::create(DocumentId id, std::string name) {
   const auto object_id = id.empty() ? std::string("assembly_document") : id.value();
   if (id.empty()) {
@@ -123,6 +217,19 @@ Result<std::size_t> AssemblyDocument::add_binding(ParameterBinding binding) {
   }
   bindings_.push_back(std::move(binding));
   return Result<std::size_t>::success(bindings_.size() - 1U);
+}
+
+Result<std::size_t> AssemblyDocument::add_component_instance(ComponentInstance instance) {
+  if (has_component_instance_id(instance.id())) {
+    return Result<std::size_t>::failure(Error::validation(
+        instance.id().value(), "component instance id must be unique within assembly document"));
+  }
+  if (!has_member_part(instance.referenced_part_document())) {
+    return Result<std::size_t>::failure(Error::validation(
+        instance.id().value(), "component instance referenced part must be an assembly member part"));
+  }
+  component_instances_.push_back(std::move(instance));
+  return Result<std::size_t>::success(component_instances_.size() - 1U);
 }
 
 Result<std::size_t> AssemblyDocument::set_parameter_value(ParameterId id, Quantity value) {
@@ -202,6 +309,9 @@ const std::vector<DocumentId>& AssemblyDocument::member_parts() const noexcept {
 const std::vector<ParameterBinding>& AssemblyDocument::bindings() const noexcept {
   return bindings_;
 }
+const std::vector<ComponentInstance>& AssemblyDocument::component_instances() const noexcept {
+  return component_instances_;
+}
 std::size_t AssemblyDocument::parameter_count() const noexcept {
   return parameters_.size();
 }
@@ -210,6 +320,9 @@ std::size_t AssemblyDocument::member_part_count() const noexcept {
 }
 std::size_t AssemblyDocument::binding_count() const noexcept {
   return bindings_.size();
+}
+std::size_t AssemblyDocument::component_instance_count() const noexcept {
+  return component_instances_.size();
 }
 
 const Parameter* AssemblyDocument::find_parameter(ParameterId id) const noexcept {
@@ -225,6 +338,15 @@ const ParameterBinding* AssemblyDocument::find_binding(ParameterBindingId id) co
   for (const auto& binding : bindings_) {
     if (binding.id() == id) {
       return &binding;
+    }
+  }
+  return nullptr;
+}
+
+const ComponentInstance* AssemblyDocument::find_component_instance(ComponentInstanceId id) const noexcept {
+  for (const auto& instance : component_instances_) {
+    if (instance.id() == id) {
+      return &instance;
     }
   }
   return nullptr;
@@ -250,6 +372,10 @@ bool AssemblyDocument::has_parameter_name(std::string_view name) const noexcept 
 
 bool AssemblyDocument::has_binding_id(const ParameterBindingId& id) const noexcept {
   return find_binding(id) != nullptr;
+}
+
+bool AssemblyDocument::has_component_instance_id(const ComponentInstanceId& id) const noexcept {
+  return find_component_instance(id) != nullptr;
 }
 
 } // namespace blcad
