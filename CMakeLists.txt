@@ -222,8 +222,8 @@ if(BLCAD_BUILD_TESTS)
       blcad_geometry_tests
       tests/geometry/arc_closed_profile_pipeline_tests.cpp
       tests/geometry/assembly_constraint_target_resolver_tests.cpp
-      tests/geometry/assembly_transform_evaluator_tests.cpp
       tests/geometry/assembly_parameter_pipeline_tests.cpp
+      tests/geometry/assembly_transform_evaluator_tests.cpp
       tests/geometry/back_workplane_pipeline_tests.cpp
       tests/geometry/bolt_circle_pattern_pipeline_tests.cpp
       tests/geometry/chained_construction_plane_resolver_tests.cpp
