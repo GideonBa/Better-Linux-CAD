@@ -76,6 +76,15 @@ public:
       ComponentGroundingState grounding_state = ComponentGroundingState::Free,
       RigidTransform transform = identity_rigid_transform());
 
+  // Copy-style updates preserve component identity and referenced part model
+  // intent while replacing one explicit free-placement/state field.
+  [[nodiscard]] Result<ComponentInstance> with_transform(RigidTransform transform) const;
+  [[nodiscard]] Result<ComponentInstance> with_visibility(ComponentVisibility visibility) const;
+  [[nodiscard]] Result<ComponentInstance>
+  with_suppression_state(ComponentSuppressionState suppression_state) const;
+  [[nodiscard]] Result<ComponentInstance>
+  with_grounding_state(ComponentGroundingState grounding_state) const;
+
   [[nodiscard]] const ComponentInstanceId& id() const noexcept;
   [[nodiscard]] const std::string& name() const noexcept;
   [[nodiscard]] const DocumentId& referenced_part_document() const noexcept;
@@ -102,10 +111,10 @@ private:
   RigidTransform transform_;
 };
 
-// MVP-4/5 seed: an assembly document that owns assembly-scoped parameters,
-// registers member parts by DocumentId, binds part parameters to assembly
-// parameters, and stores first component-instance placement records. Component
-// constraints and solving remain in later MVP 5 steps.
+// MVP-4/5 assembly document: owns assembly-scoped parameters, registers member
+// parts, binds part parameters to assembly parameters, and stores explicit
+// component-instance placement/state model intent. Component constraints and
+// solving remain later MVP-5 work.
 class AssemblyDocument {
 public:
   [[nodiscard]] static Result<AssemblyDocument> create(DocumentId id, std::string name);
@@ -118,6 +127,17 @@ public:
   [[nodiscard]] Result<std::size_t> add_binding(ParameterBinding binding);
   // The component instance must reference an already registered member part.
   [[nodiscard]] Result<std::size_t> add_component_instance(ComponentInstance instance);
+  // Explicit free-placement/state edits. These do not infer constraints, solve
+  // transforms, enforce grounding, or trigger part recompute.
+  [[nodiscard]] Result<std::size_t>
+  set_component_instance_transform(ComponentInstanceId id, RigidTransform transform);
+  [[nodiscard]] Result<std::size_t>
+  set_component_instance_visibility(ComponentInstanceId id, ComponentVisibility visibility);
+  [[nodiscard]] Result<std::size_t> set_component_instance_suppression_state(
+      ComponentInstanceId id, ComponentSuppressionState suppression_state);
+  [[nodiscard]] Result<std::size_t>
+  set_component_instance_grounding_state(ComponentInstanceId id,
+                                         ComponentGroundingState grounding_state);
   // Sets an assembly parameter value with the same validation as creation.
   [[nodiscard]] Result<std::size_t> set_parameter_value(ParameterId id, Quantity value);
 
