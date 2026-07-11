@@ -1,10 +1,30 @@
 # Project and Save File Format
 
-Status: target architecture. MVP-1 implements single-part `.blcad.json` model-intent persistence; the multi-document project file, multi-body part records, body transforms, body booleans, and path-feature records are future blocks.
+Status: implemented seeds exist for single-part `.blcad.json`, assembly-parameter JSON, embedded project JSON, and first component-instance records. Multi-body part records, body transforms, body booleans, constraints, and path-feature records remain future blocks.
 
-The file format must store the full parametric model, not only computed geometry. OCCT geometry may be stored additionally as a cache, but must never be the only source of information. A file that stored only the final shape would lose parameters, features, bodies, transforms, sketches, paths, and references.
+The file format must store the full parametric model, not only computed geometry. OCCT geometry may be stored additionally as a cache, but must never be the only source of information. A file that stored only the final shape would lose parameters, features, bodies, transforms, sketches, paths, references, assembly structure, and component instances.
 
-## Project structure (target)
+## Implemented project structure
+
+The current project seed uses embedded documents:
+
+```text
+Project
+  id
+  name
+  assembly              # embedded AssemblyDocument JSON
+  parts[]               # embedded PartDocument JSON records
+```
+
+Schema marker:
+
+```text
+blcad.project.mvp4
+```
+
+Component instances are persisted inside the embedded assembly document.
+
+## Target project structure
 
 ```text
 ProjectFile
@@ -23,7 +43,45 @@ ProjectFile
   cached_shapes
 ```
 
-## Part document (target)
+The current embedded project format is intentionally simpler than the target container. A manifest-based project file that references separate part files is deferred.
+
+## Assembly document records
+
+Current implemented assembly records:
+
+```text
+AssemblyDocument
+  parameters[]              # assembly-scoped parameters
+  member_parts[]            # DocumentId list
+  parameter_bindings[]      # part parameter follows assembly parameter
+  component_instances[]     # MVP-5 seed
+```
+
+A component instance has this implemented JSON shape:
+
+```json
+{
+  "id": "component.bolt.1",
+  "name": "Bolt 1",
+  "referenced_part_document": "part.bolt",
+  "visibility": "visible",
+  "suppression_state": "active",
+  "grounding_state": "grounded",
+  "transform": {
+    "translation_mm": {"x": 0.0, "y": 0.0, "z": 0.0},
+    "rotation_deg": {"x": 0.0, "y": 0.0, "z": 0.0}
+  }
+}
+```
+
+Rules:
+
+- component instances reference part document ids, not duplicated part geometry
+- project validation must resolve each component instance to an assembly member and owned project part document
+- transforms are free-placement records until a later solver exists
+- constraints, DOF, and assembly-level STEP export are not implemented in this seed
+
+## Part document target
 
 ```text
 PartDocument BasePlate
@@ -167,12 +225,15 @@ The detailed target is in `docs/multi-body-transform-and-path-features-roadmap.m
 
 ## Current implemented scope
 
-- `serialize_part_document_to_json` / `deserialize_part_document_from_json` for in-memory model intent.
+- `serialize_part_document_to_json` / `deserialize_part_document_from_json` for in-memory part model intent.
 - `write_part_document_json_file` / `read_part_document_json_file` for `.blcad.json` files.
+- `serialize_assembly_document_to_json` / `deserialize_assembly_document_from_json` for assembly parameters, member parts, parameter bindings, and component instances.
+- `serialize_project_to_json` / `deserialize_project_from_json` for embedded assembly plus embedded part documents.
+- `write_project_json_file` / `read_project_json_file` for `.blcad.project.json` files.
 - serialization stores model intent only; it does not serialize OCCT shapes or ShapeCache contents.
 - `derived_workplanes` with `top/bottom/right/left/front/back` faces are persisted.
 
-See `docs/json-serialization-mvp1.md` and `docs/json-file-workflow-mvp1.md`.
+See `docs/json-serialization-mvp1.md`, `docs/json-file-workflow-mvp1.md`, `docs/assembly-parameters-mvp4.md`, `docs/project-container-mvp4.md`, and `docs/component-instance-mvp5.md`.
 
 ## Proposed implementation sequence
 
@@ -185,8 +246,8 @@ See `docs/json-serialization-mvp1.md` and `docs/json-file-workflow-mvp1.md`.
 7. Add `body_booleans` for add/subtract/intersect between bodies.
 8. Add `path_curves` as ordered semantic path chains.
 9. Add path-following extrude/cut and loft feature serialization.
-10. Introduce a multi-document project container holding several parts.
-11. Add the assembly document (component instances, constraints), see `docs/assembly-system.md`.
+10. Extend project files from embedded documents to optional manifest/external-file references.
+11. Add assembly constraints and solver state, see `docs/assembly-system.md`.
 12. Add project-level `resources` (materials, standard parts) referenced by engineering modules (`docs/engineering-modules.md`).
 13. Optionally add an out-of-band `cached_shapes` store, kept clearly separate from model intent.
 
@@ -195,7 +256,7 @@ See `docs/json-serialization-mvp1.md` and `docs/json-file-workflow-mvp1.md`.
 - model intent is the source of truth; cached shapes are regenerable and optional.
 - never serialize raw OCCT topology as a model reference; store semantic references instead.
 - STEP export runs through normal recompute and is a projection of the model, not the save format. See `docs/step-export-mvp1.md`.
-- multi-body records, body transforms, body booleans, and path features must be serialized as explicit model intent before geometry cache support is added for them.
+- multi-body records, body transforms, body booleans, path features, component instances, and assembly constraints must be serialized as explicit model intent before geometry cache support is added for them.
 
 ## Out of scope for the first versions
 
