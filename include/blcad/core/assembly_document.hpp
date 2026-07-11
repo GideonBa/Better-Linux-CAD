@@ -113,10 +113,52 @@ private:
   RigidTransform transform_;
 };
 
+// Persistent rigid occurrence of one project-owned child AssemblyDocument.
+// It has placement, visibility, and suppression intent at the parent boundary,
+// but no grounding or solver variables in the rigid-subassembly seed.
+class SubassemblyInstance {
+public:
+  [[nodiscard]] static Result<SubassemblyInstance> create(
+      SubassemblyInstanceId id,
+      std::string name,
+      DocumentId referenced_assembly_document,
+      ComponentVisibility visibility = ComponentVisibility::Visible,
+      ComponentSuppressionState suppression_state = ComponentSuppressionState::Active,
+      RigidTransform transform = identity_rigid_transform());
+
+  [[nodiscard]] Result<SubassemblyInstance> with_transform(RigidTransform transform) const;
+  [[nodiscard]] Result<SubassemblyInstance>
+  with_visibility(ComponentVisibility visibility) const;
+  [[nodiscard]] Result<SubassemblyInstance>
+  with_suppression_state(ComponentSuppressionState suppression_state) const;
+
+  [[nodiscard]] const SubassemblyInstanceId& id() const noexcept;
+  [[nodiscard]] const std::string& name() const noexcept;
+  [[nodiscard]] const DocumentId& referenced_assembly_document() const noexcept;
+  [[nodiscard]] ComponentVisibility visibility() const noexcept;
+  [[nodiscard]] ComponentSuppressionState suppression_state() const noexcept;
+  [[nodiscard]] const RigidTransform& transform() const noexcept;
+
+private:
+  SubassemblyInstance(SubassemblyInstanceId id,
+                      std::string name,
+                      DocumentId referenced_assembly_document,
+                      ComponentVisibility visibility,
+                      ComponentSuppressionState suppression_state,
+                      RigidTransform transform);
+
+  SubassemblyInstanceId id_;
+  std::string name_;
+  DocumentId referenced_assembly_document_;
+  ComponentVisibility visibility_;
+  ComponentSuppressionState suppression_state_;
+  RigidTransform transform_;
+};
+
 // MVP-4/5 assembly document: owns assembly-scoped parameters, member parts,
-// parameter bindings, component occurrence placement/state intent, geometric
-// assembly constraints, and solver-independent joint/limit intent. Storage does
-// not resolve semantic geometry or run placement/motion solving.
+// parameter bindings, part occurrences, rigid child-assembly occurrences,
+// geometric assembly constraints, and solver-independent joint/limit intent.
+// Storage does not resolve hierarchy geometry or run placement/motion solving.
 class AssemblyDocument {
 public:
   [[nodiscard]] static Result<AssemblyDocument> create(DocumentId id, std::string name);
@@ -129,6 +171,10 @@ public:
   [[nodiscard]] Result<std::size_t> add_binding(ParameterBinding binding);
   // The component instance must reference an already registered member part.
   [[nodiscard]] Result<std::size_t> add_component_instance(ComponentInstance instance);
+  // Child-assembly existence and indirect cycles are project-level validation.
+  // Direct self-reference is rejected immediately. Adding an occurrence never
+  // mutates the referenced child assembly or any child component transform.
+  [[nodiscard]] Result<std::size_t> add_subassembly_instance(SubassemblyInstance instance);
   // Constraint and joint endpoints must reference component instances already
   // owned by this assembly. Adding either record never changes transforms.
   [[nodiscard]] Result<std::size_t> add_constraint(AssemblyConstraint constraint);
@@ -144,6 +190,12 @@ public:
   [[nodiscard]] Result<std::size_t>
   set_component_instance_grounding_state(ComponentInstanceId id,
                                          ComponentGroundingState grounding_state);
+  [[nodiscard]] Result<std::size_t>
+  set_subassembly_instance_transform(SubassemblyInstanceId id, RigidTransform transform);
+  [[nodiscard]] Result<std::size_t>
+  set_subassembly_instance_visibility(SubassemblyInstanceId id, ComponentVisibility visibility);
+  [[nodiscard]] Result<std::size_t> set_subassembly_instance_suppression_state(
+      SubassemblyInstanceId id, ComponentSuppressionState suppression_state);
   // Explicit authored joint-coordinate update; geometry movement remains an
   // application-layer operation through the motion solve/application boundary.
   [[nodiscard]] Result<std::size_t> set_joint_coordinate(AssemblyJointId id, Quantity coordinate);
@@ -162,18 +214,22 @@ public:
   [[nodiscard]] const std::vector<DocumentId>& member_parts() const noexcept;
   [[nodiscard]] const std::vector<ParameterBinding>& bindings() const noexcept;
   [[nodiscard]] const std::vector<ComponentInstance>& component_instances() const noexcept;
+  [[nodiscard]] const std::vector<SubassemblyInstance>& subassembly_instances() const noexcept;
   [[nodiscard]] const std::vector<AssemblyConstraint>& constraints() const noexcept;
   [[nodiscard]] const std::vector<AssemblyJoint>& joints() const noexcept;
   [[nodiscard]] std::size_t parameter_count() const noexcept;
   [[nodiscard]] std::size_t member_part_count() const noexcept;
   [[nodiscard]] std::size_t binding_count() const noexcept;
   [[nodiscard]] std::size_t component_instance_count() const noexcept;
+  [[nodiscard]] std::size_t subassembly_instance_count() const noexcept;
   [[nodiscard]] std::size_t constraint_count() const noexcept;
   [[nodiscard]] std::size_t joint_count() const noexcept;
   [[nodiscard]] const Parameter* find_parameter(ParameterId id) const noexcept;
   [[nodiscard]] const ParameterBinding* find_binding(ParameterBindingId id) const noexcept;
   [[nodiscard]] const ComponentInstance*
   find_component_instance(ComponentInstanceId id) const noexcept;
+  [[nodiscard]] const SubassemblyInstance*
+  find_subassembly_instance(SubassemblyInstanceId id) const noexcept;
   [[nodiscard]] const AssemblyConstraint*
   find_constraint(AssemblyConstraintId id) const noexcept;
   [[nodiscard]] const AssemblyJoint* find_joint(AssemblyJointId id) const noexcept;
@@ -186,6 +242,7 @@ private:
   [[nodiscard]] bool has_parameter_name(std::string_view name) const noexcept;
   [[nodiscard]] bool has_binding_id(const ParameterBindingId& id) const noexcept;
   [[nodiscard]] bool has_component_instance_id(const ComponentInstanceId& id) const noexcept;
+  [[nodiscard]] bool has_subassembly_instance_id(const SubassemblyInstanceId& id) const noexcept;
   [[nodiscard]] bool has_constraint_id(const AssemblyConstraintId& id) const noexcept;
   [[nodiscard]] bool has_joint_id(const AssemblyJointId& id) const noexcept;
 
@@ -195,6 +252,7 @@ private:
   std::vector<DocumentId> member_parts_;
   std::vector<ParameterBinding> bindings_;
   std::vector<ComponentInstance> component_instances_;
+  std::vector<SubassemblyInstance> subassembly_instances_;
   std::vector<AssemblyConstraint> constraints_;
   std::vector<AssemblyJoint> joints_;
 };
