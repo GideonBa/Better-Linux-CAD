@@ -91,14 +91,14 @@ The core build provides component inspection:
 ./build/dev/blcad_inspect_project_components examples/component_instances.blcad.project.json
 ```
 
-The geometry build provides single-part and project export:
+The geometry build provides single-part export:
 
 ```bash
 ./build/dev-geometry/blcad_export_step examples/reference_plate.blcad.json build/reference_plate.step
 ./build/dev-geometry/blcad_export_step examples/bolt_circle_plate.blcad.json build/bolt_circle_plate.step
-./build/dev-geometry/blcad_export_project \
-  examples/flange_project.blcad.project.json assembly.bolt_count 8 build/project-export
 ```
+
+The geometry build also provides `blcad_export_project`. Use it with a valid `.blcad.project.json` file and an assembly parameter id that exists in that project.
 
 Command shapes:
 
