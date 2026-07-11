@@ -57,6 +57,15 @@ AssemblyDocument
   component_instances[]     # MVP-5 free placement/state model intent
 ```
 
+The assembly document currently retains this schema marker and version:
+
+```text
+blcad.assembly_document.mvp4
+version 1
+```
+
+The marker is historical and retained for compatibility. Component instances are an MVP-5 feature that extended the existing assembly schema additively through optional `component_instances`. Older files without that field remain loadable and produce an assembly with zero component instances.
+
 A component instance has this implemented JSON shape:
 
 ```json
@@ -76,14 +85,15 @@ A component instance has this implemented JSON shape:
 
 Rules:
 
-- component instances reference part document ids, not duplicated part geometry
+- component instances reference part document ids instead of duplicating owned `PartDocument` records or their model intent
 - project validation must resolve each component instance to an assembly member and owned project part document
 - explicit placement/state updates preserve component id, name, and `referenced_part_document`
 - updated transform, visibility, suppression state, and grounding state use the same existing JSON fields and roundtrip through assembly/project files
+- all translation and rotation components must be finite; `NaN` and positive or negative infinity are rejected before the component instance enters the model
 - transforms are direct free-placement records until a later solver exists
 - `grounded` is persisted model intent but does not yet prevent an explicit transform update
 - visibility and suppression are persisted state only until future assembly consumers define their execution/export/solver effects
-- assembly constraints, DOF, and assembly-level STEP export are not implemented in the current block
+- assembly constraints, DOF, assembly-level geometry instancing, and assembly-level STEP export are not implemented in the current block
 
 ## Part document target
 
