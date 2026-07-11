@@ -14,7 +14,7 @@ constexpr double k_tolerance = 1.0e-9;
 }
 
 [[nodiscard]] const Parameter* find_parameter(const PartDocument& document,
-                                              const ParameterId& parameter_id) noexcept {
+                                               const ParameterId& parameter_id) noexcept {
   return document.find_parameter(parameter_id);
 }
 
@@ -68,17 +68,18 @@ resolve_explicit_construction_plane(const ConstructionPlane& plane) {
 }
 
 [[nodiscard]] Result<ResolvedWorkplane>
-resolve_additive_extrude_face_workplane(const PartDocument& document,
-                                        const DerivedWorkplane& workplane) {
-  const FeatureId& source_feature_id = workplane.face_reference().source_feature();
+resolve_additive_extrude_face(const PartDocument& document,
+                              const SemanticFaceReference& face_reference,
+                              DatumPlaneId resolved_id) {
+  const FeatureId& source_feature_id = face_reference.source_feature();
   const Feature* source_feature = document.find_feature(source_feature_id);
   if (source_feature == nullptr) {
     return Result<ResolvedWorkplane>::failure(validation_error(
-        workplane.id().value(), "derived workplane source feature must exist in part document"));
+        resolved_id.value(), "generated face source feature must exist in part document"));
   }
   if (source_feature->type() != FeatureType::AdditiveExtrude) {
     return Result<ResolvedWorkplane>::failure(validation_error(
-        workplane.id().value(), "derived workplane source feature must be an additive extrude"));
+        resolved_id.value(), "generated face source feature must be an additive extrude"));
   }
   const Sketch* source_sketch = document.find_sketch(source_feature->input_sketch());
   if (source_sketch == nullptr) {
@@ -88,7 +89,7 @@ resolve_additive_extrude_face_workplane(const PartDocument& document,
   if (source_sketch->rectangle_profiles().size() != 1U ||
       !source_sketch->circle_profiles().empty() || !source_sketch->closed_profiles().empty()) {
     return Result<ResolvedWorkplane>::failure(validation_error(
-        source_sketch->id().value(), "derived workplane resolution requires a source sketch with "
+        source_sketch->id().value(), "generated face resolution requires a source sketch with "
                                      "exactly one rectangle profile"));
   }
 
@@ -117,43 +118,50 @@ resolve_additive_extrude_face_workplane(const PartDocument& document,
   const double height_mm = height->value().millimeters();
   const double thickness_mm = thickness->value().millimeters();
 
-  switch (workplane.face_reference().face()) {
+  switch (face_reference.face()) {
   case SemanticFace::Top:
     return Result<ResolvedWorkplane>::success(ResolvedWorkplane{
-        workplane.id(), Point3{rectangle_center.x, rectangle_center.y, thickness_mm},
+        std::move(resolved_id), Point3{rectangle_center.x, rectangle_center.y, thickness_mm},
         Vector3{1.0, 0.0, 0.0}, Vector3{0.0, 1.0, 0.0}, Vector3{0.0, 0.0, 1.0},
         make_bounds(width_mm, height_mm)});
   case SemanticFace::Bottom:
     return Result<ResolvedWorkplane>::success(ResolvedWorkplane{
-        workplane.id(), Point3{rectangle_center.x, rectangle_center.y, 0.0}, Vector3{1.0, 0.0, 0.0},
-        Vector3{0.0, 1.0, 0.0}, Vector3{0.0, 0.0, -1.0}, make_bounds(width_mm, height_mm)});
+        std::move(resolved_id), Point3{rectangle_center.x, rectangle_center.y, 0.0},
+        Vector3{1.0, 0.0, 0.0}, Vector3{0.0, 1.0, 0.0}, Vector3{0.0, 0.0, -1.0},
+        make_bounds(width_mm, height_mm)});
   case SemanticFace::Right:
     return Result<ResolvedWorkplane>::success(ResolvedWorkplane{
-        workplane.id(),
+        std::move(resolved_id),
         Point3{rectangle_center.x + width_mm / 2.0, rectangle_center.y, thickness_mm / 2.0},
         Vector3{0.0, 1.0, 0.0}, Vector3{0.0, 0.0, 1.0}, Vector3{1.0, 0.0, 0.0},
         make_bounds(height_mm, thickness_mm)});
   case SemanticFace::Left:
     return Result<ResolvedWorkplane>::success(ResolvedWorkplane{
-        workplane.id(),
+        std::move(resolved_id),
         Point3{rectangle_center.x - width_mm / 2.0, rectangle_center.y, thickness_mm / 2.0},
         Vector3{0.0, -1.0, 0.0}, Vector3{0.0, 0.0, 1.0}, Vector3{-1.0, 0.0, 0.0},
         make_bounds(height_mm, thickness_mm)});
   case SemanticFace::Front:
     return Result<ResolvedWorkplane>::success(ResolvedWorkplane{
-        workplane.id(),
+        std::move(resolved_id),
         Point3{rectangle_center.x, rectangle_center.y + height_mm / 2.0, thickness_mm / 2.0},
         Vector3{-1.0, 0.0, 0.0}, Vector3{0.0, 0.0, 1.0}, Vector3{0.0, 1.0, 0.0},
         make_bounds(width_mm, thickness_mm)});
   case SemanticFace::Back:
     return Result<ResolvedWorkplane>::success(ResolvedWorkplane{
-        workplane.id(),
+        std::move(resolved_id),
         Point3{rectangle_center.x, rectangle_center.y - height_mm / 2.0, thickness_mm / 2.0},
         Vector3{1.0, 0.0, 0.0}, Vector3{0.0, 0.0, 1.0}, Vector3{0.0, -1.0, 0.0},
         make_bounds(width_mm, thickness_mm)});
   }
   return Result<ResolvedWorkplane>::failure(
-      validation_error(workplane.id().value(), "unsupported semantic face"));
+      validation_error(resolved_id.value(), "unsupported semantic face"));
+}
+
+[[nodiscard]] Result<ResolvedWorkplane>
+resolve_additive_extrude_face_workplane(const PartDocument& document,
+                                        const DerivedWorkplane& workplane) {
+  return resolve_additive_extrude_face(document, workplane.face_reference(), workplane.id());
 }
 
 [[nodiscard]] Result<ResolvedWorkplane>
@@ -243,6 +251,14 @@ Result<ResolvedWorkplane> WorkplaneResolver::resolve(const PartDocument& documen
     return resolve_additive_extrude_face_workplane(document, *derived_workplane);
   return Result<ResolvedWorkplane>::failure(
       validation_error(workplane_id.value(), "workplane must exist in part document"));
+}
+
+Result<ResolvedWorkplane>
+WorkplaneResolver::resolve_generated_face(const PartDocument& document,
+                                          const SemanticFaceReference& face_reference) const {
+  const DatumPlaneId resolved_id(face_reference.source_feature().value() + "." +
+                                 std::string(to_string(face_reference.face())));
+  return resolve_additive_extrude_face(document, face_reference, resolved_id);
 }
 
 Result<ResolvedWorkplane> WorkplaneResolver::resolve_for_sketch(const PartDocument& document,
