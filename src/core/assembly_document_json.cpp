@@ -18,6 +18,83 @@ constexpr int k_version = 1;
   return Error::validation("assembly_document_json", std::move(message));
 }
 
+[[nodiscard]] json vector3_to_json(Vector3 vector) {
+  return json{{"x", vector.x}, {"y", vector.y}, {"z", vector.z}};
+}
+
+[[nodiscard]] Vector3 vector3_from_json(const json& value) {
+  return Vector3{value.at("x").get<double>(), value.at("y").get<double>(),
+                 value.at("z").get<double>()};
+}
+
+[[nodiscard]] json transform_to_json(const RigidTransform& transform) {
+  return json{{"translation_mm", vector3_to_json(transform.translation_mm)},
+              {"rotation_deg", vector3_to_json(transform.rotation_deg)}};
+}
+
+[[nodiscard]] RigidTransform transform_from_json(const json& value) {
+  return RigidTransform{vector3_from_json(value.at("translation_mm")),
+                        vector3_from_json(value.at("rotation_deg"))};
+}
+
+[[nodiscard]] Result<ComponentVisibility> visibility_from_json(const json& value) {
+  const auto text = value.get<std::string>();
+  if (text == "visible") return Result<ComponentVisibility>::success(ComponentVisibility::Visible);
+  if (text == "hidden") return Result<ComponentVisibility>::success(ComponentVisibility::Hidden);
+  return Result<ComponentVisibility>::failure(json_error("unsupported component visibility"));
+}
+
+[[nodiscard]] Result<ComponentSuppressionState> suppression_state_from_json(const json& value) {
+  const auto text = value.get<std::string>();
+  if (text == "active") {
+    return Result<ComponentSuppressionState>::success(ComponentSuppressionState::Active);
+  }
+  if (text == "suppressed") {
+    return Result<ComponentSuppressionState>::success(ComponentSuppressionState::Suppressed);
+  }
+  return Result<ComponentSuppressionState>::failure(
+      json_error("unsupported component suppression state"));
+}
+
+[[nodiscard]] Result<ComponentGroundingState> grounding_state_from_json(const json& value) {
+  const auto text = value.get<std::string>();
+  if (text == "free") return Result<ComponentGroundingState>::success(ComponentGroundingState::Free);
+  if (text == "grounded") {
+    return Result<ComponentGroundingState>::success(ComponentGroundingState::Grounded);
+  }
+  return Result<ComponentGroundingState>::failure(json_error("unsupported component grounding state"));
+}
+
+[[nodiscard]] json component_instance_to_json(const ComponentInstance& instance) {
+  return json{{"id", instance.id().value()},
+              {"name", instance.name()},
+              {"referenced_part_document", instance.referenced_part_document().value()},
+              {"visibility", std::string(to_string(instance.visibility()))},
+              {"suppression_state", std::string(to_string(instance.suppression_state()))},
+              {"grounding_state", std::string(to_string(instance.grounding_state()))},
+              {"transform", transform_to_json(instance.transform())}};
+}
+
+[[nodiscard]] Result<ComponentInstance> component_instance_from_json(const json& instance_json) {
+  auto visibility = visibility_from_json(instance_json.at("visibility"));
+  if (visibility.has_error()) return Result<ComponentInstance>::failure(visibility.error());
+
+  auto suppression_state = suppression_state_from_json(instance_json.at("suppression_state"));
+  if (suppression_state.has_error()) {
+    return Result<ComponentInstance>::failure(suppression_state.error());
+  }
+
+  auto grounding_state = grounding_state_from_json(instance_json.at("grounding_state"));
+  if (grounding_state.has_error()) return Result<ComponentInstance>::failure(grounding_state.error());
+
+  return ComponentInstance::create(
+      ComponentInstanceId(instance_json.at("id").get<std::string>()),
+      instance_json.at("name").get<std::string>(),
+      DocumentId(instance_json.at("referenced_part_document").get<std::string>()),
+      visibility.value(), suppression_state.value(), grounding_state.value(),
+      transform_from_json(instance_json.at("transform")));
+}
+
 [[nodiscard]] Result<Parameter> assembly_parameter_from_json(const json& parameter_json) {
   const auto id = parameter_json.at("id").get<std::string>();
   const auto type = parameter_json.at("type").get<std::string>();
@@ -79,6 +156,10 @@ Result<std::string> serialize_assembly_document_to_json(const AssemblyDocument& 
              {"part_parameter", binding.part_parameter().value()},
              {"assembly_parameter", binding.assembly_parameter().value()}});
   }
+  root["component_instances"] = json::array();
+  for (const auto& instance : document.component_instances()) {
+    root["component_instances"].push_back(component_instance_to_json(instance));
+  }
   return Result<std::string>::success(root.dump(2));
 }
 
@@ -134,6 +215,17 @@ Result<AssemblyDocument> deserialize_assembly_document_from_json(std::string_vie
         return Result<AssemblyDocument>::failure(binding.error());
       }
       auto added = document.value().add_binding(std::move(binding.value()));
+      if (added.has_error()) {
+        return Result<AssemblyDocument>::failure(added.error());
+      }
+    }
+
+    for (const auto& instance_json : root.value("component_instances", json::array())) {
+      auto instance = component_instance_from_json(instance_json);
+      if (instance.has_error()) {
+        return Result<AssemblyDocument>::failure(instance.error());
+      }
+      auto added = document.value().add_component_instance(std::move(instance.value()));
       if (added.has_error()) {
         return Result<AssemblyDocument>::failure(added.error());
       }
