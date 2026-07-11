@@ -38,30 +38,40 @@ private:
   std::vector<ProjectPartUpdate> part_updates_;
 };
 
-// Project-level container for one assembly document and its owned part documents.
-// It stores component placement/state plus solver-independent geometric constraint
-// and joint/limit intent. Numeric graph/solve/motion state stays derived.
+// Project-level container for one explicit root assembly, project-owned child
+// assembly documents, and owned part documents. Component placement/state,
+// rigid subassembly occurrence intent, constraints, and joints are persistent;
+// hierarchy traversal and numeric solve/motion state stay derived.
 class Project {
 public:
   [[nodiscard]] static Result<Project> create(DocumentId id, std::string name,
                                               AssemblyDocument assembly);
 
   [[nodiscard]] Result<std::size_t> add_part_document(PartDocument part_document);
+  [[nodiscard]] Result<std::size_t>
+  add_child_assembly_document(AssemblyDocument assembly_document);
   [[nodiscard]] Result<std::size_t> validate_member_parts() const;
   [[nodiscard]] Result<std::size_t> validate_component_instances() const;
   [[nodiscard]] Result<std::size_t> validate_assembly_constraints() const;
   [[nodiscard]] Result<std::size_t> validate_assembly_joints() const;
+  [[nodiscard]] Result<std::size_t> validate_subassembly_instances() const;
+  [[nodiscard]] Result<std::size_t> validate_assembly_hierarchy() const;
   [[nodiscard]] Result<std::size_t> validate_assembly_structure() const;
 
-  // Changes one assembly parameter, applies all assembly bindings to owned
-  // member parts, and returns per-part recompute plans for affected parts.
+  // Changes one root-assembly parameter, applies all root assembly bindings to
+  // owned member parts, and returns per-part recompute plans for affected parts.
   [[nodiscard]] Result<ProjectUpdateResult> set_assembly_parameter_value(ParameterId id,
-                                                                        Quantity value);
+                                                                         Quantity value);
 
   [[nodiscard]] const DocumentId& id() const noexcept;
   [[nodiscard]] const std::string& name() const noexcept;
   [[nodiscard]] const AssemblyDocument& assembly() const noexcept;
   [[nodiscard]] AssemblyDocument& assembly() noexcept;
+  [[nodiscard]] const std::vector<AssemblyDocument>& child_assembly_documents() const noexcept;
+  [[nodiscard]] std::vector<AssemblyDocument>& child_assembly_documents() noexcept;
+  [[nodiscard]] std::size_t child_assembly_document_count() const noexcept;
+  [[nodiscard]] const AssemblyDocument* find_assembly_document(DocumentId id) const noexcept;
+  [[nodiscard]] AssemblyDocument* find_assembly_document(DocumentId id) noexcept;
   [[nodiscard]] const std::vector<PartDocument>& part_documents() const noexcept;
   [[nodiscard]] std::vector<PartDocument>& part_documents() noexcept;
   [[nodiscard]] std::size_t part_document_count() const noexcept;
@@ -71,11 +81,13 @@ public:
 private:
   Project(DocumentId id, std::string name, AssemblyDocument assembly);
 
+  [[nodiscard]] bool has_assembly_document_id(const DocumentId& id) const noexcept;
   [[nodiscard]] bool has_part_document_id(const DocumentId& id) const noexcept;
 
   DocumentId id_;
   std::string name_;
   AssemblyDocument assembly_;
+  std::vector<AssemblyDocument> child_assembly_documents_;
   std::vector<PartDocument> part_documents_;
 };
 
