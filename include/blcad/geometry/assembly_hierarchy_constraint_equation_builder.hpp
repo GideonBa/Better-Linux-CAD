@@ -12,14 +12,16 @@
 
 #include <optional>
 #include <string>
+#include <utility>
 #include <variant>
 #include <vector>
 
 namespace blcad::geometry {
 
-// Stable read-only endpoint identity for a relationship target anywhere in the
-// rooted assembly occurrence tree. An empty path addresses the root assembly;
-// non-empty paths are exact root-to-occurrence SubassemblyInstanceId sequences.
+// Read-only geometry-query endpoint retained by the target-resolution layer.
+// Persistent project intent uses the Core-owned
+// AssemblyHierarchyConstraintEndpoint; query construction accepts that Core
+// value directly and converts it into this derived geometry-query seed.
 class AssemblyHierarchyConstraintTarget {
 public:
   [[nodiscard]] static Result<AssemblyHierarchyConstraintTarget>
@@ -56,6 +58,33 @@ public:
          AssemblyHierarchyConstraintTarget target_b,
          std::optional<Quantity> distance = std::nullopt,
          std::optional<Quantity> angle = std::nullopt);
+
+  [[nodiscard]] static Result<AssemblyHierarchyConstraintQuery>
+  create(AssemblyConstraintId id,
+         AssemblyConstraintType type,
+         AssemblyHierarchyConstraintEndpoint target_a,
+         AssemblyHierarchyConstraintEndpoint target_b,
+         std::optional<Quantity> distance = std::nullopt,
+         std::optional<Quantity> angle = std::nullopt) {
+    auto query_target_a = AssemblyHierarchyConstraintTarget::create(
+        target_a.occurrence_path(), target_a.component_instance(), target_a.semantic_reference());
+    if (query_target_a.has_error()) {
+      return Result<AssemblyHierarchyConstraintQuery>::failure(query_target_a.error());
+    }
+    auto query_target_b = AssemblyHierarchyConstraintTarget::create(
+        target_b.occurrence_path(), target_b.component_instance(), target_b.semantic_reference());
+    if (query_target_b.has_error()) {
+      return Result<AssemblyHierarchyConstraintQuery>::failure(query_target_b.error());
+    }
+    return create(std::move(id), type, std::move(query_target_a.value()),
+                  std::move(query_target_b.value()), std::move(distance), std::move(angle));
+  }
+
+  [[nodiscard]] static Result<AssemblyHierarchyConstraintQuery>
+  create(const AssemblyHierarchyConstraint& constraint) {
+    return create(constraint.id(), constraint.type(), constraint.target_a(), constraint.target_b(),
+                  constraint.distance(), constraint.angle());
+  }
 
   [[nodiscard]] const AssemblyConstraintId& id() const noexcept;
   [[nodiscard]] AssemblyConstraintType type() const noexcept;
