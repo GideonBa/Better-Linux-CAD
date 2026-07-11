@@ -1,20 +1,30 @@
 # BLCAD
 
-BLCAD is a planned independent parametric CAD system for Linux. The project stores CAD model intent in BLCAD data structures and uses OCCT/Open CASCADE as the computed geometry kernel cache, not as the primary model.
+BLCAD is a planned independent parametric CAD system for Linux. The project stores CAD model intent in BLCAD data structures and uses OCCT/Open CASCADE as computed geometry, not as the primary model.
 
-Detailed architecture and feature status live in `docs/`. This README is intentionally kept short.
+Detailed architecture and feature status live in `docs/`. This README is intentionally short.
 
 ## Status
 
-Current state: MVP-1 core skeleton, staged MVP-2 seeds for sketches, workplanes, profile geometry, recompute, STEP export, reference recovery, sketch diagnostics, and repair-command infrastructure, the MVP-3 parametric bolt circle, the MVP-4 assembly/project container path, and MVP-5 component instances with explicit placement/state updates, solver-independent Mate/Concentric/Distance intent, deterministic active-constraint connectivity, generated-face target resolution, explicit rigid-transform evaluation, planar Mate/Distance residual construction, and a first deterministic rigid-body solver with an explicit atomic transform-application boundary.
+Current state: MVP-1 core skeleton, staged MVP-2 sketch/workplane/profile/recompute/reference blocks, the MVP-3 parametric bolt circle, the MVP-4 assembly/project container path, and MVP-5 assembly infrastructure through deterministic planar rigid-body solving and read-only local Jacobian-rank/remaining-DOF diagnostics.
+
+The implemented assembly path now includes:
+
+```text
+component and constraint model intent
+  -> deterministic active-constraint graph
+  -> generated planar face target resolution
+  -> explicit local-to-assembly rigid-transform evaluation
+  -> planar Mate/Distance residual construction
+  -> shared deterministic numeric residual/Jacobian system
+  -> damped Gauss-Newton rigid-body solve on Project copies
+  -> explicit atomic converged-result application
+  -> read-only local Jacobian-rank and remaining-DOF diagnostics
+```
 
 There is no GUI yet.
 
-For the full implementation sequence, see:
-
-```text
-docs/mvp-plan.md
-```
+For the complete implementation sequence, see `docs/mvp-plan.md`.
 
 ## Technical basis
 
@@ -27,13 +37,13 @@ docs/mvp-plan.md
 
 ## Build and test
 
-Run core configure, build, and tests:
+Core workflow:
 
 ```bash
 cmake --workflow --preset dev-build-test
 ```
 
-Run geometry configure, build, and tests:
+Geometry-enabled workflow:
 
 ```bash
 cmake --workflow --preset dev-geometry-build-test
@@ -44,6 +54,15 @@ Manual geometry build:
 ```bash
 cmake --preset dev-geometry
 cmake --build --preset dev-geometry
+```
+
+Focused current assembly tests:
+
+```bash
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-equation]"
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-transform]"
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-solver]"
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-diagnostics]"
 ```
 
 ## Headless tools
@@ -67,8 +86,8 @@ Examples:
 - `include/blcad/`: public headers
 - `src/`: core and optional geometry implementation
 - `tests/`: Catch2 tests
-- `examples/`: `.blcad.json` / `.blcad.project.json` example models and headless examples
-- `docs/`: architecture, MVP, and roadmap documents
+- `examples/`: `.blcad.json` / `.blcad.project.json` examples and headless examples
+- `docs/`: architecture, implemented MVP blocks, and roadmaps
 
 ## Key documents
 
@@ -78,12 +97,10 @@ Start here:
 - `docs/architecture-summary.md`
 - `docs/mvp-plan.md`
 - `docs/development-setup.md`
-- `docs/json-serialization-mvp1.md`
-- `docs/json-file-workflow-mvp1.md`
+- `docs/file-format.md`
 
-Implemented feature blocks:
+Implemented assembly blocks:
 
-- `docs/bolt-circle-pattern-mvp3.md`
 - `docs/assembly-parameters-mvp4.md`
 - `docs/project-container-mvp4.md`
 - `docs/component-instance-mvp5.md`
@@ -93,29 +110,9 @@ Implemented feature blocks:
 - `docs/assembly-rigid-transform-evaluation-mvp5.md`
 - `docs/assembly-planar-constraint-equations-mvp5.md`
 - `docs/assembly-rigid-body-solver-mvp5.md`
-- `docs/general-closed-sketch-profile-mvp.md`
-- `docs/composite-closed-profile-holes-mvp.md`
-- `docs/arc-and-trim-extend-sketch-profile-mvp.md`
-- `docs/spline-and-tangent-continuity-mvp.md`
-- `docs/sketch-plane-extrude-direction-mvp.md`
-- `docs/derived-workplane-mvp2-seed.md`
-- `docs/workplane-resolver-mvp2.md`
-- `docs/construction-geometry-mvp.md`
-- `docs/projected-sketch-reference-geometry.md`
-- `docs/reference-recovery-mvp.md`
-- `docs/reference-generated-profile-helpers-mvp.md`
-- `docs/sketch-constraints-and-dimensions-mvp.md`
-- `docs/automatic-profile-region-detection-mvp.md`
-- `docs/sketch-solver-diagnostics-mvp.md`
-- `docs/sketch-repair-suggestions-mvp.md`
-- `docs/sketch-repair-commands-mvp.md`
-- `docs/sketch-repair-transactions-mvp.md`
-- `docs/sketch-repair-undo-stack-mvp.md`
-- `docs/sketch-repair-undo-stack-summary-mvp.md`
-- `docs/sketch-repair-command-labels-mvp.md`
-- `docs/sketch-repair-presentation-metadata-mvp.md`
-- `docs/sketch-repair-presentation-snapshot-mvp.md`
-- `docs/sketch-repair-presentation-snapshot-query-mvp.md`
+- `docs/assembly-solve-diagnostics-mvp5.md`
+
+Broader implemented sketch/profile documents remain listed from `docs/mvp-plan.md` and `docs/architecture-summary.md`.
 
 Future roadmaps:
 
@@ -125,6 +122,6 @@ Future roadmaps:
 
 ## Next technical step
 
-The next technical step is read-only assembly solve diagnostics and remaining-degree-of-freedom analysis. Reuse the solver's deterministic component/constraint ordering and local numeric Jacobian model to define rank tolerance, constrained versus remaining rigid-body DOF, and underconstrained versus locally fully constrained group state.
+The next technical step is a stable semantic generated-axis reference family and a read-only Concentric target/residual pipeline.
 
-Do not persist DOF or solved-state caches in this block. Overconstraint and fixed-geometry inconsistency diagnostics must remain explicit, and Concentric/richer constraint families remain deferred until their semantic target and residual families exist.
+The block should expose supported feature-produced axis intent without raw OCCT topology ids, resolve component-local axis descriptors through project-owned part documents, evaluate axis lines in assembly space with the canonical `RigidTransform` convention, and construct deterministic Concentric residual descriptors. Solver integration follows only after those target and residual semantics are stable. Insert remains downstream because it combines axis alignment with axial seating semantics.
