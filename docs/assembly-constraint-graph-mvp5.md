@@ -1,6 +1,8 @@
 # Assembly Constraint Graph MVP-5
 
-Status: implemented deterministic read-only active-constraint connectivity graph. Exact graph connected groups are consumed by the rigid-body solver and the read-only solve/DOF diagnostics layer.
+Status: implemented deterministic read-only active-constraint connectivity graph. Exact graph connected groups are consumed by the current planar rigid-body solver and read-only solve/DOF diagnostics.
+
+Semantic generated-axis resolution and read-only Concentric residual construction are also implemented downstream from graph records. Concentric numeric-system/solver integration is next.
 
 ## Goal
 
@@ -26,137 +28,154 @@ AssemblyConstraintGraphEdge
   component_b
 ```
 
-## Rules
+## Node and edge rules
 
-- every component occurrence is a node, including isolated occurrences
-- every active constraint is one distinct edge
-- inactive constraints create no edge
-- multiple active constraints between the same component pair remain legal multi-edges
-- each edge preserves its `AssemblyConstraintId`
-- edge endpoints preserve target-A/target-B component identity from persistent constraint intent
-- the graph does not copy semantic target geometry
-- active endpoints are defensively revalidated
+Every component occurrence becomes a graph node, including isolated components.
+
+Every active assembly constraint becomes one distinct edge.
+
+Inactive constraints do not create graph edges.
+
+Multiple active constraints between the same component pair remain legal distinct multi-edges because each edge preserves its `AssemblyConstraintId`.
+
+Edge endpoints are target-A and target-B component ids from persistent constraint intent. The graph does not copy semantic target geometry.
+
+Graph construction defensively revalidates active edge endpoints.
 
 ## Deterministic ordering
 
-```text
-nodes                 -> lexicographic ComponentInstanceId
-edges                  -> lexicographic AssemblyConstraintId
-adjacent constraints   -> graph edge order
-members within group   -> lexicographic ComponentInstanceId
-groups                 -> first member id order
-```
+Nodes are ordered lexicographically by `ComponentInstanceId`.
 
-This ordering is part of the downstream numeric contract.
+Edges are ordered lexicographically by `AssemblyConstraintId`.
 
-`AssemblyRigidBodySolver` requires caller group input to exactly match one `connected_components()` result, including order.
+`adjacent_constraints` returns incident constraint ids in graph edge order.
 
-`AssemblySolveDiagnosticsAnalyzer` analyzes the same exact group and uses the same graph constraint order through the shared numeric-system path.
+Each connected group contains lexicographically ordered component ids. Groups are ordered by the first component id.
 
-Neither consumer silently sorts, merges, splits, or expands a caller-provided group.
+This ordering is part of downstream solver and diagnostic contracts.
 
-## Connected groups as numeric partitions
+## Connected groups as solve partitions
+
+Current planar path:
 
 ```text
-AssemblyConstraintGraph::connected_components()
-  -> exact group
+AssemblyConstraintGraph::connected_components
+  -> exact connected group
   -> AssemblyRigidBodySolver
-  -> grounded/fixed and free/variable partition
-  -> shared residual/Jacobian system
-  -> AssemblySolveResult
+  -> fixed/variable partition
+  -> deterministic planar residual ordering
+  -> proposed transforms
+  -> optional explicit application
   -> AssemblySolveDiagnosticsAnalyzer
-  -> local rank and remaining DOF
 ```
 
-Independent groups can be solved and diagnosed independently.
+The current solver requires the caller-provided group to exactly match one graph connected component, including order.
 
-The graph itself does not decide fixed/variable participation.
+Independent graph groups can be solved independently.
 
-Current solver policy is documented in `docs/assembly-rigid-body-solver-mvp5.md`:
+The graph itself does not decide which components are fixed or variable. Grounding, suppression, and visibility participation are solver policies.
+
+Current solver policy:
 
 - grounded components are fixed
-- at least one grounded component is required
+- at least one grounded component is required per selected group
 - multiple grounded components are allowed
 - selected groups containing suppressed components are rejected
-- visibility does not affect solve participation
+- visibility has no solve participation effect
 
-Those policies do not alter graph connectivity.
+## Concentric downstream path
+
+A Concentric constraint is already represented as the same graph edge form as Mate or Distance because connectivity is independent from geometry family.
+
+The implemented read-only Concentric path is:
+
+```text
+AssemblyConstraintGraph edge / persistent Concentric record
+  -> AssemblyConstraintTargetResolver::resolve_axis
+  -> AssemblyTransformEvaluator::evaluate_axis
+  -> AssemblyConcentricConstraintEquationBuilder
+  -> ConcentricResidualDescriptor
+```
+
+The graph does not need a new node or edge type for semantic axes.
+
+The next block will teach the shared numeric system and solver to consume Concentric residuals from graph-ordered constraint ids.
+
+## Target A/B order
+
+The graph edge preserves constraint identity and endpoint component ids but does not own target geometry or residual semantics.
+
+Target A/B order remains in the persistent `AssemblyConstraint` record.
+
+Planar Distance and Concentric raw offset residuals have target-order-dependent conventions, so downstream builders must read the original constraint record rather than reconstruct target order from graph endpoint sorting.
 
 ## Read-only and persistence boundary
 
 Graph construction and queries do not:
 
-- mutate component transforms or state
-- change constraints
-- resolve target geometry
+- mutate component transforms
+- change grounding, visibility, or suppression
+- change constraint state
+- resolve planar or axis targets
 - evaluate assembly-space geometry
-- construct residuals
+- construct Mate, Distance, or Concentric residuals
 - build numeric Jacobians
-- solve transforms
-- apply proposals
-- compute rank or DOF
-- mutate part intent
+- run a solver
+- apply transform proposals
+- compute DOF
+- mutate part model intent
 
-The graph is regenerated from persistent component and active-constraint records.
+The graph is regenerated from persistent component and active-constraint records and is not serialized.
 
-No graph node/edge/adjacency/group cache is serialized.
+No graph node, edge, adjacency, or connected-group cache field exists in assembly/project JSON.
 
 ## Downstream implemented layers
 
 Implemented separately from the graph:
 
-- generated planar face target resolution
-- explicit rigid-transform evaluation
-- active planar Mate/Distance residual construction
-- shared deterministic residual/Jacobian construction
-- deterministic rigid-body solving
-- explicit fresh-converged-result transform application
-- read-only Jacobian-rank and remaining-DOF diagnostics
-
-`AssemblyConstraintEquationBuilder` owns residual semantics.
-
-The private assembly numeric-system path owns residual flattening, variable order, and finite-difference Jacobian construction.
-
-`AssemblyRigidBodySolver` owns solve participation and optimization.
-
-`AssemblySolveResultApplier` owns the explicit mutation boundary.
-
-`AssemblySolveDiagnosticsAnalyzer` owns local rank and remaining-DOF classification.
+- generated-face planar target resolution
+- generated-axis target resolution
+- rigid-transform plane/axis evaluation
+- planar Mate/Distance residual construction
+- read-only Concentric residual construction
+- shared planar numeric residual/Jacobian system
+- deterministic planar rigid-body solving
+- explicit fresh-converged-result application
+- local planar Jacobian-rank and remaining-DOF diagnostics
 
 None changes graph nodes or edges.
 
 ## Tests
 
-Core graph tests cover node/edge identity, active filtering, multi-edges, deterministic ordering, adjacency, isolated nodes, connected groups, and unchanged assembly intent.
-
-Targeted command:
-
 ```bash
 ./build/dev/blcad_core_tests "[core][assembly-constraint-graph]"
 ```
 
-Solver tests verify exact group validation and deterministic constraint ordering:
+Graph tests cover every component as a node, active/inactive filtering, lexicographic ordering, multi-edges, deterministic adjacency, isolated nodes, deterministic connected groups, and unchanged model state.
 
-```bash
-./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-solver]"
-```
+Solver/diagnostics tests separately verify exact group input and graph-ordered numeric consumption.
 
-Diagnostics tests verify deterministic group/constraint ordering is preserved through local rank analysis:
-
-```bash
-./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-diagnostics]"
-```
+Concentric tests verify axis/residual construction from persistent Concentric records but do not yet claim solver consumption.
 
 ## Deliberate graph-layer limitations
 
-The graph remains independent from semantic geometry resolution, transform evaluation, residual semantics, solver participation, Jacobian construction, optimization, transform application, and DOF analysis.
+The graph remains independent from:
 
-Those capabilities are implemented by separate downstream layers and are not graph responsibilities.
+- semantic geometry resolution
+- transform evaluation
+- residual semantics
+- fixed/variable participation
+- numeric Jacobian construction
+- rigid-body optimization
+- transform application
+- DOF analysis
+- richer constraints and joints
+- collision, subassemblies, and assembly export
 
-The graph also does not implement semantic axis references, richer constraint families, joints, collision, subassemblies, or assembly export.
+These are downstream layer responsibilities.
 
 ## Current downstream boundary
 
-Jacobian-rank and remaining-DOF diagnostics are implemented.
+Generated-axis and Concentric residual layers are implemented without changing graph connectivity.
 
-The next assembly block is a semantic generated-axis target family and read-only Concentric residual pipeline. Graph connectivity will continue to provide deterministic relationship partitions, but axis geometry and Concentric semantics must remain outside the graph.
+The next repository-wide assembly step is Concentric integration into the shared graph-ordered numeric residual/Jacobian system, rigid-body solver, and DOF diagnostics.
