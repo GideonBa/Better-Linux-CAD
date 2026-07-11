@@ -1,12 +1,12 @@
 # Project and Save File Format
 
-Status: implemented seeds exist for single-part `.blcad.json`, assembly parameters, embedded project JSON, component instances, Mate/Concentric/Distance/Insert relationship intent, semantic generated face/axis/seat targets, and the derived graph/target/transform/residual/numeric-solve/DOF pipeline.
+Status: implemented seeds exist for single-part `.blcad.json`, assembly parameters, embedded project JSON, component instances, Mate/Concentric/Distance/Insert/Angle geometric relationship intent, persistent Revolute joint/limit/coordinate intent, semantic generated face/axis/seat targets, and the derived graph/solve/motion/export pipeline.
 
-The save format stores parametric model intent. OCCT shapes, resolved target geometry, residual descriptors, numeric Jacobians, solver products, and DOF diagnostics are regenerable derived data and are not the source of truth.
+The save format stores parametric model intent. OCCT shapes, resolved target geometry, residual descriptors, transient motion drives, numeric Jacobians, solver products, motion results, and DOF diagnostics are regenerable derived data and are not the source of truth.
 
 ## Implemented project structure
 
-The current project format embeds one assembly and its owned parts:
+The current project format embeds one root assembly and its owned parts:
 
 ```text
 Project
@@ -20,9 +20,12 @@ Schema marker:
 
 ```text
 blcad.project.mvp4
+version 1
 ```
 
 The historical marker remains while MVP-5 fields extend the embedded assembly format additively.
+
+Structured ownership of child assembly documents is the next project-container extension and is not part of the current format yet.
 
 ## Assembly document records
 
@@ -33,6 +36,7 @@ AssemblyDocument
   parameter_bindings[]
   component_instances[]
   assembly_constraints[]
+  assembly_joints[]
 ```
 
 Historical assembly marker:
@@ -42,7 +46,7 @@ blcad.assembly_document.mvp4
 version 1
 ```
 
-Older files without `component_instances` or `assembly_constraints` remain loadable and produce empty collections for those optional fields.
+The current loader treats `component_instances`, `assembly_constraints`, and `assembly_joints` as additive optional collections. Older files without them remain loadable and produce empty collections.
 
 ## Component instance JSON
 
@@ -65,22 +69,52 @@ Representative shape:
 
 Persistence rules:
 
-- component occurrences reference part ids instead of duplicating parts
-- transform components must be finite
-- `translation_mm` is stored in millimeters
-- `rotation_deg` is stored in degrees
-- transform evaluation uses active right-handed fixed-axis X-then-Y-then-Z rotation
-- no matrix, quaternion, evaluated plane, evaluated axis, or evaluated seating plane is serialized
-- grounding, suppression, and visibility are persisted model intent
-- storage-level direct transform edits remain legal while grounded
+- component occurrences reference part ids instead of duplicating parts;
+- transform components must be finite;
+- `translation_mm` is stored in millimeters;
+- `rotation_deg` is stored in degrees;
+- transform evaluation uses active right-handed fixed-axis X-then-Y-then-Z rotation;
+- no matrix, quaternion, evaluated plane, evaluated axis, or evaluated seating plane is serialized;
+- grounding, suppression, and visibility are persisted model intent;
+- storage-level direct transform edits remain legal while grounded.
 
 Changing the interpretation of `rotation_deg` would be a model-format semantic compatibility change even if the JSON shape stayed identical.
 
-## Assembly constraint JSON
+## Geometric assembly constraint JSON
 
-The same existing record shape stores Mate, Concentric, Distance, and Insert intent.
+The `assembly_constraints[]` collection stores geometric relationship intent.
 
-### Concentric
+Current type spellings are:
+
+```text
+mate
+concentric
+distance
+insert
+angle
+```
+
+Every record stores:
+
+```text
+id
+name
+type
+target_a
+target_b
+state = active | inactive
+```
+
+Target shape:
+
+```json
+{
+  "component_instance": "component.plate.1",
+  "semantic_reference": "feature.hole.seat"
+}
+```
+
+### Concentric example
 
 ```json
 {
@@ -99,7 +133,7 @@ The same existing record shape stores Mate, Concentric, Distance, and Insert int
 }
 ```
 
-### Insert
+### Insert example
 
 ```json
 {
@@ -118,39 +152,94 @@ The same existing record shape stores Mate, Concentric, Distance, and Insert int
 }
 ```
 
-### Distance
+### Distance value
+
+Distance alone adds:
 
 ```json
-{
-  "id": "constraint.spacing",
-  "name": "Spacing",
-  "type": "distance",
-  "target_a": {
-    "component_instance": "component.plate.1",
-    "semantic_reference": "feature.base_extrude.top"
-  },
-  "target_b": {
-    "component_instance": "component.plate.2",
-    "semantic_reference": "feature.base_extrude.top"
-  },
-  "state": "active",
-  "distance": {
-    "unit": "mm",
-    "value": 40.0
-  }
+"distance": {
+  "unit": "mm",
+  "value": 40.0
 }
 ```
 
+The value must be a positive length quantity.
+
+### Angle value
+
+Angle alone adds:
+
+```json
+"angle": {
+  "unit": "deg",
+  "value": 35.0
+}
+```
+
+The value must be a finite degree quantity.
+
 Constraint persistence rules:
 
-- constraints use typed ids and semantic target strings
-- raw OCCT topology ids are not persistent model references
-- target A/B order is preserved
-- Mate, Concentric, and Insert omit `distance`
-- Distance requires a positive length quantity
-- constraint state is `active` or `inactive`
-- adding/loading a constraint does not mutate component transforms
-- project structure validation checks target component identity
+- constraints use typed ids and semantic target strings;
+- raw OCCT topology ids are not persistent model references;
+- target A/B order is preserved;
+- Mate, Concentric, and Insert omit both `distance` and `angle`;
+- Distance requires `distance` and excludes `angle`;
+- Angle requires `angle` and excludes `distance`;
+- state is `active` or `inactive`;
+- adding/loading a constraint does not mutate component transforms;
+- project structure validation checks target component identity.
+
+## Revolute joint JSON
+
+Joint intent is separate from geometric constraint intent and uses `assembly_joints[]`.
+
+The first supported type spelling is:
+
+```text
+revolute
+```
+
+Representative record:
+
+```json
+{
+  "id": "joint.revolute",
+  "name": "Plate Revolute Joint",
+  "type": "revolute",
+  "target_a": {
+    "component_instance": "component.plate.grounded",
+    "semantic_reference": "feature.hole.seat"
+  },
+  "target_b": {
+    "component_instance": "component.plate.free",
+    "semantic_reference": "feature.hole.seat"
+  },
+  "state": "active",
+  "limits": {
+    "lower": {"unit": "deg", "value": -90.0},
+    "upper": {"unit": "deg", "value": 90.0}
+  },
+  "coordinate": {"unit": "deg", "value": 0.0}
+}
+```
+
+Persistent Revolute rules:
+
+```text
+-180 deg <= lower < upper <= 180 deg
+lower <= coordinate <= upper
+```
+
+All limit and coordinate quantities use unit `deg`.
+
+The coordinate is persistent because it is explicit authored motion state. A joint record does not imply that component transforms were moved merely by loading or adding the record. Component transforms change only after explicit application of a fresh converged motion result.
+
+The current motion API rejects requested coordinates outside the persistent limits. It does not persist a clamped value and does not silently change the request.
+
+Files without `assembly_joints` load with an empty joint collection.
+
+## Semantic target strings
 
 The semantic target string is intentionally opaque at the record/JSON layer. Geometry consumers interpret only explicitly supported families.
 
@@ -164,36 +253,85 @@ feature.<feature-id>.seat
 
 The first `.axis` and `.seat` producer is a single-circle `SubtractiveExtrude`.
 
-Changing the semantic meaning of an established token family is a model-format compatibility change even if the JSON field shape is unchanged.
+`.seat` resolves to one primary axis plus one oriented seating plane from the same exact source feature/profile. Insert and Revolute reuse that derived endpoint.
 
-## Why Insert needs no new JSON shape
-
-`AssemblyConstraintType::Insert` serializes through the existing `type` string field as:
+No fields such as the following are persistent:
 
 ```text
-insert
-```
-
-A stable seating target serializes through the existing target string field as:
-
-```text
-feature.hole.seat
-```
-
-The geometry layer derives the endpoint's primary axis and oriented seating plane from the same exact feature/profile intent.
-
-No fields such as the following are introduced:
-
-```text
+occt_face_id
+cylinder_face
 axis_target
 seat_target
 opening_face
-cylinder_face
-insert_pose
-insert_offset
+joint_axis_shape
+resolved_axis
+resolved_seating_plane
 ```
 
-The first Insert relationship means zero signed seating separation. A future parameterized nonzero axial Insert offset requires an explicit model-intent design rather than a hidden solver value.
+Changing the semantic meaning of an established token family is a model-format compatibility change even if the JSON field shape remains unchanged.
+
+## Shared numeric relationships remain derived
+
+The current private numeric relationship set contains:
+
+```text
+constraint_ids[]
+revolute_drives[]
+```
+
+The ids and drive targets are collected for one solve/motion query. The set itself is not serialized.
+
+Current geometric constraint flattening is:
+
+```text
+Mate:
+  normal_opposition.x
+  normal_opposition.y
+  normal_opposition.z
+  signed_separation_mm / length_residual_scale_mm
+
+Distance:
+  normal_parallelism.x
+  normal_parallelism.y
+  normal_parallelism.z
+  distance_residual_mm / length_residual_scale_mm
+
+Concentric:
+  direction_parallelism.x
+  direction_parallelism.y
+  direction_parallelism.z
+  axis_offset_mm.x / length_residual_scale_mm
+  axis_offset_mm.y / length_residual_scale_mm
+  axis_offset_mm.z / length_residual_scale_mm
+
+Insert:
+  direction_parallelism.x
+  direction_parallelism.y
+  direction_parallelism.z
+  axis_offset_mm.x / length_residual_scale_mm
+  axis_offset_mm.y / length_residual_scale_mm
+  axis_offset_mm.z / length_residual_scale_mm
+  signed_seating_separation_mm / length_residual_scale_mm
+
+Angle:
+  angle_alignment
+```
+
+One transient Revolute drive flattens as:
+
+```text
+direction_alignment.x
+direction_alignment.y
+direction_alignment.z
+axis_offset_mm.x / length_residual_scale_mm
+axis_offset_mm.y / length_residual_scale_mm
+axis_offset_mm.z / length_residual_scale_mm
+signed_seating_separation_mm / length_residual_scale_mm
+twist_alignment_sine
+twist_alignment_cosine
+```
+
+The selected motion joint receives the requested coordinate. Other active Revolute joints in the same active combined relationship group receive their currently persisted coordinates. These transient drive values are not stored as a numeric cache.
 
 ## Derived assembly data is not persisted
 
@@ -201,70 +339,75 @@ Implemented derivation layers include:
 
 ```text
 AssemblyConstraintGraph
+AssemblyJointGraph
+combined motion relationship closure
 AssemblyConstraintTargetResolver
 AssemblyTransformEvaluator
-AssemblyConstraintEquationBuilder
-AssemblyConcentricConstraintEquationBuilder
-AssemblyInsertConstraintEquationBuilder
-shared assembly numeric system
+geometric constraint equation builders
+AssemblyRevoluteJointEquationBuilder
+shared assembly numeric relationship system
+shared numeric solve engine
 AssemblyRigidBodySolver
 AssemblySolveResultApplier
+AssemblyJointMotionSolver
+AssemblyJointMotionResultApplier
 AssemblySolveDiagnosticsAnalyzer
+AssemblyStepExporter
 ```
 
 Derived outputs include:
 
 ```text
 constraint graph nodes/edges/groups
+joint graph nodes/edges/groups
+combined motion component groups
 component-local planar targets
 component-local axis targets
-component-local composite Insert axis/seat targets
-assembly-space planes
-assembly-space axes
-assembly-space Insert endpoint geometry
-Mate/Distance residual descriptors
-Concentric residual descriptors
-Insert residual descriptors
+component-local composite axis/seat targets
+assembly-space planes/axes/seating frames
+Mate/Distance/Concentric/Insert/Angle residual descriptors
+Revolute drive residual descriptors
+transient Revolute drive sets
 flattened scaled numeric residual vectors
 central finite-difference Jacobians
 normal equations and damping attempts
 solver iteration state
 AssemblySolveResult values
+AssemblyJointMotionResult values
 component input snapshots
+driven-joint input snapshots
 unapplied transform proposals
 residual summaries
 Jacobian rank summaries
 constrained and remaining DOF counts
-local DOF/consistency/rank classifications
+per-export ShapeCache values
+posed component shape copies
+OCCT assembly compounds
 ```
 
 None is serialized.
 
-The descriptors are rebuilt from persistent model intent and current placement/state.
+## Explicit application and persisted state changes
 
-Current shared numeric flattening exists for Mate, Distance, and Concentric only. Insert residual construction is derived but not yet part of the shared numeric solver.
+`AssemblyRigidBodySolver` and `AssemblyJointMotionSolver` change only private `Project` copies while solving.
 
-The direct Insert residual test proves a regular local `7 x 6` Jacobian rank of `5`; that rank is a regenerable observation, not file state.
+`AssemblySolveResultApplier` is the ordinary geometric mutation boundary. A fresh converged result must pass component source-snapshot and proposal validation before transforms are applied atomically through another project copy.
 
-## Solver application and persisted transforms
-
-`AssemblyRigidBodySolver` changes transforms only on private `Project` copies and returns an unpersisted `AssemblySolveResult`.
-
-Mate, Distance, and Concentric currently use this shared solver path.
-
-`AssemblySolveResultApplier` is the explicit mutation boundary. A fresh converged result must pass complete source-snapshot and proposal validation before transforms are applied atomically through another project copy.
-
-After successful application, the existing field changes:
+After successful geometric application, existing fields may change:
 
 ```text
 component_instances[].transform
 ```
 
-No separate `solved_transform`, `solver_pose`, constraint-family pose, or solve-cache field exists.
+`AssemblyJointMotionResultApplier` additionally validates every driven-joint input snapshot. On one project copy it then applies the embedded component transform proposals and changes:
 
-A later save serializes the current transform exactly like a direct placement edit. The format does not record transform provenance as manual versus solver-applied.
+```text
+assembly_joints[selected].coordinate
+```
 
-Insert has no solver result yet. Persisting an Insert constraint therefore never implies that component transforms have already been solved.
+Only after both operations succeed is the project copy committed.
+
+A later save serializes current transforms and the selected authored coordinate. The format does not persist solve iteration history, transform provenance, or motion-result provenance.
 
 ## DOF diagnostics remain derived
 
@@ -285,29 +428,48 @@ consistency classification
 residual rank structure
 ```
 
-These values depend on current geometry, placement, constraints, and numeric policy. Persisting them as authority would create stale cache semantics.
+Proven regular local results include:
 
-Concentric diagnostics use the shared solver Jacobian and prove regular rank `4/6`.
+```text
+Concentric geometric relationship: rank 4/6
+Insert geometric relationship:     rank 5/6
+Angle non-extremal seed:            rank 1/6
+Driven Revolute query:              rank 6/6 on a 9 x 6 Jacobian
+```
 
-Insert rank `5/6` is currently proven by a focused direct residual Jacobian. Shared diagnostic integration is the next block.
-
-No `dof`, `rank`, `insert_state`, `concentric_state`, or diagnostics cache field is added.
+The driven Revolute rank is a query-time observation with an explicit target coordinate. It is not a persistent claim that the underlying joint has zero motion DOF.
 
 ## Current serialization APIs
 
 Implemented APIs include:
 
-- `serialize_part_document_to_json` / `deserialize_part_document_from_json`
-- `write_part_document_json_file` / `read_part_document_json_file`
-- `serialize_assembly_document_to_json` / `deserialize_assembly_document_from_json`
-- `serialize_project_to_json` / `deserialize_project_from_json`
-- `write_project_json_file` / `read_project_json_file`
+- `serialize_part_document_to_json` / `deserialize_part_document_from_json`;
+- `write_part_document_json_file` / `read_part_document_json_file`;
+- `serialize_assembly_document_to_json` / `deserialize_assembly_document_from_json`;
+- `serialize_project_to_json` / `deserialize_project_from_json`;
+- `write_project_json_file` / `read_project_json_file`.
 
-Serialization stores model intent only. It excludes OCCT shapes, `ShapeCache`, graph connectivity, resolved planes/axes/seats, evaluated assembly-space descriptors, residuals, numeric vectors, Jacobians, solver results, unapplied proposals, rank summaries, and DOF diagnostics.
+Serialization stores model intent only.
+
+## Current compatibility policy
+
+The current MVP uses additive fields under historical schema markers where the loader can define an unambiguous empty/default meaning.
+
+Examples:
+
+```text
+missing component_instances -> empty component collection
+missing assembly_constraints -> empty geometric constraint collection
+missing assembly_joints -> empty joint collection
+```
+
+A semantic reinterpretation of existing transform conventions, target token families, quantity units, or relationship type spellings is not an additive change and requires an explicit compatibility design.
 
 ## Target project container
 
-The future container may evolve toward:
+The next project-container extension introduces project-owned child assembly documents plus rigid subassembly occurrences from the root or another child assembly. The hierarchy must be cycle-free.
+
+The future broader container may evolve toward:
 
 ```text
 ProjectFile
@@ -326,15 +488,18 @@ The current embedded project format remains intentionally simpler. Manifest/exte
 
 ## Rules
 
-- model intent is the source of truth
-- raw OCCT topology ids are never persistent model references
-- semantic token families have compatibility semantics even when stored as strings
-- target A/B order is preserved
-- resolved target geometry and residuals remain derived
-- flattened numeric residual vectors remain derived
-- numeric Jacobians and solver iteration products remain derived
-- local rank and DOF diagnostics remain derived
-- only explicit application of a fresh converged solve result changes persisted placement
-- persistent solver/DOF caches require a separate design and must never replace relationship intent
-
-The next assembly implementation block integrates the already-persistent Insert intent and already-derived composite Insert residual into the shared numeric solver/application/DOF pipeline. No new save-file field is required for that integration.
+- model intent is the source of truth;
+- raw OCCT topology ids are never persistent model references;
+- semantic token families have compatibility semantics even when stored as strings;
+- target A/B order is preserved;
+- geometric constraint intent and joint/motion intent remain separate record families;
+- joint limits and authored coordinates are persistent only as explicit user intent;
+- resolved target geometry and residuals remain derived;
+- transient motion drive sets remain derived;
+- flattened numeric residual vectors remain derived;
+- numeric Jacobians and solver iteration products remain derived;
+- solve/motion results and their input snapshots remain derived;
+- local rank and DOF diagnostics remain derived;
+- only explicit application of a fresh converged result changes persisted placement;
+- successful motion application may additionally change the selected authored joint coordinate;
+- persistent solver/DOF caches require a separate design and must never replace relationship intent.
