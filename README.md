@@ -6,7 +6,7 @@ Detailed architecture and feature status live in `docs/`. This README is intenti
 
 ## Status
 
-Current state: MVP-1 core skeleton, staged MVP-2 sketch/workplane/profile/recompute/reference blocks, the MVP-3 parametric bolt circle, the MVP-4 assembly/project container path, and MVP-5 assembly infrastructure through deterministic Mate/Distance/Concentric/Insert/Angle rigid-body solving, local Jacobian-rank/remaining-DOF diagnostics, suppressed-component solve filtering, posed assembly STEP export, the first persistent Revolute joint/limit motion path, rigid subassembly hierarchy with nested posed-leaf export, read-only posed interference and clearance analysis over the shared posed-leaf boundary, and document-scoped flexible child-assembly solving through the existing rigid-body solver.
+Current state: MVP-1 core skeleton, staged MVP-2 sketch/workplane/profile/recompute/reference blocks, the MVP-3 parametric bolt circle, the MVP-4 assembly/project container path, and MVP-5 assembly infrastructure through deterministic Mate/Distance/Concentric/Insert/Angle rigid-body solving, local Jacobian-rank/remaining-DOF diagnostics, suppressed-component solve filtering, posed assembly STEP export, the first persistent Revolute joint/limit motion path, rigid subassembly hierarchy with nested posed-leaf export, read-only posed interference and clearance analysis, document-scoped flexible child-assembly solving, and occurrence-qualified read-only cross-hierarchy relationship target/residual semantics.
 
 The implemented assembly path now includes:
 
@@ -43,6 +43,12 @@ active rooted child occurrence selection
   -> result carries occurrence path + child document identity + normal component snapshots/proposals
   -> atomic application updates child component transforms only; rigid occurrence boundary placement stays unchanged
 
+occurrence-qualified cross-hierarchy relationship query
+  -> exact (subassembly path, local component id, semantic reference) endpoint identity
+  -> existing local semantic target resolver reused as the only feature-target authority
+  -> exact component + parent transform chain evaluated into root-assembly space
+  -> canonical Mate/Distance/Angle/Concentric/Insert residual descriptors reused read-only
+
 posed assembly export
   -> one recomputed ShapeCache per referenced leaf part document
   -> repeated root/child assembly occurrences reuse recomputed part caches
@@ -57,6 +63,8 @@ Suppressed components contribute no solve variables. Geometric constraints and n
 `AssemblyHierarchyTraversal` derives the rooted rigid occurrence tree in deterministic pre-order. `AssemblyLeafOccurrenceResolver` removes hidden/suppressed subtrees and local hidden/suppressed components, then exposes stable leaf identity/path plus authored transform chains. These descriptors are derived and unpersisted.
 
 `AssemblyFlexibleSubassemblySolver` selects an exact active non-root occurrence path, constructs a temporary child-as-root project view, and reuses the existing local rigid-body solver. Its applier reconstructs the current local view, reuses normal stale-result validation, and atomically writes proposed direct component transforms back to the referenced child document. Repeated occurrences of one child document therefore share the same internal solved pose while retaining independent rigid boundary transforms.
+
+`AssemblyHierarchyConstraintTarget` adds stable read-only endpoint identity as `(occurrence_path, local ComponentInstanceId, semantic_reference)`. `AssemblyHierarchyConstraintTargetResolver` resolves the exact rooted occurrence, reuses the existing local feature-target resolver, and evaluates `[component, inner parent, ..., outer parent]` transforms into root-assembly space. `AssemblyHierarchyConstraintEquationBuilder` then reuses the canonical Mate, Distance, Angle, Concentric, and Insert residual definitions without persisting or solving the query.
 
 `AssemblyStepExporter` recomputes each referenced visible-active leaf part once per export, reuses that cache across repeated component and subassembly occurrences, applies every authored rigid transform to independent shape copies in exact inner-to-outer order, composes one OCCT compound, and delegates final file writing to the existing STEP writer. Export geometry remains derived and unpersisted.
 
@@ -119,6 +127,7 @@ Focused current assembly tests:
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-interference]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-clearance]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-flexible-subassembly]"
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-cross-hierarchy]"
 ```
 
 ## Headless tools
@@ -186,6 +195,7 @@ Implemented assembly blocks:
 - `docs/assembly-rigid-subassembly-nested-export-mvp5.md`
 - `docs/assembly-interference-analysis-mvp5.md`
 - `docs/assembly-flexible-subassembly-solving-mvp5.md`
+- `docs/assembly-cross-hierarchy-relationship-semantics-mvp5.md`
 
 Broader implemented sketch/profile documents remain listed from `docs/mvp-plan.md` and `docs/architecture-summary.md`.
 
@@ -197,4 +207,4 @@ Future roadmaps:
 
 ## Next technical step
 
-Document-scoped flexible subassembly solving is implemented (`docs/assembly-flexible-subassembly-solving-mvp5.md`). The next assembly block is cross-hierarchy relationship semantics: define stable endpoint identity for a component reached through a subassembly occurrence path before constraints or joints are allowed to cross assembly-document boundaries. See `docs/mvp-plan.md`.
+Occurrence-qualified read-only cross-hierarchy target and residual semantics are implemented (`docs/assembly-cross-hierarchy-relationship-semantics-mvp5.md`). The next assembly block is persistent project-level cross-hierarchy geometric constraint intent plus an occurrence-qualified active-constraint graph and shared numeric solve/application integration. Repeated occurrences of one child document must never alias by local `ComponentInstanceId` alone. See `docs/mvp-plan.md`.
