@@ -6,21 +6,28 @@ Detailed architecture and feature status live in `docs/`. This README is intenti
 
 ## Status
 
-Current state: MVP-1 core skeleton, staged MVP-2 sketch/workplane/profile/recompute/reference blocks, the MVP-3 parametric bolt circle, the MVP-4 assembly/project container path, and MVP-5 assembly infrastructure through deterministic planar rigid-body solving and read-only local Jacobian-rank/remaining-DOF diagnostics.
+Current state: MVP-1 core skeleton, staged MVP-2 sketch/workplane/profile/recompute/reference blocks, the MVP-3 parametric bolt circle, the MVP-4 assembly/project container path, and MVP-5 assembly infrastructure through deterministic planar rigid-body solving, local Jacobian-rank/remaining-DOF diagnostics, semantic generated-axis resolution, and read-only Concentric residual construction.
 
 The implemented assembly path now includes:
 
 ```text
 component and constraint model intent
   -> deterministic active-constraint graph
-  -> generated planar face target resolution
+  -> generated planar face and circular-cut axis target resolution
   -> explicit local-to-assembly rigid-transform evaluation
   -> planar Mate/Distance residual construction
-  -> shared deterministic numeric residual/Jacobian system
+  -> shared deterministic planar numeric residual/Jacobian system
   -> damped Gauss-Newton rigid-body solve on Project copies
   -> explicit atomic converged-result application
   -> read-only local Jacobian-rank and remaining-DOF diagnostics
+
+semantic feature.hole.axis targets
+  -> component-local generated axis
+  -> assembly-space axis line
+  -> deterministic read-only Concentric residual descriptor
 ```
+
+The current solver and DOF analyzer still consume planar Mate/Distance residuals only. Concentric target and residual semantics are implemented, but their numeric-system and solver integration is the next block.
 
 There is no GUI yet.
 
@@ -59,10 +66,12 @@ cmake --build --preset dev-geometry
 Focused current assembly tests:
 
 ```bash
+./build/dev/blcad_core_tests "[core][semantic-axis]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-equation]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-transform]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-solver]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-diagnostics]"
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-concentric]"
 ```
 
 ## Headless tools
@@ -111,6 +120,7 @@ Implemented assembly blocks:
 - `docs/assembly-planar-constraint-equations-mvp5.md`
 - `docs/assembly-rigid-body-solver-mvp5.md`
 - `docs/assembly-solve-diagnostics-mvp5.md`
+- `docs/assembly-semantic-axis-concentric-residuals-mvp5.md`
 
 Broader implemented sketch/profile documents remain listed from `docs/mvp-plan.md` and `docs/architecture-summary.md`.
 
@@ -122,6 +132,6 @@ Future roadmaps:
 
 ## Next technical step
 
-The next technical step is a stable semantic generated-axis reference family and a read-only Concentric target/residual pipeline.
+The next technical step is explicit Concentric integration into the shared numeric residual/Jacobian system, rigid-body solver, and remaining-DOF diagnostics.
 
-The block should expose supported feature-produced axis intent without raw OCCT topology ids, resolve component-local axis descriptors through project-owned part documents, evaluate axis lines in assembly space with the canonical `RigidTransform` convention, and construct deterministic Concentric residual descriptors. Solver integration follows only after those target and residual semantics are stable. Insert remains downstream because it combines axis alignment with axial seating semantics.
+The block should preserve all current deterministic ordering, residual scaling, grounding, suppression, snapshot, stale-result, and explicit-application contracts; flatten Concentric direction residuals before scaled axis-offset residuals; solve axis offset and tilt through the existing finite-difference/Gauss-Newton path; and prove the regular one-free-body Concentric Jacobian has rank four with two remaining DOF. Insert remains downstream because it adds axial seating semantics to Concentric alignment.
