@@ -4,6 +4,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <limits>
 #include <string>
 #include <utility>
 
@@ -65,6 +66,24 @@ TEST_CASE("ComponentInstance validates required identity fields", "[core][compon
   CHECK(instance.transform().rotation_deg == expected_rotation);
 }
 
+TEST_CASE("ComponentInstance rejects non-finite transform values", "[core][component-instance]") {
+  auto infinite_translation = replacement_transform();
+  infinite_translation.translation_mm.x = std::numeric_limits<double>::infinity();
+  CHECK(ComponentInstance::create(
+            ComponentInstanceId("component.infinite"), "Infinite", DocumentId("part.base"),
+            ComponentVisibility::Visible, ComponentSuppressionState::Active,
+            ComponentGroundingState::Free, infinite_translation)
+            .has_error());
+
+  auto nan_rotation = replacement_transform();
+  nan_rotation.rotation_deg.z = std::numeric_limits<double>::quiet_NaN();
+  CHECK(ComponentInstance::create(ComponentInstanceId("component.nan"), "NaN", DocumentId("part.base"),
+                                  ComponentVisibility::Visible,
+                                  ComponentSuppressionState::Active,
+                                  ComponentGroundingState::Free, nan_rotation)
+            .has_error());
+}
+
 TEST_CASE("AssemblyDocument owns component instances that reference member parts",
           "[core][component-instance]") {
   auto assembly = make_empty_assembly();
@@ -120,6 +139,7 @@ TEST_CASE("AssemblyDocument explicitly updates free component placement and stat
   CHECK(updated->grounding_state() == ComponentGroundingState::Free);
   CHECK(updated->transform() == transform);
 
+  CHECK(assembly.set_component_instance_transform(ComponentInstanceId(""), transform).has_error());
   CHECK(assembly.set_component_instance_transform(ComponentInstanceId("component.missing"), transform)
             .has_error());
   CHECK(assembly.set_component_instance_visibility(ComponentInstanceId("component.missing"),
@@ -132,6 +152,17 @@ TEST_CASE("AssemblyDocument explicitly updates free component placement and stat
   CHECK(assembly.set_component_instance_grounding_state(ComponentInstanceId("component.missing"),
                                                         ComponentGroundingState::Grounded)
             .has_error());
+
+  auto invalid_transform = transform;
+  invalid_transform.rotation_deg.y = std::numeric_limits<double>::infinity();
+  CHECK(assembly.set_component_instance_transform(ComponentInstanceId("component.base"),
+                                                  invalid_transform)
+            .has_error());
+
+  const ComponentInstance* unchanged =
+      assembly.find_component_instance(ComponentInstanceId("component.base"));
+  REQUIRE(unchanged != nullptr);
+  CHECK(unchanged->transform() == transform);
 }
 
 TEST_CASE("AssemblyDocument JSON roundtrip preserves updated component placement and state",
