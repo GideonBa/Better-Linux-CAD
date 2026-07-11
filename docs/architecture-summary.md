@@ -58,13 +58,11 @@ Implemented assembly-relevant types include:
 
 Planned object families include richer constraints, bodies and body transforms/booleans, path records, 3D sketches, surfacing, joints, and motion.
 
-## Implemented part-model path
+## Part and project model
 
 The implemented part path includes typed quantities/parameters, datum planes, sketches and multiple profile families, additive/subtractive extrude intent, dependency/invalidation/recompute planning, semantic references, derived workplanes, construction geometry, projected/reference-driven sketch geometry, reference recovery, sketch constraints/diagnostics/repair helpers, optional OCCT execution through `ShapeCache`, STEP export, and JSON model-intent serialization.
 
 `CircularHolePattern` is parametric model intent and expands into per-hole cuts during geometry recompute.
-
-## Project and assembly container
 
 `Project` owns one assembly and project-owned part documents. A `ComponentInstance` is an occurrence with identity independent from part-document identity. Repeated occurrences may reference the same `PartDocument` while retaining independent placement/state.
 
@@ -73,7 +71,7 @@ Persisted component state includes:
 ```text
 visibility
 suppression
- grounding
+grounding
 RigidTransform
   translation_mm
   rotation_deg
@@ -154,7 +152,7 @@ The local axis, local seating plane, and component transform remain distinct der
 
 There is no hidden second target and no four-target Insert record.
 
-## Explicit rigid-transform evaluation
+## Rigid-transform evaluation
 
 Persisted `RigidTransform` semantics are:
 
@@ -258,7 +256,7 @@ ry_deg
 rz_deg
 ```
 
-Current exact flattening:
+Exact current flattening:
 
 ```text
 Mate:
@@ -296,7 +294,7 @@ The solver mutates private `Project` copies only and returns explicit transform 
 
 `AssemblySolveResultApplier` accepts only converged results, rejects stale snapshots including moved grounded anchors, validates proposals, and applies atomically through another project copy.
 
-Insert currently reaches an explicit unsupported numeric boundary:
+Insert currently reaches the explicit unsupported numeric boundary:
 
 ```text
 Insert equation construction requires dedicated composite target support
@@ -316,7 +314,7 @@ remaining_dof   = variable_count - rank(J)
 
 DOF, consistency, and residual-row rank structure are separate classifications. Redundant scalar residual rows are not automatically semantic overconstraint.
 
-Proven Concentric regular result:
+Proven regular Concentric result:
 
 ```text
 residual_component_count = 6
