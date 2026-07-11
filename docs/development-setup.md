@@ -1,6 +1,6 @@
 # Development Setup
 
-This document describes the local development setup for BLCAD.
+This document describes the local development setup for BLCAD. Feature status and the implementation sequence are maintained in `docs/mvp-plan.md`; this file focuses on building, testing, formatting, and running the current headless tools.
 
 ## System
 
@@ -10,7 +10,7 @@ Current target environment:
 - C++20
 - CMake 3.28 or newer
 - Ninja
-- OCCT 7.6 from the Ubuntu packages
+- OCCT from the Ubuntu packages for optional geometry targets
 - Qt 6 from the Ubuntu packages for later GUI work
 - nlohmann-json for model-intent serialization
 - Catch2 for tests
@@ -30,9 +30,15 @@ sudo apt-get install -y build-essential cmake ninja-build pkg-config git clang-f
   doxygen graphviz
 ```
 
-## Configure and build
+## Configure, build, and test
 
-Core-only build:
+Run the complete core-only workflow:
+
+```bash
+cmake --workflow --preset dev-build-test
+```
+
+The equivalent step-by-step commands are:
 
 ```bash
 cmake --preset dev
@@ -40,7 +46,13 @@ cmake --build --preset dev
 ctest --preset dev
 ```
 
-Geometry build:
+Run the complete geometry-enabled workflow:
+
+```bash
+cmake --workflow --preset dev-geometry-build-test
+```
+
+The equivalent step-by-step commands are:
 
 ```bash
 cmake --preset dev-geometry
@@ -48,116 +60,82 @@ cmake --build --preset dev-geometry
 ctest --preset dev-geometry
 ```
 
-Current test coverage includes:
+Run only the component-instance tests after a core build:
 
-- `Quantity`, `Error`, and `Result`
-- `Parameter` creation and value updates
-- `PartDocument` identity, validation, lookup, and reference management
-- datum-plane, derived-workplane, construction-geometry, sketch, line-segment, rectangle-profile, circle-profile, and closed-profile data models
-- construction point, construction line, and construction plane validation
-- construction plane workplane references from sketches
-- construction-geometry parameter-dependency invalidation paths
-- closed-profile validation for ordered connected loops and self-intersection rejection
-- semantic top, bottom, right, left, front, and back face references for generated additive extrudes
-- additive and subtractive feature-intent data models
-- dependency graph construction, topological ordering, and cycle detection
-- invalidation state and recompute-plan creation
-- JSON serialization/deserialization of model intent, including top, bottom, right, left, front, and back derived workplanes
-- JSON serialization/deserialization of line segments and line-based closed profiles
-- JSON serialization/deserialization of explicit construction points, lines, planes, and their parameter dependencies
-- `.blcad.json` file read/write helpers
-- rectangle extrusion through OCCT in the optional geometry build
-- centered and axis-directed circular cuts through OCCT in the optional geometry build
-- line-based closed-profile extrusion through OCCT in the optional geometry build
-- line-based closed-profile through-all cuts through OCCT in the optional geometry build
-- explicit construction-plane resolution through `WorkplaneResolver`
-- `ShapeCache` storage, replacement, removal, and final-shape tracking
-- geometry-layer `WorkplaneResolver`
-- rectangular bounds on resolved top, bottom, right, left, front, and back workplanes
-- mapping local sketch points through resolved datum, derived, and construction workplanes
-- additive and subtractive recompute execution
-- full document recompute into a fresh `ShapeCache`
-- STEP export of the final shape
-- numeric incremental recompute after a real parameter change
-- recompute and STEP export from a JSON-restored document
-- recompute of off-center cuts whose sketches reference derived top, bottom, right, left, front, or back workplanes
-- recompute of triangle closed-profile prisms and triangle closed-profile through-all cuts
-- recompute of a closed-profile prism whose sketch references an explicit construction plane
-- bounded face validation for valid and out-of-bounds holes and closed-profile vertices
-- incremental recompute through derived-workplane and construction-geometry dependency paths
-- stale dirty feature-shape removal before incremental recompute
+```bash
+./build/dev/blcad_core_tests "[core][component-instance]"
+```
 
-## Headless examples
+The build directories are defined by `CMakePresets.json` as `build/dev`, `build/dev-geometry`, and `build/release`.
 
-After configuring and building the geometry preset, export the checked-in models:
+## Test coverage
+
+The test targets and exact source files registered in the current build are the source of truth in `CMakeLists.txt`. Do not maintain another exhaustive per-test-file list here; it becomes stale as MVP blocks are added.
+
+At a high level, the current suites cover:
+
+- core value types, parameters, document validation, dependency graphs, invalidation, and recompute planning
+- sketches, constraints/dimensions, profile regions, arcs, splines, composite profiles, and construction geometry
+- semantic/projected references, reference recovery, sketch diagnostics, repair commands, transactions, undo, and presentation snapshots
+- assembly parameters, project-level propagation, component instances, free placement/state updates, shared part ownership, and JSON roundtrip
+- part, assembly, and project model-intent serialization/file workflows
+- optional OCCT workplane resolution, profile geometry, recompute execution, shape caching, and STEP export
+
+When a feature block is added, register its tests in `CMakeLists.txt` and document its scope in the feature-specific document plus `docs/mvp-plan.md`.
+
+## Headless tools
+
+The core build provides component inspection:
+
+```bash
+./build/dev/blcad_inspect_project_components examples/component_instances.blcad.project.json
+```
+
+The geometry build provides single-part export:
 
 ```bash
 ./build/dev-geometry/blcad_export_step examples/reference_plate.blcad.json build/reference_plate.step
-./build/dev-geometry/blcad_export_step examples/top_face_cut.blcad.json build/top_face_cut.step
-./build/dev-geometry/blcad_export_step examples/bottom_face_cut.blcad.json build/bottom_face_cut.step
-./build/dev-geometry/blcad_export_step examples/right_face_cut.blcad.json build/right_face_cut.step
-./build/dev-geometry/blcad_export_step examples/left_face_cut.blcad.json build/left_face_cut.step
-./build/dev-geometry/blcad_export_step examples/front_face_cut.blcad.json build/front_face_cut.step
-./build/dev-geometry/blcad_export_step examples/back_face_cut.blcad.json build/back_face_cut.step
-./build/dev-geometry/blcad_export_step examples/triangle_prism.blcad.json build/triangle_prism.step
-./build/dev-geometry/blcad_export_step examples/triangle_cut_plate.blcad.json build/triangle_cut_plate.step
-./build/dev-geometry/blcad_export_step examples/construction_plane_prism.blcad.json build/construction_plane_prism.step
+./build/dev-geometry/blcad_export_step examples/bolt_circle_plate.blcad.json build/bolt_circle_plate.step
 ```
 
-Depending on the local CMake preset output directory, the executable path may differ. The command shape is:
+The geometry build also provides `blcad_export_project`. Use it with a valid `.blcad.project.json` file and an assembly parameter id that exists in that project.
+
+Command shapes:
 
 ```text
 blcad_export_step <input.blcad.json> <output.step>
+blcad_export_project <input.blcad.project.json> <assembly-parameter-id> <value> <output-dir>
+blcad_inspect_project_components <input.blcad.project.json>
 ```
 
-## Documentation
+The component inspector is read-only. It validates project assembly structure and prints component references, visibility, suppression state, grounding state, translation, and rotation.
 
-Important documents:
+## Documentation entry points
 
-- `docs/project-goal.md`: explicit long-term project goal
-- `docs/architecture-summary.md`: condensed architecture overview
-- `docs/core-mvp1-skeleton.md`: current core skeleton
-- `docs/sketch-mvp1-data-model.md`: sketch and profile data model
-- `docs/feature-mvp1-data-model.md`: feature data model
-- `docs/dependency-graph-mvp1-data-model.md`: dependency graph data model
-- `docs/invalidation-mvp1-data-model.md`: invalidation-state data model
-- `docs/recompute-plan-mvp1-data-model.md`: recompute-plan data model
-- `docs/geometry-adapter-mvp1-rectangle-extrusion.md`: first OCCT adapter
-- `docs/geometry-adapter-mvp1-circular-cut.md`: centered and axis-directed cut OCCT adapter
-- `docs/shape-cache-mvp1-data-model.md`: ShapeCache data model
-- `docs/recompute-execution-mvp1-additive-extrude.md`: additive recompute execution
-- `docs/recompute-execution-mvp1-subtractive-cut.md`: subtractive recompute execution
-- `docs/step-export-mvp1.md`: STEP export
-- `docs/document-recompute-mvp1.md`: full document recompute and reference-part pipeline
-- `docs/parameter-update-mvp1.md`: parameter update and numeric incremental recompute
-- `docs/json-serialization-mvp1.md`: JSON serialization of model intent
-- `docs/json-file-workflow-mvp1.md`: `.blcad.json` file workflow and headless export example
-- `docs/derived-workplane-mvp2-seed.md`: semantic generated-face workplanes and sketches on generated planar faces
-- `docs/workplane-resolver-mvp2.md`: geometry-layer resolver for derived and construction workplanes
-- `docs/bounded-workplane-validation-mvp2.md`: bounded circle and closed-profile validation on derived workplanes
-- `docs/incremental-derived-workplane-recompute-mvp2.md`: incremental recompute through derived-workplane dependencies
-- `docs/bottom-workplane-mvp2.md`: bottom-face derived workplane for simple additive extrudes
-- `docs/right-workplane-mvp2.md`: right-face derived workplane for simple additive extrudes
-- `docs/left-workplane-mvp2.md`: left-face derived workplane for simple additive extrudes
-- `docs/front-workplane-mvp2.md`: front-face derived workplane for simple additive extrudes
-- `docs/back-workplane-mvp2.md`: back-face derived workplane for simple additive extrudes
-- `docs/general-closed-sketch-profile-mvp.md`: implemented first line-based closed profile block
-- `docs/construction-geometry-mvp.md`: implemented explicit construction geometry and next relation-driven construction geometry
-- `docs/inventor-like-sketcher-and-feature-roadmap.md`: future Inventor-like sketcher and sketch-driven feature roadmap
-- `docs/advanced-surfacing-and-3d-sketch-mvp.md`: future 3D sketch and surfacing block
-- `docs/mvp-plan.md`: MVP sequence
-- `docs/mvp-1-specification.md`: detailed MVP-1 specification
-- `docs/decisions/`: architecture decision records
-- `docs/dependencies-ubuntu-24.04.md`: package list for Ubuntu 24.04
+Use these documents as the maintained status entry points:
+
+- `README.md`: short repository status and current next technical step
+- `docs/mvp-plan.md`: detailed implementation sequence and implemented/deferred scope
+- `docs/architecture-summary.md`: condensed current and target architecture
+- `docs/component-instance-mvp5.md`: component instances and explicit free-placement/state updates
+- `docs/assembly-system.md`: assembly constraint, solver, DOF, and joint roadmap
+- `docs/file-format.md`: persisted model-intent format
+- `docs/project-goal.md`: long-term project goal
+
+Feature-specific documents remain the canonical detail for their own implemented blocks. Avoid copying the full feature status or next-step checklist into unrelated setup documents.
 
 ## Formatting
 
-Project formatting is prepared:
+Project formatting is configured through:
 
 - `.editorconfig`
 - `.clang-format`
 
-Use `clang-format` for C++ files before committing.
+Use `clang-format` for changed C++ files before committing. For example:
+
+```bash
+clang-format -i src/core/assembly_document.cpp tests/core/component_instance_tests.cpp
+```
 
 ## Clean generated files
 
@@ -167,21 +145,17 @@ CMake build directories are located under `build/`.
 rm -rf build/
 ```
 
-## Development rule after explicit construction geometry
+## Current development boundaries
 
-The current code should still move carefully:
+The current implementation already includes the parametric bolt circle, richer sketch/profile blocks, assembly parameters, the project container, component instances, and explicit free-placement/state updates. Those capabilities must not be listed as future or missing in current-status documentation.
 
-- no GUI code yet
-- no assembly yet
-- no engineering assistants yet
-- no bolt circle yet
-- no general constraint solver yet
-- no serialization of OCCT geometry
-- no full topological naming system yet
-- no arbitrary generated-face topology yet
-- no arcs, splines, multiple contours, inner holes, or automatic profile-region detection yet
-- no relation-driven construction geometry yet
-- no generated semantic edge/vertex construction references yet
-- no 3D sketching, sweep, loft, surfacing, or closed-shell-to-solid conversion yet
+The current assembly boundary is still deliberate:
 
-The next technical step should start relation-driven construction geometry with `ConstructionRelation`, `PlaneOffsetFromPlane`, `LineThroughTwoPoints`, and `PlaneThroughThreePoints`, while keeping explicit construction geometry as the stable fallback path.
+- component transforms are explicit free-placement model intent, not solver output
+- grounding, visibility, and suppression are stored state and are not yet enforced by assembly consumers
+- assembly Mate, Concentric, and Distance constraint records are the next model-intent block
+- no assembly constraint graph, rigid-body solver, remaining-DOF computation, collision analysis, subassemblies, or assembly-level STEP export exists yet
+- persistent model references must remain semantic; raw OCCT topology ids are not core model intent
+- no GUI code should own CAD logic
+
+For the exact next implementation sequence, use `docs/mvp-plan.md` rather than duplicating it here.

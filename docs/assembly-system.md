@@ -6,51 +6,35 @@ The assembly system composes parts into assemblies like Inventor or SolidWorks. 
 
 ## Core idea
 
-A part document describes one part. An assembly holds instances of parts, so one part can appear many times without duplicating its geometry.
+A part document defines part model intent once. An assembly holds occurrences of parts, so one owned `PartDocument` can be referenced by several component instances.
 
 ```text
-PartDocument Screw_M6x25          # defines geometry once
+PartDocument Screw_M6x25
 AssemblyDocument HousingAssembly
   ComponentInstance Screw_01 -> Screw_M6x25
   ComponentInstance Screw_02 -> Screw_M6x25
 ```
 
+The current core stores assembly occurrence intent only; assembly-level geometry instancing is not implemented yet.
+
 The current implementation stores and updates free-placement transforms directly. Later solver work will make instance positions depend on constraints.
 
 ## Implemented component-instance and free-placement blocks
 
-Detailed document: `docs/component-instance-mvp5.md`
+The canonical detailed document for the implemented component-instance records, states, update APIs, validation rules, JSON compatibility, inspection tool, and tests is `docs/component-instance-mvp5.md`.
 
-Implemented now:
+Implemented assembly behavior relevant to this roadmap:
 
-```text
-ComponentInstance
-  id
-  name
-  referenced_part_document
-  visibility
-  suppression_state
-  grounding_state
-  transform
+- `AssemblyDocument` owns component instances by value
+- each component instance references a registered member part document
+- several component instances may reference the same project-owned `PartDocument`
+- free-placement transforms contain finite translation values in millimeters and finite rotation values in degrees
+- visibility, suppression, and grounding state are persisted model intent
+- transform, visibility, suppression, and grounding can be updated explicitly on an existing component instance
+- updates preserve component identity and the referenced part document
+- direct placement edits do not infer constraints, compute DOF, or trigger part geometry recompute
 
-RigidTransform
-  translation_mm
-  rotation_deg
-```
-
-Implemented states:
-
-```text
-ComponentVisibility: visible | hidden
-ComponentSuppressionState: active | suppressed
-ComponentGroundingState: free | grounded
-```
-
-The implementation validates that a component instance references an assembly member part and that project-level validation resolves that part to an owned project part document.
-
-Existing component instances can now be changed through explicit `AssemblyDocument` update APIs for transform, visibility, suppression state, and grounding state. Those updates preserve component identity and the referenced part document.
-
-The update path is deliberately not a solver. A transform edit directly replaces the stored free-placement transform. No constraint is inferred, no DOF is computed, and no part geometry is duplicated or recomputed.
+Field-by-field record definitions and JSON examples are intentionally not duplicated here; `docs/component-instance-mvp5.md` is the source of truth for the implemented block.
 
 ## Target component instances
 
@@ -78,7 +62,7 @@ DOF analysis is not implemented in the current free-placement block.
 
 ## Part features vs. assembly constraints
 
-A part feature changes a part's geometry (extrude, cut, hole, fillet, chamfer). An assembly constraint does not change geometry; it describes the pose relationship between two components or between a component and an assembly reference.
+A part feature changes a part's geometry (extrude, cut, hole, fillet, chamfer). An assembly constraint does not change part geometry; it describes the pose relationship between two component instances or between a component and an assembly reference.
 
 ## Constraint types
 
@@ -182,9 +166,9 @@ Implemented:
 
 - component instances owned by `AssemblyDocument`
 - references from component instances to project-owned part documents
-- visibility, suppression, grounding state, and free-placement transform records
+- finite free-placement transforms plus visibility, suppression, and grounding state
 - explicit transform, visibility, suppression, and grounding update APIs
-- update validation for existing component instance ids
+- update validation for empty or missing component instance ids and non-finite transforms
 - placement/state updates that preserve instance identity and part-document references
 - JSON roundtrip through assembly/project JSON for updated placement/state
 - project validation for component instance references after updates
@@ -214,10 +198,10 @@ Then add: Insert, Angle, Tangent constraints; movable joints; limits; collision 
 
 ## Out of scope for the first versions
 
-- geometric constraint solving before stable constraint model-intent records and semantic targets exist.
-- joints, motion, and limits before the rigid solver is stable.
-- flexible subassemblies.
-- collision/interference analysis beyond a simple static check.
+- geometric constraint solving before stable constraint model-intent records and semantic targets exist
+- joints, motion, and limits before the rigid solver is stable
+- flexible subassemblies
+- collision/interference analysis beyond a simple static check
 
 ## Role in the system
 

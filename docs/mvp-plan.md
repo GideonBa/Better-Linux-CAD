@@ -140,14 +140,14 @@ Implemented scope:
 - `ComponentInstance` owned by `AssemblyDocument`
 - stable instance id, display name, and referenced project part document id
 - visibility, suppression state, and grounding state records
-- `RigidTransform` with translation in millimeters and rotation in degrees for free placement
+- `RigidTransform` with finite translation values in millimeters and finite rotation values in degrees for free placement
 - assembly-level validation that component instances reference member parts
 - project-level validation that component instances resolve to owned project parts
 - copy-style `ComponentInstance::with_*` operations that preserve identity and referenced part intent
 - explicit `AssemblyDocument` updates for transform, visibility, suppression state, and grounding state
 - direct transform edits even while an instance is marked grounded, preserving the deliberate no-solver boundary
 - assembly/project JSON roundtrip for initial and updated component instance state
-- core tests proving two updated component instances can reference one owned part document without duplicating part geometry
+- core tests proving two updated component instances can reference one owned `PartDocument` without duplicating the owned part model intent
 - checked-in `examples/component_instances.blcad.project.json`
 - headless `blcad_inspect_project_components` inspection tool exposing persisted placement/state values
 

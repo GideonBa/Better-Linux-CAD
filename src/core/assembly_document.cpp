@@ -1,9 +1,49 @@
 #include "blcad/core/assembly_document.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <utility>
 
 namespace blcad {
+namespace {
+
+[[nodiscard]] bool is_finite(Vector3 vector) noexcept {
+  return std::isfinite(vector.x) && std::isfinite(vector.y) && std::isfinite(vector.z);
+}
+
+[[nodiscard]] bool is_finite(const RigidTransform& transform) noexcept {
+  return is_finite(transform.translation_mm) && is_finite(transform.rotation_deg);
+}
+
+template <typename Update>
+[[nodiscard]] Result<std::size_t>
+update_component_instance(std::vector<ComponentInstance>& component_instances,
+                          ComponentInstanceId id,
+                          Update update) {
+  if (id.empty()) {
+    return Result<std::size_t>::failure(
+        Error::validation("component_instance", "component instance id must not be empty"));
+  }
+
+  const auto found = std::find_if(
+      component_instances.begin(), component_instances.end(),
+      [&id](const ComponentInstance& instance) { return instance.id() == id; });
+  if (found == component_instances.end()) {
+    return Result<std::size_t>::failure(
+        Error::validation(id.value(), "component instance must exist in assembly document"));
+  }
+
+  auto updated = update(*found);
+  if (updated.has_error()) {
+    return Result<std::size_t>::failure(updated.error());
+  }
+
+  const auto index = static_cast<std::size_t>(found - component_instances.begin());
+  *found = std::move(updated.value());
+  return Result<std::size_t>::success(index);
+}
+
+} // namespace
 
 Result<ParameterBinding> ParameterBinding::create(ParameterBindingId id, DocumentId part_document,
                                                   ParameterId part_parameter,
@@ -97,6 +137,10 @@ Result<ComponentInstance> ComponentInstance::create(
   if (referenced_part_document.empty()) {
     return Result<ComponentInstance>::failure(
         Error::validation(object_id, "component instance referenced part document must not be empty"));
+  }
+  if (!is_finite(transform)) {
+    return Result<ComponentInstance>::failure(
+        Error::validation(object_id, "component instance transform values must be finite"));
   }
   return Result<ComponentInstance>::success(ComponentInstance(
       std::move(id), std::move(name), std::move(referenced_part_document), visibility,
@@ -258,82 +302,34 @@ Result<std::size_t> AssemblyDocument::add_component_instance(ComponentInstance i
 Result<std::size_t>
 AssemblyDocument::set_component_instance_transform(ComponentInstanceId id,
                                                    RigidTransform transform) {
-  if (id.empty()) {
-    return Result<std::size_t>::failure(
-        Error::validation("component_instance", "component instance id must not be empty"));
-  }
-  for (std::size_t index = 0U; index < component_instances_.size(); ++index) {
-    if (component_instances_[index].id() == id) {
-      auto updated = component_instances_[index].with_transform(transform);
-      if (updated.has_error()) {
-        return Result<std::size_t>::failure(updated.error());
-      }
-      component_instances_[index] = std::move(updated.value());
-      return Result<std::size_t>::success(index);
-    }
-  }
-  return Result<std::size_t>::failure(
-      Error::validation(id.value(), "component instance must exist in assembly document"));
+  return update_component_instance(
+      component_instances_, std::move(id),
+      [transform](const ComponentInstance& instance) { return instance.with_transform(transform); });
 }
 
 Result<std::size_t> AssemblyDocument::set_component_instance_visibility(
     ComponentInstanceId id, ComponentVisibility visibility) {
-  if (id.empty()) {
-    return Result<std::size_t>::failure(
-        Error::validation("component_instance", "component instance id must not be empty"));
-  }
-  for (std::size_t index = 0U; index < component_instances_.size(); ++index) {
-    if (component_instances_[index].id() == id) {
-      auto updated = component_instances_[index].with_visibility(visibility);
-      if (updated.has_error()) {
-        return Result<std::size_t>::failure(updated.error());
-      }
-      component_instances_[index] = std::move(updated.value());
-      return Result<std::size_t>::success(index);
-    }
-  }
-  return Result<std::size_t>::failure(
-      Error::validation(id.value(), "component instance must exist in assembly document"));
+  return update_component_instance(
+      component_instances_, std::move(id), [visibility](const ComponentInstance& instance) {
+        return instance.with_visibility(visibility);
+      });
 }
 
 Result<std::size_t> AssemblyDocument::set_component_instance_suppression_state(
     ComponentInstanceId id, ComponentSuppressionState suppression_state) {
-  if (id.empty()) {
-    return Result<std::size_t>::failure(
-        Error::validation("component_instance", "component instance id must not be empty"));
-  }
-  for (std::size_t index = 0U; index < component_instances_.size(); ++index) {
-    if (component_instances_[index].id() == id) {
-      auto updated = component_instances_[index].with_suppression_state(suppression_state);
-      if (updated.has_error()) {
-        return Result<std::size_t>::failure(updated.error());
-      }
-      component_instances_[index] = std::move(updated.value());
-      return Result<std::size_t>::success(index);
-    }
-  }
-  return Result<std::size_t>::failure(
-      Error::validation(id.value(), "component instance must exist in assembly document"));
+  return update_component_instance(
+      component_instances_, std::move(id),
+      [suppression_state](const ComponentInstance& instance) {
+        return instance.with_suppression_state(suppression_state);
+      });
 }
 
 Result<std::size_t> AssemblyDocument::set_component_instance_grounding_state(
     ComponentInstanceId id, ComponentGroundingState grounding_state) {
-  if (id.empty()) {
-    return Result<std::size_t>::failure(
-        Error::validation("component_instance", "component instance id must not be empty"));
-  }
-  for (std::size_t index = 0U; index < component_instances_.size(); ++index) {
-    if (component_instances_[index].id() == id) {
-      auto updated = component_instances_[index].with_grounding_state(grounding_state);
-      if (updated.has_error()) {
-        return Result<std::size_t>::failure(updated.error());
-      }
-      component_instances_[index] = std::move(updated.value());
-      return Result<std::size_t>::success(index);
-    }
-  }
-  return Result<std::size_t>::failure(
-      Error::validation(id.value(), "component instance must exist in assembly document"));
+  return update_component_instance(
+      component_instances_, std::move(id), [grounding_state](const ComponentInstance& instance) {
+        return instance.with_grounding_state(grounding_state);
+      });
 }
 
 Result<std::size_t> AssemblyDocument::set_parameter_value(ParameterId id, Quantity value) {

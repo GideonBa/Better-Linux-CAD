@@ -16,7 +16,7 @@ The project container must not:
 - bypass `PartDocument` invalidation and recompute planning
 - emit assembly-level geometry or an assembly-level STEP file
 
-Component instances are now handled by the first MVP-5 seed in `docs/component-instance-mvp5.md`. Constraint solving remains later MVP-5 work tracked in `docs/assembly-system.md`.
+Component instances and explicit free-placement/state updates are handled by the MVP-5 block in `docs/component-instance-mvp5.md`. Constraint records and solving remain later MVP-5 work tracked in `docs/assembly-system.md`.
 
 ## Implemented records
 
@@ -116,7 +116,7 @@ A manifest-based project file that references separate part files is deliberatel
 
 ## Headless project export
 
-When geometry targets are enabled, the seed adds:
+When geometry targets are enabled, the project block adds:
 
 ```text
 blcad_export_project <input.blcad.project.json> <assembly-parameter-id> <value> <output-dir>
@@ -133,11 +133,11 @@ The command:
 
 This command is a headless example, not a GUI workflow. It does not solve assembly placement and does not emit an assembly-level STEP file.
 
-The later component-instance seed adds a separate non-geometry inspection command, `blcad_inspect_project_components`, for listing component instances and their referenced part documents.
+The MVP-5 component-instance block adds the separate non-geometry `blcad_inspect_project_components` command for listing component instances, their referenced part documents, and persisted placement/state values.
 
 ## Test coverage
 
-The tests cover:
+The project-container tests cover:
 
 - project creation and duplicate owned part rejection
 - membership validation for assembly member ids
@@ -145,11 +145,12 @@ The tests cover:
 - per-part recompute plans from one project-level parameter update
 - project JSON roundtrip with embedded assembly and part documents
 - project JSON rejection when an assembly member part is missing from the project
-- project-level component-instance validation through the MVP-5 component instance tests
+
+The MVP-5 component-instance tests separately cover project-level component reference validation, placement/state updates, shared `PartDocument` ownership, and project JSON roundtrip after those updates.
 
 ## Deliberate limitations
 
-This block itself does not solve component placements, constraints, or DOF.
+This MVP-4 block itself does not solve component placements, constraints, or DOF.
 
 It does not implement mates, concentric constraints, distance constraints, collision checks, or assembly-level STEP export.
 

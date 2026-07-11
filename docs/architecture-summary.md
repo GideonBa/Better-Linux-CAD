@@ -4,7 +4,7 @@ Source: condensed from the current repository architecture documents and impleme
 
 ## Goal
 
-BLCAD is intended to become an independent parametric CAD system for Linux. The model does not only store final BRep geometry, but the underlying design intent: parameters, sketches, features, dependencies, semantic references, construction geometry, 3D curves, surfaces, multi-body part records, body transforms, body booleans, and assembly relationships. The explicit long-term goal is also recorded in `docs/project-goal.md`.
+BLCAD is intended to become an independent parametric CAD system for Linux. The model does not only store final BRep geometry, but the underlying design intent: parameters, sketches, features, dependencies, semantic references, construction geometry, assembly structure, and later multi-body, path, surfacing, and engineering intent. The explicit long-term goal is recorded in `docs/project-goal.md`.
 
 ## Fundamental decision
 
@@ -37,25 +37,23 @@ Current and planned core object families include:
 - `AssemblyDocument`
 - `Project`
 - `Parameter`
-- `Expression`
+- future `Expression`
 - `Sketch`
 - `SketchEntityId`
-- `LineSegment`
-- `ClosedProfile`
-- sketch entities such as arcs, circles, splines, projected geometry, and later ellipses, polygons, slots, and text
-- `SketchConstraint`, `SketchDimension`, `SketchRegion`, and `ProfileRegion` families
+- line, arc, spline, projected, and profile-region sketch records
+- `SketchConstraint` and `SketchDimension` families
 - `DatumPlane`
 - `DerivedWorkplane`
-- `SemanticFaceReference`
+- `SemanticFaceReference`, `SemanticEdgeReference`, and `SemanticVertexReference`
 - `ConstructionPoint`
-- `ConstructionLine` / `DatumAxis`
+- `ConstructionLine` / datum-axis intent
 - `ConstructionPlane`
-- future `ConstructionRelation`
+- `ConstructionRelation`
 - future `BodyId`, `Body`, `BodyTransform`, `BodyTransformStack`, and `BodyBooleanFeature`
 - future `SketchOwnership`
 - future `PathCurve`, `PathSegmentReference`, and `ProfileSectionReference`
 - future `SketchPoint3D`, `SketchCurve3D`, and `GuideCurve`
-- feature families including extrude/cut and future revolve, sweep, loft, surface, fillet, and chamfer features
+- feature families including implemented extrude/cut paths and future revolve, sweep, loft, surface, fillet, and chamfer features
 - `FeatureReference`
 - `DependencyGraph`
 - `ShapeCache`
@@ -82,19 +80,19 @@ The MVP-1 code implements the first narrow vertical slice:
 
 ## MVP-2 semantic reference and workplane path
 
-The MVP-2 workplane seed introduces semantic generated-face references and resolves them in the geometry layer:
+The implemented workplane/reference path introduces semantic generated-face references and resolves them in the geometry layer:
 
-- `SemanticFaceReference` identifies generated faces such as `feature.base_extrude.top` and the other principal faces.
+- `SemanticFaceReference` identifies generated faces such as `feature.base_extrude.top` and the other supported principal faces.
 - `DerivedWorkplane` exposes semantic generated faces as sketch workplanes.
 - `Sketch` can reference datum, derived, and implemented construction workplanes.
 - The dependency graph connects source features, workplanes, sketches, and dependent features.
 - JSON persists the implemented semantic workplane intent.
-- `WorkplaneResolver` maps supported semantic faces and explicit construction planes to concrete frames.
+- `WorkplaneResolver` maps supported semantic faces and construction planes to concrete frames.
 - Geometry recompute maps sketch-local profile coordinates through resolved workplanes.
-- Incremental recompute follows the semantic workplane dependency path after source-dimension changes.
+- Incremental recompute follows semantic workplane and construction dependency paths after source changes.
 - `ShapeCache` removes stale dirty feature shapes before incremental recompute, so failed recompute does not leave old geometry behind.
 
-This remains intentionally different from storing raw OCCT face IDs in `PartDocument`.
+Persistent model intent remains deliberately different from raw OCCT face IDs.
 
 ## Implemented richer sketch-driven profile path
 
@@ -115,21 +113,26 @@ The current sketch/profile blocks include:
 
 The sketch-repair chain additionally provides diagnostics, deterministic repair suggestions, safe repair commands, transaction capture, undo stacks, and read-only presentation snapshots. Presentation helpers are intentionally frozen until a real CLI or GUI consumer exists.
 
-## Implemented explicit construction geometry
+## Implemented construction geometry and datum relations
 
-The first construction-geometry step is implemented:
+Construction geometry is no longer limited to explicit placement. The current headless core/geometry path implements explicit and relation-driven construction geometry; `docs/construction-geometry-mvp.md` is the canonical detailed status document.
 
-- `ConstructionPointId`, `ConstructionLineId`, and `ConstructionPlaneId` identify construction geometry.
-- `ConstructionPoint`, `ConstructionLine`, and `ConstructionPlane` are core model-intent objects.
-- Construction geometry supports explicit numeric placement.
-- Construction geometry can carry optional parameter dependencies for invalidation.
-- `PartDocument` stores construction points, lines, and planes.
-- Construction geometry receives dependency-graph nodes and parameter dependency edges.
-- A sketch can reference a construction plane as its workplane.
-- JSON serialization supports construction points, lines, and planes.
-- `WorkplaneResolver` resolves explicit construction planes into concrete workplane frames.
+Implemented capabilities include:
 
-Still intentionally missing from this datum block: expression-evaluated coordinate placement, surface-based construction geometry, GUI manipulators, and relation-driven construction geometry.
+- `ConstructionPointId`, `ConstructionLineId`, `ConstructionPlaneId`, and `ConstructionRelationId`
+- explicit construction points, lines, and planes
+- relation-driven construction points, lines, and planes
+- `PlaneOffsetFromPlane`, `PlaneThroughThreePoints`, and `PlaneParallelToPlaneThroughPoint`
+- `LineThroughTwoPoints`, line-parallel-through-point relations, and generated-edge-parallel line relations
+- generated-vertex and generated-edge construction-point relations
+- semantic generated edge and vertex references without storing raw OCCT topology ids
+- `SemanticReferenceEvaluator`, `ConstructionPointResolver`, and `ConstructionLineResolver` for the implemented deterministic relation families
+- dependency-graph nodes and edges for parameters, source construction objects, generated semantic references, and relation-driven construction objects
+- chained construction relations
+- JSON serialization/deserialization and roundtrip coverage for explicit, relation-driven, chained, and semantic-reference construction geometry
+- `WorkplaneResolver` support for implemented explicit and relation-driven construction-plane families
+
+Some relation types such as `PointOnPlane`, `PointOnLine`, and `LineOnPlane` are currently validated model-intent records but are not geometrically solved. Expression-evaluated coordinates, arbitrary topology families, and GUI manipulators also remain later work.
 
 ## Implemented MVP-3 parametric bolt circle
 
@@ -154,7 +157,7 @@ The first cross-part parametrization step is implemented (`docs/assembly-paramet
 - `AssemblyDocument` owns assembly-scoped parameters, registers member parts by `DocumentId`, and stores explicit `ParameterBinding` records.
 - `apply_bindings_to(PartDocument&)` pushes bound values through `PartDocument::set_parameter_value`, reusing part invalidation and recompute planning unchanged.
 - Type agreement is enforced when bindings are applied.
-- Assembly documents serialize as `blcad.assembly_document.mvp4`.
+- Assembly documents serialize with the compatibility marker `blcad.assembly_document.mvp4`.
 - The flange assembly path demonstrates one assembly parameter driving member-part parameters.
 
 ## Implemented MVP-4 project container
@@ -176,18 +179,26 @@ The first assembly-structure blocks are implemented (`docs/component-instance-mv
 
 - `ComponentInstanceId` identifies assembly occurrences independently from part-document identity.
 - `ComponentInstance` stores stable identity, display name, referenced part document, visibility, suppression state, grounding state, and `RigidTransform`.
-- Multiple component instances can reference one project-owned `PartDocument` without duplicating part model intent.
+- Multiple component instances can reference one project-owned `PartDocument` without duplicating the owned part model intent.
+- Free-placement translation and rotation components must be finite.
 - `AssemblyDocument` validates that component instances reference registered member parts.
 - `Project` validates that component instance references resolve to project-owned parts.
 - `ComponentInstance::with_*` operations preserve identity and referenced part intent while replacing one placement/state field.
 - `AssemblyDocument` exposes explicit transform, visibility, suppression, and grounding update APIs for existing component instances.
+- The public component update entry points share one internal lookup/replacement path.
 - A transform update is a direct free-placement edit; no constraint is inferred and no solver or DOF analysis runs.
 - Grounding is stored model intent only and does not yet prevent an explicit transform update.
 - Visibility and suppression are stored state only until future assembly consumers define their behavior.
 - Assembly/project JSON roundtrip preserves current component placement/state values.
 - `blcad_inspect_project_components` exposes persisted component reference and placement/state fields headlessly.
 
-The next assembly block is solver-independent constraint model intent on semantic component targets. Constraint graph construction and rigid-body solving remain later work.
+Assembly-level geometry instancing is not implemented yet. The current block stores occurrence and placement/state model intent.
+
+## Next assembly block
+
+The next core-CAD MVP block is solver-independent assembly constraint model intent on semantic component targets. The first record types should be limited to Mate, Concentric, and Distance relationships and must be persisted and validated without mutating free-placement transforms.
+
+Constraint graph construction, semantic target geometry resolution, rigid-body solving, enforced grounding, and remaining-DOF computation remain later work. The detailed implementation sequence is maintained in `docs/mvp-plan.md` and the target assembly architecture in `docs/assembly-system.md`.
 
 ## Future multi-body part modeling, transforms, and path features
 
@@ -213,26 +224,9 @@ Critical rule: body transforms and booleans are model intent. They must update t
 
 The long-term sketcher roadmap is an Inventor-like parity target, not an immediate implementation target. It is documented in `docs/inventor-like-sketcher-and-feature-roadmap.md`.
 
-The intended capability includes richer 2D entities and editing tools, complete geometric constraints and dimensions, robust region selection, 3D sketches, and broader sketch-driven feature families such as revolve, sweep, loft, hole, thread, shell, pattern, mirror, and surfacing workflows.
+The intended capability includes richer 2D entities and editing tools, more complete geometric constraints and dimensions, robust region selection, 3D sketches, and broader sketch-driven feature families such as revolve, sweep, loft, hole, thread, shell, pattern, mirror, and surfacing workflows.
 
-This target depends on construction geometry, stable semantic references, the existing sketch entity/profile work, and eventually stronger constraint solving.
-
-## Next construction geometry block
-
-The next construction-geometry block is relation-driven datum geometry.
-
-The intended capability is:
-
-- `ConstructionRelation` model objects
-- `PlaneOffsetFromPlane`
-- `LineThroughTwoPoints`
-- `PlaneThroughThreePoints`
-- dependency graph edges from referenced construction objects to relation-driven construction objects
-- JSON persistence for relation-driven construction definitions
-- `WorkplaneResolver` support for relation-driven planes
-- invalidation through point, line, plane, and parameter references
-
-The detailed roadmap is in `docs/construction-geometry-mvp.md`.
+This target depends on construction geometry, stable semantic references, the existing sketch entity/profile work, and stronger constraint solving where required.
 
 ## Future 3D sketching and surfacing
 
@@ -248,9 +242,9 @@ The detailed roadmap is in `docs/advanced-surfacing-and-3d-sketch-mvp.md`.
 - Features store rules, not only result geometry.
 - Recompute runs through a dependency graph.
 - Persistent geometry references must be semantic rather than raw OCCT topology identifiers.
-- User-created construction geometry is model intent, not temporary UI state.
+- User-created explicit and relation-driven construction geometry is model intent, not temporary UI state.
 - Construction planes answer where sketches live; sketch profiles answer what shape sketches describe.
-- Explicit construction geometry is implemented; relation-driven construction geometry is the next datum-system block.
+- Relation-driven construction geometry and chained construction relations are implemented for the documented deterministic families.
 - A future `PartDocument` may contain multiple bodies; each body needs stable semantic identity and cache output.
 - Body transforms must be feature-tree operations with dependency graph participation, not destructive geometry edits.
 - Body booleans must reference semantic `BodyId` values and explicit tool/target body roles.
@@ -260,7 +254,7 @@ The detailed roadmap is in `docs/advanced-surfacing-and-3d-sketch-mvp.md`.
 - JSON serialization stores model intent only; it does not serialize OCCT shapes or `ShapeCache` contents as the source of truth.
 - Parameter changes use the normal document update/invalidation path and drive incremental recompute.
 - Assembly parameters already flow into member parts through explicit `ParameterBinding` records.
-- Component instances reference part model intent without duplicating `PartDocument` objects.
+- Component instances reference part model intent without duplicating owned `PartDocument` objects.
 - Component placement/state updates are explicit free-placement edits until assembly constraints and a solver exist.
 - Future assembly constraints must use semantic component targets and must remain model intent distinct from solver/cache output.
 - The assembly system will eventually describe spatial relationships through constraints; a constraint graph and solver determine component positions and remaining degrees of freedom.
@@ -278,7 +272,7 @@ The condensed points above are expanded in dedicated documents. Each is written 
 - `docs/feature-system.md` — general feature model and sketch-driven feature families
 - `docs/multi-body-transform-and-path-features-roadmap.md` — multi-body part files, body transforms, body booleans, path-following extrudes/cuts, and path/loft features
 - `docs/inventor-like-sketcher-and-feature-roadmap.md` — Inventor-like 2D/3D sketcher, constraints, dimensions, profile detection, and sketch-driven feature parity
-- `docs/construction-geometry-mvp.md` — explicit construction geometry and next relation-driven construction geometry
+- `docs/construction-geometry-mvp.md` — implemented explicit/relation-driven construction geometry and remaining datum limitations
 - `docs/file-format.md` — project and save format
 - `docs/fillet-chamfer-features.md` — fillets and chamfers
 - `docs/pattern-and-mirror-features.md` — linear/circular patterns and mirror
