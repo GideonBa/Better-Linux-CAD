@@ -59,10 +59,19 @@ enum class SemanticAxis {
 
 [[nodiscard]] std::string_view to_string(SemanticAxis axis) noexcept;
 
+// The first semantic seating-plane family exposes the oriented source seat of
+// one supported circular feature. It is constructive feature intent, not an
+// OCCT face id.
+enum class SemanticSeatingPlane {
+  Primary,
+};
+
+[[nodiscard]] std::string_view to_string(SemanticSeatingPlane plane) noexcept;
+
 class SemanticFaceReference {
 public:
   [[nodiscard]] static Result<SemanticFaceReference> create(FeatureId source_feature,
-                                                            SemanticFace face);
+                                                             SemanticFace face);
 
   [[nodiscard]] const FeatureId& source_feature() const noexcept;
   [[nodiscard]] SemanticFace face() const noexcept;
@@ -90,10 +99,27 @@ private:
   SemanticAxis axis_;
 };
 
+class SemanticSeatingPlaneReference {
+public:
+  [[nodiscard]] static Result<SemanticSeatingPlaneReference>
+  create(FeatureId source_feature,
+         SemanticSeatingPlane plane = SemanticSeatingPlane::Primary);
+
+  [[nodiscard]] const FeatureId& source_feature() const noexcept;
+  [[nodiscard]] SemanticSeatingPlane plane() const noexcept;
+  [[nodiscard]] std::string node_id() const;
+
+private:
+  SemanticSeatingPlaneReference(FeatureId source_feature, SemanticSeatingPlane plane);
+
+  FeatureId source_feature_;
+  SemanticSeatingPlane plane_;
+};
+
 class SemanticEdgeReference {
 public:
   [[nodiscard]] static Result<SemanticEdgeReference> create(FeatureId source_feature,
-                                                            SemanticEdge edge);
+                                                             SemanticEdge edge);
 
   [[nodiscard]] const FeatureId& source_feature() const noexcept;
   [[nodiscard]] SemanticEdge edge() const noexcept;
@@ -109,7 +135,7 @@ private:
 class SemanticVertexReference {
 public:
   [[nodiscard]] static Result<SemanticVertexReference> create(FeatureId source_feature,
-                                                              SemanticVertex vertex);
+                                                               SemanticVertex vertex);
 
   [[nodiscard]] const FeatureId& source_feature() const noexcept;
   [[nodiscard]] SemanticVertex vertex() const noexcept;
@@ -129,13 +155,17 @@ public:
 
   [[nodiscard]] const DatumPlaneId& id() const noexcept;
   [[nodiscard]] const std::string& name() const noexcept;
-  [[nodiscard]] Point3 origin() const noexcept;
-  [[nodiscard]] Vector3 x_axis() const noexcept;
-  [[nodiscard]] Vector3 y_axis() const noexcept;
-  [[nodiscard]] Vector3 normal() const noexcept;
+  [[nodiscard]] const Point3& origin() const noexcept;
+  [[nodiscard]] const Vector3& x_axis() const noexcept;
+  [[nodiscard]] const Vector3& y_axis() const noexcept;
+  [[nodiscard]] const Vector3& normal() const noexcept;
 
 private:
-  DatumPlane(DatumPlaneId id, std::string name, Point3 origin, Vector3 x_axis, Vector3 y_axis,
+  DatumPlane(DatumPlaneId id,
+             std::string name,
+             Point3 origin,
+             Vector3 x_axis,
+             Vector3 y_axis,
              Vector3 normal);
 
   DatumPlaneId id_;
@@ -144,23 +174,6 @@ private:
   Vector3 x_axis_;
   Vector3 y_axis_;
   Vector3 normal_;
-};
-
-class DerivedWorkplane {
-public:
-  [[nodiscard]] static Result<DerivedWorkplane>
-  create_on_feature_face(DatumPlaneId id, std::string name, SemanticFaceReference face_reference);
-
-  [[nodiscard]] const DatumPlaneId& id() const noexcept;
-  [[nodiscard]] const std::string& name() const noexcept;
-  [[nodiscard]] const SemanticFaceReference& face_reference() const noexcept;
-
-private:
-  DerivedWorkplane(DatumPlaneId id, std::string name, SemanticFaceReference face_reference);
-
-  DatumPlaneId id_;
-  std::string name_;
-  SemanticFaceReference face_reference_;
 };
 
 } // namespace blcad
