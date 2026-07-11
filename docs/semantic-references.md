@@ -1,6 +1,6 @@
 # Semantic References
 
-Status: target architecture. Partially proven by the MVP-2 semantic-face seed; the full reference system is a future block.
+Status: partially implemented. The generated-face family is proven by the MVP-2 workplane path and the MVP-5 read-only assembly target resolver; the full reference system remains future work.
 
 This document is the canonical description of how BLCAD refers to geometry. It is referenced by the sketch, feature, hole-wizard, fillet/chamfer, pattern/mirror, and assembly documents so the rule is stated once.
 
@@ -43,21 +43,24 @@ HoleFeature_M6_01
 
 ## Current implemented scope
 
-The MVP-2 seed proves the principle for a simple `AdditiveExtrude`:
+The generated-face seed proves the principle for a simple `AdditiveExtrude`:
 
-- `SemanticFaceReference` resolves `feature.base_extrude.{top,bottom,right,left,front,back}`.
+- `SemanticFaceReference` resolves generated faces such as `feature.base_extrude.{top,bottom,right,left,front,back}`.
 - `DerivedWorkplane` exposes those faces as sketch workplanes.
-- `WorkplaneResolver` maps them to concrete frames in the geometry layer.
-- No raw OCCT face IDs are stored in `PartDocument`.
+- `WorkplaneResolver` maps them to concrete frames.
+- `WorkplaneResolver::resolve_generated_face` exposes the same generated-face frame path directly to other geometry-layer consumers.
+- `AssemblyConstraintTargetResolver` parses the supported generated-face semantic target family and resolves it through component occurrence and project-owned part identity to a component-local planar descriptor.
+- The assembly target resolver keeps the component `RigidTransform` separate and does not silently invent assembly-space rotation semantics.
+- No raw OCCT face IDs are stored in `PartDocument` or assembly constraint model intent.
 
-See `docs/derived-workplane-mvp2-seed.md` and `docs/workplane-resolver-mvp2.md`.
+See `docs/derived-workplane-mvp2-seed.md`, `docs/workplane-resolver-mvp2.md`, and `docs/assembly-constraint-target-resolution-mvp5.md`.
 
 ## Future scope
 
 - named edge groups produced by features (needed by fillet/chamfer, see `docs/fillet-chamfer-features.md`).
 - axis references produced by hole features (needed by assembly `Concentric`/`Insert`, see `docs/assembly-system.md`).
 - references to generated edges, vertices, and later analytic surfaces, still without storing raw OCCT topology in the core.
-- a resolution mechanism that re-binds a semantic reference to the correct kernel entity after every recompute, and reports a clear error if the reference can no longer be resolved.
+- a broader resolution mechanism that re-binds semantic references to correct kernel entities after every recompute and reports a clear error if a reference can no longer be resolved.
 
 ## Dependency-graph integration
 
@@ -68,6 +71,8 @@ source feature -> exposed reference -> consuming feature/constraint
 ```
 
 When the source geometry changes, the reference is re-resolved. If it cannot be resolved, dependents are marked invalid with a clear error rather than silently binding to the wrong entity.
+
+The current assembly target resolver is read-only and does not yet add assembly solve dependencies. That integration belongs to the later assembly solve pipeline.
 
 ## Out of scope for the first versions
 
