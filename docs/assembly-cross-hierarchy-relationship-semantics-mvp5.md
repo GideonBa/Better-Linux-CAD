@@ -1,6 +1,6 @@
 # Cross-Hierarchy Relationship Target and Residual Semantics MVP-5
 
-Status: implemented the first read-only cross-hierarchy geometric relationship semantics. Stable occurrence-qualified endpoint identity resolves existing component-local semantic feature targets through exact hierarchy transform chains into root-assembly space, then reuses the canonical Mate, Distance, Angle, Concentric, and Insert residual definitions.
+Status: implemented the first read-only cross-hierarchy geometric relationship semantics. Stable occurrence-qualified endpoint identity resolves existing component-local semantic feature targets through exact hierarchy transform chains into root-assembly space, then applies the canonical Mate, Distance, Angle, Concentric, and Insert residual definitions.
 
 ## Scope
 
@@ -20,7 +20,7 @@ occurrence-qualified endpoint identity
 
 No persistent cross-hierarchy constraint record, graph edge, solve variable, Jacobian row, solve result, or application path is introduced.
 
-The purpose of this block is to make the identity and geometry contract stable before cross-document relationships are allowed into the numeric solver.
+The identity and geometry contract is made stable before cross-document relationships enter the numeric solver.
 
 ## Stable endpoint identity
 
@@ -32,7 +32,13 @@ component_instance: ComponentInstanceId
 semantic_reference: string
 ```
 
-The occurrence path uses the existing `AssemblyHierarchyTraversal` identity contract.
+The stable identity is:
+
+```text
+(occurrence_path, local ComponentInstanceId, semantic_reference)
+```
+
+The occurrence path uses the existing `AssemblyHierarchyTraversal` contract.
 
 An empty path addresses the explicit root assembly occurrence:
 
@@ -46,13 +52,13 @@ A direct child occurrence is addressed by:
 [subassembly.gearbox.left]
 ```
 
-A nested occurrence is addressed by the complete root-to-current sequence:
+A nested occurrence uses the complete root-to-current sequence:
 
 ```text
 [subassembly.machine, subassembly.gearbox, subassembly.shaft_group]
 ```
 
-The endpoint then identifies one component local to the selected assembly occurrence and one existing semantic feature target, for example:
+Example endpoint:
 
 ```text
 occurrence_path = [subassembly.machine, subassembly.gearbox]
@@ -60,15 +66,9 @@ component_instance = component.shaft
 semantic_reference = feature.bore.axis
 ```
 
-The tuple is the stable derived target identity:
+`ComponentInstanceId` alone is insufficient because it is scoped to one `AssemblyDocument`. Repeated occurrences of one child assembly document may expose the same local component id at different rooted paths.
 
-```text
-(occurrence_path, local ComponentInstanceId, semantic_reference)
-```
-
-This is necessary because `ComponentInstanceId` is unique only inside one `AssemblyDocument`. Repeated occurrences of one child assembly document may expose the same local component id at different rooted paths.
-
-## Validation
+## Endpoint validation
 
 `AssemblyHierarchyConstraintTarget::create` rejects:
 
@@ -78,7 +78,7 @@ This is necessary because `ComponentInstanceId` is unique only inside one `Assem
 
 The empty occurrence path itself is valid and means the root assembly occurrence.
 
-Path existence is resolved later against a concrete `Project` because endpoint creation is model-independent identity construction.
+Path existence is resolved later against a concrete `Project`; target construction is identity construction, not project traversal.
 
 ## Read-only relationship query
 
@@ -93,7 +93,7 @@ distance: optional Quantity
 angle: optional Quantity
 ```
 
-The query deliberately reuses the existing relationship family enumeration:
+The query reuses the existing relationship family enumeration:
 
 ```text
 Mate
@@ -109,9 +109,7 @@ It also reuses the existing `AssemblyConstraint::create` value-family validation
 - Angle requires a degree quantity and is the only family allowed to carry `angle`;
 - Mate, Concentric, and Insert carry neither value.
 
-The temporary validation record is not inserted into any `AssemblyDocument` and is not returned as model intent.
-
-`AssemblyHierarchyConstraintQuery` is a derived read-only query object.
+The temporary validation record is never inserted into an `AssemblyDocument`. `AssemblyHierarchyConstraintQuery` remains derived and unpersisted.
 
 ## Exact occurrence resolution
 
@@ -121,11 +119,9 @@ The temporary validation record is not inserted into any `AssemblyDocument` and 
 AssemblyHierarchyTraversal::build(project)
 ```
 
-This preserves the complete existing project-structure and cycle-validation boundary.
+This preserves the existing complete project-structure and cycle-validation boundary.
 
-The target occurrence is selected by exact path equality against one traversal descriptor.
-
-Examples:
+The target occurrence is selected by exact path equality against one traversal descriptor:
 
 ```text
 []                         -> root occurrence
@@ -147,11 +143,11 @@ The selected assembly document must still resolve in the project.
 
 ## Reusing local semantic target authority
 
-The cross-hierarchy resolver does not parse `.top`, `.axis`, or `.seat` references itself.
+The cross-hierarchy resolver does not parse `.top`, `.axis`, or `.seat` references independently.
 
-Instead, the selected `AssemblyDocument` is copied into a temporary local target-resolution view as the view's root assembly. Project-owned part documents are copied into the same view.
+The selected `AssemblyDocument` is copied into a temporary local target-resolution view as the view's root assembly. Project-owned part documents are copied into the same view.
 
-The endpoint is converted to the existing local target shape:
+The endpoint is converted to the existing local form:
 
 ```text
 AssemblyConstraintTarget(
@@ -160,7 +156,7 @@ AssemblyConstraintTarget(
 )
 ```
 
-Then the existing `AssemblyConstraintTargetResolver` remains the single authority for:
+Then `AssemblyConstraintTargetResolver` remains the single authority for:
 
 ```text
 feature.<feature-id>.top|bottom|right|left|front|back
@@ -168,15 +164,7 @@ feature.<feature-id>.axis
 feature.<feature-id>.seat
 ```
 
-Therefore the cross-hierarchy layer inherits the existing rules for:
-
-- source-feature existence and type;
-- source-sketch existence;
-- CircleProfile producer restrictions;
-- source-profile identity;
-- workplane resolution;
-- extrude direction;
-- semantic face, axis, and seating-plane identity.
+The hierarchy layer therefore inherits existing rules for source-feature existence/type, source-sketch existence, circular producer restrictions, source-profile identity, workplane resolution, extrude direction, and semantic face/axis/seating identity.
 
 No second semantic-reference parser or feature-geometry inference path is introduced.
 
@@ -184,13 +172,13 @@ No second semantic-reference parser or feature-geometry inference path is introd
 
 The local resolver returns component-local geometry plus the selected component's authored `RigidTransform`.
 
-For a local target inside one nested assembly occurrence, the cross-hierarchy resolver constructs:
+The hierarchy target resolver constructs:
 
 ```text
 [component transform, inner parent transform, ..., outer parent transform]
 ```
 
-This is the exact transform-chain contract already used by `AssemblyLeafOccurrenceResolver` and posed geometry.
+This is the same transform-chain contract used by `AssemblyLeafOccurrenceResolver` and posed geometry.
 
 Example:
 
@@ -203,13 +191,15 @@ chain = [Tc, Ti, To]
 point = To(Ti(Tc(local_point)))
 ```
 
-`AssemblyHierarchyTransformEvaluator` applies every authored level in inner-to-outer order.
+`AssemblyHierarchyTransformEvaluator` applies each authored level in exact inner-to-outer order.
 
-Points are rotated and translated at each level. Vectors are rotated only.
+Points rotate and translate at every level. Vectors rotate only.
 
 The chain is never collapsed to a persisted composed transform and is never converted back to X/Y/Z Euler angles.
 
-## Resolved planar target
+## Typed resolved targets
+
+### Planar target
 
 `AssemblyHierarchyPlanarConstraintTargetDescriptor` preserves:
 
@@ -224,7 +214,7 @@ semantic_reference
 root-space AssemblySpacePlanarDescriptor
 ```
 
-The root-space planar descriptor contains:
+The planar geometry contains:
 
 ```text
 origin
@@ -233,7 +223,7 @@ y_axis
 normal
 ```
 
-## Resolved axis target
+### Axis target
 
 `AssemblyHierarchyAxisConstraintTargetDescriptor` preserves:
 
@@ -249,14 +239,14 @@ semantic_reference
 root-space AssemblySpaceAxisDescriptor
 ```
 
-The root-space axis descriptor contains:
+The axis geometry contains:
 
 ```text
 origin
 direction
 ```
 
-## Resolved Insert target
+### Insert target
 
 `AssemblyHierarchyInsertConstraintTargetDescriptor` preserves:
 
@@ -291,32 +281,32 @@ assembly.gearbox
   component.shaft
 ```
 
-These endpoints are distinct:
+The endpoints:
 
 ```text
 ([subassembly.left],  component.shaft, feature.bore.axis)
 ([subassembly.right], component.shaft, feature.bore.axis)
 ```
 
-They resolve through the same child `AssemblyDocument` and the same local component/feature identity, but their root-space geometry differs because the parent transform chain differs.
+resolve through the same child document and local component/feature identity but through different parent transform chains. Their root-space geometry therefore differs.
 
-This contract is required before any cross-hierarchy graph can use occurrence-qualified component variables.
+This contract is required before an occurrence-qualified graph can identify component variables safely.
 
-## Canonical residual semantics
+## Equation descriptor
 
-`AssemblyHierarchyConstraintEquationBuilder` evaluates target A first, then target B, and preserves that order in every signed or directed residual.
+`AssemblyHierarchyConstraintEquationBuilder` evaluates target A first and target B second.
 
-The result is `AssemblyHierarchyConstraintEquationDescriptor`:
+It returns `AssemblyHierarchyConstraintEquationDescriptor`:
 
 ```text
 relationship: AssemblyConstraintId
 type: AssemblyConstraintType
 target_a: typed hierarchy target descriptor
 target_b: typed hierarchy target descriptor
-residual: one canonical residual descriptor
+residual: canonical residual descriptor
 ```
 
-The target descriptor variant is one of:
+Target descriptors are one of:
 
 ```text
 AssemblyHierarchyPlanarConstraintTargetDescriptor
@@ -324,7 +314,17 @@ AssemblyHierarchyAxisConstraintTargetDescriptor
 AssemblyHierarchyInsertConstraintTargetDescriptor
 ```
 
-The residual variant reuses the existing canonical descriptor types.
+Residual descriptors reuse the existing types:
+
+```text
+PlanarMateResidualDescriptor
+PlanarDistanceResidualDescriptor
+PlanarAngleResidualDescriptor
+ConcentricResidualDescriptor
+InsertResidualDescriptor
+```
+
+## Canonical residual semantics
 
 ### Mate
 
@@ -345,9 +345,7 @@ signed_separation_mm = dot(oB - oA, nA)
 distance_residual_mm = signed_separation_mm - target_distance_mm
 ```
 
-Target A owns the signed direction exactly as in the local builder.
-
-Reversing A and B may therefore change both signed separation and distance residual.
+Target A owns signed direction exactly as in the local builder. Reversing A and B may change both signed separation and distance residual.
 
 ### Angle
 
@@ -356,7 +354,7 @@ normal_dot      = dot(nA, nB)
 angle_alignment = normal_dot - cos(target_angle_deg)
 ```
 
-The existing cosine semantics remain direction-symmetric and keep the same documented `0°`/`180°` local-rank degeneracies.
+The existing cosine semantics remain direction-symmetric and keep the documented `0°`/`180°` local-rank degeneracies.
 
 ### Concentric
 
@@ -381,13 +379,13 @@ signed_seating_separation_mm = dot(sB - sA, nA)
 
 Target A defines signed seating direction.
 
-The residual equations are intentionally identical to the local builders. Only target identity and transform depth differ.
+The residual equations are identical to the local builders. Only endpoint identity and transform depth differ.
 
 ## Visibility and suppression boundary
 
 Target resolution is geometric and read-only.
 
-Visibility and suppression do not change endpoint identity or the mathematical ability to resolve existing authored geometry. This matches the separation already present in local target resolution.
+Visibility and suppression do not change endpoint identity or the mathematical ability to resolve authored geometry. This matches the separation already present in local target resolution.
 
 Future cross-hierarchy graph and numeric-solver integration must own participation filtering:
 
@@ -428,7 +426,7 @@ No resolved point, vector, normal, axis, seating plane, composed transform, or r
 
 ## Failure policy
 
-The read-only target/residual path fails closed on:
+The read-only path fails closed on:
 
 - empty occurrence ids inside endpoint paths;
 - empty component ids or semantic references;
@@ -442,14 +440,14 @@ The read-only target/residual path fails closed on:
 - missing or wrong-type source features;
 - invalid circular axis/seat producer geometry;
 - local workplane resolution failures;
-- target family mismatches such as using a planar face for Concentric;
+- target-family mismatches such as using a planar face for Concentric;
 - any existing local semantic target-resolution failure.
 
 The source `Project` is never mutated.
 
 ## Focused coverage
 
-`tests/geometry/assembly_hierarchy_constraint_equation_builder_tests.inc`, compiled through the existing geometry test target, proves:
+`tests/geometry/assembly_hierarchy_constraint_equation_builder_tests.cpp` proves:
 
 - stable endpoint validation with the root empty-path convention;
 - query value-family validation through the existing `AssemblyConstraint` contract;
@@ -486,7 +484,7 @@ Focused command:
 - cross-hierarchy rigid-body solve/application and stale snapshots;
 - cross-hierarchy remaining-DOF diagnostics;
 - cross-hierarchy joints and nested motion propagation;
-- whole-SubassemblyInstance rigid solve variables;
+- whole-`SubassemblyInstance` rigid solve variables;
 - occurrence-local internal component pose overrides;
 - collision/contact response or physics.
 
@@ -494,10 +492,10 @@ Focused command:
 
 Add persistent project-level cross-hierarchy geometric constraint intent and route it through an occurrence-qualified constraint graph plus the shared numeric solve/application path.
 
-The next block must preserve the endpoint identity defined here exactly:
+The endpoint identity defined here is frozen for that block:
 
 ```text
 (occurrence_path, local ComponentInstanceId, semantic_reference)
 ```
 
-Before solving, numeric variable and stale-snapshot identity must also become occurrence-qualified so repeated occurrences of one child document cannot alias merely because they share the same local `ComponentInstanceId`.
+Numeric variable and stale-snapshot identity must also become occurrence-qualified so repeated occurrences of one child document cannot alias merely because they share the same local `ComponentInstanceId`.
