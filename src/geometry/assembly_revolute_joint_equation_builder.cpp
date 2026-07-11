@@ -19,6 +19,10 @@ namespace {
   return Vector3{target.x - source.x, target.y - source.y, target.z - source.z};
 }
 
+[[nodiscard]] Vector3 difference(const Vector3& target, const Vector3& source) noexcept {
+  return Vector3{target.x - source.x, target.y - source.y, target.z - source.z};
+}
+
 [[nodiscard]] Vector3 cross(const Vector3& lhs, const Vector3& rhs) noexcept {
   return Vector3{lhs.y * rhs.z - lhs.z * rhs.y,
                  lhs.z * rhs.x - lhs.x * rhs.z,
@@ -98,7 +102,7 @@ AssemblyRevoluteJointEquationBuilder::build(const Project& project, const Assemb
       AssemblyRevoluteJointEquationDescriptor{
           joint.id(), target_a.value(), target_b.value(), requested_coordinate.degrees(),
           RevoluteJointResidualDescriptor{
-              cross(axis_a.direction, axis_b.direction),
+              difference(axis_a.direction, axis_b.direction),
               cross(axis_origin_delta, axis_a.direction),
               dot(seat_origin_delta, seat_a.normal),
               reference_sine * target_cosine - reference_cosine * target_sine,
