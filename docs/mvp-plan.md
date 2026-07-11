@@ -371,7 +371,7 @@ Implemented the first end-to-end assembly geometry deliverable:
 5. Fail closed on unresolved project members, recompute failures, missing final part shapes, transform failures, empty visible-active assemblies, or STEP writer failures.
 6. Keep recompute caches, transformed shapes, the compound, and export summaries derived and unpersisted.
 7. Provide `blcad_export_posed_assembly`, which loads project JSON, builds the active graph, solves one connected multi-component group, explicitly applies the converged result, and exports the posed assembly.
-8. Cover repeated instances of one part, bounding-box and volume transform checks, hidden/suppressed exclusion, deterministic repeated STEP data, unresolved members, and missing recompute end shapes.
+8. Cover repeated instances of one part, bounding-box and volume transform checks, hidden/suppressed exclusion, geometrically equivalent repeated STEP exports after re-import, unresolved members, and missing recompute end shapes.
 
 ## Next MVP: Joint/limit model intent and first motion seed
 
