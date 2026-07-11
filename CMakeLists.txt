@@ -276,6 +276,7 @@ if(BLCAD_BUILD_TESTS)
 
     target_link_libraries(blcad_geometry_tests PRIVATE BLCAD::geometry Catch2::Catch2WithMain)
     target_include_directories(blcad_geometry_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/geometry)
+    target_include_directories(blcad_geometry_tests SYSTEM PRIVATE ${OpenCASCADE_INCLUDE_DIR})
 
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
       target_compile_options(blcad_geometry_tests PRIVATE -Wall -Wextra -Wpedantic)
