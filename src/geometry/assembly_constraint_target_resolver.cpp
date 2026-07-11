@@ -11,8 +11,6 @@
 namespace blcad::geometry {
 namespace {
 
-constexpr std::string_view k_feature_reference_prefix = "feature.";
-
 [[nodiscard]] Error validation_error(std::string object_id, std::string message) {
   return Error::validation(std::move(object_id), std::move(message));
 }
@@ -45,8 +43,7 @@ parse_generated_face_reference(std::string_view semantic_reference) {
   const std::string_view source_feature = semantic_reference.substr(0U, separator);
   const std::string_view face_name = semantic_reference.substr(separator + 1U);
   const auto face = parse_semantic_face(face_name);
-  if (!source_feature.starts_with(k_feature_reference_prefix) ||
-      source_feature.size() == k_feature_reference_prefix.size() || !face.has_value()) {
+  if (!face.has_value()) {
     return Result<SemanticFaceReference>::failure(validation_error(
         std::string(semantic_reference), "unsupported assembly semantic reference family"));
   }
