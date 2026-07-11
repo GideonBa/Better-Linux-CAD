@@ -4,18 +4,16 @@ Status: implemented read-only resolution of supported generated-face assembly ta
 
 ## Goal
 
-This block connects persistent `AssemblyConstraintTarget` intent to the first supported geometric reference family without introducing constraint equations or a rigid-body solver.
+This block connects persistent `AssemblyConstraintTarget` intent to the first supported geometric reference family without applying component placement or solving assembly relationships.
 
-The resolver answers four questions for one target:
+The resolver answers:
 
 1. Which component occurrence does the target name?
 2. Which project-owned `PartDocument` does that occurrence reference?
-3. Which supported semantic generated face does the target name inside that part?
+3. Which supported semantic generated face does the token name inside that part?
 4. What is the deterministic component-local planar frame of that face?
 
-The result is derived geometry data. It is not model intent and is not serialized.
-
-Assembly-space transform evaluation now exists as the next separate layer in `docs/assembly-rigid-transform-evaluation-mvp5.md`.
+The result is regenerable derived geometry data and is not serialized.
 
 ## API
 
@@ -42,18 +40,18 @@ AssemblyConstraintTargetResolver
 
 `ComponentLocalPlanarDescriptor` is expressed in the referenced part/component-local coordinate system.
 
-`component_transform` is returned separately as the persisted free-placement intent of the component occurrence. The resolver deliberately does not apply it to the planar descriptor.
+`component_transform` is returned separately as persisted placement intent. The resolver does not apply it.
 
 ## Resolution path
 
-For a target such as:
+For:
 
 ```text
 component.face_plate
 feature.base_extrude.top
 ```
 
-resolution proceeds as follows:
+resolution proceeds as:
 
 ```text
 AssemblyConstraintTarget
@@ -61,17 +59,17 @@ AssemblyConstraintTarget
   -> ComponentInstanceId
   -> ComponentInstance
   -> referenced_part_document
-  -> Project-owned PartDocument
+  -> project-owned PartDocument
   -> SemanticFaceReference
-  -> WorkplaneResolver::resolve_generated_face(...)
+  -> WorkplaneResolver::resolve_generated_face
   -> component-local origin/x-axis/y-axis/normal
 ```
 
-The target resolver is read-only. It receives a `const Project&`, reads the existing occurrence and part model, and returns a new derived descriptor.
+The resolver receives a `const Project&`, reads existing occurrence and part intent, and returns a new descriptor.
 
 ## Supported semantic reference family
 
-The first supported assembly target family is the generated planar face family already proven by the MVP-2 workplane path:
+The first supported assembly target family is:
 
 ```text
 feature.<feature-id>.top
@@ -82,7 +80,7 @@ feature.<feature-id>.front
 feature.<feature-id>.back
 ```
 
-The source feature must resolve inside the component's referenced `PartDocument` and must currently be an `AdditiveExtrude` supported by generated-face workplane resolution.
+The source feature must resolve inside the referenced `PartDocument` and currently be a supported `AdditiveExtrude`.
 
 Examples:
 
@@ -92,31 +90,31 @@ feature.base_extrude.bottom
 feature.housing_block.front
 ```
 
-The parser validates the target family at resolution time. Persistent `AssemblyConstraintTarget` records remain intentionally more general and continue to store non-empty semantic tokens without geometry-layer interpretation.
+The geometry-layer parser validates the target family at resolution time. Persistent target records remain intentionally more general and store non-empty semantic tokens without record-layer geometry interpretation.
 
 ## Reuse of generated-face geometry
 
-The existing `WorkplaneResolver` owns the deterministic frame construction for generated additive-extrude faces. This block exposes that same path through:
+`WorkplaneResolver` owns deterministic generated-face frame construction. The shared API is:
 
 ```text
 WorkplaneResolver::resolve_generated_face(PartDocument, SemanticFaceReference)
 ```
 
-Derived workplanes and assembly target resolution therefore use one generated-face frame implementation. Face origins, basis axes, normals, bounds calculations, and source-profile restrictions are not duplicated in the assembly resolver.
+Derived workplanes and assembly targets therefore share one implementation for face origins, basis axes, normals, bounds inputs, and source-profile restrictions.
 
-The assembly target resolver consumes the resolved frame and copies only `origin`, `x_axis`, `y_axis`, and `normal` into its component-local planar descriptor. Workplane bounds are not assembly constraint target model intent.
+The assembly resolver copies `origin`, `x_axis`, `y_axis`, and `normal` into its local planar descriptor. Workplane bounds are not assembly constraint target intent.
 
 ## Explicit failure behavior
 
-Resolution fails explicitly when:
+Resolution fails when:
 
-- the target component instance does not exist in the project assembly
+- the target component does not exist in the project assembly
 - the component's referenced part does not resolve to a project-owned `PartDocument`
 - the semantic token is malformed
-- the semantic token belongs to an unsupported reference family
-- the generated-face source feature does not exist in the referenced part
+- the token belongs to an unsupported reference family
+- the generated-face source feature does not exist
 - the source feature is not a supported additive extrude
-- the existing generated-face geometry path cannot resolve the source sketch or required parameters
+- the shared generated-face geometry path cannot resolve the source sketch or required parameters
 
 Unsupported examples include:
 
@@ -125,36 +123,56 @@ bolt.main_axis
 feature.base_extrude.edge.top_front
 ```
 
-Semantic axes remain unsupported. This is deliberate because a stable axis-reference family is required before full Concentric or Insert solving can be implemented.
+Semantic axes remain unsupported because a stable axis-reference family is required before Concentric or Insert equation construction.
 
 ## Placement boundary
 
-`RigidTransform` stores translation in millimeters and rotation values in degrees. Target resolution does not interpret those values itself.
+`RigidTransform` stores translation in millimeters and rotation in degrees.
+
+This resolver deliberately does not interpret those values. Placement evaluation belongs to `AssemblyTransformEvaluator`, documented in `docs/assembly-rigid-transform-evaluation-mvp5.md`.
 
 For example, a component may store:
 
 ```text
 translation_mm = (10, 20, 30)
-rotation_deg   = (5, 15, 25)
+rotation_deg   = (0, 0, 90)
 ```
 
-If its local top face resolves to origin `(0, 0, 8)` and normal `(0, 0, 1)`, this resolver returns that local frame plus the unchanged `RigidTransform`.
-
-The next layer is now explicit:
+If its local top face resolves to:
 
 ```text
-ResolvedAssemblyConstraintTarget
-  local_plane
-  component_transform
-
-  -> AssemblyTransformEvaluator::evaluate_plane(...)
-
-AssemblySpacePlanarDescriptor
+origin = (0, 0, 8)
+normal = (0, 0, 1)
 ```
 
-`AssemblyTransformEvaluator` defines active right-handed fixed-axis X-then-Y-then-Z rotation, equivalent to `Rz * Ry * Rx` for column vectors. That convention is documented in `docs/assembly-rigid-transform-evaluation-mvp5.md`.
+this resolver returns that local frame plus the unchanged transform.
 
-Keeping transform math outside target resolution prevents semantic lookup and coordinate-space evaluation from becoming one coupled subsystem.
+The separate transform layer can then produce assembly-space geometry under the canonical X-then-Y-then-Z convention.
+
+## Downstream use
+
+Two downstream geometry layers now consume resolver output.
+
+### Transform evaluation
+
+```text
+ResolvedAssemblyConstraintTarget.local_plane
++ ResolvedAssemblyConstraintTarget.component_transform
+  -> AssemblyTransformEvaluator
+  -> AssemblySpacePlanarDescriptor
+```
+
+### Planar constraint residual construction
+
+```text
+AssemblyConstraint
+  -> AssemblyConstraintEquationBuilder
+  -> resolve target A/B through AssemblyConstraintTargetResolver
+  -> evaluate target A/B through AssemblyTransformEvaluator
+  -> Mate or Distance residual descriptor
+```
+
+The resolver itself remains independent from constraint type and residual semantics.
 
 ## Read-only and persistence boundary
 
@@ -162,49 +180,52 @@ Resolution does not:
 
 - mutate component transforms
 - mutate grounding, visibility, or suppression state
-- add, remove, or change assembly constraint records
-- add generated references or derived workplanes to the original part document
+- change assembly constraints
+- add generated references or derived workplanes to the original part
 - take ownership of a `ShapeCache`
 - persist a resolved target descriptor
 
-The descriptor can be regenerated from project model intent and current part parameters. It therefore remains derived data like constraint graph connectivity and evaluated assembly-space frames.
+The descriptor is regenerated from project model intent and current part parameters.
 
 ## Tests
 
 `tests/geometry/assembly_constraint_target_resolver_tests.cpp` covers:
 
-- top, bottom, right, left, front, and back generated-face targets
-- component and referenced-part identity in the resolved result
-- separate preservation of component `RigidTransform`
+- all six generated-face targets
+- component and referenced-part identity
+- separate component transform preservation
 - missing component targets
-- missing project-owned part documents
+- missing project-owned parts
 - missing source features
 - malformed semantic tokens
 - unsupported semantic axis targets
 - unsupported generated-edge targets
 - deterministic repeated resolution
-- unchanged component transform, constraint records, semantic tokens, and part derived-workplane count
+- unchanged component transforms, constraint records, semantic tokens, and part derived-workplane count
 
-The resolver is registered in the optional geometry target and its tests are registered in `blcad_geometry_tests`.
+Targeted test command:
 
-The separate transform-evaluation suite covers the local-to-assembly coordinate convention; this resolver suite intentionally continues to assert local geometry plus separate placement intent.
+```bash
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-target]"
+```
 
-## Deferred work
+The transform and planar equation suites separately verify downstream coordinate mapping and residual semantics.
 
-This block itself does not implement:
+## Deliberate limitations
 
-- Mate or Distance constraint equations
-- Concentric equations or semantic axis references
+This resolver itself does not implement:
+
+- component-local-to-assembly transform math
+- constraint equation semantics
 - rigid-body solving
-- solved component transform updates
-- remaining-DOF computation
-- underconstrained, fully constrained, or overconstrained state analysis
-- enforced grounding or suppression participation rules
+- solved transform updates
+- remaining-DOF analysis
+- enforced grounding or suppression participation
 
-Component-local to assembly-space point/vector/frame evaluation is no longer deferred globally; it is implemented as the separate `AssemblyTransformEvaluator` block.
+Transform evaluation and planar Mate/Distance residual construction are implemented as separate downstream layers.
 
-## Next technical step
+## Current downstream boundary
 
-The next assembly block is read-only planar Mate/Distance equation/residual construction over assembly-space target descriptors.
+The repository-wide next assembly step is a first rigid-body solver seed over deterministic graph groups and the implemented planar residual descriptors.
 
-It should resolve both supported generated-face targets, evaluate both local planes through `AssemblyTransformEvaluator`, and construct documented deterministic geometric residual data without solving or mutating component transforms. Concentric remains deferred until semantic axis references are stable.
+Semantic axis references and Concentric residual construction remain deferred.
