@@ -157,7 +157,7 @@ TEST_CASE("AssemblyStepExporter poses repeated part instances and preserves repe
   const std::filesystem::path first_path =
       std::filesystem::temp_directory_path() / "blcad_posed_assembly_first.step";
   const std::filesystem::path second_path =
-      std::filesystem::temp_directory_path() / "blcad_posed_assembly_next_.step";
+      std::filesystem::temp_directory_path() / "blcad_posed_assembly_second.step";
   std::filesystem::remove(first_path);
   std::filesystem::remove(second_path);
 
