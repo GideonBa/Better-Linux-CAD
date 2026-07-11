@@ -1,8 +1,8 @@
 # Assembly System with Constraints
 
-Status: target architecture. Not implemented yet. MVP 5 in `docs/mvp-plan.md` starts the minimal version.
+Status: target architecture with the first MVP-5 component-instance seed implemented. Constraint solving is still not implemented.
 
-The assembly system composes parts into assemblies like Inventor or SolidWorks: it describes spatial relationships between parts through constraints, then solves component positions from them. It has its own data model for component instances, references, degrees of freedom, constraints, a solver, motion, subassemblies, and assembly parameters.
+The assembly system composes parts into assemblies like Inventor or SolidWorks. The first implemented seed stores component instances that reference project-owned part documents. Later stages will describe spatial relationships through constraints and solve component positions from them.
 
 ## Core idea
 
@@ -15,31 +15,66 @@ AssemblyDocument HousingAssembly
   ComponentInstance Screw_02 -> Screw_M6x25
 ```
 
-Each instance has a position determined by constraints, not only a free transform.
+The first seed stores free-placement transforms directly. Later solver work will make instance positions depend on constraints.
 
-## Component instances
+## Implemented component-instance seed
+
+Detailed document: `docs/component-instance-mvp5.md`
+
+Implemented now:
+
+```text
+ComponentInstance
+  id
+  name
+  referenced_part_document
+  visibility
+  suppression_state
+  grounding_state
+  transform
+
+RigidTransform
+  translation_mm
+  rotation_deg
+```
+
+Implemented states:
+
+```text
+ComponentVisibility: visible | hidden
+ComponentSuppressionState: active | suppressed
+ComponentGroundingState: free | grounded
+```
+
+The implemented seed validates that a component instance references an assembly member part and that project-level validation resolves that part to an owned project part document.
+
+## Target component instances
+
+Later versions should extend the current seed toward:
 
 ```text
 ComponentInstance
   id, name
   referenced_document
   transform
-  fixed_state          # grounded/fixed vs. free
+  fixed_state
   visibility, suppression_state, color_override
   constraints
   exposed_references
-  degrees_of_freedom   # computed by solver
+  degrees_of_freedom
 ```
 
-State display: Fixed, Underdefined, Fully constrained, Overconstrained, Suppressed.
+State display target: Fixed, Underdefined, Fully constrained, Overconstrained, Suppressed.
 
 ## Degrees of freedom
 
-A rigid body has 6 DOF (translate x/y/z, rotate x/y/z). Constraints reduce them. Face-on-face removes translation along the normal and some rotations; axis-on-axis leaves translation along and rotation about the axis. The system shows remaining DOF per component.
+A rigid body has 6 DOF (translate x/y/z, rotate x/y/z). Constraints reduce them. Face-on-face removes translation along the normal and some rotations; axis-on-axis leaves translation along and rotation about the axis. The system should eventually show remaining DOF per component.
+
+This is not implemented in the component-instance seed.
 
 ## Part features vs. assembly constraints
 
-A part feature changes a part's geometry (extrude, cut, hole, fillet, chamfer). An assembly constraint does not change geometry; it describes the pose relationship between two components (or a component and an assembly reference).
+A part feature changes a part's geometry (extrude, cut, hole, fillet, chamfer). An assembly constraint does not change geometry; it describes the pose relationship between two components or between a component and an assembly reference.
 
 ## Constraint types
 
@@ -55,25 +90,20 @@ A part feature changes a part's geometry (extrude, cut, hole, fillet, chamfer). 
 | Insert     | concentric + axial seating (screw in hole). |
 | Lock       | fully fix one component relative to another. |
 
-Constraints work on **semantic references** (`docs/semantic-references.md`): `CoverPlate.bottom_mounting_face`, `Screw.main_axis`, `BasePlate.HoleFeature_01.axis` — never `Face17`. Hole features expose their axis so a screw binds to the correct bore, not a random cylindrical face.
+Constraints should work on semantic references (`docs/semantic-references.md`): `CoverPlate.bottom_mounting_face`, `Screw.main_axis`, `BasePlate.HoleFeature_01.axis` — never raw OCCT face names such as `Face17`.
 
 ```text
 AssemblyConstraint
   id, name, constraint_type
   component_a, reference_a
   component_b, reference_b
-  parameters           # offset, distance, angle, direction
+  parameters
   active_state, solve_status
-
-InsertConstraint
-  component_a = Screw_01, axis_a = Screw_01.main_axis, face_a = Screw_01.under_head_face
-  component_b = BasePlate, axis_b = BasePlate.HoleFeature_01.axis, face_b = BasePlate.top_mounting_face
-  axial_offset = 0 mm, rotation_free = true
 ```
 
 ## Solver and constraint graph
 
-The solver computes component transforms from all active constraints over rigid bodies, DOF, transforms, and nonlinear geometric relations.
+The future solver computes component transforms from active constraints over rigid bodies, DOF, transforms, and nonlinear geometric relations.
 
 ```text
 AssemblySolvePipeline
@@ -83,17 +113,19 @@ AssemblySolvePipeline
   -> update assembly transforms -> update viewport
 ```
 
-A separate **constraint graph** (components = nodes, constraints = edges) reveals connected groups; independent groups can be solved separately.
+A separate constraint graph should reveal connected component groups; independent groups can be solved separately.
 
 ## Grounding
 
-Every assembly needs at least one grounded/fixed component or coordinate system, else the whole assembly floats. Warn if no component is grounded.
+The current seed stores `ComponentGroundingState::Grounded` as model intent, but it does not enforce grounding behavior.
+
+A later solver stage should warn if no component is grounded and should use grounded components as fixed references.
 
 ## Motion, joints, and limits
 
-Underdefined components can be dragged only within allowed DOF: a drag is input to the solver, which projects it onto the valid constraint space; connected components update; the viewport updates. Never edit the transform freely.
+Underdefined components should eventually be draggable only within allowed DOF. A drag becomes input to the solver, which projects it onto the valid constraint space.
 
-Joints describe allowed motion (not only a fixed pose): Revolute, Prismatic, Cylindrical, Planar, Ball, Rigid, Gear relation, Screw relation. Joints and some constraints can have limits (`angle_min/max`, `position_min/max`, `distance_min/max`) for realistic mechanisms.
+Joints describe allowed motion: Revolute, Prismatic, Cylindrical, Planar, Ball, Rigid, Gear relation, Screw relation. Joints and some constraints can have limits (`angle_min/max`, `position_min/max`, `distance_min/max`).
 
 ## Assembly parameters
 
@@ -105,44 +137,56 @@ PrismaticJoint.position    = Assembly.slider_position
 RevoluteJoint.angle        = Assembly.crank_angle
 ```
 
+Assembly parameters already drive member part parameters through the MVP-4 `ParameterBinding` seed.
+
 ## Assembly features and collision
 
-Assembly features (e.g. a hole through several mounted plates) act in assembly context and may or may not modify the source parts — the distinction must be explicit. Collision detection (static, during motion, clearance, minimum distances, interference) is a later addition; an MVP needs only a simple static check.
+Assembly features and collision checks are later additions. They are not part of the component-instance seed.
 
 ## Dependency-graph integration
 
-Constraints integrate into the dependency graph: when a referenced face/axis/hole/component changes, affected constraints re-solve.
+Future constraints should integrate into a dependency graph: when a referenced face/axis/hole/component changes, affected constraints re-solve.
 
 ```text
 BasePlate.HoleFeature_M6.axis -> InsertConstraint_Screw_01 -> Screw_01.transform
 Assembly.bolt_circle_radius -> HoleFeature_BoltCircle -> hole axes -> InsertConstraints -> screw transforms
 ```
 
-Works with the hole wizard and pattern system: changing `bolt_count` regenerates hole axes, screw instances (`FastenerPattern`, `docs/pattern-and-mirror-features.md`), and their insert constraints together.
-
 ## MVP scope (MVP 5)
 
-- assembly document, component instances, one grounded component.
-- free placement of components.
-- Mate (planar), Concentric (cylindrical axes), Distance constraints.
-- simple remaining-DOF display.
-- simple rigid-body solver.
-- save/load of the assembly structure.
+Implemented first seed:
+
+- component instances owned by `AssemblyDocument`
+- references from component instances to project-owned part documents
+- visibility, suppression, grounding state, and free-placement transform records
+- JSON roundtrip through assembly/project JSON
+- project validation for component instance references
+- headless project component inspection
+
+Next MVP-5 steps:
+
+- explicit component placement/state update APIs
+- semantic component references for constraint targets
+- Mate, Concentric, and Distance constraint records
+- a first constraint graph and rigid-body solver
+- simple remaining-DOF display
 
 Then add: Insert, Angle, Tangent constraints; movable joints; limits; collision checks; flexible subassemblies.
 
 ## Proposed implementation sequence
 
-1. Add `AssemblyDocument`, `ComponentInstance`, and grounding.
-2. Add `AssemblyConstraint` with Mate, Concentric, Distance on semantic references.
-3. Add the constraint graph and a rigid-body solver producing transforms and remaining DOF.
-4. Add JSON serialization and roundtrip tests for the assembly structure.
-5. Add Insert constraints and integration with hole axes / fastener patterns.
-6. Add joints and limits, then motion via the solver.
-7. Add subassemblies (rigid first, flexible later) and collision checks.
+1. Add `AssemblyDocument`, `ComponentInstance`, and grounding. Implemented seed: see `docs/component-instance-mvp5.md`.
+2. Add explicit component placement/state update APIs without a solver.
+3. Add `AssemblyConstraint` with Mate, Concentric, Distance on semantic references.
+4. Add the constraint graph and a rigid-body solver producing transforms and remaining DOF.
+5. Add JSON serialization and roundtrip tests for constraints and solved structure.
+6. Add Insert constraints and integration with hole axes / fastener patterns.
+7. Add joints and limits, then motion via the solver.
+8. Add subassemblies (rigid first, flexible later) and collision checks.
 
 ## Out of scope for the first versions
 
+- mate/concentric/distance constraints before stable component placement records.
 - joints, motion, and limits before the rigid solver is stable.
 - flexible subassemblies.
 - collision/interference analysis beyond a simple static check.
