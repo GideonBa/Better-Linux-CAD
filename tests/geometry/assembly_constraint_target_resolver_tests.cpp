@@ -227,6 +227,23 @@ TEST_CASE("Assembly target resolver rejects missing component, part, and feature
     CHECK(resolved.error().message() ==
           "generated-face assembly target source feature must exist in referenced part document");
   }
+
+  SECTION("unsupported source feature type") {
+    Project project = make_face_project();
+    PartDocument* part = project.find_part_document(DocumentId("part.face_plate"));
+    REQUIRE(part != nullptr);
+    auto cut = Feature::create_subtractive_extrude(FeatureId("feature.cut"), "Cut",
+                                                   SketchId("sketch.base"),
+                                                   FeatureId("feature.base_extrude"));
+    REQUIRE(cut);
+    REQUIRE(part->add_feature(cut.value()));
+
+    const auto resolved =
+        resolver.resolve(project, make_target("component.face_plate", "feature.cut.top"));
+    REQUIRE(resolved.has_error());
+    CHECK(resolved.error().message() ==
+          "generated-face assembly target source feature must be an additive extrude");
+  }
 }
 
 TEST_CASE("Assembly target resolver rejects malformed and unsupported semantic target families",
