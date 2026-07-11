@@ -56,16 +56,18 @@ The current cross-hierarchy planning explicitly separates three identities:
 
 ```text
 geometric endpoint
-  = (occurrence_path, ComponentInstanceId, semantic_reference)
+  = (occurrence_path, local ComponentInstanceId, semantic_reference)
 
-relationship node
-  = (occurrence_path, ComponentInstanceId)
+geometric component occurrence
+  = (occurrence_path, local ComponentInstanceId)
 
 persisted transform authority
-  = (AssemblyDocumentId, ComponentInstanceId)
+  = (assembly_document: DocumentId, local ComponentInstanceId)
 ```
 
 This matters for repeated occurrences of one child assembly. Two occurrences may have different root-space geometry while sharing one child-document `ComponentInstance::transform()` authority. They must not become independent numeric transform variables until occurrence-local internal pose overrides exist.
+
+Future cross-hierarchy solve connectivity is planned as relationship-to-transform-authority incidence. Local constraints remain one relationship per containing `AssemblyDocument`; project-level cross-hierarchy relationships retain exact occurrence-qualified endpoints.
 
 See `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md` for the corrected implementation sequence.
 
@@ -185,4 +187,4 @@ Broader future roadmaps:
 
 Implement **block 23 only** from `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`: extract the frozen occurrence-qualified endpoint value contract into the Core layer and add persistent project-owned cross-hierarchy geometric constraint intent.
 
-JSON, graph connectivity, numeric variables, solving, snapshots, proposals, diagnostics, and application are explicitly later blocks.
+JSON, connectivity, numeric variables, solving, snapshots, proposals, diagnostics, and application are explicitly later blocks.
