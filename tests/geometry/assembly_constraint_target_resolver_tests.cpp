@@ -1,7 +1,9 @@
 #include "blcad/geometry/assembly_constraint_target_resolver.hpp"
 
-#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
+
+#include <cstddef>
+#include <string>
 
 using namespace blcad;
 using namespace blcad::geometry;
@@ -56,8 +58,8 @@ Project make_face_project(bool add_part_document = true, bool include_base_featu
   const RigidTransform transform{Vector3{10.0, 20.0, 30.0}, Vector3{5.0, 15.0, 25.0}};
   auto component = ComponentInstance::create(
       ComponentInstanceId("component.face_plate"), "Face Plate", DocumentId("part.face_plate"),
-      ComponentVisibility::Visible, ComponentSuppressionState::Active, ComponentGroundingState::Free,
-      transform);
+      ComponentVisibility::Visible, ComponentSuppressionState::Active,
+      ComponentGroundingState::Free, transform);
   REQUIRE(component);
   REQUIRE(assembly.value().add_component_instance(component.value()));
 
@@ -70,7 +72,8 @@ Project make_face_project(bool add_part_document = true, bool include_base_featu
 }
 
 AssemblyConstraintTarget make_target(const char* component_id, const char* semantic_reference) {
-  auto target = AssemblyConstraintTarget::create(ComponentInstanceId(component_id), semantic_reference);
+  auto target =
+      AssemblyConstraintTarget::create(ComponentInstanceId(component_id), semantic_reference);
   REQUIRE(target);
   return target.value();
 }
@@ -87,10 +90,10 @@ TEST_CASE("Assembly target resolver resolves every implemented generated face",
         project, make_target("component.face_plate", "feature.base_extrude.top"));
     REQUIRE(resolved);
     CHECK(resolved.value().face == SemanticFace::Top);
-    CHECK(resolved.value().local_plane.origin == Point3{0.0, 0.0, 8.0});
-    CHECK(resolved.value().local_plane.x_axis == Vector3{1.0, 0.0, 0.0});
-    CHECK(resolved.value().local_plane.y_axis == Vector3{0.0, 1.0, 0.0});
-    CHECK(resolved.value().local_plane.normal == Vector3{0.0, 0.0, 1.0});
+    CHECK((resolved.value().local_plane.origin == Point3{0.0, 0.0, 8.0}));
+    CHECK((resolved.value().local_plane.x_axis == Vector3{1.0, 0.0, 0.0}));
+    CHECK((resolved.value().local_plane.y_axis == Vector3{0.0, 1.0, 0.0}));
+    CHECK((resolved.value().local_plane.normal == Vector3{0.0, 0.0, 1.0}));
   }
 
   SECTION("bottom") {
@@ -98,8 +101,8 @@ TEST_CASE("Assembly target resolver resolves every implemented generated face",
         project, make_target("component.face_plate", "feature.base_extrude.bottom"));
     REQUIRE(resolved);
     CHECK(resolved.value().face == SemanticFace::Bottom);
-    CHECK(resolved.value().local_plane.origin == Point3{0.0, 0.0, 0.0});
-    CHECK(resolved.value().local_plane.normal == Vector3{0.0, 0.0, -1.0});
+    CHECK((resolved.value().local_plane.origin == Point3{0.0, 0.0, 0.0}));
+    CHECK((resolved.value().local_plane.normal == Vector3{0.0, 0.0, -1.0}));
   }
 
   SECTION("right") {
@@ -107,10 +110,10 @@ TEST_CASE("Assembly target resolver resolves every implemented generated face",
         project, make_target("component.face_plate", "feature.base_extrude.right"));
     REQUIRE(resolved);
     CHECK(resolved.value().face == SemanticFace::Right);
-    CHECK(resolved.value().local_plane.origin == Point3{60.0, 0.0, 4.0});
-    CHECK(resolved.value().local_plane.x_axis == Vector3{0.0, 1.0, 0.0});
-    CHECK(resolved.value().local_plane.y_axis == Vector3{0.0, 0.0, 1.0});
-    CHECK(resolved.value().local_plane.normal == Vector3{1.0, 0.0, 0.0});
+    CHECK((resolved.value().local_plane.origin == Point3{60.0, 0.0, 4.0}));
+    CHECK((resolved.value().local_plane.x_axis == Vector3{0.0, 1.0, 0.0}));
+    CHECK((resolved.value().local_plane.y_axis == Vector3{0.0, 0.0, 1.0}));
+    CHECK((resolved.value().local_plane.normal == Vector3{1.0, 0.0, 0.0}));
   }
 
   SECTION("left") {
@@ -118,8 +121,8 @@ TEST_CASE("Assembly target resolver resolves every implemented generated face",
         project, make_target("component.face_plate", "feature.base_extrude.left"));
     REQUIRE(resolved);
     CHECK(resolved.value().face == SemanticFace::Left);
-    CHECK(resolved.value().local_plane.origin == Point3{-60.0, 0.0, 4.0});
-    CHECK(resolved.value().local_plane.normal == Vector3{-1.0, 0.0, 0.0});
+    CHECK((resolved.value().local_plane.origin == Point3{-60.0, 0.0, 4.0}));
+    CHECK((resolved.value().local_plane.normal == Vector3{-1.0, 0.0, 0.0}));
   }
 
   SECTION("front") {
@@ -127,8 +130,8 @@ TEST_CASE("Assembly target resolver resolves every implemented generated face",
         project, make_target("component.face_plate", "feature.base_extrude.front"));
     REQUIRE(resolved);
     CHECK(resolved.value().face == SemanticFace::Front);
-    CHECK(resolved.value().local_plane.origin == Point3{0.0, 40.0, 4.0});
-    CHECK(resolved.value().local_plane.normal == Vector3{0.0, 1.0, 0.0});
+    CHECK((resolved.value().local_plane.origin == Point3{0.0, 40.0, 4.0}));
+    CHECK((resolved.value().local_plane.normal == Vector3{0.0, 1.0, 0.0}));
   }
 
   SECTION("back") {
@@ -136,8 +139,8 @@ TEST_CASE("Assembly target resolver resolves every implemented generated face",
         project, make_target("component.face_plate", "feature.base_extrude.back"));
     REQUIRE(resolved);
     CHECK(resolved.value().face == SemanticFace::Back);
-    CHECK(resolved.value().local_plane.origin == Point3{0.0, -40.0, 4.0});
-    CHECK(resolved.value().local_plane.normal == Vector3{0.0, -1.0, 0.0});
+    CHECK((resolved.value().local_plane.origin == Point3{0.0, -40.0, 4.0}));
+    CHECK((resolved.value().local_plane.normal == Vector3{0.0, -1.0, 0.0}));
   }
 }
 
@@ -152,9 +155,9 @@ TEST_CASE("Assembly target resolver keeps component placement separate from loca
   CHECK(resolved.value().component_instance.value() == "component.face_plate");
   CHECK(resolved.value().referenced_part_document.value() == "part.face_plate");
   CHECK(resolved.value().source_feature.value() == "feature.base_extrude");
-  CHECK(resolved.value().local_plane.origin == Point3{0.0, 0.0, 8.0});
-  CHECK(resolved.value().component_transform.translation_mm == Vector3{10.0, 20.0, 30.0});
-  CHECK(resolved.value().component_transform.rotation_deg == Vector3{5.0, 15.0, 25.0});
+  CHECK((resolved.value().local_plane.origin == Point3{0.0, 0.0, 8.0}));
+  CHECK((resolved.value().component_transform.translation_mm == Vector3{10.0, 20.0, 30.0}));
+  CHECK((resolved.value().component_transform.rotation_deg == Vector3{5.0, 15.0, 25.0}));
 }
 
 TEST_CASE("Assembly target resolver is deterministic and leaves project intent unchanged",
@@ -168,7 +171,9 @@ TEST_CASE("Assembly target resolver is deterministic and leaves project intent u
   REQUIRE(project.assembly().add_constraint(constraint.value()));
 
   const RigidTransform transform_before =
-      project.assembly().find_component_instance(ComponentInstanceId("component.face_plate"))->transform();
+      project.assembly()
+          .find_component_instance(ComponentInstanceId("component.face_plate"))
+          ->transform();
   const std::size_t constraint_count_before = project.assembly().constraint_count();
   const std::size_t workplane_count_before =
       project.find_part_document(DocumentId("part.face_plate"))->derived_workplane_count();
@@ -182,8 +187,9 @@ TEST_CASE("Assembly target resolver is deterministic and leaves project intent u
   REQUIRE(first);
   REQUIRE(second);
   CHECK(first.value() == second.value());
-  CHECK(project.assembly().find_component_instance(ComponentInstanceId("component.face_plate"))->transform() ==
-        transform_before);
+  CHECK(project.assembly()
+            .find_component_instance(ComponentInstanceId("component.face_plate"))
+            ->transform() == transform_before);
   CHECK(project.assembly().constraint_count() == constraint_count_before);
   CHECK(project.assembly().constraints().front().target_a().semantic_reference() ==
         semantic_reference_before);
