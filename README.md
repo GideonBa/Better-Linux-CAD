@@ -126,6 +126,7 @@ Implemented assembly blocks:
 - `docs/assembly-insert-intent-composite-residuals-mvp5.md`
 - `docs/assembly-insert-numeric-solver-dof-mvp5.md`
 - `docs/assembly-angle-constraint-mvp5.md`
+- `docs/assembly-suppressed-component-solving-mvp5.md`
 
 Broader implemented sketch/profile documents remain listed from `docs/mvp-plan.md` and `docs/architecture-summary.md`.
 
@@ -137,4 +138,4 @@ Future roadmaps:
 
 ## Next technical step
 
-The next technical step is suppressed-component support in solved groups: instead of the current hard rejection, suppressed components and every constraint touching them are excluded from the numeric system, snapshots keep covering them for stale-result detection, the remaining subgroup still requires one grounded non-suppressed component, and rank/DOF diagnostics are computed only over non-suppressed free components. See `docs/mvp-plan.md`.
+The next technical step is the posed assembly STEP export seed: recompute each referenced part's final shape, apply each visible non-suppressed component's rigid transform (matching `AssemblyTransformEvaluator` semantics exactly), compose one OCCT compound, and export it through the existing STEP writer — plus a headless example that loads a project, solves one group, applies the result, and exports the posed assembly. See `docs/mvp-plan.md`.

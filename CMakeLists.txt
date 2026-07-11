@@ -239,6 +239,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/assembly_parameter_pipeline_tests.cpp
       tests/geometry/assembly_rigid_body_solver_tests.cpp
       tests/geometry/assembly_solve_diagnostics_tests.cpp
+      tests/geometry/assembly_suppressed_component_solver_tests.cpp
       tests/geometry/assembly_transform_evaluator_tests.cpp
       tests/geometry/back_workplane_pipeline_tests.cpp
       tests/geometry/bolt_circle_pattern_pipeline_tests.cpp

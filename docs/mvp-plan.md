@@ -355,20 +355,25 @@ residual_row_redundancy  = 0
 
 Known seed semantics: the cosine form is direction-symmetric, and extremal targets (`0°`, `180°`) contribute no rank at the solved state (reported as redundancy). Oriented signed angles are a later extension.
 
-## Next MVP: Suppressed components in solved groups
+### 14. Suppressed components in solved groups
 
-Goal: replace the current hard rejection of suppressed components inside a connected group with the documented suppression policy, so a partially suppressed assembly still solves deterministically.
+Canonical document: `docs/assembly-suppressed-component-solving-mvp5.md`.
+
+Implemented: suppressed components contribute no solve variables, every constraint touching them vanishes from the collected constraint set, snapshots still cover them for stale-result detection, proposals must match free **active** snapshots, the remaining subgroup requires a grounded non-suppressed component only while constraints survive, fully vanished constraint sets are trivially converged with zero residual components, and diagnostics compute rank/DOF over the active subgroup only.
+
+## Next MVP: Posed assembly STEP export seed
+
+Goal: the first end-to-end assembly deliverable — export every visible, resolvable component of a project assembly as one posed STEP file, using each component's rigid transform on its part's recomputed final shape. This is pulled ahead of joints/motion because it proves the whole placement/solve pipeline in one inspectable artifact.
 
 Required implementation sequence:
 
-1. Exclude suppressed components from the variable and fixed sets instead of erroring on them.
-2. Exclude every constraint that touches a suppressed component from the collected constraint set.
-3. Keep suppressed components in the solve snapshots so stale-result detection still covers them.
-4. Reject application when a component's suppression state changed after solving (already snapshotted).
-5. Require at least one grounded non-suppressed component in the remaining subgroup.
-6. Classify a group whose constraints all vanish through suppression as converged with zero residual components.
-7. Keep diagnostics honest: rank/DOF are computed only over non-suppressed free components.
-8. Cover: suppressed leaf component, suppressed grounded component, fully suppressed group, unchanged determinism, stale-result rejection after unsuppressing.
+1. Recompute each referenced part document's final shape through the existing recompute executor and shape cache (one cache per part document, reused across instances).
+2. Apply each visible, non-suppressed component's `RigidTransform` to a copy of its part shape (rotation X, then Y, then Z in degrees, then translation in millimeters — exactly the semantics of `AssemblyTransformEvaluator`).
+3. Compose the posed shapes into one OCCT compound and export it through the existing STEP writer.
+4. Skip suppressed and hidden components deterministically; fail closed on missing part documents or failed part recomputes.
+5. Add a headless example that loads a project JSON, solves one connected group, applies the result, and exports the posed assembly to STEP.
+6. Cover: two posed instances of one part, suppressed/hidden exclusion, transform correctness via bounding-box or volume checks, deterministic repeat export, and failure on unresolvable members.
+7. Keep the export derived and unpersisted; no assembly geometry caches in the model.
 
 ## Proposed assembly implementation sequence
 
@@ -388,9 +393,10 @@ Required implementation sequence:
 14. Insert numeric-system, solver, and DOF integration. Implemented.
 15. Add solved-state or DOF cache records only if a later consumer requires non-regenerable data. No current requirement.
 16. Add richer constraint families. First family (planar Angle) implemented; further families follow as needed.
-17. Suppressed components in solved groups. Next.
-18. Add joints and limits, then motion through the solver.
-19. Add rigid subassemblies first, flexible subassemblies later, collision/interference checks, component geometry instancing, and assembly-level STEP export.
+17. Suppressed components in solved groups. Implemented.
+18. Posed assembly STEP export seed (pulled ahead as the first end-to-end assembly deliverable). Next.
+19. Add joints and limits, then motion through the solver.
+20. Add rigid subassemblies first, flexible subassemblies later, collision/interference checks, and component geometry instancing.
 
 ## Future roadmaps
 

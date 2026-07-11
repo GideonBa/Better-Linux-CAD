@@ -39,24 +39,21 @@ PartDocument make_face_part() {
   REQUIRE(part);
   REQUIRE(part.value().add_parameter(make_length_parameter("part.width", "width", 120.0)));
   REQUIRE(part.value().add_parameter(make_length_parameter("part.height", "height", 80.0)));
-  REQUIRE(part.value().add_parameter(
-      make_length_parameter("part.thickness", "thickness", 8.0)));
+  REQUIRE(part.value().add_parameter(make_length_parameter("part.thickness", "thickness", 8.0)));
 
   auto xy = DatumPlane::xy();
   REQUIRE(xy);
   REQUIRE(part.value().add_datum_plane(xy.value()));
-  auto sketch =
-      Sketch::create(SketchId("sketch.base"), "BaseSketch", DatumPlaneId("datum.xy"));
+  auto sketch = Sketch::create(SketchId("sketch.base"), "BaseSketch", DatumPlaneId("datum.xy"));
   REQUIRE(sketch);
-  auto rectangle = RectangleProfile::create(ProfileId("profile.base"),
-                                            ParameterId("part.width"),
+  auto rectangle = RectangleProfile::create(ProfileId("profile.base"), ParameterId("part.width"),
                                             ParameterId("part.height"));
   REQUIRE(rectangle);
   REQUIRE(sketch.value().add_profile(rectangle.value()));
   REQUIRE(part.value().add_sketch(sketch.value()));
-  auto feature = Feature::create_additive_extrude(
-      FeatureId("feature.base_extrude"), "BaseExtrude", SketchId("sketch.base"),
-      ParameterId("part.thickness"));
+  auto feature =
+      Feature::create_additive_extrude(FeatureId("feature.base_extrude"), "BaseExtrude",
+                                       SketchId("sketch.base"), ParameterId("part.thickness"));
   REQUIRE(feature);
   REQUIRE(part.value().add_feature(feature.value()));
   return part.value();
@@ -81,7 +78,8 @@ Project make_project(std::initializer_list<ComponentSpec> components) {
 }
 
 AssemblyConstraintTarget make_target(const char* component, const char* semantic_reference) {
-  auto target = AssemblyConstraintTarget::create(ComponentInstanceId(component), semantic_reference);
+  auto target =
+      AssemblyConstraintTarget::create(ComponentInstanceId(component), semantic_reference);
   REQUIRE(target);
   return target.value();
 }
@@ -92,18 +90,12 @@ Quantity make_distance(double millimeters, const char* id) {
   return distance.value();
 }
 
-void add_constraint(Project& project,
-                    const char* id,
-                    AssemblyConstraintType type,
-                    const char* component_a,
-                    const char* target_a,
-                    const char* component_b,
-                    const char* target_b,
-                    std::optional<Quantity> distance = std::nullopt) {
+void add_constraint(Project& project, const char* id, AssemblyConstraintType type,
+                    const char* component_a, const char* target_a, const char* component_b,
+                    const char* target_b, std::optional<Quantity> distance = std::nullopt) {
   auto constraint = AssemblyConstraint::create(
       AssemblyConstraintId(id), id, type, make_target(component_a, target_a),
-      make_target(component_b, target_b), AssemblyConstraintState::Active,
-      std::move(distance));
+      make_target(component_b, target_b), AssemblyConstraintState::Active, std::move(distance));
   REQUIRE(constraint);
   REQUIRE(project.assembly().add_constraint(constraint.value()));
 }
@@ -132,9 +124,9 @@ const ProposedComponentTransform& proposal_for(const AssemblySolveResult& result
 
 TEST_CASE("Rigid-body solver solves and explicitly applies one movable planar Mate",
           "[geometry][assembly-solver]") {
-  Project project = make_project(
-      {{"component.a", identity_rigid_transform(), ComponentGroundingState::Grounded},
-       {"component.b", RigidTransform{Vector3{5.0, -3.0, 20.0}, Vector3{}}}});
+  Project project =
+      make_project({{"component.a", identity_rigid_transform(), ComponentGroundingState::Grounded},
+                    {"component.b", RigidTransform{Vector3{5.0, -3.0, 20.0}, Vector3{}}}});
   add_constraint(project, "constraint.mate", AssemblyConstraintType::Mate, "component.a",
                  "feature.base_extrude.top", "component.b", "feature.base_extrude.bottom");
 
@@ -160,8 +152,9 @@ TEST_CASE("Rigid-body solver solves and explicitly applies one movable planar Ma
   CHECK(proposal.proposed_transform.translation_mm.z == Approx(8.0).margin(kSolveTolerance));
   CHECK(first.value().residual_summary.initial_rms > first.value().residual_summary.final_rms);
   CHECK(first.value().residual_summary.final_rms <= 1.0e-8);
-  CHECK(project.assembly().find_component_instance(ComponentInstanceId("component.b"))->transform() ==
-        source_transform);
+  CHECK(
+      project.assembly().find_component_instance(ComponentInstanceId("component.b"))->transform() ==
+      source_transform);
 
   const AssemblySolveResultApplier applier;
   const auto applied = applier.apply(project, first.value());
@@ -186,9 +179,9 @@ TEST_CASE("Rigid-body solver corrects planar Distance translation and orientatio
     Project project = make_project(
         {{"component.a", identity_rigid_transform(), ComponentGroundingState::Grounded},
          {"component.b", RigidTransform{Vector3{4.0, 6.0, -2.0}, Vector3{}}}});
-    add_constraint(project, "constraint.distance", AssemblyConstraintType::Distance,
-                   "component.a", "feature.base_extrude.top", "component.b",
-                   "feature.base_extrude.top", make_distance(12.0, "constraint.distance"));
+    add_constraint(project, "constraint.distance", AssemblyConstraintType::Distance, "component.a",
+                   "feature.base_extrude.top", "component.b", "feature.base_extrude.top",
+                   make_distance(12.0, "constraint.distance"));
 
     const auto solved = solver.solve(project, group({"component.a", "component.b"}));
     REQUIRE(solved);
@@ -226,14 +219,12 @@ TEST_CASE("Rigid-body solver uses deterministic constraint and variable ordering
          {"component.b", RigidTransform{Vector3{1.0, 2.0, 20.0}, Vector3{}}},
          {"component.c", RigidTransform{Vector3{-4.0, 7.0, 40.0}, Vector3{}}}});
     auto add_ab = [&project] {
-      add_constraint(project, "constraint.a.mate_ab", AssemblyConstraintType::Mate,
-                     "component.a", "feature.base_extrude.top", "component.b",
-                     "feature.base_extrude.bottom");
+      add_constraint(project, "constraint.a.mate_ab", AssemblyConstraintType::Mate, "component.a",
+                     "feature.base_extrude.top", "component.b", "feature.base_extrude.bottom");
     };
     auto add_bc = [&project] {
-      add_constraint(project, "constraint.z.mate_bc", AssemblyConstraintType::Mate,
-                     "component.b", "feature.base_extrude.top", "component.c",
-                     "feature.base_extrude.bottom");
+      add_constraint(project, "constraint.z.mate_bc", AssemblyConstraintType::Mate, "component.b",
+                     "feature.base_extrude.top", "component.c", "feature.base_extrude.bottom");
     };
     if (reverse_insertion) {
       add_bc();
@@ -306,7 +297,7 @@ TEST_CASE("Rigid-body solver defines grounded, suppressed, and connected-group p
           "solver connected group requires at least one grounded component");
   }
 
-  SECTION("suppressed components are rejected") {
+  SECTION("a suppressed component removes its constraints instead of failing the solve") {
     Project project = make_project(
         {{"component.a", identity_rigid_transform(), ComponentGroundingState::Grounded},
          {"component.b", identity_rigid_transform(), ComponentGroundingState::Free,
@@ -314,9 +305,12 @@ TEST_CASE("Rigid-body solver defines grounded, suppressed, and connected-group p
     add_constraint(project, "constraint.mate", AssemblyConstraintType::Mate, "component.a",
                    "feature.base_extrude.top", "component.b", "feature.base_extrude.bottom");
     const auto solved = solver.solve(project, group({"component.a", "component.b"}));
-    REQUIRE(solved.has_error());
-    CHECK(solved.error().message() ==
-          "first assembly solver seed does not support suppressed components");
+    REQUIRE(solved);
+    CHECK(solved.value().state == AssemblySolveState::Converged);
+    CHECK(solved.value().iterations == 0U);
+    CHECK(solved.value().residual_summary.residual_component_count == 0U);
+    CHECK(solved.value().proposed_transforms.empty());
+    CHECK(solved.value().component_snapshots.size() == 2U);
   }
 
   SECTION("input must exactly match deterministic graph group order") {
@@ -334,9 +328,9 @@ TEST_CASE("Rigid-body solver defines grounded, suppressed, and connected-group p
 
 TEST_CASE("Rigid-body solver exposes validation and semantic target failures",
           "[geometry][assembly-solver]") {
-  Project project = make_project(
-      {{"component.a", identity_rigid_transform(), ComponentGroundingState::Grounded},
-       {"component.b", identity_rigid_transform()}});
+  Project project =
+      make_project({{"component.a", identity_rigid_transform(), ComponentGroundingState::Grounded},
+                    {"component.b", identity_rigid_transform()}});
   const AssemblyRigidBodySolver solver;
 
   SECTION("invalid numeric options") {
@@ -346,8 +340,7 @@ TEST_CASE("Rigid-body solver exposes validation and semantic target failures",
     options.length_residual_scale_mm = 0.0;
     const auto solved = solver.solve(project, group({"component.a", "component.b"}), options);
     REQUIRE(solved.has_error());
-    CHECK(solved.error().message() ==
-          "solver length residual scale must be finite and positive");
+    CHECK(solved.error().message() == "solver length residual scale must be finite and positive");
   }
 
   SECTION("unsupported Concentric semantic axis family is rejected") {
@@ -355,8 +348,7 @@ TEST_CASE("Rigid-body solver exposes validation and semantic target failures",
                    "component.a", "bolt.main_axis", "component.b", "bolt.main_axis");
     const auto solved = solver.solve(project, group({"component.a", "component.b"}));
     REQUIRE(solved.has_error());
-    CHECK(solved.error().message() ==
-          "unsupported assembly semantic axis reference family");
+    CHECK(solved.error().message() == "unsupported assembly semantic axis reference family");
   }
 }
 
@@ -369,9 +361,9 @@ TEST_CASE("Non-converged and stale solve results cannot mutate project placement
     Project project = make_project(
         {{"component.a", identity_rigid_transform(), ComponentGroundingState::Grounded},
          {"component.b", RigidTransform{Vector3{}, Vector3{20.0, 0.0, 0.0}}}});
-    add_constraint(project, "constraint.distance", AssemblyConstraintType::Distance,
-                   "component.a", "feature.base_extrude.top", "component.b",
-                   "feature.base_extrude.top", make_distance(1.0, "constraint.distance"));
+    add_constraint(project, "constraint.distance", AssemblyConstraintType::Distance, "component.a",
+                   "feature.base_extrude.top", "component.b", "feature.base_extrude.top",
+                   make_distance(1.0, "constraint.distance"));
     const RigidTransform before =
         project.assembly().find_component_instance(ComponentInstanceId("component.b"))->transform();
     AssemblyRigidBodySolverOptions options;
@@ -381,12 +373,14 @@ TEST_CASE("Non-converged and stale solve results cannot mutate project placement
     const auto solved = solver.solve(project, group({"component.a", "component.b"}), options);
     REQUIRE(solved);
     CHECK(solved.value().state == AssemblySolveState::MaximumIterationsReached);
-    CHECK(project.assembly().find_component_instance(ComponentInstanceId("component.b"))->transform() ==
-          before);
+    CHECK(project.assembly()
+              .find_component_instance(ComponentInstanceId("component.b"))
+              ->transform() == before);
     const auto applied = applier.apply(project, solved.value());
     REQUIRE(applied.has_error());
-    CHECK(project.assembly().find_component_instance(ComponentInstanceId("component.b"))->transform() ==
-          before);
+    CHECK(project.assembly()
+              .find_component_instance(ComponentInstanceId("component.b"))
+              ->transform() == before);
   }
 
   SECTION("changed grounded anchor makes a converged result stale") {
@@ -401,14 +395,14 @@ TEST_CASE("Non-converged and stale solve results cannot mutate project placement
     const RigidTransform component_b_before =
         project.assembly().find_component_instance(ComponentInstanceId("component.b"))->transform();
     REQUIRE(project.assembly().set_component_instance_transform(
-        ComponentInstanceId("component.a"),
-        RigidTransform{Vector3{1.0, 0.0, 0.0}, Vector3{}}));
+        ComponentInstanceId("component.a"), RigidTransform{Vector3{1.0, 0.0, 0.0}, Vector3{}}));
 
     const auto applied = applier.apply(project, solved.value());
     REQUIRE(applied.has_error());
     CHECK(applied.error().message() ==
           "assembly solve result is stale because component solve input changed");
-    CHECK(project.assembly().find_component_instance(ComponentInstanceId("component.b"))->transform() ==
-          component_b_before);
+    CHECK(project.assembly()
+              .find_component_instance(ComponentInstanceId("component.b"))
+              ->transform() == component_b_before);
   }
 }
