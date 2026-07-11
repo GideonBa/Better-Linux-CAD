@@ -6,7 +6,7 @@ Detailed architecture and feature status live in `docs/`. This README is intenti
 
 ## Status
 
-Current state: MVP-1 core skeleton, staged MVP-2 sketch/workplane/profile/recompute/reference blocks, the MVP-3 parametric bolt circle, the MVP-4 assembly/project container path, and MVP-5 assembly infrastructure through deterministic Mate/Distance/Concentric/Insert/Angle rigid-body solving, local Jacobian-rank/remaining-DOF diagnostics, suppressed-component solve filtering, posed assembly STEP export, the first persistent Revolute joint/limit motion path, and rigid subassembly hierarchy with nested posed-leaf export.
+Current state: MVP-1 core skeleton, staged MVP-2 sketch/workplane/profile/recompute/reference blocks, the MVP-3 parametric bolt circle, the MVP-4 assembly/project container path, and MVP-5 assembly infrastructure through deterministic Mate/Distance/Concentric/Insert/Angle rigid-body solving, local Jacobian-rank/remaining-DOF diagnostics, suppressed-component solve filtering, posed assembly STEP export, the first persistent Revolute joint/limit motion path, rigid subassembly hierarchy with nested posed-leaf export, and read-only posed interference analysis over the shared posed-leaf boundary.
 
 The implemented assembly path now includes:
 
@@ -108,6 +108,7 @@ Focused current assembly tests:
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-revolute-joint]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-hierarchy-transform]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-nested-step-export]"
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-interference]"
 ```
 
 ## Headless tools
@@ -171,6 +172,7 @@ Implemented assembly blocks:
 - `docs/assembly-posed-step-export-mvp5.md`
 - `docs/assembly-revolute-joint-motion-mvp5.md`
 - `docs/assembly-rigid-subassembly-nested-export-mvp5.md`
+- `docs/assembly-interference-analysis-mvp5.md`
 
 Broader implemented sketch/profile documents remain listed from `docs/mvp-plan.md` and `docs/architecture-summary.md`.
 
@@ -182,4 +184,4 @@ Future roadmaps:
 
 ## Next technical step
 
-The next technical step is the first posed assembly interference-analysis seed: reuse deterministic visible-active flattened leaf occurrences plus the same part recompute and hierarchy-transform semantics, derive lexicographically ordered leaf pairs, detect positive-volume OCCT intersections, and return read-only occurrence-pair interference records without persisting collision state or introducing contact physics. See `docs/mvp-plan.md`.
+The next technical step is the posed assembly clearance-analysis seed: extend the shared posed-leaf boundary with deterministic OCCT minimum-distance records between non-interfering leaves below an explicit finite clearance threshold, keeping the lexicographic pair order, the stable non-topological leaf identities, and the fail-closed/unpersisted contract of the interference seed. See `docs/mvp-plan.md`.

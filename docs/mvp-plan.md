@@ -276,24 +276,25 @@ Implemented the complete rigid hierarchy seed:
 14. Provide `examples/nested_subassembly.blcad.project.json` as a direct `blcad_export_posed_assembly` consumer.
 15. Keep flexible subassembly solve variables, grounding of whole subassembly occurrences, and geometric constraints/joints across assembly-document boundaries deferred.
 
-## Next MVP: First posed assembly interference-analysis seed
+### 18. Posed assembly interference-analysis seed
 
-Goal: reuse the stable flattened visible-active leaf occurrence boundary to derive deterministic positive-volume interference records without persisting collision state or introducing contact physics.
+Canonical document: `docs/assembly-interference-analysis-mvp5.md`.
+
+Implemented: a read-only `AssemblyInterferenceAnalyzer` over the shared posed-leaf boundary (`AssemblyPosedLeafShapeBuilder`, now also backing posed STEP export), deterministic lexicographic pair evaluation with stable non-topological leaf identities, OCCT boolean-common positive-volume overlap above an explicit finite tolerance, fail-closed error propagation, and fully derived/unpersisted analysis products. Contact without positive volume is not interference. Posing composes each authored transform chain into one rigid OCCT transform per leaf occurrence.
+
+## Next MVP: Posed assembly clearance-analysis seed
+
+Goal: extend the same posed-leaf boundary with deterministic minimum-distance records between non-interfering leaves, so clearance requirements become checkable before joints and motion sweeps.
 
 Required implementation sequence:
 
-1. Define a read-only `AssemblyInterferenceAnalyzer` geometry service consuming `const Project&`.
-2. Reuse `AssemblyLeafOccurrenceResolver`; do not implement a second hierarchy traversal or visibility/suppression policy.
-3. Recompute each unique referenced leaf `PartDocument` exactly once per analysis into one derived `ShapeCache`, matching posed export cache reuse.
-4. Pose each flattened leaf shape through its exact `transforms_inner_to_outer` chain using the same authored X-then-Y-then-Z semantics as nested posed export.
-5. Preserve stable leaf occurrence identity in analysis descriptors through assembly id, subassembly path, and component id; do not use OCCT topology ids as relationship identity.
-6. Derive unordered leaf pairs in deterministic lexicographic occurrence-key order and evaluate each pair exactly once. Self-pairs are impossible and must not be reported.
-7. Use OCCT boolean common/intersection geometry to derive overlap. The seed reports interference only for a finite positive common solid volume above an explicit numeric tolerance; mere face/edge/point contact is not positive-volume interference.
-8. Return read-only interference records containing the two ordered leaf identities and overlap volume in `mm^3`, plus an analysis summary containing leaf count and evaluated pair count.
-9. Fail closed on invalid project hierarchy, unresolved leaf parts, recompute failures, missing final shapes, hierarchy transform failures, boolean-operation failures, non-finite overlap properties, or inconsistent pair identity.
-10. Keep broad-phase acceleration, contact classification, minimum-distance analysis, penetration direction/depth, collision response, motion sweeping, and physics deferred.
-11. Keep all posed shapes, pair candidates, OCCT common shapes, volume properties, and interference records derived and unpersisted.
-12. Cover disjoint leaves, exact touching without positive volume, overlapping leaves with known common volume, repeated nested child occurrences, hidden/suppressed leaf filtering, deterministic pair/result ordering independent of insertion order, part-cache reuse, and repeated identical analysis results.
+1. Add a read-only `AssemblyClearanceAnalyzer` (or extend the interference analyzer with a combined analysis) consuming `const Project&` through the shared `AssemblyPosedLeafShapeBuilder`.
+2. Reuse the deterministic lexicographic pair order and the stable leaf identity contract unchanged.
+3. Use OCCT extrema (`BRepExtrema_DistShapeShape`) to derive the minimum distance in `mm` for each pair without positive-volume interference.
+4. Report pairs below an explicit finite positive clearance threshold; report interfering pairs separately (distance zero with overlap volume), never as clearance records.
+5. Fail closed on extrema failures and non-finite distances.
+6. Keep witness points optional and derived; keep everything unpersisted.
+7. Cover: pair above threshold (no record), pair below threshold with known exact distance, touching pair (distance zero, no volume), interfering pair excluded from clearance records, nested occurrences, determinism, and threshold validation.
 
 ## Proposed assembly implementation sequence
 
@@ -317,8 +318,9 @@ Required implementation sequence:
 18. Posed assembly STEP export seed. Implemented.
 19. Add joints and limits, then motion through the solver. First Revolute family implemented.
 20. Rigid subassembly instance and nested posed-export seed. Implemented.
-21. First posed assembly interference-analysis seed. Next.
-22. Add flexible subassemblies, cross-hierarchy relationship semantics, component geometry instancing, and richer collision/contact analysis in later dedicated blocks.
+21. First posed assembly interference-analysis seed. Implemented.
+22. Posed assembly clearance-analysis seed. Next.
+23. Add flexible subassemblies, cross-hierarchy relationship semantics, component geometry instancing, and richer collision/contact analysis in later dedicated blocks.
 
 ## Future roadmaps
 
