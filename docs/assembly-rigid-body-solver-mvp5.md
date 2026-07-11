@@ -1,195 +1,73 @@
-# Rigid-Body Assembly Solver MVP-5
+# Assembly Rigid-Body Solver MVP-5
 
-Status: implemented deterministic rigid-body solver for supported Mate, Distance, and Concentric connected groups with one shared numeric residual/Jacobian path and an explicit atomic result-application boundary. Insert target/residual semantics are implemented separately but are not yet numeric solver inputs.
+Status: implemented deterministic local rigid-body solving for Mate, Distance, Concentric, Insert, and planar Angle relationships, including suppression filtering, complete stale snapshots, explicit solve states, atomic result application, and shared numeric-engine reuse by Revolute motion.
 
-## Goal
+## Scope and locality
 
-The solver derives proposed component placements from persistent assembly relationship intent without mutating the source project during solve.
+`AssemblyRigidBodySolver` solves exactly one deterministic local connected component of the temporary solve view's root `AssemblyDocument`.
 
-It consumes exactly one deterministic connected group from `AssemblyConstraintGraph`, keeps grounded components fixed, evaluates the shared assembly numeric system, optimizes free component transforms on private `Project` copies, and returns explicit transform proposals.
-
-`AssemblySolveResultApplier` is the only transform-application boundary.
-
-## Public API
+The ordinary public path receives:
 
 ```text
-AssemblySolveState
-  Converged
-  MaximumIterationsReached
-  FixedGeometryInconsistent
-  NumericalFailure
-
+const Project&
+connected_group: [ComponentInstanceId, ...]
 AssemblyRigidBodySolverOptions
-AssemblySolveResidualSummary
-AssemblySolveComponentSnapshot
-ProposedComponentTransform
-AssemblySolveResult
-AssemblyRigidBodySolver
-AssemblySolveResultApplier
 ```
 
-Public header:
+For a normal project, the local relationship graph is `project.assembly()`.
 
-```text
-include/blcad/geometry/assembly_rigid_body_solver.hpp
-```
+`AssemblyFlexibleSubassemblySolver` later reuses the same solver by copying a selected child `AssemblyDocument` into a temporary `Project` as the local root. The rigid-body solver itself therefore remains local; it does not traverse or solve cross-hierarchy endpoints.
 
-Constraint-family integrations do not add solver methods or family-specific solve result types.
+## Supported local geometric families
 
-## Exact connected-group contract
-
-Solver input must exactly match one group returned by:
-
-```text
-AssemblyConstraintGraph::connected_components()
-```
-
-including lexicographic component order.
-
-The solver does not silently sort, merge, split, or expand caller-provided groups.
-
-Independent graph groups remain independently solvable.
-
-## Grounding policy
-
-```text
-Grounded -> fixed participant
-Free     -> six numeric transform variables
-```
-
-At least one component must be grounded. The solver does not invent a floating-group gauge condition.
-
-Multiple grounded components are allowed and remain fixed.
-
-An all-grounded supported numeric group returns:
-
-- `Converged` if residual RMS is within tolerance
-- `FixedGeometryInconsistent` otherwise
-
-Grounded components receive no transform proposals.
-
-## Suppression and visibility
-
-A selected group containing a suppressed component fails before numeric solving.
-
-Visibility does not affect solve participation.
-
-These are solver policies; storage APIs still permit explicit component state/transform edits.
-
-## Supported numeric constraint families
-
-The shared numeric system currently consumes:
+The shared local numeric path supports:
 
 ```text
 Mate
 Distance
 Concentric
+Insert
+Angle
 ```
 
-Builder selection:
+Canonical residual semantics live in their feature documents. The solver does not duplicate semantic feature-target inference.
+
+## Deterministic input group
+
+`AssemblyConstraintGraph::build(project.assembly())` derives local active-constraint connectivity.
+
+The requested `connected_group` must exactly equal one deterministic graph connected component.
+
+Component and relationship ordering is lexicographic according to the existing local graph/numeric contracts.
+
+The solver does not silently expand or shrink the requested graph component except for the documented derived suppression filtering before numeric participation.
+
+## Suppression participation
+
+Complete group component identity is preserved for snapshots.
+
+For numeric participation:
 
 ```text
-Mate / Distance
-  -> AssemblyConstraintEquationBuilder
-
-Concentric
-  -> AssemblyConcentricConstraintEquationBuilder
+active_subgroup = non-suppressed group components
 ```
 
-The shared numeric evaluator selects the builder from `AssemblyConstraintType`, flattens the descriptor, and supplies one residual vector to solver and diagnostics.
+Local geometric constraints survive only when both endpoints are in the active subgroup.
 
-The solver has no Concentric-specific optimization branch.
+Suppressed components:
 
-## Insert boundary
+- contribute no numeric variables;
+- are not treated as fixed bodies;
+- receive no proposals;
+- remain in complete input snapshots so later suppression changes make the result stale.
 
-Canonical Insert semantics are implemented in `docs/assembly-insert-intent-composite-residuals-mvp5.md`.
+If all relationships vanish through suppression, the group is trivially converged with zero residual components.
 
-Insert now has:
+## Grounding policy
 
-```text
-AssemblyConstraintType::Insert
-feature.<feature-id>.seat
-ResolvedAssemblyInsertConstraintTarget
-AssemblyInsertConstraintEquationBuilder
-InsertResidualDescriptor
-```
+Grounded active components participate in target and residual evaluation but contribute no numeric variables.
 
-Canonical Insert residual:
-
-```text
-direction_parallelism       = cross(dA, dB)
-axis_offset_mm               = cross(oB - oA, dA)
-signed_seating_separation_mm = dot(sB - sA, nA)
-```
-
-However, `AssemblyConstraintNumericSystem` does not yet route/flatten Insert.
-
-An active Insert record currently reaches the explicit planar-builder rejection:
-
-```text
-Insert equation construction requires dedicated composite target support
-```
-
-The solver does not ignore the Insert edge or pretend it is solved. The source project remains unchanged.
-
-## Deterministic residual ordering
-
-Constraints use lexicographic `AssemblyConstraintId` order from the graph. Persistent target A/B order remains unchanged inside every constraint.
-
-### Mate
-
-```text
-normal_opposition.x
-normal_opposition.y
-normal_opposition.z
-signed_separation_mm / length_residual_scale_mm
-```
-
-### Distance
-
-```text
-normal_parallelism.x
-normal_parallelism.y
-normal_parallelism.z
-distance_residual_mm / length_residual_scale_mm
-```
-
-### Concentric
-
-```text
-direction_parallelism.x
-direction_parallelism.y
-direction_parallelism.z
-axis_offset_mm.x / length_residual_scale_mm
-axis_offset_mm.y / length_residual_scale_mm
-axis_offset_mm.z / length_residual_scale_mm
-```
-
-Default length residual scale:
-
-```text
-1.0 mm
-```
-
-The next Insert integration must preserve every existing scalar order exactly.
-
-Documented future Insert order:
-
-```text
-direction_parallelism.x
-direction_parallelism.y
-direction_parallelism.z
-axis_offset_mm.x / length_residual_scale_mm
-axis_offset_mm.y / length_residual_scale_mm
-axis_offset_mm.z / length_residual_scale_mm
-signed_seating_separation_mm / length_residual_scale_mm
-```
-
-## Deterministic variable ordering
-
-Free components follow lexicographic connected-group order.
-
-Each free component contributes:
+Free active components contribute six direct persisted-transform variables:
 
 ```text
 tx_mm
@@ -200,62 +78,111 @@ ry_deg
 rz_deg
 ```
 
-The solver uses persisted `RigidTransform` coordinate values directly.
+The variables correspond directly to `ComponentInstance::transform()` fields. The local solver does not optimize a matrix, quaternion, composed hierarchy transform, or shape placement cache.
 
-Every residual evaluation follows the authoritative active right-handed fixed-axis X-then-Y-then-Z transform convention.
+When surviving constrained relationships exist, the current local seed requires grounded active participation under the established solver validation contract.
 
-## Numeric method
+Grounded components are never moved to repair inconsistency.
 
-The current method is deterministic damped Gauss-Newton.
+## Shared numeric relationship system
 
-```text
-1. evaluate flattened residual vector r
-2. construct central finite-difference Jacobian J
-3. form J^T J + lambda I
-4. form -J^T r
-5. solve with partial-pivot Gaussian elimination
-6. try the step with deterministic backtracking line search
-7. escalate damping if no candidate decreases RMS
-8. accept the first decreasing candidate
-```
-
-Default numeric contract:
+The private numeric relationship set contains:
 
 ```text
-length residual scale                 1.0 mm
-convergence RMS                       1.0e-8
-translation finite-difference step    1.0e-4 mm
-rotation finite-difference step       1.0e-4 deg
-initial damping                       1.0e-6
-maximum iterations                    100
-maximum damping attempts              8
-maximum line-search steps             12
+constraint_ids[]
+revolute_drives[]
 ```
 
-Central finite-difference column:
+Ordinary `AssemblyRigidBodySolver` supplies geometric constraint ids and an empty Revolute drive set.
+
+`AssemblyJointMotionSolver` later supplies geometric constraint ids plus deterministic transient Revolute drives.
+
+Both paths call the private shared engine:
 
 ```text
-J[:,j] = (r(x + h_j e_j) - r(x - h_j e_j)) / (2 h_j)
+detail::solve_numeric_relationships
 ```
 
-Every plus/minus perturbation re-evaluates current semantic target geometry and reconstructs the relevant residual descriptor.
+There is no joint-specific or Insert-specific optimizer.
 
-No analytic Jacobian or sparse linear algebra is implemented.
+## Residual flattening
 
-## Concentric solve behavior
+Length residual components are divided by `length_residual_scale_mm`.
 
-Concentric residuals are:
+Canonical local flattening includes:
 
 ```text
-direction_parallelism = cross(dA, dB)
-axis_offset_mm         = cross(oB - oA, dA)
+Mate:
+  normal_opposition.x
+  normal_opposition.y
+  normal_opposition.z
+  signed_separation_mm / scale
+
+Distance:
+  normal_parallelism.x
+  normal_parallelism.y
+  normal_parallelism.z
+  distance_residual_mm / scale
+
+Concentric:
+  direction_parallelism.x
+  direction_parallelism.y
+  direction_parallelism.z
+  axis_offset_mm.x / scale
+  axis_offset_mm.y / scale
+  axis_offset_mm.z / scale
+
+Insert:
+  direction_parallelism.x
+  direction_parallelism.y
+  direction_parallelism.z
+  axis_offset_mm.x / scale
+  axis_offset_mm.y / scale
+  axis_offset_mm.z / scale
+  signed_seating_separation_mm / scale
+
+Angle:
+  angle_alignment
 ```
 
-The generic solver corrects lateral axis offset and axis tilt.
+Residual order follows deterministic relationship order and family-specific scalar order.
 
-Equal and opposed coincident directions are valid because `cross(dA,dB)=0` for both.
+## Finite-difference Jacobian
 
-The residual intentionally leaves axial translation and rotation about the common axis free. The solver adds no hidden lock for those directions.
+The solver uses central finite differences over direct component variables.
+
+For variable `x_j` and step `h_j`:
+
+```text
+J[:, j] = (r(x + h_j) - r(x - h_j)) / (2 h_j)
+```
+
+Translation and degree-rotation step sizes are explicit solver options and validated as finite positive values.
+
+Every residual evaluation occurs on a private candidate `Project` copy.
+
+The solver does not implement analytic Jacobians.
+
+## Damped Gauss-Newton engine
+
+For residual vector `r` and Jacobian `J`, the engine forms damped normal equations:
+
+```text
+(J^T J + lambda I) delta = -J^T r
+```
+
+The current implementation uses deterministic dense matrices and partial-pivot Gaussian elimination.
+
+The iteration policy includes:
+
+- finite option validation;
+- deterministic damping escalation;
+- backtracking line search;
+- RMS residual convergence;
+- maximum iteration limits;
+- explicit numerical-failure classification.
+
+There is no sparse solve path or trust-region implementation yet.
 
 ## Solve states
 
@@ -269,35 +196,40 @@ Only a converged result may be applied.
 
 ### MaximumIterationsReached
 
-Iteration limit reached above tolerance. Current best proposals remain diagnostic only and cannot be applied.
+The configured iteration limit was reached above tolerance. Current best proposals remain diagnostic and unapplable.
 
 ### FixedGeometryInconsistent
 
-Returned for all-grounded supported numeric groups above tolerance. Grounded components are not moved to repair inconsistency.
+The supported all-grounded/fixed active system remains above tolerance. Grounded components are not moved.
 
 ### NumericalFailure
 
-Free variables exist but no configured damping/line-search attempt produces a decreasing RMS step. Current best proposals remain unapplable.
+Free variables exist but no configured damping/line-search attempt produces a decreasing RMS step.
 
-Validation and semantic-target failures use `Result<T>` errors rather than solve states.
+Validation and target-resolution failures remain `Result<T>` errors rather than solve states.
 
 ## Read-only solve boundary
 
-`AssemblyRigidBodySolver::solve` copies the input `Project` before changing candidate transforms.
+`AssemblyRigidBodySolver::solve` never mutates the caller's `Project`.
 
-All iterations occur on private project copies.
+The engine changes only private project copies and returns `AssemblySolveResult`.
 
-The source project remains unchanged for every solve state and every validation/semantic-target error.
+The result stores:
 
-`AssemblySolveResult` stores complete component snapshots from the original input and proposed free-component transforms from the private solve state.
+```text
+solve state
+iteration count
+residual summary
+complete group component snapshots
+fixed component identity
+free-active component transform proposals
+```
 
 Solver output is derived and unpersisted.
 
-## Explicit atomic application boundary
+## Complete component snapshots
 
-`AssemblySolveResultApplier::apply` accepts only `Converged`.
-
-Every group component snapshot contains:
+Every group component snapshot stores:
 
 ```text
 component id
@@ -306,79 +238,134 @@ suppression state
 source transform
 ```
 
-The applier rejects stale results if any snapshotted solve input changed, including a moved grounded anchor.
+Snapshots include grounded and suppressed group components, not only numeric variables.
 
-Proposals must match free-component snapshots and valid transform values.
+This protects application from stale solve inputs such as:
 
-After full prevalidation, proposals are applied to another project copy. The caller project is replaced only after every update succeeds.
+- a free component moved after solve;
+- a grounded anchor moved;
+- grounding changed;
+- suppression changed.
 
-The current application path is shared by Mate, Distance, and Concentric results.
+## Explicit atomic application
 
-Insert will use this same boundary after numeric integration; no Insert-specific mutation API is planned.
+`AssemblySolveResultApplier::apply` accepts only converged results.
 
-## Semantic target error propagation
+Before mutation it validates:
 
-The shared numeric system propagates geometry-layer failures unchanged.
+- duplicate snapshots;
+- duplicate proposals;
+- every snapshotted component still exists;
+- source transform, grounding, and suppression still match;
+- every proposal matches a free active snapshot;
+- proposal source transforms match snapshot source transforms;
+- every proposed transform satisfies the normal component transform contract.
 
-For example, an unsupported Concentric token such as `bolt.main_axis` remains an axis-resolver failure rather than becoming a generic solver error.
+Application then:
 
-Likewise, future Insert numeric integration must propagate `.seat` resolution failures through the same boundary.
+```text
+copy Project
+  -> write proposed direct component transforms
+  -> commit only after every write succeeds
+```
 
-## Tests
+The caller project is unchanged on any failure.
+
+This one application boundary is shared by every implemented local geometric family and is also reused inside later joint-motion and flexible-child application paths.
+
+## Local diagnostics
+
+`AssemblySolveDiagnosticsAnalyzer` evaluates the same local geometric finite-difference Jacobian used by ordinary solving.
+
+```text
+variable_count  = 6 * free_active_component_count
+constrained_dof = rank(J)
+remaining_dof   = variable_count - rank(J)
+```
+
+Regular covered one-free-body results include:
+
+```text
+Concentric: rank 4/6, remaining DOF 2
+Insert:     rank 5/6, remaining DOF 1
+Angle:      rank 1/6, remaining DOF 5 away from extremal targets
+```
+
+Rank is derived from the generic numeric Jacobian. Family rank is not hard-coded.
+
+## Error propagation
+
+Semantic target and equation-builder failures propagate through the shared numeric path without being collapsed into generic solver errors.
+
+Examples include unsupported semantic reference families, invalid `.axis` producers, and invalid `.seat` producers.
+
+The solver does not reinterpret semantic tokens.
+
+## Persistence boundary
+
+Persistent authority used by the local solver:
+
+```text
+AssemblyDocument local AssemblyConstraint records
+ComponentInstance grounding/suppression/transform
+```
+
+Derived and unpersisted:
+
+```text
+local active constraint graph connectivity
+active numeric subgroup
+resolved target geometry
+residual descriptors
+flattened residual vectors
+numeric variable ordering
+finite-difference Jacobians
+normal equations and damping attempts
+solver iteration state
+AssemblySolveResult
+component snapshots
+transform proposals
+rank and remaining-DOF diagnostics
+```
+
+Only explicit successful result application changes persistent component transforms.
+
+## Focused tests
 
 ```bash
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-solver]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-concentric-solver]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-insert]"
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-diagnostics]"
 ```
 
-Current coverage includes Mate/Distance solve regressions, deterministic groups/variables, grounding/suppression policy, option validation, source-project immutability, stale result detection, atomic application, Concentric six-scalar numeric participation, offset/tilt correction, preserved axial/axis-rotation freedoms, equal/opposed axes, fixed inconsistency, non-convergence, and semantic target failures.
+Related Angle and suppression suites extend the same shared path.
 
-The Insert suite currently verifies the explicit unsupported numeric boundary and unchanged project placement.
+Coverage across the local solver chain includes deterministic groups/variables, all five geometric families, grounding, suppression filtering, option validation, source-project immutability, stale-result detection, atomic application, fixed inconsistency, non-convergence, semantic target failure propagation, and local rank/DOF proofs.
 
-## Persistence boundary
+## Current limitations
 
-Unpersisted data includes:
+The ordinary rigid-body solver remains local to the temporary solve view's root `AssemblyDocument`.
 
-```text
-resolved target descriptors
-assembly-space plane/axis/seat geometry
-Mate/Distance/Concentric/Insert residual descriptors
-flattened residual vectors
-solver Jacobians and normal equations
-AssemblySolveResult
-proposed component transforms
-residual summaries
-rank and DOF diagnostics
-```
+Still not implemented in this local solver contract:
 
-Persisted component transforms change only after explicit successful application through the normal assembly transform update path.
+- persistent project-level cross-hierarchy constraints;
+- cross-hierarchy relationship/solve connectivity;
+- transform-authority deduplication across repeated child occurrences;
+- cross-hierarchy numeric variables, snapshots, proposals, and application;
+- whole-`SubassemblyInstance` solve variables or grounding;
+- occurrence-local child component pose overrides;
+- analytic Jacobians;
+- sparse matrix storage/solve;
+- trust-region methods;
+- per-constraint weights;
+- general floating-group gauge fixing;
+- per-component null-space labels or drag projection.
 
-## Deliberate limitations
+The next cross-hierarchy solver work is deliberately split into blocks 23-27 in `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`.
 
-The current solver does not implement:
+## Current handoff
 
-- Insert numeric flattening or solving
-- Insert shared diagnostics rank evaluation
-- analytic Jacobians
-- sparse matrix storage/solve
-- trust-region methods
-- per-constraint weights
-- angle canonicalization
-- floating-group gauge fixing
-- suppressed-component solving
-- semantic pattern axis/seat identities
-- per-component null-space labels
-- drag projection into valid DOF
-- richer constraints
-- joints or motion
-- collision/interference analysis
-- subassemblies
-- component geometry instancing
-- assembly-level STEP export
+Do not extend this local solver by making occurrence paths direct numeric variable ids.
 
-## Next technical step
-
-The next assembly block is **Insert integration into `AssemblyConstraintNumericSystem`, `AssemblyRigidBodySolver`, `AssemblySolveResultApplier` coverage, and `AssemblySolveDiagnosticsAnalyzer`**.
-
-It must route Insert through the dedicated composite builder, preserve Mate/Distance/Concentric flattening, flatten the seven Insert scalars in the documented order, reuse the existing finite-difference/Gauss-Newton path, solve lateral offset/tilt/axial seating, preserve rotation about the common axis, and prove shared local rank `5/6` with one remaining DOF.
+Block 23 first moves/extracts the frozen occurrence-qualified endpoint value contract into the Core layer and adds persistent project-owned cross-hierarchy geometric constraint intent. JSON, graph connectivity, numeric solving, and application follow in separate blocks.

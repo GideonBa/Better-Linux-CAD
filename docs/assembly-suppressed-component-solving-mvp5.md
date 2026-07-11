@@ -1,33 +1,82 @@
 # Suppressed Components in Solved Groups MVP-5
 
-Status: implemented the documented suppression policy inside the shared rigid-body solve path, replacing the previous hard rejection of suppressed components.
+Status: implemented the suppression policy inside the shared local rigid-body solve path, replacing the earlier hard rejection of suppressed components.
 
 ## Policy
 
-A suppressed component stays part of the persistent group but leaves the numeric system:
+A suppressed local component remains persistent model intent but leaves the active numeric subgroup:
 
-- suppressed components contribute no solve variables and are neither fixed nor variable.
-- every constraint touching a suppressed component vanishes from the collected constraint set. This falls out of the existing collector: constraints are only collected when **both** endpoints are in the passed subgroup, and the solver now passes the non-suppressed subgroup.
-- suppressed components remain in the complete solve snapshots, so stale-result detection covers suppression exactly like grounding and transforms: unsuppressing (or suppressing) any snapshotted component after solving makes the result unapplable.
-- proposals must match a **free active** component snapshot; a proposal for a suppressed component is rejected at application time.
-- the remaining subgroup still requires at least one grounded non-suppressed component — but only if any constraints survive.
-- a group whose constraints all vanish through suppression is trivially converged: zero residual components, zero iterations, and identity proposals for the remaining free components.
-- diagnostics use the same filtered subgroup, so Jacobian rank and remaining DOF are computed only over non-suppressed free components and the surviving constraints.
+- suppressed components contribute no solve variables and are neither fixed nor variable;
+- every local geometric constraint touching a suppressed component vanishes from the collected numeric relationship set;
+- suppressed components remain in complete solve snapshots, so suppression changes make old results stale;
+- proposals must match free active component snapshots;
+- the surviving constrained subgroup still requires grounded active participation under the existing local solver rules;
+- a group whose relationships all vanish through suppression is trivially converged with zero residual components and zero iterations;
+- diagnostics use the same filtered subgroup and surviving relationships.
+
+This is a derived solve-participation policy. The persistent `AssemblyConstraint` records are not auto-suppressed or rewritten.
 
 ## Proven behavior
 
-`tests/geometry/assembly_suppressed_component_solver_tests.cpp`:
+`tests/geometry/assembly_suppressed_component_solver_tests.cpp` proves:
 
-- a suppressed middle component in an `a - b - c` Mate chain removes both constraints; the group converges deterministically with zero residual components, full three-component snapshots, and an unchanged proposal for the remaining free component.
-- a suppressed grounded component drops only its own constraint; the remaining grounded/free pair solves normally (four Mate residual components) and applies.
-- a subgroup whose only grounded component is suppressed is still rejected with the established grounding error.
-- unsuppressing a snapshotted component after solving makes the result stale and unapplable.
-- diagnostics report constraint order, rank `3/6`, and three remaining DOF over the active subgroup only, deterministically.
+- suppressing the middle component of an `a - b - c` Mate chain removes both numeric relationships while retaining complete three-component snapshots;
+- suppressing one grounded component drops only its touching relationship while another grounded/free pair solves normally;
+- a surviving constrained subgroup without an active grounded component is rejected under the established grounding rule;
+- changing suppression after solving makes the result stale and unapplable;
+- diagnostics use only active free components and surviving relationships;
+- repeated evaluation is deterministic.
 
-The previous rejection test in `tests/geometry/assembly_rigid_body_solver_tests.cpp` now asserts the vanishing-constraint behavior instead.
+The corresponding rigid-body solver regression asserts vanishing-relationship behavior rather than hard rejection.
 
-## Still not implemented
+## Persistence boundary
 
-- suppression cascade semantics (for example auto-suppressing constraints in the model intent layer; the numeric layer filters derived data only).
-- joints, limits, motion, subassemblies.
-- posed assembly-level STEP export (next block).
+Persistent authority remains:
+
+```text
+ComponentInstance::suppression_state
+AssemblyConstraint intent
+```
+
+Derived and unpersisted:
+
+```text
+active component subgroup
+filtered numeric relationship set
+numeric variables
+residual vectors
+Jacobians
+solve results
+snapshots
+proposals
+rank / remaining-DOF diagnostics
+```
+
+Suppression filtering never rewrites constraint state.
+
+## Hierarchy interaction
+
+Later hierarchy work adds a second suppression dimension: `SubassemblyInstance` path state.
+
+For posed leaf consumers, a suppressed subassembly occurrence removes its complete subtree.
+
+For future persistent cross-hierarchy solving, path-sensitive participation must be evaluated before repeated occurrence nodes are mapped to shared transform authority. One suppressed occurrence path must not automatically suppress another active occurrence of the same child document.
+
+That future contract is specified in `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`.
+
+## Current boundaries
+
+Still deferred:
+
+- automatic persistent suppression cascades or rewriting relationship state;
+- configuration/model-state systems that author groups of suppression changes;
+- occurrence-local internal component pose overrides.
+
+Implemented later in separate blocks:
+
+- posed assembly STEP export;
+- Revolute joint motion with selected-endpoint suppression rejection and non-selected drive filtering;
+- rigid subassembly hierarchy;
+- posed interference/clearance analysis;
+- document-scoped flexible child solving;
+- read-only cross-hierarchy target/residual semantics.
