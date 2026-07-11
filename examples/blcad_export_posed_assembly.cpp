@@ -5,6 +5,7 @@
 #include "blcad/geometry/assembly_step_exporter.hpp"
 
 #include <algorithm>
+#include <cstddef>
 #include <iostream>
 #include <string_view>
 #include <vector>
@@ -40,34 +41,33 @@ int main(int argc, char** argv) {
     return 1;
   }
 
+  std::size_t solved_component_count = 0U;
+  std::size_t applied_proposal_count = 0U;
   const auto groups = graph.value().connected_components();
   const auto group = std::find_if(groups.begin(), groups.end(), [](const auto& candidate) {
     return candidate.size() > 1U;
   });
-  if (group == groups.end()) {
-    print_error(blcad::Error::validation(
-        project.value().assembly().id().value(),
-        "posed assembly export example requires one connected multi-component solve group"));
-    return 1;
-  }
+  if (group != groups.end()) {
+    const blcad::geometry::AssemblyRigidBodySolver solver;
+    const auto solved = solver.solve(project.value(), *group);
+    if (solved.has_error()) {
+      print_error(solved.error());
+      return 1;
+    }
+    if (!solved.value().converged()) {
+      print_error(blcad::Error::geometry(project.value().assembly().id().value(),
+                                         "assembly solve did not converge before posed export"));
+      return 1;
+    }
 
-  const blcad::geometry::AssemblyRigidBodySolver solver;
-  const auto solved = solver.solve(project.value(), *group);
-  if (solved.has_error()) {
-    print_error(solved.error());
-    return 1;
-  }
-  if (!solved.value().converged()) {
-    print_error(blcad::Error::geometry(project.value().assembly().id().value(),
-                                       "assembly solve did not converge before posed export"));
-    return 1;
-  }
-
-  const blcad::geometry::AssemblySolveResultApplier applier;
-  const auto applied = applier.apply(project.value(), solved.value());
-  if (applied.has_error()) {
-    print_error(applied.error());
-    return 1;
+    const blcad::geometry::AssemblySolveResultApplier applier;
+    const auto applied = applier.apply(project.value(), solved.value());
+    if (applied.has_error()) {
+      print_error(applied.error());
+      return 1;
+    }
+    solved_component_count = group->size();
+    applied_proposal_count = applied.value();
   }
 
   const blcad::geometry::AssemblyStepExporter exporter;
@@ -77,10 +77,10 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  std::cout << "Solved " << group->size() << " component(s), applied " << applied.value()
-            << " transform proposal(s), recomputed " << written.value().recomputed_part_count
-            << " part(s), and exported " << written.value().exported_component_count
-            << " posed component(s) to " << argv[2] << " (" << written.value().written_bytes
-            << " bytes)\n";
+  std::cout << "Solved " << solved_component_count << " component(s), applied "
+            << applied_proposal_count << " transform proposal(s), recomputed "
+            << written.value().recomputed_part_count << " part(s), and exported "
+            << written.value().exported_component_count << " posed component(s) to " << argv[2]
+            << " (" << written.value().written_bytes << " bytes)\n";
   return 0;
 }

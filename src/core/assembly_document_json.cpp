@@ -106,31 +106,24 @@ constexpr int k_version = 1;
   const auto text = value.get<std::string>();
   if (text == "mate")
     return Result<AssemblyConstraintType>::success(AssemblyConstraintType::Mate);
-  if (text == "concentric") {
+  if (text == "concentric")
     return Result<AssemblyConstraintType>::success(AssemblyConstraintType::Concentric);
-  }
-  if (text == "distance") {
+  if (text == "distance")
     return Result<AssemblyConstraintType>::success(AssemblyConstraintType::Distance);
-  }
-  if (text == "insert") {
+  if (text == "insert")
     return Result<AssemblyConstraintType>::success(AssemblyConstraintType::Insert);
-  }
-  if (text == "angle") {
+  if (text == "angle")
     return Result<AssemblyConstraintType>::success(AssemblyConstraintType::Angle);
-  }
-  return Result<AssemblyConstraintType>::failure(
-      json_error("unsupported assembly constraint type"));
+  return Result<AssemblyConstraintType>::failure(json_error("unsupported assembly constraint type"));
 }
 
 [[nodiscard]] Result<AssemblyConstraintState> constraint_state_from_json(const json& value) {
   const auto text = value.get<std::string>();
   if (text == "active")
     return Result<AssemblyConstraintState>::success(AssemblyConstraintState::Active);
-  if (text == "inactive") {
+  if (text == "inactive")
     return Result<AssemblyConstraintState>::success(AssemblyConstraintState::Inactive);
-  }
-  return Result<AssemblyConstraintState>::failure(
-      json_error("unsupported assembly constraint state"));
+  return Result<AssemblyConstraintState>::failure(json_error("unsupported assembly constraint state"));
 }
 
 [[nodiscard]] json constraint_target_to_json(const AssemblyConstraintTarget& target) {
@@ -145,6 +138,19 @@ constraint_target_from_json(const json& target_json) {
       target_json.at("semantic_reference").get<std::string>());
 }
 
+[[nodiscard]] json angle_quantity_to_json(double degrees) {
+  return json{{"unit", "deg"}, {"value", degrees}};
+}
+
+[[nodiscard]] Result<Quantity> angle_quantity_from_json(const json& value,
+                                                       const std::string& object_id,
+                                                       std::string_view context) {
+  if (value.at("unit").get<std::string>() != "deg") {
+    return Result<Quantity>::failure(json_error(std::string(context) + " must use degrees"));
+  }
+  return Quantity::angle_deg(value.at("value").get<double>(), object_id);
+}
+
 [[nodiscard]] json assembly_constraint_to_json(const AssemblyConstraint& constraint) {
   json constraint_json{{"id", constraint.id().value()},
                        {"name", constraint.name()},
@@ -157,8 +163,7 @@ constraint_target_from_json(const json& target_json) {
                                        {"value", constraint.distance()->millimeters()}};
   }
   if (constraint.angle().has_value()) {
-    constraint_json["angle"] = json{{"unit", std::string(constraint.angle()->unit())},
-                                    {"value", constraint.angle()->degrees()}};
+    constraint_json["angle"] = angle_quantity_to_json(constraint.angle()->degrees());
   }
   return constraint_json;
 }
@@ -181,6 +186,7 @@ assembly_constraint_from_json(const json& constraint_json) {
   if (target_b.has_error())
     return Result<AssemblyConstraint>::failure(target_b.error());
 
+  const std::string id = constraint_json.at("id").get<std::string>();
   std::optional<Quantity> distance;
   if (constraint_json.contains("distance")) {
     const json& distance_json = constraint_json.at("distance");
@@ -188,8 +194,7 @@ assembly_constraint_from_json(const json& constraint_json) {
       return Result<AssemblyConstraint>::failure(
           json_error("assembly constraint distance must use millimeters"));
     }
-    auto quantity = Quantity::length_mm(distance_json.at("value").get<double>(),
-                                        constraint_json.at("id").get<std::string>());
+    auto quantity = Quantity::length_mm(distance_json.at("value").get<double>(), id);
     if (quantity.has_error())
       return Result<AssemblyConstraint>::failure(quantity.error());
     distance = quantity.value();
@@ -197,22 +202,79 @@ assembly_constraint_from_json(const json& constraint_json) {
 
   std::optional<Quantity> angle;
   if (constraint_json.contains("angle")) {
-    const json& angle_json = constraint_json.at("angle");
-    if (angle_json.at("unit").get<std::string>() != "deg") {
-      return Result<AssemblyConstraint>::failure(
-          json_error("assembly constraint angle must use degrees"));
-    }
-    auto quantity = Quantity::angle_deg(angle_json.at("value").get<double>(),
-                                        constraint_json.at("id").get<std::string>());
+    auto quantity = angle_quantity_from_json(constraint_json.at("angle"), id,
+                                             "assembly constraint angle");
     if (quantity.has_error())
       return Result<AssemblyConstraint>::failure(quantity.error());
     angle = quantity.value();
   }
 
-  return AssemblyConstraint::create(
-      AssemblyConstraintId(constraint_json.at("id").get<std::string>()),
-      constraint_json.at("name").get<std::string>(), type.value(), std::move(target_a.value()),
-      std::move(target_b.value()), state.value(), std::move(distance), std::move(angle));
+  return AssemblyConstraint::create(AssemblyConstraintId(id),
+                                    constraint_json.at("name").get<std::string>(), type.value(),
+                                    std::move(target_a.value()), std::move(target_b.value()),
+                                    state.value(), std::move(distance), std::move(angle));
+}
+
+[[nodiscard]] Result<AssemblyJointType> joint_type_from_json(const json& value) {
+  const auto text = value.get<std::string>();
+  if (text == "revolute")
+    return Result<AssemblyJointType>::success(AssemblyJointType::Revolute);
+  return Result<AssemblyJointType>::failure(json_error("unsupported assembly joint type"));
+}
+
+[[nodiscard]] Result<AssemblyJointState> joint_state_from_json(const json& value) {
+  const auto text = value.get<std::string>();
+  if (text == "active")
+    return Result<AssemblyJointState>::success(AssemblyJointState::Active);
+  if (text == "inactive")
+    return Result<AssemblyJointState>::success(AssemblyJointState::Inactive);
+  return Result<AssemblyJointState>::failure(json_error("unsupported assembly joint state"));
+}
+
+[[nodiscard]] json assembly_joint_to_json(const AssemblyJoint& joint) {
+  return json{{"id", joint.id().value()},
+              {"name", joint.name()},
+              {"type", std::string(to_string(joint.type()))},
+              {"target_a", constraint_target_to_json(joint.target_a())},
+              {"target_b", constraint_target_to_json(joint.target_b())},
+              {"state", std::string(to_string(joint.state()))},
+              {"limits",
+               json{{"lower", angle_quantity_to_json(joint.limits().lower_deg)},
+                    {"upper", angle_quantity_to_json(joint.limits().upper_deg)}}},
+              {"coordinate", angle_quantity_to_json(joint.coordinate_deg())}};
+}
+
+[[nodiscard]] Result<AssemblyJoint> assembly_joint_from_json(const json& joint_json) {
+  auto type = joint_type_from_json(joint_json.at("type"));
+  if (type.has_error())
+    return Result<AssemblyJoint>::failure(type.error());
+  auto state = joint_state_from_json(joint_json.at("state"));
+  if (state.has_error())
+    return Result<AssemblyJoint>::failure(state.error());
+  auto target_a = constraint_target_from_json(joint_json.at("target_a"));
+  if (target_a.has_error())
+    return Result<AssemblyJoint>::failure(target_a.error());
+  auto target_b = constraint_target_from_json(joint_json.at("target_b"));
+  if (target_b.has_error())
+    return Result<AssemblyJoint>::failure(target_b.error());
+
+  const std::string id = joint_json.at("id").get<std::string>();
+  const json& limits = joint_json.at("limits");
+  auto lower = angle_quantity_from_json(limits.at("lower"), id, "assembly joint lower limit");
+  if (lower.has_error())
+    return Result<AssemblyJoint>::failure(lower.error());
+  auto upper = angle_quantity_from_json(limits.at("upper"), id, "assembly joint upper limit");
+  if (upper.has_error())
+    return Result<AssemblyJoint>::failure(upper.error());
+  auto coordinate = angle_quantity_from_json(joint_json.at("coordinate"), id,
+                                              "assembly joint coordinate");
+  if (coordinate.has_error())
+    return Result<AssemblyJoint>::failure(coordinate.error());
+
+  return AssemblyJoint::create(AssemblyJointId(id), joint_json.at("name").get<std::string>(),
+                               type.value(), std::move(target_a.value()),
+                               std::move(target_b.value()), state.value(), lower.value(),
+                               upper.value(), coordinate.value());
 }
 
 [[nodiscard]] Result<Parameter> assembly_parameter_from_json(const json& parameter_json) {
@@ -230,20 +292,17 @@ assembly_constraint_from_json(const json& constraint_json) {
       return Result<Parameter>::failure(json_error("count parameters must use unit \"1\""));
     }
     auto quantity = Quantity::count(parameter_json.at("value").get<double>(), id);
-    if (quantity.has_error()) {
+    if (quantity.has_error())
       return Result<Parameter>::failure(quantity.error());
-    }
     return Parameter::create_count(ParameterId(id), parameter_json.at("name").get<std::string>(),
                                    quantity.value(), ParameterScope::Assembly);
   }
   if (parameter_json.at("unit").get<std::string>() != "mm") {
-    return Result<Parameter>::failure(
-        json_error("only millimeter length parameters are supported"));
+    return Result<Parameter>::failure(json_error("only millimeter length parameters are supported"));
   }
   auto quantity = Quantity::length_mm(parameter_json.at("value").get<double>(), id);
-  if (quantity.has_error()) {
+  if (quantity.has_error())
     return Result<Parameter>::failure(quantity.error());
-  }
   return Parameter::create_length(ParameterId(id), parameter_json.at("name").get<std::string>(),
                                   quantity.value(), ParameterScope::Assembly);
 }
@@ -284,6 +343,10 @@ Result<std::string> serialize_assembly_document_to_json(const AssemblyDocument& 
   for (const auto& constraint : document.constraints()) {
     root["assembly_constraints"].push_back(assembly_constraint_to_json(constraint));
   }
+  root["assembly_joints"] = json::array();
+  for (const auto& joint : document.joints()) {
+    root["assembly_joints"].push_back(assembly_joint_to_json(joint));
+  }
   return Result<std::string>::success(root.dump(2));
 }
 
@@ -307,26 +370,22 @@ Result<AssemblyDocument> deserialize_assembly_document_from_json(std::string_vie
     auto document =
         AssemblyDocument::create(DocumentId(root.at("document").at("id").get<std::string>()),
                                  root.at("document").at("name").get<std::string>());
-    if (document.has_error()) {
+    if (document.has_error())
       return document;
-    }
 
     for (const auto& parameter_json : root.value("parameters", json::array())) {
       auto parameter = assembly_parameter_from_json(parameter_json);
-      if (parameter.has_error()) {
+      if (parameter.has_error())
         return Result<AssemblyDocument>::failure(parameter.error());
-      }
       auto added = document.value().add_parameter(std::move(parameter.value()));
-      if (added.has_error()) {
+      if (added.has_error())
         return Result<AssemblyDocument>::failure(added.error());
-      }
     }
 
     for (const auto& part_json : root.value("member_parts", json::array())) {
       auto added = document.value().add_member_part(DocumentId(part_json.get<std::string>()));
-      if (added.has_error()) {
+      if (added.has_error())
         return Result<AssemblyDocument>::failure(added.error());
-      }
     }
 
     for (const auto& binding_json : root.value("parameter_bindings", json::array())) {
@@ -335,35 +394,38 @@ Result<AssemblyDocument> deserialize_assembly_document_from_json(std::string_vie
           DocumentId(binding_json.at("part_document").get<std::string>()),
           ParameterId(binding_json.at("part_parameter").get<std::string>()),
           ParameterId(binding_json.at("assembly_parameter").get<std::string>()));
-      if (binding.has_error()) {
+      if (binding.has_error())
         return Result<AssemblyDocument>::failure(binding.error());
-      }
       auto added = document.value().add_binding(std::move(binding.value()));
-      if (added.has_error()) {
+      if (added.has_error())
         return Result<AssemblyDocument>::failure(added.error());
-      }
     }
 
     for (const auto& instance_json : root.value("component_instances", json::array())) {
       auto instance = component_instance_from_json(instance_json);
-      if (instance.has_error()) {
+      if (instance.has_error())
         return Result<AssemblyDocument>::failure(instance.error());
-      }
       auto added = document.value().add_component_instance(std::move(instance.value()));
-      if (added.has_error()) {
+      if (added.has_error())
         return Result<AssemblyDocument>::failure(added.error());
-      }
     }
 
     for (const auto& constraint_json : root.value("assembly_constraints", json::array())) {
       auto constraint = assembly_constraint_from_json(constraint_json);
-      if (constraint.has_error()) {
+      if (constraint.has_error())
         return Result<AssemblyDocument>::failure(constraint.error());
-      }
       auto added = document.value().add_constraint(std::move(constraint.value()));
-      if (added.has_error()) {
+      if (added.has_error())
         return Result<AssemblyDocument>::failure(added.error());
-      }
+    }
+
+    for (const auto& joint_json : root.value("assembly_joints", json::array())) {
+      auto joint = assembly_joint_from_json(joint_json);
+      if (joint.has_error())
+        return Result<AssemblyDocument>::failure(joint.error());
+      auto added = document.value().add_joint(std::move(joint.value()));
+      if (added.has_error())
+        return Result<AssemblyDocument>::failure(added.error());
     }
 
     return document;

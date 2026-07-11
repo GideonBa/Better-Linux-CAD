@@ -1,0 +1,172 @@
+{
+  "schema": "blcad.project.mvp4",
+  "version": 1,
+  "project": {
+    "id": "project.revolute_joint",
+    "name": "RevoluteJointProject"
+  },
+  "assembly": {
+    "schema": "blcad.assembly_document.mvp4",
+    "version": 1,
+    "document": {
+      "id": "assembly.revolute_joint",
+      "name": "RevoluteJointAssembly"
+    },
+    "parameters": [],
+    "member_parts": [
+      "part.revolute_plate"
+    ],
+    "parameter_bindings": [],
+    "component_instances": [
+      {
+        "id": "component.plate.grounded",
+        "name": "Grounded Plate",
+        "referenced_part_document": "part.revolute_plate",
+        "visibility": "visible",
+        "suppression_state": "active",
+        "grounding_state": "grounded",
+        "transform": {
+          "translation_mm": {"x": 0.0, "y": 0.0, "z": 0.0},
+          "rotation_deg": {"x": 0.0, "y": 0.0, "z": 0.0}
+        }
+      },
+      {
+        "id": "component.plate.free",
+        "name": "Free Plate",
+        "referenced_part_document": "part.revolute_plate",
+        "visibility": "visible",
+        "suppression_state": "active",
+        "grounding_state": "free",
+        "transform": {
+          "translation_mm": {"x": 0.0, "y": 0.0, "z": 0.0},
+          "rotation_deg": {"x": 0.0, "y": 0.0, "z": 0.0}
+        }
+      }
+    ],
+    "assembly_constraints": [],
+    "assembly_joints": [
+      {
+        "id": "joint.revolute",
+        "name": "Plate Revolute Joint",
+        "type": "revolute",
+        "target_a": {
+          "component_instance": "component.plate.grounded",
+          "semantic_reference": "feature.hole.seat"
+        },
+        "target_b": {
+          "component_instance": "component.plate.free",
+          "semantic_reference": "feature.hole.seat"
+        },
+        "state": "active",
+        "limits": {
+          "lower": {"unit": "deg", "value": -90.0},
+          "upper": {"unit": "deg", "value": 90.0}
+        },
+        "coordinate": {"unit": "deg", "value": 0.0}
+      }
+    ]
+  },
+  "parts": [
+    {
+      "schema": "blcad.part_document.mvp1",
+      "version": 1,
+      "document": {
+        "id": "part.revolute_plate",
+        "name": "RevolutePlate"
+      },
+      "parameters": [
+        {
+          "id": "part.width",
+          "name": "width",
+          "type": "length",
+          "scope": "part",
+          "unit": "mm",
+          "value": 10.0
+        },
+        {
+          "id": "part.height",
+          "name": "height",
+          "type": "length",
+          "scope": "part",
+          "unit": "mm",
+          "value": 20.0
+        },
+        {
+          "id": "part.thickness",
+          "name": "thickness",
+          "type": "length",
+          "scope": "part",
+          "unit": "mm",
+          "value": 2.0
+        },
+        {
+          "id": "part.hole_diameter",
+          "name": "hole_diameter",
+          "type": "length",
+          "scope": "part",
+          "unit": "mm",
+          "value": 4.0
+        }
+      ],
+      "datum_planes": [
+        {
+          "id": "datum.xy",
+          "name": "XY",
+          "kind": "xy",
+          "origin": {"x": 0.0, "y": 0.0, "z": 0.0},
+          "x_axis": {"x": 1.0, "y": 0.0, "z": 0.0},
+          "y_axis": {"x": 0.0, "y": 1.0, "z": 0.0},
+          "normal": {"x": 0.0, "y": 0.0, "z": 1.0}
+        }
+      ],
+      "sketches": [
+        {
+          "id": "sketch.base",
+          "name": "BaseSketch",
+          "workplane": "datum.xy",
+          "rectangle_profiles": [
+            {
+              "id": "profile.base",
+              "center": {"x": 0.0, "y": 0.0},
+              "width_parameter": "part.width",
+              "height_parameter": "part.height"
+            }
+          ],
+          "circle_profiles": []
+        },
+        {
+          "id": "sketch.hole",
+          "name": "HoleSketch",
+          "workplane": "datum.xy",
+          "rectangle_profiles": [],
+          "circle_profiles": [
+            {
+              "id": "profile.hole",
+              "center": {"x": 0.0, "y": 0.0},
+              "diameter_parameter": "part.hole_diameter"
+            }
+          ]
+        }
+      ],
+      "features": [
+        {
+          "id": "feature.base_extrude",
+          "name": "BaseExtrude",
+          "type": "additive_extrude",
+          "input_sketch": "sketch.base",
+          "direction": "+Z",
+          "length_parameter": "part.thickness"
+        },
+        {
+          "id": "feature.hole",
+          "name": "HoleCut",
+          "type": "subtractive_extrude",
+          "input_sketch": "sketch.hole",
+          "direction": "+Z",
+          "target_feature": "feature.base_extrude",
+          "depth": "through_all"
+        }
+      ]
+    }
+  ]
+}
