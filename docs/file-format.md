@@ -1,19 +1,20 @@
 # Project and Save File Format
 
-Status: implemented seeds exist for single-part `.blcad.json`, assembly parameters, embedded project JSON, part component occurrences, rigid child assembly occurrences, Mate/Concentric/Distance/Insert/Angle geometric intent, persistent Revolute joint/limit/coordinate intent, semantic generated face/axis/seat targets, rigid hierarchy traversal, nested posed export, and the derived solve/motion pipeline.
+Status: implemented save-format seeds exist for single-part `.blcad.json`, assembly parameters, embedded project JSON, part component occurrences, rigid child assembly occurrences, local Mate/Concentric/Distance/Insert/Angle intent, project-level cross-hierarchy Mate/Concentric/Distance/Insert/Angle intent, persistent Revolute joint/limit/coordinate intent, semantic generated face/axis/seat targets, and current authored transform/state records.
 
-The save format stores parametric model intent. OCCT shapes, hierarchy traversal state, flattened leaves, resolved target geometry, residual descriptors, transient motion drives, numeric Jacobians, solver products, and diagnostics are regenerable derived data and are not the source of truth.
+The save format stores parametric model intent. OCCT shapes, hierarchy traversal state, flattened leaves, resolved target geometry, residual descriptors, numeric Jacobians, solver products, and diagnostics are derived and are not the source of truth.
 
 ## Project structure
 
-The current project container has one explicit root assembly, optional project-owned child assemblies, and owned parts:
+The current project container has one explicit root assembly, optional project-owned child assemblies, project-owned cross-hierarchy geometric constraints, and owned parts:
 
 ```text
 Project
   id
   name
-  assembly       # explicit root AssemblyDocument
-  assemblies[]   # project-owned child AssemblyDocument records
+  assembly                         # explicit root AssemblyDocument
+  assemblies[]                     # project-owned child AssemblyDocument records
+  cross_hierarchy_constraints[]    # project-level geometric relationship intent
   parts[]
 ```
 
@@ -26,7 +27,17 @@ version 1
 
 The marker remains while MVP-5 fields extend the container additively.
 
-The root keeps the existing `assembly` field. Child assembly documents use the optional additive `assemblies` collection. Files without `assemblies` remain loadable and produce an empty child assembly collection.
+The root keeps the `assembly` field. Child assembly documents use optional additive `assemblies`. Project-level cross-hierarchy geometric relationships use optional additive `cross_hierarchy_constraints`.
+
+Backward compatibility:
+
+```text
+missing assemblies
+  -> empty child assembly collection
+
+missing cross_hierarchy_constraints
+  -> empty project cross-hierarchy constraint collection
+```
 
 Assembly document ids are unique across the explicit root and child assembly collection.
 
@@ -52,6 +63,8 @@ version 1
 
 `component_instances`, `subassembly_instances`, `assembly_constraints`, and `assembly_joints` are additive optional collections. Older records without them load as empty collections.
 
+Project-level `cross_hierarchy_constraints` do not belong inside one `AssemblyDocument`; endpoints may address different rooted assembly occurrences.
+
 ## Component instance JSON
 
 Representative part component occurrence:
@@ -75,18 +88,18 @@ Persistence rules:
 
 - component occurrences reference part ids instead of duplicating parts;
 - transform components must be finite;
-- `translation_mm` is stored in millimeters;
-- `rotation_deg` is stored in degrees;
+- `translation_mm` is millimeters;
+- `rotation_deg` is degrees;
 - transform evaluation uses active right-handed fixed-axis X-then-Y-then-Z rotation;
 - grounding, suppression, visibility, and placement are persistent model intent;
 - no matrix, quaternion, evaluated target, or posed shape is serialized;
 - storage-level direct transform edits remain legal while grounded.
 
-Changing the interpretation of `rotation_deg` would be a format-semantic compatibility change even if the JSON shape stayed identical.
+Changing the interpretation of `rotation_deg` is a format-semantic compatibility change even if the JSON shape remains identical.
 
 ## Rigid subassembly instance JSON
 
-Rigid child assembly occurrences are stored separately in `subassembly_instances[]`.
+Rigid child assembly occurrences are stored in `subassembly_instances[]` of the containing assembly document.
 
 Representative record:
 
@@ -106,18 +119,16 @@ Representative record:
 
 Persistence rules:
 
-- `id` is a stable `SubassemblyInstanceId`;
+- `id` is a stable local `SubassemblyInstanceId`;
 - `referenced_assembly_document` identifies a project-owned child `AssemblyDocument`;
 - the project root assembly is not a valid child reference;
 - direct self-reference is invalid;
-- indirect child assembly cycles are invalid;
+- indirect assembly cycles are invalid;
 - occurrence ids are unique within one containing assembly document;
 - visibility and suppression are persistent subtree state;
-- the occurrence transform is persistent rigid placement intent;
-- there is no grounding field and no flexible subassembly solver coordinate in the current seed;
-- adding/loading an occurrence never moves child components.
-
-Files without `subassembly_instances` load with no child occurrences.
+- the occurrence transform is persistent rigid boundary placement intent;
+- there is no grounding field and no whole-subassembly solver coordinate in the current seed;
+- adding or loading an occurrence never moves child components.
 
 ## Assembly hierarchy format semantics
 
@@ -132,24 +143,28 @@ SubassemblyInstance -> referenced child assembly id
 SubassemblyInstance visibility/suppression/transform
 ```
 
-The following are not serialized:
+The following are derived and not serialized:
 
 ```text
 parent assembly links
 DFS active/completed sets
 hierarchy traversal order
-occurrence paths
+rooted occurrence descriptors
 parent transform chains
 composed transforms
 flattened leaf descriptors
 posed leaf geometry
 ```
 
-`Project::validate_assembly_hierarchy` regenerates the assembly document reference graph and rejects direct or indirect cycles.
+An occurrence path stored inside a cross-hierarchy relationship endpoint is different: it is persistent endpoint identity, not a persisted traversal descriptor cache.
 
-`AssemblyHierarchyTraversal` regenerates the rooted occurrence tree in deterministic root-first pre-order. Child occurrences are ordered lexicographically by `SubassemblyInstanceId`. Repeated occurrences of one child assembly document remain distinct traversal occurrences.
+Example persistent endpoint path:
 
-`AssemblyLeafOccurrenceResolver` regenerates visible-active part leaves. Its identity includes containing assembly id, subassembly occurrence path, and component id. No derived leaf identity is written back into JSON.
+```text
+[subassembly.outer, subassembly.inner]
+```
+
+The path says which exact authored child-occurrence chain the endpoint addresses. Derived hierarchy traversal still regenerates all occurrence descriptors and parent transform chains.
 
 ## Hierarchical transform semantics
 
@@ -162,13 +177,13 @@ rotation: active right-handed fixed-axis
 order: X -> Y -> Z -> translation
 ```
 
-For component transform `Tc`, inner child occurrence transform `Ti`, and outer occurrence transform `To`, evaluation order is:
+For component transform `Tc`, inner child occurrence transform `Ti`, and outer occurrence transform `To`, point evaluation order is:
 
 ```text
 To(Ti(Tc(p)))
 ```
 
-The derived transform chain is:
+The derived inner-to-outer chain is:
 
 ```text
 [Tc, Ti, To]
@@ -176,11 +191,11 @@ The derived transform chain is:
 
 This chain is not serialized. BLCAD does not collapse arbitrary hierarchy rotations and persist a recomputed Euler triple.
 
-## Geometric assembly constraint JSON
+## Local geometric assembly constraint JSON
 
-`assembly_constraints[]` stores geometric relationship intent.
+`assembly_constraints[]` inside one `AssemblyDocument` stores local geometric relationship intent.
 
-Current type spellings:
+Type spellings:
 
 ```text
 mate
@@ -192,7 +207,7 @@ angle
 
 Every record stores id, name, type, target A, target B, and `active|inactive` state.
 
-Target shape:
+Local target shape:
 
 ```json
 {
@@ -201,7 +216,74 @@ Target shape:
 }
 ```
 
-Distance adds:
+Local constraints target component instances in their containing `AssemblyDocument` only.
+
+Target A/B order is persistent.
+
+## Project-level cross-hierarchy geometric constraint JSON
+
+`cross_hierarchy_constraints[]` is an additive Project-level collection.
+
+The exact endpoint shape is:
+
+```json
+{
+  "occurrence_path": ["subassembly.outer", "subassembly.inner"],
+  "component_instance": "component.shaft",
+  "semantic_reference": "feature.bore.axis"
+}
+```
+
+The explicit root occurrence uses an empty path:
+
+```json
+{
+  "occurrence_path": [],
+  "component_instance": "component.root_bore",
+  "semantic_reference": "feature.bore.axis"
+}
+```
+
+Representative relationship:
+
+```json
+{
+  "id": "constraint.cross.main",
+  "name": "Root to nested shaft",
+  "type": "concentric",
+  "target_a": {
+    "occurrence_path": [],
+    "component_instance": "component.root_bore",
+    "semantic_reference": "feature.bore.axis"
+  },
+  "target_b": {
+    "occurrence_path": ["subassembly.gearbox"],
+    "component_instance": "component.shaft",
+    "semantic_reference": "feature.bore.axis"
+  },
+  "state": "active"
+}
+```
+
+Persistent cross-hierarchy rules:
+
+- relationship ids are unique within the Project-level cross-hierarchy collection;
+- local `AssemblyConstraintId` values remain scoped by containing assembly document and may use the same text as a Project-level cross-hierarchy id;
+- `occurrence_path` is an ordered root-to-current `SubassemblyInstanceId` sequence;
+- path element order is identity and is preserved exactly;
+- `[]` addresses the explicit root assembly occurrence;
+- `component_instance` is local to the assembly document reached by the exact path;
+- semantic target text is stored as opaque identity;
+- target A/B order is preserved exactly;
+- adding/loading a relationship never mutates component or subassembly transforms.
+
+Core project structure validation first validates the ordinary assembly hierarchy, then follows each endpoint path exactly from the root through authored `SubassemblyInstance` links and requires the addressed local component to exist in the reached assembly document.
+
+Loading does not resolve semantic feature geometry and does not call OCCT.
+
+## Distance quantity JSON
+
+Local and Project-level cross-hierarchy Distance constraints use:
 
 ```json
 "distance": {
@@ -210,9 +292,11 @@ Distance adds:
 }
 ```
 
-Distance must be a positive length quantity.
+Distance is a positive finite length quantity and must use `mm`.
 
-Angle adds:
+## Angle quantity JSON
+
+Local and Project-level cross-hierarchy Angle constraints use:
 
 ```json
 "angle": {
@@ -221,23 +305,25 @@ Angle adds:
 }
 ```
 
-Angle must be a finite degree quantity.
+Angle is a finite degree quantity and must use `deg`.
 
-Constraint rules:
+## Geometric relationship value-family rules
 
-- semantic target strings, not OCCT topology ids, are persistent;
-- target A/B order is preserved;
-- Mate, Concentric, and Insert omit `distance` and `angle`;
-- Distance requires `distance` and excludes `angle`;
-- Angle requires `angle` and excludes `distance`;
-- adding/loading a constraint does not mutate transforms;
-- constraints currently target local component instances in the containing `AssemblyDocument` only.
+For both local and Project-level cross-hierarchy geometric relationship records:
 
-Cross-hierarchy geometric constraint targets are not part of the current format semantics.
+```text
+Mate        -> omit distance and angle
+Concentric  -> omit distance and angle
+Insert      -> omit distance and angle
+Distance    -> require distance, omit angle
+Angle       -> require angle, omit distance
+```
+
+The Core typed relationship constructors remain authoritative after JSON parsing.
 
 ## Revolute joint JSON
 
-Joint intent is separate from geometric constraint intent and uses `assembly_joints[]`.
+Joint intent is separate from geometric constraint intent and uses local `assembly_joints[]`.
 
 The first supported type spelling is:
 
@@ -276,17 +362,13 @@ Persistent Revolute rules:
 lower <= coordinate <= upper
 ```
 
-All limit and coordinate quantities use `deg`.
+The coordinate is persistent authored motion state. Loading or adding a joint does not move component transforms. The current motion API rejects requested coordinates outside persistent limits instead of clamping them.
 
-The coordinate is persistent explicit authored motion state. Loading or adding a joint does not move component transforms. The current motion API rejects requested coordinates outside persistent limits instead of clamping them.
-
-Joints currently target local component instances in the containing `AssemblyDocument` only. Cross-hierarchy joint targets are deferred.
-
-Files without `assembly_joints` load with an empty joint collection.
+Joints currently target local component instances in the containing assembly document only. Cross-hierarchy joint targets are deferred.
 
 ## Semantic target strings
 
-The record/JSON layer treats semantic target strings as opaque identity tokens. Geometry consumers interpret only supported families:
+The record/JSON layer treats semantic target strings as opaque identity tokens. Geometry consumers currently interpret supported families:
 
 ```text
 feature.<feature-id>.top|bottom|right|left|front|back
@@ -314,16 +396,9 @@ Changing the semantic meaning of an established token family is a format compati
 
 ## Numeric relationships remain derived
 
-The current private numeric relationship set contains:
+The current local private numeric relationship set contains local geometric constraint ids plus optional transient Revolute drives. It is collected for one solve/motion query and is not serialized.
 
-```text
-constraint_ids[]
-revolute_drives[]
-```
-
-It is collected for one solve/motion query and is not serialized.
-
-Current geometric flattening:
+Current geometric flattening remains derived:
 
 ```text
 Mate:
@@ -359,25 +434,11 @@ Angle:
   angle_alignment
 ```
 
-One transient Revolute drive flattens as:
-
-```text
-direction_alignment.x
-direction_alignment.y
-direction_alignment.z
-axis_offset_mm.x / length_residual_scale_mm
-axis_offset_mm.y / length_residual_scale_mm
-axis_offset_mm.z / length_residual_scale_mm
-signed_seating_separation_mm / length_residual_scale_mm
-twist_alignment_sine
-twist_alignment_cosine
-```
-
-The selected joint receives the requested coordinate. Other active Revolute joints in the same active combined relationship group receive their persisted coordinates. These drive values are query-time derived data.
+Cross-hierarchy relationship-to-transform-authority incidence and future solve groups remain derived and are not serialized.
 
 ## Derived assembly data is not persisted
 
-Implemented derivation layers include:
+Implemented or planned derivation layers include:
 
 ```text
 AssemblyConstraintGraph
@@ -388,6 +449,7 @@ AssemblyLeafOccurrenceResolver
 AssemblyConstraintTargetResolver
 AssemblyTransformEvaluator
 AssemblyHierarchyTransformEvaluator
+AssemblyHierarchyConstraintTargetResolver
 geometric constraint equation builders
 AssemblyRevoluteJointEquationBuilder
 shared numeric relationship system
@@ -396,36 +458,11 @@ AssemblyRigidBodySolver
 AssemblyJointMotionSolver
 AssemblySolveDiagnosticsAnalyzer
 AssemblyStepExporter
+future cross-hierarchy relationship-to-authority incidence
+future cross-hierarchy solve groups
 ```
 
-Derived outputs include:
-
-```text
-constraint graph nodes/edges/groups
-joint graph nodes/edges/groups
-combined motion groups
-assembly document reference graph
-cycle validation state
-hierarchy occurrence descriptors
-parent links
-occurrence paths
-parent transform chains
-flattened leaf occurrence descriptors
-local and assembly-space target geometry
-geometric and Revolute residual descriptors
-transient Revolute drive sets
-scaled numeric residual vectors
-finite-difference Jacobians
-normal equations and damping attempts
-solver iteration state
-solve and motion results
-component and driven-joint snapshots
-unapplied transform proposals
-rank and remaining-DOF summaries
-per-consumer ShapeCache values
-posed leaf shape copies
-OCCT compounds
-```
+Derived outputs include graph nodes/edges/groups, hierarchy occurrence descriptors, parent links, parent transform chains, flattened leaves, local and root-space target geometry, residual descriptors, transient drives, numeric residuals, Jacobians, normal equations, damping attempts, solver iteration state, solve/motion results, snapshots, unapplied proposals, diagnostics, per-consumer `ShapeCache` values, posed leaf shape copies, and OCCT compounds.
 
 None is serialized.
 
@@ -433,29 +470,25 @@ None is serialized.
 
 `AssemblyRigidBodySolver` and `AssemblyJointMotionSolver` change only private project copies while solving.
 
-A fresh converged `AssemblySolveResult` may explicitly change:
+A fresh converged local `AssemblySolveResult` may explicitly change:
 
 ```text
 component_instances[].transform
 ```
 
-A fresh converged `AssemblyJointMotionResult` may additionally change:
+A fresh converged `AssemblyJointMotionResult` may additionally change the selected authored joint coordinate.
 
-```text
-assembly_joints[selected].coordinate
-```
+Application paths are atomic through project copies and validate stale input snapshots before commit.
 
-Both application paths are atomic through project copies and validate stale input snapshots before commit.
+Rigid subassembly occurrence transforms and state change only through explicit occurrence edit APIs. Hierarchy traversal, nested STEP export, and cross-hierarchy relationship loading never rewrite them.
 
-Rigid subassembly occurrence transforms and state are changed only through explicit `AssemblyDocument` occurrence edit APIs. Hierarchy traversal or nested STEP export never rewrites them.
-
-A later save serializes current authored transforms and coordinates. The file does not record solver iteration history, transform provenance, or motion-result provenance.
+A later save serializes current authored transforms, coordinates, and relationship intent. The file does not record solver iteration history, transform provenance, or solve-result provenance.
 
 ## DOF diagnostics remain derived
 
-Current local rank and remaining-DOF values are not persistent.
+Current rank and remaining-DOF values are not persistent.
 
-Proven regular local results include:
+Regular local observations include:
 
 ```text
 Concentric geometric relationship: rank 4/6
@@ -464,76 +497,27 @@ Angle non-extremal seed:            rank 1/6
 Driven Revolute query:              rank 6/6 on a 9 x 6 Jacobian
 ```
 
-The driven Revolute rank is a query-time observation with an explicit target coordinate. It is not persistent authority about the joint's free motion DOF.
+Future cross-hierarchy diagnostics will use unique free active transform-authority count, not rooted geometric occurrence count, when repeated occurrences share one child-document transform authority.
 
-## Posed export data remains derived
+## Posed export and analysis data remain derived
 
-`AssemblyStepExporter` consumes `AssemblyLeafOccurrenceResolver`.
+Posed leaf descriptors, recomputed part caches, transformed shape copies, interference pairs, clearance distances, OCCT compounds, and STEP entity identity are regenerated by their consumers.
 
-The export pipeline regenerates:
+The save format stores authored placement/state and relationship intent only.
 
-```text
-visible-active flattened leaves
-unique referenced leaf part ids
-one ShapeCache per referenced part
-independent part shape copies per leaf
-full inner-to-outer transform application
-one OCCT compound
-STEP exchange entities
-```
+## Current cross-hierarchy format handoff
 
-Repeated child assembly occurrences may produce multiple leaf descriptors referencing the same part. They share the recomputed part cache but receive independent transformed shape copies.
-
-Hidden/suppressed subassembly paths and hidden/suppressed local components do not appear in the flattened leaf list.
-
-No composed matrix, posed BRep, compound, STEP entity id, or export cache is saved into project JSON.
-
-## Current serialization APIs
-
-Implemented APIs include:
-
-- `serialize_part_document_to_json` / `deserialize_part_document_from_json`;
-- `write_part_document_json_file` / `read_part_document_json_file`;
-- `serialize_assembly_document_to_json` / `deserialize_assembly_document_from_json`;
-- `serialize_project_to_json` / `deserialize_project_from_json`;
-- `write_project_json_file` / `read_project_json_file`.
-
-## Future container direction
-
-A later externalized container may evolve toward:
+Implemented:
 
 ```text
-ProjectFile
-  metadata
-  global_parameters
-  documents
-    root_assembly
-    assemblies
-    parts
-  resources
-    materials
-    standard_parts
-  optional out-of-band caches
+Core AssemblyHierarchyConstraintEndpoint
+Project-owned AssemblyHierarchyConstraint
+cross_hierarchy_constraints[] project JSON
+exact endpoint path and target-order roundtrip
+mm/deg value-family roundtrip
+backward-compatible absent-field loading
+exact authored occurrence-path structure validation
+reached local component validation
 ```
 
-The current format remains an embedded JSON project container. Manifest/external part/assembly references are deferred.
-
-## Rules
-
-- model intent is the source of truth;
-- one explicit root assembly remains identifiable;
-- child assemblies are project-owned documents referenced by stable rigid occurrence records;
-- raw OCCT topology ids are never persistent model references;
-- target A/B order is preserved;
-- transform interpretation is stable format semantics;
-- hierarchy cycles are invalid project structure;
-- parent links, traversal order, occurrence paths, and flattened leaves remain derived;
-- composed hierarchy transforms remain derived;
-- resolved target geometry and residuals remain derived;
-- numeric Jacobians and solver iteration products remain derived;
-- solve/motion results and snapshots remain derived;
-- local rank and DOF diagnostics remain derived;
-- per-consumer shape caches and posed geometry remain derived;
-- only explicit application/edit boundaries change persistent transforms, joint coordinate, or rigid occurrence state.
-
-The next assembly block adds read-only posed interference analysis over deterministic flattened leaf occurrence pairs. Interference candidates, posed leaf shapes, OCCT common geometry, volume properties, and interference records remain derived and must not become save-file authority.
+Next derived work is Block 25 in `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`: deterministic active relationship-to-`ComponentTransformAuthority` incidence and connected cross-hierarchy solve groups.
