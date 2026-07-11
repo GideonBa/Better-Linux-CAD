@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <optional>
 #include <string>
+#include <utility>
 #include <variant>
 
 using namespace blcad;
@@ -300,8 +301,10 @@ TEST_CASE("Assembly constraint equation construction is deterministic and leaves
   const RigidTransform transform_b_before =
       project.assembly().find_component_instance(ComponentInstanceId("component.b"))->transform();
   const std::size_t constraint_count_before = project.assembly().constraint_count();
-  const std::string target_a_before = project.assembly().constraints().front().target_a().semantic_reference();
-  const std::string target_b_before = project.assembly().constraints().front().target_b().semantic_reference();
+  const std::string target_a_before =
+      project.assembly().constraints().front().target_a().semantic_reference();
+  const std::string target_b_before =
+      project.assembly().constraints().front().target_b().semantic_reference();
   const std::size_t workplane_count_before =
       project.find_part_document(DocumentId("part.face_plate"))->derived_workplane_count();
 
@@ -312,13 +315,17 @@ TEST_CASE("Assembly constraint equation construction is deterministic and leaves
   REQUIRE(first);
   REQUIRE(second);
   CHECK(first.value() == second.value());
-  CHECK(project.assembly().find_component_instance(ComponentInstanceId("component.a"))->transform() ==
-        transform_a_before);
-  CHECK(project.assembly().find_component_instance(ComponentInstanceId("component.b"))->transform() ==
-        transform_b_before);
+  CHECK(project.assembly()
+            .find_component_instance(ComponentInstanceId("component.a"))
+            ->transform() == transform_a_before);
+  CHECK(project.assembly()
+            .find_component_instance(ComponentInstanceId("component.b"))
+            ->transform() == transform_b_before);
   CHECK(project.assembly().constraint_count() == constraint_count_before);
-  CHECK(project.assembly().constraints().front().target_a().semantic_reference() == target_a_before);
-  CHECK(project.assembly().constraints().front().target_b().semantic_reference() == target_b_before);
+  CHECK(project.assembly().constraints().front().target_a().semantic_reference() ==
+        target_a_before);
+  CHECK(project.assembly().constraints().front().target_b().semantic_reference() ==
+        target_b_before);
   CHECK(project.find_part_document(DocumentId("part.face_plate"))->derived_workplane_count() ==
         workplane_count_before);
 }
