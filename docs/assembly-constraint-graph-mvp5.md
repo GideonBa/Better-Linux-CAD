@@ -1,18 +1,16 @@
 # Assembly Constraint Graph MVP-5
 
-Status: implemented read-only connectivity graph over persistent assembly constraint records.
+Status: implemented deterministic read-only connectivity graph over persistent assembly constraint records.
 
 ## Goal
 
-This block derives deterministic component connectivity from the solver-independent Mate, Concentric, and Distance relationship records in `AssemblyDocument`.
+This block derives component connectivity from the solver-independent Mate, Concentric, and Distance records in `AssemblyDocument`.
 
-The graph answers which component occurrences are connected by active relationship intent. It does not resolve semantic target geometry, evaluate transforms, construct constraint equations, move components, or compute remaining degrees of freedom.
-
-Downstream semantic target resolution and rigid-transform evaluation are now implemented as separate layers. Their existence does not change the graph boundary.
+The graph answers which component occurrences are connected by active relationship intent. It does not resolve semantic geometry, evaluate transforms, construct residuals, solve placement, or compute remaining degrees of freedom.
 
 ## API
 
-The implemented core API lives in `include/blcad/core/assembly_constraint_graph.hpp`:
+The core API lives in `include/blcad/core/assembly_constraint_graph.hpp`:
 
 ```text
 AssemblyConstraintGraphEdge
@@ -30,21 +28,23 @@ AssemblyConstraintGraph
   connected_components()
 ```
 
-`AssemblyConstraintGraph` is derived read-only data. It is built from an existing `AssemblyDocument`; it is not owned by the assembly and is not serialized.
+The graph is derived read-only data. It is not owned by `AssemblyDocument` and is not serialized.
 
 ## Nodes
 
-Every current `ComponentInstance` becomes one graph node, including components that participate in no active constraint.
+Every `ComponentInstance` becomes one graph node, including components with no active constraints.
 
-Node identity is the existing `ComponentInstanceId`. Nodes are stored in lexicographic id order so graph results do not depend on component insertion order.
+Node identity uses `ComponentInstanceId`.
 
-An isolated component therefore still appears as a single-node connected component.
+Nodes are stored in lexicographic id order so results do not depend on insertion order.
+
+An isolated component therefore appears as a one-node connected group.
 
 ## Edges
 
 Every active `AssemblyConstraint` becomes one distinct `AssemblyConstraintGraphEdge`.
 
-An edge stores only:
+An edge stores:
 
 ```text
 constraint   AssemblyConstraintId
@@ -52,19 +52,19 @@ component_a ComponentInstanceId
 component_b ComponentInstanceId
 ```
 
-The edge preserves the target-A and target-B component endpoints from the relationship record. Semantic reference tokens remain on the owning `AssemblyConstraint`; the graph does not copy or resolve face, edge, vertex, axis, or OCCT topology data.
+The edge preserves target-A and target-B component endpoints but does not copy semantic target geometry.
 
-Inactive constraints create no graph edge.
+Inactive constraints create no edge.
 
-Several different active constraints may connect the same pair of components. These remain distinct legal multi-edges because Mate, Concentric, and Distance intent can coexist between the same occurrences.
+Several active constraints may connect the same component pair. They remain distinct legal multi-edges because different Mate or Distance relationships may coexist between the same occurrences.
 
 Edges are ordered lexicographically by `AssemblyConstraintId`.
 
 ## Defensive graph validation
 
-`AssemblyConstraintGraph::build` checks the two component endpoints of every active edge against the source `AssemblyDocument`.
+`AssemblyConstraintGraph::build` checks both component endpoints of every active edge against the source `AssemblyDocument`.
 
-The public `AssemblyDocument::add_constraint` and JSON load paths already reject dangling component targets. The graph repeats the endpoint check deliberately so graph construction does not silently accept invalid model state if another construction path is introduced later.
+Normal constraint insertion and JSON loading already reject dangling component targets. The graph repeats the check so graph construction cannot silently accept invalid model state if another construction path appears later.
 
 ## Deterministic adjacency
 
@@ -72,14 +72,14 @@ The public `AssemblyDocument::add_constraint` and JSON load paths already reject
 adjacent_constraints(component)
 ```
 
-returns the active constraint ids incident to the requested component.
+returns active constraint ids incident to the requested component.
 
 Rules:
 
 - the component must be a graph node
 - inactive constraints never appear
-- multi-edges remain separate entries
-- returned constraint ids follow lexicographic `AssemblyConstraintId` order
+- multi-edges remain separate
+- returned ids follow lexicographic `AssemblyConstraintId` order
 - an isolated component returns an empty successful result
 - an empty or unknown component id returns a validation error
 
@@ -89,35 +89,35 @@ Rules:
 connected_components()
 ```
 
-returns independent connectivity groups over active constraint edges.
+returns independent groups over active relationship edges.
 
 Determinism guarantees:
 
 - component ids inside each group are lexicographically ordered
 - groups are ordered by their lexicographically first component id
-- inactive constraints cannot merge two groups
-- repeated active constraints between one component pair do not duplicate nodes
-- isolated component nodes produce one-element groups
+- inactive constraints cannot join groups
+- repeated active constraints do not duplicate nodes
+- isolated nodes produce one-element groups
 
-These groups are intended to become natural solve partitions later. This block does not claim that a connected group is fully constrained, solvable, or geometrically consistent.
+The graph does not claim that a connected group is fully constrained or geometrically consistent.
 
-## Relationship to downstream geometry layers
+## Downstream solver partition role
 
-The graph stores only connectivity. Downstream implemented geometry layers are:
+The implemented planar residual builder operates on individual active constraints and does not modify graph connectivity.
+
+The next rigid-body solver seed should use deterministic connected groups as natural solve partitions:
 
 ```text
-AssemblyConstraintTargetResolver
-  AssemblyConstraintTarget
-    -> ComponentLocalPlanarDescriptor + RigidTransform
-
-AssemblyTransformEvaluator
-  ComponentLocalPlanarDescriptor + RigidTransform
-    -> AssemblySpacePlanarDescriptor
+AssemblyConstraintGraph::connected_components()
+  -> one component-id group
+  -> collect active constraints whose endpoints are inside the group
+  -> build supported Mate/Distance residual descriptors
+  -> solve variable transforms for that group
 ```
 
-The graph does not duplicate either result.
+Constraint collection and residual flattening must remain deterministic, preferably by `AssemblyConstraintId`, so solver output does not depend on insertion order.
 
-A future equation builder can use graph groups to partition work while resolving and evaluating each constraint's own targets through those dedicated APIs.
+The graph itself must not absorb solver state, residual values, or transform proposals.
 
 ## Read-only boundary
 
@@ -126,57 +126,67 @@ Building or querying the graph does not modify:
 - `RigidTransform`
 - component grounding state
 - visibility or suppression state
-- assembly constraint active/inactive state
-- semantic reference tokens
-- referenced `PartDocument` model intent
+- constraint active/inactive state
+- semantic target tokens
+- referenced part model intent
 - assembly/project JSON
 
-The graph is not the part `DependencyGraph` and is not a rigid-body solve graph. It only represents current assembly relationship connectivity.
+The graph is distinct from the part `DependencyGraph` and from future nonlinear solve state.
 
 ## Headless inspection
 
-`blcad_inspect_project_components` builds the graph after normal project structure validation and prints a compact summary:
+`blcad_inspect_project_components` builds the graph after project structure validation and prints a compact summary:
 
 ```text
 Constraint graph has <nodes> node(s), <active edges> active edge(s), and <groups> connected group(s)
 graph_group[0] components=component.a,component.b
 ```
 
-The group order uses the same deterministic ordering as the core API.
+The group order uses the same deterministic API ordering.
 
 ## Persistence
 
-No JSON schema field is added for the graph.
+No JSON field is added for graph data.
 
-The graph is fully regenerable from:
+The graph is fully regenerated from:
 
 ```text
 component_instances[]
 assembly_constraints[]
 ```
 
-Persisting nodes, edges, adjacency, or connected groups would duplicate derivable data and could drift from model intent. Existing assembly and project schema markers therefore remain unchanged.
+Persisting nodes, edges, adjacency, or connected groups would duplicate derived state and could drift from relationship intent.
 
-## Test coverage
+## Downstream implemented layers
+
+The following are now implemented separately from the graph:
+
+- generated-face semantic target resolution
+- explicit rigid-transform evaluation
+- active planar Mate/Distance residual construction
+
+`AssemblyConstraintEquationBuilder` uses constraint records directly for target identity and residual semantics. It does not change graph nodes or edges.
+
+## Tests
 
 The focused core tests cover:
 
-- every component instance becoming a node
+- every component becoming a node
 - lexicographically deterministic node order
 - active constraints becoming edges
 - inactive constraints being ignored
 - edge id and endpoint preservation
 - lexicographically deterministic edge order
-- multiple constraints between one component pair remaining distinct
+- legal multi-edges
 - deterministic adjacency
 - isolated-component adjacency
 - empty and unknown adjacency queries
 - deterministic connected groups
-- isolated nodes as one-element groups
+- isolated one-node groups
 - inactive constraints not joining groups
-- graph construction and queries leaving transforms and constraint state unchanged
+- unchanged transforms and constraint state
 
-Targeted test command after a core build:
+Targeted test command:
 
 ```bash
 ./build/dev/blcad_core_tests "[core][assembly-constraint-graph]"
@@ -188,24 +198,29 @@ Complete core workflow:
 cmake --workflow --preset dev-build-test
 ```
 
-## Deferred work from the graph layer
+## Deliberate limitations
 
-The graph itself remains intentionally independent from:
+The graph remains independent from:
 
-- semantic target geometry resolution
+- semantic geometry resolution
 - rigid-transform evaluation
-- Mate, Concentric, and Distance equation construction
+- Mate/Distance residual construction
 - rigid-body solving and transform mutation
-- remaining DOF computation
-- underdefined, fully constrained, and overconstrained analysis
-- enforced grounding
-- suppression participation rules
-- richer constraints, joints, collision checks, subassemblies, and assembly export
+- remaining-DOF analysis
+- under/fully/overconstrained state analysis
+- grounding enforcement
+- suppression solver participation
+- richer constraints and joints
+- collision checks
+- subassemblies
+- assembly-level export
 
-The first two items are now implemented as separate downstream geometry layers; they are not graph responsibilities.
+The first three items are implemented as separate downstream geometry layers.
 
-## Next technical step
+## Current downstream boundary
 
-The repository-wide next assembly block is read-only planar Mate/Distance equation/residual construction.
+The repository-wide next assembly block is a first rigid-body solver seed.
 
-A future builder should consume active constraint records, resolve each supported generated-face target through `AssemblyConstraintTargetResolver`, evaluate both frames through `AssemblyTransformEvaluator`, and construct documented deterministic residual data. It must not change graph connectivity, component transforms, or project model intent.
+The solver should consume one deterministic graph connected group, define grounded/fixed and variable component participation, collect supported active Mate/Distance constraints in deterministic order, build residual descriptors, and return proposed transforms before any explicit application step.
+
+Concentric remains deferred until semantic axis targets and Concentric residuals exist.
