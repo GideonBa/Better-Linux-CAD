@@ -155,17 +155,13 @@ public:
 
   [[nodiscard]] const DatumPlaneId& id() const noexcept;
   [[nodiscard]] const std::string& name() const noexcept;
-  [[nodiscard]] const Point3& origin() const noexcept;
-  [[nodiscard]] const Vector3& x_axis() const noexcept;
-  [[nodiscard]] const Vector3& y_axis() const noexcept;
-  [[nodiscard]] const Vector3& normal() const noexcept;
+  [[nodiscard]] Point3 origin() const noexcept;
+  [[nodiscard]] Vector3 x_axis() const noexcept;
+  [[nodiscard]] Vector3 y_axis() const noexcept;
+  [[nodiscard]] Vector3 normal() const noexcept;
 
 private:
-  DatumPlane(DatumPlaneId id,
-             std::string name,
-             Point3 origin,
-             Vector3 x_axis,
-             Vector3 y_axis,
+  DatumPlane(DatumPlaneId id, std::string name, Point3 origin, Vector3 x_axis, Vector3 y_axis,
              Vector3 normal);
 
   DatumPlaneId id_;
@@ -174,6 +170,23 @@ private:
   Vector3 x_axis_;
   Vector3 y_axis_;
   Vector3 normal_;
+};
+
+class DerivedWorkplane {
+public:
+  [[nodiscard]] static Result<DerivedWorkplane>
+  create_on_feature_face(DatumPlaneId id, std::string name, SemanticFaceReference face_reference);
+
+  [[nodiscard]] const DatumPlaneId& id() const noexcept;
+  [[nodiscard]] const std::string& name() const noexcept;
+  [[nodiscard]] const SemanticFaceReference& face_reference() const noexcept;
+
+private:
+  DerivedWorkplane(DatumPlaneId id, std::string name, SemanticFaceReference face_reference);
+
+  DatumPlaneId id_;
+  std::string name_;
+  SemanticFaceReference face_reference_;
 };
 
 } // namespace blcad
