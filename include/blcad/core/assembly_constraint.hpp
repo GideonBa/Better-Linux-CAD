@@ -10,7 +10,7 @@
 
 namespace blcad {
 
-enum class AssemblyConstraintType { Mate, Concentric, Distance, Insert };
+enum class AssemblyConstraintType { Mate, Concentric, Distance, Insert, Angle };
 [[nodiscard]] std::string_view to_string(AssemblyConstraintType type) noexcept;
 
 enum class AssemblyConstraintState { Active, Inactive };
@@ -27,7 +27,8 @@ public:
   [[nodiscard]] const ComponentInstanceId& component_instance() const noexcept;
   [[nodiscard]] const std::string& semantic_reference() const noexcept;
 
-  friend bool operator==(const AssemblyConstraintTarget&, const AssemblyConstraintTarget&) = default;
+  friend bool operator==(const AssemblyConstraintTarget&,
+                         const AssemblyConstraintTarget&) = default;
 
 private:
   AssemblyConstraintTarget(ComponentInstanceId component_instance, std::string semantic_reference);
@@ -37,17 +38,16 @@ private:
 };
 
 // Solver-independent assembly relationship intent. Distance constraints carry
-// one length quantity; Mate, Concentric, and Insert intentionally carry no distance.
+// one length quantity and Angle constraints carry one angle quantity; Mate,
+// Concentric, and Insert intentionally carry no value.
 class AssemblyConstraint {
 public:
   [[nodiscard]] static Result<AssemblyConstraint>
-  create(AssemblyConstraintId id,
-         std::string name,
-         AssemblyConstraintType type,
-         AssemblyConstraintTarget target_a,
-         AssemblyConstraintTarget target_b,
+  create(AssemblyConstraintId id, std::string name, AssemblyConstraintType type,
+         AssemblyConstraintTarget target_a, AssemblyConstraintTarget target_b,
          AssemblyConstraintState state = AssemblyConstraintState::Active,
-         std::optional<Quantity> distance = std::nullopt);
+         std::optional<Quantity> distance = std::nullopt,
+         std::optional<Quantity> angle = std::nullopt);
 
   [[nodiscard]] const AssemblyConstraintId& id() const noexcept;
   [[nodiscard]] const std::string& name() const noexcept;
@@ -56,15 +56,13 @@ public:
   [[nodiscard]] const AssemblyConstraintTarget& target_b() const noexcept;
   [[nodiscard]] AssemblyConstraintState state() const noexcept;
   [[nodiscard]] const std::optional<Quantity>& distance() const noexcept;
+  [[nodiscard]] const std::optional<Quantity>& angle() const noexcept;
 
 private:
-  AssemblyConstraint(AssemblyConstraintId id,
-                     std::string name,
-                     AssemblyConstraintType type,
-                     AssemblyConstraintTarget target_a,
-                     AssemblyConstraintTarget target_b,
-                     AssemblyConstraintState state,
-                     std::optional<Quantity> distance);
+  AssemblyConstraint(AssemblyConstraintId id, std::string name, AssemblyConstraintType type,
+                     AssemblyConstraintTarget target_a, AssemblyConstraintTarget target_b,
+                     AssemblyConstraintState state, std::optional<Quantity> distance,
+                     std::optional<Quantity> angle);
 
   AssemblyConstraintId id_;
   std::string name_;
@@ -73,6 +71,7 @@ private:
   AssemblyConstraintTarget target_b_;
   AssemblyConstraintState state_;
   std::optional<Quantity> distance_;
+  std::optional<Quantity> angle_;
 };
 
 } // namespace blcad

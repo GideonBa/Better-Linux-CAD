@@ -2,6 +2,8 @@
 
 #include "blcad/geometry/assembly_constraint_target_resolver.hpp"
 
+#include <cmath>
+#include <numbers>
 #include <string>
 #include <utility>
 
@@ -25,8 +27,7 @@ namespace {
 }
 
 [[nodiscard]] Vector3 cross(const Vector3& lhs, const Vector3& rhs) noexcept {
-  return Vector3{lhs.y * rhs.z - lhs.z * rhs.y,
-                 lhs.z * rhs.x - lhs.x * rhs.z,
+  return Vector3{lhs.y * rhs.z - lhs.z * rhs.y, lhs.z * rhs.x - lhs.x * rhs.z,
                  lhs.x * rhs.y - lhs.y * rhs.x};
 }
 
@@ -58,9 +59,9 @@ AssemblyConstraintEquationBuilder::build(const Project& project,
   }
 
   if (constraint.type() == AssemblyConstraintType::Concentric) {
-    return Result<AssemblyConstraintEquationDescriptor>::failure(validation_error(
-        constraint.id().value(),
-        "concentric equation construction requires semantic axis target support"));
+    return Result<AssemblyConstraintEquationDescriptor>::failure(
+        validation_error(constraint.id().value(),
+                         "concentric equation construction requires semantic axis target support"));
   }
   if (constraint.type() == AssemblyConstraintType::Insert) {
     return Result<AssemblyConstraintEquationDescriptor>::failure(validation_error(
@@ -91,20 +92,36 @@ AssemblyConstraintEquationBuilder::build(const Project& project,
                                          signed_separation_mm}});
   }
 
+  if (constraint.type() == AssemblyConstraintType::Angle) {
+    if (!constraint.angle().has_value() || constraint.angle()->kind() != QuantityKind::AngleDeg) {
+      return Result<AssemblyConstraintEquationDescriptor>::failure(validation_error(
+          constraint.id().value(),
+          "planar Angle equation construction requires an angle value in degrees"));
+    }
+
+    const double target_angle_deg = constraint.angle()->degrees();
+    const double target_cosine = std::cos(target_angle_deg * (std::numbers::pi_v<double> / 180.0));
+    const double normal_dot = dot(plane_a.normal, plane_b.normal);
+    return Result<AssemblyConstraintEquationDescriptor>::success(
+        AssemblyConstraintEquationDescriptor{
+            constraint.id(), constraint.type(), target_a.value(), target_b.value(),
+            PlanarAngleResidualDescriptor{target_angle_deg, normal_dot,
+                                          normal_dot - target_cosine}});
+  }
+
   if (!constraint.distance().has_value() ||
       constraint.distance()->kind() != QuantityKind::LengthMm) {
-    return Result<AssemblyConstraintEquationDescriptor>::failure(validation_error(
-        constraint.id().value(),
-        "planar Distance equation construction requires a length distance value"));
+    return Result<AssemblyConstraintEquationDescriptor>::failure(
+        validation_error(constraint.id().value(),
+                         "planar Distance equation construction requires a length distance value"));
   }
 
   const double target_distance_mm = constraint.distance()->millimeters();
-  return Result<AssemblyConstraintEquationDescriptor>::success(
-      AssemblyConstraintEquationDescriptor{
-          constraint.id(), constraint.type(), target_a.value(), target_b.value(),
-          PlanarDistanceResidualDescriptor{cross(plane_a.normal, plane_b.normal),
-                                           target_distance_mm, signed_separation_mm,
-                                           signed_separation_mm - target_distance_mm}});
+  return Result<AssemblyConstraintEquationDescriptor>::success(AssemblyConstraintEquationDescriptor{
+      constraint.id(), constraint.type(), target_a.value(), target_b.value(),
+      PlanarDistanceResidualDescriptor{cross(plane_a.normal, plane_b.normal), target_distance_mm,
+                                       signed_separation_mm,
+                                       signed_separation_mm - target_distance_mm}});
 }
 
 } // namespace blcad::geometry

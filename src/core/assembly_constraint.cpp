@@ -6,18 +6,26 @@ namespace blcad {
 
 std::string_view to_string(AssemblyConstraintType type) noexcept {
   switch (type) {
-  case AssemblyConstraintType::Mate: return "mate";
-  case AssemblyConstraintType::Concentric: return "concentric";
-  case AssemblyConstraintType::Distance: return "distance";
-  case AssemblyConstraintType::Insert: return "insert";
+  case AssemblyConstraintType::Mate:
+    return "mate";
+  case AssemblyConstraintType::Concentric:
+    return "concentric";
+  case AssemblyConstraintType::Distance:
+    return "distance";
+  case AssemblyConstraintType::Insert:
+    return "insert";
+  case AssemblyConstraintType::Angle:
+    return "angle";
   }
   return "mate";
 }
 
 std::string_view to_string(AssemblyConstraintState state) noexcept {
   switch (state) {
-  case AssemblyConstraintState::Active: return "active";
-  case AssemblyConstraintState::Inactive: return "inactive";
+  case AssemblyConstraintState::Active:
+    return "active";
+  case AssemblyConstraintState::Inactive:
+    return "inactive";
   }
   return "active";
 }
@@ -25,9 +33,8 @@ std::string_view to_string(AssemblyConstraintState state) noexcept {
 Result<AssemblyConstraintTarget>
 AssemblyConstraintTarget::create(ComponentInstanceId component_instance,
                                  std::string semantic_reference) {
-  const auto object_id =
-      component_instance.empty() ? std::string("assembly_constraint_target")
-                                 : component_instance.value();
+  const auto object_id = component_instance.empty() ? std::string("assembly_constraint_target")
+                                                    : component_instance.value();
   if (component_instance.empty()) {
     return Result<AssemblyConstraintTarget>::failure(Error::validation(
         object_id, "assembly constraint target component instance id must not be empty"));
@@ -53,14 +60,11 @@ const std::string& AssemblyConstraintTarget::semantic_reference() const noexcept
   return semantic_reference_;
 }
 
-Result<AssemblyConstraint> AssemblyConstraint::create(
-    AssemblyConstraintId id,
-    std::string name,
-    AssemblyConstraintType type,
-    AssemblyConstraintTarget target_a,
-    AssemblyConstraintTarget target_b,
-    AssemblyConstraintState state,
-    std::optional<Quantity> distance) {
+Result<AssemblyConstraint>
+AssemblyConstraint::create(AssemblyConstraintId id, std::string name, AssemblyConstraintType type,
+                           AssemblyConstraintTarget target_a, AssemblyConstraintTarget target_b,
+                           AssemblyConstraintState state, std::optional<Quantity> distance,
+                           std::optional<Quantity> angle) {
   const auto object_id = id.empty() ? std::string("assembly_constraint") : id.value();
   if (id.empty()) {
     return Result<AssemblyConstraint>::failure(
@@ -85,33 +89,63 @@ Result<AssemblyConstraint> AssemblyConstraint::create(
         object_id, "only distance assembly constraints may store a distance value"));
   }
 
+  if (type == AssemblyConstraintType::Angle) {
+    if (!angle.has_value()) {
+      return Result<AssemblyConstraint>::failure(
+          Error::validation(object_id, "angle assembly constraint requires an angle value"));
+    }
+    if (angle->kind() != QuantityKind::AngleDeg) {
+      return Result<AssemblyConstraint>::failure(Error::validation(
+          object_id, "angle assembly constraint requires an angle value in degrees"));
+    }
+  } else if (angle.has_value()) {
+    return Result<AssemblyConstraint>::failure(
+        Error::validation(object_id, "only angle assembly constraints may store an angle value"));
+  }
+
   return Result<AssemblyConstraint>::success(
       AssemblyConstraint(std::move(id), std::move(name), type, std::move(target_a),
-                         std::move(target_b), state, std::move(distance)));
+                         std::move(target_b), state, std::move(distance), std::move(angle)));
 }
 
-AssemblyConstraint::AssemblyConstraint(AssemblyConstraintId id,
-                                       std::string name,
-                                       AssemblyConstraintType type,
-                                       AssemblyConstraintTarget target_a,
-                                       AssemblyConstraintTarget target_b,
-                                       AssemblyConstraintState state,
-                                       std::optional<Quantity> distance)
+AssemblyConstraint::AssemblyConstraint(
+    AssemblyConstraintId id, std::string name, AssemblyConstraintType type,
+    AssemblyConstraintTarget target_a, AssemblyConstraintTarget target_b,
+    AssemblyConstraintState state, std::optional<Quantity> distance, std::optional<Quantity> angle)
     : id_(std::move(id)), name_(std::move(name)), type_(type), target_a_(std::move(target_a)),
-      target_b_(std::move(target_b)), state_(state), distance_(std::move(distance)) {}
+      target_b_(std::move(target_b)), state_(state), distance_(std::move(distance)),
+      angle_(std::move(angle)) {}
 
-const AssemblyConstraintId& AssemblyConstraint::id() const noexcept { return id_; }
+const AssemblyConstraintId& AssemblyConstraint::id() const noexcept {
+  return id_;
+}
 
-const std::string& AssemblyConstraint::name() const noexcept { return name_; }
+const std::string& AssemblyConstraint::name() const noexcept {
+  return name_;
+}
 
-AssemblyConstraintType AssemblyConstraint::type() const noexcept { return type_; }
+AssemblyConstraintType AssemblyConstraint::type() const noexcept {
+  return type_;
+}
 
-const AssemblyConstraintTarget& AssemblyConstraint::target_a() const noexcept { return target_a_; }
+const AssemblyConstraintTarget& AssemblyConstraint::target_a() const noexcept {
+  return target_a_;
+}
 
-const AssemblyConstraintTarget& AssemblyConstraint::target_b() const noexcept { return target_b_; }
+const AssemblyConstraintTarget& AssemblyConstraint::target_b() const noexcept {
+  return target_b_;
+}
 
-AssemblyConstraintState AssemblyConstraint::state() const noexcept { return state_; }
+AssemblyConstraintState AssemblyConstraint::state() const noexcept {
+  return state_;
+}
 
-const std::optional<Quantity>& AssemblyConstraint::distance() const noexcept { return distance_; }
+const std::optional<Quantity>& AssemblyConstraint::distance() const noexcept {
+  return distance_;
+}
+
+const std::optional<Quantity>& AssemblyConstraint::angle() const noexcept {
+  return angle_;
+}
 
 } // namespace blcad

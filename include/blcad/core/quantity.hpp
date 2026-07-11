@@ -10,6 +10,7 @@ namespace blcad {
 enum class QuantityKind {
   LengthMm,
   Count,
+  AngleDeg,
 };
 
 class Quantity {
@@ -19,13 +20,18 @@ public:
   // A dimensionless positive integer amount, for example a hole count.
   [[nodiscard]] static Result<Quantity> count(double value,
                                               std::string_view object_id = "quantity");
+  // A signed angle in degrees, for example an assembly Angle constraint value.
+  [[nodiscard]] static Result<Quantity> angle_deg(double value_deg,
+                                                  std::string_view object_id = "quantity");
 
   [[nodiscard]] QuantityKind kind() const noexcept;
   [[nodiscard]] double millimeters() const noexcept;
   [[nodiscard]] std::size_t count_value() const noexcept;
+  [[nodiscard]] double degrees() const noexcept;
   [[nodiscard]] std::string_view unit() const noexcept;
   [[nodiscard]] bool is_positive_length() const noexcept;
   [[nodiscard]] bool is_valid_count() const noexcept;
+  [[nodiscard]] bool is_valid_angle() const noexcept;
 
 private:
   Quantity(double value, QuantityKind kind);

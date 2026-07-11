@@ -166,6 +166,7 @@ if(BLCAD_BUILD_TESTS)
 
   add_executable(
     blcad_core_tests
+    tests/core/assembly_angle_constraint_tests.cpp
     tests/core/assembly_constraint_graph_tests.cpp
     tests/core/assembly_constraint_tests.cpp
     tests/core/assembly_document_tests.cpp
@@ -228,6 +229,7 @@ if(BLCAD_BUILD_TESTS)
     add_executable(
       blcad_geometry_tests
       tests/geometry/arc_closed_profile_pipeline_tests.cpp
+      tests/geometry/assembly_angle_numeric_solver_tests.cpp
       tests/geometry/assembly_concentric_constraint_equation_builder_tests.cpp
       tests/geometry/assembly_concentric_numeric_solver_tests.cpp
       tests/geometry/assembly_constraint_equation_builder_tests.cpp

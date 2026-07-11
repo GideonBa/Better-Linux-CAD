@@ -125,6 +125,7 @@ Implemented assembly blocks:
 - `docs/assembly-concentric-numeric-solver-dof-mvp5.md`
 - `docs/assembly-insert-intent-composite-residuals-mvp5.md`
 - `docs/assembly-insert-numeric-solver-dof-mvp5.md`
+- `docs/assembly-angle-constraint-mvp5.md`
 
 Broader implemented sketch/profile documents remain listed from `docs/mvp-plan.md` and `docs/architecture-summary.md`.
 
@@ -136,6 +137,4 @@ Future roadmaps:
 
 ## Next technical step
 
-The next technical step is the first richer constraint family: a planar Angle constraint between two generated-face targets with a persistent angle value (`QuantityKind::AngleDeg`), integrated into the same shared numeric solve path in one block.
-
-The block must add the `angle` constraint intent with a required angle quantity, resolve both targets through the existing generated-face planar resolution, flatten one dimensionless `dot(nA, nB) - cos(angle_deg)` residual component in the shared lexicographic order, reuse every existing solver and diagnostics contract, and prove the regular one-free-body Angle system has rank one with five remaining DOF and full row rank. See `docs/mvp-plan.md`.
+The next technical step is suppressed-component support in solved groups: instead of the current hard rejection, suppressed components and every constraint touching them are excluded from the numeric system, snapshots keep covering them for stale-result detection, the remaining subgroup still requires one grounded non-suppressed component, and rank/DOF diagnostics are computed only over non-suppressed free components. See `docs/mvp-plan.md`.

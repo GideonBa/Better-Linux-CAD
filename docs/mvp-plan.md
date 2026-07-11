@@ -330,21 +330,45 @@ remaining_dof            = 1
 
 Mixed Concentric/Insert on one axis is also covered: rank `5`, thirteen residual components, redundancy `8`, insertion-order independent.
 
-## Next MVP: Planar Angle constraint family
+### 13. Planar Angle constraint family
 
-Goal: the first richer constraint family — an Angle constraint between two generated-face planar targets with a persistent angle value, integrated into the same shared numeric solve path in one block (the planar target and equation machinery it needs already exists).
+Canonical document: `docs/assembly-angle-constraint-mvp5.md`.
+
+Implemented in one block: `QuantityKind::AngleDeg` (`unit "deg"`), `AssemblyConstraintType::Angle` with a required angle value (JSON spelling `angle`), generated-face planar target resolution, and the dedicated dimensionless residual:
+
+```text
+angle_alignment = dot(nA, nB) - cos(target_angle_deg)
+```
+
+Angle flattens as one unscaled component in the shared lexicographic order and reuses the whole numeric/solver/application/diagnostics path unchanged.
+
+Proven regular one-free-body result:
+
+```text
+variable_count           = 6
+residual_component_count = 1
+jacobian_rank            = 1
+constrained_dof          = 1
+remaining_dof            = 5
+residual_row_redundancy  = 0
+```
+
+Known seed semantics: the cosine form is direction-symmetric, and extremal targets (`0°`, `180°`) contribute no rank at the solved state (reported as redundancy). Oriented signed angles are a later extension.
+
+## Next MVP: Suppressed components in solved groups
+
+Goal: replace the current hard rejection of suppressed components inside a connected group with the documented suppression policy, so a partially suppressed assembly still solves deterministically.
 
 Required implementation sequence:
 
-1. Add `QuantityKind::AngleDeg` with `Quantity::angle_deg` validating finite values (unit `"deg"`), plus JSON support wherever constraint values are persisted.
-2. Add `AssemblyConstraintType::Angle` with string/JSON spelling `angle`; the constraint requires an angle value and rejects length and count quantities.
-3. Resolve both targets through the existing generated-face planar resolution (`feature.<feature-id>.<face>`).
-4. Build a dedicated read-only residual: `angle_alignment = dot(nA, nB) - cos(angle_deg)` as one dimensionless scalar component.
-5. Flatten Angle as that single component in the same lexicographic constraint order used by every family.
-6. Reuse graph order, target A/B order, variable order, finite differences, damped Gauss-Newton, solve states, snapshots, stale-result checks, and explicit application unchanged.
-7. Prove the regular one-free-body Angle system: rank `1`, five remaining DOF, full row rank (no redundancy).
-8. Cover deterministic mixed-family ordering with Mate/Distance/Concentric/Insert, fixed inconsistency, non-convergence, explicit application, and read-only diagnostics.
-9. Keep all residual, Jacobian, solve, and DOF products derived and unpersisted.
+1. Exclude suppressed components from the variable and fixed sets instead of erroring on them.
+2. Exclude every constraint that touches a suppressed component from the collected constraint set.
+3. Keep suppressed components in the solve snapshots so stale-result detection still covers them.
+4. Reject application when a component's suppression state changed after solving (already snapshotted).
+5. Require at least one grounded non-suppressed component in the remaining subgroup.
+6. Classify a group whose constraints all vanish through suppression as converged with zero residual components.
+7. Keep diagnostics honest: rank/DOF are computed only over non-suppressed free components.
+8. Cover: suppressed leaf component, suppressed grounded component, fully suppressed group, unchanged determinism, stale-result rejection after unsuppressing.
 
 ## Proposed assembly implementation sequence
 
@@ -363,9 +387,10 @@ Required implementation sequence:
 13. Stable Insert intent, semantic seating targets, and read-only composite residual semantics. Implemented.
 14. Insert numeric-system, solver, and DOF integration. Implemented.
 15. Add solved-state or DOF cache records only if a later consumer requires non-regenerable data. No current requirement.
-16. Add richer constraint families (first: the planar Angle family). Next.
-17. Add joints and limits, then motion through the solver.
-18. Add rigid subassemblies first, flexible subassemblies later, collision/interference checks, component geometry instancing, and assembly-level STEP export.
+16. Add richer constraint families. First family (planar Angle) implemented; further families follow as needed.
+17. Suppressed components in solved groups. Next.
+18. Add joints and limits, then motion through the solver.
+19. Add rigid subassemblies first, flexible subassemblies later, collision/interference checks, component geometry instancing, and assembly-level STEP export.
 
 ## Future roadmaps
 

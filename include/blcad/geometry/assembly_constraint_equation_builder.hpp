@@ -46,8 +46,23 @@ struct PlanarDistanceResidualDescriptor {
                          const PlanarDistanceResidualDescriptor&) = default;
 };
 
+// Canonical planar Angle residual:
+//   normal_dot = dot(nA, nB)
+//   angle_alignment = normal_dot - cos(target_angle_deg)
+// A satisfied Angle has angle_alignment equal to zero. The component is
+// dimensionless, so no length scaling applies during flattening.
+struct PlanarAngleResidualDescriptor {
+  double target_angle_deg = 0.0;
+  double normal_dot = 0.0;
+  double angle_alignment = 0.0;
+
+  friend bool operator==(const PlanarAngleResidualDescriptor&,
+                         const PlanarAngleResidualDescriptor&) = default;
+};
+
 using PlanarConstraintResidualDescriptor =
-    std::variant<PlanarMateResidualDescriptor, PlanarDistanceResidualDescriptor>;
+    std::variant<PlanarMateResidualDescriptor, PlanarDistanceResidualDescriptor,
+                 PlanarAngleResidualDescriptor>;
 
 struct AssemblyConstraintEquationDescriptor {
   AssemblyConstraintId constraint;

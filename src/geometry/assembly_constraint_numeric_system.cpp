@@ -115,6 +115,12 @@ Result<NumericVector> evaluate_residuals(const Project& project,
       continue;
     }
 
+    if (const auto* angle =
+            std::get_if<PlanarAngleResidualDescriptor>(&equation.value().residual)) {
+      residuals.push_back(angle->angle_alignment);
+      continue;
+    }
+
     const auto* distance =
         std::get_if<PlanarDistanceResidualDescriptor>(&equation.value().residual);
     if (distance == nullptr) {

@@ -40,8 +40,10 @@ constexpr int k_version = 1;
 
 [[nodiscard]] Result<ComponentVisibility> visibility_from_json(const json& value) {
   const auto text = value.get<std::string>();
-  if (text == "visible") return Result<ComponentVisibility>::success(ComponentVisibility::Visible);
-  if (text == "hidden") return Result<ComponentVisibility>::success(ComponentVisibility::Hidden);
+  if (text == "visible")
+    return Result<ComponentVisibility>::success(ComponentVisibility::Visible);
+  if (text == "hidden")
+    return Result<ComponentVisibility>::success(ComponentVisibility::Hidden);
   return Result<ComponentVisibility>::failure(json_error("unsupported component visibility"));
 }
 
@@ -59,11 +61,13 @@ constexpr int k_version = 1;
 
 [[nodiscard]] Result<ComponentGroundingState> grounding_state_from_json(const json& value) {
   const auto text = value.get<std::string>();
-  if (text == "free") return Result<ComponentGroundingState>::success(ComponentGroundingState::Free);
+  if (text == "free")
+    return Result<ComponentGroundingState>::success(ComponentGroundingState::Free);
   if (text == "grounded") {
     return Result<ComponentGroundingState>::success(ComponentGroundingState::Grounded);
   }
-  return Result<ComponentGroundingState>::failure(json_error("unsupported component grounding state"));
+  return Result<ComponentGroundingState>::failure(
+      json_error("unsupported component grounding state"));
 }
 
 [[nodiscard]] json component_instance_to_json(const ComponentInstance& instance) {
@@ -78,7 +82,8 @@ constexpr int k_version = 1;
 
 [[nodiscard]] Result<ComponentInstance> component_instance_from_json(const json& instance_json) {
   auto visibility = visibility_from_json(instance_json.at("visibility"));
-  if (visibility.has_error()) return Result<ComponentInstance>::failure(visibility.error());
+  if (visibility.has_error())
+    return Result<ComponentInstance>::failure(visibility.error());
 
   auto suppression_state = suppression_state_from_json(instance_json.at("suppression_state"));
   if (suppression_state.has_error()) {
@@ -86,7 +91,8 @@ constexpr int k_version = 1;
   }
 
   auto grounding_state = grounding_state_from_json(instance_json.at("grounding_state"));
-  if (grounding_state.has_error()) return Result<ComponentInstance>::failure(grounding_state.error());
+  if (grounding_state.has_error())
+    return Result<ComponentInstance>::failure(grounding_state.error());
 
   return ComponentInstance::create(
       ComponentInstanceId(instance_json.at("id").get<std::string>()),
@@ -98,7 +104,8 @@ constexpr int k_version = 1;
 
 [[nodiscard]] Result<AssemblyConstraintType> constraint_type_from_json(const json& value) {
   const auto text = value.get<std::string>();
-  if (text == "mate") return Result<AssemblyConstraintType>::success(AssemblyConstraintType::Mate);
+  if (text == "mate")
+    return Result<AssemblyConstraintType>::success(AssemblyConstraintType::Mate);
   if (text == "concentric") {
     return Result<AssemblyConstraintType>::success(AssemblyConstraintType::Concentric);
   }
@@ -108,16 +115,22 @@ constexpr int k_version = 1;
   if (text == "insert") {
     return Result<AssemblyConstraintType>::success(AssemblyConstraintType::Insert);
   }
-  return Result<AssemblyConstraintType>::failure(json_error("unsupported assembly constraint type"));
+  if (text == "angle") {
+    return Result<AssemblyConstraintType>::success(AssemblyConstraintType::Angle);
+  }
+  return Result<AssemblyConstraintType>::failure(
+      json_error("unsupported assembly constraint type"));
 }
 
 [[nodiscard]] Result<AssemblyConstraintState> constraint_state_from_json(const json& value) {
   const auto text = value.get<std::string>();
-  if (text == "active") return Result<AssemblyConstraintState>::success(AssemblyConstraintState::Active);
+  if (text == "active")
+    return Result<AssemblyConstraintState>::success(AssemblyConstraintState::Active);
   if (text == "inactive") {
     return Result<AssemblyConstraintState>::success(AssemblyConstraintState::Inactive);
   }
-  return Result<AssemblyConstraintState>::failure(json_error("unsupported assembly constraint state"));
+  return Result<AssemblyConstraintState>::failure(
+      json_error("unsupported assembly constraint state"));
 }
 
 [[nodiscard]] json constraint_target_to_json(const AssemblyConstraintTarget& target) {
@@ -141,7 +154,11 @@ constraint_target_from_json(const json& target_json) {
                        {"state", std::string(to_string(constraint.state()))}};
   if (constraint.distance().has_value()) {
     constraint_json["distance"] = json{{"unit", std::string(constraint.distance()->unit())},
-                                        {"value", constraint.distance()->millimeters()}};
+                                       {"value", constraint.distance()->millimeters()}};
+  }
+  if (constraint.angle().has_value()) {
+    constraint_json["angle"] = json{{"unit", std::string(constraint.angle()->unit())},
+                                    {"value", constraint.angle()->degrees()}};
   }
   return constraint_json;
 }
@@ -149,16 +166,20 @@ constraint_target_from_json(const json& target_json) {
 [[nodiscard]] Result<AssemblyConstraint>
 assembly_constraint_from_json(const json& constraint_json) {
   auto type = constraint_type_from_json(constraint_json.at("type"));
-  if (type.has_error()) return Result<AssemblyConstraint>::failure(type.error());
+  if (type.has_error())
+    return Result<AssemblyConstraint>::failure(type.error());
 
   auto state = constraint_state_from_json(constraint_json.at("state"));
-  if (state.has_error()) return Result<AssemblyConstraint>::failure(state.error());
+  if (state.has_error())
+    return Result<AssemblyConstraint>::failure(state.error());
 
   auto target_a = constraint_target_from_json(constraint_json.at("target_a"));
-  if (target_a.has_error()) return Result<AssemblyConstraint>::failure(target_a.error());
+  if (target_a.has_error())
+    return Result<AssemblyConstraint>::failure(target_a.error());
 
   auto target_b = constraint_target_from_json(constraint_json.at("target_b"));
-  if (target_b.has_error()) return Result<AssemblyConstraint>::failure(target_b.error());
+  if (target_b.has_error())
+    return Result<AssemblyConstraint>::failure(target_b.error());
 
   std::optional<Quantity> distance;
   if (constraint_json.contains("distance")) {
@@ -169,14 +190,29 @@ assembly_constraint_from_json(const json& constraint_json) {
     }
     auto quantity = Quantity::length_mm(distance_json.at("value").get<double>(),
                                         constraint_json.at("id").get<std::string>());
-    if (quantity.has_error()) return Result<AssemblyConstraint>::failure(quantity.error());
+    if (quantity.has_error())
+      return Result<AssemblyConstraint>::failure(quantity.error());
     distance = quantity.value();
+  }
+
+  std::optional<Quantity> angle;
+  if (constraint_json.contains("angle")) {
+    const json& angle_json = constraint_json.at("angle");
+    if (angle_json.at("unit").get<std::string>() != "deg") {
+      return Result<AssemblyConstraint>::failure(
+          json_error("assembly constraint angle must use degrees"));
+    }
+    auto quantity = Quantity::angle_deg(angle_json.at("value").get<double>(),
+                                        constraint_json.at("id").get<std::string>());
+    if (quantity.has_error())
+      return Result<AssemblyConstraint>::failure(quantity.error());
+    angle = quantity.value();
   }
 
   return AssemblyConstraint::create(
       AssemblyConstraintId(constraint_json.at("id").get<std::string>()),
       constraint_json.at("name").get<std::string>(), type.value(), std::move(target_a.value()),
-      std::move(target_b.value()), state.value(), std::move(distance));
+      std::move(target_b.value()), state.value(), std::move(distance), std::move(angle));
 }
 
 [[nodiscard]] Result<Parameter> assembly_parameter_from_json(const json& parameter_json) {
