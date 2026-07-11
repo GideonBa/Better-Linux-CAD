@@ -6,7 +6,7 @@ Detailed architecture and feature status live in `docs/`. This README is intenti
 
 ## Status
 
-Current state: MVP-1 core skeleton, staged MVP-2 seeds for sketches, workplanes, profile geometry, recompute, STEP export, reference recovery, sketch diagnostics, and repair-command infrastructure, the MVP-3 parametric bolt circle, the MVP-4 seed for assembly parameters shared across parts, and a project container that owns one assembly plus embedded member parts.
+Current state: MVP-1 core skeleton, staged MVP-2 seeds for sketches, workplanes, profile geometry, recompute, STEP export, reference recovery, sketch diagnostics, and repair-command infrastructure, the MVP-3 parametric bolt circle, the MVP-4 assembly/project container path, and the first MVP-5 component-instance seed.
 
 There is no GUI yet.
 
@@ -46,11 +46,12 @@ cmake --preset dev-geometry
 cmake --build --preset dev-geometry
 ```
 
-## Headless STEP export
+## Headless tools
 
 ```text
 blcad_export_step <input.blcad.json> <output.step>
 blcad_export_project <input.blcad.project.json> <assembly-parameter-id> <value> <output-dir>
+blcad_inspect_project_components <input.blcad.project.json>
 ```
 
 Examples:
@@ -58,6 +59,7 @@ Examples:
 ```bash
 ./build/dev-geometry/blcad_export_step examples/reference_plate.blcad.json build/reference_plate.step
 ./build/dev-geometry/blcad_export_step examples/bolt_circle_plate.blcad.json build/bolt_circle_plate.step
+./build/dev-geometry/blcad_inspect_project_components examples/component_instances.blcad.project.json
 ```
 
 ## Repository structure
@@ -65,7 +67,7 @@ Examples:
 - `include/blcad/`: public headers
 - `src/`: core and optional geometry implementation
 - `tests/`: Catch2 tests
-- `examples/`: `.blcad.json` example models and headless export examples
+- `examples/`: `.blcad.json` / `.blcad.project.json` example models and headless examples
 - `docs/`: architecture, MVP, and roadmap documents
 
 ## Key documents
@@ -84,6 +86,7 @@ Implemented feature blocks:
 - `docs/bolt-circle-pattern-mvp3.md`
 - `docs/assembly-parameters-mvp4.md`
 - `docs/project-container-mvp4.md`
+- `docs/component-instance-mvp5.md`
 - `docs/general-closed-sketch-profile-mvp.md`
 - `docs/composite-closed-profile-holes-mvp.md`
 - `docs/arc-and-trim-extend-sketch-profile-mvp.md`
@@ -116,15 +119,14 @@ Future roadmaps:
 
 ## Next technical step
 
-The next technical step should add the first MVP-5 component instance seed.
+The next technical step should add component instance placement and state update APIs.
 
-1. Add a `ComponentInstance` record owned by `AssemblyDocument` or a closely related assembly-structure model.
-2. Store stable instance id, display name, referenced project part document id, visibility, suppression state, and grounded/fixed state.
-3. Add an initial rigid transform record for free placement, but do not solve constraints yet.
-4. Validate that every component instance references an assembly member part and an owned project part.
-5. Add JSON persistence for component instances inside the assembly/project structure.
-6. Add project-level tests proving two instances can reference the same part document without duplicating part geometry.
-7. Add a minimal headless inspection/export hook that lists component instances and their referenced part documents.
-8. Keep mate/concentric/distance constraints, solver, DOF display, collision checks, subassemblies, and assembly-level STEP export deferred.
+1. Add explicit `AssemblyDocument` update functions for component instance transform, visibility, suppression state, and grounding state.
+2. Validate that the target component instance id exists and that updated state remains in the no-solver/free-placement boundary.
+3. Keep transform edits as direct free-placement edits; do not infer constraints or recompute solved positions.
+4. Preserve JSON roundtrip for updated component state and transform values.
+5. Add project-level validation tests showing updates do not duplicate part documents and keep instance references valid.
+6. Extend `blcad_inspect_project_components` output or tests so updated placement/state is observable from a project file.
+7. Keep mate/concentric/distance constraints, solver, DOF display, collision checks, subassemblies, and assembly-level STEP export deferred.
 
-The completed project-container block is documented in `docs/project-container-mvp4.md`.
+The completed component-instance block is documented in `docs/component-instance-mvp5.md`.
