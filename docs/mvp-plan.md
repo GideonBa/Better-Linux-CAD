@@ -274,7 +274,7 @@ Implemented the complete rigid hierarchy seed:
 12. Fail closed on invalid hierarchy, missing children, cycles, unresolved leaf parts, failed recomputes, missing final shapes, transform failures, and empty visible-active flattened output.
 13. Cover insertion-order-independent traversal and leaf order, repeated child occurrences, two hierarchy levels, exact path/transform-chain semantics, transform non-commutativity, hidden/suppressed subtree filtering, local component filtering, exact STEP solid/volume/bounding-box behavior, and repeated STEP geometric equivalence after re-import.
 14. Provide `examples/nested_subassembly.blcad.project.json` as a direct `blcad_export_posed_assembly` consumer.
-15. Keep flexible subassembly solve variables, grounding of whole subassembly occurrences, and geometric constraints/joints across assembly-document boundaries deferred.
+15. Keep occurrence-local flexible pose overrides, grounding of whole subassembly occurrences, and geometric constraints/joints across assembly-document boundaries deferred.
 
 ### 18. Posed assembly interference-analysis seed
 
@@ -294,6 +294,16 @@ Canonical document: `docs/assembly-interference-analysis-mvp5.md`.
 
 Implemented: `blcad_analyze_assembly <input.blcad.project.json> [clearance-threshold-mm]` loads a project, runs the combined clearance/interference analysis, prints leaf/pair/part counts plus every record in deterministic occurrence-key order, and exits non-zero with the error object id and message on failure. A test drives the analyzer against the checked-in posed assembly example (12 mm axial gap below a 15 mm threshold).
 
+### 21. Document-scoped flexible subassembly local solving
+
+Canonical document: `docs/assembly-flexible-subassembly-solving-mvp5.md`.
+
+Implemented: exact active non-root occurrence-path selection, the referenced child `AssemblyDocument` isolated as a temporary local solve root, unchanged reuse of the existing constraint graph, numeric residual/Jacobian path, `AssemblyRigidBodySolver`, and normal `AssemblySolveResultApplier`, a wrapper result carrying occurrence path and child document identity, and atomic application of direct component proposals back to the project-owned child document.
+
+The `SubassemblyInstance` boundary transform remains rigid, persistent, and untouched by the child-local solve. Repeated occurrences of one child document share one internal solved component pose while preserving independent boundary transforms. No JSON schema change or second internal-pose source is introduced.
+
+Still deferred: occurrence-local flexible pose overrides, a persistent rigid/flexible occurrence mode, whole-subassembly grounding, cross-hierarchy constraints/joints, motion propagation across assembly-document boundaries, and cross-hierarchy DOF diagnostics.
+
 ## Parameter expression seed
 
 Canonical document: `docs/parameter-expression-mvp.md`.
@@ -304,9 +314,11 @@ Also implemented: formula editing through `PartDocument::set_parameter_formula` 
 
 Still deferred: plain/expression conversion, assembly-scope/cross-part expressions, functions, and further units.
 
-## Next MVP: Continue per the assembly sequence
+## Next MVP: Cross-hierarchy relationship semantics
 
-The next numbered step is item 24 of the assembly sequence (flexible subassemblies, cross-hierarchy relationship semantics, component geometry instancing, or richer collision/contact analysis) or the deferred expression follow-ups above, whichever the next session prioritizes. Define the chosen block here before implementing it.
+Define stable occurrence-qualified endpoint identity before constraints or joints are allowed to cross `AssemblyDocument` boundaries. A cross-hierarchy endpoint must identify the rooted `SubassemblyInstanceId` path, the local `ComponentInstanceId`, and the existing semantic feature reference. Resolution must derive exact posed geometry through the current component-plus-parent transform chain without persisting composed transforms or topology ids.
+
+The first block should stabilize read-only endpoint resolution and residual semantics. Cross-boundary numeric solving, joints, occurrence-local internal pose overrides, and new persistence records remain deferred until that identity contract is proven.
 
 ## Proposed assembly implementation sequence
 
@@ -333,7 +345,10 @@ The next numbered step is item 24 of the assembly sequence (flexible subassembli
 21. First posed assembly interference-analysis seed. Implemented.
 22. Posed assembly clearance-analysis seed. Implemented.
 23. Headless assembly analysis report example. Implemented.
-24. Add flexible subassemblies, cross-hierarchy relationship semantics, component geometry instancing, and richer collision/contact analysis in later dedicated blocks.
+24. Document-scoped flexible subassembly local solving. Implemented.
+25. Define cross-hierarchy relationship endpoint identity and read-only target/residual semantics. Next.
+26. Add occurrence-local flexible poses only after cross-hierarchy identity requires independent repeated-child motion.
+27. Add component geometry instancing and richer collision/contact analysis in later dedicated blocks.
 
 ## Future roadmaps
 
@@ -341,12 +356,12 @@ The next numbered step is item 24 of the assembly sequence (flexible subassembli
 - Inventor-like sketch/feature parity: `docs/inventor-like-sketcher-and-feature-roadmap.md`
 - Advanced surfacing and 3D sketches: `docs/advanced-surfacing-and-3d-sketch-mvp.md`
 
-Later assembly work includes richer constraint and joint families, per-component/null-space DOF presentation, multi-turn and time-based motion, flexible subassemblies, cross-hierarchy relationship semantics, richer collision/contact and swept-motion analysis, component geometry instancing, and structured STEP assembly product export beyond the current geometric compound seed.
+Later assembly work includes richer constraint and joint families, per-component/null-space DOF presentation, multi-turn and time-based motion, occurrence-local flexible poses, cross-hierarchy relationship solving, richer collision/contact and swept-motion analysis, component geometry instancing, and structured STEP assembly product export beyond the current geometric compound seed.
 
 ## Persistence rule
 
-Persist model intent. Current persistent assembly intent includes component placement/state, geometric constraints, joint/limit/coordinate records, project-owned child assembly documents, and rigid subassembly occurrence placement/state.
+Persist model intent. Current persistent assembly intent includes component placement/state in root and project-owned child assembly documents, geometric constraints, joint/limit/coordinate records, project-owned child assembly documents, and rigid subassembly occurrence placement/state.
 
-Regenerate constraint/joint graph connectivity, combined motion groups, assembly hierarchy traversal, occurrence paths, parent transform chains, flattened leaf occurrence descriptors, resolved semantic geometry, residual descriptors, transient drive sets, numeric Jacobians, solve/motion results, input snapshots, rank summaries, remaining-DOF diagnostics, per-consumer shape caches, posed leaf shapes, pair candidates, future interference records, and assembly STEP compounds.
+Regenerate constraint/joint graph connectivity, combined motion groups, assembly hierarchy traversal, occurrence paths, parent transform chains, flattened leaf occurrence descriptors, flexible-subassembly occurrence selection context and child-as-root solve views, resolved semantic geometry, residual descriptors, transient drive sets, numeric Jacobians, ordinary and wrapped solve/motion results, input snapshots, rank summaries, remaining-DOF diagnostics, per-consumer shape caches, posed leaf shapes, pair candidates, future interference records, and assembly STEP compounds.
 
-Only explicit application of a fresh converged solve or motion result changes persisted component `RigidTransform` intent. A successful motion application additionally changes the selected persistent joint coordinate because that coordinate is explicit user-authored motion state. Rigid subassembly placement/state changes only through explicit occurrence edits.
+Only explicit application of a fresh converged solve or motion result changes persisted component `RigidTransform` intent. A successful flexible child solve changes component transforms in the referenced project-owned child `AssemblyDocument`; every occurrence of that shared child definition observes the new internal pose. A successful motion application additionally changes the selected persistent joint coordinate because that coordinate is explicit user-authored motion state. Rigid subassembly boundary placement/state changes only through explicit occurrence edits.
