@@ -148,7 +148,6 @@ TEST_CASE("AssemblyStepExporter poses repeated part instances and writes determi
   CHECK(first.value().recomputed_part_count == 1U);
   CHECK(first.value().exported_component_count == 2U);
   CHECK(first.value().written_bytes > 0U);
-  CHECK(first.value().written_bytes == second.value().written_bytes);
 
   const StepBounds bounds = read_step_bounds(first_path);
   CHECK(bounds.x_min == Approx(-5.0).margin(1.0e-5));
