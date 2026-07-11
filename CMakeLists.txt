@@ -30,6 +30,7 @@ add_library(
   blcad_core STATIC
   src/core/assembly_constraint.cpp
   src/core/assembly_constraint_graph.cpp
+  src/core/assembly_cross_hierarchy_constraint_graph.cpp
   src/core/assembly_document.cpp
   src/core/assembly_document_json.cpp
   src/core/assembly_hierarchy.cpp
@@ -196,6 +197,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/assembly_angle_constraint_tests.cpp
     tests/core/assembly_constraint_graph_tests.cpp
     tests/core/assembly_constraint_tests.cpp
+    tests/core/assembly_cross_hierarchy_constraint_graph_tests.cpp
     tests/core/assembly_cross_hierarchy_constraint_tests.cpp
     tests/core/assembly_document_tests.cpp
     tests/core/assembly_hierarchy_tests.cpp

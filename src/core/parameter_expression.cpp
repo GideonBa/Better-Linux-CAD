@@ -214,7 +214,7 @@ Result<ParameterExpressionEvaluation>
 ParameterExpressionEvaluator::evaluate(const PartDocument& document, std::string_view formula,
                                        ParameterType target_type,
                                        std::string_view object_id) const {
-  ExpressionParser parser{document, formula, std::string(object_id)};
+  ExpressionParser parser{document, formula, std::string(object_id), 0U, {}};
 
   auto value = parser.parse_expression();
   if (value.has_error()) {

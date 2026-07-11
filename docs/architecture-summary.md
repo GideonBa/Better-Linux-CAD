@@ -1,6 +1,6 @@
 # Architecture Summary
 
-This document summarizes implemented BLCAD architecture and the current direction. Feature-specific MVP documents remain canonical for exact contracts, formulas, failure policies, JSON spellings, and focused proofs.
+This document summarizes implemented BLCAD architecture and the current direction. Feature-specific MVP documents remain canonical for exact contracts, formulas, failure policies, JSON spellings, ordering rules, and focused proofs.
 
 ## Goal and authority model
 
@@ -27,6 +27,7 @@ Core parametric model intent
 sketch / construction / semantic-reference layers
 part feature history
 assembly relationship / motion / hierarchy intent
+Core derived connectivity/query identities
 Geometry and numeric execution
 engineering analysis consumers
 OCCT geometry kernel
@@ -37,7 +38,7 @@ A lower authority layer must not depend on a higher execution layer for persiste
 
 ## Part model
 
-Implemented part architecture includes typed quantities/parameters, unit-aware part-local parameter expressions, datum planes and derived workplanes, construction geometry, line/arc/spline/circle/rectangle/composite/detected sketch profiles, projected/reference-driven sketch geometry, semantic generated face/edge/vertex references, recovery helpers, sketch constraints/dimensions/diagnostics/repair helpers, additive and subtractive extrude intent, `CircularHolePattern`, dependency/invalidation/recompute planning, optional OCCT recompute through `ShapeCache`, STEP export, and JSON model-intent serialization.
+Implemented part architecture includes typed quantities/parameters, unit-aware part-local parameter expressions, datum planes and derived workplanes, construction geometry, line/arc/spline/circle/rectangle/composite/detected sketch profiles, projected/reference-driven sketch geometry, semantic generated references, recovery helpers, sketch constraints/dimensions/diagnostics/repair helpers, additive and subtractive extrude intent, `CircularHolePattern`, dependency/invalidation/recompute planning, optional OCCT recompute through `ShapeCache`, STEP export, and JSON model-intent serialization.
 
 OCCT shapes are computed cache products.
 
@@ -78,7 +79,7 @@ RigidTransform
 
 The direct component transform is persistent local placement authority.
 
-For identity-sensitive mutation and future cross-hierarchy solving, one component transform authority is conceptually:
+Block 25 now exposes the derived identity:
 
 ```text
 ComponentTransformAuthority =
@@ -86,9 +87,9 @@ ComponentTransformAuthority =
    local ComponentInstanceId)
 ```
 
-This is currently a derived planning identity, not a separately persisted public record.
+The identity is not a separate persisted model record. It identifies the persistent `ComponentInstance` whose direct local transform/state will be the numeric mutation authority.
 
-Repeated rooted occurrences of one child assembly may read the same child-document component transform authority.
+Repeated rooted occurrences of one child assembly may read the same child-document transform authority.
 
 ## Rigid subassembly occurrence intent
 
@@ -113,11 +114,11 @@ Adding or loading a child occurrence never changes child component transforms.
 
 ## Hierarchy validity and traversal
 
-Project structure validation rejects duplicate assembly document ids, invalid child references, root-as-child references, direct self-reference, indirect cycles, and invalid component/member relationships.
+Project structure validation rejects invalid child references, root-as-child references, direct self-reference, indirect cycles, invalid component/member relationships, invalid local relationship/joint endpoints, and invalid cross-hierarchy endpoint path/component structure.
 
-`AssemblyHierarchyTraversal` derives the rooted occurrence tree in deterministic root-first pre-order after complete project structure validation. Child occurrences are ordered lexicographically by local `SubassemblyInstanceId`.
+`AssemblyHierarchyTraversal` derives the rooted occurrence tree in deterministic root-first pre-order after complete Project structure validation. Child occurrences are ordered lexicographically by local `SubassemblyInstanceId`.
 
-One `AssemblyHierarchyOccurrenceDescriptor` carries derived context:
+One `AssemblyHierarchyOccurrenceDescriptor` carries:
 
 ```text
 assembly_document
@@ -142,7 +143,9 @@ occurrence_path = [outer, inner]
 parent_transforms_inner_to_outer = [T_inner, T_outer]
 ```
 
-Hierarchy descriptors, paths, parent links, and transform chains are derived and unpersisted.
+Hierarchy descriptors, parent links, and transform chains are derived and unpersisted.
+
+Persistent cross-hierarchy endpoint `occurrence_path` values are different: they are authored endpoint identity stored inside `AssemblyHierarchyConstraintEndpoint` and Project JSON.
 
 ## Rigid-transform semantics
 
@@ -179,11 +182,11 @@ The hierarchy is not persisted as a composed matrix or converted back into a rec
 
 A leaf descriptor stores containing assembly identity, exact subassembly occurrence path, local component identity, referenced part document, and exact inner-to-outer transform chain.
 
-Hidden or suppressed subassembly occurrences remove their descendant subtree. Hidden or suppressed local components are also absent from flattened posed leaves.
+Hidden or suppressed subassembly occurrences remove their descendant subtree. Hidden or suppressed local components are absent from flattened posed leaves.
 
 Flattened leaves are derived and unpersisted.
 
-## Local geometric relationship intent
+## Local geometric relationship intent and solving
 
 Persistent local relationship families are:
 
@@ -203,23 +206,17 @@ Local target identity is:
 
 Local constraints belong to one containing `AssemblyDocument`. Target A/B order and active/inactive state are persistent. Distance carries a length quantity and Angle carries a degree quantity.
 
-`AssemblyConstraintGraph` derives deterministic local active relationship connectivity without persisting graph caches.
+`AssemblyConstraintGraph` derives deterministic local active relationship connectivity.
 
-## Semantic target families
+`AssemblyConstraintTargetResolver` maps supported local semantic target strings to component-local geometry and direct component transform context.
 
-Implemented target strings include:
+Implemented semantic target strings include:
 
 ```text
 feature.<feature-id>.top|bottom|right|left|front|back
 feature.<feature-id>.axis
 feature.<feature-id>.seat
 ```
-
-`AssemblyConstraintTargetResolver` is the authority for mapping supported local semantic target strings to component-local geometry and direct component transform context.
-
-Raw OCCT topology ids are never persistent assembly target identity.
-
-## Local residual and numeric solve path
 
 Canonical local residual semantics are reused for Mate, Distance, Concentric, Insert, and Angle.
 
@@ -234,11 +231,9 @@ ry_deg
 rz_deg
 ```
 
-The shared numeric engine implements scaled residual flattening, central finite differences, damped Gauss-Newton normal equations, partial-pivot Gaussian elimination, deterministic damping escalation, backtracking line search, explicit solve states, complete component snapshots, and transform proposals.
+The shared numeric engine implements scaled residual flattening, central finite differences, damped Gauss-Newton normal equations, partial-pivot dense solving, deterministic damping escalation, backtracking, explicit solve states, complete component snapshots, and transform proposals.
 
 `AssemblyRigidBodySolver` supplies local geometric relationships. `AssemblyJointMotionSolver` supplies local geometric relationships plus transient Revolute drives. There is no separate motion optimizer.
-
-Ordinary local solving removes suppressed components and local constraints touching them from the active numeric subgroup while retaining complete snapshots for stale-result validation.
 
 Only explicit successful application changes persistent component solver placement or a selected authored joint coordinate.
 
@@ -266,7 +261,7 @@ Repeated occurrences of one child document share the same internal component pos
 
 Canonical document: `docs/assembly-cross-hierarchy-relationship-semantics-mvp5.md`.
 
-The implemented geometric endpoint identity is:
+The geometric endpoint identity is:
 
 ```text
 (occurrence_path,
@@ -278,103 +273,114 @@ The empty path addresses the root assembly occurrence. Non-empty paths are exact
 
 `AssemblyHierarchyConstraintTargetResolver` resolves the exact rooted occurrence, delegates local semantic feature meaning to `AssemblyConstraintTargetResolver`, and evaluates the component plus parent transform chain into root-assembly space.
 
-`AssemblyHierarchyConstraintEquationBuilder` reuses the canonical Mate, Distance, Angle, Concentric, and Insert residual descriptors.
+`AssemblyHierarchyConstraintEquationBuilder` reuses canonical Mate, Distance, Angle, Concentric, and Insert residual descriptors.
 
-The Geometry query layer is derived and unpersisted.
+Geometry query products are derived and unpersisted.
 
-## Persistent cross-hierarchy relationship intent
+## Persistent cross-hierarchy relationship intent and JSON
 
 Canonical documents:
 
 - `docs/assembly-cross-hierarchy-constraint-intent-mvp5.md`
 - `docs/assembly-cross-hierarchy-constraint-json-mvp5.md`
 
-`AssemblyHierarchyConstraintEndpoint` is Core-owned persistent endpoint identity:
-
-```text
-(occurrence_path,
- local ComponentInstanceId,
- semantic_reference)
-```
+`AssemblyHierarchyConstraintEndpoint` is Core-owned persistent endpoint identity.
 
 `AssemblyHierarchyConstraint` stores project-level Mate, Concentric, Distance, Insert, or Angle intent with exact target A/B order and active/inactive state.
 
-`Project` owns the cross-hierarchy constraint collection. Its ids are unique within that collection and are independent from local document-scoped constraint ids.
+`Project` owns the cross-hierarchy collection. Its ids are unique within that collection and independent from local document-scoped constraint ids.
 
-Project JSON now stores:
+Project JSON stores the additive field:
 
 ```text
 cross_hierarchy_constraints[]
 ```
 
-The field is additive. Files without it load with an empty collection.
+Files without the field load with an empty collection.
 
-## Cross-hierarchy structure validation
+`Project::validate_assembly_structure()` validates ordinary structure and the complete assembly hierarchy before following each cross-hierarchy endpoint path from the root and requiring its local component to exist in the reached document.
 
-`Project::validate_assembly_structure()` validates ordinary member/component/local relationship/joint structure and the complete assembly hierarchy before cross-hierarchy endpoints.
+Structure validation is Core-only and does not resolve semantic feature geometry.
 
-Each endpoint path is then followed exactly from the explicit root through authored `SubassemblyInstanceId` values. The local `ComponentInstanceId` must exist in the assembly document reached by that exact path.
+## Cross-hierarchy active incidence and solve groups
 
-Validation is Core-only. It does not resolve semantic feature geometry or call OCCT.
+Canonical document: `docs/assembly-cross-hierarchy-incidence-groups-mvp5.md`.
 
-Example semantic text can therefore roundtrip before a Geometry consumer interprets it:
+`AssemblyCrossHierarchyConstraintGraph` is the implemented Core-derived connectivity layer.
 
-```text
-semantic.no_geometry.distance.a
-```
-
-A later target resolver may reject unsupported semantic geometry. The JSON/structure layer only protects persistent identity and project structure.
-
-## Cross-hierarchy identity split
-
-Future cross-hierarchy solving preserves three distinct identities:
+Relationship identities are:
 
 ```text
-geometric endpoint
-  = (occurrence_path, local ComponentInstanceId, semantic_reference)
-
-geometric component occurrence
-  = (occurrence_path, local ComponentInstanceId)
-
-persisted transform authority
-  = (assembly_document: DocumentId, local ComponentInstanceId)
-```
-
-Two rooted occurrences may have different root-space geometry while mapping to one shared transform authority.
-
-Future numeric variables, component snapshots, proposals, and direct transform application are therefore keyed by transform authority rather than blindly by occurrence path.
-
-## Relationship-to-authority solve connectivity
-
-The next cross-hierarchy solve partitioning layer is a derived bipartite relationship-to-transform-authority incidence model.
-
-Relationship nodes:
-
-```text
-local relationship
+AssemblyLocalRelationshipIdentity
   = (assembly_document, AssemblyConstraintId)
 
-project-level cross-hierarchy relationship
+AssemblyProjectCrossHierarchyRelationshipIdentity
   = project-level AssemblyConstraintId
 ```
 
-Authority nodes:
+The public relationship identity is their `AssemblyRelationshipIdentity` variant.
+
+Local constraints are collected once per containing `AssemblyDocument`, not once per rooted occurrence.
+
+Local participation requires active relationship state and active target components.
+
+Cross-hierarchy participation additionally requires every `SubassemblyInstance` on both exact endpoint paths and both addressed components to be active.
+
+Visibility is ignored for solve participation.
+
+Every participating relationship maps to each unique `ComponentTransformAuthority` whose candidate direct local transform can affect its residual.
 
 ```text
-(assembly_document, ComponentInstanceId)
+relationship node
+      |
+      | AssemblyRelationshipAuthorityIncidence
+      v
+ComponentTransformAuthority
 ```
 
-A local relationship appears once in its containing assembly document and is evaluated once in that local assembly space.
+Incidence is unique per `(relationship, authority)` pair.
 
-A project-level cross-hierarchy relationship preserves exact occurrence-qualified endpoints and is later evaluated in root-assembly space.
+Cross-hierarchy endpoint occurrence context is retained separately in `AssemblyCrossHierarchyEndpointAuthorityMapping`:
 
-Each participating relationship is incident to every unique transform authority whose candidate direct component transform can affect its residual.
+```text
+constraint id
+TargetA | TargetB
+complete AssemblyHierarchyConstraintEndpoint
+ComponentTransformAuthority
+```
 
-Solve groups are deterministic connected components of that active incidence graph. Pure-local groups remain ordinary local solver work. Cross-hierarchy solve groups contain at least one active project-level cross-hierarchy relationship.
+Therefore:
 
-Local relationship participation uses local state and local component suppression. Cross-hierarchy relationship participation additionally checks suppression along each exact endpoint occurrence path. Visibility remains a presentation/export property.
+```text
+([left],  shaft, feature.left.axis)
+([right], shaft, feature.right.axis)
+```
 
-The complete sequence is canonical in `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`.
+may produce two endpoint mappings to:
+
+```text
+(assembly.gearbox, shaft)
+```
+
+while the relationship has one unique authority incidence.
+
+`AssemblyCrossHierarchySolveGroup` is one connected component of the bipartite active graph containing at least one project-level cross-hierarchy relationship.
+
+Pure-local components remain ordinary local solver work and are omitted from `solve_groups()`.
+
+Ordering is deterministic and insertion-order independent:
+
+```text
+relationship kind: local before cross
+local relationship: assembly id, constraint id
+cross relationship: constraint id
+authority: assembly id, component id
+incidence: relationship key, authority key
+endpoint mapping: cross constraint id, TargetA before TargetB
+solve group: first ordered relationship key, authority fallback
+```
+
+Block-25 graph products are derived and unpersisted.
 
 ## Posed geometry and analysis
 
@@ -404,14 +410,14 @@ local joint/limit/coordinate records
 project-owned AssemblyHierarchyConstraint records
 ```
 
-Cross-hierarchy relationship intent now roundtrips in project JSON through `cross_hierarchy_constraints[]`.
+Cross-hierarchy relationship intent roundtrips through `cross_hierarchy_constraints[]`.
 
-Derived and unpersisted data includes local graph connectivity, hierarchy traversal descriptors, parent transform chains, flattened leaves, target-resolution views, Geometry query target seeds, resolved semantic geometry, root-space target descriptors, residual descriptors, motion drive sets, relationship-to-authority incidence, cross-hierarchy solve groups, numeric residuals/Jacobians, solver state, solve/motion results, snapshots, proposals, diagnostics, `ShapeCache` values, posed leaf shapes, interference/clearance products, OCCT compounds, and STEP entity identity.
+Derived and unpersisted data includes local graph connectivity, hierarchy traversal descriptors, parent transform chains, flattened leaves, target-resolution views, root-space target descriptors, residual descriptors, motion drive sets, `ComponentTransformAuthority` values, relationship identities, relationship-to-authority incidence, endpoint-to-authority mappings, cross-hierarchy solve groups, numeric residuals/Jacobians, solver state, solve/motion results, snapshots, proposals, diagnostics, `ShapeCache` values, posed leaf shapes, interference/clearance products, OCCT compounds, and STEP entity identity.
 
 ## Next assembly block
 
-Block 25 is deterministic active relationship-to-`ComponentTransformAuthority` incidence and connected cross-hierarchy solve groups.
+Block 26 is shared authority-scoped numeric residual/Jacobian execution and solve-result integration for one `AssemblyCrossHierarchySolveGroup`.
 
-It must collect local constraints once per containing assembly document, retain exact occurrence-qualified cross-hierarchy endpoints, map every participating endpoint to its shared document/component transform authority, apply suppression without treating visibility as solve participation, and derive insertion-order-independent connected components.
+Use six variables per unique free active `ComponentTransformAuthority`. Evaluate local relationships once in containing-document local space and project-level cross-hierarchy relationships through exact endpoint parent chains in root space. Reuse the existing five residual families, length scaling, central finite differences, and numeric solve engine.
 
-It must not add semantic target geometry evaluation, numeric residual/Jacobian execution, solver iterations, snapshots, proposals, diagnostics, or result application.
+Block 26 returns unapplied authority-scoped proposals. Application, full freshness validation, and cross-hierarchy diagnostics remain Block 27.

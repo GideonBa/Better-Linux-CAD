@@ -1,95 +1,82 @@
-# Cross-Hierarchy Constraint Intent MVP-5
+# Cross-Hierarchy Geometric Constraint Intent MVP-5
 
-Status: implemented Block 23 of the persistent cross-hierarchy geometric constraint sequence. Block 24 JSON and structural validation are also implemented in `docs/assembly-cross-hierarchy-constraint-json-mvp5.md`.
+Status: implemented as Block 23 of `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`.
 
-This document is canonical for the Core-owned endpoint and project-level relationship intent contract.
+This document is canonical for the Core-owned occurrence-qualified endpoint value contract and persistent Project-owned cross-hierarchy geometric relationship intent.
 
-## Implemented scope
+## Scope
+
+Block 23 introduces persistent model intent only.
+
+It does not resolve hierarchy paths, semantic feature geometry, graph connectivity, numeric variables, or solve results during record creation or insertion.
+
+## Core-owned endpoint identity
+
+Persistent endpoint identity is:
 
 ```text
-frozen occurrence-qualified endpoint identity
-  -> Core-owned AssemblyHierarchyConstraintEndpoint
-  -> project-level AssemblyHierarchyConstraint relationship intent
-  -> Project-owned cross_hierarchy_constraints collection
-  -> direct bridge into the existing read-only Geometry query layer
+AssemblyHierarchyConstraintEndpoint =
+  (occurrence_path,
+   local ComponentInstanceId,
+   semantic_reference)
 ```
 
-Record creation and collection insertion are model-intent operations. They do not resolve hierarchy geometry and do not move components or subassemblies.
+The endpoint type lives in Core.
 
-## Core endpoint identity
+It is the persistence authority used by `AssemblyHierarchyConstraint` and Project JSON.
 
-`AssemblyHierarchyConstraintEndpoint` stores:
+The Geometry-layer `AssemblyHierarchyConstraintTarget` remains a derived query seed and is not save-format authority.
+
+## Root and child paths
+
+The explicit root assembly occurrence uses:
 
 ```text
-occurrence_path
-local ComponentInstanceId
-semantic_reference
+occurrence_path = []
 ```
 
-Exact identity is:
+A child or nested occurrence uses the exact root-to-current authored `SubassemblyInstanceId` sequence:
 
 ```text
-(occurrence_path,
- local ComponentInstanceId,
- semantic_reference)
+[subassembly.outer, subassembly.inner]
 ```
 
-The empty path addresses the explicit root assembly occurrence:
+Path order is preserved exactly.
+
+Endpoint construction validates identity shape only:
+
+- every path id is non-empty;
+- `ComponentInstanceId` is non-empty;
+- `semantic_reference` is non-empty.
+
+Block 23 does not ask whether a path or addressed component exists in the current Project.
+
+That structure boundary is implemented by Block 24.
+
+## Project-level relationship record
+
+Persistent cross-hierarchy geometric relationship intent is:
 
 ```text
-([], component.root, feature.base.top)
+AssemblyHierarchyConstraint
 ```
 
-A nested endpoint may be:
+The record stores:
 
 ```text
-([subassembly.outer, subassembly.inner],
- component.shaft,
- feature.bore.axis)
-```
-
-Occurrence-path element order is identity. The Core record stores the path verbatim and does not sort, normalize, or resolve it during construction.
-
-Endpoint construction rejects empty path ids, an empty component id, and an empty semantic-reference string.
-
-## Why the endpoint belongs in Core
-
-The earlier read-only Geometry seed introduced a query target with the same geometric identity shape.
-
-Persistent relationship intent cannot use a `blcad::geometry` type as save-format authority. Block 23 therefore introduced the frozen endpoint value contract in Core.
-
-Current ownership is:
-
-```text
-Core:
-  AssemblyHierarchyConstraintEndpoint
-    -> persistent model identity
-
-Geometry:
-  AssemblyHierarchyConstraintTarget
-    -> derived target-resolution query seed
-```
-
-The Geometry query layer accepts the Core endpoint directly and converts it into its derived query target.
-
-There is one persistent endpoint authority.
-
-## Persistent project-level relationship intent
-
-`AssemblyHierarchyConstraint` stores:
-
-```text
-id
+AssemblyConstraintId id
 name
-type
-target_a
-target_b
-state
-optional distance
-optional angle
+AssemblyConstraintType type
+target A: AssemblyHierarchyConstraintEndpoint
+target B: AssemblyHierarchyConstraintEndpoint
+AssemblyConstraintState state
+optional Distance quantity
+optional Angle quantity
 ```
 
-Supported types are the existing geometric families:
+Target A/B order is persistent intent.
+
+Supported families reuse the existing local relationship enum:
 
 ```text
 Mate
@@ -99,36 +86,50 @@ Insert
 Angle
 ```
 
-State uses the existing:
+Supported states reuse:
 
 ```text
 Active
 Inactive
 ```
 
-Target A/B order is preserved exactly.
+## Shared value-family rules
 
-The record reuses the same value-family rules as local `AssemblyConstraint`:
+`AssemblyHierarchyConstraint::create` delegates the established local `AssemblyConstraint` value-family contract.
 
 ```text
-Mate        -> no distance, no angle
-Concentric  -> no distance, no angle
-Insert      -> no distance, no angle
-Distance    -> LengthMm distance required, no angle
-Angle       -> AngleDeg angle required, no distance
+Mate
+  no distance
+  no angle
+
+Concentric
+  no distance
+  no angle
+
+Insert
+  no distance
+  no angle
+
+Distance
+  requires LengthMm
+  no angle
+
+Angle
+  requires AngleDeg
+  no distance
 ```
 
-Block 23 delegates this validation to the established local relationship contract instead of maintaining a second family rule set.
+The cross-hierarchy model does not define a second interpretation of Distance or Angle values.
 
 ## Project ownership and id scope
 
 `Project` owns:
 
 ```text
-cross_hierarchy_constraints[]
+cross_hierarchy_constraints_
 ```
 
-Core collection APIs are:
+Public APIs include:
 
 ```text
 add_cross_hierarchy_constraint
@@ -137,100 +138,52 @@ cross_hierarchy_constraint_count
 find_cross_hierarchy_constraint
 ```
 
-Project-level cross-hierarchy constraint ids are unique within this collection.
+Cross-hierarchy ids are unique inside the Project-level cross-hierarchy collection.
 
-Local geometric constraint ids remain scoped by containing `AssemblyDocument`.
+Local `AssemblyConstraintId` values remain scoped by their containing `AssemblyDocument`.
 
 Therefore this is legal:
 
 ```text
 assembly.root / constraint.shared
-Project cross_hierarchy_constraints / constraint.shared
+project cross-hierarchy collection / constraint.shared
 ```
 
-They are different relationship scopes.
+but two project-level cross-hierarchy records with `constraint.shared` are invalid.
 
-## Creation does not resolve structure or geometry
+## Intent construction does not resolve structure
 
-`AssemblyHierarchyConstraintEndpoint::create` and `Project::add_cross_hierarchy_constraint` intentionally do not ask:
+A Project may temporarily contain intent such as:
 
 ```text
-does occurrence_path currently exist?
-does the reached AssemblyDocument exist?
-does the local ComponentInstanceId exist there?
-does semantic_reference resolve to a supported feature target?
+([subassembly.outer, subassembly.inner], component.shaft, feature.bore.axis)
 ```
 
-This allows Core model-intent construction to stay independent from hierarchy traversal and Geometry execution.
+before a caller requests complete structure validation.
 
-Block 24 subsequently added exact path/reached-component Project structure validation and JSON loading. Semantic feature geometry remains a later Geometry concern.
+`add_cross_hierarchy_constraint` checks project-level id uniqueness only.
 
-## Repeated child occurrence identity
+It does not:
 
-Example:
+- walk the rooted hierarchy;
+- require reached components;
+- resolve PartDocument ids;
+- inspect semantic target families;
+- call OCCT.
 
-```text
-root
-  subassembly.left  -> assembly.gearbox
-  subassembly.right -> assembly.gearbox
+Complete Project structure validation is a separate boundary.
 
-assembly.gearbox
-  component.shaft
-```
+## Core-to-Geometry query bridge
 
-These endpoints are distinct:
+`AssemblyHierarchyConstraintQuery::create` accepts either Core endpoint values or a complete `AssemblyHierarchyConstraint`.
 
-```text
-([subassembly.left],  component.shaft, feature.bore.axis)
-([subassembly.right], component.shaft, feature.bore.axis)
-```
+The bridge converts Core endpoint identity into the derived Geometry query target and reuses the implemented root-space target/residual semantics.
 
-But both currently map to one persisted child-component transform authority:
-
-```text
-(assembly.gearbox, component.shaft)
-```
-
-The Core endpoint contract therefore preserves occurrence-specific geometric identity without claiming occurrence-local transform ownership.
-
-## Identity split
-
-The current cross-hierarchy architecture freezes three roles:
-
-```text
-geometric endpoint
-  = (occurrence_path, local ComponentInstanceId, semantic_reference)
-
-geometric component occurrence
-  = (occurrence_path, local ComponentInstanceId)
-
-persisted transform authority
-  = (assembly_document: DocumentId, local ComponentInstanceId)
-```
-
-Future graph and solver layers must not collapse these roles.
-
-## Geometry query bridge
-
-`AssemblyHierarchyConstraintQuery::create` accepts:
-
-```text
-AssemblyHierarchyConstraintEndpoint
-```
-
-or a complete:
-
-```text
-AssemblyHierarchyConstraint
-```
-
-The query path converts Core endpoints into the existing derived Geometry target type and reuses the implemented root-space target/residual semantics.
-
-This bridge does not make the Geometry target type persistent.
+This does not make the Geometry target persistent.
 
 ## Transform immutability
 
-Adding project-level cross-hierarchy intent never changes:
+Creating or adding cross-hierarchy relationship intent never changes:
 
 ```text
 ComponentInstance::transform()
@@ -239,30 +192,36 @@ SubassemblyInstance::transform()
 
 Relationship creation is not solving.
 
-Grounding, suppression, visibility, and joint coordinates are also not changed by record insertion.
+Grounding, suppression, visibility, and joint coordinates are also unchanged.
 
 ## Focused coverage
 
-`tests/core/assembly_cross_hierarchy_constraint_tests.cpp` under:
+Test file:
+
+```text
+tests/core/assembly_cross_hierarchy_constraint_tests.cpp
+```
+
+Focused tag:
 
 ```text
 [core][assembly-cross-hierarchy-intent]
 ```
 
-proves:
+The suite proves:
 
 - root empty-path endpoint identity;
-- exact nested occurrence-path ordering;
-- empty occurrence/component/semantic identity rejection;
+- exact nested path order;
+- empty path-element/component/semantic identity rejection;
 - shared five-family value rules;
 - inactive state preservation;
 - Distance and Angle quantity preservation;
-- target A/B endpoint preservation;
-- project-owned collection access and lookup;
-- project-level id uniqueness;
-- separate local and project-level relationship id scopes;
-- root-to-child, repeated-left-to-right, and nested-to-root intent construction without path/component/geometry resolution;
-- component and subassembly transforms remaining unchanged when intent is added.
+- exact target A/B endpoint preservation;
+- Project-owned collection access and lookup;
+- Project-level id uniqueness;
+- separate local and project-level id scopes;
+- root-to-child, repeated-left-to-right, and nested-to-root intent construction without structure or geometry execution;
+- component and subassembly transform immutability.
 
 Focused command:
 
@@ -270,46 +229,52 @@ Focused command:
 ./build/dev/blcad_core_tests "[core][assembly-cross-hierarchy-intent]"
 ```
 
-Block-24 persistence/structure coverage is separate:
+## Implemented follow-ups
 
-```bash
-./build/dev/blcad_core_tests "[core][assembly-cross-hierarchy-json]"
-```
-
-## Implemented follow-up
-
-Block 24 is implemented:
+Block 24 is implemented in `docs/assembly-cross-hierarchy-constraint-json-mvp5.md`:
 
 ```text
-cross_hierarchy_constraints[] project JSON
-exact endpoint/target-order roundtrip
-absent-field backward compatibility
+cross_hierarchy_constraints[] Project JSON
+exact endpoint and target-order roundtrip
+backward-compatible absent-field loading
 exact occurrence-path structure validation
 reached local component validation
 ```
 
-See `docs/assembly-cross-hierarchy-constraint-json-mvp5.md`.
+Block 25 is implemented in `docs/assembly-cross-hierarchy-incidence-groups-mvp5.md`:
+
+```text
+active relationship participation
+ComponentTransformAuthority identity
+relationship-to-authority incidence
+endpoint-to-authority mappings
+connected cross-hierarchy solve groups
+```
+
+The Block-25 graph remains derived and unpersisted.
 
 ## Explicitly deferred
 
-- active/suppressed relationship participation graph semantics;
-- relationship-to-transform-authority incidence;
-- deterministic cross-hierarchy solve groups;
-- numeric variable ordering;
-- persistent cross-hierarchy residual/Jacobian execution;
-- solve results and freshness snapshots;
-- atomic result application;
+- numeric authority-variable ordering and candidate transforms;
+- mixed local/root-space residual execution;
+- cross-hierarchy finite-difference Jacobians;
+- numeric solve results and proposals;
+- freshness snapshots and atomic application;
 - cross-hierarchy rank/DOF diagnostics;
 - cross-hierarchy joints and nested motion.
 
 ## Next technical step
 
-Implement Block 25 only:
+Implement Block 26 only:
 
 ```text
-active local and project-level cross-hierarchy relationships
-  -> relationship-to-ComponentTransformAuthority incidence
-  -> deterministic connected cross-hierarchy solve groups
+AssemblyCrossHierarchySolveGroup
+  -> unique free active ComponentTransformAuthority variables
+  -> mixed local/root-space residual evaluation
+  -> shared scaled residual vector
+  -> authority-scoped central finite-difference Jacobian
+  -> existing numeric solve engine
+  -> unapplied transform proposals
 ```
 
-Do not add numeric residual/Jacobian execution, solving, snapshots, proposals, diagnostics, or application in the same block.
+Do not add result application or cross-hierarchy diagnostics in the same block.
