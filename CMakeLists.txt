@@ -35,6 +35,7 @@ add_library(
   src/core/assembly_hierarchy.cpp
   src/core/assembly_joint.cpp
   src/core/assembly_joint_graph.cpp
+  src/core/assembly_leaf_occurrence.cpp
   src/core/assembly_subassembly_instances.cpp
   src/core/composite_closed_profile.cpp
   src/core/construction_geometry.cpp
@@ -191,6 +192,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/assembly_insert_constraint_tests.cpp
     tests/core/assembly_joint_graph_tests.cpp
     tests/core/assembly_joint_tests.cpp
+    tests/core/assembly_leaf_occurrence_tests.cpp
     tests/core/chained_construction_relation_tests.cpp
     tests/core/circular_hole_pattern_tests.cpp
     tests/core/closed_profile_json_tests.cpp
