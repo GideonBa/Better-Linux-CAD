@@ -231,3 +231,91 @@ TEST_CASE("Interference analysis validates its overlap tolerance",
           "interference overlap volume tolerance must be finite and positive");
   }
 }
+
+TEST_CASE("Clearance analysis reports near pairs, touching pairs, and separates interference",
+          "[geometry][assembly-clearance]") {
+  const AssemblyClearanceAnalyzer analyzer;
+
+  SECTION("a pair above the threshold is not a clearance violation") {
+    const Project project =
+        make_two_plate_project(RigidTransform{Vector3{50.0, 0.0, 0.0}, Vector3{}});
+    const auto analysis = analyzer.analyze(project);
+
+    REQUIRE(analysis);
+    CHECK(analysis.value().leaf_count == 2U);
+    CHECK(analysis.value().evaluated_pair_count == 1U);
+    CHECK(analysis.value().clearance_violations.empty());
+    CHECK(analysis.value().interferences.empty());
+  }
+
+  SECTION("a pair below the threshold reports the exact minimum distance") {
+    // Plates are 10 mm wide: x-offset 12 leaves a 2 mm gap.
+    const Project project =
+        make_two_plate_project(RigidTransform{Vector3{12.0, 0.0, 0.0}, Vector3{}});
+    AssemblyClearanceAnalysisOptions options;
+    options.clearance_threshold_mm = 5.0;
+    const auto analysis = analyzer.analyze(project, options);
+
+    REQUIRE(analysis);
+    REQUIRE(analysis.value().clearance_violations.size() == 1U);
+    const AssemblyLeafClearanceRecord& record = analysis.value().clearance_violations.front();
+    CHECK(record.leaf_a.occurrence_key == "assembly.root/component.a");
+    CHECK(record.leaf_b.occurrence_key == "assembly.root/component.b");
+    CHECK(record.minimum_distance_mm == Approx(2.0).margin(1.0e-6));
+    CHECK(analysis.value().interferences.empty());
+  }
+
+  SECTION("exact touching is a zero-distance clearance violation, not interference") {
+    const Project project =
+        make_two_plate_project(RigidTransform{Vector3{10.0, 0.0, 0.0}, Vector3{}});
+    const auto analysis = analyzer.analyze(project);
+
+    REQUIRE(analysis);
+    REQUIRE(analysis.value().clearance_violations.size() == 1U);
+    CHECK(analysis.value().clearance_violations.front().minimum_distance_mm ==
+          Approx(0.0).margin(1.0e-9));
+    CHECK(analysis.value().interferences.empty());
+  }
+
+  SECTION("an interfering pair is reported as interference and never as clearance") {
+    const Project project =
+        make_two_plate_project(RigidTransform{Vector3{0.0, 0.0, 1.0}, Vector3{}});
+    const auto analysis = analyzer.analyze(project);
+
+    REQUIRE(analysis);
+    CHECK(analysis.value().clearance_violations.empty());
+    REQUIRE(analysis.value().interferences.size() == 1U);
+    CHECK(analysis.value().interferences.front().overlap_volume_mm3 ==
+          Approx(200.0).margin(1.0e-6));
+  }
+}
+
+TEST_CASE("Clearance analysis is deterministic and validates its thresholds",
+          "[geometry][assembly-clearance]") {
+  const AssemblyClearanceAnalyzer analyzer;
+  const Project forward =
+      make_two_plate_project(RigidTransform{Vector3{12.0, 0.0, 0.0}, Vector3{}});
+  const Project reverse = make_two_plate_project(RigidTransform{Vector3{12.0, 0.0, 0.0}, Vector3{}},
+                                                 ComponentSuppressionState::Active, true);
+
+  AssemblyClearanceAnalysisOptions options;
+  options.clearance_threshold_mm = 5.0;
+  const auto first = analyzer.analyze(forward, options);
+  const auto repeated = analyzer.analyze(forward, options);
+  const auto reversed = analyzer.analyze(reverse, options);
+
+  REQUIRE(first);
+  REQUIRE(repeated);
+  REQUIRE(reversed);
+  CHECK(first.value() == repeated.value());
+  CHECK(first.value() == reversed.value());
+
+  for (const double invalid : {0.0, -1.0, std::numeric_limits<double>::infinity(),
+                               std::numeric_limits<double>::quiet_NaN()}) {
+    AssemblyClearanceAnalysisOptions invalid_options;
+    invalid_options.clearance_threshold_mm = invalid;
+    const auto analysis = analyzer.analyze(forward, invalid_options);
+    REQUIRE(analysis.has_error());
+    CHECK(analysis.error().message() == "clearance threshold must be finite and positive");
+  }
+}

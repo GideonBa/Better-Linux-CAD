@@ -6,7 +6,7 @@ Detailed architecture and feature status live in `docs/`. This README is intenti
 
 ## Status
 
-Current state: MVP-1 core skeleton, staged MVP-2 sketch/workplane/profile/recompute/reference blocks, the MVP-3 parametric bolt circle, the MVP-4 assembly/project container path, and MVP-5 assembly infrastructure through deterministic Mate/Distance/Concentric/Insert/Angle rigid-body solving, local Jacobian-rank/remaining-DOF diagnostics, suppressed-component solve filtering, posed assembly STEP export, the first persistent Revolute joint/limit motion path, rigid subassembly hierarchy with nested posed-leaf export, and read-only posed interference analysis over the shared posed-leaf boundary.
+Current state: MVP-1 core skeleton, staged MVP-2 sketch/workplane/profile/recompute/reference blocks, the MVP-3 parametric bolt circle, the MVP-4 assembly/project container path, and MVP-5 assembly infrastructure through deterministic Mate/Distance/Concentric/Insert/Angle rigid-body solving, local Jacobian-rank/remaining-DOF diagnostics, suppressed-component solve filtering, posed assembly STEP export, the first persistent Revolute joint/limit motion path, rigid subassembly hierarchy with nested posed-leaf export, and read-only posed interference and clearance analysis over the shared posed-leaf boundary.
 
 The implemented assembly path now includes:
 
@@ -109,6 +109,7 @@ Focused current assembly tests:
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-hierarchy-transform]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-nested-step-export]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-interference]"
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-clearance]"
 ```
 
 ## Headless tools
@@ -184,4 +185,4 @@ Future roadmaps:
 
 ## Next technical step
 
-The next technical step is the posed assembly clearance-analysis seed: extend the shared posed-leaf boundary with deterministic OCCT minimum-distance records between non-interfering leaves below an explicit finite clearance threshold, keeping the lexicographic pair order, the stable non-topological leaf identities, and the fail-closed/unpersisted contract of the interference seed. See `docs/mvp-plan.md`.
+The next technical step is a headless assembly analysis report example: one command that loads a project JSON, runs the combined interference/clearance analysis over the shared posed-leaf boundary, and prints a deterministic plain-text report with occurrence keys, overlap volumes, and minimum distances. See `docs/mvp-plan.md`.

@@ -282,19 +282,23 @@ Canonical document: `docs/assembly-interference-analysis-mvp5.md`.
 
 Implemented: a read-only `AssemblyInterferenceAnalyzer` over the shared posed-leaf boundary (`AssemblyPosedLeafShapeBuilder`, now also backing posed STEP export), deterministic lexicographic pair evaluation with stable non-topological leaf identities, OCCT boolean-common positive-volume overlap above an explicit finite tolerance, fail-closed error propagation, and fully derived/unpersisted analysis products. Contact without positive volume is not interference. Posing composes each authored transform chain into one rigid OCCT transform per leaf occurrence.
 
-## Next MVP: Posed assembly clearance-analysis seed
+### 19. Posed assembly clearance-analysis seed
 
-Goal: extend the same posed-leaf boundary with deterministic minimum-distance records between non-interfering leaves, so clearance requirements become checkable before joints and motion sweeps.
+Canonical document: `docs/assembly-interference-analysis-mvp5.md`.
+
+Implemented: `AssemblyClearanceAnalyzer` on the shared posed-leaf boundary with the unchanged pair order and identity contract. Interfering pairs stay interference records; remaining pairs derive their OCCT minimum distance and become clearance-violation records below a finite positive threshold. Touching without positive volume is a zero-distance clearance violation. Fail-closed on extrema failures, non-finite distances, and invalid thresholds; everything derived and unpersisted.
+
+## Next MVP: Headless assembly analysis report example
+
+Goal: one headless command that makes the whole MVP-5 pipeline inspectable — load a project, optionally solve, run interference and clearance analysis, and print a deterministic plain-text report.
 
 Required implementation sequence:
 
-1. Add a read-only `AssemblyClearanceAnalyzer` (or extend the interference analyzer with a combined analysis) consuming `const Project&` through the shared `AssemblyPosedLeafShapeBuilder`.
-2. Reuse the deterministic lexicographic pair order and the stable leaf identity contract unchanged.
-3. Use OCCT extrema (`BRepExtrema_DistShapeShape`) to derive the minimum distance in `mm` for each pair without positive-volume interference.
-4. Report pairs below an explicit finite positive clearance threshold; report interfering pairs separately (distance zero with overlap volume), never as clearance records.
-5. Fail closed on extrema failures and non-finite distances.
-6. Keep witness points optional and derived; keep everything unpersisted.
-7. Cover: pair above threshold (no record), pair below threshold with known exact distance, touching pair (distance zero, no volume), interfering pair excluded from clearance records, nested occurrences, determinism, and threshold validation.
+1. Add `blcad_analyze_assembly <input.blcad.project.json> [clearance-threshold-mm]` under `examples/`.
+2. Load the project JSON, run `AssemblyClearanceAnalyzer` (which includes interference), and print leaf count, evaluated pairs, recomputed parts, then every interference and clearance record in deterministic order with occurrence keys and values.
+3. Exit non-zero on analysis errors; print the error object id and message.
+4. Register the tool in CMake and the README headless-tools list with an example invocation against a checked-in example project.
+5. Cover the report path with one test that drives the analyzer on an example project file (tool wiring itself stays a thin main).
 
 ## Proposed assembly implementation sequence
 
@@ -319,8 +323,9 @@ Required implementation sequence:
 19. Add joints and limits, then motion through the solver. First Revolute family implemented.
 20. Rigid subassembly instance and nested posed-export seed. Implemented.
 21. First posed assembly interference-analysis seed. Implemented.
-22. Posed assembly clearance-analysis seed. Next.
-23. Add flexible subassemblies, cross-hierarchy relationship semantics, component geometry instancing, and richer collision/contact analysis in later dedicated blocks.
+22. Posed assembly clearance-analysis seed. Implemented.
+23. Headless assembly analysis report example. Next.
+24. Add flexible subassemblies, cross-hierarchy relationship semantics, component geometry instancing, and richer collision/contact analysis in later dedicated blocks.
 
 ## Future roadmaps
 

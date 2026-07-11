@@ -60,4 +60,46 @@ public:
       AssemblyInterferenceAnalysisOptions options = AssemblyInterferenceAnalysisOptions{}) const;
 };
 
+// One derived clearance violation: two non-interfering posed leaves closer
+// than the requested clearance threshold. Touching without positive common
+// volume reports a minimum distance of zero here, never as interference.
+struct AssemblyLeafClearanceRecord {
+  AssemblyLeafIdentity leaf_a;
+  AssemblyLeafIdentity leaf_b;
+  double minimum_distance_mm = 0.0;
+
+  friend bool operator==(const AssemblyLeafClearanceRecord&,
+                         const AssemblyLeafClearanceRecord&) = default;
+};
+
+struct AssemblyClearanceAnalysisOptions {
+  // Non-interfering pairs closer than this threshold are clearance
+  // violations. Must be finite and positive.
+  double clearance_threshold_mm = 1.0;
+  // Same interference boundary as AssemblyInterferenceAnalysisOptions.
+  double minimum_overlap_volume_mm3 = 1.0e-6;
+};
+
+struct AssemblyClearanceAnalysis {
+  std::size_t leaf_count = 0U;
+  std::size_t evaluated_pair_count = 0U;
+  std::size_t recomputed_part_count = 0U;
+  std::vector<AssemblyLeafClearanceRecord> clearance_violations;
+  std::vector<AssemblyLeafInterferenceRecord> interferences;
+
+  friend bool operator==(const AssemblyClearanceAnalysis&,
+                         const AssemblyClearanceAnalysis&) = default;
+};
+
+// Read-only posed assembly clearance analysis over the same shared posed-leaf
+// boundary, pair order, and identity contract as interference analysis.
+// Interfering pairs are reported separately and never as clearance records;
+// remaining pairs use the OCCT minimum distance between the posed shapes.
+class AssemblyClearanceAnalyzer {
+public:
+  [[nodiscard]] Result<AssemblyClearanceAnalysis>
+  analyze(const Project& project,
+          AssemblyClearanceAnalysisOptions options = AssemblyClearanceAnalysisOptions{}) const;
+};
+
 } // namespace blcad::geometry

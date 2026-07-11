@@ -1,6 +1,6 @@
-# Posed Assembly Interference Analysis MVP-5
+# Posed Assembly Interference and Clearance Analysis MVP-5
 
-Status: implemented the first read-only posed assembly interference-analysis seed over the flattened visible-active leaf occurrence boundary.
+Status: implemented the first read-only posed assembly interference-analysis seed over the flattened visible-active leaf occurrence boundary, plus the clearance-analysis seed on the same boundary.
 
 ## Shared posed-geometry boundary
 
@@ -39,7 +39,18 @@ src/geometry/assembly_posed_leaf_shapes.cpp
 
 The refactored exporter keeps every existing posed/nested export test green.
 
+## Clearance analysis
+
+`AssemblyClearanceAnalyzer::analyze(const Project&, options)` reuses the same boundary, pair order, identity contract, and interference boundary (`minimum_overlap_volume_mm3`) and adds:
+
+- interfering pairs are reported separately as interference records and never as clearance records.
+- every remaining pair derives its minimum distance in `mm` through OCCT `BRepExtrema_DistShapeShape`.
+- pairs below the finite positive `clearance_threshold_mm` (default `1.0`) become clearance-violation records; exact touching without positive volume is a zero-distance clearance violation.
+- fail-closed on extrema failures, non-finite distances, and invalid thresholds; everything stays derived and unpersisted.
+
+Clearance tests cover: pairs above the threshold, the exact `2 mm` gap distance below a `5 mm` threshold, zero-distance touching, interference exclusion, determinism with insertion-order reversal, and threshold validation.
+
 ## Still deferred
 
-- broad-phase acceleration, contact classification, minimum-distance/clearance analysis, penetration direction/depth, collision response, motion sweeping, and physics.
+- broad-phase acceleration, contact classification, witness points, penetration direction/depth, collision response, motion sweeping, and physics.
 - persistent collision state of any kind.

@@ -3,6 +3,7 @@
 #include "assembly_posed_leaf_shapes.hpp"
 
 #include <BRepAlgoAPI_Common.hxx>
+#include <BRepExtrema_DistShapeShape.hxx>
 #include <BRepGProp.hxx>
 #include <GProp_GProps.hxx>
 #include <Standard_Failure.hxx>
@@ -128,6 +129,90 @@ AssemblyInterferenceAnalyzer::analyze(const Project& project,
   }
 
   return Result<AssemblyInterferenceAnalysis>::success(std::move(analysis));
+}
+
+Result<AssemblyClearanceAnalysis>
+AssemblyClearanceAnalyzer::analyze(const Project& project,
+                                   AssemblyClearanceAnalysisOptions options) const {
+  if (!std::isfinite(options.clearance_threshold_mm) || options.clearance_threshold_mm <= 0.0) {
+    return Result<AssemblyClearanceAnalysis>::failure(Error::validation(
+        kInterferenceAnalyzerId, "clearance threshold must be finite and positive"));
+  }
+  if (!std::isfinite(options.minimum_overlap_volume_mm3) ||
+      options.minimum_overlap_volume_mm3 <= 0.0) {
+    return Result<AssemblyClearanceAnalysis>::failure(
+        Error::validation(kInterferenceAnalyzerId,
+                          "interference overlap volume tolerance must be finite and positive"));
+  }
+
+  auto posed_leaves = detail::build_posed_leaf_shapes(project);
+  if (posed_leaves.has_error()) {
+    return Result<AssemblyClearanceAnalysis>::failure(posed_leaves.error());
+  }
+
+  std::vector<const detail::PosedLeafShape*> ordered_leaves;
+  ordered_leaves.reserve(posed_leaves.value().leaves.size());
+  for (const detail::PosedLeafShape& posed : posed_leaves.value().leaves) {
+    ordered_leaves.push_back(&posed);
+  }
+  std::sort(ordered_leaves.begin(), ordered_leaves.end(),
+            [](const detail::PosedLeafShape* lhs, const detail::PosedLeafShape* rhs) {
+              return detail::leaf_occurrence_key(lhs->leaf) <
+                     detail::leaf_occurrence_key(rhs->leaf);
+            });
+
+  AssemblyClearanceAnalysis analysis;
+  analysis.leaf_count = ordered_leaves.size();
+  analysis.recomputed_part_count = posed_leaves.value().recomputed_part_count;
+
+  try {
+    for (std::size_t first = 0U; first < ordered_leaves.size(); ++first) {
+      for (std::size_t second = first + 1U; second < ordered_leaves.size(); ++second) {
+        const detail::PosedLeafShape& leaf_a = *ordered_leaves[first];
+        const detail::PosedLeafShape& leaf_b = *ordered_leaves[second];
+        ++analysis.evaluated_pair_count;
+
+        const std::string pair_key = detail::leaf_occurrence_key(leaf_a.leaf) + " x " +
+                                     detail::leaf_occurrence_key(leaf_b.leaf);
+        auto volume = common_solid_volume_mm3(leaf_a.shape, leaf_b.shape, pair_key);
+        if (volume.has_error()) {
+          return Result<AssemblyClearanceAnalysis>::failure(volume.error());
+        }
+
+        if (volume.value() > options.minimum_overlap_volume_mm3) {
+          analysis.interferences.push_back(AssemblyLeafInterferenceRecord{
+              make_leaf_identity(leaf_a), make_leaf_identity(leaf_b), volume.value()});
+          continue;
+        }
+
+        BRepExtrema_DistShapeShape distance_builder(leaf_a.shape, leaf_b.shape);
+        if (!distance_builder.IsDone()) {
+          return Result<AssemblyClearanceAnalysis>::failure(make_geometry_error(
+              "clearance minimum-distance computation failed for pair " + pair_key));
+        }
+        const double distance = distance_builder.Value();
+        if (!std::isfinite(distance)) {
+          return Result<AssemblyClearanceAnalysis>::failure(
+              make_geometry_error("clearance minimum distance is not finite for pair " + pair_key));
+        }
+
+        if (distance < options.clearance_threshold_mm) {
+          analysis.clearance_violations.push_back(AssemblyLeafClearanceRecord{
+              make_leaf_identity(leaf_a), make_leaf_identity(leaf_b), distance});
+        }
+      }
+    }
+  } catch (const Standard_Failure& failure) {
+    return Result<AssemblyClearanceAnalysis>::failure(
+        make_geometry_error(standard_failure_message(failure)));
+  } catch (const std::exception& exception) {
+    return Result<AssemblyClearanceAnalysis>::failure(make_geometry_error(exception.what()));
+  } catch (...) {
+    return Result<AssemblyClearanceAnalysis>::failure(
+        make_geometry_error("unknown assembly clearance analysis error"));
+  }
+
+  return Result<AssemblyClearanceAnalysis>::success(std::move(analysis));
 }
 
 } // namespace blcad::geometry
