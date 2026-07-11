@@ -38,7 +38,7 @@ Run the complete core-only workflow:
 cmake --workflow --preset dev-build-test
 ```
 
-The equivalent step-by-step commands are:
+Equivalent commands:
 
 ```bash
 cmake --preset dev
@@ -52,7 +52,7 @@ Run the complete geometry-enabled workflow:
 cmake --workflow --preset dev-geometry-build-test
 ```
 
-The equivalent step-by-step commands are:
+Equivalent commands:
 
 ```bash
 cmake --preset dev-geometry
@@ -60,52 +60,34 @@ cmake --build --preset dev-geometry
 ctest --preset dev-geometry
 ```
 
-Run only the component-instance tests after a core build:
+Focused assembly test commands:
 
 ```bash
 ./build/dev/blcad_core_tests "[core][component-instance]"
-```
-
-Run only the assembly-constraint model-intent tests after a core build:
-
-```bash
 ./build/dev/blcad_core_tests "[core][assembly-constraint]"
-```
-
-Run only the read-only assembly constraint graph tests after a core build:
-
-```bash
 ./build/dev/blcad_core_tests "[core][assembly-constraint-graph]"
-```
-
-Run only the read-only semantic assembly target resolution tests after a geometry build:
-
-```bash
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-target]"
-```
-
-Run only the assembly rigid-transform evaluation tests after a geometry build:
-
-```bash
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-transform]"
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-equation]"
 ```
 
 The build directories are defined by `CMakePresets.json` as `build/dev`, `build/dev-geometry`, and `build/release`.
 
 ## Test coverage
 
-The test targets and exact source files registered in the current build are the source of truth in `CMakeLists.txt`. Do not maintain another exhaustive per-test-file list here; it becomes stale as MVP blocks are added.
+The exact test source registration in `CMakeLists.txt` is the source of truth. Do not duplicate an exhaustive per-file list here.
 
 At a high level, the current suites cover:
 
 - core value types, parameters, document validation, dependency graphs, invalidation, and recompute planning
 - sketches, constraints/dimensions, profile regions, arcs, splines, composite profiles, and construction geometry
 - semantic/projected references, reference recovery, sketch diagnostics, repair commands, transactions, undo, and presentation snapshots
-- assembly parameters, project-level propagation, component instances, free placement/state updates, shared part ownership, and JSON roundtrip
-- assembly Mate/Concentric/Distance constraint intent, semantic component targets, validation, transform immutability, project structure, and JSON roundtrip
+- assembly parameters, project propagation, component instances, placement/state updates, shared part ownership, and JSON roundtrip
+- Mate/Concentric/Distance constraint intent, semantic component targets, validation, transform immutability, project structure, and JSON roundtrip
 - read-only active-constraint graph nodes/edges, inactive filtering, multi-edges, deterministic adjacency, connected groups, isolated nodes, and unchanged assembly intent
-- read-only generated-face assembly target resolution, explicit unsupported-family failures, deterministic local planar descriptors, separate placement intent, and unchanged project model intent
-- explicit assembly rigid-transform evaluation for points, vectors, and planar frames, including identity, translation, right-handed single-axis rotations, combined-axis order, length/orthogonality preservation, determinism, and read-only behavior
+- generated-face assembly target resolution, unsupported-family failures, deterministic local planar descriptors, separate placement intent, and unchanged project model intent
+- explicit rigid-transform evaluation for points, vectors, and planar frames, including identity, translation, right-handed single-axis rotations, combined-axis order, length/orthogonality preservation, determinism, and read-only behavior
+- planar Mate and Distance residual construction, including target identity/order, transformed assembly-space target planes, satisfied and unsatisfied residuals, signed Distance direction, inactive/Concentric rejection, unsupported target propagation, determinism, and unchanged project intent
 - part, assembly, and project model-intent serialization/file workflows
 - optional OCCT workplane resolution, profile geometry, recompute execution, shape caching, and STEP export
 
@@ -113,7 +95,7 @@ When a feature block is added, register its tests in `CMakeLists.txt` and docume
 
 ## Headless tools
 
-The core build provides component, stored assembly-constraint, and derived graph-group inspection:
+The core build provides component, stored assembly-constraint, and graph-group inspection:
 
 ```bash
 ./build/dev/blcad_inspect_project_components examples/component_instances.blcad.project.json
@@ -136,27 +118,28 @@ blcad_export_project <input.blcad.project.json> <assembly-parameter-id> <value> 
 blcad_inspect_project_components <input.blcad.project.json>
 ```
 
-The component inspector is read-only. It validates project assembly structure, prints component references and placement/state values, prints stored assembly constraint type/state/semantic targets plus Distance values, builds the derived `AssemblyConstraintGraph`, and prints active-edge and deterministic connected-group summaries.
+The component inspector is read-only. It validates project assembly structure, prints component placement/state and stored constraints, builds `AssemblyConstraintGraph`, and prints active-edge and deterministic connected-group summaries.
 
-Assembly target resolution and rigid-transform evaluation are currently geometry-library APIs with focused tests; they have no dedicated CLI consumer yet.
+Target resolution, rigid-transform evaluation, and planar equation/residual construction are geometry-library APIs with focused tests. They do not yet have dedicated CLI consumers.
 
 ## Documentation entry points
 
-Use these documents as the maintained status entry points:
+Use these maintained status documents:
 
 - `README.md`: short repository status and current next technical step
 - `docs/mvp-plan.md`: detailed implementation sequence and implemented/deferred scope
 - `docs/architecture-summary.md`: condensed current and target architecture
-- `docs/component-instance-mvp5.md`: component instances and explicit free-placement/state updates
-- `docs/assembly-constraint-model-intent-mvp5.md`: implemented semantic Mate/Concentric/Distance record layer
-- `docs/assembly-constraint-graph-mvp5.md`: implemented read-only active-constraint connectivity graph
-- `docs/assembly-constraint-target-resolution-mvp5.md`: implemented read-only generated-face assembly target resolution
-- `docs/assembly-rigid-transform-evaluation-mvp5.md`: implemented local-to-assembly rigid-transform convention and evaluator
-- `docs/assembly-system.md`: equation construction, solver, DOF, and joint roadmap
+- `docs/component-instance-mvp5.md`: component instances and explicit placement/state updates
+- `docs/assembly-constraint-model-intent-mvp5.md`: Mate/Concentric/Distance record layer
+- `docs/assembly-constraint-graph-mvp5.md`: active-constraint connectivity graph
+- `docs/assembly-constraint-target-resolution-mvp5.md`: generated-face target resolution
+- `docs/assembly-rigid-transform-evaluation-mvp5.md`: local-to-assembly transform convention and evaluator
+- `docs/assembly-planar-constraint-equations-mvp5.md`: planar Mate/Distance residual conventions and builder
+- `docs/assembly-system.md`: solver, DOF, and joint roadmap over implemented assembly layers
 - `docs/file-format.md`: persisted model-intent format
 - `docs/project-goal.md`: long-term project goal
 
-Feature-specific documents remain the canonical detail for their own implemented blocks. Avoid copying the full feature status or next-step checklist into unrelated setup documents.
+Feature-specific documents remain canonical for their own implemented blocks. Avoid copying full feature status into unrelated setup documents.
 
 ## Formatting
 
@@ -165,17 +148,17 @@ Project formatting is configured through:
 - `.editorconfig`
 - `.clang-format`
 
-Use `clang-format` for changed C++ files before committing. For the transform-evaluation block:
+Use `clang-format` for changed C++ files before committing. For the planar equation block:
 
 ```bash
-clang-format -i include/blcad/geometry/assembly_transform_evaluator.hpp \
-  src/geometry/assembly_transform_evaluator.cpp \
-  tests/geometry/assembly_transform_evaluator_tests.cpp
+clang-format -i include/blcad/geometry/assembly_constraint_equation_builder.hpp \
+  src/geometry/assembly_constraint_equation_builder.cpp \
+  tests/geometry/assembly_constraint_equation_builder_tests.cpp
 ```
 
 ## Clean generated files
 
-CMake build directories are located under `build/`.
+CMake build directories are under `build/`.
 
 ```bash
 rm -rf build/
@@ -183,22 +166,26 @@ rm -rf build/
 
 ## Current development boundaries
 
-The current implementation already includes the parametric bolt circle, richer sketch/profile blocks, assembly parameters, the project container, component instances, explicit free-placement/state updates, solver-independent Mate/Concentric/Distance assembly constraint records, the read-only active-constraint graph, read-only generated-face assembly target resolution, and explicit component-local-to-assembly-space rigid-transform evaluation. Those capabilities must not be listed as future or missing in current-status documentation.
+The current implementation includes the parametric bolt circle, richer sketch/profile blocks, assembly parameters, the project container, component instances, placement/state updates, persistent Mate/Concentric/Distance intent, the active-constraint graph, generated-face target resolution, explicit rigid-transform evaluation, and planar Mate/Distance equation-residual construction. Those capabilities must not be listed as future or missing in current-status documentation.
 
 The current assembly boundary is deliberate:
 
-- component transforms remain explicit free-placement model intent, not solver output
-- grounding, visibility, and suppression are stored state and are not yet enforced by assembly consumers
-- semantic constraint target tokens are persisted; the optional geometry layer resolves only the supported generated-face family
-- generated-face targets resolve to component-local planar descriptors plus separate placement intent
-- `AssemblyTransformEvaluator` interprets `rotation_deg` as active right-handed fixed-axis X-then-Y-then-Z rotations, equivalent to `Rz * Ry * Rx` for column vectors
+- component transforms remain explicit placement model intent, not solver output
+- grounding, visibility, and suppression are persisted state and are not enforced by current geometry consumers
+- semantic target tokens are persisted; geometry resolution supports the generated planar face family
+- target resolution produces component-local planar descriptors plus separate placement intent
+- `AssemblyTransformEvaluator` applies the active right-handed fixed-axis X-then-Y-then-Z convention, equivalent to `Rz * Ry * Rx` for column vectors
 - points are rotated and translated; vectors, axes, and normals are rotated only
-- assembly-space planar descriptors are derived from local target frames and persisted placement
-- graph connectivity, target descriptors, and evaluated assembly-space frames are derived and are not persisted
-- the next block is read-only planar Mate/Distance equation/residual construction
-- no rigid-body solver, solved transform mutation, remaining-DOF computation, overconstraint analysis, enforced grounding, collision analysis, subassemblies, or assembly-level STEP export exists yet
-- semantic axis references and Concentric equation construction remain deferred
-- persistent model references must remain semantic; raw OCCT topology ids are not core model intent
+- assembly-space planar descriptors are derived data
+- `AssemblyConstraintEquationBuilder` supports active planar Mate and Distance constraints only
+- Mate residuals use `nA + nB` and `dot(oB - oA, nA)`
+- Distance residuals use `cross(nA, nB)` and signed A-to-B separation along `nA`
+- target order is semantically observable for Distance and must be preserved
+- graph connectivity, resolved targets, evaluated frames, and residual descriptors are not persisted
+- the next block is the first rigid-body assembly solver seed
+- no solved transform application, remaining-DOF computation, overconstraint analysis, solver participation for suppression, collision analysis, subassemblies, or assembly-level STEP export exists yet
+- semantic axis references and Concentric residual construction remain deferred
+- persistent model references remain semantic; raw OCCT topology ids are not core model intent
 - no GUI code should own CAD logic
 
-For the exact next implementation sequence, use `docs/mvp-plan.md` rather than duplicating it here.
+For the exact next implementation sequence, use `docs/mvp-plan.md`.

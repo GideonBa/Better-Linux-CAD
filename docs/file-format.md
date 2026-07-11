@@ -1,8 +1,8 @@
 # Project and Save File Format
 
-Status: implemented seeds exist for single-part `.blcad.json`, assembly-parameter JSON, embedded project JSON, component instances with explicit placement/state updates, solver-independent Mate/Concentric/Distance assembly constraint records, and the derived read-only assembly graph/target-resolution/transform-evaluation path. Multi-body part records, body transforms, body booleans, solver state, equation caches, and path-feature records remain future blocks.
+Status: implemented seeds exist for single-part `.blcad.json`, assembly parameters, embedded project JSON, component instances, Mate/Concentric/Distance relationship intent, and the derived assembly graph/target-resolution/transform/residual pipeline. Multi-body part records, body transforms, body booleans, solver state, solved transform caches, and path-feature records remain future blocks.
 
-The file format must store the full parametric model, not only computed geometry. OCCT geometry may be stored additionally as cache data, but must never be the only source of information.
+The file format stores parametric model intent, not only computed geometry. OCCT geometry and later solve products may be cached separately, but they must never replace the persistent model relationships required to regenerate them.
 
 ## Implemented project structure
 
@@ -24,7 +24,7 @@ blcad.project.mvp4
 
 Component instances, placement/state values, and assembly constraint model intent are persisted inside the embedded assembly document.
 
-Derived constraint graph connectivity, resolved target descriptors, and evaluated assembly-space frames are rebuilt from persisted model intent and are not stored.
+Derived graph connectivity, resolved targets, assembly-space frames, and Mate/Distance residual descriptors are rebuilt from persisted model intent and are not stored.
 
 ## Target project structure
 
@@ -45,7 +45,7 @@ ProjectFile
   cached_shapes
 ```
 
-The current embedded project format is intentionally simpler than the target container. A manifest-based project file that references separate part files is deferred.
+The current embedded project format is intentionally simpler than the target container. Manifest-based separate part files remain deferred.
 
 ## Assembly document records
 
@@ -53,23 +53,23 @@ Current implemented assembly records:
 
 ```text
 AssemblyDocument
-  parameters[]              # assembly-scoped parameters
-  member_parts[]            # DocumentId list
-  parameter_bindings[]      # part parameter follows assembly parameter
-  component_instances[]     # MVP-5 free placement/state model intent
-  assembly_constraints[]    # MVP-5 semantic relationship model intent
+  parameters[]
+  member_parts[]
+  parameter_bindings[]
+  component_instances[]
+  assembly_constraints[]
 ```
 
-The assembly document currently retains this schema marker and version:
+The assembly document retains the historical compatibility marker:
 
 ```text
 blcad.assembly_document.mvp4
 version 1
 ```
 
-The marker is historical and retained for compatibility. Component instances and assembly constraints are MVP-5 features that extend the existing assembly schema additively through optional fields. Older files without `component_instances` or `assembly_constraints` remain loadable and produce empty corresponding collections.
+Component instances and assembly constraints are MVP-5 features added through optional fields. Older files without `component_instances` or `assembly_constraints` remain loadable and produce empty collections.
 
-A component instance has this implemented JSON shape:
+A component instance has this implemented shape:
 
 ```json
 {
@@ -86,7 +86,7 @@ A component instance has this implemented JSON shape:
 }
 ```
 
-A Distance assembly constraint has this implemented JSON shape:
+A Distance assembly constraint has this implemented shape:
 
 ```json
 {
@@ -109,66 +109,89 @@ A Distance assembly constraint has this implemented JSON shape:
 }
 ```
 
-Mate and Concentric constraints use the same target/state structure and omit `distance`.
+Mate and Concentric use the same target/state structure and omit `distance`.
 
 Assembly persistence rules:
 
 - component instances reference part document ids instead of duplicating owned `PartDocument` records
-- project validation resolves each component instance to an assembly member and project-owned part document
+- project validation resolves every component reference through assembly membership to a project-owned part
 - explicit placement/state updates preserve component id, name, and `referenced_part_document`
-- all translation and rotation components must be finite
-- `translation_mm` values are stored in millimeters
-- `rotation_deg` values are stored in degrees
-- persisted transform evaluation uses the documented active right-handed fixed-axis X-then-Y-then-Z convention, equivalent to `Rz * Ry * Rx` for column vectors
-- the evaluator changes no JSON field and does not persist a matrix, quaternion, or evaluated frame
-- `grounded` is model intent but does not yet prevent explicit transform updates
-- visibility and suppression are stored state until assembly consumers define their participation rules
-- assembly constraints use typed ids and semantic component target tokens, not raw OCCT topology ids
-- Mate and Concentric omit `distance`; Distance requires a millimeter length value
+- transform components must be finite
+- `translation_mm` is stored in millimeters
+- `rotation_deg` is stored in degrees
+- transform evaluation uses active right-handed fixed-axis X-then-Y-then-Z rotation, equivalent to `Rz * Ry * Rx` for column vectors
+- the evaluator does not persist a matrix, quaternion, or evaluated frame
+- `grounded` is model intent but does not yet prevent direct explicit transform updates
+- visibility and suppression remain stored state until assembly consumers define participation rules
+- assembly constraints use typed ids and semantic target tokens, not raw OCCT topology ids
+- Mate and Concentric omit `distance`; Distance requires a millimeter length quantity
 - constraint state is `active` or `inactive`
 - adding or loading constraints does not mutate component transforms
 - project structure validation includes constraint component targets
 
-The transform convention is canonicalized in `docs/assembly-rigid-transform-evaluation-mvp5.md`.
+The exact transform convention is canonicalized in `docs/assembly-rigid-transform-evaluation-mvp5.md`.
 
 ## Derived assembly data is not persisted
 
-The current assembly path has three derived layers:
+The current assembly path has four derived layers:
 
 ```text
 AssemblyConstraintGraph
 AssemblyConstraintTargetResolver
 AssemblyTransformEvaluator
+AssemblyConstraintEquationBuilder
 ```
 
-Their outputs are:
+Their outputs include:
 
 ```text
 constraint graph nodes/edges/groups
 component-local resolved target descriptors
 assembly-space evaluated points/vectors/planar frames
+planar Mate/Distance equation-residual descriptors
 ```
 
 None is persisted.
 
 The graph is rebuilt from `component_instances` and active `assembly_constraints`.
 
-Supported target descriptors are rebuilt from semantic target tokens, component references, project-owned part intent, and current part parameters.
+Supported target descriptors are rebuilt from semantic tokens, component references, project-owned part intent, and current part parameters.
 
-Assembly-space frames are rebuilt from component-local descriptors plus the persisted `RigidTransform`.
+Assembly-space frames are rebuilt from component-local descriptors plus persisted `RigidTransform` values.
 
-No graph field, resolved-target field, transform matrix field, or evaluated-frame field is added to the current schema.
+Planar residual descriptors are rebuilt from active constraint intent plus the current evaluated target planes.
 
-The next planned equation/residual construction block should follow the same rule and remain regenerable unless a later cache design proves a concrete persistence need.
+For Mate, the current residual convention is:
+
+```text
+normal_opposition = nA + nB
+signed_separation_mm = dot(oB - oA, nA)
+```
+
+For planar Distance:
+
+```text
+normal_parallelism = cross(nA, nB)
+signed_separation_mm = dot(oB - oA, nA)
+distance_residual_mm = signed_separation_mm - target_distance_mm
+```
+
+The signed Distance convention is target-order dependent. Target A/B order is therefore part of persistent relationship intent and must not be reordered by a cache or solver layer.
+
+No graph field, resolved-target field, evaluated-frame field, or residual field is added to the current schema.
+
+Canonical residual semantics are documented in `docs/assembly-planar-constraint-equations-mvp5.md`.
 
 ## Part document target
+
+The future part model remains intent-oriented:
 
 ```text
 PartDocument BasePlate
   parameters
-    plate_width = 120 mm
-    plate_height = 80 mm
-    plate_thickness = Assembly.plate_thickness
+    plate_width
+    plate_height
+    plate_thickness
 
   bodies
     body.base
@@ -249,7 +272,7 @@ Rules:
 - body records are model intent, not cached shape records
 - body transforms preserve ordered transform-stack intent
 - body booleans reference semantic `BodyId` values
-- owned-sketch transform behavior is explicit, not inferred silently
+- owned-sketch transform behavior is explicit
 - cached body shapes are optional and never replace body/feature intent
 
 ## Path-feature target records
@@ -295,11 +318,11 @@ Future files should persist connected path curves and multi-section profile refe
 
 Rules:
 
-- path segments are semantic references to sketch, construction, projected, 3D-sketch, or generated semantic curve sources
+- path segments are semantic references to sketch, construction, projected, future 3D-sketch, or generated curve sources
 - path records store ordered connected chains, not raw OCCT wires
 - loft section order is explicit
 - loft section sketches may be on arbitrary planes
-- section alignment/seam metadata should be added before complex closed-profile lofts
+- section alignment/seam metadata should precede complex closed-profile lofts
 
 The detailed target is in `docs/multi-body-transform-and-path-features-roadmap.md`.
 
@@ -307,16 +330,17 @@ The detailed target is in `docs/multi-body-transform-and-path-features-roadmap.m
 
 - `serialize_part_document_to_json` / `deserialize_part_document_from_json` for in-memory part model intent.
 - `write_part_document_json_file` / `read_part_document_json_file` for `.blcad.json` files.
-- `serialize_assembly_document_to_json` / `deserialize_assembly_document_from_json` for assembly parameters, member parts, parameter bindings, component instances, current placement/state values, and assembly constraint records.
-- `serialize_project_to_json` / `deserialize_project_from_json` for embedded assembly plus embedded part documents.
+- `serialize_assembly_document_to_json` / `deserialize_assembly_document_from_json` for assembly parameters, members, bindings, component placement/state, and constraint records.
+- `serialize_project_to_json` / `deserialize_project_from_json` for embedded assembly plus embedded parts.
 - `write_project_json_file` / `read_project_json_file` for `.blcad.project.json` files.
-- serialization stores model intent only; it does not serialize OCCT shapes, `ShapeCache`, graph connectivity, resolved target descriptors, evaluated assembly-space frames, equation/residual data, solved transforms, or DOF state.
-- `AssemblyConstraintGraph` rebuilds relationship connectivity from persisted components and constraints.
+- serialization stores model intent only; it does not serialize OCCT shapes, `ShapeCache`, graph connectivity, resolved targets, evaluated assembly-space frames, residual descriptors, solved transforms, or DOF state.
+- `AssemblyConstraintGraph` rebuilds relationship connectivity.
 - `AssemblyConstraintTargetResolver` rebuilds supported component-local generated-face descriptors.
-- `AssemblyTransformEvaluator` derives assembly-space points, vectors, and planar frames using the documented persisted-transform convention.
-- `derived_workplanes` with `top/bottom/right/left/front/back` faces are persisted as semantic model intent.
+- `AssemblyTransformEvaluator` derives assembly-space points, vectors, and planar frames using the documented transform convention.
+- `AssemblyConstraintEquationBuilder` derives active planar Mate/Distance residual descriptors using the documented target-order conventions.
+- `derived_workplanes` with supported semantic faces are persisted as model intent.
 
-See `docs/json-serialization-mvp1.md`, `docs/json-file-workflow-mvp1.md`, `docs/assembly-parameters-mvp4.md`, `docs/project-container-mvp4.md`, `docs/component-instance-mvp5.md`, `docs/assembly-constraint-model-intent-mvp5.md`, `docs/assembly-constraint-graph-mvp5.md`, `docs/assembly-constraint-target-resolution-mvp5.md`, and `docs/assembly-rigid-transform-evaluation-mvp5.md`.
+See the feature-specific assembly documents and `docs/mvp-plan.md` for exact status.
 
 ## Proposed implementation sequence
 
@@ -331,25 +355,27 @@ See `docs/json-serialization-mvp1.md`, `docs/json-file-workflow-mvp1.md`, `docs/
 9. Add path-following extrude/cut and loft feature serialization.
 10. Extend project files from embedded documents to optional manifest/external-file references.
 11. Assembly constraint model-intent records are implemented; keep them independent from solver/cache state.
-12. The read-only constraint graph is implemented and intentionally has no persisted graph field.
-13. Generated-face target resolution is implemented and its descriptors remain unpersisted.
-14. Rigid-transform evaluation is implemented and assembly-space evaluated frames remain unpersisted.
-15. Keep the next Mate/Distance equation/residual descriptors regenerable and unpersisted.
+12. Constraint graph connectivity is implemented and unpersisted.
+13. Generated-face target descriptors are implemented and unpersisted.
+14. Rigid-transform evaluation is implemented and evaluated frames are unpersisted.
+15. Planar Mate/Distance residual construction is implemented and residual descriptors are unpersisted.
 16. Add solver/cache records only after a rigid-body solver exists, and persist only data that is not safely derivable.
 17. Add project-level `resources` for engineering modules.
-18. Optionally add an out-of-band `cached_shapes` store, clearly separated from model intent.
+18. Optionally add an out-of-band `cached_shapes` store separated from model intent.
 
 ## Rules
 
-- model intent is the source of truth; cached shapes are regenerable and optional.
+- model intent is the source of truth; caches are regenerable and optional.
 - never serialize raw OCCT topology as a model reference; store semantic references instead.
 - STEP export runs through normal recompute and is a projection of the model, not the save format.
 - component instances and assembly constraints are explicit persistent model intent.
-- graph connectivity is regenerated rather than serialized as a second source of truth.
-- resolved assembly target descriptors remain regenerable derived data.
-- evaluated assembly-space points, vectors, and planar frames remain regenerable derived data.
-- the persisted `rotation_deg` field uses the exact convention documented in `docs/assembly-rigid-transform-evaluation-mvp5.md`; changing that convention would be a model-format semantic compatibility change even if the JSON shape stayed identical.
-- future equation/residual and solver cache persistence requires an explicit cache design and must not replace persistent relationship intent.
+- active constraint graph connectivity is regenerated.
+- resolved assembly targets remain derived data.
+- evaluated assembly-space geometry remains derived data.
+- planar Mate/Distance residual descriptors remain derived data.
+- persisted target A/B order must be preserved because signed Distance residual semantics depend on it.
+- `rotation_deg` uses the exact convention documented in `docs/assembly-rigid-transform-evaluation-mvp5.md`; changing that convention is a model-format semantic compatibility change even if JSON shape is unchanged.
+- future solver result/cache persistence requires an explicit design and must not replace persistent relationship intent.
 
 ## Out of scope for the first versions
 

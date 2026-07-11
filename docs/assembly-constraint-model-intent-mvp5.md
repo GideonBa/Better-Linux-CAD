@@ -1,22 +1,22 @@
 # Assembly Constraint Model Intent MVP-5
 
-Status: implemented solver-independent assembly relationship records for Mate, Concentric, and Distance. The read-only constraint graph, generated-face target resolver, and rigid-transform evaluator are implemented as separate downstream layers.
+Status: implemented solver-independent assembly relationship records for Mate, Concentric, and Distance. Geometry resolution, transform evaluation, and planar Mate/Distance residual construction exist as separate downstream read-only layers.
 
 ## Goal
 
-This block makes assembly relationships persistent model intent independently from geometry resolution, transform evaluation, equation construction, and rigid-body solving.
+This block makes assembly relationships persistent model intent independently from geometry caches and solver output.
 
-The record layer stores what two component occurrences are intended to relate. It does not compute where either component must move.
+It stores what two component occurrences are intended to relate. It does not compute where either component must move.
 
 ## Typed identity
 
-Assembly constraints use a dedicated typed id:
+Assembly constraints use:
 
 ```text
 AssemblyConstraintId
 ```
 
-The id is independent from `ComponentInstanceId`, `DocumentId`, and part feature ids.
+The id is independent from component, document, and feature ids.
 
 Constraint ids must be non-empty and unique within one `AssemblyDocument`.
 
@@ -26,7 +26,7 @@ Constraint ids must be non-empty and unique within one `AssemblyDocument`.
 
 ```text
 component_instance   ComponentInstanceId
-semantic_reference  persistent semantic reference token
+semantic_reference  persistent semantic token
 ```
 
 Examples:
@@ -40,17 +40,13 @@ Validation guarantees:
 
 - component instance id is non-empty
 - semantic reference token is non-empty
-- when a constraint enters an `AssemblyDocument`, target A and target B component instance ids must already exist in that assembly
+- when a constraint enters an `AssemblyDocument`, both target component ids already exist in that assembly
 
-The semantic reference token is intentionally opaque at this layer. The record layer does not resolve it to a face, edge, axis, vertex, workplane, or OCCT topology id.
-
-Raw OCCT topology names such as `Face17` or `Edge4` are not the intended persistent model representation.
-
-The separate `AssemblyConstraintTargetResolver` now interprets the first supported generated planar face family. That does not change the general persistent token model or add geometry logic to this record layer.
+The semantic token is intentionally opaque at this record layer. Raw OCCT names such as `Face17` or `Edge4` are not the intended persistent representation.
 
 ## Constraint types
 
-The implemented seed is limited to:
+The implemented persistent seed is limited to:
 
 ```text
 AssemblyConstraintType::Mate
@@ -58,7 +54,7 @@ AssemblyConstraintType::Concentric
 AssemblyConstraintType::Distance
 ```
 
-No Flush, Coincident, Insert, Angle, Tangent, Lock, or joint records are added by this block.
+Flush, Coincident, Insert, Angle, Tangent, Lock, and joints remain future record families.
 
 ## Constraint record
 
@@ -74,23 +70,23 @@ state = active | inactive
 distance = optional length quantity
 ```
 
-The record has stable identity and two semantic component targets.
+Target A/B order is persistent intent and must be preserved by downstream consumers. This matters for the implemented signed planar Distance residual convention.
 
 `AssemblyConstraintState::Inactive` persists disabled relationship intent without deleting the record.
 
 ## Type-specific distance validation
 
-Distance is stored as a BLCAD `Quantity` so units and finite numeric validation remain explicit.
+Distance is stored as a BLCAD `Quantity`.
 
 Rules:
 
-- `Distance` requires exactly one length quantity
-- the current `Quantity::length_mm` rules require a finite value greater than zero
-- `Mate` must not carry a distance value
-- `Concentric` must not carry a distance value
+- Distance requires one length quantity
+- the current length rules require a finite positive value
+- Mate must not carry a distance value
+- Concentric must not carry a distance value
 - count quantities are rejected for Distance
 
-This block stores a concrete distance value. Binding a distance constraint directly to an assembly parameter remains deferred until an explicit assembly parameter-to-constraint dependency model exists.
+Direct binding of a constraint distance to an assembly parameter remains deferred until an explicit constraint dependency model exists.
 
 ## Assembly ownership
 
@@ -102,7 +98,7 @@ AssemblyDocument
   constraints[]
 ```
 
-Public APIs added by this block:
+Public APIs include:
 
 ```text
 add_constraint(AssemblyConstraint)
@@ -111,58 +107,101 @@ constraint_count()
 find_constraint(AssemblyConstraintId)
 ```
 
-`add_constraint` validates:
+`add_constraint` validates unique ids and existing target component instances.
 
-- unique constraint id
-- existing target A component instance
-- existing target B component instance
+## Record-layer boundary
 
-Target construction already validates non-empty component ids and semantic reference tokens. `AssemblyConstraint::create` validates identity, name, and type-specific distance requirements.
+Adding a constraint is read-only with respect to component placement/state.
 
-## No-solver boundary
+This persistent record block does not:
 
-Adding a constraint is read-only with respect to all component placement/state records.
-
-This record block does not itself:
-
-- mutate either component `RigidTransform`
-- infer a constraint from a free-placement edit
-- resolve semantic target geometry
-- evaluate component-local geometry in assembly space
-- construct constraint equations or residuals
-- move grounded or free components
+- mutate component `RigidTransform` values
+- infer constraints from free-placement edits
+- resolve semantic geometry
+- evaluate component transforms
+- construct residuals
+- solve placement
+- enforce grounding
 - compute remaining degrees of freedom
-- detect underdefined, fully constrained, or overconstrained assemblies
+- detect under/fully/overconstrained assemblies
 - recompute member part geometry
 
-Separate derived layers now build graph connectivity, resolve supported generated-face targets, and evaluate valid persisted transforms. None of them changes this record-layer boundary.
+Loading constraints from JSON follows the same ownership and validation path and cannot silently move components.
 
-Loading constraints from JSON follows the same path: component instances are loaded first, then constraints are validated and added. JSON loading cannot silently solve or move component instances.
+## Downstream implemented layers
+
+The persistent record is now consumed by three independent read-only layers.
+
+### Active relationship connectivity
+
+```text
+AssemblyConstraintGraph
+```
+
+The graph uses component endpoints and active/inactive state. It does not copy semantic geometry.
+
+### Semantic target geometry and transform evaluation
+
+```text
+AssemblyConstraintTargetResolver
+AssemblyTransformEvaluator
+```
+
+These layers resolve supported generated-face targets and evaluate them in assembly coordinates.
+
+### Planar equation/residual construction
+
+```text
+AssemblyConstraintEquationBuilder
+```
+
+The builder consumes active Mate and Distance records with supported generated planar targets.
+
+Canonical Mate residuals:
+
+```text
+normal_opposition = nA + nB
+signed_separation_mm = dot(oB - oA, nA)
+```
+
+Canonical planar Distance residuals:
+
+```text
+normal_parallelism = cross(nA, nB)
+signed_separation_mm = dot(oB - oA, nA)
+distance_residual_mm = signed_separation_mm - target_distance_mm
+```
+
+Distance separation is target-order dependent. The record layer therefore must preserve target A/B order exactly.
+
+Concentric residual construction remains unsupported because semantic axis target resolution is not implemented.
+
+See `docs/assembly-planar-constraint-equations-mvp5.md`.
 
 ## Project structure validation
 
-`Project::validate_assembly_constraints()` verifies that every persisted constraint target still resolves to an owned assembly component instance.
+`Project::validate_assembly_constraints()` verifies that every persisted target still resolves to an owned assembly component instance.
 
-`Project::validate_assembly_structure()` validates, in order:
+`Project::validate_assembly_structure()` validates:
 
-1. assembly member parts resolve to project-owned `PartDocument`s
+1. assembly members resolve to project-owned parts
 2. component instances reference valid member/project parts
 3. assembly constraints reference existing component instances
 
-Several component instances may still reference one owned `PartDocument`. Constraints relate occurrences, not duplicated part model records.
+Several component instances may reference one owned `PartDocument`. Constraints relate occurrences, not duplicated part model records.
 
 ## JSON representation
 
-Assembly JSON keeps the compatibility marker:
+Assembly JSON retains the historical compatibility marker:
 
 ```text
 blcad.assembly_document.mvp4
 version 1
 ```
 
-The marker is historical. MVP-5 component instances and assembly constraints extend the schema additively.
+MVP-5 component instances and constraints extend this schema additively.
 
-Constraints are stored in the optional array:
+Constraints are stored in optional `assembly_constraints`:
 
 ```json
 {
@@ -189,32 +228,15 @@ Constraints are stored in the optional array:
 }
 ```
 
-Mate and Concentric records omit `distance`.
-
 Compatibility rules:
 
-- old files without `assembly_constraints` load with zero constraints
-- unsupported constraint type/state strings are rejected
+- files without `assembly_constraints` load with zero constraints
+- unsupported type/state strings are rejected
 - Distance JSON must carry a millimeter distance value
-- target validation runs through the normal `AssemblyDocument::add_constraint` path
-- project JSON automatically inherits constraint persistence because it embeds assembly JSON
+- target validation runs through `AssemblyDocument::add_constraint`
+- project JSON inherits constraint persistence through embedded assembly JSON
 
-No solver result, resolved target descriptor, evaluated assembly-space frame, graph cache, equation cache, DOF state, or solved transform cache is serialized. Derived assembly data is regenerated from model intent.
-
-## Downstream read-only pipeline
-
-The current implemented downstream path is:
-
-```text
-AssemblyConstraint record
-  -> AssemblyConstraintGraph              # active relationship connectivity
-  -> AssemblyConstraintTargetResolver     # supported local target frames
-  -> AssemblyTransformEvaluator           # assembly-space target frames
-  -> future equation/residual builder
-  -> future rigid-body solver
-```
-
-The record layer remains the persistent source of relationship intent. Each downstream layer consumes records without rewriting them.
+No graph cache, resolved target geometry, evaluated frame, residual descriptor, solver result, DOF state, or solved transform cache is serialized by this record block.
 
 ## Headless inspection
 
@@ -222,77 +244,69 @@ The record layer remains the persistent source of relationship intent. Each down
 
 For each constraint it prints:
 
-- constraint id and name
+- id and name
 - type
 - active/inactive state
 - target A component id and semantic token
 - target B component id and semantic token
-- distance in millimeters when present
+- Distance value when present
 
-The inspector also builds `AssemblyConstraintGraph` and prints a compact connectivity summary.
+The inspector also prints a derived active-constraint graph summary.
 
-The checked-in `examples/component_instances.blcad.project.json` contains Mate, Concentric, and Distance records for this inspection path.
-
-The example may contain semantic token families that are not yet supported by the geometry resolver. Persistent record support is intentionally broader than the currently implemented geometric target families.
-
-## Test coverage
+## Tests
 
 `tests/core/assembly_constraint_tests.cpp` covers:
 
 - empty target component ids
-- empty semantic reference tokens
+- empty semantic tokens
 - empty constraint id/name
 - Mate and Concentric rejecting distance values
 - Distance requiring a length value
 - Distance rejecting count quantities
-- duplicate constraint ids
-- missing target component instances
-- unchanged component transforms after adding Mate, Concentric, and Distance
-- Mate/Concentric/Distance assembly JSON roundtrip
+- duplicate ids
+- missing target components
+- unchanged component transforms after adding constraints
+- Mate/Concentric/Distance JSON roundtrip
 - active/inactive state roundtrip
-- semantic target roundtrip
+- semantic target order/token roundtrip
 - Distance value roundtrip
 - backward-compatible loading without `assembly_constraints`
-- invalid constraint targets from JSON
+- invalid JSON constraint targets
 - project JSON roundtrip
-- shared owned `PartDocument` intent across multiple constrained component instances
-- project assembly-structure validation with constraints
+- shared owned part intent across constrained occurrences
+- project assembly-structure validation
 
-Graph, target-resolution, and transform-evaluation suites are documented separately.
-
-Targeted record-layer test command after a core build:
+Targeted record-layer command:
 
 ```bash
 ./build/dev/blcad_core_tests "[core][assembly-constraint]"
 ```
 
-Complete core workflow:
+Graph, target-resolution, transform-evaluation, and equation-builder tests live in their own suites.
 
-```bash
-cmake --workflow --preset dev-build-test
-```
+## Deliberate limitations
 
-## Deferred work from the record block
+The record block remains independent from:
 
-The following remain outside this persistent record layer:
-
-- geometry interpretation of semantic tokens
+- semantic geometry interpretation
 - local-to-assembly transform evaluation
-- constraint equation/residual construction
+- constraint residual construction
 - rigid-body solving
 - transform mutation from constraints
-- remaining DOF computation and display
-- enforced grounding
-- underdefined/fully constrained/overconstrained analysis
-- richer constraint and joint families
-- collision/interference checks
+- remaining-DOF computation
+- grounding enforcement
+- under/fully/overconstrained analysis
+- richer constraints and joints
+- collision/interference analysis
 - subassemblies
 - assembly-level geometry instancing and STEP export
 
-Geometry interpretation and transform evaluation are now implemented as separate read-only layers. They remain intentionally outside this record block.
+Geometry interpretation, transform evaluation, and planar Mate/Distance residual construction are implemented downstream but intentionally remain outside persistent record ownership.
 
-## Next technical step
+## Current downstream boundary
 
-The repository-wide next assembly block is read-only planar Mate/Distance equation/residual construction.
+The repository-wide next assembly block is a first rigid-body solver seed.
 
-It should consume active persisted records, resolve the currently supported generated-face targets, evaluate both planes in assembly space, and construct documented deterministic residual data without solving or mutating component transforms. Concentric remains deferred until semantic axis references are implemented.
+It should consume deterministic connected groups and supported active Mate/Distance residual descriptors, define grounded/fixed participation, variable transform representation, residual weighting, convergence behavior, and an explicit proposed-transform application boundary.
+
+Concentric remains deferred until semantic axis targets and Concentric residual construction exist.

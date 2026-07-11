@@ -88,6 +88,7 @@ if(BLCAD_BUILD_GEOMETRY)
   add_library(
     blcad_geometry STATIC
     src/geometry/arc_closed_profile_adapter.cpp
+    src/geometry/assembly_constraint_equation_builder.cpp
     src/geometry/assembly_constraint_target_resolver.cpp
     src/geometry/assembly_transform_evaluator.cpp
     src/geometry/circular_cut_adapter.cpp
@@ -221,6 +222,7 @@ if(BLCAD_BUILD_TESTS)
     add_executable(
       blcad_geometry_tests
       tests/geometry/arc_closed_profile_pipeline_tests.cpp
+      tests/geometry/assembly_constraint_equation_builder_tests.cpp
       tests/geometry/assembly_constraint_target_resolver_tests.cpp
       tests/geometry/assembly_parameter_pipeline_tests.cpp
       tests/geometry/assembly_transform_evaluator_tests.cpp

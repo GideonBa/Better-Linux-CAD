@@ -1,18 +1,18 @@
 # Assembly Rigid-Transform Evaluation MVP-5
 
-Status: implemented deterministic read-only component-local-to-assembly-space evaluation for the persisted `RigidTransform` free-placement record.
+Status: implemented deterministic read-only component-local-to-assembly-space evaluation for persisted `RigidTransform` placement intent.
 
 ## Goal
 
-This block gives the existing component placement record one explicit geometry-evaluation convention before assembly constraint equations consume resolved target frames.
+This block gives the existing persisted component transform one explicit geometry-evaluation convention before assembly equations or a solver consume target geometry.
 
-It answers three narrow questions:
+It evaluates:
 
-1. How is one component-local point evaluated in assembly coordinates?
-2. How is one component-local vector evaluated without applying translation?
-3. How is a `ComponentLocalPlanarDescriptor` converted into an assembly-space planar frame?
+- component-local points
+- component-local vectors
+- component-local planar frames
 
-The evaluator is derived geometry logic. It does not change model intent, solve constraints, or persist evaluated geometry.
+The result is derived assembly-space geometry. No stored component transform is changed.
 
 ## API
 
@@ -27,120 +27,124 @@ AssemblySpacePlanarDescriptor
 
 AssemblyTransformEvaluator
   evaluate_point(RigidTransform, Point3)
-    -> Point3
-
   evaluate_vector(RigidTransform, Vector3)
-    -> Vector3
-
   evaluate_plane(RigidTransform, ComponentLocalPlanarDescriptor)
-    -> AssemblySpacePlanarDescriptor
 ```
 
-`AssemblySpacePlanarDescriptor` is a separate type from `ComponentLocalPlanarDescriptor`. The coordinate-space distinction therefore remains visible in the API instead of relying on comments or caller discipline.
+`AssemblySpacePlanarDescriptor` is distinct from `ComponentLocalPlanarDescriptor` so coordinate space remains explicit in the API vocabulary.
 
-## Persisted transform units
+## Persisted transform convention
 
-The existing `RigidTransform` remains:
+`RigidTransform` stores:
 
 ```text
-RigidTransform
-  translation_mm
-  rotation_deg
+translation_mm
+rotation_deg
 ```
 
-The interpretation is now explicit:
+The canonical interpretation is:
 
-- `translation_mm.x`, `.y`, and `.z` are assembly-coordinate translations in millimeters
-- `rotation_deg.x`, `.y`, and `.z` are angles in degrees
-- positive rotations follow the right-hand rule
+- translation components are millimeters
+- rotation components are degrees
 - rotations are active rotations of component-local geometry
-- rotations are applied about fixed axes in X, then Y, then Z order
+- rotations use fixed assembly X, Y, and Z axes
+- positive angles follow the right-hand rule
+- X rotation is applied first
+- Y rotation is applied second
+- Z rotation is applied third
 
-The evaluator converts each degree value to radians only for the `std::sin` and `std::cos` calculations. The persisted representation remains degrees and the JSON schema does not change.
-
-## Exact rotation convention
-
-Let:
-
-```text
-rx = rotation_deg.x
-ry = rotation_deg.y
-rz = rotation_deg.z
-```
-
-For a component-local column vector `v`, BLCAD evaluates:
-
-```text
-v1 = Rx(rx) * v
-v2 = Ry(ry) * v1
-v3 = Rz(rz) * v2
-```
-
-Equivalently:
-
-```text
-v_assembly = Rz(rz) * Ry(ry) * Rx(rx) * v_local
-```
-
-This is an active, right-handed, fixed-axis X-then-Y-then-Z convention.
-
-It is not an implicit library Euler convention and it must not be silently replaced by intrinsic/body-axis XYZ rotation or by Z-then-Y-then-X application order.
-
-A combined-axis test proves the convention:
-
-```text
-rotation_deg = (90, 90, 90)
-local vector = (1, 2, 3)
-
-Rx(90): (1, -3, 2)
-Ry(90): (2, -3, -1)
-Rz(90): (3, 2, -1)
-```
-
-The expected assembly-space vector is therefore:
-
-```text
-(3, 2, -1)
-```
-
-This test exists specifically so later solver, import/export, GUI manipulator, and assembly-instancing code cannot infer a different order from the field names alone.
-
-## Point evaluation
-
-Points are rotated first and translated second:
-
-```text
-p_assembly = Rz * Ry * Rx * p_local + translation_mm
-```
-
-Example with no rotation:
-
-```text
-translation_mm = (10, -20, 30)
-local point    = (1.25, -2.5, 3.75)
-
-assembly point = (11.25, -22.5, 33.75)
-```
-
-Identity rotation and zero translation preserve the point exactly within the existing `double` representation.
-
-## Vector evaluation
-
-Vectors are rotated only:
+For column vectors:
 
 ```text
 v_assembly = Rz * Ry * Rx * v_local
 ```
 
-Translation is never added to vectors, basis axes, or normals.
+This convention is part of the semantic meaning of persisted `rotation_deg`. Changing it later would change model interpretation even if the JSON field shape remained identical.
 
-The evaluator does not normalize arbitrary vectors. A rigid rotation must preserve vector magnitude, so returning a normalized value would incorrectly destroy meaningful vector length. For unit basis axes and unit normals, rotation preserves unit length and orthogonality within floating-point tolerance.
+## Point evaluation
 
-The focused tests use a `1e-12` numeric tolerance for rotated-value, magnitude, and orthogonality checks.
+For a component-local point `p`:
+
+```text
+p_rotated = Rz * Ry * Rx * p
+p_assembly = p_rotated + translation_mm
+```
+
+Translation is applied after rotation.
+
+A pure translation therefore maps:
+
+```text
+p_local = (1.25, -2.5, 3.75)
+translation_mm = (10, -20, 30)
+
+p_assembly = (11.25, -22.5, 33.75)
+```
+
+## Vector evaluation
+
+Vectors represent direction and magnitude rather than position.
+
+```text
+v_assembly = Rz * Ry * Rx * v_local
+```
+
+Translation is never applied to vectors, basis axes, or normals.
+
+Rigid rotation preserves vector magnitude within floating-point tolerance.
+
+## Positive single-axis rotations
+
+The tests lock the right-handed convention explicitly.
+
+Positive X rotation:
+
+```text
+(0, 1, 0) --Rx(90 deg)--> (0, 0, 1)
+```
+
+Positive Y rotation:
+
+```text
+(0, 0, 1) --Ry(90 deg)--> (1, 0, 0)
+```
+
+Positive Z rotation:
+
+```text
+(1, 0, 0) --Rz(90 deg)--> (0, 1, 0)
+```
+
+## Combined rotation-order proof
+
+The implementation does not rely on an unstated Euler convention.
+
+For:
+
+```text
+rotation_deg = (90, 90, 90)
+v_local = (1, 2, 3)
+```
+
+The documented sequence is:
+
+```text
+Rx(90): (1, -3, 2)
+Ry(90): (2, -3, -1)
+Rz(90): (3, 2, -1)
+```
+
+Therefore:
+
+```text
+v_assembly = (3, 2, -1)
+```
+
+The combined-axis test exists specifically to prove order, not only single-axis sign conventions.
 
 ## Planar-frame evaluation
 
-A component-local target frame is:
+For:
 
 ```text
 ComponentLocalPlanarDescriptor
@@ -150,42 +154,22 @@ ComponentLocalPlanarDescriptor
   normal
 ```
 
-The evaluator produces:
+`evaluate_plane` performs:
 
 ```text
-AssemblySpacePlanarDescriptor
-  origin = evaluate_point(transform, local.origin)
-  x_axis = evaluate_vector(transform, local.x_axis)
-  y_axis = evaluate_vector(transform, local.y_axis)
-  normal = evaluate_vector(transform, local.normal)
+assembly origin = evaluate_point(transform, local origin)
+assembly x_axis = evaluate_vector(transform, local x_axis)
+assembly y_axis = evaluate_vector(transform, local y_axis)
+assembly normal = evaluate_vector(transform, local normal)
 ```
 
-Only the origin receives translation.
+Translation applies only to the origin.
 
-For example:
-
-```text
-local origin = (0, 0, 8)
-local x-axis = (1, 0, 0)
-local y-axis = (0, 1, 0)
-local normal = (0, 0, 1)
-
-translation_mm = (10, 20, 30)
-rotation_deg   = (0, 0, 90)
-```
-
-The assembly-space frame is:
-
-```text
-origin = (10, 20, 38)
-x-axis = (0, 1, 0)
-y-axis = (-1, 0, 0)
-normal = (0, 0, 1)
-```
+Rigid rotation preserves unit basis lengths and frame orthogonality within numeric tolerance.
 
 ## Bridge from semantic target resolution
 
-The completed target-resolution block returns:
+The target resolver returns:
 
 ```text
 ResolvedAssemblyConstraintTarget
@@ -193,42 +177,57 @@ ResolvedAssemblyConstraintTarget
   component_transform
 ```
 
-The explicit bridge is now:
+The evaluator consumes those fields directly:
 
 ```text
 AssemblyConstraintTarget
-  -> AssemblyConstraintTargetResolver::resolve(...)
-  -> ResolvedAssemblyConstraintTarget
-  -> AssemblyTransformEvaluator::evaluate_plane(
-       resolved.component_transform,
-       resolved.local_plane)
+  -> AssemblyConstraintTargetResolver
+  -> local_plane + component_transform
+  -> AssemblyTransformEvaluator::evaluate_plane
   -> AssemblySpacePlanarDescriptor
 ```
 
-Target resolution still owns semantic component/part/feature lookup and generated-face frame construction. Transform evaluation owns only the component-local-to-assembly-space mapping.
+The responsibilities remain separate:
 
-The two responsibilities remain separate so semantic reference resolution does not duplicate transform math and transform evaluation does not depend on part feature semantics.
+- target resolution owns semantic lookup and component-local frame construction
+- transform evaluation owns component-local-to-assembly coordinate mapping
+
+## Downstream residual construction
+
+Planar Mate/Distance residual construction is now implemented separately in `docs/assembly-planar-constraint-equations-mvp5.md`.
+
+`AssemblyConstraintEquationBuilder` reuses this evaluator for both targets before constructing residuals:
+
+```text
+AssemblyConstraint
+  -> target A/B resolution
+  -> target A/B transform evaluation
+  -> assembly-space planes
+  -> Mate or Distance residual descriptor
+```
+
+The transform evaluator itself still has no knowledge of constraint type or residual semantics.
 
 ## Valid transform boundary
 
-`ComponentInstance::create` and the explicit component transform update path reject non-finite translation or rotation components. Persisted project model intent therefore provides finite `RigidTransform` values to this evaluator.
+`ComponentInstance::create` and explicit transform updates reject non-finite translation or rotation components. Persisted model intent therefore supplies finite `RigidTransform` values to this evaluator.
 
-The evaluator is intentionally a direct geometry helper and does not repeat model-record validation or return `Result<T>` for already validated persisted transforms.
+The evaluator is a direct geometry helper and does not repeat record validation or return `Result<T>` for already validated persisted transforms.
 
 ## Read-only and persistence boundary
 
 Evaluation does not:
 
 - mutate the input `RigidTransform`
-- mutate the input local point, vector, or planar descriptor
+- mutate the input point, vector, or local planar descriptor
 - update a `ComponentInstance`
 - change grounding, visibility, or suppression state
-- add or change assembly constraints
+- change assembly constraints
 - recompute a `PartDocument`
 - own or mutate a `ShapeCache`
-- persist an assembly-space point, vector, or planar descriptor
+- persist evaluated assembly-space geometry
 
-Assembly-space evaluated geometry is regenerable from persisted component placement plus component-local geometry. No transform-evaluation cache field is added to assembly or project JSON.
+Assembly-space geometry is regenerated from component-local geometry plus persisted placement. No transform matrix, quaternion, or evaluated-frame JSON field is added.
 
 ## Tests
 
@@ -239,15 +238,15 @@ Assembly-space evaluated geometry is regenerable from persisted component placem
 - positive 90-degree X rotation
 - positive 90-degree Y rotation
 - positive 90-degree Z rotation
-- combined X-then-Y-then-Z rotation order
-- conversion of a resolved-target-shaped local plane into assembly space
+- combined X-then-Y-then-Z order
+- end-to-end target resolution followed by plane evaluation
 - deterministic repeated frame evaluation
 - unchanged input transform and local frame
 - unit-length preservation for planar basis axes and normals
-- preserved planar-frame orthogonality
+- frame orthogonality preservation
 - arbitrary vector magnitude preservation
 
-Targeted test command after a geometry build:
+Targeted test command:
 
 ```bash
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-transform]"
@@ -259,25 +258,27 @@ Complete geometry workflow:
 cmake --workflow --preset dev-geometry-build-test
 ```
 
-## Deferred work
+## Deliberate limitations
 
-This block does not implement:
+This block itself does not implement:
 
-- Mate or Distance constraint equations
-- Concentric equations or semantic axis references
+- assembly constraint residual semantics
 - rigid-body solving
 - solved component transform updates
+- residual Jacobians or weighting
 - remaining-DOF computation
-- underconstrained, fully constrained, or overconstrained state analysis
+- under/fully/overconstrained analysis
 - enforced grounding
-- suppression participation rules for assembly solving
+- suppression participation rules
 - component geometry instancing
 - assembly-level STEP export
 
-## Next technical step
+Planar Mate/Distance residual construction is no longer deferred globally; it is implemented as the separate `AssemblyConstraintEquationBuilder` layer.
 
-The next assembly block is the first read-only planar Mate/Distance constraint equation-construction seed over assembly-space target descriptors.
+## Current downstream boundary
 
-That block should consume persistent active constraint records, resolve supported generated-face targets, evaluate both local target planes into assembly space, and construct deterministic geometric equation/residual data without solving for or mutating component transforms.
+The repository-wide next assembly step is a first rigid-body solver seed over the active-constraint graph and the implemented planar residual descriptors.
 
-Concentric equation construction remains deferred until a stable semantic axis-reference family exists.
+The solver must preserve this transform convention at its API boundary and explicitly define its internal variable representation, fixed/grounded participation, residual weighting, convergence behavior, solve-result representation, and transform-application boundary.
+
+Concentric remains deferred until semantic axis targets and Concentric residual construction exist.
