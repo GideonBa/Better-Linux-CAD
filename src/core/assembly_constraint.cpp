@@ -9,6 +9,7 @@ std::string_view to_string(AssemblyConstraintType type) noexcept {
   case AssemblyConstraintType::Mate: return "mate";
   case AssemblyConstraintType::Concentric: return "concentric";
   case AssemblyConstraintType::Distance: return "distance";
+  case AssemblyConstraintType::Insert: return "insert";
   }
   return "mate";
 }

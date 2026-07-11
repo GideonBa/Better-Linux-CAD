@@ -59,6 +59,15 @@ enum class SemanticAxis {
 
 [[nodiscard]] std::string_view to_string(SemanticAxis axis) noexcept;
 
+// The first semantic seating-plane family exposes the oriented source seat of
+// one supported circular feature. It is constructive feature intent, not an
+// OCCT face id.
+enum class SemanticSeatingPlane {
+  Primary,
+};
+
+[[nodiscard]] std::string_view to_string(SemanticSeatingPlane plane) noexcept;
+
 class SemanticFaceReference {
 public:
   [[nodiscard]] static Result<SemanticFaceReference> create(FeatureId source_feature,
@@ -88,6 +97,23 @@ private:
 
   FeatureId source_feature_;
   SemanticAxis axis_;
+};
+
+class SemanticSeatingPlaneReference {
+public:
+  [[nodiscard]] static Result<SemanticSeatingPlaneReference>
+  create(FeatureId source_feature,
+         SemanticSeatingPlane plane = SemanticSeatingPlane::Primary);
+
+  [[nodiscard]] const FeatureId& source_feature() const noexcept;
+  [[nodiscard]] SemanticSeatingPlane plane() const noexcept;
+  [[nodiscard]] std::string node_id() const;
+
+private:
+  SemanticSeatingPlaneReference(FeatureId source_feature, SemanticSeatingPlane plane);
+
+  FeatureId source_feature_;
+  SemanticSeatingPlane plane_;
 };
 
 class SemanticEdgeReference {

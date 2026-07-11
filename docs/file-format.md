@@ -1,6 +1,6 @@
 # Project and Save File Format
 
-Status: implemented seeds exist for single-part `.blcad.json`, assembly parameters, embedded project JSON, component instances, Mate/Concentric/Distance relationship intent, semantic generated-axis targets, and the derived graph/target/transform/residual/numeric-solve/DOF-diagnostic pipeline.
+Status: implemented seeds exist for single-part `.blcad.json`, assembly parameters, embedded project JSON, component instances, Mate/Concentric/Distance/Insert relationship intent, semantic generated face/axis/seat targets, and the derived graph/target/transform/residual/numeric-solve/DOF pipeline.
 
 The save format stores parametric model intent. OCCT shapes, resolved target geometry, residual descriptors, numeric Jacobians, solver products, and DOF diagnostics are regenerable derived data and are not the source of truth.
 
@@ -65,22 +65,22 @@ Representative shape:
 
 Persistence rules:
 
-- component occurrences reference part document ids instead of duplicating parts
+- component occurrences reference part ids instead of duplicating parts
 - transform components must be finite
 - `translation_mm` is stored in millimeters
 - `rotation_deg` is stored in degrees
 - transform evaluation uses active right-handed fixed-axis X-then-Y-then-Z rotation
-- no transform matrix, quaternion, evaluated plane, or evaluated axis is serialized
+- no matrix, quaternion, evaluated plane, evaluated axis, or evaluated seating plane is serialized
 - grounding, suppression, and visibility are persisted model intent
 - storage-level direct transform edits remain legal while grounded
-
-The exact transform semantics are canonicalized in `docs/assembly-rigid-transform-evaluation-mvp5.md`.
 
 Changing the interpretation of `rotation_deg` would be a model-format semantic compatibility change even if the JSON shape stayed identical.
 
 ## Assembly constraint JSON
 
-A Concentric relationship persists semantic generated-axis tokens directly in the existing target string fields:
+The same existing record shape stores Mate, Concentric, Distance, and Insert intent.
+
+### Concentric
 
 ```json
 {
@@ -99,7 +99,26 @@ A Concentric relationship persists semantic generated-axis tokens directly in th
 }
 ```
 
-A Distance record uses the same target structure and adds a positive millimeter length value:
+### Insert
+
+```json
+{
+  "id": "constraint.insert",
+  "name": "Insert",
+  "type": "insert",
+  "target_a": {
+    "component_instance": "component.plate.1",
+    "semantic_reference": "feature.hole.seat"
+  },
+  "target_b": {
+    "component_instance": "component.plate.2",
+    "semantic_reference": "feature.hole.seat"
+  },
+  "state": "active"
+}
+```
+
+### Distance
 
 ```json
 {
@@ -125,30 +144,60 @@ A Distance record uses the same target structure and adds a positive millimeter 
 Constraint persistence rules:
 
 - constraints use typed ids and semantic target strings
-- raw OCCT topology ids are not persisted as model references
+- raw OCCT topology ids are not persistent model references
 - target A/B order is preserved
-- Mate and Concentric omit `distance`
+- Mate, Concentric, and Insert omit `distance`
 - Distance requires a positive length quantity
 - constraint state is `active` or `inactive`
-- adding or loading a constraint does not mutate component transforms
+- adding/loading a constraint does not mutate component transforms
 - project structure validation checks target component identity
 
-The semantic target string remains intentionally opaque at the record/JSON layer. Geometry consumers interpret only the families they explicitly support.
+The semantic target string is intentionally opaque at the record/JSON layer. Geometry consumers interpret only explicitly supported families.
 
-Current interpreted assembly geometry families include:
+Current interpreted assembly target families include:
 
 ```text
 feature.<feature-id>.top|bottom|right|left|front|back
 feature.<feature-id>.axis
+feature.<feature-id>.seat
 ```
 
-The first `.axis` producer is a single-circle `SubtractiveExtrude`, documented in `docs/assembly-semantic-axis-concentric-residuals-mvp5.md`.
+The first `.axis` and `.seat` producer is a single-circle `SubtractiveExtrude`.
 
-Changing the semantic meaning of an established token family is a model-format compatibility change even when the JSON field shape is unchanged.
+Changing the semantic meaning of an established token family is a model-format compatibility change even if the JSON field shape is unchanged.
+
+## Why Insert needs no new JSON shape
+
+`AssemblyConstraintType::Insert` serializes through the existing `type` string field as:
+
+```text
+insert
+```
+
+A stable seating target serializes through the existing target string field as:
+
+```text
+feature.hole.seat
+```
+
+The geometry layer derives the endpoint's primary axis and oriented seating plane from the same exact feature/profile intent.
+
+No fields such as the following are introduced:
+
+```text
+axis_target
+seat_target
+opening_face
+cylinder_face
+insert_pose
+insert_offset
+```
+
+The first Insert relationship means zero signed seating separation. A future parameterized nonzero axial Insert offset requires an explicit model-intent design rather than a hidden solver value.
 
 ## Derived assembly data is not persisted
 
-The implemented derivation layers include:
+Implemented derivation layers include:
 
 ```text
 AssemblyConstraintGraph
@@ -156,6 +205,7 @@ AssemblyConstraintTargetResolver
 AssemblyTransformEvaluator
 AssemblyConstraintEquationBuilder
 AssemblyConcentricConstraintEquationBuilder
+AssemblyInsertConstraintEquationBuilder
 shared assembly numeric system
 AssemblyRigidBodySolver
 AssemblySolveResultApplier
@@ -166,15 +216,18 @@ Derived outputs include:
 
 ```text
 constraint graph nodes/edges/groups
-component-local planar target descriptors
-component-local axis target descriptors
-assembly-space plane descriptors
-assembly-space axis descriptors
-planar Mate/Distance residual descriptors
+component-local planar targets
+component-local axis targets
+component-local composite Insert axis/seat targets
+assembly-space planes
+assembly-space axes
+assembly-space Insert endpoint geometry
+Mate/Distance residual descriptors
 Concentric residual descriptors
-flattened scaled Mate/Distance/Concentric residual vectors
+Insert residual descriptors
+flattened scaled numeric residual vectors
 central finite-difference Jacobians
-normal-equation matrices and damping attempts
+normal equations and damping attempts
 solver iteration state
 AssemblySolveResult values
 component input snapshots
@@ -187,33 +240,35 @@ local DOF/consistency/rank classifications
 
 None is serialized.
 
-They are rebuilt from persistent model intent and current component placement/state.
+The descriptors are rebuilt from persistent model intent and current placement/state.
 
-`SemanticAxisReference`, `ComponentLocalAxisDescriptor`, `AssemblySpaceAxisDescriptor`, and `ConcentricResidualDescriptor` are derived API descriptors rather than save-file records.
+Current shared numeric flattening exists for Mate, Distance, and Concentric only. Insert residual construction is derived but not yet part of the shared numeric solver.
 
-The six-scalar Concentric flattening order and rank `4/6` result are numeric interpretation, not persistence fields.
+The direct Insert residual test proves a regular local `7 x 6` Jacobian rank of `5`; that rank is a regenerable observation, not file state.
 
 ## Solver application and persisted transforms
 
 `AssemblyRigidBodySolver` changes transforms only on private `Project` copies and returns an unpersisted `AssemblySolveResult`.
 
-Mate, Distance, and Concentric all use this same solver path.
+Mate, Distance, and Concentric currently use this shared solver path.
 
-`AssemblySolveResultApplier` is the explicit mutation boundary. A fresh converged result must pass source-snapshot and proposal validation before proposed transforms are applied to another project copy.
+`AssemblySolveResultApplier` is the explicit mutation boundary. A fresh converged result must pass complete source-snapshot and proposal validation before transforms are applied atomically through another project copy.
 
-After successful application, the existing persistent field changes:
+After successful application, the existing field changes:
 
 ```text
 component_instances[].transform
 ```
 
-No separate `solved_transform`, `solver_pose`, Concentric pose, or solve-cache field exists.
+No separate `solved_transform`, `solver_pose`, constraint-family pose, or solve-cache field exists.
 
-A later save serializes the current transform exactly as it would after a direct explicit placement edit. The format does not record whether the transform originated from user placement or successful Mate/Distance/Concentric solver application.
+A later save serializes the current transform exactly like a direct placement edit. The format does not record transform provenance as manual versus solver-applied.
+
+Insert has no solver result yet. Persisting an Insert constraint therefore never implies that component transforms have already been solved.
 
 ## DOF diagnostics remain derived
 
-Current local rank and remaining-DOF values are intentionally not persisted:
+Current local rank and remaining-DOF values are not persisted:
 
 ```text
 rank_evaluated
@@ -230,24 +285,15 @@ consistency classification
 residual rank structure
 ```
 
-These are local linearized values under the current numeric system and configured rank tolerances. Persisting them as authoritative state would create stale cache semantics after component, constraint, part-parameter, semantic-target, or numeric-policy changes.
+These values depend on current geometry, placement, constraints, and numeric policy. Persisting them as authority would create stale cache semantics.
 
-Concentric diagnostics use the same derived Jacobian path as Mate/Distance.
+Concentric diagnostics use the shared solver Jacobian and prove regular rank `4/6`.
 
-A regular one-free-body Concentric relationship currently evaluates to:
+Insert rank `5/6` is currently proven by a focused direct residual Jacobian. Shared diagnostic integration is the next block.
 
-```text
-residual_component_count = 6
-variable_count           = 6
-jacobian_rank            = 4
-remaining_dof            = 2
-```
+No `dof`, `rank`, `insert_state`, `concentric_state`, or diagnostics cache field is added.
 
-Those values remain regenerable observations, not file-format state.
-
-No `dof`, `rank`, `constraint_state`, `concentric_state`, or diagnostics cache field is added to the current assembly/project schema.
-
-## Current implemented serialization scope
+## Current serialization APIs
 
 Implemented APIs include:
 
@@ -257,7 +303,7 @@ Implemented APIs include:
 - `serialize_project_to_json` / `deserialize_project_from_json`
 - `write_project_json_file` / `read_project_json_file`
 
-Serialization stores model intent only. It excludes OCCT shapes, `ShapeCache`, graph connectivity, resolved planes/axes, evaluated assembly-space descriptors, residual descriptors, numeric residual vectors, Jacobians, solver results, unapplied proposals, rank summaries, and DOF diagnostics.
+Serialization stores model intent only. It excludes OCCT shapes, `ShapeCache`, graph connectivity, resolved planes/axes/seats, evaluated assembly-space descriptors, residuals, numeric vectors, Jacobians, solver results, unapplied proposals, rank summaries, and DOF diagnostics.
 
 ## Target project container
 
@@ -276,7 +322,7 @@ ProjectFile
   optional out-of-band caches
 ```
 
-The current embedded project format is intentionally simpler. Manifest/external part references remain deferred.
+The current embedded project format remains intentionally simpler. Manifest/external part references are deferred.
 
 ## Rules
 
@@ -291,4 +337,4 @@ The current embedded project format is intentionally simpler. Manifest/external 
 - only explicit application of a fresh converged solve result changes persisted placement
 - persistent solver/DOF caches require a separate design and must never replace relationship intent
 
-The next assembly model-format extension is expected to come from explicit Insert relationship intent and stable semantic axial-seating target semantics. See `docs/mvp-plan.md`.
+The next assembly implementation block integrates the already-persistent Insert intent and already-derived composite Insert residual into the shared numeric solver/application/DOF pipeline. No new save-file field is required for that integration.

@@ -2,24 +2,24 @@
 
 Status: implemented stable generated-axis semantic references for the first supported circular-cut feature family, deterministic Concentric target/residual construction, and downstream integration into the shared numeric solver and local DOF diagnostics.
 
+The same circular-feature identity is now also reused by the separate `.seat`/Insert endpoint family documented in `docs/assembly-insert-intent-composite-residuals-mvp5.md`.
+
 ## Goal
 
-This block defines the semantic geometry and geometric residual contract for Concentric relationships.
-
-It answers:
+This block defines semantic geometry and geometric residual semantics for Concentric relationships:
 
 ```text
-Which feature-produced axis does a persistent assembly target mean?
-Where is that axis in component-local coordinates?
-Where is it in assembly coordinates under the persisted RigidTransform?
-What deterministic residual data describes Concentric error between two axes?
+Which feature-produced axis does a persistent target mean?
+Where is it in component-local coordinates?
+Where is it in assembly coordinates?
+What deterministic residual describes Concentric error?
 ```
 
-The axis and residual builders remain read-only. A separate shared numeric layer now consumes the resulting descriptors for solving and diagnostics.
+Axis resolution and residual construction remain read-only. A separate shared numeric layer consumes the descriptors for solving and diagnostics.
 
 ## Stable semantic axis family
 
-The first implemented generated-axis token is:
+First token:
 
 ```text
 feature.<feature-id>.axis
@@ -31,68 +31,56 @@ Example:
 feature.hole.axis
 ```
 
-The token identifies the primary generated axis of one supported feature. It never stores an OCCT face, edge, wire, or transient topology index.
-
-Core semantic identity:
+Core identity:
 
 ```text
-SemanticAxis
-  Primary
-
+SemanticAxis::Primary
 SemanticAxisReference
   source_feature
   axis
   node_id()
 ```
 
-For the first family:
-
 ```text
-SemanticAxis::Primary -> "axis"
 SemanticAxisReference(feature.hole, Primary).node_id()
   -> feature.hole.axis
 ```
 
-The enum leaves room for future feature families with more than one named axis while preserving the rule that references describe BLCAD model intent rather than kernel topology ids.
+The token identifies constructive feature meaning and never stores an OCCT face, edge, wire, or transient topology index.
 
-## First supported axis producer
+## First supported producer
 
-The first feature family exposing `feature.<feature-id>.axis` is:
+The first axis producer is:
 
 ```text
 FeatureType::SubtractiveExtrude
-+ exactly one CircleProfile in the input sketch
-+ exactly one total profile in that sketch
++ exactly one CircleProfile in the source sketch
++ exactly one total profile in the sketch
++ circle diameter resolves to a length parameter
 ```
 
-This matches the existing circular through-all cut path in `GeometryRecomputeExecutor`.
+This matches the current circular through-all cut model path.
 
-The generated axis is derived from the same intent used to create the circular cut:
+Axis geometry:
 
 ```text
-axis origin
-  = CircleProfile.center mapped through the resolved sketch workplane
+origin = CircleProfile.center mapped through the resolved source-sketch workplane
 
-axis direction
-  = resolved workplane normal
-    or its negation for OppositeSketchNormal
+direction = workplane.normal
+          or -workplane.normal for OppositeSketchNormal
 ```
 
-The circle diameter parameter must resolve to a length parameter. Diameter does not change the axis line, but requiring valid circular-profile intent prevents an invalid circular cut record from becoming a valid axis producer accidentally.
+Diameter does not change the axis line, but valid circular-profile intent is required before the feature may expose a semantic axis.
 
-## Why additive extrudes are not generic axis producers
+## Why generic additive extrudes are not axis producers
 
-The current additive-extrude geometry path supports rectangle, closed, arc-closed, composite, and detected-region profiles. It does not currently execute a single-circle additive extrusion as a cylinder feature.
+The current additive-extrude path supports several profile families but does not generally interpret every profile as one unambiguous cylindrical axis producer.
 
-Therefore no cylindrical axis is invented for every additive extrude.
+BLCAD therefore exposes semantic axes only where current feature intent has stable axis meaning.
 
-A semantic axis is exposed only where current feature intent has an unambiguous axis-producing meaning.
+## Why one circular pattern does not equal one axis
 
-## Why circular hole patterns are not mapped to one `axis`
-
-`CircularHolePattern` produces several distinct hole axes.
-
-A token such as:
+`CircularHolePattern` produces several holes.
 
 ```text
 feature.bolt_pattern.axis
@@ -100,21 +88,15 @@ feature.bolt_pattern.axis
 
 would be ambiguous.
 
-Pattern-axis references require stable per-instance semantic identity. That identity is deferred rather than inferred from transient OCCT topology or hidden vector order.
+Pattern axis references require stable per-instance semantic identity and must not rely on OCCT topology order or hidden vector position.
 
 ## Component-local axis descriptor
-
-Axis target resolution uses:
 
 ```text
 ComponentLocalAxisDescriptor
   origin
   direction
-```
 
-and:
-
-```text
 ResolvedAssemblyAxisConstraintTarget
   component_instance
   referenced_part_document
@@ -129,40 +111,33 @@ ResolvedAssemblyAxisConstraintTarget
 
 The local axis and persisted component transform remain separate.
 
-## Axis target resolution API
-
-`AssemblyConstraintTargetResolver` provides explicit geometry-family methods:
+## Axis resolution API
 
 ```text
-resolve(Project, AssemblyConstraintTarget)
-  -> generated planar face target
-
-resolve_axis(Project, AssemblyConstraintTarget)
-  -> generated axis target
+AssemblyConstraintTargetResolver::resolve_axis(Project, target)
+  -> ResolvedAssemblyAxisConstraintTarget
 ```
 
-The APIs remain separate so a caller cannot accidentally reinterpret a plane as an axis or vice versa.
-
-Axis resolution:
+Resolution order:
 
 ```text
 AssemblyConstraintTarget
   -> component instance
-  -> referenced project-owned PartDocument
+  -> project-owned referenced PartDocument
   -> parse feature.<feature-id>.axis
   -> source Feature
   -> require SubtractiveExtrude
   -> source Sketch
   -> require exactly one CircleProfile and one total profile
-  -> require a length diameter parameter
+  -> require length diameter parameter
   -> WorkplaneResolver::resolve_for_sketch
-  -> map CircleProfile.center into the workplane frame
-  -> apply ExtrudeDirection to the workplane normal
+  -> map CircleProfile.center
+  -> apply ExtrudeDirection to workplane normal
   -> ComponentLocalAxisDescriptor
   + separate component RigidTransform
 ```
 
-Target component and part ownership are resolved before feature geometry, preserving deterministic error precedence.
+Component/part ownership is resolved before feature geometry, preserving deterministic failure precedence.
 
 ## Assembly-space axis evaluation
 
@@ -184,23 +159,14 @@ X, then Y, then Z
 R = Rz * Ry * Rx
 ```
 
-Axis evaluation:
-
 ```text
-axis.origin_assembly
-  = evaluate_point(transform, local_axis.origin)
-
-axis.direction_assembly
-  = evaluate_vector(transform, local_axis.direction)
+axis.origin_assembly = evaluate_point(transform, local_axis.origin)
+axis.direction_assembly = evaluate_vector(transform, local_axis.direction)
 ```
 
-Translation affects the axis origin but not its direction.
-
-Rigid rotation preserves direction magnitude within floating-point tolerance.
+Translation affects the origin but not direction. Rigid rotation preserves direction magnitude within floating-point tolerance.
 
 ## Concentric equation API
-
-The dedicated read-only builder is:
 
 ```text
 AssemblyConcentricConstraintEquationBuilder
@@ -208,13 +174,13 @@ AssemblyConcentricConstraintEquationBuilder
     -> AssemblyConcentricConstraintEquationDescriptor
 ```
 
-Descriptor types:
+Descriptor family:
 
 ```text
 AssemblySpaceAxisConstraintTargetDescriptor
   component_instance
   semantic_reference
-  axis : AssemblySpaceAxisDescriptor
+  axis
 
 ConcentricResidualDescriptor
   direction_parallelism
@@ -229,45 +195,35 @@ AssemblyConcentricConstraintEquationDescriptor
 
 The builder accepts only active `AssemblyConstraintType::Concentric` records.
 
-Inactive records and non-Concentric types fail before target resolution.
+Inactive and wrong-type records fail before target resolution.
 
-Target A resolves before target B, preserving deterministic failure precedence.
+Target A resolves before target B.
 
-## Canonical Concentric residual convention
+## Canonical Concentric residual
 
-For assembly-space axis lines:
-
-```text
-oA = target A axis origin
-dA = target A unit axis direction
-
-oB = target B axis origin
-dB = target B unit axis direction
-```
-
-Residuals:
+For assembly-space axis lines `(oA,dA)` and `(oB,dB)`:
 
 ```text
 direction_parallelism = cross(dA, dB)
 axis_offset_mm         = cross(oB - oA, dA)
 ```
 
-A satisfied Concentric relationship has both vectors equal to zero.
+A satisfied relationship has both vectors equal to zero.
 
-## Direction parallelism
+## Direction semantics
 
 ```text
 cross(dA, dB) = 0
 ```
 
-accepts both:
+accepts:
 
 ```text
 dB = dA
 dB = -dA
 ```
 
-Concentric aligns axis lines without imposing a same-direction or opposed-direction orientation convention.
+Concentric aligns axis lines without imposing same-direction versus opposed-direction orientation.
 
 ## Perpendicular axis offset
 
@@ -275,46 +231,46 @@ Concentric aligns axis lines without imposing a same-direction or opposed-direct
 cross(oB - oA, dA)
 ```
 
-removes the component of the origin delta parallel to target A's axis.
-
-Therefore axial displacement is not a Concentric residual.
+removes origin separation parallel to target A's axis.
 
 Example:
 
 ```text
-oA = (0, 0, 0)
-dA = (0, 0, 1)
-oB = (0, 0, 25)
-dB = (0, 0, 1)
+oA = (0,0,0)
+dA = (0,0,1)
+oB = (0,0,25)
 ```
 
-produces zero residual.
+produces zero offset.
 
 For:
 
 ```text
-oB = (3, 0, 25)
+oB = (3,0,25)
 ```
-
-the offset residual is:
 
 ```text
-cross((3, 0, 25), (0, 0, 1))
-  = (0, -3, 0) mm
+axis_offset_mm = (0,-3,0)
 ```
 
-The axis lines are parallel but separated laterally by 3 mm.
+The axes are parallel but separated laterally by 3 mm.
 
-## Remaining Concentric freedoms and proven rank
+## Target-order behavior
 
-For one free rigid body relative to one fixed body, a regular Concentric relationship locally constrains four independent rigid-body directions:
+The zero condition is symmetric, but raw `axis_offset_mm` is target-order and direction dependent because it uses target A's direction.
+
+Persistent A/B order is preserved through graph lookup, residual construction, numeric flattening, solving, and diagnostics.
+
+## Regular freedoms and proven rank
+
+One regular Concentric relationship between one grounded and one free body constrains:
 
 ```text
-two rotational directions that tilt the axis
-two translational directions perpendicular to the axis
+2 axis-tilt rotations
+2 translations perpendicular to the common axis
 ```
 
-It deliberately leaves:
+It leaves:
 
 ```text
 translation along the common axis
@@ -323,9 +279,9 @@ rotation about the common axis
 
 free.
 
-The vector residual representation has six scalar components, but only four are locally independent in the regular case.
+The six-scalar vector residual has only four independent local sensitivities.
 
-The shared finite-difference Jacobian and generic rank analyzer now prove:
+The shared finite-difference Jacobian and generic rank analyzer prove:
 
 ```text
 residual_component_count = 6
@@ -338,19 +294,7 @@ residual_row_redundancy  = 2
 
 No Concentric-specific DOF rule is hard-coded.
 
-## Target-order behavior
-
-The satisfaction condition is symmetric, but raw `axis_offset_mm` is target-order and direction dependent because it uses target A's direction:
-
-```text
-cross(oB - oA, dA)
-```
-
-Swapping A and B may reverse the residual vector.
-
-Persistent target A/B order is therefore preserved through graph lookup, residual construction, numeric flattening, solver evaluation, and diagnostics.
-
-## Separate residual builders, shared numeric consumer
+## Separate builders, shared numeric consumer
 
 The planar builder remains:
 
@@ -360,7 +304,7 @@ AssemblyConstraintEquationBuilder
 
 for Mate and Distance.
 
-The axis-line builder remains:
+The axis builder remains:
 
 ```text
 AssemblyConcentricConstraintEquationBuilder
@@ -368,9 +312,9 @@ AssemblyConcentricConstraintEquationBuilder
 
 for Concentric.
 
-The private shared numeric system now selects the appropriate builder from persistent `AssemblyConstraintType`.
+The private shared numeric system selects the builder from persistent `AssemblyConstraintType`.
 
-Exact Concentric numeric order:
+Exact Concentric flattening:
 
 ```text
 direction_parallelism.x
@@ -381,47 +325,62 @@ axis_offset_mm.y / length_residual_scale_mm
 axis_offset_mm.z / length_residual_scale_mm
 ```
 
-The same flattened residual evaluator is used by:
+The same residual evaluator is consumed by `AssemblyRigidBodySolver` and `AssemblySolveDiagnosticsAnalyzer`.
 
-```text
-AssemblyRigidBodySolver
-AssemblySolveDiagnosticsAnalyzer
-```
-
-Geometry-family semantics remain explicit while numeric interpretation is shared.
-
-Canonical downstream integration document:
-
-```text
-docs/assembly-concentric-numeric-solver-dof-mvp5.md
-```
+Canonical numeric integration detail: `docs/assembly-concentric-numeric-solver-dof-mvp5.md`.
 
 ## Solver behavior
 
-The shared rigid-body solver now corrects:
+The shared solver corrects lateral axis offset and axis tilt.
+
+It preserves Concentric-defined axial and rotation-about-axis freedoms rather than adding hidden residuals.
+
+Equal and opposed coincident axes are valid states.
+
+All-grounded unsatisfied Concentric geometry returns `FixedGeometryInconsistent`.
+
+Non-converged results remain read-only and cannot be applied.
+
+A converged result uses the existing snapshot, stale-result, and atomic-application contracts.
+
+## Reuse by Insert
+
+The separate Insert block reuses the same first circular-feature identity but persists a `.seat` endpoint:
 
 ```text
-lateral axis offset
-axis tilt
+feature.<feature-id>.seat
 ```
 
-It preserves the Concentric-defined freedoms rather than adding hidden axial or rotational residuals.
+`resolve_insert` derives from one exact source feature/profile:
 
-Equal and opposed coincident axis directions are valid initial states.
+```text
+primary axis
+oriented seating plane
+```
 
-All-grounded unsatisfied Concentric geometry is reported as `FixedGeometryInconsistent`.
+The Insert axis uses the same origin/direction convention as `.axis`.
 
-Non-converged Concentric solve results remain read-only and cannot be applied.
+Insert then reuses Concentric axis-line residuals and adds signed seating:
 
-A converged Concentric result uses the existing `AssemblySolveResultApplier` snapshot, stale-result, and atomic-application contracts.
+```text
+direction_parallelism       = cross(dA, dB)
+axis_offset_mm               = cross(oB - oA, dA)
+signed_seating_separation_mm = dot(sB - sA, nA)
+```
+
+This does not change Concentric semantics or its numeric flattening.
+
+A direct Insert residual Jacobian proves regular rank `5/6`, leaving only rotation about the common axis free.
+
+Insert is not yet a shared numeric solver family.
 
 ## Read-only and persistence boundary
 
 Axis resolution and Concentric residual construction do not mutate project intent.
 
-The downstream solver mutates only private `Project` copies until explicit successful result application.
+The solver mutates private `Project` copies only until explicit successful application.
 
-The following are unpersisted derived data:
+Derived and unpersisted data includes:
 
 - semantic-axis parser interpretation
 - component-local axis descriptors
@@ -429,120 +388,36 @@ The following are unpersisted derived data:
 - Concentric residual descriptors
 - flattened Concentric residual scalars
 - finite-difference Jacobians
-- solve iteration state and results
-- unapplied transform proposals
-- Jacobian-rank and remaining-DOF diagnostics
+- solver state/results/proposals
+- rank and remaining-DOF diagnostics
 
-No new assembly or project JSON field is added for this axis/residual/numeric integration.
+No assembly/project JSON field is added for axis, residual, numeric, or solver integration.
 
-Persistent inputs remain:
-
-```text
-component_instances[].transform
-assembly_constraints[].target_a.semantic_reference
-assembly_constraints[].target_b.semantic_reference
-part sketch/profile/feature intent
-```
-
-Only explicit application of a fresh converged solve result changes the existing component transform field.
+Persistent inputs remain component transforms, semantic target strings, and part sketch/profile/feature intent.
 
 ## Failure behavior
 
-Axis resolution fails explicitly when:
+Axis resolution fails explicitly for missing components/parts, malformed or unsupported axis tokens, missing/wrong source features, missing source sketches, ambiguous/non-circle profile content, invalid diameter parameters, or unresolved workplanes.
 
-- the component instance does not exist
-- the referenced part is not project-owned
-- the axis token is malformed
-- the token suffix is not `axis`
-- the source feature does not exist
-- the source feature is not a subtractive extrude
-- the source feature input sketch does not exist
-- the source sketch does not contain exactly one `CircleProfile` and one total profile
-- the circle diameter does not resolve to a length parameter
-- the source sketch workplane cannot be resolved
-
-Concentric equation construction fails before target resolution when:
-
-- the constraint is inactive
-- the constraint type is not Concentric
+Concentric equation construction rejects inactive and non-Concentric records before target resolution.
 
 Target-resolution failures propagate unchanged through the shared numeric system, solver, and diagnostics.
 
-For example:
-
-```text
-bolt.main_axis
-```
-
-currently fails with:
-
-```text
-unsupported assembly semantic axis reference family
-```
-
 ## Tests
-
-Semantic axis and geometric residual suite:
 
 ```bash
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-concentric]"
-```
-
-Numeric solver and DOF integration suite:
-
-```bash
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-concentric-solver]"
 ```
 
-Coverage includes:
+The semantic suite covers target identity, local/assembly axis geometry, opposite extrude direction, residual semantics, target order, determinism, read-only behavior, and explicit failures.
 
-- stable `feature.<feature-id>.axis` resolution
-- source feature/profile identity
-- CircleProfile-center mapping
-- extrude-direction axis orientation
-- assembly-space axis evaluation
-- equal and opposed direction semantics
-- parallel offset and nonparallel residual construction
-- target-order-sensitive offset vectors
-- deterministic read-only equation construction
-- exact six-scalar numeric flattening
-- length residual scaling
-- mixed residual ordering and dimension
-- lateral axis-offset solving
-- axis-tilt solving
-- preserved regular axial slide and rotation-about-axis freedoms
-- source-project immutability
-- explicit successful result application
-- fixed Concentric inconsistency
-- non-converged Concentric boundaries
-- regular Jacobian rank `4/6`
-- two remaining local DOF
-- mixed Distance/Concentric rank `5/6`
-- semantic target failure propagation
+The numeric suite covers exact six-scalar flattening, mixed ordering/dimensions, offset/tilt solving, equal/opposed states, preserved freedoms, result application, non-convergence, fixed inconsistency, semantic failure propagation, rank `4/6`, and mixed Distance+Concentric rank `5/6`.
 
-Core tests also cover `SemanticAxisReference` identity and the stable `feature.hole.axis` node id.
+## Current downstream boundary
 
-## Deliberate limitations
+Concentric semantic geometry, residual construction, shared numeric flattening, solving, explicit application, and local DOF analysis are implemented.
 
-This axis/Concentric path does not implement:
+Stable `.seat` targets and read-only composite Insert residuals are also implemented as a separate downstream family.
 
-- analytic Concentric Jacobians
-- explicit null-space bases or semantic per-component DOF labels
-- pattern-hole semantic axis identities
-- cylindrical additive-feature axis producers
-- explicit construction-axis assembly targets
-- Insert constraints or axial seating semantics
-- richer constraint families
-- joints or motion
-- collision/interference analysis
-- subassemblies
-- component geometry instancing
-- assembly-level STEP export
-
-## Next technical step
-
-The next assembly block is stable Insert constraint intent and a read-only composite Insert residual model.
-
-That block should first define stable semantic axial-seating geometry for the supported circular-cut feature family, then define explicit persistent Insert relationship semantics and a derived residual combining axis alignment with signed seating-plane separation.
-
-The regular composite residual should prove local rank five over six rigid-body variables, leaving only rotation about the common axis free, before Insert is connected to the shared numeric solver.
+The next assembly step is Insert integration into the existing shared numeric residual/Jacobian, solver, application, and diagnostics path. Concentric semantics remain unchanged by that integration.

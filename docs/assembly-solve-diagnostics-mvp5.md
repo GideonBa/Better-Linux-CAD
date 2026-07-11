@@ -1,6 +1,6 @@
 # Assembly Solve Diagnostics and Remaining DOF MVP-5
 
-Status: implemented read-only local Jacobian-rank and remaining-degree-of-freedom diagnostics for the shared Mate, Distance, and Concentric rigid-body numeric path.
+Status: implemented read-only local Jacobian-rank and remaining-degree-of-freedom diagnostics for the shared Mate, Distance, and Concentric rigid-body numeric path. Insert residual semantics and a direct rank-five proof exist separately; shared Insert diagnostics integration is the next block.
 
 ## Goal
 
@@ -58,7 +58,7 @@ AssemblySolveDiagnosticsAnalyzer
   analyze(Project, connected_group, options)
 ```
 
-Concentric integration adds no second diagnostics API.
+Constraint-family integrations do not add a second diagnostics API.
 
 ## Shared numeric-system path
 
@@ -81,7 +81,7 @@ The shared path owns:
 
 The analyzer does not maintain a second residual or Jacobian interpretation.
 
-Current numeric families are:
+Current integrated numeric families are:
 
 ```text
 Mate
@@ -89,11 +89,7 @@ Distance
 Concentric
 ```
 
-Concentric detail is canonicalized in:
-
-```text
-docs/assembly-concentric-numeric-solver-dof-mvp5.md
-```
+Insert is not yet integrated into this shared path.
 
 ## Analysis pipeline
 
@@ -120,6 +116,8 @@ Project + connected group
 
 The input project remains unchanged.
 
+An unsupported numeric family such as current Insert fails through the solver/shared-numeric boundary and therefore produces no false rank classification.
+
 ## Local Jacobian rank convention
 
 Let:
@@ -129,8 +127,6 @@ J = m x n numeric Jacobian
 m = residual component count
 n = free rigid-body variable count
 ```
-
-The maximum entry magnitude is:
 
 ```text
 maximum_abs_jacobian_entry = max(abs(J[i,j]))
@@ -154,9 +150,9 @@ rank_relative_tolerance = 1.0e-8
 
 Both tolerances must be finite and non-negative and may not both be zero.
 
-Rank is computed deterministically by row-echelon elimination with columns scanned left-to-right and maximum-magnitude row pivot selection in the current column.
+Rank is computed deterministically by row-echelon elimination with left-to-right columns and maximum-magnitude row pivot selection in the current column.
 
-Solver damping is not included in diagnostic rank because damping is a solve-stabilization mechanism and must not create artificial constrained directions.
+Solver damping is excluded from rank because damping is solve stabilization and must not create artificial constrained directions.
 
 ## DOF counts
 
@@ -184,29 +180,28 @@ constrained_dof = jacobian_rank
 remaining_dof   = variable_count - jacobian_rank
 ```
 
-These are local nullity/rank values in the solver's direct `RigidTransform` coordinates.
+These are local rank/nullity values in direct persisted `RigidTransform` coordinates.
 
-They do not claim a global configuration-space dimension across singularities, alternate assembly modes, or semantic-reference changes.
+They do not claim global configuration-space dimension across singularities, alternate assembly modes, or semantic-reference changes.
 
 ## DOF classification
 
 ### NotEvaluated
 
-Used when no locally converged numeric state is suitable for rank-based DOF classification.
+Used when no locally converged integrated numeric state is suitable for rank-based classification.
 
-This includes:
+Examples:
 
 ```text
 FixedGeometryInconsistent
 MaximumIterationsReached
 NumericalFailure
+unsupported shared numeric constraint family
 ```
 
 ### NoVariableDof
 
-Used for a converged group with zero free components.
-
-The absence of variables comes from grounding policy. It does not mean constraints alone fully constrained the bodies.
+Used for a converged group with zero free components. The absence of variables comes from grounding policy and is not a claim that constraints alone fully constrain bodies.
 
 ### Underconstrained
 
@@ -216,23 +211,20 @@ variable_count > 0
 remaining_dof > 0
 ```
 
-Proven examples now include:
+Proven shared-path examples:
 
 ```text
-one planar Mate:
-  variable_count = 6
-  jacobian_rank  = 3
-  remaining_dof  = 3
+one Mate:
+  rank 3/6
+  remaining 3
 
 one Concentric:
-  variable_count = 6
-  jacobian_rank  = 4
-  remaining_dof  = 2
+  rank 4/6
+  remaining 2
 
 one aligned Distance + one Concentric:
-  variable_count = 6
-  jacobian_rank  = 5
-  remaining_dof  = 1
+  rank 5/6
+  remaining 1
 ```
 
 ### LocallyFullyConstrained
@@ -243,31 +235,27 @@ variable_count > 0
 remaining_dof == 0
 ```
 
-The local numeric Jacobian has full column rank.
-
 Three orthogonal planar Mates provide the first proven rank-six case.
 
 ## Consistency classification
 
-DOF classification and consistency are separate fields.
+DOF classification and consistency remain separate.
 
 ### LocallyConsistent
 
-The supported numeric system converged and rank was evaluated at the private converged transform state.
+The supported numeric system converged and rank was evaluated at the private converged state.
 
 ### FixedGeometryInconsistent
 
-An all-grounded group has residual RMS above the configured convergence tolerance.
+An all-grounded supported numeric group has residual RMS above convergence tolerance.
 
-This applies equally to planar and Concentric residual systems.
-
-The analyzer preserves the explicit solver state and does not invent a DOF classification.
+The analyzer preserves the solver state and does not invent a DOF classification.
 
 ### SolverDidNotConverge
 
 Used for `MaximumIterationsReached` and `NumericalFailure`.
 
-The residual summary and deterministic order remain visible, but `rank_evaluated` is false.
+Residual summary/order remain visible but `rank_evaluated` is false.
 
 ## Residual row rank is not semantic overconstraint
 
@@ -277,47 +265,31 @@ For an evaluated Jacobian:
 residual_row_redundancy = residual_component_count - jacobian_rank
 ```
 
-The descriptor distinguishes:
+The result distinguishes:
 
 ```text
 FullRowRank
 RedundantResidualComponents
 ```
 
-`RedundantResidualComponents` means only that flattened residual rows are not all linearly independent at the evaluated state.
+`RedundantResidualComponents` means flattened residual rows are not all linearly independent at the evaluated state.
 
 It does not mean the assembly is semantically overconstrained.
 
-Examples include vector residuals with fewer independent geometric directions, duplicate constraints, and locally overlapping sensitivities.
-
-The analyzer therefore does not expose an `Overconstrained` state from `residual_count > rank(J)` alone.
+Vector residuals commonly contain more scalar rows than independent geometric sensitivities.
 
 ## Proven Concentric rank behavior
 
-Canonical Concentric residuals are:
+Canonical residual:
 
 ```text
 direction_parallelism = cross(dA, dB)
 axis_offset_mm         = cross(oB - oA, dA)
 ```
 
-A regular Concentric relationship between one grounded and one free body constrains:
+A regular one-free-body Concentric relationship constrains two tilt rotations and two lateral translations. It leaves axial translation and axis rotation free.
 
-```text
-two rotational axis-tilt directions
-two translations perpendicular to the common axis
-```
-
-It leaves:
-
-```text
-translation along the common axis
-rotation about the common axis
-```
-
-free.
-
-The actual shared central finite-difference Jacobian now proves:
+The actual shared Jacobian proves:
 
 ```text
 residual_component_count = 6
@@ -328,29 +300,11 @@ remaining_dof            = 2
 residual_row_redundancy  = 2
 ```
 
-This result is computed by the generic rank analyzer. There is no `if Concentric then rank = 4` rule.
-
-## Why Concentric has two redundant residual rows
-
-`direction_parallelism` has three scalar components, but near a regular aligned unit-axis state only two first-order rotational directions tilt the axis.
-
-`axis_offset_mm` also has three scalar components, but it is perpendicular to target A's axis and has only two independent lateral directions.
-
-Therefore six residual rows carry four independent local sensitivities in the regular case.
-
-The correct classification is:
-
-```text
-Underconstrained
-LocallyConsistent
-RedundantResidualComponents
-```
-
-not semantic overconstraint.
+There is no `if Concentric then rank = 4` rule.
 
 ## Proven mixed Distance plus Concentric behavior
 
-For one free body with one Concentric relationship and one planar Distance relationship whose normal follows the common axis:
+For one Concentric relationship and one planar Distance whose normal follows the common axis:
 
 ```text
 residual_component_count = 10
@@ -360,11 +314,40 @@ constrained_dof          = 5
 remaining_dof            = 1
 ```
 
-The planar Distance adds axial separation. Its two orientation sensitivities overlap the existing Concentric axis-tilt sensitivities.
+Distance adds axial separation while its orientation sensitivities overlap the existing Concentric tilt sensitivities.
 
 The remaining local freedom is rotation about the common axis.
 
-This is measured from the shared Jacobian rather than inferred by summing nominal constraint DOF counts.
+## Insert residual rank seed
+
+Canonical Insert document: `docs/assembly-insert-intent-composite-residuals-mvp5.md`.
+
+Insert residuals are implemented read-only:
+
+```text
+direction_parallelism       = cross(dA, dB)
+axis_offset_mm               = cross(oB - oA, dA)
+signed_seating_separation_mm = dot(sB - sA, nA)
+```
+
+The first two fields carry the four regular Concentric sensitivities. The seating scalar adds axial translation sensitivity.
+
+A focused geometry test directly central-finite-differences the seven raw Insert scalar residuals over all six direct transform variables and applies deterministic row-echelon rank evaluation.
+
+Proven regular result:
+
+```text
+residual_component_count = 7
+variable_count           = 6
+jacobian_rank            = 5
+remaining_local_dof      = 1
+```
+
+Pure rotation about the common axis remains a zero-residual state.
+
+This is an architecture seed, not an analyzer result. Because Insert is not yet flattened by `AssemblyConstraintNumericSystem`, `AssemblySolveDiagnosticsAnalyzer` does not currently report Insert rank.
+
+The next integration block must reproduce rank `5/6` through the exact shared solver/diagnostics Jacobian rather than hard-code it from the Insert type.
 
 ## Deterministic ordering
 
@@ -377,31 +360,21 @@ variable_components
 constraint_order
 ```
 
-Variable components use the solver's lexicographic order.
+Variable components use solver lexicographic order.
 
 Constraints use graph lexicographic `AssemblyConstraintId` order.
 
-Mixed constraint families do not change this order.
+Mixed integrated constraint families do not change this ordering.
 
-Repeated analysis of the same project state/options produces equal descriptors.
+Repeated analysis of the same project/options produces equal descriptors.
 
 ## Semantic target failure propagation
 
-Diagnostics consume the solver and shared numeric system rather than pre-validating semantic targets independently.
+Diagnostics consume the solver/shared numeric path rather than pre-validating semantic targets independently.
 
-An unsupported Concentric target such as:
+Unsupported semantic targets propagate their geometry-layer error unchanged.
 
-```text
-bolt.main_axis
-```
-
-therefore propagates:
-
-```text
-unsupported assembly semantic axis reference family
-```
-
-The analyzer does not convert that failure into a generic "Concentric unsupported" diagnostic.
+Future Insert integration must preserve this behavior for malformed or unsupported `.seat` targets.
 
 ## Read-only and persistence boundary
 
@@ -416,65 +389,32 @@ The analyzer does not convert that failure into a generic "Concentric unsupporte
 - persist rank or DOF values
 - persist local classifications
 
-The analysis is regenerated from persistent model intent, current component placement/state, semantic target geometry, canonical residual conventions, and configured numeric policy.
+Analysis is regenerated from current persistent model intent, placement/state, semantic target geometry, canonical residual conventions, and configured numeric policy.
 
 No assembly/project JSON field is added.
 
-## Tests
+The direct Insert rank proof is also unpersisted derived test evidence.
 
-Core diagnostics suite:
+## Tests
 
 ```bash
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-diagnostics]"
-```
-
-Concentric numeric/solver/diagnostic integration suite:
-
-```bash
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-concentric-solver]"
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-insert]"
 ```
 
-Coverage includes:
-
-- Mate rank `3/6`
-- Distance rank `3/6`
-- three orthogonal Mates rank `6/6`
-- two-Mate chain rank `6/12`
-- deterministic ordering
-- all-grounded consistency/inconsistency
-- non-convergence propagation
-- rank tolerance
-- duplicate residual-row redundancy
-- read-only behavior
-- semantic target failure propagation
-- Concentric rank `4/6`
-- Concentric remaining DOF `2`
-- Concentric residual-row redundancy `2`
-- deterministic repeated Concentric analysis
-- mixed Distance/Concentric residual dimension `10`
-- mixed Distance/Concentric rank `5/6`
-- mixed remaining DOF `1`
-- fixed inconsistent Concentric diagnostics without false rank
-- non-converged Concentric diagnostics without false rank
-
-## Deliberate limitations
-
-This diagnostics block does not implement:
-
-- global configuration-space dimension analysis
-- singularity classification
-- analytic Jacobians
-- SVD or sparse rank factorization
-- per-component DOF labels
-- a null-space basis for drag projection
-- semantic overconstraint classification for arbitrary conflicting free-body constraints
-- constraint-removal recommendations
-- persistent DOF caches
-- Insert diagnostics
-- joints or motion
+Coverage includes Mate rank `3/6`, Distance rank `3/6`, three orthogonal Mates rank `6/6`, two-Mate chain rank `6/12`, deterministic ordering, all-grounded consistency/inconsistency, non-convergence propagation, rank tolerance, duplicate residual-row redundancy, read-only behavior, semantic target failures, Concentric rank `4/6`, mixed Distance+Concentric rank `5/6`, and the separate direct Insert rank-five seed.
 
 ## Next technical step
 
-The next assembly block is stable Insert constraint intent and a read-only composite Insert residual model.
+The next diagnostics increment is Insert integration through the one shared numeric system and solver.
 
-The first Insert residual contract should combine stable axis-line alignment with explicit semantic axial seating geometry and prove regular rank five with one remaining rotation-about-axis DOF before Insert enters the shared numeric solver and diagnostics path.
+After successful Insert solve integration, `AssemblySolveDiagnosticsAnalyzer` must evaluate the same seven-scalar Insert residual/Jacobian path and prove:
+
+```text
+variable_count = 6
+jacobian_rank  = 5
+remaining_dof  = 1
+```
+
+No Insert-specific DOF table or hard-coded nominal constraint count should be added.

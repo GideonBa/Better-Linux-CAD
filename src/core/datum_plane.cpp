@@ -87,6 +87,15 @@ std::string_view to_string(SemanticAxis axis) noexcept {
   return "axis";
 }
 
+std::string_view to_string(SemanticSeatingPlane plane) noexcept {
+  switch (plane) {
+  case SemanticSeatingPlane::Primary:
+    return "seat";
+  }
+
+  return "seat";
+}
+
 Result<SemanticFaceReference> SemanticFaceReference::create(FeatureId source_feature,
                                                             SemanticFace face) {
   const auto object_id = source_feature.empty()
@@ -142,6 +151,37 @@ std::string SemanticAxisReference::node_id() const {
 
 SemanticAxisReference::SemanticAxisReference(FeatureId source_feature, SemanticAxis axis)
     : source_feature_(std::move(source_feature)), axis_(axis) {}
+
+Result<SemanticSeatingPlaneReference>
+SemanticSeatingPlaneReference::create(FeatureId source_feature, SemanticSeatingPlane plane) {
+  const auto object_id = source_feature.empty()
+                             ? std::string("semantic_seating_plane")
+                             : source_feature.value() + "." + std::string(to_string(plane));
+
+  if (source_feature.empty()) {
+    return Result<SemanticSeatingPlaneReference>::failure(Error::validation(
+        object_id, "semantic seating plane source feature id must not be empty"));
+  }
+
+  return Result<SemanticSeatingPlaneReference>::success(
+      SemanticSeatingPlaneReference(std::move(source_feature), plane));
+}
+
+const FeatureId& SemanticSeatingPlaneReference::source_feature() const noexcept {
+  return source_feature_;
+}
+
+SemanticSeatingPlane SemanticSeatingPlaneReference::plane() const noexcept {
+  return plane_;
+}
+
+std::string SemanticSeatingPlaneReference::node_id() const {
+  return source_feature_.value() + "." + std::string(to_string(plane_));
+}
+
+SemanticSeatingPlaneReference::SemanticSeatingPlaneReference(FeatureId source_feature,
+                                                             SemanticSeatingPlane plane)
+    : source_feature_(std::move(source_feature)), plane_(plane) {}
 
 Result<SemanticEdgeReference> SemanticEdgeReference::create(FeatureId source_feature,
                                                             SemanticEdge edge) {

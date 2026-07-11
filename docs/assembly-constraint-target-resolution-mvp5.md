@@ -1,14 +1,12 @@
 # Assembly Constraint Target Resolution MVP-5
 
-Status: implemented read-only generated-planar-face resolution and the first read-only generated-axis resolution family. Planar targets feed Mate/Distance; generated axes feed Concentric. Both residual families now join the shared numeric solver and DOF path downstream.
+Status: implemented read-only generated planar-face resolution, primary circular-feature axis resolution, and primary circular-feature seating/composite Insert endpoint resolution.
 
 ## Goal
 
 `AssemblyConstraintTargetResolver` bridges persistent semantic assembly target strings to deterministic component-local geometry.
 
-It owns semantic target lookup and local geometry construction only.
-
-It does not apply component placement, construct constraint residuals, decide solver participation, optimize transforms, or compute DOF.
+It owns semantic target lookup and local geometry construction only. It does not apply component placement, construct residuals, decide solver participation, optimize transforms, or compute DOF.
 
 ## API
 
@@ -47,22 +45,39 @@ ResolvedAssemblyAxisConstraintTarget
   component_transform
 ```
 
+Composite Insert target type:
+
+```text
+ResolvedAssemblyInsertConstraintTarget
+  component_instance
+  referenced_part_document
+  source_feature
+  source_profile
+  axis
+  seating_plane
+  local_axis
+  local_seating_plane
+  component_transform
+```
+
 Resolver methods:
 
 ```text
-AssemblyConstraintTargetResolver
-  resolve(Project, target)
-    -> ResolvedAssemblyConstraintTarget
+resolve(Project, target)
+  -> generated planar face
 
-  resolve_axis(Project, target)
-    -> ResolvedAssemblyAxisConstraintTarget
+resolve_axis(Project, target)
+  -> primary generated axis
+
+resolve_insert(Project, target)
+  -> primary generated axis + oriented seating plane
 ```
 
-Plane and axis APIs are separate so callers cannot accidentally reinterpret one geometry family as the other.
+The APIs remain explicit so callers cannot reinterpret one geometry family accidentally.
 
 ## Shared ownership resolution
 
-Both paths first resolve:
+Every path first resolves:
 
 ```text
 AssemblyConstraintTarget.component_instance
@@ -73,7 +88,7 @@ AssemblyConstraintTarget.component_instance
 
 The component occurrence and project-owned part must exist before semantic feature geometry is interpreted.
 
-The resolver never duplicates the referenced `PartDocument` as new model intent.
+The resolver never duplicates the referenced `PartDocument` as model intent.
 
 ## Generated planar-face family
 
@@ -90,15 +105,13 @@ feature.<feature-id>.back
 
 The source feature must be a supported `AdditiveExtrude`.
 
-Face geometry is delegated to:
+Face geometry delegates to:
 
 ```text
 WorkplaneResolver::resolve_generated_face
 ```
 
-Derived workplanes and assembly face targets therefore share one implementation of generated-face frame geometry.
-
-The returned local plane contains origin, basis axes, and normal. Component placement remains separate in `component_transform`.
+The result remains component-local and preserves component placement separately.
 
 ## Generated-axis family
 
@@ -110,55 +123,108 @@ Supported first token:
 feature.<feature-id>.axis
 ```
 
-The source feature must be:
+The first producer is:
 
 ```text
 FeatureType::SubtractiveExtrude
++ exactly one CircleProfile in the source sketch
++ exactly one total profile in the source sketch
++ circle diameter resolves to a length parameter
 ```
 
-Its input sketch must contain:
+Axis geometry uses the source sketch workplane:
 
 ```text
-exactly one CircleProfile
-and exactly one total profile
+origin = WorkplaneResolver::evaluate_point(workplane, CircleProfile.center)
+
+direction = workplane.normal
+          or -workplane.normal for OppositeSketchNormal
 ```
 
-The circle diameter parameter must resolve to a length parameter.
+The result preserves source feature and source `CircleProfile` identity.
 
-Axis geometry reuses the source sketch workplane:
+## Generated seating family
+
+Canonical detail: `docs/assembly-insert-intent-composite-residuals-mvp5.md`.
+
+Supported first token:
 
 ```text
-WorkplaneResolver::resolve_for_sketch
+feature.<feature-id>.seat
 ```
 
-The local axis is:
+The `.seat` producer uses the same narrow single-circle `SubtractiveExtrude` requirements as `.axis`.
+
+`resolve_insert` deliberately interprets one persistent seat endpoint as a composite circular-feature target:
 
 ```text
-origin
-  = WorkplaneResolver::evaluate_point(workplane, CircleProfile.center)
-
-direction
-  = workplane.normal
-    or -workplane.normal for OppositeSketchNormal
+feature.hole.seat
+  -> exact source Feature
+  -> exact source CircleProfile
+  -> source Sketch workplane
+  -> mapped CircleProfile.center
+  -> primary local axis
+  -> oriented local seating plane
 ```
 
-This is the same intent interpretation used by the existing circular-cut geometry execution path.
+The local primary axis is:
 
-The resolved descriptor preserves the source `CircleProfile` id in addition to source feature identity.
+```text
+origin = mapped CircleProfile.center
+direction = extrude direction
+```
+
+The local seating plane is:
+
+```text
+origin = axis.origin
+normal = axis.direction
+```
+
+For `SketchNormal`:
+
+```text
+x_axis = workplane.x_axis
+y_axis = workplane.y_axis
+normal = workplane.normal
+```
+
+For `OppositeSketchNormal`:
+
+```text
+x_axis =  workplane.x_axis
+y_axis = -workplane.y_axis
+normal = -workplane.normal
+```
+
+Reversing Y with the normal preserves a right-handed seating frame.
+
+No OCCT opening face is queried to define the seat.
+
+## Why one seat target derives two geometry descriptors
+
+Insert requires axis-line alignment plus axial seating.
+
+A persistent endpoint such as `feature.hole.seat` identifies one exact circular feature/profile. From that constructive identity, the primary axis and seating plane are deterministic and inseparable for this first feature family.
+
+The record therefore does not store a hidden second target and does not expand Insert into four target strings.
+
+The composite derived descriptor makes the coupling explicit while keeping persistent intent compact.
 
 ## Why circular-hole patterns are excluded
 
-A `CircularHolePattern` generates several distinct hole axes.
+`CircularHolePattern` produces several distinct holes.
 
-One token such as:
+Tokens such as:
 
 ```text
 feature.pattern.axis
+feature.pattern.seat
 ```
 
 would be ambiguous.
 
-A later pattern-axis family must define stable per-instance semantic identity. The resolver does not infer identity from OCCT topology order or hidden vector position.
+A future pattern target family must define stable per-instance semantic identity. The resolver does not infer identity from transient OCCT topology or hidden vector order.
 
 ## Component-local versus assembly-space geometry
 
@@ -169,7 +235,6 @@ Planar path:
 ```text
 local_plane + component_transform
   -> AssemblyTransformEvaluator::evaluate_plane
-  -> AssemblySpacePlanarDescriptor
 ```
 
 Axis path:
@@ -177,10 +242,16 @@ Axis path:
 ```text
 local_axis + component_transform
   -> AssemblyTransformEvaluator::evaluate_axis
-  -> AssemblySpaceAxisDescriptor
 ```
 
-This keeps persisted placement semantics centralized in the transform evaluator.
+Insert path:
+
+```text
+local_axis + local_seating_plane + component_transform
+  -> evaluate_axis + evaluate_plane
+```
+
+This centralizes persisted placement semantics in `AssemblyTransformEvaluator`.
 
 ## Downstream use
 
@@ -188,25 +259,34 @@ Planar branch:
 
 ```text
 resolve
-  -> AssemblyTransformEvaluator::evaluate_plane
+  -> evaluate_plane
   -> AssemblyConstraintEquationBuilder
   -> Mate/Distance residuals
   -> shared numeric system
-  -> rigid-body solver / DOF diagnostics
+  -> solver / DOF diagnostics
 ```
 
 Axis branch:
 
 ```text
 resolve_axis
-  -> AssemblyTransformEvaluator::evaluate_axis
+  -> evaluate_axis
   -> AssemblyConcentricConstraintEquationBuilder
   -> Concentric residuals
-  -> same shared numeric system
-  -> same rigid-body solver / DOF diagnostics
+  -> shared numeric system
+  -> solver / DOF diagnostics
 ```
 
-The resolver remains unchanged by numeric integration. The shared numeric system simply re-enters this path for every Concentric residual and finite-difference evaluation.
+Insert branch:
+
+```text
+resolve_insert
+  -> evaluate_axis + evaluate_plane
+  -> AssemblyInsertConstraintEquationBuilder
+  -> Insert residuals
+```
+
+Insert numeric/solver/DOF consumption is the next block.
 
 ## Failure behavior
 
@@ -215,62 +295,42 @@ Shared failures include:
 - target component does not exist
 - referenced part is not project-owned
 
-Planar failures include malformed/unsupported face tokens, missing source features, unsupported feature type, and shared generated-face resolution failures.
+Planar failures include malformed/unsupported face tokens, missing source features, unsupported feature type, and generated-face resolution failures.
 
-Axis failures include:
+Axis failures include malformed axis tokens, unsupported suffixes, missing source features/sketches, wrong feature type, ambiguous/non-circle profile content, invalid diameter parameters, and unresolved source workplanes.
 
-- malformed axis token
-- unsupported axis suffix
-- missing source feature
-- source feature is not a subtractive extrude
-- missing source sketch
-- source sketch does not contain exactly one `CircleProfile` and one total profile
-- invalid/missing length diameter parameter
-- unresolved source sketch workplane
+Seat/Insert target failures use parallel explicit messages for malformed/unsupported seating tokens and unsupported circular-feature source intent.
 
-Failures use existing `Result<T>`/`Error` propagation.
-
-Axis target failures propagate unchanged through Concentric residual construction, the shared numeric system, solver, and diagnostics.
+Failure values propagate through downstream builders unchanged.
 
 ## Read-only and persistence boundary
 
 Resolution does not:
 
-- mutate component transforms or component state
+- mutate component transforms or state
 - change constraints or target strings
-- modify part parameters, sketches, profiles, features, or derived workplanes
+- modify part parameters, sketches, profiles, features, or workplanes
 - execute a solver
 - own `ShapeCache`
-- persist a resolved target descriptor
+- persist resolved descriptors
 
-Resolved descriptors are regenerated from current model intent.
+Resolved plane, axis, and seat descriptors are regenerated from current model intent.
 
-No solver or Jacobian cache owns resolved target bindings.
+No solver or Jacobian cache owns persistent target bindings.
 
 ## Tests
 
-Planar tests:
-
 ```bash
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-target]"
-```
-
-Axis and Concentric semantic tests:
-
-```bash
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-concentric]"
-```
-
-Concentric downstream numeric/solver tests:
-
-```bash
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-concentric-solver]"
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-insert]"
 ```
 
-Coverage includes all six generated faces, semantic axis identity, CircleProfile-center axis origins, extrude-direction axis orientation, unsupported feature/profile families, determinism, unchanged model intent, and repeated target re-resolution through numeric solver/Jacobian evaluation.
+Coverage includes all six generated faces, primary circular axis identity, primary circular seat identity, CircleProfile-center mapping, extrude-direction orientation, right-handed opposite seat frames, source feature/profile preservation, unsupported source families, determinism, read-only behavior, and downstream assembly-space evaluation.
 
 ## Current downstream boundary
 
-Generated-axis target resolution and Concentric shared-numeric/solver/DOF consumption are implemented.
+Generated planar-face, circular-axis, and circular-seat/composite Insert endpoint resolution are implemented.
 
-The next semantic target-resolution work is stable axial-seating geometry for Insert. That target family must remain semantic and component-local before the transform evaluator, just like existing planar and axis targets.
+Mate, Distance, and Concentric already join the shared numeric solver/DOF path. Insert target/residual semantics are stable and read-only; the next step is Insert integration into that existing shared numeric path.

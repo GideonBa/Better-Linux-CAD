@@ -52,6 +52,21 @@ struct ResolvedAssemblyAxisConstraintTarget {
                          const ResolvedAssemblyAxisConstraintTarget&) = default;
 };
 
+struct ResolvedAssemblyInsertConstraintTarget {
+  ComponentInstanceId component_instance;
+  DocumentId referenced_part_document;
+  FeatureId source_feature;
+  ProfileId source_profile;
+  SemanticAxis axis = SemanticAxis::Primary;
+  SemanticSeatingPlane seating_plane = SemanticSeatingPlane::Primary;
+  ComponentLocalAxisDescriptor local_axis;
+  ComponentLocalPlanarDescriptor local_seating_plane;
+  RigidTransform component_transform;
+
+  friend bool operator==(const ResolvedAssemblyInsertConstraintTarget&,
+                         const ResolvedAssemblyInsertConstraintTarget&) = default;
+};
+
 // Resolves supported persistent assembly target intent to component-local geometry.
 // The component transform remains separate placement intent and is not applied here.
 class AssemblyConstraintTargetResolver {
@@ -61,6 +76,9 @@ public:
 
   [[nodiscard]] Result<ResolvedAssemblyAxisConstraintTarget>
   resolve_axis(const Project& project, const AssemblyConstraintTarget& target) const;
+
+  [[nodiscard]] Result<ResolvedAssemblyInsertConstraintTarget>
+  resolve_insert(const Project& project, const AssemblyConstraintTarget& target) const;
 };
 
 } // namespace blcad::geometry

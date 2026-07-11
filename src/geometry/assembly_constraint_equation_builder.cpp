@@ -62,6 +62,11 @@ AssemblyConstraintEquationBuilder::build(const Project& project,
         constraint.id().value(),
         "concentric equation construction requires semantic axis target support"));
   }
+  if (constraint.type() == AssemblyConstraintType::Insert) {
+    return Result<AssemblyConstraintEquationDescriptor>::failure(validation_error(
+        constraint.id().value(),
+        "Insert equation construction requires dedicated composite target support"));
+  }
 
   auto target_a = resolve_assembly_space_target(project, constraint.target_a());
   if (target_a.has_error()) {

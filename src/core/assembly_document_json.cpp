@@ -105,6 +105,9 @@ constexpr int k_version = 1;
   if (text == "distance") {
     return Result<AssemblyConstraintType>::success(AssemblyConstraintType::Distance);
   }
+  if (text == "insert") {
+    return Result<AssemblyConstraintType>::success(AssemblyConstraintType::Insert);
+  }
   return Result<AssemblyConstraintType>::failure(json_error("unsupported assembly constraint type"));
 }
 
