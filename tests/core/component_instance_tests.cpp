@@ -5,6 +5,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <string>
+#include <utility>
 
 using namespace blcad;
 
@@ -48,11 +49,13 @@ TEST_CASE("ComponentInstance validates required identity fields", "[core][compon
             .has_error());
 
   const auto instance = make_instance("component.base", "BasePlate", "part.base");
+  const Vector3 expected_translation{10.0, 20.0, 30.0};
+  const Vector3 expected_rotation{0.0, 0.0, 45.0};
   CHECK(instance.id().value() == "component.base");
   CHECK(instance.name() == "BasePlate");
   CHECK(instance.referenced_part_document().value() == "part.base");
-  CHECK(instance.transform().translation_mm == Vector3{10.0, 20.0, 30.0});
-  CHECK(instance.transform().rotation_deg == Vector3{0.0, 0.0, 45.0});
+  CHECK(instance.transform().translation_mm == expected_translation);
+  CHECK(instance.transform().rotation_deg == expected_rotation);
 }
 
 TEST_CASE("AssemblyDocument owns component instances that reference member parts",
@@ -93,11 +96,12 @@ TEST_CASE("AssemblyDocument JSON roundtrip preserves component instances",
   const ComponentInstance* instance =
       restored.value().find_component_instance(ComponentInstanceId("component.base"));
   REQUIRE(instance != nullptr);
+  const Vector3 expected_translation{10.0, 20.0, 30.0};
   CHECK(instance->name() == "BasePlate");
   CHECK(instance->visibility() == ComponentVisibility::Visible);
   CHECK(instance->suppression_state() == ComponentSuppressionState::Active);
   CHECK(instance->grounding_state() == ComponentGroundingState::Grounded);
-  CHECK(instance->transform().translation_mm == Vector3{10.0, 20.0, 30.0});
+  CHECK(instance->transform().translation_mm == expected_translation);
 }
 
 TEST_CASE("Project validates component instances against owned member parts",
