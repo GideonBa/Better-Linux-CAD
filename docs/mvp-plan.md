@@ -151,29 +151,52 @@ Implemented scope:
 - checked-in `examples/component_instances.blcad.project.json`
 - headless `blcad_inspect_project_components` inspection tool exposing persisted placement/state values
 
+## Implemented block: MVP 5 assembly constraint model-intent seed
+
+Detailed document: `docs/assembly-constraint-model-intent-mvp5.md`
+
+Implemented scope:
+
+- typed `AssemblyConstraintId`
+- `AssemblyConstraintType` limited to Mate, Concentric, and Distance
+- `AssemblyConstraintTarget` combining a `ComponentInstanceId` with a non-empty persistent semantic reference token
+- `AssemblyConstraint` records with stable id, name, type, target A, target B, active/inactive state, and a Distance-only length value
+- type-specific validation so Distance requires a length and Mate/Concentric reject distance values
+- `AssemblyDocument` ownership with unique constraint-id and existing component-target validation
+- constraint creation and loading that never mutate component free-placement transforms
+- optional `assembly_constraints` JSON loading with backward compatibility for older files without the field
+- assembly/project JSON roundtrip for Mate, Concentric, Distance, semantic targets, state, and distance values
+- project structure validation of assembly constraint component targets
+- shared owned `PartDocument` intent across multiple constrained component instances
+- headless constraint inspection through `blcad_inspect_project_components`
+- Mate/Concentric/Distance records in `examples/component_instances.blcad.project.json`
+
 Still deferred:
 
-- semantic component reference targets for assembly constraints
-- mate, concentric, distance, insert, angle, and tangent constraints
-- constraint graph, solver, and remaining DOF display
+- semantic target geometry resolution
+- constraint graph construction and rigid-body solving
+- remaining DOF computation and assembly constraint-state analysis
 - enforced grounding and suppression behavior in future assembly consumers
+- Insert, Angle, Tangent, Flush, Coincident, and Lock constraints
 - collision checks, subassemblies, and assembly-level STEP export
 
-## Next MVP: Assembly constraint model-intent seed
+## Next MVP: Read-only assembly constraint graph seed
 
-Goal: store solver-independent assembly relationship intent on semantic component targets before any constraint graph or rigid-body solver is introduced.
+Goal: derive deterministic component connectivity from the stable persistent assembly constraint records before semantic geometry resolution or rigid-body solving is introduced.
 
 Proposed first implementation sequence:
 
-- add a typed `AssemblyConstraintId` and an `AssemblyConstraintType` limited to Mate, Concentric, and Distance
-- add a semantic component-target record that combines an existing `ComponentInstanceId` with a persistent semantic reference token instead of a raw OCCT face/edge id
-- add `AssemblyConstraint` model-intent records with stable id, name, type, target A, target B, active state, and a distance value only where required by Distance
-- let `AssemblyDocument` own constraints and validate unique constraint ids, existing component instance targets, non-empty semantic reference tokens, and type-specific parameter requirements
-- keep constraints read-only with respect to component transforms: adding or loading a constraint must not solve placement or mutate free-placement transforms
-- persist optional `assembly_constraints` records through assembly/project JSON and keep old files without the field loadable
-- add tests for invalid targets, duplicate ids, Mate/Concentric/Distance roundtrip, unchanged component transforms, shared part ownership, and project structure validation
-- extend `blcad_inspect_project_components` or a focused headless inspector so stored constraint type and semantic targets are observable from a project file
-- keep geometric reference resolution, constraint graph construction, rigid-body solving, DOF display, enforced grounding, Insert/Angle/Tangent constraints, collision checks, subassemblies, and assembly-level STEP export deferred
+- add a read-only `AssemblyConstraintGraph` whose nodes are existing `ComponentInstanceId` values
+- add graph edges for active `AssemblyConstraintId` records only; inactive constraints must not participate
+- preserve each edge's constraint id and two component endpoints without copying semantic geometry or OCCT topology into the graph
+- validate graph construction against an `AssemblyDocument` and reject dangling component endpoints if invalid model state is ever observed
+- provide deterministic adjacency queries per component instance
+- provide deterministic connected-component/group queries so independent assembly groups can be identified
+- keep duplicate component pairs legal because several different constraints may relate the same two component instances
+- keep graph construction read-only with respect to `RigidTransform`, grounding, constraint state, and part model intent
+- add tests for active/inactive edges, isolated component nodes, multiple constraints between one component pair, deterministic adjacency, connected groups, and unchanged component transforms
+- optionally extend the headless inspector with a compact graph/group summary after the core graph API is stable
+- keep semantic target resolution, rigid-body solving, constraint equations, remaining DOF, enforced grounding, overconstraint detection, and solved transform updates deferred
 
 ## Future roadmap: Multi-body transforms and path features
 
