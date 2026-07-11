@@ -1,24 +1,28 @@
 # Planar Assembly Constraint Equations MVP-5
 
-Status: implemented read-only equation/residual construction for active planar Mate and Distance assembly constraints over the supported generated-face target family.
+Status: implemented read-only equation/residual construction for active planar Mate and Distance assembly constraints over the supported generated-face target family. The first rigid-body solver now consumes these descriptors as a separate downstream layer.
 
 ## Goal
 
-This block connects persistent assembly relationship intent to deterministic geometric residual data without introducing a rigid-body solver.
+This block connects persistent assembly relationship intent to deterministic geometric residual data.
 
-The implemented path now answers:
+It answers:
 
-1. Which active assembly constraint record is being evaluated?
-2. Which two component occurrences and semantic targets does it reference?
-3. What are the supported target planes in component-local coordinates?
-4. What are those planes in assembly coordinates under the persisted component transforms?
-5. What deterministic residual values describe the current Mate or Distance error?
+1. Which active assembly constraint is evaluated?
+2. Which component occurrences and semantic targets does it reference?
+3. What are those targets in component-local geometry?
+4. What are their planes in assembly coordinates under current component transforms?
+5. What deterministic Mate or Distance residual values describe the current relationship error?
 
 The returned equation descriptor is derived data. It is not model intent, is not serialized, and does not update component transforms.
 
 ## API
 
-The geometry-layer API lives in `include/blcad/geometry/assembly_constraint_equation_builder.hpp`.
+The geometry-layer API lives in:
+
+```text
+include/blcad/geometry/assembly_constraint_equation_builder.hpp
+```
 
 ```text
 AssemblySpaceConstraintTargetDescriptor
@@ -51,11 +55,9 @@ AssemblyConstraintEquationBuilder
   build(Project, AssemblyConstraint)
 ```
 
-`AssemblyConstraintEquationDescriptor` preserves the persistent constraint id and type plus both target component ids and semantic reference tokens. The returned target planes are expressed in assembly coordinates.
+Constraint id/type and both target identities remain explicit in the returned descriptor. Target planes are expressed in assembly coordinates.
 
 ## Construction pipeline
-
-For each supported active constraint:
 
 ```text
 AssemblyConstraint
@@ -73,41 +75,41 @@ AssemblyConstraint
   -> AssemblyConstraintEquationDescriptor
 ```
 
-Target order is preserved exactly. Target A is always resolved and evaluated before target B.
+Target order is preserved exactly. Target A is resolved before target B, so target-resolution error precedence is deterministic.
 
-The builder reuses the existing target-resolution and transform-evaluation layers. It does not duplicate generated-face frame construction or rigid-transform rotation math.
+Generated-face frame construction remains owned by `WorkplaneResolver`/`AssemblyConstraintTargetResolver`. Rigid-transform evaluation remains owned by `AssemblyTransformEvaluator`. This builder does not duplicate either geometry path.
 
 ## Canonical planar Mate residual convention
 
-For target planes A and B, define:
+For assembly-space target planes:
 
 ```text
-oA = target A assembly-space origin
-nA = target A assembly-space unit normal
+oA = target A origin
+nA = target A unit normal
 
-oB = target B assembly-space origin
-nB = target B assembly-space unit normal
+oB = target B origin
+nB = target B unit normal
 ```
 
-The implemented planar Mate convention is:
+Mate residuals are:
 
 ```text
 normal_opposition = nA + nB
 signed_separation_mm = dot(oB - oA, nA)
 ```
 
-A satisfied Mate requires:
+A satisfied Mate has:
 
 ```text
 normal_opposition = (0, 0, 0)
 signed_separation_mm = 0
 ```
 
-The first equation requires the two unit normals to oppose each other.
+`normal_opposition` requires opposed unit normals.
 
-The second equation requires target B's plane origin to have zero signed offset from target A's plane along target A's normal.
+`signed_separation_mm` requires target B's plane origin to have zero normal offset from target A's plane.
 
-Tangential origin differences inside the plane are intentionally not residuals. Infinite coincident planes may use different frame origins without violating a planar Mate relationship.
+Tangential origin differences are intentionally not residuals. The current planar relationship is between infinite supporting planes, so coincident planes may use different frame origins inside the plane.
 
 Example:
 
@@ -121,18 +123,11 @@ B bottom face
   normal = (0, 0, -1)
 ```
 
-Then:
-
-```text
-normal_opposition = (0, 0, 0)
-signed_separation_mm = 0
-```
-
-The planes satisfy the implemented Mate residual convention even though their frame origins differ tangentially by `(15, -9, 0)`.
+The Mate residual is zero even though the frame origins differ tangentially by `(15, -9, 0)`.
 
 ## Canonical signed planar Distance convention
 
-For the same target definitions, the implemented planar Distance convention is:
+Planar Distance residuals are:
 
 ```text
 normal_parallelism = cross(nA, nB)
@@ -140,14 +135,14 @@ signed_separation_mm = dot(oB - oA, nA)
 distance_residual_mm = signed_separation_mm - target_distance_mm
 ```
 
-A satisfied planar Distance requires:
+A satisfied Distance has:
 
 ```text
 normal_parallelism = (0, 0, 0)
 distance_residual_mm = 0
 ```
 
-`normal_parallelism = cross(nA, nB)` accepts parallel planes with either equal or opposite normal direction. Distance does not impose Mate-style normal opposition.
+`cross(nA, nB) = 0` accepts equal or opposed normal direction. Distance therefore enforces parallel supporting planes without imposing Mate-style normal opposition.
 
 The signed separation is deliberately target-order dependent:
 
@@ -155,11 +150,9 @@ The signed separation is deliberately target-order dependent:
 A -> B uses nA
 ```
 
-Positive separation means target B lies in the positive target-A normal direction from target A.
+Positive separation means B lies in target A's positive normal direction. Negative separation means B lies in the negative direction.
 
-Negative separation means target B lies in the negative target-A normal direction.
-
-For example:
+Example:
 
 ```text
 oA = (0, 0, 8)
@@ -179,20 +172,20 @@ signed_separation_mm = 12
 distance_residual_mm = 0
 ```
 
-If the two targets are reversed while the positive distance remains `10 mm`, the same geometry gives:
+Swapping the targets while keeping a positive `10 mm` target can produce:
 
 ```text
 signed_separation_mm = -12
 distance_residual_mm = -22
 ```
 
-This behavior is intentional. A later solver must preserve the persisted target order rather than silently converting planar Distance into an unsigned absolute-distance equation.
+This is intentional. Target A/B order is persistent semantic intent and must not be normalized away by later consumers.
 
-## Why the residuals are explicit descriptors
+## Why residuals are explicit descriptors
 
-This seed does not hide the equations behind a boolean `is_satisfied` result.
+The builder does not reduce the relationship to a boolean `is_satisfied` value.
 
-The returned values preserve the geometric error components needed by later solver and diagnostic layers:
+It exposes geometric error components:
 
 ```text
 Mate
@@ -204,20 +197,24 @@ Distance
   1 signed-distance component
 ```
 
-The vector residuals are represented as `Vector3` values rather than an opaque numeric array. The scalar length residuals retain explicit `_mm` naming.
+Vector residuals remain `Vector3` values and scalar lengths retain `_mm` naming.
 
-This block does not yet construct Jacobians, choose residual weighting, define convergence tolerances, or reduce mathematically redundant vector components. Those are solver-layer decisions.
+The descriptor layer does not choose numeric weighting, Jacobian construction, convergence tolerance, or optimization method.
 
-## Supported constraint and target families
+Those decisions are now owned by `AssemblyRigidBodySolver`, documented in `docs/assembly-rigid-body-solver-mvp5.md`.
 
-The first builder supports:
+The first solver currently flattens each descriptor orientation-first and length-last, scales the length component by its explicit millimeter residual scale, and evaluates a central finite-difference Jacobian. Those are solver policies rather than equation-builder semantics.
+
+## Supported constraints and targets
+
+The builder supports:
 
 ```text
 AssemblyConstraintType::Mate
 AssemblyConstraintType::Distance
 ```
 
-Both targets must resolve through the currently implemented generated planar face family:
+Both targets must resolve through the implemented generated planar face family:
 
 ```text
 feature.<feature-id>.top
@@ -228,50 +225,50 @@ feature.<feature-id>.front
 feature.<feature-id>.back
 ```
 
-The source feature restrictions remain those of `AssemblyConstraintTargetResolver` and `WorkplaneResolver::resolve_generated_face`.
+The source-feature restrictions remain those of `AssemblyConstraintTargetResolver` and `WorkplaneResolver::resolve_generated_face`.
 
 ## Explicit failure behavior
 
 Construction fails explicitly when:
 
-- the constraint state is inactive
+- the constraint is inactive
 - the constraint type is Concentric
 - target A cannot be resolved
 - target B cannot be resolved
-- either semantic target token is malformed
-- either target belongs to an unsupported semantic reference family
-- either target component does not exist
-- either referenced part cannot be resolved to a project-owned `PartDocument`
-- either generated-face source feature cannot be resolved by the existing target-resolution path
+- either semantic token is malformed
+- either target belongs to an unsupported semantic family
+- a target component does not exist
+- a referenced part is not project-owned
+- a generated-face source feature cannot be resolved
 - a defensive Distance record reaches the builder without a length quantity
 
 Inactive constraints fail before target geometry resolution.
 
-Concentric fails before target geometry resolution with:
+Concentric fails before target resolution with:
 
 ```text
 concentric equation construction requires semantic axis target support
 ```
 
-This preserves the architecture boundary that full Concentric construction requires a stable semantic axis-reference family.
+Target-resolution diagnostics are propagated unchanged.
 
-Target-resolution failures are propagated without rewriting their diagnostics. Target A is resolved before target B, so error precedence is deterministic.
+The implemented rigid-body solver also propagates these builder errors. It does not silently ignore unsupported active constraints in a selected graph group.
 
 ## Read-only and persistence boundary
 
 Equation construction does not:
 
-- mutate either component `RigidTransform`
+- mutate a component `RigidTransform`
 - update a component instance
 - enforce grounding
 - infer suppression participation
 - change constraint state or target tokens
-- add, remove, or rewrite assembly constraint records
+- add, remove, or rewrite constraints
 - modify part parameters, sketches, features, or derived workplanes
 - run part recompute
-- own or mutate a `ShapeCache`
-- solve an equation
-- write a solved transform
+- own or mutate `ShapeCache`
+- solve a constraint system
+- apply a proposed transform
 - compute remaining degrees of freedom
 - persist equation or residual data
 
@@ -283,32 +280,32 @@ persistent AssemblyConstraint intent
 + persisted component RigidTransform values
 ```
 
-No assembly or project JSON schema field is added.
+No assembly or project JSON field is added.
+
+The downstream solver also keeps residual descriptors and numeric Jacobians unpersisted. Only explicit application of a fresh converged solve result may update the existing persistent component transform fields.
 
 ## Tests
 
 `tests/geometry/assembly_constraint_equation_builder_tests.cpp` covers:
 
-- a satisfied planar Mate between a top face and translated bottom face
-- preservation of constraint id, type, target component ids, and semantic tokens
-- tangentially different Mate frame origins with zero signed plane separation
-- unsatisfied Mate normal-opposition and signed-separation residuals
-- transformed target geometry after component translation and Z rotation
-- a satisfied planar Distance residual
-- Distance normal-parallelism residual construction
-- explicit target distance preservation
+- satisfied planar Mate
+- constraint and target identity preservation
+- tangential Mate frame-origin differences
+- unsatisfied Mate normal/separation residuals
+- transformed target geometry
+- satisfied planar Distance
+- nonparallel Distance plane residuals
+- explicit target-distance preservation
 - signed A-to-B separation
 - positive Distance residual error
-- reversed target order producing the documented negative signed separation
-- inactive-constraint rejection
-- Concentric rejection before semantic-axis target resolution
-- unsupported generated-edge target-family error propagation
+- reversed target-order sign behavior
+- inactive rejection
+- Concentric rejection
+- unsupported generated-edge target propagation
 - deterministic repeated construction
-- unchanged component transforms
-- unchanged constraint count and semantic target tokens
-- unchanged part derived-workplane count
+- unchanged component transforms, constraint records, target tokens, and part workplane intent
 
-Targeted test command after a geometry build:
+Targeted test command:
 
 ```bash
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-equation]"
@@ -320,31 +317,30 @@ Complete geometry workflow:
 cmake --workflow --preset dev-geometry-build-test
 ```
 
-## Deliberate limitations
+## Deliberate block boundary
 
-This block does not implement:
+This builder itself does not implement:
 
-- a rigid-body solver
-- transform mutation from residuals
-- residual Jacobians
-- residual weighting or solver tolerances
+- rigid-body optimization
+- transform mutation
+- residual weighting
+- Jacobian construction
+- convergence or iteration policy
 - remaining-DOF computation
-- underconstrained, fully constrained, or overconstrained analysis
-- grounding enforcement
-- suppression participation rules
+- Jacobian-rank diagnostics
+- underconstrained, fully constrained, or overconstrained classification
+- grounding or suppression solver policy
 - semantic axis references
-- Concentric equation construction
-- Insert or other richer constraint families
-- joints or motion
-- collision/interference analysis
-- subassemblies
-- component geometry instancing
-- assembly-level STEP export
+- Concentric equations
+- richer constraint/joint families
+- motion, collision, subassemblies, geometry instancing, or assembly STEP export
+
+The first rigid-body optimization, grounding policy, residual weighting, numeric Jacobian, convergence semantics, proposed-transform result, and explicit application boundary are implemented downstream in `AssemblyRigidBodySolver` and `AssemblySolveResultApplier`.
 
 ## Next technical step
 
-The next assembly block is a first rigid-body solver seed over the now-stable active-constraint graph, supported target-resolution path, explicit rigid-transform convention, and planar Mate/Distance residual descriptors.
+The repository-wide next assembly block is read-only solve diagnostics and remaining-degree-of-freedom analysis.
 
-That solver block must define its fixed-component/grounding participation rule, variable transform representation, convergence/error behavior, and transform-update boundary explicitly before mutating component placement.
+It should reuse the solver's deterministic variable/residual ordering and local numeric Jacobian model, define a canonical Jacobian-rank tolerance, and report variable count, local rank, constrained DOF, remaining DOF, and underconstrained versus locally fully constrained state without persisting DOF cache data.
 
-Concentric remains outside the first solver seed until semantic axis targets and Concentric residual construction exist.
+Concentric remains deferred until semantic axis targets and Concentric residual construction exist.
