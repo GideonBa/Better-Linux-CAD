@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <string>
+#include <string_view>
 #include <utility>
 
 namespace blcad::geometry {
@@ -70,16 +71,17 @@ resolve_explicit_construction_plane(const ConstructionPlane& plane) {
 [[nodiscard]] Result<ResolvedWorkplane>
 resolve_additive_extrude_face(const PartDocument& document,
                               const SemanticFaceReference& face_reference,
-                              DatumPlaneId resolved_id) {
+                              DatumPlaneId resolved_id,
+                              std::string_view context) {
   const FeatureId& source_feature_id = face_reference.source_feature();
   const Feature* source_feature = document.find_feature(source_feature_id);
   if (source_feature == nullptr) {
     return Result<ResolvedWorkplane>::failure(validation_error(
-        resolved_id.value(), "generated face source feature must exist in part document"));
+        resolved_id.value(), std::string(context) + " source feature must exist in part document"));
   }
   if (source_feature->type() != FeatureType::AdditiveExtrude) {
     return Result<ResolvedWorkplane>::failure(validation_error(
-        resolved_id.value(), "generated face source feature must be an additive extrude"));
+        resolved_id.value(), std::string(context) + " source feature must be an additive extrude"));
   }
   const Sketch* source_sketch = document.find_sketch(source_feature->input_sketch());
   if (source_sketch == nullptr) {
@@ -89,8 +91,9 @@ resolve_additive_extrude_face(const PartDocument& document,
   if (source_sketch->rectangle_profiles().size() != 1U ||
       !source_sketch->circle_profiles().empty() || !source_sketch->closed_profiles().empty()) {
     return Result<ResolvedWorkplane>::failure(validation_error(
-        source_sketch->id().value(), "generated face resolution requires a source sketch with "
-                                     "exactly one rectangle profile"));
+        source_sketch->id().value(), std::string(context) +
+                                         " resolution requires a source sketch with exactly one "
+                                         "rectangle profile"));
   }
 
   const RectangleProfile& rectangle = source_sketch->rectangle_profiles().front();
@@ -161,7 +164,8 @@ resolve_additive_extrude_face(const PartDocument& document,
 [[nodiscard]] Result<ResolvedWorkplane>
 resolve_additive_extrude_face_workplane(const PartDocument& document,
                                         const DerivedWorkplane& workplane) {
-  return resolve_additive_extrude_face(document, workplane.face_reference(), workplane.id());
+  return resolve_additive_extrude_face(document, workplane.face_reference(), workplane.id(),
+                                       "derived workplane");
 }
 
 [[nodiscard]] Result<ResolvedWorkplane>
@@ -258,7 +262,7 @@ WorkplaneResolver::resolve_generated_face(const PartDocument& document,
                                           const SemanticFaceReference& face_reference) const {
   const DatumPlaneId resolved_id(face_reference.source_feature().value() + "." +
                                  std::string(to_string(face_reference.face())));
-  return resolve_additive_extrude_face(document, face_reference, resolved_id);
+  return resolve_additive_extrude_face(document, face_reference, resolved_id, "generated face");
 }
 
 Result<ResolvedWorkplane> WorkplaneResolver::resolve_for_sketch(const PartDocument& document,
