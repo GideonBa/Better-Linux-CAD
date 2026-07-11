@@ -329,7 +329,9 @@ The next implementation must:
 9. preserve rigid `SubassemblyInstance` boundary transforms unless a later dedicated whole-subassembly solve-variable block explicitly changes that contract;
 10. keep cross-hierarchy joints and nested motion propagation deferred.
 
-## Proposed assembly implementation sequence
+## Broad assembly implementation sequence
+
+This broad sequence groups the interference, clearance, and headless analysis sub-blocks that are listed separately as detailed MVP-5 sections 18-20 above. The detailed section numbers above are canonical for the split implementation blocks.
 
 1. Component instances and grounding. Implemented.
 2. Explicit placement/state updates. Implemented.
@@ -351,9 +353,9 @@ The next implementation must:
 18. Posed assembly STEP export seed. Implemented.
 19. Add joints and limits, then motion through the solver. First Revolute family implemented.
 20. Rigid subassembly instance and nested posed-export seed. Implemented.
-21. Posed interference, clearance, and headless analysis report. Implemented.
-22. Document-scoped flexible child-assembly solving. Implemented.
-23. Stable cross-hierarchy endpoint identity and read-only target/residual semantics. Implemented.
+21. Posed interference, clearance, and headless analysis report. Implemented as detailed sections 18-20 above.
+22. Document-scoped flexible child-assembly solving. Implemented as detailed section 21 above.
+23. Stable cross-hierarchy endpoint identity and read-only target/residual semantics. Implemented as detailed section 22 above.
 24. Persistent cross-hierarchy geometric constraint intent, occurrence-qualified graph, and shared numeric solve/application integration. Next.
 25. Cross-hierarchy joint semantics and nested motion propagation. Deferred.
 26. Component geometry instancing and structured STEP assembly products. Deferred.
