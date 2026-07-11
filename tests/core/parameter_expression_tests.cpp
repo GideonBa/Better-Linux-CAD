@@ -174,3 +174,64 @@ TEST_CASE("Expression parameters survive JSON roundtrip and re-derive edges",
   CHECK(restored.value().find_parameter(ParameterId("part.margin"))->value().millimeters() ==
         Approx(75.0));
 }
+
+TEST_CASE("Expression formulas can be rewritten with edge replacement",
+          "[core][parameter-expression]") {
+  PartDocument document = make_document();
+  REQUIRE(document.add_expression_parameter(ParameterId("part.margin"), "margin",
+                                            ParameterType::Length, "width / 2 - 15 mm"));
+
+  SECTION("editing the formula changes value, edges, and dependents") {
+    document.mark_all_clean();
+    const auto affected = document.set_parameter_formula(ParameterId("part.margin"), "height / 4");
+    REQUIRE(affected);
+    CHECK(std::find(affected.value().begin(), affected.value().end(), "part.margin") !=
+          affected.value().end());
+
+    const Parameter* margin = document.find_parameter(ParameterId("part.margin"));
+    REQUIRE(margin != nullptr);
+    CHECK(margin->formula().value() == "height / 4");
+    CHECK(margin->value().millimeters() == Approx(20.0));
+    CHECK(document.dependency_graph().has_dependency("part.height", "part.margin"));
+    CHECK_FALSE(document.dependency_graph().has_dependency("part.width", "part.margin"));
+
+    // The old input no longer re-evaluates the expression.
+    auto new_width = Quantity::length_mm(200.0, "part.width");
+    REQUIRE(new_width);
+    REQUIRE(document.set_parameter_value(ParameterId("part.width"), new_width.value()));
+    CHECK(document.find_parameter(ParameterId("part.margin"))->value().millimeters() ==
+          Approx(20.0));
+  }
+
+  SECTION("chained expressions re-evaluate after a formula edit") {
+    REQUIRE(document.add_expression_parameter(ParameterId("part.half_margin"), "half_margin",
+                                              ParameterType::Length, "margin / 2"));
+    REQUIRE(document.set_parameter_formula(ParameterId("part.margin"), "height / 4"));
+    CHECK(document.find_parameter(ParameterId("part.half_margin"))->value().millimeters() ==
+          Approx(10.0));
+  }
+
+  SECTION("invalid edits are rejected without changing the document") {
+    CHECK(document.set_parameter_formula(ParameterId("part.width"), "height / 2").has_error());
+    CHECK(document.set_parameter_formula(ParameterId("part.margin"), "unknown + 1 mm").has_error());
+    CHECK(document.set_parameter_formula(ParameterId("part.margin"), "3 * 4").has_error());
+    CHECK(document.set_parameter_formula(ParameterId("part.margin"), "margin + 1 mm").has_error());
+
+    const Parameter* margin = document.find_parameter(ParameterId("part.margin"));
+    REQUIRE(margin != nullptr);
+    CHECK(margin->formula().value() == "width / 2 - 15 mm");
+    CHECK(margin->value().millimeters() == Approx(45.0));
+    CHECK(document.dependency_graph().has_dependency("part.width", "part.margin"));
+  }
+
+  SECTION("indirect cycles across two expressions are rejected") {
+    REQUIRE(document.add_expression_parameter(ParameterId("part.half_margin"), "half_margin",
+                                              ParameterType::Length, "margin / 2"));
+    const auto cyclic =
+        document.set_parameter_formula(ParameterId("part.margin"), "half_margin * 2");
+    REQUIRE(cyclic.has_error());
+    CHECK(cyclic.error().message() == "expression formula edit must not create a dependency cycle");
+    CHECK(document.find_parameter(ParameterId("part.margin"))->formula().value() ==
+          "width / 2 - 15 mm");
+  }
+}

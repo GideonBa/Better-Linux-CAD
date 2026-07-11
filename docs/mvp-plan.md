@@ -300,7 +300,9 @@ Canonical document: `docs/parameter-expression-mvp.md`.
 
 Implemented: unit-aware formula parameters on part documents (`+ - * /`, parentheses, unary minus, `mm` literals, name references), length-power unit tracking with rejection of invalid dimensions, dependency edges from every referenced parameter, topological re-evaluation after input changes, cycle rejection, direct-write rejection, JSON formula roundtrip with re-derived edges, and a geometry proof where a formula-driven thickness drives an incremental recompute.
 
-Still deferred: formula editing, assembly-scope/cross-part expressions, functions, and further units.
+Also implemented: formula editing through `PartDocument::set_parameter_formula` — evaluate first, replace the parameter's input edges (`DependencyGraph::remove_dependencies_of_dependent`), reject direct and indirect cycles before any state changes, then invalidate and re-evaluate dependents. Invalid edits leave the document untouched.
+
+Still deferred: plain/expression conversion, assembly-scope/cross-part expressions, functions, and further units.
 
 ## Next MVP: Continue per the assembly sequence
 

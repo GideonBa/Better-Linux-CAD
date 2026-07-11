@@ -17,6 +17,10 @@ public:
 
   [[nodiscard]] Result<std::size_t> add_node(NodeId node_id);
   [[nodiscard]] Result<std::size_t> add_dependency(NodeId dependency, NodeId dependent);
+  // Removes every edge whose dependent is the given node and returns how many
+  // were removed. Nodes stay in the graph; only incoming edges are dropped.
+  // Used when an expression formula is rewritten and its inputs change.
+  [[nodiscard]] std::size_t remove_dependencies_of_dependent(std::string_view dependent);
 
   [[nodiscard]] bool has_node(std::string_view node_id) const noexcept;
   [[nodiscard]] bool has_dependency(std::string_view dependency,

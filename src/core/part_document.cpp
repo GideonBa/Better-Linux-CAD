@@ -939,15 +939,81 @@ Result<std::vector<std::string>> PartDocument::set_parameter_value(ParameterId i
   auto affected = invalidation_state_.mark_changed(dependency_graph_, id.value());
   if (affected.has_error())
     return affected;
+  auto reevaluated = reevaluate_affected_expressions(affected.value());
+  if (reevaluated.has_error())
+    return Result<std::vector<std::string>>::failure(reevaluated.error());
+  return affected;
+}
 
+Result<std::vector<std::string>> PartDocument::set_parameter_formula(ParameterId id,
+                                                                     std::string formula) {
+  if (id.empty())
+    return Result<std::vector<std::string>>::failure(
+        Error::validation("parameter", "parameter id must not be empty"));
+  const Parameter* existing = find_parameter(id);
+  if (existing == nullptr)
+    return Result<std::vector<std::string>>::failure(
+        Error::validation(id.value(), "parameter must exist in part document"));
+  if (!existing->is_expression())
+    return Result<std::vector<std::string>>::failure(
+        Error::validation(id.value(), "only expression parameters carry an editable formula"));
+
+  const ParameterExpressionEvaluator evaluator;
+  auto evaluation = evaluator.evaluate(*this, formula, existing->type(), id.value());
+  if (evaluation.has_error())
+    return Result<std::vector<std::string>>::failure(evaluation.error());
+
+  auto updated =
+      Parameter::create_expression(id, existing->name(), existing->type(), std::move(formula),
+                                   evaluation.value().value, existing->scope());
+  if (updated.has_error())
+    return Result<std::vector<std::string>>::failure(updated.error());
+
+  // Replace the parameter's input edges with the new formula's references and
+  // reject the edit before any state changes if it would create a cycle.
+  auto graph = dependency_graph_;
+  graph.remove_dependencies_of_dependent(id.value());
+  for (const ParameterId& referenced : evaluation.value().referenced_parameters) {
+    auto edge = add_dependency_if_missing(graph, referenced.value(), id.value());
+    if (edge.has_error())
+      return Result<std::vector<std::string>>::failure(edge.error());
+  }
+  if (graph.has_cycle())
+    return Result<std::vector<std::string>>::failure(Error::dependency(
+        id.value(), "expression formula edit must not create a dependency cycle"));
+
+  auto invalidation_state = invalidation_state_;
+  auto synced = sync_graph(std::move(graph), invalidation_state, dependency_graph_);
+  if (synced.has_error())
+    return Result<std::vector<std::string>>::failure(synced.error());
+  invalidation_state_ = std::move(invalidation_state);
+
+  for (auto& parameter : parameters_)
+    if (parameter.id() == id) {
+      parameter = std::move(updated.value());
+      break;
+    }
+
+  auto affected = invalidation_state_.mark_changed(dependency_graph_, id.value());
+  if (affected.has_error())
+    return affected;
+  auto reevaluated = reevaluate_affected_expressions(affected.value());
+  if (reevaluated.has_error())
+    return Result<std::vector<std::string>>::failure(reevaluated.error());
+  return affected;
+}
+
+Result<std::size_t>
+PartDocument::reevaluate_affected_expressions(const std::vector<std::string>& affected_nodes) {
   // Re-evaluate affected expression parameters in topological order so chained
   // formulas read already-updated inputs.
   auto order = dependency_graph_.topological_order();
   if (order.has_error())
-    return Result<std::vector<std::string>>::failure(order.error());
+    return Result<std::size_t>::failure(order.error());
   const ParameterExpressionEvaluator evaluator;
+  std::size_t reevaluated_count = 0U;
   for (const std::string& node : order.value()) {
-    if (std::find(affected.value().begin(), affected.value().end(), node) == affected.value().end())
+    if (std::find(affected_nodes.begin(), affected_nodes.end(), node) == affected_nodes.end())
       continue;
     for (auto& parameter : parameters_) {
       if (parameter.id().value() != node || !parameter.is_expression())
@@ -955,16 +1021,18 @@ Result<std::vector<std::string>> PartDocument::set_parameter_value(ParameterId i
       auto evaluation = evaluator.evaluate(*this, parameter.formula().value(), parameter.type(),
                                            parameter.id().value());
       if (evaluation.has_error())
-        return Result<std::vector<std::string>>::failure(evaluation.error());
+        return Result<std::size_t>::failure(evaluation.error());
       auto reevaluated = parameter.with_value(evaluation.value().value);
       if (reevaluated.has_error())
-        return Result<std::vector<std::string>>::failure(reevaluated.error());
+        return Result<std::size_t>::failure(reevaluated.error());
       parameter = std::move(reevaluated.value());
+      ++reevaluated_count;
       break;
     }
   }
-  return affected;
+  return Result<std::size_t>::success(reevaluated_count);
 }
+
 Result<RecomputePlan> PartDocument::create_recompute_plan() const {
   return RecomputePlan::from_graph_and_invalidation_state(dependency_graph_, invalidation_state_);
 }

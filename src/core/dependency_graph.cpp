@@ -1,5 +1,7 @@
 #include "blcad/core/dependency_graph.hpp"
 
+#include <algorithm>
+
 #include <deque>
 #include <limits>
 #include <unordered_map>
@@ -62,6 +64,15 @@ Result<std::size_t> DependencyGraph::add_dependency(NodeId dependency, NodeId de
 
   dependencies_.emplace_back(std::move(dependency), std::move(dependent));
   return Result<std::size_t>::success(dependencies_.size() - 1);
+}
+
+std::size_t DependencyGraph::remove_dependencies_of_dependent(std::string_view dependent) {
+  const auto removed_begin =
+      std::remove_if(dependencies_.begin(), dependencies_.end(),
+                     [dependent](const DependencyEdge& edge) { return edge.second == dependent; });
+  const auto removed_count = static_cast<std::size_t>(dependencies_.end() - removed_begin);
+  dependencies_.erase(removed_begin, dependencies_.end());
+  return removed_count;
 }
 
 bool DependencyGraph::has_node(std::string_view node_id) const noexcept {

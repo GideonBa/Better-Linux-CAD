@@ -49,6 +49,12 @@ public:
   // writes to expression-driven parameters are rejected.
   [[nodiscard]] Result<std::vector<std::string>> set_parameter_value(ParameterId id,
                                                                      Quantity value);
+  // Rewrites the formula of an existing expression parameter: the new formula
+  // is evaluated, the parameter's old input edges are replaced by the new
+  // ones, cycles are rejected, and affected expression parameters are
+  // re-evaluated in topological order. Returns the affected graph nodes.
+  [[nodiscard]] Result<std::vector<std::string>> set_parameter_formula(ParameterId id,
+                                                                       std::string formula);
   [[nodiscard]] Result<RecomputePlan> create_recompute_plan() const;
   void mark_all_clean() noexcept;
 
@@ -103,6 +109,8 @@ public:
 private:
   PartDocument(DocumentId id, std::string name);
 
+  [[nodiscard]] Result<std::size_t>
+  reevaluate_affected_expressions(const std::vector<std::string>& affected_nodes);
   [[nodiscard]] bool has_parameter_id(const ParameterId& id) const noexcept;
   [[nodiscard]] bool has_parameter_name(std::string_view name) const noexcept;
   [[nodiscard]] bool has_datum_plane_id(const DatumPlaneId& id) const noexcept;
