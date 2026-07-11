@@ -89,6 +89,7 @@ if(BLCAD_BUILD_GEOMETRY)
     blcad_geometry STATIC
     src/geometry/arc_closed_profile_adapter.cpp
     src/geometry/assembly_constraint_target_resolver.cpp
+    src/geometry/assembly_transform_evaluator.cpp
     src/geometry/circular_cut_adapter.cpp
     src/geometry/closed_profile_adapter.cpp
     src/geometry/construction_line_resolver.cpp
@@ -221,6 +222,7 @@ if(BLCAD_BUILD_TESTS)
       blcad_geometry_tests
       tests/geometry/arc_closed_profile_pipeline_tests.cpp
       tests/geometry/assembly_constraint_target_resolver_tests.cpp
+      tests/geometry/assembly_transform_evaluator_tests.cpp
       tests/geometry/assembly_parameter_pipeline_tests.cpp
       tests/geometry/back_workplane_pipeline_tests.cpp
       tests/geometry/bolt_circle_pattern_pipeline_tests.cpp
