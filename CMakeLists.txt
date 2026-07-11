@@ -75,6 +75,13 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
   target_compile_options(blcad_core PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
+add_executable(blcad_inspect_project_components examples/blcad_inspect_project_components.cpp)
+target_link_libraries(blcad_inspect_project_components PRIVATE BLCAD::core)
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+  target_compile_options(blcad_inspect_project_components PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+
 if(BLCAD_BUILD_GEOMETRY)
   add_library(
     blcad_geometry STATIC
@@ -153,6 +160,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/chained_construction_relation_tests.cpp
     tests/core/circular_hole_pattern_tests.cpp
     tests/core/closed_profile_json_tests.cpp
+    tests/core/component_instance_tests.cpp
     tests/core/composite_closed_profile_json_tests.cpp
     tests/core/composite_closed_profile_tests.cpp
     tests/core/construction_geometry_tests.cpp
