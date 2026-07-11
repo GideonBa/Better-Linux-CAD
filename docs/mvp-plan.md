@@ -130,7 +130,7 @@ Still deferred:
 - manifest-based project files and external part references
 - lazy part loading and dirty-file tracking
 
-## Implemented block: MVP 5 first component instance seed
+## Implemented block: MVP 5 component instances and explicit placement/state updates
 
 Detailed document: `docs/component-instance-mvp5.md`
 
@@ -138,36 +138,42 @@ Implemented scope:
 
 - `ComponentInstanceId` typed id
 - `ComponentInstance` owned by `AssemblyDocument`
-- stable instance id, display name, referenced project part document id
+- stable instance id, display name, and referenced project part document id
 - visibility, suppression state, and grounding state records
 - `RigidTransform` with translation in millimeters and rotation in degrees for free placement
 - assembly-level validation that component instances reference member parts
 - project-level validation that component instances resolve to owned project parts
-- assembly/project JSON roundtrip for component instances
-- core tests proving two component instances can reference one owned part document without duplicating part geometry
+- copy-style `ComponentInstance::with_*` operations that preserve identity and referenced part intent
+- explicit `AssemblyDocument` updates for transform, visibility, suppression state, and grounding state
+- direct transform edits even while an instance is marked grounded, preserving the deliberate no-solver boundary
+- assembly/project JSON roundtrip for initial and updated component instance state
+- core tests proving two updated component instances can reference one owned part document without duplicating part geometry
 - checked-in `examples/component_instances.blcad.project.json`
-- headless `blcad_inspect_project_components` inspection tool
+- headless `blcad_inspect_project_components` inspection tool exposing persisted placement/state values
 
 Still deferred:
 
-- explicit component transform/state update APIs
+- semantic component reference targets for assembly constraints
 - mate, concentric, distance, insert, angle, and tangent constraints
-- constraint solver and remaining DOF display
+- constraint graph, solver, and remaining DOF display
+- enforced grounding and suppression behavior in future assembly consumers
 - collision checks, subassemblies, and assembly-level STEP export
 
-## Next MVP: Component instance placement and state update seed
+## Next MVP: Assembly constraint model-intent seed
 
-Goal: allow explicit free-placement/state edits on existing component instances while keeping the no-solver boundary clear.
+Goal: store solver-independent assembly relationship intent on semantic component targets before any constraint graph or rigid-body solver is introduced.
 
 Proposed first implementation sequence:
 
-- add `AssemblyDocument` update functions for component instance transform, visibility, suppression state, and grounding state
-- validate that the target component instance id exists
-- keep transform edits direct and explicit; do not infer constraints, solve placement, or recompute DOF
-- preserve JSON roundtrip for updated state and transform values
-- add project-level tests showing component updates do not duplicate part documents and keep instance references valid
-- extend `blcad_inspect_project_components` output or tests so updated placement/state is observable from a project file
-- keep mate/concentric/distance constraints, solver, DOF display, collision checks, subassemblies, and assembly-level STEP export deferred
+- add a typed `AssemblyConstraintId` and an `AssemblyConstraintType` limited to Mate, Concentric, and Distance
+- add a semantic component-target record that combines an existing `ComponentInstanceId` with a persistent semantic reference token instead of a raw OCCT face/edge id
+- add `AssemblyConstraint` model-intent records with stable id, name, type, target A, target B, active state, and a distance value only where required by Distance
+- let `AssemblyDocument` own constraints and validate unique constraint ids, existing component instance targets, non-empty semantic reference tokens, and type-specific parameter requirements
+- keep constraints read-only with respect to component transforms: adding or loading a constraint must not solve placement or mutate free-placement transforms
+- persist optional `assembly_constraints` records through assembly/project JSON and keep old files without the field loadable
+- add tests for invalid targets, duplicate ids, Mate/Concentric/Distance roundtrip, unchanged component transforms, shared part ownership, and project structure validation
+- extend `blcad_inspect_project_components` or a focused headless inspector so stored constraint type and semantic targets are observable from a project file
+- keep geometric reference resolution, constraint graph construction, rigid-body solving, DOF display, enforced grounding, Insert/Angle/Tangent constraints, collision checks, subassemblies, and assembly-level STEP export deferred
 
 ## Future roadmap: Multi-body transforms and path features
 
