@@ -2,7 +2,7 @@
 
 Status: implemented component-instance seed and explicit placement/state update block. Component instances are stored as assembly model-intent records, reference project-owned part documents, and can be edited without an assembly solver.
 
-This document is the canonical detailed description of the implemented MVP-5 component-instance and free-placement block above the MVP-4 project container. The later implemented constraint-record block is documented separately in `docs/assembly-constraint-model-intent-mvp5.md`.
+This document is the canonical detailed description of the implemented MVP-5 component-instance and free-placement block above the MVP-4 project container. The later constraint-record and read-only graph blocks are documented separately in `docs/assembly-constraint-model-intent-mvp5.md` and `docs/assembly-constraint-graph-mvp5.md`.
 
 ## Goal
 
@@ -20,7 +20,7 @@ The component-instance block itself must not:
 - generate an assembly-level STEP file
 - duplicate an owned `PartDocument` for every component occurrence
 
-Mate, Concentric, and Distance constraint records now exist as a separate solver-independent MVP-5 layer. They do not change the guarantees of this component-placement API.
+Mate, Concentric, and Distance constraint records and the derived read-only active-constraint graph now exist as separate MVP-5 layers. They do not change the guarantees of this component-placement API.
 
 ## Implemented records
 
@@ -102,7 +102,7 @@ The no-solver boundary is deliberate. For example, a component currently marked 
 
 Visibility and suppression are also stored state only. They do not yet remove components from assembly geometry execution, assembly export, collision checks, or solver input because those assembly consumers do not exist yet.
 
-Adding or loading an `AssemblyConstraint` also leaves these free-placement transforms unchanged. Constraint records and placement edits are separate model-intent operations.
+Adding or loading an `AssemblyConstraint` and deriving `AssemblyConstraintGraph` connectivity also leave these free-placement transforms unchanged. Constraint records, connectivity queries, and placement edits are separate operations.
 
 ## Assembly ownership
 
@@ -114,7 +114,7 @@ AssemblyDocument
   component_instances[]
 ```
 
-A component instance must reference an already registered `member_part`. This keeps the instance graph tied to assembly members and prevents arbitrary document ids from appearing in the assembly structure.
+A component instance must reference an already registered `member_part`. This keeps the instance structure tied to assembly members and prevents arbitrary document ids from appearing in the assembly.
 
 Multiple component instances may reference the same member part document. That is the intended representation for repeated assembly occurrences without duplicating the owned part model intent.
 
@@ -158,6 +158,8 @@ The placement/state update block introduces no additional persisted fields. It c
 
 The later constraint-record block additively introduces optional `assembly_constraints` while retaining the same compatibility marker. Its JSON rules are documented in `docs/assembly-constraint-model-intent-mvp5.md`.
 
+The read-only `AssemblyConstraintGraph` adds no JSON field. Its nodes, active edges, adjacency, and connected groups are derived from component and constraint model intent.
+
 A representative updated component entry has this shape:
 
 ```json
@@ -198,7 +200,7 @@ translation_mm
 rotation_deg
 ```
 
-The inspector now also prints stored assembly constraints, but that output belongs to the separate constraint model-intent block. See `docs/assembly-constraint-model-intent-mvp5.md`.
+The inspector also prints stored assembly constraints and a derived constraint-graph group summary. Those outputs belong to the separate constraint-record and graph blocks. See `docs/assembly-constraint-model-intent-mvp5.md` and `docs/assembly-constraint-graph-mvp5.md`.
 
 The tool is read-only: it does not edit a project, export an assembly, solve transforms, or create component geometry.
 
@@ -221,10 +223,10 @@ The component-instance tests cover:
 - two component instances referencing one owned part document without duplicating the owned `PartDocument`
 - project JSON roundtrip preserving updated component placement/state and shared part ownership
 
-Assembly constraint tests are intentionally separate in `tests/core/assembly_constraint_tests.cpp`.
+Assembly constraint and graph tests are intentionally separate in `tests/core/assembly_constraint_tests.cpp` and `tests/core/assembly_constraint_graph_tests.cpp`.
 
 ## Deliberate limitations
 
-This component-instance block does not implement constraint graph construction, semantic target geometry resolution, solver output, remaining degrees of freedom, enforced grounding behavior, suppression effects on assembly consumers, collision checks, subassemblies, assembly-level geometry instancing, or assembly-level STEP export.
+This component-instance block does not implement semantic target geometry resolution, solver output, remaining degrees of freedom, enforced grounding behavior, suppression effects on assembly consumers, collision checks, subassemblies, assembly-level geometry instancing, or assembly-level STEP export.
 
-Solver-independent semantic Mate, Concentric, and Distance records are now implemented separately. The next assembly increment is the read-only active-constraint graph described in `docs/assembly-constraint-model-intent-mvp5.md`, `docs/mvp-plan.md`, and `docs/assembly-system.md`.
+Solver-independent Mate, Concentric, and Distance records and the read-only active-constraint graph are implemented separately. The next assembly increment is read-only semantic target resolution for the supported generated-face family; see `docs/assembly-constraint-graph-mvp5.md`, `docs/mvp-plan.md`, and `docs/assembly-system.md`.
