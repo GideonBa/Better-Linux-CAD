@@ -319,3 +319,7 @@ if(BLCAD_BUILD_TESTS)
     catch_discover_tests(blcad_geometry_tests)
   endif()
 endif()
+
+message(STATUS "BLCAD MVP-1 core skeleton configured.")
+message(STATUS "Geometry/OCCT targets enabled: ${BLCAD_BUILD_GEOMETRY}")
+message(STATUS "GUI/Qt targets enabled: ${BLCAD_BUILD_GUI}")
