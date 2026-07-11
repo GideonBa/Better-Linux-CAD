@@ -159,7 +159,7 @@ Implemented:
 - separate component-transform preservation
 - explicit failure paths and read-only behavior
 
-The same resolver now also owns the separate generated-axis family described in step 9.
+The same resolver also owns the separate generated-axis family described in step 9.
 
 ### 5. Explicit rigid-transform evaluation
 
@@ -204,9 +204,9 @@ Distance:
 
 Target A/B order is preserved because signed Distance semantics are order-dependent.
 
-The planar builder remains Mate/Distance-specific. Concentric uses the dedicated builder in step 9.
+The planar builder remains Mate/Distance-specific. Concentric uses the dedicated builder introduced in step 9.
 
-### 7. First deterministic rigid-body solver
+### 7. Deterministic rigid-body solver and explicit result application
 
 Canonical document: `docs/assembly-rigid-body-solver-mvp5.md`.
 
@@ -218,7 +218,7 @@ Implemented:
 - suppressed group components rejected; visibility ignored for participation
 - six direct variables per free component: `tx,ty,tz,rx_deg,ry_deg,rz_deg`
 - lexicographic variable and constraint ordering
-- planar Mate/Distance numeric residual flattening
+- shared Mate/Distance/Concentric numeric residual evaluation
 - explicit default `1 mm` residual length scale
 - central finite-difference Jacobian
 - damped Gauss-Newton normal equations
@@ -231,7 +231,7 @@ Implemented:
 - stale-input detection including grounded anchors
 - atomic successful application through a project copy
 
-The solver currently consumes Mate and Distance only. Concentric integration is the next block.
+Concentric reaches the solver only through the shared numeric-system path described in step 10. No Concentric-specific optimizer branch exists.
 
 ### 8. Read-only Jacobian-rank and remaining-DOF diagnostics
 
@@ -239,8 +239,9 @@ Canonical document: `docs/assembly-solve-diagnostics-mvp5.md`.
 
 Implemented:
 
-- shared private numeric-system path used by solver and diagnostics
-- identical planar residual flattening, variable ordering, finite-difference steps, and Jacobian construction
+- one shared private numeric-system path used by solver and diagnostics
+- identical residual flattening, variable ordering, finite-difference steps, and Jacobian construction for both consumers
+- Mate, Distance, and Concentric Jacobian evaluation
 - `AssemblySolveDiagnosticsAnalyzer`
 - configurable absolute/relative rank tolerances
 - deterministic row-echelon rank computation with maximum-magnitude row pivot selection
@@ -301,19 +302,12 @@ axis_offset_mm         = cross(oB - oA, dA)
 - target-order-sensitive raw offset-vector convention
 - read-only, regenerable local/assembly axis and residual descriptors
 - no new project/assembly JSON field
-- focused core and geometry tests
 
-The first Concentric semantics are stable, but the shared numeric system, solver, and DOF analyzer still consume planar Mate/Distance residuals only.
+### 10. Concentric numeric-system, solver, and DOF integration
 
-## Next MVP: Concentric numeric-system, solver, and DOF integration
+Canonical document: `docs/assembly-concentric-numeric-solver-dof-mvp5.md`.
 
-Goal: make the implemented Concentric residual family a first-class numeric solve input without weakening any current solver or diagnostic contract.
-
-Proposed implementation sequence:
-
-1. Teach the shared assembly numeric system to choose the dedicated Concentric builder for Concentric records.
-2. Preserve existing Mate/Distance flattening exactly.
-3. Flatten Concentric residuals in this exact order:
+Implemented exact Concentric flattening:
 
 ```text
 direction_parallelism.x
@@ -324,18 +318,63 @@ axis_offset_mm.y / length_residual_scale_mm
 axis_offset_mm.z / length_residual_scale_mm
 ```
 
-4. Reuse the existing free-component variable order and central finite-difference Jacobian path.
-5. Reuse the current damped Gauss-Newton, line-search, damping, solve-state, and grounding/suppression policies.
-6. Preserve source-project immutability, complete solve-input snapshots, stale-result detection, and explicit atomic result application.
-7. Solve lateral axis offset and axis tilt for one grounded/one free component.
-8. Verify equal and opposed axis directions are valid Concentric states.
-9. Verify axial translation and rotation about the common axis remain unconstrained.
-10. Extend diagnostics over the same shared Jacobian and prove a regular one-free-body Concentric system has rank four over six variables and two remaining DOF.
-11. Test deterministic mixed Mate/Distance/Concentric constraint ordering and residual dimensions.
-12. Test fixed inconsistent Concentric geometry, non-convergence, read-only solve/diagnostics, and successful explicit application.
-13. Keep Insert downstream until axial seating semantics are explicitly defined on top of stable Concentric behavior.
+Implemented:
 
-No persistent Jacobian, solve-result, or DOF cache is required.
+- constraint-type selection inside the one shared assembly numeric residual evaluator
+- unchanged Mate/Distance flattening
+- six Concentric scalar residual components
+- reuse of lexicographic graph constraint ordering
+- reuse of persistent target A/B order
+- reuse of six-variable free-component ordering
+- reuse of central finite-difference Jacobian construction
+- reuse of existing damped Gauss-Newton, damping, and line-search policy
+- lateral axis-offset solving
+- axis-tilt solving
+- equal and opposed valid axis directions
+- preserved axial translation and rotation-about-axis freedom in the regular centered-axis case
+- source-project immutability
+- complete solve-input snapshots
+- stale-result detection
+- explicit atomic successful result application
+- all-grounded Concentric inconsistency
+- explicit non-converged Concentric boundaries
+- unchanged semantic target failure propagation
+- regular one-free-body Concentric Jacobian rank:
+
+```text
+variable_count           = 6
+residual_component_count = 6
+jacobian_rank            = 4
+constrained_dof          = 4
+remaining_dof            = 2
+```
+
+- mixed Distance/Concentric deterministic residual order and dimension `10`
+- regular mixed Distance/Concentric rank `5/6` with one remaining rotation-about-axis DOF
+- no persistent residual/Jacobian/solve/DOF cache
+
+## Next MVP: Stable Insert intent and read-only composite residual semantics
+
+Goal: define Insert as explicit assembly model intent over stable semantic circular-feature geometry before allowing it to participate in the numeric solver.
+
+Insert must not be treated as an undocumented Concentric relationship plus an arbitrary axial offset.
+
+Proposed implementation sequence:
+
+1. Define stable semantic axial-seating plane references for the first supported circular-cut feature family without raw OCCT topology ids.
+2. Preserve exact source feature/profile identity and deterministic component-local seating geometry.
+3. Evaluate seating planes in assembly space through the existing `AssemblyTransformEvaluator` convention.
+4. Introduce `AssemblyConstraintType::Insert` with explicit record and JSON compatibility semantics.
+5. Define the target contract required to derive both one semantic axis and one seating plane per Insert endpoint.
+6. Define canonical axis alignment semantics, including whether equal/opposed directions are accepted.
+7. Define canonical seating-plane normal orientation and signed axial seating in persistent target A/B order.
+8. Construct a dedicated read-only Insert residual descriptor from semantic axes plus seating planes.
+9. Keep the Insert residual path derived and unpersisted.
+10. Prove the regular Insert residual Jacobian has local rank five over six rigid-body variables and one remaining rotation-about-axis DOF.
+11. Test target order, semantic geometry failures, deterministic construction, read-only behavior, and JSON roundtrip of Insert model intent.
+12. Keep Insert numeric-system/solver/application integration as the following block after target and residual semantics are stable.
+
+No persistent solved transform, residual, Jacobian, or DOF cache is required.
 
 ## Proposed assembly implementation sequence
 
@@ -350,11 +389,13 @@ No persistent Jacobian, solve-result, or DOF cache is required.
 9. First rigid-body solver and explicit successful result application. Implemented.
 10. Jacobian-rank and remaining-DOF diagnostics. Implemented.
 11. Semantic generated-axis references and read-only Concentric residual construction. Implemented.
-12. Concentric numeric-system, solver, and DOF integration. Next.
-13. Add solved-state or DOF cache records only if a later consumer requires data that cannot be safely regenerated.
-14. Add Insert and richer constraint families.
-15. Add joints and limits, then motion through the solver.
-16. Add rigid subassemblies first, flexible subassemblies later, collision/interference checks, component geometry instancing, and assembly-level STEP export.
+12. Concentric numeric-system, solver, and DOF integration. Implemented.
+13. Add solved-state or DOF cache records only if a later consumer requires data that cannot be safely regenerated. No current requirement.
+14. Stable Insert intent and read-only composite residual semantics. Next.
+15. Insert numeric-system, solver, and DOF integration.
+16. Add richer constraint families.
+17. Add joints and limits, then motion through the solver.
+18. Add rigid subassemblies first, flexible subassemblies later, collision/interference checks, component geometry instancing, and assembly-level STEP export.
 
 ## Future roadmaps
 
@@ -362,7 +403,7 @@ No persistent Jacobian, solve-result, or DOF cache is required.
 - Inventor-like sketcher and feature parity: `docs/inventor-like-sketcher-and-feature-roadmap.md`
 - Advanced surfacing and 3D sketches: `docs/advanced-surfacing-and-3d-sketch-mvp.md`
 
-Later assembly work includes Insert and richer constraint families, per-component/null-space DOF presentation, joints and limits, motion, rigid then flexible subassemblies, collision/interference checks, component geometry instancing, and assembly-level STEP export.
+Later assembly work includes Insert solver integration, richer constraint families, per-component/null-space DOF presentation, joints and limits, motion, rigid then flexible subassemblies, collision/interference checks, component geometry instancing, and assembly-level STEP export.
 
 ## Persistence rule
 
