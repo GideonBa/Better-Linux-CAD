@@ -12,8 +12,9 @@ namespace blcad {
 
 class Project;
 
-// One persistent direct component-transform authority. Repeated rooted
-// occurrences of one child AssemblyDocument can map to the same authority.
+// Derived identity of one persistent direct component-transform authority.
+// Repeated rooted occurrences of one child AssemblyDocument can map to the same
+// authority; the identity itself is not an additional persisted model record.
 struct ComponentTransformAuthority {
   DocumentId assembly_document;
   ComponentInstanceId component_instance;
