@@ -1,8 +1,8 @@
 # Assembly System with Constraints
 
-Status: component instances, explicit placement/state updates, Mate/Concentric/Distance intent records, deterministic active-constraint connectivity, generated planar-face and generated-axis target resolution, explicit rigid-transform evaluation, Mate/Distance/Concentric residual construction, one shared numeric residual/Jacobian system, deterministic rigid-body solving, explicit atomic result application, and read-only local Jacobian-rank/remaining-DOF diagnostics are implemented.
+Status: component instances, explicit placement/state updates, Mate/Concentric/Distance/Insert intent records, deterministic active-constraint connectivity, generated planar-face/circular-axis/circular-seat target resolution, explicit rigid-transform evaluation, Mate/Distance/Concentric/Insert residual construction, Mate/Distance/Concentric numeric solving, explicit atomic result application, and read-only local Jacobian-rank/remaining-DOF diagnostics are implemented.
 
-Stable Insert intent and read-only composite Insert residual semantics are the next assembly block.
+Insert numeric-system, solver, application, and shared DOF integration is the next assembly block.
 
 ## Core model
 
@@ -15,62 +15,64 @@ AssemblyDocument HousingAssembly
   ComponentInstance Screw_02 -> Screw_M6x25
 ```
 
-One part model may therefore be reused by several component occurrences.
+One part model may be reused by several component occurrences.
 
-Persistent records store model intent. Graphs, resolved geometry, residuals, Jacobians, solve results, and DOF diagnostics remain derived unless an explicit successful solve proposal is applied to a persisted component transform.
+Persistent records store model intent. Graphs, resolved geometry, residuals, Jacobians, solve results, and DOF diagnostics remain derived unless a fresh converged transform proposal is explicitly applied.
 
 ## Current assembly pipeline
 
 ```text
-persistent component and constraint intent
+persistent ComponentInstance + AssemblyConstraint intent
   -> AssemblyConstraintGraph
-  -> deterministic graph-ordered active constraints
+  -> deterministic graph-ordered active constraint ids
 
-planar target
+planar face target
   -> AssemblyConstraintTargetResolver::resolve
-  -> ComponentLocalPlanarDescriptor
+  -> component-local plane
   -> AssemblyTransformEvaluator::evaluate_plane
-  -> AssemblySpacePlanarDescriptor
   -> AssemblyConstraintEquationBuilder
-  -> Mate / Distance residual descriptor
+  -> Mate / Distance residual
 
 axis target
   -> AssemblyConstraintTargetResolver::resolve_axis
-  -> ComponentLocalAxisDescriptor
+  -> component-local axis
   -> AssemblyTransformEvaluator::evaluate_axis
-  -> AssemblySpaceAxisDescriptor
   -> AssemblyConcentricConstraintEquationBuilder
-  -> Concentric residual descriptor
+  -> Concentric residual
 
-supported residual descriptor
-  -> one shared numeric residual/Jacobian system
+circular seat target
+  -> AssemblyConstraintTargetResolver::resolve_insert
+  -> component-local primary axis + oriented seating plane
+  -> evaluate_axis + evaluate_plane
+  -> AssemblyInsertConstraintEquationBuilder
+  -> composite Insert residual
+
+Mate / Distance / Concentric residual
+  -> shared numeric residual/Jacobian system
   -> AssemblyRigidBodySolver on Project copies
   -> AssemblySolveResult
   -> explicit AssemblySolveResultApplier
   -> AssemblySolveDiagnosticsAnalyzer
+
+Insert residual
+  -> next: shared numeric / solver / application / diagnostics integration
 ```
 
-Geometry-family interpretation is explicit before all supported constraint families rejoin one numeric path.
+Geometry-family interpretation is explicit. The current numeric solver remains one common path for every integrated family.
 
 ## Component instances and placement
 
 Canonical document: `docs/component-instance-mvp5.md`.
 
-`AssemblyDocument` owns `ComponentInstance` values. Each occurrence carries:
+Each `ComponentInstance` stores occurrence identity, referenced part, visibility, suppression, grounding, and:
 
 ```text
-ComponentInstanceId
-name
-referenced_part_document
-visibility
-suppression_state
-grounding_state
 RigidTransform
   translation_mm
   rotation_deg
 ```
 
-Direct placement/state edits are explicit storage operations. They do not infer constraints or run a solver.
+Direct placement/state edits are explicit storage operations. They do not infer constraints or run the solver.
 
 ## Assembly constraint intent
 
@@ -84,20 +86,22 @@ AssemblyConstraintTarget
 AssemblyConstraint
   id
   name
-  type = mate | concentric | distance
+  type = mate | concentric | distance | insert
   target_a
   target_b
   state = active | inactive
   distance = optional positive length
 ```
 
-The record layer validates identity and type-specific fields but keeps semantic target strings opaque.
+Distance is the only type that may carry `distance`.
 
-Target A/B order is persistent relationship intent and is never normalized away.
+Mate, Concentric, and Insert are distance-free persistent relationship intent.
+
+The record layer keeps target semantic strings opaque. It does not resolve geometry or solve placement.
+
+Target A/B order is persistent intent and is never normalized away.
 
 ## Active-constraint connectivity
-
-Canonical document: `docs/assembly-constraint-graph-mvp5.md`.
 
 `AssemblyConstraintGraph` is a deterministic read-only relationship graph:
 
@@ -106,17 +110,15 @@ nodes = every ComponentInstanceId
 edges = active AssemblyConstraintId records
 ```
 
-Inactive constraints do not affect connectivity. Multi-edges are legal. Nodes, edges, adjacency lists, and connected groups use lexicographic deterministic ordering.
+Inactive constraints do not affect connectivity. Multi-edges are legal. Node, edge, adjacency, and connected-group order is lexicographic.
 
-The graph does not own semantic geometry or numeric equations.
+The graph does not distinguish planar, axis, or composite seat geometry. An active Insert record is the same relationship-edge form as any other active constraint.
 
-Exact connected groups are rigid-body solve partition boundaries.
+Exact connected groups are current rigid-body solve partition boundaries.
 
-## Semantic planar target resolution
+## Semantic planar face targets
 
-Canonical document: `docs/assembly-constraint-target-resolution-mvp5.md`.
-
-Implemented generated-face family:
+Implemented family:
 
 ```text
 feature.<feature-id>.top
@@ -127,57 +129,70 @@ feature.<feature-id>.front
 feature.<feature-id>.back
 ```
 
-`AssemblyConstraintTargetResolver::resolve` performs:
+For supported `AdditiveExtrude` features, `resolve` reuses `WorkplaneResolver::resolve_generated_face` and returns a component-local plane plus separate persisted component transform.
 
-```text
-component occurrence
-  -> project-owned PartDocument
-  -> SemanticFaceReference
-  -> supported AdditiveExtrude
-  -> WorkplaneResolver::resolve_generated_face
-  -> ComponentLocalPlanarDescriptor
-  + separate component RigidTransform
-```
-
-The resolver does not apply component placement.
-
-## Semantic generated-axis target resolution
+## Semantic generated-axis targets
 
 Canonical document: `docs/assembly-semantic-axis-concentric-residuals-mvp5.md`.
 
-First implemented axis token:
+First axis token:
 
 ```text
 feature.<feature-id>.axis
 ```
 
-The first supported producer is a `SubtractiveExtrude` whose source sketch contains exactly one `CircleProfile` and exactly one total profile.
+The first producer is one `SubtractiveExtrude` whose source sketch contains exactly one `CircleProfile` and exactly one total profile.
 
-`AssemblyConstraintTargetResolver::resolve_axis` performs:
+The axis is derived from constructive intent:
 
 ```text
-component occurrence
-  -> project-owned PartDocument
-  -> SemanticAxisReference
-  -> supported SubtractiveExtrude
-  -> source Sketch
-  -> exactly one CircleProfile
-  -> source sketch workplane resolution
-  -> CircleProfile.center mapped to the workplane
-  -> direction from workplane normal and ExtrudeDirection
-  -> ComponentLocalAxisDescriptor
-  + separate component RigidTransform
+origin = mapped CircleProfile.center
+direction = source workplane normal adjusted by ExtrudeDirection
 ```
 
-The descriptor preserves source feature and source profile identity.
+Exact source feature/profile identity is preserved.
 
-The definition follows existing circular through-all cut model intent rather than querying OCCT topology.
+## Semantic seating targets and composite Insert endpoints
 
-`CircularHolePattern` remains excluded from one ambiguous `.axis` token because one pattern produces several distinct axes.
+Canonical document: `docs/assembly-insert-intent-composite-residuals-mvp5.md`.
+
+First seating token:
+
+```text
+feature.<feature-id>.seat
+```
+
+The first producer uses the same intentionally narrow single-circle `SubtractiveExtrude` family as `.axis`.
+
+`AssemblyConstraintTargetResolver::resolve_insert` derives:
+
+```text
+ResolvedAssemblyInsertConstraintTarget
+  component_instance
+  referenced_part_document
+  source_feature
+  source_profile
+  axis = Primary
+  seating_plane = Primary
+  local_axis
+  local_seating_plane
+  component_transform
+```
+
+The local axis and seat come from the same exact feature/profile identity.
+
+```text
+axis.origin = mapped CircleProfile.center
+axis.direction = extrude direction
+seat.origin = axis.origin
+seat.normal = axis.direction
+```
+
+For `OppositeSketchNormal`, the seat Y basis and normal are both reversed so the local seat frame remains right-handed.
+
+`CircularHolePattern` is not assigned one ambiguous `.axis` or `.seat` token because it produces several distinct holes. Stable per-instance pattern identity remains future work.
 
 ## Rigid-transform evaluation
-
-Canonical document: `docs/assembly-rigid-transform-evaluation-mvp5.md`.
 
 `RigidTransform` uses:
 
@@ -192,26 +207,26 @@ R = Rz * Ry * Rx for column vectors
 Evaluation rules:
 
 ```text
-point/origin    -> rotate, then translate
-vector          -> rotate only
-normal          -> rotate only
-axis direction  -> rotate only
+point/origin   -> rotate, then translate
+vector         -> rotate only
+normal         -> rotate only
+axis direction -> rotate only
 ```
 
-The geometry layer exposes distinct component-local and assembly-space plane/axis descriptor types.
+Insert reuses `evaluate_axis` for its primary axis and `evaluate_plane` for its seating plane.
 
-## Planar Mate residuals
+A focused test proves that local seat/axis origin `(4,-6,0)` under translation `(10,20,30)` and X rotation `90 deg` evaluates to `(14,20,24)`, while local +Z axis/seat normal evaluates to `(0,-1,0)`.
 
-For assembly-space planes `(oA,nA)` and `(oB,nB)`:
+## Mate residual
 
 ```text
 normal_opposition    = nA + nB
 signed_separation_mm = dot(oB - oA, nA)
 ```
 
-A Mate aligns supporting planes and opposes normals. Tangential frame-origin separation is not a residual.
+Tangential plane-origin separation is intentionally absent.
 
-## Planar Distance residuals
+## Distance residual
 
 ```text
 normal_parallelism   = cross(nA, nB)
@@ -219,64 +234,72 @@ signed_separation_mm = dot(oB - oA, nA)
 distance_residual_mm = signed_separation_mm - target_distance_mm
 ```
 
-Parallel equal or opposed normals are accepted. Signed separation uses target A's normal and is target-order dependent.
+Equal or opposed parallel normals are accepted. Target A defines signed separation.
 
-The planar residual builder remains Mate/Distance-specific.
-
-## Concentric residuals
-
-Canonical documents:
-
-- `docs/assembly-semantic-axis-concentric-residuals-mvp5.md`
-- `docs/assembly-concentric-numeric-solver-dof-mvp5.md`
-
-The dedicated geometric builder is:
-
-```text
-AssemblyConcentricConstraintEquationBuilder
-```
-
-For axis lines `(oA,dA)` and `(oB,dB)`:
+## Concentric residual
 
 ```text
 direction_parallelism = cross(dA, dB)
 axis_offset_mm         = cross(oB - oA, dA)
 ```
 
-A satisfied Concentric relationship has both vectors equal to zero.
+Equal and opposed directions are accepted. Axial origin separation is absent, so Concentric leaves axial translation and rotation about the common axis free.
 
-`cross(dA,dB) = 0` accepts equal and opposed directions.
+Regular one-free-body Concentric rank is `4/6` with two remaining local DOF.
 
-`axis_offset_mm` ignores origin separation parallel to target A's axis. Therefore Concentric does not constrain axial translation.
+## Composite Insert residual
 
-A regular Concentric relationship between one grounded and one free body constrains four independent local directions:
-
-```text
-two axis-tilt rotational directions
-two translations perpendicular to the common axis
-```
-
-It leaves:
+The dedicated read-only builder is:
 
 ```text
-translation along the common axis
-rotation about the common axis
+AssemblyInsertConstraintEquationBuilder
 ```
 
-free.
+One `.seat` endpoint is resolved and evaluated to:
+
+```text
+AssemblySpaceInsertConstraintTargetDescriptor
+  component_instance
+  semantic_reference
+  source_feature
+  source_profile
+  axis
+  seating_plane
+```
+
+For target axis lines `(oA,dA)`, `(oB,dB)` and seating planes with origins `sA`, `sB` and target-A normal `nA`:
+
+```text
+direction_parallelism       = cross(dA, dB)
+axis_offset_mm               = cross(oB - oA, dA)
+signed_seating_separation_mm = dot(sB - sA, nA)
+```
+
+The seat normal is canonically aligned with the same endpoint's semantic axis direction.
+
+The first two fields reuse stable Concentric axis-line semantics. The third removes Concentric's axial freedom by seating the target planes.
+
+Target A defines the signed seating direction.
+
+No separate seat-normal vector is included because axis-direction parallelism already constrains the two regular tilt directions.
+
+Insert therefore exposes seven scalar residual components:
+
+```text
+3 direction components
+3 axis-offset components
+1 seating-separation component
+```
+
+A direct central finite-difference `7 x 6` Jacobian test proves regular rank `5`, leaving only rotation about the common axis free.
+
+The rank is measured from residual sensitivity, not hard-coded from the Insert type.
 
 ## Shared numeric residual/Jacobian system
 
-The shared numeric implementation is private to the geometry layer:
+The private shared numeric implementation is used by solver and diagnostics.
 
-```text
-src/geometry/assembly_constraint_numeric_system.hpp
-src/geometry/assembly_constraint_numeric_system.cpp
-```
-
-It is used by both solver and diagnostics.
-
-Supported numeric families:
+Current numeric families:
 
 ```text
 Mate
@@ -284,19 +307,7 @@ Distance
 Concentric
 ```
 
-The numeric evaluator selects:
-
-```text
-Concentric
-  -> AssemblyConcentricConstraintEquationBuilder
-
-Mate / Distance
-  -> AssemblyConstraintEquationBuilder
-```
-
-Constraint order is lexicographic `AssemblyConstraintId` order from the graph. Persistent target A/B order remains unchanged inside each record.
-
-Each free component contributes variables in this exact order:
+Constraint records use lexicographic graph order. Each free component contributes:
 
 ```text
 tx_mm
@@ -307,7 +318,7 @@ ry_deg
 rz_deg
 ```
 
-Exact scalar residual flattening:
+Current scalar flattening:
 
 ```text
 Mate:
@@ -331,23 +342,11 @@ Concentric:
   axis_offset_mm.z / length_residual_scale_mm
 ```
 
-Mate and Distance contribute four scalar residuals. Concentric contributes six.
+Every finite-difference perturbation re-resolves semantic geometry and reconstructs residuals from current project intent.
 
-Default length scale:
-
-```text
-1.0 mm
-```
-
-The central finite-difference Jacobian uses separate translation and rotation perturbation steps.
-
-Every plus/minus evaluation re-resolves semantic targets and rebuilds the appropriate geometric residual descriptor.
-
-A residual-dimension change during finite differences fails explicitly.
+Insert is not yet flattened in this shared path.
 
 ## Rigid-body solver
-
-Canonical document: `docs/assembly-rigid-body-solver-mvp5.md`.
 
 Participation policy:
 
@@ -355,12 +354,12 @@ Participation policy:
 Grounded   -> fixed participant
 Free       -> six numeric variables
 Suppressed -> selected group rejected
-Visibility -> no solve participation effect
+Visibility -> no participation effect
 ```
 
-At least one grounded component is required. Multiple grounded components are allowed and remain fixed.
+At least one grounded component is required. Multiple grounded components may remain fixed.
 
-The numeric method is deterministic damped Gauss-Newton:
+The current solver uses deterministic damped Gauss-Newton:
 
 ```text
 evaluate r
@@ -372,24 +371,9 @@ evaluate r
   -> damping escalation
 ```
 
-Solve states:
+Mate, Distance, and Concentric participate through the same residual evaluator.
 
-```text
-Converged
-MaximumIterationsReached
-FixedGeometryInconsistent
-NumericalFailure
-```
-
-The solver changes transforms only on private project copies.
-
-Mate, Distance, and Concentric all participate through the shared numeric system. There is no Concentric-specific solver branch.
-
-The implemented Concentric solve path corrects lateral axis offset and axis tilt.
-
-Equal and opposed coincident axis directions are valid states.
-
-Axial translation and rotation about the common axis remain unconstrained by the Concentric residual definition.
+Insert currently fails explicitly before numeric solving through the dedicated composite-target boundary. It is never silently ignored and the source project remains unchanged.
 
 ## Explicit result application
 
@@ -398,22 +382,18 @@ Axial translation and rotation about the common axis remain unconstrained by the
 `AssemblySolveResultApplier`:
 
 - accepts only converged results
-- verifies complete component snapshots
+- verifies complete source snapshots
 - rejects changed transforms, grounding, or suppression state
 - detects moved grounded anchors
-- validates every proposal
+- validates all proposals
 - applies to a private project copy
 - replaces the caller project only after every update succeeds
 
-This same atomic application boundary handles Mate, Distance, and Concentric solver results.
-
-Non-converged Concentric results cannot partially mutate persistent placement.
+No solve result is persisted.
 
 ## Local Jacobian-rank and remaining-DOF diagnostics
 
-Canonical document: `docs/assembly-solve-diagnostics-mvp5.md`.
-
-For a converged numeric state, diagnostics evaluate the same shared Jacobian on a private project copy.
+For a converged integrated numeric state:
 
 ```text
 variable_count  = 6 * free_component_count
@@ -428,127 +408,60 @@ max(rank_absolute_tolerance,
     rank_relative_tolerance * maximum_abs_jacobian_entry)
 ```
 
-DOF classification, consistency classification, and residual-row rank structure are separate concepts.
+DOF, consistency, and residual-row rank structure are separate classifications.
 
-Redundant scalar residual rows do not automatically imply semantic overconstraint.
+Concentric rank is already evaluated through this shared analyzer.
 
-Regular one-free-body Concentric result:
+Insert rank is currently proven by a focused direct residual/Jacobian test because Insert is not yet a shared numeric family. The next integration block must prove the same rank `5/6` and one remaining DOF through `AssemblySolveDiagnosticsAnalyzer`.
 
-```text
-residual_component_count = 6
-variable_count           = 6
-jacobian_rank            = 4
-constrained_dof          = 4
-remaining_dof            = 2
-residual_row_redundancy  = 2
-```
+## Grounding, visibility, and suppression
 
-The rank is measured from the shared central finite-difference Jacobian. It is not hard-coded from the constraint type.
+Grounding is persisted model intent. Direct storage-level transform updates remain legal while grounded; solver policy interprets grounded components as fixed.
 
-A regular Distance plus Concentric system with the plane normal following the common axis produces:
+Visibility does not affect current solving.
 
-```text
-residual_component_count = 10
-jacobian_rank            = 5
-remaining_dof            = 1
-```
-
-The remaining local freedom is rotation about the common axis.
-
-## Grounding
-
-`ComponentGroundingState::Grounded` is persisted model intent.
-
-Storage-level direct transform updates remain legal while grounded. This keeps explicit model edits separate from solver policy.
-
-The solver interprets grounded components as fixed participants.
-
-A group with no grounded component is rejected instead of receiving a hidden floating-group gauge condition.
-
-An all-grounded group with unsatisfied Concentric residuals is reported as `FixedGeometryInconsistent` rather than moving an anchor.
-
-## Visibility and suppression
-
-Visibility and suppression are persistent editable state.
-
-Visibility does not affect the solver.
-
-Suppression does not currently rewrite graph connectivity or constraint participation, so the solver rejects a selected connected group containing a suppressed component instead of silently dropping it.
-
-A later suppression-aware solve path must define graph and constraint participation together.
-
-## Failure propagation
-
-Semantic target failures propagate through the shared numeric path unchanged.
-
-An unsupported Concentric token such as:
-
-```text
-bolt.main_axis
-```
-
-fails with:
-
-```text
-unsupported assembly semantic axis reference family
-```
-
-The solver and diagnostics no longer report Concentric as globally unsupported.
+Suppressed selected components are rejected rather than silently removed because suppression-aware graph and constraint participation has not yet been defined together.
 
 ## Persistence boundary
 
-The assembly/project format persists:
+Assembly/project JSON persists:
 
 - component identity and referenced part documents
 - visibility, suppression, grounding
 - `RigidTransform`
-- assembly constraint records and semantic target strings
+- Mate/Concentric/Distance/Insert constraint records
+- target A/B semantic-reference strings
 
 The following are derived and unpersisted:
 
 - graph connectivity
-- component-local plane and axis descriptors
-- assembly-space planes and axes
-- Mate/Distance/Concentric residual descriptors
-- flattened residual vectors
+- local plane/axis/seat descriptors
+- assembly-space plane/axis/seat geometry
+- Mate/Distance/Concentric/Insert residual descriptors
+- flattened numeric residuals
 - numeric Jacobians
 - normal equations and damping state
 - solve results and proposals
-- rank and DOF diagnostics
+- rank/DOF diagnostics
 
-`feature.hole.axis` uses the existing semantic-reference string field.
+`feature.hole.seat` uses the existing semantic-reference field. Insert uses the existing type string field. No new persistence field is introduced.
 
-Only explicit application of a fresh converged solver result changes the existing persisted component transform.
-
-## Motion, joints, and limits
-
-Underdefined components should eventually be draggable only within allowed DOF. A drag should become solver input projected into valid constraint space.
-
-Future joint families include Revolute, Prismatic, Cylindrical, Planar, Ball, Rigid, Gear, and Screw relations.
-
-These remain downstream of a stable rigid constraint/DOF model and future null-space presentation.
+Only explicit application of a fresh converged solve result changes the existing persistent component transform.
 
 ## Next technical step
 
-The next assembly block is stable Insert constraint intent and a read-only composite Insert residual model.
+The next assembly block is **Insert integration into the shared numeric residual/Jacobian system, rigid-body solver, explicit result application, and local remaining-DOF diagnostics**.
 
-Insert must explicitly combine:
-
-```text
-semantic axis alignment
-semantic axial seating-plane intent
-```
-
-The first block should define stable seating-plane references for the supported circular-cut feature family, add explicit Insert record/JSON semantics, preserve target A/B order for signed axial seating, and construct a dedicated derived residual descriptor.
-
-A regular Insert relationship should preserve Concentric's four independent axis-line constraints and add one independent axial seating direction:
+Exact Insert flattening must be:
 
 ```text
-variable_count  = 6
-jacobian_rank   = 5
-remaining_dof   = 1
+direction_parallelism.x
+direction_parallelism.y
+direction_parallelism.z
+axis_offset_mm.x / length_residual_scale_mm
+axis_offset_mm.y / length_residual_scale_mm
+axis_offset_mm.z / length_residual_scale_mm
+signed_seating_separation_mm / length_residual_scale_mm
 ```
 
-The remaining freedom should be rotation about the common axis.
-
-Insert numeric-system, solver, application, and DOF integration remain a separate following block after those target and residual semantics are stable.
+The integration must preserve all current deterministic ordering, finite-difference, damping, line-search, solve-state, grounding, suppression, snapshot, stale-result, and atomic-application contracts. It must solve lateral offset, tilt, and axial seating, preserve rotation about the common axis, and prove rank `5/6` with one remaining DOF through the exact shared diagnostics Jacobian.
