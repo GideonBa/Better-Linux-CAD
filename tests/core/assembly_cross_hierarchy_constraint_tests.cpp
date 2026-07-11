@@ -1,8 +1,11 @@
 #include "blcad/core/project.hpp"
+#include "blcad/core/project_json.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+#include <nlohmann/json.hpp>
 
 #include <optional>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -84,6 +87,39 @@ Project hierarchy_intent_project() {
   return project.value();
 }
 
+Project hierarchy_json_project() {
+  auto root = AssemblyDocument::create(DocumentId("assembly.root"), "Root");
+  REQUIRE(root);
+  REQUIRE(root.value().add_member_part(DocumentId("part.shared")));
+  REQUIRE(root.value().add_component_instance(hierarchy_instance("component.root", 10.0)));
+  REQUIRE(root.value().add_subassembly_instance(
+      hierarchy_subassembly("subassembly.outer", "assembly.child", 100.0)));
+
+  auto child = AssemblyDocument::create(DocumentId("assembly.child"), "Child");
+  REQUIRE(child);
+  REQUIRE(child.value().add_member_part(DocumentId("part.shared")));
+  REQUIRE(child.value().add_component_instance(hierarchy_instance("component.child", 20.0)));
+  REQUIRE(child.value().add_subassembly_instance(
+      hierarchy_subassembly("subassembly.inner", "assembly.grandchild", 200.0)));
+
+  auto grandchild = AssemblyDocument::create(DocumentId("assembly.grandchild"), "Grandchild");
+  REQUIRE(grandchild);
+  REQUIRE(grandchild.value().add_member_part(DocumentId("part.shared")));
+  REQUIRE(grandchild.value().add_component_instance(hierarchy_instance("component.leaf", 30.0)));
+
+  auto part = PartDocument::create(DocumentId("part.shared"), "SharedPart");
+  REQUIRE(part);
+
+  auto project = Project::create(DocumentId("project.hierarchy.json"), "HierarchyJson",
+                                 std::move(root.value()));
+  REQUIRE(project);
+  REQUIRE(project.value().add_child_assembly_document(std::move(child.value())));
+  REQUIRE(project.value().add_child_assembly_document(std::move(grandchild.value())));
+  REQUIRE(project.value().add_part_document(std::move(part.value())));
+  REQUIRE(project.value().validate_assembly_structure());
+  return project.value();
+}
+
 Quantity hierarchy_distance(double value_mm, const char* object_id) {
   auto quantity = Quantity::length_mm(value_mm, object_id);
   REQUIRE(quantity);
@@ -94,6 +130,44 @@ Quantity hierarchy_angle(double value_deg, const char* object_id) {
   auto quantity = Quantity::angle_deg(value_deg, object_id);
   REQUIRE(quantity);
   return quantity.value();
+}
+
+void add_json_constraints(Project& project) {
+  REQUIRE(project.add_cross_hierarchy_constraint(hierarchy_constraint(
+      "constraint.cross.mate", AssemblyConstraintType::Mate,
+      hierarchy_endpoint({}, "component.root", "semantic.no_geometry.mate.a"),
+      hierarchy_endpoint({"subassembly.outer"}, "component.child",
+                         "semantic.no_geometry.mate.b"))));
+
+  REQUIRE(project.add_cross_hierarchy_constraint(hierarchy_constraint(
+      "constraint.cross.concentric", AssemblyConstraintType::Concentric,
+      hierarchy_endpoint({"subassembly.outer"}, "component.child",
+                         "semantic.no_geometry.concentric.a"),
+      hierarchy_endpoint({"subassembly.outer", "subassembly.inner"}, "component.leaf",
+                         "semantic.no_geometry.concentric.b"))));
+
+  REQUIRE(project.add_cross_hierarchy_constraint(hierarchy_constraint(
+      "constraint.cross.distance", AssemblyConstraintType::Distance,
+      hierarchy_endpoint({"subassembly.outer", "subassembly.inner"}, "component.leaf",
+                         "semantic.no_geometry.distance.a"),
+      hierarchy_endpoint({}, "component.root", "semantic.no_geometry.distance.b"),
+      AssemblyConstraintState::Active,
+      hierarchy_distance(12.5, "constraint.cross.distance"))));
+
+  REQUIRE(project.add_cross_hierarchy_constraint(hierarchy_constraint(
+      "constraint.cross.insert", AssemblyConstraintType::Insert,
+      hierarchy_endpoint({"subassembly.outer"}, "component.child",
+                         "semantic.no_geometry.insert.a"),
+      hierarchy_endpoint({"subassembly.outer", "subassembly.inner"}, "component.leaf",
+                         "semantic.no_geometry.insert.b"))));
+
+  REQUIRE(project.add_cross_hierarchy_constraint(hierarchy_constraint(
+      "constraint.cross.angle", AssemblyConstraintType::Angle,
+      hierarchy_endpoint({}, "component.root", "semantic.no_geometry.angle.a"),
+      hierarchy_endpoint({"subassembly.outer", "subassembly.inner"}, "component.leaf",
+                         "semantic.no_geometry.angle.b"),
+      AssemblyConstraintState::Inactive, std::nullopt,
+      hierarchy_angle(35.0, "constraint.cross.angle"))));
 }
 
 } // namespace
@@ -285,4 +359,226 @@ TEST_CASE("Adding cross-hierarchy constraint intent never mutates authored trans
   CHECK(project.assembly()
             .find_subassembly_instance(SubassemblyInstanceId("subassembly.child"))
             ->transform() == boundary_transform);
+}
+
+TEST_CASE("Cross-hierarchy project JSON roundtrip preserves exact intent and authored transforms",
+          "[core][assembly-cross-hierarchy-json]") {
+  auto project = hierarchy_json_project();
+  const RigidTransform root_transform =
+      project.assembly().find_component_instance(ComponentInstanceId("component.root"))->transform();
+  const RigidTransform child_transform = project
+                                             .find_assembly_document(DocumentId("assembly.child"))
+                                             ->find_component_instance(
+                                                 ComponentInstanceId("component.child"))
+                                             ->transform();
+  const RigidTransform leaf_transform = project
+                                            .find_assembly_document(DocumentId("assembly.grandchild"))
+                                            ->find_component_instance(ComponentInstanceId("component.leaf"))
+                                            ->transform();
+  const RigidTransform outer_transform =
+      project.assembly()
+          .find_subassembly_instance(SubassemblyInstanceId("subassembly.outer"))
+          ->transform();
+  const RigidTransform inner_transform = project
+                                             .find_assembly_document(DocumentId("assembly.child"))
+                                             ->find_subassembly_instance(
+                                                 SubassemblyInstanceId("subassembly.inner"))
+                                             ->transform();
+
+  add_json_constraints(project);
+  REQUIRE(project.validate_assembly_structure());
+
+  auto serialized = serialize_project_to_json(project);
+  REQUIRE(serialized);
+  const auto serialized_json = nlohmann::json::parse(serialized.value());
+  REQUIRE(serialized_json.at("cross_hierarchy_constraints").size() == 5U);
+
+  auto restored = deserialize_project_from_json(serialized.value());
+  REQUIRE(restored);
+  REQUIRE(restored.value().validate_assembly_structure());
+  CHECK(restored.value().cross_hierarchy_constraint_count() == 5U);
+
+  const AssemblyHierarchyConstraint* distance = restored.value().find_cross_hierarchy_constraint(
+      AssemblyConstraintId("constraint.cross.distance"));
+  REQUIRE(distance != nullptr);
+  CHECK(distance->name() == "constraint.cross.distance");
+  CHECK(distance->type() == AssemblyConstraintType::Distance);
+  CHECK(distance->state() == AssemblyConstraintState::Active);
+  REQUIRE(distance->distance().has_value());
+  CHECK(distance->distance()->millimeters() == 12.5);
+  REQUIRE(distance->target_a().occurrence_path().size() == 2U);
+  CHECK(distance->target_a().occurrence_path()[0].value() == "subassembly.outer");
+  CHECK(distance->target_a().occurrence_path()[1].value() == "subassembly.inner");
+  CHECK(distance->target_a().component_instance().value() == "component.leaf");
+  CHECK(distance->target_a().semantic_reference() == "semantic.no_geometry.distance.a");
+  CHECK(distance->target_b().occurrence_path().empty());
+  CHECK(distance->target_b().component_instance().value() == "component.root");
+  CHECK(distance->target_b().semantic_reference() == "semantic.no_geometry.distance.b");
+
+  const AssemblyHierarchyConstraint* angle = restored.value().find_cross_hierarchy_constraint(
+      AssemblyConstraintId("constraint.cross.angle"));
+  REQUIRE(angle != nullptr);
+  CHECK(angle->type() == AssemblyConstraintType::Angle);
+  CHECK(angle->state() == AssemblyConstraintState::Inactive);
+  REQUIRE(angle->angle().has_value());
+  CHECK(angle->angle()->degrees() == 35.0);
+
+  CHECK(restored.value().assembly()
+            .find_component_instance(ComponentInstanceId("component.root"))
+            ->transform() == root_transform);
+  CHECK(restored.value()
+            .find_assembly_document(DocumentId("assembly.child"))
+            ->find_component_instance(ComponentInstanceId("component.child"))
+            ->transform() == child_transform);
+  CHECK(restored.value()
+            .find_assembly_document(DocumentId("assembly.grandchild"))
+            ->find_component_instance(ComponentInstanceId("component.leaf"))
+            ->transform() == leaf_transform);
+  CHECK(restored.value().assembly()
+            .find_subassembly_instance(SubassemblyInstanceId("subassembly.outer"))
+            ->transform() == outer_transform);
+  CHECK(restored.value()
+            .find_assembly_document(DocumentId("assembly.child"))
+            ->find_subassembly_instance(SubassemblyInstanceId("subassembly.inner"))
+            ->transform() == inner_transform);
+}
+
+TEST_CASE("Project JSON remains backward compatible without cross-hierarchy constraints",
+          "[core][assembly-cross-hierarchy-json]") {
+  auto project = hierarchy_json_project();
+  auto serialized = serialize_project_to_json(project);
+  REQUIRE(serialized);
+
+  auto json = nlohmann::json::parse(serialized.value());
+  json.erase("cross_hierarchy_constraints");
+
+  auto restored = deserialize_project_from_json(json.dump());
+  REQUIRE(restored);
+  CHECK(restored.value().cross_hierarchy_constraint_count() == 0U);
+  REQUIRE(restored.value().validate_assembly_structure());
+}
+
+TEST_CASE("Project JSON rejects duplicate cross-hierarchy relationship ids",
+          "[core][assembly-cross-hierarchy-json]") {
+  auto project = hierarchy_json_project();
+  REQUIRE(project.add_cross_hierarchy_constraint(hierarchy_constraint(
+      "constraint.cross.duplicate", AssemblyConstraintType::Mate,
+      hierarchy_endpoint({}, "component.root", "semantic.duplicate.a"),
+      hierarchy_endpoint({"subassembly.outer"}, "component.child", "semantic.duplicate.b"))));
+
+  auto serialized = serialize_project_to_json(project);
+  REQUIRE(serialized);
+  auto json = nlohmann::json::parse(serialized.value());
+  json["cross_hierarchy_constraints"].push_back(json["cross_hierarchy_constraints"][0]);
+
+  auto restored = deserialize_project_from_json(json.dump());
+  REQUIRE(restored.has_error());
+  CHECK(restored.error().message() ==
+        "cross-hierarchy assembly constraint id must be unique within project");
+}
+
+TEST_CASE("Cross-hierarchy structure validation rejects missing paths and reached components",
+          "[core][assembly-cross-hierarchy-json]") {
+  auto project = hierarchy_json_project();
+  REQUIRE(project.add_cross_hierarchy_constraint(hierarchy_constraint(
+      "constraint.cross.structure", AssemblyConstraintType::Mate,
+      hierarchy_endpoint({}, "component.root", "semantic.structure.a"),
+      hierarchy_endpoint({"subassembly.outer"}, "component.child", "semantic.structure.b"))));
+  auto serialized = serialize_project_to_json(project);
+  REQUIRE(serialized);
+
+  SECTION("missing exact occurrence path") {
+    auto json = nlohmann::json::parse(serialized.value());
+    json["cross_hierarchy_constraints"][0]["target_b"]["occurrence_path"][0] =
+        "subassembly.missing";
+    auto restored = deserialize_project_from_json(json.dump());
+    REQUIRE(restored.has_error());
+    CHECK(restored.error().message() ==
+          "cross-hierarchy assembly constraint target B occurrence path must exist in rooted hierarchy");
+  }
+
+  SECTION("missing component in reached assembly") {
+    auto json = nlohmann::json::parse(serialized.value());
+    json["cross_hierarchy_constraints"][0]["target_b"]["component_instance"] =
+        "component.missing";
+    auto restored = deserialize_project_from_json(json.dump());
+    REQUIRE(restored.has_error());
+    CHECK(restored.error().message() ==
+          "cross-hierarchy assembly constraint target B component instance must exist in reached assembly document");
+  }
+}
+
+TEST_CASE("Project structure validates hierarchy before cross-hierarchy endpoint paths",
+          "[core][assembly-cross-hierarchy-json]") {
+  auto project = hierarchy_json_project();
+  REQUIRE(project.add_cross_hierarchy_constraint(hierarchy_constraint(
+      "constraint.cross.validation-order", AssemblyConstraintType::Mate,
+      hierarchy_endpoint({}, "component.root", "semantic.validation.a"),
+      hierarchy_endpoint({"subassembly.outer"}, "component.child", "semantic.validation.b"))));
+  auto serialized = serialize_project_to_json(project);
+  REQUIRE(serialized);
+
+  auto json = nlohmann::json::parse(serialized.value());
+  json["assembly"]["subassembly_instances"][0]["referenced_assembly_document"] =
+      "assembly.missing";
+  json["cross_hierarchy_constraints"][0]["target_b"]["occurrence_path"][0] =
+      "subassembly.also-missing";
+
+  auto restored = deserialize_project_from_json(json.dump());
+  REQUIRE(restored.has_error());
+  CHECK(restored.error().message() ==
+        "subassembly instance referenced assembly must resolve to a project-owned child assembly document");
+}
+
+TEST_CASE("Cross-hierarchy project JSON enforces millimeter and degree quantity spellings",
+          "[core][assembly-cross-hierarchy-json]") {
+  auto project = hierarchy_json_project();
+  REQUIRE(project.add_cross_hierarchy_constraint(hierarchy_constraint(
+      "constraint.cross.distance", AssemblyConstraintType::Distance,
+      hierarchy_endpoint({}, "component.root", "semantic.distance.a"),
+      hierarchy_endpoint({"subassembly.outer"}, "component.child", "semantic.distance.b"),
+      AssemblyConstraintState::Active,
+      hierarchy_distance(5.0, "constraint.cross.distance"))));
+  REQUIRE(project.add_cross_hierarchy_constraint(hierarchy_constraint(
+      "constraint.cross.angle", AssemblyConstraintType::Angle,
+      hierarchy_endpoint({}, "component.root", "semantic.angle.a"),
+      hierarchy_endpoint({"subassembly.outer", "subassembly.inner"}, "component.leaf",
+                         "semantic.angle.b"),
+      AssemblyConstraintState::Active, std::nullopt,
+      hierarchy_angle(15.0, "constraint.cross.angle"))));
+  auto serialized = serialize_project_to_json(project);
+  REQUIRE(serialized);
+
+  SECTION("distance requires mm") {
+    auto json = nlohmann::json::parse(serialized.value());
+    json["cross_hierarchy_constraints"][0]["distance"]["unit"] = "cm";
+    auto restored = deserialize_project_from_json(json.dump());
+    REQUIRE(restored.has_error());
+    CHECK(restored.error().message() ==
+          "cross-hierarchy assembly constraint distance must use millimeters");
+  }
+
+  SECTION("angle requires deg") {
+    auto json = nlohmann::json::parse(serialized.value());
+    json["cross_hierarchy_constraints"][1]["angle"]["unit"] = "rad";
+    auto restored = deserialize_project_from_json(json.dump());
+    REQUIRE(restored.has_error());
+    CHECK(restored.error().message() ==
+          "cross-hierarchy assembly constraint angle must use degrees");
+  }
+}
+
+TEST_CASE("Cross-hierarchy structure validation rejects duplicate ids introduced through mutation",
+          "[core][assembly-cross-hierarchy-json]") {
+  auto project = hierarchy_json_project();
+  REQUIRE(project.add_cross_hierarchy_constraint(hierarchy_constraint(
+      "constraint.cross.mutable", AssemblyConstraintType::Mate,
+      hierarchy_endpoint({}, "component.root", "semantic.mutable.a"),
+      hierarchy_endpoint({"subassembly.outer"}, "component.child", "semantic.mutable.b"))));
+  project.cross_hierarchy_constraints().push_back(project.cross_hierarchy_constraints().front());
+
+  auto validated = project.validate_assembly_structure();
+  REQUIRE(validated.has_error());
+  CHECK(validated.error().message() ==
+        "cross-hierarchy assembly constraint id must be unique within project");
 }
