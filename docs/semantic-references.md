@@ -1,72 +1,100 @@
 # Semantic References
 
-Status: partially implemented. The generated-face family is proven by the MVP-2 workplane path and the MVP-5 assembly target/residual path; the broader reference system remains future work.
+Status: partially implemented. Generated planar faces are proven by the MVP-2 workplane path and the MVP-5 assembly target/residual/solver path; a complete general reference system remains future work.
 
-This document defines how BLCAD refers to geometry. Sketch, feature, hole-wizard, fillet/chamfer, pattern/mirror, and assembly documents share this rule.
+This document is the canonical rule for persistent geometry references shared by sketch, feature, construction, assembly, and future engineering layers.
 
 ## Rule
 
-The core must not depend permanently on raw OCCT `TopoDS_Face`, `TopoDS_Edge`, or `TopoDS_Vertex` handles or kernel labels such as `Face17` or `Edge7`. Those identifiers can change after feature edits and create the topological-naming problem.
+The core must not depend permanently on raw OCCT `TopoDS_Face`, `TopoDS_Edge`, or `TopoDS_Vertex` handles or transient kernel ids such as `Face17` or `Edge7`.
 
-Every persistent geometry reference must instead be semantic: it names constructive meaning rather than incidental kernel position.
+Persistent references must describe constructive meaning rather than incidental topology numbering.
 
 ```text
 Bad:
   Sketch starts on Face_12
-  Hole direction uses Edge_7
+  Constraint targets Face_17
   Chamfer applies to Edge_3
 
 Good:
-  Sketch starts on BasePlate.top_mounting_face
-  Hole direction uses DatumAxis.main_bolt_axis
-  Chamfer applies to BasePlate.outer_top_edges
+  Sketch starts on feature.base_extrude.top
+  Assembly target is feature.mount_plate.bottom
+  Chamfer targets outer_top_edges
 ```
 
 ## Reference objects
 
-BLCAD owns its reference objects. A reference describes what a face, edge, axis, or point means.
+BLCAD owns its own semantic reference records.
 
-- `SemanticFaceReference` — named generated face such as `feature.base_extrude.top`
-- edge references / named edge groups such as `outer_top_edges`
-- axis references such as a hole axis or shaft main axis
-- point/vertex references
+Current and planned families include:
 
-Features that create geometry should expose semantic references for downstream consumers:
+- `SemanticFaceReference`
+- semantic edge references and named edge groups
+- semantic axis references
+- semantic point/vertex references
+- future analytic surface references where needed
+
+Features that create geometry should expose stable semantic meaning for downstream consumers.
+
+Example target architecture:
 
 ```text
 HoleFeature_M6_01
-  exposed_references:
+  exposed_references
     hole_axis
     entry_face
     bottom_face
 ```
 
-## Current implemented scope
+## Current implemented generated-face scope
 
-The generated-face seed proves the principle for a supported `AdditiveExtrude`:
+The implemented `AdditiveExtrude` generated-face family is:
 
-- `SemanticFaceReference` identifies `feature.<feature-id>.{top,bottom,right,left,front,back}`.
-- `DerivedWorkplane` exposes supported semantic faces as sketch workplanes.
-- `WorkplaneResolver` maps those faces to deterministic local frames.
-- `WorkplaneResolver::resolve_generated_face` exposes one shared generated-face frame path.
-- `AssemblyConstraintTargetResolver` parses supported persistent assembly target tokens and resolves component/project/part ownership to a component-local planar descriptor.
-- `AssemblyTransformEvaluator` maps those local descriptors into assembly coordinates using the explicit persisted `RigidTransform` convention.
-- `AssemblyConstraintEquationBuilder` consumes active Mate/Distance records whose targets use the generated planar face family and constructs canonical residual descriptors.
-- No raw OCCT face ids are stored in `PartDocument` or assembly constraint model intent.
+```text
+feature.<feature-id>.top
+feature.<feature-id>.bottom
+feature.<feature-id>.right
+feature.<feature-id>.left
+feature.<feature-id>.front
+feature.<feature-id>.back
+```
 
-The current assembly path is:
+The implemented path is:
+
+```text
+SemanticFaceReference
+  -> WorkplaneResolver::resolve_generated_face
+  -> deterministic generated-face frame
+```
+
+`DerivedWorkplane` uses that path for sketch placement.
+
+`AssemblyConstraintTargetResolver` parses supported persistent assembly target tokens and resolves component/project/part ownership to a component-local planar descriptor.
+
+`AssemblyTransformEvaluator` maps the local descriptor into assembly coordinates using the exact persisted `RigidTransform` convention.
+
+`AssemblyConstraintEquationBuilder` consumes active Mate/Distance records and creates canonical planar residual descriptors.
+
+`AssemblyRigidBodySolver` repeatedly consumes those residuals on private project copies while evaluating current and finite-difference candidate transforms.
+
+The full implemented assembly path is therefore:
 
 ```text
 semantic target token
   -> AssemblyConstraintTargetResolver
-  -> ComponentLocalPlanarDescriptor
+  -> ComponentLocalPlanarDescriptor + RigidTransform
   -> AssemblyTransformEvaluator
   -> AssemblySpacePlanarDescriptor
   -> AssemblyConstraintEquationBuilder
   -> Mate/Distance residual descriptor
+  -> AssemblyRigidBodySolver
+  -> proposed component transforms
+  -> explicit fresh-result application
 ```
 
-Target resolution itself still keeps `RigidTransform` separate. Transform interpretation and residual semantics belong to their own downstream layers.
+No raw OCCT face id is stored in `PartDocument` or assembly constraint model intent.
+
+Target resolution keeps transform interpretation, residual semantics, and solver policy in their separate downstream layers.
 
 See:
 
@@ -75,33 +103,59 @@ See:
 - `docs/assembly-constraint-target-resolution-mvp5.md`
 - `docs/assembly-rigid-transform-evaluation-mvp5.md`
 - `docs/assembly-planar-constraint-equations-mvp5.md`
+- `docs/assembly-rigid-body-solver-mvp5.md`
 
-## Future scope
+## Target order as semantic intent
+
+For planar Distance constraints, target A/B order is semantically observable because signed separation is:
+
+```text
+dot(oB - oA, nA)
+```
+
+A reference consumer must not silently reorder the two targets even when the graph edge connects the same component pair.
+
+`AssemblyConstraintGraph` preserves constraint identity but does not own semantic target geometry.
+
+`AssemblyConstraintEquationBuilder` reads target order from the persistent `AssemblyConstraint` record.
+
+`AssemblyRigidBodySolver` orders constraints by graph edge id but preserves each constraint's internal target A/B semantics through the equation builder.
+
+## Future semantic-reference scope
+
+Still required:
 
 - named edge groups produced by features for fillet/chamfer
 - semantic axis references produced by hole and shaft features for Concentric/Insert
 - generated edge and vertex assembly target families
 - analytic surface references where needed
-- broader reference rebinding after recompute with explicit lost-reference diagnostics
+- broader rebinding after recompute with explicit lost-reference diagnostics
+- stronger reference dependency/invalidation integration across assembly solve consumers
 
-Semantic axis references are the current blocker for Concentric residual construction.
+Semantic axis references remain the current blocker for Concentric residual construction and Concentric solving.
 
 ## Dependency and solve integration
 
-A semantic reference creates a conceptual dependency from geometry producer to consumer:
+A semantic reference creates a conceptual dependency from a geometry producer to a consumer:
 
 ```text
 source feature -> exposed reference -> consuming feature/constraint
 ```
 
-When source geometry changes, the reference must be re-resolved. A failed semantic resolution should invalidate the consumer rather than silently bind to another kernel entity.
+When source geometry changes, the reference must be re-resolved. Failed resolution should invalidate or fail the consumer rather than silently bind to another kernel entity.
 
-The current assembly target/residual path is read-only and does not yet create a solve dependency graph.
+The current assembly solver does not persist resolved targets or move reference ownership into solver state. Every residual evaluation reuses the semantic resolution path from current project intent.
 
-The first rigid-body solver seed should consume current semantic resolution and residual construction without moving persistent reference ownership into the solver.
+The repository still does not have a dedicated assembly solve-dependency graph. `AssemblyConstraintGraph` represents relationship connectivity, not geometry-producer invalidation dependencies.
 
 ## Out of scope for the first versions
 
 - a complete general topological naming system
 - automatic repair of every lost reference chain
 - raw OCCT handles as core model references
+
+## Current downstream boundary
+
+The next assembly block is Jacobian-rank and remaining-degree-of-freedom diagnostics over the implemented solver model.
+
+Semantic-reference expansion remains a separate prerequisite for Concentric and richer constraint families.
