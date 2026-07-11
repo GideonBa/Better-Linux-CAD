@@ -6,17 +6,28 @@
 #include "blcad/core/result.hpp"
 #include "blcad/geometry/assembly_rigid_body_solver.hpp"
 
+#include <vector>
+
 namespace blcad::geometry {
+
+struct AssemblyJointMotionInputSnapshot {
+  AssemblyJointId joint;
+  AssemblyJointType type = AssemblyJointType::Revolute;
+  AssemblyJointState state = AssemblyJointState::Inactive;
+  AssemblyConstraintTarget target_a;
+  AssemblyConstraintTarget target_b;
+  AssemblyJointLimits limits;
+  double coordinate_deg = 0.0;
+
+  friend bool operator==(const AssemblyJointMotionInputSnapshot&,
+                         const AssemblyJointMotionInputSnapshot&) = default;
+};
 
 struct AssemblyJointMotionResult {
   AssemblyJointId joint;
-  AssemblyJointType source_joint_type = AssemblyJointType::Revolute;
-  AssemblyJointState source_joint_state = AssemblyJointState::Inactive;
-  AssemblyConstraintTarget source_target_a;
-  AssemblyConstraintTarget source_target_b;
-  AssemblyJointLimits source_limits;
   double source_coordinate_deg = 0.0;
   double requested_coordinate_deg = 0.0;
+  std::vector<AssemblyJointMotionInputSnapshot> joint_snapshots;
   AssemblySolveResult solve_result;
 
   [[nodiscard]] bool converged() const noexcept { return solve_result.converged(); }
@@ -36,9 +47,9 @@ public:
        AssemblyRigidBodySolverOptions options = {}) const;
 };
 
-// Atomic motion application boundary. It validates both the embedded solve
-// snapshots and the source joint-intent snapshot before applying transforms and
-// replacing the authored joint coordinate on a Project copy.
+// Atomic motion application boundary. It validates the embedded component solve
+// snapshots plus every driven joint-input snapshot before applying transforms
+// and replacing the selected authored joint coordinate on a Project copy.
 class AssemblyJointMotionResultApplier {
 public:
   [[nodiscard]] Result<std::size_t> apply(Project& project,
