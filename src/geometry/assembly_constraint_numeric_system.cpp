@@ -51,9 +51,7 @@ append_constraint_residuals(const Project& project, const AssemblyConstraintId& 
   if (constraint->type() == AssemblyConstraintType::Concentric) {
     const AssemblyConcentricConstraintEquationBuilder builder;
     auto equation = builder.build(project, *constraint);
-    if (equation.has_error()) {
-      return Result<std::size_t>::failure(equation.error());
-    }
+    if (equation.has_error()) return Result<std::size_t>::failure(equation.error());
     const ConcentricResidualDescriptor& concentric = equation.value().residual;
     residuals.push_back(concentric.direction_parallelism.x);
     residuals.push_back(concentric.direction_parallelism.y);
@@ -67,9 +65,7 @@ append_constraint_residuals(const Project& project, const AssemblyConstraintId& 
   if (constraint->type() == AssemblyConstraintType::Insert) {
     const AssemblyInsertConstraintEquationBuilder builder;
     auto equation = builder.build(project, *constraint);
-    if (equation.has_error()) {
-      return Result<std::size_t>::failure(equation.error());
-    }
+    if (equation.has_error()) return Result<std::size_t>::failure(equation.error());
     const InsertResidualDescriptor& insert = equation.value().residual;
     residuals.push_back(insert.direction_parallelism.x);
     residuals.push_back(insert.direction_parallelism.y);
@@ -83,9 +79,7 @@ append_constraint_residuals(const Project& project, const AssemblyConstraintId& 
 
   const AssemblyConstraintEquationBuilder builder;
   auto equation = builder.build(project, *constraint);
-  if (equation.has_error()) {
-    return Result<std::size_t>::failure(equation.error());
-  }
+  if (equation.has_error()) return Result<std::size_t>::failure(equation.error());
 
   if (const auto* mate = std::get_if<PlanarMateResidualDescriptor>(&equation.value().residual)) {
     residuals.push_back(mate->normal_opposition.x);
@@ -123,15 +117,11 @@ append_revolute_drive_residuals(const Project& project, const AssemblyRevoluteJo
         internal_error(drive.joint.value(), "assembly numeric revolute drive joint must exist"));
   }
   auto requested = Quantity::angle_deg(drive.requested_coordinate_deg, drive.joint.value());
-  if (requested.has_error()) {
-    return Result<std::size_t>::failure(requested.error());
-  }
+  if (requested.has_error()) return Result<std::size_t>::failure(requested.error());
 
   const AssemblyRevoluteJointEquationBuilder builder;
   auto equation = builder.build(project, *joint, requested.value());
-  if (equation.has_error()) {
-    return Result<std::size_t>::failure(equation.error());
-  }
+  if (equation.has_error()) return Result<std::size_t>::failure(equation.error());
   const RevoluteJointResidualDescriptor& revolute = equation.value().residual;
   residuals.push_back(revolute.direction_parallelism.x);
   residuals.push_back(revolute.direction_parallelism.y);
@@ -163,9 +153,8 @@ collect_constraint_ids(const AssemblyConstraintGraph& graph,
 Result<NumericVector> evaluate_residuals(const Project& project,
                                          const std::vector<AssemblyConstraintId>& constraint_ids,
                                          double length_residual_scale_mm) {
-  return evaluate_residuals(
-      project, AssemblyNumericRelationshipSet{constraint_ids, std::nullopt},
-      length_residual_scale_mm);
+  return evaluate_residuals(project, AssemblyNumericRelationshipSet{constraint_ids, {}},
+                            length_residual_scale_mm);
 }
 
 Result<NumericVector> evaluate_residuals(const Project& project,
@@ -173,43 +162,33 @@ Result<NumericVector> evaluate_residuals(const Project& project,
                                          double length_residual_scale_mm) {
   NumericVector residuals;
   residuals.reserve(relationships.constraint_ids.size() * 7U +
-                    (relationships.revolute_drive.has_value() ? 9U : 0U));
+                    relationships.revolute_drives.size() * 9U);
 
   for (const auto& constraint_id : relationships.constraint_ids) {
     auto appended =
         append_constraint_residuals(project, constraint_id, length_residual_scale_mm, residuals);
-    if (appended.has_error()) {
-      return Result<NumericVector>::failure(appended.error());
-    }
+    if (appended.has_error()) return Result<NumericVector>::failure(appended.error());
   }
 
-  if (relationships.revolute_drive.has_value()) {
-    auto appended = append_revolute_drive_residuals(
-        project, relationships.revolute_drive.value(), length_residual_scale_mm, residuals);
-    if (appended.has_error()) {
-      return Result<NumericVector>::failure(appended.error());
-    }
+  for (const auto& drive : relationships.revolute_drives) {
+    auto appended =
+        append_revolute_drive_residuals(project, drive, length_residual_scale_mm, residuals);
+    if (appended.has_error()) return Result<NumericVector>::failure(appended.error());
   }
 
   return Result<NumericVector>::success(std::move(residuals));
 }
 
 double residual_rms(const NumericVector& residuals) noexcept {
-  if (residuals.empty()) {
-    return 0.0;
-  }
+  if (residuals.empty()) return 0.0;
   double sum_squares = 0.0;
-  for (double residual : residuals) {
-    sum_squares += residual * residual;
-  }
+  for (double residual : residuals) sum_squares += residual * residual;
   return std::sqrt(sum_squares / static_cast<double>(residuals.size()));
 }
 
 double residual_max_abs(const NumericVector& residuals) noexcept {
   double maximum = 0.0;
-  for (double residual : residuals) {
-    maximum = std::max(maximum, std::abs(residual));
-  }
+  for (double residual : residuals) maximum = std::max(maximum, std::abs(residual));
   return maximum;
 }
 
@@ -243,9 +222,7 @@ Result<std::size_t> apply_variables(Project& project,
     const std::size_t offset = index * kAssemblyTransformVariableCount;
     auto updated = project.assembly().set_component_instance_transform(
         variable_components[index], transform_from_variables(values, offset));
-    if (updated.has_error()) {
-      return Result<std::size_t>::failure(updated.error());
-    }
+    if (updated.has_error()) return Result<std::size_t>::failure(updated.error());
   }
   return Result<std::size_t>::success(variable_components.size());
 }
@@ -255,8 +232,8 @@ Result<NumericMatrix> build_central_difference_jacobian(
     const std::vector<AssemblyConstraintId>& constraint_ids, const NumericVector& variables,
     const NumericVector& baseline_residuals, const AssemblyNumericSystemOptions& options) {
   return build_central_difference_jacobian(
-      project, variable_components, AssemblyNumericRelationshipSet{constraint_ids, std::nullopt},
-      variables, baseline_residuals, options);
+      project, variable_components, AssemblyNumericRelationshipSet{constraint_ids, {}}, variables,
+      baseline_residuals, options);
 }
 
 Result<NumericMatrix> build_central_difference_jacobian(
@@ -274,25 +251,17 @@ Result<NumericMatrix> build_central_difference_jacobian(
 
     Project plus_project = project;
     auto plus_applied = apply_variables(plus_project, variable_components, plus_variables);
-    if (plus_applied.has_error()) {
-      return Result<NumericMatrix>::failure(plus_applied.error());
-    }
+    if (plus_applied.has_error()) return Result<NumericMatrix>::failure(plus_applied.error());
     auto plus_residuals =
         evaluate_residuals(plus_project, relationships, options.length_residual_scale_mm);
-    if (plus_residuals.has_error()) {
-      return Result<NumericMatrix>::failure(plus_residuals.error());
-    }
+    if (plus_residuals.has_error()) return Result<NumericMatrix>::failure(plus_residuals.error());
 
     Project minus_project = project;
     auto minus_applied = apply_variables(minus_project, variable_components, minus_variables);
-    if (minus_applied.has_error()) {
-      return Result<NumericMatrix>::failure(minus_applied.error());
-    }
+    if (minus_applied.has_error()) return Result<NumericMatrix>::failure(minus_applied.error());
     auto minus_residuals =
         evaluate_residuals(minus_project, relationships, options.length_residual_scale_mm);
-    if (minus_residuals.has_error()) {
-      return Result<NumericMatrix>::failure(minus_residuals.error());
-    }
+    if (minus_residuals.has_error()) return Result<NumericMatrix>::failure(minus_residuals.error());
 
     if (plus_residuals.value().size() != baseline_residuals.size() ||
         minus_residuals.value().size() != baseline_residuals.size()) {
