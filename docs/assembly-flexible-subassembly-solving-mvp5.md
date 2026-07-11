@@ -4,7 +4,7 @@ Status: implemented the first flexible-subassembly solver-variable seed. An exac
 
 ## Scope
 
-This block adds document-scoped flexible child solving without introducing cross-hierarchy relationship endpoints or occurrence-local component pose overrides.
+This block adds document-scoped flexible child solving. It does not introduce occurrence-local component pose overrides, whole-subassembly variables, or cross-hierarchy solver participation.
 
 ```text
 root occurrence path
@@ -37,7 +37,7 @@ connected_group: [ComponentInstanceId, ...]
 AssemblyRigidBodySolverOptions
 ```
 
-The occurrence path is the exact root-to-current path already defined by `AssemblyHierarchyTraversal`.
+The occurrence path is the exact root-to-current path defined by `AssemblyHierarchyTraversal`.
 
 The path must:
 
@@ -50,9 +50,9 @@ The path is selection and stale-context identity. It does not become a new persi
 
 ## Child-as-root solve view
 
-The source `Project` is first validated through `AssemblyHierarchyTraversal::build`, which preserves the existing complete project structure and hierarchy validation boundary.
+The source `Project` is validated through `AssemblyHierarchyTraversal::build`, preserving the existing complete project structure and hierarchy validation boundary.
 
-The selected child `AssemblyDocument` is then copied into a temporary `Project` as that temporary project's root assembly. Project-owned `PartDocument` records are copied into the view so existing semantic target resolution continues to resolve referenced part models normally.
+The selected child `AssemblyDocument` is copied into a temporary `Project` as that temporary project's root assembly. Project-owned `PartDocument` records are copied into the view so existing semantic target resolution continues to resolve referenced part models normally.
 
 The local view deliberately exposes only the selected child document as solver root. The existing solver therefore keeps its exact semantics:
 
@@ -93,26 +93,24 @@ The wrapper remains derived and unpersisted.
 
 `AssemblyFlexibleSubassemblySolveResultApplier` does not trust a stored child pointer or cached hierarchy descriptor.
 
-Application performs the following steps:
+Application:
 
-1. rebuild the current hierarchy and resolve the exact stored occurrence path;
-2. require the path to remain active and to resolve to the same child `AssemblyDocument` id;
-3. reconstruct a fresh child-as-root solve view from the current project;
-4. pass `local_result` to the existing `AssemblySolveResultApplier` on that fresh local view;
-5. therefore reuse the ordinary converged-result, duplicate-snapshot/proposal, source-transform, grounding, suppression, proposal/snapshot consistency, and transform-validation checks;
-6. copy the source `Project`;
-7. write only the proposed direct child component transforms from the successfully applied local view into the selected child document of the project copy;
-8. replace the source project only after every write succeeds.
+1. rebuilds the current hierarchy and resolves the exact stored occurrence path;
+2. requires the path to remain active and to resolve to the same child `AssemblyDocument` id;
+3. reconstructs a fresh child-as-root solve view;
+4. passes `local_result` to the existing `AssemblySolveResultApplier`;
+5. reuses converged-result, duplicate snapshot/proposal, source-transform, grounding, suppression, proposal/snapshot consistency, and transform-validation checks;
+6. copies the source `Project`;
+7. writes only proposed direct child component transforms from the successfully applied local view into the selected child document of the project copy;
+8. replaces the source project only after every write succeeds.
 
-A stale or invalid result therefore changes no project state.
+A stale or invalid result changes no project state.
 
 The selected `SubassemblyInstance::transform()` remains unchanged throughout solve and application.
 
 ## Repeated child occurrences
 
-Project-owned child assembly documents are shared model definitions. The existing rigid hierarchy already allows one child `AssemblyDocument` to occur more than once through separate `SubassemblyInstance` records.
-
-This first flexible seed preserves that ownership contract instead of inventing occurrence-local internal pose overrides.
+Project-owned child assembly documents are shared model definitions. The rigid hierarchy allows one child `AssemblyDocument` to occur more than once through separate `SubassemblyInstance` records.
 
 Example:
 
@@ -132,7 +130,7 @@ A child-local Mate solve selected through `subassembly.left` may propose:
 component.shaft local z: 20 mm -> 8 mm
 ```
 
-After application, `assembly.gearbox/component.shaft` has local `z = 8 mm`. Both flattened gearbox occurrences therefore observe the same internal `z = 8 mm` pose, while their independent `+100 mm` and `-100 mm` parent boundary transforms remain unchanged.
+After application, `assembly.gearbox/component.shaft` has local `z = 8 mm`. Both flattened gearbox occurrences observe the same internal `z = 8 mm` pose, while their independent `+100 mm` and `-100 mm` boundary transforms remain unchanged.
 
 This is document-scoped flexible solving, not occurrence-local flexible instancing.
 
@@ -140,9 +138,9 @@ This is document-scoped flexible solving, not occurrence-local flexible instanci
 
 No leaf-occurrence format changes are required.
 
-`AssemblyLeafOccurrenceResolver` already reads each component's current authored transform from the referenced child document and prepends it to the exact inner-to-outer parent transform chain.
+`AssemblyLeafOccurrenceResolver` reads each component's current authored transform from the referenced child document and prepends it to the exact inner-to-outer parent transform chain.
 
-After a successful flexible child solve application:
+After successful flexible child solve application:
 
 ```text
 updated child ComponentInstance::transform()
@@ -154,6 +152,20 @@ updated child ComponentInstance::transform()
 
 No shape, posed leaf, composed transform, export cache, or analysis record is persisted by the solver.
 
+## Interaction with cross-hierarchy relationship semantics
+
+The later read-only target/residual block is implemented in `docs/assembly-cross-hierarchy-relationship-semantics-mvp5.md`.
+
+It reuses the same rooted occurrence-path identity but adds a local component and semantic feature reference:
+
+```text
+(occurrence_path, local ComponentInstanceId, semantic_reference)
+```
+
+That query layer can observe the child component transforms produced by this flexible solve path and evaluate them through the complete parent transform chain into root-assembly space.
+
+The read-only hierarchy relationship layer does not change this solver's ownership contract: repeated occurrences of one child document still share one internal component pose. Persistent occurrence-qualified graph and solver integration remain a separate next block.
+
 ## Persistence boundary
 
 No JSON schema change is introduced.
@@ -164,9 +176,9 @@ Already-persisted intent that may change after explicit successful application:
 ComponentInstance::transform() inside a project-owned child AssemblyDocument
 ```
 
-Existing project/assembly JSON therefore persists the solved internal child pose through the normal child assembly document serialization path.
+Existing project/assembly JSON persists the solved internal child pose through normal child assembly document serialization.
 
-Still derived and unpersisted:
+Derived and unpersisted:
 
 ```text
 occurrence-path selection context
@@ -230,13 +242,15 @@ Focused command:
 - occurrence-local internal component pose overrides for repeated child documents;
 - a persistent rigid/flexible occurrence mode flag, until a consumer requires one;
 - grounding or solving a complete `SubassemblyInstance` boundary as one rigid variable;
-- geometric constraint endpoints across assembly-document boundaries;
-- joint endpoints across assembly-document boundaries;
-- motion propagation through nested child assemblies;
+- persistent project-level cross-hierarchy geometric constraint records;
+- occurrence-qualified cross-hierarchy graph and numeric solver integration;
+- cross-hierarchy joint records and nested motion propagation;
 - cross-hierarchy Jacobian/remaining-DOF diagnostics;
 - collision/contact response or physics;
 - component geometry instancing.
 
 ## Next technical step
 
-Define stable cross-hierarchy relationship endpoint identity and read-only target/residual semantics before allowing constraints or joints to cross assembly-document boundaries. An endpoint must identify the rooted subassembly occurrence path, the local `ComponentInstanceId`, and the existing semantic feature reference without persisting resolved geometry or composed transforms.
+Read-only occurrence-qualified cross-hierarchy endpoint and residual semantics are now implemented in `docs/assembly-cross-hierarchy-relationship-semantics-mvp5.md`.
+
+The next block is persistent project-level cross-hierarchy geometric constraint intent plus occurrence-qualified active-constraint graph and shared numeric solve/application integration. Numeric variable, snapshot, and proposal identity must include occurrence path so repeated occurrences of one child document never alias by local `ComponentInstanceId` alone.
