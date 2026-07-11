@@ -112,8 +112,8 @@ Result<Project> deserialize_project_from_json(std::string_view content) {
       if (added.has_error()) return Result<Project>::failure(added.error());
     }
 
-    auto valid_members = project.value().validate_member_parts();
-    if (valid_members.has_error()) return Result<Project>::failure(valid_members.error());
+    auto valid_structure = project.value().validate_assembly_structure();
+    if (valid_structure.has_error()) return Result<Project>::failure(valid_structure.error());
 
     return project;
   } catch (const std::exception& content_error) {
