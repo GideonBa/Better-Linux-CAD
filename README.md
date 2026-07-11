@@ -6,7 +6,7 @@ Detailed architecture and feature status live in `docs/`. This README is intenti
 
 ## Status
 
-Current state: MVP-1 core skeleton, staged MVP-2 seeds for sketches, workplanes, profile geometry, recompute, STEP export, reference recovery, sketch diagnostics, and repair-command infrastructure, the MVP-3 parametric bolt circle, the MVP-4 assembly/project container path, and MVP-5 component instances with explicit free-placement/state updates, solver-independent Mate/Concentric/Distance constraint model intent, and a deterministic read-only active-constraint graph.
+Current state: MVP-1 core skeleton, staged MVP-2 seeds for sketches, workplanes, profile geometry, recompute, STEP export, reference recovery, sketch diagnostics, and repair-command infrastructure, the MVP-3 parametric bolt circle, the MVP-4 assembly/project container path, and MVP-5 component instances with explicit free-placement/state updates, solver-independent Mate/Concentric/Distance constraint model intent, a deterministic read-only active-constraint graph, and read-only generated-face assembly target resolution.
 
 There is no GUI yet.
 
@@ -89,6 +89,7 @@ Implemented feature blocks:
 - `docs/component-instance-mvp5.md`
 - `docs/assembly-constraint-model-intent-mvp5.md`
 - `docs/assembly-constraint-graph-mvp5.md`
+- `docs/assembly-constraint-target-resolution-mvp5.md`
 - `docs/general-closed-sketch-profile-mvp.md`
 - `docs/composite-closed-profile-holes-mvp.md`
 - `docs/arc-and-trim-extend-sketch-profile-mvp.md`
@@ -121,6 +122,6 @@ Future roadmaps:
 
 ## Next technical step
 
-The next technical step is a read-only semantic assembly target resolution seed. Resolve each `AssemblyConstraintTarget` through its `ComponentInstanceId` to the referenced project-owned `PartDocument`, and support the currently implemented generated-face semantic reference family as component-local geometric descriptors. Unsupported target families must fail explicitly.
+The next technical step is an explicit assembly rigid-transform evaluation convention seed. Define deterministic component-local-to-assembly-space point, vector, and planar-frame evaluation for the persisted `RigidTransform`, including one documented rotation order and angle convention, without solving constraints or mutating stored transforms.
 
-Do not solve Mate/Concentric/Distance equations, mutate component transforms, compute remaining degrees of freedom, or persist derived resolution data in this block. The completed graph block is documented in `docs/assembly-constraint-graph-mvp5.md`; the detailed next-step scope remains in `docs/mvp-plan.md` and `docs/assembly-system.md`.
+Do not build Mate/Distance equations, run a rigid-body solver, compute remaining degrees of freedom, or add semantic axis references in this block. The completed target-resolution block is documented in `docs/assembly-constraint-target-resolution-mvp5.md`; the detailed next-step scope remains in `docs/mvp-plan.md` and `docs/assembly-system.md`.
