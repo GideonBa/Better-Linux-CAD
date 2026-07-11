@@ -78,6 +78,15 @@ std::string_view to_string(SemanticVertex vertex) noexcept {
   return "top_front_right";
 }
 
+std::string_view to_string(SemanticAxis axis) noexcept {
+  switch (axis) {
+  case SemanticAxis::Primary:
+    return "axis";
+  }
+
+  return "axis";
+}
+
 Result<SemanticFaceReference> SemanticFaceReference::create(FeatureId source_feature,
                                                             SemanticFace face) {
   const auto object_id = source_feature.empty()
@@ -103,6 +112,36 @@ SemanticFace SemanticFaceReference::face() const noexcept {
 
 SemanticFaceReference::SemanticFaceReference(FeatureId source_feature, SemanticFace face)
     : source_feature_(std::move(source_feature)), face_(face) {}
+
+Result<SemanticAxisReference> SemanticAxisReference::create(FeatureId source_feature,
+                                                            SemanticAxis axis) {
+  const auto object_id = source_feature.empty()
+                             ? std::string("semantic_axis")
+                             : source_feature.value() + "." + std::string(to_string(axis));
+
+  if (source_feature.empty()) {
+    return Result<SemanticAxisReference>::failure(
+        Error::validation(object_id, "semantic axis source feature id must not be empty"));
+  }
+
+  return Result<SemanticAxisReference>::success(
+      SemanticAxisReference(std::move(source_feature), axis));
+}
+
+const FeatureId& SemanticAxisReference::source_feature() const noexcept {
+  return source_feature_;
+}
+
+SemanticAxis SemanticAxisReference::axis() const noexcept {
+  return axis_;
+}
+
+std::string SemanticAxisReference::node_id() const {
+  return source_feature_.value() + "." + std::string(to_string(axis_));
+}
+
+SemanticAxisReference::SemanticAxisReference(FeatureId source_feature, SemanticAxis axis)
+    : source_feature_(std::move(source_feature)), axis_(axis) {}
 
 Result<SemanticEdgeReference> SemanticEdgeReference::create(FeatureId source_feature,
                                                             SemanticEdge edge) {
