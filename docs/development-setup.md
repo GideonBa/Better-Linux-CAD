@@ -30,6 +30,8 @@ sudo apt-get install -y build-essential cmake ninja-build pkg-config git clang-f
   doxygen graphviz
 ```
 
+The first rigid-body solver uses project-owned dynamic numeric containers and a small partial-pivot dense linear solve. It does not currently add Eigen as a BLCAD build dependency despite the development package already being listed for future numeric work.
+
 ## Configure, build, and test
 
 Run the complete core-only workflow:
@@ -69,6 +71,7 @@ Focused assembly test commands:
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-target]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-transform]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-equation]"
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-solver]"
 ```
 
 The build directories are defined by `CMakePresets.json` as `build/dev`, `build/dev-geometry`, and `build/release`.
@@ -84,10 +87,11 @@ At a high level, the current suites cover:
 - semantic/projected references, reference recovery, sketch diagnostics, repair commands, transactions, undo, and presentation snapshots
 - assembly parameters, project propagation, component instances, placement/state updates, shared part ownership, and JSON roundtrip
 - Mate/Concentric/Distance constraint intent, semantic component targets, validation, transform immutability, project structure, and JSON roundtrip
-- read-only active-constraint graph nodes/edges, inactive filtering, multi-edges, deterministic adjacency, connected groups, isolated nodes, and unchanged assembly intent
-- generated-face assembly target resolution, unsupported-family failures, deterministic local planar descriptors, separate placement intent, and unchanged project model intent
-- explicit rigid-transform evaluation for points, vectors, and planar frames, including identity, translation, right-handed single-axis rotations, combined-axis order, length/orthogonality preservation, determinism, and read-only behavior
-- planar Mate and Distance residual construction, including target identity/order, transformed assembly-space target planes, satisfied and unsatisfied residuals, signed Distance direction, inactive/Concentric rejection, unsupported target propagation, determinism, and unchanged project intent
+- active-constraint graph nodes/edges, inactive filtering, multi-edges, deterministic adjacency, connected groups, and isolated nodes
+- generated-face assembly target resolution and explicit unsupported-family failures
+- explicit rigid-transform point/vector/planar-frame evaluation and combined-axis rotation order
+- planar Mate/Distance residual construction, target order, transformed target planes, signed Distance direction, and failure paths
+- rigid-body solve participation, deterministic variable/residual ordering, Mate and Distance solve convergence, orientation correction, multi-component chains, all-grounded consistency, maximum-iteration state, read-only solve behavior, stale-result detection, and explicit atomic application
 - part, assembly, and project model-intent serialization/file workflows
 - optional OCCT workplane resolution, profile geometry, recompute execution, shape caching, and STEP export
 
@@ -120,7 +124,7 @@ blcad_inspect_project_components <input.blcad.project.json>
 
 The component inspector is read-only. It validates project assembly structure, prints component placement/state and stored constraints, builds `AssemblyConstraintGraph`, and prints active-edge and deterministic connected-group summaries.
 
-Target resolution, rigid-transform evaluation, and planar equation/residual construction are geometry-library APIs with focused tests. They do not yet have dedicated CLI consumers.
+Target resolution, transform evaluation, planar residual construction, and rigid-body solving are currently geometry-library APIs with focused tests. They do not yet have dedicated CLI consumers.
 
 ## Documentation entry points
 
@@ -135,7 +139,8 @@ Use these maintained status documents:
 - `docs/assembly-constraint-target-resolution-mvp5.md`: generated-face target resolution
 - `docs/assembly-rigid-transform-evaluation-mvp5.md`: local-to-assembly transform convention and evaluator
 - `docs/assembly-planar-constraint-equations-mvp5.md`: planar Mate/Distance residual conventions and builder
-- `docs/assembly-system.md`: solver, DOF, and joint roadmap over implemented assembly layers
+- `docs/assembly-rigid-body-solver-mvp5.md`: first deterministic rigid-body solver and explicit result-application boundary
+- `docs/assembly-system.md`: assembly pipeline, solver, DOF, and joint roadmap
 - `docs/file-format.md`: persisted model-intent format
 - `docs/project-goal.md`: long-term project goal
 
@@ -148,12 +153,12 @@ Project formatting is configured through:
 - `.editorconfig`
 - `.clang-format`
 
-Use `clang-format` for changed C++ files before committing. For the planar equation block:
+Use `clang-format` for changed C++ files before committing. For the rigid-body solver block:
 
 ```bash
-clang-format -i include/blcad/geometry/assembly_constraint_equation_builder.hpp \
-  src/geometry/assembly_constraint_equation_builder.cpp \
-  tests/geometry/assembly_constraint_equation_builder_tests.cpp
+clang-format -i include/blcad/geometry/assembly_rigid_body_solver.hpp \
+  src/geometry/assembly_rigid_body_solver.cpp \
+  tests/geometry/assembly_rigid_body_solver_tests.cpp
 ```
 
 ## Clean generated files
@@ -166,25 +171,28 @@ rm -rf build/
 
 ## Current development boundaries
 
-The current implementation includes the parametric bolt circle, richer sketch/profile blocks, assembly parameters, the project container, component instances, placement/state updates, persistent Mate/Concentric/Distance intent, the active-constraint graph, generated-face target resolution, explicit rigid-transform evaluation, and planar Mate/Distance equation-residual construction. Those capabilities must not be listed as future or missing in current-status documentation.
+The current implementation includes the parametric bolt circle, richer sketch/profile blocks, assembly parameters, the project container, component instances, placement/state updates, persistent Mate/Concentric/Distance intent, active-constraint connectivity, generated-face target resolution, rigid-transform evaluation, planar Mate/Distance residual construction, and the first rigid-body assembly solver plus explicit successful-result application boundary. Those capabilities must not be listed as future or missing in current-status documentation.
 
 The current assembly boundary is deliberate:
 
-- component transforms remain explicit placement model intent, not solver output
-- grounding, visibility, and suppression are persisted state and are not enforced by current geometry consumers
-- semantic target tokens are persisted; geometry resolution supports the generated planar face family
-- target resolution produces component-local planar descriptors plus separate placement intent
-- `AssemblyTransformEvaluator` applies the active right-handed fixed-axis X-then-Y-then-Z convention, equivalent to `Rz * Ry * Rx` for column vectors
-- points are rotated and translated; vectors, axes, and normals are rotated only
-- assembly-space planar descriptors are derived data
-- `AssemblyConstraintEquationBuilder` supports active planar Mate and Distance constraints only
-- Mate residuals use `nA + nB` and `dot(oB - oA, nA)`
-- Distance residuals use `cross(nA, nB)` and signed A-to-B separation along `nA`
-- target order is semantically observable for Distance and must be preserved
-- graph connectivity, resolved targets, evaluated frames, and residual descriptors are not persisted
-- the next block is the first rigid-body assembly solver seed
-- no solved transform application, remaining-DOF computation, overconstraint analysis, solver participation for suppression, collision analysis, subassemblies, or assembly-level STEP export exists yet
-- semantic axis references and Concentric residual construction remain deferred
+- storage-level transform updates remain explicit edits and do not infer constraints
+- the solver requires one exact deterministic graph-connected group
+- at least one grounded component is required; every grounded component is fixed
+- multiple grounded components are allowed
+- suppressed group components are rejected by the first solver; visibility does not affect solving
+- variable transforms are ordered as `tx,ty,tz,rx_deg,ry_deg,rz_deg` per lexicographically ordered free component
+- residuals are ordered by constraint id and flattened orientation-first, length-last
+- length residuals use an explicit default `1 mm` scale
+- central finite differences, damped Gauss-Newton, partial-pivot elimination, line search, and damping escalation define the first numeric solve policy
+- solve states distinguish convergence, maximum iterations, fixed-geometry inconsistency, and numerical failure
+- solving occurs on a project copy and never mutates source placement
+- solve results snapshot every group component input, including grounded anchors
+- only fresh converged results may be explicitly applied
+- application occurs through a project copy and atomic replacement
+- graph connectivity, resolved targets, evaluated frames, residual descriptors, Jacobians, and solve results are not persisted
+- remaining-DOF computation, Jacobian-rank diagnostics, and under/fully/overconstrained analysis remain unimplemented
+- semantic axis references and Concentric residual/solve support remain deferred
+- collision analysis, subassemblies, and assembly-level STEP export remain future work
 - persistent model references remain semantic; raw OCCT topology ids are not core model intent
 - no GUI code should own CAD logic
 
