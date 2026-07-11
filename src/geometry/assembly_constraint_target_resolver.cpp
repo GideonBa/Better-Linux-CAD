@@ -54,21 +54,6 @@ parse_generated_face_reference(std::string_view semantic_reference) {
   return SemanticFaceReference::create(FeatureId(std::string(source_feature)), face.value());
 }
 
-[[nodiscard]] DatumPlaneId
-make_temporary_workplane_id(const PartDocument& document,
-                            const SemanticFaceReference& face_reference) {
-  const std::string base_id = "__assembly_target_resolution__." +
-                              face_reference.source_feature().value() + "." +
-                              std::string(to_string(face_reference.face()));
-  std::string candidate = base_id;
-  std::size_t suffix = 0U;
-  while (document.has_workplane_id(DatumPlaneId(candidate))) {
-    ++suffix;
-    candidate = base_id + "." + std::to_string(suffix);
-  }
-  return DatumPlaneId(std::move(candidate));
-}
-
 } // namespace
 
 Result<ResolvedAssemblyConstraintTarget>
@@ -106,21 +91,9 @@ AssemblyConstraintTargetResolver::resolve(const Project& project,
         "generated-face assembly target source feature must be an additive extrude"));
   }
 
-  PartDocument resolution_document = *part;
-  const DatumPlaneId workplane_id =
-      make_temporary_workplane_id(resolution_document, face_reference.value());
-  auto workplane = DerivedWorkplane::create_on_feature_face(
-      workplane_id, "AssemblyTargetResolution", face_reference.value());
-  if (workplane.has_error()) {
-    return Result<ResolvedAssemblyConstraintTarget>::failure(workplane.error());
-  }
-  auto added = resolution_document.add_derived_workplane(workplane.value());
-  if (added.has_error()) {
-    return Result<ResolvedAssemblyConstraintTarget>::failure(added.error());
-  }
-
   const WorkplaneResolver workplane_resolver;
-  auto resolved_workplane = workplane_resolver.resolve(resolution_document, workplane_id);
+  auto resolved_workplane =
+      workplane_resolver.resolve_generated_face(*part, face_reference.value());
   if (resolved_workplane.has_error()) {
     return Result<ResolvedAssemblyConstraintTarget>::failure(resolved_workplane.error());
   }
