@@ -98,6 +98,7 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/assembly_constraint_equation_builder.cpp
     src/geometry/assembly_constraint_numeric_system.cpp
     src/geometry/assembly_constraint_target_resolver.cpp
+    src/geometry/assembly_hierarchy_constraint_equation_builder.cpp
     src/geometry/assembly_hierarchy_transform_evaluator.cpp
     src/geometry/assembly_insert_constraint_equation_builder.cpp
     src/geometry/assembly_interference_analyzer.cpp
@@ -265,6 +266,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/assembly_concentric_numeric_solver_tests.cpp
       tests/geometry/assembly_constraint_equation_builder_tests.cpp
       tests/geometry/assembly_constraint_target_resolver_tests.cpp
+      tests/geometry/assembly_hierarchy_constraint_equation_builder_tests.cpp
       tests/geometry/assembly_hierarchy_transform_evaluator_tests.cpp
       tests/geometry/assembly_insert_constraint_equation_builder_tests.cpp
       tests/geometry/assembly_insert_numeric_solver_tests.cpp
