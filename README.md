@@ -6,7 +6,7 @@ Detailed architecture and feature status live in `docs/`. This README is intenti
 
 ## Status
 
-Current state: MVP-1 core skeleton, staged MVP-2 sketch/workplane/profile/recompute/reference blocks, the MVP-3 parametric bolt circle, the MVP-4 assembly/project container path, and MVP-5 assembly infrastructure through deterministic Mate/Distance/Concentric/Insert/Angle rigid-body solving, local Jacobian-rank/remaining-DOF diagnostics, suppressed-component solve filtering, posed assembly STEP export, the first persistent Revolute joint/limit motion path, rigid subassembly hierarchy with nested posed-leaf export, and read-only posed interference and clearance analysis over the shared posed-leaf boundary.
+Current state: MVP-1 core skeleton, staged MVP-2 sketch/workplane/profile/recompute/reference blocks, the MVP-3 parametric bolt circle, the MVP-4 assembly/project container path, and MVP-5 assembly infrastructure through deterministic Mate/Distance/Concentric/Insert/Angle rigid-body solving, local Jacobian-rank/remaining-DOF diagnostics, suppressed-component solve filtering, posed assembly STEP export, the first persistent Revolute joint/limit motion path, rigid subassembly hierarchy with nested posed-leaf export, read-only posed interference and clearance analysis over the shared posed-leaf boundary, and document-scoped flexible child-assembly solving through the existing rigid-body solver.
 
 The implemented assembly path now includes:
 
@@ -37,6 +37,12 @@ explicit root assembly + project-owned child assemblies
   -> visible-active AssemblyLeafOccurrenceDescriptor flattening
   -> exact component/parent transform chains in inner-to-outer order
 
+active rooted child occurrence selection
+  -> referenced child AssemblyDocument becomes an isolated local solve root
+  -> existing local constraint graph + rigid-body solver/application path reused unchanged
+  -> result carries occurrence path + child document identity + normal component snapshots/proposals
+  -> atomic application updates child component transforms only; rigid occurrence boundary placement stays unchanged
+
 posed assembly export
   -> one recomputed ShapeCache per referenced leaf part document
   -> repeated root/child assembly occurrences reuse recomputed part caches
@@ -49,6 +55,8 @@ Concentric, Insert, Angle, and transient Revolute motion drives reuse the shared
 Suppressed components contribute no solve variables. Geometric constraints and non-selected joint drives touching them vanish from the active numeric subgroup while full component snapshots still protect result application from stale suppression changes. A selected Revolute joint cannot be driven through a suppressed endpoint.
 
 `AssemblyHierarchyTraversal` derives the rooted rigid occurrence tree in deterministic pre-order. `AssemblyLeafOccurrenceResolver` removes hidden/suppressed subtrees and local hidden/suppressed components, then exposes stable leaf identity/path plus authored transform chains. These descriptors are derived and unpersisted.
+
+`AssemblyFlexibleSubassemblySolver` selects an exact active non-root occurrence path, constructs a temporary child-as-root project view, and reuses the existing local rigid-body solver. Its applier reconstructs the current local view, reuses normal stale-result validation, and atomically writes proposed direct component transforms back to the referenced child document. Repeated occurrences of one child document therefore share the same internal solved pose while retaining independent rigid boundary transforms.
 
 `AssemblyStepExporter` recomputes each referenced visible-active leaf part once per export, reuses that cache across repeated component and subassembly occurrences, applies every authored rigid transform to independent shape copies in exact inner-to-outer order, composes one OCCT compound, and delegates final file writing to the existing STEP writer. Export geometry remains derived and unpersisted.
 
@@ -110,6 +118,7 @@ Focused current assembly tests:
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-nested-step-export]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-interference]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-clearance]"
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-flexible-subassembly]"
 ```
 
 ## Headless tools
@@ -176,6 +185,7 @@ Implemented assembly blocks:
 - `docs/assembly-revolute-joint-motion-mvp5.md`
 - `docs/assembly-rigid-subassembly-nested-export-mvp5.md`
 - `docs/assembly-interference-analysis-mvp5.md`
+- `docs/assembly-flexible-subassembly-solving-mvp5.md`
 
 Broader implemented sketch/profile documents remain listed from `docs/mvp-plan.md` and `docs/architecture-summary.md`.
 
@@ -187,4 +197,4 @@ Future roadmaps:
 
 ## Next technical step
 
-The parameter expression seed is implemented (`docs/parameter-expression-mvp.md`). The next block is chosen from item 24 of the assembly sequence or the deferred expression follow-ups; define it in `docs/mvp-plan.md` before implementing.
+Document-scoped flexible subassembly solving is implemented (`docs/assembly-flexible-subassembly-solving-mvp5.md`). The next assembly block is cross-hierarchy relationship semantics: define stable endpoint identity for a component reached through a subassembly occurrence path before constraints or joints are allowed to cross assembly-document boundaries. See `docs/mvp-plan.md`.
