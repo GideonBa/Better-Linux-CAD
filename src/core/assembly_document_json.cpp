@@ -102,6 +102,33 @@ constexpr int k_version = 1;
       transform_from_json(instance_json.at("transform")));
 }
 
+[[nodiscard]] json subassembly_instance_to_json(const SubassemblyInstance& instance) {
+  return json{{"id", instance.id().value()},
+              {"name", instance.name()},
+              {"referenced_assembly_document", instance.referenced_assembly_document().value()},
+              {"visibility", std::string(to_string(instance.visibility()))},
+              {"suppression_state", std::string(to_string(instance.suppression_state()))},
+              {"transform", transform_to_json(instance.transform())}};
+}
+
+[[nodiscard]] Result<SubassemblyInstance>
+subassembly_instance_from_json(const json& instance_json) {
+  auto visibility = visibility_from_json(instance_json.at("visibility"));
+  if (visibility.has_error())
+    return Result<SubassemblyInstance>::failure(visibility.error());
+
+  auto suppression_state = suppression_state_from_json(instance_json.at("suppression_state"));
+  if (suppression_state.has_error())
+    return Result<SubassemblyInstance>::failure(suppression_state.error());
+
+  return SubassemblyInstance::create(
+      SubassemblyInstanceId(instance_json.at("id").get<std::string>()),
+      instance_json.at("name").get<std::string>(),
+      DocumentId(instance_json.at("referenced_assembly_document").get<std::string>()),
+      visibility.value(), suppression_state.value(),
+      transform_from_json(instance_json.at("transform")));
+}
+
 [[nodiscard]] Result<AssemblyConstraintType> constraint_type_from_json(const json& value) {
   const auto text = value.get<std::string>();
   if (text == "mate")
@@ -339,6 +366,10 @@ Result<std::string> serialize_assembly_document_to_json(const AssemblyDocument& 
   for (const auto& instance : document.component_instances()) {
     root["component_instances"].push_back(component_instance_to_json(instance));
   }
+  root["subassembly_instances"] = json::array();
+  for (const auto& instance : document.subassembly_instances()) {
+    root["subassembly_instances"].push_back(subassembly_instance_to_json(instance));
+  }
   root["assembly_constraints"] = json::array();
   for (const auto& constraint : document.constraints()) {
     root["assembly_constraints"].push_back(assembly_constraint_to_json(constraint));
@@ -406,6 +437,15 @@ Result<AssemblyDocument> deserialize_assembly_document_from_json(std::string_vie
       if (instance.has_error())
         return Result<AssemblyDocument>::failure(instance.error());
       auto added = document.value().add_component_instance(std::move(instance.value()));
+      if (added.has_error())
+        return Result<AssemblyDocument>::failure(added.error());
+    }
+
+    for (const auto& instance_json : root.value("subassembly_instances", json::array())) {
+      auto instance = subassembly_instance_from_json(instance_json);
+      if (instance.has_error())
+        return Result<AssemblyDocument>::failure(instance.error());
+      auto added = document.value().add_subassembly_instance(std::move(instance.value()));
       if (added.has_error())
         return Result<AssemblyDocument>::failure(added.error());
     }
