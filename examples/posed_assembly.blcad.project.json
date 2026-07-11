@@ -1,0 +1,136 @@
+{
+  "schema": "blcad.project.mvp4",
+  "version": 1,
+  "project": {
+    "id": "project.posed_assembly",
+    "name": "PosedAssemblyProject"
+  },
+  "assembly": {
+    "schema": "blcad.assembly_document.mvp4",
+    "version": 1,
+    "document": {
+      "id": "assembly.posed_assembly",
+      "name": "PosedAssembly"
+    },
+    "parameters": [],
+    "member_parts": [
+      "part.posed_plate"
+    ],
+    "parameter_bindings": [],
+    "component_instances": [
+      {
+        "id": "component.plate.grounded",
+        "name": "Grounded Plate",
+        "referenced_part_document": "part.posed_plate",
+        "visibility": "visible",
+        "suppression_state": "active",
+        "grounding_state": "grounded",
+        "transform": {
+          "translation_mm": {"x": 0.0, "y": 0.0, "z": 0.0},
+          "rotation_deg": {"x": 0.0, "y": 0.0, "z": 0.0}
+        }
+      },
+      {
+        "id": "component.plate.free",
+        "name": "Free Plate",
+        "referenced_part_document": "part.posed_plate",
+        "visibility": "visible",
+        "suppression_state": "active",
+        "grounding_state": "free",
+        "transform": {
+          "translation_mm": {"x": 25.0, "y": -10.0, "z": 20.0},
+          "rotation_deg": {"x": 0.0, "y": 0.0, "z": 0.0}
+        }
+      }
+    ],
+    "assembly_constraints": [
+      {
+        "id": "constraint.plate_mate",
+        "name": "Plate face mate",
+        "type": "mate",
+        "target_a": {
+          "component_instance": "component.plate.grounded",
+          "semantic_reference": "feature.base_extrude.top"
+        },
+        "target_b": {
+          "component_instance": "component.plate.free",
+          "semantic_reference": "feature.base_extrude.bottom"
+        },
+        "state": "active"
+      }
+    ]
+  },
+  "parts": [
+    {
+      "schema": "blcad.part_document.mvp1",
+      "version": 1,
+      "document": {
+        "id": "part.posed_plate",
+        "name": "PosedPlate"
+      },
+      "parameters": [
+        {
+          "id": "part.width",
+          "name": "width",
+          "type": "length",
+          "scope": "part",
+          "unit": "mm",
+          "value": 120.0
+        },
+        {
+          "id": "part.height",
+          "name": "height",
+          "type": "length",
+          "scope": "part",
+          "unit": "mm",
+          "value": 80.0
+        },
+        {
+          "id": "part.thickness",
+          "name": "thickness",
+          "type": "length",
+          "scope": "part",
+          "unit": "mm",
+          "value": 8.0
+        }
+      ],
+      "datum_planes": [
+        {
+          "id": "datum.xy",
+          "name": "XY",
+          "kind": "xy",
+          "origin": {"x": 0.0, "y": 0.0, "z": 0.0},
+          "x_axis": {"x": 1.0, "y": 0.0, "z": 0.0},
+          "y_axis": {"x": 0.0, "y": 1.0, "z": 0.0},
+          "normal": {"x": 0.0, "y": 0.0, "z": 1.0}
+        }
+      ],
+      "sketches": [
+        {
+          "id": "sketch.base",
+          "name": "BaseSketch",
+          "workplane": "datum.xy",
+          "rectangle_profiles": [
+            {
+              "id": "profile.base",
+              "center": {"x": 0.0, "y": 0.0},
+              "width_parameter": "part.width",
+              "height_parameter": "part.height"
+            }
+          ],
+          "circle_profiles": []
+        }
+      ],
+      "features": [
+        {
+          "id": "feature.base_extrude",
+          "name": "BaseExtrude",
+          "type": "additive_extrude",
+          "input_sketch": "sketch.base",
+          "direction": "+Z",
+          "length_parameter": "part.thickness"
+        }
+      ]
+    }
+  ]
+}

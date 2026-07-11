@@ -95,6 +95,7 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/assembly_insert_constraint_equation_builder.cpp
     src/geometry/assembly_rigid_body_solver.cpp
     src/geometry/assembly_solve_diagnostics.cpp
+    src/geometry/assembly_step_exporter.cpp
     src/geometry/assembly_transform_evaluator.cpp
     src/geometry/circular_cut_adapter.cpp
     src/geometry/closed_profile_adapter.cpp
@@ -154,9 +155,13 @@ if(BLCAD_BUILD_GEOMETRY)
   add_executable(blcad_export_project examples/blcad_export_project.cpp)
   target_link_libraries(blcad_export_project PRIVATE BLCAD::geometry)
 
+  add_executable(blcad_export_posed_assembly examples/blcad_export_posed_assembly.cpp)
+  target_link_libraries(blcad_export_posed_assembly PRIVATE BLCAD::geometry)
+
   if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(blcad_export_step PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(blcad_export_project PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(blcad_export_posed_assembly PRIVATE -Wall -Wextra -Wpedantic)
   endif()
 endif()
 
@@ -239,6 +244,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/assembly_parameter_pipeline_tests.cpp
       tests/geometry/assembly_rigid_body_solver_tests.cpp
       tests/geometry/assembly_solve_diagnostics_tests.cpp
+      tests/geometry/assembly_step_exporter_tests.cpp
       tests/geometry/assembly_suppressed_component_solver_tests.cpp
       tests/geometry/assembly_transform_evaluator_tests.cpp
       tests/geometry/back_workplane_pipeline_tests.cpp
@@ -270,6 +276,7 @@ if(BLCAD_BUILD_TESTS)
 
     target_link_libraries(blcad_geometry_tests PRIVATE BLCAD::geometry Catch2::Catch2WithMain)
     target_include_directories(blcad_geometry_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/geometry)
+    target_include_directories(blcad_geometry_tests SYSTEM PRIVATE ${OpenCASCADE_INCLUDE_DIR})
 
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
       target_compile_options(blcad_geometry_tests PRIVATE -Wall -Wextra -Wpedantic)

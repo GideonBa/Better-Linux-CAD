@@ -18,6 +18,7 @@ class RectangleExtrusionAdapter;
 class CircularCutAdapter;
 class ClosedProfileAdapter;
 class StepExporter;
+class AssemblyStepExporter;
 
 class GeometryShape {
 public:
@@ -38,6 +39,7 @@ private:
   friend class CircularCutAdapter;
   friend class ClosedProfileAdapter;
   friend class StepExporter;
+  friend class AssemblyStepExporter;
 
   explicit GeometryShape(std::shared_ptr<Impl> impl);
 

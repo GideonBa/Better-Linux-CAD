@@ -6,25 +6,31 @@ Detailed architecture and feature status live in `docs/`. This README is intenti
 
 ## Status
 
-Current state: MVP-1 core skeleton, staged MVP-2 sketch/workplane/profile/recompute/reference blocks, the MVP-3 parametric bolt circle, the MVP-4 assembly/project container path, and MVP-5 assembly infrastructure through deterministic Mate/Distance/Concentric rigid-body solving, local Jacobian-rank/remaining-DOF diagnostics, and stable read-only Insert target/residual semantics.
+Current state: MVP-1 core skeleton, staged MVP-2 sketch/workplane/profile/recompute/reference blocks, the MVP-3 parametric bolt circle, the MVP-4 assembly/project container path, and MVP-5 assembly infrastructure through deterministic Mate/Distance/Concentric/Insert/Angle rigid-body solving, local Jacobian-rank/remaining-DOF diagnostics, suppressed-component solve filtering, and posed assembly STEP compound export.
 
 The implemented assembly path now includes:
 
 ```text
-component and Mate/Distance/Concentric/Insert model intent
+component and Mate/Distance/Concentric/Insert/Angle model intent
   -> deterministic active-constraint graph
   -> generated planar face, circular-cut axis, and circular-cut seat target resolution
   -> explicit local-to-assembly rigid-transform evaluation
-  -> planar Mate/Distance, axis-line Concentric, and composite Insert residual construction
-  -> Mate/Distance/Concentric shared numeric residual/Jacobian system
+  -> planar, axis-line, and composite Insert residual construction
+  -> shared numeric residual/Jacobian system
   -> damped Gauss-Newton rigid-body solve on Project copies
   -> explicit atomic converged-result application
   -> read-only local Jacobian-rank and remaining-DOF diagnostics
+  -> suppressed-component filtering over the active solve subgroup
+  -> one recomputed ShapeCache per referenced part document
+  -> visible active component shape posing with the same X-then-Y-then-Z transform convention
+  -> one derived OCCT compound and STEP export
 ```
 
-Concentric uses the shared numeric system and solver. A regular one-free-body Concentric relationship is proven as rank `4/6` with `2` remaining local DOF.
+Concentric, Insert, and planar Angle use the shared numeric system and solver. Regular one-free-body Concentric and Insert relationships are proven as rank `4/6` and `5/6`; the scalar cosine Angle seed is rank `1/6` away from its documented extremal degeneracies.
 
-Insert now has explicit persistent relationship intent and a stable `feature.<feature-id>.seat` endpoint family. Each supported seat endpoint derives one primary axis plus one oriented seating plane from the same circular-cut feature/profile. The read-only composite Insert residual is proven by direct finite differences as rank `5/6`, leaving only rotation about the common axis free. Insert is not yet connected to the shared numeric solver.
+Suppressed components contribute no solve variables and every constraint touching them vanishes from the active numeric subgroup while full solve snapshots still protect result application from stale suppression changes.
+
+`AssemblyStepExporter` recomputes each referenced part once per export, reuses that cache across repeated occurrences, skips hidden and suppressed components, applies persisted rigid transforms to shape copies, composes one OCCT compound, and delegates final file writing to the existing STEP writer. Export geometry remains derived and unpersisted.
 
 There is no GUI yet.
 
@@ -73,6 +79,7 @@ Focused current assembly tests:
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-insert]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-solver]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-diagnostics]"
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-step-export]"
 ```
 
 ## Headless tools
@@ -81,6 +88,7 @@ Focused current assembly tests:
 blcad_export_step <input.blcad.json> <output.step>
 blcad_export_project <input.blcad.project.json> <assembly-parameter-id> <value> <output-dir>
 blcad_inspect_project_components <input.blcad.project.json>
+blcad_export_posed_assembly <input.blcad.project.json> <output.step>
 ```
 
 Examples:
@@ -89,6 +97,7 @@ Examples:
 ./build/dev-geometry/blcad_export_step examples/reference_plate.blcad.json build/reference_plate.step
 ./build/dev-geometry/blcad_export_step examples/bolt_circle_plate.blcad.json build/bolt_circle_plate.step
 ./build/dev/blcad_inspect_project_components examples/component_instances.blcad.project.json
+./build/dev-geometry/blcad_export_posed_assembly examples/posed_assembly.blcad.project.json build/posed_assembly.step
 ```
 
 ## Repository structure
@@ -127,6 +136,7 @@ Implemented assembly blocks:
 - `docs/assembly-insert-numeric-solver-dof-mvp5.md`
 - `docs/assembly-angle-constraint-mvp5.md`
 - `docs/assembly-suppressed-component-solving-mvp5.md`
+- `docs/assembly-posed-step-export-mvp5.md`
 
 Broader implemented sketch/profile documents remain listed from `docs/mvp-plan.md` and `docs/architecture-summary.md`.
 
@@ -138,4 +148,4 @@ Future roadmaps:
 
 ## Next technical step
 
-The next technical step is the posed assembly STEP export seed: recompute each referenced part's final shape, apply each visible non-suppressed component's rigid transform (matching `AssemblyTransformEvaluator` semantics exactly), compose one OCCT compound, and export it through the existing STEP writer — plus a headless example that loads a project, solves one group, applies the result, and exports the posed assembly. See `docs/mvp-plan.md`.
+The next technical step is the first joint/limit model-intent and motion seed: define persistent solver-independent joint records and limit ranges on semantic assembly targets, derive their active graph participation without persisting numeric state, and integrate one minimal motion-capable joint family through the existing rigid-body solve/application boundary. See `docs/mvp-plan.md`.

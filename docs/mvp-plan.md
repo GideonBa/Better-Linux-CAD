@@ -86,7 +86,7 @@ Implemented:
 - embedded assembly/project JSON
 - headless project parameter update, recompute, and per-part STEP export
 
-Assembly-level STEP export and manifest/external-file project containers remain deferred.
+Assembly-level STEP product structure and manifest/external-file project containers remain deferred.
 
 ## MVP 5: Assembly relationship and rigid-body pipeline
 
@@ -186,12 +186,12 @@ Canonical document: `docs/assembly-rigid-body-solver-mvp5.md`.
 Implemented:
 
 - exactly one deterministic connected group per solve
-- at least one grounded component
-- every grounded component fixed
-- suppressed selected components rejected; visibility ignored
-- six direct variables per free component: `tx,ty,tz,rx_deg,ry_deg,rz_deg`
+- at least one grounded component while constraints survive
+- every grounded active component fixed
+- suppressed selected components excluded from the numeric subgroup; visibility ignored
+- six direct variables per free active component: `tx,ty,tz,rx_deg,ry_deg,rz_deg`
 - lexicographic component and constraint ordering
-- shared Mate/Distance/Concentric residual evaluation
+- shared Mate/Distance/Concentric/Insert/Angle residual evaluation
 - central finite-difference Jacobian
 - damped Gauss-Newton normal equations
 - partial-pivot Gaussian elimination
@@ -199,19 +199,17 @@ Implemented:
 - explicit solve states
 - source-project immutability during solve
 - complete solve-input snapshots and transform proposals
-- stale-result detection including moved grounded anchors
+- stale-result detection including moved grounded anchors and suppression changes
 - explicit atomic successful application through `AssemblySolveResultApplier`
-
-Insert is not yet a solver residual family.
 
 ### 8. Local Jacobian-rank and remaining-DOF diagnostics
 
 Canonical document: `docs/assembly-solve-diagnostics-mvp5.md`.
 
-Solver and diagnostics share the same private residual/variable/finite-difference Jacobian path for Mate, Distance, and Concentric.
+Solver and diagnostics share the same private residual/variable/finite-difference Jacobian path for every currently integrated numeric constraint family.
 
 ```text
-variable_count = 6 * free_component_count
+variable_count = 6 * free_active_component_count
 constrained_dof = rank(J)
 remaining_dof = variable_count - rank(J)
 ```
@@ -297,7 +295,6 @@ signed_seating_separation_mm = dot(sB - sA, nA)
 - one remaining rotation-about-axis DOF
 - read-only target/residual construction
 - assembly JSON roundtrip without schema-shape change
-- explicit solver rejection until the numeric integration block below
 - no persistent target/residual/Jacobian/DOF cache
 
 ### 12. Insert numeric-system, solver, and DOF integration
@@ -361,19 +358,35 @@ Canonical document: `docs/assembly-suppressed-component-solving-mvp5.md`.
 
 Implemented: suppressed components contribute no solve variables, every constraint touching them vanishes from the collected constraint set, snapshots still cover them for stale-result detection, proposals must match free **active** snapshots, the remaining subgroup requires a grounded non-suppressed component only while constraints survive, fully vanished constraint sets are trivially converged with zero residual components, and diagnostics compute rank/DOF over the active subgroup only.
 
-## Next MVP: Posed assembly STEP export seed
+### 15. Posed assembly STEP export seed
 
-Goal: the first end-to-end assembly deliverable — export every visible, resolvable component of a project assembly as one posed STEP file, using each component's rigid transform on its part's recomputed final shape. This is pulled ahead of joints/motion because it proves the whole placement/solve pipeline in one inspectable artifact.
+Canonical document: `docs/assembly-posed-step-export-mvp5.md`.
+
+Implemented the first end-to-end assembly geometry deliverable:
+
+1. Validate project/member/component structure before geometry export.
+2. Collect referenced part documents deterministically and recompute each one exactly once into one per-export `ShapeCache`, reused across repeated component occurrences.
+3. Apply each visible, non-suppressed component's persisted `RigidTransform` to a part-shape copy using explicit X, then Y, then Z degree rotations followed by millimeter translation, matching `AssemblyTransformEvaluator` semantics exactly.
+4. Compose posed occurrence shapes into one OCCT compound and export through the existing `StepExporter`.
+5. Fail closed on unresolved project members, recompute failures, missing final part shapes, transform failures, empty visible-active assemblies, or STEP writer failures.
+6. Keep recompute caches, transformed shapes, the compound, and export summaries derived and unpersisted.
+7. Provide `blcad_export_posed_assembly`, which loads project JSON, builds the active graph, solves one connected multi-component group, explicitly applies the converged result, and exports the posed assembly.
+8. Cover repeated instances of one part, bounding-box and volume transform checks, hidden/suppressed exclusion, deterministic repeated STEP data, unresolved members, and missing recompute end shapes.
+
+## Next MVP: Joint/limit model intent and first motion seed
+
+Goal: add the first persistent solver-independent motion relationship layer without turning solved numeric state into model intent.
 
 Required implementation sequence:
 
-1. Recompute each referenced part document's final shape through the existing recompute executor and shape cache (one cache per part document, reused across instances).
-2. Apply each visible, non-suppressed component's `RigidTransform` to a copy of its part shape (rotation X, then Y, then Z in degrees, then translation in millimeters — exactly the semantics of `AssemblyTransformEvaluator`).
-3. Compose the posed shapes into one OCCT compound and export it through the existing STEP writer.
-4. Skip suppressed and hidden components deterministically; fail closed on missing part documents or failed part recomputes.
-5. Add a headless example that loads a project JSON, solves one connected group, applies the result, and exports the posed assembly to STEP.
-6. Cover: two posed instances of one part, suppressed/hidden exclusion, transform correctness via bounding-box or volume checks, deterministic repeat export, and failure on unresolvable members.
-7. Keep the export derived and unpersisted; no assembly geometry caches in the model.
+1. Define stable joint identity, active/inactive state, semantic target endpoints, and explicit limit ranges as persistent records separate from geometric assembly constraints.
+2. Start with one minimal motion-capable joint family whose unconstrained motion is already expressible by the current rigid-body coordinate system; a revolute joint is the preferred seed.
+3. Validate joint targets against existing component instances and reuse semantic face/axis/seat resolution instead of storing OCCT topology ids.
+4. Derive active joint graph participation without persisting connectivity or numeric state.
+5. Map the seed joint and limits into the shared residual/Jacobian path while preserving deterministic component/relationship ordering, finite differences, damping, solve states, snapshots, stale-result checks, and atomic application.
+6. Expose an explicit motion input/query boundary that changes only a requested joint coordinate and returns transform proposals; no continuous simulation cache yet.
+7. Cover free in-range motion, lower/upper limit clamping or rejection semantics, grounded participation, suppression filtering, stale application, and deterministic repeated solves.
+8. Keep joint coordinates, limit intent, and relationship identity persistent only when they are true user model intent; regenerate Jacobians, null spaces, and solve state.
 
 ## Proposed assembly implementation sequence
 
@@ -394,8 +407,8 @@ Required implementation sequence:
 15. Add solved-state or DOF cache records only if a later consumer requires non-regenerable data. No current requirement.
 16. Add richer constraint families. First family (planar Angle) implemented; further families follow as needed.
 17. Suppressed components in solved groups. Implemented.
-18. Posed assembly STEP export seed (pulled ahead as the first end-to-end assembly deliverable). Next.
-19. Add joints and limits, then motion through the solver.
+18. Posed assembly STEP export seed. Implemented.
+19. Add joints and limits, then motion through the solver. Next.
 20. Add rigid subassemblies first, flexible subassemblies later, collision/interference checks, and component geometry instancing.
 
 ## Future roadmaps
@@ -404,10 +417,10 @@ Required implementation sequence:
 - Inventor-like sketch/feature parity: `docs/inventor-like-sketcher-and-feature-roadmap.md`
 - Advanced surfacing and 3D sketches: `docs/advanced-surfacing-and-3d-sketch-mvp.md`
 
-Later assembly work includes richer constraint families, per-component/null-space DOF presentation, joints and limits, motion, rigid then flexible subassemblies, collision/interference checks, component geometry instancing, and assembly-level STEP export.
+Later assembly work includes richer constraint families, per-component/null-space DOF presentation, joints and limits, motion, rigid then flexible subassemblies, collision/interference checks, component geometry instancing, and structured STEP assembly product export beyond the current geometric compound seed.
 
 ## Persistence rule
 
-Persist model intent. Regenerate graph connectivity, resolved plane/axis/seat targets, assembly-space geometry, residual descriptors, numeric Jacobians, solve results, rank summaries, and remaining-DOF diagnostics.
+Persist model intent. Regenerate graph connectivity, resolved plane/axis/seat targets, assembly-space geometry, residual descriptors, numeric Jacobians, solve results, rank summaries, remaining-DOF diagnostics, per-export shape caches, posed component shapes, and assembly STEP compounds.
 
-Only explicitly applied successful transform proposals change the existing persisted component `RigidTransform` model intent.
+Only explicitly applied successful transform proposals change the existing persisted component `RigidTransform` model intent. Future joint coordinates and limits may be persistent only when introduced as explicit user-authored model intent.
