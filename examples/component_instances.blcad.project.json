@@ -42,6 +42,54 @@
           "rotation_deg": {"x": 0.0, "y": 0.0, "z": 0.0}
         }
       }
+    ],
+    "assembly_constraints": [
+      {
+        "id": "constraint.bolt_faces",
+        "name": "Bolt face mate",
+        "type": "mate",
+        "target_a": {
+          "component_instance": "component.bolt.1",
+          "semantic_reference": "bolt.head_seat"
+        },
+        "target_b": {
+          "component_instance": "component.bolt.2",
+          "semantic_reference": "bolt.head_seat"
+        },
+        "state": "active"
+      },
+      {
+        "id": "constraint.bolt_axes",
+        "name": "Bolt axes",
+        "type": "concentric",
+        "target_a": {
+          "component_instance": "component.bolt.1",
+          "semantic_reference": "bolt.main_axis"
+        },
+        "target_b": {
+          "component_instance": "component.bolt.2",
+          "semantic_reference": "bolt.main_axis"
+        },
+        "state": "inactive"
+      },
+      {
+        "id": "constraint.bolt_spacing",
+        "name": "Bolt spacing",
+        "type": "distance",
+        "target_a": {
+          "component_instance": "component.bolt.1",
+          "semantic_reference": "bolt.main_axis"
+        },
+        "target_b": {
+          "component_instance": "component.bolt.2",
+          "semantic_reference": "bolt.main_axis"
+        },
+        "state": "active",
+        "distance": {
+          "unit": "mm",
+          "value": 40.0
+        }
+      }
     ]
   },
   "parts": [

@@ -66,6 +66,12 @@ Run only the component-instance tests after a core build:
 ./build/dev/blcad_core_tests "[core][component-instance]"
 ```
 
+Run only the assembly-constraint model-intent tests after a core build:
+
+```bash
+./build/dev/blcad_core_tests "[core][assembly-constraint]"
+```
+
 The build directories are defined by `CMakePresets.json` as `build/dev`, `build/dev-geometry`, and `build/release`.
 
 ## Test coverage
@@ -78,6 +84,7 @@ At a high level, the current suites cover:
 - sketches, constraints/dimensions, profile regions, arcs, splines, composite profiles, and construction geometry
 - semantic/projected references, reference recovery, sketch diagnostics, repair commands, transactions, undo, and presentation snapshots
 - assembly parameters, project-level propagation, component instances, free placement/state updates, shared part ownership, and JSON roundtrip
+- assembly Mate/Concentric/Distance constraint intent, semantic component targets, validation, transform immutability, project structure, and JSON roundtrip
 - part, assembly, and project model-intent serialization/file workflows
 - optional OCCT workplane resolution, profile geometry, recompute execution, shape caching, and STEP export
 
@@ -85,7 +92,7 @@ When a feature block is added, register its tests in `CMakeLists.txt` and docume
 
 ## Headless tools
 
-The core build provides component inspection:
+The core build provides component and stored assembly-constraint inspection:
 
 ```bash
 ./build/dev/blcad_inspect_project_components examples/component_instances.blcad.project.json
@@ -108,7 +115,7 @@ blcad_export_project <input.blcad.project.json> <assembly-parameter-id> <value> 
 blcad_inspect_project_components <input.blcad.project.json>
 ```
 
-The component inspector is read-only. It validates project assembly structure and prints component references, visibility, suppression state, grounding state, translation, and rotation.
+The component inspector is read-only. It validates project assembly structure and prints component references, visibility, suppression state, grounding state, translation, rotation, and stored assembly constraint type/state/semantic targets plus Distance values where present.
 
 ## Documentation entry points
 
@@ -118,7 +125,8 @@ Use these documents as the maintained status entry points:
 - `docs/mvp-plan.md`: detailed implementation sequence and implemented/deferred scope
 - `docs/architecture-summary.md`: condensed current and target architecture
 - `docs/component-instance-mvp5.md`: component instances and explicit free-placement/state updates
-- `docs/assembly-system.md`: assembly constraint, solver, DOF, and joint roadmap
+- `docs/assembly-constraint-model-intent-mvp5.md`: implemented semantic Mate/Concentric/Distance record layer
+- `docs/assembly-system.md`: assembly constraint graph, solver, DOF, and joint roadmap
 - `docs/file-format.md`: persisted model-intent format
 - `docs/project-goal.md`: long-term project goal
 
@@ -134,7 +142,8 @@ Project formatting is configured through:
 Use `clang-format` for changed C++ files before committing. For example:
 
 ```bash
-clang-format -i src/core/assembly_document.cpp tests/core/component_instance_tests.cpp
+clang-format -i include/blcad/core/assembly_constraint.hpp src/core/assembly_constraint.cpp \
+  src/core/assembly_document_json.cpp tests/core/assembly_constraint_tests.cpp
 ```
 
 ## Clean generated files
@@ -147,14 +156,15 @@ rm -rf build/
 
 ## Current development boundaries
 
-The current implementation already includes the parametric bolt circle, richer sketch/profile blocks, assembly parameters, the project container, component instances, and explicit free-placement/state updates. Those capabilities must not be listed as future or missing in current-status documentation.
+The current implementation already includes the parametric bolt circle, richer sketch/profile blocks, assembly parameters, the project container, component instances, explicit free-placement/state updates, and solver-independent Mate/Concentric/Distance assembly constraint records. Those capabilities must not be listed as future or missing in current-status documentation.
 
-The current assembly boundary is still deliberate:
+The current assembly boundary is deliberate:
 
 - component transforms are explicit free-placement model intent, not solver output
 - grounding, visibility, and suppression are stored state and are not yet enforced by assembly consumers
-- assembly Mate, Concentric, and Distance constraint records are the next model-intent block
-- no assembly constraint graph, rigid-body solver, remaining-DOF computation, collision analysis, subassemblies, or assembly-level STEP export exists yet
+- semantic constraint target tokens are persisted but not geometrically resolved
+- the next block is a read-only active-constraint graph with deterministic adjacency and connected-group queries
+- no rigid-body solver, remaining-DOF computation, overconstraint analysis, collision analysis, subassemblies, or assembly-level STEP export exists yet
 - persistent model references must remain semantic; raw OCCT topology ids are not core model intent
 - no GUI code should own CAD logic
 

@@ -3,6 +3,7 @@
 #include <nlohmann/json.hpp>
 
 #include <exception>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -95,6 +96,86 @@ constexpr int k_version = 1;
       transform_from_json(instance_json.at("transform")));
 }
 
+[[nodiscard]] Result<AssemblyConstraintType> constraint_type_from_json(const json& value) {
+  const auto text = value.get<std::string>();
+  if (text == "mate") return Result<AssemblyConstraintType>::success(AssemblyConstraintType::Mate);
+  if (text == "concentric") {
+    return Result<AssemblyConstraintType>::success(AssemblyConstraintType::Concentric);
+  }
+  if (text == "distance") {
+    return Result<AssemblyConstraintType>::success(AssemblyConstraintType::Distance);
+  }
+  return Result<AssemblyConstraintType>::failure(json_error("unsupported assembly constraint type"));
+}
+
+[[nodiscard]] Result<AssemblyConstraintState> constraint_state_from_json(const json& value) {
+  const auto text = value.get<std::string>();
+  if (text == "active") return Result<AssemblyConstraintState>::success(AssemblyConstraintState::Active);
+  if (text == "inactive") {
+    return Result<AssemblyConstraintState>::success(AssemblyConstraintState::Inactive);
+  }
+  return Result<AssemblyConstraintState>::failure(json_error("unsupported assembly constraint state"));
+}
+
+[[nodiscard]] json constraint_target_to_json(const AssemblyConstraintTarget& target) {
+  return json{{"component_instance", target.component_instance().value()},
+              {"semantic_reference", target.semantic_reference()}};
+}
+
+[[nodiscard]] Result<AssemblyConstraintTarget>
+constraint_target_from_json(const json& target_json) {
+  return AssemblyConstraintTarget::create(
+      ComponentInstanceId(target_json.at("component_instance").get<std::string>()),
+      target_json.at("semantic_reference").get<std::string>());
+}
+
+[[nodiscard]] json assembly_constraint_to_json(const AssemblyConstraint& constraint) {
+  json constraint_json{{"id", constraint.id().value()},
+                       {"name", constraint.name()},
+                       {"type", std::string(to_string(constraint.type()))},
+                       {"target_a", constraint_target_to_json(constraint.target_a())},
+                       {"target_b", constraint_target_to_json(constraint.target_b())},
+                       {"state", std::string(to_string(constraint.state()))}};
+  if (constraint.distance().has_value()) {
+    constraint_json["distance"] = json{{"unit", std::string(constraint.distance()->unit())},
+                                        {"value", constraint.distance()->millimeters()}};
+  }
+  return constraint_json;
+}
+
+[[nodiscard]] Result<AssemblyConstraint>
+assembly_constraint_from_json(const json& constraint_json) {
+  auto type = constraint_type_from_json(constraint_json.at("type"));
+  if (type.has_error()) return Result<AssemblyConstraint>::failure(type.error());
+
+  auto state = constraint_state_from_json(constraint_json.at("state"));
+  if (state.has_error()) return Result<AssemblyConstraint>::failure(state.error());
+
+  auto target_a = constraint_target_from_json(constraint_json.at("target_a"));
+  if (target_a.has_error()) return Result<AssemblyConstraint>::failure(target_a.error());
+
+  auto target_b = constraint_target_from_json(constraint_json.at("target_b"));
+  if (target_b.has_error()) return Result<AssemblyConstraint>::failure(target_b.error());
+
+  std::optional<Quantity> distance;
+  if (constraint_json.contains("distance")) {
+    const json& distance_json = constraint_json.at("distance");
+    if (distance_json.at("unit").get<std::string>() != "mm") {
+      return Result<AssemblyConstraint>::failure(
+          json_error("assembly constraint distance must use millimeters"));
+    }
+    auto quantity = Quantity::length_mm(distance_json.at("value").get<double>(),
+                                        constraint_json.at("id").get<std::string>());
+    if (quantity.has_error()) return Result<AssemblyConstraint>::failure(quantity.error());
+    distance = quantity.value();
+  }
+
+  return AssemblyConstraint::create(
+      AssemblyConstraintId(constraint_json.at("id").get<std::string>()),
+      constraint_json.at("name").get<std::string>(), type.value(), std::move(target_a.value()),
+      std::move(target_b.value()), state.value(), std::move(distance));
+}
+
 [[nodiscard]] Result<Parameter> assembly_parameter_from_json(const json& parameter_json) {
   const auto id = parameter_json.at("id").get<std::string>();
   const auto type = parameter_json.at("type").get<std::string>();
@@ -159,6 +240,10 @@ Result<std::string> serialize_assembly_document_to_json(const AssemblyDocument& 
   root["component_instances"] = json::array();
   for (const auto& instance : document.component_instances()) {
     root["component_instances"].push_back(component_instance_to_json(instance));
+  }
+  root["assembly_constraints"] = json::array();
+  for (const auto& constraint : document.constraints()) {
+    root["assembly_constraints"].push_back(assembly_constraint_to_json(constraint));
   }
   return Result<std::string>::success(root.dump(2));
 }
@@ -226,6 +311,17 @@ Result<AssemblyDocument> deserialize_assembly_document_from_json(std::string_vie
         return Result<AssemblyDocument>::failure(instance.error());
       }
       auto added = document.value().add_component_instance(std::move(instance.value()));
+      if (added.has_error()) {
+        return Result<AssemblyDocument>::failure(added.error());
+      }
+    }
+
+    for (const auto& constraint_json : root.value("assembly_constraints", json::array())) {
+      auto constraint = assembly_constraint_from_json(constraint_json);
+      if (constraint.has_error()) {
+        return Result<AssemblyDocument>::failure(constraint.error());
+      }
+      auto added = document.value().add_constraint(std::move(constraint.value()));
       if (added.has_error()) {
         return Result<AssemblyDocument>::failure(added.error());
       }

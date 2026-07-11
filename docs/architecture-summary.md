@@ -58,8 +58,10 @@ Current and planned core object families include:
 - `DependencyGraph`
 - `ShapeCache`
 - `ComponentInstance`
-- future `AssemblyConstraint`
-- future `Joint`
+- `AssemblyConstraintTarget`
+- `AssemblyConstraint`
+- future `AssemblyConstraintGraph`
+- future rigid-body assembly solver and `Joint`
 
 ## MVP-1 implemented vertical slice
 
@@ -120,19 +122,17 @@ Construction geometry is no longer limited to explicit placement. The current he
 Implemented capabilities include:
 
 - `ConstructionPointId`, `ConstructionLineId`, `ConstructionPlaneId`, and `ConstructionRelationId`
-- explicit construction points, lines, and planes
-- relation-driven construction points, lines, and planes
+- explicit and relation-driven construction points, lines, and planes
 - `PlaneOffsetFromPlane`, `PlaneThroughThreePoints`, and `PlaneParallelToPlaneThroughPoint`
 - `LineThroughTwoPoints`, line-parallel-through-point relations, and generated-edge-parallel line relations
 - generated-vertex and generated-edge construction-point relations
-- semantic generated edge and vertex references without storing raw OCCT topology ids
-- `SemanticReferenceEvaluator`, `ConstructionPointResolver`, and `ConstructionLineResolver` for the implemented deterministic relation families
-- dependency-graph nodes and edges for parameters, source construction objects, generated semantic references, and relation-driven construction objects
-- chained construction relations
-- JSON serialization/deserialization and roundtrip coverage for explicit, relation-driven, chained, and semantic-reference construction geometry
-- `WorkplaneResolver` support for implemented explicit and relation-driven construction-plane families
+- semantic generated edge and vertex references without raw OCCT topology ids
+- `SemanticReferenceEvaluator`, `ConstructionPointResolver`, and `ConstructionLineResolver`
+- dependency-graph integration and chained construction relations
+- JSON roundtrip for explicit, relation-driven, chained, and semantic-reference construction geometry
+- `WorkplaneResolver` support for implemented construction-plane families
 
-Some relation types such as `PointOnPlane`, `PointOnLine`, and `LineOnPlane` are currently validated model-intent records but are not geometrically solved. Expression-evaluated coordinates, arbitrary topology families, and GUI manipulators also remain later work.
+Some relation types such as `PointOnPlane`, `PointOnLine`, and `LineOnPlane` are validated model-intent records but are not geometrically solved. Expression-evaluated coordinates, arbitrary topology families, and GUI manipulators remain later work.
 
 ## Implemented MVP-3 parametric bolt circle
 
@@ -149,56 +149,74 @@ The first meaningful parametric feature test is implemented (`docs/bolt-circle-p
 
 Still intentionally missing: hole-wizard semantics, skipped/partial pattern instances, and arbitrary seed-feature patterns.
 
-## Implemented MVP-4 shared assembly parameters
+## Implemented MVP-4 assembly and project path
 
-The first cross-part parametrization step is implemented (`docs/assembly-parameters-mvp4.md`):
+The cross-part and project-container path is implemented through `docs/assembly-parameters-mvp4.md` and `docs/project-container-mvp4.md`:
 
 - `ParameterScope` distinguishes part and assembly scope.
-- `AssemblyDocument` owns assembly-scoped parameters, registers member parts by `DocumentId`, and stores explicit `ParameterBinding` records.
-- `apply_bindings_to(PartDocument&)` pushes bound values through `PartDocument::set_parameter_value`, reusing part invalidation and recompute planning unchanged.
-- Type agreement is enforced when bindings are applied.
-- Assembly documents serialize with the compatibility marker `blcad.assembly_document.mvp4`.
-- The flange assembly path demonstrates one assembly parameter driving member-part parameters.
-
-## Implemented MVP-4 project container
-
-The project container is implemented (`docs/project-container-mvp4.md`):
-
+- `AssemblyDocument` owns assembly-scoped parameters, member-part ids, and `ParameterBinding` records.
+- `apply_bindings_to(PartDocument&)` pushes bound values through the normal part update/invalidation path.
 - `Project` owns one `AssemblyDocument` and embedded `PartDocument` objects.
-- Assembly member ids are validated against project-owned parts.
-- Project-level assembly parameter updates propagate bindings into member parts.
-- Affected parts produce per-part recompute plans.
-- Project JSON persists embedded assembly and part model intent as `blcad.project.mvp4`.
+- Project validation resolves assembly members to project-owned parts.
+- Project-level assembly parameter updates propagate bindings and produce per-part recompute plans.
+- Assembly/project JSON persist model intent through the historical compatibility markers `blcad.assembly_document.mvp4` and `blcad.project.mvp4`.
 - `blcad_export_project` provides a headless project-level parameter-update, recompute, and per-part STEP export path.
 
-The project container still deliberately avoids assembly-level geometry/export and external/manifest part references.
+Assembly-level geometry/export and external/manifest part references remain deferred.
 
 ## Implemented MVP-5 component instances and free placement
 
-The first assembly-structure blocks are implemented (`docs/component-instance-mvp5.md`):
+The occurrence and free-placement blocks are implemented (`docs/component-instance-mvp5.md`):
 
 - `ComponentInstanceId` identifies assembly occurrences independently from part-document identity.
-- `ComponentInstance` stores stable identity, display name, referenced part document, visibility, suppression state, grounding state, and `RigidTransform`.
+- `ComponentInstance` stores identity, name, referenced part document, visibility, suppression state, grounding state, and `RigidTransform`.
 - Multiple component instances can reference one project-owned `PartDocument` without duplicating the owned part model intent.
 - Free-placement translation and rotation components must be finite.
-- `AssemblyDocument` validates that component instances reference registered member parts.
-- `Project` validates that component instance references resolve to project-owned parts.
-- `ComponentInstance::with_*` operations preserve identity and referenced part intent while replacing one placement/state field.
-- `AssemblyDocument` exposes explicit transform, visibility, suppression, and grounding update APIs for existing component instances.
+- Assembly and project validation check component references.
+- Copy-style component updates preserve identity and referenced part intent.
+- `AssemblyDocument` exposes explicit transform, visibility, suppression, and grounding update APIs.
 - The public component update entry points share one internal lookup/replacement path.
-- A transform update is a direct free-placement edit; no constraint is inferred and no solver or DOF analysis runs.
-- Grounding is stored model intent only and does not yet prevent an explicit transform update.
-- Visibility and suppression are stored state only until future assembly consumers define their behavior.
-- Assembly/project JSON roundtrip preserves current component placement/state values.
-- `blcad_inspect_project_components` exposes persisted component reference and placement/state fields headlessly.
+- Direct transform updates infer no constraints and run no solver or DOF analysis.
+- Grounding, visibility, and suppression remain stored model intent until future assembly consumers enforce their semantics.
+- Assembly/project JSON roundtrip preserves component placement/state.
 
-Assembly-level geometry instancing is not implemented yet. The current block stores occurrence and placement/state model intent.
+Assembly-level geometry instancing is not implemented.
+
+## Implemented MVP-5 assembly constraint model intent
+
+The first persistent assembly relationship layer is implemented (`docs/assembly-constraint-model-intent-mvp5.md`):
+
+- `AssemblyConstraintId` is a dedicated typed id.
+- `AssemblyConstraintTarget` combines an existing `ComponentInstanceId` with a persistent non-empty semantic reference token.
+- `AssemblyConstraintType` is limited to Mate, Concentric, and Distance.
+- `AssemblyConstraint` stores stable id/name, two targets, active/inactive state, and a Distance-only length quantity.
+- Distance requires a length; Mate and Concentric reject distance values.
+- `AssemblyDocument` validates unique constraint ids and existing component target ids.
+- Constraint creation and JSON loading do not mutate component `RigidTransform` values.
+- Semantic target tokens remain opaque and unresolved at this record layer.
+- Additive `assembly_constraints` JSON remains backward compatible with old files that omit the field.
+- Project structure validation includes constraint component targets.
+- Multiple constrained component occurrences may still share one owned `PartDocument` model.
+- `blcad_inspect_project_components` exposes stored constraint type, state, semantic targets, and optional distance.
+
+No solved transform, semantic target topology resolution, DOF state, or constraint graph is persisted by this block.
 
 ## Next assembly block
 
-The next core-CAD MVP block is solver-independent assembly constraint model intent on semantic component targets. The first record types should be limited to Mate, Concentric, and Distance relationships and must be persisted and validated without mutating free-placement transforms.
+The next core-CAD MVP block is a read-only `AssemblyConstraintGraph` derived from the now-stable persistent constraint records.
 
-Constraint graph construction, semantic target geometry resolution, rigid-body solving, enforced grounding, and remaining-DOF computation remain later work. The detailed implementation sequence is maintained in `docs/mvp-plan.md` and the target assembly architecture in `docs/assembly-system.md`.
+The first graph should:
+
+- use every `ComponentInstanceId` as a node
+- add one distinct edge per active `AssemblyConstraintId`
+- ignore inactive constraints
+- preserve multiple different constraints between the same component pair
+- provide deterministic adjacency queries
+- provide deterministic connected-component/group queries
+- remain read-only with respect to component transforms, grounding, constraint state, and part intent
+- avoid semantic target geometry resolution and OCCT topology entirely
+
+Semantic target geometry resolution, rigid-body solving, enforced grounding, remaining-DOF computation, and overconstraint analysis remain later work. The detailed sequence is maintained in `docs/mvp-plan.md` and `docs/assembly-system.md`.
 
 ## Future multi-body part modeling, transforms, and path features
 
@@ -253,11 +271,12 @@ The detailed roadmap is in `docs/advanced-surfacing-and-3d-sketch-mvp.md`.
 - The OCCT path lives in an optional `blcad_geometry` target; `PartDocument` remains OCCT-free.
 - JSON serialization stores model intent only; it does not serialize OCCT shapes or `ShapeCache` contents as the source of truth.
 - Parameter changes use the normal document update/invalidation path and drive incremental recompute.
-- Assembly parameters already flow into member parts through explicit `ParameterBinding` records.
+- Assembly parameters flow into member parts through explicit `ParameterBinding` records.
 - Component instances reference part model intent without duplicating owned `PartDocument` objects.
-- Component placement/state updates are explicit free-placement edits until assembly constraints and a solver exist.
-- Future assembly constraints must use semantic component targets and must remain model intent distinct from solver/cache output.
-- The assembly system will eventually describe spatial relationships through constraints; a constraint graph and solver determine component positions and remaining degrees of freedom.
+- Component placement/state updates remain explicit free-placement edits until a solver produces derived placement.
+- Assembly constraints use semantic component targets and remain model intent distinct from solver/cache output.
+- Constraint graph connectivity should be regenerated from persistent records rather than stored as a second source of truth.
+- The future assembly solver will resolve semantic target geometry and determine component positions and remaining degrees of freedom.
 - Fillets and chamfers are their own parametric features with semantic edge references, not only late BRep corrections.
 - Engineering assistants must size deterministically and traceably; AI is a later helper, never the sizing authority.
 - The UI only operates the core and holds no CAD logic; it is built after the internal models work.
@@ -278,7 +297,8 @@ The condensed points above are expanded in dedicated documents. Each is written 
 - `docs/pattern-and-mirror-features.md` — linear/circular patterns and mirror
 - `docs/hole-wizard.md` — semantic hole features and the standards database
 - `docs/shaft-wizard.md` — shaft calculation and geometry generation
-- `docs/assembly-system.md` — component instances, constraints, solver, joints, and motion
+- `docs/assembly-system.md` — component instances, persistent constraint intent, constraint graph, solver, joints, and motion
+- `docs/assembly-constraint-model-intent-mvp5.md` — implemented Mate/Concentric/Distance record layer
 - `docs/engineering-modules.md` — bolt, bearing, gear, material, and standard-parts modules
 - `docs/advanced-surfacing-and-3d-sketch-mvp.md` — 3D sketches, guide curves, sweep, loft, boundary surfaces, surface stitching, and closed-shell-to-solid conversion
 - `docs/user-interface.md` — UI architecture over the core

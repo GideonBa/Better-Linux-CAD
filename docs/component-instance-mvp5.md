@@ -2,7 +2,7 @@
 
 Status: implemented component-instance seed and explicit placement/state update block. Component instances are stored as assembly model-intent records, reference project-owned part documents, and can be edited without an assembly solver.
 
-This document is the canonical detailed description of the implemented MVP-5 component-instance and free-placement block above the MVP-4 project container.
+This document is the canonical detailed description of the implemented MVP-5 component-instance and free-placement block above the MVP-4 project container. The later implemented constraint-record block is documented separately in `docs/assembly-constraint-model-intent-mvp5.md`.
 
 ## Goal
 
@@ -10,15 +10,17 @@ The goal is to let one project-owned part document appear as multiple assembly o
 
 Assembly-level geometry instancing is not implemented yet. This block models assembly occurrences and placement/state intent only.
 
-The current block must not:
+The component-instance block itself must not:
 
 - solve assembly constraints
-- create mate, concentric, distance, angle, insert, or tangent constraints
+- create constraint records as a side effect of placement/state updates
 - compute degrees of freedom
 - infer a placement from grounding or other component state
 - perform collision checks
 - generate an assembly-level STEP file
 - duplicate an owned `PartDocument` for every component occurrence
+
+Mate, Concentric, and Distance constraint records now exist as a separate solver-independent MVP-5 layer. They do not change the guarantees of this component-placement API.
 
 ## Implemented records
 
@@ -96,9 +98,11 @@ Each stored-instance update:
 
 The four public update entry points share one internal lookup/replacement path so empty-id handling, missing-instance handling, validation propagation, and replacement semantics cannot drift independently.
 
-The no-solver boundary is deliberate. For example, a component currently marked `grounded` can still receive a direct transform update in this block. `grounded` is stored model intent only until a later assembly solver enforces it as a fixed rigid-body condition.
+The no-solver boundary is deliberate. For example, a component currently marked `grounded` can still receive a direct transform update. `grounded` is stored model intent only until a later assembly solver enforces it as a fixed rigid-body condition.
 
 Visibility and suppression are also stored state only. They do not yet remove components from assembly geometry execution, assembly export, collision checks, or solver input because those assembly consumers do not exist yet.
+
+Adding or loading an `AssemblyConstraint` also leaves these free-placement transforms unchanged. Constraint records and placement edits are separate model-intent operations.
 
 ## Assembly ownership
 
@@ -120,11 +124,12 @@ Placement/state updates cannot change `referenced_part_document`; changing the r
 
 `Project` owns the concrete `PartDocument` objects.
 
-Project-level validation has three relevant checks:
+Project-level validation has four relevant checks:
 
 ```text
 validate_member_parts()
 validate_component_instances()
+validate_assembly_constraints()
 validate_assembly_structure()
 ```
 
@@ -132,7 +137,9 @@ validate_assembly_structure()
 
 `validate_component_instances` checks that every component instance references an assembly member and that the referenced member resolves to an owned project part document.
 
-`validate_assembly_structure` runs both checks and is used when loading project JSON and before project-level assembly parameter propagation.
+`validate_assembly_constraints` belongs to the later constraint-record layer and verifies constraint component targets. See `docs/assembly-constraint-model-intent-mvp5.md`.
+
+`validate_assembly_structure` runs all current structure checks and is used when loading project JSON and before project-level assembly parameter propagation.
 
 Because placement/state updates preserve `referenced_part_document`, a structurally valid project remains structurally valid after those updates. Tests explicitly cover two instances referencing one owned part document before and after state/placement changes.
 
@@ -149,7 +156,9 @@ The `mvp4` marker is retained as a historical compatibility marker. It does not 
 
 The placement/state update block introduces no additional persisted fields. It changes values of fields that were already part of `component_instances`, so the existing marker and version remain unchanged.
 
-A representative updated entry has this shape:
+The later constraint-record block additively introduces optional `assembly_constraints` while retaining the same compatibility marker. Its JSON rules are documented in `docs/assembly-constraint-model-intent-mvp5.md`.
+
+A representative updated component entry has this shape:
 
 ```json
 {
@@ -189,11 +198,13 @@ translation_mm
 rotation_deg
 ```
 
-Therefore a project file written after component placement/state updates exposes the changed values directly through the existing inspection tool. The tool is read-only: it does not edit a project, export an assembly, solve transforms, or create component geometry.
+The inspector now also prints stored assembly constraints, but that output belongs to the separate constraint model-intent block. See `docs/assembly-constraint-model-intent-mvp5.md`.
+
+The tool is read-only: it does not edit a project, export an assembly, solve transforms, or create component geometry.
 
 ## Test coverage
 
-The tests cover:
+The component-instance tests cover:
 
 - required `ComponentInstance` identity fields
 - initial transform storage
@@ -210,8 +221,10 @@ The tests cover:
 - two component instances referencing one owned part document without duplicating the owned `PartDocument`
 - project JSON roundtrip preserving updated component placement/state and shared part ownership
 
+Assembly constraint tests are intentionally separate in `tests/core/assembly_constraint_tests.cpp`.
+
 ## Deliberate limitations
 
-This block does not implement semantic component reference targets, assembly constraint records, constraint graphs, solver output, remaining degrees of freedom, enforced grounding behavior, suppression effects on assembly consumers, collision checks, subassemblies, assembly-level geometry instancing, or assembly-level STEP export.
+This component-instance block does not implement constraint graph construction, semantic target geometry resolution, solver output, remaining degrees of freedom, enforced grounding behavior, suppression effects on assembly consumers, collision checks, subassemblies, assembly-level geometry instancing, or assembly-level STEP export.
 
-The next MVP-5 increment should introduce semantic component reference targets and solver-independent `AssemblyConstraint` model-intent records for Mate, Concentric, and Distance constraints. Constraint solving remains a separate later step.
+Solver-independent semantic Mate, Concentric, and Distance records are now implemented separately. The next assembly increment is the read-only active-constraint graph described in `docs/assembly-constraint-model-intent-mvp5.md`, `docs/mvp-plan.md`, and `docs/assembly-system.md`.

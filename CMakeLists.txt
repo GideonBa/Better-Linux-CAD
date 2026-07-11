@@ -28,6 +28,7 @@ endif()
 
 add_library(
   blcad_core STATIC
+  src/core/assembly_constraint.cpp
   src/core/assembly_document.cpp
   src/core/assembly_document_json.cpp
   src/core/composite_closed_profile.cpp
@@ -156,6 +157,7 @@ if(BLCAD_BUILD_TESTS)
 
   add_executable(
     blcad_core_tests
+    tests/core/assembly_constraint_tests.cpp
     tests/core/assembly_document_tests.cpp
     tests/core/chained_construction_relation_tests.cpp
     tests/core/circular_hole_pattern_tests.cpp

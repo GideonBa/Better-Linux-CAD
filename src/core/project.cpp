@@ -81,6 +81,20 @@ Result<std::size_t> Project::validate_component_instances() const {
   return Result<std::size_t>::success(assembly_.component_instance_count());
 }
 
+Result<std::size_t> Project::validate_assembly_constraints() const {
+  for (const AssemblyConstraint& constraint : assembly_.constraints()) {
+    if (assembly_.find_component_instance(constraint.target_a().component_instance()) == nullptr) {
+      return Result<std::size_t>::failure(Error::validation(
+          constraint.id().value(), "assembly constraint target A component instance must exist"));
+    }
+    if (assembly_.find_component_instance(constraint.target_b().component_instance()) == nullptr) {
+      return Result<std::size_t>::failure(Error::validation(
+          constraint.id().value(), "assembly constraint target B component instance must exist"));
+    }
+  }
+  return Result<std::size_t>::success(assembly_.constraint_count());
+}
+
 Result<std::size_t> Project::validate_assembly_structure() const {
   auto members = validate_member_parts();
   if (members.has_error()) return members;
@@ -88,7 +102,10 @@ Result<std::size_t> Project::validate_assembly_structure() const {
   auto instances = validate_component_instances();
   if (instances.has_error()) return instances;
 
-  return Result<std::size_t>::success(members.value() + instances.value());
+  auto constraints = validate_assembly_constraints();
+  if (constraints.has_error()) return constraints;
+
+  return Result<std::size_t>::success(members.value() + instances.value() + constraints.value());
 }
 
 Result<ProjectUpdateResult> Project::set_assembly_parameter_value(ParameterId id, Quantity value) {

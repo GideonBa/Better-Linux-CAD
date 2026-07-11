@@ -6,7 +6,7 @@ Detailed architecture and feature status live in `docs/`. This README is intenti
 
 ## Status
 
-Current state: MVP-1 core skeleton, staged MVP-2 seeds for sketches, workplanes, profile geometry, recompute, STEP export, reference recovery, sketch diagnostics, and repair-command infrastructure, the MVP-3 parametric bolt circle, the MVP-4 assembly/project container path, and MVP-5 component instances with explicit free-placement/state updates.
+Current state: MVP-1 core skeleton, staged MVP-2 seeds for sketches, workplanes, profile geometry, recompute, STEP export, reference recovery, sketch diagnostics, and repair-command infrastructure, the MVP-3 parametric bolt circle, the MVP-4 assembly/project container path, and MVP-5 component instances with explicit free-placement/state updates plus solver-independent Mate, Concentric, and Distance constraint model intent.
 
 There is no GUI yet.
 
@@ -87,6 +87,7 @@ Implemented feature blocks:
 - `docs/assembly-parameters-mvp4.md`
 - `docs/project-container-mvp4.md`
 - `docs/component-instance-mvp5.md`
+- `docs/assembly-constraint-model-intent-mvp5.md`
 - `docs/general-closed-sketch-profile-mvp.md`
 - `docs/composite-closed-profile-holes-mvp.md`
 - `docs/arc-and-trim-extend-sketch-profile-mvp.md`
@@ -119,6 +120,6 @@ Future roadmaps:
 
 ## Next technical step
 
-The next technical step is a solver-independent assembly constraint model-intent seed for Mate, Concentric, and Distance relationships on semantic component targets. Constraint records should be validated and persisted without moving component instances, solving placement, or computing remaining degrees of freedom.
+The next technical step is a read-only assembly constraint graph seed over the persistent MVP-5 relationship records. Use `ComponentInstanceId` nodes and active `AssemblyConstraintId` edges, provide deterministic adjacency and connected-component queries, and ignore inactive constraints without resolving semantic geometry or changing component transforms.
 
-The detailed implementation sequence and scope boundary live in `docs/mvp-plan.md` and `docs/assembly-system.md`. The completed component-instance placement/state block is documented in `docs/component-instance-mvp5.md`.
+The completed constraint model-intent block is documented in `docs/assembly-constraint-model-intent-mvp5.md`. The detailed next-step scope remains in `docs/mvp-plan.md` and `docs/assembly-system.md`.
