@@ -44,3 +44,5 @@ TEST_CASE("Hierarchical transform order is not treated as commutative",
   CHECK(outer_then_inner.x == Approx(10.0).margin(1.0e-12));
   CHECK(outer_then_inner.y == Approx(0.0).margin(1.0e-12));
 }
+
+#include "assembly_flexible_subassembly_solver_tests.inc"
