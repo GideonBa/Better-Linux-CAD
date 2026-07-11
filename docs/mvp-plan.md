@@ -173,8 +173,8 @@ Implemented scope:
 
 Still deferred from the record block:
 
-- semantic target geometry resolution
-- rigid-body solving and constraint equations
+- geometry interpretation and equation construction remain outside the persistent record layer
+- rigid-body solving and solved transform updates
 - remaining DOF computation and assembly constraint-state analysis
 - enforced grounding and suppression behavior in future assembly consumers
 - Insert, Angle, Tangent, Flush, Coincident, and Lock constraints
@@ -201,12 +201,15 @@ Implemented scope:
 - focused tests for active/inactive edges, isolated nodes, multi-edges, deterministic results, unknown adjacency targets, connected groups, and unchanged assembly intent
 - no graph JSON field because the graph is fully regenerable from component and constraint model intent
 
+Implemented separately after the graph seed:
+
+- generated-face semantic target resolution is implemented in `docs/assembly-constraint-target-resolution-mvp5.md`
+- component-local-to-assembly-space rigid-transform evaluation is implemented in `docs/assembly-rigid-transform-evaluation-mvp5.md`
+
 Still deferred:
 
-- semantic target geometry resolution
-- interpretation of semantic tokens as supported face, axis, edge, or vertex reference families
-- rigid-transform evaluation for resolved assembly targets
-- Mate, Concentric, and Distance equation construction
+- Mate and Distance equation construction
+- semantic axis references and Concentric equation construction
 - rigid-body solving and solved transform updates
 - remaining DOF and under/fully/overconstrained analysis
 - enforced grounding and suppression participation rules
@@ -224,37 +227,73 @@ Implemented scope:
 - support for `feature.<feature-id>.{top,bottom,right,left,front,back}` targets
 - direct reuse of `WorkplaneResolver::resolve_generated_face` so derived workplanes and assembly targets share one generated-face frame implementation
 - component-local planar descriptors containing origin, x-axis, y-axis, and normal
-- separate preservation of the component's persisted `RigidTransform` without applying an implicit assembly rotation convention
+- separate preservation of the component's persisted `RigidTransform` without applying transform math inside target resolution
 - explicit unsupported-reference errors for semantic axes and generated edge families that are not implemented for assembly targets yet
 - read-only resolution with no transform, constraint-record, part-intent, or geometry-cache ownership mutation
 - geometry tests for all six generated faces, missing component/part/feature targets, malformed and unsupported semantic tokens, deterministic resolution, separate placement intent, and unchanged project model intent
 - no resolved-target JSON field because descriptors are regenerable derived geometry data
 
+Implemented separately after target resolution:
+
+- deterministic point, vector, and planar-frame transform evaluation
+- explicit degree and X-then-Y-then-Z fixed-axis rotation convention
+- assembly-space planar descriptors derived from local target frames plus persisted placement
+
 Still deferred:
 
-- component-local to assembly-space point, vector, and frame evaluation
-- an explicit persisted-rotation evaluation convention and rotation order
 - Mate and Distance constraint equation construction
 - semantic axis references and Concentric equation construction
 - rigid-body solving and solved transform updates
 - remaining DOF and under/fully/overconstrained analysis
 - enforced grounding and suppression participation rules
 
-## Next MVP: Explicit assembly rigid-transform evaluation convention
+## Implemented block: MVP 5 explicit assembly rigid-transform evaluation
 
-Goal: define deterministic component-local-to-assembly-space geometry evaluation for the existing persisted `RigidTransform` before constraint equations consume resolved target frames.
+Detailed document: `docs/assembly-rigid-transform-evaluation-mvp5.md`
+
+Implemented scope:
+
+- read-only `AssemblyTransformEvaluator` in the optional geometry layer
+- separate `AssemblySpacePlanarDescriptor` type so local and assembly coordinate spaces remain explicit
+- translation interpreted in millimeters and rotation interpreted in degrees
+- active right-handed fixed-axis rotations applied in X, then Y, then Z order
+- column-vector composition `Rz * Ry * Rx`
+- point evaluation by rotation followed by translation
+- vector evaluation by rotation only
+- planar-frame evaluation with translation applied only to the origin
+- direct compatibility with `ResolvedAssemblyConstraintTarget::local_plane` and `component_transform`
+- preservation of vector magnitude, unit frame lengths, and frame orthogonality within numeric tolerance
+- deterministic repeated evaluation
+- no input transform, local descriptor, component record, constraint record, or part model mutation
+- no assembly-space transform-evaluation JSON/cache field because evaluated geometry is regenerable derived data
+- focused tests for identity, pure translation, single-axis rotations, combined-axis order, planar target frames, determinism, normalization properties, and read-only behavior
+
+Still deferred:
+
+- planar Mate and Distance equation construction
+- semantic axis references and Concentric equation construction
+- rigid-body solving and solved transform updates
+- remaining DOF and under/fully/overconstrained analysis
+- enforced grounding and suppression participation rules
+- component geometry instancing and assembly-level STEP export
+
+## Next MVP: Read-only planar Mate/Distance equation construction
+
+Goal: construct deterministic geometric equation/residual data for the first supported planar assembly constraints after target resolution and transform evaluation, without solving or mutating component transforms.
 
 Proposed first implementation sequence:
 
-- document the angle unit and exact rotation order used to interpret `RigidTransform::rotation_deg`
-- add a read-only geometry helper for component-local point and vector evaluation
-- apply rotation followed by translation to points
-- apply rotation only to vectors, basis axes, and normals
-- provide planar-frame evaluation for `ComponentLocalPlanarDescriptor`
-- preserve vector/frame normalization and deterministic results within numeric tolerance
-- test identity, pure translation, single-axis rotations, combined rotations that prove the chosen order, and unchanged component model intent
-- keep stored component transforms unchanged; evaluated assembly-space geometry remains derived data
-- do not build Mate/Distance equations, run a rigid-body solver, compute remaining DOF, enforce grounding, or add semantic axis references in this block
+- introduce a read-only equation-construction geometry-layer API over `Project` and one active `AssemblyConstraint`
+- support Mate and Distance records whose two semantic targets resolve to the implemented generated planar face family
+- resolve both targets through `AssemblyConstraintTargetResolver`
+- evaluate both component-local target frames through `AssemblyTransformEvaluator`
+- define and document one canonical planar Mate residual convention before implementing it
+- define and document one signed planar Distance separation convention before implementing it
+- preserve constraint id, type, and target/component identity in equation/residual descriptors for later diagnostics
+- reject inactive constraints and unsupported Concentric/semantic-axis cases explicitly in the first seed
+- keep equation/residual descriptors regenerable and unpersisted
+- test deterministic construction, target order, transformed target geometry, unsupported families, and unchanged project/component intent
+- do not run a rigid-body solver, mutate transforms, compute remaining DOF, enforce grounding, or infer suppression participation in this block
 
 ## Future roadmap: Multi-body transforms and path features
 
