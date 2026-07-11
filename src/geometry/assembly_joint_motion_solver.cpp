@@ -23,6 +23,11 @@ namespace {
   return std::find(components.begin(), components.end(), component) != components.end();
 }
 
+[[nodiscard]] bool contains_joint(const std::vector<AssemblyJointId>& joints,
+                                  const AssemblyJointId& joint) {
+  return std::find(joints.begin(), joints.end(), joint) != joints.end();
+}
+
 void add_component(std::vector<ComponentInstanceId>& components,
                    const ComponentInstanceId& component) {
   if (!contains_component(components, component)) {
@@ -68,12 +73,18 @@ void add_component(std::vector<ComponentInstanceId>& components,
   return group;
 }
 
-[[nodiscard]] bool joint_snapshot_matches(const AssemblyJoint& joint,
-                                          const AssemblyJointMotionResult& result) noexcept {
-  return joint.type() == result.source_joint_type && joint.state() == result.source_joint_state &&
-         joint.target_a() == result.source_target_a && joint.target_b() == result.source_target_b &&
-         joint.limits() == result.source_limits &&
-         joint.coordinate_deg() == result.source_coordinate_deg;
+[[nodiscard]] AssemblyJointMotionInputSnapshot make_joint_snapshot(const AssemblyJoint& joint) {
+  return AssemblyJointMotionInputSnapshot{joint.id(), joint.type(), joint.state(), joint.target_a(),
+                                          joint.target_b(), joint.limits(),
+                                          joint.coordinate_deg()};
+}
+
+[[nodiscard]] bool joint_snapshot_matches(
+    const AssemblyJoint& joint, const AssemblyJointMotionInputSnapshot& snapshot) noexcept {
+  return joint.id() == snapshot.joint && joint.type() == snapshot.type &&
+         joint.state() == snapshot.state && joint.target_a() == snapshot.target_a &&
+         joint.target_b() == snapshot.target_b && joint.limits() == snapshot.limits &&
+         joint.coordinate_deg() == snapshot.coordinate_deg;
 }
 
 } // namespace
@@ -155,6 +166,7 @@ AssemblyJointMotionSolver::move(const Project& project, AssemblyJointId joint_id
   }
 
   std::vector<detail::AssemblyRevoluteJointDrive> drives;
+  std::vector<AssemblyJointMotionInputSnapshot> joint_snapshots;
   for (const auto& edge : joint_graph.value().edges()) {
     if (!contains_component(active_subgroup, edge.component_a()) ||
         !contains_component(active_subgroup, edge.component_b())) {
@@ -172,6 +184,7 @@ AssemblyJointMotionSolver::move(const Project& project, AssemblyJointId joint_id
     drives.push_back(detail::AssemblyRevoluteJointDrive{
         active_joint->id(), active_joint->id() == joint_id ? requested_deg
                                                            : active_joint->coordinate_deg()});
+    joint_snapshots.push_back(make_joint_snapshot(*active_joint));
   }
 
   auto solved = detail::solve_numeric_relationships(
@@ -182,9 +195,9 @@ AssemblyJointMotionSolver::move(const Project& project, AssemblyJointId joint_id
     return Result<AssemblyJointMotionResult>::failure(solved.error());
   }
 
-  return Result<AssemblyJointMotionResult>::success(AssemblyJointMotionResult{
-      joint->id(), joint->type(), joint->state(), joint->target_a(), joint->target_b(),
-      joint->limits(), joint->coordinate_deg(), requested_deg, std::move(solved.value())});
+  return Result<AssemblyJointMotionResult>::success(
+      AssemblyJointMotionResult{joint->id(), joint->coordinate_deg(), requested_deg,
+                                std::move(joint_snapshots), std::move(solved.value())});
 }
 
 Result<std::size_t>
@@ -195,14 +208,39 @@ AssemblyJointMotionResultApplier::apply(Project& project,
         result.joint.value(), "only a converged joint motion result can be applied"));
   }
 
-  const AssemblyJoint* joint = project.assembly().find_joint(result.joint);
-  if (joint == nullptr) {
-    return Result<std::size_t>::failure(
-        validation_error(result.joint.value(), "joint motion result joint no longer exists"));
+  bool selected_joint_snapshot_found = false;
+  std::vector<AssemblyJointId> seen_joints;
+  seen_joints.reserve(result.joint_snapshots.size());
+  for (const auto& snapshot : result.joint_snapshots) {
+    if (contains_joint(seen_joints, snapshot.joint)) {
+      return Result<std::size_t>::failure(validation_error(
+          snapshot.joint.value(), "joint motion result contains duplicate joint snapshots"));
+    }
+    seen_joints.push_back(snapshot.joint);
+
+    const AssemblyJoint* joint = project.assembly().find_joint(snapshot.joint);
+    if (joint == nullptr) {
+      return Result<std::size_t>::failure(validation_error(
+          snapshot.joint.value(), "joint motion result joint input no longer exists"));
+    }
+    if (!joint_snapshot_matches(*joint, snapshot)) {
+      return Result<std::size_t>::failure(validation_error(
+          snapshot.joint.value(), "joint motion result is stale because joint input changed"));
+    }
+
+    if (snapshot.joint == result.joint) {
+      selected_joint_snapshot_found = true;
+      if (snapshot.coordinate_deg != result.source_coordinate_deg ||
+          result.requested_coordinate_deg < snapshot.limits.lower_deg ||
+          result.requested_coordinate_deg > snapshot.limits.upper_deg) {
+        return Result<std::size_t>::failure(validation_error(
+            result.joint.value(), "joint motion result selected joint snapshot is inconsistent"));
+      }
+    }
   }
-  if (!joint_snapshot_matches(*joint, result)) {
+  if (!selected_joint_snapshot_found) {
     return Result<std::size_t>::failure(validation_error(
-        result.joint.value(), "joint motion result is stale because joint input changed"));
+        result.joint.value(), "joint motion result must snapshot the selected joint"));
   }
 
   Project candidate_project = project;
