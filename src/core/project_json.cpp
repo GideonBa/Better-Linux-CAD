@@ -8,11 +8,13 @@
 #include <exception>
 #include <filesystem>
 #include <fstream>
+#include <optional>
 #include <sstream>
 #include <string>
 #include <string_view>
 #include <system_error>
 #include <utility>
+#include <vector>
 
 namespace blcad {
 namespace {
@@ -63,6 +65,129 @@ constexpr int k_version = 1;
   return deserialize_part_document_from_json(part_json.dump());
 }
 
+[[nodiscard]] Result<AssemblyConstraintType> constraint_type_from_json(const json& value) {
+  const auto text = value.get<std::string>();
+  if (text == "mate")
+    return Result<AssemblyConstraintType>::success(AssemblyConstraintType::Mate);
+  if (text == "concentric")
+    return Result<AssemblyConstraintType>::success(AssemblyConstraintType::Concentric);
+  if (text == "distance")
+    return Result<AssemblyConstraintType>::success(AssemblyConstraintType::Distance);
+  if (text == "insert")
+    return Result<AssemblyConstraintType>::success(AssemblyConstraintType::Insert);
+  if (text == "angle")
+    return Result<AssemblyConstraintType>::success(AssemblyConstraintType::Angle);
+  return Result<AssemblyConstraintType>::failure(
+      json_error("unsupported cross-hierarchy assembly constraint type"));
+}
+
+[[nodiscard]] Result<AssemblyConstraintState> constraint_state_from_json(const json& value) {
+  const auto text = value.get<std::string>();
+  if (text == "active")
+    return Result<AssemblyConstraintState>::success(AssemblyConstraintState::Active);
+  if (text == "inactive")
+    return Result<AssemblyConstraintState>::success(AssemblyConstraintState::Inactive);
+  return Result<AssemblyConstraintState>::failure(
+      json_error("unsupported cross-hierarchy assembly constraint state"));
+}
+
+[[nodiscard]] json endpoint_to_json(const AssemblyHierarchyConstraintEndpoint& endpoint) {
+  json occurrence_path = json::array();
+  for (const SubassemblyInstanceId& occurrence : endpoint.occurrence_path()) {
+    occurrence_path.push_back(occurrence.value());
+  }
+  return json{{"occurrence_path", std::move(occurrence_path)},
+              {"component_instance", endpoint.component_instance().value()},
+              {"semantic_reference", endpoint.semantic_reference()}};
+}
+
+[[nodiscard]] Result<AssemblyHierarchyConstraintEndpoint>
+endpoint_from_json(const json& endpoint_json) {
+  std::vector<SubassemblyInstanceId> occurrence_path;
+  for (const auto& occurrence_json : endpoint_json.at("occurrence_path")) {
+    occurrence_path.emplace_back(occurrence_json.get<std::string>());
+  }
+  return AssemblyHierarchyConstraintEndpoint::create(
+      std::move(occurrence_path),
+      ComponentInstanceId(endpoint_json.at("component_instance").get<std::string>()),
+      endpoint_json.at("semantic_reference").get<std::string>());
+}
+
+[[nodiscard]] json cross_hierarchy_constraint_to_json(
+    const AssemblyHierarchyConstraint& constraint) {
+  json constraint_json{{"id", constraint.id().value()},
+                       {"name", constraint.name()},
+                       {"type", std::string(to_string(constraint.type()))},
+                       {"target_a", endpoint_to_json(constraint.target_a())},
+                       {"target_b", endpoint_to_json(constraint.target_b())},
+                       {"state", std::string(to_string(constraint.state()))}};
+  if (constraint.distance().has_value()) {
+    constraint_json["distance"] =
+        json{{"unit", std::string(constraint.distance()->unit())},
+             {"value", constraint.distance()->millimeters()}};
+  }
+  if (constraint.angle().has_value()) {
+    constraint_json["angle"] =
+        json{{"unit", std::string(constraint.angle()->unit())},
+             {"value", constraint.angle()->degrees()}};
+  }
+  return constraint_json;
+}
+
+[[nodiscard]] Result<AssemblyHierarchyConstraint>
+cross_hierarchy_constraint_from_json(const json& constraint_json) {
+  auto type = constraint_type_from_json(constraint_json.at("type"));
+  if (type.has_error()) {
+    return Result<AssemblyHierarchyConstraint>::failure(type.error());
+  }
+  auto state = constraint_state_from_json(constraint_json.at("state"));
+  if (state.has_error()) {
+    return Result<AssemblyHierarchyConstraint>::failure(state.error());
+  }
+  auto target_a = endpoint_from_json(constraint_json.at("target_a"));
+  if (target_a.has_error()) {
+    return Result<AssemblyHierarchyConstraint>::failure(target_a.error());
+  }
+  auto target_b = endpoint_from_json(constraint_json.at("target_b"));
+  if (target_b.has_error()) {
+    return Result<AssemblyHierarchyConstraint>::failure(target_b.error());
+  }
+
+  const std::string id = constraint_json.at("id").get<std::string>();
+  std::optional<Quantity> distance;
+  if (constraint_json.contains("distance")) {
+    const json& distance_json = constraint_json.at("distance");
+    if (distance_json.at("unit").get<std::string>() != "mm") {
+      return Result<AssemblyHierarchyConstraint>::failure(
+          json_error("cross-hierarchy assembly constraint distance must use millimeters"));
+    }
+    auto quantity = Quantity::length_mm(distance_json.at("value").get<double>(), id);
+    if (quantity.has_error()) {
+      return Result<AssemblyHierarchyConstraint>::failure(quantity.error());
+    }
+    distance = quantity.value();
+  }
+
+  std::optional<Quantity> angle;
+  if (constraint_json.contains("angle")) {
+    const json& angle_json = constraint_json.at("angle");
+    if (angle_json.at("unit").get<std::string>() != "deg") {
+      return Result<AssemblyHierarchyConstraint>::failure(
+          json_error("cross-hierarchy assembly constraint angle must use degrees"));
+    }
+    auto quantity = Quantity::angle_deg(angle_json.at("value").get<double>(), id);
+    if (quantity.has_error()) {
+      return Result<AssemblyHierarchyConstraint>::failure(quantity.error());
+    }
+    angle = quantity.value();
+  }
+
+  return AssemblyHierarchyConstraint::create(
+      AssemblyConstraintId(id), constraint_json.at("name").get<std::string>(), type.value(),
+      std::move(target_a.value()), std::move(target_b.value()), state.value(),
+      std::move(distance), std::move(angle));
+}
+
 } // namespace
 
 Result<std::string> serialize_project_to_json(const Project& project) {
@@ -77,6 +202,11 @@ Result<std::string> serialize_project_to_json(const Project& project) {
     assemblies.push_back(std::move(assembly_json.value()));
   }
 
+  json cross_hierarchy_constraints = json::array();
+  for (const AssemblyHierarchyConstraint& constraint : project.cross_hierarchy_constraints()) {
+    cross_hierarchy_constraints.push_back(cross_hierarchy_constraint_to_json(constraint));
+  }
+
   json parts = json::array();
   for (const PartDocument& part : project.part_documents()) {
     auto part_json = part_to_json(part);
@@ -89,6 +219,7 @@ Result<std::string> serialize_project_to_json(const Project& project) {
             {"project", json{{"id", project.id().value()}, {"name", project.name()}}},
             {"assembly", std::move(root_assembly_json.value())},
             {"assemblies", std::move(assemblies)},
+            {"cross_hierarchy_constraints", std::move(cross_hierarchy_constraints)},
             {"parts", std::move(parts)}};
   return Result<std::string>::success(root.dump(2));
 }
@@ -130,6 +261,17 @@ Result<Project> deserialize_project_from_json(std::string_view content) {
       if (added.has_error()) return Result<Project>::failure(added.error());
     }
 
+    for (const auto& constraint_json :
+         root.value("cross_hierarchy_constraints", json::array())) {
+      auto constraint = cross_hierarchy_constraint_from_json(constraint_json);
+      if (constraint.has_error()) {
+        return Result<Project>::failure(constraint.error());
+      }
+      auto added =
+          project.value().add_cross_hierarchy_constraint(std::move(constraint.value()));
+      if (added.has_error()) return Result<Project>::failure(added.error());
+    }
+
     auto valid_structure = project.value().validate_assembly_structure();
     if (valid_structure.has_error()) return Result<Project>::failure(valid_structure.error());
 
@@ -161,7 +303,6 @@ Result<Project> read_project_json_file(const std::filesystem::path& path) {
   if (!input) {
     return Result<Project>::failure(json_file_error(path, "could not open project file"));
   }
-
   std::stringstream buffer;
   buffer << input.rdbuf();
   if (!input.good() && !input.eof()) {
