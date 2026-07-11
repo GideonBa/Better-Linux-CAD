@@ -171,32 +171,63 @@ Implemented scope:
 - headless constraint inspection through `blcad_inspect_project_components`
 - Mate/Concentric/Distance records in `examples/component_instances.blcad.project.json`
 
-Still deferred:
+Still deferred from the record block:
 
 - semantic target geometry resolution
-- constraint graph construction and rigid-body solving
+- rigid-body solving and constraint equations
 - remaining DOF computation and assembly constraint-state analysis
 - enforced grounding and suppression behavior in future assembly consumers
 - Insert, Angle, Tangent, Flush, Coincident, and Lock constraints
 - collision checks, subassemblies, and assembly-level STEP export
 
-## Next MVP: Read-only assembly constraint graph seed
+## Implemented block: MVP 5 read-only assembly constraint graph seed
 
-Goal: derive deterministic component connectivity from the stable persistent assembly constraint records before semantic geometry resolution or rigid-body solving is introduced.
+Detailed document: `docs/assembly-constraint-graph-mvp5.md`
+
+Implemented scope:
+
+- read-only `AssemblyConstraintGraph` derived from an `AssemblyDocument`
+- every `ComponentInstanceId` represented as a graph node, including isolated components
+- distinct graph edges for active `AssemblyConstraintId` records only
+- inactive constraints excluded from graph connectivity
+- edge records preserving constraint id and target-A/target-B component endpoints without copying semantic geometry
+- defensive graph-build validation of active edge endpoints
+- lexicographically deterministic node and edge ordering
+- deterministic `adjacent_constraints(ComponentInstanceId)` queries
+- deterministic `connected_components()` group queries
+- legal multi-edges when several constraints relate the same component pair
+- graph construction and queries that do not mutate `RigidTransform`, grounding, constraint state, or part model intent
+- compact connected-group summary in `blcad_inspect_project_components`
+- focused tests for active/inactive edges, isolated nodes, multi-edges, deterministic results, unknown adjacency targets, connected groups, and unchanged assembly intent
+- no graph JSON field because the graph is fully regenerable from component and constraint model intent
+
+Still deferred:
+
+- semantic target geometry resolution
+- interpretation of semantic tokens as supported face, axis, edge, or vertex reference families
+- rigid-transform evaluation for resolved assembly targets
+- Mate, Concentric, and Distance equation construction
+- rigid-body solving and solved transform updates
+- remaining DOF and under/fully/overconstrained analysis
+- enforced grounding and suppression participation rules
+
+## Next MVP: Read-only semantic assembly target resolution seed
+
+Goal: resolve persistent assembly target intent to supported component-local geometric descriptors before any constraint equation or rigid-body solver is introduced.
 
 Proposed first implementation sequence:
 
-- add a read-only `AssemblyConstraintGraph` whose nodes are existing `ComponentInstanceId` values
-- add graph edges for active `AssemblyConstraintId` records only; inactive constraints must not participate
-- preserve each edge's constraint id and two component endpoints without copying semantic geometry or OCCT topology into the graph
-- validate graph construction against an `AssemblyDocument` and reject dangling component endpoints if invalid model state is ever observed
-- provide deterministic adjacency queries per component instance
-- provide deterministic connected-component/group queries so independent assembly groups can be identified
-- keep duplicate component pairs legal because several different constraints may relate the same two component instances
-- keep graph construction read-only with respect to `RigidTransform`, grounding, constraint state, and part model intent
-- add tests for active/inactive edges, isolated component nodes, multiple constraints between one component pair, deterministic adjacency, connected groups, and unchanged component transforms
-- optionally extend the headless inspector with a compact graph/group summary after the core graph API is stable
-- keep semantic target resolution, rigid-body solving, constraint equations, remaining DOF, enforced grounding, overconstraint detection, and solved transform updates deferred
+- add a read-only `AssemblyConstraintTargetResolver` in the optional geometry layer
+- resolve `AssemblyConstraintTarget::component_instance` through the owning `Project` and its `AssemblyDocument`
+- resolve the component's `referenced_part_document` to the project-owned `PartDocument`
+- parse and validate the currently implemented generated-face semantic reference family instead of accepting arbitrary target text at resolution time
+- reuse the existing semantic face/workplane geometry path to produce a component-local planar descriptor with origin, basis axes, and normal
+- keep the component `RigidTransform` available as separate placement intent; do not silently invent an assembly rotation convention inside the target resolver
+- return explicit unsupported-reference errors for target families that are not implemented yet, including semantic axes needed for full Concentric solving
+- keep target resolution read-only with respect to component transforms, constraint records, part model intent, and geometry cache ownership
+- add geometry tests for valid generated faces, missing component/part/feature targets, malformed and unsupported semantic tokens, deterministic resolution, and unchanged assembly intent
+- do not persist resolved target descriptors because they are regenerable derived data
+- keep Mate/Distance/Concentric equation construction, assembly-space transform math, rigid-body solving, remaining DOF, enforced grounding, and solved transform updates deferred
 
 ## Future roadmap: Multi-body transforms and path features
 
