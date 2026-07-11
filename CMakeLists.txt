@@ -32,6 +32,8 @@ add_library(
   src/core/assembly_constraint_graph.cpp
   src/core/assembly_document.cpp
   src/core/assembly_document_json.cpp
+  src/core/assembly_joint.cpp
+  src/core/assembly_joint_graph.cpp
   src/core/composite_closed_profile.cpp
   src/core/construction_geometry.cpp
   src/core/datum_plane.cpp
@@ -93,6 +95,9 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/assembly_constraint_numeric_system.cpp
     src/geometry/assembly_constraint_target_resolver.cpp
     src/geometry/assembly_insert_constraint_equation_builder.cpp
+    src/geometry/assembly_joint_motion_solver.cpp
+    src/geometry/assembly_numeric_solve_engine.cpp
+    src/geometry/assembly_revolute_joint_equation_builder.cpp
     src/geometry/assembly_rigid_body_solver.cpp
     src/geometry/assembly_solve_diagnostics.cpp
     src/geometry/assembly_step_exporter.cpp
@@ -158,10 +163,14 @@ if(BLCAD_BUILD_GEOMETRY)
   add_executable(blcad_export_posed_assembly examples/blcad_export_posed_assembly.cpp)
   target_link_libraries(blcad_export_posed_assembly PRIVATE BLCAD::geometry)
 
+  add_executable(blcad_move_joint examples/blcad_move_joint.cpp)
+  target_link_libraries(blcad_move_joint PRIVATE BLCAD::geometry)
+
   if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(blcad_export_step PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(blcad_export_project PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(blcad_export_posed_assembly PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(blcad_move_joint PRIVATE -Wall -Wextra -Wpedantic)
   endif()
 endif()
 
@@ -176,6 +185,8 @@ if(BLCAD_BUILD_TESTS)
     tests/core/assembly_constraint_tests.cpp
     tests/core/assembly_document_tests.cpp
     tests/core/assembly_insert_constraint_tests.cpp
+    tests/core/assembly_joint_graph_tests.cpp
+    tests/core/assembly_joint_tests.cpp
     tests/core/chained_construction_relation_tests.cpp
     tests/core/circular_hole_pattern_tests.cpp
     tests/core/closed_profile_json_tests.cpp
@@ -242,6 +253,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/assembly_insert_constraint_equation_builder_tests.cpp
       tests/geometry/assembly_insert_numeric_solver_tests.cpp
       tests/geometry/assembly_parameter_pipeline_tests.cpp
+      tests/geometry/assembly_revolute_joint_motion_tests.cpp
       tests/geometry/assembly_rigid_body_solver_tests.cpp
       tests/geometry/assembly_solve_diagnostics_tests.cpp
       tests/geometry/assembly_step_exporter_tests.cpp
