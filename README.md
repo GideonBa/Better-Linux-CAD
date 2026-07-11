@@ -6,7 +6,7 @@ Detailed architecture and feature status live in `docs/`. This README is intenti
 
 ## Status
 
-Current state: MVP-1 core skeleton, staged MVP-2 sketch/workplane/profile/recompute/reference blocks, the MVP-3 parametric bolt circle, the MVP-4 assembly/project container path, and MVP-5 assembly infrastructure through deterministic Mate/Distance/Concentric/Insert/Angle rigid-body solving, local Jacobian-rank/remaining-DOF diagnostics, suppressed-component solve filtering, posed assembly STEP compound export, and the first persistent Revolute joint/limit plus explicit motion-query/application path.
+Current state: MVP-1 core skeleton, staged MVP-2 sketch/workplane/profile/recompute/reference blocks, the MVP-3 parametric bolt circle, the MVP-4 assembly/project container path, and MVP-5 assembly infrastructure through deterministic Mate/Distance/Concentric/Insert/Angle rigid-body solving, local Jacobian-rank/remaining-DOF diagnostics, suppressed-component solve filtering, posed assembly STEP export, the first persistent Revolute joint/limit motion path, and rigid subassembly hierarchy with nested posed-leaf export.
 
 The implemented assembly path now includes:
 
@@ -31,9 +31,16 @@ persistent Revolute joint/limit/coordinate intent
   -> complete component and driven-joint stale snapshots
   -> atomic transform + selected joint-coordinate application
 
+explicit root assembly + project-owned child assemblies
+  -> rigid SubassemblyInstance placement/state intent
+  -> cycle-free deterministic assembly hierarchy traversal
+  -> visible-active AssemblyLeafOccurrenceDescriptor flattening
+  -> exact component/parent transform chains in inner-to-outer order
+
 posed assembly export
-  -> one recomputed ShapeCache per referenced part document
-  -> visible active component shape posing with the same X-then-Y-then-Z transform convention
+  -> one recomputed ShapeCache per referenced leaf part document
+  -> repeated root/child assembly occurrences reuse recomputed part caches
+  -> visible active leaf shape posing with X-then-Y-then-Z semantics at every authored level
   -> one derived OCCT compound and STEP export
 ```
 
@@ -41,7 +48,9 @@ Concentric, Insert, Angle, and transient Revolute motion drives reuse the shared
 
 Suppressed components contribute no solve variables. Geometric constraints and non-selected joint drives touching them vanish from the active numeric subgroup while full component snapshots still protect result application from stale suppression changes. A selected Revolute joint cannot be driven through a suppressed endpoint.
 
-`AssemblyStepExporter` recomputes each referenced part once per export, reuses that cache across repeated occurrences, skips hidden and suppressed components, applies persisted rigid transforms to shape copies, composes one OCCT compound, and delegates final file writing to the existing STEP writer. Export geometry remains derived and unpersisted.
+`AssemblyHierarchyTraversal` derives the rooted rigid occurrence tree in deterministic pre-order. `AssemblyLeafOccurrenceResolver` removes hidden/suppressed subtrees and local hidden/suppressed components, then exposes stable leaf identity/path plus authored transform chains. These descriptors are derived and unpersisted.
+
+`AssemblyStepExporter` recomputes each referenced visible-active leaf part once per export, reuses that cache across repeated component and subassembly occurrences, applies every authored rigid transform to independent shape copies in exact inner-to-outer order, composes one OCCT compound, and delegates final file writing to the existing STEP writer. Export geometry remains derived and unpersisted.
 
 There is no GUI yet.
 
@@ -85,6 +94,9 @@ Focused current assembly tests:
 ./build/dev/blcad_core_tests "[core][assembly-insert]"
 ./build/dev/blcad_core_tests "[core][assembly-joint]"
 ./build/dev/blcad_core_tests "[core][assembly-joint-graph]"
+./build/dev/blcad_core_tests "[core][subassembly-instance]"
+./build/dev/blcad_core_tests "[core][assembly-hierarchy]"
+./build/dev/blcad_core_tests "[core][assembly-leaf-occurrence]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-equation]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-transform]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-concentric]"
@@ -94,6 +106,8 @@ Focused current assembly tests:
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-diagnostics]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-step-export]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-revolute-joint]"
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-hierarchy-transform]"
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-nested-step-export]"
 ```
 
 ## Headless tools
@@ -115,6 +129,7 @@ Examples:
 ./build/dev-geometry/blcad_export_posed_assembly examples/posed_assembly.blcad.project.json build/posed_assembly.step
 ./build/dev-geometry/blcad_move_joint examples/revolute_joint.blcad.project.json joint.revolute 45 build/revolute_joint_45.blcad.project.json
 ./build/dev-geometry/blcad_export_posed_assembly build/revolute_joint_45.blcad.project.json build/revolute_joint_45.step
+./build/dev-geometry/blcad_export_posed_assembly examples/nested_subassembly.blcad.project.json build/nested_subassembly.step
 ```
 
 ## Repository structure
@@ -155,6 +170,7 @@ Implemented assembly blocks:
 - `docs/assembly-suppressed-component-solving-mvp5.md`
 - `docs/assembly-posed-step-export-mvp5.md`
 - `docs/assembly-revolute-joint-motion-mvp5.md`
+- `docs/assembly-rigid-subassembly-nested-export-mvp5.md`
 
 Broader implemented sketch/profile documents remain listed from `docs/mvp-plan.md` and `docs/architecture-summary.md`.
 
@@ -166,4 +182,4 @@ Future roadmaps:
 
 ## Next technical step
 
-The next technical step is the rigid subassembly instance and nested posed-export seed: add owned child assembly documents plus cycle-free rigid subassembly occurrences, compose parent/child `RigidTransform` values deterministically, and flatten visible active leaf components into posed assembly STEP export while keeping flexible-subassembly solve variables deferred. See `docs/mvp-plan.md`.
+The next technical step is the first posed assembly interference-analysis seed: reuse deterministic visible-active flattened leaf occurrences plus the same part recompute and hierarchy-transform semantics, derive lexicographically ordered leaf pairs, detect positive-volume OCCT intersections, and return read-only occurrence-pair interference records without persisting collision state or introducing contact physics. See `docs/mvp-plan.md`.
