@@ -6,7 +6,7 @@ Detailed architecture, feature contracts, and implementation status live in `doc
 
 ## Status
 
-Implemented seeds now cover single-part parametric modeling, semantic references and richer sketch/profile workflows, a parametric bolt-circle pattern, assembly parameters/project ownership, deterministic local Mate/Distance/Concentric/Insert/Angle solving, rank/remaining-DOF diagnostics, first Revolute joint motion, rigid nested assembly hierarchy, posed STEP export, interference/clearance analysis, document-scoped flexible child solving, and occurrence-qualified read-only cross-hierarchy target/residual semantics.
+Implemented seeds now cover single-part parametric modeling, semantic references and richer sketch/profile workflows, a parametric bolt-circle pattern, assembly parameters/project ownership, deterministic local Mate/Distance/Concentric/Insert/Angle solving, rank/remaining-DOF diagnostics, first Revolute joint motion, rigid nested assembly hierarchy, posed STEP export, interference/clearance analysis, document-scoped flexible child solving, occurrence-qualified read-only cross-hierarchy target/residual semantics, and persistent Project-owned cross-hierarchy geometric constraint intent.
 
 There is no GUI yet. Current work remains focused on headless CAD-core and application contracts.
 
@@ -44,15 +44,22 @@ document-scoped flexible child solving
   -> successful application updates child component transforms only
   -> repeated child occurrences share the child document's internal pose
 
-read-only cross-hierarchy relationship semantics
-  -> endpoint = (occurrence_path, local component id, semantic reference)
+read-only cross-hierarchy geometry semantics
+  -> exact occurrence-qualified endpoint
   -> exact rooted occurrence resolution
   -> existing local semantic target resolver reused
   -> exact component + parent chain evaluation into root space
   -> canonical Mate/Distance/Angle/Concentric/Insert residuals reused
+
+persistent cross-hierarchy relationship intent
+  -> Core-owned AssemblyHierarchyConstraintEndpoint
+  -> persistent AssemblyHierarchyConstraint
+  -> Project-owned cross_hierarchy_constraints collection
+  -> same five relationship families and value-family rules
+  -> direct bridge into the read-only Geometry query layer
 ```
 
-The current cross-hierarchy planning explicitly separates three identities:
+The cross-hierarchy architecture separates three identities:
 
 ```text
 geometric endpoint
@@ -69,7 +76,9 @@ This matters for repeated occurrences of one child assembly. Two occurrences may
 
 Future cross-hierarchy solve connectivity is planned as relationship-to-transform-authority incidence. Local constraints remain one relationship per containing `AssemblyDocument`; project-level cross-hierarchy relationships retain exact occurrence-qualified endpoints.
 
-See `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md` for the corrected implementation sequence.
+Block 23 intentionally stops before JSON. The new Core records exist in the in-memory model, but project save/load does not roundtrip them until Block 24.
+
+See `docs/assembly-cross-hierarchy-constraint-intent-mvp5.md` and `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`.
 
 ## Technical basis
 
@@ -112,6 +121,7 @@ Focused current assembly tests:
 ./build/dev/blcad_core_tests "[core][subassembly-instance]"
 ./build/dev/blcad_core_tests "[core][assembly-hierarchy]"
 ./build/dev/blcad_core_tests "[core][assembly-leaf-occurrence]"
+./build/dev/blcad_core_tests "[core][assembly-cross-hierarchy-intent]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-equation]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-transform]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-concentric]"
@@ -175,6 +185,7 @@ Current assembly handoff:
 
 - `docs/assembly-flexible-subassembly-solving-mvp5.md`
 - `docs/assembly-cross-hierarchy-relationship-semantics-mvp5.md`
+- `docs/assembly-cross-hierarchy-constraint-intent-mvp5.md`
 - `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`
 
 Broader future roadmaps:
@@ -185,6 +196,6 @@ Broader future roadmaps:
 
 ## Next technical step
 
-Implement **block 23 only** from `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`: extract the frozen occurrence-qualified endpoint value contract into the Core layer and add persistent project-owned cross-hierarchy geometric constraint intent.
+Implement **Block 24 only** from `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`: add backward-compatible `cross_hierarchy_constraints[]` project JSON and fail-closed occurrence-path/reached-component structure validation.
 
-JSON, connectivity, numeric variables, solving, snapshots, proposals, diagnostics, and application are explicitly later blocks.
+Connectivity, numeric variables, solving, snapshots, proposals, diagnostics, and application remain later blocks.
