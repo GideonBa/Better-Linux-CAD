@@ -6,7 +6,7 @@ Detailed architecture and feature status live in `docs/`. This README is intenti
 
 ## Status
 
-Current state: MVP-1 core skeleton, staged MVP-2 sketch/workplane/profile/recompute/reference blocks, the MVP-3 parametric bolt circle, the MVP-4 assembly/project container path, and MVP-5 assembly infrastructure through deterministic Mate/Distance/Concentric/Insert/Angle rigid-body solving, local Jacobian-rank/remaining-DOF diagnostics, suppressed-component solve filtering, and posed assembly STEP compound export.
+Current state: MVP-1 core skeleton, staged MVP-2 sketch/workplane/profile/recompute/reference blocks, the MVP-3 parametric bolt circle, the MVP-4 assembly/project container path, and MVP-5 assembly infrastructure through deterministic Mate/Distance/Concentric/Insert/Angle rigid-body solving, local Jacobian-rank/remaining-DOF diagnostics, suppressed-component solve filtering, posed assembly STEP compound export, and the first persistent Revolute joint/limit plus explicit motion-query/application path.
 
 The implemented assembly path now includes:
 
@@ -17,18 +17,29 @@ component and Mate/Distance/Concentric/Insert/Angle model intent
   -> explicit local-to-assembly rigid-transform evaluation
   -> planar, axis-line, and composite Insert residual construction
   -> shared numeric residual/Jacobian system
-  -> damped Gauss-Newton rigid-body solve on Project copies
+  -> shared damped Gauss-Newton rigid-body solve engine on Project copies
   -> explicit atomic converged-result application
   -> read-only local Jacobian-rank and remaining-DOF diagnostics
   -> suppressed-component filtering over the active solve subgroup
+
+persistent Revolute joint/limit/coordinate intent
+  -> deterministic active-joint graph
+  -> existing semantic seat axis + oriented frame resolution
+  -> transitive combined constraint/joint relationship group
+  -> directed-axis + seating + signed periodic twist drive residuals
+  -> the same shared numeric residual/Jacobian and solve engine
+  -> complete component and driven-joint stale snapshots
+  -> atomic transform + selected joint-coordinate application
+
+posed assembly export
   -> one recomputed ShapeCache per referenced part document
   -> visible active component shape posing with the same X-then-Y-then-Z transform convention
   -> one derived OCCT compound and STEP export
 ```
 
-Concentric, Insert, and planar Angle use the shared numeric system and solver. Regular one-free-body Concentric and Insert relationships are proven as rank `4/6` and `5/6`; the scalar cosine Angle seed is rank `1/6` away from its documented extremal degeneracies.
+Concentric, Insert, Angle, and transient Revolute motion drives reuse the shared numeric system. Regular one-free-body Concentric and Insert relationships are proven as rank `4/6` and `5/6`; the scalar cosine Angle seed is rank `1/6` away from its documented extremal degeneracies. A driven one-free-body Revolute query contributes nine residual components and is proven as local rank `6/6` because the requested joint coordinate temporarily constrains the joint's one motion DOF.
 
-Suppressed components contribute no solve variables and every constraint touching them vanishes from the active numeric subgroup while full solve snapshots still protect result application from stale suppression changes.
+Suppressed components contribute no solve variables. Geometric constraints and non-selected joint drives touching them vanish from the active numeric subgroup while full component snapshots still protect result application from stale suppression changes. A selected Revolute joint cannot be driven through a suppressed endpoint.
 
 `AssemblyStepExporter` recomputes each referenced part once per export, reuses that cache across repeated occurrences, skips hidden and suppressed components, applies persisted rigid transforms to shape copies, composes one OCCT compound, and delegates final file writing to the existing STEP writer. Export geometry remains derived and unpersisted.
 
@@ -72,6 +83,8 @@ Focused current assembly tests:
 ./build/dev/blcad_core_tests "[core][semantic-axis]"
 ./build/dev/blcad_core_tests "[core][semantic-seat]"
 ./build/dev/blcad_core_tests "[core][assembly-insert]"
+./build/dev/blcad_core_tests "[core][assembly-joint]"
+./build/dev/blcad_core_tests "[core][assembly-joint-graph]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-equation]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-transform]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-concentric]"
@@ -80,6 +93,7 @@ Focused current assembly tests:
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-solver]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-diagnostics]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-step-export]"
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-revolute-joint]"
 ```
 
 ## Headless tools
@@ -89,6 +103,7 @@ blcad_export_step <input.blcad.json> <output.step>
 blcad_export_project <input.blcad.project.json> <assembly-parameter-id> <value> <output-dir>
 blcad_inspect_project_components <input.blcad.project.json>
 blcad_export_posed_assembly <input.blcad.project.json> <output.step>
+blcad_move_joint <input.blcad.project.json> <joint-id> <angle-deg> <output.blcad.project.json>
 ```
 
 Examples:
@@ -98,6 +113,8 @@ Examples:
 ./build/dev-geometry/blcad_export_step examples/bolt_circle_plate.blcad.json build/bolt_circle_plate.step
 ./build/dev/blcad_inspect_project_components examples/component_instances.blcad.project.json
 ./build/dev-geometry/blcad_export_posed_assembly examples/posed_assembly.blcad.project.json build/posed_assembly.step
+./build/dev-geometry/blcad_move_joint examples/revolute_joint.blcad.project.json joint.revolute 45 build/revolute_joint_45.blcad.project.json
+./build/dev-geometry/blcad_export_posed_assembly build/revolute_joint_45.blcad.project.json build/revolute_joint_45.step
 ```
 
 ## Repository structure
@@ -137,6 +154,7 @@ Implemented assembly blocks:
 - `docs/assembly-angle-constraint-mvp5.md`
 - `docs/assembly-suppressed-component-solving-mvp5.md`
 - `docs/assembly-posed-step-export-mvp5.md`
+- `docs/assembly-revolute-joint-motion-mvp5.md`
 
 Broader implemented sketch/profile documents remain listed from `docs/mvp-plan.md` and `docs/architecture-summary.md`.
 
@@ -148,4 +166,4 @@ Future roadmaps:
 
 ## Next technical step
 
-The next technical step is the first joint/limit model-intent and motion seed: define persistent solver-independent joint records and limit ranges on semantic assembly targets, derive their active graph participation without persisting numeric state, and integrate one minimal motion-capable joint family through the existing rigid-body solve/application boundary. See `docs/mvp-plan.md`.
+The next technical step is the rigid subassembly instance and nested posed-export seed: add owned child assembly documents plus cycle-free rigid subassembly occurrences, compose parent/child `RigidTransform` values deterministically, and flatten visible active leaf components into posed assembly STEP export while keeping flexible-subassembly solve variables deferred. See `docs/mvp-plan.md`.
