@@ -1,76 +1,73 @@
 # BLCAD
 
-BLCAD is a planned independent parametric CAD system for Linux. The project stores CAD model intent in BLCAD data structures and uses OCCT/Open CASCADE as computed geometry, not as the primary model.
+BLCAD is an independent parametric CAD system for Linux in active development. BLCAD stores CAD model intent in its own data structures and uses OCCT/Open CASCADE as computed geometry rather than as the primary model authority.
 
-Detailed architecture and feature status live in `docs/`. This README is intentionally short.
+Detailed architecture, feature contracts, and implementation status live in `docs/`.
 
 ## Status
 
-Current state: MVP-1 core skeleton, staged MVP-2 sketch/workplane/profile/recompute/reference blocks, the MVP-3 parametric bolt circle, the MVP-4 assembly/project container path, and MVP-5 assembly infrastructure through deterministic Mate/Distance/Concentric/Insert/Angle rigid-body solving, local Jacobian-rank/remaining-DOF diagnostics, suppressed-component solve filtering, posed assembly STEP export, the first persistent Revolute joint/limit motion path, rigid subassembly hierarchy with nested posed-leaf export, read-only posed interference and clearance analysis, document-scoped flexible child-assembly solving, and occurrence-qualified read-only cross-hierarchy relationship target/residual semantics.
+Implemented seeds now cover single-part parametric modeling, semantic references and richer sketch/profile workflows, a parametric bolt-circle pattern, assembly parameters/project ownership, deterministic local Mate/Distance/Concentric/Insert/Angle solving, rank/remaining-DOF diagnostics, first Revolute joint motion, rigid nested assembly hierarchy, posed STEP export, interference/clearance analysis, document-scoped flexible child solving, and occurrence-qualified read-only cross-hierarchy target/residual semantics.
 
-The implemented assembly path now includes:
+There is no GUI yet. Current work remains focused on headless CAD-core and application contracts.
+
+## Assembly architecture snapshot
 
 ```text
-component and Mate/Distance/Concentric/Insert/Angle model intent
-  -> deterministic active-constraint graph
-  -> generated planar face, circular-cut axis, and circular-cut seat target resolution
-  -> explicit local-to-assembly rigid-transform evaluation
-  -> planar, axis-line, and composite Insert residual construction
-  -> shared numeric residual/Jacobian system
-  -> shared damped Gauss-Newton rigid-body solve engine on Project copies
-  -> explicit atomic converged-result application
-  -> read-only local Jacobian-rank and remaining-DOF diagnostics
-  -> suppressed-component filtering over the active solve subgroup
+local component + geometric relationship intent
+  -> deterministic local graph
+  -> semantic face/axis/seat resolution
+  -> canonical residual descriptors
+  -> shared numeric residual/Jacobian path
+  -> damped Gauss-Newton solve
+  -> complete stale snapshots + transform proposals
+  -> atomic explicit application
 
 persistent Revolute joint/limit/coordinate intent
-  -> deterministic active-joint graph
-  -> existing semantic seat axis + oriented frame resolution
-  -> transitive combined constraint/joint relationship group
-  -> directed-axis + seating + signed periodic twist drive residuals
-  -> the same shared numeric residual/Jacobian and solve engine
-  -> complete component and driven-joint stale snapshots
-  -> atomic transform + selected joint-coordinate application
+  -> deterministic local joint graph
+  -> combined local relationship closure
+  -> directed axis/seating/twist drive residuals
+  -> same numeric solve engine
+  -> atomic transform + selected coordinate application
 
 explicit root assembly + project-owned child assemblies
-  -> rigid SubassemblyInstance placement/state intent
-  -> cycle-free deterministic assembly hierarchy traversal
-  -> visible-active AssemblyLeafOccurrenceDescriptor flattening
-  -> exact component/parent transform chains in inner-to-outer order
+  -> rigid SubassemblyInstance placement/state
+  -> validated cycle-free hierarchy
+  -> deterministic rooted occurrence traversal
+  -> visible-active leaf flattening
+  -> exact inner-to-outer authored transform chains
+  -> nested posed STEP and posed analysis consumers
 
-active rooted child occurrence selection
-  -> referenced child AssemblyDocument becomes an isolated local solve root
-  -> existing local constraint graph + rigid-body solver/application path reused unchanged
-  -> result carries occurrence path + child document identity + normal component snapshots/proposals
-  -> atomic application updates child component transforms only; rigid occurrence boundary placement stays unchanged
+document-scoped flexible child solving
+  -> exact active child occurrence selection
+  -> child AssemblyDocument as temporary local solve root
+  -> existing local solver/application contract reused
+  -> successful application updates child component transforms only
+  -> repeated child occurrences share the child document's internal pose
 
-occurrence-qualified cross-hierarchy relationship query
-  -> exact (subassembly path, local component id, semantic reference) endpoint identity
-  -> existing local semantic target resolver reused as the only feature-target authority
-  -> exact component + parent transform chain evaluated into root-assembly space
-  -> canonical Mate/Distance/Angle/Concentric/Insert residual descriptors reused read-only
-
-posed assembly export
-  -> one recomputed ShapeCache per referenced leaf part document
-  -> repeated root/child assembly occurrences reuse recomputed part caches
-  -> visible active leaf shape posing with X-then-Y-then-Z semantics at every authored level
-  -> one derived OCCT compound and STEP export
+read-only cross-hierarchy relationship semantics
+  -> endpoint = (occurrence_path, local component id, semantic reference)
+  -> exact rooted occurrence resolution
+  -> existing local semantic target resolver reused
+  -> exact component + parent chain evaluation into root space
+  -> canonical Mate/Distance/Angle/Concentric/Insert residuals reused
 ```
 
-Concentric, Insert, Angle, and transient Revolute motion drives reuse the shared numeric system. Regular one-free-body Concentric and Insert relationships are proven as rank `4/6` and `5/6`; the scalar cosine Angle seed is rank `1/6` away from its documented extremal degeneracies. A driven one-free-body Revolute query contributes nine residual components and is proven as local rank `6/6` because the requested joint coordinate temporarily constrains the joint's one motion DOF.
+The current cross-hierarchy planning explicitly separates three identities:
 
-Suppressed components contribute no solve variables. Geometric constraints and non-selected joint drives touching them vanish from the active numeric subgroup while full component snapshots still protect result application from stale suppression changes. A selected Revolute joint cannot be driven through a suppressed endpoint.
+```text
+geometric endpoint
+  = (occurrence_path, ComponentInstanceId, semantic_reference)
 
-`AssemblyHierarchyTraversal` derives the rooted rigid occurrence tree in deterministic pre-order. `AssemblyLeafOccurrenceResolver` removes hidden/suppressed subtrees and local hidden/suppressed components, then exposes stable leaf identity/path plus authored transform chains. These descriptors are derived and unpersisted.
+relationship node
+  = (occurrence_path, ComponentInstanceId)
 
-`AssemblyFlexibleSubassemblySolver` selects an exact active non-root occurrence path, constructs a temporary child-as-root project view, and reuses the existing local rigid-body solver. Its applier reconstructs the current local view, reuses normal stale-result validation, and atomically writes proposed direct component transforms back to the referenced child document. Repeated occurrences of one child document therefore share the same internal solved pose while retaining independent rigid boundary transforms.
+persisted transform authority
+  = (AssemblyDocumentId, ComponentInstanceId)
+```
 
-`AssemblyHierarchyConstraintTarget` adds stable read-only endpoint identity as `(occurrence_path, local ComponentInstanceId, semantic_reference)`. `AssemblyHierarchyConstraintTargetResolver` resolves the exact rooted occurrence, reuses the existing local feature-target resolver, and evaluates `[component, inner parent, ..., outer parent]` transforms into root-assembly space. `AssemblyHierarchyConstraintEquationBuilder` then reuses the canonical Mate, Distance, Angle, Concentric, and Insert residual definitions without persisting or solving the query.
+This matters for repeated occurrences of one child assembly. Two occurrences may have different root-space geometry while sharing one child-document `ComponentInstance::transform()` authority. They must not become independent numeric transform variables until occurrence-local internal pose overrides exist.
 
-`AssemblyStepExporter` recomputes each referenced visible-active leaf part once per export, reuses that cache across repeated component and subassembly occurrences, applies every authored rigid transform to independent shape copies in exact inner-to-outer order, composes one OCCT compound, and delegates final file writing to the existing STEP writer. Export geometry remains derived and unpersisted.
-
-There is no GUI yet.
-
-For the complete implementation sequence, see `docs/mvp-plan.md`.
+See `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md` for the corrected implementation sequence.
 
 ## Technical basis
 
@@ -79,7 +76,7 @@ For the complete implementation sequence, see `docs/mvp-plan.md`.
 - OCCT / Open CASCADE Technology
 - nlohmann-json
 - Catch2
-- Qt 6 planned for the future GUI
+- Qt 6 planned for a future GUI layer
 
 ## Build and test
 
@@ -159,8 +156,8 @@ Examples:
 - `include/blcad/`: public headers
 - `src/`: core and optional geometry implementation
 - `tests/`: Catch2 tests
-- `examples/`: `.blcad.json` / `.blcad.project.json` examples and headless examples
-- `docs/`: architecture, implemented MVP blocks, and roadmaps
+- `examples/`: `.blcad.json` / `.blcad.project.json` examples and headless flows
+- `docs/`: architecture, implemented MVP contracts, implementation sequences, and future roadmaps
 
 ## Key documents
 
@@ -172,34 +169,13 @@ Start here:
 - `docs/development-setup.md`
 - `docs/file-format.md`
 
-Implemented assembly blocks:
+Current assembly handoff:
 
-- `docs/assembly-parameters-mvp4.md`
-- `docs/project-container-mvp4.md`
-- `docs/component-instance-mvp5.md`
-- `docs/assembly-constraint-model-intent-mvp5.md`
-- `docs/assembly-constraint-graph-mvp5.md`
-- `docs/assembly-constraint-target-resolution-mvp5.md`
-- `docs/assembly-rigid-transform-evaluation-mvp5.md`
-- `docs/assembly-planar-constraint-equations-mvp5.md`
-- `docs/assembly-rigid-body-solver-mvp5.md`
-- `docs/assembly-solve-diagnostics-mvp5.md`
-- `docs/assembly-semantic-axis-concentric-residuals-mvp5.md`
-- `docs/assembly-concentric-numeric-solver-dof-mvp5.md`
-- `docs/assembly-insert-intent-composite-residuals-mvp5.md`
-- `docs/assembly-insert-numeric-solver-dof-mvp5.md`
-- `docs/assembly-angle-constraint-mvp5.md`
-- `docs/assembly-suppressed-component-solving-mvp5.md`
-- `docs/assembly-posed-step-export-mvp5.md`
-- `docs/assembly-revolute-joint-motion-mvp5.md`
-- `docs/assembly-rigid-subassembly-nested-export-mvp5.md`
-- `docs/assembly-interference-analysis-mvp5.md`
 - `docs/assembly-flexible-subassembly-solving-mvp5.md`
 - `docs/assembly-cross-hierarchy-relationship-semantics-mvp5.md`
+- `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`
 
-Broader implemented sketch/profile documents remain listed from `docs/mvp-plan.md` and `docs/architecture-summary.md`.
-
-Future roadmaps:
+Broader future roadmaps:
 
 - `docs/multi-body-transform-and-path-features-roadmap.md`
 - `docs/inventor-like-sketcher-and-feature-roadmap.md`
@@ -207,4 +183,6 @@ Future roadmaps:
 
 ## Next technical step
 
-Occurrence-qualified read-only cross-hierarchy target and residual semantics are implemented (`docs/assembly-cross-hierarchy-relationship-semantics-mvp5.md`). The next assembly block is persistent project-level cross-hierarchy geometric constraint intent plus an occurrence-qualified active-constraint graph and shared numeric solve/application integration. Repeated occurrences of one child document must never alias by local `ComponentInstanceId` alone. See `docs/mvp-plan.md`.
+Implement **block 23 only** from `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`: extract the frozen occurrence-qualified endpoint value contract into the Core layer and add persistent project-owned cross-hierarchy geometric constraint intent.
+
+JSON, graph connectivity, numeric variables, solving, snapshots, proposals, diagnostics, and application are explicitly later blocks.
