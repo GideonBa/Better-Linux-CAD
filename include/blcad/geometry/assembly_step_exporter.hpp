@@ -18,10 +18,11 @@ struct AssemblyStepExportSummary {
                          const AssemblyStepExportSummary&) = default;
 };
 
-// Builds and exports derived posed assembly geometry. Part shapes are recomputed
-// once per referenced part document, component placement is applied with the
-// exact AssemblyTransformEvaluator X-then-Y-then-Z convention, and visible
-// active component shapes are combined into one OCCT compound.
+// Builds and exports derived posed assembly geometry. The root/child assembly
+// hierarchy is traversed deterministically, visible active leaf component
+// occurrences are flattened, and every authored rigid transform is applied in
+// exact inner-to-outer X-then-Y-then-Z semantics. Referenced part shapes are
+// recomputed once per exported part document and combined into one OCCT compound.
 class AssemblyStepExporter {
 public:
   [[nodiscard]] Result<GeometryShape> build_posed_shape(const Project& project) const;
