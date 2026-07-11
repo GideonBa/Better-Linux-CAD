@@ -6,7 +6,7 @@ Detailed architecture, feature contracts, and implementation status live in `doc
 
 ## Status
 
-Implemented seeds now cover single-part parametric modeling, semantic references and richer sketch/profile workflows, a parametric bolt-circle pattern, assembly parameters/project ownership, deterministic local Mate/Distance/Concentric/Insert/Angle solving, rank/remaining-DOF diagnostics, first Revolute joint motion, rigid nested assembly hierarchy, posed STEP export, interference/clearance analysis, document-scoped flexible child solving, occurrence-qualified read-only cross-hierarchy target/residual semantics, persistent Project-owned cross-hierarchy geometric constraint intent, and backward-compatible cross-hierarchy project JSON with Core structure validation.
+Implemented seeds now cover single-part parametric modeling, semantic references and richer sketch/profile workflows, a parametric bolt-circle pattern, assembly parameters/project ownership, deterministic local Mate/Distance/Concentric/Insert/Angle solving, rank/remaining-DOF diagnostics, first Revolute joint motion, rigid nested assembly hierarchy, posed STEP export, interference/clearance analysis, document-scoped flexible child solving, occurrence-qualified read-only cross-hierarchy target/residual semantics, persistent Project-owned cross-hierarchy geometric constraint intent, backward-compatible cross-hierarchy project JSON with Core structure validation, and deterministic relationship-to-transform-authority incidence with connected cross-hierarchy solve groups.
 
 There is no GUI yet. Current work remains focused on headless CAD-core and application contracts.
 
@@ -58,6 +58,14 @@ persistent cross-hierarchy relationship intent
   -> additive project JSON roundtrip
   -> exact path and target-order preservation
   -> Core-only occurrence-path/reached-component validation
+
+active cross-hierarchy solve connectivity
+  -> local relationships collected once per AssemblyDocument
+  -> project-level cross-hierarchy relationships retain exact endpoints
+  -> endpoint occurrence paths map to ComponentTransformAuthority
+  -> unique relationship-to-authority incidence
+  -> separate TargetA/TargetB endpoint mappings retain occurrence context
+  -> deterministic connected cross-hierarchy solve groups
 ```
 
 The cross-hierarchy architecture separates three identities:
@@ -75,11 +83,11 @@ persisted transform authority
 
 This matters for repeated occurrences of one child assembly. Two occurrences may have different root-space geometry while sharing one child-document `ComponentInstance::transform()` authority. They must not become independent numeric transform variables until occurrence-local internal pose overrides exist.
 
-Future cross-hierarchy solve connectivity is relationship-to-transform-authority incidence. Local constraints remain one relationship per containing `AssemblyDocument`; project-level cross-hierarchy relationships retain exact occurrence-qualified endpoints.
+`AssemblyCrossHierarchyConstraintGraph` now derives active relationship-to-`ComponentTransformAuthority` incidence. Local constraints appear once per containing `AssemblyDocument`. Cross-hierarchy endpoint paths remain separate in endpoint mappings even when both map to the same transform authority. Visibility does not filter solve participation; inactive relationships, suppressed local endpoint components, and suppressed cross-hierarchy endpoint paths/components do.
 
-`cross_hierarchy_constraints[]` is now part of project JSON. Loading validates the ordinary project and assembly hierarchy first, then follows each exact authored endpoint path from the root and requires the addressed local component to exist in the reached assembly document. Semantic feature geometry remains unresolved until a Geometry consumer requests it.
+`cross_hierarchy_constraints[]` is part of project JSON. Loading validates the ordinary project and assembly hierarchy first, then follows each exact authored endpoint path from the root and requires the addressed local component to exist in the reached assembly document. Semantic feature geometry remains unresolved until a Geometry consumer requests it.
 
-See `docs/assembly-cross-hierarchy-constraint-intent-mvp5.md`, `docs/assembly-cross-hierarchy-constraint-json-mvp5.md`, and `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`.
+See `docs/assembly-cross-hierarchy-constraint-intent-mvp5.md`, `docs/assembly-cross-hierarchy-constraint-json-mvp5.md`, `docs/assembly-cross-hierarchy-incidence-groups-mvp5.md`, and `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`.
 
 ## Technical basis
 
@@ -124,6 +132,7 @@ Focused current assembly tests:
 ./build/dev/blcad_core_tests "[core][assembly-leaf-occurrence]"
 ./build/dev/blcad_core_tests "[core][assembly-cross-hierarchy-intent]"
 ./build/dev/blcad_core_tests "[core][assembly-cross-hierarchy-json]"
+./build/dev/blcad_core_tests "[core][assembly-cross-hierarchy-graph]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-equation]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-transform]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-concentric]"
@@ -189,6 +198,7 @@ Current assembly handoff:
 - `docs/assembly-cross-hierarchy-relationship-semantics-mvp5.md`
 - `docs/assembly-cross-hierarchy-constraint-intent-mvp5.md`
 - `docs/assembly-cross-hierarchy-constraint-json-mvp5.md`
+- `docs/assembly-cross-hierarchy-incidence-groups-mvp5.md`
 - `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`
 
 Broader future roadmaps:
@@ -199,6 +209,6 @@ Broader future roadmaps:
 
 ## Next technical step
 
-Implement **Block 25 only** from `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`: derive deterministic active relationship-to-`ComponentTransformAuthority` incidence and connected cross-hierarchy solve groups.
+Implement **Block 26 only** from `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`: execute one `AssemblyCrossHierarchySolveGroup` through unique free active `ComponentTransformAuthority` variables, mixed local/root-space cross-hierarchy residual evaluation, the shared scaled residual/Jacobian path, and the existing numeric solve engine.
 
-No numeric residual/Jacobian execution, solving, snapshots, proposals, diagnostics, or application belongs in Block 25.
+Block 26 returns unapplied authority-scoped proposals. Result application, stale-result freshness validation, and cross-hierarchy diagnostics remain Block 27.
