@@ -8,10 +8,10 @@
 
 namespace blcad::geometry {
 
-// Revolute-drive residuals reuse the Insert endpoint semantics and add one
-// oriented periodic twist condition around target A's semantic axis.
+// Revolute-drive residuals reuse the semantic axis/seat endpoint family but
+// orient the common axis explicitly because target A defines positive rotation:
 //
-//   direction_parallelism       = cross(dA, dB)
+//   direction_alignment          = dA - dB
 //   axis_offset_mm               = cross(oB - oA, dA)
 //   signed_seating_separation_mm = dot(sB - sA, nA)
 //   twist_alignment_sine         = sin(phi - target)
@@ -21,7 +21,7 @@ namespace blcad::geometry {
 // periodic revolute coordinates. At a satisfied state the sine row carries the
 // regular twist rank and the cosine row is intentionally locally redundant.
 struct RevoluteJointResidualDescriptor {
-  Vector3 direction_parallelism;
+  Vector3 direction_alignment;
   Vector3 axis_offset_mm;
   double signed_seating_separation_mm = 0.0;
   double twist_alignment_sine = 0.0;
