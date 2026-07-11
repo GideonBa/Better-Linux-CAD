@@ -98,6 +98,7 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/assembly_constraint_equation_builder.cpp
     src/geometry/assembly_constraint_numeric_system.cpp
     src/geometry/assembly_constraint_target_resolver.cpp
+    src/geometry/assembly_hierarchy_constraint_equation_builder.cpp
     src/geometry/assembly_hierarchy_transform_evaluator.cpp
     src/geometry/assembly_insert_constraint_equation_builder.cpp
     src/geometry/assembly_interference_analyzer.cpp
@@ -265,6 +266,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/assembly_concentric_numeric_solver_tests.cpp
       tests/geometry/assembly_constraint_equation_builder_tests.cpp
       tests/geometry/assembly_constraint_target_resolver_tests.cpp
+      tests/geometry/assembly_hierarchy_constraint_equation_builder_tests.cpp
       tests/geometry/assembly_hierarchy_transform_evaluator_tests.cpp
       tests/geometry/assembly_insert_constraint_equation_builder_tests.cpp
       tests/geometry/assembly_insert_numeric_solver_tests.cpp
@@ -317,7 +319,3 @@ if(BLCAD_BUILD_TESTS)
     catch_discover_tests(blcad_geometry_tests)
   endif()
 endif()
-
-message(STATUS "BLCAD MVP-1 core skeleton configured.")
-message(STATUS "Geometry/OCCT targets enabled: ${BLCAD_BUILD_GEOMETRY}")
-message(STATUS "GUI/Qt targets enabled: ${BLCAD_BUILD_GUI}")
