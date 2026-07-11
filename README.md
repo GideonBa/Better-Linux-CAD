@@ -6,7 +6,7 @@ Detailed architecture and feature status live in `docs/`. This README is intenti
 
 ## Status
 
-Current state: MVP-1 core skeleton, staged MVP-2 seeds for sketches, workplanes, profile geometry, recompute, STEP export, reference recovery, sketch diagnostics, and repair-command infrastructure, the MVP-3 parametric bolt circle, the MVP-4 assembly/project container path, and MVP-5 component instances with explicit free-placement/state updates, solver-independent Mate/Concentric/Distance constraint intent, a deterministic read-only active-constraint graph, generated-face assembly target resolution, explicit rigid-transform evaluation, and read-only planar Mate/Distance equation-residual construction.
+Current state: MVP-1 core skeleton, staged MVP-2 seeds for sketches, workplanes, profile geometry, recompute, STEP export, reference recovery, sketch diagnostics, and repair-command infrastructure, the MVP-3 parametric bolt circle, the MVP-4 assembly/project container path, and MVP-5 component instances with explicit placement/state updates, solver-independent Mate/Concentric/Distance intent, deterministic active-constraint connectivity, generated-face target resolution, explicit rigid-transform evaluation, planar Mate/Distance residual construction, and a first deterministic rigid-body solver with an explicit atomic transform-application boundary.
 
 There is no GUI yet.
 
@@ -92,6 +92,7 @@ Implemented feature blocks:
 - `docs/assembly-constraint-target-resolution-mvp5.md`
 - `docs/assembly-rigid-transform-evaluation-mvp5.md`
 - `docs/assembly-planar-constraint-equations-mvp5.md`
+- `docs/assembly-rigid-body-solver-mvp5.md`
 - `docs/general-closed-sketch-profile-mvp.md`
 - `docs/composite-closed-profile-holes-mvp.md`
 - `docs/arc-and-trim-extend-sketch-profile-mvp.md`
@@ -124,6 +125,6 @@ Future roadmaps:
 
 ## Next technical step
 
-The next technical step is a first rigid-body assembly solver seed over the implemented active-constraint graph and planar Mate/Distance residual descriptors. Define fixed versus variable component participation, consume the documented residual conventions, solve supported connected groups, and produce explicit transform-update results.
+The next technical step is read-only assembly solve diagnostics and remaining-degree-of-freedom analysis. Reuse the solver's deterministic component/constraint ordering and local numeric Jacobian model to define rank tolerance, constrained versus remaining rigid-body DOF, and underconstrained versus locally fully constrained group state.
 
-The solver must define grounding participation, variable transform representation, convergence/failure behavior, and the transform mutation boundary before component placement is changed. Concentric remains deferred until semantic axis targets and Concentric residual construction exist; no DOF-state persistence or richer constraint families belong in the first solver seed.
+Do not persist DOF or solved-state caches in this block. Overconstraint and fixed-geometry inconsistency diagnostics must remain explicit, and Concentric/richer constraint families remain deferred until their semantic target and residual families exist.
