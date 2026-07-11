@@ -60,6 +60,51 @@ const std::string& AssemblyConstraintTarget::semantic_reference() const noexcept
   return semantic_reference_;
 }
 
+Result<AssemblyHierarchyConstraintEndpoint> AssemblyHierarchyConstraintEndpoint::create(
+    std::vector<SubassemblyInstanceId> occurrence_path,
+    ComponentInstanceId component_instance,
+    std::string semantic_reference) {
+  for (const SubassemblyInstanceId& occurrence : occurrence_path) {
+    if (occurrence.empty()) {
+      return Result<AssemblyHierarchyConstraintEndpoint>::failure(Error::validation(
+          "assembly_hierarchy_constraint_endpoint",
+          "cross-hierarchy relationship occurrence path ids must not be empty"));
+    }
+  }
+
+  auto local_target = AssemblyConstraintTarget::create(component_instance, semantic_reference);
+  if (local_target.has_error()) {
+    return Result<AssemblyHierarchyConstraintEndpoint>::failure(local_target.error());
+  }
+
+  return Result<AssemblyHierarchyConstraintEndpoint>::success(
+      AssemblyHierarchyConstraintEndpoint(std::move(occurrence_path),
+                                          std::move(component_instance),
+                                          std::move(semantic_reference)));
+}
+
+AssemblyHierarchyConstraintEndpoint::AssemblyHierarchyConstraintEndpoint(
+    std::vector<SubassemblyInstanceId> occurrence_path,
+    ComponentInstanceId component_instance,
+    std::string semantic_reference)
+    : occurrence_path_(std::move(occurrence_path)),
+      component_instance_(std::move(component_instance)),
+      semantic_reference_(std::move(semantic_reference)) {}
+
+const std::vector<SubassemblyInstanceId>&
+AssemblyHierarchyConstraintEndpoint::occurrence_path() const noexcept {
+  return occurrence_path_;
+}
+
+const ComponentInstanceId&
+AssemblyHierarchyConstraintEndpoint::component_instance() const noexcept {
+  return component_instance_;
+}
+
+const std::string& AssemblyHierarchyConstraintEndpoint::semantic_reference() const noexcept {
+  return semantic_reference_;
+}
+
 Result<AssemblyConstraint>
 AssemblyConstraint::create(AssemblyConstraintId id, std::string name, AssemblyConstraintType type,
                            AssemblyConstraintTarget target_a, AssemblyConstraintTarget target_b,
@@ -145,6 +190,79 @@ const std::optional<Quantity>& AssemblyConstraint::distance() const noexcept {
 }
 
 const std::optional<Quantity>& AssemblyConstraint::angle() const noexcept {
+  return angle_;
+}
+
+Result<AssemblyHierarchyConstraint> AssemblyHierarchyConstraint::create(
+    AssemblyConstraintId id, std::string name, AssemblyConstraintType type,
+    AssemblyHierarchyConstraintEndpoint target_a,
+    AssemblyHierarchyConstraintEndpoint target_b,
+    AssemblyConstraintState state,
+    std::optional<Quantity> distance,
+    std::optional<Quantity> angle) {
+  auto local_target_a =
+      AssemblyConstraintTarget::create(target_a.component_instance(), target_a.semantic_reference());
+  if (local_target_a.has_error()) {
+    return Result<AssemblyHierarchyConstraint>::failure(local_target_a.error());
+  }
+  auto local_target_b =
+      AssemblyConstraintTarget::create(target_b.component_instance(), target_b.semantic_reference());
+  if (local_target_b.has_error()) {
+    return Result<AssemblyHierarchyConstraint>::failure(local_target_b.error());
+  }
+
+  auto validated = AssemblyConstraint::create(id, name, type, std::move(local_target_a.value()),
+                                              std::move(local_target_b.value()), state, distance,
+                                              angle);
+  if (validated.has_error()) {
+    return Result<AssemblyHierarchyConstraint>::failure(validated.error());
+  }
+
+  return Result<AssemblyHierarchyConstraint>::success(AssemblyHierarchyConstraint(
+      std::move(id), std::move(name), type, std::move(target_a), std::move(target_b), state,
+      std::move(distance), std::move(angle)));
+}
+
+AssemblyHierarchyConstraint::AssemblyHierarchyConstraint(
+    AssemblyConstraintId id, std::string name, AssemblyConstraintType type,
+    AssemblyHierarchyConstraintEndpoint target_a,
+    AssemblyHierarchyConstraintEndpoint target_b,
+    AssemblyConstraintState state,
+    std::optional<Quantity> distance,
+    std::optional<Quantity> angle)
+    : id_(std::move(id)), name_(std::move(name)), type_(type), target_a_(std::move(target_a)),
+      target_b_(std::move(target_b)), state_(state), distance_(std::move(distance)),
+      angle_(std::move(angle)) {}
+
+const AssemblyConstraintId& AssemblyHierarchyConstraint::id() const noexcept {
+  return id_;
+}
+
+const std::string& AssemblyHierarchyConstraint::name() const noexcept {
+  return name_;
+}
+
+AssemblyConstraintType AssemblyHierarchyConstraint::type() const noexcept {
+  return type_;
+}
+
+const AssemblyHierarchyConstraintEndpoint& AssemblyHierarchyConstraint::target_a() const noexcept {
+  return target_a_;
+}
+
+const AssemblyHierarchyConstraintEndpoint& AssemblyHierarchyConstraint::target_b() const noexcept {
+  return target_b_;
+}
+
+AssemblyConstraintState AssemblyHierarchyConstraint::state() const noexcept {
+  return state_;
+}
+
+const std::optional<Quantity>& AssemblyHierarchyConstraint::distance() const noexcept {
+  return distance_;
+}
+
+const std::optional<Quantity>& AssemblyHierarchyConstraint::angle() const noexcept {
   return angle_;
 }
 

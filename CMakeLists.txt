@@ -49,6 +49,7 @@ add_library(
   src/core/parameter.cpp
   src/core/parameter_expression.cpp
   src/core/project.cpp
+  src/core/project_cross_hierarchy_constraints.cpp
   src/core/project_json.cpp
   src/core/quantity.cpp
   src/core/recompute_plan.cpp
@@ -195,6 +196,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/assembly_angle_constraint_tests.cpp
     tests/core/assembly_constraint_graph_tests.cpp
     tests/core/assembly_constraint_tests.cpp
+    tests/core/assembly_cross_hierarchy_constraint_tests.cpp
     tests/core/assembly_document_tests.cpp
     tests/core/assembly_hierarchy_tests.cpp
     tests/core/assembly_insert_constraint_tests.cpp
