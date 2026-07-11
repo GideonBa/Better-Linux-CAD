@@ -50,7 +50,7 @@ resolve_assembly_space_target(const Project& project, const AssemblyConstraintTa
 
 Result<AssemblyConstraintEquationDescriptor>
 AssemblyConstraintEquationBuilder::build(const Project& project,
-                                          const AssemblyConstraint& constraint) const {
+                                         const AssemblyConstraint& constraint) const {
   if (constraint.state() != AssemblyConstraintState::Active) {
     return Result<AssemblyConstraintEquationDescriptor>::failure(validation_error(
         constraint.id().value(),
