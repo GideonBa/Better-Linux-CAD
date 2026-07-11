@@ -62,7 +62,10 @@ Current and planned core object families include:
 - `AssemblyConstraint`
 - `AssemblyConstraintGraphEdge`
 - `AssemblyConstraintGraph`
-- future semantic assembly target resolver, rigid-body assembly solver, and `Joint`
+- `ComponentLocalPlanarDescriptor`
+- `ResolvedAssemblyConstraintTarget`
+- `AssemblyConstraintTargetResolver`
+- future assembly transform evaluator, rigid-body assembly solver, and `Joint`
 
 ## MVP-1 implemented vertical slice
 
@@ -91,6 +94,7 @@ The implemented workplane/reference path introduces semantic generated-face refe
 - The dependency graph connects source features, workplanes, sketches, and dependent features.
 - JSON persists implemented semantic workplane intent.
 - `WorkplaneResolver` maps supported semantic faces and construction planes to concrete frames.
+- `WorkplaneResolver::resolve_generated_face` exposes the same generated-face frame path directly to other geometry-layer consumers.
 - Geometry recompute maps sketch-local profile coordinates through resolved workplanes.
 - Incremental recompute follows semantic workplane and construction dependency paths after source changes.
 - `ShapeCache` removes stale dirty feature shapes before incremental recompute.
@@ -200,7 +204,7 @@ The persistent assembly relationship layer is implemented (`docs/assembly-constr
 - Multiple constrained component occurrences may still share one owned `PartDocument` model.
 - `blcad_inspect_project_components` exposes stored constraint type, state, semantic targets, and optional distance.
 
-No solved transform, semantic target topology resolution, DOF state, or graph cache is persisted by this block.
+No solved transform, DOF state, or graph cache is persisted by this block.
 
 ## Implemented MVP-5 read-only assembly constraint graph
 
@@ -222,24 +226,39 @@ The first derived assembly relationship graph is implemented (`docs/assembly-con
 
 The graph is regenerable derived data and is not serialized. It is distinct from the part recompute `DependencyGraph` and is not yet a solver graph.
 
+## Implemented MVP-5 read-only assembly target resolution
+
+The first semantic assembly target geometry bridge is implemented (`docs/assembly-constraint-target-resolution-mvp5.md`):
+
+- `AssemblyConstraintTargetResolver` is a read-only optional geometry-layer consumer of persistent target intent.
+- Target component ids resolve through the project assembly to a concrete `ComponentInstance`.
+- Component part references resolve to project-owned `PartDocument` objects.
+- The supported assembly target family is `feature.<feature-id>.{top,bottom,right,left,front,back}`.
+- Supported targets become `SemanticFaceReference` values and reuse `WorkplaneResolver::resolve_generated_face`.
+- `ComponentLocalPlanarDescriptor` carries origin, x-axis, y-axis, and normal in component-local coordinates.
+- `ResolvedAssemblyConstraintTarget` preserves component identity, referenced part identity, source feature, semantic face, local plane, and the separate persisted `RigidTransform`.
+- Malformed and unsupported target families fail explicitly.
+- Semantic axes and generated edge/vertex assembly targets remain unsupported.
+- Resolution does not mutate component transforms, constraints, part model intent, or geometry cache ownership.
+- Resolved target descriptors are regenerable derived geometry data and are not serialized.
+
+The target resolver does not interpret `rotation_deg` or produce assembly-space target geometry. This preserves a clean boundary before an explicit rotation convention exists.
+
 ## Next assembly block
 
-The next core-CAD MVP block is read-only semantic assembly target resolution.
+The next core-CAD MVP block is explicit assembly rigid-transform evaluation.
 
-The first resolver should:
+The first evaluator should:
 
-- start from an `AssemblyConstraintTarget`
-- resolve its `ComponentInstanceId` through the project's assembly
-- resolve the component's `referenced_part_document` to the project-owned `PartDocument`
-- support the currently implemented generated-face semantic reference family first
-- reuse the semantic face/workplane geometry path
-- produce a component-local planar descriptor with origin, basis axes, and normal
-- keep the component `RigidTransform` as separate placement intent
-- reject malformed or unsupported target families explicitly
-- leave not-yet-implemented semantic axis targets unsupported, so full Concentric solving remains deferred
-- remain read-only and avoid persisted resolution cache data
+- consume the existing persisted `RigidTransform`
+- document the exact angle and rotation-order convention for `rotation_deg`
+- evaluate component-local points into assembly space by rotation followed by translation
+- evaluate vectors, basis axes, and normals by rotation only
+- evaluate `ComponentLocalPlanarDescriptor` into a deterministic assembly-space planar frame
+- prove the rotation order with combined-axis tests rather than relying on an implicit Euler convention
+- remain read-only and avoid persisted transform-evaluation cache data
 
-Constraint equation construction, assembly-space transform evaluation, rigid-body solving, enforced grounding, remaining-DOF computation, and overconstraint analysis remain later work. The detailed sequence is maintained in `docs/mvp-plan.md` and `docs/assembly-system.md`.
+Constraint equation construction, rigid-body solving, enforced grounding, remaining-DOF computation, and overconstraint analysis remain later work. The detailed sequence is maintained in `docs/mvp-plan.md` and `docs/assembly-system.md`.
 
 ## Future multi-body part modeling, transforms, and path features
 
@@ -273,9 +292,7 @@ This target depends on construction geometry, stable semantic references, the ex
 
 Advanced surfacing is a planned freeform-modeling layer, not yet implemented. It should introduce 3D sketch points, 3D lines, 3D splines, guide curves, sweeps, lofts, boundary surfaces, surface stitching, and closed-shell-to-solid conversion.
 
-The intended capability includes connecting geometry across differently oriented sketches, reusable spatial guide/path curves, path-following features, arbitrary multi-section lofts, continuity controls, freeform surface generation, shell stitching, and conversion of closed shells into solid bodies.
-
-The detailed roadmap is in `docs/advanced-surfacing-and-3d-sketch-mvp.md`.
+The intended capability includes connecting geometry across differently oriented sketches, reusable spatial guide/path curves, path-following features, arbitrary multi-section lofts, and surface workflows without reducing the model to opaque imported BRep edits.
 
 ## Critical architecture topics
 
@@ -300,8 +317,9 @@ The detailed roadmap is in `docs/advanced-surfacing-and-3d-sketch-mvp.md`.
 - Assembly constraints use semantic component targets and remain model intent distinct from solver/cache output.
 - `AssemblyConstraintGraph` connectivity is regenerated from persistent records rather than stored as a second source of truth.
 - Active/inactive constraint state controls graph participation; component suppression does not yet alter graph connectivity.
-- Semantic assembly target resolution should reuse existing semantic reference infrastructure and remain distinct from solving.
-- A future assembly solver will consume connected groups and resolved targets to determine component positions and remaining degrees of freedom.
+- `AssemblyConstraintTargetResolver` reuses existing semantic generated-face geometry and remains distinct from solving.
+- Generated-face target descriptors are component-local; the persisted `RigidTransform` remains separate until explicit assembly-space evaluation is defined.
+- A future assembly solver will consume connected groups and assembly-space resolved targets to determine component positions and remaining degrees of freedom.
 - Fillets and chamfers are their own parametric features with semantic edge references, not only late BRep corrections.
 - Engineering assistants must size deterministically and traceably; AI is a later helper, never the sizing authority.
 - The UI only operates the core and holds no CAD logic; it is built after the internal models work.
@@ -322,9 +340,10 @@ The condensed points above are expanded in dedicated documents. Each is written 
 - `docs/pattern-and-mirror-features.md` — linear/circular patterns and mirror
 - `docs/hole-wizard.md` — semantic hole features and the standards database
 - `docs/shaft-wizard.md` — shaft calculation and geometry generation
-- `docs/assembly-system.md` — component instances, persistent constraint intent, graph connectivity, target resolution, solver, joints, and motion
+- `docs/assembly-system.md` — component instances, persistent constraint intent, graph connectivity, target resolution, transform evaluation, solver, joints, and motion
 - `docs/assembly-constraint-model-intent-mvp5.md` — implemented Mate/Concentric/Distance record layer
 - `docs/assembly-constraint-graph-mvp5.md` — implemented read-only active-constraint connectivity graph
+- `docs/assembly-constraint-target-resolution-mvp5.md` — implemented read-only generated-face assembly target resolution
 - `docs/engineering-modules.md` — bolt, bearing, gear, material, and standard-parts modules
 - `docs/advanced-surfacing-and-3d-sketch-mvp.md` — 3D sketches, guide curves, sweep, loft, boundary surfaces, surface stitching, and closed-shell-to-solid conversion
 - `docs/user-interface.md` — UI architecture over the core
