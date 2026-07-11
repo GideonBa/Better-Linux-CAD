@@ -60,7 +60,7 @@ AssemblyConstraintEquationBuilder::build(const Project& project,
   if (constraint.type() == AssemblyConstraintType::Concentric) {
     return Result<AssemblyConstraintEquationDescriptor>::failure(validation_error(
         constraint.id().value(),
-        "planar assembly constraint equation builder does not support Concentric constraints"));
+        "concentric equation construction requires semantic axis target support"));
   }
 
   auto target_a = resolve_assembly_space_target(project, constraint.target_a());
