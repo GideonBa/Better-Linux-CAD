@@ -121,7 +121,7 @@ Implemented scope:
 - `ProjectPartUpdate` and `ProjectUpdateResult` with per-part recompute plans
 - JSON schema `blcad.project.mvp4` using embedded assembly and part documents
 - file helpers for reading and writing project JSON
-- headless `blcad_export_project` example that loads a project, updates one assembly parameter, recomputes owned parts, and exports each part to STEP
+- headless `blcad_export_project` parameter-update, recompute, and per-part STEP export path
 - tests for membership validation, automatic propagation, per-part invalidation, JSON roundtrip, and missing-member rejection
 
 Still deferred:
@@ -140,16 +140,15 @@ Implemented scope:
 - `ComponentInstance` owned by `AssemblyDocument`
 - stable instance id, display name, and referenced project part document id
 - visibility, suppression state, and grounding state records
-- `RigidTransform` with finite translation values in millimeters and finite rotation values in degrees for free placement
-- assembly-level validation that component instances reference member parts
-- project-level validation that component instances resolve to owned project parts
-- copy-style `ComponentInstance::with_*` operations that preserve identity and referenced part intent
-- explicit `AssemblyDocument` updates for transform, visibility, suppression state, and grounding state
-- direct transform edits even while an instance is marked grounded, preserving the deliberate no-solver boundary
-- assembly/project JSON roundtrip for initial and updated component instance state
-- core tests proving two updated component instances can reference one owned `PartDocument` without duplicating the owned part model intent
+- finite `RigidTransform` translation values in millimeters and rotation values in degrees
+- assembly/project reference validation
+- copy-style `ComponentInstance::with_*` operations preserving identity and referenced part intent
+- explicit transform, visibility, suppression, and grounding updates
+- direct transform edits while grounded, preserving the deliberate no-solver boundary
+- assembly/project JSON roundtrip for component placement/state
+- shared owned `PartDocument` intent across repeated component occurrences
 - checked-in `examples/component_instances.blcad.project.json`
-- headless `blcad_inspect_project_components` inspection tool exposing persisted placement/state values
+- headless component inspection
 
 ## Implemented block: MVP 5 assembly constraint model-intent seed
 
@@ -159,26 +158,23 @@ Implemented scope:
 
 - typed `AssemblyConstraintId`
 - `AssemblyConstraintType` limited to Mate, Concentric, and Distance
-- `AssemblyConstraintTarget` combining a `ComponentInstanceId` with a non-empty persistent semantic reference token
-- `AssemblyConstraint` records with stable id, name, type, target A, target B, active/inactive state, and a Distance-only length value
-- type-specific validation so Distance requires a length and Mate/Concentric reject distance values
-- `AssemblyDocument` ownership with unique constraint-id and existing component-target validation
-- constraint creation and loading that never mutate component free-placement transforms
-- optional `assembly_constraints` JSON loading with backward compatibility for older files without the field
-- assembly/project JSON roundtrip for Mate, Concentric, Distance, semantic targets, state, and distance values
-- project structure validation of assembly constraint component targets
-- shared owned `PartDocument` intent across multiple constrained component instances
-- headless constraint inspection through `blcad_inspect_project_components`
-- Mate/Concentric/Distance records in `examples/component_instances.blcad.project.json`
+- persistent semantic `AssemblyConstraintTarget` records
+- stable constraint id/name/type, target A/B, active/inactive state, and Distance-only length value
+- type-specific distance validation
+- `AssemblyDocument` ownership with unique id and existing component-target validation
+- constraint creation/loading without transform mutation
+- optional backward-compatible `assembly_constraints` JSON
+- assembly/project JSON roundtrip
+- project structure validation of constraint component targets
+- shared part model intent across constrained occurrences
+- headless constraint inspection
 
-Still deferred from the record block:
+Persistent record-layer boundary:
 
-- geometry interpretation and equation construction remain outside the persistent record layer
-- rigid-body solving and solved transform updates
-- remaining DOF computation and assembly constraint-state analysis
-- enforced grounding and suppression behavior in future assembly consumers
-- Insert, Angle, Tangent, Flush, Coincident, and Lock constraints
-- collision checks, subassemblies, and assembly-level STEP export
+- semantic geometry interpretation remains outside the record layer
+- transform evaluation remains outside the record layer
+- residual construction remains outside the record layer
+- solving and solved transform updates remain outside the record layer
 
 ## Implemented block: MVP 5 read-only assembly constraint graph seed
 
@@ -186,33 +182,18 @@ Detailed document: `docs/assembly-constraint-graph-mvp5.md`
 
 Implemented scope:
 
-- read-only `AssemblyConstraintGraph` derived from an `AssemblyDocument`
-- every `ComponentInstanceId` represented as a graph node, including isolated components
-- distinct graph edges for active `AssemblyConstraintId` records only
-- inactive constraints excluded from graph connectivity
-- edge records preserving constraint id and target-A/target-B component endpoints without copying semantic geometry
-- defensive graph-build validation of active edge endpoints
-- lexicographically deterministic node and edge ordering
-- deterministic `adjacent_constraints(ComponentInstanceId)` queries
-- deterministic `connected_components()` group queries
-- legal multi-edges when several constraints relate the same component pair
-- graph construction and queries that do not mutate `RigidTransform`, grounding, constraint state, or part model intent
-- compact connected-group summary in `blcad_inspect_project_components`
-- focused tests for active/inactive edges, isolated nodes, multi-edges, deterministic results, unknown adjacency targets, connected groups, and unchanged assembly intent
-- no graph JSON field because the graph is fully regenerable from component and constraint model intent
-
-Implemented separately after the graph seed:
-
-- generated-face semantic target resolution is implemented in `docs/assembly-constraint-target-resolution-mvp5.md`
-- component-local-to-assembly-space rigid-transform evaluation is implemented in `docs/assembly-rigid-transform-evaluation-mvp5.md`
-
-Still deferred:
-
-- Mate and Distance equation construction
-- semantic axis references and Concentric equation construction
-- rigid-body solving and solved transform updates
-- remaining DOF and under/fully/overconstrained analysis
-- enforced grounding and suppression participation rules
+- read-only `AssemblyConstraintGraph` derived from `AssemblyDocument`
+- every component represented as a node, including isolated components
+- active constraints represented as distinct edges
+- inactive constraints excluded from connectivity
+- endpoint identity preserved without copying semantic geometry
+- defensive active-edge endpoint validation
+- lexicographically deterministic node/edge ordering
+- deterministic adjacency and connected-group queries
+- legal multi-edges between the same component pair
+- no transform, grounding, constraint-state, or part-intent mutation
+- headless connected-group summary
+- no graph JSON field because connectivity is regenerable
 
 ## Implemented block: MVP 5 read-only semantic assembly target resolution
 
@@ -221,31 +202,18 @@ Detailed document: `docs/assembly-constraint-target-resolution-mvp5.md`
 Implemented scope:
 
 - read-only `AssemblyConstraintTargetResolver` in the optional geometry layer
-- target `ComponentInstanceId` resolution through the project's `AssemblyDocument`
-- component `referenced_part_document` resolution to the project-owned `PartDocument`
-- parsing and validation of the implemented generated-face semantic token family
-- support for `feature.<feature-id>.{top,bottom,right,left,front,back}` targets
-- direct reuse of `WorkplaneResolver::resolve_generated_face` so derived workplanes and assembly targets share one generated-face frame implementation
-- component-local planar descriptors containing origin, x-axis, y-axis, and normal
-- separate preservation of the component's persisted `RigidTransform` without applying transform math inside target resolution
-- explicit unsupported-reference errors for semantic axes and generated edge families that are not implemented for assembly targets yet
-- read-only resolution with no transform, constraint-record, part-intent, or geometry-cache ownership mutation
-- geometry tests for all six generated faces, missing component/part/feature targets, malformed and unsupported semantic tokens, deterministic resolution, separate placement intent, and unchanged project model intent
-- no resolved-target JSON field because descriptors are regenerable derived geometry data
-
-Implemented separately after target resolution:
-
-- deterministic point, vector, and planar-frame transform evaluation
-- explicit degree and X-then-Y-then-Z fixed-axis rotation convention
-- assembly-space planar descriptors derived from local target frames plus persisted placement
-
-Still deferred:
-
-- Mate and Distance constraint equation construction
-- semantic axis references and Concentric equation construction
-- rigid-body solving and solved transform updates
-- remaining DOF and under/fully/overconstrained analysis
-- enforced grounding and suppression participation rules
+- component resolution through the project assembly
+- component part resolution to a project-owned `PartDocument`
+- parsing and validation of the generated-face semantic token family
+- `feature.<feature-id>.{top,bottom,right,left,front,back}` support
+- direct reuse of `WorkplaneResolver::resolve_generated_face`
+- component-local origin/x-axis/y-axis/normal descriptors
+- separate preservation of persisted `RigidTransform`
+- explicit malformed/unsupported-reference failures
+- semantic axes and generated edge/vertex target families remain unsupported
+- no transform, constraint, part-intent, or geometry-cache mutation
+- no resolved-target JSON field
+- geometry tests for all six faces, failure paths, determinism, and unchanged model intent
 
 ## Implemented block: MVP 5 explicit assembly rigid-transform evaluation
 
@@ -253,47 +221,76 @@ Detailed document: `docs/assembly-rigid-transform-evaluation-mvp5.md`
 
 Implemented scope:
 
-- read-only `AssemblyTransformEvaluator` in the optional geometry layer
-- separate `AssemblySpacePlanarDescriptor` type so local and assembly coordinate spaces remain explicit
-- translation interpreted in millimeters and rotation interpreted in degrees
-- active right-handed fixed-axis rotations applied in X, then Y, then Z order
+- read-only `AssemblyTransformEvaluator`
+- distinct `AssemblySpacePlanarDescriptor`
+- translation in millimeters and rotation in degrees
+- active right-handed fixed-axis X-then-Y-then-Z rotation convention
 - column-vector composition `Rz * Ry * Rx`
-- point evaluation by rotation followed by translation
-- vector evaluation by rotation only
+- points rotated then translated
+- vectors, axes, and normals rotated only
 - planar-frame evaluation with translation applied only to the origin
-- direct compatibility with `ResolvedAssemblyConstraintTarget::local_plane` and `component_transform`
-- preservation of vector magnitude, unit frame lengths, and frame orthogonality within numeric tolerance
+- direct compatibility with resolved target local planes and component transforms
+- vector magnitude and frame orthogonality preservation within numeric tolerance
 - deterministic repeated evaluation
-- no input transform, local descriptor, component record, constraint record, or part model mutation
-- no assembly-space transform-evaluation JSON/cache field because evaluated geometry is regenerable derived data
-- focused tests for identity, pure translation, single-axis rotations, combined-axis order, planar target frames, determinism, normalization properties, and read-only behavior
+- no input/model mutation
+- no transform-evaluation JSON/cache field
+- focused identity, translation, single-axis, combined-axis, target-frame, and read-only tests
 
-Still deferred:
+## Implemented block: MVP 5 read-only planar Mate/Distance equation construction
 
-- planar Mate and Distance equation construction
-- semantic axis references and Concentric equation construction
+Detailed document: `docs/assembly-planar-constraint-equations-mvp5.md`
+
+Implemented scope:
+
+- read-only `AssemblyConstraintEquationBuilder` in the optional geometry layer
+- `AssemblySpaceConstraintTargetDescriptor` preserving component identity, semantic token, and evaluated assembly-space plane
+- `AssemblyConstraintEquationDescriptor` preserving constraint id/type and target A/B order
+- active Mate and Distance support for the implemented generated planar face family
+- direct reuse of `AssemblyConstraintTargetResolver`
+- direct reuse of `AssemblyTransformEvaluator`
+- canonical Mate residuals:
+  - `normal_opposition = nA + nB`
+  - `signed_separation_mm = dot(oB - oA, nA)`
+- canonical planar Distance residuals:
+  - `normal_parallelism = cross(nA, nB)`
+  - `signed_separation_mm = dot(oB - oA, nA)`
+  - `distance_residual_mm = signed_separation_mm - target_distance_mm`
+- explicit target-order dependence for signed Distance separation
+- inactive-constraint rejection before geometry resolution
+- explicit Concentric rejection until semantic axis targets exist
+- deterministic target-A-then-target-B resolution and error precedence
+- residual descriptors remain regenerable and unpersisted
+- no transform, constraint, or part-intent mutation
+- focused tests for satisfied/unsatisfied Mate, transformed target geometry, satisfied/unsatisfied Distance, target-order sign, unsupported families, determinism, and read-only behavior
+
+Still deferred after equation construction:
+
 - rigid-body solving and solved transform updates
+- residual Jacobians, weighting, convergence tolerances, and nonlinear solve policy
 - remaining DOF and under/fully/overconstrained analysis
 - enforced grounding and suppression participation rules
+- semantic axis references and Concentric equation construction
 - component geometry instancing and assembly-level STEP export
 
-## Next MVP: Read-only planar Mate/Distance equation construction
+## Next MVP: First rigid-body assembly solver seed
 
-Goal: construct deterministic geometric equation/residual data for the first supported planar assembly constraints after target resolution and transform evaluation, without solving or mutating component transforms.
+Goal: consume the implemented active-constraint connectivity and planar Mate/Distance residual descriptors to solve the first constrained component transforms with an explicit fixed/variable participation and update boundary.
 
 Proposed first implementation sequence:
 
-- introduce a read-only equation-construction geometry-layer API over `Project` and one active `AssemblyConstraint`
-- support Mate and Distance records whose two semantic targets resolve to the implemented generated planar face family
-- resolve both targets through `AssemblyConstraintTargetResolver`
-- evaluate both component-local target frames through `AssemblyTransformEvaluator`
-- define and document one canonical planar Mate residual convention before implementing it
-- define and document one signed planar Distance separation convention before implementing it
-- preserve constraint id, type, and target/component identity in equation/residual descriptors for later diagnostics
-- reject inactive constraints and unsupported Concentric/semantic-axis cases explicitly in the first seed
-- keep equation/residual descriptors regenerable and unpersisted
-- test deterministic construction, target order, transformed target geometry, unsupported families, and unchanged project/component intent
-- do not run a rigid-body solver, mutate transforms, compute remaining DOF, enforce grounding, or infer suppression participation in this block
+- define solver input over one deterministic `AssemblyConstraintGraph` connected group
+- define grounded components as fixed rigid-body references for the first seed
+- define behavior for groups with zero grounded components and groups with multiple grounded components
+- define the solver's variable transform representation while preserving persisted `RigidTransform` semantics at the API boundary
+- consume only active Mate/Distance constraints supported by `AssemblyConstraintEquationBuilder`
+- define residual flattening and ordering deterministically by constraint id and residual component
+- define numeric tolerance, maximum-iteration, convergence, and failure semantics explicitly
+- return a solve-result descriptor before applying any transform mutation
+- add a separate explicit transform-application boundary after a successful solve result exists
+- preserve project intent on failed or non-converged solves
+- test one fixed/one movable Mate case, one fixed/one movable Distance case, a small connected multi-constraint group, deterministic results, failure behavior, and unchanged model state before explicit application
+- keep Concentric outside the first solver seed until semantic axis targets and Concentric residuals exist
+- defer persistent DOF/constraint-state caches until their data model is justified
 
 ## Future roadmap: Multi-body transforms and path features
 
