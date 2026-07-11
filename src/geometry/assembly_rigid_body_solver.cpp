@@ -118,8 +118,7 @@ AssemblyRigidBodySolver::solve(const Project& project,
 
   return detail::solve_numeric_relationships(
       project, connected_group,
-      detail::AssemblyNumericRelationshipSet{std::move(constraint_ids.value()), std::nullopt},
-      options);
+      detail::AssemblyNumericRelationshipSet{std::move(constraint_ids.value()), {}}, options);
 }
 
 Result<std::size_t> AssemblySolveResultApplier::apply(Project& project,
