@@ -48,6 +48,7 @@ struct ShapeCacheIdTag;
 struct ParameterBindingIdTag;
 struct ComponentInstanceIdTag;
 struct AssemblyConstraintIdTag;
+struct AssemblyJointIdTag;
 
 using DocumentId = TypedId<DocumentIdTag>;
 using ParameterId = TypedId<ParameterIdTag>;
@@ -69,5 +70,6 @@ using ShapeCacheId = TypedId<ShapeCacheIdTag>;
 using ParameterBindingId = TypedId<ParameterBindingIdTag>;
 using ComponentInstanceId = TypedId<ComponentInstanceIdTag>;
 using AssemblyConstraintId = TypedId<AssemblyConstraintIdTag>;
+using AssemblyJointId = TypedId<AssemblyJointIdTag>;
 
 } // namespace blcad
