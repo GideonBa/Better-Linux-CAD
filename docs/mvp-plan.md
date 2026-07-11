@@ -1,19 +1,17 @@
 # MVP Plan
 
-This document tracks the current implementation sequence. Detailed technical scope lives in the referenced documents.
-
 ## MVP 1: Single-part modeling
 
 Goal: one single parametric part with a headless file-based export path.
 
 Detailed document: `docs/mvp-1-specification.md`
 
-Implemented scope:
+Implemented scope summary:
 
-- `PartDocument`, parameters with units, datum planes, sketches, and feature-intent records
+- part document, parameters with units, datum planes, sketches, and feature-intent records
 - rectangle and circle profile seeds
 - additive extrude and subtractive through-all cut seeds
-- dependency graph, invalidation state, recompute plan, and numeric parameter updates
+- dependency graph, invalidation state, recompute plan, and numeric parameter update
 - optional OCCT geometry execution through `ShapeCache`
 - STEP export and headless JSON-to-STEP example
 - JSON serialization of the currently JSON-backed model-intent records
@@ -128,24 +126,47 @@ Implemented scope:
 
 Still deferred:
 
-- component instances, transforms, and assembly constraints
 - assembly-level STEP export
 - manifest-based project files and external part references
 - lazy part loading and dirty-file tracking
 
-## Next MVP: First component instance seed
+## Implemented block: MVP 5 first component instance seed
 
-Goal: start MVP 5 by introducing assembly component instances that reference owned project part documents without duplicating part geometry.
+Detailed document: `docs/component-instance-mvp5.md`
+
+Implemented scope:
+
+- `ComponentInstanceId` typed id
+- `ComponentInstance` owned by `AssemblyDocument`
+- stable instance id, display name, referenced project part document id
+- visibility, suppression state, and grounding state records
+- `RigidTransform` with translation in millimeters and rotation in degrees for free placement
+- assembly-level validation that component instances reference member parts
+- project-level validation that component instances resolve to owned project parts
+- assembly/project JSON roundtrip for component instances
+- core tests proving two component instances can reference one owned part document without duplicating part geometry
+- checked-in `examples/component_instances.blcad.project.json`
+- headless `blcad_inspect_project_components` inspection tool
+
+Still deferred:
+
+- explicit component transform/state update APIs
+- mate, concentric, distance, insert, angle, and tangent constraints
+- constraint solver and remaining DOF display
+- collision checks, subassemblies, and assembly-level STEP export
+
+## Next MVP: Component instance placement and state update seed
+
+Goal: allow explicit free-placement/state edits on existing component instances while keeping the no-solver boundary clear.
 
 Proposed first implementation sequence:
 
-- add a `ComponentInstance` record owned by `AssemblyDocument` or a closely related assembly-structure model
-- store stable instance id, display name, referenced project part document id, visibility, suppression state, and grounded/fixed state
-- add an initial rigid transform record for free placement, but do not solve constraints yet
-- validate that every component instance references an assembly member part and an owned project part
-- add JSON persistence for component instances inside the assembly/project structure
-- add project-level tests proving two instances can reference the same part document without duplicating part geometry
-- add a minimal headless inspection/export hook that lists component instances and their referenced part documents
+- add `AssemblyDocument` update functions for component instance transform, visibility, suppression state, and grounding state
+- validate that the target component instance id exists
+- keep transform edits direct and explicit; do not infer constraints, solve placement, or recompute DOF
+- preserve JSON roundtrip for updated state and transform values
+- add project-level tests showing component updates do not duplicate part documents and keep instance references valid
+- extend `blcad_inspect_project_components` output or tests so updated placement/state is observable from a project file
 - keep mate/concentric/distance constraints, solver, DOF display, collision checks, subassemblies, and assembly-level STEP export deferred
 
 ## Future roadmap: Multi-body transforms and path features
