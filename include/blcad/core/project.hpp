@@ -39,8 +39,9 @@ private:
 };
 
 // Project-level container for one assembly document and its owned part documents.
-// It is an MVP container only: component instances, placements, assembly
-// constraints, and solver state remain in the later assembly-system MVP.
+// It is an MVP container only: placements are stored as explicit component
+// instance records, while assembly constraints and solver state remain later
+// assembly-system MVP work.
 class Project {
 public:
   [[nodiscard]] static Result<Project> create(DocumentId id, std::string name,
@@ -48,6 +49,8 @@ public:
 
   [[nodiscard]] Result<std::size_t> add_part_document(PartDocument part_document);
   [[nodiscard]] Result<std::size_t> validate_member_parts() const;
+  [[nodiscard]] Result<std::size_t> validate_component_instances() const;
+  [[nodiscard]] Result<std::size_t> validate_assembly_structure() const;
 
   // Changes one assembly parameter, applies all assembly bindings to owned
   // member parts, and returns per-part recompute plans for affected parts.
