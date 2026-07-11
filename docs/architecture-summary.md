@@ -4,7 +4,7 @@ This document condenses the implemented architecture and current target directio
 
 ## Goal
 
-BLCAD is an independent parametric CAD system for Linux. The model stores design intent rather than only final BRep geometry: parameters, sketches, features, dependencies, semantic references, construction geometry, assembly structure, and later multi-body, path, surfacing, and engineering intent.
+BLCAD is an independent parametric CAD system for Linux. The model stores design intent rather than only final BRep geometry: parameters, sketches, features, dependencies, semantic references, construction geometry, assembly structure, and later multi-body, path, surfacing, joint, motion, and engineering intent.
 
 The long-term goal is recorded in `docs/project-goal.md`.
 
@@ -38,7 +38,7 @@ file and exchange formats
 Implemented assembly-relevant types include:
 
 - `PartDocument`, `AssemblyDocument`, `Project`
-- `ComponentInstance`
+- `ComponentInstance`, `RigidTransform`
 - `AssemblyConstraintTarget`, `AssemblyConstraint`
 - `AssemblyConstraintGraph`
 - `SemanticFaceReference`, `SemanticAxisReference`, `SemanticSeatingPlaneReference`
@@ -48,15 +48,17 @@ Implemented assembly-relevant types include:
 - `AssemblyConstraintTargetResolver`
 - `AssemblySpacePlanarDescriptor`, `AssemblySpaceAxisDescriptor`
 - `AssemblyTransformEvaluator`
-- `PlanarMateResidualDescriptor`, `PlanarDistanceResidualDescriptor`
+- `PlanarMateResidualDescriptor`, `PlanarDistanceResidualDescriptor`, `PlanarAngleResidualDescriptor`
+- `ConcentricResidualDescriptor`, `InsertResidualDescriptor`
 - `AssemblyConstraintEquationBuilder`
-- `ConcentricResidualDescriptor`, `AssemblyConcentricConstraintEquationBuilder`
-- `InsertResidualDescriptor`, `AssemblyInsertConstraintEquationBuilder`
+- `AssemblyConcentricConstraintEquationBuilder`
+- `AssemblyInsertConstraintEquationBuilder`
 - private shared assembly numeric residual/Jacobian system
 - `AssemblyRigidBodySolver`, `AssemblySolveResult`, `AssemblySolveResultApplier`
 - `AssemblySolveDiagnosticsAnalyzer` and rank/DOF descriptors
+- `AssemblyStepExporter`, `AssemblyStepExportSummary`
 
-Planned object families include richer constraints, bodies and body transforms/booleans, path records, 3D sketches, surfacing, joints, and motion.
+Planned object families include joints and limits, motion inputs, bodies and body transforms/booleans, path records, 3D sketches, surfacing, subassemblies, and collision/interference analysis.
 
 ## Part and project model
 
@@ -90,17 +92,18 @@ Mate
 Concentric
 Distance
 Insert
+Angle
 ```
 
-Every record preserves target A/B semantic strings and active/inactive state. Distance alone carries a positive length quantity.
+Every record preserves target A/B semantic strings and active/inactive state. Distance carries a positive length quantity. Angle carries a finite degree quantity. Mate, Concentric, and Insert are value-free relationship records.
 
 The record layer does not resolve geometry, evaluate transforms, construct residuals, solve placement, or persist derived solver data.
 
 ## Deterministic relationship graph
 
-`AssemblyConstraintGraph` contains every component as a node and every active constraint as one distinct edge. It excludes inactive constraints, preserves multi-edges, sorts deterministically, and exposes exact connected groups as current solve partition boundaries.
+`AssemblyConstraintGraph` contains every component as a node and every active assembly constraint as one distinct edge. It excludes inactive constraints, preserves multi-edges, sorts deterministically, and exposes exact connected groups as current solve partition boundaries.
 
-The graph is geometry-family agnostic. Insert uses the same relationship edge form as Mate, Distance, and Concentric.
+The graph is geometry-family agnostic. Mate, Distance, Concentric, Insert, and Angle use the same relationship edge form.
 
 ## Semantic target families
 
@@ -148,9 +151,7 @@ seating plane
   right-handed basis preserved for OppositeSketchNormal
 ```
 
-The local axis, local seating plane, and component transform remain distinct derived values.
-
-There is no hidden second target and no four-target Insert record.
+The local axis, local seating plane, and component transform remain distinct derived values. There is no hidden second target and no four-target Insert record.
 
 ## Rigid-transform evaluation
 
@@ -167,21 +168,14 @@ column-vector composition: Rz * Ry * Rx
 
 Points/origins rotate then translate. Vectors, normals, and axis directions rotate only.
 
-Insert reuses the existing evaluator twice:
-
-```text
-local axis -> evaluate_axis -> assembly-space axis
-local seat -> evaluate_plane -> assembly-space seating plane
-```
-
-No Insert-specific transform convention exists.
+The exact same convention is reused by posed assembly export. `AssemblyStepExporter` applies explicit OCCT X, Y, and Z rotations in that order, then translation. There is no export-specific placement convention.
 
 ## Geometry-family residual branches
 
-Persistent constraints branch into geometry-specific builders before supported numeric families rejoin one shared numeric path.
+Persistent constraints branch into geometry-specific builders before all currently supported numeric families rejoin one shared numeric path.
 
 ```text
-planar Mate/Distance target
+planar Mate/Distance/Angle target
   -> resolve
   -> evaluate_plane
   -> AssemblyConstraintEquationBuilder
@@ -227,13 +221,17 @@ axis_offset_mm               = cross(oB - oA, dA)
 signed_seating_separation_mm = dot(sB - sA, nA)
 ```
 
-For Insert, `nA` is canonically aligned with target A's semantic axis direction. Target A defines the signed seating direction.
+For Insert, `nA` is canonically aligned with target A's semantic axis direction. Target A defines the signed seating direction. No separate seating-normal residual is added because axis-direction parallelism already owns the two regular tilt constraints.
 
-No separate seating-normal residual is added because axis-direction parallelism already owns the two regular tilt constraints.
+### Angle
+
+```text
+angle_alignment = dot(nA, nB) - cos(target_angle_deg)
+```
+
+The current cosine seed is direction-symmetric. At `0°` and `180°`, the derivative vanishes at the solved state and local rank is reported accordingly. Oriented signed angles are deferred.
 
 ## Shared numeric residual/Jacobian system
-
-Canonical Concentric integration document: `docs/assembly-concentric-numeric-solver-dof-mvp5.md`.
 
 The private shared numeric system currently consumes:
 
@@ -241,11 +239,13 @@ The private shared numeric system currently consumes:
 Mate
 Distance
 Concentric
+Insert
+Angle
 ```
 
-It owns deterministic graph constraint ordering, constraint-family builder selection, scalar residual flattening, residual summaries, free-component variable extraction/application on project copies, and central finite-difference Jacobian construction.
+It owns deterministic graph constraint ordering, constraint-family builder selection, scalar residual flattening, residual summaries, free-active-component variable extraction/application on project copies, and central finite-difference Jacobian construction.
 
-Each free component contributes:
+Each free active component contributes:
 
 ```text
 tx_mm
@@ -278,102 +278,125 @@ Concentric:
   axis_offset_mm.x / length_residual_scale_mm
   axis_offset_mm.y / length_residual_scale_mm
   axis_offset_mm.z / length_residual_scale_mm
+
+Insert:
+  direction_parallelism.x
+  direction_parallelism.y
+  direction_parallelism.z
+  axis_offset_mm.x / length_residual_scale_mm
+  axis_offset_mm.y / length_residual_scale_mm
+  axis_offset_mm.z / length_residual_scale_mm
+  signed_seating_separation_mm / length_residual_scale_mm
+
+Angle:
+  angle_alignment
 ```
 
-Insert residual construction is implemented but Insert is deliberately not flattened by the shared numeric system yet.
+## Rigid-body solver, suppression, and application
 
-## Rigid-body solver and application
+`AssemblyRigidBodySolver` solves exactly one deterministic connected group. The active numeric subgroup excludes suppressed components and every constraint touching them. Visibility does not affect solving.
 
-`AssemblyRigidBodySolver` solves exactly one deterministic connected group, requires at least one grounded component, fixes every grounded component, rejects selected suppressed components, and ignores visibility for participation.
+If constraints survive suppression, at least one active component must be grounded. Every grounded active component is fixed. Every free active component contributes six direct persisted-transform coordinates.
 
-It uses deterministic damped Gauss-Newton with central finite differences, damped normal equations, partial-pivot Gaussian elimination, backtracking line search, and damping escalation.
+A group whose constraints all vanish through suppression is trivially converged with zero residual components. Complete component snapshots still include suppressed members, so suppressing or unsuppressing after solve makes the result stale.
 
-Mate, Distance, and Concentric use this one path. No Concentric-specific optimizer exists.
+The solver uses deterministic damped Gauss-Newton with central finite differences, damped normal equations, partial-pivot Gaussian elimination, backtracking line search, and damping escalation.
 
 The solver mutates private `Project` copies only and returns explicit transform proposals plus complete solve-input snapshots.
 
-`AssemblySolveResultApplier` accepts only converged results, rejects stale snapshots including moved grounded anchors, validates proposals, and applies atomically through another project copy.
-
-Insert currently reaches the explicit unsupported numeric boundary:
-
-```text
-Insert equation construction requires dedicated composite target support
-```
-
-The source project remains unchanged.
+`AssemblySolveResultApplier` accepts only converged results, rejects stale snapshots including moved grounded anchors and changed suppression states, validates proposals against free active snapshots, and applies atomically through another project copy.
 
 ## Local Jacobian rank and remaining DOF
 
-`AssemblySolveDiagnosticsAnalyzer` evaluates the exact shared numeric Jacobian at a converged private solve state.
+`AssemblySolveDiagnosticsAnalyzer` evaluates the exact shared numeric Jacobian at a converged private solve state over the same active subgroup as the solver.
 
 ```text
-variable_count  = 6 * free_component_count
+variable_count  = 6 * free_active_component_count
 constrained_dof = rank(J)
 remaining_dof   = variable_count - rank(J)
 ```
 
 DOF, consistency, and residual-row rank structure are separate classifications. Redundant scalar residual rows are not automatically semantic overconstraint.
 
-Proven regular Concentric result:
+Proven regular one-free-body results include:
 
 ```text
-residual_component_count = 6
-variable_count           = 6
-jacobian_rank            = 4
-remaining_dof            = 2
-```
+Concentric:
+  residual_component_count = 6
+  variable_count           = 6
+  jacobian_rank            = 4
+  remaining_dof            = 2
 
-The implemented read-only Insert test independently central-finite-differences its seven scalar residuals over all six direct transform variables and proves:
+Insert:
+  residual_component_count = 7
+  variable_count           = 6
+  jacobian_rank            = 5
+  remaining_dof            = 1
 
-```text
-residual_component_count = 7
-variable_count           = 6
-jacobian_rank            = 5
-remaining_local_dof      = 1
+Angle away from extremal targets:
+  residual_component_count = 1
+  variable_count           = 6
+  jacobian_rank            = 1
+  remaining_dof            = 5
 ```
 
 The remaining regular Insert freedom is rotation about the common axis.
 
-This Insert rank proof is not yet produced by `AssemblySolveDiagnosticsAnalyzer`; shared numeric integration is the next block.
+## Posed assembly STEP export
+
+Canonical document: `docs/assembly-posed-step-export-mvp5.md`.
+
+`AssemblyStepExporter` is the first derived end-to-end assembly geometry consumer.
+
+```text
+const Project
+  -> validate assembly structure
+  -> collect referenced parts in lexicographic id order
+  -> recompute each referenced part once into one per-export ShapeCache
+  -> reuse that cache for repeated occurrences
+  -> collect visible active components in lexicographic id order
+  -> copy and pose each final part shape with persisted RigidTransform semantics
+  -> compose one OCCT compound
+  -> existing StepExporter
+  -> STEP file
+```
+
+Hidden and suppressed components are omitted from the compound. Missing project members, failed recomputes, missing final shapes, transform failures, empty visible-active output, and STEP writer failures stop the export.
+
+The current seed exports one geometric compound. Structured STEP assembly product hierarchy, occurrence naming in STEP, and geometry instancing are deferred.
+
+`blcad_export_posed_assembly` proves the current end-to-end path by loading project JSON, deriving the active constraint graph, solving one connected group, explicitly applying the converged result, and exporting the posed compound.
 
 ## Persistence boundary
 
-Persisted model intent includes project/part/assembly records, component placement/state, and assembly constraints with semantic target strings.
+Persisted model intent includes project/part/assembly records, component placement/state, assembly constraints with semantic target strings, and their explicit quantity values where applicable.
 
 Derived and unpersisted data includes:
 
 - constraint graph connectivity
 - resolved local plane/axis/seat descriptors
 - assembly-space plane/axis/seat geometry
-- Mate/Distance/Concentric/Insert residual descriptors
+- Mate/Distance/Concentric/Insert/Angle residual descriptors
 - flattened numeric residual vectors
 - numeric Jacobians and normal equations
 - solver iteration state and solve results
 - unapplied transform proposals
 - residual summaries
 - rank summaries and remaining-DOF diagnostics
-
-`feature.hole.seat` uses the existing semantic-reference string field. `Insert` uses the existing constraint type string field. No new JSON field is required.
+- per-export part `ShapeCache` instances
+- transformed component BRep copies
+- posed assembly OCCT compounds
+- assembly STEP export summaries
 
 Only explicit application of a fresh converged solve result changes persisted component `RigidTransform` intent.
 
 ## Next assembly block
 
-The next core assembly block is **Insert numeric-system, rigid-body solver, explicit application, and DOF-diagnostics integration**.
+The next core assembly block is **joint/limit model intent and the first motion-capable solve seed**.
 
-The shared numeric evaluator should route Insert to `AssemblyInsertConstraintEquationBuilder` and flatten exactly:
+The first implementation should define persistent solver-independent joint identity, semantic endpoints, active state, and explicit limit ranges. A minimal revolute joint is the preferred seed because its free coordinate aligns naturally with the already-proven rotation-about-axis freedom of Concentric/Insert relationships.
 
-```text
-direction_parallelism.x
-direction_parallelism.y
-direction_parallelism.z
-axis_offset_mm.x / length_residual_scale_mm
-axis_offset_mm.y / length_residual_scale_mm
-axis_offset_mm.z / length_residual_scale_mm
-signed_seating_separation_mm / length_residual_scale_mm
-```
-
-All existing ordering, finite-difference, damping, grounding, suppression, solve-state, snapshot, stale-result, and atomic-application contracts must remain unchanged. The regular integrated Insert system must be proven as rank `5/6` with one remaining rotation-about-axis DOF through the shared diagnostics path.
+Joint connectivity, resolved endpoints, Jacobians, null-space information, and solve state must remain derived. The motion boundary should accept an explicit requested joint coordinate, evaluate limits with documented clamp-or-reject semantics, reuse deterministic solver/application contracts, and return transform proposals rather than silently mutating a source project.
 
 ## Broader future direction
 
