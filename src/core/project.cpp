@@ -66,10 +66,35 @@ Result<std::size_t> Project::validate_member_parts() const {
   return Result<std::size_t>::success(assembly_.member_part_count());
 }
 
+Result<std::size_t> Project::validate_component_instances() const {
+  for (const ComponentInstance& instance : assembly_.component_instances()) {
+    if (!assembly_.has_member_part(instance.referenced_part_document())) {
+      return Result<std::size_t>::failure(Error::validation(
+          instance.id().value(), "component instance referenced part must be an assembly member part"));
+    }
+    if (find_part_document(instance.referenced_part_document()) == nullptr) {
+      return Result<std::size_t>::failure(Error::validation(
+          instance.id().value(),
+          "component instance referenced part must resolve to an owned project part document"));
+    }
+  }
+  return Result<std::size_t>::success(assembly_.component_instance_count());
+}
+
+Result<std::size_t> Project::validate_assembly_structure() const {
+  auto members = validate_member_parts();
+  if (members.has_error()) return members;
+
+  auto instances = validate_component_instances();
+  if (instances.has_error()) return instances;
+
+  return Result<std::size_t>::success(members.value() + instances.value());
+}
+
 Result<ProjectUpdateResult> Project::set_assembly_parameter_value(ParameterId id, Quantity value) {
-  auto valid_members = validate_member_parts();
-  if (valid_members.has_error()) {
-    return Result<ProjectUpdateResult>::failure(valid_members.error());
+  auto valid_structure = validate_assembly_structure();
+  if (valid_structure.has_error()) {
+    return Result<ProjectUpdateResult>::failure(valid_structure.error());
   }
 
   auto updated = assembly_.set_parameter_value(id, value);
