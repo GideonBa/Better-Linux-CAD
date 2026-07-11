@@ -1,45 +1,63 @@
 # Planar Angle Constraint Family MVP-5
 
-Status: implemented the first richer assembly constraint family — a planar Angle constraint with a persistent angle value, integrated into the shared numeric residual/Jacobian system, rigid-body solver, explicit application path, and DOF diagnostics in one block.
+Status: implemented the first richer local assembly constraint family after Mate/Distance/Concentric/Insert: a planar Angle constraint with persistent degree intent, shared residual/Jacobian integration, local rigid-body solving, explicit application, and local DOF diagnostics.
 
 ## Intent
 
 ```text
 AssemblyConstraint
-  type    = angle
+  type     = angle
   target_a = feature.<feature-id>.<face> on component A
   target_b = feature.<feature-id>.<face> on component B
-  angle    = signed angle in degrees (required, AngleDeg quantity)
+  angle    = degree quantity (required)
 ```
 
-- `QuantityKind::AngleDeg` with `Quantity::angle_deg` validates finite signed degree values (unit `"deg"`, accessor `degrees()`).
-- Angle constraints require an angle value and reject length and count quantities; every other family rejects angle values (mirroring the distance rule).
-- JSON spelling `angle` with `"angle": {"unit": "deg", "value": ...}`; roundtrip does not change the assembly schema shape.
+`QuantityKind::AngleDeg` and `Quantity::angle_deg` validate finite degree values.
+
+Angle constraints require an angle value and reject Distance values. Every non-Angle family rejects angle values.
+
+JSON persists:
+
+```json
+"angle": {"unit": "deg", "value": 35.0}
+```
 
 ## Residual
 
-Both targets resolve through the existing generated-face planar resolution and the shared transform evaluator. The dedicated read-only residual is one dimensionless scalar:
+Both endpoints resolve through existing generated planar-face semantics and the shared transform evaluator.
 
 ```text
 normal_dot      = dot(nA, nB)
 angle_alignment = normal_dot - cos(target_angle_deg)
 ```
 
-A satisfied Angle has `angle_alignment = 0`. No length scaling applies during flattening; the component enters the shared residual vector as-is, in the same lexicographic constraint order as every family:
+The flattened residual contributes one dimensionless scalar:
 
 ```text
 angle_alignment
 ```
 
-`PlanarAngleResidualDescriptor` joins the planar variant next to Mate and Distance; the builder, numeric system, solver, application path, and diagnostics all stay single-path.
+No length scaling applies.
+
+`PlanarAngleResidualDescriptor` joins the planar Mate/Distance descriptor family. Target resolution, numeric flattening, solver execution, result application, and diagnostics remain single-path.
 
 ## Semantics and limits of the seed
 
-- the residual constrains only the relative normal orientation (one DOF in the regular case); position is free.
-- the cosine form is direction-symmetric: an angle of `θ` and `-θ` are the same state. Signed/oriented angle measurement around a reference axis is a later extension.
-- at extremal targets (`0°`, `180°`) the residual gradient vanishes at the solution, so those targets contribute no rank at the solved state; diagnostics report that honestly as redundancy instead of hiding it.
+The residual constrains relative normal orientation only. Position remains free.
+
+The cosine form is direction-symmetric:
+
+```text
++theta and -theta describe the same normal alignment
+```
+
+Oriented signed angle measurement around an explicit reference axis is a later relationship extension.
+
+At satisfied `0 deg` and `180 deg` targets, the cosine residual gradient vanishes. Local rank diagnostics report that degeneracy rather than hiding it.
 
 ## Proven regular one-free-body result
+
+Away from the extremal targets:
 
 ```text
 variable_count           = 6
@@ -47,31 +65,53 @@ residual_component_count = 1
 jacobian_rank            = 1
 constrained_dof          = 1
 remaining_dof            = 5
-residual_row_redundancy  = 0   (full row rank)
+residual_row_redundancy  = 0
 ```
 
 ## Covered by tests
 
-`tests/core/assembly_angle_constraint_tests.cpp`:
+`tests/core/assembly_angle_constraint_tests.cpp` proves:
 
-- angle quantity validation (finite, signed, unit `"deg"`, kind checks against length/count).
-- intent validation matrix: missing angle, wrong quantity kind, distance-on-angle, angle-on-mate.
-- JSON roundtrip with type `angle`, unit `deg`, inactive state, and unchanged placements.
+- finite signed degree quantity behavior;
+- value-family validation;
+- required Angle value and forbidden values on other families;
+- JSON roundtrip with `deg`, inactive state, and unchanged placement.
 
-`tests/geometry/assembly_angle_numeric_solver_tests.cpp`:
+`tests/geometry/assembly_angle_numeric_solver_tests.cpp` proves:
 
-- residual values against expected cosines for aligned and rotated targets.
-- deterministic mixed Distance/Angle flattening with exact expected values (`5` components).
-- solver converges a tilted free component to the target angle; applied result has near-zero alignment; source project unchanged; deterministic double-solve.
-- already-satisfied target converges with zero iterations and unchanged transforms.
-- grounded wrong-angle pairs classify as fixed-geometry inconsistent.
-- non-converged results stay read-only and unapplable.
-- diagnostics prove rank `1/6`, five remaining DOF, full row rank, twice, with identical results.
-- mixed Mate/Angle diagnostics stay insertion-order independent (opposed normals with a consistent `180°` target).
+- residual values against expected cosines;
+- deterministic mixed Distance/Angle flattening;
+- convergence of a tilted free component;
+- source-project immutability before application;
+- zero-iteration already-satisfied cases;
+- grounded fixed inconsistency;
+- read-only non-convergence;
+- local rank `1/6` with five remaining DOF;
+- insertion-order-independent mixed Mate/Angle diagnostics.
 
-## Still not implemented
+## Persistence boundary
 
-- oriented/signed angle measurement around a reference axis and angle limits.
-- angle constraints on axis or seat targets (planar faces only).
-- suppressed components inside a solved group.
-- joints, limits, motion, subassemblies, and assembly-level STEP export.
+Persistent authority is the existing local `AssemblyConstraint` record with its semantic targets, active/inactive state, and Angle quantity.
+
+Derived data includes resolved planar target geometry, Angle residual descriptors, flattened residual scalars, Jacobian rows, solve results, proposals, and rank/DOF diagnostics.
+
+Only explicit successful solve-result application changes component transforms.
+
+## Current boundaries
+
+Still deferred:
+
+- oriented/signed planar angle measurement around a reference axis;
+- angle limits as geometric constraint intent;
+- Angle endpoints on semantic axes or seating frames.
+
+Implemented later in separate blocks:
+
+- suppressed-component solving;
+- Revolute joint limits and motion;
+- rigid nested subassemblies and posed STEP export;
+- interference/clearance analysis;
+- document-scoped flexible child solving;
+- read-only cross-hierarchy target/residual semantics.
+
+Persistent project-level cross-hierarchy geometric constraints and solving remain deferred to `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`.
