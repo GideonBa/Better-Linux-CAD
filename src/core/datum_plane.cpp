@@ -97,7 +97,7 @@ std::string_view to_string(SemanticSeatingPlane plane) noexcept {
 }
 
 Result<SemanticFaceReference> SemanticFaceReference::create(FeatureId source_feature,
-                                                             SemanticFace face) {
+                                                            SemanticFace face) {
   const auto object_id = source_feature.empty()
                              ? std::string("semantic_face")
                              : source_feature.value() + "." + std::string(to_string(face));
@@ -123,7 +123,7 @@ SemanticFaceReference::SemanticFaceReference(FeatureId source_feature, SemanticF
     : source_feature_(std::move(source_feature)), face_(face) {}
 
 Result<SemanticAxisReference> SemanticAxisReference::create(FeatureId source_feature,
-                                                             SemanticAxis axis) {
+                                                            SemanticAxis axis) {
   const auto object_id = source_feature.empty()
                              ? std::string("semantic_axis")
                              : source_feature.value() + "." + std::string(to_string(axis));
@@ -184,7 +184,7 @@ SemanticSeatingPlaneReference::SemanticSeatingPlaneReference(FeatureId source_fe
     : source_feature_(std::move(source_feature)), plane_(plane) {}
 
 Result<SemanticEdgeReference> SemanticEdgeReference::create(FeatureId source_feature,
-                                                             SemanticEdge edge) {
+                                                            SemanticEdge edge) {
   const auto object_id = source_feature.empty()
                              ? std::string("semantic_edge")
                              : source_feature.value() + ".edge." + std::string(to_string(edge));
@@ -214,7 +214,7 @@ SemanticEdgeReference::SemanticEdgeReference(FeatureId source_feature, SemanticE
     : source_feature_(std::move(source_feature)), edge_(edge) {}
 
 Result<SemanticVertexReference> SemanticVertexReference::create(FeatureId source_feature,
-                                                                 SemanticVertex vertex) {
+                                                                SemanticVertex vertex) {
   const auto object_id = source_feature.empty()
                              ? std::string("semantic_vertex")
                              : source_feature.value() + ".vertex." + std::string(to_string(vertex));
@@ -257,8 +257,8 @@ Result<DatumPlane> DatumPlane::xy(DatumPlaneId id, std::string name) {
   }
 
   return Result<DatumPlane>::success(DatumPlane(std::move(id), std::move(name),
-                                                 Point3{0.0, 0.0, 0.0}, Vector3{1.0, 0.0, 0.0},
-                                                 Vector3{0.0, 1.0, 0.0}, Vector3{0.0, 0.0, 1.0}));
+                                                Point3{0.0, 0.0, 0.0}, Vector3{1.0, 0.0, 0.0},
+                                                Vector3{0.0, 1.0, 0.0}, Vector3{0.0, 0.0, 1.0}));
 }
 
 const DatumPlaneId& DatumPlane::id() const noexcept {
