@@ -140,12 +140,20 @@ constexpr double kPivotTolerance = 1.0e-14;
   return solve_linear_system(std::move(normal_matrix), std::move(right_hand_side), step);
 }
 
+[[nodiscard]] AssemblyNumericSolveOutcome make_numeric_outcome(
+    AssemblySolveState state, std::size_t iterations,
+    const NumericVector& initial_residuals, NumericVector final_residuals,
+    NumericVector final_variables) {
+  return AssemblyNumericSolveOutcome{state, iterations, initial_residuals,
+                                     std::move(final_residuals),
+                                     std::move(final_variables)};
+}
+
 [[nodiscard]] AssemblySolveResult make_solve_result(
-    AssemblySolveState state, std::size_t iterations, const Project& source_project,
+    const AssemblyNumericSolveOutcome& outcome, const Project& source_project,
     const Project& solved_project, const std::vector<ComponentInstanceId>& connected_group,
     const std::vector<ComponentInstanceId>& fixed_components,
-    const std::vector<ComponentInstanceId>& variable_components,
-    const NumericVector& initial_residuals, const NumericVector& final_residuals) {
+    const std::vector<ComponentInstanceId>& variable_components) {
   std::vector<AssemblySolveComponentSnapshot> snapshots;
   snapshots.reserve(connected_group.size());
   for (const auto& component_id : connected_group) {
@@ -168,18 +176,125 @@ constexpr double kPivotTolerance = 1.0e-14;
   }
 
   return AssemblySolveResult{
-      state,
-      iterations,
+      outcome.state,
+      outcome.iterations,
       connected_group,
       fixed_components,
       std::move(snapshots),
       std::move(proposals),
-      AssemblySolveResidualSummary{final_residuals.size(), residual_rms(initial_residuals),
-                                   residual_rms(final_residuals),
-                                   residual_max_abs(final_residuals)}};
+      AssemblySolveResidualSummary{outcome.final_residuals.size(),
+                                   residual_rms(outcome.initial_residuals),
+                                   residual_rms(outcome.final_residuals),
+                                   residual_max_abs(outcome.final_residuals)}};
 }
 
 } // namespace
+
+Result<AssemblyNumericSolveOutcome> solve_numeric_variables(
+    const NumericVector& initial_variables, bool has_fixed_reference,
+    const AssemblyNumericResidualEvaluator& evaluator, AssemblyRigidBodySolverOptions options) {
+  auto options_validation = validate_options(options);
+  if (options_validation.has_error()) {
+    return Result<AssemblyNumericSolveOutcome>::failure(options_validation.error());
+  }
+
+  auto initial_residuals = evaluator(initial_variables);
+  if (initial_residuals.has_error()) {
+    return Result<AssemblyNumericSolveOutcome>::failure(initial_residuals.error());
+  }
+
+  NumericVector variables = initial_variables;
+  NumericVector current_residuals = initial_residuals.value();
+
+  if (current_residuals.empty()) {
+    return Result<AssemblyNumericSolveOutcome>::success(make_numeric_outcome(
+        AssemblySolveState::Converged, 0U, initial_residuals.value(),
+        std::move(current_residuals), std::move(variables)));
+  }
+
+  if (!has_fixed_reference) {
+    return Result<AssemblyNumericSolveOutcome>::failure(validation_error(
+        "assembly.solver", "solver connected group requires at least one grounded component"));
+  }
+
+  if (variables.empty()) {
+    const AssemblySolveState state = residual_rms(current_residuals) <= options.convergence_rms
+                                         ? AssemblySolveState::Converged
+                                         : AssemblySolveState::FixedGeometryInconsistent;
+    return Result<AssemblyNumericSolveOutcome>::success(make_numeric_outcome(
+        state, 0U, initial_residuals.value(), std::move(current_residuals),
+        std::move(variables)));
+  }
+
+  const AssemblyNumericSystemOptions numeric_options{
+      options.length_residual_scale_mm, options.finite_difference_translation_step_mm,
+      options.finite_difference_rotation_step_deg};
+
+  std::size_t completed_iterations = 0U;
+  for (std::size_t iteration = 0U; iteration < options.maximum_iterations; ++iteration) {
+    if (residual_rms(current_residuals) <= options.convergence_rms) {
+      return Result<AssemblyNumericSolveOutcome>::success(make_numeric_outcome(
+          AssemblySolveState::Converged, completed_iterations, initial_residuals.value(),
+          std::move(current_residuals), std::move(variables)));
+    }
+
+    auto jacobian = build_central_difference_jacobian(
+        variables, current_residuals, numeric_options, evaluator);
+    if (jacobian.has_error()) {
+      return Result<AssemblyNumericSolveOutcome>::failure(jacobian.error());
+    }
+
+    const double current_rms = residual_rms(current_residuals);
+    bool accepted = false;
+    for (std::size_t damping_attempt = 0U;
+         damping_attempt < options.maximum_damping_attempts && !accepted; ++damping_attempt) {
+      const double damping = options.initial_damping * std::pow(10.0, damping_attempt);
+      NumericVector step;
+      if (!gauss_newton_step(jacobian.value(), current_residuals, damping, step)) {
+        continue;
+      }
+
+      for (std::size_t line_search = 0U; line_search < options.maximum_line_search_steps;
+           ++line_search) {
+        const double scale = std::ldexp(1.0, -static_cast<int>(line_search));
+        NumericVector candidate_variables = variables;
+        for (std::size_t index = 0U; index < candidate_variables.size(); ++index) {
+          candidate_variables[index] += scale * step[index];
+        }
+
+        auto candidate_residuals = evaluator(candidate_variables);
+        if (candidate_residuals.has_error()) {
+          return Result<AssemblyNumericSolveOutcome>::failure(candidate_residuals.error());
+        }
+        if (candidate_residuals.value().size() != current_residuals.size()) {
+          return Result<AssemblyNumericSolveOutcome>::failure(validation_error(
+              "assembly.solver", "solver residual dimension changed during line search"));
+        }
+
+        if (residual_rms(candidate_residuals.value()) < current_rms) {
+          variables = std::move(candidate_variables);
+          current_residuals = std::move(candidate_residuals.value());
+          accepted = true;
+          ++completed_iterations;
+          break;
+        }
+      }
+    }
+
+    if (!accepted) {
+      return Result<AssemblyNumericSolveOutcome>::success(make_numeric_outcome(
+          AssemblySolveState::NumericalFailure, completed_iterations, initial_residuals.value(),
+          std::move(current_residuals), std::move(variables)));
+    }
+  }
+
+  const AssemblySolveState final_state = residual_rms(current_residuals) <= options.convergence_rms
+                                             ? AssemblySolveState::Converged
+                                             : AssemblySolveState::MaximumIterationsReached;
+  return Result<AssemblyNumericSolveOutcome>::success(make_numeric_outcome(
+      final_state, completed_iterations, initial_residuals.value(),
+      std::move(current_residuals), std::move(variables)));
+}
 
 Result<AssemblySolveResult> solve_numeric_relationships(
     const Project& project, const std::vector<ComponentInstanceId>& connected_group,
@@ -207,111 +322,34 @@ Result<AssemblySolveResult> solve_numeric_relationships(
     }
   }
 
-  if (relationships.empty()) {
-    return Result<AssemblySolveResult>::success(make_solve_result(
-        AssemblySolveState::Converged, 0U, project, project, connected_group, fixed_components,
-        variable_components, NumericVector{}, NumericVector{}));
-  }
-
-  if (fixed_components.empty()) {
-    return Result<AssemblySolveResult>::failure(validation_error(
-        "assembly.solver", "solver connected group requires at least one grounded component"));
-  }
-
-  const AssemblyNumericSystemOptions numeric_options{
-      options.length_residual_scale_mm, options.finite_difference_translation_step_mm,
-      options.finite_difference_rotation_step_deg};
-
-  Project working_project = project;
-  auto initial_residuals =
-      evaluate_residuals(working_project, relationships, options.length_residual_scale_mm);
-  if (initial_residuals.has_error()) {
-    return Result<AssemblySolveResult>::failure(initial_residuals.error());
-  }
-  NumericVector current_residuals = initial_residuals.value();
-
-  if (variable_components.empty()) {
-    const AssemblySolveState state = residual_rms(current_residuals) <= options.convergence_rms
-                                         ? AssemblySolveState::Converged
-                                         : AssemblySolveState::FixedGeometryInconsistent;
-    return Result<AssemblySolveResult>::success(
-        make_solve_result(state, 0U, project, working_project, connected_group, fixed_components,
-                          variable_components, initial_residuals.value(), current_residuals));
-  }
-
-  NumericVector variables = read_variables(working_project, variable_components);
-  std::size_t completed_iterations = 0U;
-
-  for (std::size_t iteration = 0U; iteration < options.maximum_iterations; ++iteration) {
-    if (residual_rms(current_residuals) <= options.convergence_rms) {
-      return Result<AssemblySolveResult>::success(make_solve_result(
-          AssemblySolveState::Converged, completed_iterations, project, working_project,
-          connected_group, fixed_components, variable_components, initial_residuals.value(),
-          current_residuals));
-    }
-
-    auto jacobian = build_central_difference_jacobian(
-        working_project, variable_components, relationships, variables, current_residuals,
-        numeric_options);
-    if (jacobian.has_error()) {
-      return Result<AssemblySolveResult>::failure(jacobian.error());
-    }
-
-    const double current_rms = residual_rms(current_residuals);
-    bool accepted = false;
-    for (std::size_t damping_attempt = 0U;
-         damping_attempt < options.maximum_damping_attempts && !accepted; ++damping_attempt) {
-      const double damping = options.initial_damping * std::pow(10.0, damping_attempt);
-      NumericVector step;
-      if (!gauss_newton_step(jacobian.value(), current_residuals, damping, step)) {
-        continue;
-      }
-
-      for (std::size_t line_search = 0U; line_search < options.maximum_line_search_steps;
-           ++line_search) {
-        const double scale = std::ldexp(1.0, -static_cast<int>(line_search));
-        NumericVector candidate_variables = variables;
-        for (std::size_t index = 0U; index < candidate_variables.size(); ++index) {
-          candidate_variables[index] += scale * step[index];
+  const NumericVector initial_variables = read_variables(project, variable_components);
+  const AssemblyNumericResidualEvaluator evaluator =
+      [&project, &variable_components, &relationships,
+       length_scale = options.length_residual_scale_mm](const NumericVector& candidate_values) {
+        Project candidate_project = project;
+        auto applied = apply_variables(candidate_project, variable_components, candidate_values);
+        if (applied.has_error()) {
+          return Result<NumericVector>::failure(applied.error());
         }
+        return evaluate_residuals(candidate_project, relationships, length_scale);
+      };
 
-        Project candidate_project = working_project;
-        auto candidate_applied =
-            apply_variables(candidate_project, variable_components, candidate_variables);
-        if (candidate_applied.has_error()) {
-          return Result<AssemblySolveResult>::failure(candidate_applied.error());
-        }
-        auto candidate_residuals =
-            evaluate_residuals(candidate_project, relationships, options.length_residual_scale_mm);
-        if (candidate_residuals.has_error()) {
-          return Result<AssemblySolveResult>::failure(candidate_residuals.error());
-        }
-
-        if (residual_rms(candidate_residuals.value()) < current_rms) {
-          variables = std::move(candidate_variables);
-          working_project = std::move(candidate_project);
-          current_residuals = std::move(candidate_residuals.value());
-          accepted = true;
-          ++completed_iterations;
-          break;
-        }
-      }
-    }
-
-    if (!accepted) {
-      return Result<AssemblySolveResult>::success(make_solve_result(
-          AssemblySolveState::NumericalFailure, completed_iterations, project, working_project,
-          connected_group, fixed_components, variable_components, initial_residuals.value(),
-          current_residuals));
-    }
+  auto outcome = solve_numeric_variables(initial_variables, !fixed_components.empty(), evaluator,
+                                         options);
+  if (outcome.has_error()) {
+    return Result<AssemblySolveResult>::failure(outcome.error());
   }
 
-  const AssemblySolveState final_state = residual_rms(current_residuals) <= options.convergence_rms
-                                             ? AssemblySolveState::Converged
-                                             : AssemblySolveState::MaximumIterationsReached;
+  Project solved_project = project;
+  auto applied = apply_variables(solved_project, variable_components,
+                                 outcome.value().final_variables);
+  if (applied.has_error()) {
+    return Result<AssemblySolveResult>::failure(applied.error());
+  }
+
   return Result<AssemblySolveResult>::success(make_solve_result(
-      final_state, completed_iterations, project, working_project, connected_group, fixed_components,
-      variable_components, initial_residuals.value(), current_residuals));
+      outcome.value(), project, solved_project, connected_group, fixed_components,
+      variable_components));
 }
 
 } // namespace blcad::geometry::detail
