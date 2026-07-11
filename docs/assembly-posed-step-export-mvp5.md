@@ -89,18 +89,20 @@ This deliberately avoids treating STEP entity numbers, entity ordering, or write
 
 ## Headless end-to-end example
 
-`blcad_export_posed_assembly` executes the full current assembly path:
+`blcad_export_posed_assembly` first inspects the active geometric constraint graph. If one connected multi-component constraint group exists, the example solves and explicitly applies that group before export. If no such group exists, the project is treated as already posed and its persisted component transforms are exported directly.
 
 ```text
 read_project_json_file
   -> AssemblyConstraintGraph::build
-  -> select one connected multi-component group
-  -> AssemblyRigidBodySolver::solve
-  -> AssemblySolveResultApplier::apply
+  -> optional connected multi-component geometric group
+       -> AssemblyRigidBodySolver::solve
+       -> AssemblySolveResultApplier::apply
   -> AssemblyStepExporter::write_step
 ```
 
-Checked-in input:
+The optional solve is a headless-example behavior, not part of `AssemblyStepExporter`. This allows the same export CLI to consume both an unsolved geometric-constraint example and a project whose pose was already explicitly applied by `AssemblyJointMotionResultApplier`.
+
+Checked-in geometric-solve input:
 
 ```text
 examples/posed_assembly.blcad.project.json
@@ -116,6 +118,22 @@ Example command:
 
 The example contains two occurrences of one rectangular plate. One occurrence is grounded; the second starts above it. A planar Mate is solved and explicitly applied before both posed occurrences are exported as one STEP compound.
 
+Applied-motion flow:
+
+```bash
+./build/dev-geometry/blcad_move_joint \
+  examples/revolute_joint.blcad.project.json \
+  joint.revolute \
+  45 \
+  build/revolute_joint_45.blcad.project.json
+
+./build/dev-geometry/blcad_export_posed_assembly \
+  build/revolute_joint_45.blcad.project.json \
+  build/revolute_joint_45.step
+```
+
+The second command finds no geometric multi-component solve group and exports the already-applied Revolute pose directly.
+
 ## Proven behavior
 
 `tests/geometry/assembly_step_exporter_tests.cpp` covers:
@@ -129,10 +147,11 @@ The example contains two occurrences of one rectangular plate. One occurrence is
 - failure on an unresolvable project member;
 - failure when a referenced part recomputes without a final shape.
 
+The headless consumer additionally preserves the previous solve-before-export path while allowing already-applied poses to bypass an unnecessary geometric solve.
+
 ## Still not implemented
 
 - STEP assembly product structure with named occurrences and hierarchy; the seed exports one geometric compound;
 - component geometry instancing instead of transformed shape copies;
-- joints, limits, and motion;
 - rigid or flexible subassemblies;
 - collision/interference analysis.
