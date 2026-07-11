@@ -6,7 +6,7 @@ Detailed architecture and feature status live in `docs/`. This README is intenti
 
 ## Status
 
-Current state: MVP-1 core skeleton, staged MVP-2 seeds for sketches, workplanes, profile geometry, recompute, STEP export, reference recovery, sketch diagnostics, and repair-command infrastructure, the MVP-3 parametric bolt circle, the MVP-4 assembly/project container path, and the first MVP-5 component-instance seed.
+Current state: MVP-1 core skeleton, staged MVP-2 seeds for sketches, workplanes, profile geometry, recompute, STEP export, reference recovery, sketch diagnostics, and repair-command infrastructure, the MVP-3 parametric bolt circle, the MVP-4 assembly/project container path, and MVP-5 component instances with explicit free-placement/state updates.
 
 There is no GUI yet.
 
@@ -119,14 +119,16 @@ Future roadmaps:
 
 ## Next technical step
 
-The next technical step should add component instance placement and state update APIs.
+The next technical step should add the first solver-independent assembly constraint model-intent records on semantic component targets.
 
-1. Add explicit `AssemblyDocument` update functions for component instance transform, visibility, suppression state, and grounding state.
-2. Validate that the target component instance id exists and that updated state remains in the no-solver/free-placement boundary.
-3. Keep transform edits as direct free-placement edits; do not infer constraints or recompute solved positions.
-4. Preserve JSON roundtrip for updated component state and transform values.
-5. Add project-level validation tests showing updates do not duplicate part documents and keep instance references valid.
-6. Extend `blcad_inspect_project_components` output or tests so updated placement/state is observable from a project file.
-7. Keep mate/concentric/distance constraints, solver, DOF display, collision checks, subassemblies, and assembly-level STEP export deferred.
+1. Add a typed `AssemblyConstraintId` and an `AssemblyConstraintType` limited to Mate, Concentric, and Distance.
+2. Add a semantic component-target record that combines an existing `ComponentInstanceId` with a persistent semantic reference token; never store raw OCCT face, edge, or vertex ids.
+3. Add `AssemblyConstraint` records with stable id, name, type, target A, target B, active state, and a distance value only for Distance constraints.
+4. Let `AssemblyDocument` own constraints and validate unique constraint ids, existing component instance targets, non-empty semantic reference tokens, and type-specific distance requirements.
+5. Keep constraint creation and JSON loading read-only with respect to component transforms: no placement solving, constraint inference, DOF computation, or grounding enforcement in this block.
+6. Persist optional `assembly_constraints` through assembly/project JSON while keeping older files without the field loadable.
+7. Add core and project tests for invalid targets, duplicate ids, Mate/Concentric/Distance roundtrip, unchanged free-placement transforms, shared part ownership, and valid project structure.
+8. Extend `blcad_inspect_project_components` or add a focused headless constraint inspector so stored constraint type and semantic targets are observable from a project file.
+9. Keep geometric semantic-reference resolution, constraint graph construction, rigid-body solving, remaining DOF display, Insert/Angle/Tangent constraints, collision checks, subassemblies, and assembly-level STEP export deferred.
 
-The completed component-instance block is documented in `docs/component-instance-mvp5.md`.
+The completed component-instance placement/state update block is documented in `docs/component-instance-mvp5.md`.
