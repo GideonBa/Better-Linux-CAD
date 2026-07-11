@@ -71,7 +71,7 @@ enum class SemanticSeatingPlane {
 class SemanticFaceReference {
 public:
   [[nodiscard]] static Result<SemanticFaceReference> create(FeatureId source_feature,
-                                                             SemanticFace face);
+                                                            SemanticFace face);
 
   [[nodiscard]] const FeatureId& source_feature() const noexcept;
   [[nodiscard]] SemanticFace face() const noexcept;
@@ -119,7 +119,7 @@ private:
 class SemanticEdgeReference {
 public:
   [[nodiscard]] static Result<SemanticEdgeReference> create(FeatureId source_feature,
-                                                             SemanticEdge edge);
+                                                            SemanticEdge edge);
 
   [[nodiscard]] const FeatureId& source_feature() const noexcept;
   [[nodiscard]] SemanticEdge edge() const noexcept;
@@ -135,7 +135,7 @@ private:
 class SemanticVertexReference {
 public:
   [[nodiscard]] static Result<SemanticVertexReference> create(FeatureId source_feature,
-                                                               SemanticVertex vertex);
+                                                              SemanticVertex vertex);
 
   [[nodiscard]] const FeatureId& source_feature() const noexcept;
   [[nodiscard]] SemanticVertex vertex() const noexcept;
