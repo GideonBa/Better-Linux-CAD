@@ -38,6 +38,13 @@ ComponentInstance make_instance(const char* id,
   return instance.value();
 }
 
+RigidTransform replacement_transform() {
+  RigidTransform transform;
+  transform.translation_mm = Vector3{-12.5, 8.0, 72.25};
+  transform.rotation_deg = Vector3{15.0, 30.0, 90.0};
+  return transform;
+}
+
 } // namespace
 
 TEST_CASE("ComponentInstance validates required identity fields", "[core][component-instance]") {
@@ -78,17 +85,75 @@ TEST_CASE("AssemblyDocument owns component instances that reference member parts
             .has_error());
 }
 
-TEST_CASE("AssemblyDocument JSON roundtrip preserves component instances",
+TEST_CASE("AssemblyDocument explicitly updates free component placement and state",
           "[core][component-instance]") {
   auto assembly = make_empty_assembly();
   REQUIRE(assembly.add_member_part(DocumentId("part.base")));
   REQUIRE(assembly.add_component_instance(make_instance("component.base", "BasePlate", "part.base",
                                                         ComponentGroundingState::Grounded)));
 
+  const auto transform = replacement_transform();
+  REQUIRE(assembly.set_component_instance_transform(ComponentInstanceId("component.base"), transform));
+
+  const ComponentInstance* placed =
+      assembly.find_component_instance(ComponentInstanceId("component.base"));
+  REQUIRE(placed != nullptr);
+  CHECK(placed->grounding_state() == ComponentGroundingState::Grounded);
+  CHECK(placed->transform() == transform);
+  CHECK(placed->referenced_part_document().value() == "part.base");
+
+  REQUIRE(assembly.set_component_instance_visibility(ComponentInstanceId("component.base"),
+                                                     ComponentVisibility::Hidden));
+  REQUIRE(assembly.set_component_instance_suppression_state(
+      ComponentInstanceId("component.base"), ComponentSuppressionState::Suppressed));
+  REQUIRE(assembly.set_component_instance_grounding_state(
+      ComponentInstanceId("component.base"), ComponentGroundingState::Free));
+
+  const ComponentInstance* updated =
+      assembly.find_component_instance(ComponentInstanceId("component.base"));
+  REQUIRE(updated != nullptr);
+  CHECK(updated->id().value() == "component.base");
+  CHECK(updated->name() == "BasePlate");
+  CHECK(updated->referenced_part_document().value() == "part.base");
+  CHECK(updated->visibility() == ComponentVisibility::Hidden);
+  CHECK(updated->suppression_state() == ComponentSuppressionState::Suppressed);
+  CHECK(updated->grounding_state() == ComponentGroundingState::Free);
+  CHECK(updated->transform() == transform);
+
+  CHECK(assembly.set_component_instance_transform(ComponentInstanceId("component.missing"), transform)
+            .has_error());
+  CHECK(assembly.set_component_instance_visibility(ComponentInstanceId("component.missing"),
+                                                   ComponentVisibility::Hidden)
+            .has_error());
+  CHECK(assembly.set_component_instance_suppression_state(
+                    ComponentInstanceId("component.missing"),
+                    ComponentSuppressionState::Suppressed)
+            .has_error());
+  CHECK(assembly.set_component_instance_grounding_state(ComponentInstanceId("component.missing"),
+                                                        ComponentGroundingState::Grounded)
+            .has_error());
+}
+
+TEST_CASE("AssemblyDocument JSON roundtrip preserves updated component placement and state",
+          "[core][component-instance]") {
+  auto assembly = make_empty_assembly();
+  REQUIRE(assembly.add_member_part(DocumentId("part.base")));
+  REQUIRE(assembly.add_component_instance(make_instance("component.base", "BasePlate", "part.base",
+                                                        ComponentGroundingState::Grounded)));
+
+  const auto transform = replacement_transform();
+  REQUIRE(assembly.set_component_instance_transform(ComponentInstanceId("component.base"), transform));
+  REQUIRE(assembly.set_component_instance_visibility(ComponentInstanceId("component.base"),
+                                                     ComponentVisibility::Hidden));
+  REQUIRE(assembly.set_component_instance_suppression_state(
+      ComponentInstanceId("component.base"), ComponentSuppressionState::Suppressed));
+
   const auto serialized = serialize_assembly_document_to_json(assembly);
   REQUIRE(serialized);
   CHECK(serialized.value().find("component_instances") != std::string::npos);
   CHECK(serialized.value().find("component.base") != std::string::npos);
+  CHECK(serialized.value().find("hidden") != std::string::npos);
+  CHECK(serialized.value().find("suppressed") != std::string::npos);
 
   const auto restored = deserialize_assembly_document_from_json(serialized.value());
   REQUIRE(restored);
@@ -96,12 +161,11 @@ TEST_CASE("AssemblyDocument JSON roundtrip preserves component instances",
   const ComponentInstance* instance =
       restored.value().find_component_instance(ComponentInstanceId("component.base"));
   REQUIRE(instance != nullptr);
-  const Vector3 expected_translation{10.0, 20.0, 30.0};
   CHECK(instance->name() == "BasePlate");
-  CHECK(instance->visibility() == ComponentVisibility::Visible);
-  CHECK(instance->suppression_state() == ComponentSuppressionState::Active);
+  CHECK(instance->visibility() == ComponentVisibility::Hidden);
+  CHECK(instance->suppression_state() == ComponentSuppressionState::Suppressed);
   CHECK(instance->grounding_state() == ComponentGroundingState::Grounded);
-  CHECK(instance->transform().translation_mm == expected_translation);
+  CHECK(instance->transform() == transform);
 }
 
 TEST_CASE("Project validates component instances against owned member parts",
@@ -119,7 +183,7 @@ TEST_CASE("Project validates component instances against owned member parts",
   CHECK(project.value().validate_assembly_structure());
 }
 
-TEST_CASE("Project allows multiple component instances to reference one owned part document",
+TEST_CASE("Project component updates preserve shared part ownership and references",
           "[core][component-instance]") {
   auto assembly = make_empty_assembly();
   REQUIRE(assembly.add_member_part(DocumentId("part.bolt")));
@@ -130,9 +194,27 @@ TEST_CASE("Project allows multiple component instances to reference one owned pa
   REQUIRE(project);
   REQUIRE(project.value().add_part_document(make_empty_part("part.bolt", "Bolt")));
 
+  const auto transform = replacement_transform();
+  REQUIRE(project.value().assembly().set_component_instance_transform(
+      ComponentInstanceId("component.bolt.1"), transform));
+  REQUIRE(project.value().assembly().set_component_instance_visibility(
+      ComponentInstanceId("component.bolt.1"), ComponentVisibility::Hidden));
+  REQUIRE(project.value().assembly().set_component_instance_suppression_state(
+      ComponentInstanceId("component.bolt.1"), ComponentSuppressionState::Suppressed));
+  REQUIRE(project.value().assembly().set_component_instance_grounding_state(
+      ComponentInstanceId("component.bolt.1"), ComponentGroundingState::Grounded));
+
   CHECK(project.value().part_document_count() == 1U);
   CHECK(project.value().assembly().component_instance_count() == 2U);
   CHECK(project.value().validate_assembly_structure());
+
+  const ComponentInstance* second = project.value().assembly().find_component_instance(
+      ComponentInstanceId("component.bolt.2"));
+  REQUIRE(second != nullptr);
+  CHECK(second->referenced_part_document().value() == "part.bolt");
+  CHECK(second->visibility() == ComponentVisibility::Visible);
+  CHECK(second->suppression_state() == ComponentSuppressionState::Active);
+  CHECK(second->grounding_state() == ComponentGroundingState::Free);
 
   const auto serialized = serialize_project_to_json(project.value());
   REQUIRE(serialized);
@@ -141,4 +223,13 @@ TEST_CASE("Project allows multiple component instances to reference one owned pa
   CHECK(restored.value().part_document_count() == 1U);
   CHECK(restored.value().assembly().component_instance_count() == 2U);
   CHECK(restored.value().validate_assembly_structure());
+
+  const ComponentInstance* restored_first = restored.value().assembly().find_component_instance(
+      ComponentInstanceId("component.bolt.1"));
+  REQUIRE(restored_first != nullptr);
+  CHECK(restored_first->referenced_part_document().value() == "part.bolt");
+  CHECK(restored_first->visibility() == ComponentVisibility::Hidden);
+  CHECK(restored_first->suppression_state() == ComponentSuppressionState::Suppressed);
+  CHECK(restored_first->grounding_state() == ComponentGroundingState::Grounded);
+  CHECK(restored_first->transform() == transform);
 }
