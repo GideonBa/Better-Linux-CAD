@@ -1,6 +1,6 @@
 #include "blcad/geometry/assembly_step_exporter.hpp"
 
-#include "blcad/core/assembly_hierarchy.hpp"
+#include "blcad/core/assembly_leaf_occurrence.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
 #include "blcad/geometry/shape_cache.hpp"
 #include "blcad/geometry/step_exporter.hpp"
@@ -35,12 +35,6 @@ constexpr const char* kAssemblyStepExporterId = "geometry.assembly_step_exporter
 struct RecomputedPartShape {
   DocumentId part_document;
   ShapeCache shape_cache;
-};
-
-struct FlattenedLeafComponent {
-  const ComponentInstance* component = nullptr;
-  std::vector<RigidTransform> transforms_inner_to_outer;
-  std::string occurrence_key;
 };
 
 [[nodiscard]] Error make_geometry_error(std::string message) {
@@ -139,71 +133,14 @@ find_recomputed_part(const std::vector<RecomputedPartShape>& parts,
   return found == parts.end() ? nullptr : &*found;
 }
 
-[[nodiscard]] bool is_exported_component(const ComponentInstance& component) noexcept {
-  return component.visibility() == ComponentVisibility::Visible &&
-         component.suppression_state() == ComponentSuppressionState::Active;
-}
-
-[[nodiscard]] std::vector<const ComponentInstance*>
-ordered_components(const AssemblyDocument& assembly) {
-  std::vector<const ComponentInstance*> components;
-  components.reserve(assembly.component_instances().size());
-  for (const ComponentInstance& component : assembly.component_instances()) {
-    components.push_back(&component);
-  }
-  std::sort(components.begin(), components.end(), [](const auto* lhs, const auto* rhs) {
-    return lhs->id().value() < rhs->id().value();
-  });
-  return components;
-}
-
-[[nodiscard]] std::string leaf_occurrence_key(
-    const AssemblyHierarchyOccurrenceDescriptor& assembly_occurrence,
-    const ComponentInstance& component) {
-  std::string key = assembly_occurrence.assembly_document.value();
-  for (const SubassemblyInstanceId& occurrence : assembly_occurrence.occurrence_path) {
+[[nodiscard]] std::string
+leaf_occurrence_key(const AssemblyLeafOccurrenceDescriptor& leaf) {
+  std::string key = leaf.assembly_document.value();
+  for (const SubassemblyInstanceId& occurrence : leaf.subassembly_path) {
     key += "/" + occurrence.value();
   }
-  key += "/" + component.id().value();
+  key += "/" + leaf.component_instance.value();
   return key;
-}
-
-[[nodiscard]] Result<std::vector<FlattenedLeafComponent>>
-flatten_leaf_components(const Project& project) {
-  auto hierarchy = AssemblyHierarchyTraversal::build(project);
-  if (hierarchy.has_error()) {
-    return Result<std::vector<FlattenedLeafComponent>>::failure(hierarchy.error());
-  }
-
-  std::vector<FlattenedLeafComponent> leaves;
-  for (const auto& assembly_occurrence : hierarchy.value().occurrences()) {
-    if (!assembly_occurrence.visible_path || !assembly_occurrence.active_path) {
-      continue;
-    }
-
-    const AssemblyDocument* assembly =
-        project.find_assembly_document(assembly_occurrence.assembly_document);
-    if (assembly == nullptr) {
-      return Result<std::vector<FlattenedLeafComponent>>::failure(Error::validation(
-          assembly_occurrence.assembly_document.value(),
-          "assembly export hierarchy occurrence must resolve to a project assembly document"));
-    }
-
-    for (const ComponentInstance* component : ordered_components(*assembly)) {
-      if (!is_exported_component(*component)) {
-        continue;
-      }
-
-      std::vector<RigidTransform> transforms{component->transform()};
-      transforms.insert(transforms.end(),
-                        assembly_occurrence.parent_transforms_inner_to_outer.begin(),
-                        assembly_occurrence.parent_transforms_inner_to_outer.end());
-      leaves.push_back(FlattenedLeafComponent{
-          component, std::move(transforms), leaf_occurrence_key(assembly_occurrence, *component)});
-    }
-  }
-
-  return Result<std::vector<FlattenedLeafComponent>>::success(std::move(leaves));
 }
 
 } // namespace
@@ -216,19 +153,20 @@ AssemblyStepExporter::build(const Project& project) const {
   }
 
   try {
-    auto flattened = flatten_leaf_components(project);
-    if (flattened.has_error()) {
-      return Result<PosedAssemblyBuild>::failure(flattened.error());
+    const AssemblyLeafOccurrenceResolver leaf_resolver;
+    auto leaves = leaf_resolver.resolve(project);
+    if (leaves.has_error()) {
+      return Result<PosedAssemblyBuild>::failure(leaves.error());
     }
-    if (flattened.value().empty()) {
+    if (leaves.value().empty()) {
       return Result<PosedAssemblyBuild>::failure(
           make_export_error("posed assembly export requires at least one visible active component"));
     }
 
     std::vector<DocumentId> referenced_part_ids;
-    for (const FlattenedLeafComponent& leaf : flattened.value()) {
-      if (!contains_part(referenced_part_ids, leaf.component->referenced_part_document())) {
-        referenced_part_ids.push_back(leaf.component->referenced_part_document());
+    for (const AssemblyLeafOccurrenceDescriptor& leaf : leaves.value()) {
+      if (!contains_part(referenced_part_ids, leaf.referenced_part_document)) {
+        referenced_part_ids.push_back(leaf.referenced_part_document);
       }
     }
     std::sort(referenced_part_ids.begin(), referenced_part_ids.end(),
@@ -268,12 +206,12 @@ AssemblyStepExporter::build(const Project& project) const {
     TopoDS_Compound compound;
     compound_builder.MakeCompound(compound);
 
-    for (const FlattenedLeafComponent& leaf : flattened.value()) {
+    for (const AssemblyLeafOccurrenceDescriptor& leaf : leaves.value()) {
       const RecomputedPartShape* part =
-          find_recomputed_part(recomputed_parts, leaf.component->referenced_part_document());
+          find_recomputed_part(recomputed_parts, leaf.referenced_part_document);
       if (part == nullptr || part->shape_cache.final_shape() == nullptr) {
         return Result<PosedAssemblyBuild>::failure(Error::geometry(
-            leaf.occurrence_key, "assembly export leaf component part shape is unavailable"));
+            leaf_occurrence_key(leaf), "assembly export leaf component part shape is unavailable"));
       }
 
       const GeometryShape* final_shape = part->shape_cache.final_shape();
@@ -290,8 +228,8 @@ AssemblyStepExporter::build(const Project& project) const {
     }
 
     GeometryShape shape(std::make_shared<GeometryShape::Impl>(TopoDS_Shape(compound)));
-    return Result<PosedAssemblyBuild>::success(PosedAssemblyBuild{
-        std::move(shape), recomputed_parts.size(), flattened.value().size()});
+    return Result<PosedAssemblyBuild>::success(
+        PosedAssemblyBuild{std::move(shape), recomputed_parts.size(), leaves.value().size()});
   } catch (const Standard_Failure& failure) {
     return Result<PosedAssemblyBuild>::failure(
         make_geometry_error(standard_failure_message(failure)));
