@@ -1,6 +1,6 @@
 # Project container for assembly and member parts
 
-Status: implemented seed. The project container owns one assembly document and embedded member part documents and now validates the current MVP-5 component/constraint structure carried by the assembly.
+Status: implemented seed. The project container owns one assembly document and embedded member part documents and validates the current MVP-5 component/constraint structure carried by the assembly.
 
 This document describes the first project-level container above `AssemblyDocument` and `PartDocument`.
 
@@ -16,7 +16,7 @@ The project container must not:
 - bypass `PartDocument` invalidation and recompute planning
 - emit assembly-level geometry or an assembly-level STEP file
 
-Component instances and explicit free-placement/state updates are handled by `docs/component-instance-mvp5.md`. Solver-independent Mate, Concentric, and Distance records are handled by `docs/assembly-constraint-model-intent-mvp5.md`. The project container validates and persists those assembly-owned records but does not solve them.
+Component instances and explicit free-placement/state updates are handled by `docs/component-instance-mvp5.md`. Solver-independent Mate, Concentric, and Distance records are handled by `docs/assembly-constraint-model-intent-mvp5.md`. The derived read-only active-constraint graph is handled by `docs/assembly-constraint-graph-mvp5.md`. The project container owns the source documents used by those layers but does not solve constraints.
 
 ## Implemented records
 
@@ -75,7 +75,7 @@ It performs this sequence:
 
 The project does not recompute geometry itself. It returns recompute plans so the caller can decide whether to recompute through the core recompute path, the geometry executor, or a future job system.
 
-Constraint validation is structural only. Assembly parameter propagation does not resolve constraints, mutate component transforms, or build a solve graph.
+Constraint validation is structural only. Assembly parameter propagation does not resolve constraints, mutate component transforms, or perform solver work. The separate `AssemblyConstraintGraph` may read the project's assembly to derive connectivity but does not change project state.
 
 ## JSON persistence
 
@@ -119,6 +119,8 @@ The project serializer/deserializer delegates assembly persistence to `serialize
 
 After loading, project deserialization validates member parts, component instances, and assembly constraint component targets through `validate_assembly_structure`.
 
+Constraint graph connectivity is not persisted in project JSON. It is regenerated from the embedded assembly's component and active constraint records.
+
 A manifest-based project file that references separate part files is deliberately deferred.
 
 ## Headless project export and inspection
@@ -140,7 +142,7 @@ The command:
 
 This command is a headless example, not a GUI workflow. It does not solve assembly placement and does not emit an assembly-level STEP file.
 
-The MVP-5 assembly blocks use the separate non-geometry `blcad_inspect_project_components` command for listing component instances, persisted placement/state values, and stored assembly constraint type/state/semantic targets.
+The MVP-5 assembly blocks use the separate non-geometry `blcad_inspect_project_components` command for listing component instances, persisted placement/state values, stored assembly constraint type/state/semantic targets, and the derived active-edge/connected-group graph summary.
 
 ## Test coverage
 
@@ -157,10 +159,12 @@ The MVP-5 component tests separately cover project-level component reference val
 
 The MVP-5 assembly constraint tests separately cover constraint target validation in project structure, shared part ownership across constrained occurrences, and project JSON roundtrip for Mate, Concentric, and Distance records.
 
+The read-only graph tests are separate in `tests/core/assembly_constraint_graph_tests.cpp`; graph construction consumes the validated assembly structure but does not add project persistence or mutation semantics.
+
 ## Deliberate limitations
 
 The project container does not solve component placements, constraints, or DOF.
 
-It does not resolve semantic constraint target geometry, construct the next read-only constraint graph itself, enforce grounding, perform collision checks, or emit assembly-level STEP.
+It does not resolve semantic constraint target geometry, enforce grounding, perform collision checks, or emit assembly-level STEP. The read-only constraint graph is implemented separately as regenerable derived data and is not project-owned persistent state.
 
 It also does not implement manifest-based project files, external part references, lazy part loading, dirty-file tracking, or partial project save.

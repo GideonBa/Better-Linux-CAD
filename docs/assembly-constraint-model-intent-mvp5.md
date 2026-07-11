@@ -1,12 +1,12 @@
 # Assembly Constraint Model Intent MVP-5
 
-Status: implemented solver-independent assembly relationship records for Mate, Concentric, and Distance.
+Status: implemented solver-independent assembly relationship records for Mate, Concentric, and Distance. A separate read-only connectivity graph is now also implemented in `docs/assembly-constraint-graph-mvp5.md`.
 
 ## Goal
 
-This block makes assembly relationships persistent model intent before BLCAD introduces a constraint graph, semantic target geometry resolution, or a rigid-body solver.
+This block makes assembly relationships persistent model intent before semantic target geometry resolution or a rigid-body solver.
 
-The implementation deliberately stores what two component occurrences are intended to relate. It does not yet compute where either component must move.
+The implementation deliberately stores what two component occurrences are intended to relate. It does not compute where either component must move.
 
 ## Typed identity
 
@@ -88,7 +88,7 @@ Rules:
 - `Concentric` must not carry a distance value
 - count quantities are rejected for Distance
 
-This block stores a concrete distance value. Binding a distance constraint directly to an assembly parameter is deferred until the assembly dependency/constraint graph design is introduced.
+This block stores a concrete distance value. Binding a distance constraint directly to an assembly parameter remains deferred until an explicit assembly parameter-to-constraint dependency model exists.
 
 ## Assembly ownership
 
@@ -121,16 +121,17 @@ Target construction already validates non-empty component ids and semantic refer
 
 Adding a constraint is read-only with respect to all component placement/state records.
 
-The implementation does not:
+This record block does not itself:
 
 - mutate either component `RigidTransform`
 - infer a constraint from a free-placement edit
 - resolve semantic target geometry
-- construct a constraint graph
 - move grounded or free components
 - compute remaining degrees of freedom
 - detect underdefined, fully constrained, or overconstrained assemblies
 - recompute member part geometry
+
+A separate derived `AssemblyConstraintGraph` now reads these records to expose active connectivity. Graph construction also remains read-only and does not change this record-layer boundary.
 
 Loading constraints from JSON follows the same path: component instances are loaded first, then constraints are validated and added. JSON loading therefore cannot silently solve or move component instances.
 
@@ -138,7 +139,7 @@ Loading constraints from JSON follows the same path: component instances are loa
 
 `Project::validate_assembly_constraints()` verifies that every persisted constraint target still resolves to an owned assembly component instance.
 
-`Project::validate_assembly_structure()` now validates, in order:
+`Project::validate_assembly_structure()` validates, in order:
 
 1. assembly member parts resolve to project-owned `PartDocument`s
 2. component instances reference valid member/project parts
@@ -194,11 +195,11 @@ Compatibility rules:
 - target validation runs through the normal `AssemblyDocument::add_constraint` path
 - project JSON automatically inherits constraint persistence because it embeds assembly JSON
 
-No solver result, resolved OCCT topology, DOF state, or solved transform cache is serialized by this block.
+No solver result, resolved OCCT topology, graph cache, DOF state, or solved transform cache is serialized. The connectivity graph is fully regenerated from component and constraint intent.
 
 ## Headless inspection
 
-`blcad_inspect_project_components` now reports both component instances and stored assembly constraints.
+`blcad_inspect_project_components` reports component instances and stored assembly constraints.
 
 For each constraint it prints:
 
@@ -209,9 +210,11 @@ For each constraint it prints:
 - target B component id and semantic token
 - distance in millimeters when present
 
+The inspector now also builds `AssemblyConstraintGraph` and prints a compact active-edge and connected-group summary. Graph details are documented in `docs/assembly-constraint-graph-mvp5.md`.
+
 The checked-in `examples/component_instances.blcad.project.json` contains Mate, Concentric, and Distance records for this read-only inspection path.
 
-The example intentionally uses semantic reference tokens without geometry resolution. That is the exact boundary of this MVP block.
+The example intentionally uses semantic reference tokens without geometry resolution. That remains the exact target-resolution boundary.
 
 ## Test coverage
 
@@ -236,7 +239,9 @@ The example intentionally uses semantic reference tokens without geometry resolu
 - shared owned `PartDocument` intent across multiple constrained component instances
 - project assembly-structure validation with constraints
 
-Targeted test command after a core build:
+The separate graph suite is documented in `docs/assembly-constraint-graph-mvp5.md`.
+
+Targeted record-layer test command after a core build:
 
 ```bash
 ./build/dev/blcad_core_tests "[core][assembly-constraint]"
@@ -250,10 +255,9 @@ cmake --workflow --preset dev-build-test
 
 ## Deferred work
 
-The following remain intentionally outside this block:
+The following remain intentionally outside this record block:
 
 - semantic target geometry resolution
-- constraint graph construction
 - rigid-body solving
 - transform mutation from constraints
 - remaining DOF computation and display
@@ -265,10 +269,12 @@ The following remain intentionally outside this block:
 - subassemblies
 - assembly-level geometry instancing and STEP export
 
+The read-only connectivity graph is no longer deferred; it is implemented as a separate derived block and intentionally does not change the persistent record schema.
+
 ## Next technical step
 
-Build the first read-only assembly constraint graph over the now-stable persistent records.
+The completed read-only constraint graph is documented in `docs/assembly-constraint-graph-mvp5.md`.
 
-The graph should use `ComponentInstanceId` nodes and active `AssemblyConstraintId` edges, provide deterministic adjacency and connected-component queries, ignore inactive constraints, and validate graph construction without resolving geometry or changing `RigidTransform` values.
+The next assembly block is a read-only semantic target resolution seed. It should resolve an `AssemblyConstraintTarget` through its component occurrence to the referenced project-owned `PartDocument` and support the currently implemented generated-face semantic reference family as component-local planar descriptors.
 
-Rigid-body solving and remaining-DOF computation should come only after this graph seed is stable.
+Unsupported semantic target families must fail explicitly. Constraint equation construction, assembly-space transform math, rigid-body solving, remaining DOF, and solved transform updates remain later steps.

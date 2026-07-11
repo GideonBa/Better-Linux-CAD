@@ -1,6 +1,8 @@
+#include "blcad/core/assembly_constraint_graph.hpp"
 #include "blcad/core/error.hpp"
 #include "blcad/core/project_json.hpp"
 
+#include <cstddef>
 #include <iostream>
 #include <string_view>
 
@@ -43,6 +45,12 @@ int main(int argc, char** argv) {
     return 1;
   }
 
+  auto graph = blcad::AssemblyConstraintGraph::build(project.value().assembly());
+  if (graph.has_error()) {
+    print_error(graph.error());
+    return 1;
+  }
+
   std::cout << "Project " << project.value().id().value() << " has "
             << project.value().assembly().component_instance_count() << " component instance(s) and "
             << project.value().assembly().constraint_count() << " assembly constraint(s)\n";
@@ -69,6 +77,22 @@ int main(int argc, char** argv) {
     print_constraint_target(constraint.target_b());
     if (constraint.distance().has_value()) {
       std::cout << " distance_mm=" << constraint.distance()->millimeters();
+    }
+    std::cout << '\n';
+  }
+
+  const auto groups = graph.value().connected_components();
+  std::cout << "Constraint graph has " << graph.value().node_count() << " node(s), "
+            << graph.value().edge_count() << " active edge(s), and " << groups.size()
+            << " connected group(s)\n";
+  for (std::size_t group_index = 0U; group_index < groups.size(); ++group_index) {
+    std::cout << "graph_group[" << group_index << "] components=";
+    for (std::size_t component_index = 0U; component_index < groups[group_index].size();
+         ++component_index) {
+      if (component_index > 0U) {
+        std::cout << ',';
+      }
+      std::cout << groups[group_index][component_index].value();
     }
     std::cout << '\n';
   }
