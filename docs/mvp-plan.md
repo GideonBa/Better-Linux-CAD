@@ -231,7 +231,7 @@ Still deferred: plain/expression conversion, assembly-scope/cross-part expressio
 
 Canonical planning document: `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`.
 
-The previous plan incorrectly grouped persistent intent, JSON, graph semantics, numeric solving, snapshots, application, and diagnostics into one block. It also treated occurrence-qualified component identity as if it were automatically numeric-variable identity. That is incompatible with the implemented document-scoped flexible-subassembly persistence contract.
+The previous plan incorrectly grouped persistent intent, JSON, connectivity, numeric solving, snapshots, application, and diagnostics into one block. It also treated occurrence-qualified geometric identity as if it were automatically numeric-variable identity. That is incompatible with document-scoped flexible-child persistence.
 
 The corrected identity split is:
 
@@ -239,42 +239,62 @@ The corrected identity split is:
 geometric endpoint
   = (occurrence_path, local ComponentInstanceId, semantic_reference)
 
-relationship node
+geometric component occurrence
   = (occurrence_path, local ComponentInstanceId)
 
 persisted transform authority
-  = (AssemblyDocumentId, local ComponentInstanceId)
+  = (assembly_document: DocumentId, local ComponentInstanceId)
 ```
 
 Repeated occurrences of one shared child document are distinct geometric occurrences but may map to one shared persisted transform authority. Until occurrence-local pose overrides exist, they must not become independent six-variable transform blocks.
+
+Local constraints also remain model-definition intent of one containing `AssemblyDocument`. They must not be duplicated once per rooted occurrence merely because the child document is placed multiple times.
 
 ### 23. Core endpoint contract and project-level constraint intent — Next
 
 Extract the frozen endpoint value contract into the Core layer and add persistent project-owned cross-hierarchy Mate/Distance/Angle/Concentric/Insert relationship records.
 
-Do not add JSON, graph connectivity, numeric solving, snapshots, or result application in this block.
+Do not add JSON, connectivity, numeric solving, snapshots, or result application in this block.
 
 ### 24. Additive cross-hierarchy constraint JSON and structure validation
 
 Add backward-compatible `cross_hierarchy_constraints[]` project JSON, exact occurrence-path roundtrip, endpoint structural validation, and fail-closed loading.
 
-Do not add graph or solver behavior in this block.
+Do not add connectivity or solver behavior in this block.
 
-### 25. Occurrence relationship graph and transform-authority solve connectivity
+### 25. Relationship-to-authority incidence and active solve groups
 
-Lift local active constraints once per rooted assembly occurrence, add project-level cross-hierarchy edges, derive path-sensitive suppression participation, map occurrence nodes to `(AssemblyDocumentId, ComponentInstanceId)` transform authorities, and derive solve groups coupled by both relationship adjacency and shared transform-authority identity.
+Collect active local constraints once per owned `AssemblyDocument` and identify them by:
 
-Authority coupling contributes no residual row.
+```text
+(assembly_document: DocumentId, AssemblyConstraintId)
+```
+
+Collect active project-level cross-hierarchy relationships with their exact occurrence-qualified endpoints.
+
+Map every participating relationship to each unique transform authority whose candidate direct component transform can affect its residual:
+
+```text
+(assembly_document: DocumentId, ComponentInstanceId)
+```
+
+Derive deterministic connected groups from this relationship-to-authority incidence graph. Expose a group to the cross-hierarchy solver only when it contains at least one active project-level cross-hierarchy relationship.
+
+Local relationships are evaluated once and are not lifted or duplicated per rooted occurrence. Visibility does not filter solve participation. Local component suppression controls local relationship participation; path suppression additionally controls occurrence-qualified cross-hierarchy endpoint participation.
 
 ### 26. Shared numeric residual/Jacobian and solve-result integration
 
-Use six variables per unique free active transform authority, not per occurrence node. Evaluate every relationship endpoint through its own parent transform chain while reading the candidate local transform of its shared authority. Reuse the existing five geometric residual families, finite-difference Jacobian semantics, and numeric solve engine.
+Use six variables per unique free active transform authority, not per geometric occurrence.
 
-Return derived solve results with complete transform-authority snapshots and at most one proposal per transform authority. Do not apply results in this block.
+Evaluate local relationships once in the containing assembly document's local assembly space through the existing local target/equation builders. Evaluate project-level cross-hierarchy relationships through each endpoint's exact parent transform chain in root-assembly space.
+
+Reuse the existing five geometric residual families, length scaling, finite-difference Jacobian semantics, and numeric solve engine. Return complete transform-authority snapshots and at most one proposal per transform authority. Do not apply results in this block.
 
 ### 27. Atomic application and cross-hierarchy diagnostics
 
-Validate current hierarchy/relationship context plus complete transform-authority snapshots, reject stale results, and atomically apply at most one direct local component transform per authority on a `Project` copy.
+Validate current transform-authority inputs, persistent relationship intent, and participating hierarchy boundary inputs. Reject stale results and atomically apply at most one direct local component transform per authority on a `Project` copy.
+
+The block must explicitly document the semantic target-producing part-model freshness boundary rather than silently claiming geometry-complete stale-result detection.
 
 Rank/DOF diagnostics must use:
 
@@ -282,7 +302,7 @@ Rank/DOF diagnostics must use:
 variable_count = 6 * unique_free_active_transform_authority_count
 ```
 
-not the number of free occurrence nodes.
+not the number of free geometric occurrences.
 
 ### 28. Cross-hierarchy joints and nested motion propagation
 
@@ -314,4 +334,4 @@ Only explicit application of a fresh converged solve or motion result changes pe
 
 ## Next technical step
 
-Implement block 23 from `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`: Core-owned occurrence-qualified endpoint value intent plus persistent project-level cross-hierarchy geometric constraint records. No JSON, graph, solver, snapshot, or application integration belongs in the same block.
+Implement block 23 from `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`: Core-owned occurrence-qualified endpoint value intent plus persistent project-level cross-hierarchy geometric constraint records. No JSON, connectivity graph, solver, snapshot, diagnostic, or application integration belongs in the same block.
