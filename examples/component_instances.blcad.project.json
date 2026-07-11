@@ -1,0 +1,68 @@
+{
+  "schema": "blcad.project.mvp4",
+  "version": 1,
+  "project": {
+    "id": "project.component_instances",
+    "name": "ComponentInstanceProject"
+  },
+  "assembly": {
+    "schema": "blcad.assembly_document.mvp4",
+    "version": 1,
+    "document": {
+      "id": "assembly.component_instances",
+      "name": "ComponentInstanceAssembly"
+    },
+    "parameters": [],
+    "member_parts": [
+      "part.bolt"
+    ],
+    "parameter_bindings": [],
+    "component_instances": [
+      {
+        "id": "component.bolt.1",
+        "name": "Bolt 1",
+        "referenced_part_document": "part.bolt",
+        "visibility": "visible",
+        "suppression_state": "active",
+        "grounding_state": "grounded",
+        "transform": {
+          "translation_mm": {"x": 0.0, "y": 0.0, "z": 0.0},
+          "rotation_deg": {"x": 0.0, "y": 0.0, "z": 0.0}
+        }
+      },
+      {
+        "id": "component.bolt.2",
+        "name": "Bolt 2",
+        "referenced_part_document": "part.bolt",
+        "visibility": "visible",
+        "suppression_state": "active",
+        "grounding_state": "free",
+        "transform": {
+          "translation_mm": {"x": 40.0, "y": 0.0, "z": 0.0},
+          "rotation_deg": {"x": 0.0, "y": 0.0, "z": 0.0}
+        }
+      }
+    ]
+  },
+  "parts": [
+    {
+      "schema": "blcad.part_document.mvp1",
+      "version": 1,
+      "document": {
+        "id": "part.bolt",
+        "name": "Bolt"
+      },
+      "parameters": [],
+      "datum_planes": [],
+      "construction_points": [],
+      "construction_lines": [],
+      "construction_planes": [],
+      "derived_workplanes": [],
+      "sketches": [],
+      "features": [],
+      "reference_statuses": [],
+      "reference_remaps": [],
+      "sketch_origin_overrides": []
+    }
+  ]
+}
