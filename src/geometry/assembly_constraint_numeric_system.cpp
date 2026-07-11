@@ -24,7 +24,7 @@ namespace {
 }
 
 [[nodiscard]] RigidTransform transform_from_variables(const NumericVector& values,
-                                                       std::size_t offset) noexcept {
+                                                      std::size_t offset) noexcept {
   return RigidTransform{Vector3{values[offset], values[offset + 1U], values[offset + 2U]},
                         Vector3{values[offset + 3U], values[offset + 4U],
                                 values[offset + 5U]}};
