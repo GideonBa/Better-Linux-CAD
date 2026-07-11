@@ -123,9 +123,9 @@ append_revolute_drive_residuals(const Project& project, const AssemblyRevoluteJo
   auto equation = builder.build(project, *joint, requested.value());
   if (equation.has_error()) return Result<std::size_t>::failure(equation.error());
   const RevoluteJointResidualDescriptor& revolute = equation.value().residual;
-  residuals.push_back(revolute.direction_parallelism.x);
-  residuals.push_back(revolute.direction_parallelism.y);
-  residuals.push_back(revolute.direction_parallelism.z);
+  residuals.push_back(revolute.direction_alignment.x);
+  residuals.push_back(revolute.direction_alignment.y);
+  residuals.push_back(revolute.direction_alignment.z);
   residuals.push_back(revolute.axis_offset_mm.x / length_residual_scale_mm);
   residuals.push_back(revolute.axis_offset_mm.y / length_residual_scale_mm);
   residuals.push_back(revolute.axis_offset_mm.z / length_residual_scale_mm);
