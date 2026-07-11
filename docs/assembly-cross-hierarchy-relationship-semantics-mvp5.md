@@ -1,183 +1,95 @@
 # Cross-Hierarchy Relationship Target and Residual Semantics MVP-5
 
-Status: implemented the read-only geometric identity, target-resolution, and residual-semantics seed for relationships whose endpoints may live in different rooted assembly occurrences.
+Status: implemented as the read-only geometric semantics seed before persistent cross-hierarchy solver integration.
 
-Persistent Core intent and project JSON are now implemented separately in:
+This document is canonical for occurrence-qualified target resolution and read-only root-space Mate, Distance, Angle, Concentric, and Insert residual construction across assembly-document boundaries.
 
-- `docs/assembly-cross-hierarchy-constraint-intent-mvp5.md`
-- `docs/assembly-cross-hierarchy-constraint-json-mvp5.md`
+Persistent endpoint/relationship intent is canonical in `docs/assembly-cross-hierarchy-constraint-intent-mvp5.md` and `docs/assembly-cross-hierarchy-constraint-json-mvp5.md`.
 
-The follow-up solve-connectivity sequence is canonical in `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`.
+Active relationship connectivity is canonical in `docs/assembly-cross-hierarchy-incidence-groups-mvp5.md`.
 
-## Implemented Geometry scope
+## Scope
 
-```text
-occurrence-qualified endpoint identity
-  -> exact rooted AssemblyHierarchyOccurrenceDescriptor
-  -> containing AssemblyDocument
-  -> local ComponentInstanceId
-  -> existing semantic feature reference
-  -> existing local AssemblyConstraintTargetResolver
-  -> exact [component, inner parent, ..., outer parent] transform chain
-  -> root-assembly-space target geometry
-  -> canonical Mate/Distance/Angle/Concentric/Insert residual
-```
-
-The Geometry layer resolves and evaluates. It does not own persistent endpoint identity or project relationship storage.
-
-## Geometric endpoint identity
-
-The frozen identity shape is:
+The read-only Geometry layer answers:
 
 ```text
-(occurrence_path,
- local ComponentInstanceId,
- semantic_reference)
+where is this exact semantic endpoint in root-assembly space?
+
+and
+
+what canonical relationship residual descriptor follows from two such endpoints?
 ```
 
-The persistent Core value type is:
+It does not persist a target, decide solve participation, create numeric variables, or apply transforms.
+
+## Persistent endpoint authority versus Geometry query target
+
+Core-owned persistent identity is:
 
 ```text
-AssemblyHierarchyConstraintEndpoint
+AssemblyHierarchyConstraintEndpoint =
+  (occurrence_path,
+   local ComponentInstanceId,
+   semantic_reference)
 ```
 
-The Geometry query target is:
+The Geometry layer retains:
 
 ```text
 AssemblyHierarchyConstraintTarget
 ```
 
-The empty occurrence path addresses the explicit root assembly occurrence:
+as a derived query seed.
+
+`AssemblyHierarchyConstraintQuery::create` accepts Core endpoint values and complete `AssemblyHierarchyConstraint` records.
+
+Save-format authority remains in Core.
+
+## Exact rooted occurrence selection
+
+The empty path addresses the explicit root assembly occurrence:
 
 ```text
-([], component.root, feature.base_extrude.top)
+[]
 ```
 
-A non-empty path is an exact root-to-current `SubassemblyInstanceId` sequence:
-
-```text
-([subassembly.outer, subassembly.inner],
- component.shaft,
- feature.bore.axis)
-```
-
-Path order is identity.
-
-## Why occurrence path is required
-
-A local `ComponentInstanceId` is scoped to one `AssemblyDocument` model definition. The same child document may occur multiple times in the rooted tree.
+A non-empty path is followed as an exact root-to-current `SubassemblyInstanceId` sequence.
 
 Example:
 
 ```text
+[subassembly.outer, subassembly.inner]
+```
+
+means:
+
+```text
 root
-  subassembly.left  -> assembly.gearbox at +100 mm
-  subassembly.right -> assembly.gearbox at -100 mm
-
-assembly.gearbox
-  component.shaft
+  -> subassembly.outer
+  -> reached child assembly
+  -> subassembly.inner
+  -> reached nested child assembly
 ```
 
-These endpoints are geometrically distinct:
+Repeated occurrences of one child document remain distinct because the paths differ.
+
+## Local semantic target authority reuse
+
+After selecting the exact containing assembly occurrence, the hierarchy resolver creates the appropriate local target-resolution view and delegates semantic feature meaning to:
 
 ```text
-([subassembly.left],  component.shaft, feature.bore.axis)
-([subassembly.right], component.shaft, feature.bore.axis)
+AssemblyConstraintTargetResolver
 ```
 
-They reuse one local component/feature definition but evaluate through different parent transform chains.
-
-Local `ComponentInstanceId` alone is insufficient geometric endpoint identity.
-
-## Transform-authority boundary
-
-Geometric endpoint identity is not persisted transform authority.
-
-The current document-scoped flexible-child contract stores the shaft transform once in the child assembly document:
-
-```text
-ComponentTransformAuthority =
-  (assembly.gearbox, component.shaft)
-```
-
-The architecture therefore separates:
-
-```text
-geometric endpoint
-  = (occurrence_path, ComponentInstanceId, semantic_reference)
-
-geometric component occurrence
-  = (occurrence_path, ComponentInstanceId)
-
-persisted transform authority
-  = (AssemblyDocumentId, ComponentInstanceId)
-```
-
-The first two are occurrence-sensitive. The third is document/component-sensitive until occurrence-local internal pose overrides exist.
-
-Future numeric variables, snapshots, proposals, and direct transform application must not automatically become occurrence-qualified.
-
-## Query contract
-
-`AssemblyHierarchyConstraintQuery` stores:
-
-```text
-id
-AssemblyConstraintType
-target_a
-target_b
-optional distance
-optional angle
-```
-
-It can be constructed from Core-owned endpoints or a complete persistent `AssemblyHierarchyConstraint` record.
-
-The query reuses existing value-family rules:
-
-```text
-Mate        -> no distance, no angle
-Concentric  -> no distance, no angle
-Insert      -> no distance, no angle
-Distance    -> length distance required, no angle
-Angle       -> degree angle required, no distance
-```
-
-The query is derived. Persistent project-level intent lives in Core and now roundtrips through Project JSON.
-
-## Exact occurrence resolution
-
-`AssemblyHierarchyConstraintTargetResolver` builds the deterministic rooted hierarchy and requires one exact `occurrence_path` match.
-
-For the empty path, the matching occurrence is the explicit root descriptor.
-
-For a non-empty path, the matching descriptor identifies the exact rooted child occurrence and containing assembly document.
-
-Missing paths fail closed. The resolver does not guess by assembly document id or by the path's final local occurrence id alone.
-
-## Local semantic target authority
-
-After resolving the containing assembly document, the hierarchy resolver creates a temporary local target-resolution view with:
-
-```text
-selected AssemblyDocument as temporary root
-project-owned PartDocument records
-```
-
-It converts the hierarchy endpoint to the existing local target shape:
-
-```text
-(component_instance, semantic_reference)
-```
-
-and delegates to `AssemblyConstraintTargetResolver`.
-
-That existing resolver remains the only Geometry authority for implemented target families:
+Supported target families remain:
 
 ```text
 feature.<feature-id>.top|bottom|right|left|front|back
 feature.<feature-id>.axis
 feature.<feature-id>.seat
 ```
+
+The cross-hierarchy layer does not implement a second parser for feature target strings.
 
 The hierarchy layer does not reparse feature history or infer alternative semantic geometry.
 
@@ -205,7 +117,7 @@ For point `p`:
 T_outer(...T_inner(T_component(p)))
 ```
 
-Vectors, normals, and axis directions rotate only at each level.
+Vectors, normals, and axis directions rotate only at every level.
 
 No composed matrix or recomputed Euler triple becomes persistent model intent.
 
@@ -243,8 +155,8 @@ Target A owns signed direction.
 ### Angle
 
 ```text
-normal_dot       = dot(nA, nB)
-angle_alignment  = normal_dot - cos(target_angle_deg)
+normal_dot      = dot(nA, nB)
+angle_alignment = normal_dot - cos(target_angle_deg)
 ```
 
 The current cosine seed remains direction-symmetric.
@@ -270,21 +182,46 @@ Target A owns signed seating direction.
 
 Only endpoint identity and transform depth differ from the local builders. The mathematics do not.
 
-## Visibility and suppression boundary
+## Visibility, suppression, and graph participation
 
-The resolver answers a mathematical geometry question:
+Target resolution answers a mathematical geometry query and does not itself filter by visibility or suppression.
+
+Block 25 now implements participation policy in `AssemblyCrossHierarchyConstraintGraph`:
+
+- inactive local/cross relationships do not participate;
+- local relationships touching a suppressed component do not participate;
+- cross-hierarchy relationships using a suppressed path boundary or addressed component do not participate;
+- visibility does not filter solve participation.
+
+This keeps geometric resolution separate from solve-connectivity policy.
+
+## Endpoint mappings and shared transform authority
+
+Block 25 maps every participating cross-hierarchy endpoint to:
 
 ```text
-where is this exact semantic endpoint in root-assembly space?
+ComponentTransformAuthority =
+  (reached assembly document,
+   local ComponentInstanceId)
 ```
 
-Visibility and suppression do not alter target-resolution mathematics.
+The complete endpoint identity remains in `AssemblyCrossHierarchyEndpointAuthorityMapping`.
 
-Path-sensitive active/suppressed relationship participation belongs to Block 25 graph semantics. Geometric target resolution must not silently become a solver-participation policy.
+Therefore two endpoints may read one direct component-transform authority while retaining different parent transform chains:
+
+```text
+TargetA = ([left],  component.shaft, feature.left.axis)
+TargetB = ([right], component.shaft, feature.right.axis)
+
+both authority:
+  (assembly.gearbox, component.shaft)
+```
+
+In Block 26 both endpoints must observe the same candidate direct shaft transform but each must still be evaluated through its own path-specific parent chain.
 
 ## Persistence boundary
 
-Persistent Core model intent now includes:
+Persistent Core model intent includes:
 
 ```text
 AssemblyHierarchyConstraintEndpoint
@@ -292,7 +229,7 @@ AssemblyHierarchyConstraint
 Project::cross_hierarchy_constraints
 ```
 
-Project JSON now serializes those records in:
+Project JSON serializes those records in:
 
 ```text
 cross_hierarchy_constraints[]
@@ -300,7 +237,7 @@ cross_hierarchy_constraints[]
 
 Project loading validates exact endpoint path structure and reached local component identity, but does not resolve semantic feature geometry.
 
-Derived and unpersisted Geometry data includes:
+Derived and unpersisted data includes:
 
 ```text
 AssemblyHierarchyConstraintTarget
@@ -311,9 +248,13 @@ root-space hierarchy target descriptors
 hierarchy transform chains used for target evaluation
 AssemblyHierarchyConstraintEquationDescriptor
 cross-hierarchy residual descriptors
+ComponentTransformAuthority identities
+relationship-to-authority incidence
+endpoint-to-authority mappings
+cross-hierarchy solve groups
 ```
 
-No resolved point, vector, normal, axis, seating plane, composed transform, or residual value becomes model intent.
+No resolved point, vector, normal, axis, seating plane, composed transform, residual value, or connectivity cache becomes model intent.
 
 ## Failure policy
 
@@ -333,26 +274,26 @@ Geometry coverage:
 
 The Geometry suite proves exact repeated-occurrence path identity, different root-space positions for repeated rigid child occurrences, root endpoint resolution, all five relationship families, Distance target-order signed semantics, different repeated-occurrence Concentric offsets, fail-closed target resolution, determinism, and source immutability.
 
-Core persistent-intent coverage:
+Core intent/JSON/connectivity coverage:
 
 ```bash
 ./build/dev/blcad_core_tests "[core][assembly-cross-hierarchy-intent]"
-```
-
-Project JSON and structural coverage:
-
-```bash
 ./build/dev/blcad_core_tests "[core][assembly-cross-hierarchy-json]"
+./build/dev/blcad_core_tests "[core][assembly-cross-hierarchy-graph]"
 ```
 
 ## Next technical step
 
-Implement Block 25 from `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`:
+Implement Block 26 from `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`:
 
 ```text
-active local and project-level cross-hierarchy relationships
-  -> relationship-to-ComponentTransformAuthority incidence
-  -> deterministic connected cross-hierarchy solve groups
+AssemblyCrossHierarchySolveGroup
+  -> authority-scoped candidate transforms and free variables
+  -> local relationship residuals in containing-document local space
+  -> cross-hierarchy endpoint residuals in root space
+  -> deterministic mixed residual vector
+  -> central finite-difference Jacobian by authority variable
+  -> existing numeric solve engine
 ```
 
-Block 25 must remain a derived Core graph/query layer. Do not add numeric residual/Jacobian execution, solver iterations, snapshots, proposals, diagnostics, or application.
+Block 26 must return unapplied authority-scoped proposals and must not add result application or cross-hierarchy diagnostics.
