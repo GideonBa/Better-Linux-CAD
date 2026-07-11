@@ -10,14 +10,13 @@ The goal is to let one project-level object coordinate assembly parameters and t
 
 The project container must not:
 
-- create component instances
-- place components in 3D space
 - solve assembly constraints
-- introduce assembly transforms or mates
+- introduce mates, concentric constraints, or distance constraints
 - replace `AssemblyDocument` binding semantics
 - bypass `PartDocument` invalidation and recompute planning
+- emit assembly-level geometry or an assembly-level STEP file
 
-Component instances and constraints remain MVP 5 and are tracked in `docs/assembly-system.md`.
+Component instances are now handled by the first MVP-5 seed in `docs/component-instance-mvp5.md`. Constraint solving remains later MVP-5 work tracked in `docs/assembly-system.md`.
 
 ## Implemented records
 
@@ -42,9 +41,13 @@ ProjectUpdateResult
 
 `Project` owns an `AssemblyDocument` by value and owns each `PartDocument` by value. This is still a single-process, in-memory model. It is not a document database and does not yet support external part references.
 
-## Membership validation
+## Membership and assembly-structure validation
 
 `Project::validate_member_parts` checks that every `AssemblyDocument::member_parts()` id resolves to an owned `PartDocument`.
+
+`Project::validate_component_instances` checks that every component instance references an assembly member part and that the referenced part resolves to an owned `PartDocument`.
+
+`Project::validate_assembly_structure` runs both validations and is the preferred project-level check before using assembly structure.
 
 Extra owned parts are allowed by the seed. They are ignored by assembly parameter propagation unless the assembly explicitly registers them as members.
 
@@ -61,10 +64,11 @@ Project::set_assembly_parameter_value(parameter, value) -> ProjectUpdateResult
 It performs this sequence:
 
 1. validate that every assembly member id resolves to an owned part document
-2. update the assembly parameter value with `AssemblyDocument::set_parameter_value`
-3. apply assembly bindings to each owned member part through `AssemblyDocument::apply_bindings_to`
-4. ask each affected part for `PartDocument::create_recompute_plan`
-5. return one `ProjectPartUpdate` per affected member part
+2. validate that every component instance references an assembly member and owned project part
+3. update the assembly parameter value with `AssemblyDocument::set_parameter_value`
+4. apply assembly bindings to each owned member part through `AssemblyDocument::apply_bindings_to`
+5. ask each affected part for `PartDocument::create_recompute_plan`
+6. return one `ProjectPartUpdate` per affected member part
 
 The project does not recompute geometry itself. It returns recompute plans so the caller can decide whether to recompute through the core recompute path, the geometry executor, or a future job system.
 
@@ -106,7 +110,7 @@ The seed uses an embedded-document project file:
 }
 ```
 
-The project deserializer delegates assembly parsing to `deserialize_assembly_document_from_json` and part parsing to `deserialize_part_document_from_json`. After loading, it validates that every assembly member part resolves to an embedded part document.
+The project deserializer delegates assembly parsing to `deserialize_assembly_document_from_json` and part parsing to `deserialize_part_document_from_json`. After loading, it validates that every assembly member and component instance reference resolves to an embedded part document.
 
 A manifest-based project file that references separate part files is deliberately deferred.
 
@@ -129,6 +133,8 @@ The command:
 
 This command is a headless example, not a GUI workflow. It does not solve assembly placement and does not emit an assembly-level STEP file.
 
+The later component-instance seed adds a separate non-geometry inspection command, `blcad_inspect_project_components`, for listing component instances and their referenced part documents.
+
 ## Test coverage
 
 The tests cover:
@@ -139,13 +145,12 @@ The tests cover:
 - per-part recompute plans from one project-level parameter update
 - project JSON roundtrip with embedded assembly and part documents
 - project JSON rejection when an assembly member part is missing from the project
+- project-level component-instance validation through the MVP-5 component instance tests
 
 ## Deliberate limitations
 
-This block does not implement component instances.
+This block itself does not solve component placements, constraints, or DOF.
 
-It does not implement assembly transforms, free placement, grounding, mates, concentric constraints, distance constraints, constraint solving, DOF display, collision checks, or assembly-level STEP export.
+It does not implement mates, concentric constraints, distance constraints, collision checks, or assembly-level STEP export.
 
-It does not implement manifest-based project files, external file references, lazy part loading, dirty-file tracking, or partial project save.
-
-A later MVP 5 seed should add `ComponentInstance` records that reference owned project part documents, including explicit instance ids, names, referenced document ids, fixed/grounded state, visibility, and an initial free transform, but still without a full constraint solver.
+It does not implement manifest-based project files, external part references, lazy part loading, dirty-file tracking, or partial project save.
