@@ -1048,13 +1048,17 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
   root["version"] = k_version;
   root["document"] = json{{"id", document.id().value()}, {"name", document.name()}};
   root["parameters"] = json::array();
-  for (const auto& parameter : document.parameters())
-    root["parameters"].push_back(json{{"id", parameter.id().value()},
-                                      {"name", parameter.name()},
-                                      {"type", std::string(to_string(parameter.type()))},
-                                      {"scope", std::string(to_string(parameter.scope()))},
-                                      {"unit", std::string(parameter.value().unit())},
-                                      {"value", parameter.value().millimeters()}});
+  for (const auto& parameter : document.parameters()) {
+    json parameter_json{{"id", parameter.id().value()},
+                        {"name", parameter.name()},
+                        {"type", std::string(to_string(parameter.type()))},
+                        {"scope", std::string(to_string(parameter.scope()))},
+                        {"unit", std::string(parameter.value().unit())},
+                        {"value", parameter.value().millimeters()}};
+    if (parameter.formula().has_value())
+      parameter_json["formula"] = parameter.formula().value();
+    root["parameters"].push_back(std::move(parameter_json));
+  }
   root["datum_planes"] = json::array();
   for (const auto& datum_plane : document.datum_planes())
     root["datum_planes"].push_back(json{{"id", datum_plane.id().value()},
@@ -1234,6 +1238,19 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
     if (document.has_error())
       return document;
     for (const auto& parameter_json : root.at("parameters")) {
+      if (parameter_json.contains("formula")) {
+        // Expression parameters re-derive value and dependency edges from the
+        // persisted formula; earlier file order guarantees inputs exist.
+        auto type = parameter_json.at("type").get<std::string>() == "count" ? ParameterType::Count
+                                                                            : ParameterType::Length;
+        auto added = document.value().add_expression_parameter(
+            ParameterId(parameter_json.at("id").get<std::string>()),
+            parameter_json.at("name").get<std::string>(), type,
+            parameter_json.at("formula").get<std::string>());
+        if (added.has_error())
+          return Result<PartDocument>::failure(added.error());
+        continue;
+      }
       auto parameter = parameter_from_json(parameter_json);
       if (parameter.has_error())
         return Result<PartDocument>::failure(parameter.error());

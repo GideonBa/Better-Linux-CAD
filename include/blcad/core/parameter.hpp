@@ -4,6 +4,7 @@
 #include "blcad/core/quantity.hpp"
 #include "blcad/core/result.hpp"
 
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -32,6 +33,13 @@ public:
                                                       Quantity value,
                                                       ParameterScope scope = ParameterScope::Part);
 
+  // A computed parameter: the value is derived from a unit-aware formula over
+  // other parameters of the same document. The already-evaluated value is
+  // passed in; evaluation itself lives in ParameterExpressionEvaluator.
+  [[nodiscard]] static Result<Parameter>
+  create_expression(ParameterId id, std::string name, ParameterType type, std::string formula,
+                    Quantity evaluated_value, ParameterScope scope = ParameterScope::Part);
+
   // Returns a copy with a new value and the same identity. The new value follows
   // the same validation path as parameter creation.
   [[nodiscard]] Result<Parameter> with_value(Quantity value) const;
@@ -41,16 +49,19 @@ public:
   [[nodiscard]] ParameterType type() const noexcept;
   [[nodiscard]] ParameterScope scope() const noexcept;
   [[nodiscard]] const Quantity& value() const noexcept;
+  [[nodiscard]] const std::optional<std::string>& formula() const noexcept;
+  [[nodiscard]] bool is_expression() const noexcept;
 
 private:
   Parameter(ParameterId id, std::string name, ParameterType type, Quantity value,
-            ParameterScope scope);
+            ParameterScope scope, std::optional<std::string> formula = std::nullopt);
 
   ParameterId id_;
   std::string name_;
   ParameterType type_;
   Quantity value_;
   ParameterScope scope_;
+  std::optional<std::string> formula_;
 };
 
 } // namespace blcad

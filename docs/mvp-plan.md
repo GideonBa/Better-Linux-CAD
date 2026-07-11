@@ -294,20 +294,17 @@ Canonical document: `docs/assembly-interference-analysis-mvp5.md`.
 
 Implemented: `blcad_analyze_assembly <input.blcad.project.json> [clearance-threshold-mm]` loads a project, runs the combined clearance/interference analysis, prints leaf/pair/part counts plus every record in deterministic occurrence-key order, and exits non-zero with the error object id and message on failure. A test drives the analyzer against the checked-in posed assembly example (12 mm axial gap below a 15 mm threshold).
 
-## Next MVP: Parameter expression seed
+## Parameter expression seed
 
-Goal: the first computed-parameter block from `docs/parameter-model.md` — a part parameter whose value is a unit-aware formula over other part parameters, re-evaluated through the existing dependency graph.
+Canonical document: `docs/parameter-expression-mvp.md`.
 
-Required implementation sequence:
+Implemented: unit-aware formula parameters on part documents (`+ - * /`, parentheses, unary minus, `mm` literals, name references), length-power unit tracking with rejection of invalid dimensions, dependency edges from every referenced parameter, topological re-evaluation after input changes, cycle rejection, direct-write rejection, JSON formula roundtrip with re-derived edges, and a geometry proof where a formula-driven thickness drives an incremental recompute.
 
-1. Add an `Expression` record on `Parameter` (optional formula string) with a small deterministic parser: literals, parameter names, `+ - * /`, parentheses.
-2. Length semantics: length ± length = length; length × scalar and length ÷ scalar = length; count/scalar literals stay dimensionless; reject unit-invalid combinations (for example length × length) in the seed.
-3. Evaluation resolves referenced parameters by name within the owning part document and validates the result against the target parameter type.
-4. Dependency edges run from every referenced parameter to the expression parameter, so a change re-evaluates the expression and invalidates its dependents in topological order.
-5. Cycles across expression edges are rejected through the existing graph cycle detection.
-6. `PartDocument::set_parameter_value` rejects direct writes to expression-driven parameters; editing the formula is the mutation path.
-7. JSON persists the formula string; roundtrip re-derives value and edges.
-8. Cover: parsing/validation errors, unit rules, evaluation, incremental re-evaluation through the graph, cycle rejection, direct-write rejection, JSON roundtrip, and one geometry test where a formula-driven length drives a recompute.
+Still deferred: formula editing, assembly-scope/cross-part expressions, functions, and further units.
+
+## Next MVP: Continue per the assembly sequence
+
+The next numbered step is item 24 of the assembly sequence (flexible subassemblies, cross-hierarchy relationship semantics, component geometry instancing, or richer collision/contact analysis) or the deferred expression follow-ups above, whichever the next session prioritizes. Define the chosen block here before implementing it.
 
 ## Proposed assembly implementation sequence
 

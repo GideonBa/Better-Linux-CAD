@@ -47,6 +47,7 @@ add_library(
   src/core/part_document.cpp
   src/core/part_document_json.cpp
   src/core/parameter.cpp
+  src/core/parameter_expression.cpp
   src/core/project.cpp
   src/core/project_json.cpp
   src/core/quantity.cpp
@@ -216,6 +217,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/part_document_json_tests.cpp
     tests/core/part_document_json_workplane_tests.cpp
     tests/core/part_document_tests.cpp
+    tests/core/parameter_expression_tests.cpp
     tests/core/parameter_tests.cpp
     tests/core/project_tests.cpp
     tests/core/projected_reference_invalidation_tests.cpp
@@ -287,6 +289,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/dimension_driven_profile_resolver_tests.cpp
       tests/geometry/front_workplane_pipeline_tests.cpp
       tests/geometry/left_workplane_pipeline_tests.cpp
+      tests/geometry/parameter_expression_pipeline_tests.cpp
       tests/geometry/recompute_executor_tests.cpp
       tests/geometry/rectangle_extrusion_adapter_tests.cpp
       tests/geometry/reference_driven_sketch_helper_tests.cpp

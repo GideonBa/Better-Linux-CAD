@@ -72,15 +72,36 @@ Result<Parameter> Parameter::create_count(ParameterId id, std::string name, Quan
       Parameter(std::move(id), std::move(name), ParameterType::Count, value, scope));
 }
 
-Result<Parameter> Parameter::with_value(Quantity value) const {
-  switch (type_) {
-  case ParameterType::Length:
-    return create_length(id_, name_, value, scope_);
-  case ParameterType::Count:
-    return create_count(id_, name_, value, scope_);
+Result<Parameter> Parameter::create_expression(ParameterId id, std::string name, ParameterType type,
+                                               std::string formula, Quantity evaluated_value,
+                                               ParameterScope scope) {
+  const auto object_id = id.empty() ? std::string("parameter") : id.value();
+
+  if (formula.empty()) {
+    return Result<Parameter>::failure(
+        Error::validation(object_id, "expression parameter formula must not be empty"));
   }
 
-  return create_length(id_, name_, value, scope_);
+  auto plain = type == ParameterType::Count
+                   ? create_count(std::move(id), std::move(name), evaluated_value, scope)
+                   : create_length(std::move(id), std::move(name), evaluated_value, scope);
+  if (plain.has_error()) {
+    return plain;
+  }
+
+  Parameter parameter = std::move(plain.value());
+  parameter.formula_ = std::move(formula);
+  return Result<Parameter>::success(std::move(parameter));
+}
+
+Result<Parameter> Parameter::with_value(Quantity value) const {
+  auto updated = type_ == ParameterType::Count ? create_count(id_, name_, value, scope_)
+                                               : create_length(id_, name_, value, scope_);
+  if (updated.has_error()) {
+    return updated;
+  }
+  updated.value().formula_ = formula_;
+  return updated;
 }
 
 const ParameterId& Parameter::id() const noexcept {
@@ -103,8 +124,17 @@ const Quantity& Parameter::value() const noexcept {
   return value_;
 }
 
+const std::optional<std::string>& Parameter::formula() const noexcept {
+  return formula_;
+}
+
+bool Parameter::is_expression() const noexcept {
+  return formula_.has_value();
+}
+
 Parameter::Parameter(ParameterId id, std::string name, ParameterType type, Quantity value,
-                     ParameterScope scope)
-    : id_(std::move(id)), name_(std::move(name)), type_(type), value_(value), scope_(scope) {}
+                     ParameterScope scope, std::optional<std::string> formula)
+    : id_(std::move(id)), name_(std::move(name)), type_(type), value_(value), scope_(scope),
+      formula_(std::move(formula)) {}
 
 } // namespace blcad

@@ -1,5 +1,8 @@
 #include "blcad/core/part_document.hpp"
 
+#include "blcad/core/parameter_expression.hpp"
+
+#include <algorithm>
 #include <cmath>
 #include <string>
 #include <utility>
@@ -448,6 +451,49 @@ Result<std::size_t> PartDocument::add_parameter(Parameter parameter) {
   return Result<std::size_t>::success(parameters_.size() - 1U);
 }
 
+Result<std::size_t> PartDocument::add_expression_parameter(ParameterId id, std::string name,
+                                                           ParameterType type,
+                                                           std::string formula) {
+  const auto object_id = id.empty() ? std::string("parameter") : id.value();
+  if (has_parameter_id(id))
+    return Result<std::size_t>::failure(
+        Error::validation(object_id, "parameter id must be unique within part document"));
+  if (has_parameter_name(name))
+    return Result<std::size_t>::failure(
+        Error::validation(object_id, "parameter name must be unique within part document"));
+
+  const ParameterExpressionEvaluator evaluator;
+  auto evaluation = evaluator.evaluate(*this, formula, type, object_id);
+  if (evaluation.has_error())
+    return Result<std::size_t>::failure(evaluation.error());
+
+  auto parameter = Parameter::create_expression(id, std::move(name), type, std::move(formula),
+                                                evaluation.value().value);
+  if (parameter.has_error())
+    return Result<std::size_t>::failure(parameter.error());
+
+  auto graph = dependency_graph_;
+  auto added_node = graph.add_node(id.value());
+  if (added_node.has_error())
+    return Result<std::size_t>::failure(added_node.error());
+  for (const ParameterId& referenced : evaluation.value().referenced_parameters) {
+    auto edge = add_dependency_if_missing(graph, referenced.value(), id.value());
+    if (edge.has_error())
+      return Result<std::size_t>::failure(edge.error());
+  }
+  if (graph.has_cycle())
+    return Result<std::size_t>::failure(
+        Error::dependency(object_id, "expression parameter must not create a dependency cycle"));
+
+  auto invalidation_state = invalidation_state_;
+  auto synced = sync_graph(std::move(graph), invalidation_state, dependency_graph_);
+  if (synced.has_error())
+    return Result<std::size_t>::failure(synced.error());
+  invalidation_state_ = std::move(invalidation_state);
+  parameters_.push_back(std::move(parameter.value()));
+  return Result<std::size_t>::success(parameters_.size() - 1U);
+}
+
 Result<std::size_t> PartDocument::add_datum_plane(DatumPlane datum_plane) {
   if (has_datum_plane_id(datum_plane.id()))
     return Result<std::size_t>::failure(Error::validation(
@@ -879,6 +925,9 @@ Result<std::vector<std::string>> PartDocument::set_parameter_value(ParameterId i
   if (existing == nullptr)
     return Result<std::vector<std::string>>::failure(
         Error::validation(id.value(), "parameter must exist in part document"));
+  if (existing->is_expression())
+    return Result<std::vector<std::string>>::failure(
+        Error::validation(id.value(), "expression-driven parameter value cannot be set directly"));
   auto updated = existing->with_value(value);
   if (updated.has_error())
     return Result<std::vector<std::string>>::failure(updated.error());
@@ -887,7 +936,34 @@ Result<std::vector<std::string>> PartDocument::set_parameter_value(ParameterId i
       parameter = std::move(updated.value());
       break;
     }
-  return invalidation_state_.mark_changed(dependency_graph_, id.value());
+  auto affected = invalidation_state_.mark_changed(dependency_graph_, id.value());
+  if (affected.has_error())
+    return affected;
+
+  // Re-evaluate affected expression parameters in topological order so chained
+  // formulas read already-updated inputs.
+  auto order = dependency_graph_.topological_order();
+  if (order.has_error())
+    return Result<std::vector<std::string>>::failure(order.error());
+  const ParameterExpressionEvaluator evaluator;
+  for (const std::string& node : order.value()) {
+    if (std::find(affected.value().begin(), affected.value().end(), node) == affected.value().end())
+      continue;
+    for (auto& parameter : parameters_) {
+      if (parameter.id().value() != node || !parameter.is_expression())
+        continue;
+      auto evaluation = evaluator.evaluate(*this, parameter.formula().value(), parameter.type(),
+                                           parameter.id().value());
+      if (evaluation.has_error())
+        return Result<std::vector<std::string>>::failure(evaluation.error());
+      auto reevaluated = parameter.with_value(evaluation.value().value);
+      if (reevaluated.has_error())
+        return Result<std::vector<std::string>>::failure(reevaluated.error());
+      parameter = std::move(reevaluated.value());
+      break;
+    }
+  }
+  return affected;
 }
 Result<RecomputePlan> PartDocument::create_recompute_plan() const {
   return RecomputePlan::from_graph_and_invalidation_state(dependency_graph_, invalidation_state_);

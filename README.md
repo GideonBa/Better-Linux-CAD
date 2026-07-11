@@ -187,4 +187,4 @@ Future roadmaps:
 
 ## Next technical step
 
-The next technical step is the parameter expression seed: a part parameter whose value is a unit-aware formula over other part parameters, parsed deterministically, re-evaluated through the existing dependency graph with cycle rejection, persisted as a formula string, and proven by a formula-driven length that drives a geometry recompute. See `docs/mvp-plan.md` and `docs/parameter-model.md`.
+The parameter expression seed is implemented (`docs/parameter-expression-mvp.md`). The next block is chosen from item 24 of the assembly sequence or the deferred expression follow-ups; define it in `docs/mvp-plan.md` before implementing.

@@ -25,6 +25,12 @@ public:
   [[nodiscard]] static Result<PartDocument> create(DocumentId id, std::string name);
 
   [[nodiscard]] Result<std::size_t> add_parameter(Parameter parameter);
+  // Adds a computed parameter whose value derives from a unit-aware formula
+  // over already-existing parameters of this document. Evaluation happens
+  // here; dependency edges run from every referenced parameter to this one.
+  [[nodiscard]] Result<std::size_t> add_expression_parameter(ParameterId id, std::string name,
+                                                             ParameterType type,
+                                                             std::string formula);
   [[nodiscard]] Result<std::size_t> add_datum_plane(DatumPlane datum_plane);
   [[nodiscard]] Result<std::size_t> add_construction_point(ConstructionPoint point);
   [[nodiscard]] Result<std::size_t> add_construction_line(ConstructionLine line);
@@ -38,7 +44,9 @@ public:
   add_sketch_origin_override(SketchOriginOverrideRecord origin_override);
   [[nodiscard]] Result<std::vector<std::string>> mark_parameter_changed(ParameterId id);
   // Sets a parameter value, validates it, and marks the parameter and its
-  // dependents as changed. Returns the affected graph nodes.
+  // dependents as changed. Affected expression parameters are re-evaluated in
+  // topological order before the affected graph nodes are returned. Direct
+  // writes to expression-driven parameters are rejected.
   [[nodiscard]] Result<std::vector<std::string>> set_parameter_value(ParameterId id,
                                                                      Quantity value);
   [[nodiscard]] Result<RecomputePlan> create_recompute_plan() const;
