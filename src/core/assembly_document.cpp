@@ -46,8 +46,8 @@ update_component_instance(std::vector<ComponentInstance>& component_instances,
 } // namespace
 
 Result<ParameterBinding> ParameterBinding::create(ParameterBindingId id, DocumentId part_document,
-                                                  ParameterId part_parameter,
-                                                  ParameterId assembly_parameter) {
+                                                   ParameterId part_parameter,
+                                                   ParameterId assembly_parameter) {
   const auto object_id = id.empty() ? std::string("parameter_binding") : id.value();
   if (id.empty()) {
     return Result<ParameterBinding>::failure(
@@ -66,8 +66,8 @@ Result<ParameterBinding> ParameterBinding::create(ParameterBindingId id, Documen
         Error::validation(object_id, "parameter binding assembly parameter must not be empty"));
   }
   return Result<ParameterBinding>::success(ParameterBinding(std::move(id), std::move(part_document),
-                                                            std::move(part_parameter),
-                                                            std::move(assembly_parameter)));
+                                                             std::move(part_parameter),
+                                                             std::move(assembly_parameter)));
 }
 
 ParameterBinding::ParameterBinding(ParameterBindingId id, DocumentId part_document,
@@ -299,6 +299,24 @@ Result<std::size_t> AssemblyDocument::add_component_instance(ComponentInstance i
   return Result<std::size_t>::success(component_instances_.size() - 1U);
 }
 
+Result<std::size_t> AssemblyDocument::add_constraint(AssemblyConstraint constraint) {
+  if (has_constraint_id(constraint.id())) {
+    return Result<std::size_t>::failure(Error::validation(
+        constraint.id().value(), "assembly constraint id must be unique within assembly document"));
+  }
+  if (!has_component_instance_id(constraint.target_a().component_instance())) {
+    return Result<std::size_t>::failure(Error::validation(
+        constraint.id().value(), "assembly constraint target A component instance must exist"));
+  }
+  if (!has_component_instance_id(constraint.target_b().component_instance())) {
+    return Result<std::size_t>::failure(Error::validation(
+        constraint.id().value(), "assembly constraint target B component instance must exist"));
+  }
+
+  constraints_.push_back(std::move(constraint));
+  return Result<std::size_t>::success(constraints_.size() - 1U);
+}
+
 Result<std::size_t>
 AssemblyDocument::set_component_instance_transform(ComponentInstanceId id,
                                                    RigidTransform transform) {
@@ -412,6 +430,9 @@ const std::vector<ParameterBinding>& AssemblyDocument::bindings() const noexcept
 const std::vector<ComponentInstance>& AssemblyDocument::component_instances() const noexcept {
   return component_instances_;
 }
+const std::vector<AssemblyConstraint>& AssemblyDocument::constraints() const noexcept {
+  return constraints_;
+}
 std::size_t AssemblyDocument::parameter_count() const noexcept {
   return parameters_.size();
 }
@@ -423,6 +444,9 @@ std::size_t AssemblyDocument::binding_count() const noexcept {
 }
 std::size_t AssemblyDocument::component_instance_count() const noexcept {
   return component_instances_.size();
+}
+std::size_t AssemblyDocument::constraint_count() const noexcept {
+  return constraints_.size();
 }
 
 const Parameter* AssemblyDocument::find_parameter(ParameterId id) const noexcept {
@@ -443,10 +467,21 @@ const ParameterBinding* AssemblyDocument::find_binding(ParameterBindingId id) co
   return nullptr;
 }
 
-const ComponentInstance* AssemblyDocument::find_component_instance(ComponentInstanceId id) const noexcept {
+const ComponentInstance*
+AssemblyDocument::find_component_instance(ComponentInstanceId id) const noexcept {
   for (const auto& instance : component_instances_) {
     if (instance.id() == id) {
       return &instance;
+    }
+  }
+  return nullptr;
+}
+
+const AssemblyConstraint*
+AssemblyDocument::find_constraint(AssemblyConstraintId id) const noexcept {
+  for (const auto& constraint : constraints_) {
+    if (constraint.id() == id) {
+      return &constraint;
     }
   }
   return nullptr;
@@ -476,6 +511,10 @@ bool AssemblyDocument::has_binding_id(const ParameterBindingId& id) const noexce
 
 bool AssemblyDocument::has_component_instance_id(const ComponentInstanceId& id) const noexcept {
   return find_component_instance(id) != nullptr;
+}
+
+bool AssemblyDocument::has_constraint_id(const AssemblyConstraintId& id) const noexcept {
+  return find_constraint(id) != nullptr;
 }
 
 } // namespace blcad
