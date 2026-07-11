@@ -50,6 +50,15 @@ enum class SemanticVertex {
 
 [[nodiscard]] std::string_view to_string(SemanticVertex vertex) noexcept;
 
+// The first semantic axis family exposes one primary generated axis per
+// supported feature. Additional feature-specific axis identities can extend
+// this enum without exposing transient kernel topology ids.
+enum class SemanticAxis {
+  Primary,
+};
+
+[[nodiscard]] std::string_view to_string(SemanticAxis axis) noexcept;
+
 class SemanticFaceReference {
 public:
   [[nodiscard]] static Result<SemanticFaceReference> create(FeatureId source_feature,
@@ -63,6 +72,22 @@ private:
 
   FeatureId source_feature_;
   SemanticFace face_;
+};
+
+class SemanticAxisReference {
+public:
+  [[nodiscard]] static Result<SemanticAxisReference>
+  create(FeatureId source_feature, SemanticAxis axis = SemanticAxis::Primary);
+
+  [[nodiscard]] const FeatureId& source_feature() const noexcept;
+  [[nodiscard]] SemanticAxis axis() const noexcept;
+  [[nodiscard]] std::string node_id() const;
+
+private:
+  SemanticAxisReference(FeatureId source_feature, SemanticAxis axis);
+
+  FeatureId source_feature_;
+  SemanticAxis axis_;
 };
 
 class SemanticEdgeReference {

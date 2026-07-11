@@ -17,7 +17,7 @@ enum class AssemblyConstraintState { Active, Inactive };
 [[nodiscard]] std::string_view to_string(AssemblyConstraintState state) noexcept;
 
 // Persistent semantic assembly target. The semantic reference is model intent
-// such as feature.base_extrude.top or Bolt.main_axis, never a raw OCCT topology id.
+// such as feature.base_extrude.top or feature.hole.axis, never a raw OCCT topology id.
 class AssemblyConstraintTarget {
 public:
   [[nodiscard]] static Result<AssemblyConstraintTarget>

@@ -2,6 +2,7 @@
 
 #include "blcad/core/assembly_constraint.hpp"
 #include "blcad/core/assembly_document.hpp"
+#include "blcad/core/datum_plane.hpp"
 #include "blcad/core/project.hpp"
 #include "blcad/core/result.hpp"
 #include "blcad/core/spatial.hpp"
@@ -18,6 +19,14 @@ struct ComponentLocalPlanarDescriptor {
                          const ComponentLocalPlanarDescriptor&) = default;
 };
 
+struct ComponentLocalAxisDescriptor {
+  Point3 origin;
+  Vector3 direction;
+
+  friend bool operator==(const ComponentLocalAxisDescriptor&,
+                         const ComponentLocalAxisDescriptor&) = default;
+};
+
 struct ResolvedAssemblyConstraintTarget {
   ComponentInstanceId component_instance;
   DocumentId referenced_part_document;
@@ -30,12 +39,28 @@ struct ResolvedAssemblyConstraintTarget {
                          const ResolvedAssemblyConstraintTarget&) = default;
 };
 
+struct ResolvedAssemblyAxisConstraintTarget {
+  ComponentInstanceId component_instance;
+  DocumentId referenced_part_document;
+  FeatureId source_feature;
+  ProfileId source_profile;
+  SemanticAxis axis = SemanticAxis::Primary;
+  ComponentLocalAxisDescriptor local_axis;
+  RigidTransform component_transform;
+
+  friend bool operator==(const ResolvedAssemblyAxisConstraintTarget&,
+                         const ResolvedAssemblyAxisConstraintTarget&) = default;
+};
+
 // Resolves supported persistent assembly target intent to component-local geometry.
 // The component transform remains separate placement intent and is not applied here.
 class AssemblyConstraintTargetResolver {
 public:
   [[nodiscard]] Result<ResolvedAssemblyConstraintTarget>
   resolve(const Project& project, const AssemblyConstraintTarget& target) const;
+
+  [[nodiscard]] Result<ResolvedAssemblyAxisConstraintTarget>
+  resolve_axis(const Project& project, const AssemblyConstraintTarget& target) const;
 };
 
 } // namespace blcad::geometry

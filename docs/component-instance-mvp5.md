@@ -1,6 +1,8 @@
 # Component Instances and Explicit Placement MVP-5
 
-Status: implemented persistent component occurrence, placement, visibility, suppression, and grounding records plus explicit state-update APIs. The first rigid-body solver now consumes these records and may propose new transforms, while a separate applier owns the explicit successful-result mutation boundary.
+Status: implemented persistent component occurrence, placement, visibility, suppression, and grounding records plus explicit state-update APIs. The rigid-body solver consumes these records and may propose new transforms, while a separate applier owns the explicit successful-result mutation boundary.
+
+Downstream local DOF diagnostics, semantic generated-axis resolution, and read-only Concentric residual construction are also implemented without adding fields to `ComponentInstance`.
 
 ## Goal
 
@@ -21,7 +23,7 @@ part.bolt
   -> component.bolt.3
 ```
 
-All occurrences may reference the same project-owned part while retaining independent transforms and component state.
+All occurrences may reference the same project-owned part while retaining independent transforms and state.
 
 ## Component record
 
@@ -36,7 +38,7 @@ ComponentInstance
   transform
 ```
 
-State enums are:
+State enums:
 
 ```text
 ComponentVisibility
@@ -52,7 +54,7 @@ ComponentGroundingState
   Grounded
 ```
 
-Placement is:
+Placement:
 
 ```text
 RigidTransform
@@ -60,20 +62,19 @@ RigidTransform
   rotation_deg
 ```
 
-Translation components are millimeters and rotation components are degrees.
-
-All transform components must be finite.
+Translation components are millimeters and rotation components are degrees. All transform components must be finite.
 
 ## Transform semantics
 
-The persisted transform record is interpreted by `AssemblyTransformEvaluator` using the canonical active right-handed fixed-axis rotation order:
+`AssemblyTransformEvaluator` interprets the persisted transform using:
 
 ```text
+active right-handed fixed-axis rotations
 X -> Y -> Z
 Rz * Ry * Rx for column vectors
 ```
 
-Points are rotated and translated. Vectors, axes, and normals are rotated only.
+Points and geometry origins rotate and translate. Vectors, planar normals, and semantic axis directions rotate only.
 
 The exact convention is documented in `docs/assembly-rigid-transform-evaluation-mvp5.md`.
 
@@ -85,7 +86,7 @@ A component may reference only a registered assembly member part.
 
 `Project::validate_component_instances()` additionally requires every component reference to resolve to a project-owned `PartDocument`.
 
-Several component instances may reference one owned part document. Component occurrences do not duplicate part parameters, sketches, features, or shape-cache ownership.
+Several component instances may reference one owned part. Component occurrences do not duplicate part parameters, sketches, features, or shape-cache ownership.
 
 ## Explicit update APIs
 
@@ -100,15 +101,15 @@ Copy-style `ComponentInstance::with_*` operations preserve stable component iden
 
 The shared assembly update path rejects empty/unknown ids and invalid transforms before replacing the stored record.
 
-Failed updates preserve the previously stored component record.
+Failed updates preserve the previous component record.
 
 ## Storage-layer versus solver grounding semantics
 
-The component storage layer deliberately permits an explicit direct transform update even when a component is marked grounded.
+The component storage layer permits an explicit direct transform update even when a component is grounded.
 
-This allows explicit model edits and keeps record semantics independent from solver behavior.
+This keeps explicit model edits separate from solver behavior.
 
-The first rigid-body solver is the first consumer that enforces grounding as solve policy:
+The rigid-body solver interprets:
 
 ```text
 Grounded -> fixed solve participant
@@ -121,56 +122,65 @@ Changing a grounded anchor after a solve invalidates the old solve result becaus
 
 ## Suppression and visibility
 
-The records persist both suppression and visibility.
+Visibility does not affect the current solver.
 
-Visibility does not affect the first rigid-body solver.
-
-The first solver rejects a selected graph group containing a suppressed component instead of silently removing it or its constraints.
+The current solver rejects a selected graph group containing a suppressed component instead of silently removing it or its constraints.
 
 This is a solver policy, not a storage-layer mutation rule.
 
-Future suppression-aware graph/solve participation must define connectivity and constraint participation together.
+A later suppression-aware graph/solve path must define connectivity and constraint participation together.
 
-## Constraint and solver consumers
+## Downstream consumers
 
-The current assembly path consumes component records through separate layers:
+The assembly path consumes component records through separate layers:
 
 ```text
 ComponentInstance
   -> AssemblyConstraintGraph
-  -> AssemblyConstraintTargetResolver
+  -> semantic target resolver
   -> AssemblyTransformEvaluator
-  -> AssemblyConstraintEquationBuilder
+  -> planar or axis assembly-space descriptor
+  -> residual builder
+  -> optional numeric solve/DOF path
+```
+
+Implemented planar path:
+
+```text
+AssemblyConstraintEquationBuilder
+  -> Mate/Distance residuals
+  -> shared numeric system
   -> AssemblyRigidBodySolver
   -> AssemblySolveResult
   -> AssemblySolveResultApplier
+  -> AssemblySolveDiagnosticsAnalyzer
 ```
+
+Implemented semantic axis/Concentric path:
+
+```text
+AssemblyConstraintTargetResolver::resolve_axis
+  -> AssemblyTransformEvaluator::evaluate_axis
+  -> AssemblyConcentricConstraintEquationBuilder
+  -> ConcentricResidualDescriptor
+```
+
+Concentric numeric-system/solver/DOF integration is the next block.
 
 Responsibilities remain separate:
 
 - graph: active relationship connectivity
-- target resolver: component/part semantic lookup and local plane construction
-- transform evaluator: exact local-to-assembly coordinate mapping
-- equation builder: planar Mate/Distance residual semantics
-- rigid-body solver: fixed/variable participation and numeric solve on a private project copy
-- result applier: explicit fresh-converged-result transform mutation boundary
+- target resolver: component/part semantic lookup and component-local geometry
+- transform evaluator: exact local-to-assembly mapping
+- residual builders: constraint-family geometry semantics
+- numeric system: deterministic scalar residual/variable/Jacobian interpretation
+- rigid-body solver: fixed/variable participation and numeric solve on project copies
+- result applier: fresh-converged-result mutation boundary
+- diagnostics: local rank and remaining DOF over the exact shared numeric system
 
-The solver does not mutate the source project.
-
-A successful apply updates the existing component transform records through the normal assembly transform update path.
-
-No separate solved-transform record is added to `ComponentInstance`.
+No downstream descriptor becomes a new `ComponentInstance` field.
 
 ## JSON representation
-
-Assembly JSON retains the historical compatibility marker:
-
-```text
-blcad.assembly_document.mvp4
-version 1
-```
-
-The marker is historical. MVP-5 component instances extended the schema additively.
 
 Representative component JSON:
 
@@ -191,11 +201,11 @@ Representative component JSON:
 
 Assembly/project JSON roundtrip preserves component placement and state.
 
-Graph, resolved targets, assembly-space frames, residuals, Jacobians, `AssemblySolveResult`, and proposed transforms are not component persistence fields.
+Graph connectivity, resolved planar/axis targets, assembly-space planes/axes, residuals, Jacobians, solve results, proposed transforms, rank values, and DOF diagnostics are not component persistence fields.
 
-After a fresh converged solve result is explicitly applied, a later save serializes the updated existing `transform` field exactly like any other valid transform edit.
+After a fresh converged result is explicitly applied, a later save serializes the updated existing `transform` field exactly like any other valid transform edit.
 
-The file format does not persist transform provenance as "manual" versus "solver-applied".
+The file format does not persist transform provenance as manual versus solver-applied.
 
 ## Headless inspection
 
@@ -203,66 +213,39 @@ The file format does not persist transform provenance as "manual" versus "solver
 blcad_inspect_project_components <input.blcad.project.json>
 ```
 
-The current inspector reports:
+The inspector reports component placement/state, stored constraints, and a derived graph-group summary.
 
-- referenced part document
-- visibility
-- suppression state
-- grounding state
-- translation
-- rotation
-- stored constraints
-- derived graph-group summary
-
-The tool is read-only and does not run the solver.
+It is read-only and does not run the solver or resolve semantic axis geometry.
 
 ## Tests
 
-Component-instance core tests cover:
-
-- required identity fields
-- initial transform storage
-- non-finite transform rejection
-- member-part reference validation
-- unique component ids
-- explicit transform/state updates
-- empty and unknown update ids
-- failed update immutability
-- direct transform edits while grounded
-- identity and part-reference preservation across updates
-- assembly/project JSON roundtrip
-- project-owned part validation
-- repeated occurrences sharing one part
-
-Targeted command:
-
 ```bash
 ./build/dev/blcad_core_tests "[core][component-instance]"
-```
-
-The rigid-body solver suite separately covers grounded/fixed participation, suppression rejection, source-project immutability, stale component snapshots, and explicit transform application:
-
-```bash
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-solver]"
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-diagnostics]"
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-concentric]"
 ```
+
+These suites separately cover component storage/update behavior, solver participation/application boundaries, local rank/DOF behavior, and semantic axis/Concentric residual use of component transforms.
 
 ## Deliberate component-record limitations
 
 The component record layer itself does not:
 
 - infer assembly constraints from placement
+- resolve semantic geometry
 - run numeric optimization
-- compute remaining degrees of freedom
-- classify under/fully/overconstrained state
+- compute remaining DOF
+- classify constraint rank
 - automatically block direct edits while grounded
 - automatically remove suppressed components from graph connectivity
 - instantiate assembly geometry
 - export assembly STEP
 
-Persistent constraint records, graph connectivity, target resolution, transform evaluation, planar residual construction, rigid-body solving, and explicit successful-result application are implemented as separate layers.
+Those responsibilities belong to separate downstream layers.
 
 ## Current downstream boundary
 
-The repository-wide next assembly block is read-only Jacobian-rank and remaining-degree-of-freedom diagnostics.
+Local Jacobian-rank/remaining-DOF diagnostics and read-only semantic-axis/Concentric residual construction are implemented downstream without changing `ComponentInstance`.
 
-That diagnostics layer will consume the solver's deterministic variable ordering and local numeric model without adding persistent DOF fields to `ComponentInstance`.
+The next repository-wide assembly block is Concentric integration into the shared numeric residual/Jacobian system, rigid-body solver, and DOF diagnostics. No new component persistence field is required.

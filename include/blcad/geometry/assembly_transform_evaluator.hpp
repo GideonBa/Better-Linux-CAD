@@ -16,9 +16,17 @@ struct AssemblySpacePlanarDescriptor {
                          const AssemblySpacePlanarDescriptor&) = default;
 };
 
+struct AssemblySpaceAxisDescriptor {
+  Point3 origin;
+  Vector3 direction;
+
+  friend bool operator==(const AssemblySpaceAxisDescriptor&,
+                         const AssemblySpaceAxisDescriptor&) = default;
+};
+
 // Evaluates persisted component free-placement intent in assembly coordinates.
 // rotation_deg uses active right-handed fixed-axis rotations in X, then Y, then Z order.
-// Points are rotated and translated; vectors are rotated only.
+// Points are rotated and translated; vectors and axis directions are rotated only.
 class AssemblyTransformEvaluator {
 public:
   [[nodiscard]] Point3 evaluate_point(const RigidTransform& transform,
@@ -28,6 +36,9 @@ public:
   [[nodiscard]] AssemblySpacePlanarDescriptor evaluate_plane(
       const RigidTransform& transform,
       const ComponentLocalPlanarDescriptor& component_local_plane) const noexcept;
+  [[nodiscard]] AssemblySpaceAxisDescriptor evaluate_axis(
+      const RigidTransform& transform,
+      const ComponentLocalAxisDescriptor& component_local_axis) const noexcept;
 };
 
 } // namespace blcad::geometry
