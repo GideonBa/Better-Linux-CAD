@@ -7,6 +7,7 @@
 #include "blcad/core/result.hpp"
 #include "blcad/geometry/assembly_concentric_constraint_equation_builder.hpp"
 #include "blcad/geometry/assembly_constraint_equation_builder.hpp"
+#include "blcad/geometry/assembly_constraint_target_resolver.hpp"
 #include "blcad/geometry/assembly_insert_constraint_equation_builder.hpp"
 
 #include <optional>
