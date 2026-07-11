@@ -66,7 +66,7 @@ Schema `blcad.assembly_document.mvp4`, version 1:
 
 `examples/flange_assembly.blcad.json` is the checked-in reference: it binds the bolt-circle parameters of `examples/bolt_circle_plate.blcad.json` to assembly values.
 
-The same assembly JSON compatibility marker also supports optional `component_instances`; that field belongs to the separate MVP-5 block in `docs/component-instance-mvp5.md`, not to the parameter-binding seed.
+The same assembly JSON compatibility marker also supports optional `component_instances` and `assembly_constraints`; those fields belong to the separate MVP-5 blocks in `docs/component-instance-mvp5.md` and `docs/assembly-constraint-model-intent-mvp5.md`, not to the parameter-binding seed.
 
 ## Covered by tests
 
@@ -82,7 +82,7 @@ The same assembly JSON compatibility marker also supports optional `component_in
 ## Deliberate limitations
 
 - `AssemblyDocument` itself remains an explicit low-level model. Automatic cross-document propagation is implemented by `Project`, not by hidden assembly side effects.
-- component instances and explicit free-placement/state updates are a separate MVP-5 structure; parameter bindings do not depend on component placement or instance count.
-- no assembly constraints or solver (`docs/assembly-system.md`).
+- component instances, explicit free-placement/state updates, and solver-independent assembly constraint records are separate MVP-5 structures; parameter bindings do not depend on component placement, instance count, or constraint records.
+- assembly constraint graph construction, semantic target geometry resolution, rigid-body solving, and constraint-to-assembly-parameter binding are not implemented yet (`docs/assembly-system.md`).
 - no expressions over assembly parameters yet (`docs/parameter-model.md`).
 - no global/project parameter scope yet.
