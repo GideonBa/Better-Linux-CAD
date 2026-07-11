@@ -1,8 +1,8 @@
 # Component Instances and Explicit Placement MVP-5
 
-Status: implemented persistent component occurrence, placement, visibility, suppression, and grounding records plus explicit state-update APIs. The rigid-body solver consumes these records and may propose new transforms, while a separate applier owns the explicit successful-result mutation boundary.
+Status: implemented persistent component occurrence, placement, visibility, suppression, and grounding records plus explicit state-update APIs. The shared Mate/Distance/Concentric rigid-body solver consumes these records and may propose new transforms, while a separate applier owns the explicit successful-result mutation boundary.
 
-Downstream local DOF diagnostics, semantic generated-axis resolution, and read-only Concentric residual construction are also implemented without adding fields to `ComponentInstance`.
+Local DOF diagnostics and semantic generated-axis/Concentric solving are implemented downstream without adding fields to `ComponentInstance`.
 
 ## Goal
 
@@ -120,6 +120,8 @@ At least one component in a selected connected group must be grounded. Multiple 
 
 Changing a grounded anchor after a solve invalidates the old solve result because solver snapshots include every group component's source transform and state.
 
+These rules apply to Mate, Distance, and Concentric groups through the same solver path.
+
 ## Suppression and visibility
 
 Visibility does not affect the current solver.
@@ -140,23 +142,22 @@ ComponentInstance
   -> semantic target resolver
   -> AssemblyTransformEvaluator
   -> planar or axis assembly-space descriptor
-  -> residual builder
-  -> optional numeric solve/DOF path
-```
-
-Implemented planar path:
-
-```text
-AssemblyConstraintEquationBuilder
-  -> Mate/Distance residuals
-  -> shared numeric system
+  -> geometry-family residual builder
+  -> shared numeric residual/Jacobian system
   -> AssemblyRigidBodySolver
   -> AssemblySolveResult
   -> AssemblySolveResultApplier
   -> AssemblySolveDiagnosticsAnalyzer
 ```
 
-Implemented semantic axis/Concentric path:
+Planar branch:
+
+```text
+AssemblyConstraintEquationBuilder
+  -> Mate/Distance residuals
+```
+
+Semantic axis branch:
 
 ```text
 AssemblyConstraintTargetResolver::resolve_axis
@@ -165,7 +166,7 @@ AssemblyConstraintTargetResolver::resolve_axis
   -> ConcentricResidualDescriptor
 ```
 
-Concentric numeric-system/solver/DOF integration is the next block.
+Both branches feed the same shared numeric/solver/diagnostic path.
 
 Responsibilities remain separate:
 
@@ -179,6 +180,31 @@ Responsibilities remain separate:
 - diagnostics: local rank and remaining DOF over the exact shared numeric system
 
 No downstream descriptor becomes a new `ComponentInstance` field.
+
+## Concentric freedoms do not become component state
+
+A regular Concentric relationship leaves:
+
+```text
+translation along the common axis
+rotation about the common axis
+```
+
+free.
+
+Those freedoms are observed as null directions in the shared Jacobian and as two remaining local DOF.
+
+They are not persisted as component flags such as `can_slide` or `can_rotate`.
+
+The current regular Concentric rank result is:
+
+```text
+variable_count  = 6
+jacobian_rank   = 4
+remaining_dof   = 2
+```
+
+A future null-space or per-component DOF presentation layer may derive richer labels without changing the component record.
 
 ## JSON representation
 
@@ -201,11 +227,11 @@ Representative component JSON:
 
 Assembly/project JSON roundtrip preserves component placement and state.
 
-Graph connectivity, resolved planar/axis targets, assembly-space planes/axes, residuals, Jacobians, solve results, proposed transforms, rank values, and DOF diagnostics are not component persistence fields.
+Graph connectivity, resolved planar/axis targets, assembly-space planes/axes, residuals, flattened numeric vectors, Jacobians, solve results, proposed transforms, rank values, and DOF diagnostics are not component persistence fields.
 
 After a fresh converged result is explicitly applied, a later save serializes the updated existing `transform` field exactly like any other valid transform edit.
 
-The file format does not persist transform provenance as manual versus solver-applied.
+The file format does not persist transform provenance as manual versus solver-applied or constraint-family-specific.
 
 ## Headless inspection
 
@@ -224,9 +250,10 @@ It is read-only and does not run the solver or resolve semantic axis geometry.
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-solver]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-diagnostics]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-concentric]"
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-concentric-solver]"
 ```
 
-These suites separately cover component storage/update behavior, solver participation/application boundaries, local rank/DOF behavior, and semantic axis/Concentric residual use of component transforms.
+These suites separately cover component storage/update behavior, solver participation/application boundaries, local rank/DOF behavior, semantic axis resolution, and Concentric use of component transforms through the shared solver.
 
 ## Deliberate component-record limitations
 
@@ -237,6 +264,7 @@ The component record layer itself does not:
 - run numeric optimization
 - compute remaining DOF
 - classify constraint rank
+- persist null-space directions
 - automatically block direct edits while grounded
 - automatically remove suppressed components from graph connectivity
 - instantiate assembly geometry
@@ -246,6 +274,6 @@ Those responsibilities belong to separate downstream layers.
 
 ## Current downstream boundary
 
-Local Jacobian-rank/remaining-DOF diagnostics and read-only semantic-axis/Concentric residual construction are implemented downstream without changing `ComponentInstance`.
+Mate, Distance, and Concentric solving plus local Jacobian-rank/remaining-DOF diagnostics are implemented downstream without changing `ComponentInstance`.
 
-The next repository-wide assembly block is Concentric integration into the shared numeric residual/Jacobian system, rigid-body solver, and DOF diagnostics. No new component persistence field is required.
+The next repository-wide assembly block is stable Insert intent and read-only composite Insert residual semantics. No new component persistence field is required for that semantic/residual block.
