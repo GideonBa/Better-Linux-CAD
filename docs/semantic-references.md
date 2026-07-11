@@ -1,6 +1,6 @@
 # Semantic References
 
-Status: partially implemented. Generated planar faces, selected generated edges/vertices, and the first feature-produced semantic axis family are implemented. A complete general topological naming system remains future work.
+Status: partially implemented. Generated planar faces, selected generated edges/vertices, and the first feature-produced semantic axis family are implemented. Semantic generated axes now participate in Concentric residual construction, the shared numeric solver, and local DOF diagnostics. A complete general topological naming system remains future work.
 
 This document is the canonical rule for persistent geometry references shared by sketch, feature, construction, assembly, and future engineering layers.
 
@@ -59,7 +59,7 @@ SemanticFaceReference
 
 `DerivedWorkplane` consumes this path for sketch placement.
 
-The assembly path is:
+Assembly path:
 
 ```text
 semantic face token
@@ -68,10 +68,10 @@ semantic face token
   -> AssemblyTransformEvaluator::evaluate_plane
   -> AssemblySpacePlanarDescriptor
   -> AssemblyConstraintEquationBuilder
-  -> planar Mate/Distance residuals
+  -> Mate/Distance residual descriptor
+  -> shared numeric residual/Jacobian system
+  -> solver and DOF diagnostics
 ```
-
-The current numeric solver and DOF analyzer consume this planar residual path.
 
 ## Implemented generated-axis family
 
@@ -125,6 +125,9 @@ feature.hole.axis
   -> AssemblySpaceAxisDescriptor
   -> AssemblyConcentricConstraintEquationBuilder
   -> ConcentricResidualDescriptor
+  -> shared numeric residual/Jacobian system
+  -> AssemblyRigidBodySolver
+  -> AssemblySolveDiagnosticsAnalyzer
 ```
 
 No raw cylindrical face or OCCT topology id participates in the reference identity.
@@ -165,6 +168,8 @@ A graph, numeric system, solver, cache, or diagnostic consumer must not silently
 
 Residual builders read target A/B order directly from persistent `AssemblyConstraint` intent.
 
+The shared numeric system preserves that internal order while consuming constraints in deterministic graph constraint-id order.
+
 ## Concentric semantic dependency
 
 Concentric consumes two semantic assembly-space axis lines.
@@ -182,9 +187,22 @@ Axial origin separation is absent from the offset residual, so Concentric leaves
 
 Rotation about the common axis is also unconstrained by axis-line coincidence.
 
-These semantics are implemented in the read-only Concentric builder.
+These semantics remain owned by the read-only Concentric builder.
 
-The shared numeric system, rigid-body solver, and DOF diagnostics do not yet consume Concentric residuals. That integration is the next assembly block.
+The shared numeric system now flattens the descriptor in exact order:
+
+```text
+direction_parallelism.x
+direction_parallelism.y
+direction_parallelism.z
+axis_offset_mm.x / length_residual_scale_mm
+axis_offset_mm.y / length_residual_scale_mm
+axis_offset_mm.z / length_residual_scale_mm
+```
+
+The same residual evaluator and finite-difference Jacobian are used by solver and diagnostics.
+
+A regular one-free-body Concentric system is proven numerically as rank four with two remaining local DOF.
 
 ## Solve and DOF integration rule
 
@@ -192,17 +210,35 @@ Semantic references remain the source of target geometry for every residual eval
 
 The solver does not persist resolved target geometry.
 
-For current Mate/Distance solving, central finite-difference perturbations re-evaluate residuals from current project intent through the same target resolver.
+Central finite-difference perturbations re-evaluate residuals from current project intent through the same target resolver and transform evaluator.
 
-`AssemblySolveDiagnosticsAnalyzer` evaluates local Jacobian rank through the same shared numeric path as the solver.
+This rule now applies to:
 
-The next Concentric integration must follow the same rule: each residual/Jacobian evaluation resolves `feature.<feature-id>.axis` from current project model intent rather than caching kernel bindings in solver state.
+```text
+Mate
+Distance
+Concentric
+```
+
+For Concentric, every plus/minus Jacobian evaluation resolves `feature.<feature-id>.axis` from current project model intent and reconstructs the local/assembly axis and residual descriptor.
+
+`AssemblySolveDiagnosticsAnalyzer` evaluates local Jacobian rank through the same shared numeric residual/Jacobian path as the solver.
+
+Therefore no solver or DOF cache takes ownership of semantic reference bindings.
 
 When source geometry changes, semantic targets are re-resolved. Failed resolution must fail or invalidate the consumer. It must never silently bind to another kernel entity because a topology index changed.
 
+An unsupported token such as:
+
+```text
+bolt.main_axis
+```
+
+propagates the semantic-axis resolver failure through the numeric system, solver, and diagnostics unchanged.
+
 ## Persistence rule
 
-The existing assembly target field already stores semantic references as strings:
+The existing assembly target field stores semantic references as strings:
 
 ```text
 assembly_constraints[].target_a.semantic_reference
@@ -217,7 +253,10 @@ The following remain derived:
 - local axis descriptors
 - assembly-space axis descriptors
 - Concentric residual descriptors
-- numeric Jacobians and DOF diagnostics
+- flattened numeric residual vectors
+- finite-difference Jacobians
+- solve results and unapplied proposals
+- rank and DOF diagnostics
 
 Changing the meaning of an established semantic token family is a compatibility change even when the JSON schema shape remains identical.
 
@@ -225,6 +264,7 @@ Changing the meaning of an established semantic token family is a compatibility 
 
 Still required:
 
+- stable axial-seating plane semantics for Insert
 - broader axis producers from shafts, revolves, cylindrical features, and construction geometry
 - stable per-instance pattern-axis tokens
 - named edge groups for fillet/chamfer
@@ -233,6 +273,32 @@ Still required:
 - broader reference rebinding after recompute
 - explicit lost-reference diagnostics
 - stronger geometry-producer invalidation integration across assembly consumers
+
+## Next semantic-reference block: axial seating for Insert
+
+Concentric axis-line semantics are now integrated through solving and DOF analysis.
+
+The next assembly semantic-reference blocker is axial seating geometry for Insert.
+
+Insert must be able to derive, per endpoint:
+
+```text
+one stable semantic axis
+one stable semantic seating plane
+```
+
+The first seating-plane family should be produced explicitly by supported circular-feature intent. It must not guess an entry face by scanning OCCT cylinders or face order.
+
+The next block must define:
+
+- which circular-cut model intent exposes a seating plane
+- the stable semantic token family
+- component-local seating-plane origin and orientation
+- assembly-space evaluation through the existing transform convention
+- target A/B semantics for signed axial seating
+- failure behavior for unsupported feature families
+
+Only after those semantics are stable should Insert residual and later solver integration consume them.
 
 ## Dependency integration
 
@@ -251,10 +317,10 @@ A future dependency model may connect feature/reference changes to affected asse
 - a complete general topological naming system
 - automatic repair of every lost reference chain
 - raw OCCT handles as persistent model references
-- silently inferring semantic axes from arbitrary kernel cylinders
+- silently inferring semantic axes or seating planes from arbitrary kernel cylinders/faces
 
 ## Current downstream boundary
 
-Generated-axis resolution and read-only Concentric residual construction are implemented.
+Generated-axis resolution, Concentric residual construction, shared numeric flattening, rigid-body solving, and local rank/remaining-DOF diagnostics are implemented.
 
-The next assembly step is to integrate the Concentric residual family into the shared numeric residual/Jacobian system, rigid-body solver, and local remaining-DOF diagnostics. Insert remains downstream until axial seating semantics are explicit.
+The next semantic-reference work is stable axial-seating geometry for Insert and a read-only composite Insert residual model. Insert numeric solver integration follows only after that target/residual contract is stable.

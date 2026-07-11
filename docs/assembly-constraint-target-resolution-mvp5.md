@@ -1,6 +1,6 @@
 # Assembly Constraint Target Resolution MVP-5
 
-Status: implemented read-only generated-planar-face resolution and the first read-only generated-axis resolution family. Planar targets feed Mate/Distance; generated axes feed the dedicated Concentric residual builder.
+Status: implemented read-only generated-planar-face resolution and the first read-only generated-axis resolution family. Planar targets feed Mate/Distance; generated axes feed Concentric. Both residual families now join the shared numeric solver and DOF path downstream.
 
 ## Goal
 
@@ -202,9 +202,11 @@ resolve_axis
   -> AssemblyTransformEvaluator::evaluate_axis
   -> AssemblyConcentricConstraintEquationBuilder
   -> Concentric residuals
+  -> same shared numeric system
+  -> same rigid-body solver / DOF diagnostics
 ```
 
-Concentric numeric-system/solver/DOF integration is not implemented yet.
+The resolver remains unchanged by numeric integration. The shared numeric system simply re-enters this path for every Concentric residual and finite-difference evaluation.
 
 ## Failure behavior
 
@@ -228,6 +230,8 @@ Axis failures include:
 
 Failures use existing `Result<T>`/`Error` propagation.
 
+Axis target failures propagate unchanged through Concentric residual construction, the shared numeric system, solver, and diagnostics.
+
 ## Read-only and persistence boundary
 
 Resolution does not:
@@ -241,6 +245,8 @@ Resolution does not:
 
 Resolved descriptors are regenerated from current model intent.
 
+No solver or Jacobian cache owns resolved target bindings.
+
 ## Tests
 
 Planar tests:
@@ -249,16 +255,22 @@ Planar tests:
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-target]"
 ```
 
-Axis and Concentric-path tests:
+Axis and Concentric semantic tests:
 
 ```bash
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-concentric]"
 ```
 
-Coverage includes all six generated faces, semantic axis identity, CircleProfile-center axis origins, extrude-direction axis orientation, unsupported feature/profile families, determinism, and unchanged model intent.
+Concentric downstream numeric/solver tests:
+
+```bash
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-concentric-solver]"
+```
+
+Coverage includes all six generated faces, semantic axis identity, CircleProfile-center axis origins, extrude-direction axis orientation, unsupported feature/profile families, determinism, unchanged model intent, and repeated target re-resolution through numeric solver/Jacobian evaluation.
 
 ## Current downstream boundary
 
-Generated-axis target resolution is implemented.
+Generated-axis target resolution and Concentric shared-numeric/solver/DOF consumption are implemented.
 
-The next repository-wide assembly step is to integrate the already-implemented Concentric residual descriptors into the shared numeric residual/Jacobian system, rigid-body solver, and DOF diagnostics.
+The next semantic target-resolution work is stable axial-seating geometry for Insert. That target family must remain semantic and component-local before the transform evaluator, just like existing planar and axis targets.

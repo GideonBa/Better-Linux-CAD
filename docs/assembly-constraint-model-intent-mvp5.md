@@ -1,6 +1,6 @@
 # Assembly Constraint Model Intent MVP-5
 
-Status: implemented solver-independent assembly relationship records for Mate, Concentric, and Distance. Generated planar-face and generated-axis target resolution, planar Mate/Distance residuals, and read-only Concentric residual construction exist as separate downstream geometry layers.
+Status: implemented solver-independent assembly relationship records for Mate, Concentric, and Distance. Generated planar/axis target resolution, geometry-family residual construction, shared numeric solving, and local DOF diagnostics exist as separate downstream layers.
 
 ## Goal
 
@@ -59,6 +59,8 @@ AssemblyConstraintType::Concentric
 AssemblyConstraintType::Distance
 ```
 
+All three types now have downstream numeric solve support for their currently supported semantic target families.
+
 Flush, Coincident, Insert, Angle, Tangent, Lock, and joints remain future record families.
 
 ## Constraint record
@@ -77,7 +79,7 @@ distance = optional length quantity
 
 Target A/B order is persistent intent and must be preserved.
 
-Order is already observable in current residual conventions:
+Order is observable in current residual conventions:
 
 ```text
 Distance signed separation = dot(oB - oA, nA)
@@ -130,6 +132,7 @@ Adding or loading a constraint does not:
 - resolve semantic geometry
 - evaluate component transforms
 - construct residuals
+- flatten numeric residual vectors
 - solve placement
 - enforce grounding
 - compute remaining DOF
@@ -187,8 +190,6 @@ signed_separation_mm = dot(oB - oA, nA)
 distance_residual_mm = signed_separation_mm - target_distance_mm
 ```
 
-The current shared numeric system, solver, and DOF analyzer consume these planar descriptors.
-
 ### Concentric residual construction
 
 ```text
@@ -204,7 +205,34 @@ axis_offset_mm         = cross(oB - oA, dA)
 
 Equal and opposed axis directions are accepted. Axial translation and rotation about the common axis are intentionally free.
 
-Concentric residual descriptors are implemented and read-only. Their integration into the shared numeric system, rigid-body solver, and DOF diagnostics is the next block.
+### Shared numeric, solver, and diagnostics path
+
+The private assembly numeric system selects the residual builder from persistent `AssemblyConstraintType`.
+
+Exact Concentric flattening:
+
+```text
+direction_parallelism.x
+direction_parallelism.y
+direction_parallelism.z
+axis_offset_mm.x / length_residual_scale_mm
+axis_offset_mm.y / length_residual_scale_mm
+axis_offset_mm.z / length_residual_scale_mm
+```
+
+Mate and Distance retain their existing four-scalar flattening.
+
+`AssemblyRigidBodySolver` and `AssemblySolveDiagnosticsAnalyzer` consume the same residual evaluator and central finite-difference Jacobian.
+
+For one regular Concentric relationship between one grounded and one free body, the generic rank analyzer measures:
+
+```text
+variable_count  = 6
+jacobian_rank   = 4
+remaining_dof   = 2
+```
+
+None of this numeric interpretation becomes persistent relationship state.
 
 ## Project structure validation
 
@@ -218,7 +246,7 @@ Concentric residual descriptors are implemented and read-only. Their integration
 
 Several component instances may reference one owned `PartDocument`. Constraints relate occurrences, not duplicated part model records.
 
-Semantic geometry resolution remains a downstream geometry-layer concern. A non-empty unsupported semantic token may be stored as intent and fail only when a geometry consumer attempts to interpret it.
+Semantic geometry resolution remains a downstream geometry-layer concern. A non-empty unsupported semantic token may be stored as intent and fail when a geometry or numeric consumer attempts to interpret it.
 
 ## JSON representation
 
@@ -262,9 +290,9 @@ Compatibility rules:
 - target component validation runs through `AssemblyDocument::add_constraint`
 - project JSON inherits constraint persistence through embedded assembly JSON
 
-No graph cache, resolved plane/axis descriptor, evaluated assembly-space geometry, residual descriptor, solver result, Jacobian, rank, DOF state, or solved-transform cache is serialized by this record block.
+No graph cache, resolved plane/axis descriptor, evaluated assembly-space geometry, residual descriptor, flattened numeric vector, solver result, Jacobian, rank, DOF state, or solved-transform cache is serialized by this record block.
 
-`feature.hole.axis` uses the already-existing semantic-reference string field. No schema field was added for semantic axes.
+`feature.hole.axis` uses the existing semantic-reference string field. No schema field was added for Concentric solver integration.
 
 ## Headless inspection
 
@@ -283,10 +311,11 @@ Downstream geometry tests cover:
 ```bash
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-equation]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-concentric]"
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-concentric-solver]"
 ```
 
 ## Current downstream boundary
 
-Constraint model intent already supports Concentric records and the semantic generated-axis/Concentric residual path is implemented.
+Mate, Distance, and Concentric records are interpreted by separate semantic geometry/residual builders and one shared numeric solver/DOF path without changing the persistent record model.
 
-The next assembly step is to integrate those Concentric residuals into the shared numeric residual/Jacobian system, rigid-body solver, and local remaining-DOF diagnostics.
+The next assembly model-intent extension is stable Insert relationship intent with explicit semantic axial-seating target semantics. Insert residual/solver work remains downstream from that record contract.

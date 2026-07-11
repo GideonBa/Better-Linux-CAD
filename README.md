@@ -6,7 +6,7 @@ Detailed architecture and feature status live in `docs/`. This README is intenti
 
 ## Status
 
-Current state: MVP-1 core skeleton, staged MVP-2 sketch/workplane/profile/recompute/reference blocks, the MVP-3 parametric bolt circle, the MVP-4 assembly/project container path, and MVP-5 assembly infrastructure through deterministic planar rigid-body solving, local Jacobian-rank/remaining-DOF diagnostics, semantic generated-axis resolution, and read-only Concentric residual construction.
+Current state: MVP-1 core skeleton, staged MVP-2 sketch/workplane/profile/recompute/reference blocks, the MVP-3 parametric bolt circle, the MVP-4 assembly/project container path, and MVP-5 assembly infrastructure through deterministic Mate/Distance/Concentric rigid-body solving and read-only local Jacobian-rank/remaining-DOF diagnostics.
 
 The implemented assembly path now includes:
 
@@ -15,19 +15,14 @@ component and constraint model intent
   -> deterministic active-constraint graph
   -> generated planar face and circular-cut axis target resolution
   -> explicit local-to-assembly rigid-transform evaluation
-  -> planar Mate/Distance residual construction
-  -> shared deterministic planar numeric residual/Jacobian system
+  -> planar Mate/Distance and axis-line Concentric residual construction
+  -> one shared deterministic numeric residual/Jacobian system
   -> damped Gauss-Newton rigid-body solve on Project copies
   -> explicit atomic converged-result application
   -> read-only local Jacobian-rank and remaining-DOF diagnostics
-
-semantic feature.hole.axis targets
-  -> component-local generated axis
-  -> assembly-space axis line
-  -> deterministic read-only Concentric residual descriptor
 ```
 
-The current solver and DOF analyzer still consume planar Mate/Distance residuals only. Concentric target and residual semantics are implemented, but their numeric-system and solver integration is the next block.
+Concentric uses the same shared numeric system, solver, result-applier, and rank analyzer as Mate/Distance. A regular one-free-body Concentric relationship is proven numerically as rank `4` over `6` rigid-body variables with `2` remaining local DOF.
 
 There is no GUI yet.
 
@@ -69,9 +64,10 @@ Focused current assembly tests:
 ./build/dev/blcad_core_tests "[core][semantic-axis]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-equation]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-transform]"
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-concentric]"
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-concentric-solver]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-solver]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-diagnostics]"
-./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-concentric]"
 ```
 
 ## Headless tools
@@ -121,6 +117,7 @@ Implemented assembly blocks:
 - `docs/assembly-rigid-body-solver-mvp5.md`
 - `docs/assembly-solve-diagnostics-mvp5.md`
 - `docs/assembly-semantic-axis-concentric-residuals-mvp5.md`
+- `docs/assembly-concentric-numeric-solver-dof-mvp5.md`
 
 Broader implemented sketch/profile documents remain listed from `docs/mvp-plan.md` and `docs/architecture-summary.md`.
 
@@ -132,6 +129,6 @@ Future roadmaps:
 
 ## Next technical step
 
-The next technical step is explicit Concentric integration into the shared numeric residual/Jacobian system, rigid-body solver, and remaining-DOF diagnostics.
+The next technical step is the first stable Insert constraint intent and a read-only composite Insert residual model.
 
-The block should preserve all current deterministic ordering, residual scaling, grounding, suppression, snapshot, stale-result, and explicit-application contracts; flatten Concentric direction residuals before scaled axis-offset residuals; solve axis offset and tilt through the existing finite-difference/Gauss-Newton path; and prove the regular one-free-body Concentric Jacobian has rank four with two remaining DOF. Insert remains downstream because it adds axial seating semantics to Concentric alignment.
+That block should define semantic axial-seating geometry for the first supported circular feature family, add explicit persistent Insert relationship semantics, combine stable axis alignment with signed seating-plane separation in target A/B order, and prove a regular Insert relationship has local rank five with one remaining rotation-about-axis DOF before Insert is connected to the numeric solver.

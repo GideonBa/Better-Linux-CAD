@@ -1,16 +1,14 @@
 # Rigid-Body Assembly Solver MVP-5
 
-Status: implemented deterministic rigid-body solver for supported planar Mate/Distance connected groups, with an explicit atomic application boundary. The solver shares its planar numeric residual/Jacobian path with read-only DOF diagnostics.
-
-Semantic generated axes and read-only Concentric residual descriptors are implemented separately. Concentric solver integration is the next block.
+Status: implemented deterministic rigid-body solver for supported Mate, Distance, and Concentric connected groups with one shared numeric residual/Jacobian path and an explicit atomic result-application boundary.
 
 ## Goal
 
-The solver derives proposed component placement values from persistent assembly constraint intent without mutating the source project during solve.
+The solver derives proposed component placements from persistent assembly relationship intent without mutating the source project during solve.
 
-It consumes exactly one deterministic connected group from `AssemblyConstraintGraph`, keeps grounded components fixed, evaluates the currently supported numeric residual system, optimizes free component transforms on private `Project` copies, and returns explicit transform proposals.
+It consumes exactly one deterministic connected group from `AssemblyConstraintGraph`, keeps grounded components fixed, evaluates the shared assembly numeric system, optimizes free component transforms on private `Project` copies, and returns explicit transform proposals.
 
-`AssemblySolveResultApplier` is the only transform-application boundary introduced by this block.
+`AssemblySolveResultApplier` is the only transform-application boundary introduced by this solver path.
 
 ## API
 
@@ -36,6 +34,8 @@ Public header:
 include/blcad/geometry/assembly_rigid_body_solver.hpp
 ```
 
+Concentric integration adds no new public solver type or solver method.
+
 ## Exact connected-group contract
 
 The solver input must exactly match one group returned by:
@@ -57,7 +57,7 @@ Grounded -> fixed participant
 Free     -> six numeric transform variables
 ```
 
-At least one component must be grounded. The first solver does not invent a floating-group gauge condition.
+At least one component must be grounded. The solver does not invent a floating-group gauge condition.
 
 Multiple grounded components are allowed and remain fixed.
 
@@ -68,6 +68,8 @@ An all-grounded group returns:
 
 Grounded components receive no transform proposals.
 
+This policy is identical for Mate, Distance, and Concentric groups.
+
 ## Suppression and visibility
 
 Suppressed components are explicitly unsupported by the current solver.
@@ -76,28 +78,45 @@ A selected group containing a suppressed component fails before numeric solving.
 
 Visibility does not affect solve participation.
 
-These are solver policies; the storage layer still permits explicit state and transform edits.
+These are solver policies; the component storage layer still permits explicit state and transform edits.
 
-## Current supported numeric constraints
+## Supported numeric constraint families
 
-The shared numeric system currently consumes:
+The shared numeric system now consumes:
 
 ```text
-planar Mate
-planar Distance
+Mate
+Distance
+Concentric
 ```
 
-The generated planar face restrictions of `AssemblyConstraintTargetResolver::resolve` apply.
+Geometry-family builders remain separate:
 
-Semantic generated-axis targets and `ConcentricResidualDescriptor` now exist, but `AssemblyConstraintNumericSystem` does not flatten them yet.
+```text
+Mate / Distance
+  -> AssemblyConstraintEquationBuilder
 
-Therefore an active Concentric record still reaches the existing planar builder rejection path when passed to the solver. The solver does not silently ignore it.
+Concentric
+  -> AssemblyConcentricConstraintEquationBuilder
+```
+
+The private shared numeric system selects the correct builder from `AssemblyConstraintType`, flattens the resulting descriptor, and supplies one residual vector to the solver.
+
+The solver itself has no Concentric-specific optimization branch.
+
+Canonical Concentric integration detail:
+
+```text
+docs/assembly-concentric-numeric-solver-dof-mvp5.md
+```
 
 ## Deterministic residual ordering
 
 Constraints are consumed in lexicographic `AssemblyConstraintId` order inherited from the graph.
 
-Current Mate flattening:
+Persistent target A/B order remains unchanged inside each constraint.
+
+### Mate
 
 ```text
 normal_opposition.x
@@ -106,7 +125,9 @@ normal_opposition.z
 signed_separation_mm / length_residual_scale_mm
 ```
 
-Current Distance flattening:
+Four scalar residuals.
+
+### Distance
 
 ```text
 normal_parallelism.x
@@ -115,15 +136,30 @@ normal_parallelism.z
 distance_residual_mm / length_residual_scale_mm
 ```
 
+Four scalar residuals.
+
+### Concentric
+
+```text
+direction_parallelism.x
+direction_parallelism.y
+direction_parallelism.z
+axis_offset_mm.x / length_residual_scale_mm
+axis_offset_mm.y / length_residual_scale_mm
+axis_offset_mm.z / length_residual_scale_mm
+```
+
+Six scalar residuals.
+
+The first three Concentric components are dimensionless. The final three are millimeter-valued axis-offset components divided by the configured length scale.
+
 Default length residual scale:
 
 ```text
 1.0 mm
 ```
 
-The three orientation components are dimensionless. Length residuals are divided by the configured millimeter scale before optimization.
-
-The next Concentric integration must preserve both existing planar orders exactly.
+Mate and Distance flattening are unchanged by Concentric integration.
 
 ## Deterministic variable ordering
 
@@ -140,13 +176,13 @@ ry_deg
 rz_deg
 ```
 
-The solver uses persisted `RigidTransform` coordinate values directly. It does not hide a quaternion, rotation vector, or alternative Euler convention at the API boundary.
+The solver uses persisted `RigidTransform` coordinates directly. It does not hide a quaternion, rotation vector, or alternative Euler convention at the API boundary.
 
 Every residual evaluation continues through `AssemblyTransformEvaluator`, whose active right-handed fixed-axis X-then-Y-then-Z convention is authoritative.
 
 ## Numeric method
 
-The current solver is deterministic damped Gauss-Newton.
+The solver is deterministic damped Gauss-Newton.
 
 At each iteration:
 
@@ -168,10 +204,10 @@ length residual scale                 1.0 mm
 convergence RMS                       1.0e-8
 translation finite-difference step    1.0e-4 mm
 rotation finite-difference step       1.0e-4 deg
-initial damping                        1.0e-6
-maximum iterations                     100
-maximum damping attempts               8
-maximum line-search steps              12
+initial damping                       1.0e-6
+maximum iterations                    100
+maximum damping attempts              8
+maximum line-search steps             12
 ```
 
 Central finite-difference column:
@@ -180,7 +216,71 @@ Central finite-difference column:
 J[:,j] = (r(x + h_j e_j) - r(x - h_j e_j)) / (2 h_j)
 ```
 
+Every plus/minus perturbation re-evaluates current semantic target geometry and reconstructs the relevant residual descriptor.
+
 No analytic Jacobian or sparse linear algebra is implemented.
+
+## Concentric solve behavior
+
+Concentric geometric residuals remain:
+
+```text
+direction_parallelism = cross(dA, dB)
+axis_offset_mm         = cross(oB - oA, dA)
+```
+
+The shared solver now corrects:
+
+```text
+lateral axis offset
+axis tilt
+```
+
+### Lateral axis offset
+
+A free axis offset perpendicular to the grounded target axis produces non-zero `axis_offset_mm`.
+
+The translational finite-difference columns and existing Gauss-Newton path remove that lateral separation.
+
+### Axis tilt
+
+A nonparallel free axis produces non-zero `direction_parallelism`.
+
+The rotational finite-difference columns and same Gauss-Newton path correct the tilt.
+
+No analytic Concentric rotation derivative is introduced.
+
+### Equal and opposed directions
+
+Because:
+
+```text
+cross(dA, dB) = 0
+```
+
+for both:
+
+```text
+dB = dA
+dB = -dA
+```
+
+same-direction and opposed-direction coincident axes are both valid Concentric states.
+
+The solver does not rotate an already valid opposed axis merely to make directions equal.
+
+### Remaining axis freedoms
+
+Concentric deliberately does not constrain:
+
+```text
+translation along the common axis
+rotation about the common axis
+```
+
+The solver adds no hidden residual or variable lock for those directions.
+
+In the regular centered-axis test case, an offset-only solve preserves the existing axial translation and rotation-about-axis variables because the corresponding Concentric Jacobian columns carry no local sensitivity.
 
 ## Solve states
 
@@ -200,9 +300,9 @@ Current best free-component transforms remain in the result for diagnostics, but
 
 ### FixedGeometryInconsistent
 
-Returned only for all-grounded groups whose residual RMS exceeds tolerance.
+Returned for all-grounded groups whose residual RMS exceeds tolerance.
 
-Grounded components are not moved to repair inconsistency.
+Grounded components are not moved to repair Mate, Distance, or Concentric inconsistency.
 
 ### NumericalFailure
 
@@ -210,7 +310,7 @@ Free variables exist but no configured damping/line-search attempt produces a de
 
 The current best proposals are retained for diagnostics and remain unapplable.
 
-Validation and unsupported-family problems use `Result<T>` failures rather than solve states.
+Validation and semantic-target failures use `Result<T>` errors rather than solve states.
 
 ## Read-only solve boundary
 
@@ -218,7 +318,7 @@ Validation and unsupported-family problems use `Result<T>` failures rather than 
 
 All iterative placement updates occur on private project copies.
 
-The source project remains unchanged for every solve state and for validation/unsupported-family errors.
+The source project remains unchanged for every solve state and for validation or semantic-target errors.
 
 `AssemblySolveResult` stores component snapshots from the original input and proposed free-component transforms from the private current/best solve state.
 
@@ -245,69 +345,59 @@ After complete prevalidation, proposals are applied to another project copy. The
 
 The application boundary is atomic at the current `Project` value boundary.
 
-## Concentric semantics now available downstream
+Concentric results use exactly this existing application path.
 
-Canonical document: `docs/assembly-semantic-axis-concentric-residuals-mvp5.md`.
+## Semantic target error propagation
 
-The implemented Concentric builder produces:
+The shared numeric system does not translate geometry-layer failures into a generic solver error.
 
-```text
-direction_parallelism = cross(dA, dB)
-axis_offset_mm         = cross(oB - oA, dA)
-```
-
-Equal and opposed axis directions are valid.
-
-Axial translation and rotation about the common axis are deliberately unconstrained.
-
-Those semantics are not yet part of solver residual flattening.
-
-## Next numeric integration contract
-
-The next solver increment should extend the shared numeric system with this exact Concentric scalar order:
+For example, an unsupported Concentric semantic token:
 
 ```text
-direction_parallelism.x
-direction_parallelism.y
-direction_parallelism.z
-axis_offset_mm.x / length_residual_scale_mm
-axis_offset_mm.y / length_residual_scale_mm
-axis_offset_mm.z / length_residual_scale_mm
+bolt.main_axis
 ```
 
-The first three components are dimensionless. The three axis-offset components are millimeter-valued and use the existing configured length scale.
+fails through the axis resolver with:
 
-The integration must reuse the current:
+```text
+unsupported assembly semantic axis reference family
+```
 
-- lexicographic constraint ordering
-- free-component variable ordering
-- central finite-difference path
-- transform evaluator convention
-- Gauss-Newton/damping/line-search method
-- solve states
-- grounding and suppression policy
-- read-only solve boundary
-- complete source snapshots
-- stale-result validation
-- atomic explicit application
+The solver propagates that failure unchanged.
 
 ## Tests
 
-Current solver tests:
+Core solver regression suite:
 
 ```bash
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-solver]"
 ```
 
-They cover Mate, Distance, rotation correction, chains, deterministic ordering, multiple grounded participants, fixed inconsistency, zero-grounded and suppression rejection, input validation, non-convergence, stale results, read-only solve behavior, and successful explicit application.
-
-Semantic axis/Concentric residual tests are separate:
+Concentric numeric/solver integration suite:
 
 ```bash
-./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-concentric]"
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-concentric-solver]"
 ```
 
-No current test claims Concentric solve support.
+Coverage includes:
+
+- existing Mate/Distance solve behavior
+- deterministic connected-group and variable ordering
+- multiple grounded participants
+- suppression and zero-ground rejection
+- solver option validation
+- source-project immutability
+- stale result detection
+- atomic successful application
+- exact Concentric six-scalar residual participation
+- lateral axis-offset correction
+- axis-tilt correction
+- preserved axial slide and axis rotation in the regular centered-axis case
+- equal and opposed valid axis directions
+- all-grounded Concentric inconsistency
+- non-converged Concentric result boundaries
+- unapplable non-converged Concentric results
+- semantic axis target failure propagation
 
 ## Persistence boundary
 
@@ -331,8 +421,7 @@ Persisted component transforms change only after explicit successful application
 
 The current solver does not implement:
 
-- Concentric numeric flattening or solving
-- Concentric rank/DOF diagnostics
+- Insert constraints or axial seating semantics
 - analytic Jacobians
 - sparse matrix storage/solve
 - trust-region methods
@@ -341,7 +430,9 @@ The current solver does not implement:
 - floating-group gauge fixing
 - suppressed-component solving
 - semantic pattern-axis identities
-- Insert or richer constraints
+- per-component null-space labels
+- drag projection into valid DOF
+- richer constraint families
 - joints or motion
 - collision/interference analysis
 - subassemblies
@@ -350,8 +441,6 @@ The current solver does not implement:
 
 ## Next technical step
 
-The next assembly block is Concentric integration into `AssemblyConstraintNumericSystem`, `AssemblyRigidBodySolver`, and `AssemblySolveDiagnosticsAnalyzer`.
+The next assembly block is stable Insert constraint intent and a read-only composite Insert residual model.
 
-It should solve lateral axis offset and tilt, preserve axial slide and axis rotation freedom, support equal/opposed directions, and prove local rank four with two remaining DOF for a regular one-free-body Concentric relationship.
-
-Insert remains downstream until axial seating semantics are explicitly defined.
+That block must first define stable semantic axial-seating geometry for supported circular features, combine explicit axis and seating-plane intent, define signed seating semantics in target A/B order, and prove the regular composite residual has local rank five with one remaining rotation-about-axis DOF before Insert is connected to this shared numeric solver.

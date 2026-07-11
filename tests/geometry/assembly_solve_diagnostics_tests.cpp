@@ -358,7 +358,7 @@ TEST_CASE("Assembly solve diagnostics expose rank tolerance and residual redunda
         "assembly diagnostics rank tolerances must be finite, non-negative, and not both zero");
 }
 
-TEST_CASE("Assembly solve diagnostics preserve unsupported solver diagnostics and enum labels",
+TEST_CASE("Assembly solve diagnostics preserve semantic target failures and enum labels",
           "[geometry][assembly-diagnostics]") {
   Project project = make_project(
       {{"component.a", identity_rigid_transform(), ComponentGroundingState::Grounded},
@@ -371,7 +371,7 @@ TEST_CASE("Assembly solve diagnostics preserve unsupported solver diagnostics an
 
   REQUIRE(diagnostics.has_error());
   CHECK(diagnostics.error().message() ==
-        "concentric equation construction requires semantic axis target support");
+        "unsupported assembly semantic axis reference family");
   CHECK(to_string(AssemblyDofClassification::LocallyFullyConstrained) ==
         "locally_fully_constrained");
   CHECK(to_string(AssemblyConstraintConsistencyClassification::FixedGeometryInconsistent) ==

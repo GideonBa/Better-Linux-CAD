@@ -1,5 +1,6 @@
 #include "assembly_constraint_numeric_system.hpp"
 
+#include "blcad/geometry/assembly_concentric_constraint_equation_builder.hpp"
 #include "blcad/geometry/assembly_constraint_equation_builder.hpp"
 
 #include <algorithm>
@@ -55,9 +56,10 @@ Result<NumericVector> evaluate_residuals(
     const Project& project,
     const std::vector<AssemblyConstraintId>& constraint_ids,
     double length_residual_scale_mm) {
-  const AssemblyConstraintEquationBuilder builder;
+  const AssemblyConstraintEquationBuilder planar_builder;
+  const AssemblyConcentricConstraintEquationBuilder concentric_builder;
   NumericVector residuals;
-  residuals.reserve(constraint_ids.size() * 4U);
+  residuals.reserve(constraint_ids.size() * 6U);
 
   for (const auto& constraint_id : constraint_ids) {
     const AssemblyConstraint* constraint = project.assembly().find_constraint(constraint_id);
@@ -66,7 +68,23 @@ Result<NumericVector> evaluate_residuals(
           constraint_id.value(), "assembly numeric system graph constraint must exist in assembly"));
     }
 
-    auto equation = builder.build(project, *constraint);
+    if (constraint->type() == AssemblyConstraintType::Concentric) {
+      auto equation = concentric_builder.build(project, *constraint);
+      if (equation.has_error()) {
+        return Result<NumericVector>::failure(equation.error());
+      }
+
+      const ConcentricResidualDescriptor& concentric = equation.value().residual;
+      residuals.push_back(concentric.direction_parallelism.x);
+      residuals.push_back(concentric.direction_parallelism.y);
+      residuals.push_back(concentric.direction_parallelism.z);
+      residuals.push_back(concentric.axis_offset_mm.x / length_residual_scale_mm);
+      residuals.push_back(concentric.axis_offset_mm.y / length_residual_scale_mm);
+      residuals.push_back(concentric.axis_offset_mm.z / length_residual_scale_mm);
+      continue;
+    }
+
+    auto equation = planar_builder.build(project, *constraint);
     if (equation.has_error()) {
       return Result<NumericVector>::failure(equation.error());
     }

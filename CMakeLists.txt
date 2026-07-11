@@ -227,6 +227,7 @@ if(BLCAD_BUILD_TESTS)
       blcad_geometry_tests
       tests/geometry/arc_closed_profile_pipeline_tests.cpp
       tests/geometry/assembly_concentric_constraint_equation_builder_tests.cpp
+      tests/geometry/assembly_concentric_numeric_solver_tests.cpp
       tests/geometry/assembly_constraint_equation_builder_tests.cpp
       tests/geometry/assembly_constraint_target_resolver_tests.cpp
       tests/geometry/assembly_parameter_pipeline_tests.cpp
@@ -261,6 +262,7 @@ if(BLCAD_BUILD_TESTS)
     )
 
     target_link_libraries(blcad_geometry_tests PRIVATE BLCAD::geometry Catch2::Catch2WithMain)
+    target_include_directories(blcad_geometry_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/geometry)
 
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
       target_compile_options(blcad_geometry_tests PRIVATE -Wall -Wextra -Wpedantic)
