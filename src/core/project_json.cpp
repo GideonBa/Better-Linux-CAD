@@ -66,8 +66,16 @@ constexpr int k_version = 1;
 } // namespace
 
 Result<std::string> serialize_project_to_json(const Project& project) {
-  auto assembly_json = assembly_to_json(project.assembly());
-  if (assembly_json.has_error()) return Result<std::string>::failure(assembly_json.error());
+  auto root_assembly_json = assembly_to_json(project.assembly());
+  if (root_assembly_json.has_error())
+    return Result<std::string>::failure(root_assembly_json.error());
+
+  json assemblies = json::array();
+  for (const AssemblyDocument& assembly : project.child_assembly_documents()) {
+    auto assembly_json = assembly_to_json(assembly);
+    if (assembly_json.has_error()) return Result<std::string>::failure(assembly_json.error());
+    assemblies.push_back(std::move(assembly_json.value()));
+  }
 
   json parts = json::array();
   for (const PartDocument& part : project.part_documents()) {
@@ -79,7 +87,8 @@ Result<std::string> serialize_project_to_json(const Project& project) {
   json root{{"schema", k_schema},
             {"version", k_version},
             {"project", json{{"id", project.id().value()}, {"name", project.name()}}},
-            {"assembly", std::move(assembly_json.value())},
+            {"assembly", std::move(root_assembly_json.value())},
+            {"assemblies", std::move(assemblies)},
             {"parts", std::move(parts)}};
   return Result<std::string>::success(root.dump(2));
 }
@@ -104,6 +113,15 @@ Result<Project> deserialize_project_from_json(std::string_view content) {
                                    root.at("project").at("name").get<std::string>(),
                                    std::move(assembly.value()));
     if (project.has_error()) return project;
+
+    for (const auto& assembly_json : root.value("assemblies", json::array())) {
+      auto child_assembly = assembly_from_json(assembly_json);
+      if (child_assembly.has_error())
+        return Result<Project>::failure(child_assembly.error());
+      auto added =
+          project.value().add_child_assembly_document(std::move(child_assembly.value()));
+      if (added.has_error()) return Result<Project>::failure(added.error());
+    }
 
     for (const auto& part_json : root.value("parts", json::array())) {
       auto part = part_from_json(part_json);

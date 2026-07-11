@@ -1,0 +1,178 @@
+{
+  "schema": "blcad.project.mvp4",
+  "version": 1,
+  "project": {
+    "id": "project.nested_subassembly",
+    "name": "NestedSubassemblyProject"
+  },
+  "assembly": {
+    "schema": "blcad.assembly_document.mvp4",
+    "version": 1,
+    "document": {
+      "id": "assembly.root",
+      "name": "RootAssembly"
+    },
+    "parameters": [],
+    "member_parts": [],
+    "parameter_bindings": [],
+    "component_instances": [],
+    "subassembly_instances": [
+      {
+        "id": "subassembly.a",
+        "name": "Child occurrence A",
+        "referenced_assembly_document": "assembly.child",
+        "visibility": "visible",
+        "suppression_state": "active",
+        "transform": {
+          "translation_mm": {"x": 100.0, "y": 0.0, "z": 0.0},
+          "rotation_deg": {"x": 0.0, "y": 0.0, "z": 90.0}
+        }
+      },
+      {
+        "id": "subassembly.z",
+        "name": "Child occurrence Z",
+        "referenced_assembly_document": "assembly.child",
+        "visibility": "visible",
+        "suppression_state": "active",
+        "transform": {
+          "translation_mm": {"x": 200.0, "y": 0.0, "z": 0.0},
+          "rotation_deg": {"x": 0.0, "y": 0.0, "z": 0.0}
+        }
+      }
+    ],
+    "assembly_constraints": [],
+    "assembly_joints": []
+  },
+  "assemblies": [
+    {
+      "schema": "blcad.assembly_document.mvp4",
+      "version": 1,
+      "document": {
+        "id": "assembly.child",
+        "name": "ChildAssembly"
+      },
+      "parameters": [],
+      "member_parts": [],
+      "parameter_bindings": [],
+      "component_instances": [],
+      "subassembly_instances": [
+        {
+          "id": "subassembly.inner",
+          "name": "Grandchild occurrence",
+          "referenced_assembly_document": "assembly.grandchild",
+          "visibility": "visible",
+          "suppression_state": "active",
+          "transform": {
+            "translation_mm": {"x": 0.0, "y": 20.0, "z": 0.0},
+            "rotation_deg": {"x": 0.0, "y": 0.0, "z": 90.0}
+          }
+        }
+      ],
+      "assembly_constraints": [],
+      "assembly_joints": []
+    },
+    {
+      "schema": "blcad.assembly_document.mvp4",
+      "version": 1,
+      "document": {
+        "id": "assembly.grandchild",
+        "name": "GrandchildAssembly"
+      },
+      "parameters": [],
+      "member_parts": [
+        "part.nested_plate"
+      ],
+      "parameter_bindings": [],
+      "component_instances": [
+        {
+          "id": "component.plate",
+          "name": "Nested plate",
+          "referenced_part_document": "part.nested_plate",
+          "visibility": "visible",
+          "suppression_state": "active",
+          "grounding_state": "free",
+          "transform": {
+            "translation_mm": {"x": 10.0, "y": 0.0, "z": 0.0},
+            "rotation_deg": {"x": 0.0, "y": 0.0, "z": 0.0}
+          }
+        }
+      ],
+      "subassembly_instances": [],
+      "assembly_constraints": [],
+      "assembly_joints": []
+    }
+  ],
+  "parts": [
+    {
+      "schema": "blcad.part_document.mvp1",
+      "version": 1,
+      "document": {
+        "id": "part.nested_plate",
+        "name": "NestedPlate"
+      },
+      "parameters": [
+        {
+          "id": "part.width",
+          "name": "width",
+          "type": "length",
+          "scope": "part",
+          "unit": "mm",
+          "value": 10.0
+        },
+        {
+          "id": "part.height",
+          "name": "height",
+          "type": "length",
+          "scope": "part",
+          "unit": "mm",
+          "value": 20.0
+        },
+        {
+          "id": "part.thickness",
+          "name": "thickness",
+          "type": "length",
+          "scope": "part",
+          "unit": "mm",
+          "value": 2.0
+        }
+      ],
+      "datum_planes": [
+        {
+          "id": "datum.xy",
+          "name": "XY",
+          "kind": "xy",
+          "origin": {"x": 0.0, "y": 0.0, "z": 0.0},
+          "x_axis": {"x": 1.0, "y": 0.0, "z": 0.0},
+          "y_axis": {"x": 0.0, "y": 1.0, "z": 0.0},
+          "normal": {"x": 0.0, "y": 0.0, "z": 1.0}
+        }
+      ],
+      "sketches": [
+        {
+          "id": "sketch.base",
+          "name": "BaseSketch",
+          "workplane": "datum.xy",
+          "rectangle_profiles": [
+            {
+              "id": "profile.base",
+              "center": {"x": 0.0, "y": 0.0},
+              "width_parameter": "part.width",
+              "height_parameter": "part.height"
+            }
+          ],
+          "circle_profiles": []
+        }
+      ],
+      "features": [
+        {
+          "id": "feature.base_extrude",
+          "name": "BaseExtrude",
+          "type": "additive_extrude",
+          "input_sketch": "sketch.base",
+          "direction": "+Z",
+          "length_parameter": "part.thickness"
+        }
+      ]
+    }
+  ]
+}

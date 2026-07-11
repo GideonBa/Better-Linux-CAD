@@ -47,6 +47,7 @@ struct FeatureIdTag;
 struct ShapeCacheIdTag;
 struct ParameterBindingIdTag;
 struct ComponentInstanceIdTag;
+struct SubassemblyInstanceIdTag;
 struct AssemblyConstraintIdTag;
 struct AssemblyJointIdTag;
 
@@ -69,6 +70,7 @@ using FeatureId = TypedId<FeatureIdTag>;
 using ShapeCacheId = TypedId<ShapeCacheIdTag>;
 using ParameterBindingId = TypedId<ParameterBindingIdTag>;
 using ComponentInstanceId = TypedId<ComponentInstanceIdTag>;
+using SubassemblyInstanceId = TypedId<SubassemblyInstanceIdTag>;
 using AssemblyConstraintId = TypedId<AssemblyConstraintIdTag>;
 using AssemblyJointId = TypedId<AssemblyJointIdTag>;
 
