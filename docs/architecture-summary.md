@@ -1,10 +1,10 @@
 # Architecture Summary
 
-Source: condensed from the current repository architecture documents.
+Source: condensed from the current repository architecture documents and implemented MVP status.
 
 ## Goal
 
-BLCAD is intended to become an independent parametric CAD system for Linux. The model does not only store final BRep geometry, but the underlying design intent: parameters, sketches, features, dependencies, semantic references, construction geometry, 3D curves, surfaces, multi-body part records, body transforms, body booleans, and later assembly relationships. The explicit long-term goal is also recorded in `docs/project-goal.md`.
+BLCAD is intended to become an independent parametric CAD system for Linux. The model does not only store final BRep geometry, but the underlying design intent: parameters, sketches, features, dependencies, semantic references, construction geometry, 3D curves, surfaces, multi-body part records, body transforms, body booleans, and assembly relationships. The explicit long-term goal is also recorded in `docs/project-goal.md`.
 
 ## Fundamental decision
 
@@ -30,17 +30,20 @@ BLCAD is intended to become an independent parametric CAD system for Linux. The 
 
 ## Core objects
 
+Current and planned core object families include:
+
 - `Document`
 - `PartDocument`
 - `AssemblyDocument`
+- `Project`
 - `Parameter`
 - `Expression`
 - `Sketch`
 - `SketchEntityId`
 - `LineSegment`
 - `ClosedProfile`
-- future sketch entities such as arcs, circles, ellipses, splines, polygons, slots, text, and projected geometry
-- future `SketchConstraint`, `SketchDimension`, `SketchRegion`, and `ProfileRegion`
+- sketch entities such as arcs, circles, splines, projected geometry, and later ellipses, polygons, slots, and text
+- `SketchConstraint`, `SketchDimension`, `SketchRegion`, and `ProfileRegion` families
 - `DatumPlane`
 - `DerivedWorkplane`
 - `SemanticFaceReference`
@@ -48,25 +51,17 @@ BLCAD is intended to become an independent parametric CAD system for Linux. The 
 - `ConstructionLine` / `DatumAxis`
 - `ConstructionPlane`
 - future `ConstructionRelation`
-- `BodyId`
-- `Body`
-- `BodyTransform`
-- `BodyTransformStack`
-- `BodyBooleanFeature`
-- `SketchOwnership`
-- `PathCurve`
-- `PathSegmentReference`
-- `ProfileSectionReference`
-- `SketchPoint3D`
-- `SketchCurve3D`
-- `GuideCurve`
-- `Feature`, including `RevolveFeature`, `RevolveCutFeature`, `PathExtrudeFeature`, `PathCutFeature`, `SweepFeature`, `LoftFeature`, `LoftCutFeature`, `SurfaceStitchFeature`, `FilletFeature`, and `ChamferFeature`
+- future `BodyId`, `Body`, `BodyTransform`, `BodyTransformStack`, and `BodyBooleanFeature`
+- future `SketchOwnership`
+- future `PathCurve`, `PathSegmentReference`, and `ProfileSectionReference`
+- future `SketchPoint3D`, `SketchCurve3D`, and `GuideCurve`
+- feature families including extrude/cut and future revolve, sweep, loft, surface, fillet, and chamfer features
 - `FeatureReference`
 - `DependencyGraph`
 - `ShapeCache`
 - `ComponentInstance`
-- `AssemblyConstraint`
-- `Joint`
+- future `AssemblyConstraint`
+- future `Joint`
 
 ## MVP-1 implemented vertical slice
 
@@ -85,48 +80,40 @@ The MVP-1 code implements the first narrow vertical slice:
 - JSON and `.blcad.json` helpers persist and restore model intent.
 - `blcad_export_step` provides a headless file-to-STEP workflow.
 
-## MVP-2 seed
+## MVP-2 semantic reference and workplane path
 
-The MVP-2 seed introduces semantic generated-face references and resolves them in the geometry layer:
+The MVP-2 workplane seed introduces semantic generated-face references and resolves them in the geometry layer:
 
-- `SemanticFaceReference` can reference `feature.base_extrude.top`, `feature.base_extrude.bottom`, `feature.base_extrude.right`, `feature.base_extrude.left`, `feature.base_extrude.front`, and `feature.base_extrude.back`.
-- `DerivedWorkplane` can expose those semantic faces as sketch workplanes.
-- `Sketch` can reference either a standard datum plane or a derived workplane.
-- The dependency graph connects source feature, derived workplane, sketch, and dependent cut feature.
-- JSON serialization supports `derived_workplanes` with `top`, `bottom`, `right`, `left`, `front`, and `back` faces.
-- `WorkplaneResolver` resolves `datum.xy`, `feature.base_extrude.top`, `feature.base_extrude.bottom`, `feature.base_extrude.right`, `feature.base_extrude.left`, `feature.base_extrude.front`, and `feature.base_extrude.back` into concrete workplane frames.
-- `ResolvedWorkplane` carries rectangular bounds for the derived top, bottom, right, left, front, and back faces.
-- Subtractive recompute maps circle-profile centers through the resolved workplane before executing the cut.
-- The circular cut adapter supports axis-directed through-all cuts for the current principal-axis face cases.
-- The geometry layer rejects circle profiles that exceed resolved workplane bounds.
-- Incremental recompute follows the derived-workplane dependency path after source-dimension changes.
-- `ShapeCache` removes stale dirty feature shapes before incremental recompute, so failed recompute does not leave old cut geometry behind.
-- `examples/top_face_cut.blcad.json` demonstrates an off-center cut on the derived top-face workplane.
-- `examples/bottom_face_cut.blcad.json` demonstrates an off-center cut on the derived bottom-face workplane.
-- `examples/right_face_cut.blcad.json` demonstrates a side cut on the derived right-face workplane.
-- `examples/left_face_cut.blcad.json` demonstrates a side cut on the derived left-face workplane.
-- `examples/front_face_cut.blcad.json` demonstrates a side cut on the derived front-face workplane.
-- `examples/back_face_cut.blcad.json` demonstrates a side cut on the derived back-face workplane.
+- `SemanticFaceReference` identifies generated faces such as `feature.base_extrude.top` and the other principal faces.
+- `DerivedWorkplane` exposes semantic generated faces as sketch workplanes.
+- `Sketch` can reference datum, derived, and implemented construction workplanes.
+- The dependency graph connects source features, workplanes, sketches, and dependent features.
+- JSON persists the implemented semantic workplane intent.
+- `WorkplaneResolver` maps supported semantic faces and explicit construction planes to concrete frames.
+- Geometry recompute maps sketch-local profile coordinates through resolved workplanes.
+- Incremental recompute follows the semantic workplane dependency path after source-dimension changes.
+- `ShapeCache` removes stale dirty feature shapes before incremental recompute, so failed recompute does not leave old geometry behind.
 
-This is still intentionally not a full topological-naming system. No raw OCCT face IDs are stored in `PartDocument`.
+This remains intentionally different from storing raw OCCT face IDs in `PartDocument`.
 
-## Implemented line-based closed profiles
+## Implemented richer sketch-driven profile path
 
-The first general closed-profile step is implemented:
+The current sketch/profile blocks include:
 
-- `SketchEntityId` identifies sketch entities.
-- `LineSegment` stores ordered 2D endpoints in sketch-local coordinates.
-- `ClosedProfile` references ordered line-segment IDs.
-- The sketch model validates connected loops, duplicate line references, and self-intersections.
-- JSON serialization stores `line_segments` and `closed_profiles` as model intent.
-- The geometry layer converts closed-profile vertices into an OCCT polygon wire and face.
-- `AdditiveExtrude` supports exactly one rectangle profile or exactly one closed profile.
-- `SubtractiveExtrude` supports exactly one circle profile or exactly one closed profile.
-- Closed-profile geometry uses resolved workplanes, so it works with the existing datum and semantic-face workplane paths.
-- `examples/triangle_prism.blcad.json` demonstrates a non-rectangular additive prism.
-- `examples/triangle_cut_plate.blcad.json` demonstrates a non-circular through-all cut.
+- stable sketch entity ids
+- line segments and ordered closed profiles
+- connected-loop and self-intersection validation
+- construction geometry and projected reference geometry
+- reference recovery helpers
+- arcs, trim/extend support, splines, and tangent-continuity records
+- first sketch constraints and driving dimensions
+- automatic profile-region detection
+- composite closed profiles with holes
+- sketch-plane-relative extrude direction
+- JSON persistence for the implemented model-intent records
+- geometry execution for the implemented line/composite profile paths
 
-Still intentionally missing: automatic multi-body inference, full automatic region detection for complex profiles, a full sketch constraint solver, and GUI sketch editing.
+The sketch-repair chain additionally provides diagnostics, deterministic repair suggestions, safe repair commands, transaction capture, undo stacks, and read-only presentation snapshots. Presentation helpers are intentionally frozen until a real CLI or GUI consumer exists.
 
 ## Implemented explicit construction geometry
 
@@ -135,45 +122,72 @@ The first construction-geometry step is implemented:
 - `ConstructionPointId`, `ConstructionLineId`, and `ConstructionPlaneId` identify construction geometry.
 - `ConstructionPoint`, `ConstructionLine`, and `ConstructionPlane` are core model-intent objects.
 - Construction geometry supports explicit numeric placement.
-- Construction geometry can carry optional `parameter_dependencies` for invalidation.
-- `PartDocument` stores construction points, construction lines, and construction planes.
-- Construction geometry receives dependency graph nodes.
-- Parameter dependencies create graph edges from parameters to construction geometry.
+- Construction geometry can carry optional parameter dependencies for invalidation.
+- `PartDocument` stores construction points, lines, and planes.
+- Construction geometry receives dependency-graph nodes and parameter dependency edges.
 - A sketch can reference a construction plane as its workplane.
-- A construction plane used as a sketch workplane creates a graph edge from construction plane to sketch.
-- JSON serialization supports `construction_points`, `construction_lines`, and `construction_planes`.
-- `WorkplaneResolver` resolves explicit construction planes into `ResolvedWorkplane` frames.
-- `examples/construction_plane_prism.blcad.json` demonstrates a closed-profile sketch on a construction plane.
+- JSON serialization supports construction points, lines, and planes.
+- `WorkplaneResolver` resolves explicit construction planes into concrete workplane frames.
 
-Still intentionally missing: expression-evaluated coordinate placement, surface-based construction geometry, GUI manipulators, and assembly-level construction geometry.
+Still intentionally missing from this datum block: expression-evaluated coordinate placement, surface-based construction geometry, GUI manipulators, and relation-driven construction geometry.
 
 ## Implemented MVP-3 parametric bolt circle
 
 The first meaningful parametric feature test is implemented (`docs/bolt-circle-pattern-mvp3.md`):
 
-- `Quantity` distinguishes `LengthMm` and dimensionless `Count` values.
+- `Quantity` distinguishes length and dimensionless count values.
 - `ParameterType::Count` stores whole-number parameters such as a hole count.
-- `CircularHolePattern` is a sketch-level model-intent record: center, angle offset, and radius/count/hole-diameter parameter references.
+- `CircularHolePattern` stores center, angle offset, and radius/count/hole-diameter parameter references.
 - `PartDocument` validates pattern parameter existence and types and creates parameter-to-sketch dependency edges.
 - Subtractive recompute expands the pattern into sequential through-all circular cuts with per-hole bounds validation.
-- Changing `bolt_count` or `bolt_circle_radius` drives incremental recompute of only the affected features.
-- JSON persists count parameters (`"type": "count"`, `"unit": "1"`) and `circular_hole_patterns`.
+- Changing `bolt_count` or `bolt_circle_radius` drives incremental recompute of affected features.
+- JSON persists count parameters and circular hole patterns.
 - `examples/bolt_circle_plate.blcad.json` exports a six-hole plate to STEP headlessly.
 
-Still intentionally missing: hole semantics (`docs/hole-wizard.md`), skip instances, and seed-feature patterns (`docs/pattern-and-mirror-features.md`).
+Still intentionally missing: hole-wizard semantics, skipped/partial pattern instances, and arbitrary seed-feature patterns.
 
-## Implemented MVP-4 seed: shared assembly parameters
+## Implemented MVP-4 shared assembly parameters
 
 The first cross-part parametrization step is implemented (`docs/assembly-parameters-mvp4.md`):
 
-- `ParameterScope` distinguishes `part` and `assembly`.
+- `ParameterScope` distinguishes part and assembly scope.
 - `AssemblyDocument` owns assembly-scoped parameters, registers member parts by `DocumentId`, and stores explicit `ParameterBinding` records.
 - `apply_bindings_to(PartDocument&)` pushes bound values through `PartDocument::set_parameter_value`, reusing part invalidation and recompute planning unchanged.
-- Type agreement (length/count) is enforced when bindings are applied.
-- Assembly documents serialize separately as `blcad.assembly_document.mvp4`.
-- `examples/flange_assembly.blcad.json` binds the bolt-circle plate example; an end-to-end test drives two plates from one shared `bolt_count`.
+- Type agreement is enforced when bindings are applied.
+- Assembly documents serialize as `blcad.assembly_document.mvp4`.
+- The flange assembly path demonstrates one assembly parameter driving member-part parameters.
 
-Still intentionally missing: a project container with automatic propagation, component instances, constraints (MVP 5), and expressions over assembly parameters.
+## Implemented MVP-4 project container
+
+The project container is implemented (`docs/project-container-mvp4.md`):
+
+- `Project` owns one `AssemblyDocument` and embedded `PartDocument` objects.
+- Assembly member ids are validated against project-owned parts.
+- Project-level assembly parameter updates propagate bindings into member parts.
+- Affected parts produce per-part recompute plans.
+- Project JSON persists embedded assembly and part model intent as `blcad.project.mvp4`.
+- `blcad_export_project` provides a headless project-level parameter-update, recompute, and per-part STEP export path.
+
+The project container still deliberately avoids assembly-level geometry/export and external/manifest part references.
+
+## Implemented MVP-5 component instances and free placement
+
+The first assembly-structure blocks are implemented (`docs/component-instance-mvp5.md`):
+
+- `ComponentInstanceId` identifies assembly occurrences independently from part-document identity.
+- `ComponentInstance` stores stable identity, display name, referenced part document, visibility, suppression state, grounding state, and `RigidTransform`.
+- Multiple component instances can reference one project-owned `PartDocument` without duplicating part model intent.
+- `AssemblyDocument` validates that component instances reference registered member parts.
+- `Project` validates that component instance references resolve to project-owned parts.
+- `ComponentInstance::with_*` operations preserve identity and referenced part intent while replacing one placement/state field.
+- `AssemblyDocument` exposes explicit transform, visibility, suppression, and grounding update APIs for existing component instances.
+- A transform update is a direct free-placement edit; no constraint is inferred and no solver or DOF analysis runs.
+- Grounding is stored model intent only and does not yet prevent an explicit transform update.
+- Visibility and suppression are stored state only until future assembly consumers define their behavior.
+- Assembly/project JSON roundtrip preserves current component placement/state values.
+- `blcad_inspect_project_components` exposes persisted component reference and placement/state fields headlessly.
+
+The next assembly block is solver-independent constraint model intent on semantic component targets. Constraint graph construction and rigid-body solving remain later work.
 
 ## Future multi-body part modeling, transforms, and path features
 
@@ -188,8 +202,8 @@ The intended capability is:
 - transform stacks preserve operation order
 - transforming a body can optionally transform sketches and construction geometry owned by that body
 - body boolean features add, subtract, or intersect semantic body references
-- path curves can be composed from connected line, arc, spline, projected, construction, 3D-sketch, or semantic curve segments
-- extrude and extruded cut can later follow a connected path curve
+- path curves can be composed from connected semantic curve sources
+- extrude and cut can later follow connected path curves
 - loft can later use two or more profile sketches on arbitrarily oriented planes
 - loft can later follow path or guide curves
 
@@ -199,16 +213,9 @@ Critical rule: body transforms and booleans are model intent. They must update t
 
 The long-term sketcher roadmap is an Inventor-like parity target, not an immediate implementation target. It is documented in `docs/inventor-like-sketcher-and-feature-roadmap.md`.
 
-The intended capability is:
+The intended capability includes richer 2D entities and editing tools, complete geometric constraints and dimensions, robust region selection, 3D sketches, and broader sketch-driven feature families such as revolve, sweep, loft, hole, thread, shell, pattern, mirror, and surfacing workflows.
 
-- 2D sketch entities: points, lines, centerlines, rectangles, circles, arcs, ellipses, splines, polygons, slots, sketch fillets/chamfers, text, projected geometry, and included geometry
-- sketch editing tools: trim, extend, split, break, offset, mirror, sketch patterns, move, copy, rotate, scale, stretch, and construction-geometry toggling
-- sketch constraints: coincident, collinear, concentric, parallel, perpendicular, tangent, horizontal, vertical, equal, symmetric, midpoint, fix/ground, smooth, and point-on-curve relations
-- sketch dimensions: linear, aligned, horizontal, vertical, angular, radius, diameter, arc length, point-to-line, point-to-point, driving, and driven/reference dimensions
-- automatic region detection from unordered curves, including multiple regions, inner loops, islands, and profile-region selection
-- feature families: richer extrude/cut, revolve, revolve cut, sweep, sweep cut, loft, loft cut, hole, thread, emboss, engrave, rib, web, shell, draft, patterns, mirrors, and surface workflows
-
-This target depends on construction geometry, a stronger sketch entity model, profile-region detection, and eventually a constraint solver.
+This target depends on construction geometry, stable semantic references, the existing sketch entity/profile work, and eventually stronger constraint solving.
 
 ## Next construction geometry block
 
@@ -231,73 +238,53 @@ The detailed roadmap is in `docs/construction-geometry-mvp.md`.
 
 Advanced surfacing is a planned freeform-modeling layer, not yet implemented. It should introduce 3D sketch points, 3D lines, 3D splines, guide curves, sweeps, lofts, boundary surfaces, surface stitching, and closed-shell-to-solid conversion.
 
-The intended capability is:
-
-- connect points from different sketches on different planes with a 3D spline
-- use those splines as guide curves for lofts, sweeps, or surface generation
-- create sweeps along lines, polylines, arcs, splines, or reusable connected path curves
-- create path-following extrudes and cuts along a connected path curve
-- loft between two, three, or arbitrary many profile sketches
-- loft between sketches on non-parallel or otherwise arbitrarily oriented planes
-- use a middle profile as a smooth transition control without forcing a hard transition edge when smooth continuity is requested
-- allow path/guide curves to control loft flow
-- support continuity settings such as C0, G1, and G2 in later versions
-- generate surfaces from arbitrary curves in space across several sketches
-- stitch or knit several generated surfaces into a shell
-- convert a closed stitched shell into a solid body
-- support use cases such as turbine blades, propeller blades, wings, duct transitions, and pipe-to-pipe transitions
+The intended capability includes connecting geometry across differently oriented sketches, reusable spatial guide/path curves, path-following features, arbitrary multi-section lofts, continuity controls, freeform surface generation, shell stitching, and conversion of closed shells into solid bodies.
 
 The detailed roadmap is in `docs/advanced-surfacing-and-3d-sketch-mvp.md`.
 
 ## Critical architecture topics
 
-- Parameters must be first-class objects.
+- Parameters are first-class model-intent objects.
 - Features store rules, not only result geometry.
 - Recompute runs through a dependency graph.
-- Sketches on generated faces require stable semantic references.
-- User-created construction geometry should be model intent, not temporary UI state.
+- Persistent geometry references must be semantic rather than raw OCCT topology identifiers.
+- User-created construction geometry is model intent, not temporary UI state.
 - Construction planes answer where sketches live; sketch profiles answer what shape sketches describe.
-- Explicit construction geometry is now implemented; relation-driven construction geometry is the next datum-system block.
+- Explicit construction geometry is implemented; relation-driven construction geometry is the next datum-system block.
 - A future `PartDocument` may contain multiple bodies; each body needs stable semantic identity and cache output.
 - Body transforms must be feature-tree operations with dependency graph participation, not destructive geometry edits.
-- If a transformed body owns sketches, sketch workplane frames should be transformable with the body while preserving sketch-local coordinates.
 - Body booleans must reference semantic `BodyId` values and explicit tool/target body roles.
-- Inventor-like sketching requires explicit sketch entities, constraints, dimensions, automatic profile detection, and stable region selection.
-- 3D sketches and surfacing answer how spatial curves, multiple profile sections, guide curves, and surfaces form freeform geometry.
-- Path curves provide reusable connected curve chains for sweep, path-extrude, path-cut, loft, and surfacing features.
+- Path curves provide reusable connected semantic curve chains for path-driven feature and surfacing families.
 - OCCT shapes are a cache, not the primary model.
-- The OCCT path lives in an optional `blcad_geometry` target: adapters for rectangle extrusion, circular cut, line-based closed-profile extrusion/cut, a small ShapeCache, a WorkplaneResolver, recompute execution for `AdditiveExtrude` and `SubtractiveExtrude`, full document recompute, incremental recompute, bounds validation for the current top/bottom/right/left/front/back face cases, explicit construction-plane resolution, and STEP export of the final shape.
-- The ShapeCache remains in the geometry layer; `PartDocument` remains OCCT-free and is computed into the cache through `execute_document` and `execute_plan`.
-- JSON serialization stores model intent only; it does not serialize OCCT shapes or ShapeCache contents.
-- Parameter values can be changed through `PartDocument::set_parameter_value`; a change marks dependents and drives incremental recompute.
-- Derived workplanes and construction planes are resolved geometrically without turning raw OCCT faces into core model references.
-- Line-based closed sketch profiles are implemented as a first planar general-profile path and remain separate from topological naming.
-- Revolve, revolve cut, sweep, loft, path-following extrude, path-following cut, 3D sketch, surfacing, and surface-to-solid workflows are documented as future feature families and must remain semantic feature-tree operations, not raw BRep edits.
-- Assembly parameters must later flow into parts in a controlled way.
+- The OCCT path lives in an optional `blcad_geometry` target; `PartDocument` remains OCCT-free.
+- JSON serialization stores model intent only; it does not serialize OCCT shapes or `ShapeCache` contents as the source of truth.
+- Parameter changes use the normal document update/invalidation path and drive incremental recompute.
+- Assembly parameters already flow into member parts through explicit `ParameterBinding` records.
+- Component instances reference part model intent without duplicating `PartDocument` objects.
+- Component placement/state updates are explicit free-placement edits until assembly constraints and a solver exist.
+- Future assembly constraints must use semantic component targets and must remain model intent distinct from solver/cache output.
+- The assembly system will eventually describe spatial relationships through constraints; a constraint graph and solver determine component positions and remaining degrees of freedom.
 - Fillets and chamfers are their own parametric features with semantic edge references, not only late BRep corrections.
-- The assembly system will describe spatial relationships through constraints: a constraint graph and solver determine component positions and remaining degrees of freedom; joints later allow controlled motion.
-- Edge and assembly references should remain semantic so they can survive model changes.
-- Parameters have scopes (global, assembly, part, sketch, feature) and optional expressions; assembly parameters flow into parts for top-down design.
-- Engineering assistants (hole wizard, shaft, bolt, bearing, gear) must size deterministically and traceably; AI is a later helper, never the sizing authority.
+- Engineering assistants must size deterministically and traceably; AI is a later helper, never the sizing authority.
 - The UI only operates the core and holds no CAD logic; it is built after the internal models work.
-- The save file stores model intent; OCCT shapes are a regenerable cache and never the primary persisted data.
+- The save file stores model intent; computed geometry and future solved cache data remain regenerable.
 
 ## Detailed target-architecture documents
 
-The condensed points above are expanded in dedicated documents. Each is written as an incremental, testable block (goal, data model, dependency-graph integration, MVP scope, implementation sequence, out-of-scope):
+The condensed points above are expanded in dedicated documents. Each is written as an incremental, testable block:
 
-- `docs/semantic-references.md` — the non-topological reference rule shared by all feature and assembly documents
+- `docs/semantic-references.md` — the non-topological reference rule shared by feature and assembly documents
 - `docs/parameter-model.md` — scopes, expressions, cross-part flow, top-down design
 - `docs/feature-system.md` — general feature model and sketch-driven feature families
 - `docs/multi-body-transform-and-path-features-roadmap.md` — multi-body part files, body transforms, body booleans, path-following extrudes/cuts, and path/loft features
-- `docs/inventor-like-sketcher-and-feature-roadmap.md` — Inventor-like 2D/3D sketcher, constraints, dimensions, profile detection, revolve, sweep, loft, and sketch-driven feature parity
+- `docs/inventor-like-sketcher-and-feature-roadmap.md` — Inventor-like 2D/3D sketcher, constraints, dimensions, profile detection, and sketch-driven feature parity
 - `docs/construction-geometry-mvp.md` — explicit construction geometry and next relation-driven construction geometry
 - `docs/file-format.md` — project and save format
 - `docs/fillet-chamfer-features.md` — fillets and chamfers
 - `docs/pattern-and-mirror-features.md` — linear/circular patterns and mirror
 - `docs/hole-wizard.md` — semantic hole features and the standards database
 - `docs/shaft-wizard.md` — shaft calculation and geometry generation
-- `docs/assembly-system.md` — constraints, solver, joints, motion
-- `docs/engineering-modules.md` — bolt, bearing, gear, material, standard-parts modules
+- `docs/assembly-system.md` — component instances, constraints, solver, joints, and motion
+- `docs/engineering-modules.md` — bolt, bearing, gear, material, and standard-parts modules
 - `docs/advanced-surfacing-and-3d-sketch-mvp.md` — 3D sketches, guide curves, sweep, loft, boundary surfaces, surface stitching, and closed-shell-to-solid conversion
 - `docs/user-interface.md` — UI architecture over the core
