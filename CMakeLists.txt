@@ -32,8 +32,10 @@ add_library(
   src/core/assembly_constraint_graph.cpp
   src/core/assembly_document.cpp
   src/core/assembly_document_json.cpp
+  src/core/assembly_hierarchy.cpp
   src/core/assembly_joint.cpp
   src/core/assembly_joint_graph.cpp
+  src/core/assembly_subassembly_instances.cpp
   src/core/composite_closed_profile.cpp
   src/core/construction_geometry.cpp
   src/core/datum_plane.cpp
@@ -94,6 +96,7 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/assembly_constraint_equation_builder.cpp
     src/geometry/assembly_constraint_numeric_system.cpp
     src/geometry/assembly_constraint_target_resolver.cpp
+    src/geometry/assembly_hierarchy_transform_evaluator.cpp
     src/geometry/assembly_insert_constraint_equation_builder.cpp
     src/geometry/assembly_joint_motion_solver.cpp
     src/geometry/assembly_numeric_solve_engine.cpp
@@ -184,6 +187,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/assembly_constraint_graph_tests.cpp
     tests/core/assembly_constraint_tests.cpp
     tests/core/assembly_document_tests.cpp
+    tests/core/assembly_hierarchy_tests.cpp
     tests/core/assembly_insert_constraint_tests.cpp
     tests/core/assembly_joint_graph_tests.cpp
     tests/core/assembly_joint_tests.cpp
@@ -231,6 +235,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/sketch_repair_undo_stack_tests.cpp
     tests/core/sketch_spline_profile_json_tests.cpp
     tests/core/sketch_tests.cpp
+    tests/core/subassembly_instance_tests.cpp
   )
 
   target_link_libraries(blcad_core_tests PRIVATE BLCAD::core Catch2::Catch2WithMain)
@@ -250,9 +255,11 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/assembly_concentric_numeric_solver_tests.cpp
       tests/geometry/assembly_constraint_equation_builder_tests.cpp
       tests/geometry/assembly_constraint_target_resolver_tests.cpp
+      tests/geometry/assembly_hierarchy_transform_evaluator_tests.cpp
       tests/geometry/assembly_insert_constraint_equation_builder_tests.cpp
       tests/geometry/assembly_insert_numeric_solver_tests.cpp
       tests/geometry/assembly_joint_motion_snapshot_tests.cpp
+      tests/geometry/assembly_nested_step_exporter_tests.cpp
       tests/geometry/assembly_parameter_pipeline_tests.cpp
       tests/geometry/assembly_revolute_joint_motion_tests.cpp
       tests/geometry/assembly_rigid_body_solver_tests.cpp
