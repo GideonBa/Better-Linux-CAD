@@ -1,24 +1,26 @@
-# Project container for assembly and member parts
+# Project container for assemblies and owned parts
 
-Status: implemented seed. The project container owns one assembly document and embedded member part documents and validates the current MVP-5 component/constraint structure carried by the assembly.
+Status: implemented MVP-4 seed, additively extended by MVP-5 rigid child assembly ownership. `Project` now owns one explicit root assembly, project-owned child assembly documents, and project-owned part documents.
 
-This document describes the first project-level container above `AssemblyDocument` and `PartDocument`.
+This document records the project-container boundary. Exact rigid hierarchy and nested export contracts are canonical in `docs/assembly-rigid-subassembly-nested-export-mvp5.md`.
 
-## Goal
+## Original MVP-4 goal
 
-The original MVP-4 goal is to let one project-level object coordinate assembly parameters and their bound member parts without requiring callers to manually update each part document.
+The original MVP-4 goal was to let one project-level object coordinate root assembly parameters and their bound member parts without requiring callers to manually update each part document.
 
-The project container must not:
+That root-parameter propagation contract remains unchanged.
 
-- solve assembly constraints
-- resolve semantic assembly target geometry
-- replace `AssemblyDocument` binding or constraint-record semantics
-- bypass `PartDocument` invalidation and recompute planning
-- emit assembly-level geometry or an assembly-level STEP file
+The project container itself does not:
 
-Component instances and explicit free-placement/state updates are handled by `docs/component-instance-mvp5.md`. Solver-independent Mate, Concentric, and Distance records are handled by `docs/assembly-constraint-model-intent-mvp5.md`. The derived read-only active-constraint graph is handled by `docs/assembly-constraint-graph-mvp5.md`. The project container owns the source documents used by those layers but does not solve constraints.
+- solve geometric assembly constraints;
+- resolve semantic assembly target geometry;
+- replace `AssemblyDocument` relationship-record semantics;
+- bypass `PartDocument` invalidation/recompute planning;
+- persist solver, hierarchy traversal, or geometry cache authority.
 
-## Implemented records
+Solver, motion, hierarchy traversal, leaf flattening, and assembly geometry consumers are separate layers above the persistent container records.
+
+## Current project records
 
 The implemented API lives in `include/blcad/core/project.hpp`.
 
@@ -26,7 +28,8 @@ The implemented API lives in `include/blcad/core/project.hpp`.
 Project
   id
   name
-  assembly
+  assembly                         # explicit root
+  child_assembly_documents[]
   part_documents[]
 
 ProjectPartUpdate
@@ -39,43 +42,64 @@ ProjectUpdateResult
   updated_part_count()
 ```
 
-`Project` owns an `AssemblyDocument` by value and owns each `PartDocument` by value. This is still a single-process, in-memory model. It is not a document database and does not yet support external part references.
+`Project` owns all current documents by value. It is still a single-process in-memory model, not a document database.
 
-## Membership and assembly-structure validation
+The root API remains:
 
-`Project::validate_member_parts` checks that every `AssemblyDocument::member_parts()` id resolves to an owned `PartDocument`.
+```text
+Project::assembly()
+```
 
-`Project::validate_component_instances` checks that every component instance references an assembly member part and that the referenced part resolves to an owned `PartDocument`.
+Child assembly documents are owned separately:
 
-`Project::validate_assembly_constraints` checks that every assembly constraint target A and target B component id resolves to an existing assembly component instance.
+```text
+Project::child_assembly_documents()
+Project::find_assembly_document(id)
+```
 
-`Project::validate_assembly_structure` runs all three validations and is the preferred project-level check before using assembly structure.
+`find_assembly_document` resolves the root or an owned child. Child assembly ids are unique across the complete project assembly-document set.
 
-Extra owned parts are allowed by the seed. They are ignored by assembly parameter propagation unless the assembly explicitly registers them as members.
+External part/assembly references and lazy loading remain deferred.
 
-Duplicate owned part document ids are rejected by `Project::add_part_document`.
+## Project structure validation
 
-## Project-level parameter update
+`Project::validate_member_parts` checks every root and child `AssemblyDocument::member_parts()` id against the project-owned part collection.
 
-The implemented project-level update call is:
+`Project::validate_component_instances` checks every root and child component occurrence against its containing assembly member-part set and the project-owned parts.
+
+`Project::validate_assembly_constraints` checks geometric relationship target component ids inside each containing assembly document.
+
+`Project::validate_assembly_joints` checks joint target component ids inside each containing assembly document.
+
+`Project::validate_subassembly_instances` checks that each rigid child occurrence references a project-owned child assembly document rather than a missing document or the explicit project root.
+
+`Project::validate_assembly_hierarchy` validates child references and rejects direct/indirect assembly-document cycles across the root and all owned child assembly documents.
+
+`Project::validate_assembly_structure` runs the full member/component/constraint/joint/hierarchy validation chain and is the preferred project-level structural guard before geometry, motion, or hierarchy consumers.
+
+Extra owned parts and child assemblies are allowed. An unreferenced child assembly is not part of the rooted occurrence tree, but its document graph is still hierarchy-cycle validated so invalid latent cycles cannot enter project state.
+
+## Root assembly parameter update
+
+The implemented project-level parameter update call remains:
 
 ```text
 Project::set_assembly_parameter_value(parameter, value) -> ProjectUpdateResult
 ```
 
-It performs this sequence:
+This API is explicitly the root assembly parameter update boundary.
 
-1. validate assembly member ids against owned part documents
-2. validate component instance member/project references
-3. validate assembly constraint component targets
-4. update the assembly parameter value with `AssemblyDocument::set_parameter_value`
-5. apply assembly bindings to each owned member part through `AssemblyDocument::apply_bindings_to`
-6. ask each affected part for `PartDocument::create_recompute_plan`
-7. return one `ProjectPartUpdate` per affected member part
+It performs:
 
-The project does not recompute geometry itself. It returns recompute plans so the caller can decide whether to recompute through the core recompute path, the geometry executor, or a future job system.
+1. validate complete current project assembly structure;
+2. update the root `AssemblyDocument` parameter value;
+3. apply root assembly bindings to owned root member parts;
+4. ask each affected part for `PartDocument::create_recompute_plan`;
+5. return one `ProjectPartUpdate` per affected root member part.
 
-Constraint validation is structural only. Assembly parameter propagation does not resolve constraints, mutate component transforms, or perform solver work. The separate `AssemblyConstraintGraph` may read the project's assembly to derive connectivity but does not change project state.
+The project does not recompute geometry itself. It returns recompute plans.
+
+The current API does not provide a generic child-assembly parameter update path. That is a later application-layer design question and is separate from the rigid subassembly occurrence/export seed.
 
 ## JSON persistence
 
@@ -88,25 +112,31 @@ write_project_json_file(Project, path)
 read_project_json_file(path)
 ```
 
-The schema marker is:
+Historical schema marker:
 
 ```text
 blcad.project.mvp4
+version 1
 ```
 
-The seed uses an embedded-document project file:
+Current embedded shape:
 
 ```json
 {
   "schema": "blcad.project.mvp4",
   "version": 1,
   "project": {
-    "id": "project.flange",
-    "name": "FlangeProject"
+    "id": "project.example",
+    "name": "ExampleProject"
   },
   "assembly": {
     "schema": "blcad.assembly_document.mvp4"
   },
+  "assemblies": [
+    {
+      "schema": "blcad.assembly_document.mvp4"
+    }
+  ],
   "parts": [
     {
       "schema": "blcad.part_document.mvp1"
@@ -115,56 +145,79 @@ The seed uses an embedded-document project file:
 }
 ```
 
-The project serializer/deserializer delegates assembly persistence to `serialize_assembly_document_to_json` / `deserialize_assembly_document_from_json` and part persistence to the part JSON helpers. Therefore component instances, updated component state, and `assembly_constraints` are carried automatically by embedded assembly JSON.
+`assembly` is the explicit root.
 
-After loading, project deserialization validates member parts, component instances, and assembly constraint component targets through `validate_assembly_structure`.
+`assemblies[]` is the optional additive collection of project-owned child assembly documents. Older project files without it remain loadable and produce zero child assemblies.
 
-Constraint graph connectivity is not persisted in project JSON. It is regenerated from the embedded assembly's component and active constraint records.
+Project serialization delegates each assembly record to `serialize_assembly_document_to_json` and each part record to the part JSON helpers. Therefore component occurrences, rigid subassembly occurrences, constraints, and joints are carried by each embedded assembly record.
 
-A manifest-based project file that references separate part files is deliberately deferred.
+After load, project deserialization validates the complete structure and hierarchy.
 
-## Headless project export and inspection
+No constraint graph, joint graph, hierarchy traversal, parent link, occurrence path, transform chain, flattened leaf descriptor, solve result, or shape cache is persisted in project JSON.
 
-When geometry targets are enabled, the project block adds:
+A manifest-based project file with separate document files remains deferred.
+
+## Headless project consumers
+
+### Root parameter update and per-part STEP
 
 ```text
 blcad_export_project <input.blcad.project.json> <assembly-parameter-id> <value> <output-dir>
 ```
 
-The command:
+The command updates one root assembly parameter, obtains affected part recompute plans, recomputes project parts through `GeometryRecomputeExecutor`, and writes per-part STEP outputs.
 
-1. reads a project file
-2. looks up the assembly parameter
-3. parses the new value as a length or count based on the existing parameter type
-4. calls `Project::set_assembly_parameter_value`
-5. recomputes every owned project part through `GeometryRecomputeExecutor::execute_document`
-6. exports each final part shape as `<part_document_id>.step`
+It does not solve assembly placement.
 
-This command is a headless example, not a GUI workflow. It does not solve assembly placement and does not emit an assembly-level STEP file.
+### Component inspection
 
-The MVP-5 assembly blocks use the separate non-geometry `blcad_inspect_project_components` command for listing component instances, persisted placement/state values, stored assembly constraint type/state/semantic targets, and the derived active-edge/connected-group graph summary.
+```text
+blcad_inspect_project_components <input.blcad.project.json>
+```
+
+This remains a non-geometry inspection example for current root component/relationship data.
+
+### Posed assembly export
+
+```text
+blcad_export_posed_assembly <input.blcad.project.json> <output.step>
+```
+
+The geometry consumer may optionally solve/apply one root geometric constraint group before export. `AssemblyStepExporter` then validates the complete root/child hierarchy, derives flattened visible-active leaves, recomputes referenced parts, applies full rigid transform chains, and emits one OCCT compound through the existing STEP writer.
+
+Nested export behavior is not persistence logic; it is a derived geometry consumer of project records.
 
 ## Test coverage
 
-The original project-container tests cover:
+Original MVP-4 project tests cover:
 
-- project creation and duplicate owned part rejection
-- membership validation for assembly member ids
-- automatic assembly binding propagation into owned member parts
-- per-part recompute plans from one project-level parameter update
-- project JSON roundtrip with embedded assembly and part documents
-- project JSON rejection when an assembly member part is missing from the project
+- project creation and duplicate owned part rejection;
+- root membership validation;
+- automatic root assembly binding propagation;
+- per-part recompute plans from a root project-level parameter update;
+- project JSON roundtrip;
+- rejection when a registered member part is missing.
 
-The MVP-5 component tests separately cover project-level component reference validation, placement/state updates, shared `PartDocument` ownership, and project JSON roundtrip after those updates.
+Later MVP-5 coverage separately proves:
 
-The MVP-5 assembly constraint tests separately cover constraint target validation in project structure, shared part ownership across constrained occurrences, and project JSON roundtrip for Mate, Concentric, and Distance records.
-
-The read-only graph tests are separate in `tests/core/assembly_constraint_graph_tests.cpp`; graph construction consumes the validated assembly structure but does not add project persistence or mutation semantics.
+- component reference validation and placement/state roundtrip;
+- geometric constraint and joint structural validation;
+- child assembly id uniqueness including the root id;
+- rigid `SubassemblyInstance` JSON roundtrip;
+- project JSON roundtrip with explicit root plus owned child assemblies;
+- backward compatibility without `assemblies[]`;
+- missing-child and root-reference rejection;
+- indirect hierarchy cycle rejection;
+- deterministic hierarchy traversal;
+- canonical visible-active flattened leaf resolution;
+- nested posed assembly STEP export.
 
 ## Deliberate limitations
 
-The project container does not solve component placements, constraints, or DOF.
+The project container does not itself solve component placement, motion, or DOF.
 
-It does not resolve semantic constraint target geometry, enforce grounding, perform collision checks, or emit assembly-level STEP. The read-only constraint graph is implemented separately as regenerable derived data and is not project-owned persistent state.
+Current ordinary constraint/joint solving remains local to the explicit root assembly APIs. Flexible child assembly solver variables and cross-hierarchy constraint/joint targets are not implemented.
 
-It also does not implement manifest-based project files, external part references, lazy part loading, dirty-file tracking, or partial project save.
+The container does not persist resolved semantic geometry, graph connectivity, hierarchy traversal, composed transforms, flattened leaves, collision/interference state, or exchange-format geometry.
+
+Manifest-based project files, external document references, lazy loading, dirty-file tracking, and partial project save remain deferred.
