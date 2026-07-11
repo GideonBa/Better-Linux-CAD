@@ -1,12 +1,12 @@
 # Assembly Constraint Model Intent MVP-5
 
-Status: implemented solver-independent assembly relationship records for Mate, Concentric, and Distance. A separate read-only connectivity graph is now also implemented in `docs/assembly-constraint-graph-mvp5.md`.
+Status: implemented solver-independent assembly relationship records for Mate, Concentric, and Distance. The read-only constraint graph, generated-face target resolver, and rigid-transform evaluator are implemented as separate downstream layers.
 
 ## Goal
 
-This block makes assembly relationships persistent model intent before semantic target geometry resolution or a rigid-body solver.
+This block makes assembly relationships persistent model intent independently from geometry resolution, transform evaluation, equation construction, and rigid-body solving.
 
-The implementation deliberately stores what two component occurrences are intended to relate. It does not compute where either component must move.
+The record layer stores what two component occurrences are intended to relate. It does not compute where either component must move.
 
 ## Typed identity
 
@@ -29,7 +29,7 @@ component_instance   ComponentInstanceId
 semantic_reference  persistent semantic reference token
 ```
 
-Example:
+Examples:
 
 ```text
 component.bolt.1 : bolt.main_axis
@@ -42,13 +42,15 @@ Validation guarantees:
 - semantic reference token is non-empty
 - when a constraint enters an `AssemblyDocument`, target A and target B component instance ids must already exist in that assembly
 
-The semantic reference token is intentionally opaque at this layer. The record layer does not resolve it to an OCCT face, edge, axis, vertex, or workplane.
+The semantic reference token is intentionally opaque at this layer. The record layer does not resolve it to a face, edge, axis, vertex, workplane, or OCCT topology id.
 
-Raw OCCT topology names such as `Face17` or `Edge4` are not the intended persistent model representation. Semantic target resolution remains a later geometry/assembly layer.
+Raw OCCT topology names such as `Face17` or `Edge4` are not the intended persistent model representation.
+
+The separate `AssemblyConstraintTargetResolver` now interprets the first supported generated planar face family. That does not change the general persistent token model or add geometry logic to this record layer.
 
 ## Constraint types
 
-The implemented seed is intentionally limited to:
+The implemented seed is limited to:
 
 ```text
 AssemblyConstraintType::Mate
@@ -115,7 +117,7 @@ find_constraint(AssemblyConstraintId)
 - existing target A component instance
 - existing target B component instance
 
-Target construction already validates non-empty component ids and semantic reference tokens. `AssemblyConstraint::create` already validates identity, name, and type-specific distance requirements.
+Target construction already validates non-empty component ids and semantic reference tokens. `AssemblyConstraint::create` validates identity, name, and type-specific distance requirements.
 
 ## No-solver boundary
 
@@ -126,14 +128,16 @@ This record block does not itself:
 - mutate either component `RigidTransform`
 - infer a constraint from a free-placement edit
 - resolve semantic target geometry
+- evaluate component-local geometry in assembly space
+- construct constraint equations or residuals
 - move grounded or free components
 - compute remaining degrees of freedom
 - detect underdefined, fully constrained, or overconstrained assemblies
 - recompute member part geometry
 
-A separate derived `AssemblyConstraintGraph` now reads these records to expose active connectivity. Graph construction also remains read-only and does not change this record-layer boundary.
+Separate derived layers now build graph connectivity, resolve supported generated-face targets, and evaluate valid persisted transforms. None of them changes this record-layer boundary.
 
-Loading constraints from JSON follows the same path: component instances are loaded first, then constraints are validated and added. JSON loading therefore cannot silently solve or move component instances.
+Loading constraints from JSON follows the same path: component instances are loaded first, then constraints are validated and added. JSON loading cannot silently solve or move component instances.
 
 ## Project structure validation
 
@@ -195,7 +199,22 @@ Compatibility rules:
 - target validation runs through the normal `AssemblyDocument::add_constraint` path
 - project JSON automatically inherits constraint persistence because it embeds assembly JSON
 
-No solver result, resolved OCCT topology, graph cache, DOF state, or solved transform cache is serialized. The connectivity graph is fully regenerated from component and constraint intent.
+No solver result, resolved target descriptor, evaluated assembly-space frame, graph cache, equation cache, DOF state, or solved transform cache is serialized. Derived assembly data is regenerated from model intent.
+
+## Downstream read-only pipeline
+
+The current implemented downstream path is:
+
+```text
+AssemblyConstraint record
+  -> AssemblyConstraintGraph              # active relationship connectivity
+  -> AssemblyConstraintTargetResolver     # supported local target frames
+  -> AssemblyTransformEvaluator           # assembly-space target frames
+  -> future equation/residual builder
+  -> future rigid-body solver
+```
+
+The record layer remains the persistent source of relationship intent. Each downstream layer consumes records without rewriting them.
 
 ## Headless inspection
 
@@ -210,11 +229,11 @@ For each constraint it prints:
 - target B component id and semantic token
 - distance in millimeters when present
 
-The inspector now also builds `AssemblyConstraintGraph` and prints a compact active-edge and connected-group summary. Graph details are documented in `docs/assembly-constraint-graph-mvp5.md`.
+The inspector also builds `AssemblyConstraintGraph` and prints a compact connectivity summary.
 
-The checked-in `examples/component_instances.blcad.project.json` contains Mate, Concentric, and Distance records for this read-only inspection path.
+The checked-in `examples/component_instances.blcad.project.json` contains Mate, Concentric, and Distance records for this inspection path.
 
-The example intentionally uses semantic reference tokens without geometry resolution. That remains the exact target-resolution boundary.
+The example may contain semantic token families that are not yet supported by the geometry resolver. Persistent record support is intentionally broader than the currently implemented geometric target families.
 
 ## Test coverage
 
@@ -239,7 +258,7 @@ The example intentionally uses semantic reference tokens without geometry resolu
 - shared owned `PartDocument` intent across multiple constrained component instances
 - project assembly-structure validation with constraints
 
-The separate graph suite is documented in `docs/assembly-constraint-graph-mvp5.md`.
+Graph, target-resolution, and transform-evaluation suites are documented separately.
 
 Targeted record-layer test command after a core build:
 
@@ -253,28 +272,27 @@ Complete core workflow:
 cmake --workflow --preset dev-build-test
 ```
 
-## Deferred work
+## Deferred work from the record block
 
-The following remain intentionally outside this record block:
+The following remain outside this persistent record layer:
 
-- semantic target geometry resolution
+- geometry interpretation of semantic tokens
+- local-to-assembly transform evaluation
+- constraint equation/residual construction
 - rigid-body solving
 - transform mutation from constraints
 - remaining DOF computation and display
 - enforced grounding
-- underdefined/fully constrained/overconstrained state analysis
-- Insert, Angle, Tangent, Flush, Coincident, and Lock constraints
-- joints and limits
+- underdefined/fully constrained/overconstrained analysis
+- richer constraint and joint families
 - collision/interference checks
 - subassemblies
 - assembly-level geometry instancing and STEP export
 
-The read-only connectivity graph is no longer deferred; it is implemented as a separate derived block and intentionally does not change the persistent record schema.
+Geometry interpretation and transform evaluation are now implemented as separate read-only layers. They remain intentionally outside this record block.
 
 ## Next technical step
 
-The completed read-only constraint graph is documented in `docs/assembly-constraint-graph-mvp5.md`.
+The repository-wide next assembly block is read-only planar Mate/Distance equation/residual construction.
 
-The next assembly block is a read-only semantic target resolution seed. It should resolve an `AssemblyConstraintTarget` through its component occurrence to the referenced project-owned `PartDocument` and support the currently implemented generated-face semantic reference family as component-local planar descriptors.
-
-Unsupported semantic target families must fail explicitly. Constraint equation construction, assembly-space transform math, rigid-body solving, remaining DOF, and solved transform updates remain later steps.
+It should consume active persisted records, resolve the currently supported generated-face targets, evaluate both planes in assembly space, and construct documented deterministic residual data without solving or mutating component transforms. Concentric remains deferred until semantic axis references are implemented.

@@ -6,7 +6,9 @@ Status: implemented read-only connectivity graph over persistent assembly constr
 
 This block derives deterministic component connectivity from the solver-independent Mate, Concentric, and Distance relationship records in `AssemblyDocument`.
 
-The graph answers which component occurrences are connected by active relationship intent. It does not resolve semantic target geometry, evaluate constraint equations, move components, or compute remaining degrees of freedom.
+The graph answers which component occurrences are connected by active relationship intent. It does not resolve semantic target geometry, evaluate transforms, construct constraint equations, move components, or compute remaining degrees of freedom.
+
+Downstream semantic target resolution and rigid-transform evaluation are now implemented as separate layers. Their existence does not change the graph boundary.
 
 ## API
 
@@ -99,6 +101,24 @@ Determinism guarantees:
 
 These groups are intended to become natural solve partitions later. This block does not claim that a connected group is fully constrained, solvable, or geometrically consistent.
 
+## Relationship to downstream geometry layers
+
+The graph stores only connectivity. Downstream implemented geometry layers are:
+
+```text
+AssemblyConstraintTargetResolver
+  AssemblyConstraintTarget
+    -> ComponentLocalPlanarDescriptor + RigidTransform
+
+AssemblyTransformEvaluator
+  ComponentLocalPlanarDescriptor + RigidTransform
+    -> AssemblySpacePlanarDescriptor
+```
+
+The graph does not duplicate either result.
+
+A future equation builder can use graph groups to partition work while resolving and evaluating each constraint's own targets through those dedicated APIs.
+
 ## Read-only boundary
 
 Building or querying the graph does not modify:
@@ -115,7 +135,7 @@ The graph is not the part `DependencyGraph` and is not a rigid-body solve graph.
 
 ## Headless inspection
 
-`blcad_inspect_project_components` now builds the graph after normal project structure validation and prints a compact summary:
+`blcad_inspect_project_components` builds the graph after normal project structure validation and prints a compact summary:
 
 ```text
 Constraint graph has <nodes> node(s), <active edges> active edge(s), and <groups> connected group(s)
@@ -135,7 +155,7 @@ component_instances[]
 assembly_constraints[]
 ```
 
-Persisting nodes, edges, adjacency, or connected groups would duplicate derivable cache data and could drift from model intent. Existing assembly and project schema markers therefore remain unchanged.
+Persisting nodes, edges, adjacency, or connected groups would duplicate derivable data and could drift from model intent. Existing assembly and project schema markers therefore remain unchanged.
 
 ## Test coverage
 
@@ -168,29 +188,24 @@ Complete core workflow:
 cmake --workflow --preset dev-build-test
 ```
 
-## Deferred work
+## Deferred work from the graph layer
 
-The following remain outside this graph block:
+The graph itself remains intentionally independent from:
 
-- semantic constraint-target geometry resolution
-- interpretation of semantic target tokens as faces, axes, edges, or vertices
-- rigid-transform evaluation for resolved assembly references
+- semantic target geometry resolution
+- rigid-transform evaluation
 - Mate, Concentric, and Distance equation construction
 - rigid-body solving and transform mutation
 - remaining DOF computation
-- underdefined, fully constrained, and overconstrained state analysis
+- underdefined, fully constrained, and overconstrained analysis
 - enforced grounding
-- solver participation rules for suppressed components
-- Insert, Angle, Tangent, Flush, Coincident, and Lock constraints
-- joints and limits
-- collision/interference checks
-- subassemblies
-- assembly-level geometry instancing and STEP export
+- suppression participation rules
+- richer constraints, joints, collision checks, subassemblies, and assembly export
+
+The first two items are now implemented as separate downstream geometry layers; they are not graph responsibilities.
 
 ## Next technical step
 
-Add a read-only semantic assembly target resolution seed before introducing constraint equations or a rigid-body solver.
+The repository-wide next assembly block is read-only planar Mate/Distance equation/residual construction.
 
-The first resolver should start from `AssemblyConstraintTarget`, resolve its `ComponentInstanceId` to the referenced project-owned `PartDocument`, and support the currently implemented generated-face semantic reference family as component-local geometric descriptors. Unsupported target families, including not-yet-implemented semantic axes required for full Concentric solving, must fail explicitly.
-
-The resolver must not change component transforms, constraint records, or part model intent. Constraint equation construction, assembly-space solve math, remaining DOF, and solved transform updates remain later blocks.
+A future builder should consume active constraint records, resolve each supported generated-face target through `AssemblyConstraintTargetResolver`, evaluate both frames through `AssemblyTransformEvaluator`, and construct documented deterministic residual data. It must not change graph connectivity, component transforms, or project model intent.

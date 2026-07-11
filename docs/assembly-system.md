@@ -1,8 +1,8 @@
 # Assembly System with Constraints
 
-Status: component instances, explicit free-placement/state updates, solver-independent Mate/Concentric/Distance constraint records, a deterministic read-only active-constraint graph, and read-only generated-face semantic target resolution are implemented. Assembly-space rigid-transform evaluation and rigid-body solving are not implemented yet.
+Status: component instances, explicit free-placement/state updates, solver-independent Mate/Concentric/Distance constraint records, a deterministic read-only active-constraint graph, generated-face semantic target resolution, and explicit read-only rigid-transform evaluation are implemented. Constraint equation construction and rigid-body solving are not implemented yet.
 
-The assembly system composes parts into assemblies like Inventor or SolidWorks. The implemented MVP-5 blocks store component occurrences, direct placement/state intent, persistent semantic relationship records, derived relationship connectivity, and the first supported semantic target geometry descriptors. Later stages will evaluate those descriptors in assembly space and solve component positions from relationships.
+The assembly system composes project-owned part models into component occurrences. Persistent records store design intent; connectivity, resolved target geometry, and evaluated assembly-space frames remain regenerable derived data.
 
 ## Core idea
 
@@ -15,30 +15,49 @@ AssemblyDocument HousingAssembly
   ComponentInstance Screw_02 -> Screw_M6x25
 ```
 
-The current core stores assembly occurrence and relationship intent plus a regenerable connectivity graph. The optional geometry layer can resolve supported generated-face targets to component-local planar frames. Assembly-level geometry instancing is not implemented yet.
+The current assembly pipeline is deliberately layered:
 
-Free-placement transforms are still stored and updated directly. Constraints are persistent records, graph edges expose active connectivity, and supported generated-face target geometry can be resolved, but none of those layers solves or replaces stored transforms.
+```text
+persistent component and constraint intent
+  -> active constraint connectivity
+  -> semantic target resolution
+  -> component-local target frames
+  -> explicit rigid-transform evaluation
+  -> assembly-space target frames
+  -> future equation construction
+  -> future rigid-body solver
+```
 
-## Implemented component-instance and free-placement blocks
+No implemented derived layer replaces or mutates persisted component placement intent.
 
-The canonical detailed document for the implemented component-instance records, states, update APIs, validation rules, JSON compatibility, inspection tool, and tests is `docs/component-instance-mvp5.md`.
+## Implemented component instances and free placement
 
-Implemented assembly behavior relevant to this roadmap:
+The canonical detailed document is `docs/component-instance-mvp5.md`.
+
+Implemented behavior:
 
 - `AssemblyDocument` owns component instances by value
 - each component instance references a registered member part document
 - several component instances may reference the same project-owned `PartDocument`
 - free-placement transforms contain finite translation values in millimeters and finite rotation values in degrees
 - visibility, suppression, and grounding state are persisted model intent
-- transform, visibility, suppression, and grounding can be updated explicitly on an existing component instance
-- updates preserve component identity and the referenced part document
+- transform, visibility, suppression, and grounding can be updated explicitly
+- component identity and referenced part intent are preserved across updates
 - direct placement edits do not infer constraints, compute DOF, or trigger part geometry recompute
 
-Field-by-field component record definitions are intentionally not duplicated here; `docs/component-instance-mvp5.md` is the source of truth for that implemented block.
+The transform record is:
+
+```text
+RigidTransform
+  translation_mm
+  rotation_deg
+```
+
+The exact geometry-evaluation convention for this record is now implemented separately in `docs/assembly-rigid-transform-evaluation-mvp5.md`.
 
 ## Implemented assembly constraint model intent
 
-The canonical detailed document for the implemented constraint records, validation, JSON, project validation, tests, and headless inspection is `docs/assembly-constraint-model-intent-mvp5.md`.
+The canonical detailed document is `docs/assembly-constraint-model-intent-mvp5.md`.
 
 The current record layer includes:
 
@@ -59,25 +78,24 @@ AssemblyConstraint
 
 Implemented rules:
 
-- constraint ids are typed through `AssemblyConstraintId`
+- constraint ids use `AssemblyConstraintId`
 - target component ids and semantic reference tokens must be non-empty
-- both target component instances must already exist in the owning `AssemblyDocument`
+- both target components must already exist in the owning `AssemblyDocument`
 - constraint ids are unique within the assembly
 - Distance requires a length quantity
 - Mate and Concentric reject distance values
 - inactive constraints remain persisted but disabled as model intent
 - adding or loading a constraint does not change component transforms
-- semantic tokens remain opaque at the record layer and are not resolved to OCCT topology
+- semantic tokens remain opaque at the record layer
 - assembly/project JSON persist the records through additive `assembly_constraints`
 - older assembly JSON without `assembly_constraints` remains loadable
 - project structure validation includes constraint component targets
-- the existing component inspector prints stored constraint type/state/semantic targets plus optional Distance values
+
+The record layer stores relationship intent only. It does not resolve geometry or construct equations.
 
 ## Implemented read-only constraint graph
 
-The canonical detailed document for graph construction, deterministic query behavior, tests, persistence boundaries, and headless inspection is `docs/assembly-constraint-graph-mvp5.md`.
-
-The implemented core graph is:
+The canonical detailed document is `docs/assembly-constraint-graph-mvp5.md`.
 
 ```text
 AssemblyConstraintGraph
@@ -91,26 +109,24 @@ connected_components()
 Graph rules:
 
 - every component instance is a node, including isolated instances
-- active constraints create distinct edges between target A and target B component instances
+- active constraints create distinct edges
 - inactive constraints create no graph edge
-- multiple different constraints between the same component pair remain distinct legal edges
-- edge records preserve the constraint id and both component endpoints but do not copy semantic target geometry
-- graph construction defensively validates active edge endpoints against the source `AssemblyDocument`
+- multiple constraints between the same component pair remain legal multi-edges
+- edge records preserve constraint id and component endpoints without copying target geometry
+- graph construction revalidates active edge endpoints
 - node order is lexicographic by `ComponentInstanceId`
 - edge and adjacency order is lexicographic by `AssemblyConstraintId`
-- component ids inside each connected group are lexicographically ordered
-- connected groups are ordered by their lexicographically first component id
-- graph construction and all queries are read-only with respect to transforms, grounding, constraint state, and part model intent
+- component ids inside connected groups are lexicographically ordered
+- connected groups are ordered by their first component id
+- graph construction and queries are read-only
 
-The graph is derived data. It is not stored in assembly or project JSON because it can be rebuilt exactly from `component_instances` and active `assembly_constraints`.
+The graph is derived data and is not serialized.
 
-The headless component inspector prints node count, active-edge count, and deterministic connected groups after normal project structure validation.
-
-## Implemented read-only semantic assembly target resolution
+## Implemented semantic assembly target resolution
 
 The canonical detailed document is `docs/assembly-constraint-target-resolution-mvp5.md`.
 
-The optional geometry-layer seed is:
+The geometry-layer path is:
 
 ```text
 AssemblyConstraintTargetResolver
@@ -119,143 +135,184 @@ AssemblyConstraintTargetResolver
     -> referenced PartDocument
     -> supported SemanticFaceReference
     -> component-local planar descriptor
-    -> separate persisted RigidTransform intent
+    -> separate persisted RigidTransform
 ```
 
 Implemented rules:
 
-- `ComponentInstanceId` resolves through the project's `AssemblyDocument`
+- `ComponentInstanceId` resolves through the project assembly
 - the component's `referenced_part_document` resolves to the project-owned `PartDocument`
 - the supported token family is `feature.<feature-id>.{top,bottom,right,left,front,back}`
 - the source feature must resolve in the referenced part and currently be a supported `AdditiveExtrude`
-- `WorkplaneResolver::resolve_generated_face` is the shared generated-face frame implementation used by assembly target resolution and derived workplanes
-- the resolved component-local descriptor contains origin, x-axis, y-axis, and normal
-- the component `RigidTransform` is returned separately and is not applied to the local descriptor
-- malformed and unsupported semantic target families fail explicitly
+- `WorkplaneResolver::resolve_generated_face` supplies the shared generated-face frame implementation
+- the local descriptor contains origin, x-axis, y-axis, and normal
+- the component `RigidTransform` is returned separately
+- malformed and unsupported target families fail explicitly
 - semantic axes, generated edges, and generated vertices remain unsupported assembly target families
-- resolution does not mutate component transforms, constraint records, part model intent, or geometry cache ownership
-- resolved target descriptors are derived data and are not serialized
+- resolution does not mutate component transforms, constraints, part model intent, or geometry cache ownership
+- resolved descriptors are not serialized
 
-This block does not define an assembly rotation order. It deliberately avoids inventing an implicit Euler-angle convention inside target resolution.
+Target resolution deliberately does not apply component placement. That responsibility belongs to the transform evaluator.
 
-## Target component instances
+## Implemented rigid-transform evaluation
 
-Later versions should extend the current occurrence records toward:
+The canonical detailed document is `docs/assembly-rigid-transform-evaluation-mvp5.md`.
+
+The evaluator API is:
 
 ```text
-ComponentInstance
-  id, name
-  referenced_document
-  transform
-  fixed_state
-  visibility, suppression_state, color_override
-  constraints
-  exposed_references
-  degrees_of_freedom
+AssemblyTransformEvaluator
+  evaluate_point(RigidTransform, Point3)
+  evaluate_vector(RigidTransform, Vector3)
+  evaluate_plane(RigidTransform, ComponentLocalPlanarDescriptor)
+    -> AssemblySpacePlanarDescriptor
 ```
 
-State display target: Fixed, Underdefined, Fully constrained, Overconstrained, Suppressed.
+The exact convention is:
+
+- translation values are millimeters
+- rotation values are degrees
+- positive rotations follow the right-hand rule
+- rotations are active fixed-axis rotations
+- rotation order is X, then Y, then Z
+- for column vectors the composition is `Rz * Ry * Rx`
+- points are rotated and then translated
+- vectors, axes, and normals are rotated without translation
+- arbitrary vector magnitude is preserved
+- unit frame vectors remain unit length and orthogonal within floating-point tolerance
+
+The transform bridge from semantic targets is now explicit:
+
+```text
+AssemblyConstraintTarget
+  -> AssemblyConstraintTargetResolver::resolve(...)
+  -> ResolvedAssemblyConstraintTarget.local_plane
+     + ResolvedAssemblyConstraintTarget.component_transform
+  -> AssemblyTransformEvaluator::evaluate_plane(...)
+  -> AssemblySpacePlanarDescriptor
+```
+
+`AssemblySpacePlanarDescriptor` is distinct from `ComponentLocalPlanarDescriptor` so coordinate space remains part of the type-level API vocabulary.
+
+Evaluation is read-only and unpersisted. It never updates the stored `RigidTransform`.
 
 ## Degrees of freedom
 
-A rigid body has 6 DOF (translate x/y/z, rotate x/y/z). Constraints reduce them. Face-on-face removes translation along the normal and some rotations; axis-on-axis leaves translation along and rotation about the axis. The system should eventually show remaining DOF per component.
+A rigid body has six DOF: translation along X/Y/Z and rotation about X/Y/Z.
 
-DOF analysis is not implemented. The current constraint records, connectivity graph, and target resolver do not claim any DOF effect.
+Face-on-face, axis-on-axis, and other relationships eventually reduce those DOF. The current record, graph, target-resolution, and transform-evaluation layers do not claim any DOF effect.
+
+DOF analysis remains unimplemented.
 
 ## Part features vs. assembly constraints
 
-A part feature changes a part's geometry (extrude, cut, hole, fillet, chamfer). An assembly constraint does not change part geometry; it describes intended pose relationships between two component instances or, in later versions, between a component and an assembly reference.
+A part feature changes part geometry. An assembly constraint describes intended pose relationships between component occurrences or, later, between a component and an assembly reference.
+
+Part features include extrudes, cuts, future holes, fillets, and chamfers. Assembly constraints must not modify part feature intent.
 
 ## Constraint types
 
 | Constraint | Description |
 |-----------|-------------|
-| Mate       | two planar faces together, normals opposed. |
-| Flush      | two planar faces aligned, normals same direction. |
+| Mate | two planar faces together, normals opposed. |
+| Flush | two planar faces aligned, normals same direction. |
 | Coincident | points, axes, or planes coincide. |
 | Concentric | two cylindrical/circular references share an axis. |
-| Distance   | fixed distance between two references. |
-| Angle      | fixed angle between planes/axes/faces. |
-| Tangent    | a face tangent to another (cylinder-plane, cylinder-cylinder). |
-| Insert     | concentric + axial seating (screw in hole). |
-| Lock       | fully fix one component relative to another. |
+| Distance | fixed distance between two references. |
+| Angle | fixed angle between planes/axes/faces. |
+| Tangent | one face tangent to another. |
+| Insert | concentric plus axial seating. |
+| Lock | fully fix one component relative to another. |
 
-The implemented record seed is limited to Mate, Concentric, and Distance. The other rows remain target architecture.
+The implemented record seed is limited to Mate, Concentric, and Distance.
 
-Constraints use semantic references (`docs/semantic-references.md`): `feature.base_extrude.top`, `Screw.main_axis`, `BasePlate.HoleFeature_01.axis` — never raw OCCT face names such as `Face17`.
+Persistent targets use semantic references such as `feature.base_extrude.top`; raw OCCT topology names such as `Face17` are not core model intent.
 
-The record layer validates persistent target tokens. The graph uses only the component endpoint portion of each target. The geometry resolver interprets only the currently supported generated-face family. None of those layers moves components.
+The geometry resolver currently interprets only the generated planar face family. Semantic axes required for Concentric remain future work.
 
-## Next block: explicit assembly rigid-transform evaluation
+## Next block: read-only planar Mate/Distance equation construction
 
-The next assembly step should define deterministic component-local-to-assembly-space evaluation for persisted `RigidTransform` values before constraint equations consume resolved target frames.
+The next assembly block should construct deterministic geometric equation/residual data over the now-available assembly-space planar target frames.
 
 Target seed:
 
 ```text
-AssemblyTransformEvaluator
-  evaluate_point(RigidTransform, component_local_point)
-  evaluate_vector(RigidTransform, component_local_vector)
-  evaluate_plane(RigidTransform, ComponentLocalPlanarDescriptor)
-    -> assembly-space planar descriptor
+AssemblyConstraintEquationBuilder
+  build(Project, AssemblyConstraint)
+    -> resolve target A
+    -> resolve target B
+    -> evaluate target A plane in assembly space
+    -> evaluate target B plane in assembly space
+    -> construct supported equation/residual descriptor
 ```
 
 First-scope rules:
 
-- document that stored translation values are millimeters and stored rotation values are degrees
-- define one explicit rotation order for `rotation_deg`
-- rotate component-local points and then apply translation
-- rotate vectors, basis axes, and normals without translation
-- evaluate `ComponentLocalPlanarDescriptor` into an assembly-space planar frame
-- preserve normalized basis vectors and normals within numeric tolerance
-- identity and pure-translation behavior must be exact within the existing numeric representation
-- combined-rotation tests must prove the chosen order instead of relying on an unstated Euler convention
-- evaluation remains derived read-only data and must not update persisted component transforms
-- no constraint equations or solver behavior belong in this block
+- operate read-only on one persisted constraint record
+- support active Mate and Distance constraints only
+- require both targets to resolve through the implemented generated planar face family
+- reuse `AssemblyConstraintTargetResolver`
+- reuse `AssemblyTransformEvaluator`
+- define one canonical planar Mate residual convention explicitly
+- define one canonical signed planar Distance separation convention explicitly
+- preserve constraint id/type and target/component identities in returned descriptors
+- reject inactive constraints explicitly in the first seed
+- reject Concentric until semantic axis references are implemented
+- keep equation/residual descriptors derived and unpersisted
+- do not solve equations or mutate transforms
 
-## Solver and constraint graph
+The exact residual semantics must be documented together with the implementation rather than inferred later by a solver.
 
-After explicit transform evaluation is stable, a future solver can compute component transforms from active constraints over connected rigid-body groups, resolved geometry, DOF, transforms, and nonlinear geometric relations.
+## Solver pipeline
+
+After equation construction is stable, a future solver can operate over connected rigid-body groups.
 
 ```text
 AssemblySolvePipeline
-  read component instances -> read active constraints -> identify fixed components
-  -> build constraint graph -> resolve semantic target geometry
+  read component instances
+  -> read active constraints
+  -> identify fixed components
+  -> build constraint graph
+  -> resolve semantic target geometry
   -> evaluate resolved targets in assembly space
-  -> build constraint equations -> solve component transforms
-  -> detect underdefined -> detect overconstrained
-  -> update assembly transforms -> update viewport
+  -> build constraint equations
+  -> solve component transforms
+  -> detect underdefined / fully constrained / overconstrained state
+  -> update assembly transforms
+  -> update viewport
 ```
 
 Independent connected groups identified by `AssemblyConstraintGraph` can later be solved separately.
 
-Constraint equation construction, rigid-body solving, and remaining-DOF computation are not implemented yet.
+Rigid-body solving and remaining-DOF computation are not implemented.
 
 ## Grounding
 
-The current implementation stores and updates `ComponentGroundingState::Grounded` as model intent, but it does not enforce grounding behavior.
+`ComponentGroundingState::Grounded` is persisted model intent but is not yet enforced.
 
-A component marked `grounded` can still receive an explicit free-placement transform update. Adding or loading constraints, building the constraint graph, and resolving semantic targets also do not enforce grounding. This is intentional for the no-solver MVP boundary.
+A grounded component can still receive an explicit free-placement transform update. Constraint creation, graph construction, target resolution, and transform evaluation also do not enforce grounding.
 
-A later solver stage should warn if no component is grounded and should use grounded components as fixed references.
+A future solver should treat grounded components as fixed rigid-body references and should diagnose solve groups without an adequate fixed reference where required.
 
 ## Visibility and suppression
 
-Visibility and suppression are persisted and explicitly editable component states.
+Visibility and suppression are persisted, editable component states.
 
-They do not yet affect assembly geometry execution, export, collision analysis, graph connectivity, target resolution, or solver participation because those assembly consumers or participation rules are not implemented. Later consumers must define those semantics explicitly instead of inferring them inside storage, graph, or target-resolution APIs.
+They do not yet affect assembly geometry execution, export, graph connectivity, target resolution, transform evaluation, or solver participation. Future consumers must define those semantics explicitly.
 
-Constraint active/inactive state is separate from component suppression state. The current graph filters on constraint state only.
+Constraint active/inactive state is separate from component suppression state. The graph filters on constraint state only.
 
 ## Motion, joints, and limits
 
-Underdefined components should eventually be draggable only within allowed DOF. A drag becomes input to the solver, which projects it onto the valid constraint space.
+Underdefined components should eventually be draggable only within allowed DOF. A drag becomes solver input projected onto the valid constraint space.
 
-Joints describe allowed motion: Revolute, Prismatic, Cylindrical, Planar, Ball, Rigid, Gear relation, Screw relation. Joints and some constraints can have limits (`angle_min/max`, `position_min/max`, `distance_min/max`).
+Future joint families include Revolute, Prismatic, Cylindrical, Planar, Ball, Rigid, Gear relation, and Screw relation. Joints and constraints may later carry angle, position, or distance limits.
 
 ## Assembly parameters
 
-Assembly parameters can later drive constraints and joints for top-down control (`docs/parameter-model.md`):
+Assembly parameters already drive member part parameters through the MVP-4 `ParameterBinding` seed.
+
+Future top-down assembly control may bind parameters to constraints and joints:
 
 ```text
 DistanceConstraint.distance = Assembly.bearing_distance
@@ -263,22 +320,22 @@ PrismaticJoint.position    = Assembly.slider_position
 RevoluteJoint.angle        = Assembly.crank_angle
 ```
 
-Assembly parameters already drive member part parameters through the MVP-4 `ParameterBinding` seed. Direct constraint-to-assembly-parameter binding is not implemented by the current concrete Distance record.
+Direct constraint-to-assembly-parameter binding is not implemented by the current Distance record.
 
 ## Assembly features and collision
 
-Assembly features and collision checks are later additions. They are not part of the component-instance, free-placement, constraint-record, read-only graph, or target-resolution blocks.
+Assembly features and collision checks remain future additions. They are outside the current component, constraint-record, graph, target-resolution, and transform-evaluation blocks.
 
 ## Dependency-graph integration
 
-Future resolved constraints should integrate into a dependency graph: when a referenced face/axis/hole/component changes, affected constraints re-solve.
+Future solved constraints should integrate with a solve dependency model:
 
 ```text
 BasePlate.HoleFeature_M6.axis -> InsertConstraint_Screw_01 -> Screw_01.transform
 Assembly.bolt_circle_radius -> HoleFeature_BoltCircle -> hole axes -> InsertConstraints -> screw transforms
 ```
 
-The implemented `AssemblyConstraintGraph` is an assembly relationship-connectivity graph. It is not the part recompute `DependencyGraph` and is not yet a solve dependency graph. `AssemblyConstraintTargetResolver` resolves supported geometry but does not create solve dependencies.
+The implemented `AssemblyConstraintGraph` is relationship connectivity, not the part recompute `DependencyGraph` and not yet a solve dependency graph.
 
 ## MVP scope (MVP 5)
 
@@ -287,56 +344,55 @@ Implemented:
 - component instances owned by `AssemblyDocument`
 - references from component instances to project-owned part documents
 - finite free-placement transforms plus visibility, suppression, and grounding state
-- explicit transform, visibility, suppression, and grounding update APIs
-- solver-independent Mate, Concentric, and Distance relationship records
-- semantic component targets using persistent tokens
+- explicit transform/state update APIs
+- solver-independent Mate, Concentric, and Distance records
+- semantic component target tokens
 - active/inactive constraint state
-- type-specific Distance value validation
-- assembly/project JSON roundtrip for component state and constraints
+- Distance value validation
+- assembly/project JSON roundtrip for components and constraints
 - project structure validation for constraint component targets
 - read-only active-constraint graph
 - deterministic graph nodes, edges, adjacency, and connected groups
-- isolated component nodes and legal multi-edges
-- generated-face assembly target resolution through project/component/part ownership
-- component-local planar target descriptors for top/bottom/right/left/front/back additive-extrude faces
-- direct reuse of the generated-face workplane frame path
-- separate returned `RigidTransform` placement intent without implicit assembly-space evaluation
-- explicit malformed/unsupported target-family failures
-- headless inspection of component placement/state, stored constraints, and graph groups
+- generated-face target resolution through project/component/part ownership
+- component-local planar target descriptors
+- shared generated-face workplane frame implementation
+- explicit rigid-transform evaluation convention
+- point, vector, and planar-frame component-local-to-assembly-space evaluation
+- distinct assembly-space planar descriptor type
+- no persisted graph, target-resolution, or transform-evaluation cache data
+- focused test coverage for every implemented assembly block
 
 Next MVP-5 steps:
 
-- explicit assembly rigid-transform evaluation conventions
-- component-local to assembly-space planar-frame evaluation
-- constraint equation construction for supported Mate/Distance targets
+- planar Mate/Distance equation/residual construction
 - rigid-body solver producing transforms
 - remaining-DOF display and under/fully/overconstrained analysis
 
-Concentric solving remains blocked on a stable semantic axis-reference family. Then add: Insert, Angle, Tangent constraints; movable joints; limits; collision checks; flexible subassemblies.
+Concentric equation construction remains blocked on a stable semantic axis-reference family. Later steps include Insert, Angle, Tangent, joints, limits, collision checks, and subassemblies.
 
 ## Proposed implementation sequence
 
-1. Add `AssemblyDocument`, `ComponentInstance`, and grounding. Implemented: see `docs/component-instance-mvp5.md`.
-2. Add explicit component placement/state update APIs without a solver. Implemented: see `docs/component-instance-mvp5.md`.
-3. Add semantic component reference targets and `AssemblyConstraint` records with Mate, Concentric, and Distance. Implemented: see `docs/assembly-constraint-model-intent-mvp5.md`.
-4. Persist and inspect constraints without changing component transforms. Implemented: see `docs/assembly-constraint-model-intent-mvp5.md`.
-5. Add a read-only active-constraint graph and connected-group queries without geometry resolution. Implemented: see `docs/assembly-constraint-graph-mvp5.md`.
-6. Resolve supported generated-face assembly targets to component-local planar descriptors without solving. Implemented: see `docs/assembly-constraint-target-resolution-mvp5.md`.
-7. Define and test explicit assembly rigid-transform evaluation for points, vectors, and planar frames. This is the next step.
-8. Build first supported Mate/Distance constraint equations over assembly-space planar targets.
+1. Add `AssemblyDocument`, `ComponentInstance`, and grounding. Implemented: `docs/component-instance-mvp5.md`.
+2. Add explicit component placement/state update APIs. Implemented: `docs/component-instance-mvp5.md`.
+3. Add semantic component targets and Mate/Concentric/Distance records. Implemented: `docs/assembly-constraint-model-intent-mvp5.md`.
+4. Persist and inspect constraints without changing component transforms. Implemented.
+5. Add a read-only active-constraint graph. Implemented: `docs/assembly-constraint-graph-mvp5.md`.
+6. Resolve supported generated-face targets to component-local planar descriptors. Implemented: `docs/assembly-constraint-target-resolution-mvp5.md`.
+7. Define and test explicit rigid-transform evaluation for points, vectors, and planar frames. Implemented: `docs/assembly-rigid-transform-evaluation-mvp5.md`.
+8. Build first supported planar Mate/Distance equation/residual descriptors. This is the next step.
 9. Add a rigid-body solver producing transforms and remaining DOF.
-10. Add solved-state JSON records only where they are not regenerable cache data; model intent remains primary.
-11. Add semantic axis references and Concentric/Insert integration with hole axes / fastener patterns.
+10. Add solved-state JSON records only where data is not safely regenerable.
+11. Add semantic axis references and Concentric/Insert integration.
 12. Add joints and limits, then motion via the solver.
-13. Add subassemblies (rigid first, flexible later) and collision checks.
+13. Add rigid subassemblies first, flexible subassemblies later, and collision checks.
 
 ## Out of scope for the first versions
 
-- geometric constraint solving before stable constraint records, semantic targets, graph structure, supported target resolution, and explicit transform evaluation exist
+- solver mutation before stable records, semantic targets, connectivity, transform evaluation, and equation construction exist
 - joints, motion, and limits before the rigid solver is stable
 - flexible subassemblies
-- collision/interference analysis beyond a simple static check
+- collision/interference analysis beyond a later simple static check
 
 ## Role in the system
 
-The assembly system connects part modeling, parameters, the hole wizard, the shaft wizard, standard parts, patterns, and motion analysis. A subassembly is itself an assembly used as a component. The goal is assemblies defined by traceable constraints, not just visually stacked bodies.
+The assembly system connects part modeling, parameters, future hole and shaft assistants, standard parts, patterns, and motion analysis. A subassembly is itself an assembly used as a component. The goal is assemblies defined by traceable semantic relationships and deterministic solve logic, not only visually stacked bodies.

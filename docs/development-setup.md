@@ -84,6 +84,12 @@ Run only the read-only semantic assembly target resolution tests after a geometr
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-target]"
 ```
 
+Run only the assembly rigid-transform evaluation tests after a geometry build:
+
+```bash
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-transform]"
+```
+
 The build directories are defined by `CMakePresets.json` as `build/dev`, `build/dev-geometry`, and `build/release`.
 
 ## Test coverage
@@ -99,6 +105,7 @@ At a high level, the current suites cover:
 - assembly Mate/Concentric/Distance constraint intent, semantic component targets, validation, transform immutability, project structure, and JSON roundtrip
 - read-only active-constraint graph nodes/edges, inactive filtering, multi-edges, deterministic adjacency, connected groups, isolated nodes, and unchanged assembly intent
 - read-only generated-face assembly target resolution, explicit unsupported-family failures, deterministic local planar descriptors, separate placement intent, and unchanged project model intent
+- explicit assembly rigid-transform evaluation for points, vectors, and planar frames, including identity, translation, right-handed single-axis rotations, combined-axis order, length/orthogonality preservation, determinism, and read-only behavior
 - part, assembly, and project model-intent serialization/file workflows
 - optional OCCT workplane resolution, profile geometry, recompute execution, shape caching, and STEP export
 
@@ -131,7 +138,7 @@ blcad_inspect_project_components <input.blcad.project.json>
 
 The component inspector is read-only. It validates project assembly structure, prints component references and placement/state values, prints stored assembly constraint type/state/semantic targets plus Distance values, builds the derived `AssemblyConstraintGraph`, and prints active-edge and deterministic connected-group summaries.
 
-Assembly target resolution is currently a geometry-library API with focused tests; it has no dedicated CLI consumer yet.
+Assembly target resolution and rigid-transform evaluation are currently geometry-library APIs with focused tests; they have no dedicated CLI consumer yet.
 
 ## Documentation entry points
 
@@ -144,7 +151,8 @@ Use these documents as the maintained status entry points:
 - `docs/assembly-constraint-model-intent-mvp5.md`: implemented semantic Mate/Concentric/Distance record layer
 - `docs/assembly-constraint-graph-mvp5.md`: implemented read-only active-constraint connectivity graph
 - `docs/assembly-constraint-target-resolution-mvp5.md`: implemented read-only generated-face assembly target resolution
-- `docs/assembly-system.md`: transform evaluation, solver, DOF, and joint roadmap
+- `docs/assembly-rigid-transform-evaluation-mvp5.md`: implemented local-to-assembly rigid-transform convention and evaluator
+- `docs/assembly-system.md`: equation construction, solver, DOF, and joint roadmap
 - `docs/file-format.md`: persisted model-intent format
 - `docs/project-goal.md`: long-term project goal
 
@@ -157,13 +165,12 @@ Project formatting is configured through:
 - `.editorconfig`
 - `.clang-format`
 
-Use `clang-format` for changed C++ files before committing. For example:
+Use `clang-format` for changed C++ files before committing. For the transform-evaluation block:
 
 ```bash
-clang-format -i include/blcad/geometry/assembly_constraint_target_resolver.hpp \
-  include/blcad/geometry/workplane_resolver.hpp \
-  src/geometry/assembly_constraint_target_resolver.cpp src/geometry/workplane_resolver.cpp \
-  tests/geometry/assembly_constraint_target_resolver_tests.cpp
+clang-format -i include/blcad/geometry/assembly_transform_evaluator.hpp \
+  src/geometry/assembly_transform_evaluator.cpp \
+  tests/geometry/assembly_transform_evaluator_tests.cpp
 ```
 
 ## Clean generated files
@@ -176,18 +183,21 @@ rm -rf build/
 
 ## Current development boundaries
 
-The current implementation already includes the parametric bolt circle, richer sketch/profile blocks, assembly parameters, the project container, component instances, explicit free-placement/state updates, solver-independent Mate/Concentric/Distance assembly constraint records, the read-only active-constraint graph, and read-only generated-face assembly target resolution. Those capabilities must not be listed as future or missing in current-status documentation.
+The current implementation already includes the parametric bolt circle, richer sketch/profile blocks, assembly parameters, the project container, component instances, explicit free-placement/state updates, solver-independent Mate/Concentric/Distance assembly constraint records, the read-only active-constraint graph, read-only generated-face assembly target resolution, and explicit component-local-to-assembly-space rigid-transform evaluation. Those capabilities must not be listed as future or missing in current-status documentation.
 
 The current assembly boundary is deliberate:
 
-- component transforms are explicit free-placement model intent, not solver output
+- component transforms remain explicit free-placement model intent, not solver output
 - grounding, visibility, and suppression are stored state and are not yet enforced by assembly consumers
 - semantic constraint target tokens are persisted; the optional geometry layer resolves only the supported generated-face family
-- generated-face targets resolve to component-local planar descriptors while the component `RigidTransform` remains separate placement intent
-- no explicit assembly rotation order or local-to-assembly-space transform evaluator exists yet
-- graph connectivity and resolved target descriptors are derived data and are not persisted
-- the next block is explicit assembly rigid-transform evaluation for points, vectors, and planar frames
-- no constraint equations, rigid-body solver, remaining-DOF computation, overconstraint analysis, collision analysis, subassemblies, or assembly-level STEP export exists yet
+- generated-face targets resolve to component-local planar descriptors plus separate placement intent
+- `AssemblyTransformEvaluator` interprets `rotation_deg` as active right-handed fixed-axis X-then-Y-then-Z rotations, equivalent to `Rz * Ry * Rx` for column vectors
+- points are rotated and translated; vectors, axes, and normals are rotated only
+- assembly-space planar descriptors are derived from local target frames and persisted placement
+- graph connectivity, target descriptors, and evaluated assembly-space frames are derived and are not persisted
+- the next block is read-only planar Mate/Distance equation/residual construction
+- no rigid-body solver, solved transform mutation, remaining-DOF computation, overconstraint analysis, enforced grounding, collision analysis, subassemblies, or assembly-level STEP export exists yet
+- semantic axis references and Concentric equation construction remain deferred
 - persistent model references must remain semantic; raw OCCT topology ids are not core model intent
 - no GUI code should own CAD logic
 
