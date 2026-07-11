@@ -1,5 +1,6 @@
 #pragma once
 
+#include "blcad/core/assembly_constraint.hpp"
 #include "blcad/core/assembly_document.hpp"
 #include "blcad/core/part_document.hpp"
 #include "blcad/core/recompute_plan.hpp"
@@ -39,9 +40,9 @@ private:
 };
 
 // Project-level container for one explicit root assembly, project-owned child
-// assembly documents, and owned part documents. Component placement/state,
-// rigid subassembly occurrence intent, constraints, and joints are persistent;
-// hierarchy traversal and numeric solve/motion state stay derived.
+// assembly documents, owned part documents, and project-level cross-hierarchy
+// geometric relationship intent. Hierarchy traversal, target resolution, graph
+// connectivity, and numeric solve/motion state stay derived.
 class Project {
 public:
   [[nodiscard]] static Result<Project> create(DocumentId id, std::string name,
@@ -50,6 +51,8 @@ public:
   [[nodiscard]] Result<std::size_t> add_part_document(PartDocument part_document);
   [[nodiscard]] Result<std::size_t>
   add_child_assembly_document(AssemblyDocument assembly_document);
+  [[nodiscard]] Result<std::size_t>
+  add_cross_hierarchy_constraint(AssemblyHierarchyConstraint constraint);
   [[nodiscard]] Result<std::size_t> validate_member_parts() const;
   [[nodiscard]] Result<std::size_t> validate_component_instances() const;
   [[nodiscard]] Result<std::size_t> validate_assembly_constraints() const;
@@ -72,6 +75,14 @@ public:
   [[nodiscard]] std::size_t child_assembly_document_count() const noexcept;
   [[nodiscard]] const AssemblyDocument* find_assembly_document(DocumentId id) const noexcept;
   [[nodiscard]] AssemblyDocument* find_assembly_document(DocumentId id) noexcept;
+  [[nodiscard]] const std::vector<AssemblyHierarchyConstraint>&
+  cross_hierarchy_constraints() const noexcept;
+  [[nodiscard]] std::vector<AssemblyHierarchyConstraint>& cross_hierarchy_constraints() noexcept;
+  [[nodiscard]] std::size_t cross_hierarchy_constraint_count() const noexcept;
+  [[nodiscard]] const AssemblyHierarchyConstraint*
+  find_cross_hierarchy_constraint(AssemblyConstraintId id) const noexcept;
+  [[nodiscard]] AssemblyHierarchyConstraint*
+  find_cross_hierarchy_constraint(AssemblyConstraintId id) noexcept;
   [[nodiscard]] const std::vector<PartDocument>& part_documents() const noexcept;
   [[nodiscard]] std::vector<PartDocument>& part_documents() noexcept;
   [[nodiscard]] std::size_t part_document_count() const noexcept;
@@ -88,6 +99,7 @@ private:
   std::string name_;
   AssemblyDocument assembly_;
   std::vector<AssemblyDocument> child_assembly_documents_;
+  std::vector<AssemblyHierarchyConstraint> cross_hierarchy_constraints_;
   std::vector<PartDocument> part_documents_;
 };
 
