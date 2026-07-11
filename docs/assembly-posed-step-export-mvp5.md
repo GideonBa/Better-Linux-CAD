@@ -73,6 +73,20 @@ The following are derived and unpersisted:
 
 No assembly geometry cache, STEP entity identity, or transformed BRep is written into `Project`, `AssemblyDocument`, or `ComponentInstance`.
 
+## Repeat-export contract
+
+Determinism is defined at the BLCAD assembly and resulting geometry boundary, not as byte-identical STEP serialization from independent OCCT writer sessions.
+
+For one unchanged project, repeated exports must rebuild the same ordered component set and re-import as geometrically equivalent STEP shapes. The focused coverage compares:
+
+```text
+solid count
+volume
+axis-aligned bounding box
+```
+
+This deliberately avoids treating STEP entity numbers, entity ordering, or writer-session serialization details as persistent BLCAD identity. `STEPControl_Writer` remains the exchange-format boundary; BLCAD does not persist or compare STEP entity ids.
+
 ## Headless end-to-end example
 
 `blcad_export_posed_assembly` executes the full current assembly path:
@@ -111,7 +125,7 @@ The example contains two occurrences of one rectangular plate. One occurrence is
 - compound solid count and total volume for repeated instances;
 - exported STEP bounding-box correctness for Z rotation followed by translation;
 - hidden and suppressed occurrence exclusion;
-- deterministic repeated STEP `DATA` sections;
+- repeated STEP exports re-importing with equal solid count, volume, and bounding box;
 - failure on an unresolvable project member;
 - failure when a referenced part recomputes without a final shape.
 
