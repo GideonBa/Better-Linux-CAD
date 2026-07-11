@@ -1,12 +1,12 @@
 # Assembly Rigid-Transform Evaluation MVP-5
 
-Status: implemented deterministic read-only component-local-to-assembly-space evaluation for persisted `RigidTransform` values. The solver and local DOF diagnostics both evaluate candidate geometry through this exact convention.
+Status: implemented deterministic read-only component-local-to-assembly-space evaluation for points, vectors, planar frames, and generated axis lines under persisted `RigidTransform` values.
 
 ## Goal
 
 This block gives persisted component placement one explicit geometry meaning.
 
-It maps component-local points, vectors, and planar frames into assembly coordinates without mutating component records or persisting evaluated geometry.
+It maps component-local geometry descriptors into assembly coordinates without mutating component records or persisting evaluated geometry.
 
 ## API
 
@@ -17,13 +17,18 @@ AssemblySpacePlanarDescriptor
   y_axis
   normal
 
+AssemblySpaceAxisDescriptor
+  origin
+  direction
+
 AssemblyTransformEvaluator
   evaluate_point(RigidTransform, Point3)
   evaluate_vector(RigidTransform, Vector3)
   evaluate_plane(RigidTransform, ComponentLocalPlanarDescriptor)
+  evaluate_axis(RigidTransform, ComponentLocalAxisDescriptor)
 ```
 
-`AssemblySpacePlanarDescriptor` is distinct from `ComponentLocalPlanarDescriptor` so coordinate space remains explicit in the API.
+Distinct local and assembly-space descriptor types make coordinate space explicit.
 
 ## Persisted transform record
 
@@ -33,11 +38,9 @@ RigidTransform
   rotation_deg
 ```
 
-Translation values are millimeters.
+Translation components are millimeters. Rotation components are degrees.
 
-Rotation values are degrees.
-
-The evaluator does not infer radians and does not introduce a quaternion or matrix as alternate persisted placement intent.
+No matrix or quaternion is alternative persisted placement intent.
 
 ## Canonical rotation convention
 
@@ -58,8 +61,6 @@ For column vectors:
 R = Rz(rz) * Ry(ry) * Rx(rx)
 ```
 
-The implementation applies elementary rotations directly rather than depending on a third-party Euler convention.
-
 Positive 90-degree examples:
 
 ```text
@@ -68,43 +69,71 @@ Ry: +Z -> +X
 Rz: +X -> +Y
 ```
 
-## Point and vector evaluation
+The implementation applies elementary rotations directly rather than depending on an external library's implicit Euler convention.
 
-For component-local point `p`:
+## Point evaluation
 
 ```text
 p_assembly = Rz * Ry * Rx * p_local + translation_mm
 ```
 
-For component-local vector `v`:
+Rotation is applied first. Translation is applied second.
+
+## Vector evaluation
 
 ```text
 v_assembly = Rz * Ry * Rx * v_local
 ```
 
-Translation is applied to points only.
+Translation is not applied to vectors.
 
-The vector rule also applies to basis axes, planar normals, and the future semantic-axis direction vector.
+The same rule applies to basis axes, normals, and semantic axis directions.
+
+Rigid rotation preserves vector magnitude within floating-point tolerance.
 
 ## Planar-frame evaluation
 
 ```text
-ComponentLocalPlanarDescriptor
-  origin
-  x_axis
-  y_axis
-  normal
-
--> AssemblySpacePlanarDescriptor
-  origin = evaluate_point(...)
-  x_axis = evaluate_vector(...)
-  y_axis = evaluate_vector(...)
-  normal = evaluate_vector(...)
+AssemblySpacePlanarDescriptor
+  origin = evaluate_point(transform, local_plane.origin)
+  x_axis = evaluate_vector(transform, local_plane.x_axis)
+  y_axis = evaluate_vector(transform, local_plane.y_axis)
+  normal = evaluate_vector(transform, local_plane.normal)
 ```
 
-Rigid rotation preserves vector magnitude and frame orthogonality within floating-point tolerance.
+Translation affects only the origin.
 
-## Combined-order proof
+Unit frame vectors remain unit length and orthogonality is preserved within floating-point tolerance.
+
+## Generated-axis evaluation
+
+```text
+AssemblySpaceAxisDescriptor
+  origin    = evaluate_point(transform, local_axis.origin)
+  direction = evaluate_vector(transform, local_axis.direction)
+```
+
+Therefore a component translation moves the axis line origin but cannot change its direction.
+
+A component rotation changes both the axis origin position and direction consistently under the same persisted X-then-Y-then-Z convention.
+
+Example:
+
+```text
+local axis origin = (4, -6, 0)
+local direction   = (0, 0, 1)
+translation       = (10, 20, 30)
+rotation_deg      = (90, 0, 0)
+```
+
+The result is:
+
+```text
+assembly origin    = (14, 20, 24)
+assembly direction = (0, -1, 0)
+```
+
+## Combined-axis order proof
 
 For:
 
@@ -121,94 +150,94 @@ Ry(90): (2, -3, -1)
 Rz(90): (3, 2, -1)
 ```
 
-Therefore:
+A different Euler order would generally produce a different result.
 
-```text
-v_assembly = (3, 2, -1)
-```
+## Semantic-target bridges
 
-The focused tests prove this combined order explicitly.
-
-## Assembly pipeline use
+Planar bridge:
 
 ```text
 AssemblyConstraintTarget
-  -> AssemblyConstraintTargetResolver
+  -> AssemblyConstraintTargetResolver::resolve
   -> ComponentLocalPlanarDescriptor + RigidTransform
-  -> AssemblyTransformEvaluator
+  -> evaluate_plane
   -> AssemblySpacePlanarDescriptor
-  -> AssemblyConstraintEquationBuilder
-  -> Mate/Distance residual descriptor
-  -> shared numeric system
-  -> AssemblyRigidBodySolver
-  -> AssemblySolveDiagnosticsAnalyzer
 ```
 
-The solver variable representation directly uses:
+Generated-axis bridge:
 
 ```text
-tx_mm, ty_mm, tz_mm, rx_deg, ry_deg, rz_deg
+AssemblyConstraintTarget feature.<feature-id>.axis
+  -> AssemblyConstraintTargetResolver::resolve_axis
+  -> ComponentLocalAxisDescriptor + RigidTransform
+  -> evaluate_axis
+  -> AssemblySpaceAxisDescriptor
 ```
 
-for each free component.
+Target resolution remains component-local and does not apply placement itself.
 
-Every solver residual evaluation and central finite-difference perturbation changes candidate `RigidTransform` values only on private project copies and then uses the normal target/equation/evaluator path.
+## Downstream use
 
-The shared numeric path is also reused by the DOF diagnostics. Rank is therefore measured from Jacobian sensitivities produced under the same persisted transform convention.
+Planar assembly-space frames feed:
 
-Neither solver nor diagnostics can silently use another Euler order.
+```text
+AssemblyConstraintEquationBuilder
+  -> Mate/Distance residuals
+  -> current shared numeric system
+  -> solver and DOF diagnostics
+```
+
+Assembly-space axes feed:
+
+```text
+AssemblyConcentricConstraintEquationBuilder
+  -> ConcentricResidualDescriptor
+```
+
+The Concentric residual path is implemented. Concentric numeric-system/solver/DOF integration is next.
 
 ## Valid transform boundary
 
-Component creation and explicit transform update paths reject non-finite transform components.
+`ComponentInstance` creation and transform updates reject non-finite transform components.
 
-The evaluator assumes a validated `RigidTransform` and remains a direct read-only geometry helper rather than returning `Result<T>`.
+The evaluator assumes a validated persisted `RigidTransform` and therefore remains a direct geometry helper rather than returning `Result<T>`.
 
-Numeric candidate transforms also pass through `AssemblyDocument::set_component_instance_transform` before residual evaluation.
+The current solver candidate path uses `AssemblyDocument::set_component_instance_transform`, so non-finite candidates cannot become valid project placement state.
 
 ## Read-only and persistence boundary
 
 Evaluation does not:
 
-- mutate input transforms or geometry descriptors
-- update a component occurrence
-- change component state
-- change constraints
-- recompute part intent
-- own a `ShapeCache`
+- mutate the input transform
+- mutate input points, vectors, planes, or axes
+- update a component instance
+- change assembly constraints
+- recompute a part
+- own or mutate `ShapeCache`
 - persist evaluated assembly-space geometry
 
-No matrix, quaternion, or evaluated-frame JSON field exists.
+Assembly-space planes and axes are regenerated from component-local semantic geometry plus persisted placement.
 
-Solver candidate transforms remain on private project copies. Only explicit application of a fresh converged solve result may update the existing persisted component transform field.
-
-Rank and remaining-DOF diagnostics are also unpersisted.
+No transform matrix, quaternion, evaluated-plane, or evaluated-axis JSON field is added.
 
 ## Tests
 
-`tests/geometry/assembly_transform_evaluator_tests.cpp` covers identity, translation, positive X/Y/Z rotations, combined order, end-to-end target resolution plus plane evaluation, deterministic repeated evaluation, input immutability, vector-length preservation, and frame orthogonality.
-
-Targeted command:
+Transform suite:
 
 ```bash
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-transform]"
 ```
 
-Solver and diagnostics tests separately verify that degree-variable orientation correction and Jacobian-rank evaluation continue through this convention:
+Axis/Concentric suite:
 
 ```bash
-./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-solver]"
-./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-diagnostics]"
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-concentric]"
 ```
 
-## Deliberate evaluator-layer limitations
-
-This evaluator does not own residual semantics, solver participation, Jacobian policy, optimization, transform application, or DOF classification. Those are separate downstream responsibilities.
-
-It currently exposes planar-frame evaluation but no distinct assembly-space axis descriptor API.
+Coverage includes identity, translation, single-axis rotations, combined rotation order, planar-frame preservation, arbitrary vector magnitude, generated-axis origin/direction mapping, input immutability, and downstream Concentric target evaluation.
 
 ## Current downstream boundary
 
-Jacobian-rank and remaining-DOF diagnostics are implemented and preserve this transform convention.
+Transform evaluation for semantic axes is implemented.
 
-The next assembly block is semantic generated-axis resolution and read-only Concentric residual construction. Axis point evaluation must use `evaluate_point` semantics and axis direction evaluation must use `evaluate_vector` semantics.
+The next assembly step is Concentric integration into the shared numeric residual/Jacobian path, rigid-body solver, and local remaining-DOF diagnostics. That integration must continue using this exact transform convention for every baseline and finite-difference evaluation.
