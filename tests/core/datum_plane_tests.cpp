@@ -38,3 +38,18 @@ TEST_CASE("DatumPlane rejects empty names", "[core][datum_plane]") {
   CHECK(plane.error().object_id() == "datum.xy");
   CHECK(plane.error().message() == "datum plane name must not be empty");
 }
+
+TEST_CASE("SemanticAxisReference exposes stable generated-axis identity",
+          "[core][semantic-axis]") {
+  const auto axis = SemanticAxisReference::create(FeatureId("feature.hole"));
+
+  REQUIRE(axis);
+  CHECK(axis.value().source_feature().value() == "feature.hole");
+  CHECK(axis.value().axis() == SemanticAxis::Primary);
+  CHECK(to_string(axis.value().axis()) == "axis");
+  CHECK(axis.value().node_id() == "feature.hole.axis");
+
+  const auto invalid = SemanticAxisReference::create(FeatureId());
+  REQUIRE(invalid.has_error());
+  CHECK(invalid.error().message() == "semantic axis source feature id must not be empty");
+}
