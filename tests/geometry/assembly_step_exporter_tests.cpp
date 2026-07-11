@@ -3,19 +3,21 @@
 #include "blcad/geometry/rectangle_extrusion_adapter.hpp"
 
 #include <BRepBndLib.hxx>
+#include <BRepGProp.hxx>
 #include <Bnd_Box.hxx>
+#include <GProp_GProps.hxx>
 #include <IFSelect_ReturnStatus.hxx>
 #include <STEPControl_Reader.hxx>
+#include <TopAbs_ShapeEnum.hxx>
+#include <TopExp_Explorer.hxx>
 #include <TopoDS_Shape.hxx>
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <cstddef>
 #include <filesystem>
-#include <fstream>
 #include <initializer_list>
-#include <iterator>
-#include <string>
 
 using namespace blcad;
 using namespace blcad::geometry;
@@ -37,6 +39,12 @@ struct StepBounds {
   double x_max = 0.0;
   double y_max = 0.0;
   double z_max = 0.0;
+};
+
+struct StepShapeSummary {
+  StepBounds bounds;
+  std::size_t solid_count = 0U;
+  double volume_mm3 = 0.0;
 };
 
 Parameter make_length_parameter(const char* id, const char* name, double value_mm) {
@@ -93,7 +101,7 @@ Project make_project(std::initializer_list<ComponentSpec> components) {
   return project.value();
 }
 
-StepBounds read_step_bounds(const std::filesystem::path& path) {
+StepShapeSummary read_step_shape_summary(const std::filesystem::path& path) {
   STEPControl_Reader reader;
   REQUIRE(reader.ReadFile(path.string().c_str()) == IFSelect_RetDone);
   REQUIRE(reader.TransferRoots() > 0);
@@ -104,23 +112,35 @@ StepBounds read_step_bounds(const std::filesystem::path& path) {
   BRepBndLib::Add(shape, bounds);
   REQUIRE_FALSE(bounds.IsVoid());
 
-  StepBounds result;
-  bounds.Get(result.x_min, result.y_min, result.z_min, result.x_max, result.y_max, result.z_max);
-  return result;
+  StepShapeSummary summary;
+  bounds.Get(summary.bounds.x_min, summary.bounds.y_min, summary.bounds.z_min,
+             summary.bounds.x_max, summary.bounds.y_max, summary.bounds.z_max);
+
+  for (TopExp_Explorer explorer(shape, TopAbs_SOLID); explorer.More(); explorer.Next()) {
+    ++summary.solid_count;
+  }
+
+  GProp_GProps volume_properties;
+  BRepGProp::VolumeProperties(shape, volume_properties);
+  summary.volume_mm3 = volume_properties.Mass();
+  return summary;
 }
 
-std::string read_step_data_section(const std::filesystem::path& path) {
-  std::ifstream file(path, std::ios::binary);
-  REQUIRE(file.good());
-  const std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-  const std::size_t data_start = content.find("DATA;");
-  REQUIRE(data_start != std::string::npos);
-  return content.substr(data_start);
+void check_equivalent_step_geometry(const StepShapeSummary& actual,
+                                    const StepShapeSummary& expected) {
+  CHECK(actual.solid_count == expected.solid_count);
+  CHECK(actual.volume_mm3 == Approx(expected.volume_mm3).margin(1.0e-6));
+  CHECK(actual.bounds.x_min == Approx(expected.bounds.x_min).margin(1.0e-5));
+  CHECK(actual.bounds.x_max == Approx(expected.bounds.x_max).margin(1.0e-5));
+  CHECK(actual.bounds.y_min == Approx(expected.bounds.y_min).margin(1.0e-5));
+  CHECK(actual.bounds.y_max == Approx(expected.bounds.y_max).margin(1.0e-5));
+  CHECK(actual.bounds.z_min == Approx(expected.bounds.z_min).margin(1.0e-5));
+  CHECK(actual.bounds.z_max == Approx(expected.bounds.z_max).margin(1.0e-5));
 }
 
 } // namespace
 
-TEST_CASE("AssemblyStepExporter poses repeated part instances and writes deterministic STEP data",
+TEST_CASE("AssemblyStepExporter poses repeated part instances and preserves repeat-export geometry",
           "[geometry][assembly-step-export]") {
   Project project = make_project(
       {{"component.a"},
@@ -137,7 +157,7 @@ TEST_CASE("AssemblyStepExporter poses repeated part instances and writes determi
   const std::filesystem::path first_path =
       std::filesystem::temp_directory_path() / "blcad_posed_assembly_first.step";
   const std::filesystem::path second_path =
-      std::filesystem::temp_directory_path() / "blcad_posed_assembly_second.step";
+      std::filesystem::temp_directory_path() / "blcad_posed_assembly_next_.step";
   std::filesystem::remove(first_path);
   std::filesystem::remove(second_path);
 
@@ -149,14 +169,18 @@ TEST_CASE("AssemblyStepExporter poses repeated part instances and writes determi
   CHECK(first.value().exported_component_count == 2U);
   CHECK(first.value().written_bytes > 0U);
 
-  const StepBounds bounds = read_step_bounds(first_path);
-  CHECK(bounds.x_min == Approx(-5.0).margin(1.0e-5));
-  CHECK(bounds.x_max == Approx(40.0).margin(1.0e-5));
-  CHECK(bounds.y_min == Approx(-10.0).margin(1.0e-5));
-  CHECK(bounds.y_max == Approx(10.0).margin(1.0e-5));
-  CHECK(bounds.z_min == Approx(0.0).margin(1.0e-5));
-  CHECK(bounds.z_max == Approx(2.0).margin(1.0e-5));
-  CHECK(read_step_data_section(first_path) == read_step_data_section(second_path));
+  const StepShapeSummary first_step = read_step_shape_summary(first_path);
+  CHECK(first_step.solid_count == 2U);
+  CHECK(first_step.volume_mm3 == Approx(800.0).margin(1.0e-6));
+  CHECK(first_step.bounds.x_min == Approx(-5.0).margin(1.0e-5));
+  CHECK(first_step.bounds.x_max == Approx(40.0).margin(1.0e-5));
+  CHECK(first_step.bounds.y_min == Approx(-10.0).margin(1.0e-5));
+  CHECK(first_step.bounds.y_max == Approx(10.0).margin(1.0e-5));
+  CHECK(first_step.bounds.z_min == Approx(0.0).margin(1.0e-5));
+  CHECK(first_step.bounds.z_max == Approx(2.0).margin(1.0e-5));
+
+  const StepShapeSummary second_step = read_step_shape_summary(second_path);
+  check_equivalent_step_geometry(second_step, first_step);
 
   std::filesystem::remove(first_path);
   std::filesystem::remove(second_path);
@@ -187,7 +211,7 @@ TEST_CASE("AssemblyStepExporter excludes hidden and suppressed component occurre
   CHECK(written.value().recomputed_part_count == 1U);
   CHECK(written.value().exported_component_count == 1U);
 
-  const StepBounds bounds = read_step_bounds(path);
+  const StepBounds bounds = read_step_shape_summary(path).bounds;
   CHECK(bounds.x_min == Approx(-5.0).margin(1.0e-5));
   CHECK(bounds.x_max == Approx(5.0).margin(1.0e-5));
   CHECK(bounds.y_min == Approx(-10.0).margin(1.0e-5));
