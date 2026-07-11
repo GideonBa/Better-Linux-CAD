@@ -325,6 +325,25 @@ TEST_CASE("Insert equation builder constructs canonical composite residuals",
     CHECK(equation.value().residual.signed_seating_separation_mm == Approx(0.0));
   }
 
+  SECTION("component placement evaluates both axis and seating plane in assembly space") {
+    Project project = make_project(
+        {{"component.a", identity_rigid_transform()},
+         {"component.b",
+          RigidTransform{Vector3{10.0, 20.0, 30.0}, Vector3{90.0, 0.0, 0.0}}}},
+        Point2{4.0, -6.0});
+    const AssemblyConstraint constraint = make_insert(
+        "constraint.transformed", "component.a", "feature.hole.seat", "component.b",
+        "feature.hole.seat");
+
+    const auto equation = builder.build(project, constraint);
+
+    REQUIRE(equation);
+    check_point(equation.value().target_b.axis.origin, Point3{14.0, 20.0, 24.0});
+    check_vector(equation.value().target_b.axis.direction, Vector3{0.0, -1.0, 0.0});
+    check_point(equation.value().target_b.seating_plane.origin, Point3{14.0, 20.0, 24.0});
+    check_vector(equation.value().target_b.seating_plane.normal, Vector3{0.0, -1.0, 0.0});
+  }
+
   SECTION("axial separation is an explicit signed seating residual") {
     Project project = make_project(
         {{"component.a", identity_rigid_transform()},
