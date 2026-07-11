@@ -6,7 +6,7 @@ Detailed architecture, feature contracts, and implementation status live in `doc
 
 ## Status
 
-Implemented seeds now cover single-part parametric modeling, semantic references and richer sketch/profile workflows, a parametric bolt-circle pattern, assembly parameters/project ownership, deterministic local Mate/Distance/Concentric/Insert/Angle solving, rank/remaining-DOF diagnostics, first Revolute joint motion, rigid nested assembly hierarchy, posed STEP export, interference/clearance analysis, document-scoped flexible child solving, occurrence-qualified read-only cross-hierarchy target/residual semantics, and persistent Project-owned cross-hierarchy geometric constraint intent.
+Implemented seeds now cover single-part parametric modeling, semantic references and richer sketch/profile workflows, a parametric bolt-circle pattern, assembly parameters/project ownership, deterministic local Mate/Distance/Concentric/Insert/Angle solving, rank/remaining-DOF diagnostics, first Revolute joint motion, rigid nested assembly hierarchy, posed STEP export, interference/clearance analysis, document-scoped flexible child solving, occurrence-qualified read-only cross-hierarchy target/residual semantics, persistent Project-owned cross-hierarchy geometric constraint intent, and backward-compatible cross-hierarchy project JSON with Core structure validation.
 
 There is no GUI yet. Current work remains focused on headless CAD-core and application contracts.
 
@@ -55,8 +55,9 @@ persistent cross-hierarchy relationship intent
   -> Core-owned AssemblyHierarchyConstraintEndpoint
   -> persistent AssemblyHierarchyConstraint
   -> Project-owned cross_hierarchy_constraints collection
-  -> same five relationship families and value-family rules
-  -> direct bridge into the read-only Geometry query layer
+  -> additive project JSON roundtrip
+  -> exact path and target-order preservation
+  -> Core-only occurrence-path/reached-component validation
 ```
 
 The cross-hierarchy architecture separates three identities:
@@ -74,11 +75,11 @@ persisted transform authority
 
 This matters for repeated occurrences of one child assembly. Two occurrences may have different root-space geometry while sharing one child-document `ComponentInstance::transform()` authority. They must not become independent numeric transform variables until occurrence-local internal pose overrides exist.
 
-Future cross-hierarchy solve connectivity is planned as relationship-to-transform-authority incidence. Local constraints remain one relationship per containing `AssemblyDocument`; project-level cross-hierarchy relationships retain exact occurrence-qualified endpoints.
+Future cross-hierarchy solve connectivity is relationship-to-transform-authority incidence. Local constraints remain one relationship per containing `AssemblyDocument`; project-level cross-hierarchy relationships retain exact occurrence-qualified endpoints.
 
-Block 23 intentionally stops before JSON. The new Core records exist in the in-memory model, but project save/load does not roundtrip them until Block 24.
+`cross_hierarchy_constraints[]` is now part of project JSON. Loading validates the ordinary project and assembly hierarchy first, then follows each exact authored endpoint path from the root and requires the addressed local component to exist in the reached assembly document. Semantic feature geometry remains unresolved until a Geometry consumer requests it.
 
-See `docs/assembly-cross-hierarchy-constraint-intent-mvp5.md` and `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`.
+See `docs/assembly-cross-hierarchy-constraint-intent-mvp5.md`, `docs/assembly-cross-hierarchy-constraint-json-mvp5.md`, and `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`.
 
 ## Technical basis
 
@@ -122,6 +123,7 @@ Focused current assembly tests:
 ./build/dev/blcad_core_tests "[core][assembly-hierarchy]"
 ./build/dev/blcad_core_tests "[core][assembly-leaf-occurrence]"
 ./build/dev/blcad_core_tests "[core][assembly-cross-hierarchy-intent]"
+./build/dev/blcad_core_tests "[core][assembly-cross-hierarchy-json]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-equation]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-transform]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-concentric]"
@@ -186,6 +188,7 @@ Current assembly handoff:
 - `docs/assembly-flexible-subassembly-solving-mvp5.md`
 - `docs/assembly-cross-hierarchy-relationship-semantics-mvp5.md`
 - `docs/assembly-cross-hierarchy-constraint-intent-mvp5.md`
+- `docs/assembly-cross-hierarchy-constraint-json-mvp5.md`
 - `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`
 
 Broader future roadmaps:
@@ -196,6 +199,6 @@ Broader future roadmaps:
 
 ## Next technical step
 
-Implement **Block 24 only** from `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`: add backward-compatible `cross_hierarchy_constraints[]` project JSON and fail-closed occurrence-path/reached-component structure validation.
+Implement **Block 25 only** from `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`: derive deterministic active relationship-to-`ComponentTransformAuthority` incidence and connected cross-hierarchy solve groups.
 
-Connectivity, numeric variables, solving, snapshots, proposals, diagnostics, and application remain later blocks.
+No numeric residual/Jacobian execution, solving, snapshots, proposals, diagnostics, or application belongs in Block 25.
