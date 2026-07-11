@@ -1,5 +1,7 @@
 #pragma once
 
+#include "blcad/core/assembly_constraint.hpp"
+#include "blcad/core/assembly_document.hpp"
 #include "blcad/core/project.hpp"
 #include "blcad/core/result.hpp"
 #include "blcad/core/spatial.hpp"
