@@ -3,6 +3,7 @@
 #include "blcad/geometry/assembly_concentric_constraint_equation_builder.hpp"
 #include "blcad/geometry/assembly_constraint_equation_builder.hpp"
 #include "blcad/geometry/assembly_insert_constraint_equation_builder.hpp"
+#include "blcad/geometry/assembly_revolute_joint_equation_builder.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -37,6 +38,113 @@ namespace {
              : options.finite_difference_rotation_step_deg;
 }
 
+[[nodiscard]] Result<std::size_t>
+append_constraint_residuals(const Project& project, const AssemblyConstraintId& constraint_id,
+                            double length_residual_scale_mm, NumericVector& residuals) {
+  const AssemblyConstraint* constraint = project.assembly().find_constraint(constraint_id);
+  if (constraint == nullptr) {
+    return Result<std::size_t>::failure(
+        internal_error(constraint_id.value(),
+                       "assembly numeric system graph constraint must exist in assembly"));
+  }
+
+  if (constraint->type() == AssemblyConstraintType::Concentric) {
+    const AssemblyConcentricConstraintEquationBuilder builder;
+    auto equation = builder.build(project, *constraint);
+    if (equation.has_error()) {
+      return Result<std::size_t>::failure(equation.error());
+    }
+    const ConcentricResidualDescriptor& concentric = equation.value().residual;
+    residuals.push_back(concentric.direction_parallelism.x);
+    residuals.push_back(concentric.direction_parallelism.y);
+    residuals.push_back(concentric.direction_parallelism.z);
+    residuals.push_back(concentric.axis_offset_mm.x / length_residual_scale_mm);
+    residuals.push_back(concentric.axis_offset_mm.y / length_residual_scale_mm);
+    residuals.push_back(concentric.axis_offset_mm.z / length_residual_scale_mm);
+    return Result<std::size_t>::success(6U);
+  }
+
+  if (constraint->type() == AssemblyConstraintType::Insert) {
+    const AssemblyInsertConstraintEquationBuilder builder;
+    auto equation = builder.build(project, *constraint);
+    if (equation.has_error()) {
+      return Result<std::size_t>::failure(equation.error());
+    }
+    const InsertResidualDescriptor& insert = equation.value().residual;
+    residuals.push_back(insert.direction_parallelism.x);
+    residuals.push_back(insert.direction_parallelism.y);
+    residuals.push_back(insert.direction_parallelism.z);
+    residuals.push_back(insert.axis_offset_mm.x / length_residual_scale_mm);
+    residuals.push_back(insert.axis_offset_mm.y / length_residual_scale_mm);
+    residuals.push_back(insert.axis_offset_mm.z / length_residual_scale_mm);
+    residuals.push_back(insert.signed_seating_separation_mm / length_residual_scale_mm);
+    return Result<std::size_t>::success(7U);
+  }
+
+  const AssemblyConstraintEquationBuilder builder;
+  auto equation = builder.build(project, *constraint);
+  if (equation.has_error()) {
+    return Result<std::size_t>::failure(equation.error());
+  }
+
+  if (const auto* mate = std::get_if<PlanarMateResidualDescriptor>(&equation.value().residual)) {
+    residuals.push_back(mate->normal_opposition.x);
+    residuals.push_back(mate->normal_opposition.y);
+    residuals.push_back(mate->normal_opposition.z);
+    residuals.push_back(mate->signed_separation_mm / length_residual_scale_mm);
+    return Result<std::size_t>::success(4U);
+  }
+
+  if (const auto* angle =
+          std::get_if<PlanarAngleResidualDescriptor>(&equation.value().residual)) {
+    residuals.push_back(angle->angle_alignment);
+    return Result<std::size_t>::success(1U);
+  }
+
+  const auto* distance = std::get_if<PlanarDistanceResidualDescriptor>(&equation.value().residual);
+  if (distance == nullptr) {
+    return Result<std::size_t>::failure(
+        internal_error(constraint_id.value(),
+                       "assembly numeric system received an unknown residual descriptor"));
+  }
+  residuals.push_back(distance->normal_parallelism.x);
+  residuals.push_back(distance->normal_parallelism.y);
+  residuals.push_back(distance->normal_parallelism.z);
+  residuals.push_back(distance->distance_residual_mm / length_residual_scale_mm);
+  return Result<std::size_t>::success(4U);
+}
+
+[[nodiscard]] Result<std::size_t>
+append_revolute_drive_residuals(const Project& project, const AssemblyRevoluteJointDrive& drive,
+                                double length_residual_scale_mm, NumericVector& residuals) {
+  const AssemblyJoint* joint = project.assembly().find_joint(drive.joint);
+  if (joint == nullptr) {
+    return Result<std::size_t>::failure(
+        internal_error(drive.joint.value(), "assembly numeric revolute drive joint must exist"));
+  }
+  auto requested = Quantity::angle_deg(drive.requested_coordinate_deg, drive.joint.value());
+  if (requested.has_error()) {
+    return Result<std::size_t>::failure(requested.error());
+  }
+
+  const AssemblyRevoluteJointEquationBuilder builder;
+  auto equation = builder.build(project, *joint, requested.value());
+  if (equation.has_error()) {
+    return Result<std::size_t>::failure(equation.error());
+  }
+  const RevoluteJointResidualDescriptor& revolute = equation.value().residual;
+  residuals.push_back(revolute.direction_parallelism.x);
+  residuals.push_back(revolute.direction_parallelism.y);
+  residuals.push_back(revolute.direction_parallelism.z);
+  residuals.push_back(revolute.axis_offset_mm.x / length_residual_scale_mm);
+  residuals.push_back(revolute.axis_offset_mm.y / length_residual_scale_mm);
+  residuals.push_back(revolute.axis_offset_mm.z / length_residual_scale_mm);
+  residuals.push_back(revolute.signed_seating_separation_mm / length_residual_scale_mm);
+  residuals.push_back(revolute.twist_alignment_sine);
+  residuals.push_back(revolute.twist_alignment_cosine);
+  return Result<std::size_t>::success(9U);
+}
+
 } // namespace
 
 Result<std::vector<AssemblyConstraintId>>
@@ -55,83 +163,32 @@ collect_constraint_ids(const AssemblyConstraintGraph& graph,
 Result<NumericVector> evaluate_residuals(const Project& project,
                                          const std::vector<AssemblyConstraintId>& constraint_ids,
                                          double length_residual_scale_mm) {
-  const AssemblyConstraintEquationBuilder planar_builder;
-  const AssemblyConcentricConstraintEquationBuilder concentric_builder;
-  const AssemblyInsertConstraintEquationBuilder insert_builder;
+  return evaluate_residuals(
+      project, AssemblyNumericRelationshipSet{constraint_ids, std::nullopt},
+      length_residual_scale_mm);
+}
+
+Result<NumericVector> evaluate_residuals(const Project& project,
+                                         const AssemblyNumericRelationshipSet& relationships,
+                                         double length_residual_scale_mm) {
   NumericVector residuals;
-  residuals.reserve(constraint_ids.size() * 7U);
+  residuals.reserve(relationships.constraint_ids.size() * 7U +
+                    (relationships.revolute_drive.has_value() ? 9U : 0U));
 
-  for (const auto& constraint_id : constraint_ids) {
-    const AssemblyConstraint* constraint = project.assembly().find_constraint(constraint_id);
-    if (constraint == nullptr) {
-      return Result<NumericVector>::failure(
-          internal_error(constraint_id.value(),
-                         "assembly numeric system graph constraint must exist in assembly"));
+  for (const auto& constraint_id : relationships.constraint_ids) {
+    auto appended =
+        append_constraint_residuals(project, constraint_id, length_residual_scale_mm, residuals);
+    if (appended.has_error()) {
+      return Result<NumericVector>::failure(appended.error());
     }
+  }
 
-    if (constraint->type() == AssemblyConstraintType::Concentric) {
-      auto equation = concentric_builder.build(project, *constraint);
-      if (equation.has_error()) {
-        return Result<NumericVector>::failure(equation.error());
-      }
-
-      const ConcentricResidualDescriptor& concentric = equation.value().residual;
-      residuals.push_back(concentric.direction_parallelism.x);
-      residuals.push_back(concentric.direction_parallelism.y);
-      residuals.push_back(concentric.direction_parallelism.z);
-      residuals.push_back(concentric.axis_offset_mm.x / length_residual_scale_mm);
-      residuals.push_back(concentric.axis_offset_mm.y / length_residual_scale_mm);
-      residuals.push_back(concentric.axis_offset_mm.z / length_residual_scale_mm);
-      continue;
+  if (relationships.revolute_drive.has_value()) {
+    auto appended = append_revolute_drive_residuals(
+        project, relationships.revolute_drive.value(), length_residual_scale_mm, residuals);
+    if (appended.has_error()) {
+      return Result<NumericVector>::failure(appended.error());
     }
-
-    if (constraint->type() == AssemblyConstraintType::Insert) {
-      auto equation = insert_builder.build(project, *constraint);
-      if (equation.has_error()) {
-        return Result<NumericVector>::failure(equation.error());
-      }
-
-      const InsertResidualDescriptor& insert = equation.value().residual;
-      residuals.push_back(insert.direction_parallelism.x);
-      residuals.push_back(insert.direction_parallelism.y);
-      residuals.push_back(insert.direction_parallelism.z);
-      residuals.push_back(insert.axis_offset_mm.x / length_residual_scale_mm);
-      residuals.push_back(insert.axis_offset_mm.y / length_residual_scale_mm);
-      residuals.push_back(insert.axis_offset_mm.z / length_residual_scale_mm);
-      residuals.push_back(insert.signed_seating_separation_mm / length_residual_scale_mm);
-      continue;
-    }
-
-    auto equation = planar_builder.build(project, *constraint);
-    if (equation.has_error()) {
-      return Result<NumericVector>::failure(equation.error());
-    }
-
-    if (const auto* mate = std::get_if<PlanarMateResidualDescriptor>(&equation.value().residual)) {
-      residuals.push_back(mate->normal_opposition.x);
-      residuals.push_back(mate->normal_opposition.y);
-      residuals.push_back(mate->normal_opposition.z);
-      residuals.push_back(mate->signed_separation_mm / length_residual_scale_mm);
-      continue;
-    }
-
-    if (const auto* angle =
-            std::get_if<PlanarAngleResidualDescriptor>(&equation.value().residual)) {
-      residuals.push_back(angle->angle_alignment);
-      continue;
-    }
-
-    const auto* distance =
-        std::get_if<PlanarDistanceResidualDescriptor>(&equation.value().residual);
-    if (distance == nullptr) {
-      return Result<NumericVector>::failure(
-          internal_error(constraint_id.value(),
-                         "assembly numeric system received an unknown residual descriptor"));
-    }
-    residuals.push_back(distance->normal_parallelism.x);
-    residuals.push_back(distance->normal_parallelism.y);
-    residuals.push_back(distance->normal_parallelism.z);
-    residuals.push_back(distance->distance_residual_mm / length_residual_scale_mm);
   }
 
   return Result<NumericVector>::success(std::move(residuals));
@@ -197,6 +254,15 @@ Result<NumericMatrix> build_central_difference_jacobian(
     const Project& project, const std::vector<ComponentInstanceId>& variable_components,
     const std::vector<AssemblyConstraintId>& constraint_ids, const NumericVector& variables,
     const NumericVector& baseline_residuals, const AssemblyNumericSystemOptions& options) {
+  return build_central_difference_jacobian(
+      project, variable_components, AssemblyNumericRelationshipSet{constraint_ids, std::nullopt},
+      variables, baseline_residuals, options);
+}
+
+Result<NumericMatrix> build_central_difference_jacobian(
+    const Project& project, const std::vector<ComponentInstanceId>& variable_components,
+    const AssemblyNumericRelationshipSet& relationships, const NumericVector& variables,
+    const NumericVector& baseline_residuals, const AssemblyNumericSystemOptions& options) {
   NumericMatrix jacobian(baseline_residuals.size(), NumericVector(variables.size(), 0.0));
 
   for (std::size_t column = 0U; column < variables.size(); ++column) {
@@ -212,7 +278,7 @@ Result<NumericMatrix> build_central_difference_jacobian(
       return Result<NumericMatrix>::failure(plus_applied.error());
     }
     auto plus_residuals =
-        evaluate_residuals(plus_project, constraint_ids, options.length_residual_scale_mm);
+        evaluate_residuals(plus_project, relationships, options.length_residual_scale_mm);
     if (plus_residuals.has_error()) {
       return Result<NumericMatrix>::failure(plus_residuals.error());
     }
@@ -223,7 +289,7 @@ Result<NumericMatrix> build_central_difference_jacobian(
       return Result<NumericMatrix>::failure(minus_applied.error());
     }
     auto minus_residuals =
-        evaluate_residuals(minus_project, constraint_ids, options.length_residual_scale_mm);
+        evaluate_residuals(minus_project, relationships, options.length_residual_scale_mm);
     if (minus_residuals.has_error()) {
       return Result<NumericMatrix>::failure(minus_residuals.error());
     }
