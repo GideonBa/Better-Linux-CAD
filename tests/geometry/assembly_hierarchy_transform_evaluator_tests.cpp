@@ -46,3 +46,4 @@ TEST_CASE("Hierarchical transform order is not treated as commutative",
 }
 
 #include "assembly_flexible_subassembly_solver_tests.inc"
+#include "assembly_hierarchy_constraint_equation_builder_tests.inc"
