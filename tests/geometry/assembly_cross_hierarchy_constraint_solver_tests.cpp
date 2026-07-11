@@ -4,8 +4,10 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <initializer_list>
 #include <optional>
 #include <utility>
+#include <variant>
 #include <vector>
 
 using namespace blcad;
@@ -114,7 +116,8 @@ Quantity angle(double value_deg, const char* id) {
 
 AssemblyHierarchyConstraint cross_constraint(
     const char* id, AssemblyConstraintType type, AssemblyHierarchyConstraintEndpoint target_a,
-    AssemblyHierarchyConstraintEndpoint target_b, std::optional<Quantity> distance_value = std::nullopt,
+    AssemblyHierarchyConstraintEndpoint target_b,
+    std::optional<Quantity> distance_value = std::nullopt,
     std::optional<Quantity> angle_value = std::nullopt,
     AssemblyConstraintState state = AssemblyConstraintState::Active) {
   auto constraint = AssemblyHierarchyConstraint::create(
@@ -125,7 +128,8 @@ AssemblyHierarchyConstraint cross_constraint(
 }
 
 AssemblyConstraintTarget local_target(const char* component_id, const char* semantic_reference) {
-  auto target = AssemblyConstraintTarget::create(ComponentInstanceId(component_id), semantic_reference);
+  auto target =
+      AssemblyConstraintTarget::create(ComponentInstanceId(component_id), semantic_reference);
   REQUIRE(target);
   return target.value();
 }
@@ -169,6 +173,11 @@ Project single_child_project(
   return project.value();
 }
 
+void add_cross(Project& project, AssemblyHierarchyConstraint constraint) {
+  REQUIRE(project.add_cross_hierarchy_constraint(std::move(constraint)));
+  REQUIRE(project.validate_assembly_structure());
+}
+
 AssemblyCrossHierarchySolveGroup only_group(const Project& project) {
   auto graph = AssemblyCrossHierarchyConstraintGraph::build(project);
   REQUIRE(graph);
@@ -183,9 +192,30 @@ AssemblyCrossHierarchySolveResult solve_only_group(const Project& project) {
   return result.value();
 }
 
-void add_cross(Project& project, AssemblyHierarchyConstraint constraint) {
-  REQUIRE(project.add_cross_hierarchy_constraint(std::move(constraint)));
-  REQUIRE(project.validate_assembly_structure());
+Project repeated_occurrence_project(bool reverse_relationship_insertion = false) {
+  Project project = single_child_project(
+      identity_rigid_transform(), ComponentGroundingState::Grounded,
+      ComponentGroundingState::Free, identity_rigid_transform(), true,
+      RigidTransform{Vector3{0.0, 0.0, 10.0}, Vector3{}});
+
+  std::vector<AssemblyHierarchyConstraint> constraints;
+  constraints.push_back(cross_constraint(
+      "constraint.cross.anchor", AssemblyConstraintType::Distance,
+      endpoint({}, "component.root", "feature.base_extrude.top"),
+      endpoint({"subassembly.left"}, "component.child", "feature.base_extrude.top"),
+      distance(20.0, "constraint.cross.anchor")));
+  constraints.push_back(cross_constraint(
+      "constraint.cross.same_authority", AssemblyConstraintType::Distance,
+      endpoint({"subassembly.left"}, "component.child", "feature.base_extrude.top"),
+      endpoint({"subassembly.right"}, "component.child", "feature.base_extrude.top"),
+      distance(10.0, "constraint.cross.same_authority")));
+  if (reverse_relationship_insertion) {
+    std::reverse(constraints.begin(), constraints.end());
+  }
+  for (AssemblyHierarchyConstraint& constraint : constraints) {
+    add_cross(project, std::move(constraint));
+  }
+  return project;
 }
 
 } // namespace
@@ -261,9 +291,9 @@ TEST_CASE("Cross-hierarchy numeric solver flattens all five relationship familie
                                            ComponentGroundingState::Grounded);
     add_cross(project, cross_constraint(
                            "constraint.cross.insert", AssemblyConstraintType::Insert,
-                           endpoint({}, "component.root", "feature.hole.axis"),
+                           endpoint({}, "component.root", "feature.hole.seat"),
                            endpoint({"subassembly.left"}, "component.child",
-                                    "feature.hole.axis")));
+                                    "feature.hole.seat")));
     const auto result = solve_only_group(project);
     CHECK(result.converged());
     CHECK(result.residual_summary.residual_component_count == 7U);
@@ -297,12 +327,13 @@ TEST_CASE("Cross-hierarchy numeric solver converges through authority-scoped var
   REQUIRE(result.authority_snapshots.size() == 2U);
   REQUIRE(result.fixed_authorities.size() == 1U);
   REQUIRE(result.proposed_transforms.size() == 1U);
-  CHECK(result.fixed_authorities.front() ==
-        ComponentTransformAuthority{DocumentId("assembly.root"),
-                                    ComponentInstanceId("component.root")});
-  CHECK(result.proposed_transforms.front().authority ==
-        ComponentTransformAuthority{DocumentId("assembly.child"),
-                                    ComponentInstanceId("component.child")});
+
+  const ComponentTransformAuthority expected_root_authority{
+      DocumentId("assembly.root"), ComponentInstanceId("component.root")};
+  const ComponentTransformAuthority expected_child_authority{
+      DocumentId("assembly.child"), ComponentInstanceId("component.child")};
+  CHECK(result.fixed_authorities.front() == expected_root_authority);
+  CHECK(result.proposed_transforms.front().authority == expected_child_authority);
   CHECK(result.proposed_transforms.front().proposed_transform.translation_mm.z ==
         Approx(20.0).margin(1.0e-5));
   CHECK(result.residual_summary.final_rms <= 1.0e-8);
@@ -361,32 +392,6 @@ TEST_CASE("Cross-hierarchy numeric solver evaluates nested endpoints through exa
         Approx(8.0).margin(1.0e-5));
 }
 
-Project repeated_occurrence_project(bool reverse_relationship_insertion = false) {
-  Project project = single_child_project(
-      identity_rigid_transform(), ComponentGroundingState::Grounded,
-      ComponentGroundingState::Free, identity_rigid_transform(), true,
-      RigidTransform{Vector3{0.0, 0.0, 10.0}, Vector3{}});
-
-  std::vector<AssemblyHierarchyConstraint> constraints;
-  constraints.push_back(cross_constraint(
-      "constraint.cross.anchor", AssemblyConstraintType::Distance,
-      endpoint({}, "component.root", "feature.base_extrude.top"),
-      endpoint({"subassembly.left"}, "component.child", "feature.base_extrude.top"),
-      distance(20.0, "constraint.cross.anchor")));
-  constraints.push_back(cross_constraint(
-      "constraint.cross.same_authority", AssemblyConstraintType::Distance,
-      endpoint({"subassembly.left"}, "component.child", "feature.base_extrude.top"),
-      endpoint({"subassembly.right"}, "component.child", "feature.base_extrude.top"),
-      distance(10.0, "constraint.cross.same_authority")));
-  if (reverse_relationship_insertion) {
-    std::reverse(constraints.begin(), constraints.end());
-  }
-  for (AssemblyHierarchyConstraint& constraint : constraints) {
-    add_cross(project, std::move(constraint));
-  }
-  return project;
-}
-
 TEST_CASE("Cross-hierarchy numeric solver shares one variable block across repeated occurrences",
           "[geometry][assembly-cross-hierarchy-solver]") {
   const Project project = repeated_occurrence_project();
@@ -398,9 +403,10 @@ TEST_CASE("Cross-hierarchy numeric solver shares one variable block across repea
   REQUIRE(result);
   REQUIRE(result.value().converged());
   REQUIRE(result.value().proposed_transforms.size() == 1U);
-  CHECK(result.value().proposed_transforms.front().authority ==
-        ComponentTransformAuthority{DocumentId("assembly.child"),
-                                    ComponentInstanceId("component.child")});
+
+  const ComponentTransformAuthority expected_child_authority{
+      DocumentId("assembly.child"), ComponentInstanceId("component.child")};
+  CHECK(result.value().proposed_transforms.front().authority == expected_child_authority);
   CHECK(result.value().proposed_transforms.front().proposed_transform.translation_mm.z ==
         Approx(20.0).margin(1.0e-5));
   CHECK(result.value().residual_summary.residual_component_count == 8U);
@@ -455,9 +461,9 @@ TEST_CASE("Cross-hierarchy numeric solver combines local and cross residuals in 
   CHECK(result.converged());
   CHECK(result.residual_summary.residual_component_count == 8U);
   REQUIRE(result.proposed_transforms.size() == 1U);
-  CHECK(result.proposed_transforms.front().authority ==
-        ComponentTransformAuthority{DocumentId("assembly.child"),
-                                    ComponentInstanceId("component.child")});
+  const ComponentTransformAuthority expected_child_authority{
+      DocumentId("assembly.child"), ComponentInstanceId("component.child")};
+  CHECK(result.proposed_transforms.front().authority == expected_child_authority);
 }
 
 TEST_CASE("Cross-hierarchy numeric solver enforces current group and grounded-reference contracts",
