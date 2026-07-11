@@ -144,7 +144,7 @@ Implemented scope:
 - assembly/project reference validation
 - copy-style `ComponentInstance::with_*` operations preserving identity and referenced part intent
 - explicit transform, visibility, suppression, and grounding updates
-- direct transform edits while grounded, preserving the deliberate no-solver boundary
+- direct transform edits while grounded, preserving the deliberate storage-layer boundary
 - assembly/project JSON roundtrip for component placement/state
 - shared owned `PartDocument` intent across repeated component occurrences
 - checked-in `examples/component_instances.blcad.project.json`
@@ -263,34 +263,64 @@ Implemented scope:
 - no transform, constraint, or part-intent mutation
 - focused tests for satisfied/unsatisfied Mate, transformed target geometry, satisfied/unsatisfied Distance, target-order sign, unsupported families, determinism, and read-only behavior
 
-Still deferred after equation construction:
+## Implemented block: MVP 5 first rigid-body assembly solver seed
 
-- rigid-body solving and solved transform updates
-- residual Jacobians, weighting, convergence tolerances, and nonlinear solve policy
-- remaining DOF and under/fully/overconstrained analysis
-- enforced grounding and suppression participation rules
-- semantic axis references and Concentric equation construction
+Detailed document: `docs/assembly-rigid-body-solver-mvp5.md`
+
+Implemented scope:
+
+- `AssemblyRigidBodySolver` over one exact deterministic `AssemblyConstraintGraph` connected group
+- at least one grounded component required as an absolute fixed reference
+- every grounded component treated as fixed
+- multiple grounded components allowed
+- satisfied all-grounded groups return `Converged`
+- inconsistent all-grounded groups return `FixedGeometryInconsistent`
+- suppressed group components rejected explicitly in the first seed
+- visibility excluded from solver participation policy
+- direct six-variable `RigidTransform` representation per free component: `tx,ty,tz,rx_deg,ry_deg,rz_deg`
+- lexicographic free-component variable ordering
+- lexicographic `AssemblyConstraintId` residual ordering inherited from the graph
+- four flattened components per supported Mate/Distance residual
+- explicit `1 mm` default length-residual scale before mixing length and orientation residuals
+- central finite-difference Jacobian with separate translation/rotation perturbation steps
+- damped Gauss-Newton normal equations
+- partial-pivot Gaussian elimination
+- deterministic backtracking line search and damping escalation
+- explicit convergence RMS and maximum-iteration policy
+- `Converged`, `MaximumIterationsReached`, `FixedGeometryInconsistent`, and `NumericalFailure` solve states
+- source-project immutability during every solve outcome
+- `AssemblySolveResult` with residual summary, component snapshots, and proposed free-component transforms
+- separate `AssemblySolveResultApplier`
+- stale solve-input detection including changed grounded anchors
+- successful transform application through a private project copy followed by atomic project replacement
+- no solver-result, Jacobian, iteration, damping, proposal, or residual-summary JSON fields
+- focused Mate, Distance, orientation, multi-constraint chain, deterministic ordering, fixed-group, validation, failure, stale-result, and application tests
+
+Still deferred after the first solver seed:
+
+- remaining rigid-body DOF computation
+- Jacobian rank diagnostics
+- underconstrained, locally fully constrained, and overconstrained classification
+- persistent solve/DOF cache data
+- semantic axis references and Concentric residual/solve support
 - component geometry instancing and assembly-level STEP export
 
-## Next MVP: First rigid-body assembly solver seed
+## Next MVP: Read-only assembly solve diagnostics and remaining-DOF analysis
 
-Goal: consume the implemented active-constraint connectivity and planar Mate/Distance residual descriptors to solve the first constrained component transforms with an explicit fixed/variable participation and update boundary.
+Goal: classify the local constraint state of a solved or evaluable connected group without introducing persistent DOF cache state.
 
 Proposed first implementation sequence:
 
-- define solver input over one deterministic `AssemblyConstraintGraph` connected group
-- define grounded components as fixed rigid-body references for the first seed
-- define behavior for groups with zero grounded components and groups with multiple grounded components
-- define the solver's variable transform representation while preserving persisted `RigidTransform` semantics at the API boundary
-- consume only active Mate/Distance constraints supported by `AssemblyConstraintEquationBuilder`
-- define residual flattening and ordering deterministically by constraint id and residual component
-- define numeric tolerance, maximum-iteration, convergence, and failure semantics explicitly
-- return a solve-result descriptor before applying any transform mutation
-- add a separate explicit transform-application boundary after a successful solve result exists
-- preserve project intent on failed or non-converged solves
-- test one fixed/one movable Mate case, one fixed/one movable Distance case, a small connected multi-constraint group, deterministic results, failure behavior, and unchanged model state before explicit application
-- keep Concentric outside the first solver seed until semantic axis targets and Concentric residuals exist
-- defer persistent DOF/constraint-state caches until their data model is justified
+- reuse the solver's deterministic connected-group, constraint, residual-component, and variable ordering
+- expose or reuse one read-only numeric Jacobian evaluation path at a selected transform state
+- define a documented Jacobian-rank tolerance
+- compute variable count, local Jacobian rank, constrained DOF, and remaining DOF
+- distinguish underconstrained and locally fully constrained groups
+- carry forward `FixedGeometryInconsistent` and non-converged solver diagnostics explicitly
+- define an initial overconstraint/inconsistency diagnostic boundary without pretending redundant equations always imply semantic overconstraint
+- return regenerable diagnostic descriptors without mutating transforms or persisting DOF state
+- test single-Mate remaining freedom, planar Distance freedom, a chained group, fully fixed groups, deterministic rank results, and numeric tolerance behavior
+- keep Concentric and richer constraint families outside this block until their semantic references and residuals exist
 
 ## Future roadmap: Multi-body transforms and path features
 
