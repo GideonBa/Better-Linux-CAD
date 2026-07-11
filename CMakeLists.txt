@@ -49,6 +49,7 @@ add_library(
   src/core/parameter.cpp
   src/core/parameter_expression.cpp
   src/core/project.cpp
+  src/core/project_cross_hierarchy_constraints.cpp
   src/core/project_json.cpp
   src/core/quantity.cpp
   src/core/recompute_plan.cpp
