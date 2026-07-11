@@ -1,8 +1,5 @@
 #include "assembly_constraint_numeric_system.hpp"
 
-#include "blcad/geometry/assembly_concentric_constraint_equation_builder.hpp"
-#include "blcad/geometry/assembly_constraint_equation_builder.hpp"
-#include "blcad/geometry/assembly_insert_constraint_equation_builder.hpp"
 #include "blcad/geometry/assembly_revolute_joint_equation_builder.hpp"
 
 #include <algorithm>
@@ -38,6 +35,63 @@ namespace {
              : options.finite_difference_rotation_step_deg;
 }
 
+[[nodiscard]] Result<std::size_t> append_scaled_residual(
+    const PlanarMateResidualDescriptor& mate,
+    double length_residual_scale_mm,
+    NumericVector& residuals) {
+  residuals.push_back(mate.normal_opposition.x);
+  residuals.push_back(mate.normal_opposition.y);
+  residuals.push_back(mate.normal_opposition.z);
+  residuals.push_back(mate.signed_separation_mm / length_residual_scale_mm);
+  return Result<std::size_t>::success(4U);
+}
+
+[[nodiscard]] Result<std::size_t> append_scaled_residual(
+    const PlanarDistanceResidualDescriptor& distance,
+    double length_residual_scale_mm,
+    NumericVector& residuals) {
+  residuals.push_back(distance.normal_parallelism.x);
+  residuals.push_back(distance.normal_parallelism.y);
+  residuals.push_back(distance.normal_parallelism.z);
+  residuals.push_back(distance.distance_residual_mm / length_residual_scale_mm);
+  return Result<std::size_t>::success(4U);
+}
+
+[[nodiscard]] Result<std::size_t> append_scaled_residual(
+    const PlanarAngleResidualDescriptor& angle,
+    double,
+    NumericVector& residuals) {
+  residuals.push_back(angle.angle_alignment);
+  return Result<std::size_t>::success(1U);
+}
+
+[[nodiscard]] Result<std::size_t> append_scaled_residual(
+    const ConcentricResidualDescriptor& concentric,
+    double length_residual_scale_mm,
+    NumericVector& residuals) {
+  residuals.push_back(concentric.direction_parallelism.x);
+  residuals.push_back(concentric.direction_parallelism.y);
+  residuals.push_back(concentric.direction_parallelism.z);
+  residuals.push_back(concentric.axis_offset_mm.x / length_residual_scale_mm);
+  residuals.push_back(concentric.axis_offset_mm.y / length_residual_scale_mm);
+  residuals.push_back(concentric.axis_offset_mm.z / length_residual_scale_mm);
+  return Result<std::size_t>::success(6U);
+}
+
+[[nodiscard]] Result<std::size_t> append_scaled_residual(
+    const InsertResidualDescriptor& insert,
+    double length_residual_scale_mm,
+    NumericVector& residuals) {
+  residuals.push_back(insert.direction_parallelism.x);
+  residuals.push_back(insert.direction_parallelism.y);
+  residuals.push_back(insert.direction_parallelism.z);
+  residuals.push_back(insert.axis_offset_mm.x / length_residual_scale_mm);
+  residuals.push_back(insert.axis_offset_mm.y / length_residual_scale_mm);
+  residuals.push_back(insert.axis_offset_mm.z / length_residual_scale_mm);
+  residuals.push_back(insert.signed_seating_separation_mm / length_residual_scale_mm);
+  return Result<std::size_t>::success(7U);
+}
+
 [[nodiscard]] Result<std::size_t>
 append_constraint_residuals(const Project& project, const AssemblyConstraintId& constraint_id,
                             double length_residual_scale_mm, NumericVector& residuals) {
@@ -52,60 +106,22 @@ append_constraint_residuals(const Project& project, const AssemblyConstraintId& 
     const AssemblyConcentricConstraintEquationBuilder builder;
     auto equation = builder.build(project, *constraint);
     if (equation.has_error()) return Result<std::size_t>::failure(equation.error());
-    const ConcentricResidualDescriptor& concentric = equation.value().residual;
-    residuals.push_back(concentric.direction_parallelism.x);
-    residuals.push_back(concentric.direction_parallelism.y);
-    residuals.push_back(concentric.direction_parallelism.z);
-    residuals.push_back(concentric.axis_offset_mm.x / length_residual_scale_mm);
-    residuals.push_back(concentric.axis_offset_mm.y / length_residual_scale_mm);
-    residuals.push_back(concentric.axis_offset_mm.z / length_residual_scale_mm);
-    return Result<std::size_t>::success(6U);
+    return append_scaled_residuals(equation.value().residual, length_residual_scale_mm,
+                                   residuals);
   }
 
   if (constraint->type() == AssemblyConstraintType::Insert) {
     const AssemblyInsertConstraintEquationBuilder builder;
     auto equation = builder.build(project, *constraint);
     if (equation.has_error()) return Result<std::size_t>::failure(equation.error());
-    const InsertResidualDescriptor& insert = equation.value().residual;
-    residuals.push_back(insert.direction_parallelism.x);
-    residuals.push_back(insert.direction_parallelism.y);
-    residuals.push_back(insert.direction_parallelism.z);
-    residuals.push_back(insert.axis_offset_mm.x / length_residual_scale_mm);
-    residuals.push_back(insert.axis_offset_mm.y / length_residual_scale_mm);
-    residuals.push_back(insert.axis_offset_mm.z / length_residual_scale_mm);
-    residuals.push_back(insert.signed_seating_separation_mm / length_residual_scale_mm);
-    return Result<std::size_t>::success(7U);
+    return append_scaled_residuals(equation.value().residual, length_residual_scale_mm,
+                                   residuals);
   }
 
   const AssemblyConstraintEquationBuilder builder;
   auto equation = builder.build(project, *constraint);
   if (equation.has_error()) return Result<std::size_t>::failure(equation.error());
-
-  if (const auto* mate = std::get_if<PlanarMateResidualDescriptor>(&equation.value().residual)) {
-    residuals.push_back(mate->normal_opposition.x);
-    residuals.push_back(mate->normal_opposition.y);
-    residuals.push_back(mate->normal_opposition.z);
-    residuals.push_back(mate->signed_separation_mm / length_residual_scale_mm);
-    return Result<std::size_t>::success(4U);
-  }
-
-  if (const auto* angle =
-          std::get_if<PlanarAngleResidualDescriptor>(&equation.value().residual)) {
-    residuals.push_back(angle->angle_alignment);
-    return Result<std::size_t>::success(1U);
-  }
-
-  const auto* distance = std::get_if<PlanarDistanceResidualDescriptor>(&equation.value().residual);
-  if (distance == nullptr) {
-    return Result<std::size_t>::failure(
-        internal_error(constraint_id.value(),
-                       "assembly numeric system received an unknown residual descriptor"));
-  }
-  residuals.push_back(distance->normal_parallelism.x);
-  residuals.push_back(distance->normal_parallelism.y);
-  residuals.push_back(distance->normal_parallelism.z);
-  residuals.push_back(distance->distance_residual_mm / length_residual_scale_mm);
-  return Result<std::size_t>::success(4U);
+  return append_scaled_residuals(equation.value().residual, length_residual_scale_mm, residuals);
 }
 
 [[nodiscard]] Result<std::size_t>
@@ -148,6 +164,39 @@ collect_constraint_ids(const AssemblyConstraintGraph& graph,
     }
   }
   return Result<std::vector<AssemblyConstraintId>>::success(std::move(constraint_ids));
+}
+
+Result<std::size_t> append_scaled_residuals(const PlanarConstraintResidualDescriptor& residual,
+                                            double length_residual_scale_mm,
+                                            NumericVector& residuals) {
+  return std::visit(
+      [&](const auto& value) {
+        return append_scaled_residual(value, length_residual_scale_mm, residuals);
+      },
+      residual);
+}
+
+Result<std::size_t> append_scaled_residuals(const ConcentricResidualDescriptor& residual,
+                                            double length_residual_scale_mm,
+                                            NumericVector& residuals) {
+  return append_scaled_residual(residual, length_residual_scale_mm, residuals);
+}
+
+Result<std::size_t> append_scaled_residuals(const InsertResidualDescriptor& residual,
+                                            double length_residual_scale_mm,
+                                            NumericVector& residuals) {
+  return append_scaled_residual(residual, length_residual_scale_mm, residuals);
+}
+
+Result<std::size_t> append_scaled_residuals(
+    const AssemblyHierarchyConstraintResidualDescriptor& residual,
+    double length_residual_scale_mm,
+    NumericVector& residuals) {
+  return std::visit(
+      [&](const auto& value) {
+        return append_scaled_residual(value, length_residual_scale_mm, residuals);
+      },
+      residual);
 }
 
 Result<NumericVector> evaluate_residuals(const Project& project,
@@ -228,18 +277,10 @@ Result<std::size_t> apply_variables(Project& project,
 }
 
 Result<NumericMatrix> build_central_difference_jacobian(
-    const Project& project, const std::vector<ComponentInstanceId>& variable_components,
-    const std::vector<AssemblyConstraintId>& constraint_ids, const NumericVector& variables,
-    const NumericVector& baseline_residuals, const AssemblyNumericSystemOptions& options) {
-  return build_central_difference_jacobian(
-      project, variable_components, AssemblyNumericRelationshipSet{constraint_ids, {}}, variables,
-      baseline_residuals, options);
-}
-
-Result<NumericMatrix> build_central_difference_jacobian(
-    const Project& project, const std::vector<ComponentInstanceId>& variable_components,
-    const AssemblyNumericRelationshipSet& relationships, const NumericVector& variables,
-    const NumericVector& baseline_residuals, const AssemblyNumericSystemOptions& options) {
+    const NumericVector& variables,
+    const NumericVector& baseline_residuals,
+    const AssemblyNumericSystemOptions& options,
+    const AssemblyNumericResidualEvaluator& evaluator) {
   NumericMatrix jacobian(baseline_residuals.size(), NumericVector(variables.size(), 0.0));
 
   for (std::size_t column = 0U; column < variables.size(); ++column) {
@@ -249,18 +290,9 @@ Result<NumericMatrix> build_central_difference_jacobian(
     plus_variables[column] += step;
     minus_variables[column] -= step;
 
-    Project plus_project = project;
-    auto plus_applied = apply_variables(plus_project, variable_components, plus_variables);
-    if (plus_applied.has_error()) return Result<NumericMatrix>::failure(plus_applied.error());
-    auto plus_residuals =
-        evaluate_residuals(plus_project, relationships, options.length_residual_scale_mm);
+    auto plus_residuals = evaluator(plus_variables);
     if (plus_residuals.has_error()) return Result<NumericMatrix>::failure(plus_residuals.error());
-
-    Project minus_project = project;
-    auto minus_applied = apply_variables(minus_project, variable_components, minus_variables);
-    if (minus_applied.has_error()) return Result<NumericMatrix>::failure(minus_applied.error());
-    auto minus_residuals =
-        evaluate_residuals(minus_project, relationships, options.length_residual_scale_mm);
+    auto minus_residuals = evaluator(minus_variables);
     if (minus_residuals.has_error()) return Result<NumericMatrix>::failure(minus_residuals.error());
 
     if (plus_residuals.value().size() != baseline_residuals.size() ||
@@ -278,6 +310,32 @@ Result<NumericMatrix> build_central_difference_jacobian(
   }
 
   return Result<NumericMatrix>::success(std::move(jacobian));
+}
+
+Result<NumericMatrix> build_central_difference_jacobian(
+    const Project& project, const std::vector<ComponentInstanceId>& variable_components,
+    const std::vector<AssemblyConstraintId>& constraint_ids, const NumericVector& variables,
+    const NumericVector& baseline_residuals, const AssemblyNumericSystemOptions& options) {
+  return build_central_difference_jacobian(
+      project, variable_components, AssemblyNumericRelationshipSet{constraint_ids, {}}, variables,
+      baseline_residuals, options);
+}
+
+Result<NumericMatrix> build_central_difference_jacobian(
+    const Project& project, const std::vector<ComponentInstanceId>& variable_components,
+    const AssemblyNumericRelationshipSet& relationships, const NumericVector& variables,
+    const NumericVector& baseline_residuals, const AssemblyNumericSystemOptions& options) {
+  const AssemblyNumericResidualEvaluator evaluator =
+      [&project, &variable_components, &relationships,
+       length_scale = options.length_residual_scale_mm](const NumericVector& candidate_values) {
+        Project candidate_project = project;
+        auto applied = apply_variables(candidate_project, variable_components, candidate_values);
+        if (applied.has_error()) {
+          return Result<NumericVector>::failure(applied.error());
+        }
+        return evaluate_residuals(candidate_project, relationships, length_scale);
+      };
+  return build_central_difference_jacobian(variables, baseline_residuals, options, evaluator);
 }
 
 } // namespace blcad::geometry::detail
