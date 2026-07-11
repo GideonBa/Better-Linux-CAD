@@ -91,12 +91,14 @@ RigidTransform
 
 The direct component transform is persistent local placement authority.
 
-For identity-sensitive mutation and solving under the current document model, one component transform authority is:
+For identity-sensitive mutation and solving under the current document model, one component transform authority is conceptually:
 
 ```text
 ComponentTransformAuthority =
-  (AssemblyDocumentId, local ComponentInstanceId)
+  (assembly_document: DocumentId, local ComponentInstanceId)
 ```
+
+`ComponentTransformAuthority` is a derived planning identity, not a persistent public record in the current implementation.
 
 This identity is important for repeated child assembly occurrences: multiple rooted geometric occurrences may read the same child-document component transform authority.
 
@@ -420,13 +422,13 @@ Future cross-hierarchy solving must preserve three separate identities:
 
 ```text
 geometric endpoint
-  = (occurrence_path, ComponentInstanceId, semantic_reference)
+  = (occurrence_path, local ComponentInstanceId, semantic_reference)
 
-relationship node
-  = (occurrence_path, ComponentInstanceId)
+geometric component occurrence
+  = (occurrence_path, local ComponentInstanceId)
 
 persisted transform authority
-  = (AssemblyDocumentId, ComponentInstanceId)
+  = (assembly_document: DocumentId, local ComponentInstanceId)
 ```
 
 This distinction is required by repeated child assembly occurrences.
@@ -434,41 +436,73 @@ This distinction is required by repeated child assembly occurrences.
 Example:
 
 ```text
-([left],  component.shaft) -> (assembly.gearbox, component.shaft)
-([right], component.shaft) -> (assembly.gearbox, component.shaft)
+([left],  component.shaft)
+  -> (assembly.gearbox, component.shaft)
+
+([right], component.shaft)
+  -> (assembly.gearbox, component.shaft)
 ```
 
-The occurrence nodes are geometrically distinct because their parent transforms differ. The current persistent model still stores one shared child-document component transform.
+The geometric occurrences are distinct because their parent transforms differ. The current persistent model still stores one shared child-document component transform.
 
-Therefore future numeric variables, stale snapshots, proposals, and direct transform application must be keyed by transform authority, not blindly by occurrence path.
+Therefore future numeric variables, component snapshots, proposals, and direct transform application are keyed by transform authority rather than blindly by occurrence path.
 
-A candidate transform authority may affect residual rows from multiple occurrence paths. Each endpoint evaluates the same candidate direct local transform through its own parent transform chain.
+A candidate transform authority may affect cross-hierarchy residual rows from multiple occurrence paths. Each hierarchy endpoint evaluates the same candidate direct local transform through its own parent transform chain.
 
-## Relationship connectivity versus solve connectivity
+## Relationship-to-authority solve connectivity
 
-A future cross-hierarchy relationship graph must use occurrence-qualified component nodes and include:
+Future cross-hierarchy solving must preserve local relationship ownership and occurrence-specific cross-hierarchy geometry simultaneously.
+
+Relationship nodes are conceptually:
 
 ```text
-local active AssemblyDocument constraints lifted once per rooted assembly occurrence
-project-level cross-hierarchy constraints
+local relationship
+  = (assembly_document: DocumentId, AssemblyConstraintId)
+
+project-level cross-hierarchy relationship
+  = cross-hierarchy relationship id with exact HierarchyEndpoint targets
 ```
 
-Local relationships must be lifted per occurrence because repeated child occurrences have distinct root-space geometry.
-
-A pure occurrence relationship graph is not sufficient for numeric solve partitioning. Two different occurrence nodes may map to one shared transform authority.
-
-Therefore future solve connectivity is the transitive closure over:
+Transform-variable authority nodes are:
 
 ```text
-relationship adjacency
-shared ComponentTransformAuthority identity
+(assembly_document: DocumentId, ComponentInstanceId)
 ```
 
-Shared authority coupling is not a geometric constraint and contributes no residual row.
+The derived connectivity boundary is a bipartite relationship-to-authority incidence graph:
 
-Path-sensitive suppression is evaluated before authority deduplication. Visibility remains a presentation/export property.
+```text
+relationship --depends on--> transform authority
+```
 
-The complete planned sequence is canonical in `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`.
+A local `AssemblyConstraint` appears once in its containing assembly document. It is not duplicated for every rooted occurrence of that child document. Its residual is evaluated once in the containing assembly document's local assembly space through the existing local builders.
+
+A project-level cross-hierarchy relationship appears once with its occurrence-qualified endpoint pair. Its residual is evaluated in root-assembly space because its endpoints may use different parent transform chains.
+
+Each relationship is incident to every unique transform authority whose candidate direct component transform can affect its residual.
+
+For example, the two hierarchy endpoints:
+
+```text
+([left],  component.shaft, feature.bore.axis)
+([right], component.shaft, feature.bore.axis)
+```
+
+may both map to:
+
+```text
+(assembly.gearbox, component.shaft)
+```
+
+A cross-hierarchy relationship between those endpoints can still have a nonzero residual because the two parent transform chains differ. Numerically, however, its residual depends on one six-variable transform authority.
+
+Solve groups are connected components of the active relationship-to-authority incidence graph. This naturally couples local and cross-hierarchy relationships when they depend on a shared transform authority without adding synthetic geometric constraints or fake residual rows.
+
+Pure-local connected groups remain ordinary local solver work. The future cross-hierarchy solver path selects groups containing at least one active project-level cross-hierarchy relationship.
+
+Local relationship participation is based on local relationship state and local component suppression. Cross-hierarchy relationship participation additionally evaluates suppression along each exact endpoint occurrence path. Visibility remains a presentation/export property and does not remove geometric relationships from solving.
+
+The complete sequence is canonical in `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`.
 
 ## Nested posed geometry and analysis
 
@@ -520,6 +554,7 @@ Derived and unpersisted data includes:
 - child-local temporary solve views;
 - flexible-subassembly result wrappers;
 - cross-hierarchy read-only endpoint/query objects;
+- conceptual transform-authority identity and future incidence connectivity until implemented;
 - resolved local and root-space semantic geometry;
 - residual descriptors and transient drives;
 - numeric residuals, Jacobians, and normal equations;
@@ -540,14 +575,14 @@ The next work is split into:
 ```text
 23. Core endpoint contract + persistent Project-owned cross-hierarchy constraint intent
 24. additive JSON + project structure validation
-25. occurrence relationship graph + transform-authority solve connectivity
+25. relationship-to-authority incidence + active cross-hierarchy solve groups
 26. shared numeric residual/Jacobian + solve-result integration
 27. fresh-result application + cross-hierarchy diagnostics
 ```
 
 Block 23 is next.
 
-It must extract the frozen endpoint value contract into the Core layer before persistence. It must not serialize or otherwise make a `blcad::geometry` query type model authority.
+It extracts the frozen endpoint value contract into the Core layer before persistence. It must not serialize or otherwise make a `blcad::geometry` query type model authority.
 
 Cross-hierarchy joints and nested motion propagation remain deferred until geometric solve connectivity and transform-authority application semantics are stable.
 
