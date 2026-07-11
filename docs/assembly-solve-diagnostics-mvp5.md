@@ -1,8 +1,6 @@
 # Assembly Solve Diagnostics and Remaining DOF MVP-5
 
-Status: implemented read-only local Jacobian-rank and remaining-degree-of-freedom diagnostics for the supported planar Mate/Distance rigid-body solve path.
-
-Semantic generated axes and Concentric residual descriptors are now implemented separately. Concentric rank/DOF analysis requires the next shared numeric-system integration block.
+Status: implemented read-only local Jacobian-rank and remaining-degree-of-freedom diagnostics for the shared Mate, Distance, and Concentric rigid-body numeric path.
 
 ## Goal
 
@@ -11,7 +9,7 @@ This block answers:
 ```text
 At the current locally solved assembly state,
 how many independent rigid-body variable directions are constrained
-by the supported numeric constraint system,
+by the supported active numeric constraint system,
 and how many local DOF remain?
 ```
 
@@ -60,6 +58,8 @@ AssemblySolveDiagnosticsAnalyzer
   analyze(Project, connected_group, options)
 ```
 
+Concentric integration adds no second diagnostics API.
+
 ## Shared numeric-system path
 
 Solver and diagnostics share:
@@ -69,20 +69,31 @@ src/geometry/assembly_constraint_numeric_system.hpp
 src/geometry/assembly_constraint_numeric_system.cpp
 ```
 
-The current shared path owns:
+The shared path owns:
 
 - deterministic constraint-id collection
-- planar Mate/Distance residual flattening
+- constraint-type residual-builder selection
+- Mate/Distance/Concentric scalar residual flattening
 - residual summaries
 - free-component variable extraction
 - numeric variable application to project copies
 - central finite-difference Jacobian construction
 
-The analyzer does not maintain a second Jacobian interpretation.
+The analyzer does not maintain a second residual or Jacobian interpretation.
 
-Current numeric families are Mate and Distance only.
+Current numeric families are:
 
-Concentric residual descriptors exist, but the shared numeric path does not consume them yet.
+```text
+Mate
+Distance
+Concentric
+```
+
+Concentric detail is canonicalized in:
+
+```text
+docs/assembly-concentric-numeric-solver-dof-mvp5.md
+```
 
 ## Analysis pipeline
 
@@ -101,7 +112,7 @@ Project + connected group
        do not claim DOF rank
   -> Converged:
        apply proposals to a private Project copy
-       evaluate shared numeric variables/residuals/Jacobian
+       evaluate shared variables/residuals/Jacobian
        compute local Jacobian rank
        compute constrained and remaining DOF
        classify local variable state
@@ -205,12 +216,23 @@ variable_count > 0
 remaining_dof > 0
 ```
 
-One planar Mate between one grounded component and one free component is the first proven case:
+Proven examples now include:
 
 ```text
-variable_count = 6
-jacobian_rank  = 3
-remaining_dof  = 3
+one planar Mate:
+  variable_count = 6
+  jacobian_rank  = 3
+  remaining_dof  = 3
+
+one Concentric:
+  variable_count = 6
+  jacobian_rank  = 4
+  remaining_dof  = 2
+
+one aligned Distance + one Concentric:
+  variable_count = 6
+  jacobian_rank  = 5
+  remaining_dof  = 1
 ```
 
 ### LocallyFullyConstrained
@@ -231,11 +253,13 @@ DOF classification and consistency are separate fields.
 
 ### LocallyConsistent
 
-The current supported numeric system converged and rank was evaluated at the private converged transform state.
+The supported numeric system converged and rank was evaluated at the private converged transform state.
 
 ### FixedGeometryInconsistent
 
 An all-grounded group has residual RMS above the configured convergence tolerance.
+
+This applies equally to planar and Concentric residual systems.
 
 The analyzer preserves the explicit solver state and does not invent a DOF classification.
 
@@ -268,23 +292,23 @@ Examples include vector residuals with fewer independent geometric directions, d
 
 The analyzer therefore does not expose an `Overconstrained` state from `residual_count > rank(J)` alone.
 
-## Concentric diagnostics boundary
+## Proven Concentric rank behavior
 
-Canonical Concentric residuals are now implemented:
+Canonical Concentric residuals are:
 
 ```text
 direction_parallelism = cross(dA, dB)
 axis_offset_mm         = cross(oB - oA, dA)
 ```
 
-A regular Concentric relationship between one fixed and one free body should locally constrain:
+A regular Concentric relationship between one grounded and one free body constrains:
 
 ```text
 two rotational axis-tilt directions
-two translations perpendicular to the axis
+two translations perpendicular to the common axis
 ```
 
-and leave:
+It leaves:
 
 ```text
 translation along the common axis
@@ -293,17 +317,54 @@ rotation about the common axis
 
 free.
 
-Expected regular result:
+The actual shared central finite-difference Jacobian now proves:
 
 ```text
-variable_count = 6
-jacobian_rank  = 4
-remaining_dof  = 2
+residual_component_count = 6
+variable_count           = 6
+jacobian_rank            = 4
+constrained_dof          = 4
+remaining_dof            = 2
+residual_row_redundancy  = 2
 ```
 
-The analyzer does not report this yet because its shared numeric system still rejects Concentric before Jacobian construction.
+This result is computed by the generic rank analyzer. There is no `if Concentric then rank = 4` rule.
 
-The next block must prove the rank-four result through the actual shared finite-difference Jacobian rather than hard-code DOF from the constraint type.
+## Why Concentric has two redundant residual rows
+
+`direction_parallelism` has three scalar components, but near a regular aligned unit-axis state only two first-order rotational directions tilt the axis.
+
+`axis_offset_mm` also has three scalar components, but it is perpendicular to target A's axis and has only two independent lateral directions.
+
+Therefore six residual rows carry four independent local sensitivities in the regular case.
+
+The correct classification is:
+
+```text
+Underconstrained
+LocallyConsistent
+RedundantResidualComponents
+```
+
+not semantic overconstraint.
+
+## Proven mixed Distance plus Concentric behavior
+
+For one free body with one Concentric relationship and one planar Distance relationship whose normal follows the common axis:
+
+```text
+residual_component_count = 10
+variable_count           = 6
+jacobian_rank            = 5
+constrained_dof          = 5
+remaining_dof            = 1
+```
+
+The planar Distance adds axial separation. Its two orientation sensitivities overlap the existing Concentric axis-tilt sensitivities.
+
+The remaining local freedom is rotation about the common axis.
+
+This is measured from the shared Jacobian rather than inferred by summing nominal constraint DOF counts.
 
 ## Deterministic ordering
 
@@ -320,7 +381,27 @@ Variable components use the solver's lexicographic order.
 
 Constraints use graph lexicographic `AssemblyConstraintId` order.
 
+Mixed constraint families do not change this order.
+
 Repeated analysis of the same project state/options produces equal descriptors.
+
+## Semantic target failure propagation
+
+Diagnostics consume the solver and shared numeric system rather than pre-validating semantic targets independently.
+
+An unsupported Concentric target such as:
+
+```text
+bolt.main_axis
+```
+
+therefore propagates:
+
+```text
+unsupported assembly semantic axis reference family
+```
+
+The analyzer does not convert that failure into a generic "Concentric unsupported" diagnostic.
 
 ## Read-only and persistence boundary
 
@@ -341,25 +422,45 @@ No assembly/project JSON field is added.
 
 ## Tests
 
+Core diagnostics suite:
+
 ```bash
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-diagnostics]"
 ```
 
-Coverage includes Mate rank `3/6`, Distance rank `3/6`, three orthogonal Mates rank `6/6`, a two-Mate chain rank `6/12`, deterministic ordering, all-grounded states, non-convergence propagation, rank tolerance, duplicate residual-row redundancy, read-only behavior, and unsupported Concentric propagation from the current numeric path.
-
-Concentric semantic/residual tests are separate:
+Concentric numeric/solver/diagnostic integration suite:
 
 ```bash
-./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-concentric]"
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-concentric-solver]"
 ```
 
-No current diagnostics test claims Concentric rank support.
+Coverage includes:
+
+- Mate rank `3/6`
+- Distance rank `3/6`
+- three orthogonal Mates rank `6/6`
+- two-Mate chain rank `6/12`
+- deterministic ordering
+- all-grounded consistency/inconsistency
+- non-convergence propagation
+- rank tolerance
+- duplicate residual-row redundancy
+- read-only behavior
+- semantic target failure propagation
+- Concentric rank `4/6`
+- Concentric remaining DOF `2`
+- Concentric residual-row redundancy `2`
+- deterministic repeated Concentric analysis
+- mixed Distance/Concentric residual dimension `10`
+- mixed Distance/Concentric rank `5/6`
+- mixed remaining DOF `1`
+- fixed inconsistent Concentric diagnostics without false rank
+- non-converged Concentric diagnostics without false rank
 
 ## Deliberate limitations
 
 This diagnostics block does not implement:
 
-- Concentric numeric/Jacobian/DOF integration
 - global configuration-space dimension analysis
 - singularity classification
 - analytic Jacobians
@@ -369,10 +470,11 @@ This diagnostics block does not implement:
 - semantic overconstraint classification for arbitrary conflicting free-body constraints
 - constraint-removal recommendations
 - persistent DOF caches
+- Insert diagnostics
 - joints or motion
 
 ## Next technical step
 
-The next assembly block integrates `ConcentricResidualDescriptor` into the shared numeric system, solver, and diagnostics analyzer.
+The next assembly block is stable Insert constraint intent and a read-only composite Insert residual model.
 
-The analyzer must then compute Concentric rank from the exact shared finite-difference Jacobian and prove a regular one-free-body Concentric relationship has rank four with two remaining local DOF.
+The first Insert residual contract should combine stable axis-line alignment with explicit semantic axial seating geometry and prove regular rank five with one remaining rotation-about-axis DOF before Insert enters the shared numeric solver and diagnostics path.
