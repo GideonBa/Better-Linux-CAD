@@ -4,7 +4,7 @@ Source: condensed from the current repository architecture documents and impleme
 
 ## Goal
 
-BLCAD is intended to become an independent parametric CAD system for Linux. The model does not only store final BRep geometry, but the underlying design intent: parameters, sketches, features, dependencies, semantic references, construction geometry, assembly structure, and later multi-body, path, surfacing, and engineering intent. The explicit long-term goal is recorded in `docs/project-goal.md`.
+BLCAD is intended to become an independent parametric CAD system for Linux. The model stores design intent rather than only final BRep geometry: parameters, sketches, features, dependencies, semantic references, construction geometry, assembly structure, and later multi-body, path, surfacing, and engineering intent. The explicit long-term goal is recorded in `docs/project-goal.md`.
 
 ## Fundamental decision
 
@@ -60,8 +60,9 @@ Current and planned core object families include:
 - `ComponentInstance`
 - `AssemblyConstraintTarget`
 - `AssemblyConstraint`
-- future `AssemblyConstraintGraph`
-- future rigid-body assembly solver and `Joint`
+- `AssemblyConstraintGraphEdge`
+- `AssemblyConstraintGraph`
+- future semantic assembly target resolver, rigid-body assembly solver, and `Joint`
 
 ## MVP-1 implemented vertical slice
 
@@ -88,11 +89,11 @@ The implemented workplane/reference path introduces semantic generated-face refe
 - `DerivedWorkplane` exposes semantic generated faces as sketch workplanes.
 - `Sketch` can reference datum, derived, and implemented construction workplanes.
 - The dependency graph connects source features, workplanes, sketches, and dependent features.
-- JSON persists the implemented semantic workplane intent.
+- JSON persists implemented semantic workplane intent.
 - `WorkplaneResolver` maps supported semantic faces and construction planes to concrete frames.
 - Geometry recompute maps sketch-local profile coordinates through resolved workplanes.
 - Incremental recompute follows semantic workplane and construction dependency paths after source changes.
-- `ShapeCache` removes stale dirty feature shapes before incremental recompute, so failed recompute does not leave old geometry behind.
+- `ShapeCache` removes stale dirty feature shapes before incremental recompute.
 
 Persistent model intent remains deliberately different from raw OCCT face IDs.
 
@@ -110,14 +111,14 @@ The current sketch/profile blocks include:
 - automatic profile-region detection
 - composite closed profiles with holes
 - sketch-plane-relative extrude direction
-- JSON persistence for the implemented model-intent records
-- geometry execution for the implemented line/composite profile paths
+- JSON persistence for implemented model-intent records
+- geometry execution for implemented line/composite profile paths
 
-The sketch-repair chain additionally provides diagnostics, deterministic repair suggestions, safe repair commands, transaction capture, undo stacks, and read-only presentation snapshots. Presentation helpers are intentionally frozen until a real CLI or GUI consumer exists.
+The sketch-repair chain additionally provides diagnostics, deterministic repair suggestions, safe repair commands, transaction capture, undo stacks, and read-only presentation snapshots. Presentation helpers are frozen until a real CLI or GUI consumer exists.
 
 ## Implemented construction geometry and datum relations
 
-Construction geometry is no longer limited to explicit placement. The current headless core/geometry path implements explicit and relation-driven construction geometry; `docs/construction-geometry-mvp.md` is the canonical detailed status document.
+The current headless core/geometry path implements explicit and relation-driven construction geometry; `docs/construction-geometry-mvp.md` is the canonical detailed status document.
 
 Implemented capabilities include:
 
@@ -184,7 +185,7 @@ Assembly-level geometry instancing is not implemented.
 
 ## Implemented MVP-5 assembly constraint model intent
 
-The first persistent assembly relationship layer is implemented (`docs/assembly-constraint-model-intent-mvp5.md`):
+The persistent assembly relationship layer is implemented (`docs/assembly-constraint-model-intent-mvp5.md`):
 
 - `AssemblyConstraintId` is a dedicated typed id.
 - `AssemblyConstraintTarget` combines an existing `ComponentInstanceId` with a persistent non-empty semantic reference token.
@@ -193,30 +194,52 @@ The first persistent assembly relationship layer is implemented (`docs/assembly-
 - Distance requires a length; Mate and Concentric reject distance values.
 - `AssemblyDocument` validates unique constraint ids and existing component target ids.
 - Constraint creation and JSON loading do not mutate component `RigidTransform` values.
-- Semantic target tokens remain opaque and unresolved at this record layer.
+- Semantic target tokens remain opaque and unresolved at the record layer.
 - Additive `assembly_constraints` JSON remains backward compatible with old files that omit the field.
 - Project structure validation includes constraint component targets.
 - Multiple constrained component occurrences may still share one owned `PartDocument` model.
 - `blcad_inspect_project_components` exposes stored constraint type, state, semantic targets, and optional distance.
 
-No solved transform, semantic target topology resolution, DOF state, or constraint graph is persisted by this block.
+No solved transform, semantic target topology resolution, DOF state, or graph cache is persisted by this block.
+
+## Implemented MVP-5 read-only assembly constraint graph
+
+The first derived assembly relationship graph is implemented (`docs/assembly-constraint-graph-mvp5.md`):
+
+- `AssemblyConstraintGraph` is built read-only from an `AssemblyDocument`.
+- Every `ComponentInstanceId` becomes a node, including isolated components.
+- Every active `AssemblyConstraintId` becomes one distinct graph edge.
+- Inactive constraints do not participate in connectivity.
+- `AssemblyConstraintGraphEdge` preserves the constraint id and target-A/target-B component endpoints.
+- Multiple constraints between the same component pair remain distinct legal multi-edges.
+- Active edge endpoints are defensively revalidated during graph construction.
+- Nodes are ordered lexicographically by component id.
+- Edges and adjacency results are ordered lexicographically by constraint id.
+- `adjacent_constraints` provides deterministic incident-edge queries.
+- `connected_components` provides deterministic independent component groups and includes isolated nodes.
+- Graph construction and queries do not mutate transforms, grounding, constraint state, or part model intent.
+- `blcad_inspect_project_components` prints graph node/active-edge counts and deterministic connected groups.
+
+The graph is regenerable derived data and is not serialized. It is distinct from the part recompute `DependencyGraph` and is not yet a solver graph.
 
 ## Next assembly block
 
-The next core-CAD MVP block is a read-only `AssemblyConstraintGraph` derived from the now-stable persistent constraint records.
+The next core-CAD MVP block is read-only semantic assembly target resolution.
 
-The first graph should:
+The first resolver should:
 
-- use every `ComponentInstanceId` as a node
-- add one distinct edge per active `AssemblyConstraintId`
-- ignore inactive constraints
-- preserve multiple different constraints between the same component pair
-- provide deterministic adjacency queries
-- provide deterministic connected-component/group queries
-- remain read-only with respect to component transforms, grounding, constraint state, and part intent
-- avoid semantic target geometry resolution and OCCT topology entirely
+- start from an `AssemblyConstraintTarget`
+- resolve its `ComponentInstanceId` through the project's assembly
+- resolve the component's `referenced_part_document` to the project-owned `PartDocument`
+- support the currently implemented generated-face semantic reference family first
+- reuse the semantic face/workplane geometry path
+- produce a component-local planar descriptor with origin, basis axes, and normal
+- keep the component `RigidTransform` as separate placement intent
+- reject malformed or unsupported target families explicitly
+- leave not-yet-implemented semantic axis targets unsupported, so full Concentric solving remains deferred
+- remain read-only and avoid persisted resolution cache data
 
-Semantic target geometry resolution, rigid-body solving, enforced grounding, remaining-DOF computation, and overconstraint analysis remain later work. The detailed sequence is maintained in `docs/mvp-plan.md` and `docs/assembly-system.md`.
+Constraint equation construction, assembly-space transform evaluation, rigid-body solving, enforced grounding, remaining-DOF computation, and overconstraint analysis remain later work. The detailed sequence is maintained in `docs/mvp-plan.md` and `docs/assembly-system.md`.
 
 ## Future multi-body part modeling, transforms, and path features
 
@@ -275,12 +298,14 @@ The detailed roadmap is in `docs/advanced-surfacing-and-3d-sketch-mvp.md`.
 - Component instances reference part model intent without duplicating owned `PartDocument` objects.
 - Component placement/state updates remain explicit free-placement edits until a solver produces derived placement.
 - Assembly constraints use semantic component targets and remain model intent distinct from solver/cache output.
-- Constraint graph connectivity should be regenerated from persistent records rather than stored as a second source of truth.
-- The future assembly solver will resolve semantic target geometry and determine component positions and remaining degrees of freedom.
+- `AssemblyConstraintGraph` connectivity is regenerated from persistent records rather than stored as a second source of truth.
+- Active/inactive constraint state controls graph participation; component suppression does not yet alter graph connectivity.
+- Semantic assembly target resolution should reuse existing semantic reference infrastructure and remain distinct from solving.
+- A future assembly solver will consume connected groups and resolved targets to determine component positions and remaining degrees of freedom.
 - Fillets and chamfers are their own parametric features with semantic edge references, not only late BRep corrections.
 - Engineering assistants must size deterministically and traceably; AI is a later helper, never the sizing authority.
 - The UI only operates the core and holds no CAD logic; it is built after the internal models work.
-- The save file stores model intent; computed geometry and future solved cache data remain regenerable.
+- The save file stores model intent; computed geometry, graph connectivity, target-resolution results, and future solved cache data remain regenerable.
 
 ## Detailed target-architecture documents
 
@@ -297,8 +322,9 @@ The condensed points above are expanded in dedicated documents. Each is written 
 - `docs/pattern-and-mirror-features.md` — linear/circular patterns and mirror
 - `docs/hole-wizard.md` — semantic hole features and the standards database
 - `docs/shaft-wizard.md` — shaft calculation and geometry generation
-- `docs/assembly-system.md` — component instances, persistent constraint intent, constraint graph, solver, joints, and motion
+- `docs/assembly-system.md` — component instances, persistent constraint intent, graph connectivity, target resolution, solver, joints, and motion
 - `docs/assembly-constraint-model-intent-mvp5.md` — implemented Mate/Concentric/Distance record layer
+- `docs/assembly-constraint-graph-mvp5.md` — implemented read-only active-constraint connectivity graph
 - `docs/engineering-modules.md` — bolt, bearing, gear, material, and standard-parts modules
 - `docs/advanced-surfacing-and-3d-sketch-mvp.md` — 3D sketches, guide curves, sweep, loft, boundary surfaces, surface stitching, and closed-shell-to-solid conversion
 - `docs/user-interface.md` — UI architecture over the core
