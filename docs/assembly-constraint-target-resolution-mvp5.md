@@ -1,16 +1,18 @@
 # Assembly Constraint Target Resolution MVP-5
 
-Status: implemented read-only generated-planar-face target resolution. The planar residual builder, rigid-body solver, shared numeric system, and solve/DOF diagnostics consume this target path indirectly.
+Status: implemented read-only generated-planar-face resolution and the first read-only generated-axis resolution family. Planar targets feed Mate/Distance; generated axes feed the dedicated Concentric residual builder.
 
 ## Goal
 
-`AssemblyConstraintTargetResolver` bridges persistent semantic assembly target intent to deterministic component-local planar geometry.
+`AssemblyConstraintTargetResolver` bridges persistent semantic assembly target strings to deterministic component-local geometry.
 
-It owns semantic target lookup and local frame construction only.
+It owns semantic target lookup and local geometry construction only.
 
-It does not apply component placement, construct residuals, decide solver participation, optimize transforms, or compute DOF.
+It does not apply component placement, construct constraint residuals, decide solver participation, optimize transforms, or compute DOF.
 
 ## API
+
+Planar target types:
 
 ```text
 ComponentLocalPlanarDescriptor
@@ -26,33 +28,56 @@ ResolvedAssemblyConstraintTarget
   face
   local_plane
   component_transform
-
-AssemblyConstraintTargetResolver
-  resolve(Project, AssemblyConstraintTarget)
 ```
 
-The resolved descriptor preserves component/part/feature/face identity, the component-local planar frame, and the separate persisted component transform.
-
-## Resolution path
+Axis target types:
 
 ```text
-AssemblyConstraintTarget
-  -> component id
-  -> project assembly component occurrence
-  -> component.referenced_part_document
-  -> project-owned PartDocument
-  -> parse supported generated-face token
-  -> validate source feature
-  -> WorkplaneResolver::resolve_generated_face
-  -> ComponentLocalPlanarDescriptor
-  + separate RigidTransform
+ComponentLocalAxisDescriptor
+  origin
+  direction
+
+ResolvedAssemblyAxisConstraintTarget
+  component_instance
+  referenced_part_document
+  source_feature
+  source_profile
+  axis
+  local_axis
+  component_transform
 ```
 
-Component occurrence identity is resolved before part geometry.
+Resolver methods:
 
-The resolver never duplicates the project-owned `PartDocument` as new model intent.
+```text
+AssemblyConstraintTargetResolver
+  resolve(Project, target)
+    -> ResolvedAssemblyConstraintTarget
 
-## Supported target family
+  resolve_axis(Project, target)
+    -> ResolvedAssemblyAxisConstraintTarget
+```
+
+Plane and axis APIs are separate so callers cannot accidentally reinterpret one geometry family as the other.
+
+## Shared ownership resolution
+
+Both paths first resolve:
+
+```text
+AssemblyConstraintTarget.component_instance
+  -> Project.assembly().find_component_instance
+  -> component.referenced_part_document
+  -> Project.find_part_document
+```
+
+The component occurrence and project-owned part must exist before semantic feature geometry is interpreted.
+
+The resolver never duplicates the referenced `PartDocument` as new model intent.
+
+## Generated planar-face family
+
+Supported tokens:
 
 ```text
 feature.<feature-id>.top
@@ -63,112 +88,177 @@ feature.<feature-id>.front
 feature.<feature-id>.back
 ```
 
-The final suffix selects one implemented `SemanticFace`.
+The source feature must be a supported `AdditiveExtrude`.
 
-The token prefix before the final dot is the typed `FeatureId` value.
-
-The source feature must exist in the referenced project-owned part and currently must be a supported `AdditiveExtrude`.
-
-## Shared generated-face geometry
-
-The resolver delegates geometry to:
+Face geometry is delegated to:
 
 ```text
 WorkplaneResolver::resolve_generated_face
 ```
 
-Derived workplanes and assembly targets therefore share one implementation of generated-face origin, basis axes, and normal.
+Derived workplanes and assembly face targets therefore share one implementation of generated-face frame geometry.
 
-The assembly resolver does not duplicate top/bottom/right/left/front/back frame formulas.
+The returned local plane contains origin, basis axes, and normal. Component placement remains separate in `component_transform`.
+
+## Generated-axis family
+
+Canonical detail: `docs/assembly-semantic-axis-concentric-residuals-mvp5.md`.
+
+Supported first token:
+
+```text
+feature.<feature-id>.axis
+```
+
+The source feature must be:
+
+```text
+FeatureType::SubtractiveExtrude
+```
+
+Its input sketch must contain:
+
+```text
+exactly one CircleProfile
+and exactly one total profile
+```
+
+The circle diameter parameter must resolve to a length parameter.
+
+Axis geometry reuses the source sketch workplane:
+
+```text
+WorkplaneResolver::resolve_for_sketch
+```
+
+The local axis is:
+
+```text
+origin
+  = WorkplaneResolver::evaluate_point(workplane, CircleProfile.center)
+
+direction
+  = workplane.normal
+    or -workplane.normal for OppositeSketchNormal
+```
+
+This is the same intent interpretation used by the existing circular-cut geometry execution path.
+
+The resolved descriptor preserves the source `CircleProfile` id in addition to source feature identity.
+
+## Why circular-hole patterns are excluded
+
+A `CircularHolePattern` generates several distinct hole axes.
+
+One token such as:
+
+```text
+feature.pattern.axis
+```
+
+would be ambiguous.
+
+A later pattern-axis family must define stable per-instance semantic identity. The resolver does not infer identity from OCCT topology order or hidden vector position.
 
 ## Component-local versus assembly-space geometry
 
-Resolver output is intentionally component-local.
+Resolver outputs remain component-local.
+
+Planar path:
 
 ```text
-ComponentLocalPlanarDescriptor
-+ separate ResolvedAssemblyConstraintTarget.component_transform
-  -> AssemblyTransformEvaluator
+local_plane + component_transform
+  -> AssemblyTransformEvaluator::evaluate_plane
   -> AssemblySpacePlanarDescriptor
 ```
 
-This keeps transform semantics in the dedicated evaluator and preserves the canonical X-then-Y-then-Z `RigidTransform` convention.
-
-## Downstream implemented path
+Axis path:
 
 ```text
-AssemblyConstraintTarget
-  -> AssemblyConstraintTargetResolver
-  -> ComponentLocalPlanarDescriptor + RigidTransform
-  -> AssemblyTransformEvaluator
-  -> AssemblySpacePlanarDescriptor
+local_axis + component_transform
+  -> AssemblyTransformEvaluator::evaluate_axis
+  -> AssemblySpaceAxisDescriptor
+```
+
+This keeps persisted placement semantics centralized in the transform evaluator.
+
+## Downstream use
+
+Planar branch:
+
+```text
+resolve
+  -> AssemblyTransformEvaluator::evaluate_plane
   -> AssemblyConstraintEquationBuilder
-  -> Mate/Distance residual descriptor
-  -> shared assembly numeric system
-  -> AssemblyRigidBodySolver
-  -> AssemblySolveResult / explicit application
-  -> AssemblySolveDiagnosticsAnalyzer
-  -> local Jacobian rank and remaining DOF
+  -> Mate/Distance residuals
+  -> shared numeric system
+  -> rigid-body solver / DOF diagnostics
 ```
 
-The resolver remains independent from constraint type, residual semantics, grounding, residual weighting, finite-difference policy, optimization, and DOF classification.
+Axis branch:
 
-The solver and diagnostics re-evaluate targets through the residual path on private project copies. No resolved-target cache becomes solver or DOF state.
+```text
+resolve_axis
+  -> AssemblyTransformEvaluator::evaluate_axis
+  -> AssemblyConcentricConstraintEquationBuilder
+  -> Concentric residuals
+```
+
+Concentric numeric-system/solver/DOF integration is not implemented yet.
 
 ## Failure behavior
 
-Resolution fails when:
+Shared failures include:
 
-- the target component occurrence does not exist
-- the component's referenced part is not project-owned
-- the semantic token is malformed
-- the token suffix is not one of the six supported planar faces
-- the source feature does not exist
-- the source feature is not a supported additive extrude
-- the shared generated-face resolver rejects the source profile/geometry family
+- target component does not exist
+- referenced part is not project-owned
 
-Semantic axis targets remain unsupported.
+Planar failures include malformed/unsupported face tokens, missing source features, unsupported feature type, and shared generated-face resolution failures.
 
-Generated edge and vertex assembly targets also remain unsupported.
+Axis failures include:
 
-Failures use the existing `Result<T>`/`Error` path and propagate through downstream residual, solver, and diagnostics consumers.
+- malformed axis token
+- unsupported axis suffix
+- missing source feature
+- source feature is not a subtractive extrude
+- missing source sketch
+- source sketch does not contain exactly one `CircleProfile` and one total profile
+- invalid/missing length diameter parameter
+- unresolved source sketch workplane
+
+Failures use existing `Result<T>`/`Error` propagation.
 
 ## Read-only and persistence boundary
 
 Resolution does not:
 
-- mutate component transforms or state
-- change assembly constraints
-- add generated references or derived workplanes to the original part
-- run a solver
-- compute DOF
-- own a `ShapeCache`
-- persist resolved target descriptors
+- mutate component transforms or component state
+- change constraints or target strings
+- modify part parameters, sketches, profiles, features, or derived workplanes
+- execute a solver
+- own `ShapeCache`
+- persist a resolved target descriptor
 
-Descriptors are regenerated from current project model intent and part parameters.
-
-Explicit solver-result application changes only existing component transform fields, never semantic target ownership.
+Resolved descriptors are regenerated from current model intent.
 
 ## Tests
 
-`tests/geometry/assembly_constraint_target_resolver_tests.cpp` covers all six generated faces, identity preservation, separate transform preservation, missing component/part/source feature failures, malformed tokens, unsupported axis/edge families, determinism, and unchanged project intent.
-
-Targeted command:
+Planar tests:
 
 ```bash
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-target]"
 ```
 
-Downstream transform, equation, solver, and diagnostics suites separately verify assembly-space mapping, residual semantics, repeated target evaluation, optimization, and local Jacobian-rank analysis.
+Axis and Concentric-path tests:
 
-## Deliberate resolver-layer limitations
+```bash
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-concentric]"
+```
 
-This resolver does not own transform math, residual semantics, rigid-body optimization, transform application, or DOF analysis. Those responsibilities are implemented in separate downstream layers.
-
-It also does not implement semantic axis, edge, or vertex assembly target descriptors.
+Coverage includes all six generated faces, semantic axis identity, CircleProfile-center axis origins, extrude-direction axis orientation, unsupported feature/profile families, determinism, and unchanged model intent.
 
 ## Current downstream boundary
 
-Jacobian-rank and remaining-DOF diagnostics are implemented.
+Generated-axis target resolution is implemented.
 
-The next assembly step is a new semantic generated-axis target family and a read-only Concentric target/residual pipeline. That work should extend semantic target typing rather than force axis geometry into the planar descriptor used by this resolver.
+The next repository-wide assembly step is to integrate the already-implemented Concentric residual descriptors into the shared numeric residual/Jacobian system, rigid-body solver, and DOF diagnostics.
