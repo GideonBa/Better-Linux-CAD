@@ -297,18 +297,14 @@ signed_seating_separation_mm = dot(sB - sA, nA)
 - one remaining rotation-about-axis DOF
 - read-only target/residual construction
 - assembly JSON roundtrip without schema-shape change
-- explicit current solver rejection; no silent Insert participation
+- explicit solver rejection until the numeric integration block below
 - no persistent target/residual/Jacobian/DOF cache
 
-## Next MVP: Insert numeric-system, solver, and DOF integration
+### 12. Insert numeric-system, solver, and DOF integration
 
-Goal: make the stable composite Insert residual a first-class shared numeric solve input without weakening any current solver or diagnostic contract.
+Canonical document: `docs/assembly-insert-numeric-solver-dof-mvp5.md`.
 
-Required implementation sequence:
-
-1. Route `AssemblyConstraintType::Insert` to `AssemblyInsertConstraintEquationBuilder` inside the one shared numeric residual evaluator.
-2. Preserve Mate/Distance/Concentric flattening exactly.
-3. Flatten Insert in this exact order:
+Implemented exact Insert flattening:
 
 ```text
 direction_parallelism.x
@@ -320,16 +316,35 @@ axis_offset_mm.z / length_residual_scale_mm
 signed_seating_separation_mm / length_residual_scale_mm
 ```
 
-4. Reuse lexicographic graph constraint ordering and persistent target A/B order.
-5. Reuse six-variable free-component ordering and the existing central finite-difference Jacobian.
-6. Reuse damped Gauss-Newton, damping escalation, line search, solve states, grounding, and suppression policy.
-7. Preserve source-project immutability, complete snapshots, stale-result detection, and atomic explicit application.
-8. Solve lateral axis offset, axis tilt, and axial seating.
-9. Accept equal and opposed aligned axis directions under the established Insert semantics.
-10. Preserve rotation about the common axis in the regular case.
-11. Extend `AssemblySolveDiagnosticsAnalyzer` over the same shared Jacobian and prove rank `5/6` with one remaining DOF.
-12. Cover deterministic mixed-family ordering, fixed inconsistency, non-convergence, explicit application, and read-only diagnostics.
-13. Keep all residual, Jacobian, solve, and DOF products derived and unpersisted.
+Insert reuses the same graph order, free-component variable order, finite differences, damped Gauss-Newton path, solve states, snapshots, stale-result checks, and explicit application boundary as planar and Concentric constraints. Lateral offset, axis tilt, and axial seating are solved; equal and opposed aligned axis directions stay accepted; rotation about the common axis stays free.
+
+Proven regular one-free-body result:
+
+```text
+variable_count           = 6
+residual_component_count = 7
+jacobian_rank            = 5
+constrained_dof          = 5
+remaining_dof            = 1
+```
+
+Mixed Concentric/Insert on one axis is also covered: rank `5`, thirteen residual components, redundancy `8`, insertion-order independent.
+
+## Next MVP: Planar Angle constraint family
+
+Goal: the first richer constraint family — an Angle constraint between two generated-face planar targets with a persistent angle value, integrated into the same shared numeric solve path in one block (the planar target and equation machinery it needs already exists).
+
+Required implementation sequence:
+
+1. Add `QuantityKind::AngleDeg` with `Quantity::angle_deg` validating finite values (unit `"deg"`), plus JSON support wherever constraint values are persisted.
+2. Add `AssemblyConstraintType::Angle` with string/JSON spelling `angle`; the constraint requires an angle value and rejects length and count quantities.
+3. Resolve both targets through the existing generated-face planar resolution (`feature.<feature-id>.<face>`).
+4. Build a dedicated read-only residual: `angle_alignment = dot(nA, nB) - cos(angle_deg)` as one dimensionless scalar component.
+5. Flatten Angle as that single component in the same lexicographic constraint order used by every family.
+6. Reuse graph order, target A/B order, variable order, finite differences, damped Gauss-Newton, solve states, snapshots, stale-result checks, and explicit application unchanged.
+7. Prove the regular one-free-body Angle system: rank `1`, five remaining DOF, full row rank (no redundancy).
+8. Cover deterministic mixed-family ordering with Mate/Distance/Concentric/Insert, fixed inconsistency, non-convergence, explicit application, and read-only diagnostics.
+9. Keep all residual, Jacobian, solve, and DOF products derived and unpersisted.
 
 ## Proposed assembly implementation sequence
 
@@ -346,9 +361,9 @@ signed_seating_separation_mm / length_residual_scale_mm
 11. Semantic generated-axis references and read-only Concentric residual construction. Implemented.
 12. Concentric numeric-system, solver, and DOF integration. Implemented.
 13. Stable Insert intent, semantic seating targets, and read-only composite residual semantics. Implemented.
-14. Insert numeric-system, solver, and DOF integration. Next.
+14. Insert numeric-system, solver, and DOF integration. Implemented.
 15. Add solved-state or DOF cache records only if a later consumer requires non-regenerable data. No current requirement.
-16. Add richer constraint families.
+16. Add richer constraint families (first: the planar Angle family). Next.
 17. Add joints and limits, then motion through the solver.
 18. Add rigid subassemblies first, flexible subassemblies later, collision/interference checks, component geometry instancing, and assembly-level STEP export.
 

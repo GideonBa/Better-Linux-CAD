@@ -233,6 +233,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/assembly_constraint_equation_builder_tests.cpp
       tests/geometry/assembly_constraint_target_resolver_tests.cpp
       tests/geometry/assembly_insert_constraint_equation_builder_tests.cpp
+      tests/geometry/assembly_insert_numeric_solver_tests.cpp
       tests/geometry/assembly_parameter_pipeline_tests.cpp
       tests/geometry/assembly_rigid_body_solver_tests.cpp
       tests/geometry/assembly_solve_diagnostics_tests.cpp

@@ -1,6 +1,6 @@
 # Stable Insert Intent and Composite Residual Semantics MVP-5
 
-Status: implemented persistent Insert relationship intent, stable circular-feature seating-plane references, composite axis/seat target resolution, and deterministic read-only Insert residual construction. Insert is not yet integrated into the shared numeric system, rigid-body solver, result application, or DOF analyzer.
+Status: implemented persistent Insert relationship intent, stable circular-feature seating-plane references, composite axis/seat target resolution, and deterministic read-only Insert residual construction. The follow-up integration into the shared numeric system, rigid-body solver, result application, and DOF analyzer is implemented in `docs/assembly-insert-numeric-solver-dof-mvp5.md`.
 
 ## Goal
 
@@ -418,25 +418,9 @@ All target and residual data is regenerated from current model intent and placem
 
 ## Numeric-system boundary
 
-The shared `AssemblyConstraintNumericSystem` still consumes:
+At the time of this block the shared `AssemblyConstraintNumericSystem` consumed only Mate, Distance, and Concentric; Insert reached an explicit planar-builder rejection. That boundary was intentional: target identity and residual semantics were stabilized before solver participation changed.
 
-```text
-Mate
-Distance
-Concentric
-```
-
-Insert is deliberately not yet flattened there.
-
-An Insert record passed to the current solver reaches the explicit planar-builder rejection:
-
-```text
-Insert equation construction requires dedicated composite target support
-```
-
-The source project remains unchanged.
-
-This boundary is intentional. Target identity and residual semantics are stable before solver participation changes.
+The boundary has since been removed by the follow-up block: Insert is now selected and flattened by the same shared numeric system. See `docs/assembly-insert-numeric-solver-dof-mvp5.md`.
 
 ## Tests
 
@@ -478,7 +462,7 @@ Coverage includes:
 - direct central finite-difference `7 x 6` residual Jacobian
 - regular Jacobian rank `5`
 - rotation-about-axis freedom
-- explicit current solver rejection and source-project immutability
+- shared-solver participation (added by the follow-up integration block) and source-project immutability
 
 ## Deliberate limitations
 
@@ -497,30 +481,6 @@ This block does not implement:
 - counterbore/countersink shoulder selection
 - joints, motion, or collision
 
-## Next technical step
+## Follow-up block
 
-The next assembly block is **Insert numeric-system, rigid-body solver, explicit application, and DOF-diagnostics integration**.
-
-That block should:
-
-1. route `AssemblyConstraintType::Insert` to the dedicated Insert builder inside the one shared numeric residual evaluator
-2. preserve existing Mate/Distance/Concentric flattening exactly
-3. flatten Insert in this exact order:
-
-```text
-direction_parallelism.x
-direction_parallelism.y
-direction_parallelism.z
-axis_offset_mm.x / length_residual_scale_mm
-axis_offset_mm.y / length_residual_scale_mm
-axis_offset_mm.z / length_residual_scale_mm
-signed_seating_separation_mm / length_residual_scale_mm
-```
-
-4. reuse the current graph constraint order and six-variable component order
-5. reuse the current central finite-difference Jacobian and damped Gauss-Newton path
-6. preserve grounding, suppression, solve-state, snapshot, stale-result, and atomic-application contracts
-7. solve lateral offset, tilt, and axial seating
-8. preserve rotation about the common axis in the regular case
-9. prove rank `5/6` and one remaining DOF through `AssemblySolveDiagnosticsAnalyzer`
-10. keep all numeric products derived and unpersisted
+The follow-up block — Insert numeric-system, rigid-body solver, explicit application, and DOF-diagnostics integration — is implemented; see `docs/assembly-insert-numeric-solver-dof-mvp5.md` and the current next MVP in `docs/mvp-plan.md`.

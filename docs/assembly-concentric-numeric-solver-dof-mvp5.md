@@ -2,7 +2,7 @@
 
 Status: implemented Concentric integration into the shared assembly numeric residual/Jacobian system, deterministic rigid-body solver, explicit solve-result application path, and read-only local Jacobian-rank/remaining-DOF diagnostics.
 
-Stable Insert intent and composite Insert residual semantics are now implemented separately. Insert numeric integration is the next shared-solver block.
+Insert follows the same integration pattern and is now implemented too: intent and composite residual semantics in `docs/assembly-insert-intent-composite-residuals-mvp5.md`, numeric/solver/DOF integration in `docs/assembly-insert-numeric-solver-dof-mvp5.md`.
 
 ## Goal
 
@@ -342,22 +342,4 @@ signed_seating_separation_mm = dot(sB - sA, nA)
 
 A direct `7 x 6` finite-difference Jacobian proves regular rank `5`, leaving rotation about the common axis free.
 
-Insert is not yet selected or flattened by the shared numeric system.
-
-## Next technical step
-
-The next block integrates Insert into the same shared residual/Jacobian, solver, application, and diagnostics path.
-
-Exact future Insert flattening:
-
-```text
-direction_parallelism.x
-direction_parallelism.y
-direction_parallelism.z
-axis_offset_mm.x / length_residual_scale_mm
-axis_offset_mm.y / length_residual_scale_mm
-axis_offset_mm.z / length_residual_scale_mm
-signed_seating_separation_mm / length_residual_scale_mm
-```
-
-Mate/Distance/Concentric ordering and every existing solver/application contract must remain unchanged. Shared diagnostics must reproduce Insert rank `5/6` with one remaining DOF rather than hard-code it.
+Insert is now selected and flattened by the same shared numeric system; see `docs/assembly-insert-numeric-solver-dof-mvp5.md`.

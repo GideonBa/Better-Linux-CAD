@@ -124,6 +124,7 @@ Implemented assembly blocks:
 - `docs/assembly-semantic-axis-concentric-residuals-mvp5.md`
 - `docs/assembly-concentric-numeric-solver-dof-mvp5.md`
 - `docs/assembly-insert-intent-composite-residuals-mvp5.md`
+- `docs/assembly-insert-numeric-solver-dof-mvp5.md`
 
 Broader implemented sketch/profile documents remain listed from `docs/mvp-plan.md` and `docs/architecture-summary.md`.
 
@@ -135,6 +136,6 @@ Future roadmaps:
 
 ## Next technical step
 
-The next technical step is explicit Insert integration into the shared numeric residual/Jacobian system, rigid-body solver, result-application path, and remaining-DOF diagnostics.
+The next technical step is the first richer constraint family: a planar Angle constraint between two generated-face targets with a persistent angle value (`QuantityKind::AngleDeg`), integrated into the same shared numeric solve path in one block.
 
-The block must route Insert through the dedicated composite builder, preserve every existing Mate/Distance/Concentric ordering and solver contract, flatten axis alignment before scaled axial seating, solve lateral offset, tilt, and axial seating through the existing finite-difference/Gauss-Newton path, preserve rotation about the common axis, and prove the regular one-free-body Insert system has rank five with one remaining DOF.
+The block must add the `angle` constraint intent with a required angle quantity, resolve both targets through the existing generated-face planar resolution, flatten one dimensionless `dot(nA, nB) - cos(angle_deg)` residual component in the shared lexicographic order, reuse every existing solver and diagnostics contract, and prove the regular one-free-body Angle system has rank one with five remaining DOF and full row rank. See `docs/mvp-plan.md`.

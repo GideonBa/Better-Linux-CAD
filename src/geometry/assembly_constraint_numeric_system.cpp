@@ -2,6 +2,7 @@
 
 #include "blcad/geometry/assembly_concentric_constraint_equation_builder.hpp"
 #include "blcad/geometry/assembly_constraint_equation_builder.hpp"
+#include "blcad/geometry/assembly_insert_constraint_equation_builder.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -26,8 +27,7 @@ namespace {
 [[nodiscard]] RigidTransform transform_from_variables(const NumericVector& values,
                                                       std::size_t offset) noexcept {
   return RigidTransform{Vector3{values[offset], values[offset + 1U], values[offset + 2U]},
-                        Vector3{values[offset + 3U], values[offset + 4U],
-                                values[offset + 5U]}};
+                        Vector3{values[offset + 3U], values[offset + 4U], values[offset + 5U]}};
 }
 
 [[nodiscard]] double variable_step(const AssemblyNumericSystemOptions& options,
@@ -39,9 +39,9 @@ namespace {
 
 } // namespace
 
-Result<std::vector<AssemblyConstraintId>> collect_constraint_ids(
-    const AssemblyConstraintGraph& graph,
-    const std::vector<ComponentInstanceId>& connected_group) {
+Result<std::vector<AssemblyConstraintId>>
+collect_constraint_ids(const AssemblyConstraintGraph& graph,
+                       const std::vector<ComponentInstanceId>& connected_group) {
   std::vector<AssemblyConstraintId> constraint_ids;
   for (const auto& edge : graph.edges()) {
     if (contains_component(connected_group, edge.component_a()) &&
@@ -52,20 +52,21 @@ Result<std::vector<AssemblyConstraintId>> collect_constraint_ids(
   return Result<std::vector<AssemblyConstraintId>>::success(std::move(constraint_ids));
 }
 
-Result<NumericVector> evaluate_residuals(
-    const Project& project,
-    const std::vector<AssemblyConstraintId>& constraint_ids,
-    double length_residual_scale_mm) {
+Result<NumericVector> evaluate_residuals(const Project& project,
+                                         const std::vector<AssemblyConstraintId>& constraint_ids,
+                                         double length_residual_scale_mm) {
   const AssemblyConstraintEquationBuilder planar_builder;
   const AssemblyConcentricConstraintEquationBuilder concentric_builder;
+  const AssemblyInsertConstraintEquationBuilder insert_builder;
   NumericVector residuals;
-  residuals.reserve(constraint_ids.size() * 6U);
+  residuals.reserve(constraint_ids.size() * 7U);
 
   for (const auto& constraint_id : constraint_ids) {
     const AssemblyConstraint* constraint = project.assembly().find_constraint(constraint_id);
     if (constraint == nullptr) {
-      return Result<NumericVector>::failure(internal_error(
-          constraint_id.value(), "assembly numeric system graph constraint must exist in assembly"));
+      return Result<NumericVector>::failure(
+          internal_error(constraint_id.value(),
+                         "assembly numeric system graph constraint must exist in assembly"));
     }
 
     if (constraint->type() == AssemblyConstraintType::Concentric) {
@@ -84,13 +85,29 @@ Result<NumericVector> evaluate_residuals(
       continue;
     }
 
+    if (constraint->type() == AssemblyConstraintType::Insert) {
+      auto equation = insert_builder.build(project, *constraint);
+      if (equation.has_error()) {
+        return Result<NumericVector>::failure(equation.error());
+      }
+
+      const InsertResidualDescriptor& insert = equation.value().residual;
+      residuals.push_back(insert.direction_parallelism.x);
+      residuals.push_back(insert.direction_parallelism.y);
+      residuals.push_back(insert.direction_parallelism.z);
+      residuals.push_back(insert.axis_offset_mm.x / length_residual_scale_mm);
+      residuals.push_back(insert.axis_offset_mm.y / length_residual_scale_mm);
+      residuals.push_back(insert.axis_offset_mm.z / length_residual_scale_mm);
+      residuals.push_back(insert.signed_seating_separation_mm / length_residual_scale_mm);
+      continue;
+    }
+
     auto equation = planar_builder.build(project, *constraint);
     if (equation.has_error()) {
       return Result<NumericVector>::failure(equation.error());
     }
 
-    if (const auto* mate =
-            std::get_if<PlanarMateResidualDescriptor>(&equation.value().residual)) {
+    if (const auto* mate = std::get_if<PlanarMateResidualDescriptor>(&equation.value().residual)) {
       residuals.push_back(mate->normal_opposition.x);
       residuals.push_back(mate->normal_opposition.y);
       residuals.push_back(mate->normal_opposition.z);
@@ -101,8 +118,9 @@ Result<NumericVector> evaluate_residuals(
     const auto* distance =
         std::get_if<PlanarDistanceResidualDescriptor>(&equation.value().residual);
     if (distance == nullptr) {
-      return Result<NumericVector>::failure(internal_error(
-          constraint_id.value(), "assembly numeric system received an unknown residual descriptor"));
+      return Result<NumericVector>::failure(
+          internal_error(constraint_id.value(),
+                         "assembly numeric system received an unknown residual descriptor"));
     }
     residuals.push_back(distance->normal_parallelism.x);
     residuals.push_back(distance->normal_parallelism.y);
@@ -132,9 +150,8 @@ double residual_max_abs(const NumericVector& residuals) noexcept {
   return maximum;
 }
 
-NumericVector read_variables(
-    const Project& project,
-    const std::vector<ComponentInstanceId>& variable_components) {
+NumericVector read_variables(const Project& project,
+                             const std::vector<ComponentInstanceId>& variable_components) {
   NumericVector values;
   values.reserve(variable_components.size() * kAssemblyTransformVariableCount);
   for (const auto& component_id : variable_components) {
@@ -150,14 +167,13 @@ NumericVector read_variables(
   return values;
 }
 
-Result<std::size_t> apply_variables(
-    Project& project,
-    const std::vector<ComponentInstanceId>& variable_components,
-    const NumericVector& values) {
+Result<std::size_t> apply_variables(Project& project,
+                                    const std::vector<ComponentInstanceId>& variable_components,
+                                    const NumericVector& values) {
   if (values.size() != variable_components.size() * kAssemblyTransformVariableCount) {
-    return Result<std::size_t>::failure(internal_error(
-        "assembly.numeric_system",
-        "assembly numeric variable vector does not match component variable count"));
+    return Result<std::size_t>::failure(
+        internal_error("assembly.numeric_system",
+                       "assembly numeric variable vector does not match component variable count"));
   }
 
   for (std::size_t index = 0U; index < variable_components.size(); ++index) {
@@ -172,12 +188,9 @@ Result<std::size_t> apply_variables(
 }
 
 Result<NumericMatrix> build_central_difference_jacobian(
-    const Project& project,
-    const std::vector<ComponentInstanceId>& variable_components,
-    const std::vector<AssemblyConstraintId>& constraint_ids,
-    const NumericVector& variables,
-    const NumericVector& baseline_residuals,
-    const AssemblyNumericSystemOptions& options) {
+    const Project& project, const std::vector<ComponentInstanceId>& variable_components,
+    const std::vector<AssemblyConstraintId>& constraint_ids, const NumericVector& variables,
+    const NumericVector& baseline_residuals, const AssemblyNumericSystemOptions& options) {
   NumericMatrix jacobian(baseline_residuals.size(), NumericVector(variables.size(), 0.0));
 
   for (std::size_t column = 0U; column < variables.size(); ++column) {
@@ -211,9 +224,9 @@ Result<NumericMatrix> build_central_difference_jacobian(
 
     if (plus_residuals.value().size() != baseline_residuals.size() ||
         minus_residuals.value().size() != baseline_residuals.size()) {
-      return Result<NumericMatrix>::failure(internal_error(
-          "assembly.numeric_system",
-          "assembly numeric residual dimension changed during finite differences"));
+      return Result<NumericMatrix>::failure(
+          internal_error("assembly.numeric_system",
+                         "assembly numeric residual dimension changed during finite differences"));
     }
 
     const double denominator = 2.0 * step;
