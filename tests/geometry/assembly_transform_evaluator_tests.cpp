@@ -33,6 +33,59 @@ void check_vector_approx(const Vector3& actual, const Vector3& expected) {
   return lhs.x * rhs.x + lhs.y * rhs.y + lhs.z * rhs.z;
 }
 
+Parameter make_length_parameter(const char* id, const char* name, double value_mm) {
+  auto quantity = Quantity::length_mm(value_mm, id);
+  REQUIRE(quantity);
+  auto parameter = Parameter::create_length(ParameterId(id), name, quantity.value());
+  REQUIRE(parameter);
+  return parameter.value();
+}
+
+Project make_transform_project() {
+  auto part = PartDocument::create(DocumentId("part.face_plate"), "FacePlate");
+  REQUIRE(part);
+  REQUIRE(part.value().add_parameter(make_length_parameter("part.width", "width", 120.0)));
+  REQUIRE(part.value().add_parameter(make_length_parameter("part.height", "height", 80.0)));
+  REQUIRE(
+      part.value().add_parameter(make_length_parameter("part.thickness", "thickness", 8.0)));
+
+  auto xy = DatumPlane::xy();
+  REQUIRE(xy);
+  REQUIRE(part.value().add_datum_plane(xy.value()));
+
+  auto sketch =
+      Sketch::create(SketchId("sketch.base"), "Sketch_BaseRectangle", DatumPlaneId("datum.xy"));
+  REQUIRE(sketch);
+  auto rectangle = RectangleProfile::create(ProfileId("profile.base_rectangle"),
+                                            ParameterId("part.width"), ParameterId("part.height"));
+  REQUIRE(rectangle);
+  REQUIRE(sketch.value().add_profile(rectangle.value()));
+  REQUIRE(part.value().add_sketch(sketch.value()));
+
+  auto feature = Feature::create_additive_extrude(
+      FeatureId("feature.base_extrude"), "BaseExtrude", SketchId("sketch.base"),
+      ParameterId("part.thickness"));
+  REQUIRE(feature);
+  REQUIRE(part.value().add_feature(feature.value()));
+
+  auto assembly = AssemblyDocument::create(DocumentId("assembly.face"), "FaceAssembly");
+  REQUIRE(assembly);
+  REQUIRE(assembly.value().add_member_part(DocumentId("part.face_plate")));
+
+  const RigidTransform transform{Vector3{10.0, 20.0, 30.0}, Vector3{0.0, 0.0, 90.0}};
+  auto component = ComponentInstance::create(
+      ComponentInstanceId("component.face_plate"), "Face Plate", DocumentId("part.face_plate"),
+      ComponentVisibility::Visible, ComponentSuppressionState::Active,
+      ComponentGroundingState::Free, transform);
+  REQUIRE(component);
+  REQUIRE(assembly.value().add_component_instance(component.value()));
+
+  auto project = Project::create(DocumentId("project.face"), "FaceProject", assembly.value());
+  REQUIRE(project);
+  REQUIRE(project.value().add_part_document(part.value()));
+  return project.value();
+}
+
 } // namespace
 
 TEST_CASE("Assembly transform evaluator preserves identity and applies translation only to points",
@@ -100,18 +153,24 @@ TEST_CASE("Assembly transform evaluator proves X then Y then Z rotation order",
   check_vector_approx(evaluated, Vector3{3.0, 2.0, -1.0});
 }
 
-TEST_CASE("Assembly transform evaluator maps component-local target planes into assembly space",
+TEST_CASE("Assembly transform evaluator maps a resolved target plane into assembly space",
           "[geometry][assembly-transform]") {
-  const AssemblyTransformEvaluator evaluator;
-  const ResolvedAssemblyConstraintTarget target{
-      ComponentInstanceId("component.face_plate"), DocumentId("part.face_plate"),
-      FeatureId("feature.base_extrude"), SemanticFace::Top,
-      ComponentLocalPlanarDescriptor{Point3{0.0, 0.0, 8.0}, Vector3{1.0, 0.0, 0.0},
-                                     Vector3{0.0, 1.0, 0.0}, Vector3{0.0, 0.0, 1.0}},
-      RigidTransform{Vector3{10.0, 20.0, 30.0}, Vector3{0.0, 0.0, 90.0}}};
+  const Project project = make_transform_project();
+  auto target = AssemblyConstraintTarget::create(ComponentInstanceId("component.face_plate"),
+                                                 "feature.base_extrude.top");
+  REQUIRE(target);
 
+  const AssemblyConstraintTargetResolver target_resolver;
+  const auto resolved = target_resolver.resolve(project, target.value());
+  REQUIRE(resolved);
+
+  CHECK((resolved.value().local_plane.origin == Point3{0.0, 0.0, 8.0}));
+  CHECK((resolved.value().component_transform.translation_mm == Vector3{10.0, 20.0, 30.0}));
+  CHECK((resolved.value().component_transform.rotation_deg == Vector3{0.0, 0.0, 90.0}));
+
+  const AssemblyTransformEvaluator evaluator;
   const AssemblySpacePlanarDescriptor plane =
-      evaluator.evaluate_plane(target.component_transform, target.local_plane);
+      evaluator.evaluate_plane(resolved.value().component_transform, resolved.value().local_plane);
 
   check_point_approx(plane.origin, Point3{10.0, 20.0, 38.0});
   check_vector_approx(plane.x_axis, Vector3{0.0, 1.0, 0.0});
