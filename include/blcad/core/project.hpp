@@ -56,6 +56,7 @@ public:
   [[nodiscard]] Result<std::size_t> validate_member_parts() const;
   [[nodiscard]] Result<std::size_t> validate_component_instances() const;
   [[nodiscard]] Result<std::size_t> validate_assembly_constraints() const;
+  [[nodiscard]] Result<std::size_t> validate_cross_hierarchy_constraints() const;
   [[nodiscard]] Result<std::size_t> validate_assembly_joints() const;
   [[nodiscard]] Result<std::size_t> validate_subassembly_instances() const;
   [[nodiscard]] Result<std::size_t> validate_assembly_hierarchy() const;
