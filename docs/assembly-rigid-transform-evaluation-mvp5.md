@@ -1,6 +1,6 @@
 # Assembly Rigid-Transform Evaluation MVP-5
 
-Status: implemented deterministic read-only component-local-to-assembly-space evaluation for points, vectors, planar frames, and generated axis lines under persisted `RigidTransform` values.
+Status: implemented deterministic read-only component-local-to-assembly-space evaluation for points, vectors, planar frames, and generated axis lines under persisted `RigidTransform` values. Mate, Distance, and Concentric residual/Jacobian evaluation all use this exact transform convention.
 
 ## Goal
 
@@ -126,7 +126,7 @@ translation       = (10, 20, 30)
 rotation_deg      = (90, 0, 0)
 ```
 
-The result is:
+Result:
 
 ```text
 assembly origin    = (14, 20, 24)
@@ -183,8 +183,7 @@ Planar assembly-space frames feed:
 ```text
 AssemblyConstraintEquationBuilder
   -> Mate/Distance residuals
-  -> current shared numeric system
-  -> solver and DOF diagnostics
+  -> shared numeric system
 ```
 
 Assembly-space axes feed:
@@ -192,9 +191,19 @@ Assembly-space axes feed:
 ```text
 AssemblyConcentricConstraintEquationBuilder
   -> ConcentricResidualDescriptor
+  -> same shared numeric system
 ```
 
-The Concentric residual path is implemented. Concentric numeric-system/solver/DOF integration is next.
+The shared numeric system then feeds both:
+
+```text
+AssemblyRigidBodySolver
+AssemblySolveDiagnosticsAnalyzer
+```
+
+Every baseline, line-search candidate, and central finite-difference plus/minus evaluation uses the same `AssemblyTransformEvaluator` convention.
+
+Concentric axis-tilt solving and the measured regular rank `4/6` therefore use these exact X-then-Y-then-Z transform semantics rather than a second rotation interpretation.
 
 ## Valid transform boundary
 
@@ -202,7 +211,7 @@ The Concentric residual path is implemented. Concentric numeric-system/solver/DO
 
 The evaluator assumes a validated persisted `RigidTransform` and therefore remains a direct geometry helper rather than returning `Result<T>`.
 
-The current solver candidate path uses `AssemblyDocument::set_component_instance_transform`, so non-finite candidates cannot become valid project placement state.
+The solver candidate path uses `AssemblyDocument::set_component_instance_transform`, so non-finite candidates cannot become valid project placement state.
 
 ## Read-only and persistence boundary
 
@@ -218,7 +227,9 @@ Evaluation does not:
 
 Assembly-space planes and axes are regenerated from component-local semantic geometry plus persisted placement.
 
-No transform matrix, quaternion, evaluated-plane, or evaluated-axis JSON field is added.
+The solver and diagnostics repeatedly regenerate these descriptors while evaluating residuals and finite differences.
+
+No transform matrix, quaternion, evaluated-plane, evaluated-axis, or Jacobian JSON field is added.
 
 ## Tests
 
@@ -228,16 +239,22 @@ Transform suite:
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-transform]"
 ```
 
-Axis/Concentric suite:
+Axis/Concentric semantic suite:
 
 ```bash
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-concentric]"
 ```
 
-Coverage includes identity, translation, single-axis rotations, combined rotation order, planar-frame preservation, arbitrary vector magnitude, generated-axis origin/direction mapping, input immutability, and downstream Concentric target evaluation.
+Concentric numeric solver suite:
+
+```bash
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-concentric-solver]"
+```
+
+Coverage includes identity, translation, single-axis rotations, combined rotation order, planar-frame preservation, arbitrary vector magnitude, generated-axis origin/direction mapping, input immutability, Concentric target evaluation, axis-tilt solving, and local rank evaluation through the shared transform convention.
 
 ## Current downstream boundary
 
-Transform evaluation for semantic axes is implemented.
+Transform evaluation for planar and semantic-axis geometry is implemented and consumed by the shared Mate/Distance/Concentric numeric solver and DOF diagnostics.
 
-The next assembly step is Concentric integration into the shared numeric residual/Jacobian path, rigid-body solver, and local remaining-DOF diagnostics. That integration must continue using this exact transform convention for every baseline and finite-difference evaluation.
+The next assembly geometry block is stable semantic axial-seating plane geometry for Insert. That geometry must also be evaluated through this same transform convention.
