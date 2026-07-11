@@ -25,13 +25,17 @@ struct ResolvedWorkplane {
 class WorkplaneResolver {
 public:
   [[nodiscard]] Result<ResolvedWorkplane> resolve(const PartDocument& document,
-                                                  DatumPlaneId workplane_id) const;
+                                                   DatumPlaneId workplane_id) const;
+
+  [[nodiscard]] Result<ResolvedWorkplane>
+  resolve_generated_face(const PartDocument& document,
+                         const SemanticFaceReference& face_reference) const;
 
   [[nodiscard]] Result<ResolvedWorkplane> resolve_for_sketch(const PartDocument& document,
-                                                             const Sketch& sketch) const;
+                                                              const Sketch& sketch) const;
 
   [[nodiscard]] Point3 evaluate_point(const ResolvedWorkplane& workplane,
-                                      Point2 local_point) const noexcept;
+                                       Point2 local_point) const noexcept;
 };
 
 } // namespace blcad::geometry
