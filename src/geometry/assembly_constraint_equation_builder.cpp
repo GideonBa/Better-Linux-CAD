@@ -50,7 +50,7 @@ resolve_assembly_space_target(const Project& project, const AssemblyConstraintTa
 
 Result<AssemblyConstraintEquationDescriptor>
 AssemblyConstraintEquationBuilder::build(const Project& project,
-                                         const AssemblyConstraint& constraint) const {
+                                          const AssemblyConstraint& constraint) const {
   if (constraint.state() != AssemblyConstraintState::Active) {
     return Result<AssemblyConstraintEquationDescriptor>::failure(validation_error(
         constraint.id().value(),
@@ -60,7 +60,7 @@ AssemblyConstraintEquationBuilder::build(const Project& project,
   if (constraint.type() == AssemblyConstraintType::Concentric) {
     return Result<AssemblyConstraintEquationDescriptor>::failure(validation_error(
         constraint.id().value(),
-        "concentric equation construction requires semantic axis target support"));
+        "planar assembly constraint equation builder does not support Concentric constraints"));
   }
 
   auto target_a = resolve_assembly_space_target(project, constraint.target_a());
