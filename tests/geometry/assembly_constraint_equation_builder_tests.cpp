@@ -205,6 +205,27 @@ TEST_CASE("Assembly constraint equation builder constructs signed planar Distanc
   CHECK(residual.distance_residual_mm == Approx(0.0).margin(kTolerance));
 }
 
+TEST_CASE("Assembly constraint equation builder reports nonparallel Distance plane residuals",
+          "[geometry][assembly-equation]") {
+  Project project = make_two_component_project(
+      identity_rigid_transform(),
+      RigidTransform{Vector3{}, Vector3{90.0, 0.0, 0.0}});
+  auto constraint = make_constraint(
+      "constraint.distance.nonparallel", AssemblyConstraintType::Distance,
+      make_target("component.a", "feature.base_extrude.top"),
+      make_target("component.b", "feature.base_extrude.top"), AssemblyConstraintState::Active,
+      make_distance(8.0, "constraint.distance.nonparallel"));
+  REQUIRE(project.assembly().add_constraint(constraint));
+
+  const AssemblyConstraintEquationBuilder builder;
+  const auto equation = builder.build(project, project.assembly().constraints().front());
+
+  REQUIRE(equation);
+  check_vector_approx(equation.value().target_b.plane.normal, Vector3{0.0, -1.0, 0.0});
+  const auto& residual = std::get<PlanarDistanceResidualDescriptor>(equation.value().residual);
+  check_vector_approx(residual.normal_parallelism, Vector3{1.0, 0.0, 0.0});
+}
+
 TEST_CASE("Planar Distance signed separation follows target A to target B order",
           "[geometry][assembly-equation]") {
   Project project = make_two_component_project(
