@@ -95,6 +95,20 @@ Result<std::size_t> Project::validate_assembly_constraints() const {
   return Result<std::size_t>::success(assembly_.constraint_count());
 }
 
+Result<std::size_t> Project::validate_assembly_joints() const {
+  for (const AssemblyJoint& joint : assembly_.joints()) {
+    if (assembly_.find_component_instance(joint.target_a().component_instance()) == nullptr) {
+      return Result<std::size_t>::failure(
+          Error::validation(joint.id().value(), "assembly joint target A component instance must exist"));
+    }
+    if (assembly_.find_component_instance(joint.target_b().component_instance()) == nullptr) {
+      return Result<std::size_t>::failure(
+          Error::validation(joint.id().value(), "assembly joint target B component instance must exist"));
+    }
+  }
+  return Result<std::size_t>::success(assembly_.joint_count());
+}
+
 Result<std::size_t> Project::validate_assembly_structure() const {
   auto members = validate_member_parts();
   if (members.has_error()) return members;
@@ -105,7 +119,11 @@ Result<std::size_t> Project::validate_assembly_structure() const {
   auto constraints = validate_assembly_constraints();
   if (constraints.has_error()) return constraints;
 
-  return Result<std::size_t>::success(members.value() + instances.value() + constraints.value());
+  auto joints = validate_assembly_joints();
+  if (joints.has_error()) return joints;
+
+  return Result<std::size_t>::success(members.value() + instances.value() + constraints.value() +
+                                      joints.value());
 }
 
 Result<ProjectUpdateResult> Project::set_assembly_parameter_value(ParameterId id, Quantity value) {
@@ -146,17 +164,11 @@ Result<ProjectUpdateResult> Project::set_assembly_parameter_value(ParameterId id
 }
 
 const DocumentId& Project::id() const noexcept { return id_; }
-
 const std::string& Project::name() const noexcept { return name_; }
-
 const AssemblyDocument& Project::assembly() const noexcept { return assembly_; }
-
 AssemblyDocument& Project::assembly() noexcept { return assembly_; }
-
 const std::vector<PartDocument>& Project::part_documents() const noexcept { return part_documents_; }
-
 std::vector<PartDocument>& Project::part_documents() noexcept { return part_documents_; }
-
 std::size_t Project::part_document_count() const noexcept { return part_documents_.size(); }
 
 const PartDocument* Project::find_part_document(DocumentId id) const noexcept {
