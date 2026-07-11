@@ -39,8 +39,8 @@ private:
 };
 
 // Project-level container for one assembly document and its owned part documents.
-// It stores component placement/state and solver-independent assembly constraint
-// intent. Constraint graph and solver state remain later assembly-system work.
+// It stores component placement/state plus solver-independent geometric constraint
+// and joint/limit intent. Numeric graph/solve/motion state stays derived.
 class Project {
 public:
   [[nodiscard]] static Result<Project> create(DocumentId id, std::string name,
@@ -50,6 +50,7 @@ public:
   [[nodiscard]] Result<std::size_t> validate_member_parts() const;
   [[nodiscard]] Result<std::size_t> validate_component_instances() const;
   [[nodiscard]] Result<std::size_t> validate_assembly_constraints() const;
+  [[nodiscard]] Result<std::size_t> validate_assembly_joints() const;
   [[nodiscard]] Result<std::size_t> validate_assembly_structure() const;
 
   // Changes one assembly parameter, applies all assembly bindings to owned
