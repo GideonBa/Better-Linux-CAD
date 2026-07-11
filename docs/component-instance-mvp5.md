@@ -1,28 +1,29 @@
-# MVP 5: Component Instances and Explicit Free Placement
+# Component Instances and Explicit Placement MVP-5
 
-Status: implemented component-instance and explicit placement/state update block. Component instances are assembly model-intent records that reference project-owned part documents and remain directly editable without a solver.
+Status: implemented persistent component occurrence, placement, visibility, suppression, and grounding records plus explicit state-update APIs. The first rigid-body solver now consumes these records and may propose new transforms, while a separate applier owns the explicit successful-result mutation boundary.
 
 ## Goal
 
-One project-owned part document can appear as multiple assembly occurrences without duplicating the owned `PartDocument` or its feature intent.
+A project-owned part model may appear several times in one assembly without duplicating `PartDocument` model intent.
 
-Existing component instances can receive explicit placement and state edits.
+Each occurrence needs stable identity and independent placement/state.
 
-This record/update block itself must not:
+## Component identity
 
-- solve assembly constraints
-- create constraints as a side effect of placement edits
-- compute remaining degrees of freedom
-- infer placement from grounding
-- perform collision checks
-- export assembly-level STEP
-- duplicate an owned part for each occurrence
+`ComponentInstanceId` identifies an assembly occurrence independently from `DocumentId`.
 
-Downstream graph, target-resolution, transform-evaluation, and planar residual layers are implemented separately.
+Example:
 
-## Implemented records
+```text
+part.bolt
+  -> component.bolt.1
+  -> component.bolt.2
+  -> component.bolt.3
+```
 
-The API lives in `include/blcad/core/assembly_document.hpp`.
+All occurrences may reference the same project-owned part while retaining independent transforms and component state.
+
+## Component record
 
 ```text
 ComponentInstance
@@ -33,119 +34,136 @@ ComponentInstance
   suppression_state
   grounding_state
   transform
+```
 
+State enums are:
+
+```text
+ComponentVisibility
+  Visible
+  Hidden
+
+ComponentSuppressionState
+  Active
+  Suppressed
+
+ComponentGroundingState
+  Free
+  Grounded
+```
+
+Placement is:
+
+```text
 RigidTransform
   translation_mm
   rotation_deg
 ```
 
-`ComponentInstanceId` is a typed id in `include/blcad/core/id.hpp`.
+Translation components are millimeters and rotation components are degrees.
 
-Implemented state enums:
+All transform components must be finite.
 
-```text
-ComponentVisibility
-  visible
-  hidden
+## Transform semantics
 
-ComponentSuppressionState
-  active
-  suppressed
-
-ComponentGroundingState
-  free
-  grounded
-```
-
-Translation is stored in millimeters and rotation in degrees. All six transform components must be finite; `NaN` and positive/negative infinity are rejected.
-
-The exact transform geometry semantics are defined in `docs/assembly-rigid-transform-evaluation-mvp5.md`.
-
-## Explicit component updates
-
-`ComponentInstance` provides copy-style operations:
+The persisted transform record is interpreted by `AssemblyTransformEvaluator` using the canonical active right-handed fixed-axis rotation order:
 
 ```text
-with_transform(...)
-with_visibility(...)
-with_suppression_state(...)
-with_grounding_state(...)
+X -> Y -> Z
+Rz * Ry * Rx for column vectors
 ```
 
-`AssemblyDocument` exposes stored-instance updates:
+Points are rotated and translated. Vectors, axes, and normals are rotated only.
+
+The exact convention is documented in `docs/assembly-rigid-transform-evaluation-mvp5.md`.
+
+## Ownership and validation
+
+`AssemblyDocument` owns component instances by value.
+
+A component may reference only a registered assembly member part.
+
+`Project::validate_component_instances()` additionally requires every component reference to resolve to a project-owned `PartDocument`.
+
+Several component instances may reference one owned part document. Component occurrences do not duplicate part parameters, sketches, features, or shape-cache ownership.
+
+## Explicit update APIs
+
+`AssemblyDocument` exposes explicit component updates for:
+
+- transform
+- visibility
+- suppression state
+- grounding state
+
+Copy-style `ComponentInstance::with_*` operations preserve stable component identity and `referenced_part_document`.
+
+The shared assembly update path rejects empty/unknown ids and invalid transforms before replacing the stored record.
+
+Failed updates preserve the previously stored component record.
+
+## Storage-layer versus solver grounding semantics
+
+The component storage layer deliberately permits an explicit direct transform update even when a component is marked grounded.
+
+This allows explicit model edits and keeps record semantics independent from solver behavior.
+
+The first rigid-body solver is the first consumer that enforces grounding as solve policy:
 
 ```text
-set_component_instance_transform(...)
-set_component_instance_visibility(...)
-set_component_instance_suppression_state(...)
-set_component_instance_grounding_state(...)
+Grounded -> fixed solve participant
+Free     -> variable solve participant
 ```
 
-Each update:
+At least one component in a selected connected group must be grounded. Multiple grounded components are allowed and all remain fixed during solve.
 
-- rejects an empty component id
-- requires the target component to exist
-- replaces only the requested placement/state field
-- preserves component id, name, and referenced part document
-- returns the updated component index
-- rejects non-finite transform values
-- leaves the stored instance unchanged on validation failure
-- does not modify or duplicate a `PartDocument`
-- does not infer constraints or run a solver
-- does not trigger part invalidation or geometry recompute
+Changing a grounded anchor after a solve invalidates the old solve result because solver snapshots include every group component's source transform and state.
 
-The four public update entry points share one internal lookup/replacement path.
+## Suppression and visibility
 
-## No-solver boundary
+The records persist both suppression and visibility.
 
-A component marked `grounded` can still receive a direct transform update. Grounding is stored model intent until the assembly solver defines fixed-body participation.
+Visibility does not affect the first rigid-body solver.
 
-Visibility and suppression are also stored state only. They do not currently remove components from graph connectivity, target resolution, transform evaluation, residual construction, geometry execution, export, or collision analysis.
+The first solver rejects a selected graph group containing a suppressed component instead of silently removing it or its constraints.
 
-Adding constraints, deriving graph connectivity, resolving targets, evaluating transforms, and constructing residuals leave stored component transforms unchanged.
+This is a solver policy, not a storage-layer mutation rule.
 
-## Assembly ownership
+Future suppression-aware graph/solve participation must define connectivity and constraint participation together.
 
-`AssemblyDocument` owns component instances by value:
+## Constraint and solver consumers
+
+The current assembly path consumes component records through separate layers:
 
 ```text
-AssemblyDocument
-  member_parts[]
-  component_instances[]
+ComponentInstance
+  -> AssemblyConstraintGraph
+  -> AssemblyConstraintTargetResolver
+  -> AssemblyTransformEvaluator
+  -> AssemblyConstraintEquationBuilder
+  -> AssemblyRigidBodySolver
+  -> AssemblySolveResult
+  -> AssemblySolveResultApplier
 ```
 
-A component must reference an already registered member part.
+Responsibilities remain separate:
 
-Multiple component instances may reference the same member part. This is the intended representation for repeated occurrences.
+- graph: active relationship connectivity
+- target resolver: component/part semantic lookup and local plane construction
+- transform evaluator: exact local-to-assembly coordinate mapping
+- equation builder: planar Mate/Distance residual semantics
+- rigid-body solver: fixed/variable participation and numeric solve on a private project copy
+- result applier: explicit fresh-converged-result transform mutation boundary
 
-Placement/state updates cannot change `referenced_part_document`.
+The solver does not mutate the source project.
 
-## Project validation
+A successful apply updates the existing component transform records through the normal assembly transform update path.
 
-`Project` owns the concrete `PartDocument` objects.
+No separate solved-transform record is added to `ComponentInstance`.
 
-Relevant validation APIs are:
+## JSON representation
 
-```text
-validate_member_parts()
-validate_component_instances()
-validate_assembly_constraints()
-validate_assembly_structure()
-```
-
-`validate_member_parts` checks that every assembly member resolves to an owned project part.
-
-`validate_component_instances` checks each component against assembly membership and project ownership.
-
-`validate_assembly_constraints` checks constraint component targets.
-
-`validate_assembly_structure` runs the current structure checks.
-
-Because component updates preserve `referenced_part_document`, a structurally valid project remains structurally valid after placement/state edits.
-
-## JSON persistence
-
-Component instances are an optional field of the existing assembly compatibility schema:
+Assembly JSON retains the historical compatibility marker:
 
 ```text
 blcad.assembly_document.mvp4
@@ -154,7 +172,7 @@ version 1
 
 The marker is historical. MVP-5 component instances extended the schema additively.
 
-A representative component entry is:
+Representative component JSON:
 
 ```json
 {
@@ -171,40 +189,21 @@ A representative component entry is:
 }
 ```
 
-Assembly and project JSON roundtrip preserve component placement/state.
+Assembly/project JSON roundtrip preserves component placement and state.
 
-Derived graph, target, assembly-space frame, and residual data are not component persistence fields.
+Graph, resolved targets, assembly-space frames, residuals, Jacobians, `AssemblySolveResult`, and proposed transforms are not component persistence fields.
 
-## Downstream assembly layers
+After a fresh converged solve result is explicitly applied, a later save serializes the updated existing `transform` field exactly like any other valid transform edit.
 
-The current component record is consumed read-only by:
-
-```text
-AssemblyConstraintGraph
-AssemblyConstraintTargetResolver
-AssemblyTransformEvaluator
-AssemblyConstraintEquationBuilder
-```
-
-`AssemblyConstraintGraph` uses component identity for relationship connectivity.
-
-`AssemblyConstraintTargetResolver` maps a target component occurrence to its referenced project-owned part and supported local generated-face frame.
-
-`AssemblyTransformEvaluator` applies the persisted `RigidTransform` convention to points, vectors, and planar frames.
-
-`AssemblyConstraintEquationBuilder` evaluates active planar Mate/Distance targets and constructs residual descriptors.
-
-None of those layers mutates a stored component transform.
+The file format does not persist transform provenance as "manual" versus "solver-applied".
 
 ## Headless inspection
-
-The core inspection executable is:
 
 ```text
 blcad_inspect_project_components <input.blcad.project.json>
 ```
 
-It reports:
+The current inspector reports:
 
 - referenced part document
 - visibility
@@ -215,26 +214,25 @@ It reports:
 - stored constraints
 - derived graph-group summary
 
-The tool is read-only.
+The tool is read-only and does not run the solver.
 
 ## Tests
 
-The component-instance tests cover:
+Component-instance core tests cover:
 
 - required identity fields
 - initial transform storage
-- rejection of non-finite transforms
+- non-finite transform rejection
 - member-part reference validation
 - unique component ids
-- explicit transform and state updates
-- empty/unknown update ids
-- failed transform updates preserving stored placement
-- direct transform updates while grounded
-- identity and referenced-part preservation across updates
-- assembly JSON roundtrip
-- project-level part ownership validation
-- repeated instances sharing one owned part
-- project JSON roundtrip preserving placement/state and shared ownership
+- explicit transform/state updates
+- empty and unknown update ids
+- failed update immutability
+- direct transform edits while grounded
+- identity and part-reference preservation across updates
+- assembly/project JSON roundtrip
+- project-owned part validation
+- repeated occurrences sharing one part
 
 Targeted command:
 
@@ -242,25 +240,29 @@ Targeted command:
 ./build/dev/blcad_core_tests "[core][component-instance]"
 ```
 
-Constraint, graph, target-resolution, transform-evaluation, and equation-builder tests are intentionally separate.
+The rigid-body solver suite separately covers grounded/fixed participation, suppression rejection, source-project immutability, stale component snapshots, and explicit transform application:
 
-## Deliberate limitations
+```bash
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-solver]"
+```
 
-This component block itself does not implement:
+## Deliberate component-record limitations
 
-- solver output
-- remaining degrees of freedom
-- enforced grounding
-- suppression effects on assembly consumers
-- collision checks
-- subassemblies
-- assembly geometry instancing
-- assembly-level STEP export
+The component record layer itself does not:
 
-Persistent constraint records, graph connectivity, generated-face target resolution, rigid-transform evaluation, and planar Mate/Distance residual construction are implemented as separate layers.
+- infer assembly constraints from placement
+- run numeric optimization
+- compute remaining degrees of freedom
+- classify under/fully/overconstrained state
+- automatically block direct edits while grounded
+- automatically remove suppressed components from graph connectivity
+- instantiate assembly geometry
+- export assembly STEP
+
+Persistent constraint records, graph connectivity, target resolution, transform evaluation, planar residual construction, rigid-body solving, and explicit successful-result application are implemented as separate layers.
 
 ## Current downstream boundary
 
-The next repository-wide assembly increment is a first rigid-body solver seed.
+The repository-wide next assembly block is read-only Jacobian-rank and remaining-degree-of-freedom diagnostics.
 
-That solver should define grounded components as fixed participants for its first scope, specify variable transform representation, residual weighting, convergence/failure behavior, and return proposed transforms before any explicit application step.
+That diagnostics layer will consume the solver's deterministic variable ordering and local numeric model without adding persistent DOF fields to `ComponentInstance`.
