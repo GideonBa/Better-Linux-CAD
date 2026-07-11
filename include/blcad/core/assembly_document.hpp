@@ -5,6 +5,7 @@
 #include "blcad/core/part_document.hpp"
 #include "blcad/core/quantity.hpp"
 #include "blcad/core/result.hpp"
+#include "blcad/core/spatial.hpp"
 
 #include <cstddef>
 #include <string>
@@ -46,9 +47,65 @@ struct BindingApplication {
   std::vector<std::string> affected_part_nodes;
 };
 
-// MVP-4 seed: an assembly document that owns assembly-scoped parameters,
-// registers member parts by DocumentId, and binds part parameters to assembly
-// parameters. Component instances, transforms, and constraints are MVP 5.
+struct RigidTransform {
+  Vector3 translation_mm;
+  Vector3 rotation_deg;
+
+  friend bool operator==(const RigidTransform&, const RigidTransform&) = default;
+};
+
+[[nodiscard]] RigidTransform identity_rigid_transform() noexcept;
+
+enum class ComponentVisibility { Visible, Hidden };
+[[nodiscard]] std::string_view to_string(ComponentVisibility visibility) noexcept;
+
+enum class ComponentSuppressionState { Active, Suppressed };
+[[nodiscard]] std::string_view to_string(ComponentSuppressionState state) noexcept;
+
+enum class ComponentGroundingState { Free, Grounded };
+[[nodiscard]] std::string_view to_string(ComponentGroundingState state) noexcept;
+
+class ComponentInstance {
+public:
+  [[nodiscard]] static Result<ComponentInstance> create(
+      ComponentInstanceId id,
+      std::string name,
+      DocumentId referenced_part_document,
+      ComponentVisibility visibility = ComponentVisibility::Visible,
+      ComponentSuppressionState suppression_state = ComponentSuppressionState::Active,
+      ComponentGroundingState grounding_state = ComponentGroundingState::Free,
+      RigidTransform transform = identity_rigid_transform());
+
+  [[nodiscard]] const ComponentInstanceId& id() const noexcept;
+  [[nodiscard]] const std::string& name() const noexcept;
+  [[nodiscard]] const DocumentId& referenced_part_document() const noexcept;
+  [[nodiscard]] ComponentVisibility visibility() const noexcept;
+  [[nodiscard]] ComponentSuppressionState suppression_state() const noexcept;
+  [[nodiscard]] ComponentGroundingState grounding_state() const noexcept;
+  [[nodiscard]] const RigidTransform& transform() const noexcept;
+
+private:
+  ComponentInstance(ComponentInstanceId id,
+                    std::string name,
+                    DocumentId referenced_part_document,
+                    ComponentVisibility visibility,
+                    ComponentSuppressionState suppression_state,
+                    ComponentGroundingState grounding_state,
+                    RigidTransform transform);
+
+  ComponentInstanceId id_;
+  std::string name_;
+  DocumentId referenced_part_document_;
+  ComponentVisibility visibility_;
+  ComponentSuppressionState suppression_state_;
+  ComponentGroundingState grounding_state_;
+  RigidTransform transform_;
+};
+
+// MVP-4/5 seed: an assembly document that owns assembly-scoped parameters,
+// registers member parts by DocumentId, binds part parameters to assembly
+// parameters, and stores first component-instance placement records. Component
+// constraints and solving remain in later MVP 5 steps.
 class AssemblyDocument {
 public:
   [[nodiscard]] static Result<AssemblyDocument> create(DocumentId id, std::string name);
@@ -59,6 +116,8 @@ public:
   // The binding target part must be a registered member and the assembly
   // parameter must exist. The part parameter is validated on application.
   [[nodiscard]] Result<std::size_t> add_binding(ParameterBinding binding);
+  // The component instance must reference an already registered member part.
+  [[nodiscard]] Result<std::size_t> add_component_instance(ComponentInstance instance);
   // Sets an assembly parameter value with the same validation as creation.
   [[nodiscard]] Result<std::size_t> set_parameter_value(ParameterId id, Quantity value);
 
@@ -73,11 +132,14 @@ public:
   [[nodiscard]] const std::vector<Parameter>& parameters() const noexcept;
   [[nodiscard]] const std::vector<DocumentId>& member_parts() const noexcept;
   [[nodiscard]] const std::vector<ParameterBinding>& bindings() const noexcept;
+  [[nodiscard]] const std::vector<ComponentInstance>& component_instances() const noexcept;
   [[nodiscard]] std::size_t parameter_count() const noexcept;
   [[nodiscard]] std::size_t member_part_count() const noexcept;
   [[nodiscard]] std::size_t binding_count() const noexcept;
+  [[nodiscard]] std::size_t component_instance_count() const noexcept;
   [[nodiscard]] const Parameter* find_parameter(ParameterId id) const noexcept;
   [[nodiscard]] const ParameterBinding* find_binding(ParameterBindingId id) const noexcept;
+  [[nodiscard]] const ComponentInstance* find_component_instance(ComponentInstanceId id) const noexcept;
   [[nodiscard]] bool has_member_part(const DocumentId& part_document) const noexcept;
 
 private:
@@ -86,12 +148,14 @@ private:
   [[nodiscard]] bool has_parameter_id(const ParameterId& id) const noexcept;
   [[nodiscard]] bool has_parameter_name(std::string_view name) const noexcept;
   [[nodiscard]] bool has_binding_id(const ParameterBindingId& id) const noexcept;
+  [[nodiscard]] bool has_component_instance_id(const ComponentInstanceId& id) const noexcept;
 
   DocumentId id_;
   std::string name_;
   std::vector<Parameter> parameters_;
   std::vector<DocumentId> member_parts_;
   std::vector<ParameterBinding> bindings_;
+  std::vector<ComponentInstance> component_instances_;
 };
 
 } // namespace blcad
