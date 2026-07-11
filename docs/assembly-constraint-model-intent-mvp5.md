@@ -1,26 +1,18 @@
 # Assembly Constraint Model Intent MVP-5
 
-Status: implemented solver-independent assembly relationship records for Mate, Concentric, and Distance. Generated planar/axis target resolution, geometry-family residual construction, shared numeric solving, and local DOF diagnostics exist as separate downstream layers.
+Status: implemented solver-independent assembly relationship records for Mate, Concentric, Distance, and Insert. Geometry resolution, residual construction, numeric solving, result application, and local DOF diagnostics remain separate downstream layers.
 
 ## Goal
 
-This block makes assembly relationships persistent model intent independently from geometry caches and solver output.
-
-It stores what two component occurrences are intended to relate. It does not compute where either component must move.
+Assembly relationship records persist what two component occurrences are intended to relate without computing where either component must move.
 
 ## Typed identity
 
-Assembly constraints use:
-
-```text
-AssemblyConstraintId
-```
-
-Constraint ids are independent from component, document, feature, and profile ids. They must be non-empty and unique within one `AssemblyDocument`.
+Assembly constraints use `AssemblyConstraintId`. Ids are independent from component, document, feature, and profile ids. They must be non-empty and unique within one `AssemblyDocument`.
 
 ## Semantic component targets
 
-`AssemblyConstraintTarget` combines:
+`AssemblyConstraintTarget` stores:
 
 ```text
 component_instance   ComponentInstanceId
@@ -32,87 +24,80 @@ Implemented examples:
 ```text
 component.plate.1 : feature.base_extrude.top
 component.plate.2 : feature.hole.axis
+component.plate.3 : feature.hole.seat
 ```
 
-Validation guarantees:
+The record layer validates non-empty ids/strings and assembly component ownership. It intentionally keeps semantic-reference contents opaque.
 
-- component instance id is non-empty
-- semantic reference string is non-empty
-- when a constraint enters an `AssemblyDocument`, both target component ids already exist in that assembly
+Raw OCCT names such as `Face17`, `Edge4`, or a transient cylindrical-face index are not persistent model references.
 
-The semantic token is intentionally opaque at this record layer. Raw OCCT names such as `Face17` or `Edge4` are not intended persistent representation.
-
-Geometry layers currently interpret selected token families:
+Current geometry consumers interpret:
 
 ```text
 feature.<feature-id>.top|bottom|right|left|front|back
 feature.<feature-id>.axis
+feature.<feature-id>.seat
 ```
 
 ## Constraint types
 
-The persistent seed supports:
+Persistent relationship families are:
 
 ```text
 AssemblyConstraintType::Mate
 AssemblyConstraintType::Concentric
 AssemblyConstraintType::Distance
+AssemblyConstraintType::Insert
 ```
 
-All three types now have downstream numeric solve support for their currently supported semantic target families.
+Current downstream numeric solver support exists for Mate, Distance, and Concentric.
 
-Flush, Coincident, Insert, Angle, Tangent, Lock, and joints remain future record families.
+Insert has stable target/residual semantics but is deliberately not yet integrated into the shared numeric solver.
+
+Flush, Coincident, Angle, Tangent, Lock, and joints remain future record families.
 
 ## Constraint record
 
-`AssemblyConstraint` stores:
-
 ```text
-id
-name
-type
-target_a
-target_b
-state = active | inactive
-distance = optional length quantity
+AssemblyConstraint
+  id
+  name
+  type
+  target_a
+  target_b
+  state = active | inactive
+  distance = optional length quantity
 ```
 
-Target A/B order is persistent intent and must be preserved.
+Target A/B order is persistent relationship intent.
 
 Order is observable in current residual conventions:
 
 ```text
 Distance signed separation = dot(oB - oA, nA)
 Concentric axis offset     = cross(oB - oA, dA)
+Insert seating separation  = dot(sB - sA, nA)
 ```
 
-`AssemblyConstraintState::Inactive` persists disabled relationship intent without deleting the record.
+`AssemblyConstraintState::Inactive` stores disabled intent without deleting the record.
 
 ## Type-specific distance validation
 
-Distance is stored as a BLCAD `Quantity`.
+Distance is the only relationship type that stores a distance quantity.
 
 Rules:
 
-- Distance requires one length quantity
-- current length rules require a finite positive value
-- Mate must not carry a distance value
-- Concentric must not carry a distance value
+- Distance requires one finite positive length quantity
+- Mate carries no distance
+- Concentric carries no distance
+- Insert carries no distance
 - count quantities are rejected for Distance
 
-Direct constraint-distance binding to an assembly parameter remains deferred until an explicit constraint dependency model exists.
+Insert axial seating is currently zero-separation relationship semantics. A parameterized nonzero Insert offset is not hidden in this record and remains future work.
 
 ## Assembly ownership
 
-`AssemblyDocument` owns constraints by value:
-
-```text
-AssemblyDocument
-  component_instances[]
-  constraints[]
-```
-
-Public APIs include:
+`AssemblyDocument` owns constraints by value and exposes:
 
 ```text
 add_constraint(AssemblyConstraint)
@@ -125,10 +110,10 @@ find_constraint(AssemblyConstraintId)
 
 ## Record-layer boundary
 
-Adding or loading a constraint does not:
+Adding or loading any constraint does not:
 
 - mutate component transforms
-- infer constraints from free placement
+- infer relationships from free placement
 - resolve semantic geometry
 - evaluate component transforms
 - construct residuals
@@ -136,43 +121,19 @@ Adding or loading a constraint does not:
 - solve placement
 - enforce grounding
 - compute remaining DOF
-- classify constraint rank
-- recompute member part geometry
+- classify Jacobian rank
+- recompute member-part geometry
 
-JSON loading follows the same ownership and validation path and cannot silently move components.
+JSON loading follows the same ownership/validation path and cannot silently move components.
 
-## Downstream implemented layers
+## Downstream geometry families
 
-### Active relationship connectivity
-
-```text
-AssemblyConstraintGraph
-```
-
-The graph uses component endpoints and active/inactive state. It does not copy semantic geometry.
-
-### Semantic target geometry
+### Planar Mate/Distance
 
 ```text
 AssemblyConstraintTargetResolver::resolve
-AssemblyConstraintTargetResolver::resolve_axis
-```
-
-These resolve supported generated planar faces and the first generated-axis family to component-local descriptors.
-
-### Transform evaluation
-
-```text
-AssemblyTransformEvaluator::evaluate_plane
-AssemblyTransformEvaluator::evaluate_axis
-```
-
-These map local descriptors into assembly coordinates under the canonical persisted `RigidTransform` convention.
-
-### Planar Mate/Distance residual construction
-
-```text
-AssemblyConstraintEquationBuilder
+  -> AssemblyTransformEvaluator::evaluate_plane
+  -> AssemblyConstraintEquationBuilder
 ```
 
 Mate:
@@ -190,47 +151,57 @@ signed_separation_mm = dot(oB - oA, nA)
 distance_residual_mm = signed_separation_mm - target_distance_mm
 ```
 
-### Concentric residual construction
+### Concentric
 
 ```text
-AssemblyConcentricConstraintEquationBuilder
+AssemblyConstraintTargetResolver::resolve_axis
+  -> AssemblyTransformEvaluator::evaluate_axis
+  -> AssemblyConcentricConstraintEquationBuilder
 ```
-
-For semantic assembly-space axes:
 
 ```text
 direction_parallelism = cross(dA, dB)
 axis_offset_mm         = cross(oB - oA, dA)
 ```
 
-Equal and opposed axis directions are accepted. Axial translation and rotation about the common axis are intentionally free.
+### Insert
 
-### Shared numeric, solver, and diagnostics path
+Canonical document: `docs/assembly-insert-intent-composite-residuals-mvp5.md`.
 
-The private assembly numeric system selects the residual builder from persistent `AssemblyConstraintType`.
-
-Exact Concentric flattening:
+One persistent `.seat` endpoint derives a primary axis and oriented seating plane from the same exact circular feature/profile:
 
 ```text
-direction_parallelism.x
-direction_parallelism.y
-direction_parallelism.z
-axis_offset_mm.x / length_residual_scale_mm
-axis_offset_mm.y / length_residual_scale_mm
-axis_offset_mm.z / length_residual_scale_mm
+AssemblyConstraintTargetResolver::resolve_insert
+  -> local axis + local seating plane + separate RigidTransform
+  -> evaluate_axis + evaluate_plane
+  -> AssemblyInsertConstraintEquationBuilder
 ```
 
-Mate and Distance retain their existing four-scalar flattening.
+Composite residual:
+
+```text
+direction_parallelism       = cross(dA, dB)
+axis_offset_mm               = cross(oB - oA, dA)
+signed_seating_separation_mm = dot(sB - sA, nA)
+```
+
+The Insert builder is deterministic and read-only.
+
+## Shared numeric, solver, and diagnostics boundary
+
+The private shared numeric system currently selects and flattens Mate, Distance, and Concentric residual builders.
 
 `AssemblyRigidBodySolver` and `AssemblySolveDiagnosticsAnalyzer` consume the same residual evaluator and central finite-difference Jacobian.
 
-For one regular Concentric relationship between one grounded and one free body, the generic rank analyzer measures:
+Regular one-free-body Concentric behavior is measured as:
 
 ```text
-variable_count  = 6
-jacobian_rank   = 4
-remaining_dof   = 2
+variable_count = 6
+jacobian_rank  = 4
+remaining_dof  = 2
 ```
+
+The focused Insert residual test independently proves a direct `7 x 6` Jacobian rank of `5`, leaving one rotation-about-axis DOF. Insert is not yet a shared numeric family, so the solver and analyzer do not claim Insert support yet.
 
 None of this numeric interpretation becomes persistent relationship state.
 
@@ -244,41 +215,37 @@ None of this numeric interpretation becomes persistent relationship state.
 2. component instances reference valid member/project parts
 3. assembly constraints reference existing component instances
 
-Several component instances may reference one owned `PartDocument`. Constraints relate occurrences, not duplicated part model records.
+Several components may reference one owned `PartDocument`. Constraints relate occurrences, not duplicated part records.
 
-Semantic geometry resolution remains a downstream geometry-layer concern. A non-empty unsupported semantic token may be stored as intent and fail when a geometry or numeric consumer attempts to interpret it.
+Semantic geometry resolution remains a downstream geometry concern. A non-empty unsupported semantic token may persist as intent and fail only when a consumer attempts to interpret it.
 
 ## JSON representation
 
-Assembly JSON retains the historical compatibility marker:
+Historical compatibility marker:
 
 ```text
 blcad.assembly_document.mvp4
 version 1
 ```
 
-MVP-5 component instances and constraints extend this schema additively.
+MVP-5 relationship types extend the existing record shape additively.
 
-A Concentric record using the implemented axis family can be stored as:
+Representative Insert record:
 
 ```json
 {
-  "assembly_constraints": [
-    {
-      "id": "constraint.hole_alignment",
-      "name": "Hole alignment",
-      "type": "concentric",
-      "target_a": {
-        "component_instance": "component.plate.1",
-        "semantic_reference": "feature.hole.axis"
-      },
-      "target_b": {
-        "component_instance": "component.plate.2",
-        "semantic_reference": "feature.hole.axis"
-      },
-      "state": "active"
-    }
-  ]
+  "id": "constraint.insert",
+  "name": "Insert",
+  "type": "insert",
+  "target_a": {
+    "component_instance": "component.plate.1",
+    "semantic_reference": "feature.hole.seat"
+  },
+  "target_b": {
+    "component_instance": "component.plate.2",
+    "semantic_reference": "feature.hole.seat"
+  },
+  "state": "active"
 }
 ```
 
@@ -287,35 +254,36 @@ Compatibility rules:
 - files without `assembly_constraints` load with zero constraints
 - unsupported type/state strings are rejected
 - Distance JSON must carry a millimeter distance value
+- Mate, Concentric, and Insert omit `distance`
 - target component validation runs through `AssemblyDocument::add_constraint`
 - project JSON inherits constraint persistence through embedded assembly JSON
 
-No graph cache, resolved plane/axis descriptor, evaluated assembly-space geometry, residual descriptor, flattened numeric vector, solver result, Jacobian, rank, DOF state, or solved-transform cache is serialized by this record block.
+`insert` uses the existing constraint type field. `feature.hole.seat` uses the existing semantic-reference string field. No JSON shape change is required.
 
-`feature.hole.axis` uses the existing semantic-reference string field. No schema field was added for Concentric solver integration.
-
-## Headless inspection
-
-`blcad_inspect_project_components` reports stored component instances and assembly constraints, including target A/B semantic strings.
-
-It also prints a derived active-constraint graph summary.
-
-The inspector does not resolve semantic plane/axis geometry or run a solver.
+No graph, resolved target, assembly-space geometry, residual, numeric vector, Jacobian, solve result, rank/DOF state, or solved-transform cache is serialized by the record layer.
 
 ## Tests
 
-Core constraint tests cover target validation, type-specific distance rules, ownership, JSON roundtrip, and transform immutability.
+Core intent coverage:
 
-Downstream geometry tests cover:
+```bash
+./build/dev/blcad_core_tests "[core][assembly-constraint]"
+./build/dev/blcad_core_tests "[core][assembly-insert]"
+```
+
+Downstream geometry coverage:
 
 ```bash
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-equation]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-concentric]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-concentric-solver]"
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-insert]"
 ```
 
 ## Current downstream boundary
 
-Mate, Distance, and Concentric records are interpreted by separate semantic geometry/residual builders and one shared numeric solver/DOF path without changing the persistent record model.
+Mate, Distance, and Concentric participate in the shared numeric solver/DOF path.
 
-The next assembly model-intent extension is stable Insert relationship intent with explicit semantic axial-seating target semantics. Insert residual/solver work remains downstream from that record contract.
+Insert relationship intent, semantic seating targets, composite endpoint resolution, and read-only residual construction are implemented without changing the persistent record shape beyond the additive `insert` type string.
+
+The next assembly block is Insert integration into the shared numeric residual/Jacobian system, rigid-body solver, explicit application path, and local remaining-DOF diagnostics.
