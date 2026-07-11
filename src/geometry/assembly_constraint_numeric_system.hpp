@@ -4,8 +4,13 @@
 #include "blcad/core/assembly_joint.hpp"
 #include "blcad/core/project.hpp"
 #include "blcad/core/result.hpp"
+#include "blcad/geometry/assembly_concentric_constraint_equation_builder.hpp"
+#include "blcad/geometry/assembly_constraint_equation_builder.hpp"
+#include "blcad/geometry/assembly_hierarchy_constraint_equation_builder.hpp"
+#include "blcad/geometry/assembly_insert_constraint_equation_builder.hpp"
 
 #include <cstddef>
+#include <functional>
 #include <vector>
 
 namespace blcad::geometry::detail {
@@ -41,9 +46,32 @@ struct AssemblyNumericRelationshipSet {
   }
 };
 
+// Absolute candidate variable vector -> deterministically scaled residual vector.
+// Both ordinary local solving and cross-hierarchy authority solving adapt their
+// model-specific mutation/equation semantics to this shared numeric boundary.
+using AssemblyNumericResidualEvaluator =
+    std::function<Result<NumericVector>(const NumericVector&)>;
+
 [[nodiscard]] Result<std::vector<AssemblyConstraintId>> collect_constraint_ids(
     const AssemblyConstraintGraph& graph,
     const std::vector<ComponentInstanceId>& connected_group);
+
+[[nodiscard]] Result<std::size_t> append_scaled_residuals(
+    const PlanarConstraintResidualDescriptor& residual,
+    double length_residual_scale_mm,
+    NumericVector& residuals);
+[[nodiscard]] Result<std::size_t> append_scaled_residuals(
+    const ConcentricResidualDescriptor& residual,
+    double length_residual_scale_mm,
+    NumericVector& residuals);
+[[nodiscard]] Result<std::size_t> append_scaled_residuals(
+    const InsertResidualDescriptor& residual,
+    double length_residual_scale_mm,
+    NumericVector& residuals);
+[[nodiscard]] Result<std::size_t> append_scaled_residuals(
+    const AssemblyHierarchyConstraintResidualDescriptor& residual,
+    double length_residual_scale_mm,
+    NumericVector& residuals);
 
 [[nodiscard]] Result<NumericVector> evaluate_residuals(
     const Project& project,
@@ -66,6 +94,12 @@ struct AssemblyNumericRelationshipSet {
     Project& project,
     const std::vector<ComponentInstanceId>& variable_components,
     const NumericVector& values);
+
+[[nodiscard]] Result<NumericMatrix> build_central_difference_jacobian(
+    const NumericVector& variables,
+    const NumericVector& baseline_residuals,
+    const AssemblyNumericSystemOptions& options,
+    const AssemblyNumericResidualEvaluator& evaluator);
 
 [[nodiscard]] Result<NumericMatrix> build_central_difference_jacobian(
     const Project& project,
