@@ -1,5 +1,6 @@
 #pragma once
 
+#include "blcad/core/assembly_constraint.hpp"
 #include "blcad/core/id.hpp"
 #include "blcad/core/parameter.hpp"
 #include "blcad/core/part_document.hpp"
@@ -111,10 +112,10 @@ private:
   RigidTransform transform_;
 };
 
-// MVP-4/5 assembly document: owns assembly-scoped parameters, registers member
-// parts, binds part parameters to assembly parameters, and stores explicit
-// component-instance placement/state model intent. Component constraints and
-// solving remain later MVP-5 work.
+// MVP-4/5 assembly document: owns assembly-scoped parameters, member parts,
+// parameter bindings, component occurrence placement/state intent, and
+// solver-independent assembly constraint records. Constraint storage never
+// resolves semantic geometry or mutates component transforms.
 class AssemblyDocument {
 public:
   [[nodiscard]] static Result<AssemblyDocument> create(DocumentId id, std::string name);
@@ -127,6 +128,9 @@ public:
   [[nodiscard]] Result<std::size_t> add_binding(ParameterBinding binding);
   // The component instance must reference an already registered member part.
   [[nodiscard]] Result<std::size_t> add_component_instance(ComponentInstance instance);
+  // Both semantic targets must reference component instances already owned by
+  // this assembly. Adding a constraint never changes component transforms.
+  [[nodiscard]] Result<std::size_t> add_constraint(AssemblyConstraint constraint);
   // Explicit free-placement/state edits. These do not infer constraints, solve
   // transforms, enforce grounding, or trigger part recompute.
   [[nodiscard]] Result<std::size_t>
@@ -153,13 +157,18 @@ public:
   [[nodiscard]] const std::vector<DocumentId>& member_parts() const noexcept;
   [[nodiscard]] const std::vector<ParameterBinding>& bindings() const noexcept;
   [[nodiscard]] const std::vector<ComponentInstance>& component_instances() const noexcept;
+  [[nodiscard]] const std::vector<AssemblyConstraint>& constraints() const noexcept;
   [[nodiscard]] std::size_t parameter_count() const noexcept;
   [[nodiscard]] std::size_t member_part_count() const noexcept;
   [[nodiscard]] std::size_t binding_count() const noexcept;
   [[nodiscard]] std::size_t component_instance_count() const noexcept;
+  [[nodiscard]] std::size_t constraint_count() const noexcept;
   [[nodiscard]] const Parameter* find_parameter(ParameterId id) const noexcept;
   [[nodiscard]] const ParameterBinding* find_binding(ParameterBindingId id) const noexcept;
-  [[nodiscard]] const ComponentInstance* find_component_instance(ComponentInstanceId id) const noexcept;
+  [[nodiscard]] const ComponentInstance*
+  find_component_instance(ComponentInstanceId id) const noexcept;
+  [[nodiscard]] const AssemblyConstraint*
+  find_constraint(AssemblyConstraintId id) const noexcept;
   [[nodiscard]] bool has_member_part(const DocumentId& part_document) const noexcept;
 
 private:
@@ -169,6 +178,7 @@ private:
   [[nodiscard]] bool has_parameter_name(std::string_view name) const noexcept;
   [[nodiscard]] bool has_binding_id(const ParameterBindingId& id) const noexcept;
   [[nodiscard]] bool has_component_instance_id(const ComponentInstanceId& id) const noexcept;
+  [[nodiscard]] bool has_constraint_id(const AssemblyConstraintId& id) const noexcept;
 
   DocumentId id_;
   std::string name_;
@@ -176,6 +186,7 @@ private:
   std::vector<DocumentId> member_parts_;
   std::vector<ParameterBinding> bindings_;
   std::vector<ComponentInstance> component_instances_;
+  std::vector<AssemblyConstraint> constraints_;
 };
 
 } // namespace blcad
