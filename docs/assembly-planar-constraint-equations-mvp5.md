@@ -1,8 +1,8 @@
 # Planar Assembly Constraint Equations MVP-5
 
-Status: implemented read-only residual construction for active planar Mate and Distance constraints over the supported generated-face target family. The shared numeric system, rigid-body solver, and local DOF diagnostics consume these planar descriptors downstream.
+Status: implemented read-only residual construction for active planar Mate and Distance constraints over the supported generated-face target family. The shared numeric system, rigid-body solver, and local DOF diagnostics consume these planar descriptors alongside the separately implemented Concentric residual family.
 
-Semantic axes and Concentric residual construction are now implemented separately in `docs/assembly-semantic-axis-concentric-residuals-mvp5.md`.
+Semantic axes and Concentric residual construction are canonicalized in `docs/assembly-semantic-axis-concentric-residuals-mvp5.md`. Their shared numeric integration is documented in `docs/assembly-concentric-numeric-solver-dof-mvp5.md`.
 
 ## Goal
 
@@ -89,7 +89,7 @@ Signed separation measures B from A along target A's normal. The raw value is ta
 
 The builder returns geometric residual descriptors. It does not choose numeric weighting.
 
-The current shared numeric system flattens:
+The shared numeric system flattens planar descriptors exactly as before Concentric integration:
 
 ```text
 Mate:
@@ -105,7 +105,11 @@ Distance:
   distance_residual_mm / length_residual_scale_mm
 ```
 
-These are solver/numeric-system policies rather than planar builder semantics.
+Each planar constraint contributes four scalar residuals.
+
+These are numeric-system policies rather than planar builder semantics.
+
+The addition of Concentric to the shared numeric system does not change this order or scaling.
 
 ## Concentric boundary
 
@@ -116,19 +120,29 @@ Mate
 Distance
 ```
 
-It still rejects Concentric through the established planar path.
+It continues to reject direct Concentric construction because Concentric uses different target and residual geometry.
 
-Concentric now has a dedicated builder:
+Concentric has a dedicated builder:
 
 ```text
 AssemblyConcentricConstraintEquationBuilder
 ```
 
-and dedicated axis descriptor/residual types.
+with dedicated axis descriptor/residual types.
 
-This separation avoids overloading planar descriptors and allows semantic axis/residual conventions to be stable before the shared numeric system changes.
+The private shared numeric system now selects:
 
-The current solver and DOF analyzer still use the planar builder through `AssemblyConstraintNumericSystem`; therefore an active Concentric constraint still fails in those consumers until the next integration block.
+```text
+Concentric
+  -> AssemblyConcentricConstraintEquationBuilder
+
+Mate / Distance
+  -> AssemblyConstraintEquationBuilder
+```
+
+Therefore the planar builder itself remains unchanged while solver and diagnostics can consume all three relationship families through one shared numeric path.
+
+This separation avoids overloading planar descriptors and prevents Concentric geometry semantics from leaking into the planar equation API.
 
 ## Read-only and persistence boundary
 
@@ -138,6 +152,8 @@ Planar equation construction does not:
 - enforce grounding/suppression policy
 - change target strings or target order
 - modify part parameters, sketches, features, or workplanes
+- flatten residuals
+- build Jacobians
 - run a solver
 - compute DOF
 - persist residual descriptors
@@ -146,20 +162,28 @@ No assembly/project JSON field is added.
 
 ## Tests
 
+Planar residual suite:
+
 ```bash
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-equation]"
 ```
 
 Coverage includes satisfied and unsatisfied Mate/Distance cases, transformed target geometry, target identity, tangential Mate freedom, signed Distance order, unsupported targets, deterministic repeated construction, and read-only behavior.
 
-Concentric residual tests are separate:
+Concentric semantic/residual tests are separate:
 
 ```bash
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-concentric]"
 ```
 
+Shared Concentric numeric/solver integration tests:
+
+```bash
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-concentric-solver]"
+```
+
 ## Current downstream boundary
 
-Planar residual construction remains stable and already feeds the current numeric solver/diagnostic system.
+Planar residual construction remains stable and feeds the same shared numeric solver/diagnostic system as the separate Concentric residual family.
 
-The next assembly step is to add the dedicated Concentric residual family to that shared numeric system without changing existing Mate/Distance scalar ordering or semantics.
+The next assembly residual-design block is a dedicated read-only composite Insert residual model after stable semantic axial-seating geometry and persistent Insert intent are defined.
