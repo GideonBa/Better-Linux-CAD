@@ -1,6 +1,6 @@
 # Project and Save File Format
 
-Status: implemented seeds exist for single-part `.blcad.json`, assembly-parameter JSON, embedded project JSON, and first component-instance records. Multi-body part records, body transforms, body booleans, constraints, and path-feature records remain future blocks.
+Status: implemented seeds exist for single-part `.blcad.json`, assembly-parameter JSON, embedded project JSON, and component instances with explicit placement/state updates. Multi-body part records, body transforms, body booleans, assembly constraints, and path-feature records remain future blocks.
 
 The file format must store the full parametric model, not only computed geometry. OCCT geometry may be stored additionally as a cache, but must never be the only source of information. A file that stored only the final shape would lose parameters, features, bodies, transforms, sketches, paths, references, assembly structure, and component instances.
 
@@ -22,7 +22,7 @@ Schema marker:
 blcad.project.mvp4
 ```
 
-Component instances are persisted inside the embedded assembly document.
+Component instances and their current placement/state values are persisted inside the embedded assembly document.
 
 ## Target project structure
 
@@ -54,7 +54,7 @@ AssemblyDocument
   parameters[]              # assembly-scoped parameters
   member_parts[]            # DocumentId list
   parameter_bindings[]      # part parameter follows assembly parameter
-  component_instances[]     # MVP-5 seed
+  component_instances[]     # MVP-5 free placement/state model intent
 ```
 
 A component instance has this implemented JSON shape:
@@ -78,8 +78,12 @@ Rules:
 
 - component instances reference part document ids, not duplicated part geometry
 - project validation must resolve each component instance to an assembly member and owned project part document
-- transforms are free-placement records until a later solver exists
-- constraints, DOF, and assembly-level STEP export are not implemented in this seed
+- explicit placement/state updates preserve component id, name, and `referenced_part_document`
+- updated transform, visibility, suppression state, and grounding state use the same existing JSON fields and roundtrip through assembly/project files
+- transforms are direct free-placement records until a later solver exists
+- `grounded` is persisted model intent but does not yet prevent an explicit transform update
+- visibility and suppression are persisted state only until future assembly consumers define their execution/export/solver effects
+- assembly constraints, DOF, and assembly-level STEP export are not implemented in the current block
 
 ## Part document target
 
@@ -227,7 +231,7 @@ The detailed target is in `docs/multi-body-transform-and-path-features-roadmap.m
 
 - `serialize_part_document_to_json` / `deserialize_part_document_from_json` for in-memory part model intent.
 - `write_part_document_json_file` / `read_part_document_json_file` for `.blcad.json` files.
-- `serialize_assembly_document_to_json` / `deserialize_assembly_document_from_json` for assembly parameters, member parts, parameter bindings, and component instances.
+- `serialize_assembly_document_to_json` / `deserialize_assembly_document_from_json` for assembly parameters, member parts, parameter bindings, component instances, and their current placement/state values.
 - `serialize_project_to_json` / `deserialize_project_from_json` for embedded assembly plus embedded part documents.
 - `write_project_json_file` / `read_project_json_file` for `.blcad.project.json` files.
 - serialization stores model intent only; it does not serialize OCCT shapes or ShapeCache contents.
@@ -247,9 +251,10 @@ See `docs/json-serialization-mvp1.md`, `docs/json-file-workflow-mvp1.md`, `docs/
 8. Add `path_curves` as ordered semantic path chains.
 9. Add path-following extrude/cut and loft feature serialization.
 10. Extend project files from embedded documents to optional manifest/external-file references.
-11. Add assembly constraints and solver state, see `docs/assembly-system.md`.
-12. Add project-level `resources` (materials, standard parts) referenced by engineering modules (`docs/engineering-modules.md`).
-13. Optionally add an out-of-band `cached_shapes` store, kept clearly separate from model intent.
+11. Add assembly constraint model-intent records on semantic component targets before solver state, see `docs/assembly-system.md`.
+12. Add regenerable assembly solver/cache records only after the constraint graph and rigid-body solver exist.
+13. Add project-level `resources` (materials, standard parts) referenced by engineering modules (`docs/engineering-modules.md`).
+14. Optionally add an out-of-band `cached_shapes` store, kept clearly separate from model intent.
 
 ## Rules
 
