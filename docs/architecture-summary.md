@@ -4,7 +4,7 @@ This document condenses the implemented architecture and current target directio
 
 ## Goal
 
-BLCAD is an independent parametric CAD system for Linux. The model stores design intent rather than only final BRep geometry: parameters, sketches, features, dependencies, semantic references, construction geometry, assembly structure, joint/limit intent, rigid hierarchy intent, and later multi-body, path, surfacing, flexible motion, and engineering intent.
+BLCAD is an independent parametric CAD system for Linux. The model stores design intent rather than only final BRep geometry: parameters, sketches, features, dependencies, semantic references, construction geometry, assembly structure, geometric relationships, joint/limit intent, rigid hierarchy placement, and explicit component transforms.
 
 The long-term goal is recorded in `docs/project-goal.md`.
 
@@ -16,7 +16,8 @@ The long-term goal is recorded in `docs/project-goal.md`.
 - treat OCCT shapes as computed cache data, not primary model intent;
 - persist semantic model references, not raw OCCT topology ids;
 - keep geometric assembly constraints separate from motion-joint intent;
-- keep rigid hierarchy intent separate from derived traversal, composed placement, and geometry flattening;
+- keep authored hierarchy transforms separate from derived traversal and composed evaluation;
+- keep local assembly relationships separate from occurrence-qualified cross-hierarchy query semantics until a dedicated project-level persistent graph exists;
 - keep GUI code above the CAD core; UI state must not become geometry or solver authority.
 
 ## Layers
@@ -37,9 +38,11 @@ file and exchange formats
 
 ## Part model
 
-The implemented part path includes typed quantities/parameters, datum planes, multiple sketch/profile families, additive/subtractive extrude intent, dependency/invalidation/recompute planning, semantic references, derived workplanes, construction geometry, projected/reference-driven sketch geometry, reference recovery, sketch constraints/diagnostics/repair helpers, optional OCCT execution through `ShapeCache`, STEP export, and JSON model-intent serialization.
+The implemented part path includes typed quantities/parameters, unit-aware parameter expressions, datum planes, multiple sketch/profile families, additive/subtractive extrude intent, dependency/invalidation/recompute planning, semantic references, derived workplanes, construction geometry, projected/reference-driven sketch geometry, reference recovery, sketch constraints/diagnostics/repair helpers, optional OCCT execution through `ShapeCache`, STEP export, and JSON model-intent serialization.
 
-`CircularHolePattern` is parametric model intent and expands into per-hole cuts during geometry recompute.
+`CircularHolePattern` is persistent parametric model intent and expands into per-hole cuts during geometry recompute.
+
+Expression parameters remain part-document local. Their formulas, dependency edges, topological re-evaluation, cycle rejection, and formula-edit edge replacement are documented in `docs/parameter-expression-mvp.md`.
 
 ## Project and assembly ownership
 
@@ -51,40 +54,39 @@ project-owned child AssemblyDocument records
 project-owned PartDocument records
 ```
 
-`Project::assembly()` remains the root assembly API.
+`Project::assembly()` remains the explicit root assembly API.
 
 Child assembly documents are separately owned through `child_assembly_documents()`. Assembly document ids are unique across the root and child collection.
 
-A child assembly document does not automatically occur in the rooted assembly tree. It becomes an occurrence only when a containing assembly stores a `SubassemblyInstance` referencing it.
+A child assembly document does not automatically occur in the rooted assembly tree. It enters the rooted tree only through a `SubassemblyInstance` in a containing assembly.
 
 The root assembly may not be referenced as a child. This preserves one explicit root identity.
 
 ## Part component occurrence intent
 
-A `ComponentInstance` is a part occurrence with identity independent from part-document identity. Repeated component occurrences may reference one `PartDocument` while retaining independent placement/state.
+A `ComponentInstance` is a part occurrence with identity scoped to one `AssemblyDocument`.
 
-Persisted component state is:
+Persisted state is:
 
 ```text
+id
+name
+referenced_part_document
 visibility
-suppression
-grounding
+suppression_state
+grounding_state
 RigidTransform
   translation_mm
   rotation_deg
 ```
+
+Repeated component occurrences may reference one part document while retaining independent local placement/state.
 
 Storage-level placement edits are explicit and solver-independent.
 
 ## Rigid subassembly occurrence intent
 
 Canonical document: `docs/assembly-rigid-subassembly-nested-export-mvp5.md`.
-
-Stable occurrence identity:
-
-```text
-SubassemblyInstanceId
-```
 
 A persistent `SubassemblyInstance` stores:
 
@@ -99,39 +101,32 @@ RigidTransform
   rotation_deg
 ```
 
-A rigid subassembly occurrence has no grounding field and contributes no solver variables in the current seed. Its child assembly's current internal component transforms are treated as authored rigid pose at the parent boundary.
+The occurrence transform is the authored rigid boundary between a containing assembly occurrence and the referenced child assembly document.
 
-`AssemblyDocument` keeps part components and child assembly occurrences in separate collections:
-
-```text
-component_instances[]
-subassembly_instances[]
-assembly_constraints[]
-assembly_joints[]
-```
+A `SubassemblyInstance` currently has no grounding field and is not itself a six-variable rigid-body solve node.
 
 Adding or loading a child occurrence never changes child component transforms.
 
 ## Hierarchy validity
 
-`Project` owns cross-assembly hierarchy validation.
+`Project` owns cross-document hierarchy validation.
 
-Every `SubassemblyInstance` must reference a project-owned child assembly. Validation rejects:
+Validation rejects:
 
-- duplicate child assembly document ids;
+- duplicate assembly document ids;
 - duplicate subassembly occurrence ids within one containing assembly;
 - direct self-reference;
-- references to the project root assembly;
+- references to the project root assembly as a child;
 - missing child assembly documents;
-- direct or indirect cycles.
+- direct or indirect assembly-reference cycles.
 
-Cycle validation is deterministic depth-first validation over the root and all owned child assembly documents. Owned but currently unreferenced child graphs are still validated, preventing latent cycles from entering project state.
+Owned but currently unreferenced child graphs are also validated so invalid latent cycles cannot enter project state.
 
-The document-reference graph, DFS active/completed sets, and parent links are derived and unpersisted.
+The document-reference graph and DFS validation state are derived and unpersisted.
 
 ## Deterministic hierarchy traversal
 
-`AssemblyHierarchyTraversal` derives the rooted occurrence tree after full structure validation.
+`AssemblyHierarchyTraversal` derives the rooted occurrence tree after complete project structure validation.
 
 Traversal order is:
 
@@ -161,22 +156,48 @@ For:
 root --outer--> child --inner--> grandchild
 ```
 
-the grandchild descriptor has:
+the grandchild occurrence has:
 
 ```text
 occurrence_path = [outer, inner]
 parent_transforms_inner_to_outer = [T_inner, T_outer]
 ```
 
-These descriptors are regenerated for every consumer that needs them.
+Traversal descriptors, occurrence paths, parent links, and transform chains are derived and unpersisted.
+
+## Hierarchical rigid-transform semantics
+
+Canonical convention for every authored `RigidTransform` level:
+
+```text
+translation: millimeters
+rotation: degrees
+positive rotation: right-hand rule
+rotation type: active fixed-axis
+application order: X, then Y, then Z
+column-vector composition: Rz * Ry * Rx
+```
+
+Points rotate then translate. Vectors, normals, and directions rotate only.
+
+`AssemblyTransformEvaluator` evaluates one authored level.
+
+`AssemblyHierarchyTransformEvaluator` evaluates authored transform chains exactly in inner-to-outer order.
+
+For component transform `Tc`, inner parent `Ti`, and outer parent `To`:
+
+```text
+chain = [Tc, Ti, To]
+point result = To(Ti(Tc(p)))
+```
+
+The hierarchy is not collapsed into a persisted composed transform or converted back to Euler angles.
 
 ## Flattened visible-active leaf occurrences
 
-`AssemblyLeafOccurrenceResolver` is the canonical hierarchy-to-leaf boundary for geometry consumers.
+`AssemblyLeafOccurrenceResolver` is the canonical hierarchy-to-leaf boundary for posed geometry consumers.
 
-It consumes the deterministic hierarchy traversal and returns only visible active part-component leaves.
-
-One `AssemblyLeafOccurrenceDescriptor` stores derived identity and placement context:
+One `AssemblyLeafOccurrenceDescriptor` stores:
 
 ```text
 assembly_document
@@ -193,42 +214,21 @@ hierarchy pre-order
 then local ComponentInstance id order
 ```
 
-For leaf component transform `Tc`, inner parent `Ti`, and outer parent `To`:
+For leaf component transform `Tc` and parent chain `[Ti, To]`:
 
 ```text
 transforms_inner_to_outer = [Tc, Ti, To]
 ```
 
-Hidden or suppressed subassembly occurrences remove their complete descendant subtree. Inside an active visible assembly occurrence, local component visibility and suppression still apply.
+Hidden or suppressed subassembly occurrences remove their complete descendant subtree. Local hidden/suppressed components are also absent from flattened leaves.
 
-Flattened leaves, occurrence paths, and transform chains are derived and unpersisted.
+Flattened leaf descriptors remain derived and unpersisted.
 
-## Current assembly object families
-
-Implemented assembly-relevant types include:
-
-- `PartDocument`, `AssemblyDocument`, `Project`;
-- `ComponentInstance`, `SubassemblyInstance`, `RigidTransform`;
-- `AssemblyHierarchyTraversal`, `AssemblyHierarchyOccurrenceDescriptor`;
-- `AssemblyLeafOccurrenceResolver`, `AssemblyLeafOccurrenceDescriptor`;
-- `AssemblyConstraintTarget`, `AssemblyConstraint`, `AssemblyConstraintGraph`;
-- `AssemblyJoint`, `AssemblyJointLimits`, `AssemblyJointId`, `AssemblyJointGraph`;
-- semantic face/axis/seating references and target resolvers;
-- `AssemblyTransformEvaluator`, `AssemblyHierarchyTransformEvaluator`;
-- Mate/Distance/Angle, Concentric, Insert, and Revolute residual descriptors/builders;
-- private shared numeric relationship/Jacobian system and solve engine;
-- `AssemblyRigidBodySolver`, `AssemblySolveResult`, `AssemblySolveResultApplier`;
-- `AssemblyJointMotionSolver`, `AssemblyJointMotionResult`, `AssemblyJointMotionResultApplier`;
-- `AssemblySolveDiagnosticsAnalyzer` and rank/DOF descriptors;
-- `AssemblyStepExporter`, `AssemblyStepExportSummary`.
-
-Planned assembly/analysis families include interference records, richer joints, flexible subassemblies, cross-hierarchy relationship semantics, motion studies, contact analysis, and component geometry instancing.
-
-## Persistent geometric constraint intent
+## Local geometric constraint intent
 
 Canonical document: `docs/assembly-constraint-model-intent-mvp5.md`.
 
-Persistent geometric relationship families are:
+Persistent local relationship families are:
 
 ```text
 Mate
@@ -238,17 +238,24 @@ Insert
 Angle
 ```
 
-Every record preserves target A/B semantic strings and active/inactive state. Distance carries a positive length quantity. Angle carries a degree quantity. Mate, Concentric, and Insert are value-free relationship records.
+Each `AssemblyConstraint` belongs to one `AssemblyDocument` and stores local component endpoints through `AssemblyConstraintTarget`:
 
-Constraints remain local to the containing `AssemblyDocument`. Cross-hierarchy geometric target semantics are not implemented.
+```text
+local ComponentInstanceId
+semantic_reference
+```
 
-`AssemblyConstraintGraph` contains every local component as a node and every active local geometric constraint as one distinct edge. It excludes inactive constraints, preserves multi-edges, sorts lexicographically, and exposes deterministic connected groups for ordinary geometric solving.
+Distance stores a length quantity. Angle stores a degree quantity. Mate, Concentric, and Insert store no explicit value.
 
-## Persistent joint and limit intent
+Local constraints remain local to their containing assembly document. Project-level cross-hierarchy constraint persistence is not yet implemented.
+
+`AssemblyConstraintGraph` contains every local component as a node and every active local constraint as one distinct edge. It preserves multi-edges, sorts lexicographically, and exposes deterministic connected groups.
+
+## Local joint and limit intent
 
 Canonical document: `docs/assembly-revolute-joint-motion-mvp5.md`.
 
-Joint records are separate from geometric constraints.
+Joint records remain separate from geometric constraints.
 
 The first family is:
 
@@ -256,13 +263,13 @@ The first family is:
 AssemblyJointType::Revolute
 ```
 
-One persistent Revolute record stores identity, name, semantic target A/B, active/inactive state, lower/upper degree limits, and authored current coordinate.
+A persistent Revolute record stores identity, name, local semantic endpoints, active/inactive state, lower/upper degree limits, and authored current coordinate.
 
-The current seed uses the signed principal range `[-180°, 180°]`, requires `lower < upper`, and requires the coordinate to remain inside the limits. Motion requests outside the limits are rejected rather than clamped.
+The current seed uses the signed principal range `[-180°, 180°]`, requires `lower < upper`, and rejects requested coordinates outside limits rather than clamping.
 
 `AssemblyJointGraph` contains every local component as a node and every active local joint as one distinct lexicographically sorted edge.
 
-Joints also remain local to one `AssemblyDocument`; cross-hierarchy joint semantics are deferred.
+Cross-hierarchy joint persistence and nested motion propagation remain deferred.
 
 ## Semantic target families
 
@@ -281,39 +288,11 @@ feature.<feature-id>.seat
 
 The first `.axis`/`.seat` producer is one `SubtractiveExtrude` whose source sketch contains exactly one `CircleProfile` and one total profile.
 
-The resolver preserves component, referenced part, source feature, and source profile identity. Raw OCCT topology ids are never persistent target identity.
+`AssemblyConstraintTargetResolver` is the local semantic target authority. It preserves component, referenced part, source feature, and source profile identity. Raw OCCT topology ids are never persistent target identity.
 
 Insert and Revolute reuse the `.seat` producer to derive the same primary axis and oriented seating frame.
 
-## Rigid-transform evaluation
-
-Persisted `RigidTransform` semantics are:
-
-```text
-translation: millimeters
-rotation: degrees
-positive rotation: right-hand rule
-rotation type: active fixed-axis
-application order: X, then Y, then Z
-column-vector composition: Rz * Ry * Rx
-```
-
-Points/origins rotate then translate. Vectors, normals, and axis directions rotate only.
-
-`AssemblyTransformEvaluator` evaluates one authored level.
-
-`AssemblyHierarchyTransformEvaluator` evaluates a vector of authored transforms exactly inner-to-outer:
-
-```text
-[Tc, Ti, To]
-point result = To(Ti(Tc(p)))
-```
-
-The hierarchy is not collapsed to a composed rotation and converted back to Euler angles. This avoids adding branch/gimbal representation semantics not present in the authored records.
-
-The same level-by-level transform convention is used by nested posed shape export.
-
-## Geometric residual families
+## Local geometric residual families
 
 ### Mate
 
@@ -359,15 +338,9 @@ The current cosine seed is direction-symmetric and loses local rank at satisfied
 
 ## Revolute motion-drive residual
 
-A signed Revolute coordinate requires a directed axis because target A defines positive rotation:
+A signed Revolute coordinate requires a directed axis because target A defines positive rotation.
 
-```text
-direction_alignment = dA - dB
-axis_offset_mm = cross(oB - oA, dA)
-signed_seating_separation_mm = dot(sB - sA, nA)
-```
-
-Signed twist uses target A's directed axis and oriented seating-plane x axes:
+The drive reuses axis/seating semantics and adds periodic signed twist alignment:
 
 ```text
 reference_cosine = dot(xA, xB)
@@ -379,9 +352,9 @@ twist_alignment_cosine = cos(phi - target) - 1
 
 The sine/cosine pair avoids an `atan2` branch cut.
 
-One transient Revolute drive contributes nine scalar residual components. A regular satisfied one-free-body drive is covered as a `9 x 6` central finite-difference Jacobian of rank `6` because the requested coordinate temporarily fixes the persistent joint's motion DOF.
+One transient drive contributes nine scalar residual components. A regular satisfied one-free-body drive is covered as a `9 x 6` central finite-difference Jacobian of rank `6` because the requested coordinate temporarily fixes the joint motion DOF.
 
-## Shared numeric relationship and solve path
+## Shared local numeric solve path
 
 The private numeric system consumes:
 
@@ -390,9 +363,7 @@ constraint_ids[]
 revolute_drives[]
 ```
 
-Residual order is geometric constraint graph order followed by Revolute joint graph order.
-
-Every free active component contributes:
+Every free active local component contributes:
 
 ```text
 tx_mm
@@ -403,21 +374,21 @@ ry_deg
 rz_deg
 ```
 
-The private `detail::solve_numeric_relationships` engine implements central finite differences, damped Gauss-Newton normal equations, partial-pivot Gaussian elimination, damping escalation, backtracking line search, solve states, complete component snapshots, and free-active-component transform proposals.
+The private `detail::solve_numeric_relationships` engine implements central finite differences, damped Gauss-Newton normal equations, partial-pivot Gaussian elimination, damping escalation, backtracking line search, explicit solve states, complete component snapshots, and free-active-component transform proposals.
 
-`AssemblyRigidBodySolver` supplies geometric constraint ids only.
+`AssemblyRigidBodySolver` supplies local geometric constraint ids.
 
-`AssemblyJointMotionSolver` supplies geometric constraint ids plus transient Revolute drives. There is no separate motion optimizer.
+`AssemblyJointMotionSolver` supplies local geometric constraint ids plus transient Revolute drives. There is no separate motion optimizer.
 
-The solver and motion systems currently operate on the explicit root `project.assembly()` relationship graph. Rigid child assembly occurrences are not solver variables.
+The ordinary numeric engine still uses the temporary solve view's `project.assembly()` as its local relationship graph.
 
 ## Suppression and combined motion groups
 
-Ordinary geometric solving removes suppressed components and constraints touching them from the active numeric subgroup while retaining complete solve snapshots for stale-result detection.
+Ordinary local geometric solving removes suppressed components and constraints touching them from the active numeric subgroup while retaining complete solve snapshots for stale-result detection.
 
-Motion derives a transitive local component closure over active geometric constraint and joint edges. The selected joint is driven to the requested coordinate; other active Revolute joints in the same active group are held at their persisted coordinates.
+Motion derives a transitive local component closure over active geometric constraint and joint edges. The selected joint is driven to the requested coordinate; other active Revolute joints in the same active group are held at persisted coordinates.
 
-The selected joint itself requires active, non-suppressed endpoints.
+The selected joint requires active, non-suppressed endpoints.
 
 ## Solve and motion application boundaries
 
@@ -425,13 +396,13 @@ The selected joint itself requires active, non-suppressed endpoints.
 
 `AssemblySolveResultApplier` accepts only converged fresh results and applies component transform proposals atomically through another project copy.
 
-`AssemblyJointMotionSolver::move` is read-only and returns the selected joint/request, complete driven-joint input snapshots, and an embedded `AssemblySolveResult`.
+`AssemblyJointMotionSolver::move` is read-only and returns selected joint/request identity, complete driven-joint input snapshots, and an embedded `AssemblySolveResult`.
 
-`AssemblyJointMotionResultApplier` validates all joint snapshots, applies the embedded component proposals, replaces the selected authored joint coordinate, and commits only after all operations succeed.
+`AssemblyJointMotionResultApplier` validates all joint snapshots, applies embedded component proposals, replaces the selected authored coordinate, and commits only after all operations succeed.
 
 ## Local Jacobian rank and remaining DOF
 
-`AssemblySolveDiagnosticsAnalyzer` evaluates the same geometric finite-difference Jacobian used by ordinary solving.
+`AssemblySolveDiagnosticsAnalyzer` evaluates the same geometric finite-difference Jacobian used by ordinary local solving.
 
 ```text
 variable_count  = 6 * free_active_component_count
@@ -439,7 +410,7 @@ constrained_dof = rank(J)
 remaining_dof   = variable_count - rank(J)
 ```
 
-Proven regular one-free-body geometric results:
+Proven regular one-free-body results:
 
 ```text
 Concentric: rank 4/6, remaining DOF 2
@@ -449,43 +420,128 @@ Angle:      rank 1/6, remaining DOF 5 away from extremal targets
 
 Persistent-joint null-space presentation without an explicit motion coordinate remains deferred.
 
-## Nested posed assembly STEP export
+## Document-scoped flexible child solving
+
+Canonical document: `docs/assembly-flexible-subassembly-solving-mvp5.md`.
+
+`AssemblyFlexibleSubassemblySolver` selects one exact active non-root occurrence path.
+
+The referenced child `AssemblyDocument` is copied into a temporary `Project` as the local root assembly together with project-owned parts. The existing local constraint graph, target resolver, numeric system, rigid-body solver, snapshots, and proposal contract are reused unchanged.
+
+`AssemblyFlexibleSubassemblySolveResult` wraps:
+
+```text
+occurrence_path
+assembly_document
+local_result: AssemblySolveResult
+```
+
+Application rebuilds the hierarchy and child-local solve view, reuses `AssemblySolveResultApplier` stale validation, then atomically writes only successfully applied direct child component transforms back to the selected project-owned child document.
+
+The selected `SubassemblyInstance::transform()` remains rigid and unchanged.
+
+Repeated occurrences of one child document share the same solved internal component pose while retaining independent rigid boundary transforms.
+
+This is document-scoped flexible solving, not occurrence-local internal pose overriding.
+
+## Cross-hierarchy relationship target identity
+
+Canonical document: `docs/assembly-cross-hierarchy-relationship-semantics-mvp5.md`.
+
+The implemented read-only occurrence-qualified endpoint identity is:
+
+```text
+(occurrence_path, local ComponentInstanceId, semantic_reference)
+```
+
+`AssemblyHierarchyConstraintTarget` stores that identity.
+
+The empty occurrence path addresses the explicit root assembly occurrence. Non-empty paths are exact root-to-current `SubassemblyInstanceId` sequences from `AssemblyHierarchyTraversal`.
+
+This identity is required because a local `ComponentInstanceId` is scoped only to one assembly document. Repeated occurrences of one child document may expose the same local component id at different rooted paths.
+
+## Cross-hierarchy target resolution
+
+`AssemblyHierarchyConstraintTargetResolver` resolves a target as follows:
+
+```text
+Project
+  -> AssemblyHierarchyTraversal::build
+  -> exact occurrence_path match
+  -> containing AssemblyDocument
+  -> temporary local target-resolution view
+  -> existing AssemblyConstraintTargetResolver
+  -> local semantic geometry + component transform
+  -> [component, inner parent, ..., outer parent] transform chain
+  -> AssemblyHierarchyTransformEvaluator
+  -> root-assembly-space target geometry
+```
+
+The existing local resolver remains the only authority for planar face, `.axis`, and `.seat` target semantics.
+
+Resolved typed hierarchy target descriptors preserve occurrence path, containing assembly document, local component id, referenced part id, source feature/profile identity where applicable, semantic family identity, semantic-reference string, and root-space geometry.
+
+Repeated child assembly occurrences therefore resolve through the same local model definition but different parent transform chains.
+
+Visibility and suppression do not alter mathematical target resolution. Future occurrence-qualified graph/solver integration owns participation filtering.
+
+## Cross-hierarchy read-only residual semantics
+
+`AssemblyHierarchyConstraintQuery` is a derived query object. It reuses `AssemblyConstraintType` and the existing Distance/Angle value-family validation rules but is not inserted into any assembly constraint collection.
+
+`AssemblyHierarchyConstraintEquationBuilder` resolves target A and target B into root-assembly space and reuses the canonical residual descriptor types:
+
+```text
+PlanarMateResidualDescriptor
+PlanarDistanceResidualDescriptor
+PlanarAngleResidualDescriptor
+ConcentricResidualDescriptor
+InsertResidualDescriptor
+```
+
+The formulas and target-order semantics are exactly the same as the local builders. Only endpoint identity and transform depth differ.
+
+No persistent cross-hierarchy constraint, graph edge, solve variable, Jacobian row, snapshot, proposal, or result-application path is implemented yet.
+
+## Nested posed assembly geometry
 
 Canonical documents:
 
 - `docs/assembly-posed-step-export-mvp5.md`
 - `docs/assembly-rigid-subassembly-nested-export-mvp5.md`
+- `docs/assembly-interference-analysis-mvp5.md`
 
-`AssemblyStepExporter` is a derived geometry consumer:
+`AssemblyPosedLeafShapeBuilder` and `AssemblyStepExporter` consume the canonical flattened leaf boundary.
+
+The derived pipeline is:
 
 ```text
 const Project
   -> validate complete root/child assembly structure and cycles
   -> AssemblyHierarchyTraversal
   -> AssemblyLeafOccurrenceResolver
-  -> visible active flattened leaf occurrences
+  -> visible active flattened leaves
   -> collect unique referenced leaf part ids
-  -> sort part ids lexicographically
-  -> recompute each referenced PartDocument once into one per-export ShapeCache
+  -> recompute each referenced PartDocument once into one per-consumer ShapeCache
   -> reuse each cache across repeated component and child-assembly occurrences
-  -> copy each leaf final shape
-  -> apply leaf transforms_inner_to_outer level by level
-  -> compose one OCCT compound
-  -> existing StepExporter
-  -> STEP file
+  -> copy and pose each leaf through exact authored transform-chain semantics
 ```
 
-Repeated occurrences of one child assembly remain distinct leaves with distinct subassembly paths and transform chains while sharing referenced part recompute caches.
+`AssemblyStepExporter` composes one OCCT compound and delegates to the existing STEP writer.
 
-Hidden or suppressed subassembly occurrences omit their complete subtree. Hidden/suppressed local components are also omitted.
+The current exchange seed is geometric, not a structured STEP product hierarchy. Named occurrence products and geometry instancing are deferred.
 
-The root-only export path is the degenerate one-root hierarchy and retains the original component export semantics.
+## Posed interference and clearance analysis
 
-Missing children, cycles, unresolved member/leaf parts, failed recomputes, missing final shapes, transform failures, empty visible-active leaf output, and STEP writer failures stop export.
+`AssemblyInterferenceAnalyzer` evaluates deterministic unordered posed-leaf pairs and classifies only finite positive common solid volume above explicit tolerance as interference.
 
-The current exchange seed remains one geometric compound. Structured STEP product hierarchy, named occurrence products, and geometry instancing are deferred.
+Face, edge, or point touching without positive common volume is not interference.
 
-`blcad_export_posed_assembly` proves JSON -> optional root geometric solve/apply -> hierarchical leaf flatten -> posed compound export. `examples/nested_subassembly.blcad.project.json` covers repeated two-level child occurrences.
+`AssemblyClearanceAnalyzer` preserves interference records and evaluates OCCT minimum distance for remaining pairs. Distances below a finite positive threshold become clearance violations. Exact touching without positive volume is a zero-distance clearance violation.
+
+Analysis products are read-only and unpersisted.
+
+`blcad_analyze_assembly` exposes the combined report path headlessly.
 
 ## Persistence boundary
 
@@ -494,46 +550,54 @@ Persisted model intent includes:
 - project identity and one explicit root assembly;
 - project-owned child assembly documents;
 - project-owned part documents;
-- parameters and bindings;
+- parameters, formulas, and bindings;
 - component occurrence identity/state/grounding/transform;
 - rigid subassembly occurrence identity, child assembly reference, visibility, suppression, and transform;
-- geometric constraint identity, semantic targets, state, and explicit values;
-- joint identity, family, semantic targets, state, limits, and authored coordinate.
+- local geometric constraint identity, semantic targets, state, and explicit values;
+- local joint identity, family, semantic targets, state, limits, and authored coordinate.
 
 Derived and unpersisted data includes:
 
-- constraint graph connectivity;
-- joint graph connectivity;
+- local constraint and joint graph connectivity;
 - combined motion groups;
-- assembly document reference graph;
-- hierarchy cycle traversal state;
+- assembly document reference graph and hierarchy cycle state;
 - hierarchy parent links and traversal order;
 - `AssemblyHierarchyOccurrenceDescriptor` values;
 - occurrence paths and parent transform chains;
 - `AssemblyLeafOccurrenceDescriptor` values and flattened leaf ordering;
+- child-local temporary solve views;
+- `AssemblyFlexibleSubassemblySolveResult` wrappers;
+- `AssemblyHierarchyConstraintTarget` and `AssemblyHierarchyConstraintQuery` values;
+- occurrence-qualified hierarchy target descriptors;
 - composed/evaluated hierarchy placements;
 - resolved semantic geometry;
-- residual descriptors and transient drive sets;
+- local and cross-hierarchy read-only residual descriptors;
+- transient drive sets;
 - numeric residuals, Jacobians, and normal equations;
 - solve/motion results and snapshots;
 - rank/DOF diagnostics;
 - per-consumer `ShapeCache` values;
 - posed leaf shape copies;
+- interference/clearance pair products;
 - OCCT compounds and STEP entity identity.
 
-Only explicit application changes persisted component solver placement or a selected authored joint coordinate. Rigid subassembly placement/state changes only through explicit occurrence edits.
+Only explicit successful application changes persisted component solver placement or a selected authored joint coordinate. Rigid subassembly placement/state changes only through explicit occurrence edits until a later whole-subassembly solve-variable contract exists.
 
 ## Next assembly block
 
-The next block is the first posed assembly interference-analysis seed.
+The next block is persistent project-level cross-hierarchy geometric constraint intent plus occurrence-qualified active-constraint graph and shared numeric solve/application integration.
 
-It should consume `AssemblyLeafOccurrenceResolver` rather than reimplement hierarchy traversal. Unique referenced leaf parts should be recomputed once, leaves posed with the same transform-chain semantics as nested STEP export, and unordered leaf pairs derived once in deterministic occurrence-key order.
+The endpoint identity is now frozen:
 
-OCCT common/intersection geometry should classify only finite positive common solid volume above an explicit tolerance as interference. Face, edge, or point touching is not positive-volume interference in the seed.
+```text
+(occurrence_path, local ComponentInstanceId, semantic_reference)
+```
 
-The output should be read-only occurrence-pair interference records plus leaf/pair analysis counts. Pair candidates, posed shapes, common shapes, volume properties, and results remain derived and unpersisted.
+The next block must not use local `ComponentInstanceId` alone as graph, numeric-variable, snapshot, or proposal identity because repeated occurrences of one child document may share that local id.
 
-Broad-phase acceleration, contact classification, minimum distance, penetration direction/depth, collision response, swept motion, and physics remain deferred.
+It must define occurrence-qualified component variable identity, active/suppressed path filtering, deterministic graph connectivity, shared residual flattening for all five existing geometric families, finite-difference Jacobian evaluation, fresh-result snapshots, and atomic application to the correct project-owned assembly/component targets.
+
+Cross-hierarchy joints and nested motion propagation remain deferred to a later block.
 
 ## Broader future direction
 
