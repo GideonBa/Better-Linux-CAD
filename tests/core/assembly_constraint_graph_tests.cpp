@@ -91,9 +91,9 @@ TEST_CASE("AssemblyConstraintGraph includes all nodes and active constraints onl
 
   CHECK(graph.value().node_count() == 5U);
   CHECK(graph.value().edge_count() == 3U);
-  CHECK(id_values(graph.value().nodes()) ==
-        std::vector<std::string>{"component.a", "component.b", "component.c", "component.d",
-                                 "component.z"});
+  const std::vector<std::string> expected_nodes{
+      "component.a", "component.b", "component.c", "component.d", "component.z"};
+  CHECK(id_values(graph.value().nodes()) == expected_nodes);
 
   REQUIRE(graph.value().edges().size() == 3U);
   CHECK(graph.value().edges()[0].constraint().value() == "constraint.alpha");
@@ -116,15 +116,14 @@ TEST_CASE("AssemblyConstraintGraph adjacency is deterministic and preserves mult
   auto graph = AssemblyConstraintGraph::build(assembly);
   REQUIRE(graph);
 
+  const std::vector<std::string> expected_adjacent{"constraint.alpha", "constraint.zeta"};
   auto adjacent_a = graph.value().adjacent_constraints(ComponentInstanceId("component.a"));
   REQUIRE(adjacent_a);
-  CHECK(constraint_id_values(adjacent_a.value()) ==
-        std::vector<std::string>{"constraint.alpha", "constraint.zeta"});
+  CHECK(constraint_id_values(adjacent_a.value()) == expected_adjacent);
 
   auto adjacent_b = graph.value().adjacent_constraints(ComponentInstanceId("component.b"));
   REQUIRE(adjacent_b);
-  CHECK(constraint_id_values(adjacent_b.value()) ==
-        std::vector<std::string>{"constraint.alpha", "constraint.zeta"});
+  CHECK(constraint_id_values(adjacent_b.value()) == expected_adjacent);
 
   auto adjacent_isolated = graph.value().adjacent_constraints(ComponentInstanceId("component.z"));
   REQUIRE(adjacent_isolated);
@@ -151,9 +150,12 @@ TEST_CASE("AssemblyConstraintGraph connected components are deterministic and in
 
   const auto groups = graph.value().connected_components();
   REQUIRE(groups.size() == 3U);
-  CHECK(id_values(groups[0]) == std::vector<std::string>{"component.a", "component.b"});
-  CHECK(id_values(groups[1]) == std::vector<std::string>{"component.c", "component.d"});
-  CHECK(id_values(groups[2]) == std::vector<std::string>{"component.z"});
+  const std::vector<std::string> expected_ab{"component.a", "component.b"};
+  const std::vector<std::string> expected_cd{"component.c", "component.d"};
+  const std::vector<std::string> expected_z{"component.z"};
+  CHECK(id_values(groups[0]) == expected_ab);
+  CHECK(id_values(groups[1]) == expected_cd);
+  CHECK(id_values(groups[2]) == expected_z);
 }
 
 TEST_CASE("AssemblyConstraintGraph construction and queries do not mutate assembly intent",
