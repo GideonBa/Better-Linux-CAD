@@ -1,4 +1,4 @@
-#include "blcad/core/assembly_document.hpp"
+#include "blcad/core/assembly_constraint.hpp"
 
 #include <utility>
 
@@ -112,44 +112,5 @@ const AssemblyConstraintTarget& AssemblyConstraint::target_b() const noexcept { 
 AssemblyConstraintState AssemblyConstraint::state() const noexcept { return state_; }
 
 const std::optional<Quantity>& AssemblyConstraint::distance() const noexcept { return distance_; }
-
-Result<std::size_t> AssemblyDocument::add_constraint(AssemblyConstraint constraint) {
-  if (has_constraint_id(constraint.id())) {
-    return Result<std::size_t>::failure(Error::validation(
-        constraint.id().value(), "assembly constraint id must be unique within assembly document"));
-  }
-
-  if (!has_component_instance_id(constraint.target_a().component_instance())) {
-    return Result<std::size_t>::failure(Error::validation(
-        constraint.id().value(), "assembly constraint target A component instance must exist"));
-  }
-  if (!has_component_instance_id(constraint.target_b().component_instance())) {
-    return Result<std::size_t>::failure(Error::validation(
-        constraint.id().value(), "assembly constraint target B component instance must exist"));
-  }
-
-  constraints_.push_back(std::move(constraint));
-  return Result<std::size_t>::success(constraints_.size() - 1U);
-}
-
-const std::vector<AssemblyConstraint>& AssemblyDocument::constraints() const noexcept {
-  return constraints_;
-}
-
-std::size_t AssemblyDocument::constraint_count() const noexcept { return constraints_.size(); }
-
-const AssemblyConstraint*
-AssemblyDocument::find_constraint(AssemblyConstraintId id) const noexcept {
-  for (const auto& constraint : constraints_) {
-    if (constraint.id() == id) {
-      return &constraint;
-    }
-  }
-  return nullptr;
-}
-
-bool AssemblyDocument::has_constraint_id(const AssemblyConstraintId& id) const noexcept {
-  return find_constraint(id) != nullptr;
-}
 
 } // namespace blcad
