@@ -288,17 +288,26 @@ Canonical document: `docs/assembly-interference-analysis-mvp5.md`.
 
 Implemented: `AssemblyClearanceAnalyzer` on the shared posed-leaf boundary with the unchanged pair order and identity contract. Interfering pairs stay interference records; remaining pairs derive their OCCT minimum distance and become clearance-violation records below a finite positive threshold. Touching without positive volume is a zero-distance clearance violation. Fail-closed on extrema failures, non-finite distances, and invalid thresholds; everything derived and unpersisted.
 
-## Next MVP: Headless assembly analysis report example
+### 20. Headless assembly analysis report example
 
-Goal: one headless command that makes the whole MVP-5 pipeline inspectable — load a project, optionally solve, run interference and clearance analysis, and print a deterministic plain-text report.
+Canonical document: `docs/assembly-interference-analysis-mvp5.md`.
+
+Implemented: `blcad_analyze_assembly <input.blcad.project.json> [clearance-threshold-mm]` loads a project, runs the combined clearance/interference analysis, prints leaf/pair/part counts plus every record in deterministic occurrence-key order, and exits non-zero with the error object id and message on failure. A test drives the analyzer against the checked-in posed assembly example (12 mm axial gap below a 15 mm threshold).
+
+## Next MVP: Parameter expression seed
+
+Goal: the first computed-parameter block from `docs/parameter-model.md` — a part parameter whose value is a unit-aware formula over other part parameters, re-evaluated through the existing dependency graph.
 
 Required implementation sequence:
 
-1. Add `blcad_analyze_assembly <input.blcad.project.json> [clearance-threshold-mm]` under `examples/`.
-2. Load the project JSON, run `AssemblyClearanceAnalyzer` (which includes interference), and print leaf count, evaluated pairs, recomputed parts, then every interference and clearance record in deterministic order with occurrence keys and values.
-3. Exit non-zero on analysis errors; print the error object id and message.
-4. Register the tool in CMake and the README headless-tools list with an example invocation against a checked-in example project.
-5. Cover the report path with one test that drives the analyzer on an example project file (tool wiring itself stays a thin main).
+1. Add an `Expression` record on `Parameter` (optional formula string) with a small deterministic parser: literals, parameter names, `+ - * /`, parentheses.
+2. Length semantics: length ± length = length; length × scalar and length ÷ scalar = length; count/scalar literals stay dimensionless; reject unit-invalid combinations (for example length × length) in the seed.
+3. Evaluation resolves referenced parameters by name within the owning part document and validates the result against the target parameter type.
+4. Dependency edges run from every referenced parameter to the expression parameter, so a change re-evaluates the expression and invalidates its dependents in topological order.
+5. Cycles across expression edges are rejected through the existing graph cycle detection.
+6. `PartDocument::set_parameter_value` rejects direct writes to expression-driven parameters; editing the formula is the mutation path.
+7. JSON persists the formula string; roundtrip re-derives value and edges.
+8. Cover: parsing/validation errors, unit rules, evaluation, incremental re-evaluation through the graph, cycle rejection, direct-write rejection, JSON roundtrip, and one geometry test where a formula-driven length drives a recompute.
 
 ## Proposed assembly implementation sequence
 
@@ -324,7 +333,7 @@ Required implementation sequence:
 20. Rigid subassembly instance and nested posed-export seed. Implemented.
 21. First posed assembly interference-analysis seed. Implemented.
 22. Posed assembly clearance-analysis seed. Implemented.
-23. Headless assembly analysis report example. Next.
+23. Headless assembly analysis report example. Implemented.
 24. Add flexible subassemblies, cross-hierarchy relationship semantics, component geometry instancing, and richer collision/contact analysis in later dedicated blocks.
 
 ## Future roadmaps

@@ -172,11 +172,15 @@ if(BLCAD_BUILD_GEOMETRY)
   add_executable(blcad_move_joint examples/blcad_move_joint.cpp)
   target_link_libraries(blcad_move_joint PRIVATE BLCAD::geometry)
 
+  add_executable(blcad_analyze_assembly examples/blcad_analyze_assembly.cpp)
+  target_link_libraries(blcad_analyze_assembly PRIVATE BLCAD::geometry)
+
   if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(blcad_export_step PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(blcad_export_project PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(blcad_export_posed_assembly PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(blcad_move_joint PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(blcad_analyze_assembly PRIVATE -Wall -Wextra -Wpedantic)
   endif()
 endif()
 

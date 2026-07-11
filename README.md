@@ -120,6 +120,7 @@ blcad_export_project <input.blcad.project.json> <assembly-parameter-id> <value> 
 blcad_inspect_project_components <input.blcad.project.json>
 blcad_export_posed_assembly <input.blcad.project.json> <output.step>
 blcad_move_joint <input.blcad.project.json> <joint-id> <angle-deg> <output.blcad.project.json>
+blcad_analyze_assembly <input.blcad.project.json> [clearance-threshold-mm]
 ```
 
 Examples:
@@ -132,6 +133,7 @@ Examples:
 ./build/dev-geometry/blcad_move_joint examples/revolute_joint.blcad.project.json joint.revolute 45 build/revolute_joint_45.blcad.project.json
 ./build/dev-geometry/blcad_export_posed_assembly build/revolute_joint_45.blcad.project.json build/revolute_joint_45.step
 ./build/dev-geometry/blcad_export_posed_assembly examples/nested_subassembly.blcad.project.json build/nested_subassembly.step
+./build/dev-geometry/blcad_analyze_assembly examples/posed_assembly.blcad.project.json 15
 ```
 
 ## Repository structure
@@ -185,4 +187,4 @@ Future roadmaps:
 
 ## Next technical step
 
-The next technical step is a headless assembly analysis report example: one command that loads a project JSON, runs the combined interference/clearance analysis over the shared posed-leaf boundary, and prints a deterministic plain-text report with occurrence keys, overlap volumes, and minimum distances. See `docs/mvp-plan.md`.
+The next technical step is the parameter expression seed: a part parameter whose value is a unit-aware formula over other part parameters, parsed deterministically, re-evaluated through the existing dependency graph with cycle rejection, persisted as a formula string, and proven by a formula-driven length that drives a geometry recompute. See `docs/mvp-plan.md` and `docs/parameter-model.md`.

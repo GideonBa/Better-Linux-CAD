@@ -1,9 +1,11 @@
+#include "blcad/core/project_json.hpp"
 #include "blcad/geometry/assembly_interference_analyzer.hpp"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 #include <cstddef>
+#include <filesystem>
 #include <limits>
 #include <vector>
 
@@ -318,4 +320,43 @@ TEST_CASE("Clearance analysis is deterministic and validates its thresholds",
     REQUIRE(analysis.has_error());
     CHECK(analysis.error().message() == "clearance threshold must be finite and positive");
   }
+}
+
+TEST_CASE("Clearance analysis drives the checked-in posed assembly example project",
+          "[geometry][assembly-clearance]") {
+  // Locate the repository example independent of the ctest working directory.
+  std::filesystem::path example_path;
+  std::filesystem::path candidate = std::filesystem::current_path();
+  for (int level = 0; level < 6; ++level) {
+    const std::filesystem::path probe =
+        candidate / "examples" / "posed_assembly.blcad.project.json";
+    if (std::filesystem::exists(probe)) {
+      example_path = probe;
+      break;
+    }
+    candidate = candidate.parent_path();
+  }
+  REQUIRE_FALSE(example_path.empty());
+
+  auto project = read_project_json_file(example_path.string());
+  REQUIRE(project);
+
+  // The example plates are 120 x 80 x 8; the free plate sits 20 mm above the
+  // grounded plate's base, leaving a 12 mm axial gap before solving.
+  const AssemblyClearanceAnalyzer analyzer;
+  AssemblyClearanceAnalysisOptions options;
+  options.clearance_threshold_mm = 15.0;
+  const auto analysis = analyzer.analyze(project.value(), options);
+  const auto repeated = analyzer.analyze(project.value(), options);
+
+  REQUIRE(analysis);
+  REQUIRE(repeated);
+  CHECK(analysis.value() == repeated.value());
+  CHECK(analysis.value().leaf_count == 2U);
+  CHECK(analysis.value().evaluated_pair_count == 1U);
+  CHECK(analysis.value().recomputed_part_count == 1U);
+  CHECK(analysis.value().interferences.empty());
+  REQUIRE(analysis.value().clearance_violations.size() == 1U);
+  CHECK(analysis.value().clearance_violations.front().minimum_distance_mm ==
+        Approx(12.0).margin(1.0e-6));
 }
