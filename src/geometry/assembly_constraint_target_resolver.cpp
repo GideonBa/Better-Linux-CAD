@@ -95,12 +95,47 @@ parse_generated_axis_reference(std::string_view semantic_reference) {
   return SemanticAxisReference::create(FeatureId(std::string(source_feature)));
 }
 
+[[nodiscard]] Result<SemanticSeatingPlaneReference>
+parse_generated_seating_plane_reference(std::string_view semantic_reference) {
+  const std::size_t separator = semantic_reference.rfind('.');
+  if (separator == std::string_view::npos || separator == 0U ||
+      separator + 1U >= semantic_reference.size()) {
+    return Result<SemanticSeatingPlaneReference>::failure(validation_error(
+        std::string(semantic_reference), "assembly semantic seating reference is malformed"));
+  }
+
+  const std::string_view source_feature = semantic_reference.substr(0U, separator);
+  const std::string_view seat_name = semantic_reference.substr(separator + 1U);
+  if (seat_name != "seat") {
+    return Result<SemanticSeatingPlaneReference>::failure(validation_error(
+        std::string(semantic_reference), "unsupported assembly semantic seating reference family"));
+  }
+
+  return SemanticSeatingPlaneReference::create(FeatureId(std::string(source_feature)));
+}
+
+[[nodiscard]] Vector3 negate(const Vector3& vector) noexcept {
+  return Vector3{-vector.x, -vector.y, -vector.z};
+}
+
 [[nodiscard]] Vector3 extrude_direction(const ResolvedWorkplane& workplane,
                                         ExtrudeDirection direction) noexcept {
   if (direction == ExtrudeDirection::OppositeSketchNormal) {
-    return Vector3{-workplane.normal.x, -workplane.normal.y, -workplane.normal.z};
+    return negate(workplane.normal);
   }
   return workplane.normal;
+}
+
+[[nodiscard]] ComponentLocalPlanarDescriptor
+seating_plane(const ResolvedWorkplane& workplane,
+              Point3 axis_origin,
+              ExtrudeDirection direction) noexcept {
+  if (direction == ExtrudeDirection::OppositeSketchNormal) {
+    return ComponentLocalPlanarDescriptor{axis_origin, workplane.x_axis, negate(workplane.y_axis),
+                                          negate(workplane.normal)};
+  }
+  return ComponentLocalPlanarDescriptor{axis_origin, workplane.x_axis, workplane.y_axis,
+                                        workplane.normal};
 }
 
 } // namespace
@@ -207,6 +242,72 @@ AssemblyConstraintTargetResolver::resolve_axis(const Project& project,
           axis_reference.value().source_feature(), circle.id(), axis_reference.value().axis(),
           ComponentLocalAxisDescriptor{workplane_resolver.evaluate_point(workplane, circle.center()),
                                        extrude_direction(workplane, source_feature->direction())},
+          component.transform()});
+}
+
+Result<ResolvedAssemblyInsertConstraintTarget>
+AssemblyConstraintTargetResolver::resolve_insert(const Project& project,
+                                                 const AssemblyConstraintTarget& target) const {
+  auto context = resolve_target_context(project, target);
+  if (context.has_error()) {
+    return Result<ResolvedAssemblyInsertConstraintTarget>::failure(context.error());
+  }
+
+  const ComponentInstance& component = *context.value().component;
+  const PartDocument& part = *context.value().part;
+  auto seating_reference = parse_generated_seating_plane_reference(target.semantic_reference());
+  if (seating_reference.has_error()) {
+    return Result<ResolvedAssemblyInsertConstraintTarget>::failure(seating_reference.error());
+  }
+
+  const Feature* source_feature = part.find_feature(seating_reference.value().source_feature());
+  if (source_feature == nullptr) {
+    return Result<ResolvedAssemblyInsertConstraintTarget>::failure(validation_error(
+        target.semantic_reference(),
+        "generated-seat assembly target source feature must exist in referenced part document"));
+  }
+  if (source_feature->type() != FeatureType::SubtractiveExtrude) {
+    return Result<ResolvedAssemblyInsertConstraintTarget>::failure(validation_error(
+        target.semantic_reference(),
+        "generated-seat assembly target source feature must be a subtractive extrude"));
+  }
+
+  const Sketch* sketch = part.find_sketch(source_feature->input_sketch());
+  if (sketch == nullptr) {
+    return Result<ResolvedAssemblyInsertConstraintTarget>::failure(validation_error(
+        target.semantic_reference(),
+        "generated-seat assembly target source feature input sketch must exist"));
+  }
+  if (sketch->circle_profiles().size() != 1U || sketch->profile_count() != 1U) {
+    return Result<ResolvedAssemblyInsertConstraintTarget>::failure(validation_error(
+        target.semantic_reference(),
+        "generated-seat assembly target requires exactly one CircleProfile in the source sketch"));
+  }
+
+  const CircleProfile& circle = sketch->circle_profiles().front();
+  const Parameter* diameter = part.find_parameter(circle.diameter_parameter());
+  if (diameter == nullptr || diameter->type() != ParameterType::Length) {
+    return Result<ResolvedAssemblyInsertConstraintTarget>::failure(validation_error(
+        target.semantic_reference(),
+        "generated-seat assembly target circle diameter must resolve to a length parameter"));
+  }
+
+  const WorkplaneResolver workplane_resolver;
+  auto resolved_workplane = workplane_resolver.resolve_for_sketch(part, *sketch);
+  if (resolved_workplane.has_error()) {
+    return Result<ResolvedAssemblyInsertConstraintTarget>::failure(resolved_workplane.error());
+  }
+
+  const ResolvedWorkplane& workplane = resolved_workplane.value();
+  const Point3 axis_origin = workplane_resolver.evaluate_point(workplane, circle.center());
+  const Vector3 axis_direction = extrude_direction(workplane, source_feature->direction());
+  return Result<ResolvedAssemblyInsertConstraintTarget>::success(
+      ResolvedAssemblyInsertConstraintTarget{
+          component.id(), component.referenced_part_document(),
+          seating_reference.value().source_feature(), circle.id(), SemanticAxis::Primary,
+          seating_reference.value().plane(),
+          ComponentLocalAxisDescriptor{axis_origin, axis_direction},
+          seating_plane(workplane, axis_origin, source_feature->direction()),
           component.transform()});
 }
 
