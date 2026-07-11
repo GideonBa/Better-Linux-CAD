@@ -4,7 +4,7 @@ Status: implemented read-only resolution of supported generated-face assembly ta
 
 ## Goal
 
-This block connects persistent `AssemblyConstraintTarget` intent to the first supported geometric reference family without introducing assembly-space transform evaluation, constraint equations, or a rigid-body solver.
+This block connects persistent `AssemblyConstraintTarget` intent to the first supported geometric reference family without introducing constraint equations or a rigid-body solver.
 
 The resolver answers four questions for one target:
 
@@ -14,6 +14,8 @@ The resolver answers four questions for one target:
 4. What is the deterministic component-local planar frame of that face?
 
 The result is derived geometry data. It is not model intent and is not serialized.
+
+Assembly-space transform evaluation now exists as the next separate layer in `docs/assembly-rigid-transform-evaluation-mvp5.md`.
 
 ## API
 
@@ -127,18 +129,32 @@ Semantic axes remain unsupported. This is deliberate because a stable axis-refer
 
 ## Placement boundary
 
-The current `RigidTransform` stores translation in millimeters and rotation values in degrees. The target resolver does not define a rotation order or silently interpret those rotation values as assembly-space frame math.
+`RigidTransform` stores translation in millimeters and rotation values in degrees. Target resolution does not interpret those values itself.
 
-For example, a component may currently store:
+For example, a component may store:
 
 ```text
 translation_mm = (10, 20, 30)
 rotation_deg   = (5, 15, 25)
 ```
 
-If its local top face resolves to origin `(0, 0, 8)` and normal `(0, 0, 1)`, this block returns that local face frame plus the unchanged `RigidTransform`. It does not claim an assembly-space origin or normal yet.
+If its local top face resolves to origin `(0, 0, 8)` and normal `(0, 0, 1)`, this resolver returns that local frame plus the unchanged `RigidTransform`.
 
-That separation prevents the target resolver from inventing a hidden Euler-angle convention that later solver code would have to preserve accidentally.
+The next layer is now explicit:
+
+```text
+ResolvedAssemblyConstraintTarget
+  local_plane
+  component_transform
+
+  -> AssemblyTransformEvaluator::evaluate_plane(...)
+
+AssemblySpacePlanarDescriptor
+```
+
+`AssemblyTransformEvaluator` defines active right-handed fixed-axis X-then-Y-then-Z rotation, equivalent to `Rz * Ry * Rx` for column vectors. That convention is documented in `docs/assembly-rigid-transform-evaluation-mvp5.md`.
+
+Keeping transform math outside target resolution prevents semantic lookup and coordinate-space evaluation from becoming one coupled subsystem.
 
 ## Read-only and persistence boundary
 
@@ -151,7 +167,7 @@ Resolution does not:
 - take ownership of a `ShapeCache`
 - persist a resolved target descriptor
 
-The descriptor can be regenerated from project model intent and current part parameters. It therefore remains derived data like constraint graph connectivity.
+The descriptor can be regenerated from project model intent and current part parameters. It therefore remains derived data like constraint graph connectivity and evaluated assembly-space frames.
 
 ## Tests
 
@@ -171,12 +187,12 @@ The descriptor can be regenerated from project model intent and current part par
 
 The resolver is registered in the optional geometry target and its tests are registered in `blcad_geometry_tests`.
 
+The separate transform-evaluation suite covers the local-to-assembly coordinate convention; this resolver suite intentionally continues to assert local geometry plus separate placement intent.
+
 ## Deferred work
 
-This block does not implement:
+This block itself does not implement:
 
-- component-local to assembly-space point/vector/frame evaluation
-- an Euler-angle or rigid-transform rotation-order convention
 - Mate or Distance constraint equations
 - Concentric equations or semantic axis references
 - rigid-body solving
@@ -185,4 +201,10 @@ This block does not implement:
 - underconstrained, fully constrained, or overconstrained state analysis
 - enforced grounding or suppression participation rules
 
-The next technical step is to define and test explicit assembly rigid-transform evaluation conventions before constraint equations consume resolved target frames.
+Component-local to assembly-space point/vector/frame evaluation is no longer deferred globally; it is implemented as the separate `AssemblyTransformEvaluator` block.
+
+## Next technical step
+
+The next assembly block is read-only planar Mate/Distance equation/residual construction over assembly-space target descriptors.
+
+It should resolve both supported generated-face targets, evaluate both local planes through `AssemblyTransformEvaluator`, and construct documented deterministic geometric residual data without solving or mutating component transforms. Concentric remains deferred until semantic axis references are stable.
