@@ -10,14 +10,15 @@
 
 namespace blcad {
 
-enum class AssemblyConstraintType { Mate, Concentric, Distance };
+enum class AssemblyConstraintType { Mate, Concentric, Distance, Insert };
 [[nodiscard]] std::string_view to_string(AssemblyConstraintType type) noexcept;
 
 enum class AssemblyConstraintState { Active, Inactive };
 [[nodiscard]] std::string_view to_string(AssemblyConstraintState state) noexcept;
 
 // Persistent semantic assembly target. The semantic reference is model intent
-// such as feature.base_extrude.top or feature.hole.axis, never a raw OCCT topology id.
+// such as feature.base_extrude.top, feature.hole.axis, or feature.hole.seat,
+// never a raw OCCT topology id.
 class AssemblyConstraintTarget {
 public:
   [[nodiscard]] static Result<AssemblyConstraintTarget>
@@ -36,7 +37,7 @@ private:
 };
 
 // Solver-independent assembly relationship intent. Distance constraints carry
-// one length quantity; Mate and Concentric intentionally carry no distance.
+// one length quantity; Mate, Concentric, and Insert intentionally carry no distance.
 class AssemblyConstraint {
 public:
   [[nodiscard]] static Result<AssemblyConstraint>
