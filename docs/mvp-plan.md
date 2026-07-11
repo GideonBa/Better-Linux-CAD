@@ -211,29 +211,56 @@ Still deferred:
 - remaining DOF and under/fully/overconstrained analysis
 - enforced grounding and suppression participation rules
 
-## Next MVP: Read-only semantic assembly target resolution seed
+## Implemented block: MVP 5 read-only semantic assembly target resolution
 
-Goal: resolve persistent assembly target intent to supported component-local geometric descriptors before any constraint equation or rigid-body solver is introduced.
+Detailed document: `docs/assembly-constraint-target-resolution-mvp5.md`
+
+Implemented scope:
+
+- read-only `AssemblyConstraintTargetResolver` in the optional geometry layer
+- target `ComponentInstanceId` resolution through the project's `AssemblyDocument`
+- component `referenced_part_document` resolution to the project-owned `PartDocument`
+- parsing and validation of the implemented generated-face semantic token family
+- support for `feature.<feature-id>.{top,bottom,right,left,front,back}` targets
+- direct reuse of `WorkplaneResolver::resolve_generated_face` so derived workplanes and assembly targets share one generated-face frame implementation
+- component-local planar descriptors containing origin, x-axis, y-axis, and normal
+- separate preservation of the component's persisted `RigidTransform` without applying an implicit assembly rotation convention
+- explicit unsupported-reference errors for semantic axes and generated edge families that are not implemented for assembly targets yet
+- read-only resolution with no transform, constraint-record, part-intent, or geometry-cache ownership mutation
+- geometry tests for all six generated faces, missing component/part/feature targets, malformed and unsupported semantic tokens, deterministic resolution, separate placement intent, and unchanged project model intent
+- no resolved-target JSON field because descriptors are regenerable derived geometry data
+
+Still deferred:
+
+- component-local to assembly-space point, vector, and frame evaluation
+- an explicit persisted-rotation evaluation convention and rotation order
+- Mate and Distance constraint equation construction
+- semantic axis references and Concentric equation construction
+- rigid-body solving and solved transform updates
+- remaining DOF and under/fully/overconstrained analysis
+- enforced grounding and suppression participation rules
+
+## Next MVP: Explicit assembly rigid-transform evaluation convention
+
+Goal: define deterministic component-local-to-assembly-space geometry evaluation for the existing persisted `RigidTransform` before constraint equations consume resolved target frames.
 
 Proposed first implementation sequence:
 
-- add a read-only `AssemblyConstraintTargetResolver` in the optional geometry layer
-- resolve `AssemblyConstraintTarget::component_instance` through the owning `Project` and its `AssemblyDocument`
-- resolve the component's `referenced_part_document` to the project-owned `PartDocument`
-- parse and validate the currently implemented generated-face semantic reference family instead of accepting arbitrary target text at resolution time
-- reuse the existing semantic face/workplane geometry path to produce a component-local planar descriptor with origin, basis axes, and normal
-- keep the component `RigidTransform` available as separate placement intent; do not silently invent an assembly rotation convention inside the target resolver
-- return explicit unsupported-reference errors for target families that are not implemented yet, including semantic axes needed for full Concentric solving
-- keep target resolution read-only with respect to component transforms, constraint records, part model intent, and geometry cache ownership
-- add geometry tests for valid generated faces, missing component/part/feature targets, malformed and unsupported semantic tokens, deterministic resolution, and unchanged assembly intent
-- do not persist resolved target descriptors because they are regenerable derived data
-- keep Mate/Distance/Concentric equation construction, assembly-space transform math, rigid-body solving, remaining DOF, enforced grounding, and solved transform updates deferred
+- document the angle unit and exact rotation order used to interpret `RigidTransform::rotation_deg`
+- add a read-only geometry helper for component-local point and vector evaluation
+- apply rotation followed by translation to points
+- apply rotation only to vectors, basis axes, and normals
+- provide planar-frame evaluation for `ComponentLocalPlanarDescriptor`
+- preserve vector/frame normalization and deterministic results within numeric tolerance
+- test identity, pure translation, single-axis rotations, combined rotations that prove the chosen order, and unchanged component model intent
+- keep stored component transforms unchanged; evaluated assembly-space geometry remains derived data
+- do not build Mate/Distance equations, run a rigid-body solver, compute remaining DOF, enforce grounding, or add semantic axis references in this block
 
 ## Future roadmap: Multi-body transforms and path features
 
 Detailed document: `docs/multi-body-transform-and-path-features-roadmap.md`
 
-Planned scope includes `BodyId`, `Body`, `BodyTransform`, `BodyBooleanFeature`, `SketchOwnership`, `PathCurve`, `ProfileSectionReference`, path-following extrude/cut, two-section loft, multi-section loft, path/guide-curve loft, and associated JSON/project-file records.
+Planned scope includes `BodyId`, `Body`, `BodyTransform`, `BodyTransformStack`, `BodyBooleanFeature`, `SketchOwnership`, `PathCurve`, `ProfileSectionReference`, path-following extrude/cut, two-section loft, multi-section loft, path/guide-curve loft, and associated JSON/project-file records.
 
 ## Future roadmap: Inventor-like sketcher and sketch-driven features
 
