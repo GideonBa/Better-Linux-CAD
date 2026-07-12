@@ -21,6 +21,7 @@ class StepExporter;
 class AssemblyStepExporter;
 
 namespace detail {
+class AssemblyPartShapeDefinitionBuilder;
 class AssemblyPosedLeafShapeBuilder;
 }
 
@@ -44,6 +45,7 @@ private:
   friend class ClosedProfileAdapter;
   friend class StepExporter;
   friend class AssemblyStepExporter;
+  friend class detail::AssemblyPartShapeDefinitionBuilder;
   friend class detail::AssemblyPosedLeafShapeBuilder;
 
   explicit GeometryShape(std::shared_ptr<Impl> impl);
