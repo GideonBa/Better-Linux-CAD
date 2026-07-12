@@ -7,7 +7,6 @@
 #include <string>
 #include <string_view>
 #include <utility>
-#include <vector>
 
 namespace blcad::geometry {
 namespace {
@@ -258,7 +257,6 @@ Result<AssemblyResolvedGeometricTarget> AssemblyConstraintTargetResolver::resolv
   }
   const std::string_view source_role =
       std::string_view(target.semantic_reference()).substr(separator + 1U);
-
   const AssemblyLocalGeometricTargetEndpointIdentity endpoint{
       target.component_instance(), target.semantic_reference()};
 
@@ -364,7 +362,20 @@ AssemblyConstraintTargetResolver::resolve(const Project& project,
   if (face_reference.has_error()) {
     return Result<ResolvedAssemblyConstraintTarget>::failure(face_reference.error());
   }
-  return resolve_generated_planar_target(context.value(), target, face_reference.value());
+  auto typed = resolve_geometric(project, target);
+  if (typed.has_error()) {
+    return Result<ResolvedAssemblyConstraintTarget>::failure(typed.error());
+  }
+  auto plane = project_plane(typed.value());
+  if (plane.has_error()) {
+    return Result<ResolvedAssemblyConstraintTarget>::failure(plane.error());
+  }
+  return Result<ResolvedAssemblyConstraintTarget>::success(ResolvedAssemblyConstraintTarget{
+      target.component_instance(), context.value().component->referenced_part_document(),
+      face_reference.value().source_feature(), face_reference.value().face(),
+      ComponentLocalPlanarDescriptor{plane.value().origin, plane.value().x_axis,
+                                     plane.value().y_axis, plane.value().normal},
+      context.value().component->transform()});
 }
 
 Result<ResolvedAssemblyAxisConstraintTarget>
@@ -378,20 +389,25 @@ AssemblyConstraintTargetResolver::resolve_axis(const Project& project,
   if (axis_reference.has_error()) {
     return Result<ResolvedAssemblyAxisConstraintTarget>::failure(axis_reference.error());
   }
-  auto circular = resolve_circular_feature_geometry(
-      context.value(), target, axis_reference.value().source_feature(),
-      "generated-axis assembly target");
-  if (circular.has_error()) {
-    return Result<ResolvedAssemblyAxisConstraintTarget>::failure(circular.error());
+  auto typed = resolve_geometric(project, target);
+  if (typed.has_error()) {
+    return Result<ResolvedAssemblyAxisConstraintTarget>::failure(typed.error());
   }
-
-  const ComponentInstance& component = *context.value().component;
-  const auto& value = circular.value();
+  auto axis = project_axis(typed.value());
+  if (axis.has_error()) {
+    return Result<ResolvedAssemblyAxisConstraintTarget>::failure(axis.error());
+  }
+  if (!typed.value().source_metadata.source_profile.has_value()) {
+    return Result<ResolvedAssemblyAxisConstraintTarget>::failure(validation_error(
+        target.semantic_reference(), "generated-axis assembly target source profile is missing"));
+  }
   return Result<ResolvedAssemblyAxisConstraintTarget>::success(
       ResolvedAssemblyAxisConstraintTarget{
-          component.id(), component.referenced_part_document(), value.source_feature,
-          value.source_profile, axis_reference.value().axis(), value.local_axis,
-          component.transform()});
+          target.component_instance(), context.value().component->referenced_part_document(),
+          axis_reference.value().source_feature(), typed.value().source_metadata.source_profile.value(),
+          axis_reference.value().axis(),
+          ComponentLocalAxisDescriptor{axis.value().origin, axis.value().direction},
+          context.value().component->transform()});
 }
 
 Result<ResolvedAssemblyInsertConstraintTarget>
@@ -405,20 +421,32 @@ AssemblyConstraintTargetResolver::resolve_insert(const Project& project,
   if (seating_reference.has_error()) {
     return Result<ResolvedAssemblyInsertConstraintTarget>::failure(seating_reference.error());
   }
-  auto circular = resolve_circular_feature_geometry(
-      context.value(), target, seating_reference.value().source_feature(),
-      "generated-seat assembly target");
-  if (circular.has_error()) {
-    return Result<ResolvedAssemblyInsertConstraintTarget>::failure(circular.error());
+  auto typed = resolve_geometric(project, target);
+  if (typed.has_error()) {
+    return Result<ResolvedAssemblyInsertConstraintTarget>::failure(typed.error());
   }
-
-  const ComponentInstance& component = *context.value().component;
-  const auto& value = circular.value();
+  auto axis = project_axis(typed.value());
+  if (axis.has_error()) {
+    return Result<ResolvedAssemblyInsertConstraintTarget>::failure(axis.error());
+  }
+  auto plane = project_plane(typed.value());
+  if (plane.has_error()) {
+    return Result<ResolvedAssemblyInsertConstraintTarget>::failure(plane.error());
+  }
+  if (!typed.value().source_metadata.source_profile.has_value()) {
+    return Result<ResolvedAssemblyInsertConstraintTarget>::failure(validation_error(
+        target.semantic_reference(), "generated-seat assembly target source profile is missing"));
+  }
   return Result<ResolvedAssemblyInsertConstraintTarget>::success(
       ResolvedAssemblyInsertConstraintTarget{
-          component.id(), component.referenced_part_document(), value.source_feature,
-          value.source_profile, SemanticAxis::Primary, seating_reference.value().plane(),
-          value.local_axis, value.local_seating_plane, component.transform()});
+          target.component_instance(), context.value().component->referenced_part_document(),
+          seating_reference.value().source_feature(),
+          typed.value().source_metadata.source_profile.value(), SemanticAxis::Primary,
+          seating_reference.value().plane(),
+          ComponentLocalAxisDescriptor{axis.value().origin, axis.value().direction},
+          ComponentLocalPlanarDescriptor{plane.value().origin, plane.value().x_axis,
+                                         plane.value().y_axis, plane.value().normal},
+          context.value().component->transform()});
 }
 
 } // namespace blcad::geometry
