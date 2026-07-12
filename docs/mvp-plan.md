@@ -275,6 +275,41 @@ Mandatory order:
 
 Do not merge these blocks.
 
+## MVP 6 — Planned Part Construction MVP after Block 47
+
+Canonical sequence: `docs/part-construction-sequence-mvp6.md`.
+
+Block 48 starts only after the Assembly MVP reaches Block 47.
+
+Mandatory Part Construction phase order:
+
+```text
+48-57   multi-body/result/transform authority
+58-60   shared Part feature inputs and richer Extrude/Cut
+61-62   Revolve / RevolveCut
+63-65   general Linear/Circular Pattern
+66-67   Mirror Feature
+68-70   Fillet and Chamfer
+71-74   Shell and Draft
+75-78   3D Sketch
+79      PathCurve
+80-83   Sweep and path-following Extrude/Cut
+84-87   Loft
+88-92   Surface Features and surface-to-solid
+93      multi-body STEP exchange
+94      integrated Part Construction MVP acceptance
+```
+
+The sequence consolidates existing planning from:
+
+- `docs/multi-body-transform-and-path-features-roadmap.md`
+- `docs/inventor-like-sketcher-and-feature-roadmap.md`
+- `docs/advanced-surfacing-and-3d-sketch-mvp.md`
+
+After Block 94 the first Part Construction MVP is considered complete. That means a serious headless parametric Part kernel with multiple solid/surface bodies, explicit body operations, Revolve, general patterns, Mirror, Fillet, Chamfer, Shell, Draft, 3D Sketches, Sweep, Loft, first Surface Features, surface-to-solid conversion, and multi-body STEP exchange.
+
+It does not mean SolidWorks/Inventor Part product parity. Production GUI modeling, Class-A surfacing, arbitrary NURBS control cages, variable-radius fillets, advanced topology healing, direct modeling, sheet metal, weldments, and specialized manufacturing feature systems remain later work.
+
 ## Current next technical step — Block 32
 
 Primary boundary: Core persistent semantic source identity.
