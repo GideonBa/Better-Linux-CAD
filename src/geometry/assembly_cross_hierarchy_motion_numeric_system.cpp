@@ -6,6 +6,7 @@
 #include "blcad/geometry/assembly_revolute_joint_equation_builder.hpp"
 
 #include <string>
+#include <type_traits>
 #include <utility>
 #include <variant>
 
