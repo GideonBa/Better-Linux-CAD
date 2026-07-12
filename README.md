@@ -98,19 +98,23 @@ cross_hierarchy_joints[]
 
 Block 29 adds no JSON field. Exchange graphs, generated names, part shape definitions, XDE labels, product/reference relationships, STEP entities, and export summaries remain derived and unpersisted.
 
-## Planned general assembly target expansion
+## Planned general assembly target and joint expansion
 
 The current assembly target resolver is intentionally narrower than an Inventor-/SolidWorks-like selector. It currently resolves generated planar feature faces plus the narrow circular-feature `.axis` and `.seat` families.
 
-After the current Block-30 contact/sweep work, the documented Blocks 31-37 expand this through:
+After the current Block-30 contact/sweep work, Blocks 31-47 expand the headless model in strict authority order:
 
 ```text
 semantic source identity
-  -> typed geometric target descriptor
-  -> capability projection
-  -> explicit relationship compatibility matrix
-  -> generic relationship equations
-  -> joint capability expansion
+  -> typed geometric descriptors and capabilities
+  -> explicit target compatibility
+  -> persistent generic relationship intent
+  -> shared relationship equation/numeric integration
+  -> joint target compatibility and oriented Frame semantics
+  -> general multi-coordinate joint state
+  -> coordinate JSON compatibility
+  -> vector joint drive execution
+  -> one richer joint family per block
 ```
 
 Planned semantic source kinds include:
@@ -128,7 +132,7 @@ ConstructionPoint
 CircularFeatureSeat
 ```
 
-Planned solver capabilities are separate:
+Planned derived solver capabilities are separate:
 
 ```text
 Plane
@@ -137,7 +141,7 @@ Line
 Point
 Circle
 Cylinder
-SeatFrame
+Frame
 ```
 
 For example:
@@ -147,12 +151,34 @@ GeneratedCylindricalFace -> Cylinder + Axis
 GeneratedCircularEdge -> Circle + Axis + Point(center)
 DatumPlane -> Plane
 DatumAxis -> Axis + Line
-CircularFeatureSeat -> SeatFrame + Axis + Plane
+CircularFeatureSeat -> Frame + Axis + Plane
 ```
 
-This lets relationship equations consume geometry capabilities rather than feature-specific source kinds. A cylindrical face, circular edge, DatumAxis, and current generated `.axis` can therefore eventually reach the same `Axis <-> Axis` Concentric semantics.
+This lets equation builders consume geometry capabilities rather than feature-specific source kinds. A cylindrical face, circular edge, DatumAxis, and current generated `.axis` can eventually reach the same `Axis <-> Axis` Concentric semantics.
 
-The planned first generic relationship families are:
+The sequence is deliberately split:
+
+```text
+31 target taxonomy/capability projection
+32 reference geometry Core intent
+33 reference geometry serialization
+34 reference target resolution
+35 generated topology semantic identity/recovery
+36 generated topology target resolution
+37 explicit compatibility matrix
+38 Coincident/Parallel/Perpendicular persistent intent + JSON
+39 generic relationship equations + existing solver/diagnostics
+40 joint compatibility + oriented Frame contract
+41 general coordinate/limit Core model
+42 coordinate JSON + legacy Revolute compatibility
+43 vector drives + holding/freshness/atomic apply
+44 Prismatic
+45 Cylindrical
+46 Planar
+47 Ball/Spherical
+```
+
+The first planned generic geometric relationship families are:
 
 ```text
 Coincident
@@ -160,7 +186,16 @@ Parallel
 Perpendicular
 ```
 
-The current Mate/Distance/Angle/Concentric/Insert families gain an explicit capability compatibility matrix first. Richer joint families are planned only after the same target capability layer is stable.
+The first richer joint families are planned one family per block after the general multi-coordinate drive boundary exists:
+
+```text
+Prismatic
+Cylindrical
+Planar
+Ball/Spherical
+```
+
+Current Revolute remains `Frame <-> Frame`. Axis-only Revolute is not enabled merely because two sources expose Axis capability: signed twist requires an oriented reference direction. Geometry may not invent an arbitrary world-axis reference.
 
 Raw OCCT face/edge/vertex ids, topology traversal positions, XDE labels, or STEP entity ids will not become persistent assembly target identity.
 
