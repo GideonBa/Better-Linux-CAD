@@ -1,8 +1,6 @@
 # BLCAD
 
-BLCAD is an independent, headless parametric CAD system for Linux, in active development.
-
-It owns CAD model intent in its own data structures and uses OCCT / Open CASCADE as a computed-geometry and data-exchange kernel rather than as the primary model authority. Persistent identity is always semantic model intent; geometry query, solve, analysis, and exchange results are derived and never persisted as authority.
+BLCAD will be an independent, headless parametric CAD system for Linux, in active development.
 
 All architecture, feature contracts, persistence semantics, roadmaps, and current implementation status live in [`docs/`](docs/). This README is intentionally kept small and evergreen — it is not a status page.
 
