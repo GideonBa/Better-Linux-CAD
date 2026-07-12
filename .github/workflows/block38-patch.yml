@@ -20,6 +20,53 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Normalize parser patch seed
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("scripts/apply_block38.py")
+          text = path.read_text(encoding="utf-8")
+          start = text.index("for path, error_text in (")
+          marker = '\ncreate_exact(\n    "src/core/assembly_constraint_graph_participation.hpp"'
+          end = text.index(marker, start)
+          replacement = r'''replace_exact(
+              "src/core/assembly_document_json.cpp",
+              "  if (text == \"angle\")\n"
+              "    return Result<AssemblyConstraintType>::success(AssemblyConstraintType::Angle);\n"
+              "  return Result<AssemblyConstraintType>::failure(json_error(\"unsupported assembly constraint type\"));",
+              "  if (text == \"angle\")\n"
+              "    return Result<AssemblyConstraintType>::success(AssemblyConstraintType::Angle);\n"
+              "  if (text == \"coincident\")\n"
+              "    return Result<AssemblyConstraintType>::success(AssemblyConstraintType::Coincident);\n"
+              "  if (text == \"parallel\")\n"
+              "    return Result<AssemblyConstraintType>::success(AssemblyConstraintType::Parallel);\n"
+              "  if (text == \"perpendicular\")\n"
+              "    return Result<AssemblyConstraintType>::success(AssemblyConstraintType::Perpendicular);\n"
+              "  return Result<AssemblyConstraintType>::failure(json_error(\"unsupported assembly constraint type\"));",
+          )
+
+          replace_exact(
+              "src/core/project_json.cpp",
+              "  if (text == \"angle\")\n"
+              "    return Result<AssemblyConstraintType>::success(AssemblyConstraintType::Angle);\n"
+              "  return Result<AssemblyConstraintType>::failure(\n"
+              "      json_error(\"unsupported cross-hierarchy assembly constraint type\"));",
+              "  if (text == \"angle\")\n"
+              "    return Result<AssemblyConstraintType>::success(AssemblyConstraintType::Angle);\n"
+              "  if (text == \"coincident\")\n"
+              "    return Result<AssemblyConstraintType>::success(AssemblyConstraintType::Coincident);\n"
+              "  if (text == \"parallel\")\n"
+              "    return Result<AssemblyConstraintType>::success(AssemblyConstraintType::Parallel);\n"
+              "  if (text == \"perpendicular\")\n"
+              "    return Result<AssemblyConstraintType>::success(AssemblyConstraintType::Perpendicular);\n"
+              "  return Result<AssemblyConstraintType>::failure(\n"
+              "      json_error(\"unsupported cross-hierarchy assembly constraint type\"));",
+          )
+          '''
+          path.write_text(text[:start] + replacement + text[end:], encoding="utf-8")
+          PY
+
       - name: Apply Block 38 patch
         run: python3 scripts/apply_block38.py 2>&1 | tee /tmp/block38-apply.log
 
