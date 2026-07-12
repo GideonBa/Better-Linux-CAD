@@ -1,8 +1,8 @@
 # Project and Save File Format
 
-Status: implemented save-format seeds exist for single-part model intent, assembly parameters, embedded Project JSON, part component occurrences, rigid child assembly occurrences, local Mate/Concentric/Distance/Insert/Angle intent, Project-level cross-hierarchy geometric intent, local Revolute joint intent, Project-level occurrence-qualified Revolute joint intent, semantic generated face/axis/seat targets, and authored transform/state records.
+Status: implemented save-format seeds exist for single-part model intent, assembly parameters, embedded Project JSON, part component occurrences, rigid child assembly occurrences, local Mate/Concentric/Distance/Insert/Angle intent, Project-level cross-hierarchy geometric intent, local Revolute joint intent, Project-level occurrence-qualified Revolute joint intent, semantic generated feature/axis/seat targets, `ref:` reference-geometry targets, canonical `topo:` generated-topology semantic targets, and authored transform/state records.
 
-The save format stores parametric model intent. OCCT shapes, hierarchy traversal state, occurrence graphs, transform authorities, resolved geometry, residuals, Jacobians, solve/motion results, freshness snapshots, proposals, diagnostics, and exchange products are derived.
+The save format stores parametric and semantic model intent. OCCT shapes, hierarchy traversal state, occurrence graphs, transform authorities, generated-topology producer classification/recovery results, resolved geometry, residuals, Jacobians, solve/motion results, freshness snapshots, proposals, diagnostics, and exchange products are derived.
 
 ## Project structure
 
@@ -219,7 +219,7 @@ Project-level cross-hierarchy geometric constraints and joints share one Core en
 }
 ```
 
-The explicit root occurrence uses:
+The explicit root occurrence uses an empty path:
 
 ```json
 {
@@ -238,7 +238,7 @@ Rules:
 - semantic target text is stored as opaque identity;
 - loading follows paths exactly after complete hierarchy validation;
 - the reached document must contain the addressed local component;
-- semantic feature geometry is not resolved during Core loading/validation.
+- semantic target geometry is not resolved during Core loading/validation.
 
 ## Project-level cross-hierarchy geometric constraint JSON
 
@@ -272,8 +272,6 @@ Rules:
 - target A/B order is preserved exactly;
 - adding/loading geometric intent never mutates component/subassembly transforms.
 
-### Distance quantity
-
 Distance uses:
 
 ```json
@@ -281,8 +279,6 @@ Distance uses:
 ```
 
 Distance is a positive finite length.
-
-### Angle quantity
 
 Angle uses:
 
@@ -292,9 +288,7 @@ Angle uses:
 
 Angle is a finite degree quantity.
 
-### Geometric value-family rules
-
-For local and Project-level geometric relationships:
+Value-family rules:
 
 ```text
 Mate        -> omit distance and angle
@@ -310,7 +304,7 @@ Typed Core constructors remain authoritative after JSON parsing.
 
 Local joint intent is separate from geometric constraints and uses `assembly_joints[]`.
 
-First supported type:
+Current supported type:
 
 ```text
 revolute
@@ -361,7 +355,7 @@ Representative record:
   "target_b": {
     "occurrence_path": ["subassembly.outer", "subassembly.inner"],
     "component_instance": "component.shaft",
-    "semantic_reference": "feature.hole.seat"
+    "semantic_reference": "feature.bore.seat"
   },
   "state": "active",
   "limits": {
@@ -396,21 +390,23 @@ Only explicit successful fresh motion application may update the selected author
 
 ## Semantic target strings
 
-The record/JSON layer treats semantic target strings as opaque identity.
+The record/JSON layer treats semantic target strings as opaque identity. Core loading preserves them byte-for-byte and does not resolve Geometry.
+
+### Legacy generated feature roles
 
 Geometry consumers currently interpret:
 
 ```text
-feature.<feature-id>.top|bottom|right|left|front|back
-feature.<feature-id>.axis
-feature.<feature-id>.seat
+<feature-id>.top|bottom|right|left|front|back
+<feature-id>.axis
+<feature-id>.seat
 ```
 
-The first `.axis`/`.seat` producer is a single-circle `SubtractiveExtrude`.
+The first `.axis`/`.seat` producer is a single-circle `SubtractiveExtrude`. `.seat` resolves one primary axis plus one oriented seating plane from the same feature/profile.
 
-`.seat` resolves one primary axis plus one oriented seating plane from the same exact feature/profile. Insert and local/cross Revolute motion reuse this endpoint family.
+### Reference geometry targets
 
-Block 32 adds the reference-geometry token family:
+Block 32 adds:
 
 ```text
 ref:datum_plane:<encoded-id>
@@ -419,12 +415,60 @@ ref:construction_line:<encoded-id>
 ref:construction_point:<encoded-id>
 ```
 
-Encoded ids escape every byte outside `[A-Za-z0-9_-]` as uppercase `%HH`, so valid `ref:` tokens contain no `.` and stay disjoint from feature target tokens. Endpoints persist these strings verbatim; loading never resolves reference geometry. Block-34 Geometry resolution of these strings into Plane/Axis/Line/Point capabilities is derived query state and adds no JSON field.
+Every id byte outside `[A-Za-z0-9_-]` is escaped as uppercase `%HH`. Valid `ref:` tokens contain no `.` and stay disjoint from legacy feature-role tokens.
+
+Endpoints persist these strings verbatim. Block-34 Plane/Axis/Line/Point resolution is derived query state and adds no JSON field.
+
+### Generated topology semantic targets
+
+Block 35 adds canonical producer-driven generated-topology identity strings:
+
+```text
+topo:cylindrical_face:<encoded-feature-id>:<encoded-profile-id>:wall
+topo:linear_edge:<encoded-feature-id>:<linear-edge-role>
+topo:circular_edge:<encoded-feature-id>:<encoded-profile-id>:source_rim
+topo:circular_edge:<encoded-feature-id>:<encoded-profile-id>:opposite_rim
+topo:vertex:<encoded-feature-id>:<vertex-role>
+```
+
+The same canonical uppercase `%HH` rule applies to feature/profile ids. Valid `topo:` strings contain no `.`. The distinct `topo:` prefix is disjoint from `ref:` and from legacy feature-role strings.
+
+Example:
+
+```text
+FeatureId = feature.hole/a%b:c
+ProfileId = profile.hole/50%
+
+-> topo:cylindrical_face:feature%2Ehole%2Fa%25b%3Ac:profile%2Ehole%2F50%25:wall
+```
+
+Block 35 producer identity is semantic model intent:
+
+```text
+source FeatureId
++ supported producer family
++ named semantic role
++ exact source ProfileId where profile-derived
+```
+
+The current endpoint serializers need no new JSON field because `semantic_reference` already stores opaque identity strings. `topo:` spellings roundtrip byte-for-byte through local and occurrence-qualified endpoints.
+
+Block 35 does not persist generated-topology role matrices, producer classification, validation results, recovery results, or OCCT topology. Block-36 Geometry resolution of `topo:` identities is derived query state.
 
 Fields such as these are not persistent:
 
 ```text
 occt_face_id
+occt_edge_id
+occt_vertex_id
+topology_traversal_index
+topology_hash
+brep_map_position
+xde_label_tag
+step_entity_number
+generated_topology_producer_matrix
+generated_topology_classification
+generated_topology_recovery_result
 cylinder_face
 axis_target
 seat_target
@@ -433,7 +477,15 @@ resolved_axis
 resolved_seating_plane
 ```
 
-Changing the semantic meaning of an established token family is a format compatibility change even if JSON shape is unchanged.
+Changing the semantic meaning of an established target token family is a format compatibility change even when JSON shape is unchanged.
+
+## Part document model intent
+
+Part-document persistence remains canonical in the existing single-part format sections/documents. Parameters, formulas, datum/workplane intent, construction geometry, sketches/profiles, semantic-reference recovery/remap intent, and feature history are model authority.
+
+Block 33 adds additive optional `datum_axes` records. Missing `datum_axes` remains historical-file compatible and loads an empty collection.
+
+Block 35 adds no PartDocument JSON field. Its generated-topology classification and recovery derive from current feature/sketch/profile intent.
 
 ## Numeric solve and motion relationships remain derived
 
@@ -458,18 +510,9 @@ Project cross geometry
 Project cross joint
 ```
 
-It also derives:
+It also derives combined motion groups, cross-joint endpoint-to-authority mappings, transient holding drives, root-space Revolute target frames, motion residual vectors/Jacobians, and motion proposals.
 
-```text
-combined motion groups
-cross-joint endpoint-to-authority mappings
-transient holding drives at authored non-selected joint coordinates
-root-space Revolute target frames
-motion residual vectors/Jacobians
-motion results and proposals
-```
-
-Canonical Revolute scalar residual order is:
+Canonical Revolute scalar residual order remains:
 
 ```text
 direction_alignment.x
@@ -500,6 +543,7 @@ endpoint-authority mappings
 solve/motion groups
 holding drives
 resolved targets
+resolved generated topology handles
 residual descriptors
 scaled residual vectors
 finite-difference Jacobians
@@ -512,57 +556,4 @@ AssemblySemanticTargetPartSnapshot
 transform proposals
 ```
 
-Semantic target-producing model freshness currently stores the exact canonical `serialize_part_document_to_json(part)` payload only inside derived solve/motion results. It is not an additional persistent revision field.
-
-## Part document model intent
-
-Part-document persistence remains canonical in the existing single-part format sections/documents. Parameters, formulas, datum/workplane intent, construction geometry, sketches/profiles, semantic-reference recovery/remap intent, and feature history are model authority.
-
-### Datum axis JSON
-
-Block 33 adds the additive optional `datum_axes` part-document array:
-
-```json
-{
-  "datum_axes": [
-    {
-      "id": "datum_axis.spindle",
-      "name": "Spindle",
-      "kind": "explicit",
-      "origin": {"x": 4.0, "y": 5.0, "z": 6.0},
-      "direction": {"x": 0.0, "y": 0.0, "z": 1.0},
-      "parameter_dependencies": ["part.height"]
-    },
-    {
-      "id": "datum_axis.from_line",
-      "name": "FromLine",
-      "kind": "from_construction_line",
-      "source_construction_line": "construction.center"
-    }
-  ]
-}
-```
-
-Supported kinds are exactly `explicit` and `from_construction_line`. Historical part files without `datum_axes` load empty collections. Loading validates id uniqueness, declared parameter dependencies, and source-construction-line existence, and rebuilds dependency edges; it resolves no geometry.
-
-OCCT shapes and `ShapeCache` products remain derived.
-
-## Exchange boundary
-
-Current posed STEP assembly export still builds one derived flattened OCCT compound from visible-active leaves.
-
-Structured STEP assembly/product identity is not stored in the Project JSON. Block 29 will define derived exchange identities for rooted assembly occurrences, component occurrences, and shared part product definitions before emitting structured STEP assembly relationships.
-
-## Compatibility rule
-
-Additive optional Project collections currently include:
-
-```text
-assemblies
-cross_hierarchy_constraints
-cross_hierarchy_joints
-```
-
-Missing fields load empty collections.
-
-Persistent target/path order, transform interpretation, established semantic token meaning, joint coordinate/limit units, and relationship value-family rules are format semantics. Changing those meanings requires an explicit compatibility decision even when the JSON object shape remains unchanged.
+Semantic target-producing model freshness stores the exact canonical `serialize_part_document_to_json(part)` payload only inside derived solve/motion results. It is not an additional persistent revision field.
