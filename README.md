@@ -15,7 +15,7 @@ There is no GUI yet. Current work remains focused on headless CAD-core and appli
 ```text
 local component + geometric relationship intent
   -> deterministic local graph
-  -> semantic face/axis/seat resolution
+  -> current semantic generated plane / axis / seat resolution
   -> shared residual/Jacobian/Gauss-Newton path
   -> exact modeled-input freshness
   -> atomic explicit application
@@ -81,7 +81,7 @@ part product definition
 
 Assembly occurrence order is lexicographic by exact path sequence. Component occurrence order is path then local component id. Part product definitions sort by `PartDocumentId`. None of these identities or orders depend on OCCT topology ids, XDE label tags, STEP entity ids, or insertion order.
 
-Generated exchange names keep readable ordinary ids while percent-encoding every UTF-8 byte outside `A-Z a-z 0-9 . _ -`. Literal `/` and `%` inside authored ids therefore cannot collide with path separators or percent escapes. The explicit `root` path spelling is reserved separately from a non-root occurrence whose authored id is literally `root`.
+Generated exchange names keep readable ordinary ids while percent-encoding authored id bytes outside `A-Z a-z 0-9 . _ -`. Literal `/` and `%` inside authored ids therefore cannot collide with path separators or percent escapes. The explicit `root` path spelling is reserved separately from a non-root occurrence whose authored id is literally `root`.
 
 `AssemblyPartShapeDefinitionBuilder` sorts/deduplicates referenced part ids, recomputes each unique exported `PartDocument` exactly once into one private `ShapeCache`, and exposes one unposed OCCT shape definition. Both `AssemblyPosedLeafShapeBuilder` and `AssemblyStructuredStepExporter` reuse this boundary.
 
@@ -97,6 +97,74 @@ cross_hierarchy_joints[]
 ```
 
 Block 29 adds no JSON field. Exchange graphs, generated names, part shape definitions, XDE labels, product/reference relationships, STEP entities, and export summaries remain derived and unpersisted.
+
+## Planned general assembly target expansion
+
+The current assembly target resolver is intentionally narrower than an Inventor-/SolidWorks-like selector. It currently resolves generated planar feature faces plus the narrow circular-feature `.axis` and `.seat` families.
+
+After the current Block-30 contact/sweep work, the documented Blocks 31-37 expand this through:
+
+```text
+semantic source identity
+  -> typed geometric target descriptor
+  -> capability projection
+  -> explicit relationship compatibility matrix
+  -> generic relationship equations
+  -> joint capability expansion
+```
+
+Planned semantic source kinds include:
+
+```text
+GeneratedPlanarFace
+GeneratedCylindricalFace
+GeneratedLinearEdge
+GeneratedCircularEdge
+GeneratedVertex
+DatumPlane
+DatumAxis
+ConstructionLine
+ConstructionPoint
+CircularFeatureSeat
+```
+
+Planned solver capabilities are separate:
+
+```text
+Plane
+Axis
+Line
+Point
+Circle
+Cylinder
+SeatFrame
+```
+
+For example:
+
+```text
+GeneratedCylindricalFace -> Cylinder + Axis
+GeneratedCircularEdge -> Circle + Axis + Point(center)
+DatumPlane -> Plane
+DatumAxis -> Axis + Line
+CircularFeatureSeat -> SeatFrame + Axis + Plane
+```
+
+This lets relationship equations consume geometry capabilities rather than feature-specific source kinds. A cylindrical face, circular edge, DatumAxis, and current generated `.axis` can therefore eventually reach the same `Axis <-> Axis` Concentric semantics.
+
+The planned first generic relationship families are:
+
+```text
+Coincident
+Parallel
+Perpendicular
+```
+
+The current Mate/Distance/Angle/Concentric/Insert families gain an explicit capability compatibility matrix first. Richer joint families are planned only after the same target capability layer is stable.
+
+Raw OCCT face/edge/vertex ids, topology traversal positions, XDE labels, or STEP entity ids will not become persistent assembly target identity.
+
+Canonical roadmap: `docs/assembly-general-geometric-target-roadmap.md`.
 
 See `docs/assembly-structured-step-products-mvp5.md` and `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md` for the current assembly handoff.
 
@@ -203,6 +271,7 @@ Current assembly handoff:
 
 Broader future roadmaps:
 
+- `docs/assembly-general-geometric-target-roadmap.md`
 - `docs/multi-body-transform-and-path-features-roadmap.md`
 - `docs/inventor-like-sketcher-and-feature-roadmap.md`
 - `docs/advanced-surfacing-and-3d-sketch-mvp.md`
@@ -212,3 +281,5 @@ Broader future roadmaps:
 Implement **Block 30 only** from `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`: richer posed contact classification and swept-motion analysis over the now-frozen rooted exchange/occurrence identities.
 
 Block 30 must extend the existing posed leaf/interference analysis boundary. Occurrence-local child pose overrides, whole-subassembly solve variables, richer joint families, and a general physics engine remain deferred.
+
+After Block 30, implement **Block 31 only** from `docs/assembly-general-geometric-target-roadmap.md`: typed geometric target taxonomy and capability projection while preserving all current target strings and relationship behavior.
