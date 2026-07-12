@@ -6,6 +6,7 @@
 #include "blcad/core/result.hpp"
 #include "blcad/core/spatial.hpp"
 
+#include <cstddef>
 #include <optional>
 #include <string>
 #include <string_view>
