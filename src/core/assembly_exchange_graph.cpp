@@ -30,32 +30,54 @@ void add_path(std::vector<OccurrencePath>& paths, OccurrencePath path) {
   }
 }
 
-[[nodiscard]] std::string path_text(const OccurrencePath& path) {
+[[nodiscard]] bool is_exchange_name_unreserved(unsigned char value) noexcept {
+  return (value >= static_cast<unsigned char>('A') && value <= static_cast<unsigned char>('Z')) ||
+         (value >= static_cast<unsigned char>('a') && value <= static_cast<unsigned char>('z')) ||
+         (value >= static_cast<unsigned char>('0') && value <= static_cast<unsigned char>('9')) ||
+         value == static_cast<unsigned char>('.') || value == static_cast<unsigned char>('_') ||
+         value == static_cast<unsigned char>('-');
+}
+
+[[nodiscard]] std::string encode_exchange_name_segment(const std::string& value) {
+  constexpr char kHexDigits[] = "0123456789ABCDEF";
+  std::string encoded;
+  encoded.reserve(value.size());
+  for (const unsigned char byte : value) {
+    if (is_exchange_name_unreserved(byte)) {
+      encoded.push_back(static_cast<char>(byte));
+      continue;
+    }
+    encoded.push_back('%');
+    encoded.push_back(kHexDigits[(byte >> 4U) & 0x0FU]);
+    encoded.push_back(kHexDigits[byte & 0x0FU]);
+  }
+  return encoded;
+}
+
+[[nodiscard]] std::string path_scope_text(const OccurrencePath& path) {
   if (path.empty()) {
     return "root";
   }
 
-  std::string text;
-  for (std::size_t index = 0U; index < path.size(); ++index) {
-    if (index != 0U) {
-      text += "/";
-    }
-    text += path[index].value();
+  std::string text = "path";
+  for (const SubassemblyInstanceId& occurrence : path) {
+    text += "/" + encode_exchange_name_segment(occurrence.value());
   }
   return text;
 }
 
 [[nodiscard]] std::string assembly_product_name(const OccurrencePath& path) {
-  return "blcad:assembly-occurrence:" + path_text(path);
+  return "blcad:assembly-occurrence:" + path_scope_text(path);
 }
 
 [[nodiscard]] std::string component_occurrence_name(const OccurrencePath& path,
                                                     const ComponentInstanceId& component) {
-  return "blcad:component-occurrence:" + path_text(path) + "/" + component.value();
+  return "blcad:component-occurrence:" + path_scope_text(path) + "/" +
+         encode_exchange_name_segment(component.value());
 }
 
 [[nodiscard]] std::string part_product_name(const DocumentId& part_document) {
-  return "blcad:part-definition:" + part_document.value();
+  return "blcad:part-definition:" + encode_exchange_name_segment(part_document.value());
 }
 
 [[nodiscard]] const AssemblyHierarchyOccurrenceDescriptor* find_hierarchy_occurrence(
