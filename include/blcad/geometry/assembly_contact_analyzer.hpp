@@ -46,7 +46,7 @@ struct AssemblyContactAnalysis {
   std::size_t component_occurrence_count = 0U;
   std::size_t evaluated_pair_count = 0U;
   std::size_t recomputed_part_count = 0U;
-  std::vector<AssemblyContactRecord> contacts;
+  std::vector<AssemblyContactRecord> records;
 
   friend bool operator==(const AssemblyContactAnalysis&, const AssemblyContactAnalysis&) = default;
 };
