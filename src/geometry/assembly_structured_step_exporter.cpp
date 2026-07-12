@@ -17,6 +17,7 @@
 #include <XCAFDoc_DocumentTool.hxx>
 #include <XCAFDoc_ShapeTool.hxx>
 
+#include <algorithm>
 #include <exception>
 #include <filesystem>
 #include <string>
