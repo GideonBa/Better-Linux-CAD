@@ -230,4 +230,17 @@ ReferenceRecoveryEvaluator::evaluate(ReferenceStatusId id, const PartDocument& d
   return ReferenceStatusRecord::create_resolved(std::move(id), std::move(target));
 }
 
+Result<GeneratedTopologyReferenceRecovery>
+ReferenceRecoveryEvaluator::evaluate(const PartDocument& document,
+                                     GeneratedTopologyReferenceIdentity target) const {
+  auto valid = validate_generated_topology_reference(document, target);
+  if (valid.has_error()) {
+    return Result<GeneratedTopologyReferenceRecovery>::success(
+        GeneratedTopologyReferenceRecovery{std::move(target), ReferenceStatusKind::Lost,
+                                            valid.error().message()});
+  }
+  return Result<GeneratedTopologyReferenceRecovery>::success(
+      GeneratedTopologyReferenceRecovery{std::move(target), ReferenceStatusKind::Resolved, {}});
+}
+
 } // namespace blcad
