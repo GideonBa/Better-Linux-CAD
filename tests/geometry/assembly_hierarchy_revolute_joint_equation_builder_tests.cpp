@@ -32,6 +32,12 @@ AssemblyHierarchyJoint joint(AssemblyHierarchyConstraintEndpoint target_a,
   return value.value();
 }
 
+RigidTransform rotate_30_deg_about_hole_axis() {
+  return RigidTransform{
+      Vector3{-2.4641016151377544, -2.803847577293368, 0.0},
+      Vector3{0.0, 0.0, 30.0}};
+}
+
 Project root_child_project(RigidTransform boundary = identity_rigid_transform(),
                            RigidTransform child_transform = identity_rigid_transform()) {
   auto root = AssemblyDocument::create(DocumentId("assembly.root"), "Root");
@@ -129,7 +135,8 @@ TEST_CASE("Hierarchy Revolute endpoints use exact nested parent chains",
   auto child = AssemblyDocument::create(DocumentId("assembly.child"), "Child");
   REQUIRE(child);
   REQUIRE(child.value().add_member_part(DocumentId("part.block27_plate")));
-  REQUIRE(child.value().add_component_instance(component("component.child")));
+  REQUIRE(child.value().add_component_instance(
+      component("component.child", ComponentGroundingState::Free)));
 
   auto project = Project::create(DocumentId("project.nested_revolute"), "NestedRevolute",
                                  root.value());
@@ -157,7 +164,7 @@ TEST_CASE("Repeated same-authority Revolute endpoints retain distinct rooted pat
   auto right = SubassemblyInstance::create(
       SubassemblyInstanceId("subassembly.right"), "Right", DocumentId("assembly.child"),
       ComponentVisibility::Visible, ComponentSuppressionState::Active,
-      RigidTransform{Vector3{}, Vector3{0.0, 0.0, 30.0}});
+      rotate_30_deg_about_hole_axis());
   REQUIRE(right);
   REQUIRE(project.assembly().add_subassembly_instance(right.value()));
   REQUIRE(project.validate_assembly_structure());
@@ -173,7 +180,7 @@ TEST_CASE("Repeated same-authority Revolute endpoints retain distinct rooted pat
   REQUIRE(equation);
   CHECK(equation.value().target_a.occurrence_path != equation.value().target_b.occurrence_path);
   CHECK(equation.value().target_a.assembly_document == equation.value().target_b.assembly_document);
-  CHECK(std::abs(equation.value().residual.twist_alignment_sine) <= 1.0e-12);
+  check_zero_revolute_residual(equation.value().residual);
   CHECK(project.find_assembly_document(DocumentId("assembly.child"))
             ->find_component_instance(ComponentInstanceId("component.child"))
             ->transform() == source);
