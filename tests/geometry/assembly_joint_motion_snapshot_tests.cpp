@@ -66,7 +66,7 @@ TEST_CASE("Joint motion application rejects a changed non-selected driven joint"
       0.0,
       10.0,
       {snapshot(*joint_a), snapshot(*joint_z)},
-      AssemblySolveResult{AssemblySolveState::Converged, 0U, {}, {}, {}, {}, {}}};
+      AssemblySolveResult{AssemblySolveState::Converged, 0U, {}, {}, {}, {}, {}, {}}};
 
   REQUIRE(project.assembly().set_joint_coordinate(AssemblyJointId("joint.z"),
                                                    angle(20.0, "joint.z")));
