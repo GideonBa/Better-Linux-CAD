@@ -54,25 +54,32 @@ void add_path(std::vector<OccurrencePath>& paths, OccurrencePath path) {
   return encoded;
 }
 
-[[nodiscard]] std::string path_scope_text(const OccurrencePath& path) {
+[[nodiscard]] std::string path_text(const OccurrencePath& path) {
   if (path.empty()) {
     return "root";
   }
 
-  std::string text = "path";
-  for (const SubassemblyInstanceId& occurrence : path) {
-    text += "/" + encode_exchange_name_segment(occurrence.value());
+  std::string text;
+  for (std::size_t index = 0U; index < path.size(); ++index) {
+    if (index != 0U) {
+      text += "/";
+    }
+    text += encode_exchange_name_segment(path[index].value());
   }
-  return text;
+
+  // Keep the explicit root sentinel unique from a non-root occurrence whose one
+  // authored SubassemblyInstanceId is literally "root". Percent is escaped for
+  // normal segments, so this reserved spelling cannot collide with another id.
+  return text == "root" ? "%72oot" : text;
 }
 
 [[nodiscard]] std::string assembly_product_name(const OccurrencePath& path) {
-  return "blcad:assembly-occurrence:" + path_scope_text(path);
+  return "blcad:assembly-occurrence:" + path_text(path);
 }
 
 [[nodiscard]] std::string component_occurrence_name(const OccurrencePath& path,
                                                     const ComponentInstanceId& component) {
-  return "blcad:component-occurrence:" + path_scope_text(path) + "/" +
+  return "blcad:component-occurrence:" + path_text(path) + "/" +
          encode_exchange_name_segment(component.value());
 }
 
