@@ -175,11 +175,11 @@ feature.<feature-id>.axis
 feature.<feature-id>.seat
 ```
 
-The six generated planar-face families resolve as `GeneratedPlanarFace -> Plane`.
+The six generated planar-face families resolve as `GeneratedPlanarFace -> Plane`. Plane preserves the existing independently oriented face-normal contract, so historical Bottom/side descriptors remain numerically unchanged.
 
 The currently supported `.axis` producer remains the narrow single-CircleProfile subtractive-extrude feature. Block 31 classifies that derived producer as `GeneratedCylindricalFace`, derives its radius from the existing diameter parameter, and exposes `Axis + Cylinder`. The persisted `.axis` string remains unchanged.
 
-`.seat` resolves as `CircularFeatureSeat -> Plane + Axis + Frame`. The Frame reuses the existing seating X/Y orientation and semantic axis as Z, preserving current Insert/Revolute signed orientation semantics.
+`.seat` resolves as `CircularFeatureSeat -> Plane + Axis + Frame`. The Frame preserves historical seating X and semantic Axis Z, and deterministically derives `Y = Z × X` so the typed Frame is right-handed. Insert/Revolute residual-relevant axis, seating-normal, and signed-twist X-reference semantics remain unchanged.
 
 Existing local and hierarchy `resolve`, `resolve_axis`, and `resolve_insert` APIs remain compatibility adapters, but now obtain geometry through the typed capability projection boundary. Mate/Distance/Angle/Concentric/Insert/Revolute residual formulas and numeric execution remain unchanged.
 
