@@ -284,17 +284,24 @@ current Revolute motion solve/application boundaries
 
 Do not introduce a second pose model, mutate the source Project during queries, or build a general physics engine.
 
-## Planned post-Block-30 sequence: general assembly geometric targets
+## Planned post-Block-30 sequence: general assembly targets, relationships, and joints
 
 Canonical roadmap: `docs/assembly-general-geometric-target-roadmap.md`.
 
-The current generated plane/axis/seat target layer is intentionally narrow. After Block 30, BLCAD will expand toward an Inventor-/SolidWorks-like assembly target system through separate headless blocks.
+The current generated plane/axis/seat target layer is intentionally narrow. After Block 30, BLCAD expands toward an Inventor-/SolidWorks-like assembly selection model through narrow authority-specific blocks.
 
-### 31. Typed geometric target taxonomy and capability projection
+### Blocks 31-36: semantic source identity and typed geometry
 
-Introduce a derived Geometry target taxonomy that separates selected semantic source kind from solver geometric capability.
+```text
+31 typed geometric target taxonomy and capability projection
+32 assembly-selectable reference geometry Core intent
+33 reference geometry serialization and structure validation
+34 datum/axis/line/point target resolution
+35 stable semantic generated topology identity/recovery
+36 generated face/edge/vertex target resolution
+```
 
-Planned source kinds include:
+Planned semantic source kinds:
 
 ```text
 GeneratedPlanarFace
@@ -309,7 +316,7 @@ ConstructionPoint
 CircularFeatureSeat
 ```
 
-Planned capability families:
+Planned derived capabilities:
 
 ```text
 Plane
@@ -318,129 +325,52 @@ Line
 Point
 Circle
 Cylinder
-SeatFrame
+Frame
 ```
 
-Current `.top/.bottom/.right/.left/.front/.back`, `.axis`, and `.seat` targets must adapt to the new typed boundary without changing persistent strings or solver results.
-
-Focused tag:
+Source kind and capability remain separate. Representative projections:
 
 ```text
-[geometry][assembly-geometric-target-taxonomy]
-```
-
-### 32. Assembly-selectable datum/reference geometry intent and serialization
-
-Reuse existing `DatumPlane`, construction line, and construction point model identities as assembly-selectable semantic sources.
-
-If still absent, add first-class persistent `DatumAxis` intent with explicit validation, dependency/invalidation semantics, and JSON roundtrip.
-
-Freeze an unambiguous semantic-reference grammar for these source families. The grammar must account for BLCAD ids being arbitrary non-empty strings rather than assuming dots/slashes are unavailable.
-
-Focused tags:
-
-```text
-[core][datum-axis]
-[core][assembly-reference-target-intent]
-[core][assembly-reference-target-json]
-```
-
-### 33. Datum, axis, line, and point target resolution
-
-Resolve Block-32 reference geometry into Block-31 capabilities:
-
-```text
+GeneratedCylindricalFace -> Cylinder + Axis
+GeneratedCircularEdge -> Circle + Axis + Point(center)
 DatumPlane -> Plane
 DatumAxis -> Axis + Line
-ConstructionLine -> Line
-ConstructionPoint -> Point
+CircularFeatureSeat -> Frame + Axis + Plane
 ```
 
-Reuse `WorkplaneResolver` and existing construction geometry resolvers. Local and cross-hierarchy consumers retain exact current transform-chain semantics and exact canonical PartDocument freshness.
+Existing `.top/.bottom/.right/.left/.front/.back`, `.axis`, and `.seat` strings remain backward compatible.
 
-Focused tag:
+Generated edge/vertex/cylindrical-face identity must be producer-driven from BLCAD semantic model intent. OCCT traversal index, topology hash, map position, XDE label tag, STEP entity number, memory address, or unordered OCCT result order are forbidden persistent identities.
+
+### Blocks 37-39: compatibility and generic geometric relationships
 
 ```text
-[geometry][assembly-reference-target-resolution]
+37 explicit target compatibility matrix
+38 generic geometric relationship Core intent + JSON
+39 generic relationship equations + shared solve/diagnostic integration
 ```
 
-### 34. Stable semantic generated topology identity and recovery
-
-Define producer-driven BLCAD semantic identities for:
+Initial planned compatibility:
 
 ```text
-GeneratedCylindricalFace
-GeneratedLinearEdge
-GeneratedCircularEdge
-GeneratedVertex
-```
-
-The supported producer matrix must explicitly list semantic roles, cardinality, ambiguity behavior, and recovery rules.
-
-Forbidden persistent identity sources include OCCT traversal indices, topology hash codes, map positions, XDE label tags, STEP entity numbers, or memory addresses.
-
-Patterned subelements remain unsupported until stable per-instance semantic identity is frozen.
-
-Focused tags:
-
-```text
-[core][semantic-generated-topology-reference]
-[core][semantic-generated-topology-recovery]
-```
-
-### 35. Generated face, edge, and vertex target resolution
-
-Resolve Block-34 semantic identities into typed target descriptors/capabilities:
-
-```text
-GeneratedPlanarFace -> Plane
-GeneratedCylindricalFace -> Cylinder + Axis
-GeneratedLinearEdge -> Line
-GeneratedCircularEdge -> Circle + Axis + Point(center)
-GeneratedVertex -> Point
-```
-
-The semantic producer identity remains authoritative; OCCT topology is execution data only after semantic resolution identifies the intended generated subelement.
-
-Focused tag:
-
-```text
-[geometry][assembly-generated-topology-target-resolution]
-```
-
-### 36. Explicit compatibility matrix and generic geometric relationships
-
-Introduce one deterministic compatibility layer:
-
-```text
-relationship type
-+ target A capabilities
-+ target B capabilities
--> one exact capability pair
-OR explicit incompatibility
-```
-
-Initial planned compatibility includes:
-
-```text
-Mate:
+Mate
   Plane <-> Plane
 
-Distance:
+Distance
   Plane <-> Plane
   Point <-> Point
   Point <-> Plane
   Plane <-> Point
 
-Angle:
+Angle
   Plane <-> Plane
   Line/Axis <-> Line/Axis
 
-Concentric:
+Concentric
   Axis <-> Axis
 
-Insert:
-  SeatFrame <-> SeatFrame
+Insert
+  Frame <-> Frame
 ```
 
 First planned generic relationship families:
@@ -451,54 +381,91 @@ Parallel
 Perpendicular
 ```
 
-New families must reuse local/cross-hierarchy graphs, authority variables, shared residual/Jacobian solving, freshness, atomic application, and rank diagnostics. No target-specific solver is allowed.
+New relationship types are persisted/serialized in Block 38 only after compatibility semantics are stable. Their equations and local/cross-hierarchy numeric integration follow separately in Block 39.
 
-Focused tags are defined in `docs/assembly-general-geometric-target-roadmap.md`.
+No generic-target-specific solver is allowed; all families reuse existing graph, `ComponentTransformAuthority`, finite-difference/Gauss-Newton, freshness, atomic application, and actual Jacobian-rank diagnostics.
 
-### 37. Joint target capability expansion and richer joint-family sequence
+### Blocks 40-43: joint target compatibility and multi-coordinate motion foundation
 
-Make joint compatibility consume the same capability taxonomy.
+```text
+40 joint target compatibility + oriented Frame contract
+41 general joint coordinate/limit Core model
+42 general joint coordinate JSON/backward compatibility
+43 vector joint drives + holding/freshness/atomic application
+```
 
-The current `SeatFrame <-> SeatFrame` Revolute contract remains valid.
+Current Revolute remains:
 
-Axis-only Revolute must not invent an arbitrary twist reference direction. Before supporting `Axis <-> Axis`, Block 37 must explicitly choose a persistent/reference-frame strategy for signed twist measurement.
+```text
+Frame <-> Frame
+```
 
-After that frame contract is resolved, plan dedicated persistent/JSON/equation blocks for at least:
+Axis alone is insufficient for signed twist because it does not provide a reference X direction. Axis-only Revolute remains incompatible until semantic model intent supplies a deterministic oriented Frame. Geometry may not invent a world-axis reference.
+
+Block 41 introduces typed coordinate slots with stable family-defined roles and explicit linear/angular unit kinds. Block 42 serializes them while preserving historical scalar Revolute files. Block 43 generalizes selected-joint drives and holding semantics to deterministic coordinate vectors before any multi-coordinate joint family is added.
+
+### Blocks 44-47: richer joint families, one family per block
+
+```text
+44 Prismatic
+45 Cylindrical
+46 Planar
+47 Ball/Spherical
+```
+
+Planned first coordinate roles:
 
 ```text
 Prismatic
+  translation : LengthMm
+
 Cylindrical
+  translation : LengthMm
+  rotation    : AngleDeg
+
 Planar
-Ball/Spherical
+  translation_u   : LengthMm
+  translation_v   : LengthMm
+  rotation_normal : AngleDeg
 ```
 
-Every joint family must freeze coordinates/limits, capability requirements, residual order, holding-drive semantics, motion connectivity, freshness snapshots, and atomic application behavior.
+The preferred first Ball/Spherical seed is passive center coincidence through `Point <-> Point`, leaving three rotational DOF. A driven spherical orientation is not represented by arbitrary Euler angles unless a separate singularity/order contract is frozen.
 
-## Why Blocks 31-37 are separate
+Each joint block freezes its own capability requirements, persistent type/coordinates/limits, JSON spelling, residual order, motion closure behavior, freshness, and atomic application semantics.
 
-The required dependency order is:
+## Why Blocks 31-47 are separate
+
+The dependency order is intentional:
 
 ```text
 semantic source identity
   -> typed derived geometry
   -> capability projection
-  -> explicit compatibility
+  -> explicit relationship compatibility
+  -> persistent relationship intent
   -> relationship equations
-  -> joint motion families
+  -> joint target compatibility
+  -> general coordinate state
+  -> coordinate serialization
+  -> vector drive execution
+  -> individual richer joint families
 ```
 
-Do not jump directly from current feature-specific target strings to generic Coincident/Parallel/Perpendicular or richer joints.
+Do not jump directly from current feature-specific target strings to Coincident/Parallel/Perpendicular or richer joints.
 
 In particular:
 
-- datum/reference geometry can be selected only after its semantic source grammar is stable;
-- generated edges/vertices/cylindrical faces can be selected only after producer-driven semantic identity exists;
+- datum/reference geometry is selectable only after its semantic source grammar is stable;
+- generated edges/vertices/cylindrical faces are selectable only after producer-driven semantic identity exists;
 - relationship builders consume capabilities, not source feature kinds;
-- joint equations requiring an oriented frame must not derive hidden world-axis references.
+- persistent new relationship types precede their Geometry equation integration;
+- joint equations requiring orientation do not derive hidden world-axis references;
+- multi-coordinate family state is modeled and serialized before vector motion drives;
+- Prismatic/Cylindrical/Planar/Ball are not merged into one joint PR.
 
 ## GUI selection boundary
 
-An Inventor-/SolidWorks-like picker is a later GUI presentation consumer, not part of Blocks 31-37.
+An Inventor-/SolidWorks-like picker is a later GUI presentation consumer, not part of Blocks 31-47.
 
 A future picker should query:
 
@@ -507,7 +474,7 @@ semantic source candidate
 -> resolved source kind
 -> available capabilities
 -> selected relationship/joint type
--> compatibility matrix
+-> compatibility resolver
 ```
 
 The UI may highlight OCCT faces/edges/vertices, datum planes, axes, lines, and points, but committing a selection stores BLCAD semantic reference identity rather than `TopoDS_Shape` or selection index.
@@ -519,7 +486,7 @@ The UI may highlight OCCT faces/edges/vertices, datum planes, axes, lines, and p
 - Inventor-like sketch/feature parity: `docs/inventor-like-sketcher-and-feature-roadmap.md`
 - Advanced surfacing and 3D sketches: `docs/advanced-surfacing-and-3d-sketch-mvp.md`
 
-Later assembly work also includes null-space basis presentation, multi-turn motion, occurrence-local flexible pose overrides, whole-subassembly variables, advanced joint families beyond the Block-37 seed, and general dynamic/contact response.
+Later assembly work also includes null-space basis presentation, multi-turn motion, occurrence-local flexible pose overrides, whole-subassembly variables, richer joint families beyond the planned first four, and general dynamic/contact response.
 
 ## Persistence rule
 
@@ -534,11 +501,13 @@ cross_hierarchy_constraints[]
 cross_hierarchy_joints[]
 ```
 
-The planned general target architecture continues to persist semantic source identity in local or occurrence-qualified endpoints. Typed geometric descriptors and Plane/Axis/Line/Point/Circle/Cylinder/SeatFrame capabilities remain derived.
+The planned target architecture continues to persist semantic source identity in local or occurrence-qualified endpoints. Typed descriptors and Plane/Axis/Line/Point/Circle/Cylinder/Frame capabilities remain derived.
 
-Regenerate graph connectivity, hierarchy traversal, parent chains, flattened leaves, target geometry/capabilities, transform authorities, incidence/mappings, solve/motion groups, holding drives, residuals/Jacobians, solve/motion results, freshness snapshots, proposals, diagnostics, exchange identities/graphs/names, part shape definitions, XDE labels/references, STEP entities, posed shapes, and analysis products.
+New generic relationship types become model intent in Block 38. Generalized joint coordinate slots become model intent in Block 41 and receive serialization in Block 42.
 
-Only explicit fresh converged solve/motion application changes persisted component `RigidTransform` intent. Successful motion application may additionally change the selected authored local or Project-level joint coordinate. Rigid subassembly placement changes only through explicit occurrence edits until a dedicated whole-subassembly variable contract exists.
+Regenerate graph connectivity, hierarchy traversal, parent chains, flattened leaves, target geometry/capabilities, compatibility projections, transform authorities, incidence/mappings, solve/motion groups, holding drives, residuals/Jacobians, solve/motion results, freshness snapshots, proposals, diagnostics, exchange identities/graphs/names, part shape definitions, XDE labels/references, STEP entities, posed shapes, and analysis products.
+
+Only explicit fresh converged solve/motion application changes persisted component `RigidTransform` intent. Successful motion application may additionally change selected authored joint coordinate slots according to the active drive contract. Rigid subassembly placement changes only through explicit occurrence edits until a dedicated whole-subassembly variable contract exists.
 
 ## Next technical step
 
