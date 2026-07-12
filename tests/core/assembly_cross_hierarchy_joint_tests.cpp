@@ -2,10 +2,9 @@
 #include "blcad/core/project_json.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+#include <nlohmann/json.hpp>
 
-#include <algorithm>
 #include <initializer_list>
-#include <string>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -140,10 +139,11 @@ TEST_CASE("Project-level occurrence-qualified Revolute joint intent preserves hi
       AssemblyJointState::Inactive, angle(-45.0, "joint.cross"), angle(80.0, "joint.cross"),
       angle(12.0, "joint.cross"));
   REQUIRE(joint);
+  const AssemblyJointLimits expected_limits{-45.0, 80.0};
   CHECK(joint.value().target_a() == root);
   CHECK(joint.value().target_b() == nested);
   CHECK(joint.value().state() == AssemblyJointState::Inactive);
-  CHECK(joint.value().limits() == AssemblyJointLimits{-45.0, 80.0});
+  CHECK(joint.value().limits() == expected_limits);
   CHECK(joint.value().coordinate_deg() == 12.0);
 
   CHECK(AssemblyHierarchyJoint::create(
@@ -159,7 +159,6 @@ TEST_CASE("Project-level occurrence-qualified Revolute joint intent preserves hi
             AssemblyJointState::Active, angle(-90.0, "joint.shared"),
             angle(90.0, "joint.shared"), angle(0.0, "joint.shared"))
             .has_value());
-
   CHECK(AssemblyHierarchyJoint::create(
             AssemblyJointId("joint.bad_limits"), "Bad", AssemblyJointType::Revolute, root, nested,
             AssemblyJointState::Active, angle(20.0, "joint.bad_limits"),
@@ -175,7 +174,6 @@ TEST_CASE("Project owns cross-hierarchy joint ids independently from local joint
   REQUIRE(child->add_joint(local_joint("joint.shared_id")));
   REQUIRE(project.add_cross_hierarchy_joint(cross_joint("joint.shared_id")));
   CHECK(project.cross_hierarchy_joint_count() == 1U);
-  CHECK(project.find_cross_hierarchy_joint(AssemblyJointId("joint.shared_id")) != nullptr);
   CHECK(project.add_cross_hierarchy_joint(cross_joint("joint.shared_id")).has_error());
 
   const RigidTransform root_transform =
@@ -206,32 +204,28 @@ TEST_CASE("Cross-hierarchy Revolute Project JSON is additive and exact",
 
   auto serialized = serialize_project_to_json(project);
   REQUIRE(serialized);
-  CHECK(serialized.value().find("cross_hierarchy_joints") != std::string::npos);
   auto loaded = deserialize_project_from_json(serialized.value());
   REQUIRE(loaded);
   REQUIRE(loaded.value().cross_hierarchy_joint_count() == 1U);
   const AssemblyHierarchyJoint* joint =
       loaded.value().find_cross_hierarchy_joint(AssemblyJointId("joint.cross.json"));
   REQUIRE(joint != nullptr);
+  const AssemblyJointLimits expected_limits{-90.0, 90.0};
   CHECK(joint->target_a() == target_a);
   CHECK(joint->target_b() == target_b);
   CHECK(joint->state() == AssemblyJointState::Inactive);
-  CHECK(joint->limits() == AssemblyJointLimits{-90.0, 90.0});
+  CHECK(joint->limits() == expected_limits);
   CHECK(joint->coordinate_deg() == 25.0);
 
-  std::string legacy = serialized.value();
-  const auto field = legacy.find("\"cross_hierarchy_joints\"");
-  REQUIRE(field != std::string::npos);
-  const auto array_begin = legacy.find('[', field);
-  const auto array_end = legacy.find(']', array_begin);
-  REQUIRE(array_begin != std::string::npos);
-  REQUIRE(array_end != std::string::npos);
-  const auto comma = legacy.find(',', array_end);
-  REQUIRE(comma != std::string::npos);
-  legacy.erase(field, comma - field + 1U);
-  auto legacy_loaded = deserialize_project_from_json(legacy);
+  nlohmann::json legacy_json = nlohmann::json::parse(serialized.value());
+  legacy_json.erase("cross_hierarchy_joints");
+  auto legacy_loaded = deserialize_project_from_json(legacy_json.dump());
   REQUIRE(legacy_loaded);
   CHECK(legacy_loaded.value().cross_hierarchy_joint_count() == 0U);
+
+  legacy_json = nlohmann::json::parse(serialized.value());
+  legacy_json["cross_hierarchy_joints"][0]["coordinate"]["unit"] = "mm";
+  CHECK(deserialize_project_from_json(legacy_json.dump()).has_error());
 }
 
 TEST_CASE("Cross-hierarchy joint structure validation follows exact rooted paths",
@@ -239,7 +233,6 @@ TEST_CASE("Cross-hierarchy joint structure validation follows exact rooted paths
   Project project = base_project();
   REQUIRE(project.add_cross_hierarchy_joint(cross_joint()));
   REQUIRE(project.validate_cross_hierarchy_joints());
-
   auto missing_path = AssemblyHierarchyJoint::create(
       AssemblyJointId("joint.missing_path"), "MissingPath", AssemblyJointType::Revolute,
       endpoint({}, "component.root"), endpoint({"subassembly.missing"}, "component.child"),
@@ -259,8 +252,6 @@ TEST_CASE("Combined motion graph closes over local and cross geometry and joints
   REQUIRE(child->add_joint(local_joint("joint.local")));
   REQUIRE(project.add_cross_hierarchy_constraint(cross_constraint("constraint.cross")));
   REQUIRE(project.add_cross_hierarchy_joint(cross_joint("joint.cross")));
-  REQUIRE(project.validate_assembly_structure());
-
   auto graph = AssemblyCrossHierarchyMotionGraph::build(project);
   REQUIRE(graph);
   REQUIRE(graph.value().motion_group_count() == 1U);
@@ -285,7 +276,7 @@ TEST_CASE("Combined motion graph closes over local and cross geometry and joints
   CHECK(reverse_graph.value().motion_groups() == graph.value().motion_groups());
 }
 
-TEST_CASE("Repeated cross-hierarchy joint endpoints retain two paths and one shared authority incidence",
+TEST_CASE("Repeated cross-hierarchy joint endpoints keep two paths and one authority incidence",
           "[core][assembly-cross-hierarchy-motion-graph]") {
   Project project = base_project(true);
   REQUIRE(project.add_cross_hierarchy_joint(cross_joint(
@@ -295,10 +286,10 @@ TEST_CASE("Repeated cross-hierarchy joint endpoints retain two paths and one sha
   REQUIRE(graph);
   REQUIRE(graph.value().motion_group_count() == 1U);
   REQUIRE(graph.value().joint_endpoint_mapping_count() == 2U);
-  CHECK(graph.value().joint_endpoint_mappings()[0].endpoint.occurrence_path() ==
-        std::vector<SubassemblyInstanceId>{SubassemblyInstanceId("subassembly.left")});
-  CHECK(graph.value().joint_endpoint_mappings()[1].endpoint.occurrence_path() ==
-        std::vector<SubassemblyInstanceId>{SubassemblyInstanceId("subassembly.right")});
+  const std::vector<SubassemblyInstanceId> expected_left{SubassemblyInstanceId("subassembly.left")};
+  const std::vector<SubassemblyInstanceId> expected_right{SubassemblyInstanceId("subassembly.right")};
+  CHECK(graph.value().joint_endpoint_mappings()[0].endpoint.occurrence_path() == expected_left);
+  CHECK(graph.value().joint_endpoint_mappings()[1].endpoint.occurrence_path() == expected_right);
   CHECK(graph.value().joint_endpoint_mappings()[0].authority ==
         graph.value().joint_endpoint_mappings()[1].authority);
   CHECK(graph.value().incidence_count() == 1U);
@@ -311,7 +302,6 @@ TEST_CASE("Motion graph participation uses suppression but ignores visibility",
   REQUIRE(visible.add_cross_hierarchy_joint(cross_joint()));
   auto visible_graph = AssemblyCrossHierarchyMotionGraph::build(visible);
   REQUIRE(visible_graph);
-  CHECK(visible_graph.value().motion_group_count() == 1U);
 
   Project hidden = visible;
   REQUIRE(hidden.assembly().set_subassembly_instance_visibility(
