@@ -48,6 +48,7 @@ add_library(
   src/core/dependency_graph.cpp
   src/core/error.cpp
   src/core/feature.cpp
+  src/core/generated_topology_reference.cpp
   src/core/invalidation_state.cpp
   src/core/part_document.cpp
   src/core/part_document_json.cpp
@@ -254,6 +255,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/derived_workplane_tests.cpp
     tests/core/error_result_tests.cpp
     tests/core/feature_tests.cpp
+    tests/core/generated_topology_reference_tests.cpp
     tests/core/invalidation_state_tests.cpp
     tests/core/part_document_json_tests.cpp
     tests/core/part_document_json_workplane_tests.cpp
