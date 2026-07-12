@@ -1,6 +1,6 @@
 # Cross-Hierarchy Assembly Relationship Sequence MVP-5
 
-Status: Blocks 23–34 are implemented. Block 35 is the current next technical step. Blocks 35–47 remain the explicit general assembly target, relationship, and richer-joint continuation.
+Status: Blocks 23–35 are implemented. Block 36 is the current next technical step. Blocks 36–47 remain the explicit general assembly target, relationship, and richer-joint continuation.
 
 This document is the canonical numbered handoff sequence for cross-document assembly intent, solving, motion, exchange, posed analysis, and general geometric target architecture.
 
@@ -15,6 +15,8 @@ Implemented contracts are canonical in:
 - `docs/assembly-structured-step-products-mvp5.md`
 - `docs/assembly-contact-swept-motion-mvp5.md`
 - `docs/assembly-geometric-target-taxonomy-mvp5.md`
+- `docs/assembly-reference-geometry-intent-mvp5.md`
+- `docs/assembly-generated-topology-reference-mvp5.md`
 - `docs/file-format.md`
 
 Future target/relationship/joint details are canonical in:
@@ -107,9 +109,11 @@ canonical ordered pair of
 AssemblyExchangeComponentOccurrenceIdentity values
 ```
 
-Block-31 resolved target endpoint identity remains either the exact local endpoint or exact occurrence-qualified endpoint above. Source kind, descriptor, capability vector, coordinate space, and transform context are derived.
+A Block-31 resolved target retains the exact local or occurrence-qualified endpoint identity. Source kind, descriptor, capability vector, coordinate space, and transform context remain derived.
 
-## Blocks 23–27 — Cross-hierarchy geometric solve chain — implemented
+Block 35 adds stable semantic generated-topology identity at the endpoint-string/Core reference boundary. It does not replace occurrence identity or transform authority.
+
+## Blocks 23–27 — Cross-hierarchy geometric solve chain — Implemented
 
 ### 23. Core endpoint contract and Project-level geometric intent
 
@@ -156,7 +160,7 @@ Focused tags:
 [geometry][assembly-semantic-freshness]
 ```
 
-## Block 28 — Occurrence-qualified Revolute motion — implemented
+## Block 28 — Occurrence-qualified Revolute motion — Implemented
 
 Canonical: `docs/assembly-cross-hierarchy-revolute-motion-mvp5.md`.
 
@@ -172,7 +176,7 @@ Focused tags:
 [geometry][assembly-cross-hierarchy-motion]
 ```
 
-## Block 29 — Structured assembly exchange — implemented
+## Block 29 — Structured assembly exchange — Implemented
 
 Canonical: `docs/assembly-structured-step-products-mvp5.md`.
 
@@ -189,7 +193,7 @@ Focused tags:
 
 Block 29 adds no JSON field.
 
-## Block 30 — Rooted contact classification and sampled Revolute sweep — implemented
+## Block 30 — Rooted contact classification and sampled Revolute sweep — Implemented
 
 Canonical: `docs/assembly-contact-swept-motion-mvp5.md`.
 
@@ -208,7 +212,7 @@ otherwise
 
 `AssemblyContactAnalysis::records` contains one complete record per visible-active unordered rooted component pair.
 
-`AssemblyRevoluteSweepAnalyzer` supports existing root-local and Project cross-hierarchy Revolute motion. It accepts `2..1001` inclusive linear samples and starts every sample from a fresh copy of the same source Project before existing motion solve/application and contact analysis.
+`AssemblyRevoluteSweepAnalyzer` supports existing root-local and Project cross-hierarchy Revolute motion. It accepts `2..1001` inclusive linear samples and starts every sample from a fresh copy of the source Project before existing motion solve/application and contact analysis.
 
 This is deterministic discrete sampling, not continuous collision detection.
 
@@ -221,7 +225,7 @@ Focused tags:
 
 Block 30 adds no persistent analysis record or JSON field.
 
-## Block 31 — Typed geometric target taxonomy and capability projection — implemented
+## Block 31 — Typed geometric target taxonomy and capability projection — Implemented
 
 Canonical: `docs/assembly-geometric-target-taxonomy-mvp5.md`.
 
@@ -252,17 +256,7 @@ Cylinder
 Frame
 ```
 
-One `AssemblyResolvedGeometricTarget` retains:
-
-```text
-exact local or occurrence-qualified endpoint identity
-source kind
-derived source metadata
-typed descriptor variant
-canonical capability vector
-ComponentLocal or RootAssembly coordinate space
-exact transforms_inner_to_outer context
-```
+One `AssemblyResolvedGeometricTarget` retains exact endpoint identity, source kind, derived source metadata, typed descriptor variant, canonical capability vector, coordinate space, and exact transform context.
 
 Projection is explicit:
 
@@ -276,35 +270,21 @@ project_cylinder
 project_frame
 ```
 
-Every projector validates the complete resolved target and rejects unsupported capability projection.
-
 Current source adaptation:
 
 ```text
-.top/.bottom/.right/.left/.front/.back
-  -> GeneratedPlanarFace
-  -> Plane
-
-.axis current single-circle subtractive-extrude producer
-  -> GeneratedCylindricalFace
-  -> Axis + Cylinder
-
-.seat
-  -> CircularFeatureSeat
-  -> Plane + Axis + Frame
+.top/.bottom/.right/.left/.front/.back -> GeneratedPlanarFace -> Plane
+.axis current single-circle subtractive producer -> GeneratedCylindricalFace -> Axis + Cylinder
+.seat -> CircularFeatureSeat -> Plane + Axis + Frame
 ```
 
-Existing semantic-reference strings remain unchanged.
-
-Local and hierarchy legacy target resolver APIs now adapt from the typed projection boundary. Existing Mate/Distance/Angle/Concentric/Insert/Revolute descriptor shapes and equation/residual semantics remain unchanged.
+Existing semantic-reference strings remain unchanged. Local and hierarchy legacy target resolver APIs adapt from typed projections. Existing Mate/Distance/Angle/Concentric/Insert/Revolute descriptor and residual semantics remain unchanged.
 
 Focused tag:
 
 ```text
 [geometry][assembly-geometric-target-taxonomy]
 ```
-
-Block 31 adds no persistent source kind, descriptor, capability vector, source grammar, relationship family, joint family, or JSON field.
 
 ## Blocks 32–47 — General target, relationship, and richer-joint continuation
 
@@ -316,7 +296,7 @@ Mandatory order:
 32 assembly-selectable reference geometry Core intent (implemented)
 33 reference geometry serialization and structure validation (implemented)
 34 datum/axis/line/point target resolution (implemented)
-35 stable semantic generated topology identity/recovery
+35 stable semantic generated topology identity/recovery (implemented)
 36 generated face/edge/vertex target resolution
 37 explicit target compatibility matrix
 38 generic geometric relationship Core intent + JSON
@@ -333,13 +313,11 @@ Mandatory order:
 
 Do not merge these blocks.
 
-## Block 32 — Assembly-selectable reference geometry Core intent — implemented
+## Block 32 — Assembly-selectable reference geometry Core intent — Implemented
 
 Canonical document: `docs/assembly-reference-geometry-intent-mvp5.md`.
 
-Primary boundary: Core persistent model intent and semantic source identity.
-
-Implemented first-class `DatumAxis` PartDocument intent with the frozen `Explicit` and `FromConstructionLine` definition families, existing-construction-geometry ownership/dependency/invalidation semantics, and the frozen reference semantic-source grammar:
+Implemented first-class `DatumAxis` PartDocument intent with the frozen `Explicit` and `FromConstructionLine` families and the canonical reference semantic-source grammar:
 
 ```text
 ref:datum_plane:<encoded-id>
@@ -348,7 +326,7 @@ ref:construction_line:<encoded-id>
 ref:construction_point:<encoded-id>
 ```
 
-Uppercase `%HH` escaping of every id byte outside `[A-Za-z0-9_-]` keeps valid reference spellings dot-free and therefore provably disjoint from feature target spellings; ids containing `.`, `/`, and `%` stay unambiguous and parsing fails closed. Existing feature target spellings and local/cross endpoint JSON shapes are unchanged. Block 32 performs no Geometry target resolution and adds no JSON field.
+Uppercase `%HH` escaping outside `[A-Za-z0-9_-]` keeps valid reference spellings dot-free and disjoint from legacy feature-role spellings. Parsing fails closed. Block 32 adds no JSON field and performs no Geometry target resolution.
 
 Focused tags:
 
@@ -357,11 +335,11 @@ Focused tags:
 [core][assembly-reference-target-intent]
 ```
 
-## Block 33 — Reference geometry serialization and structure validation — implemented
+## Block 33 — Reference geometry serialization and structure validation — Implemented
 
 Canonical document: `docs/assembly-reference-geometry-intent-mvp5.md`. Save-format authority: `docs/file-format.md`.
 
-Implemented the additive optional `datum_axes` part-document array for both DatumAxis families, historical-file compatibility, load-time ownership/family validation through `PartDocument::add_datum_axis`, unchanged local/cross endpoint JSON shapes, and byte-for-byte `ref:` spelling roundtrips. No target geometry resolution during load.
+Implemented the additive optional `datum_axes` PartDocument array, historical-file compatibility, load-time ownership/family validation, unchanged endpoint JSON shapes, and byte-for-byte `ref:` spelling roundtrips. No target geometry is resolved during load.
 
 Focused tags:
 
@@ -370,14 +348,14 @@ Focused tags:
 [core][assembly-reference-target-json]
 ```
 
-## Block 34 — Datum/axis/line/point target resolution — implemented
+## Block 34 — Datum/axis/line/point target resolution — Implemented
 
 Implemented:
 
 ```text
-DatumPlane       -> Plane
-DatumAxis        -> Axis + Line
-ConstructionLine -> Line
+DatumPlane        -> Plane
+DatumAxis         -> Axis + Line
+ConstructionLine  -> Line
 ConstructionPoint -> Point
 ```
 
@@ -389,11 +367,63 @@ Focused tag:
 [geometry][assembly-reference-target-resolution]
 ```
 
-## Blocks 35–36 — Stable generated topology identity and resolution
+## Block 35 — Stable generated topology identity and recovery — Implemented
 
-Block 35 defines producer-driven semantic identities/recovery for generated cylindrical faces, linear edges, circular edges, and vertices. Raw topology traversal/hash/map/XDE/STEP/memory identity remains forbidden.
+Canonical document: `docs/assembly-generated-topology-reference-mvp5.md`.
 
-Block 36 resolves only Block-35 supported semantic producers into Block-31 descriptors/capabilities.
+Block 35 defines Core producer-driven semantic identities for generated cylindrical faces, linear edges, circular edges, and vertices.
+
+Canonical `topo:` endpoint spellings retain exact feature/profile/role intent. The first producer matrices are:
+
+```text
+RectangularAdditiveExtrude
+  -> 12 named linear edges, cardinality 1 each
+  -> 8 named vertices, cardinality 1 each
+
+SingleCircleSubtractiveExtrude
+  -> cylindrical wall, cardinality 1
+  -> source_rim, cardinality 1
+  -> opposite_rim, cardinality 1
+```
+
+The single-circle producer retains exact source `CircleProfileId`. Unsupported producers, ambiguous multi/mixed-circle sources, wrong profile ids, and unsupported family/role pairs fail closed. Pattern-generated subelements remain unavailable until stable per-instance identity exists.
+
+`ReferenceRecoveryEvaluator` now provides read-only generated-topology recovery. No OCCT traversal/hash/map/XDE/STEP/memory identity is persisted or written by recovery.
+
+Focused tags:
+
+```text
+[core][semantic-generated-topology-reference]
+[core][semantic-generated-topology-recovery]
+```
+
+Block 35 adds no Geometry target resolver branch or equation.
+
+## Block 36 — Generated face, edge, and vertex target resolution — Next
+
+Primary boundary: Geometry semantic target resolution.
+
+Resolve only Block-35 supported semantic producers into Block-31 descriptors/capabilities:
+
+```text
+GeneratedPlanarFace      -> Plane
+GeneratedCylindricalFace -> Cylinder + Axis
+GeneratedLinearEdge      -> Line
+GeneratedCircularEdge    -> Circle + Axis + Point(center)
+GeneratedVertex          -> Point
+```
+
+`topo:` spellings must be parsed before legacy feature-role parsing. Resolution starts from validated producer identity and then identifies the exact current generated subelement, verifies topology type and expected cardinality, and constructs typed descriptors. OCCT topology is execution data only after semantic resolution identifies the intended producer role.
+
+Local targets remain component-local. Hierarchy targets use the exact component-plus-parent transform chain. Repeated rooted occurrences may have different root-space geometry while sharing one PartDocument semantic source identity.
+
+Focused tag:
+
+```text
+[geometry][assembly-generated-topology-target-resolution]
+```
+
+Block 36 adds no compatibility rule and no new relationship type.
 
 ## Blocks 37–40 — Compatibility and generic relationship/joint target semantics
 
@@ -442,6 +472,7 @@ Project-owned child assemblies
 SubassemblyInstance placement/state
 cross_hierarchy_constraints[]
 cross_hierarchy_joints[]
+exact endpoint semantic-reference strings including ref: and topo: families
 ```
 
 Regenerate:
@@ -450,6 +481,7 @@ Regenerate:
 hierarchy traversal and exact transform chains
 relationship/joint connectivity
 ComponentTransformAuthority mappings
+generated topology producer matrices/classification/recovery results
 resolved target source classification
 Plane/Axis/Line/Point/Circle/Cylinder/Frame descriptors
 capability vectors and projections
@@ -462,6 +494,6 @@ posed shapes/contact records/sweep analyses
 
 ## Next technical step
 
-Implement Block 35 only: stable semantic generated topology identity and recovery for generated cylindrical faces, linear edges, circular edges, and vertices.
+Implement Block 36 only: Geometry resolution of canonical Block-35 generated-topology references into generated cylindrical-face, linear-edge, circular-edge, and vertex target descriptors/capabilities with exact producer-role topology type/cardinality checks.
 
-Do not implement Block-36 generated topology target resolution in Block 35.
+Do not implement Block-37 compatibility rules in Block 36.

@@ -212,29 +212,15 @@ project_cylinder
 project_frame
 ```
 
-Every projector validates the complete resolved target and rejects unsupported capability projection.
-
-Current source migration:
+Current legacy source migration remains:
 
 ```text
-.top/.bottom/.right/.left/.front/.back
-  -> GeneratedPlanarFace
-  -> Plane
-
-.axis current single-circle subtractive-extrude producer
-  -> GeneratedCylindricalFace
-  -> Axis + Cylinder
-
-.seat
-  -> CircularFeatureSeat
-  -> Plane + Axis + Frame
+.top/.bottom/.right/.left/.front/.back -> GeneratedPlanarFace -> Plane
+.axis -> GeneratedCylindricalFace -> Axis + Cylinder
+.seat -> CircularFeatureSeat -> Plane + Axis + Frame
 ```
 
-All existing persistent target strings remain unchanged.
-
-Local and hierarchy legacy resolver APIs now adapt from the typed projection boundary, so existing Mate/Distance/Angle/Concentric/Insert/Revolute equation consumers retain their descriptor shapes and numeric semantics while Geometry source/capability classification is centralized.
-
-Block 31 adds no new source grammar, Core persistence, JSON field, relationship type, or joint family.
+Local and hierarchy legacy resolver APIs adapt from the typed projection boundary. Existing Mate/Distance/Angle/Concentric/Insert/Revolute equation consumers retain their descriptor shapes and numeric semantics.
 
 Focused tag:
 
@@ -242,26 +228,18 @@ Focused tag:
 [geometry][assembly-geometric-target-taxonomy]
 ```
 
-## Parameter expression seed
-
-Canonical document: `docs/parameter-expression-mvp.md`.
-
-Implemented unit-aware formulas, parameter dependency edges, topological evaluation, cycle rejection, JSON roundtrip with re-derived edges, incremental recompute, and transactional editing.
-
 ### Block 32 — Assembly-selectable reference geometry Core intent — Implemented
 
 Canonical document: `docs/assembly-reference-geometry-intent-mvp5.md`.
 
-Implemented first-class `DatumAxis` PartDocument intent with two frozen definition families:
+Implemented first-class `DatumAxis` PartDocument intent with:
 
 ```text
 Explicit               finite origin + unit direction + parameter dependencies
 FromConstructionLine   owned ConstructionLineId identity only
 ```
 
-Ownership, id uniqueness, dependency edges, and invalidation propagation follow existing construction-geometry semantics; derived axes join recompute plans through their parameter and source-line edges.
-
-Implemented the frozen reference semantic-source grammar:
+Implemented canonical reference semantic-source grammar:
 
 ```text
 ref:datum_plane:<encoded-id>
@@ -270,9 +248,7 @@ ref:construction_line:<encoded-id>
 ref:construction_point:<encoded-id>
 ```
 
-Every id byte outside `[A-Za-z0-9_-]` is escaped as uppercase `%HH`. Valid reference spellings therefore contain no `.`, while every feature spelling contains one, so the grammars accept provably disjoint string sets and ids containing `.`, `/`, and `%` stay unambiguous. Parsing fails closed; each identity has exactly one canonical spelling.
-
-Assembly endpoints keep persisting component/occurrence identity plus the semantic-reference string. Block 32 adds no JSON field and performs no Geometry resolution.
+Every id byte outside `[A-Za-z0-9_-]` is escaped as uppercase `%HH`. Parsing is canonical and fail closed. Assembly endpoints continue to persist component/occurrence identity plus the semantic-reference string.
 
 Focused tags:
 
@@ -285,9 +261,7 @@ Focused tags:
 
 Canonical document: `docs/assembly-reference-geometry-intent-mvp5.md`. Save-format authority: `docs/file-format.md`.
 
-Implemented the additive optional `datum_axes` part-document JSON array for both frozen families. Historical files without the array load empty collections; loading reuses `PartDocument::add_datum_axis`, so ownership, id uniqueness, family rules, and dependency/invalidation edges are enforced and rebuilt, and unsupported kinds fail closed.
-
-Local and cross-hierarchy endpoint JSON shapes are unchanged and `ref:` semantic-reference strings roundtrip byte-for-byte, including adversarial ids. Loading and structure validation resolve no reference geometry.
+Implemented the additive optional `datum_axes` part-document JSON array for both frozen families. Historical files without it load empty collections. Local and cross-hierarchy endpoint JSON shapes are unchanged and `ref:` semantic-reference strings roundtrip byte-for-byte. Loading resolves no reference geometry.
 
 Focused tags:
 
@@ -300,7 +274,7 @@ Focused tags:
 
 Canonical roadmap: `docs/assembly-general-geometric-target-roadmap.md`.
 
-Implemented Geometry resolution of `ref:` semantic sources into the Block-31 taxonomy:
+Implemented Geometry resolution:
 
 ```text
 DatumPlane        -> Plane
@@ -309,7 +283,7 @@ ConstructionLine  -> Line
 ConstructionPoint -> Point
 ```
 
-The resolver reuses existing workplane, construction-line, and construction-point execution. Local targets remain component-local; hierarchy targets use the exact existing component-plus-parent transform chain. Canonical PartDocument snapshots remain the freshness authority.
+The resolver reuses existing workplane, construction-line, and construction-point execution. Local targets remain component-local; hierarchy targets use the exact component-plus-parent transform chain. Canonical PartDocument snapshots remain freshness authority.
 
 Focused tag:
 
@@ -317,16 +291,61 @@ Focused tag:
 [geometry][assembly-reference-target-resolution]
 ```
 
-Block 34 adds no persistent record, JSON field, relationship type, joint family, generated-topology identity, or compatibility matrix.
+### Block 35 — Stable semantic generated topology identity and recovery — Implemented
 
-## Blocks 35–47 — Planned general target, relationship, and joint continuation
+Canonical document: `docs/assembly-generated-topology-reference-mvp5.md`.
+
+Block 35 implements Core producer-driven semantic identities for:
+
+```text
+GeneratedCylindricalFace
+GeneratedLinearEdge
+GeneratedCircularEdge
+GeneratedVertex
+```
+
+The canonical `topo:` grammar stores semantic producer identity rather than kernel topology identity:
+
+```text
+topo:cylindrical_face:<encoded-feature-id>:<encoded-profile-id>:wall
+topo:linear_edge:<encoded-feature-id>:<role>
+topo:circular_edge:<encoded-feature-id>:<encoded-profile-id>:<source_rim|opposite_rim>
+topo:vertex:<encoded-feature-id>:<role>
+```
+
+Supported producer matrices are deliberately finite:
+
+```text
+RectangularAdditiveExtrude
+  -> 12 named linear edges, cardinality 1 each
+  -> 8 named vertices, cardinality 1 each
+
+SingleCircleSubtractiveExtrude
+  -> wall, cardinality 1
+  -> source_rim, cardinality 1
+  -> opposite_rim, cardinality 1
+```
+
+The single-circle producer retains the exact source `CircleProfileId`. Unsupported producers, mixed/multiple-circle ambiguity, wrong profile identity, and family/role mismatches fail closed. `CircularHolePattern` subelements remain unavailable until stable per-instance semantic identity exists.
+
+`ReferenceRecoveryEvaluator` performs read-only generated-topology recovery from current PartDocument producer intent. It reports `Resolved` or `Lost` and never writes raw OCCT ids into model intent.
+
+Focused tags:
+
+```text
+[core][semantic-generated-topology-reference]
+[core][semantic-generated-topology-recovery]
+```
+
+Block 35 adds no generated-topology Geometry resolver branch. Geometry target resolution remains Block 36.
+
+## Blocks 36–47 — Planned general target, relationship, and joint continuation
 
 Canonical roadmap: `docs/assembly-general-geometric-target-roadmap.md`.
 
 Mandatory order:
 
 ```text
-35 stable semantic generated topology identity/recovery
 36 generated face/edge/vertex target resolution
 37 explicit target compatibility matrix
 38 generic geometric relationship Core intent + JSON
@@ -378,26 +397,26 @@ After Block 94 the first Part Construction MVP is considered complete. That mean
 
 It does not mean SolidWorks/Inventor Part product parity. Production GUI modeling, Class-A surfacing, arbitrary NURBS control cages, variable-radius fillets, advanced topology healing, direct modeling, sheet metal, weldments, and specialized manufacturing feature systems remain later work.
 
-## Current next technical step — Block 35
+## Current next technical step — Block 36
 
-Primary boundary: Core semantic reference model and recovery rules.
+Primary boundary: Geometry semantic target resolution.
 
-Block 35 must define stable producer-driven semantic identities for:
-
-```text
-GeneratedCylindricalFace
-GeneratedLinearEdge
-GeneratedCircularEdge
-GeneratedVertex
-```
-
-It must publish finite producer role matrices, expected cardinality, ambiguity/failure behavior, and recovery rules without persisting OCCT traversal/hash/map/XDE/STEP/memory identities.
-
-Planned focused tags:
+Block 36 must resolve validated Block-35 semantic generated topology identities into the Block-31 target taxonomy:
 
 ```text
-[core][semantic-generated-topology-reference]
-[core][semantic-generated-topology-recovery]
+GeneratedPlanarFace      -> Plane
+GeneratedCylindricalFace -> Cylinder + Axis
+GeneratedLinearEdge      -> Line
+GeneratedCircularEdge    -> Circle + Axis + Point(center)
+GeneratedVertex          -> Point
 ```
 
-Generated topology target resolution remains Block 36.
+The resolver must parse canonical `topo:` spellings before legacy feature-role parsing, validate the producer-role identity, identify the exact current generated subelement, prove topology type and expected cardinality, and preserve component-local versus exact rooted transform semantics.
+
+Focused tag:
+
+```text
+[geometry][assembly-generated-topology-target-resolution]
+```
+
+Target compatibility remains Block 37.

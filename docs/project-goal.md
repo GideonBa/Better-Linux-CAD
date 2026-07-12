@@ -10,6 +10,7 @@ Persistent or explicitly authored model intent already includes substantial part
 - sketches, construction geometry, and constraints;
 - parametric features and feature history;
 - semantic generated geometry references;
+- canonical generated-topology producer-role identities;
 - dependency, invalidation, and recompute intent;
 - assembly parameters and bindings;
 - part component occurrences and direct rigid placement;
@@ -19,7 +20,7 @@ Persistent or explicitly authored model intent already includes substantial part
 - Project-level occurrence-qualified geometric constraints;
 - Project-level occurrence-qualified Revolute joints.
 
-Derived data such as OCCT shapes, hierarchy traversal, transform-authority mappings, typed target source classifications/descriptors/capabilities, residuals/Jacobians, solve/motion results, freshness snapshots, rooted exchange records, posed shapes, contact classifications, sampled motion products, XDE labels, and STEP products/entities remains regenerable query/execution output rather than primary model authority.
+Derived data such as OCCT shapes, generated-topology producer classification/recovery query results, hierarchy traversal, transform-authority mappings, typed target source classifications/descriptors/capabilities, residuals/Jacobians, solve/motion results, freshness snapshots, rooted exchange records, posed shapes, contact classifications, sampled motion products, XDE labels, and STEP products/entities remains regenerable query/execution output rather than primary model authority.
 
 ## Direction
 
@@ -68,6 +69,8 @@ structured assembly/product STEP export
 complete rooted Separated / Touching / Interfering classification
 bounded sampled local/cross-hierarchy Revolute sweep
 typed assembly geometric target taxonomy and capability projection
+assembly-selectable reference geometry intent + JSON + Geometry resolution
+stable producer-driven generated topology identity and read-only recovery
 ```
 
 Several identity/authority questions are deliberately separated.
@@ -85,12 +88,40 @@ cross-hierarchy
    semantic_reference)
 ```
 
+The semantic-reference string may represent a legacy feature role, a `ref:` reference-geometry source, or a canonical `topo:` generated-topology producer-role identity.
+
 ### Persisted transform authority
 
 ```text
 (assembly_document: DocumentId,
  local ComponentInstanceId)
 ```
+
+### Generated topology semantic source identity
+
+```text
+source feature producer
++ generated topology family
++ named semantic producer role
++ exact source profile identity where profile-derived
+```
+
+The first Block-35 producer matrices are:
+
+```text
+RectangularAdditiveExtrude
+  -> 12 named linear edges, expected cardinality 1 each
+  -> 8 named vertices, expected cardinality 1 each
+
+SingleCircleSubtractiveExtrude
+  -> cylindrical wall, expected cardinality 1
+  -> source_rim, expected cardinality 1
+  -> opposite_rim, expected cardinality 1
+```
+
+Pattern result-vector position is not persistent semantic identity. Pattern-generated subelements remain unavailable until stable per-instance model identity exists.
+
+Raw OCCT hash/traversal/map identity, XDE label tags, STEP entity ids, and memory addresses are never promoted to semantic target identity.
 
 ### Resolved source classification and capability
 
@@ -123,7 +154,7 @@ This prevents numeric variable duplication and occurrence collapse.
 
 ## General target architecture progress
 
-Block 31 establishes the first generic assembly target Geometry boundary.
+Block 31 establishes the generic assembly target Geometry boundary.
 
 Source kinds:
 
@@ -156,15 +187,19 @@ One resolved target retains exact endpoint identity, source classification, deri
 
 Consumers project geometry explicitly through `project_plane`, `project_axis`, `project_line`, `project_point`, `project_circle`, `project_cylinder`, or `project_frame`.
 
-Current `.top/.bottom/.right/.left/.front/.back`, `.axis`, and `.seat` strings remain unchanged. Existing Mate/Distance/Angle/Concentric/Insert/Revolute consumers now receive legacy descriptor shapes adapted from the typed projection boundary, so target expressiveness can grow without duplicating equation or numeric machinery.
+Current `.top/.bottom/.right/.left/.front/.back`, `.axis`, and `.seat` strings remain unchanged. Existing Mate/Distance/Angle/Concentric/Insert/Revolute consumers receive legacy descriptor shapes adapted from the typed projection boundary.
 
-Canonical implemented target contract: `docs/assembly-geometric-target-taxonomy-mvp5.md`.
+Blocks 32–34 established assembly-selectable reference geometry Core intent, serialization, and Geometry resolution: first-class DatumAxis intent, the unambiguous `ref:` semantic source grammar, additive `datum_axes` JSON, byte-for-byte endpoint spelling roundtrips, and derived resolution of DatumPlane/DatumAxis/ConstructionLine/ConstructionPoint into Plane/Axis/Line/Point capabilities.
 
-Blocks 32–34 established assembly-selectable reference geometry Core intent, serialization, and Geometry resolution: first-class DatumAxis PartDocument intent, the unambiguous `ref:` semantic source grammar, additive `datum_axes` JSON with byte-for-byte endpoint spelling roundtrips, and derived resolution of DatumPlane/DatumAxis/ConstructionLine/ConstructionPoint sources into Block-31 Plane/Axis/Line/Point capabilities. The next authority step is Block 35: stable semantic generated topology identity and recovery.
+Block 35 establishes stable generated topology identity and recovery before Geometry topology lookup. Canonical `topo:` spellings encode exact semantic producer identities for cylindrical wall, rectangular linear-edge/vertex roles, and circular source/opposite rim roles. Producer role matrices publish expected cardinality and unsupported/ambiguous/patterned sources fail closed. Recovery is read-only and never writes raw kernel topology ids.
+
+The next authority step is Block 36: Geometry resolution of the supported Block-35 semantic producers into Cylinder/Axis, Line, Circle/Axis/center Point, and Point capabilities with exact current topology type/cardinality checks.
 
 Canonical sequence: `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`.
 
 Canonical target/joint roadmap: `docs/assembly-general-geometric-target-roadmap.md`.
+
+Canonical generated-topology identity contract: `docs/assembly-generated-topology-reference-mvp5.md`.
 
 ## Long-term scope
 
@@ -213,8 +248,12 @@ These are sequencing boundaries, not permanent product exclusions.
 
 Feature-specific MVP documents are canonical for exact contracts, persistence boundaries, mathematical semantics, failure policies, and focused proofs.
 
-`docs/assembly-geometric-target-taxonomy-mvp5.md` is canonical for implemented Block-31 source taxonomy, typed descriptors, capability projection, and current target-family migration.
+`docs/assembly-geometric-target-taxonomy-mvp5.md` is canonical for the Block-31 source taxonomy, typed descriptors, capability projection, and current target-family migration.
 
-`docs/assembly-general-geometric-target-roadmap.md` is canonical for planned Blocks 32–47.
+`docs/assembly-reference-geometry-intent-mvp5.md` is canonical for Blocks 32–34 reference-geometry intent, JSON, and resolution handoff.
 
-`docs/file-format.md` is canonical for implemented serialization. Derived target source kinds/descriptors/capabilities/projections are not save-format fields.
+`docs/assembly-generated-topology-reference-mvp5.md` is canonical for Block-35 producer-driven generated topology identity and recovery.
+
+`docs/assembly-general-geometric-target-roadmap.md` is canonical for implemented Blocks 31–35 and planned Blocks 36–47.
+
+`docs/file-format.md` is canonical for implemented serialization. Derived target source kinds/descriptors/capabilities/projections, producer matrices/classification, and recovery query results are not save-format fields.
