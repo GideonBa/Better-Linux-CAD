@@ -1,8 +1,8 @@
 # Cross-Hierarchy Assembly Relationship Sequence MVP-5
 
-Status: Blocks 23-30 are implemented. Block 31 is the current next technical step. Blocks 31-47 are explicitly planned as the general assembly geometric-target, relationship, and richer-joint sequence.
+Status: Blocks 23–31 are implemented. Block 32 is the current next technical step. Blocks 32–47 remain the explicit general assembly target, relationship, and richer-joint continuation.
 
-This document is the canonical numbered implementation sequence for assembly relationships, motion, hierarchy-aware exchange, posed analysis, and the handoff into general Inventor-/SolidWorks-like semantic target compatibility.
+This document is the canonical numbered handoff sequence for cross-document assembly intent, solving, motion, exchange, posed analysis, and general geometric target architecture.
 
 Implemented contracts are canonical in:
 
@@ -14,21 +14,20 @@ Implemented contracts are canonical in:
 - `docs/assembly-cross-hierarchy-revolute-motion-mvp5.md`
 - `docs/assembly-structured-step-products-mvp5.md`
 - `docs/assembly-contact-swept-motion-mvp5.md`
+- `docs/assembly-geometric-target-taxonomy-mvp5.md`
 - `docs/file-format.md`
 
-Planned general target/joint expansion is canonical in:
+Future target/relationship/joint details are canonical in:
 
 - `docs/assembly-general-geometric-target-roadmap.md`
 
 ## Sequencing rule
 
-Cross-document assembly work crosses separate authority boundaries:
-
 ```text
 Core persistent model intent
   -> serialization and structure compatibility
-  -> semantic source identity
-  -> derived occurrence/authority connectivity
+  -> stable semantic source identity
+  -> deterministic derived occurrence/authority connectivity
   -> typed target geometry and capability projection
   -> explicit relationship/joint compatibility
   -> persistent relationship/joint state
@@ -46,34 +45,32 @@ Do not:
 - persist Geometry query/execution types;
 - persist raw OCCT topology as semantic target identity;
 - duplicate one shared child component transform into independent variables per rooted occurrence;
-- duplicate local model-definition relationships per rooted occurrence;
+- duplicate one local relationship per rooted occurrence;
 - add residual rows merely to encode shared transform authority;
-- persist graph, residual, Jacobian, freshness snapshot, proposal, diagnostic, XDE label, STEP entity, contact, or sweep caches;
+- persist graph/residual/Jacobian/freshness/proposal/diagnostic/exchange/contact/sweep caches;
 - mutate `SubassemblyInstance::transform()` through component authority variables;
-- introduce a second optimizer, finite-difference contract, hierarchy traversal, pose model, or transform convention;
+- introduce a second optimizer, finite-difference contract, hierarchy traversal model, pose model, or transform convention;
+- infer equation geometry from source-kind enums when capability projection exists;
+- infer Revolute twist reference from an arbitrary world axis;
 - call sampled sweep analysis continuous collision detection;
-- add one-off feature-specific branches directly to generic equation builders once the target-capability layer exists;
-- infer a joint twist reference direction from an arbitrary world axis;
 - add multi-coordinate joint execution before coordinate state and JSON contracts exist;
-- merge several richer joint families into one implementation block.
+- merge several richer joint families into one block.
 
-## Frozen solve/motion identities
+## Frozen identities
 
 Occurrence-qualified semantic endpoint:
 
 ```text
-AssemblyHierarchyConstraintEndpoint =
-  (occurrence_path,
-   local ComponentInstanceId,
-   semantic_reference)
+(occurrence_path,
+ local ComponentInstanceId,
+ semantic_reference)
 ```
 
 Geometric component occurrence:
 
 ```text
-HierarchyComponentOccurrence =
-  (occurrence_path,
-   local ComponentInstanceId)
+(occurrence_path,
+ local ComponentInstanceId)
 ```
 
 Direct component transform authority:
@@ -84,87 +81,71 @@ ComponentTransformAuthority =
    local ComponentInstanceId)
 ```
 
-Repeated rooted occurrences can remain different geometric/motion contexts while mapping to one shared child-document transform authority.
-
-## Frozen exchange/contact occurrence identities
-
 Assembly exchange occurrence:
 
 ```text
-AssemblyExchangeAssemblyOccurrenceIdentity =
-  exact rooted SubassemblyInstance occurrence path
+exact rooted SubassemblyInstance path
 ```
 
 Component exchange occurrence:
 
 ```text
-AssemblyExchangeComponentOccurrenceIdentity =
-  (containing assembly occurrence path,
-   local ComponentInstanceId)
+(containing rooted assembly path,
+ local ComponentInstanceId)
 ```
 
 Part product definition:
 
 ```text
-AssemblyExchangePartProductDefinitionIdentity =
-  referenced PartDocumentId
+referenced PartDocumentId
 ```
 
-Block-30 unordered contact pair identity:
+Rooted contact pair:
 
 ```text
-AssemblyComponentOccurrencePairIdentity =
-  canonical ordered pair of
-  AssemblyExchangeComponentOccurrenceIdentity values
+canonical ordered pair of
+AssemblyExchangeComponentOccurrenceIdentity values
 ```
 
-Pair order is exact occurrence path sequence, then local `ComponentInstanceId`.
+Block-31 resolved target endpoint identity remains either the exact local endpoint or exact occurrence-qualified endpoint above. Source kind, descriptor, capability vector, coordinate space, and transform context are derived.
 
-These identities are derived and unpersisted. They are not OCCT topology ids, TDF label tags, STEP entity ids, or aliases for `ComponentTransformAuthority`.
-
-## Blocks 23-27: cross-hierarchy geometric solve chain — implemented
+## Blocks 23–27 — Cross-hierarchy geometric solve chain — implemented
 
 ### 23. Core endpoint contract and Project-level geometric intent
 
-Canonical document: `docs/assembly-cross-hierarchy-constraint-intent-mvp5.md`.
+Canonical: `docs/assembly-cross-hierarchy-constraint-intent-mvp5.md`.
 
-Implemented occurrence-qualified Core endpoints and persistent Project-owned Mate/Concentric/Distance/Insert/Angle relationships.
+Implemented occurrence-qualified Core endpoints and persistent Project-owned Mate/Distance/Angle/Concentric/Insert relationships.
 
 ### 24. Additive JSON and exact structure validation
 
-Canonical document: `docs/assembly-cross-hierarchy-constraint-json-mvp5.md`.
+Canonical: `docs/assembly-cross-hierarchy-constraint-json-mvp5.md`.
 
-Implemented additive:
-
-```text
-cross_hierarchy_constraints[]
-```
-
-with exact target/path order and root-to-reached-component structure validation after hierarchy validation.
+Implemented `cross_hierarchy_constraints[]` with exact endpoint/path order and reached-component structure validation after hierarchy validation.
 
 ### 25. Relationship-to-authority incidence and solve groups
 
-Canonical document: `docs/assembly-cross-hierarchy-incidence-groups-mvp5.md`.
+Canonical: `docs/assembly-cross-hierarchy-incidence-groups-mvp5.md`.
 
-Implemented deterministic local/Project relationship incidence over unique `ComponentTransformAuthority` values. Local relationships appear once per containing `AssemblyDocument`; repeated rooted endpoints retain exact occurrence context while mapping to shared authorities.
+Implemented deterministic local/Project relationship incidence over unique `ComponentTransformAuthority` values. Local relationships appear once per containing `AssemblyDocument`; rooted endpoints retain exact occurrence context while mapping to shared authorities.
 
 ### 26. Shared numeric residual/Jacobian integration
 
-Canonical document: `docs/assembly-cross-hierarchy-numeric-solver-mvp5.md`.
+Canonical: `docs/assembly-cross-hierarchy-numeric-solver-mvp5.md`.
 
-Implemented one six-variable block per unique free active authority:
+Each unique free active authority contributes:
 
 ```text
 tx_mm ty_mm tz_mm rx_deg ry_deg rz_deg
 ```
 
-Local relationships evaluate in document-local space. Project-level relationships evaluate through exact rooted parent chains in root space. Existing residual flattening, central finite differences, damping/backtracking, and Gauss-Newton machinery are reused.
+Local relationships evaluate in document-local space. Project-level relationships evaluate through exact rooted chains in root space. Shared residual flattening, central finite differences, damping/backtracking, and Gauss-Newton execution remain authoritative.
 
-### 27. Complete freshness, atomic application, and diagnostics
+### 27. Complete freshness, atomic application, diagnostics
 
-Canonical document: `docs/assembly-cross-hierarchy-application-diagnostics-mvp5.md`.
+Canonical: `docs/assembly-cross-hierarchy-application-diagnostics-mvp5.md`.
 
-Implemented authority/relationship/path-boundary/exact-semantic-PartDocument freshness, current solve-group revalidation, atomic direct-authority transform application, and Jacobian-rank/remaining-DOF diagnostics.
+Implemented authority/relationship/path-boundary/exact-PartDocument freshness, current solve-group revalidation, atomic direct-authority application, and Jacobian-rank/remaining-DOF diagnostics.
 
 Focused tags:
 
@@ -175,19 +156,11 @@ Focused tags:
 [geometry][assembly-semantic-freshness]
 ```
 
-## Block 28: occurrence-qualified Revolute motion — implemented
+## Block 28 — Occurrence-qualified Revolute motion — implemented
 
-Canonical document: `docs/assembly-cross-hierarchy-revolute-motion-mvp5.md`.
+Canonical: `docs/assembly-cross-hierarchy-revolute-motion-mvp5.md`.
 
-Implemented persistent Project-level `AssemblyHierarchyJoint` Revolute intent and additive:
-
-```text
-cross_hierarchy_joints[]
-```
-
-The combined motion closure spans local geometry, local joints, Project cross geometry, and Project cross joints. Exact rooted `.seat` endpoints evaluate in root space and reuse the shared directed axis/seating/signed-twist residual constructor.
-
-Selected Project-level joints receive requested drives. Other active Revolute joints in the motion group hold authored coordinates. Motion reuses shared authority variables, finite differences, numeric solve machinery, complete freshness, and atomic authority-plus-selected-coordinate application.
+Implemented Project-level `AssemblyHierarchyJoint` Revolute intent, `cross_hierarchy_joints[]`, exact rooted `.seat` endpoints, combined local/cross geometry+joint motion closure, holding drives for non-selected active Revolute joints, shared numeric execution, complete freshness, and atomic authority-plus-selected-coordinate application.
 
 Focused tags:
 
@@ -199,31 +172,13 @@ Focused tags:
 [geometry][assembly-cross-hierarchy-motion]
 ```
 
-## Block 29: structured assembly exchange and STEP product relationships — implemented
+## Block 29 — Structured assembly exchange — implemented
 
-Canonical document: `docs/assembly-structured-step-products-mvp5.md`.
+Canonical: `docs/assembly-structured-step-products-mvp5.md`.
 
-Block 29 adds no persistent record and no JSON field.
+`AssemblyExchangeGraph` derives exact rooted assembly/component occurrence identities from canonical hierarchy and visible-active leaf resolution. Ordering is deterministic by exact path sequence, then local component id, then part id.
 
-`AssemblyExchangeGraph` derives exact rooted assembly/component occurrence identities from `AssemblyHierarchyTraversal` plus canonical visible-active `AssemblyLeafOccurrenceResolver` output.
-
-Ordering:
-
-```text
-assembly occurrence:
-  lexicographic exact SubassemblyInstanceId path sequence
-
-component occurrence:
-  containing path
-  then local ComponentInstanceId
-
-part product definition:
-  PartDocumentId
-```
-
-`AssemblyPartShapeDefinitionBuilder` performs one recompute and one private `ShapeCache` per unique exported `PartDocumentId`.
-
-`AssemblyStructuredStepExporter` builds one XDE part definition per part, one assembly label per rooted occurrence, part component references to shared definitions, and parent-to-child assembly references. The flattened `AssemblyStepExporter` remains a compatibility consumer.
+`AssemblyPartShapeDefinitionBuilder` recomputes each unique referenced `PartDocumentId` once. Structured XDE/STEP export creates shared part definitions, rooted assembly labels, component references, and exact parent-child assembly references.
 
 Focused tags:
 
@@ -232,22 +187,13 @@ Focused tags:
 [geometry][assembly-structured-step-export]
 ```
 
-## Block 30: rooted contact classification and bounded sampled Revolute sweep — implemented
+Block 29 adds no JSON field.
 
-Canonical document: `docs/assembly-contact-swept-motion-mvp5.md`.
+## Block 30 — Rooted contact classification and sampled Revolute sweep — implemented
 
-### Static contact classification
+Canonical: `docs/assembly-contact-swept-motion-mvp5.md`.
 
-`AssemblyContactAnalyzer` reuses `AssemblyPosedLeafShapeBuilder` and evaluates every visible-active unordered rooted component occurrence pair exactly once.
-
-Options:
-
-```text
-touching_tolerance_mm = 1.0e-6
-minimum_overlap_volume_mm3 = 1.0e-6
-```
-
-Classification order:
+Static classification:
 
 ```text
 overlap_volume_mm3 > minimum_overlap_volume_mm3
@@ -260,51 +206,11 @@ otherwise
   -> Separated
 ```
 
-`AssemblyContactAnalysis::records` contains one complete classification record per evaluated pair. `Interfering` records have no minimum-distance value; non-interfering records retain the finite measured distance.
+`AssemblyContactAnalysis::records` contains one complete record per visible-active unordered rooted component pair.
 
-The historical `AssemblyInterferenceAnalyzer` and `AssemblyClearanceAnalyzer` remain unchanged compatibility query contracts.
+`AssemblyRevoluteSweepAnalyzer` supports existing root-local and Project cross-hierarchy Revolute motion. It accepts `2..1001` inclusive linear samples and starts every sample from a fresh copy of the same source Project before existing motion solve/application and contact analysis.
 
-### Sampled Revolute sweep
-
-`AssemblyRevoluteSweepAnalyzer` supports exactly:
-
-```text
-RootAssemblyLocal
-ProjectCrossHierarchy
-```
-
-Selected joints must exist in that scope, remain active, and be Revolute. Start/end values use `AngleDeg` and must lie within authored joint limits.
-
-Sample count is bounded:
-
-```text
-2 <= sample_count <= 1001
-```
-
-Samples are linear, inclusive, and preserve caller interval direction.
-
-Every sample starts from a fresh source Project copy:
-
-```text
-Project sample_project = source_project
-```
-
-Then the analyzer delegates to the existing scope-specific motion solver and atomic applier, requires convergence, and runs `AssemblyContactAnalyzer` over the applied sample copy.
-
-No sample starts from the previous sample. No source transform or authored joint coordinate changes.
-
-Each sample stores:
-
-```text
-sample_index
-coordinate_deg
-applied_transform_count
-complete AssemblyContactAnalysis
-```
-
-The result therefore ties pair classification and measured non-interfering clearance to exact rooted occurrence pair, sample index, and requested coordinate.
-
-This is deterministic discrete sampling, not continuous collision detection. Events occurring only between two sample coordinates may be missed.
+This is deterministic discrete sampling, not continuous collision detection.
 
 Focused tags:
 
@@ -313,41 +219,13 @@ Focused tags:
 [geometry][assembly-revolute-sweep]
 ```
 
-## Blocks 31-47: general assembly target, relationship, and joint sequence — planned
+Block 30 adds no persistent analysis record or JSON field.
 
-Canonical detail roadmap: `docs/assembly-general-geometric-target-roadmap.md`.
+## Block 31 — Typed geometric target taxonomy and capability projection — implemented
 
-Mandatory order:
+Canonical: `docs/assembly-geometric-target-taxonomy-mvp5.md`.
 
-```text
-31 typed geometric target taxonomy and capability projection
-  -> 32 assembly-selectable reference geometry Core intent
-  -> 33 reference geometry serialization and structure validation
-  -> 34 datum/axis/line/point target resolution
-  -> 35 stable semantic generated topology identity/recovery
-  -> 36 generated face/edge/vertex target resolution
-  -> 37 explicit target compatibility matrix
-  -> 38 generic geometric relationship Core intent + JSON
-  -> 39 generic relationship equations + shared solve integration
-  -> 40 joint target compatibility + oriented Frame contract
-  -> 41 general joint coordinate/limit Core model
-  -> 42 general joint coordinate JSON/backward compatibility
-  -> 43 vector joint drives + holding/freshness/atomic application
-  -> 44 Prismatic joint
-  -> 45 Cylindrical joint
-  -> 46 Planar joint
-  -> 47 Ball/Spherical joint
-```
-
-Do not merge these blocks into one feature block.
-
-### 31. Typed geometric target taxonomy and capability projection — Next
-
-Primary boundary: Geometry-derived query semantics.
-
-Separate selected semantic source kind from solver geometric capability.
-
-Planned source kinds:
+Implemented source-kind taxonomy:
 
 ```text
 GeneratedPlanarFace
@@ -362,7 +240,7 @@ ConstructionPoint
 CircularFeatureSeat
 ```
 
-Planned capabilities:
+Implemented capability taxonomy in canonical order:
 
 ```text
 Plane
@@ -374,60 +252,155 @@ Cylinder
 Frame
 ```
 
-Representative projections:
+One `AssemblyResolvedGeometricTarget` retains:
 
 ```text
-GeneratedCylindricalFace -> Cylinder + Axis
-GeneratedCircularEdge -> Circle + Axis + Point(center)
-DatumPlane -> Plane
-DatumAxis -> Axis + Line
-CircularFeatureSeat -> Frame + Axis + Plane
+exact local or occurrence-qualified endpoint identity
+source kind
+derived source metadata
+typed descriptor variant
+canonical capability vector
+ComponentLocal or RootAssembly coordinate space
+exact transforms_inner_to_outer context
 ```
 
-Existing generated face, `.axis`, and `.seat` behavior must migrate without changing persistent target strings or numeric semantics.
-
-Block 31 adds no source grammar, compatibility matrix, relationship family, joint family, or JSON shape.
-
-### 32-36. Reference and generated-topology source identity/resolution
-
-Blocks 32-36 implement, in order:
+Projection is explicit:
 
 ```text
-32 Core assembly-selectable DatumPlane / DatumAxis / ConstructionLine / ConstructionPoint intent
-33 additive serialization and structure validation
-34 Plane / Axis / Line / Point reference-geometry resolution
-35 stable producer-driven semantic cylindrical-face / linear-edge / circular-edge / vertex identity and recovery
-36 generated face / edge / vertex capability resolution
+project_plane
+project_axis
+project_line
+project_point
+project_circle
+project_cylinder
+project_frame
 ```
 
-Raw OCCT traversal indices, hashes, BRep positions, XDE labels, STEP entity numbers, memory addresses, and unordered topology result order remain forbidden persistent identity sources.
+Every projector validates the complete resolved target and rejects unsupported capability projection.
 
-### 37-40. Compatibility and generic relationship/joint target semantics
-
-Blocks 37-40 implement, in order:
+Current source adaptation:
 
 ```text
-37 deterministic relationship target compatibility matrix
-38 local + Project-level Coincident / Parallel / Perpendicular persistent intent and JSON
-39 generic relationship equations through existing local/cross numeric/freshness/diagnostic paths
-40 joint target compatibility and deterministic oriented Frame contract
+.top/.bottom/.right/.left/.front/.back
+  -> GeneratedPlanarFace
+  -> Plane
+
+.axis current single-circle subtractive-extrude producer
+  -> GeneratedCylindricalFace
+  -> Axis + Cylinder
+
+.seat
+  -> CircularFeatureSeat
+  -> Plane + Axis + Frame
 ```
 
-Axis alone remains insufficient for signed Revolute twist. Geometry may not invent a world-axis reference direction.
+Existing semantic-reference strings remain unchanged.
 
-### 41-43. General joint coordinate and vector-drive infrastructure
+Local and hierarchy legacy target resolver APIs now adapt from the typed projection boundary. Existing Mate/Distance/Angle/Concentric/Insert/Revolute descriptor shapes and equation/residual semantics remain unchanged.
 
-Blocks 41-43 implement, in order:
+Focused tag:
 
 ```text
-41 family-defined typed coordinate/limit slots
-42 coordinate-slot JSON and historical scalar Revolute compatibility
-43 vector drives, authored holding semantics, complete freshness, and atomic selected-role application
+[geometry][assembly-geometric-target-taxonomy]
 ```
 
-Joint coordinates remain drive parameters, not component transform-authority variables.
+Block 31 adds no persistent source kind, descriptor, capability vector, source grammar, relationship family, joint family, or JSON field.
 
-### 44-47. Richer joint families
+## Blocks 32–47 — Planned continuation
+
+Canonical detail roadmap: `docs/assembly-general-geometric-target-roadmap.md`.
+
+Mandatory order:
+
+```text
+32 assembly-selectable reference geometry Core intent
+33 reference geometry serialization and structure validation
+34 datum/axis/line/point target resolution
+35 stable semantic generated topology identity/recovery
+36 generated face/edge/vertex target resolution
+37 explicit target compatibility matrix
+38 generic geometric relationship Core intent + JSON
+39 generic relationship equations + shared solve integration
+40 joint target compatibility + oriented Frame contract
+41 general joint coordinate/limit Core model
+42 general joint coordinate JSON/backward compatibility
+43 vector joint drives + holding/freshness/atomic application
+44 Prismatic joint
+45 Cylindrical joint
+46 Planar joint
+47 Ball/Spherical joint
+```
+
+Do not merge these blocks.
+
+## Block 32 — Assembly-selectable reference geometry Core intent — Next
+
+Primary boundary: Core persistent model intent and semantic source identity.
+
+Required work:
+
+1. reuse existing persistent `DatumPlane`, construction-line, and construction-point identities;
+2. add first-class `DatumAxis` PartDocument intent if still absent;
+3. freeze the first supported DatumAxis definition family/families;
+4. define validation, PartDocument ownership, dependency, invalidation, and removal behavior for DatumAxis intent;
+5. freeze exact persistent semantic-reference spellings for DatumPlane, DatumAxis, ConstructionLine, and ConstructionPoint;
+6. make grammar unambiguous for arbitrary non-empty typed ids, including ids containing `.`, `/`, and `%`;
+7. preserve current feature target spellings byte-for-byte;
+8. keep local/cross endpoint JSON shapes unchanged;
+9. perform no Geometry target resolution;
+10. make no JSON serialization change yet.
+
+Planned focused tags:
+
+```text
+[core][datum-axis]
+[core][assembly-reference-target-intent]
+```
+
+## Block 33 — Reference geometry serialization and structure validation
+
+Serialize Block-32 PartDocument reference-geometry intent additively, preserve historical files, and prove local/cross endpoint semantic-reference strings roundtrip byte-for-byte. No target geometry resolution during load.
+
+## Block 34 — Datum/axis/line/point target resolution
+
+Resolve:
+
+```text
+DatumPlane       -> Plane
+DatumAxis        -> Axis + Line
+ConstructionLine -> Line
+ConstructionPoint -> Point
+```
+
+Reuse existing workplane/construction geometry execution. Local results remain component-local; hierarchy results reuse exact root-space transform chains. Existing canonical PartDocument snapshots remain freshness authority.
+
+## Blocks 35–36 — Stable generated topology identity and resolution
+
+Block 35 defines producer-driven semantic identities/recovery for generated cylindrical faces, linear edges, circular edges, and vertices. Raw topology traversal/hash/map/XDE/STEP/memory identity remains forbidden.
+
+Block 36 resolves only Block-35 supported semantic producers into Block-31 descriptors/capabilities.
+
+## Blocks 37–40 — Compatibility and generic relationship/joint target semantics
+
+Block 37 introduces one deterministic relationship compatibility resolver from relationship type plus target capability sets to one exact ordered capability pair/bundle or explicit incompatibility.
+
+Block 38 adds persistent local/Project-level `Coincident`, `Parallel`, and `Perpendicular` intent plus JSON.
+
+Block 39 adds their equations through existing graph, authority, residual/Jacobian, freshness, atomic application, and diagnostics paths.
+
+Block 40 migrates joint target compatibility to capability semantics and freezes oriented `Frame` requirements. Current Revolute remains `Frame <-> Frame`; Axis alone is insufficient for signed twist.
+
+## Blocks 41–43 — General joint coordinate foundation
+
+Block 41 generalizes persistent joint coordinates/limits into family-defined typed coordinate slots.
+
+Block 42 serializes those slots while preserving historical scalar Revolute compatibility.
+
+Block 43 generalizes selected-joint drives to deterministic coordinate drive vectors with holding semantics, freshness, and atomic application.
+
+Authority variables remain six direct component-transform variables per free authority. Joint coordinates remain drive parameters.
+
+## Blocks 44–47 — Richer joint families
 
 One family per block:
 
@@ -438,23 +411,7 @@ One family per block:
 47 Ball/Spherical
 ```
 
-Exact target capability, coordinate roles/units, limits, residual ordering, local/cross integration, freshness, and application semantics are canonical in `docs/assembly-general-geometric-target-roadmap.md` and each future family document.
-
-## GUI selection boundary
-
-Blocks 31-47 remain headless model/query/equation/motion work.
-
-A future picker consumes:
-
-```text
-semantic source candidate
--> resolved source kind
--> available capabilities
--> selected relationship/joint type
--> compatibility resolver
-```
-
-The UI may highlight OCCT faces, edges, vertices, datum planes, axes, lines, and points, but committing a selection persists BLCAD semantic reference identity. Raw `TopoDS_Shape` or selection index never becomes the assembly endpoint.
+Exact target compatibility, coordinate roles, limits, residual order, holding-drive behavior, motion integration, freshness, and application semantics remain canonical in `docs/assembly-general-geometric-target-roadmap.md` until each block is implemented.
 
 ## Persistence rule
 
@@ -464,31 +421,32 @@ Current persistent assembly intent includes:
 
 ```text
 component placement/state
-local geometric constraints
-local Revolute joint/limit/coordinate records
-Project-owned child assembly documents
-rigid SubassemblyInstance placement/state
-Project-level cross-hierarchy geometric constraints
-Project-level occurrence-qualified cross-hierarchy Revolute joints
-```
-
-Project JSON fields include:
-
-```text
+local geometric relationships
+local Revolute joints/limits/coordinate
+Project-owned child assemblies
+SubassemblyInstance placement/state
 cross_hierarchy_constraints[]
 cross_hierarchy_joints[]
 ```
 
-Block 30 adds no JSON field. Contact pair identities, contact records, sample Project copies, sample motion results, and sampled sweep results are derived.
+Regenerate:
 
-The planned target expansion continues to persist semantic endpoint identity. Resolved source classification, Plane/Axis/Line/Point/Circle/Cylinder/Frame capabilities, transformed target geometry, and compatibility projections remain derived.
-
-New generic relationship type intent becomes persistent in Block 38. Generalized joint coordinate slots become persistent in Block 41 and serialized in Block 42.
-
-Regenerate connectivity, hierarchy traversal, parent chains, leaves, target geometry/capabilities, compatibility projections, transform authorities, solve/motion groups, holding drives, residuals/Jacobians, solve/motion results, freshness snapshots, proposals, diagnostics, exchange identities/graphs/names, part shape definitions, XDE labels/component references, STEP entities, posed shapes, contact records, and sampled sweep products.
+```text
+hierarchy traversal and exact transform chains
+relationship/joint connectivity
+ComponentTransformAuthority mappings
+resolved target source classification
+Plane/Axis/Line/Point/Circle/Cylinder/Frame descriptors
+capability vectors and projections
+residuals/Jacobians/solve results
+freshness snapshots/proposals/diagnostics
+exchange graph/product identities
+XDE labels and STEP entities
+posed shapes/contact records/sweep analyses
+```
 
 ## Next technical step
 
-Implement Block 31 only from `docs/assembly-general-geometric-target-roadmap.md`: typed geometric target taxonomy and explicit capability projection.
+Implement Block 32 only: assembly-selectable reference geometry Core intent and unambiguous semantic source identity.
 
-Preserve all current semantic target strings and Mate/Distance/Angle/Concentric/Insert/Revolute numeric behavior. Do not add DatumAxis persistence, reference-geometry JSON, generic relationship families, or richer joint families in Block 31.
+Do not implement Block-33 JSON or Block-34 Geometry resolution in Block 32.

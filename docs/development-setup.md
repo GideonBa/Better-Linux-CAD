@@ -8,7 +8,7 @@ This document covers local BLCAD development, build/test workflows, formatting, 
 - C++20
 - CMake 3.28 or newer
 - Ninja
-- OCCT from Ubuntu packages for optional geometry targets
+- OCCT/Open CASCADE from Ubuntu packages for optional Geometry targets
 - Qt 6 packages for later GUI work
 - nlohmann-json
 - Catch2
@@ -30,13 +30,13 @@ The current assembly numeric engine uses project-owned dynamic containers plus d
 
 ## Configure, build, and test
 
-Complete core workflow:
+Complete Core workflow:
 
 ```bash
 cmake --workflow --preset dev-build-test
 ```
 
-Equivalent commands:
+Equivalent:
 
 ```bash
 cmake --preset dev
@@ -44,13 +44,13 @@ cmake --build --preset dev
 ctest --preset dev
 ```
 
-Complete geometry-enabled workflow:
+Complete Geometry workflow:
 
 ```bash
 cmake --workflow --preset dev-geometry-build-test
 ```
 
-Equivalent commands:
+Equivalent:
 
 ```bash
 cmake --preset dev-geometry
@@ -88,12 +88,15 @@ Core identity/model/connectivity:
 ./build/dev/blcad_core_tests "[core][assembly-exchange-graph]"
 ```
 
-Geometry solving/motion/freshness:
+Geometry target/equation/solve/motion/freshness:
 
 ```bash
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-geometric-target-taxonomy]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-target]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-transform]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-equation]"
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-concentric]"
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-insert]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-solver]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-diagnostics]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-revolute-joint]"
@@ -123,49 +126,61 @@ The exact source/test registration in `CMakeLists.txt` remains authoritative.
 
 ## Current assembly architecture under test
 
-At a high level the current suites cover:
+Current suites cover:
 
 - persistent component occurrence state and direct placement;
-- local Mate/Distance/Concentric/Insert/Angle intent and solving;
-- semantic planar face, `.axis`, and `.seat` target resolution;
+- local Mate/Distance/Angle/Concentric/Insert intent and solving;
+- exact local and occurrence-qualified endpoint identity;
+- typed target source classification and capability projection;
+- Plane/Axis/Line/Point/Circle/Cylinder/Frame descriptor validation;
+- canonical capability order and unsupported-projection failure;
+- current generated planar-face target migration to `GeneratedPlanarFace -> Plane`;
+- current `.axis` producer migration to `GeneratedCylindricalFace -> Axis + Cylinder`;
+- current `.seat` migration to `CircularFeatureSeat -> Plane + Axis + Frame`;
+- local typed descriptor geometry equal to historical target geometry;
+- hierarchy/root-space typed descriptor geometry equal to historical target geometry;
+- exact component-plus-parent transform context on hierarchy targets;
+- existing legacy target resolver APIs adapting from typed projections;
 - canonical active fixed-axis X-then-Y-then-Z rigid transforms;
 - shared residual flattening, central finite differences, and damped Gauss-Newton solving;
-- exact semantic PartDocument freshness and atomic result application;
-- local rank/remaining-DOF diagnostics;
-- local Revolute motion and authored-coordinate holding drives;
-- Project-owned child assemblies, cycle-free rooted hierarchy, and exact parent transform chains;
+- exact PartDocument semantic-target freshness and atomic application;
+- local and cross-hierarchy rank diagnostics;
+- local and Project-level occurrence-qualified Revolute motion;
+- Project-owned child assemblies and exact rooted hierarchy chains;
 - visible-active leaf flattening and repeated child occurrence semantics;
-- flattened posed STEP export;
-- historical interference and clearance analysis over shared posed leaves;
-- complete typed rooted `Separated`/`Touching`/`Interfering` pair classification;
-- exact rooted contact pair ordering independent from component insertion order;
-- explicit touching and overlap-volume tolerances;
-- bounded inclusive local Revolute sampling;
-- bounded inclusive Project-level cross-hierarchy Revolute sampling;
-- one fresh source Project copy per sampled coordinate;
-- existing motion solver/applier reuse before each sample contact analysis;
-- source Project transform and authored joint-coordinate immutability during sweep queries;
+- flattened and structured STEP exchange;
+- historical interference/clearance analysis;
+- complete rooted `Separated`/`Touching`/`Interfering` classification;
+- bounded local/cross-hierarchy Revolute sampling from fresh source Project copies;
 - document-scoped flexible child solving;
-- persistent occurrence-qualified Project-level geometric constraints and Revolute joints;
 - deterministic relationship/joint-to-`ComponentTransformAuthority` incidence;
-- mixed document-local/root-space cross-hierarchy numeric solving;
 - complete authority/relationship/path/PartDocument freshness;
-- cross-hierarchy rank diagnostics;
-- Project-level occurrence-qualified Revolute motion;
-- derived rooted assembly/component exchange identity;
-- shared part product definitions by `PartDocumentId`;
-- XDE/STEP structured assembly/component references;
-- geometric equivalence between structured and flattened STEP exports for repeated/nested fixtures.
+- rooted assembly/component exchange identity and shared part definitions.
 
-When adding a feature block, register sources/tests in `CMakeLists.txt` and document the exact scope in the feature-specific canonical document plus `docs/mvp-plan.md`.
+When adding a feature block, register sources/tests in `CMakeLists.txt` and document exact scope in the feature-specific canonical document plus `docs/mvp-plan.md`.
 
-## Private implementation test access
+## Public versus private Geometry boundaries
 
-Private geometry headers remain private to `src/geometry`.
+Private Geometry headers remain private to `src/geometry`.
 
-The geometry test target has a private include path to `src/geometry` so focused integration tests may verify internal residual/Jacobian order and shared geometry helper boundaries without promoting execution internals to public BLCAD API.
+The Geometry test target has a private include path to `src/geometry` so focused integration tests may verify internal residual/Jacobian ordering and shared helper boundaries without promoting execution internals to public BLCAD API.
 
-Production consumers access solving, diagnostics, analysis, and export through public geometry-layer APIs.
+Production consumers access target resolution/projection, solving, diagnostics, analysis, and export through public Geometry APIs.
+
+Block 31 public target API lives in:
+
+```text
+include/blcad/geometry/assembly_geometric_target.hpp
+```
+
+Current typed resolvers are exposed through:
+
+```text
+AssemblyConstraintTargetResolver::resolve_geometric
+AssemblyHierarchyConstraintTargetResolver::resolve_geometric
+```
+
+Legacy `resolve`, `resolve_axis`, and `resolve_insert` methods remain compatibility APIs and now adapt from typed projections.
 
 ## Headless tools
 
@@ -194,15 +209,7 @@ blcad_move_joint <input.blcad.project.json> <joint-id> <angle-deg> <output.blcad
 blcad_analyze_assembly <input.blcad.project.json> [clearance-threshold-mm]
 ```
 
-`blcad_export_project` updates one assembly parameter, propagates bindings, recomputes affected parts, and exports per-part STEP files.
-
-`blcad_export_posed_assembly` is the solved-root/local flattened compound flow.
-
-`blcad_export_structured_assembly` exports the current authored/persisted Project pose through structured XDE/STEP assembly/product relationships and does not invoke solving implicitly.
-
-`blcad_move_joint` remains the local root-assembly joint CLI seed. Project-level cross-hierarchy Revolute motion has a public library/API contract but no dedicated CLI.
-
-Block 30 adds public library APIs for complete rooted contact classification and sampled local/cross-hierarchy Revolute analysis. It intentionally adds no CLI or persistent analysis format.
+The typed target/capability layer is a public library query contract and intentionally adds no CLI or persistent result format.
 
 ## Documentation entry points
 
@@ -210,28 +217,26 @@ Block 30 adds public library APIs for complete rooted contact classification and
 - `docs/mvp-plan.md`: implementation sequence
 - `docs/architecture-summary.md`: condensed implemented architecture
 - `docs/file-format.md`: persistent save-format authority
-- `docs/assembly-posed-step-export-mvp5.md`: flattened posed STEP compatibility contract
-- `docs/assembly-structured-step-products-mvp5.md`: Block-29 exchange identity and structured STEP contract
-- `docs/assembly-contact-swept-motion-mvp5.md`: Block-30 rooted contact and sampled Revolute sweep contract
-- `docs/assembly-cross-hierarchy-revolute-motion-mvp5.md`: Project-level occurrence-qualified Revolute motion
-- `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`: current numbered sequence and Block-31 handoff
-- `docs/assembly-general-geometric-target-roadmap.md`: planned Blocks 31-47 target/relationship/joint sequence
+- `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`: numbered assembly sequence
+- `docs/assembly-geometric-target-taxonomy-mvp5.md`: Block-31 implemented target taxonomy/projection contract
+- `docs/assembly-general-geometric-target-roadmap.md`: planned Blocks 32–47
 - `docs/project-goal.md`: long-term direction
 
 ## Formatting
 
 Formatting is configured by `.editorconfig` and `.clang-format`.
 
-For Block 30 production/test files:
+For Block 31 production/test files:
 
 ```bash
 clang-format -i \
-  include/blcad/geometry/assembly_contact_analyzer.hpp \
-  include/blcad/geometry/assembly_revolute_sweep_analyzer.hpp \
-  src/geometry/assembly_contact_analyzer.cpp \
-  src/geometry/assembly_revolute_sweep_analyzer.cpp \
-  tests/geometry/assembly_contact_analyzer_tests.cpp \
-  tests/geometry/assembly_revolute_sweep_analyzer_tests.cpp
+  include/blcad/geometry/assembly_geometric_target.hpp \
+  include/blcad/geometry/assembly_constraint_target_resolver.hpp \
+  include/blcad/geometry/assembly_hierarchy_constraint_equation_builder.hpp \
+  src/geometry/assembly_geometric_target.cpp \
+  src/geometry/assembly_constraint_target_resolver.cpp \
+  src/geometry/assembly_hierarchy_constraint_equation_builder.cpp \
+  tests/geometry/assembly_geometric_target_taxonomy_tests.cpp
 ```
 
 ## Clean generated files
@@ -242,24 +247,26 @@ rm -rf build/
 
 ## Current assembly development boundary
 
-Blocks 23-30 of the current cross-hierarchy sequence are implemented.
+Blocks 23–31 are implemented.
 
-Block 30 freezes:
+Block 31 freezes:
 
 ```text
-contact pair identity
-  = canonical ordered pair of exact rooted
-    AssemblyExchangeComponentOccurrenceIdentity values
+semantic source classification
+  != geometric capability
 
-static classification
-  = Interfering by strict positive-volume threshold
-    else Touching by inclusive distance tolerance
-    else Separated
+resolved target
+  = exact endpoint identity
+    + source kind
+    + source metadata
+    + typed descriptor
+    + canonical capability vector
+    + coordinate space
+    + exact transform context
 
-sampled Revolute sweep
-  = 2..1001 inclusive requested-coordinate samples
-    over RootAssemblyLocal or ProjectCrossHierarchy motion
-    with one fresh source Project copy per sample
+supported projection path
+  = project_plane / project_axis / project_line
+    / project_point / project_circle / project_cylinder / project_frame
 ```
 
-The immediate next block is Block 31: typed geometric target taxonomy and capability projection. Exact sequencing is maintained in `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md` and detailed target planning in `docs/assembly-general-geometric-target-roadmap.md`.
+The immediate next step is Block 32: assembly-selectable reference geometry Core intent and unambiguous semantic source identity. Exact sequencing is maintained in `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md` and detailed target planning in `docs/assembly-general-geometric-target-roadmap.md`.
