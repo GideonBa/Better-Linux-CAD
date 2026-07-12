@@ -1,5 +1,6 @@
 #include "blcad/geometry/assembly_cross_hierarchy_constraint_solver.hpp"
 
+#include "assembly_cross_hierarchy_freshness.hpp"
 #include "assembly_cross_hierarchy_numeric_system.hpp"
 #include "assembly_numeric_solve_engine.hpp"
 #include "assembly_semantic_target_freshness.hpp"
@@ -20,17 +21,11 @@ namespace {
 }
 
 [[nodiscard]] std::optional<double> distance_mm(const std::optional<Quantity>& quantity) {
-  if (!quantity.has_value()) {
-    return std::nullopt;
-  }
-  return quantity->millimeters();
+  return quantity.has_value() ? std::optional<double>(quantity->millimeters()) : std::nullopt;
 }
 
 [[nodiscard]] std::optional<double> angle_deg(const std::optional<Quantity>& quantity) {
-  if (!quantity.has_value()) {
-    return std::nullopt;
-  }
-  return quantity->degrees();
+  return quantity.has_value() ? std::optional<double>(quantity->degrees()) : std::nullopt;
 }
 
 [[nodiscard]] AssemblyLocalRelationshipInputSnapshot make_local_relationship_snapshot(
@@ -107,192 +102,17 @@ make_relationship_snapshots(const Project& project,
       std::move(snapshots));
 }
 
-[[nodiscard]] bool same_boundary_identity(
-    const AssemblyCrossHierarchyBoundaryInputSnapshot& lhs,
-    const AssemblyCrossHierarchyBoundaryInputSnapshot& rhs) noexcept {
-  return lhs.containing_assembly_document == rhs.containing_assembly_document &&
-         lhs.subassembly_instance == rhs.subassembly_instance;
-}
-
-[[nodiscard]] Result<std::size_t> append_endpoint_boundary_snapshots(
-    const Project& project, const AssemblyHierarchyConstraintEndpoint& endpoint,
-    std::vector<AssemblyCrossHierarchyBoundaryInputSnapshot>& snapshots) {
-  const AssemblyDocument* containing = &project.assembly();
-  for (const SubassemblyInstanceId& occurrence : endpoint.occurrence_path()) {
-    const SubassemblyInstance* instance = containing->find_subassembly_instance(occurrence);
-    if (instance == nullptr) {
-      return Result<std::size_t>::failure(validation_error(
-          occurrence.value(),
-          "cross-hierarchy relationship endpoint path boundary must exist"));
-    }
-    AssemblyCrossHierarchyBoundaryInputSnapshot snapshot{
-        containing->id(), occurrence, instance->referenced_assembly_document(),
-        instance->suppression_state(), instance->transform()};
-    const auto existing = std::find_if(
-        snapshots.begin(), snapshots.end(), [&snapshot](const auto& candidate) {
-          return same_boundary_identity(candidate, snapshot);
-        });
-    if (existing == snapshots.end()) {
-      snapshots.push_back(std::move(snapshot));
-    } else if (*existing != snapshot) {
-      return Result<std::size_t>::failure(validation_error(
-          occurrence.value(),
-          "cross-hierarchy relationship endpoint boundary identity resolved inconsistently"));
-    }
-
-    containing = project.find_assembly_document(instance->referenced_assembly_document());
-    if (containing == nullptr) {
-      return Result<std::size_t>::failure(validation_error(
-          instance->referenced_assembly_document().value(),
-          "cross-hierarchy relationship endpoint child assembly must exist"));
+[[nodiscard]] std::vector<AssemblyHierarchyConstraintEndpoint> hierarchy_endpoints_from(
+    const std::vector<AssemblyCrossHierarchyRelationshipInputSnapshot>& snapshots) {
+  std::vector<AssemblyHierarchyConstraintEndpoint> endpoints;
+  for (const auto& snapshot : snapshots) {
+    if (const auto* cross =
+            std::get_if<AssemblyProjectCrossHierarchyRelationshipInputSnapshot>(&snapshot)) {
+      endpoints.push_back(cross->target_a);
+      endpoints.push_back(cross->target_b);
     }
   }
-  return Result<std::size_t>::success(endpoint.occurrence_path().size());
-}
-
-[[nodiscard]] Result<std::vector<AssemblyCrossHierarchyBoundaryInputSnapshot>>
-make_hierarchy_boundary_snapshots(
-    const Project& project,
-    const std::vector<AssemblyCrossHierarchyRelationshipInputSnapshot>& relationship_snapshots) {
-  std::vector<AssemblyCrossHierarchyBoundaryInputSnapshot> snapshots;
-  for (const auto& relationship : relationship_snapshots) {
-    const auto* cross =
-        std::get_if<AssemblyProjectCrossHierarchyRelationshipInputSnapshot>(&relationship);
-    if (cross == nullptr) {
-      continue;
-    }
-    auto target_a = append_endpoint_boundary_snapshots(project, cross->target_a, snapshots);
-    if (target_a.has_error()) {
-      return Result<std::vector<AssemblyCrossHierarchyBoundaryInputSnapshot>>::failure(
-          target_a.error());
-    }
-    auto target_b = append_endpoint_boundary_snapshots(project, cross->target_b, snapshots);
-    if (target_b.has_error()) {
-      return Result<std::vector<AssemblyCrossHierarchyBoundaryInputSnapshot>>::failure(
-          target_b.error());
-    }
-  }
-
-  std::sort(snapshots.begin(), snapshots.end(), [](const auto& lhs, const auto& rhs) {
-    if (lhs.containing_assembly_document.value() != rhs.containing_assembly_document.value()) {
-      return lhs.containing_assembly_document.value() < rhs.containing_assembly_document.value();
-    }
-    return lhs.subassembly_instance.value() < rhs.subassembly_instance.value();
-  });
-  return Result<std::vector<AssemblyCrossHierarchyBoundaryInputSnapshot>>::success(
-      std::move(snapshots));
-}
-
-[[nodiscard]] Result<std::vector<AssemblyCrossHierarchyTransformAuthoritySnapshot>>
-make_authority_snapshots(const Project& project,
-                         const std::vector<ComponentTransformAuthority>& authorities) {
-  std::vector<AssemblyCrossHierarchyTransformAuthoritySnapshot> snapshots;
-  snapshots.reserve(authorities.size());
-  for (const ComponentTransformAuthority& authority : authorities) {
-    auto component = detail::resolve_cross_hierarchy_authority_component(project, authority);
-    if (component.has_error()) {
-      return Result<std::vector<AssemblyCrossHierarchyTransformAuthoritySnapshot>>::failure(
-          component.error());
-    }
-    snapshots.push_back(AssemblyCrossHierarchyTransformAuthoritySnapshot{
-        authority, component.value()->referenced_part_document(),
-        component.value()->grounding_state(), component.value()->suppression_state(),
-        component.value()->transform()});
-  }
-  return Result<std::vector<AssemblyCrossHierarchyTransformAuthoritySnapshot>>::success(
-      std::move(snapshots));
-}
-
-[[nodiscard]] Result<std::size_t> validate_authority_and_proposal_freshness(
-    const Project& project, const AssemblyCrossHierarchySolveResult& result,
-    std::vector<ComponentTransformAuthority>& current_authorities) {
-  std::vector<ComponentTransformAuthority> expected_fixed;
-  std::vector<ComponentTransformAuthority> expected_free;
-  current_authorities.reserve(result.authority_snapshots.size());
-
-  for (const auto& snapshot : result.authority_snapshots) {
-    if (std::find(current_authorities.begin(), current_authorities.end(), snapshot.authority) !=
-        current_authorities.end()) {
-      return Result<std::size_t>::failure(validation_error(
-          snapshot.authority.component_instance.value(),
-          "cross-hierarchy solve result contains duplicate authority snapshots"));
-    }
-    current_authorities.push_back(snapshot.authority);
-
-    auto component =
-        detail::resolve_cross_hierarchy_authority_component(project, snapshot.authority);
-    if (component.has_error()) {
-      return Result<std::size_t>::failure(component.error());
-    }
-    if (component.value()->referenced_part_document() != snapshot.referenced_part_document ||
-        component.value()->grounding_state() != snapshot.grounding_state ||
-        component.value()->suppression_state() != snapshot.suppression_state ||
-        component.value()->transform() != snapshot.source_transform) {
-      return Result<std::size_t>::failure(validation_error(
-          snapshot.authority.component_instance.value(),
-          "cross-hierarchy solve result is stale because transform authority input changed"));
-    }
-    if (snapshot.suppression_state != ComponentSuppressionState::Active) {
-      return Result<std::size_t>::failure(validation_error(
-          snapshot.authority.component_instance.value(),
-          "cross-hierarchy solve result authority snapshot must be active"));
-    }
-    if (snapshot.grounding_state == ComponentGroundingState::Grounded) {
-      expected_fixed.push_back(snapshot.authority);
-    } else {
-      expected_free.push_back(snapshot.authority);
-    }
-  }
-
-  if (result.fixed_authorities != expected_fixed) {
-    return Result<std::size_t>::failure(validation_error(
-        "assembly.cross_hierarchy_application",
-        "cross-hierarchy solve result fixed-authority order does not match authority snapshots"));
-  }
-
-  std::vector<ComponentTransformAuthority> proposal_authorities;
-  proposal_authorities.reserve(result.proposed_transforms.size());
-  for (const auto& proposal : result.proposed_transforms) {
-    if (std::find(proposal_authorities.begin(), proposal_authorities.end(), proposal.authority) !=
-        proposal_authorities.end()) {
-      return Result<std::size_t>::failure(validation_error(
-          proposal.authority.component_instance.value(),
-          "cross-hierarchy solve result contains duplicate authority proposals"));
-    }
-    proposal_authorities.push_back(proposal.authority);
-
-    const auto snapshot = std::find_if(
-        result.authority_snapshots.begin(), result.authority_snapshots.end(),
-        [&proposal](const AssemblyCrossHierarchyTransformAuthoritySnapshot& candidate) {
-          return candidate.authority == proposal.authority;
-        });
-    if (snapshot == result.authority_snapshots.end() ||
-        snapshot->grounding_state != ComponentGroundingState::Free ||
-        snapshot->suppression_state != ComponentSuppressionState::Active ||
-        snapshot->source_transform != proposal.source_transform) {
-      return Result<std::size_t>::failure(validation_error(
-          proposal.authority.component_instance.value(),
-          "cross-hierarchy solve proposal does not match a free active authority snapshot"));
-    }
-
-    auto component =
-        detail::resolve_cross_hierarchy_authority_component(project, proposal.authority);
-    if (component.has_error()) {
-      return Result<std::size_t>::failure(component.error());
-    }
-    auto validated = component.value()->with_transform(proposal.proposed_transform);
-    if (validated.has_error()) {
-      return Result<std::size_t>::failure(validated.error());
-    }
-  }
-
-  if (proposal_authorities != expected_free) {
-    return Result<std::size_t>::failure(validation_error(
-        "assembly.cross_hierarchy_application",
-        "cross-hierarchy solve result proposals must exactly cover free authority snapshots"));
-  }
-
-  return Result<std::size_t>::success(result.proposed_transforms.size());
+  return endpoints;
 }
 
 [[nodiscard]] Result<std::size_t> validate_relationship_freshness(
@@ -314,7 +134,6 @@ make_authority_snapshots(const Project& project,
           "cross-hierarchy solve result contains duplicate relationships"));
     }
     seen_relationships.push_back(identity);
-
     if (relationship_identity(result.relationship_snapshots[index]) != identity) {
       return Result<std::size_t>::failure(validation_error(
           "assembly.cross_hierarchy_application",
@@ -330,7 +149,6 @@ make_authority_snapshots(const Project& project,
           "cross-hierarchy solve result is stale because relationship input changed"));
     }
   }
-
   return Result<std::size_t>::success(result.relationships.size());
 }
 
@@ -351,37 +169,14 @@ make_authority_snapshots(const Project& project,
   return Result<std::size_t>::success(expected_group.relationships.size());
 }
 
-[[nodiscard]] Result<std::size_t> validate_hierarchy_boundary_freshness(
-    const Project& project, const AssemblyCrossHierarchySolveResult& result) {
-  auto current = make_hierarchy_boundary_snapshots(project, result.relationship_snapshots);
-  if (current.has_error()) {
-    return Result<std::size_t>::failure(current.error());
-  }
-  if (current.value() != result.hierarchy_boundary_snapshots) {
-    return Result<std::size_t>::failure(validation_error(
-        "assembly.cross_hierarchy_application",
-        "cross-hierarchy solve result is stale because hierarchy path boundary input changed"));
-  }
-  return Result<std::size_t>::success(current.value().size());
-}
-
-[[nodiscard]] std::vector<DocumentId> semantic_part_documents_from(
-    const std::vector<AssemblyCrossHierarchyTransformAuthoritySnapshot>& authority_snapshots) {
-  std::vector<DocumentId> part_documents;
-  part_documents.reserve(authority_snapshots.size());
-  for (const auto& snapshot : authority_snapshots) {
-    part_documents.push_back(snapshot.referenced_part_document);
-  }
-  return part_documents;
-}
-
 [[nodiscard]] Result<AssemblyCrossHierarchySolveResult> make_solve_result(
     const Project& source_project, const Project& solved_project,
     const AssemblyCrossHierarchySolveGroup& solve_group,
     const std::vector<ComponentTransformAuthority>& fixed_authorities,
     const std::vector<ComponentTransformAuthority>& variable_authorities,
     const detail::AssemblyNumericSolveOutcome& outcome) {
-  auto authority_snapshots = make_authority_snapshots(source_project, solve_group.authorities);
+  auto authority_snapshots =
+      detail::make_cross_hierarchy_authority_snapshots(source_project, solve_group.authorities);
   if (authority_snapshots.has_error()) {
     return Result<AssemblyCrossHierarchySolveResult>::failure(authority_snapshots.error());
   }
@@ -390,14 +185,15 @@ make_authority_snapshots(const Project& project,
   if (relationship_snapshots.has_error()) {
     return Result<AssemblyCrossHierarchySolveResult>::failure(relationship_snapshots.error());
   }
-  auto hierarchy_boundary_snapshots =
-      make_hierarchy_boundary_snapshots(source_project, relationship_snapshots.value());
+  auto hierarchy_boundary_snapshots = detail::make_cross_hierarchy_boundary_snapshots(
+      source_project, hierarchy_endpoints_from(relationship_snapshots.value()));
   if (hierarchy_boundary_snapshots.has_error()) {
     return Result<AssemblyCrossHierarchySolveResult>::failure(
         hierarchy_boundary_snapshots.error());
   }
   auto semantic_target_part_snapshots = detail::make_semantic_target_part_snapshots(
-      source_project, semantic_part_documents_from(authority_snapshots.value()));
+      source_project,
+      detail::semantic_part_documents_from_authority_snapshots(authority_snapshots.value()));
   if (semantic_target_part_snapshots.has_error()) {
     return Result<AssemblyCrossHierarchySolveResult>::failure(
         semantic_target_part_snapshots.error());
@@ -420,21 +216,20 @@ make_authority_snapshots(const Project& project,
         authority, source_component.value()->transform(), solved_component.value()->transform()});
   }
 
-  return Result<AssemblyCrossHierarchySolveResult>::success(
-      AssemblyCrossHierarchySolveResult{
-          outcome.state,
-          outcome.iterations,
-          solve_group.relationships,
-          fixed_authorities,
-          std::move(authority_snapshots.value()),
-          std::move(relationship_snapshots.value()),
-          std::move(hierarchy_boundary_snapshots.value()),
-          std::move(semantic_target_part_snapshots.value()),
-          std::move(proposals),
-          AssemblySolveResidualSummary{outcome.final_residuals.size(),
-                                       detail::residual_rms(outcome.initial_residuals),
-                                       detail::residual_rms(outcome.final_residuals),
-                                       detail::residual_max_abs(outcome.final_residuals)}});
+  return Result<AssemblyCrossHierarchySolveResult>::success(AssemblyCrossHierarchySolveResult{
+      outcome.state,
+      outcome.iterations,
+      solve_group.relationships,
+      fixed_authorities,
+      std::move(authority_snapshots.value()),
+      std::move(relationship_snapshots.value()),
+      std::move(hierarchy_boundary_snapshots.value()),
+      std::move(semantic_target_part_snapshots.value()),
+      std::move(proposals),
+      AssemblySolveResidualSummary{outcome.final_residuals.size(),
+                                   detail::residual_rms(outcome.initial_residuals),
+                                   detail::residual_rms(outcome.final_residuals),
+                                   detail::residual_max_abs(outcome.final_residuals)}});
 }
 
 } // namespace
@@ -521,49 +316,44 @@ Result<std::size_t> AssemblyCrossHierarchySolveResultApplier::apply(
     return Result<std::size_t>::failure(structure.error());
   }
 
-  std::vector<ComponentTransformAuthority> current_authorities;
-  auto authorities =
-      validate_authority_and_proposal_freshness(project, result, current_authorities);
-  if (authorities.has_error()) {
-    return Result<std::size_t>::failure(authorities.error());
+  auto current_authorities = detail::validate_cross_hierarchy_authority_and_proposal_freshness(
+      project, result.fixed_authorities, result.authority_snapshots, result.proposed_transforms,
+      "assembly.cross_hierarchy_application", "cross-hierarchy solve result");
+  if (current_authorities.has_error()) {
+    return Result<std::size_t>::failure(current_authorities.error());
   }
   auto relationships = validate_relationship_freshness(project, result);
   if (relationships.has_error()) {
     return Result<std::size_t>::failure(relationships.error());
   }
-  auto group = validate_group_freshness(project, result, current_authorities);
+  auto group = validate_group_freshness(project, result, current_authorities.value());
   if (group.has_error()) {
     return Result<std::size_t>::failure(group.error());
   }
-  auto boundaries = validate_hierarchy_boundary_freshness(project, result);
+  auto boundaries = detail::validate_cross_hierarchy_boundary_freshness(
+      project, hierarchy_endpoints_from(result.relationship_snapshots),
+      result.hierarchy_boundary_snapshots, "assembly.cross_hierarchy_application",
+      "cross-hierarchy solve result");
   if (boundaries.has_error()) {
     return Result<std::size_t>::failure(boundaries.error());
   }
   auto semantic_freshness = detail::validate_semantic_target_part_snapshots(
-      project, semantic_part_documents_from(result.authority_snapshots),
+      project,
+      detail::semantic_part_documents_from_authority_snapshots(result.authority_snapshots),
       result.semantic_target_part_snapshots);
   if (semantic_freshness.has_error()) {
     return Result<std::size_t>::failure(semantic_freshness.error());
   }
 
   Project candidate_project = project;
-  for (const auto& proposal : result.proposed_transforms) {
-    AssemblyDocument* assembly =
-        candidate_project.find_assembly_document(proposal.authority.assembly_document);
-    if (assembly == nullptr) {
-      return Result<std::size_t>::failure(validation_error(
-          proposal.authority.assembly_document.value(),
-          "cross-hierarchy proposal authority assembly document must remain in candidate project"));
-    }
-    auto updated = assembly->set_component_instance_transform(
-        proposal.authority.component_instance, proposal.proposed_transform);
-    if (updated.has_error()) {
-      return Result<std::size_t>::failure(updated.error());
-    }
+  auto applied = detail::apply_cross_hierarchy_authority_proposals(
+      candidate_project, result.proposed_transforms, "assembly.cross_hierarchy_application");
+  if (applied.has_error()) {
+    return Result<std::size_t>::failure(applied.error());
   }
 
   project = std::move(candidate_project);
-  return Result<std::size_t>::success(result.proposed_transforms.size());
+  return applied;
 }
 
 } // namespace blcad::geometry
