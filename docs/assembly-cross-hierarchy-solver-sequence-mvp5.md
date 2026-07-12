@@ -1,6 +1,6 @@
 # Cross-Hierarchy Assembly Relationship Sequence MVP-5
 
-Status: Blocks 23-29 are implemented. Block 30 is the current next technical step. Blocks 31-37 are now explicitly planned as the general assembly geometric-target and relationship-expansion sequence.
+Status: Blocks 23-29 are implemented. Block 30 is the current next technical step. Blocks 31-47 are explicitly planned as the general assembly geometric-target, relationship, and richer-joint sequence.
 
 This document is the canonical numbered implementation sequence for assembly relationships, motion, hierarchy-aware exchange, posed analysis, and the handoff into general Inventor-/SolidWorks-like semantic target compatibility.
 
@@ -15,7 +15,7 @@ Implemented contracts are canonical in:
 - `docs/assembly-structured-step-products-mvp5.md`
 - `docs/file-format.md`
 
-Planned general target expansion is canonical in:
+Planned general target/joint expansion is canonical in:
 
 - `docs/assembly-general-geometric-target-roadmap.md`
 
@@ -30,6 +30,7 @@ Core persistent model intent
   -> derived occurrence/authority connectivity
   -> typed target geometry and capability projection
   -> explicit relationship/joint compatibility
+  -> persistent relationship/joint state
   -> local or root-space equation evaluation
   -> shared numeric residual/Jacobian execution
   -> derived solve/motion results and proposals
@@ -50,7 +51,9 @@ Do not:
 - mutate `SubassemblyInstance::transform()` through component authority variables;
 - introduce a second optimizer, finite-difference contract, hierarchy traversal, or transform convention;
 - add one-off feature-specific branches directly to generic equation builders once the target-capability layer exists;
-- infer a joint twist reference direction from an arbitrary world axis.
+- infer a joint twist reference direction from an arbitrary world axis;
+- add multi-coordinate joint execution before coordinate state and JSON contracts exist;
+- merge several richer joint families into one implementation block.
 
 ## Frozen solve/motion identities
 
@@ -242,8 +245,6 @@ part product definition:
   PartDocumentId
 ```
 
-Generated exchange names remain derived deterministic metadata and percent-encode authored id bytes that would otherwise collide with path separators/escape syntax.
-
 `AssemblyPartShapeDefinitionBuilder` performs one recompute and one private `ShapeCache` per unique exported `PartDocumentId`.
 
 The flattened posed-leaf path and structured STEP path reuse one OCCT rigid-transform conversion contract.
@@ -297,25 +298,35 @@ A first swept-motion seed remains deterministic and bounded. It may sample one r
 
 The result should identify exact rooted component occurrence pairs and the motion coordinate/sample at which a classification or clearance event was observed.
 
-## Blocks 31-37: general assembly geometric targets and relationship compatibility — Planned
+## Blocks 31-47: general assembly target, relationship, and joint sequence — Planned
 
 Canonical roadmap: `docs/assembly-general-geometric-target-roadmap.md`.
 
-These blocks address the current gap between BLCAD's narrow generated plane/axis/seat target families and an Inventor-/SolidWorks-like assembly target system.
+These blocks address the gap between the current generated plane/axis/seat target layer and a mature CAD assembly target system.
 
 The mandatory order is:
 
 ```text
-31 typed target taxonomy/capabilities
-  -> 32 persistent selectable reference-geometry intent
-  -> 33 reference-geometry resolution
-  -> 34 stable semantic generated-topology identity
-  -> 35 generated topology resolution
-  -> 36 relationship compatibility + generic relationships
-  -> 37 joint capability expansion
+31 typed geometric target taxonomy and capability projection
+  -> 32 assembly-selectable reference geometry Core intent
+  -> 33 reference geometry serialization and structure validation
+  -> 34 datum/axis/line/point target resolution
+  -> 35 stable semantic generated topology identity/recovery
+  -> 36 generated face/edge/vertex target resolution
+  -> 37 explicit target compatibility matrix
+  -> 38 generic geometric relationship Core intent + JSON
+  -> 39 generic relationship equations + shared solve integration
+  -> 40 joint target compatibility + oriented Frame contract
+  -> 41 general joint coordinate/limit Core model
+  -> 42 general joint coordinate JSON/backward compatibility
+  -> 43 vector joint drives + holding/freshness/atomic application
+  -> 44 Prismatic joint
+  -> 45 Cylindrical joint
+  -> 46 Planar joint
+  -> 47 Ball/Spherical joint
 ```
 
-Do not merge these into one feature block.
+Do not merge these blocks into one feature block.
 
 ### 31. Typed geometric target taxonomy and capability projection
 
@@ -347,7 +358,7 @@ Line
 Point
 Circle
 Cylinder
-SeatFrame
+Frame
 ```
 
 Representative projections:
@@ -357,49 +368,36 @@ GeneratedCylindricalFace -> Cylinder + Axis
 GeneratedCircularEdge -> Circle + Axis + Point(center)
 DatumPlane -> Plane
 DatumAxis -> Axis + Line
-CircularFeatureSeat -> SeatFrame + Axis + Plane
+CircularFeatureSeat -> Frame + Axis + Plane
 ```
 
-Existing generated face, `.axis`, and `.seat` target behavior must migrate without changing persistent target strings or numeric semantics.
+Existing generated face, `.axis`, and `.seat` behavior migrates without changing persistent target strings or numeric semantics.
 
-No new semantic target grammar or relationship family in Block 31.
+No new source grammar, compatibility matrix, relationship family, joint family, or JSON shape in Block 31.
 
-Focused tag:
+### 32. Assembly-selectable reference geometry Core intent
 
-```text
-[geometry][assembly-geometric-target-taxonomy]
-```
-
-### 32. Assembly-selectable datum/reference geometry intent and serialization
-
-Primary boundary: Core persistent intent/JSON.
+Primary boundary: Core persistent model intent and semantic source identity.
 
 Reuse existing `DatumPlane`, construction-line, and construction-point identities as assembly-selectable semantic sources.
 
-If no first-class `DatumAxis` exists at implementation time, add one with explicit ownership, validation, dependency/invalidation semantics, and JSON roundtrip.
+If no first-class `DatumAxis` exists, add one with an explicitly frozen initial definition family, validation, dependency/invalidation semantics, and PartDocument ownership.
 
-Freeze exact unambiguous semantic-reference spellings for:
+Freeze exact ambiguity-tested semantic-reference spellings for DatumPlane, DatumAxis, ConstructionLine, and ConstructionPoint.
 
-```text
-DatumPlane
-DatumAxis
-ConstructionLine
-ConstructionPoint
-```
+BLCAD ids are arbitrary non-empty strings; parser design may not assume dots, slashes, or percent characters are unavailable.
 
-BLCAD ids are arbitrary non-empty strings. The semantic-reference grammar must therefore be ambiguity-tested rather than assuming dots, slashes, or percent characters are unavailable.
+No JSON or Geometry resolution in Block 32.
 
-Assembly endpoints continue to persist semantic source identity only. No resolved coordinates are serialized.
+### 33. Reference geometry serialization and structure validation
 
-Focused tags:
+Primary boundary: Core serialization/compatibility.
 
-```text
-[core][datum-axis]
-[core][assembly-reference-target-intent]
-[core][assembly-reference-target-json]
-```
+Serialize any new DatumAxis PartDocument intent additively, preserve historical files, and prove all local/cross-hierarchy semantic endpoint strings roundtrip byte-for-byte.
 
-### 33. Datum, axis, line, and point target resolution
+No Plane/Axis/Line/Point geometry is resolved during load.
+
+### 34. Datum, axis, line, and point target resolution
 
 Primary boundary: Geometry semantic target resolution.
 
@@ -412,23 +410,15 @@ ConstructionLine -> Line
 ConstructionPoint -> Point
 ```
 
-Reuse existing workplane/construction-geometry resolvers. Do not implement a second evaluator inside assembly target resolution.
+Reuse existing workplane/construction-geometry resolvers.
 
-Local resolution remains component-local. Cross-hierarchy resolution applies the exact existing component plus parent transform chain.
+Local resolution remains component-local. Cross-hierarchy resolution applies the exact component plus parent transform chain. Existing canonical PartDocument snapshots remain freshness authority.
 
-Existing exact canonical `PartDocument` snapshots remain the freshness authority for target-producing model changes.
+### 35. Stable semantic generated topology identity and recovery
 
-Focused tag:
+Primary boundary: Core semantic reference/recovery.
 
-```text
-[geometry][assembly-reference-target-resolution]
-```
-
-### 34. Stable semantic generated topology identity and recovery
-
-Primary boundary: Part semantic-reference model and recovery.
-
-Define producer-driven BLCAD semantic identities for:
+Define producer-driven semantic identities for:
 
 ```text
 GeneratedCylindricalFace
@@ -437,21 +427,12 @@ GeneratedCircularEdge
 GeneratedVertex
 ```
 
-Each supported feature producer must publish a finite support matrix:
-
-```text
-producer
--> semantic face roles
--> semantic edge roles
--> semantic vertex roles
--> expected cardinality
--> ambiguity/failure behavior
-```
+Each supported feature producer publishes a finite matrix of semantic face/edge/vertex roles, expected cardinality, and ambiguity behavior.
 
 Forbidden persistent identity sources:
 
 ```text
-OCCT topology traversal index
+OCCT traversal index
 TopoDS hash as model identity
 BRep map position
 XDE label tag
@@ -460,20 +441,13 @@ memory address
 unordered OCCT result order
 ```
 
-Patterned subelements remain unsupported until stable per-instance semantic identity is frozen.
+Patterned subelements remain unavailable until stable per-instance semantic identity exists.
 
-Focused tags:
-
-```text
-[core][semantic-generated-topology-reference]
-[core][semantic-generated-topology-recovery]
-```
-
-### 35. Generated face, edge, and vertex target resolution
+### 36. Generated face, edge, and vertex target resolution
 
 Primary boundary: Geometry semantic target resolution.
 
-Resolve Block-34 semantic sources into Block-31 capabilities:
+Resolve Block-35 semantic sources into:
 
 ```text
 GeneratedPlanarFace -> Plane
@@ -483,54 +457,52 @@ GeneratedCircularEdge -> Circle + Axis + Point(center)
 GeneratedVertex -> Point
 ```
 
-Semantic producer identity remains authoritative. OCCT topology is execution data used only after the intended semantic generated subelement has been identified.
+Semantic producer identity remains authoritative. OCCT topology is execution data only after the intended semantic subelement is known.
 
-Local and cross-hierarchy evaluation retain exact current transform semantics.
+### 37. Explicit target compatibility matrix
 
-Focused tag:
+Primary boundary: derived relationship compatibility semantics.
 
-```text
-[geometry][assembly-generated-topology-target-resolution]
-```
-
-### 36. Explicit target compatibility matrix and generic geometric relationships
-
-Primary boundary: relationship semantics and shared numeric integration.
-
-Introduce one deterministic compatibility resolver:
+Introduce one deterministic resolver:
 
 ```text
 relationship type
 + target A capabilities
 + target B capabilities
--> one exact ordered capability pair
+-> one exact ordered capability pair/bundle
 OR explicit incompatibility
 ```
 
-Initial planned compatibility:
+Initial compatibility:
 
 ```text
-Mate:
+Mate
   Plane <-> Plane
 
-Distance:
+Distance
   Plane <-> Plane
   Point <-> Point
   Point <-> Plane
   Plane <-> Point
 
-Angle:
+Angle
   Plane <-> Plane
   Line/Axis <-> Line/Axis
 
-Concentric:
+Concentric
   Axis <-> Axis
 
-Insert:
-  SeatFrame <-> SeatFrame
+Insert
+  Frame <-> Frame
 ```
 
-Initial planned generic relationship families:
+No new relationship enum/equation in Block 37.
+
+### 38. Generic geometric relationship Core intent and JSON
+
+Primary boundary: Core persistent relationship model and serialization.
+
+Add:
 
 ```text
 Coincident
@@ -538,69 +510,185 @@ Parallel
 Perpendicular
 ```
 
-New families must reuse existing local/cross-hierarchy graphs, `ComponentTransformAuthority`, shared finite differences/Gauss-Newton solving, freshness, atomic application, and actual Jacobian-rank diagnostics.
+for local and Project-level relationship intent.
 
-A generated cylindrical face, circular edge, DatumAxis, and current feature `.axis` that all project Axis capability must reach the same Concentric equation semantics.
+Preserve existing endpoint JSON shapes, target A/B order, state semantics, independent id scopes, and historical five-family compatibility.
 
-The exact compatibility table, sign/direction rules, residual scalar order, and length scaling are frozen in the Block-36 canonical implementation document before code is merged.
+No residual/equation integration in Block 38.
 
-### 37. Joint target capability expansion and richer joint-family sequence
+### 39. Generic relationship equations and shared solve integration
 
-Primary boundary: persistent joint intent, motion equations, and application.
+Primary boundary: Geometry relationship semantics and existing numeric/diagnostic execution.
 
-Joint compatibility consumes the same target capability taxonomy.
-
-The existing:
+Initial Coincident pairs:
 
 ```text
-SeatFrame <-> SeatFrame
+Point <-> Point
+Point <-> Line
+Line <-> Point
+Point <-> Plane
+Plane <-> Point
 ```
 
-Revolute contract remains valid.
+Parallel and Perpendicular initially support Line/Axis direction pairs and Plane normal pairs.
 
-Axis-only Revolute is not automatically enabled because an Axis does not define the reference direction required for signed twist measurement. Before `Axis <-> Axis` Revolute support, Block 37 must choose one explicit frame/reference-direction model-intent strategy.
+All new families reuse existing local/cross graphs, `ComponentTransformAuthority`, shared residual scaling, central finite differences, Gauss-Newton solving, freshness, atomic application, and Jacobian-rank diagnostics.
 
-No Geometry implementation may invent an arbitrary world-axis reference.
+No generic-target-specific solver is allowed.
 
-After the frame contract is resolved, dedicated family blocks should cover at least:
+### 40. Joint target compatibility and oriented Frame contract
+
+Primary boundary: derived joint compatibility semantics.
+
+Current Revolute compatibility remains:
 
 ```text
+Frame <-> Frame
+```
+
+Current `.seat` sources project Frame.
+
+Axis alone is insufficient for signed twist because it has no reference X direction. Axis-only Revolute remains incompatible until semantic model intent supplies a deterministic oriented Frame.
+
+Geometry may not choose an arbitrary world axis.
+
+No joint persistence change or new joint family in Block 40.
+
+### 41. General joint coordinate/limit Core model
+
+Primary boundary: Core persistent joint state.
+
+Generalize the current single scalar Revolute coordinate/limit representation into typed family-defined coordinate slots with stable roles and explicit Angular/Linear kinds.
+
+Representative roles:
+
+```text
+Revolute
+  rotation
+
 Prismatic
+  translation
+
 Cylindrical
+  translation
+  rotation
+
 Planar
-Ball/Spherical
+  translation_u
+  translation_v
+  rotation_normal
 ```
 
-Every family freezes:
+Current Revolute APIs remain supported through an explicit compatibility/adaptation boundary.
+
+No JSON or vector drive execution in Block 41.
+
+### 42. General joint coordinate JSON and backward compatibility
+
+Primary boundary: Core serialization.
+
+Serialize coordinate slots with stable role spellings, units, deterministic family-defined order, values, and optional limits.
+
+Historical scalar Revolute files remain loadable. Duplicate/missing/unknown coordinate roles fail closed.
+
+No motion execution changes in Block 42.
+
+### 43. Vector joint drives, holding semantics, freshness, and atomic application
+
+Primary boundary: Geometry motion result/execution/application.
+
+Generalize selected-joint scalar drives into family-defined coordinate drive vectors.
+
+Non-selected active joints hold all authored coordinate slots. Undriven roles of the selected joint initially hold authored values.
+
+Motion snapshots protect coordinate-slot definitions, authored values, limits, and selected drive values.
+
+Atomic application writes authority transform proposals plus only the selected joint coordinate roles explicitly driven by the result.
+
+Authority variables remain six direct component-transform variables per unique free authority. Joint coordinates remain drive parameters, not transform-authority variables.
+
+No new joint family in Block 43.
+
+### 44. Prismatic joint
+
+One new family in one block.
+
+Preferred first capability contract:
 
 ```text
-persistent coordinates and limits
-required target capabilities
-residual component order
-holding-drive semantics
-motion-graph participation
-freshness snapshots
-atomic application behavior
-local and Project-level JSON spelling
+Frame <-> Frame
 ```
 
-Do not model stateful motion joints as geometric constraints with hidden coordinates.
+Coordinate:
+
+```text
+translation : LengthMm
+```
+
+The family document freezes persistent type/JSON, translation limits, residual order, holding-drive semantics, local/cross motion integration, freshness, and atomic application.
+
+### 45. Cylindrical joint
+
+One new two-coordinate family.
+
+Planned coordinates:
+
+```text
+translation : LengthMm
+rotation    : AngleDeg
+```
+
+The family must prove translation and twist drives coexist through the shared vector-drive/numeric path without duplicate transform variables.
+
+### 46. Planar joint
+
+One new three-coordinate family.
+
+Required target capability:
+
+```text
+Frame <-> Frame
+```
+
+Planned coordinates:
+
+```text
+translation_u   : LengthMm
+translation_v   : LengthMm
+rotation_normal : AngleDeg
+```
+
+The Frame defines U/V and oriented normal.
+
+### 47. Ball/Spherical joint
+
+One new spherical family.
+
+Required target compatibility:
+
+```text
+Point <-> Point
+```
+
+Preferred first seed is passive center coincidence with three free rotational DOF.
+
+A driven spherical orientation is not represented by arbitrary Euler angles without a separately frozen singularity/order contract. If the first seed remains passive-only, selecting it as a driven joint fails explicitly.
 
 ## GUI selection boundary
 
-Blocks 31-37 remain headless model/query/equation work.
+Blocks 31-47 remain headless model/query/equation/motion work.
 
-A future Inventor-/SolidWorks-like picker should consume:
+A future Inventor-/SolidWorks-like picker consumes:
 
 ```text
 semantic source candidate
 -> resolved source kind
 -> available capabilities
 -> selected relationship/joint type
--> compatibility matrix
+-> compatibility resolver
 ```
 
-The UI may highlight OCCT faces, edges, vertices, datum planes, axes, lines, and points, but committing a selection persists the BLCAD semantic reference identity. Raw `TopoDS_Shape` or selection index never becomes the assembly endpoint.
+The UI may highlight OCCT faces, edges, vertices, datum planes, axes, lines, and points, but committing a selection persists BLCAD semantic reference identity. Raw `TopoDS_Shape` or selection index never becomes the assembly endpoint.
 
 ## Persistence rule
 
@@ -625,9 +713,11 @@ cross_hierarchy_constraints[]
 cross_hierarchy_joints[]
 ```
 
-The planned target expansion continues to persist semantic endpoint identity. Resolved source classification, Plane/Axis/Line/Point/Circle/Cylinder/SeatFrame capabilities, transformed target geometry, and compatibility projections remain derived.
+The planned target expansion continues to persist semantic endpoint identity. Resolved source classification, Plane/Axis/Line/Point/Circle/Cylinder/Frame capabilities, transformed target geometry, and compatibility projections remain derived.
 
-Regenerate connectivity, hierarchy traversal, parent chains, leaves, target geometry/capabilities, transform authorities, solve/motion groups, holding drives, residuals/Jacobians, solve/motion results, freshness snapshots, proposals, diagnostics, exchange identities/graphs/names, part shape definitions, XDE labels/component references, STEP entities, posed shapes, and analysis products.
+New generic relationship type intent becomes persistent in Block 38. Generalized joint coordinate slots become persistent in Block 41 and serialized in Block 42.
+
+Regenerate connectivity, hierarchy traversal, parent chains, leaves, target geometry/capabilities, compatibility projections, transform authorities, solve/motion groups, holding drives, residuals/Jacobians, solve/motion results, freshness snapshots, proposals, diagnostics, exchange identities/graphs/names, part shape definitions, XDE labels/component references, STEP entities, posed shapes, and analysis products.
 
 ## Next technical step
 
