@@ -101,7 +101,7 @@ struct OrderedPosedOccurrence {
 }
 
 [[nodiscard]] Result<std::vector<OrderedPosedOccurrence>> build_ordered_posed_occurrences(
-    const Project& project, const detail::PosedLeafShapeBuildResult& posed_leaves) {
+    const Project& project, const detail::PosedLeafShapesBuild& posed_leaves) {
   auto exchange_graph = AssemblyExchangeGraph::build(project);
   if (exchange_graph.has_error()) {
     return Result<std::vector<OrderedPosedOccurrence>>::failure(exchange_graph.error());
