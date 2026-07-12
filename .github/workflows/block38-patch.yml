@@ -1,0 +1,63 @@
+name: Block 38 Patch
+
+on:
+  push:
+    branches:
+      - block38-generic-relationship-intent
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply Block 38 patch
+        run: python3 scripts/apply_block38.py
+
+      - name: Format Block 38 files
+        run: |
+          clang-format -i \
+            include/blcad/core/assembly_constraint.hpp \
+            src/core/assembly_constraint.cpp \
+            src/core/assembly_constraint_graph.cpp \
+            src/core/assembly_cross_hierarchy_constraint_graph.cpp \
+            src/core/assembly_cross_hierarchy_motion_graph.cpp \
+            src/core/assembly_constraint_graph_participation.hpp \
+            src/core/assembly_document_json.cpp \
+            src/core/project_json.cpp \
+            src/geometry/assembly_target_compatibility.cpp \
+            tests/core/assembly_generic_relationship_tests.cpp
+
+      - name: Install Core dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build nlohmann-json3-dev catch2
+
+      - name: Core build and tests
+        run: cmake --workflow --preset dev-build-test
+
+      - name: Focused Block 38 tests
+        run: |
+          ./build/dev/blcad_core_tests "[core][assembly-generic-relationship-intent]"
+          ./build/dev/blcad_core_tests "[core][assembly-generic-relationship-json]"
+
+      - name: Verify patch integrity
+        run: |
+          git diff --check
+          test ! -e scripts/apply_block38.py
+          test ! -e .github/workflows/block38-patch.yml
+          grep -R "AssemblyConstraintType::Coincident\|AssemblyConstraintType::Parallel\|AssemblyConstraintType::Perpendicular" -n include src tests
+
+      - name: Commit Block 38
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "Add generic relationship intent and JSON"
+          git push origin HEAD:block38-generic-relationship-intent
