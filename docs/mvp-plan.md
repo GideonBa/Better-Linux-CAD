@@ -14,7 +14,7 @@ Core model intent
   -> derived graph or query semantics
   -> numeric or geometry execution
   -> stale-result validation / atomic application
-  -> diagnostics or presentation/exchange consumers
+  -> diagnostics, analysis, or presentation/exchange consumers
 ```
 
 A block is ready only when its canonical document states persistent authority versus derived state, stable identity/order, failure behavior, focused tests/tags, deferred adjacent work, and one precise next technical step.
@@ -50,7 +50,7 @@ Implemented assembly-scoped parameters, member-part registration, bindings, prop
 
 MVP-5 extended the Project with child assembly documents and Project-level occurrence-qualified geometric and motion intent.
 
-## MVP 5: Assembly relationship, motion, hierarchy, and posed-geometry pipeline
+## MVP 5: Assembly relationship, motion, hierarchy, posed geometry, and exchange
 
 ### 1-8. Local placement, geometric solving, application, and diagnostics
 
@@ -69,15 +69,9 @@ Implemented component placement/state, local geometric intent/connectivity, sema
 
 ### 9-13. Concentric, Insert, and Angle integration
 
-Canonical documents:
-
-- `docs/assembly-semantic-axis-concentric-residuals-mvp5.md`
-- `docs/assembly-concentric-numeric-solver-dof-mvp5.md`
-- `docs/assembly-insert-intent-composite-residuals-mvp5.md`
-- `docs/assembly-insert-numeric-solver-dof-mvp5.md`
-- `docs/assembly-angle-constraint-mvp5.md`
-
 Implemented `.axis`/`.seat` semantics, Concentric and Insert residuals, full shared numeric integration, and planar Angle cosine alignment.
+
+Canonical details are in the assembly semantic/numeric MVP-5 documents.
 
 ### 14. Suppressed components in solved groups
 
@@ -85,11 +79,13 @@ Implemented `.axis`/`.seat` semantics, Concentric and Insert residuals, full sha
 
 Implemented active-subgroup filtering while retaining complete freshness context.
 
-### 15. Posed assembly STEP export
+### 15. Flattened posed assembly STEP export
 
 `docs/assembly-posed-step-export-mvp5.md`
 
-Implemented visible-active component posing, deterministic referenced-part recompute, one cache per referenced part, one derived OCCT compound, and STEP export.
+Implemented visible-active component posing, deterministic unique referenced-part recompute, exact leaf transform chains, one derived OCCT compound, and generic STEP export.
+
+Block 29 later extracts the shared part-definition and OCCT transform helpers while retaining this flattened compatibility path.
 
 ### 16. Local Revolute joint/limit intent and motion
 
@@ -123,67 +119,48 @@ Repeated child occurrences share one child-document internal pose. Rigid boundar
 
 Implemented occurrence-qualified endpoint identity, exact rooted occurrence resolution, local semantic target reuse, exact root-space transform-chain evaluation, and all five geometric residual families.
 
-### 23. Core endpoint and Project-level geometric intent
+### 23-27. Cross-hierarchy geometric persistence, solving, freshness, and diagnostics
 
-`docs/assembly-cross-hierarchy-constraint-intent-mvp5.md`
+Canonical documents:
 
-Implemented Core-owned `AssemblyHierarchyConstraintEndpoint`, persistent Project-owned `AssemblyHierarchyConstraint`, five geometric families, independent Project-level id scope, and Geometry query bridging.
+- `docs/assembly-cross-hierarchy-constraint-intent-mvp5.md`
+- `docs/assembly-cross-hierarchy-constraint-json-mvp5.md`
+- `docs/assembly-cross-hierarchy-incidence-groups-mvp5.md`
+- `docs/assembly-cross-hierarchy-numeric-solver-mvp5.md`
+- `docs/assembly-cross-hierarchy-application-diagnostics-mvp5.md`
 
-### 24. Cross-hierarchy geometric JSON and structure validation
-
-`docs/assembly-cross-hierarchy-constraint-json-mvp5.md`
-
-Implemented additive `cross_hierarchy_constraints[]`, exact target/path order, quantity roundtrip, absent-field compatibility, duplicate rejection, and exact path/reached-component Core validation.
-
-### 25. Relationship-to-authority incidence and solve groups
-
-`docs/assembly-cross-hierarchy-incidence-groups-mvp5.md`
-
-Implemented derived `ComponentTransformAuthority`, active local/Project cross relationship participation, suppression semantics, endpoint-to-authority mapping, unique incidence, and deterministic connected geometric solve groups.
-
-Repeated rooted endpoints may retain distinct paths while sharing one authority.
-
-### 26. Shared cross-hierarchy numeric solving
-
-`docs/assembly-cross-hierarchy-numeric-solver-mvp5.md`
-
-Implemented one exact current solve-group execution through unique free authority variable blocks, document-local local relationship evaluation, root-space Project relationship evaluation, shared residual flattening, central finite differences, and the existing damped Gauss-Newton engine.
-
-Each free authority contributes:
+Implemented:
 
 ```text
-tx_mm ty_mm tz_mm rx_deg ry_deg rz_deg
+Core-owned occurrence-qualified endpoint intent
+cross_hierarchy_constraints[]
+exact hierarchy path/reached-component validation
+ComponentTransformAuthority incidence
+one six-variable block per unique free authority
+document-local local residual evaluation
+root-space Project-level residual evaluation
+shared finite differences and Gauss-Newton engine
+complete authority/relationship/path/PartDocument freshness
+atomic direct authority application
+cross-hierarchy Jacobian-rank/remaining-DOF diagnostics
 ```
 
-### 27. Complete freshness, atomic authority application, and diagnostics
-
-`docs/assembly-cross-hierarchy-application-diagnostics-mvp5.md`
-
-Implemented complete authority/relationship/path-boundary snapshots, exact current group revalidation, exact canonical PartDocument model-intent snapshots, atomic authority application, shared matrix-rank elimination, and cross-hierarchy rank/remaining-DOF diagnostics.
-
-Semantic target freshness uses:
+The transform authority remains:
 
 ```text
-AssemblySemanticTargetPartSnapshot
-  part_document
-  exact serialize_part_document_to_json(part) payload
+(assembly_document: DocumentId,
+ local ComponentInstanceId)
 ```
 
-Diagnostics use:
+Repeated rooted endpoints can remain distinct geometric contexts while sharing one variable/proposal authority.
 
-```text
-variable_count = 6 * unique_free_active_transform_authority_count
-constrained_dof = rank(J)
-remaining_dof = variable_count - rank(J)
-```
-
-### 28. Project-level occurrence-qualified Revolute motion — Implemented
+### 28. Project-level occurrence-qualified Revolute motion
 
 `docs/assembly-cross-hierarchy-revolute-motion-mvp5.md`
 
-Implemented persistent `AssemblyHierarchyJoint` Revolute intent and Project-owned `cross_hierarchy_joints[]` with exact occurrence-qualified target A/B identity, Project-level joint id scope, principal limits, and authored coordinate.
+Implemented persistent `AssemblyHierarchyJoint` Revolute intent and additive `cross_hierarchy_joints[]` with exact occurrence-qualified target A/B identity, Project-level id scope, limits, and authored coordinate.
 
-Implemented `AssemblyCrossHierarchyMotionGraph` connectivity over:
+`AssemblyCrossHierarchyMotionGraph` closes transitively over:
 
 ```text
 local geometry
@@ -192,27 +169,73 @@ Project-level cross-hierarchy geometry
 Project-level cross-hierarchy joints
 ```
 
-Canonical relationship-kind order is the order above. Participation is state/suppression based and ignores visibility.
+The hierarchy Revolute builder resolves exact `.seat` endpoints into root space and reuses the local directed axis/seating/signed-twist residual constructor.
 
-Cross-joint endpoints map to `ComponentTransformAuthority`; endpoint mappings remain separate from unique incidence. Two different rooted endpoints may map to one shared authority and therefore one six-variable block.
+Selected Project-level joints receive requested in-range drives; other active local or Project-level Revolute joints in the same group receive holding drives at authored coordinates. Motion reuses authority variables, finite differences, numeric solve machinery, Block-27 freshness helpers, and atomic application.
 
-`AssemblyHierarchyRevoluteJointEquationBuilder` resolves exact `.seat` endpoints through hierarchy parent chains into root space and reuses the same directed axis/seating/signed-twist residual constructor as the local Revolute path.
+### 29. Structured assembly exchange and STEP product relationships — Implemented
 
-The selected Project-level joint receives the requested in-range drive. Every other active local or Project-level Revolute joint in the combined motion group receives a transient holding drive at its authored coordinate. All geometric relationships remain active residuals.
+`docs/assembly-structured-step-products-mvp5.md`
 
-Motion reuses the authority variable order, central finite differences, and `solve_numeric_variables`. It returns complete authority, four-family relationship, hierarchy-boundary, and exact semantic PartDocument snapshots plus at most one proposal per free authority.
+Implemented three derived exchange identities:
 
-Shared Block-27 freshness helpers now protect both geometric solve application and cross-hierarchy motion application. Fresh motion application atomically writes direct authority transforms and only the selected Project-level joint coordinate on a Project copy.
+```text
+assembly occurrence
+  = exact rooted SubassemblyInstance occurrence path
+
+part component occurrence
+  = (containing assembly occurrence path,
+     local ComponentInstanceId)
+
+part product definition
+  = referenced PartDocumentId
+```
+
+`AssemblyExchangeGraph` derives the explicit root plus every rooted assembly path prefix required by one canonical visible-active leaf.
+
+Ordering is deterministic:
+
+```text
+assembly occurrences: lexicographic path sequence
+component occurrences: path, then ComponentInstanceId
+part definitions: PartDocumentId
+```
+
+Generated exchange names percent-encode all UTF-8 bytes outside `A-Z a-z 0-9 . _ -`; path separators and the explicit root sentinel therefore cannot collide with authored ids.
+
+`AssemblyPartShapeDefinitionBuilder` sorts/deduplicates referenced part ids and performs exactly one recompute plus one private `ShapeCache` per unique exported `PartDocumentId`.
+
+The flattened posed-leaf builder and structured STEP exporter reuse this same part-definition boundary and one shared OCCT rigid-transform conversion.
+
+`AssemblyStructuredStepExporter` creates:
+
+```text
+one XDE part definition label per PartDocumentId
+one assembly label per rooted assembly occurrence
+part component references to shared definitions
+parent -> child assembly occurrence references
+```
+
+The explicit root label is transferred through `STEPCAFControl_Writer` with names enabled.
+
+The existing `AssemblyStepExporter` remains the flattened compound compatibility consumer.
+
+Headless consumer:
+
+```text
+blcad_export_structured_assembly <input.blcad.project.json> <output.step>
+```
+
+The structured command exports current authored/persisted pose and does not implicitly run a solver.
 
 Focused tags:
 
 ```text
-[core][assembly-cross-hierarchy-joint]
-[core][assembly-cross-hierarchy-joint-json]
-[core][assembly-cross-hierarchy-motion-graph]
-[geometry][assembly-cross-hierarchy-revolute]
-[geometry][assembly-cross-hierarchy-motion]
+[core][assembly-exchange-graph]
+[geometry][assembly-structured-step-export]
 ```
+
+Block 29 adds no persistent record and no JSON field.
 
 ## Parameter expression seed
 
@@ -220,36 +243,46 @@ Canonical document: `docs/parameter-expression-mvp.md`.
 
 Implemented unit-aware part formulas, dependency edges, topological re-evaluation, cycle rejection, JSON roundtrip with re-derived edges, incremental recompute, and transactional formula editing.
 
-## Next MVP sequence: structured assembly exchange
+## Next MVP sequence: richer contact and swept-motion analysis
 
 Canonical planning document: `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`.
 
-### 29. Component geometry instancing and structured STEP assembly products — Next
+### 30. Richer collision/contact and swept-motion analysis — Next
 
-Define stable derived exchange identities for assembly occurrences and part-product/component occurrences.
+Freeze a richer posed contact result over exact rooted component occurrence pairs.
 
-Requirements:
+The first static classification should explicitly define and test:
 
 ```text
-reuse explicit root + exact rooted SubassemblyInstance paths
-reuse AssemblyLeafOccurrenceResolver transform chains
-reuse one recomputed shape/cache per unique referenced PartDocument
-preserve repeated child assembly occurrences as distinct exchange occurrences
-preserve repeated part occurrences as distinct component/product instances
-avoid duplicating persistent PartDocument intent
-emit structured STEP assembly/product relationships
-retain existing flattened compound export as an explicit compatibility consumer if useful
+Separated
+Touching
+Interfering
 ```
 
-The exact product/occurrence naming and deterministic ordering must be canonical before writing STEP structure.
+Any touching/separation tolerance must be an explicit validated input or frozen documented default.
 
-Focused tests must prove repeated child assemblies, repeated parts, nested hierarchy, hidden/suppressed filtering policy, deterministic product order/names, and unchanged source Project/model intent.
+A first swept-motion seed should remain bounded and deterministic:
 
-Do not add occurrence-local flexible pose overrides or whole-subassembly solve variables in Block 29.
+```text
+selected supported Revolute joint
+start coordinate
+end coordinate
+explicit/validated sample resolution
+```
 
-### 30. Richer collision/contact and swept-motion analysis
+The implementation must state honestly that sampled sweep analysis is not continuous collision detection.
 
-Deferred until structured assembly exchange identity is frozen.
+Reuse:
+
+```text
+AssemblyLeafOccurrenceResolver
+shared part shape definition builder
+existing posed geometry semantics
+exact rooted exchange/component occurrence identity
+current Revolute motion solve/application boundaries
+```
+
+Do not introduce a second pose model, mutate the source Project during queries, or build a general physics engine.
 
 ## Future roadmaps
 
@@ -257,7 +290,7 @@ Deferred until structured assembly exchange identity is frozen.
 - Inventor-like sketch/feature parity: `docs/inventor-like-sketcher-and-feature-roadmap.md`
 - Advanced surfacing and 3D sketches: `docs/advanced-surfacing-and-3d-sketch-mvp.md`
 
-Later assembly work includes richer joint families, null-space basis presentation, multi-turn motion, occurrence-local flexible pose overrides, whole-subassembly variables, engineering contact semantics, and swept-motion analysis.
+Later assembly work includes richer joint families, null-space basis presentation, multi-turn motion, occurrence-local flexible pose overrides, whole-subassembly variables, and general dynamic/contact response.
 
 ## Persistence rule
 
@@ -272,12 +305,12 @@ cross_hierarchy_constraints[]
 cross_hierarchy_joints[]
 ```
 
-Regenerate graph connectivity, hierarchy traversal, parent chains, flattened leaves, target-resolution values, root-space geometry, transform authorities, incidence/mappings, solve/motion groups, holding drives, residuals/Jacobians, solve/motion results, freshness snapshots, proposals, rank products, diagnostics, shape caches, posed shapes, analysis products, and STEP exchange products.
+Regenerate graph connectivity, hierarchy traversal, parent chains, flattened leaves, target geometry, transform authorities, incidence/mappings, solve/motion groups, holding drives, residuals/Jacobians, solve/motion results, freshness snapshots, proposals, diagnostics, exchange identities/graphs/names, part shape definitions, XDE labels/references, STEP entities, posed shapes, and analysis products.
 
 Only explicit fresh converged solve/motion application changes persisted component `RigidTransform` intent. Successful motion application may additionally change the selected authored local or Project-level joint coordinate. Rigid subassembly placement changes only through explicit occurrence edits until a dedicated whole-subassembly variable contract exists.
 
 ## Next technical step
 
-Implement Block 29 only from `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`: component geometry instancing and structured STEP assembly products with stable derived exchange occurrence/product identity, canonical deterministic ordering/naming, reuse of posed-leaf transform chains, and preservation of repeated hierarchy occurrences as distinct STEP assembly instances.
+Implement Block 30 only from `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`: richer posed contact classification and bounded deterministic swept-Revolute analysis over exact rooted component occurrence identities.
 
-Do not add occurrence-local child pose overrides, whole-subassembly transform variables, or swept-motion contact simulation in the same block.
+Do not add occurrence-local child pose overrides, whole-subassembly transform variables, richer joint families, or a general physics engine in the same block.

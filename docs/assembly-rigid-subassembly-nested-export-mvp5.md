@@ -1,6 +1,6 @@
 # Rigid Subassembly Hierarchy and Nested Posed Export MVP-5
 
-Status: implemented one explicit root assembly plus project-owned child assembly documents, persistent rigid child occurrences, cycle-free deterministic rooted hierarchy traversal, exact authored transform chains, visible-active leaf flattening, and nested posed STEP export.
+Status: implemented explicit root plus Project-owned child assembly definitions, persistent rigid child occurrences, cycle-free deterministic rooted traversal, exact authored transform chains, visible-active leaf flattening, nested flattened posed STEP export, and the later Block-29 structured STEP occurrence/product consumer.
 
 ## Project ownership
 
@@ -8,13 +8,11 @@ Status: implemented one explicit root assembly plus project-owned child assembly
 
 ```text
 one explicit root AssemblyDocument
-project-owned child AssemblyDocument records
-project-owned PartDocument records
+Project-owned child AssemblyDocument records
+Project-owned PartDocument records
 ```
 
-`Project::assembly()` remains the explicit root assembly API.
-
-A project-owned child assembly document is a model definition. It becomes a rooted occurrence only when a containing assembly stores a `SubassemblyInstance` that references it.
+A child `AssemblyDocument` is a shared model definition. It becomes a rooted occurrence only when a containing assembly stores a `SubassemblyInstance` referencing it.
 
 The same child document may be referenced by multiple `SubassemblyInstance` records.
 
@@ -33,15 +31,15 @@ RigidTransform
   rotation_deg
 ```
 
-The transform is the authored rigid boundary from the containing assembly occurrence to the referenced child assembly document.
+The transform is the authored rigid boundary from the containing assembly occurrence to the referenced child assembly definition.
 
-A `SubassemblyInstance` currently has no grounding field and is not itself a numeric rigid-body variable.
+A `SubassemblyInstance` has no grounding field and is not currently a numeric rigid-body variable.
 
-Adding or loading an occurrence never mutates child component transforms.
+Adding/loading an occurrence never mutates child component transforms.
 
-## Separate assembly collections
+## Separate local collections
 
-`AssemblyDocument` keeps direct part components and child assembly occurrences as separate model-intent collections:
+`AssemblyDocument` keeps direct part components and child occurrences separately:
 
 ```text
 component_instances[]
@@ -50,9 +48,9 @@ assembly_constraints[]
 assembly_joints[]
 ```
 
-Local geometric constraints and local joints continue to address direct local part components in the containing assembly document.
+Local geometric constraints and local joints address direct local part components in the containing assembly document.
 
-The later read-only cross-hierarchy query layer is separate from these local collections.
+Project-level occurrence-qualified relationships/joints are separate Project collections.
 
 ## Hierarchy validity
 
@@ -65,16 +63,16 @@ Validation rejects:
 - duplicate subassembly occurrence ids within one containing assembly;
 - direct self-reference;
 - references to the explicit root as a child;
-- references to missing child assembly documents;
-- direct or indirect assembly-reference cycles.
+- missing child assembly references;
+- direct or indirect cycles.
 
-Owned but currently unreferenced child graphs are validated as well, so latent cycles cannot enter project state.
+Owned but currently unreferenced child graphs are validated as well.
 
-The document reference graph and DFS validation state are derived and unpersisted.
+The reference graph and DFS validation state are derived/unpersisted.
 
 ## Deterministic rooted traversal
 
-`AssemblyHierarchyTraversal::build(project)` validates project structure and derives rooted occurrence descriptors.
+`AssemblyHierarchyTraversal::build(project)` validates Project structure and derives rooted occurrence descriptors.
 
 Traversal order:
 
@@ -84,7 +82,7 @@ pre-order DFS
 child SubassemblyInstance records lexicographically by id
 ```
 
-Repeated occurrences of one child assembly document remain separate traversal entries.
+Repeated occurrences of one child document remain separate traversal entries.
 
 Each `AssemblyHierarchyOccurrenceDescriptor` contains:
 
@@ -98,7 +96,7 @@ visible_path
 active_path
 ```
 
-The root descriptor uses:
+Root:
 
 ```text
 parent_assembly_document = none
@@ -120,11 +118,13 @@ occurrence_path = [outer, inner]
 parent_transforms_inner_to_outer = [T_inner, T_outer]
 ```
 
+At descent, the current direct `SubassemblyInstance::transform()` is prepended. Therefore a non-root descriptor's first parent transform is exactly its direct boundary from the containing occurrence.
+
 Paths are ordered identity sequences, not sets.
 
 ## Hierarchical transform evaluation
 
-Every authored `RigidTransform` level retains the existing convention:
+Every authored `RigidTransform` retains:
 
 ```text
 translation: millimeters
@@ -134,22 +134,27 @@ X then Y then Z
 then translation
 ```
 
-`AssemblyHierarchyTransformEvaluator` applies transform chains exactly inner-to-outer.
+`AssemblyHierarchyTransformEvaluator` applies exact inner-to-outer chains.
 
-For component transform `Tc`, inner parent `Ti`, and outer parent `To`:
+For:
 
 ```text
 chain = [Tc, Ti, To]
-point = To(Ti(Tc(p)))
 ```
 
-Vectors, normals, and directions ignore translation at every level.
+point evaluation is:
 
-The hierarchy is not collapsed into a persisted composed transform or converted back into a recomputed Euler representation.
+```text
+To(Ti(Tc(p)))
+```
+
+Vectors/normals/directions ignore translation.
+
+The hierarchy is not collapsed into a persisted composed transform or recomputed Euler representation.
 
 ## Canonical leaf flattening
 
-`AssemblyLeafOccurrenceResolver` converts the rooted hierarchy into visible-active part-component leaves for posed geometry consumers.
+`AssemblyLeafOccurrenceResolver` converts the rooted hierarchy into visible-active part-component leaves.
 
 One `AssemblyLeafOccurrenceDescriptor` stores:
 
@@ -161,7 +166,7 @@ referenced_part_document
 transforms_inner_to_outer
 ```
 
-For a nested part component:
+Nested component:
 
 ```text
 transforms_inner_to_outer =
@@ -175,22 +180,22 @@ hierarchy pre-order
 then local ComponentInstanceId order
 ```
 
-Flattened descriptors are derived and unpersisted.
+Leaf descriptors are derived/unpersisted.
 
 ## Visibility and suppression
 
-Path state is accumulated through ancestor subassembly occurrences:
+Path state is accumulated through ancestor occurrences:
 
 ```text
-visible_path = every ancestor occurrence is visible
-active_path  = every ancestor occurrence is active
+visible_path = every ancestor occurrence visible
+active_path  = every ancestor occurrence active
 ```
 
-A hidden or suppressed subassembly occurrence removes its complete descendant subtree from leaf flattening.
+A hidden/suppressed subassembly occurrence removes its complete descendant subtree from leaf flattening.
 
-Within an otherwise visible-active assembly occurrence, local component visibility and suppression still apply.
+Within a visible-active assembly occurrence, local component visibility/suppression also applies.
 
-A posed leaf exists only when:
+A leaf exists only when:
 
 ```text
 visible_path
@@ -201,39 +206,39 @@ visible_path
 
 No filtered record is mutated.
 
-## Nested posed STEP export
+## Flattened posed STEP compatibility path
 
-`AssemblyStepExporter` consumes `AssemblyLeafOccurrenceResolver`.
+`AssemblyStepExporter` consumes canonical leaves.
 
-The hierarchy export pipeline is:
+Current pipeline:
 
 ```text
-const Project
-  -> validate structure and hierarchy
-  -> AssemblyHierarchyTraversal
-  -> AssemblyLeafOccurrenceResolver
-  -> visible-active leaves
-  -> unique referenced part ids
-  -> one ShapeCache per referenced part
-  -> copy each leaf shape
-  -> apply every authored leaf transform inner-to-outer
-  -> one OCCT compound
-  -> existing StepExporter
+Project
+-> AssemblyLeafOccurrenceResolver
+-> visible-active leaves
+-> AssemblyPartShapeDefinitionBuilder
+-> one recompute / one ShapeCache / one unposed shape per unique PartDocumentId
+-> pose each leaf through its exact complete chain
+-> one OCCT compound
+-> StepExporter
 ```
 
-Repeated occurrences of one child assembly document reuse recomputed part caches while retaining independent leaf transform chains and shape copies.
+Repeated child occurrences reuse shared part definitions while retaining independent leaf transform chains and posed copies.
 
-The root-only export path is the degenerate one-root hierarchy.
+The root-only export is the degenerate one-root hierarchy.
 
-## Shared child-document model authority
+Canonical details: `docs/assembly-posed-step-export-mvp5.md`.
 
-Repeated child occurrences are different rooted geometric occurrences, but they reference one shared child `AssemblyDocument` model definition.
+## Shared child-document transform authority
+
+Repeated child occurrences are different rooted geometric occurrences but reference one shared child `AssemblyDocument` model definition.
 
 For a child component:
 
 ```text
 ComponentTransformAuthority =
-  (AssemblyDocumentId, local ComponentInstanceId)
+  (AssemblyDocumentId,
+   local ComponentInstanceId)
 ```
 
 Example:
@@ -243,25 +248,78 @@ Example:
 ([right], component.shaft) -> (assembly.gearbox, component.shaft)
 ```
 
-The rooted occurrence paths differ and therefore produce different parent transform chains. The direct local component transform is still stored once in `assembly.gearbox`.
+The rooted paths differ and produce different parent chains. The direct child component transform remains stored once in `assembly.gearbox`.
 
-This ownership rule is later consumed by document-scoped flexible child solving and is a critical constraint on future cross-hierarchy numeric variable identity.
+Document-scoped flexible solving, cross-hierarchy geometric solving, and cross-hierarchy motion preserve this shared-authority rule.
+
+## Block-29 structured exchange occurrence identity
+
+Structured exchange deliberately uses a different derived identity from transform authority.
+
+Assembly occurrence:
+
+```text
+exact rooted SubassemblyInstance occurrence path
+```
+
+Component occurrence:
+
+```text
+(containing rooted assembly path,
+ local ComponentInstanceId)
+```
+
+Part product definition:
+
+```text
+referenced PartDocumentId
+```
+
+Thus:
+
+```text
+([left],  component.shaft)
+([right], component.shaft)
+```
+
+are two structured exchange component occurrences while both may still map to one solver transform authority:
+
+```text
+(assembly.gearbox, component.shaft)
+```
+
+This distinction is intentional.
+
+`AssemblyExchangeGraph` retains the root plus every assembly path prefix required by one visible-active leaf. It inherits leaf filtering and exact transform chains rather than implementing a second hierarchy interpretation.
+
+## Structured STEP assembly/product export
+
+`AssemblyStructuredStepExporter` consumes the derived exchange graph.
+
+It creates:
+
+```text
+one XDE part definition label per PartDocumentId
+one XDE assembly label per rooted assembly occurrence
+part component references to shared part definitions
+parent -> child assembly references for non-root occurrences
+```
+
+Part component placement is the direct first transform from the canonical leaf chain.
+
+Child assembly placement is the hierarchy-derived direct `transform_from_parent` boundary.
+
+Nested placement composition is represented by the XDE assembly graph instead of precomposing every leaf into root space.
+
+Repeated child occurrences remain separate assembly product occurrences. Repeated parts share one part product definition.
+
+Canonical details: `docs/assembly-structured-step-products-mvp5.md`.
 
 ## Failure policy
 
-Hierarchy/export fails closed on:
+Hierarchy/flattened/structured consumers fail closed on their documented boundaries, including invalid references/cycles, unresolved parts, recompute failures, missing final shapes, malformed derived transform context, empty visible-active output, OCCT/XDE transfer failures, and STEP write failures.
 
-- missing child assembly references;
-- root-as-child references;
-- direct or indirect cycles;
-- unresolved member or leaf parts;
-- failed part recompute;
-- recompute without a final shape;
-- rigid-transform/shape posing failures;
-- empty visible-active leaf output;
-- STEP transfer or file-write failure.
-
-Validation and geometry/export errors preserve their existing error categories.
+All hierarchy/export consumers are read-only with respect to persistent Project model intent.
 
 ## Persistence boundary
 
@@ -269,95 +327,58 @@ Persisted model intent:
 
 ```text
 explicit root assembly identity
-project-owned child AssemblyDocument records
+Project-owned child AssemblyDocument records
 SubassemblyInstance identity and referenced child id
-subassembly visibility and suppression
-subassembly rigid boundary transform
+subassembly visibility/suppression/boundary transform
 child ComponentInstance state and direct transform
 ```
 
-Derived and unpersisted:
+Derived/unpersisted:
 
 ```text
 assembly document reference graph
 cycle-validation traversal state
-parent links
-hierarchy traversal order
-AssemblyHierarchyOccurrenceDescriptor values
+hierarchy occurrence descriptors
 occurrence paths
 parent transform chains
-AssemblyLeafOccurrenceDescriptor values
+leaf occurrence descriptors
 flattened leaf order
-composed/evaluated hierarchy geometry
-per-consumer ShapeCache values
+AssemblyExchangeGraph identities/records/names
+part shape definitions and ShapeCache values
 posed leaf shape copies
+composed OCCT transforms
+XDE documents/labels/component references
 OCCT compounds
-STEP entity identity
+STEP product/entity identity
 ```
 
-Hierarchy occurrence state and direct authored transforms are model intent. Composed transforms are not a second source of truth.
+Hierarchy occurrence state and direct authored transforms are model intent. Traversal, composition, exchange occurrence products, and STEP entities are not second sources of truth.
 
 ## Focused coverage
 
-Core coverage proves:
+Hierarchy/leaf tests prove cycle validation, deterministic traversal, repeated child occurrences, exact path/parent-chain semantics, and visible-active filtering.
 
-- `SubassemblyInstance` identity/reference/finite-transform validation;
-- explicit transform/visibility/suppression edits;
-- duplicate occurrence rejection;
-- direct self-reference rejection;
-- additive assembly/project JSON roundtrip;
-- backward compatibility without child assembly collections;
-- assembly id uniqueness including the root id;
-- missing-child and child-to-root rejection;
-- direct/indirect cycle rejection;
-- deterministic insertion-order-independent traversal;
-- repeated child occurrences remaining distinct;
-- exact path and parent transform-chain semantics;
-- visible-active leaf flattening and deterministic filtering/order.
-
-Geometry coverage proves:
-
-- hierarchical point/vector evaluation;
-- non-commutative transform order;
-- two-level nested posed export;
-- repeated occurrences of one child assembly;
-- one recomputed part cache reused by nested leaves;
-- exact STEP bounding-box union, solid count, and volume;
-- hidden/suppressed subtree filtering;
-- local child component filtering;
-- empty output and unresolved nested leaf failures;
-- repeated STEP geometric equivalence after re-import.
-
-## Headless example
+Flattened geometry tests:
 
 ```bash
-./build/dev-geometry/blcad_export_posed_assembly \
-  examples/nested_subassembly.blcad.project.json \
-  build/nested_subassembly.step
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-nested-step-export]"
 ```
 
-The checked-in project contains two rigid occurrences of one child assembly. That child contains one rigid grandchild occurrence, and the grandchild contains one plate component.
+prove repeated child occurrences, nested transform order, shared part recompute, filtering, solid/volume/bounds behavior, and STEP re-import equivalence.
 
-Both root occurrences flatten to distinct posed plate leaves while sharing one referenced part recompute cache.
+Structured exchange tests:
 
-## Downstream blocks now implemented
+```bash
+./build/dev/blcad_core_tests "[core][assembly-exchange-graph]"
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-structured-step-export]"
+```
 
-The following work was implemented after this hierarchy seed:
+prove rooted assembly/component exchange identity, shared part definitions, repeated/nested occurrence products, exact transform-chain reuse, collision-free names, XDE/STEP assembly usage relationships, and geometric equivalence with the flattened compatibility export.
 
-- posed interference and clearance analysis over the same flattened leaf boundary;
-- document-scoped flexible child solving through exact active occurrence selection;
-- occurrence-qualified read-only cross-hierarchy target/residual semantics.
+## Current handoff
 
-The flexible solver preserves this document's shared-child ownership rule: applying a child-local solve changes the child document's direct component transform, so every rooted occurrence of that child observes the same internal pose through its own boundary transform.
+Block 29 structured STEP assembly/product relationships are implemented.
 
-## Still deferred
+The next technical step is Block 30: richer posed contact classification and bounded deterministic swept-Revolute analysis over exact rooted component occurrence identities.
 
-- occurrence-local internal component pose overrides;
-- grounding or solving a complete `SubassemblyInstance` boundary as one rigid variable;
-- persistent project-level cross-hierarchy geometric constraints and solve/application integration;
-- cross-hierarchy joints and nested motion propagation;
-- structured STEP product hierarchy and named occurrence products;
-- component geometry instancing;
-- contact response or rigid-body physics.
-
-The current cross-hierarchy implementation sequence is documented in `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`.
+Occurrence-local internal pose overrides, whole-subassembly solve variables, richer joint families, and a general physics engine remain deferred.

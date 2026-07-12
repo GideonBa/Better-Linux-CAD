@@ -34,6 +34,7 @@ add_library(
   src/core/assembly_cross_hierarchy_motion_graph.cpp
   src/core/assembly_document.cpp
   src/core/assembly_document_json.cpp
+  src/core/assembly_exchange_graph.cpp
   src/core/assembly_hierarchy.cpp
   src/core/assembly_joint.cpp
   src/core/assembly_joint_graph.cpp
@@ -115,6 +116,8 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/assembly_joint_motion_solver.cpp
     src/geometry/assembly_matrix_rank.cpp
     src/geometry/assembly_numeric_solve_engine.cpp
+    src/geometry/assembly_occt_rigid_transform.cpp
+    src/geometry/assembly_part_shape_definitions.cpp
     src/geometry/assembly_posed_leaf_shapes.cpp
     src/geometry/assembly_revolute_joint_equation_builder.cpp
     src/geometry/assembly_revolute_joint_residual.cpp
@@ -122,6 +125,7 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/assembly_semantic_target_freshness.cpp
     src/geometry/assembly_solve_diagnostics.cpp
     src/geometry/assembly_step_exporter.cpp
+    src/geometry/assembly_structured_step_exporter.cpp
     src/geometry/assembly_transform_evaluator.cpp
     src/geometry/circular_cut_adapter.cpp
     src/geometry/closed_profile_adapter.cpp
@@ -161,6 +165,11 @@ if(BLCAD_BUILD_GEOMETRY)
       TKBool
       TKTopAlgo
       TKGeomAlgo
+      TKXDESTEP
+      TKXCAF
+      TKCAF
+      TKLCAF
+      TKCDF
       TKSTEP
       TKXSBase
       TKBRep
@@ -184,6 +193,9 @@ if(BLCAD_BUILD_GEOMETRY)
   add_executable(blcad_export_posed_assembly examples/blcad_export_posed_assembly.cpp)
   target_link_libraries(blcad_export_posed_assembly PRIVATE BLCAD::geometry)
 
+  add_executable(blcad_export_structured_assembly examples/blcad_export_structured_assembly.cpp)
+  target_link_libraries(blcad_export_structured_assembly PRIVATE BLCAD::geometry)
+
   add_executable(blcad_move_joint examples/blcad_move_joint.cpp)
   target_link_libraries(blcad_move_joint PRIVATE BLCAD::geometry)
 
@@ -194,6 +206,7 @@ if(BLCAD_BUILD_GEOMETRY)
     target_compile_options(blcad_export_step PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(blcad_export_project PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(blcad_export_posed_assembly PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(blcad_export_structured_assembly PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(blcad_move_joint PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(blcad_analyze_assembly PRIVATE -Wall -Wextra -Wpedantic)
   endif()
@@ -212,6 +225,8 @@ if(BLCAD_BUILD_TESTS)
     tests/core/assembly_cross_hierarchy_constraint_tests.cpp
     tests/core/assembly_cross_hierarchy_joint_tests.cpp
     tests/core/assembly_document_tests.cpp
+    tests/core/assembly_exchange_graph_tests.cpp
+    tests/core/assembly_exchange_name_tests.cpp
     tests/core/assembly_hierarchy_tests.cpp
     tests/core/assembly_insert_constraint_tests.cpp
     tests/core/assembly_joint_graph_tests.cpp
@@ -299,6 +314,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/assembly_rigid_body_solver_tests.cpp
       tests/geometry/assembly_solve_diagnostics_tests.cpp
       tests/geometry/assembly_step_exporter_tests.cpp
+      tests/geometry/assembly_structured_step_exporter_tests.cpp
       tests/geometry/assembly_suppressed_component_solver_tests.cpp
       tests/geometry/assembly_transform_evaluator_tests.cpp
       tests/geometry/back_workplane_pipeline_tests.cpp
