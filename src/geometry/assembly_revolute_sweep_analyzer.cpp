@@ -32,6 +32,12 @@ constexpr const char* kSweepAnalyzerId = "geometry.assembly_revolute_sweep_analy
                    error.object_id() + ": " + error.message());
 }
 
+[[nodiscard]] bool interval_within_limits(double start_deg, double end_deg,
+                                          const AssemblyJointLimits& limits) noexcept {
+  return start_deg >= limits.lower_deg && start_deg <= limits.upper_deg &&
+         end_deg >= limits.lower_deg && end_deg <= limits.upper_deg;
+}
+
 [[nodiscard]] Result<std::size_t> validate_selected_joint(
     const Project& project, const AssemblyRevoluteSweepRequest& request) {
   if (request.joint.joint.empty()) {
@@ -52,7 +58,8 @@ constexpr const char* kSweepAnalyzerId = "geometry.assembly_revolute_sweep_analy
 
   const double start_deg = request.start_coordinate.degrees();
   const double end_deg = request.end_coordinate.degrees();
-  if (request.joint.scope == AssemblyRevoluteSweepJointScope::RootAssemblyLocal) {
+  switch (request.joint.scope) {
+  case AssemblyRevoluteSweepJointScope::RootAssemblyLocal: {
     const AssemblyJoint* joint = project.assembly().find_joint(request.joint.joint);
     if (joint == nullptr) {
       return Result<std::size_t>::failure(
@@ -63,30 +70,33 @@ constexpr const char* kSweepAnalyzerId = "geometry.assembly_revolute_sweep_analy
       return Result<std::size_t>::failure(
           validation_error("root-local Revolute sweep requires an active Revolute joint"));
     }
-    if (start_deg < joint->limits().lower_deg || start_deg > joint->limits().upper_deg ||
-        end_deg < joint->limits().lower_deg || end_deg > joint->limits().upper_deg) {
+    if (!interval_within_limits(start_deg, end_deg, joint->limits())) {
       return Result<std::size_t>::failure(
           validation_error("root-local Revolute sweep interval must lie within joint limits"));
     }
     return Result<std::size_t>::success(1U);
   }
+  case AssemblyRevoluteSweepJointScope::ProjectCrossHierarchy: {
+    const AssemblyHierarchyJoint* joint = project.find_cross_hierarchy_joint(request.joint.joint);
+    if (joint == nullptr) {
+      return Result<std::size_t>::failure(
+          validation_error("cross-hierarchy Revolute sweep joint must exist in the Project"));
+    }
+    if (joint->state() != AssemblyJointState::Active ||
+        joint->type() != AssemblyJointType::Revolute) {
+      return Result<std::size_t>::failure(
+          validation_error("cross-hierarchy Revolute sweep requires an active Revolute joint"));
+    }
+    if (!interval_within_limits(start_deg, end_deg, joint->limits())) {
+      return Result<std::size_t>::failure(
+          validation_error("cross-hierarchy Revolute sweep interval must lie within joint limits"));
+    }
+    return Result<std::size_t>::success(1U);
+  }
+  }
 
-  const AssemblyHierarchyJoint* joint = project.find_cross_hierarchy_joint(request.joint.joint);
-  if (joint == nullptr) {
-    return Result<std::size_t>::failure(
-        validation_error("cross-hierarchy Revolute sweep joint must exist in the Project"));
-  }
-  if (joint->state() != AssemblyJointState::Active ||
-      joint->type() != AssemblyJointType::Revolute) {
-    return Result<std::size_t>::failure(
-        validation_error("cross-hierarchy Revolute sweep requires an active Revolute joint"));
-  }
-  if (start_deg < joint->limits().lower_deg || start_deg > joint->limits().upper_deg ||
-      end_deg < joint->limits().lower_deg || end_deg > joint->limits().upper_deg) {
-    return Result<std::size_t>::failure(
-        validation_error("cross-hierarchy Revolute sweep interval must lie within joint limits"));
-  }
-  return Result<std::size_t>::success(1U);
+  return Result<std::size_t>::failure(
+      validation_error("Revolute sweep joint scope is unsupported"));
 }
 
 [[nodiscard]] double sample_coordinate(double start_deg, double end_deg,
@@ -112,7 +122,8 @@ constexpr const char* kSweepAnalyzerId = "geometry.assembly_revolute_sweep_analy
         sample_error(sample_index, coordinate_deg, "coordinate construction", coordinate.error()));
   }
 
-  if (joint_reference.scope == AssemblyRevoluteSweepJointScope::RootAssemblyLocal) {
+  switch (joint_reference.scope) {
+  case AssemblyRevoluteSweepJointScope::RootAssemblyLocal: {
     const AssemblyJointMotionSolver solver;
     auto moved = solver.move(sample_project, joint_reference.joint, coordinate.value(), solver_options);
     if (moved.has_error()) {
@@ -133,26 +144,33 @@ constexpr const char* kSweepAnalyzerId = "geometry.assembly_revolute_sweep_analy
     }
     return applied;
   }
+  case AssemblyRevoluteSweepJointScope::ProjectCrossHierarchy: {
+    const AssemblyCrossHierarchyJointMotionSolver solver;
+    auto moved = solver.move(sample_project, joint_reference.joint, coordinate.value(), solver_options);
+    if (moved.has_error()) {
+      return Result<std::size_t>::failure(sample_error(
+          sample_index, coordinate_deg, "cross-hierarchy motion solve", moved.error()));
+    }
+    if (!moved.value().converged()) {
+      return Result<std::size_t>::failure(Error::geometry(
+          kSweepAnalyzerId,
+          sample_text(sample_index, coordinate_deg) +
+              " cross-hierarchy motion did not converge"));
+    }
+    const AssemblyCrossHierarchyJointMotionResultApplier applier;
+    auto applied = applier.apply(sample_project, moved.value());
+    if (applied.has_error()) {
+      return Result<std::size_t>::failure(
+          sample_error(sample_index, coordinate_deg, "cross-hierarchy motion application",
+                       applied.error()));
+    }
+    return applied;
+  }
+  }
 
-  const AssemblyCrossHierarchyJointMotionSolver solver;
-  auto moved = solver.move(sample_project, joint_reference.joint, coordinate.value(), solver_options);
-  if (moved.has_error()) {
-    return Result<std::size_t>::failure(
-        sample_error(sample_index, coordinate_deg, "cross-hierarchy motion solve", moved.error()));
-  }
-  if (!moved.value().converged()) {
-    return Result<std::size_t>::failure(Error::geometry(
-        kSweepAnalyzerId,
-        sample_text(sample_index, coordinate_deg) + " cross-hierarchy motion did not converge"));
-  }
-  const AssemblyCrossHierarchyJointMotionResultApplier applier;
-  auto applied = applier.apply(sample_project, moved.value());
-  if (applied.has_error()) {
-    return Result<std::size_t>::failure(
-        sample_error(sample_index, coordinate_deg, "cross-hierarchy motion application",
-                     applied.error()));
-  }
-  return applied;
+  return Result<std::size_t>::failure(Error::validation(
+      kSweepAnalyzerId,
+      sample_text(sample_index, coordinate_deg) + " Revolute sweep joint scope is unsupported"));
 }
 
 } // namespace
