@@ -1,17 +1,18 @@
-# Posed Assembly Interference and Clearance Analysis MVP-5
+# Posed Assembly Interference, Clearance, and Contact Analysis MVP-5
 
-Status: implemented the first read-only posed assembly interference and clearance seeds over the canonical flattened visible-active leaf boundary. Block 29 now freezes rooted exchange/component occurrence identity; Block 30 is the next richer contact/swept-motion analysis step.
+Status: the original read-only interference/clearance APIs remain implemented compatibility queries. Block 30 now adds complete typed rooted contact classification and bounded sampled Revolute sweep analysis.
+
+Canonical Block-30 contract: `docs/assembly-contact-swept-motion-mvp5.md`.
 
 ## Shared posed-geometry boundary
 
-Flattened posed STEP export and interference/clearance analysis consume:
+Flattened posed STEP export and all static assembly analysis consumers reuse:
 
 ```text
-src/geometry/assembly_posed_leaf_shapes.hpp
-src/geometry/assembly_posed_leaf_shapes.cpp
+AssemblyPosedLeafShapeBuilder
 ```
 
-`AssemblyPosedLeafShapeBuilder`:
+The builder:
 
 ```text
 validates Project hierarchy
@@ -23,103 +24,194 @@ validates Project hierarchy
 -> poses every leaf through exact transforms_inner_to_outer
 ```
 
-Block 29 extracts the shared part-definition builder and OCCT rigid-transform conversion. Posed export and analysis therefore still agree on leaf selection, unique part recompute, and exact X-then-Y-then-Z-then-translate transform semantics.
+No analysis API owns a second hierarchy traversal, visibility/suppression filter, part recompute path, or transform convention.
 
-No second hierarchy traversal or visibility/suppression policy exists in analysis.
+## Compatibility interference contract
 
-## Current interference contract
+`AssemblyInterferenceAnalyzer::analyze(const Project&, options)` remains unchanged:
 
-`AssemblyInterferenceAnalyzer::analyze(const Project&, options)`:
+- identity is the historical `AssemblyLeafIdentity` plus deterministic occurrence key;
+- unordered leaf pairs are evaluated once in lexicographic occurrence-key order;
+- overlap uses `BRepAlgoAPI_Common` plus `BRepGProp::VolumeProperties`;
+- only finite common solid volume strictly above `minimum_overlap_volume_mm3` is reported;
+- default overlap threshold is `1.0e-6 mm^3` and must be finite/positive;
+- face/edge/point contact is not reported as interference;
+- result shape remains a violation/interference-only list.
 
-- current leaf identity is assembly id + subassembly path + component id through `AssemblyLeafIdentity` and its deterministic occurrence key; never an OCCT topology id;
-- unordered leaf pairs are derived in deterministic lexicographic occurrence-key order and each pair is evaluated once;
-- overlap is derived through OCCT `BRepAlgoAPI_Common` plus `BRepGProp::VolumeProperties`;
-- interference is reported only for finite positive common solid volume above `minimum_overlap_volume_mm3`;
-- default overlap threshold is `1.0e-6 mm^3` and must remain finite/positive;
-- face/edge/point contact is not classified as interference;
-- records carry ordered leaf identities and overlap volume in `mm^3`;
-- the summary carries leaf count, evaluated pair count, and recomputed part count;
-- hierarchy, part recompute, shape posing, boolean, non-finite volume, and invalid-option failures are fail-closed;
-- posed shapes, candidates, common shapes, and records are derived/unpersisted.
+This API is retained for compatibility and is not silently migrated to a new result type.
 
-## Current clearance contract
+## Compatibility clearance contract
 
-`AssemblyClearanceAnalyzer::analyze(const Project&, options)` reuses the same posed-leaf boundary, pair order, identity contract, and positive-volume interference boundary.
+`AssemblyClearanceAnalyzer::analyze(const Project&, options)` also remains unchanged:
 
-It adds:
+- interfering pairs are reported separately;
+- non-interfering pairs use `BRepExtrema_DistShapeShape`;
+- pairs strictly below `clearance_threshold_mm` are clearance violations;
+- default threshold is `1.0 mm`;
+- exact touching is a zero-distance clearance violation;
+- result shape remains a clearance-violation list plus interference list.
 
-- interfering pairs are reported separately and never as clearance records;
-- every remaining pair derives minimum distance in `mm` through `BRepExtrema_DistShapeShape`;
-- pairs below finite positive `clearance_threshold_mm` become clearance violations;
-- default clearance threshold is `1.0 mm`;
-- exact touching without positive overlap is currently a zero-distance clearance violation;
-- extrema failures, non-finite distances, and invalid thresholds fail closed;
-- all products remain derived/unpersisted.
+## Block-30 typed contact classification
 
-## Current proofs
+`AssemblyContactAnalyzer` is the new complete pair-classification query.
 
-`tests/geometry/assembly_interference_analyzer_tests.cpp` covers:
-
-- disjoint leaves;
-- exact face contact with zero common volume;
-- exact positive-volume overlap values;
-- deterministic repeated/insertion-order-independent results;
-- suppression filtering;
-- repeated nested child occurrences retaining exact subassembly paths;
-- one recomputed shared part definition for repeated occurrences;
-- tolerance validation.
-
-Clearance coverage proves above-threshold pairs, exact gap distances, zero-distance touching, interference exclusion, deterministic ordering, and threshold validation.
-
-Flattened/nested STEP tests and Block-29 structured STEP tests independently prove that the same visible-active part occurrences and transform semantics remain geometrically consistent across export consumers.
-
-## Block-29 identity follow-up
-
-`AssemblyExchangeGraph` now freezes a clearer rooted component occurrence identity:
+Identity:
 
 ```text
 AssemblyExchangeComponentOccurrenceIdentity =
-  (containing assembly occurrence path,
+  (exact rooted assembly occurrence path,
    local ComponentInstanceId)
 ```
 
-The containing assembly occurrence path is itself the exact rooted `SubassemblyInstanceId` sequence.
-
-Block 30 should use this typed rooted occurrence identity for new contact/sweep result records instead of extending the current slash-joined `AssemblyLeafIdentity::occurrence_key` as long-term analysis authority.
-
-This is an analysis identity migration boundary only. Block 29 does not change current interference/clearance API semantics.
-
-## Next technical step: Block 30
-
-Freeze and implement richer static contact classification plus a bounded deterministic sampled Revolute sweep.
-
-The first static classification should explicitly define:
+Pair identity:
 
 ```text
-Separated
-Touching
-Interfering
+AssemblyComponentOccurrencePairIdentity =
+  canonical ordered pair of exact rooted component occurrences
 ```
 
-Requirements:
+Order is typed and deterministic:
 
-- exact rooted component occurrence pair identity;
-- deterministic unordered pair order;
-- explicit validated touching/separation tolerance;
-- preserve positive-volume overlap as `Interfering`;
-- distinguish zero/near-zero minimum distance as `Touching` under the frozen tolerance;
-- retain derived/unpersisted results;
-- source Project immutability.
+```text
+occurrence path, lexicographically
+then ComponentInstanceId
+```
 
-A first swept-motion seed should accept one selected supported Revolute joint plus a bounded coordinate interval and explicit/validated sampling resolution.
+No slash-joined occurrence key is the new contact identity authority.
 
-It must reuse current motion solve/application and posed-leaf geometry boundaries on Project copies. It must report sampled coordinates honestly and must not claim continuous collision detection.
+The analyzer emits exactly one `AssemblyContactRecord` per visible-active unordered posed-leaf pair.
 
-Still deferred:
+Classification order is:
 
-- broad-phase acceleration unless required by measured Block-30 test/runtime pressure;
-- penetration direction/depth;
-- collision response;
-- contact forces or rigid-body dynamics;
-- arbitrary continuous collision detection;
-- persistent collision/contact state.
+```text
+overlap_volume_mm3 > minimum_overlap_volume_mm3
+  -> Interfering
+
+otherwise minimum_distance_mm <= touching_tolerance_mm
+  -> Touching
+
+otherwise
+  -> Separated
+```
+
+Defaults:
+
+```text
+touching_tolerance_mm = 1.0e-6
+minimum_overlap_volume_mm3 = 1.0e-6
+```
+
+The touching tolerance is finite/non-negative. The overlap tolerance is finite/positive.
+
+For `Interfering`, `minimum_distance_mm` is absent. For `Touching` and `Separated`, the finite measured OCCT minimum distance is present.
+
+`AssemblyContactAnalysis::records` is a complete classification set, not a violation list.
+
+## Block-30 sampled Revolute sweep
+
+`AssemblyRevoluteSweepAnalyzer` performs deterministic discrete sampling over one selected supported Revolute joint.
+
+Supported joint scopes:
+
+```text
+RootAssemblyLocal
+ProjectCrossHierarchy
+```
+
+The analyzer delegates to the existing corresponding motion solver and atomic applier.
+
+Request:
+
+```text
+selected joint scope + AssemblyJointId
+start AngleDeg
+end AngleDeg
+sample_count
+```
+
+Validation requires:
+
+```text
+active Revolute joint
+interval endpoints within authored limits
+2 <= sample_count <= 1001
+```
+
+Samples are inclusive and linear in requested joint-coordinate space. Caller direction is preserved.
+
+Every sample starts from:
+
+```text
+Project sample_project = source_project
+```
+
+Then:
+
+```text
+existing motion solver
+-> require convergence
+-> existing atomic motion applier
+-> AssemblyContactAnalyzer
+```
+
+No sample starts from the preceding sample. Source transforms and authored joint coordinates remain unchanged.
+
+One sample stores:
+
+```text
+sample_index
+coordinate_deg
+applied_transform_count
+complete AssemblyContactAnalysis
+```
+
+This is sampled motion analysis, not continuous collision detection. Contact/interference existing only between sample coordinates may be missed.
+
+## Focused proofs
+
+Compatibility analysis:
+
+```bash
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-interference]"
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-clearance]"
+```
+
+Typed contact classification:
+
+```bash
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-contact]"
+```
+
+Sampled Revolute sweep:
+
+```bash
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-revolute-sweep]"
+```
+
+Block-30 coverage proves exact and near touching, positive-volume interference, separated minimum distance, repeated-child rooted pair identity, deterministic insertion-order-independent pair order, source immutability, inclusive ascending/descending sample coordinates, local and cross-hierarchy motion-path reuse, a sampled `Touching -> Interfering -> Separated` transition, and fail-closed sample context.
+
+## Persistence boundary
+
+Persist existing Project/Part/Assembly model intent only.
+
+Derived/unpersisted:
+
+```text
+historical interference/clearance records
+AssemblyComponentOccurrencePairIdentity values
+AssemblyContactRecord values
+AssemblyContactAnalysis values
+sample Project copies
+sample motion results/proposals
+AssemblyRevoluteSweepSample values
+AssemblyRevoluteSweepAnalysis values
+OCCT common shapes and distance computations
+```
+
+## Current handoff
+
+Block 30 is implemented.
+
+The next technical step is Block 31 only from `docs/assembly-general-geometric-target-roadmap.md`: typed geometric target taxonomy and capability projection.
+
+Broad-phase acceleration, penetration depth/direction, collision response, persistent contact state, adaptive/continuous collision detection, and rigid-body dynamics remain deferred.
