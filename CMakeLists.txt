@@ -226,6 +226,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/assembly_cross_hierarchy_joint_tests.cpp
     tests/core/assembly_document_tests.cpp
     tests/core/assembly_exchange_graph_tests.cpp
+    tests/core/assembly_exchange_name_tests.cpp
     tests/core/assembly_hierarchy_tests.cpp
     tests/core/assembly_insert_constraint_tests.cpp
     tests/core/assembly_joint_graph_tests.cpp
@@ -266,12 +267,12 @@ if(BLCAD_BUILD_TESTS)
     tests/core/sketch_diagnostics_tests.cpp
     tests/core/sketch_dimension_tests.cpp
     tests/core/sketch_repair_command_labels_tests.cpp
-    tests/core/sketch_repair_commands_tests.cpp
+    tests/core/sketch_repair_commands.cpp
     tests/core/sketch_repair_presentation_metadata_tests.cpp
     tests/core/sketch_repair_presentation_snapshot_query_tests.cpp
     tests/core/sketch_repair_presentation_snapshot_tests.cpp
-    tests/core/sketch_repair_suggestions_tests.cpp
-    tests/core/sketch_repair_transactions_tests.cpp
+    tests/core/sketch_repair_suggestions.cpp
+    tests/core/sketch_repair_transactions.cpp
     tests/core/sketch_repair_undo_stack_summary_tests.cpp
     tests/core/sketch_repair_undo_stack_tests.cpp
     tests/core/sketch_spline_profile_json_tests.cpp
