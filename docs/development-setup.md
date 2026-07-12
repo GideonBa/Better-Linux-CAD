@@ -75,6 +75,8 @@ Core identity/model/connectivity:
 ./build/dev/blcad_core_tests "[core][datum-axis-json]"
 ./build/dev/blcad_core_tests "[core][assembly-reference-target-intent]"
 ./build/dev/blcad_core_tests "[core][assembly-reference-target-json]"
+./build/dev/blcad_core_tests "[core][semantic-generated-topology-reference]"
+./build/dev/blcad_core_tests "[core][semantic-generated-topology-recovery]"
 ./build/dev/blcad_core_tests "[core][component-instance]"
 ./build/dev/blcad_core_tests "[core][assembly-constraint]"
 ./build/dev/blcad_core_tests "[core][assembly-constraint-graph]"
@@ -96,6 +98,7 @@ Geometry target/equation/solve/motion/freshness:
 
 ```bash
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-geometric-target-taxonomy]"
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-reference-target-resolution]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-target]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-transform]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-equation]"
@@ -112,6 +115,12 @@ Geometry target/equation/solve/motion/freshness:
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-cross-hierarchy-revolute]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-cross-hierarchy-motion]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-semantic-freshness]"
+```
+
+The Block-36 tag is reserved for the next implementation step:
+
+```text
+[geometry][assembly-generated-topology-target-resolution]
 ```
 
 Posed geometry, analysis, and exchange:
@@ -135,21 +144,27 @@ Current suites cover:
 - persistent component occurrence state and direct placement;
 - first-class DatumAxis intent, ownership, dependency, and invalidation;
 - canonical `ref:` reference-target spellings, roundtrips, and fail-closed parsing;
-- additive DatumAxis JSON, historical-file compatibility, and byte-for-byte endpoint spelling roundtrips;
-- Geometry resolution of DatumPlane/DatumAxis/ConstructionLine/ConstructionPoint `ref:` sources into Block-31 Plane/Axis/Line/Point capabilities;
+- additive DatumAxis JSON, historical-file compatibility, and byte-for-byte `ref:` endpoint spelling roundtrips;
+- Geometry resolution of DatumPlane/DatumAxis/ConstructionLine/ConstructionPoint into Plane/Axis/Line/Point capabilities;
+- canonical `topo:` generated-topology spellings with strict uppercase `%HH` encoding;
+- producer-driven generated topology identity for cylindrical faces, linear edges, circular edges, and vertices;
+- finite role matrices and expected cardinality-one contracts;
+- `RectangularAdditiveExtrude` edge/vertex semantic roles;
+- `SingleCircleSubtractiveExtrude` wall/source-rim/opposite-rim semantic roles with exact source ProfileId;
+- feature insertion order independence of generated-topology identity;
+- fail-closed unsupported/ambiguous producer handling;
+- explicit rejection of patterned subelements until stable per-instance identity exists;
+- read-only generated-topology recovery and source PartDocument immutability;
+- byte-for-byte `topo:` assembly endpoint JSON roundtrips;
 - local Mate/Distance/Angle/Concentric/Insert intent and solving;
 - exact local and occurrence-qualified endpoint identity;
 - typed target source classification and capability projection;
 - Plane/Axis/Line/Point/Circle/Cylinder/Frame descriptor validation;
 - canonical capability order and unsupported-projection failure;
-- current generated planar-face target migration to `GeneratedPlanarFace -> Plane`;
-- current `.axis` producer migration to `GeneratedCylindricalFace -> Axis + Cylinder`;
+- current generated planar-face migration to `GeneratedPlanarFace -> Plane`;
+- current `.axis` migration to `GeneratedCylindricalFace -> Axis + Cylinder`;
 - current `.seat` migration to `CircularFeatureSeat -> Plane + Axis + Frame`;
-- local typed descriptor geometry equal to historical target geometry;
-- hierarchy/root-space typed descriptor geometry equal to historical target geometry;
-- exact component-plus-parent transform context on hierarchy targets;
-- existing legacy target resolver APIs adapting from typed projections;
-- canonical active fixed-axis X-then-Y-then-Z rigid transforms;
+- local and hierarchy target transform semantics;
 - shared residual flattening, central finite differences, and damped Gauss-Newton solving;
 - exact PartDocument semantic-target freshness and atomic application;
 - local and cross-hierarchy rank diagnostics;
@@ -157,9 +172,7 @@ Current suites cover:
 - Project-owned child assemblies and exact rooted hierarchy chains;
 - visible-active leaf flattening and repeated child occurrence semantics;
 - flattened and structured STEP exchange;
-- historical interference/clearance analysis;
-- complete rooted `Separated`/`Touching`/`Interfering` classification;
-- bounded local/cross-hierarchy Revolute sampling from fresh source Project copies;
+- interference, clearance, rooted contact classification, and bounded Revolute sampling;
 - document-scoped flexible child solving;
 - deterministic relationship/joint-to-`ComponentTransformAuthority` incidence;
 - complete authority/relationship/path/PartDocument freshness;
@@ -175,17 +188,24 @@ The Geometry test target has a private include path to `src/geometry` so focused
 
 Production consumers access target resolution/projection, solving, diagnostics, analysis, and export through public Geometry APIs.
 
-Block 31 public target API lives in:
+Block-31 public target API:
 
 ```text
 include/blcad/geometry/assembly_geometric_target.hpp
 ```
 
-Block 32 public Core reference-geometry APIs live in:
+Block-32 public Core reference-geometry APIs:
 
 ```text
 include/blcad/core/datum_axis.hpp
 include/blcad/core/assembly_reference_target.hpp
+```
+
+Block-35 public Core generated-topology identity API:
+
+```text
+include/blcad/core/generated_topology_reference.hpp
+include/blcad/core/reference_recovery.hpp
 ```
 
 Current typed resolvers are exposed through:
@@ -195,7 +215,9 @@ AssemblyConstraintTargetResolver::resolve_geometric
 AssemblyHierarchyConstraintTargetResolver::resolve_geometric
 ```
 
-Legacy `resolve`, `resolve_axis`, and `resolve_insert` methods remain compatibility APIs and now adapt from typed projections.
+Legacy `resolve`, `resolve_axis`, and `resolve_insert` methods remain compatibility APIs and adapt from typed projections.
+
+Block 35 intentionally does not add a `topo:` branch to these resolvers. That branch belongs to Block 36.
 
 ## Headless tools
 
@@ -224,7 +246,7 @@ blcad_move_joint <input.blcad.project.json> <joint-id> <angle-deg> <output.blcad
 blcad_analyze_assembly <input.blcad.project.json> [clearance-threshold-mm]
 ```
 
-The typed target/capability layer is a public library query contract and intentionally adds no CLI or persistent result format.
+The typed target/capability and generated-topology identity layers are public library contracts and intentionally add no CLI or persistent result format.
 
 ## Documentation entry points
 
@@ -233,25 +255,25 @@ The typed target/capability layer is a public library query contract and intenti
 - `docs/architecture-summary.md`: condensed implemented architecture
 - `docs/file-format.md`: persistent save-format authority
 - `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`: numbered assembly sequence
-- `docs/assembly-geometric-target-taxonomy-mvp5.md`: Block-31 implemented target taxonomy/projection contract
-- `docs/assembly-reference-geometry-intent-mvp5.md`: Blocks-32/33 implemented reference-geometry intent/grammar/JSON contract plus Block-34 resolution handoff
-- `docs/assembly-general-geometric-target-roadmap.md`: implemented Blocks 31–34 and planned Blocks 35–47
+- `docs/assembly-geometric-target-taxonomy-mvp5.md`: Block-31 target taxonomy/projection contract
+- `docs/assembly-reference-geometry-intent-mvp5.md`: Blocks 32–34 reference-geometry contract
+- `docs/assembly-generated-topology-reference-mvp5.md`: Block-35 generated-topology identity/recovery contract
+- `docs/assembly-general-geometric-target-roadmap.md`: implemented Blocks 31–35 and planned Blocks 36–47
 - `docs/project-goal.md`: long-term direction
 
 ## Formatting
 
 Formatting is configured by `.editorconfig` and `.clang-format`.
 
-For Block 32 production/test files:
+For Block 35 production/test files:
 
 ```bash
 clang-format -i \
-  include/blcad/core/datum_axis.hpp \
-  include/blcad/core/assembly_reference_target.hpp \
-  src/core/datum_axis.cpp \
-  src/core/assembly_reference_target.cpp \
-  tests/core/datum_axis_tests.cpp \
-  tests/core/assembly_reference_target_tests.cpp
+  include/blcad/core/generated_topology_reference.hpp \
+  include/blcad/core/reference_recovery.hpp \
+  src/core/generated_topology_reference.cpp \
+  src/core/reference_recovery.cpp \
+  tests/core/generated_topology_reference_tests.cpp
 ```
 
 ## Clean generated files
@@ -262,61 +284,39 @@ rm -rf build/
 
 ## Current assembly development boundary
 
-Blocks 23–34 are implemented.
+Blocks 23–35 are implemented.
 
-Block 31 freezes:
-
-```text
-semantic source classification
-  != geometric capability
-
-resolved target
-  = exact endpoint identity
-    + source kind
-    + source metadata
-    + typed descriptor
-    + canonical capability vector
-    + coordinate space
-    + exact transform context
-
-supported projection path
-  = project_plane / project_axis / project_line
-    / project_point / project_circle / project_cylinder / project_frame
-```
-
-Block 32 freezes:
+Block 35 freezes:
 
 ```text
-DatumAxis
-  = Explicit (finite origin + unit direction + parameter dependencies)
-    | FromConstructionLine (owned ConstructionLineId identity)
+generated topology identity
+  = semantic feature producer
+    + semantic family
+    + named producer role
+    + exact source ProfileId where profile-derived
 
-reference semantic source spelling
-  = ref:<family>:<encoded-id>
+canonical spelling
+  = topo:<family>:<encoded producer ids>:<role>
     with uppercase %HH escaping outside [A-Za-z0-9_-]
 
-valid reference spellings are dot-free
-  -> provably disjoint from <feature-id>.<role> spellings
+supported first producers
+  = RectangularAdditiveExtrude
+      12 linear edges + 8 vertices, cardinality 1 each
+    SingleCircleSubtractiveExtrude
+      wall + source_rim + opposite_rim, cardinality 1 each
+
+pattern result-vector index != persistent instance identity
+
+recovery
+  = read-only validation of current producer/profile/role intent
+  -> Resolved | Lost
 ```
 
-Block 34 freezes:
-
-```text
-ref: target resolution
-  = DatumPlane -> Plane
-    DatumAxis -> Axis + Line
-    ConstructionLine -> Line
-    ConstructionPoint -> Point
-
-local reference targets remain component-local
-hierarchy reference targets use the exact component-plus-parent transform chain
-canonical PartDocument snapshots remain freshness authority
-```
-
-Focused Block-34 tests:
+Focused Block-35 tests:
 
 ```bash
-./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-reference-target-resolution]"
+./build/dev/blcad_core_tests "[core][semantic-generated-topology-reference]"
+./build/dev/blcad_core_tests "[core][semantic-generated-topology-recovery]"
 ```
 
-The immediate next step is Block 35: stable semantic generated topology identity and recovery. Exact sequencing is maintained in `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md` and detailed target planning in `docs/assembly-general-geometric-target-roadmap.md`.
+The immediate next step is Block 36: generated face/edge/vertex Geometry target resolution. Exact sequencing is maintained in `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md` and detailed target planning in `docs/assembly-general-geometric-target-roadmap.md`.
