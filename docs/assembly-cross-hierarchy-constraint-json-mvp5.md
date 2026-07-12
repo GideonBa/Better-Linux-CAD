@@ -1,18 +1,10 @@
-# Cross-Hierarchy Constraint Project JSON and Structure Validation MVP-5
+# Cross-Hierarchy Geometric Constraint Project JSON MVP-5
 
-Status: implemented as Block 24 of `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`.
+Status: implemented as Block 24. Blocks 25 and 26 are implemented follow-ups; Block 27 is next.
 
-Exact Project JSON spelling is canonical in `docs/file-format.md`.
+This document is canonical for the Project JSON spelling and Core structure-validation boundary of persistent `AssemblyHierarchyConstraint` records.
 
-This document records the persistence and Core structure-validation boundary for project-level `AssemblyHierarchyConstraint` intent.
-
-## Scope
-
-Block 24 makes the Block-23 Core model intent roundtrip through Project JSON and validates exact rooted endpoint structure.
-
-It does not resolve semantic feature geometry, derive solve connectivity, or run numeric solving.
-
-## Project-level additive field
+## Additive Project field
 
 Project JSON stores:
 
@@ -20,53 +12,18 @@ Project JSON stores:
 cross_hierarchy_constraints[]
 ```
 
-The field is additive under the existing project schema/version marker.
+The field is additive. A Project file without the field loads with an empty cross-hierarchy constraint collection.
 
-Files without the field load with:
-
-```text
-Project::cross_hierarchy_constraints().empty() == true
-```
-
-No schema marker bump is required for this additive optional collection.
-
-## Endpoint JSON
-
-Representative endpoint:
-
-```json
-{
-  "occurrence_path": [
-    "subassembly.outer",
-    "subassembly.inner"
-  ],
-  "component_instance": "component.shaft",
-  "semantic_reference": "feature.bore.axis"
-}
-```
-
-The explicit root occurrence uses:
-
-```json
-{
-  "occurrence_path": [],
-  "component_instance": "component.root",
-  "semantic_reference": "feature.base.top"
-}
-```
-
-`occurrence_path` element order is persistent endpoint identity.
-
-The serializer does not sort or normalize path ids.
+Serialization emits the collection without changing local `AssemblyDocument::constraints()` JSON.
 
 ## Relationship JSON
 
-Representative Concentric relationship:
+One Project-level cross-hierarchy relationship stores:
 
 ```json
 {
-  "id": "constraint.cross.main",
-  "name": "Root to nested shaft",
+  "id": "constraint.cross.shaft",
+  "name": "Shaft alignment",
   "type": "concentric",
   "target_a": {
     "occurrence_path": [],
@@ -82,7 +39,7 @@ Representative Concentric relationship:
 }
 ```
 
-Supported type spellings are:
+Supported `type` spellings are:
 
 ```text
 mate
@@ -92,7 +49,7 @@ insert
 angle
 ```
 
-Supported state spellings are:
+Supported `state` spellings are:
 
 ```text
 active
@@ -101,12 +58,39 @@ inactive
 
 Target A/B order is preserved exactly.
 
+## Endpoint JSON
+
+An endpoint stores:
+
+```json
+{
+  "occurrence_path": [
+    "subassembly.outer",
+    "subassembly.inner"
+  ],
+  "component_instance": "component.shaft",
+  "semantic_reference": "feature.bore.axis"
+}
+```
+
+The empty path addresses the explicit root assembly occurrence:
+
+```json
+{
+  "occurrence_path": [],
+  "component_instance": "component.root",
+  "semantic_reference": "feature.base.top"
+}
+```
+
+`occurrence_path` element order is persistent endpoint identity and is never sorted or normalized.
+
 ## Distance and Angle quantities
 
 Distance uses:
 
 ```json
-"distance": {
+{
   "unit": "mm",
   "value": 12.5
 }
@@ -115,7 +99,7 @@ Distance uses:
 Angle uses:
 
 ```json
-"angle": {
+{
   "unit": "deg",
   "value": 35.0
 }
@@ -123,58 +107,32 @@ Angle uses:
 
 Unsupported unit spellings fail closed.
 
-The existing `AssemblyHierarchyConstraint::create` value-family contract remains authoritative:
+The established family/value contract remains authoritative:
 
 ```text
-Distance requires LengthMm and excludes Angle
-Angle requires AngleDeg and excludes Distance
-Mate/Concentric/Insert carry neither value
+Distance -> one LengthMm quantity
+Angle    -> one AngleDeg quantity
+Mate / Concentric / Insert -> no explicit value
 ```
 
-## Load order
+## Loading and collection uniqueness
 
-Project deserialization performs:
+During loading:
 
-```text
-root AssemblyDocument
-  -> child AssemblyDocument records
-  -> PartDocument records
-  -> cross_hierarchy_constraints[] records
-  -> Project::validate_assembly_structure()
-```
+1. relationship type and state are parsed fail-closed;
+2. target A and target B endpoints are reconstructed in stored order;
+3. Distance/Angle quantities are reconstructed with existing `Quantity` validation;
+4. `AssemblyHierarchyConstraint::create` applies the shared family/value contract;
+5. `Project::add_cross_hierarchy_constraint` enforces Project-level cross-hierarchy id uniqueness;
+6. complete Project structure validation runs after all records are loaded.
 
-Project-level duplicate cross-hierarchy constraint ids are rejected during additive insertion.
+Duplicate Project-level cross-hierarchy ids are rejected.
 
-Complete structure validation also rejects duplicate ids if a caller has corrupted the mutable collection directly.
+Local document-scoped constraint ids remain independent from the Project-level cross-hierarchy collection.
 
-## Exact Core endpoint path validation
+## Core structure-validation order
 
-`Project::validate_cross_hierarchy_constraints()` follows each endpoint from the explicit root.
-
-For:
-
-```text
-occurrence_path = [outer, inner]
-```
-
-the validator performs:
-
-```text
-root assembly
-  -> find SubassemblyInstance outer in root
-  -> resolve outer.referenced_assembly_document
-  -> find SubassemblyInstance inner in reached child document
-  -> resolve inner.referenced_assembly_document
-  -> require endpoint.component_instance in final reached assembly document
-```
-
-The validator never performs a global occurrence-id or component-id search.
-
-The exact ordered authored path must resolve.
-
-## Validation order
-
-`Project::validate_assembly_structure()` performs:
+`Project::validate_assembly_structure()` validates:
 
 ```text
 member parts
@@ -182,54 +140,78 @@ member parts
   -> local assembly constraints
   -> local assembly joints
   -> complete assembly hierarchy
-  -> cross-hierarchy constraint endpoint structure
+  -> cross-hierarchy endpoint structure
 ```
 
-The hierarchy is therefore known to have valid child references and no direct or indirect cycles before endpoint paths are followed.
+The complete hierarchy validates before endpoint path resolution.
 
-This ordering is intentional. An invalid hierarchy fails before an endpoint error that depends on that hierarchy.
+This prevents endpoint resolution from treating an invalid or cyclic assembly graph as a rooted path authority.
 
-## No Geometry dependency
+## Exact endpoint path validation
 
-Structure validation follows authored Core `SubassemblyInstance` references directly.
+After hierarchy validation, every endpoint path is followed directly from the explicit root through each authored `SubassemblyInstanceId` in stored order.
 
-It does not call:
+For:
 
 ```text
-AssemblyHierarchyTraversal::build
-AssemblyConstraintTargetResolver
-AssemblyHierarchyConstraintTargetResolver
-OCCT
+occurrence_path = [outer, inner]
 ```
 
-`AssemblyHierarchyTraversal::build` itself requires complete `Project::validate_assembly_structure()` success. Calling it from endpoint structure validation would recursively re-enter the full validation path.
-
-## Semantic geometry remains unresolved
-
-The JSON/Core structure layer treats semantic-reference text as persistent opaque intent.
-
-For example:
+validation requires:
 
 ```text
-semantic.no_geometry.distance.a
+root contains outer
+  -> outer references an owned child AssemblyDocument
+  -> reached child contains inner
+  -> inner references an owned child AssemblyDocument
+  -> final reached document contains the endpoint ComponentInstanceId
 ```
 
-may roundtrip when path and component structure are valid.
+No global occurrence-id or component-id search is used.
 
-A later Geometry target resolver may reject the token as unsupported.
+The addressed local component must exist in the exact assembly document reached by the path.
 
-Block 24 does not inspect PartDocument feature history or target family compatibility.
+## No semantic geometry execution during load
+
+Block-24 structure validation does not:
+
+- parse semantic face/axis/seat families;
+- inspect target-producing features;
+- execute OCCT;
+- build root-space geometry;
+- evaluate residuals.
+
+Arbitrary semantic-reference text can therefore roundtrip when endpoint identity and Project structure are valid.
+
+A later Geometry target resolver may reject unsupported semantic geometry.
 
 ## Transform immutability
 
-Loading or serializing project-level cross-hierarchy constraints does not change:
+Project serialization/deserialization and cross-hierarchy structure validation do not change:
 
 ```text
 ComponentInstance::transform()
 SubassemblyInstance::transform()
 ```
 
-It also does not solve, move, ground, suppress, hide, or alter joint coordinates.
+Stored direct component and rigid boundary transforms roundtrip as existing model intent.
+
+## Failure policy
+
+Loading/structure validation fails closed on:
+
+- malformed JSON members;
+- unsupported relationship type/state spellings;
+- unsupported Distance/Angle unit spellings;
+- invalid endpoint identity;
+- invalid relationship family/value combinations;
+- duplicate Project-level cross-hierarchy ids;
+- invalid ordinary member/component/local relationship/joint structure;
+- missing child assembly references or hierarchy cycles;
+- endpoint occurrence paths absent from the exact rooted authored hierarchy;
+- addressed local components absent from the exact reached assembly document.
+
+Semantic feature existence and target-family geometry compatibility are not structure checks.
 
 ## Focused coverage
 
@@ -245,23 +227,7 @@ Focused tag:
 [core][assembly-cross-hierarchy-json]
 ```
 
-The suite proves:
-
-- full five-family Project JSON roundtrip;
-- id/name/type/state preservation;
-- exact target A/B preservation;
-- exact nested occurrence-path element order;
-- root empty-path roundtrip;
-- Distance millimeter roundtrip;
-- Angle degree roundtrip;
-- absent-field backward compatibility;
-- duplicate id rejection during loading;
-- duplicate id rejection after direct mutable collection corruption;
-- missing exact path rejection;
-- missing reached-component rejection;
-- hierarchy validation preceding endpoint validation;
-- arbitrary semantic-reference text remaining unresolved during loading;
-- component and subassembly transform immutability.
+The suite proves all five relationship families roundtrip, id/name/type/state preservation, exact target A/B and nested path order, root empty-path roundtrip, `mm` and `deg` quantities, absent-field backward compatibility, duplicate-id rejection, missing-path and reached-component rejection, hierarchy-error precedence, unresolved semantic text during load, and transform immutability.
 
 Focused command:
 
@@ -269,47 +235,30 @@ Focused command:
 ./build/dev/blcad_core_tests "[core][assembly-cross-hierarchy-json]"
 ```
 
-## Implemented follow-up
+## Implemented follow-ups
 
-Block 25 is implemented in `docs/assembly-cross-hierarchy-incidence-groups-mvp5.md`.
+Block 25 is canonical in `docs/assembly-cross-hierarchy-incidence-groups-mvp5.md` and derives active relationship participation, transform-authority mapping, unique incidence, endpoint mappings, and deterministic cross-hierarchy solve groups.
 
-It derives:
+Block 26 is canonical in `docs/assembly-cross-hierarchy-numeric-solver-mvp5.md` and executes one exact current solve group through authority-scoped variables, mixed local/root-space residual evaluation, shared finite differences, and the existing numeric solve engine. Results remain unapplied.
 
-```text
-ComponentTransformAuthority identity
-active local/project-level relationship participation
-unique relationship-to-authority incidence
-TargetA/TargetB endpoint-to-authority mappings
-deterministic connected cross-hierarchy solve groups
-```
+Neither follow-up changes the Project JSON spelling defined here.
 
-The derived graph is unpersisted.
+## Explicitly deferred from the persistence/structure layer
 
-## Explicitly deferred
+This JSON/structure contract does not implement:
 
-The persistence/structure layer does not implement:
-
-- numeric transform-authority variables;
-- mixed local/root-space residual evaluation;
-- authority-scoped finite-difference Jacobians;
-- Gauss-Newton solve execution for cross-hierarchy groups;
-- solve-result snapshots or proposals;
-- result application;
+- result freshness validation;
+- atomic cross-hierarchy solve-result application;
 - cross-hierarchy rank/remaining-DOF diagnostics;
-- cross-hierarchy joints.
+- semantic target-producing PartDocument revision tracking;
+- cross-hierarchy joints or nested motion;
+- occurrence-local internal pose overrides;
+- whole-subassembly solve variables.
 
-## Next technical step
+## Current handoff
 
-Implement Block 26 from `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`:
+The sequence source of truth is `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`.
 
-```text
-AssemblyCrossHierarchySolveGroup
-  -> unique free active authority variables
-  -> local relationship residuals in document-local space
-  -> cross-hierarchy relationship residuals in root space
-  -> shared scaled residual/Jacobian path
-  -> existing numeric solve engine
-  -> unapplied authority-scoped proposals
-```
+Next is Block 27 only: complete Block-26 result freshness validation, an explicit semantic target-geometry freshness contract, atomic authority-qualified direct-transform application, and rank/remaining-DOF diagnostics over the exact Block-26 free-authority variable order.
 
-Do not apply solve results or add cross-hierarchy diagnostics in Block 26.
+No new Project JSON field is planned for derived solve results, residuals, Jacobians, snapshots, proposals, or diagnostics.

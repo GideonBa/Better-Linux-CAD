@@ -1,82 +1,55 @@
 # Cross-Hierarchy Geometric Constraint Intent MVP-5
 
-Status: implemented as Block 23 of `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`.
+Status: implemented as Block 23. Blocks 24-26 are implemented follow-ups; Block 27 is next.
 
-This document is canonical for the Core-owned occurrence-qualified endpoint value contract and persistent Project-owned cross-hierarchy geometric relationship intent.
+This document is canonical for the Core-owned persistent identity and Project-level model intent of geometric relationships whose endpoints may belong to different rooted assembly occurrences.
 
-## Scope
+## Persistent endpoint identity
 
-Block 23 introduces persistent model intent only.
-
-It does not resolve hierarchy paths, semantic feature geometry, graph connectivity, numeric variables, or solve results during record creation or insertion.
-
-## Core-owned endpoint identity
-
-Persistent endpoint identity is:
+`AssemblyHierarchyConstraintEndpoint` stores:
 
 ```text
-AssemblyHierarchyConstraintEndpoint =
-  (occurrence_path,
-   local ComponentInstanceId,
-   semantic_reference)
+occurrence_path
+local ComponentInstanceId
+semantic_reference
 ```
 
-The endpoint type lives in Core.
-
-It is the persistence authority used by `AssemblyHierarchyConstraint` and Project JSON.
-
-The Geometry-layer `AssemblyHierarchyConstraintTarget` remains a derived query seed and is not save-format authority.
-
-## Root and child paths
-
-The explicit root assembly occurrence uses:
+Exact identity is:
 
 ```text
-occurrence_path = []
+(occurrence_path,
+ local ComponentInstanceId,
+ semantic_reference)
 ```
 
-A child or nested occurrence uses the exact root-to-current authored `SubassemblyInstanceId` sequence:
+The empty `occurrence_path` addresses the explicit root assembly occurrence.
+
+A non-empty path is an exact root-to-current ordered sequence of `SubassemblyInstanceId` values. Path order is identity and is not sorted or normalized.
+
+Endpoint construction rejects:
+
+- an empty `SubassemblyInstanceId` inside the path;
+- an empty local `ComponentInstanceId`;
+- an empty semantic reference.
+
+Construction stores identity only. It does not walk the hierarchy or resolve geometry.
+
+## Persistent Project-level relationship intent
+
+`AssemblyHierarchyConstraint` stores:
 
 ```text
-[subassembly.outer, subassembly.inner]
-```
-
-Path order is preserved exactly.
-
-Endpoint construction validates identity shape only:
-
-- every path id is non-empty;
-- `ComponentInstanceId` is non-empty;
-- `semantic_reference` is non-empty.
-
-Block 23 does not ask whether a path or addressed component exists in the current Project.
-
-That structure boundary is implemented by Block 24.
-
-## Project-level relationship record
-
-Persistent cross-hierarchy geometric relationship intent is:
-
-```text
-AssemblyHierarchyConstraint
-```
-
-The record stores:
-
-```text
-AssemblyConstraintId id
+AssemblyConstraintId
 name
-AssemblyConstraintType type
+AssemblyConstraintType
 target A: AssemblyHierarchyConstraintEndpoint
 target B: AssemblyHierarchyConstraintEndpoint
-AssemblyConstraintState state
+AssemblyConstraintState
 optional Distance quantity
 optional Angle quantity
 ```
 
-Target A/B order is persistent intent.
-
-Supported families reuse the existing local relationship enum:
+Supported relationship families are:
 
 ```text
 Mate
@@ -86,50 +59,27 @@ Insert
 Angle
 ```
 
-Supported states reuse:
+The established value-family rules are reused from local `AssemblyConstraint` intent:
 
 ```text
-Active
-Inactive
+Mate         -> no Distance, no Angle
+Concentric   -> no Distance, no Angle
+Insert       -> no Distance, no Angle
+Distance     -> LengthMm required, no Angle
+Angle        -> AngleDeg required, no Distance
 ```
 
-## Shared value-family rules
+Target A/B order is persistent and must not be normalized.
 
-`AssemblyHierarchyConstraint::create` delegates the established local `AssemblyConstraint` value-family contract.
-
-```text
-Mate
-  no distance
-  no angle
-
-Concentric
-  no distance
-  no angle
-
-Insert
-  no distance
-  no angle
-
-Distance
-  requires LengthMm
-  no angle
-
-Angle
-  requires AngleDeg
-  no distance
-```
-
-The cross-hierarchy model does not define a second interpretation of Distance or Angle values.
-
-## Project ownership and id scope
+## Ownership and id scope
 
 `Project` owns:
 
 ```text
-cross_hierarchy_constraints_
+std::vector<AssemblyHierarchyConstraint> cross_hierarchy_constraints
 ```
 
-Public APIs include:
+Public collection APIs are:
 
 ```text
 add_cross_hierarchy_constraint
@@ -138,61 +88,47 @@ cross_hierarchy_constraint_count
 find_cross_hierarchy_constraint
 ```
 
-Cross-hierarchy ids are unique inside the Project-level cross-hierarchy collection.
+Cross-hierarchy constraint ids are unique within the Project-level cross-hierarchy collection.
 
-Local `AssemblyConstraintId` values remain scoped by their containing `AssemblyDocument`.
-
-Therefore this is legal:
-
-```text
-assembly.root / constraint.shared
-project cross-hierarchy collection / constraint.shared
-```
-
-but two project-level cross-hierarchy records with `constraint.shared` are invalid.
+Local `AssemblyDocument::constraints()` retain their document-scoped id space. Therefore a local constraint and one Project-level cross-hierarchy constraint may use the same textual `AssemblyConstraintId` without aliasing.
 
 ## Intent construction does not resolve structure
 
-A Project may temporarily contain intent such as:
-
-```text
-([subassembly.outer, subassembly.inner], component.shaft, feature.bore.axis)
-```
-
-before a caller requests complete structure validation.
-
-`add_cross_hierarchy_constraint` checks project-level id uniqueness only.
+`add_cross_hierarchy_constraint` validates Project-level id uniqueness only.
 
 It does not:
 
 - walk the rooted hierarchy;
-- require reached components;
-- resolve PartDocument ids;
+- require endpoint paths to resolve immediately;
+- require addressed local components immediately;
+- resolve referenced PartDocument geometry;
 - inspect semantic target families;
 - call OCCT.
 
-Complete Project structure validation is a separate boundary.
+Complete endpoint structure validation belongs to the Project structure boundary implemented by Block 24.
 
-## Core-to-Geometry query bridge
+## Core-to-Geometry bridge
 
-`AssemblyHierarchyConstraintQuery::create` accepts either Core endpoint values or a complete `AssemblyHierarchyConstraint`.
+`AssemblyHierarchyConstraintQuery::create` accepts either Core endpoint values or a complete persistent `AssemblyHierarchyConstraint`.
 
-The bridge converts Core endpoint identity into the derived Geometry query target and reuses the implemented root-space target/residual semantics.
+The Geometry query layer converts Core endpoint identity into the derived `AssemblyHierarchyConstraintTarget` seed and reuses the existing root-space target/equation semantics.
 
-This does not make the Geometry target persistent.
+The Geometry query type is not persistent authority.
 
 ## Transform immutability
 
-Creating or adding cross-hierarchy relationship intent never changes:
+Creating or adding Project-level cross-hierarchy intent never changes:
 
 ```text
 ComponentInstance::transform()
 SubassemblyInstance::transform()
+grounding state
+suppression state
+visibility
+joint coordinates
 ```
 
 Relationship creation is not solving.
-
-Grounding, suppression, visibility, and joint coordinates are also unchanged.
 
 ## Focused coverage
 
@@ -208,20 +144,7 @@ Focused tag:
 [core][assembly-cross-hierarchy-intent]
 ```
 
-The suite proves:
-
-- root empty-path endpoint identity;
-- exact nested path order;
-- empty path-element/component/semantic identity rejection;
-- shared five-family value rules;
-- inactive state preservation;
-- Distance and Angle quantity preservation;
-- exact target A/B endpoint preservation;
-- Project-owned collection access and lookup;
-- Project-level id uniqueness;
-- separate local and project-level id scopes;
-- root-to-child, repeated-left-to-right, and nested-to-root intent construction without structure or geometry execution;
-- component and subassembly transform immutability.
+The suite proves root empty-path identity, exact nested path ordering, invalid identity rejection, all five value-family rules, inactive state preservation, Distance/Angle quantity preservation, exact target A/B preservation, Project collection access, Project-level id uniqueness, separate local/Project id scopes, intent construction before structure or geometry resolution, and transform immutability.
 
 Focused command:
 
@@ -231,7 +154,7 @@ Focused command:
 
 ## Implemented follow-ups
 
-Block 24 is implemented in `docs/assembly-cross-hierarchy-constraint-json-mvp5.md`:
+Block 24 is canonical in `docs/assembly-cross-hierarchy-constraint-json-mvp5.md`:
 
 ```text
 cross_hierarchy_constraints[] Project JSON
@@ -241,40 +164,55 @@ exact occurrence-path structure validation
 reached local component validation
 ```
 
-Block 25 is implemented in `docs/assembly-cross-hierarchy-incidence-groups-mvp5.md`:
+Block 25 is canonical in `docs/assembly-cross-hierarchy-incidence-groups-mvp5.md`:
 
 ```text
 active relationship participation
 ComponentTransformAuthority identity
 relationship-to-authority incidence
 endpoint-to-authority mappings
-connected cross-hierarchy solve groups
+deterministic connected cross-hierarchy solve groups
 ```
 
-The Block-25 graph remains derived and unpersisted.
-
-## Explicitly deferred
-
-- numeric authority-variable ordering and candidate transforms;
-- mixed local/root-space residual execution;
-- cross-hierarchy finite-difference Jacobians;
-- numeric solve results and proposals;
-- freshness snapshots and atomic application;
-- cross-hierarchy rank/DOF diagnostics;
-- cross-hierarchy joints and nested motion.
-
-## Next technical step
-
-Implement Block 26 only:
+Block 26 is canonical in `docs/assembly-cross-hierarchy-numeric-solver-mvp5.md`:
 
 ```text
-AssemblyCrossHierarchySolveGroup
-  -> unique free active ComponentTransformAuthority variables
-  -> mixed local/root-space residual evaluation
-  -> shared scaled residual vector
-  -> authority-scoped central finite-difference Jacobian
-  -> existing numeric solve engine
-  -> unapplied transform proposals
+unique free authority variable blocks
+mixed document-local/root-space residual evaluation
+shared five-family residual flattening
+shared central finite-difference Jacobian
+existing Gauss-Newton engine
+complete authority snapshots
+unapplied authority-scoped transform proposals
 ```
 
-Do not add result application or cross-hierarchy diagnostics in the same block.
+All Block-24/25/26 execution products remain derived except the original Project-owned relationship intent and direct component transforms already owned by the model.
+
+## Explicitly deferred from this intent layer
+
+This Core intent contract does not itself implement:
+
+- result freshness validation;
+- atomic cross-hierarchy solve-result application;
+- cross-hierarchy rank/remaining-DOF diagnostics;
+- semantic target-producing PartDocument revision tracking;
+- cross-hierarchy joints and nested motion;
+- occurrence-local internal child pose overrides;
+- whole-subassembly solve variables.
+
+## Current handoff
+
+The current sequence source of truth is `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`.
+
+Next is Block 27 only:
+
+```text
+Block-26 solve result
+  -> authority + relationship + hierarchy-boundary freshness validation
+  -> explicit semantic target-geometry freshness contract
+  -> atomic authority-qualified direct-transform application
+  -> rank / constrained-DOF / remaining-DOF diagnostics
+     over the exact Block-26 free-authority variable order
+```
+
+Do not add cross-hierarchy joint motion, occurrence-local internal pose overrides, or whole-subassembly transform variables in Block 27.
