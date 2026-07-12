@@ -2,7 +2,7 @@
 
 Status: implemented as Block 31 of `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`.
 
-This document is canonical for the Geometry-layer derived assembly target taxonomy, typed geometric descriptors, source-to-capability projection matrix, local/root-space resolved target contract, and the compatibility adaptation of the current generated face, `.axis`, and `.seat` families.
+This document is canonical for the Geometry-layer derived assembly target taxonomy, typed geometric descriptors, source-to-capability projection matrix, local/root-space resolved target contract, and compatibility adaptation of the existing generated face, `.axis`, and `.seat` families.
 
 ## Scope
 
@@ -11,43 +11,43 @@ Implemented:
 - derived `AssemblyGeometricTargetSourceKind` classification;
 - derived `AssemblyGeometricTargetCapability` values;
 - exact local and occurrence-qualified endpoint identity retention;
-- explicit component-local versus root-assembly coordinate-space identity;
+- explicit component-local versus root-assembly coordinate space;
 - typed Plane, Axis, Line, Point, Circle, Cylinder, and Frame descriptors;
-- one `AssemblyResolvedGeometricTarget` variant/value boundary;
-- canonical deterministic capability order;
+- one `AssemblyResolvedGeometricTarget` value/variant boundary;
+- canonical deterministic capability ordering;
 - explicit fail-closed capability projection helpers;
-- current six generated planar-face tokens as `GeneratedPlanarFace -> Plane`;
-- current single-circle subtractive-extrude `.axis` producer as `GeneratedCylindricalFace -> Axis + Cylinder`;
+- all six current generated planar-face tokens as `GeneratedPlanarFace -> Plane`;
+- the current single-circle subtractive-extrude `.axis` producer as `GeneratedCylindricalFace -> Axis + Cylinder`;
 - current `.seat` as `CircularFeatureSeat -> Plane + Axis + Frame`;
 - local component-space typed resolution;
 - exact hierarchy/root-space typed resolution;
-- compatibility adapters for existing `resolve`, `resolve_axis`, `resolve_insert` APIs;
+- compatibility adapters for existing local/hierarchy `resolve`, `resolve_axis`, and `resolve_insert` APIs;
 - existing equation/residual consumers routed through the projection boundary;
 - source Project immutability.
 
 Not implemented:
 
 - new semantic-reference grammar;
-- assembly-selectable DatumPlane/DatumAxis/ConstructionLine/ConstructionPoint intent;
+- assembly-selectable DatumPlane/DatumAxis/ConstructionLine/ConstructionPoint source intent;
 - first-class `DatumAxis` Core records;
 - JSON/save-format changes;
-- generated cylindrical-face/edge/vertex persistent semantic topology identity;
+- stable generated cylindrical-face/edge/vertex topology identity;
 - relationship compatibility matrix;
-- Coincident, Parallel, or Perpendicular relationship intent;
+- Coincident, Parallel, or Perpendicular intent/equations;
 - richer joint families.
 
 ## Authority boundary
 
-Persistent assembly endpoint authority remains Core model intent.
+Persistent endpoint authority remains Core model intent.
 
-Local endpoint:
+Local:
 
 ```text
 (local ComponentInstanceId,
  semantic_reference)
 ```
 
-Occurrence-qualified endpoint:
+Occurrence-qualified:
 
 ```text
 (occurrence_path,
@@ -55,7 +55,7 @@ Occurrence-qualified endpoint:
  semantic_reference)
 ```
 
-Block 31 does not replace these identities and does not persist a source-kind enum or geometric descriptor.
+Block 31 does not replace those identities and does not persist a source kind, descriptor, capability vector, coordinate space, or transform context.
 
 Derived Geometry products are:
 
@@ -69,27 +69,23 @@ capability vectors
 project_* projection results
 ```
 
-These values are regenerated from the current Project/PartDocument model intent and exact semantic endpoint string.
+They are regenerated from the current Project/PartDocument model intent and exact semantic endpoint string.
 
-No Block-31 type is a save-format authority.
-
-## Semantic source kind versus geometric capability
-
-The selected/current semantic model source and the geometry an equation may consume are separate concepts.
+## Source kind versus capability
 
 Source kind answers:
 
 ```text
-what model source produced the resolved target?
+which semantic model source produced this target?
 ```
 
 Capability answers:
 
 ```text
-what typed geometric primitive may a consumer request from that target?
+which typed geometric primitive may a consumer request?
 ```
 
-The implemented source-kind taxonomy is:
+Implemented source kinds:
 
 ```text
 GeneratedPlanarFace
@@ -104,7 +100,7 @@ ConstructionPoint
 CircularFeatureSeat
 ```
 
-The implemented capability taxonomy is:
+Implemented capabilities in global canonical order:
 
 ```text
 Plane
@@ -116,25 +112,9 @@ Cylinder
 Frame
 ```
 
-A source kind is not itself a solver primitive. Equation and compatibility consumers obtain geometry through explicit capability projection.
+A source kind is not itself an equation primitive. Consumers obtain geometry through explicit capability projection.
 
-## Canonical capability order
-
-The global deterministic capability order is:
-
-```text
-Plane
-Axis
-Line
-Point
-Circle
-Cylinder
-Frame
-```
-
-Every resolved target stores the exact canonical subsequence for its source kind.
-
-Current matrix:
+## Canonical capability matrix
 
 ```text
 GeneratedPlanarFace
@@ -174,13 +154,11 @@ CircularFeatureSeat
   -> Frame
 ```
 
-The displayed order is capability order, not implementation or enum insertion order chosen by one caller.
-
-A resolved target whose capability vector differs in value or order from this matrix fails validation.
+Every resolved target stores the exact canonical subsequence for its source kind. A value/order mismatch fails validation.
 
 ## Endpoint identity variants
 
-`AssemblyGeometricTargetEndpointIdentity` is a derived variant with two exact shapes.
+`AssemblyGeometricTargetEndpointIdentity` is a derived variant.
 
 Local:
 
@@ -199,31 +177,29 @@ AssemblyHierarchyGeometricTargetEndpointIdentity
   semantic_reference
 ```
 
-The exact persistent semantic-reference string is retained verbatim.
+The persistent semantic-reference string is retained verbatim. The hierarchy path remains the exact ordered root-to-current `SubassemblyInstanceId` sequence; the empty path remains the explicit root occurrence.
 
-The hierarchy path remains the exact root-to-current ordered `SubassemblyInstanceId` sequence. The empty path remains an explicit root occurrence.
-
-No joined path string, OCCT topology id, XDE label, STEP entity id, or `ComponentTransformAuthority` replaces endpoint identity.
+Joined path strings, OCCT topology ids, XDE labels, STEP entity ids, and `ComponentTransformAuthority` never replace endpoint identity.
 
 ## Coordinate-space contract
 
-One resolved target explicitly records:
+Resolved targets explicitly store:
 
 ```text
 ComponentLocal
 RootAssembly
 ```
 
-Local endpoints use:
+Local target:
 
 ```text
 coordinate_space = ComponentLocal
 transforms_inner_to_outer = [component_transform]
 ```
 
-The typed descriptor itself remains component-local. The direct component transform is retained separately as current placement context.
+The descriptor itself is component-local. The direct component transform is retained as placement context and is not already applied to the descriptor.
 
-Occurrence-qualified targets use:
+Hierarchy target:
 
 ```text
 coordinate_space = RootAssembly
@@ -234,13 +210,11 @@ transforms_inner_to_outer =
    T_outer_parent]
 ```
 
-The typed descriptor has already been evaluated into root-assembly space through the exact stored transform chain.
-
-This separation prevents accidental double application of component placement.
+The hierarchy descriptor has already been evaluated through that exact chain into root-assembly space. Retaining both coordinate-space identity and the exact chain prevents accidental double application.
 
 ## Source metadata
 
-`AssemblyGeometricTargetSourceMetadata` currently retains:
+`AssemblyGeometricTargetSourceMetadata` currently stores:
 
 ```text
 referenced_part_document
@@ -251,26 +225,26 @@ optional semantic_axis
 optional semantic_seating_plane
 ```
 
-The endpoint semantic-reference string remains exact identity authority. Metadata is derived resolved model context for diagnostics, compatibility adapters, and future presentation.
+The endpoint semantic-reference remains identity authority. Metadata is derived resolved model context for validation, compatibility adapters, diagnostics, and future presentation.
 
-Current metadata validation:
+Current metadata requirements:
 
 ```text
 GeneratedPlanarFace
-  requires source_feature + semantic_face
+  source_feature + semantic_face
 
 GeneratedCylindricalFace
-  requires source_feature + source_profile
+  source_feature + source_profile
 
 GeneratedLinearEdge / GeneratedCircularEdge / GeneratedVertex
-  require source_feature
+  source_feature
 
 CircularFeatureSeat
-  requires source_feature + source_profile
-           + semantic_axis + semantic_seating_plane
+  source_feature + source_profile
+  + semantic_axis + semantic_seating_plane
 ```
 
-Datum/reference source-specific ids and their unambiguous semantic-reference grammar are intentionally not interpreted by Block 31. That authority boundary belongs to Block 32.
+Datum/reference source-specific ids and semantic-reference grammar are intentionally deferred to Block 32.
 
 ## Typed descriptor variant
 
@@ -286,7 +260,7 @@ AssemblyCylindricalSurfaceTargetDescriptor
 AssemblyFrameTargetDescriptor
 ```
 
-It is not a bag of unrelated optional geometric fields.
+It is not a bag of unrelated optional fields.
 
 ### Plane
 
@@ -296,6 +270,18 @@ x_axis
 y_axis
 normal
 ```
+
+A Plane preserves the existing BLCAD workplane contract: `x_axis`, `y_axis`, and the independently oriented face `normal` are finite unit and pairwise orthogonal. Plane does **not** require `cross(x_axis, y_axis) == normal`.
+
+This is required for historical generated-face semantics. For example the existing Bottom face is:
+
+```text
+x_axis = +X
+y_axis = +Y
+normal = -Z
+```
+
+and remains valid and numerically unchanged.
 
 ### Axis
 
@@ -311,7 +297,7 @@ origin
 direction
 ```
 
-Axis and Line are separate descriptor/capability types even though both currently carry one origin plus one direction. Axis represents rotational/cylindrical semantic geometry; Line represents linear geometry.
+Axis and Line are separate semantic geometric types even though both currently carry one origin and one direction.
 
 ### Point
 
@@ -328,6 +314,8 @@ y_axis
 normal
 radius_mm
 ```
+
+Circle carries a finite positive radius and a right-handed orthonormal orientation frame.
 
 ### Cylinder
 
@@ -346,11 +334,11 @@ y_axis
 z_axis
 ```
 
-`Frame` is finite, orthonormal, and right-handed. It is not an Euler-angle record.
+Frame is finite, orthonormal, and right-handed. It is not an Euler-angle record.
 
 ## Geometric validation
 
-All resolved target values are validated before a capability projection succeeds.
+Every projection first validates the complete resolved target.
 
 Common requirements:
 
@@ -370,8 +358,8 @@ Descriptor requirements:
 Plane
   finite origin
   unit x/y/normal
-  pairwise orthogonal
-  cross(x, y) aligned with normal
+  x, y, normal pairwise orthogonal
+  handedness intentionally not constrained
 
 Axis / Line
   finite origin
@@ -383,7 +371,7 @@ Point
 Circle
   finite center
   finite positive radius
-  unit orthogonal x/y/normal
+  unit pairwise-orthogonal x/y/normal
   right-handed frame
 
 Cylinder
@@ -393,17 +381,17 @@ Cylinder
 
 Frame
   finite origin
-  unit orthogonal x/y/z
+  unit pairwise-orthogonal x/y/z
   right-handed frame
 ```
 
-The current unit/orthogonality/handedness validation tolerance is `1.0e-9`.
+The current unit/orthogonality/handedness tolerance is `1.0e-9`.
 
-Malformed public aggregate values fail closed through `validate_resolved_geometric_target` and through every projection helper.
+Malformed public aggregate values fail closed through `validate_resolved_geometric_target` and through every projector.
 
 ## Capability projection API
 
-The only supported path from an `AssemblyResolvedGeometricTarget` to typed consumer geometry is:
+Supported projection functions:
 
 ```text
 project_plane
@@ -415,13 +403,13 @@ project_cylinder
 project_frame
 ```
 
-Every projector:
+Every projector performs:
 
 ```text
 validate complete resolved target
   -> require requested capability in canonical source matrix
-  -> derive exact descriptor projection
-  -> return typed geometry
+  -> derive exact typed projection
+  -> return geometry
 ```
 
 Unsupported projections fail closed.
@@ -459,9 +447,9 @@ Frame
 
 Equation builders do not infer geometry from source-kind enums.
 
-## Current generated planar face migration
+## Current generated planar-face migration
 
-The existing six semantic tokens remain unchanged:
+Existing persistent tokens remain unchanged:
 
 ```text
 feature.<feature-id>.top
@@ -474,11 +462,11 @@ feature.<feature-id>.back
 
 The existing additive-extrude generated-face resolver and `WorkplaneResolver` remain semantic geometry authority.
 
-The typed result is:
+Typed result:
 
 ```text
 source_kind = GeneratedPlanarFace
-descriptor  = AssemblyPlanarTargetDescriptor
+descriptor = AssemblyPlanarTargetDescriptor
 capabilities = [Plane]
 ```
 
@@ -490,35 +478,33 @@ FeatureId
 SemanticFace
 ```
 
-The generated Plane coordinates remain numerically identical to the historical resolver result.
+The complete generated Plane descriptor remains numerically identical to the historical resolver, including the existing independently oriented Bottom/side face normal convention.
 
 ## Current `.axis` migration
 
-The persistent semantic token remains:
+Persistent token remains:
 
 ```text
 feature.<feature-id>.axis
 ```
 
-Current support remains deliberately narrow:
+Current support remains narrow:
 
 ```text
 source feature is SubtractiveExtrude
 source sketch exists
-source sketch contains exactly one profile
+source sketch has exactly one profile
 that profile is exactly one CircleProfile
-circle diameter resolves to a Length parameter
+circle diameter resolves to Length
 ```
 
-The current `.axis` producer is therefore a single circular subtractive-extrude cylindrical feature source.
-
-Block 31 classifies that derived model producer as:
+This current producer is a circular subtractive-extrude cylindrical feature source. Block 31 classifies the derived producer as:
 
 ```text
 GeneratedCylindricalFace
 ```
 
-and resolves:
+Descriptor:
 
 ```text
 AssemblyCylindricalSurfaceTargetDescriptor
@@ -534,9 +520,9 @@ Axis
 Cylinder
 ```
 
-The exact endpoint string still says `.axis`, and `semantic_axis = Primary` remains in source metadata. No new persistent cylindrical-face token is introduced.
+The endpoint still says `.axis`; `SemanticAxis::Primary` remains source metadata. No new persistent cylindrical-face token exists.
 
-Thus existing Concentric behavior obtains exactly the previous Axis through:
+Existing Concentric behavior obtains the exact historical Axis through:
 
 ```text
 resolve_geometric
@@ -544,17 +530,17 @@ resolve_geometric
   -> legacy axis descriptor adapter
 ```
 
-The new Cylinder capability is additional derived Geometry information only.
+Cylinder is additional derived Geometry information only.
 
 ## Current `.seat` migration
 
-The persistent token remains:
+Persistent token remains:
 
 ```text
 feature.<feature-id>.seat
 ```
 
-The same current single-CircleProfile subtractive-extrude preconditions remain.
+The same single-CircleProfile subtractive-extrude preconditions remain.
 
 Typed source:
 
@@ -562,16 +548,29 @@ Typed source:
 CircularFeatureSeat
 ```
 
-Frame construction:
+Frame construction is:
 
 ```text
 origin = existing seating-plane origin
 x_axis = existing seating-plane x_axis
-y_axis = existing seating-plane y_axis
 z_axis = existing semantic axis direction
+y_axis = z_axis × x_axis
 ```
 
-The existing seating-plane helper already flips Y and normal/axis together for `OppositeSketchNormal`. The resulting Frame remains right-handed.
+`Y = Z × X` canonicalizes the typed Frame to a right-handed orientation even when a historical workplane stores an independently oriented `y_axis`/normal convention such as Bottom.
+
+Residual-relevant legacy geometry remains unchanged:
+
+```text
+Insert
+  uses Axis and seating normal
+
+Revolute
+  uses seat X reference and semantic Axis Z
+  plus seating normal for separation
+```
+
+Therefore canonicalizing Frame-Y does not change current Insert or Revolute numeric semantics.
 
 Capabilities:
 
@@ -581,19 +580,21 @@ Axis
 Frame
 ```
 
-Projection preserves current behavior:
+Projection behavior:
 
 ```text
-project_plane -> existing seating plane
+project_plane -> canonical seat Frame as Plane
 project_axis  -> existing semantic axis
-project_frame -> complete oriented seat frame
+project_frame -> complete right-handed seat frame
 ```
 
-Existing Insert and Revolute consumers therefore keep the same directed axis, seating normal, and signed-twist reference orientation.
+For existing right-handed workplanes, including the current XY and OppositeSketchNormal fixtures, projected Plane/Axis values remain completely identical to historical Insert target descriptors.
+
+Existing Insert and Revolute equations preserve directed axis, seating normal, and signed-twist X-reference semantics.
 
 ## Compatibility APIs
 
-The public historical methods remain:
+Historical methods remain:
 
 ```text
 AssemblyConstraintTargetResolver::resolve
@@ -605,7 +606,7 @@ AssemblyHierarchyConstraintTargetResolver::resolve_axis
 AssemblyHierarchyConstraintTargetResolver::resolve_insert
 ```
 
-They are compatibility adapters, not parallel target-geometry authorities.
+They are adapters, not parallel target-geometry authorities.
 
 Local flow:
 
@@ -616,7 +617,7 @@ family parser precheck
   -> legacy descriptor shape
 ```
 
-The family parser precheck preserves the established family-specific malformed/unsupported semantic-reference error behavior.
+The family parser precheck preserves established malformed/unsupported semantic-reference failure behavior.
 
 Hierarchy flow:
 
@@ -627,13 +628,13 @@ exact rooted occurrence context
   -> legacy hierarchy descriptor shape
 ```
 
-All existing Mate, Distance, Angle, Concentric, Insert, and Revolute equation/residual consumers continue to receive their old descriptor types, but those descriptors now originate from the typed capability-projection boundary.
+Existing Mate, Distance, Angle, Concentric, Insert, and Revolute consumers continue to receive legacy descriptor types, but their geometry now originates at the typed capability-projection boundary.
 
 No equation formula, residual order, finite-difference logic, transform authority, freshness contract, or application rule changes in Block 31.
 
 ## Local typed resolution
 
-`AssemblyConstraintTargetResolver::resolve_geometric` currently recognizes only the existing feature semantic families.
+`AssemblyConstraintTargetResolver::resolve_geometric` currently recognizes only existing feature semantic families.
 
 It reuses:
 
@@ -643,16 +644,16 @@ existing generated-face parser/resolution
 existing single-circle circular-feature validation
 existing WorkplaneResolver
 existing extrude-direction orientation
-existing seating-plane orientation
+existing seating-plane origin/X/normal semantics
 ```
 
-It returns component-local descriptor geometry plus:
+The returned descriptor is component-local and retains:
 
 ```text
 transforms_inner_to_outer = [component_transform]
 ```
 
-The component transform is not applied to the local descriptor.
+The direct component transform is context and is not applied to the local descriptor.
 
 ## Hierarchy/root-space typed resolution
 
@@ -666,7 +667,7 @@ AssemblyConstraintTargetResolver::resolve_geometric
 AssemblyHierarchyTransformEvaluator
 ```
 
-The transform chain remains:
+Exact chain:
 
 ```text
 [T_component,
@@ -679,22 +680,22 @@ Descriptor transform behavior:
 
 ```text
 point-like positions
-  -> rotate + translate through every transform
+  rotate + translate through every transform
 
 directions / axes / frame vectors
-  -> rotate only through every transform
+  rotate only through every transform
 
 Circle/Cylinder radius
-  -> unchanged by rigid transforms
+  unchanged by rigid transforms
 ```
 
-The output retains the exact hierarchy endpoint identity, source kind, source metadata, canonical capabilities, exact transform chain, and `RootAssembly` coordinate space.
+The output retains exact hierarchy endpoint identity, source kind, source metadata, capabilities, `RootAssembly` coordinate space, and the exact transform chain.
 
 No composed hierarchy transform is persisted or converted back to Euler angles.
 
 ## Failure policy
 
-Typed local/hierarchy resolution fails closed on:
+Typed local/hierarchy resolution and projection fail closed on:
 
 - missing component;
 - missing referenced PartDocument;
@@ -708,15 +709,17 @@ Typed local/hierarchy resolution fails closed on:
 - invalid source metadata;
 - source-kind/descriptor mismatch;
 - non-finite geometry;
-- non-unit or degenerate direction;
-- non-orthogonal Plane/Circle/Frame axes;
-- non-right-handed Plane/Circle/Frame axes;
+- non-unit or degenerate Axis/Line direction;
+- non-orthogonal Plane axes/normal;
+- non-orthogonal or non-right-handed Circle/Frame axes;
 - non-positive Circle/Cylinder radius;
 - non-canonical capability vector/order;
 - non-finite transform context;
 - unsupported capability projection.
 
-Projection failures do not mutate model intent and do not fall back to another geometric interpretation.
+Plane handedness alone is not a failure because existing workplane semantics intentionally allow an independently oriented face normal.
+
+Projection failure does not mutate model intent and does not fall back to another geometric interpretation.
 
 ## Focused coverage
 
@@ -730,15 +733,15 @@ The suite proves:
 
 - all six current generated planar-face tokens classify as `GeneratedPlanarFace`;
 - all six expose exactly `[Plane]`;
-- typed Plane projections equal historical local target geometry;
+- typed Plane projections equal complete historical local target geometry, including Bottom;
 - current `.axis` classifies as `GeneratedCylindricalFace`;
 - current `.axis` exposes `[Axis, Cylinder]`;
 - projected Axis equals historical local Axis geometry;
-- current hole diameter `20 mm` derives cylinder radius `10 mm`;
+- current hole diameter `20 mm` derives Cylinder radius `10 mm`;
 - Plane projection from current `.axis` fails;
 - current `.seat` classifies as `CircularFeatureSeat`;
 - current `.seat` exposes `[Plane, Axis, Frame]`;
-- projected Plane/Axis equal historical Insert target geometry;
+- projected Plane/Axis equal historical XY-seat target geometry;
 - Frame origin/Z preserve seating/semantic-axis orientation;
 - Circle projection from `.seat` fails;
 - synthetic DatumAxis projects Axis + Line;
@@ -755,13 +758,13 @@ The suite proves:
 - left-handed Frame fails;
 - left-handed Circle fails;
 - non-unit Plane axes fail;
-- hierarchy typed Plane/Axis/Seat projections equal historical root-space geometry;
+- hierarchy typed Plane/Axis/Seat projections equal historical root-space geometry for current fixtures;
 - exact hierarchy endpoint identity/path is retained;
 - exact component-plus-parent transform chain is retained;
 - rigid hierarchy transform preserves Cylinder radius;
 - local and hierarchy source Projects serialize identically before/after queries.
 
-Existing full Geometry workflows remain required to prove all legacy Mate/Distance/Angle/Concentric/Insert/Revolute and cross-hierarchy consumers remain green through the new adapters.
+Existing full Geometry workflows remain required to prove all legacy Mate/Distance/Angle/Concentric/Insert/Revolute and cross-hierarchy consumers remain green through the adapters.
 
 ## Persistence and file-format rule
 
@@ -779,11 +782,11 @@ transform context
 projection result
 ```
 
-`docs/file-format.md` therefore does not change for Block 31.
+`docs/file-format.md` therefore remains unchanged.
 
-Persistent endpoints still contain their existing semantic-reference strings.
+Persistent endpoints continue to contain their existing semantic-reference strings.
 
-## Next technical step: Block 32
+## Next technical step — Block 32
 
 Implement Block 32 only from `docs/assembly-general-geometric-target-roadmap.md`: assembly-selectable reference geometry Core intent and semantic source identity.
 
@@ -791,19 +794,19 @@ Block 32 must:
 
 - reuse existing persistent DatumPlane, construction-line, and construction-point identities;
 - add first-class `DatumAxis` PartDocument intent if still absent;
-- freeze the first supported DatumAxis definition family/families, validation, ownership, dependency, and invalidation semantics;
-- freeze an unambiguous persistent semantic-reference grammar for DatumPlane, DatumAxis, ConstructionLine, and ConstructionPoint;
-- explicitly prove ids containing `.`, `/`, and `%` cannot make source parsing ambiguous;
-- preserve all existing feature target spellings;
+- freeze the first supported DatumAxis definition family/families, validation, ownership, dependency, invalidation, and removal behavior;
+- freeze unambiguous persistent semantic-reference grammar for DatumPlane, DatumAxis, ConstructionLine, and ConstructionPoint;
+- prove ids containing `.`, `/`, and `%` cannot make parsing ambiguous;
+- preserve existing feature target spellings;
 - keep assembly endpoint JSON shape unchanged;
 - perform no Geometry target resolution;
 - make no JSON serialization change yet.
 
-Acceptance tags remain planned as:
+Planned tags:
 
 ```text
 [core][datum-axis]
 [core][assembly-reference-target-intent]
 ```
 
-Reference-geometry JSON belongs to Block 33. Geometry resolution of those sources into Block-31 capabilities belongs to Block 34.
+Reference-geometry JSON belongs to Block 33. Geometry resolution into Block-31 capabilities belongs to Block 34.
