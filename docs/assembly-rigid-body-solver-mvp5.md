@@ -1,6 +1,6 @@
 # Assembly Rigid-Body Solver MVP-5
 
-Status: implemented deterministic local rigid-body solving for Mate, Distance, Concentric, Insert, and planar Angle relationships, including suppression filtering, complete stale snapshots, explicit solve states, atomic result application, and shared numeric-engine reuse by Revolute motion.
+Status: implemented deterministic local rigid-body solving for Mate, Distance, Concentric, Insert, and planar Angle relationships, including suppression filtering, complete component and semantic-target PartDocument freshness snapshots, explicit solve states, atomic result application, and shared numeric-engine reuse by Revolute motion.
 
 ## Scope and locality
 
@@ -16,7 +16,7 @@ AssemblyRigidBodySolverOptions
 
 For a normal project, the local relationship graph is `project.assembly()`.
 
-`AssemblyFlexibleSubassemblySolver` later reuses the same solver by copying a selected child `AssemblyDocument` into a temporary `Project` as the local root. The rigid-body solver itself therefore remains local; it does not traverse or solve cross-hierarchy endpoints.
+`AssemblyFlexibleSubassemblySolver` reuses the same solver by copying one selected child `AssemblyDocument` into a temporary `Project` as the local root. The rigid-body solver itself remains local; it does not traverse cross-hierarchy endpoint paths.
 
 ## Supported local geometric families
 
@@ -30,7 +30,7 @@ Insert
 Angle
 ```
 
-Canonical residual semantics live in their feature documents. The solver does not duplicate semantic feature-target inference.
+Canonical residual semantics live in their feature documents. Semantic feature-target inference remains owned by the existing target/equation builders.
 
 ## Deterministic input group
 
@@ -40,7 +40,7 @@ The requested `connected_group` must exactly equal one deterministic graph conne
 
 Component and relationship ordering is lexicographic according to the existing local graph/numeric contracts.
 
-The solver does not silently expand or shrink the requested graph component except for the documented derived suppression filtering before numeric participation.
+The solver does not silently expand or shrink the requested graph component except for documented suppression filtering before numeric participation.
 
 ## Suppression participation
 
@@ -52,20 +52,20 @@ For numeric participation:
 active_subgroup = non-suppressed group components
 ```
 
-Local geometric constraints survive only when both endpoints are in the active subgroup.
+Local constraints survive only when both endpoints are in the active subgroup.
 
 Suppressed components:
 
 - contribute no numeric variables;
-- are not treated as fixed bodies;
+- are not fixed bodies;
 - receive no proposals;
-- remain in complete input snapshots so later suppression changes make the result stale.
+- remain in complete component and referenced-part freshness context.
 
 If all relationships vanish through suppression, the group is trivially converged with zero residual components.
 
-## Grounding policy
+## Grounding and variables
 
-Grounded active components participate in target and residual evaluation but contribute no numeric variables.
+Grounded active components participate in target/residual evaluation but contribute no numeric variables.
 
 Free active components contribute six direct persisted-transform variables:
 
@@ -78,9 +78,11 @@ ry_deg
 rz_deg
 ```
 
-The variables correspond directly to `ComponentInstance::transform()` fields. The local solver does not optimize a matrix, quaternion, composed hierarchy transform, or shape placement cache.
+The variables map directly to `ComponentInstance::transform()`.
 
-When surviving constrained relationships exist, the current local seed requires grounded active participation under the established solver validation contract.
+The local solver does not optimize a matrix, quaternion, composed hierarchy transform, or shape placement cache.
+
+When surviving relationship residuals exist, the current solve contract requires at least one grounded active reference.
 
 Grounded components are never moved to repair inconsistency.
 
@@ -93,23 +95,31 @@ constraint_ids[]
 revolute_drives[]
 ```
 
-Ordinary `AssemblyRigidBodySolver` supplies geometric constraint ids and an empty Revolute drive set.
+Ordinary rigid-body solving supplies geometric constraint ids and an empty Revolute drive set.
 
-`AssemblyJointMotionSolver` later supplies geometric constraint ids plus deterministic transient Revolute drives.
+`AssemblyJointMotionSolver` supplies geometric constraint ids plus deterministic transient Revolute drives.
 
-Both paths call the private shared engine:
+Both paths call:
 
 ```text
 detail::solve_numeric_relationships
 ```
 
-There is no joint-specific or Insert-specific optimizer.
+which adapts local component variables to the shared:
+
+```text
+solve_numeric_variables
+```
+
+absolute-variable-vector/residual-evaluator engine.
+
+There is one central finite-difference implementation and one damped Gauss-Newton optimizer for ordinary local, joint-motion, and later cross-hierarchy solving.
 
 ## Residual flattening
 
 Length residual components are divided by `length_residual_scale_mm`.
 
-Canonical local flattening includes:
+Canonical scalar order remains:
 
 ```text
 Mate:
@@ -149,40 +159,29 @@ Residual order follows deterministic relationship order and family-specific scal
 
 ## Finite-difference Jacobian
 
-The solver uses central finite differences over direct component variables.
-
-For variable `x_j` and step `h_j`:
+The solver uses central finite differences over direct component variables:
 
 ```text
-J[:, j] = (r(x + h_j) - r(x - h_j)) / (2 h_j)
+J[:, j] = (r(x + h_j e_j) - r(x - h_j e_j)) / (2 h_j)
 ```
 
-Translation and degree-rotation step sizes are explicit solver options and validated as finite positive values.
+Translation and degree-rotation perturbation sizes are explicit finite positive solver options.
 
 Every residual evaluation occurs on a private candidate `Project` copy.
 
-The solver does not implement analytic Jacobians.
+Analytic Jacobians are not implemented.
 
 ## Damped Gauss-Newton engine
 
-For residual vector `r` and Jacobian `J`, the engine forms damped normal equations:
+For residual vector `r` and Jacobian `J`:
 
 ```text
 (J^T J + lambda I) delta = -J^T r
 ```
 
-The current implementation uses deterministic dense matrices and partial-pivot Gaussian elimination.
+The shared engine uses deterministic dense matrices, partial-pivot Gaussian elimination, damping escalation, backtracking line search, RMS convergence, explicit iteration limits, and explicit numerical-failure classification.
 
-The iteration policy includes:
-
-- finite option validation;
-- deterministic damping escalation;
-- backtracking line search;
-- RMS residual convergence;
-- maximum iteration limits;
-- explicit numerical-failure classification.
-
-There is no sparse solve path or trust-region implementation yet.
+There is no sparse solve or trust-region path yet.
 
 ## Solve states
 
@@ -196,32 +195,31 @@ Only a converged result may be applied.
 
 ### MaximumIterationsReached
 
-The configured iteration limit was reached above tolerance. Current best proposals remain diagnostic and unapplable.
+The iteration limit was reached above tolerance. Current best proposals are diagnostic and unapplable.
 
 ### FixedGeometryInconsistent
 
-The supported all-grounded/fixed active system remains above tolerance. Grounded components are not moved.
+The all-grounded/fixed active system remains above tolerance. Grounded components are not moved.
 
 ### NumericalFailure
 
 Free variables exist but no configured damping/line-search attempt produces a decreasing RMS step.
 
-Validation and target-resolution failures remain `Result<T>` errors rather than solve states.
+Validation and target-resolution failures remain `Result<T>` errors.
 
-## Read-only solve boundary
+## Read-only solve result
 
 `AssemblyRigidBodySolver::solve` never mutates the caller's `Project`.
 
-The engine changes only private project copies and returns `AssemblySolveResult`.
-
-The result stores:
+`AssemblySolveResult` stores:
 
 ```text
 solve state
 iteration count
 residual summary
 complete group component snapshots
-fixed component identity
+canonical semantic target PartDocument snapshots
+fixed component identities
 free-active component transform proposals
 ```
 
@@ -233,19 +231,43 @@ Every group component snapshot stores:
 
 ```text
 component id
+referenced PartDocument id
 grounding state
 suppression state
-source transform
+source direct transform
 ```
 
-Snapshots include grounded and suppressed group components, not only numeric variables.
+Snapshots include grounded and suppressed group components.
 
-This protects application from stale solve inputs such as:
+Application is therefore stale when a snapshotted component is removed, retargeted to another part, moved, regrounded, or resuppressed.
 
-- a free component moved after solve;
-- a grounded anchor moved;
-- grounding changed;
-- suppression changed.
+Visibility remains outside local numeric solve input freshness.
+
+## Exact semantic target PartDocument freshness
+
+Block 27 closes the previous semantic-target model freshness gap for local solving as well as cross-hierarchy solving.
+
+For every unique PartDocument referenced by a component in the complete connected group, the result stores:
+
+```text
+AssemblySemanticTargetPartSnapshot
+  part_document
+  canonical_model_intent_json
+```
+
+The payload is the exact output of:
+
+```text
+serialize_part_document_to_json(part)
+```
+
+At application the current PartDocument is serialized again and compared byte-for-byte.
+
+No hash or mutable revision counter is used.
+
+This is a conservative exact model-intent contract rather than a minimal semantic-target dependency closure. Any serialized model-intent edit in a participating referenced part invalidates the result.
+
+The same helper is used by cross-hierarchy solving.
 
 ## Explicit atomic application
 
@@ -253,29 +275,47 @@ This protects application from stale solve inputs such as:
 
 Before mutation it validates:
 
-- duplicate snapshots;
-- duplicate proposals;
+- duplicate component snapshots;
 - every snapshotted component still exists;
+- referenced PartDocument identity still matches;
 - source transform, grounding, and suppression still match;
-- every proposal matches a free active snapshot;
+- the exact canonical PartDocument snapshot set is complete and unchanged;
+- duplicate proposals;
+- every proposal matches a free active component snapshot;
 - proposal source transforms match snapshot source transforms;
 - every proposed transform satisfies the normal component transform contract.
 
-Application then:
+Application then performs:
 
 ```text
 copy Project
   -> write proposed direct component transforms
-  -> commit only after every write succeeds
+  -> replace source Project only after every write succeeds
 ```
 
-The caller project is unchanged on any failure.
+The caller Project remains unchanged on failure.
 
-This one application boundary is shared by every implemented local geometric family and is also reused inside later joint-motion and flexible-child application paths.
+This one local application boundary is reused by every implemented local geometric family and inside flexible-child and joint-motion application.
+
+## Flexible-child and Revolute inheritance
+
+`AssemblyFlexibleSubassemblySolveResultApplier` rebuilds the selected child-as-local-root view and delegates its embedded ordinary local result to `AssemblySolveResultApplier`.
+
+Therefore a participating PartDocument edit invalidates a flexible-child result before child transforms are written back.
+
+`AssemblyJointMotionResultApplier` validates joint snapshots and then delegates the embedded ordinary local result to `AssemblySolveResultApplier` on a candidate Project copy.
+
+Therefore local Revolute motion results also protect the exact participating PartDocument model intent before transforms or the selected joint coordinate change.
 
 ## Local diagnostics
 
-`AssemblySolveDiagnosticsAnalyzer` evaluates the same local geometric finite-difference Jacobian used by ordinary solving.
+`AssemblySolveDiagnosticsAnalyzer` evaluates the same local finite-difference Jacobian used by ordinary solving.
+
+The matrix-rank implementation is now shared with cross-hierarchy diagnostics through:
+
+```text
+compute_assembly_matrix_rank
+```
 
 ```text
 variable_count  = 6 * free_active_component_count
@@ -283,7 +323,7 @@ constrained_dof = rank(J)
 remaining_dof   = variable_count - rank(J)
 ```
 
-Regular covered one-free-body results include:
+Covered one-free-body results include:
 
 ```text
 Concentric: rank 4/6, remaining DOF 2
@@ -291,42 +331,46 @@ Insert:     rank 5/6, remaining DOF 1
 Angle:      rank 1/6, remaining DOF 5 away from extremal targets
 ```
 
-Rank is derived from the generic numeric Jacobian. Family rank is not hard-coded.
+A planar Mate or Distance has rank `3/6` and leaves three local rigid-body DOF.
+
+Rank is derived from the numeric Jacobian and is not family-hard-coded.
 
 ## Error propagation
 
 Semantic target and equation-builder failures propagate through the shared numeric path without being collapsed into generic solver errors.
 
-Examples include unsupported semantic reference families, invalid `.axis` producers, and invalid `.seat` producers.
-
 The solver does not reinterpret semantic tokens.
 
 ## Persistence boundary
 
-Persistent authority used by the local solver:
+Persistent authority used by the local solver remains:
 
 ```text
 AssemblyDocument local AssemblyConstraint records
-ComponentInstance grounding/suppression/transform
+ComponentInstance referenced part / grounding / suppression / transform
+PartDocument model intent
 ```
 
-Derived and unpersisted:
+Derived and unpersisted products include:
 
 ```text
-local active constraint graph connectivity
+local active graph connectivity
 active numeric subgroup
 resolved target geometry
-residual descriptors
-flattened residual vectors
+residual descriptors and scaled residual vectors
 numeric variable ordering
 finite-difference Jacobians
 normal equations and damping attempts
 solver iteration state
 AssemblySolveResult
 component snapshots
+AssemblySemanticTargetPartSnapshot values
+canonical PartDocument freshness payloads
 transform proposals
 rank and remaining-DOF diagnostics
 ```
+
+No solve snapshot or freshness payload is serialized.
 
 Only explicit successful result application changes persistent component transforms.
 
@@ -337,35 +381,23 @@ Only explicit successful result application changes persistent component transfo
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-concentric-solver]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-insert]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-diagnostics]"
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-semantic-freshness]"
 ```
 
-Related Angle and suppression suites extend the same shared path.
+Coverage includes deterministic groups/variables, all five geometric families, grounding, suppression filtering, option validation, source-project immutability, component and referenced-part freshness, exact PartDocument model-intent freshness, atomic application, fixed inconsistency, non-convergence, semantic target failure propagation, and local rank/DOF proofs.
 
-Coverage across the local solver chain includes deterministic groups/variables, all five geometric families, grounding, suppression filtering, option validation, source-project immutability, stale-result detection, atomic application, fixed inconsistency, non-convergence, semantic target failure propagation, and local rank/DOF proofs.
+## Locality and current limitations
 
-## Current limitations
+The ordinary rigid-body solver remains local to one temporary solve view's root `AssemblyDocument`.
 
-The ordinary rigid-body solver remains local to the temporary solve view's root `AssemblyDocument`.
+Cross-hierarchy geometric solving, freshness/application, and diagnostics are implemented by their separate authority-qualified adapters.
 
-Still not implemented in this local solver contract:
+Still deferred from this local solver contract:
 
-- persistent project-level cross-hierarchy constraints;
-- cross-hierarchy relationship/solve connectivity;
-- transform-authority deduplication across repeated child occurrences;
-- cross-hierarchy numeric variables, snapshots, proposals, and application;
+- cross-hierarchy joint motion and nested motion propagation;
 - whole-`SubassemblyInstance` solve variables or grounding;
 - occurrence-local child component pose overrides;
 - analytic Jacobians;
 - sparse matrix storage/solve;
 - trust-region methods;
-- per-constraint weights;
-- general floating-group gauge fixing;
-- per-component null-space labels or drag projection.
-
-The next cross-hierarchy solver work is deliberately split into blocks 23-27 in `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`.
-
-## Current handoff
-
-Do not extend this local solver by making occurrence paths direct numeric variable ids.
-
-Block 23 first moves/extracts the frozen occurrence-qualified endpoint value contract into the Core layer and adds persistent project-owned cross-hierarchy geometric constraint intent. JSON, graph connectivity, numeric solving, and application follow in separate blocks.
+- minimal semantic-target dependency revision closure.

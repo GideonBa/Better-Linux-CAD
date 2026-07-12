@@ -1,8 +1,8 @@
 # Cross-Hierarchy Geometric Constraint Solver Sequence MVP-5
 
-Status: Blocks 23-26 are implemented. Block 27 is the current next technical step.
+Status: Blocks 23-27 are implemented. Block 28 is the current next technical step.
 
-This document is the canonical implementation sequence for persistent cross-hierarchy geometric constraints after the read-only target/residual seed in `docs/assembly-cross-hierarchy-relationship-semantics-mvp5.md`.
+This document is the canonical implementation sequence for assembly relationships that cross `AssemblyDocument` boundaries after the read-only target/residual seed in `docs/assembly-cross-hierarchy-relationship-semantics-mvp5.md`.
 
 Implemented contracts are canonical in:
 
@@ -10,38 +10,38 @@ Implemented contracts are canonical in:
 - `docs/assembly-cross-hierarchy-constraint-json-mvp5.md`
 - `docs/assembly-cross-hierarchy-incidence-groups-mvp5.md`
 - `docs/assembly-cross-hierarchy-numeric-solver-mvp5.md`
+- `docs/assembly-cross-hierarchy-application-diagnostics-mvp5.md`
 - `docs/file-format.md`
 
 ## Sequencing rule
 
-Cross-hierarchy solving crosses separate authority boundaries:
+Cross-document assembly solving crosses separate authority boundaries:
 
 ```text
-Core model intent
+Core persistent model intent
   -> serialization and structure compatibility
   -> derived relationship-to-transform-authority connectivity
-  -> numeric residual/Jacobian execution and unapplied proposals
-  -> freshness validation and atomic application
-  -> diagnostics
+  -> mixed numeric residual/Jacobian execution
+  -> derived solve results and proposals
+  -> complete modeled-input freshness
+  -> atomic authority-qualified application
+  -> rank and remaining-DOF diagnostics
+  -> cross-hierarchy motion relationships
 ```
-
-These boundaries must remain explicit.
 
 Do not:
 
-- persist a Geometry-layer query type;
-- duplicate one shared child-component transform into independent variables per rooted occurrence;
-- duplicate one local child constraint for every rooted occurrence of its containing `AssemblyDocument`;
-- add residual rows merely to represent shared transform authority;
+- persist Geometry query/execution types;
+- duplicate one shared child component transform into independent variables per rooted occurrence;
+- duplicate one local child constraint per rooted occurrence;
+- add residual rows merely to encode shared transform authority;
 - persist graph, solve-group, residual, Jacobian, snapshot, proposal, or diagnostic caches;
-- mutate a `SubassemblyInstance::transform()` through component solve variables;
-- introduce a second numeric optimizer for cross-hierarchy constraints.
+- mutate `SubassemblyInstance::transform()` through component authority variables;
+- introduce a second numeric optimizer or second finite-difference contract.
 
-## Frozen identities
+## Frozen identity split
 
 ### Geometric endpoint
-
-Persistent Core identity:
 
 ```text
 AssemblyHierarchyConstraintEndpoint =
@@ -50,20 +50,11 @@ AssemblyHierarchyConstraintEndpoint =
    semantic_reference)
 ```
 
-The empty occurrence path addresses the explicit root assembly occurrence.
+The empty path addresses the explicit root assembly occurrence.
 
-Example:
-
-```text
-([subassembly.left],  component.shaft, feature.bore.axis)
-([subassembly.right], component.shaft, feature.bore.axis)
-```
-
-These endpoints are distinct because their exact hierarchy transform chains may differ.
+Exact path order is identity.
 
 ### Geometric component occurrence
-
-Removing only the semantic reference gives rooted geometric occurrence identity:
 
 ```text
 HierarchyComponentOccurrence =
@@ -71,9 +62,9 @@ HierarchyComponentOccurrence =
    local ComponentInstanceId)
 ```
 
-### Direct component transform authority
+Two repeated child occurrences are distinct geometric contexts.
 
-Persistent direct component placement remains owned once per assembly document:
+### Direct component transform authority
 
 ```text
 ComponentTransformAuthority =
@@ -81,29 +72,22 @@ ComponentTransformAuthority =
    local ComponentInstanceId)
 ```
 
-The authority identity is derived. It addresses persistent component solve inputs:
+The authority addresses persistent:
 
 ```text
+ComponentInstance::referenced_part_document()
 ComponentInstance::transform()
 ComponentInstance::grounding_state()
 ComponentInstance::suppression_state()
 ```
 
-Repeated occurrences may map to one authority:
+Repeated geometric occurrences can map to one authority.
 
-```text
-([left],  component.shaft)
-  -> (assembly.gearbox, component.shaft)
-
-([right], component.shaft)
-  -> (assembly.gearbox, component.shaft)
-```
-
-Until occurrence-local internal pose overrides exist, both occurrences read and propose one shared direct component transform.
+Until occurrence-local internal pose overrides exist, both occurrences read, perturb, snapshot, and propose one shared direct component transform.
 
 ## Relationship identity
 
-A local `AssemblyConstraint` belongs to one containing `AssemblyDocument`:
+Local geometric relationship:
 
 ```text
 LocalRelationship =
@@ -111,33 +95,22 @@ LocalRelationship =
    AssemblyConstraintId)
 ```
 
-It exists once as model-definition intent and is evaluated once in that document's local assembly space.
+A local constraint exists once in its containing document and is evaluated once in that document's local assembly space.
 
-A project-level cross-hierarchy relationship is identified by its Project-scoped id:
+Project-level cross-hierarchy geometric relationship:
 
 ```text
 CrossHierarchyRelationship =
-  project-level AssemblyConstraintId
+  Project-level AssemblyConstraintId
 ```
 
 It preserves both exact occurrence-qualified endpoints and is evaluated in root-assembly space.
 
-## Block 23: Core endpoint and project-level constraint intent — Implemented
+## Block 23: Core endpoint and Project-level constraint intent — Implemented
 
 Canonical document: `docs/assembly-cross-hierarchy-constraint-intent-mvp5.md`.
 
-Implemented:
-
-- Core-owned `AssemblyHierarchyConstraintEndpoint`;
-- empty-root and exact ordered non-empty occurrence-path identity;
-- persistent `AssemblyHierarchyConstraint` records;
-- Mate, Concentric, Distance, Insert, and Angle families;
-- established Distance/Angle quantity validation;
-- Project-owned cross-hierarchy constraint collection;
-- Project-level id uniqueness separate from local document-scoped ids;
-- Core-record to read-only Geometry-query bridge;
-- no hierarchy or semantic geometry resolution during record construction;
-- no transform mutation.
+Implemented Core endpoint identity, persistent Project-owned cross-hierarchy Mate/Concentric/Distance/Insert/Angle intent, established quantity validation, separate Project-level id scope, and the Core-record to read-only Geometry-query bridge.
 
 Focused tag:
 
@@ -149,25 +122,7 @@ Focused tag:
 
 Canonical document: `docs/assembly-cross-hierarchy-constraint-json-mvp5.md`.
 
-Implemented Project JSON field:
-
-```text
-cross_hierarchy_constraints[]
-```
-
-Implemented behavior:
-
-1. absent field loads as an empty collection;
-2. target A/B order roundtrips exactly;
-3. occurrence-path element order roundtrips exactly;
-4. id/name/type/state roundtrip;
-5. Distance uses `mm` and Angle uses `deg`;
-6. duplicate Project-level cross-hierarchy ids fail closed;
-7. complete ordinary assembly hierarchy validation runs first;
-8. each endpoint path is then followed exactly from the explicit root through authored `SubassemblyInstanceId` values;
-9. the reached assembly document must contain the addressed local component;
-10. semantic feature geometry remains unresolved during loading;
-11. loading does not mutate component or subassembly transforms.
+Implemented additive `cross_hierarchy_constraints[]`, exact target/path order roundtrip, absent-field compatibility, hierarchy-first structure validation, exact endpoint path traversal from the root, and reached-component validation without semantic geometry execution.
 
 Focused tag:
 
@@ -179,7 +134,7 @@ Focused tag:
 
 Canonical document: `docs/assembly-cross-hierarchy-incidence-groups-mvp5.md`.
 
-The derived bipartite model is:
+The derived bipartite graph is:
 
 ```text
 relationship node
@@ -189,54 +144,9 @@ relationship node
 ComponentTransformAuthority node
 ```
 
-Implemented behavior:
+Implemented active local/project relationship participation, suppression-based filtering, visibility-independent solve participation, exact endpoint-to-authority mapping, unique `(relationship, authority)` incidence, separate target-A/target-B mappings, deterministic connected cross-hierarchy solve groups, and pure-local work exclusion.
 
-1. complete Project structure validates first;
-2. active local constraints are collected once per owned `AssemblyDocument`;
-3. active Project-level cross-hierarchy constraints retain exact endpoint identity;
-4. local relationship participation requires active relationship state and active local endpoint components;
-5. cross-hierarchy participation requires active relationship state, active suppression state on every boundary of both exact endpoint paths, and active addressed components;
-6. visibility does not filter solve participation;
-7. local targets map to `(containing assembly document, local ComponentInstanceId)`;
-8. hierarchy endpoints map to `(assembly document reached by exact occurrence path, local ComponentInstanceId)`;
-9. incidence is unique by `(relationship, authority)`;
-10. target A/B endpoint mappings remain separate even when both endpoints map to one authority;
-11. deterministic connected components are derived over the bipartite graph;
-12. only components containing at least one active Project-level cross-hierarchy relationship are exposed as cross-hierarchy solve groups;
-13. pure-local components remain ordinary local solver work;
-14. graph, mappings, and groups remain derived and unpersisted.
-
-Canonical ordering:
-
-```text
-relationship kind:
-  local before cross-hierarchy
-
-local relationship:
-  assembly document id
-  AssemblyConstraintId
-
-cross-hierarchy relationship:
-  Project-level AssemblyConstraintId
-
-authority:
-  assembly document id
-  ComponentInstanceId
-
-incidence:
-  relationship key
-  authority key
-
-endpoint mapping:
-  cross-hierarchy constraint id
-  TargetA before TargetB
-
-solve group:
-  first ordered relationship key
-  first ordered authority key as deterministic fallback
-```
-
-All string keys are lexicographic ascending.
+Canonical order remains local relationships before cross relationships, then lexicographic relationship and authority keys.
 
 Focused tag:
 
@@ -244,151 +154,22 @@ Focused tag:
 [core][assembly-cross-hierarchy-graph]
 ```
 
-## Block 26: Shared numeric residual/Jacobian and solve-result integration — Implemented
+## Block 26: Shared mixed numeric solving and unapplied proposals — Implemented
 
 Canonical document: `docs/assembly-cross-hierarchy-numeric-solver-mvp5.md`.
 
-Goal achieved: solve one exact current `AssemblyCrossHierarchySolveGroup` without applying the result.
+Implemented exact current solve-group validation at solve start, six absolute direct-transform variables per unique free active authority, grounded fixed context, document-local local relationship evaluation, exact-path root-space cross-hierarchy evaluation, shared five-family residual flattening, one central finite-difference implementation, one damped Gauss-Newton optimizer, source immutability, and authority-qualified proposals.
 
-### Exact current group validation
-
-`AssemblyCrossHierarchyConstraintSolver::solve` rebuilds the Block-25 graph and requires the supplied group to equal one current deterministic `solve_groups()` entry.
-
-A participation change such as path suppression invalidates an old selected group before numeric work begins.
-
-### Authority-scoped variables
-
-Each unique free active authority contributes six absolute direct component-transform variables:
+Variable order is:
 
 ```text
-tx_mm
-ty_mm
-tz_mm
-rx_deg
-ry_deg
-rz_deg
+solve_group.authorities
+  -> filter to Free
+  -> for each authority:
+       tx_mm ty_mm tz_mm rx_deg ry_deg rz_deg
 ```
 
-Variable blocks follow Block-25 authority order after filtering to free authorities.
-
-Grounded authorities remain residual dependencies and snapshots but contribute no variable block.
-
-Repeated rooted occurrences add no second variable block when they map to an authority already present in the group.
-
-### Local relationship residual evaluation
-
-For each local relationship identity:
-
-```text
-(assembly_document, AssemblyConstraintId)
-```
-
-Block 26 resolves the containing document, creates a temporary document-as-local-root Project view with the owned part documents, and reuses the existing local numeric relationship path.
-
-The local relationship is evaluated once in containing-document local assembly space.
-
-No arbitrary rooted occurrence of the document is selected.
-
-### Cross-hierarchy relationship residual evaluation
-
-For each Project-level cross-hierarchy relationship:
-
-1. resolve the persistent `AssemblyHierarchyConstraint`;
-2. create the derived hierarchy query;
-3. preserve target A/B and each exact occurrence path;
-4. read current candidate direct component transforms from the candidate Project copy;
-5. evaluate each endpoint through its own component-plus-parent chain into root-assembly space;
-6. reuse the existing hierarchy equation builder.
-
-Two endpoints may read one candidate authority transform while following different parent transform chains.
-
-### Shared scalar residual flattening
-
-The local numeric system owns one flattening implementation reused by local and hierarchy residual descriptors.
-
-Established component order and counts remain:
-
-```text
-Mate        4
-Distance    4
-Angle       1
-Concentric  6
-Insert      7
-```
-
-Established length scaling remains unchanged.
-
-Complete relationship blocks are concatenated in exact Block-25 solve-group relationship order.
-
-### Shared central finite differences
-
-The numeric system now has one internal evaluator boundary:
-
-```text
-absolute candidate variable vector
-  -> deterministic scaled residual vector
-```
-
-Central finite differences perturb one authority-scoped variable at a time with the existing translation/rotation step semantics.
-
-Every local and cross-hierarchy residual depending on one authority observes the same candidate direct-transform perturbation.
-
-No occurrence-local composed transform or `SubassemblyInstance::transform()` is perturbed.
-
-### Shared numeric engine
-
-The existing numeric solve loop is generalized as `solve_numeric_variables` and remains the only optimizer.
-
-It owns:
-
-```text
-option validation
-scaled residual evaluation
-central finite differences
-damped Gauss-Newton normal equations
-partial-pivot dense solve
-damping escalation
-backtracking
-convergence / iteration-limit / numerical-failure state
-```
-
-Ordinary local solving and joint motion continue through the local `solve_numeric_relationships` adapter.
-
-Cross-hierarchy solving adapts `ComponentTransformAuthority` values to the same engine.
-
-### Block-26 result contract
-
-`AssemblyCrossHierarchySolveResult` exposes:
-
-```text
-selected solve-group relationship identities
-fixed ComponentTransformAuthority values
-complete participating authority snapshots
-at most one proposal per free ComponentTransformAuthority
-solve state
-iteration count
-residual summary
-```
-
-An authority snapshot preserves:
-
-```text
-assembly document id
-ComponentInstanceId
-source direct transform
-grounding state
-component suppression state
-```
-
-A proposal preserves:
-
-```text
-ComponentTransformAuthority
-source direct transform
-proposed direct transform
-```
-
-No result is applied in Block 26.
+Repeated rooted occurrences mapping to one authority produce one six-variable block and at most one generated proposal.
 
 Focused tag:
 
@@ -396,122 +177,121 @@ Focused tag:
 [geometry][assembly-cross-hierarchy-solver]
 ```
 
-Required proofs implemented:
+## Block 27: Complete freshness, atomic application, and diagnostics — Implemented
 
-- all five cross-hierarchy residual families flatten with established counts and satisfied semantics;
-- a root/child Distance relationship converges through authority-scoped variables;
-- a nested endpoint uses its exact parent chain;
-- repeated child occurrences share one variable block and one proposal;
-- two endpoints of one authority observe the same candidate transform through different parent chains;
-- a child-local relationship and a cross-hierarchy relationship contribute to one mixed residual vector;
-- relationship and variable ordering are deterministic across persistent insertion order;
-- grounded authorities contribute residual context but no variable block;
-- no-grounded-reference groups fail closed under the existing solve contract;
-- suppressed participation invalidates a previously selected group;
-- the source Project is immutable;
-- no `SubassemblyInstance::transform()` proposal exists.
+Canonical document: `docs/assembly-cross-hierarchy-application-diagnostics-mvp5.md`.
 
-## Block 27: Fresh-result application and cross-hierarchy diagnostics — Next
+### 27A. Authority freshness — Implemented
 
-Goal: validate a Block-26 result against all modeled solve inputs, atomically apply fresh converged authority proposals, and expose rank/remaining-DOF diagnostics over exactly the same free-authority variable ordering.
-
-### 27A. Authority freshness
-
-Protect every participating authority snapshot:
+Every participating authority snapshot stores:
 
 ```text
-assembly_document: DocumentId
-ComponentInstanceId
-source direct transform
-grounding state
-component suppression state
+ComponentTransformAuthority
+referenced PartDocument identity
+grounding
+suppression
+source direct RigidTransform
 ```
 
-Requirements:
+Application rejects duplicate snapshots, missing authority targets, part retargeting, grounding/suppression/transform changes, inactive snapshots, and inconsistent fixed-authority order.
 
-1. duplicate authority snapshots are invalid;
-2. every snapshotted assembly document and component must still exist;
-3. transform, grounding, and suppression must match the snapshot;
-4. every proposal must map to exactly one free active authority snapshot;
-5. at most one proposal may address one authority.
+Visibility remains outside solve input freshness.
 
-### 27B. Relationship freshness
+Every free active authority must have exactly one proposal in exact free-authority order.
 
-Protect complete relationship inputs selected by Block 26.
+### 27B. Complete relationship freshness — Implemented
 
-Local relationship identity:
+Local relationship snapshots preserve containing assembly, id, name, type, target A/B, state, and Distance/Angle value.
+
+Project-level snapshots preserve the same complete relationship intent with exact occurrence-qualified endpoints.
+
+Application rejects relationship removal/replacement or any name/type/state/target/value change, incomplete snapshot sets, duplicate relationship identity, and order mismatch.
+
+The current Block-25 graph is rebuilt and the exact result relationship/authority group must still exist. New active relationships that merge into the numeric problem therefore stale the old result.
+
+### 27C. Hierarchy-boundary freshness — Implemented
+
+Every persistent boundary on participating cross endpoint paths is uniquely snapshotted by:
 
 ```text
-(assembly_document, AssemblyConstraintId)
+(containing AssemblyDocumentId,
+ SubassemblyInstanceId)
 ```
 
-Protect the complete local `AssemblyConstraint` record:
+The snapshot protects referenced child assembly, suppression, and boundary `RigidTransform`.
+
+At application exact endpoint paths are followed again and the canonical boundary snapshot set is rebuilt.
+
+Boundary removal, retargeting, suppression change, transform change, or missing/extra/tampered snapshots makes the result stale.
+
+Visibility does not invalidate a solve result.
+
+### 27D. Semantic target-producing PartDocument freshness — Option A implemented
+
+Every ordinary local and cross-hierarchy solve result stores exact derived:
 
 ```text
-type
-state
-target A
-target B
-Distance value
-Angle value
+AssemblySemanticTargetPartSnapshot
+  part_document
+  canonical_model_intent_json
 ```
 
-For Project-level cross-hierarchy relationships, protect the complete persistent `AssemblyHierarchyConstraint`, including both exact occurrence-qualified endpoints.
-
-Relationship removal, replacement, state change, target change, type change, or explicit value change must make the result stale.
-
-### 27C. Hierarchy-boundary freshness
-
-Every `SubassemblyInstance` boundary on a participating cross-hierarchy endpoint path can affect root-space geometry or solve participation.
-
-Protect at least:
+The payload is the exact output of:
 
 ```text
-containing assembly document identity
-SubassemblyInstanceId
-referenced child assembly document identity
-suppression state
-boundary RigidTransform
+serialize_part_document_to_json(part)
 ```
 
-Visibility is not a solve input and need not invalidate a result.
+No hash and no mutable revision counter is introduced.
 
-Boundary removal, retargeting, suppression change, or transform change must make the result stale.
+Application serializes the current PartDocument again and requires byte-for-byte equality.
 
-### 27D. Semantic target-producing geometry freshness
+This conservatively protects every serialized PartDocument model-intent edit for Parts referenced by participating components/authorities.
 
-The existing local solver has no general `PartDocument`/feature revision token for semantic target-producing model edits.
+The contract is intentionally broader than a minimal semantic-target dependency closure.
 
-Block 27 must deliberately choose and document one contract:
+The same helper is used by ordinary local solve results and therefore by flexible-child and local Revolute motion application.
+
+### 27E. Atomic authority-qualified application — Implemented
+
+Public boundary:
 
 ```text
-A. add a stable model/target-input revision snapshot used by local and cross-hierarchy solve results
-
-or
-
-B. preserve the current local-solver limitation and explicitly state that semantic target-producing part edits are outside stale-result detection
+AssemblyCrossHierarchySolveResultApplier
 ```
 
-Option A remains preferable before long-lived GUI or background solve-result lifetimes exist.
+Application order:
 
-The implementation must not silently claim geometry-complete freshness if it chooses B.
+```text
+Converged result only
+  -> validate Project structure
+  -> authority + exact free proposal freshness
+  -> complete relationship freshness
+  -> exact current solve-group participation
+  -> exact hierarchy path-boundary freshness
+  -> exact canonical PartDocument model intent
+  -> copy Project
+  -> write one direct local component transform per proposal authority
+  -> replace source Project only after all writes succeed
+```
 
-### 27E. Atomic application
+The applier never writes composed transforms, root-space endpoint placements, occurrence-local overrides, or `SubassemblyInstance::transform()` values.
 
-Rules:
+### 27F. Cross-hierarchy rank and remaining-DOF diagnostics — Implemented
 
-1. only converged results may be applied;
-2. validate complete authority, relationship, and hierarchy-boundary freshness first;
-3. validate every proposed direct transform through the existing component transform contract;
-4. create a Project copy;
-5. write at most one direct local component transform per `ComponentTransformAuthority`;
-6. replace the source Project only after every write succeeds;
-7. never persist a composed hierarchy transform;
-8. never mutate `SubassemblyInstance::transform()` through this applier.
+Public analyzer:
 
-### 27F. Diagnostics
+```text
+AssemblyCrossHierarchySolveDiagnosticsAnalyzer
+```
 
-Diagnostics must use the exact Block-26 free-authority variable order and the same mixed residual evaluator/Jacobian semantics.
+Local and cross diagnostics now share:
+
+```text
+compute_assembly_matrix_rank
+```
+
+Cross diagnostics use exactly the Block-26 free-authority proposal order and the same authority read/apply, mixed residual evaluation, length scaling, and central finite-difference implementation as the solver.
 
 ```text
 variable_count = 6 * unique_free_active_transform_authority_count
@@ -521,20 +301,122 @@ remaining_dof = variable_count - rank(J)
 
 The count is not based on geometric occurrence count.
 
-Recommended focused tags:
+For two repeated rooted occurrences sharing one free child authority:
+
+```text
+variable_count = 6
+```
+
+not `12`.
+
+Focused tags:
 
 ```text
 [geometry][assembly-cross-hierarchy-application]
 [geometry][assembly-cross-hierarchy-diagnostics]
+[geometry][assembly-semantic-freshness]
 ```
 
-Application/freshness and diagnostics may use separate test translation units, but both remain Block 27 unless the canonical plan is deliberately split before implementation.
+## Block 28: Cross-hierarchy joints and nested motion propagation — Next
 
-## Blocks 28+
+Goal: extend the frozen hierarchy identity and transform-authority model from geometric constraints to persistent motion-joint intent.
 
-### 28. Cross-hierarchy joints and nested motion propagation
+The first cross-hierarchy motion family remains Revolute.
 
-Deferred until Blocks 23-27 freeze geometric relationship persistence, solve connectivity, authority mapping, numeric execution, freshness, application, and diagnostics.
+### 28A. Persistent occurrence-qualified joint endpoints
+
+Add a Core-owned Project-level cross-hierarchy joint record whose endpoints use exact:
+
+```text
+(occurrence_path,
+ local ComponentInstanceId,
+ semantic_reference)
+```
+
+Reuse existing local Revolute type/state/limits/current-coordinate semantics.
+
+Define Project-level joint id scope independently from local document-scoped joint ids.
+
+Additive Project JSON must preserve exact target A/B and occurrence-path order.
+
+### 28B. Joint-to-transform-authority incidence
+
+Map each exact cross-hierarchy joint endpoint to:
+
+```text
+ComponentTransformAuthority =
+  (reached assembly document,
+   local ComponentInstanceId)
+```
+
+Retain complete occurrence-qualified endpoint mappings separately from unique authority incidence.
+
+A same-authority joint can therefore have two endpoint mappings and one unique authority dependency.
+
+### 28C. Combined geometric and motion connectivity
+
+Motion grouping must close transitively over:
+
+```text
+active local geometric relationships
+active local joints
+active Project-level cross-hierarchy geometric relationships
+active Project-level cross-hierarchy joints
+```
+
+The selected Project-level joint determines the initial motion component.
+
+Every other active Revolute joint in that combined component must receive a deterministic transient holding drive at its authored coordinate unless a later motion-query contract states otherwise.
+
+### 28D. Root-space Revolute drive evaluation
+
+Reuse exact hierarchy endpoint resolution and parent transform chains.
+
+Cross-hierarchy Revolute target geometry must reuse `.seat` axis/oriented-seating semantics.
+
+Directed axis, seating, and signed twist residuals remain mathematically identical to the local Revolute seed; only endpoint depth and authority mapping differ.
+
+Two endpoints sharing one component transform authority observe one candidate direct transform through distinct parent chains.
+
+### 28E. Shared numeric engine and proposals
+
+Deduplicate six-variable blocks by `ComponentTransformAuthority`.
+
+Reuse Block-26 mixed residual evaluation, central finite differences, and `solve_numeric_variables`.
+
+Do not introduce `SubassemblyInstance` variables.
+
+Return at most one direct-transform proposal per free authority.
+
+### 28F. Fresh motion result and atomic application
+
+Cross-hierarchy motion results must protect:
+
+```text
+complete transform authority inputs
+complete geometric relationship inputs in the combined motion group
+complete local joint inputs in the combined group
+complete Project-level cross-hierarchy joint inputs
+all participating hierarchy path boundaries
+exact semantic target PartDocument model intent
+selected source coordinate and requested-coordinate/limit validity
+```
+
+Application must use a Project copy and commit authority transforms plus the selected Project-level joint coordinate atomically.
+
+Block-27 freshness helpers should be generalized/reused rather than duplicated family-by-family.
+
+Recommended focused tags:
+
+```text
+[core][assembly-cross-hierarchy-joint]
+[core][assembly-cross-hierarchy-joint-json]
+[core][assembly-cross-hierarchy-motion-graph]
+[geometry][assembly-cross-hierarchy-revolute]
+[geometry][assembly-cross-hierarchy-motion]
+```
+
+## Blocks 29+
 
 ### 29. Component geometry instancing and structured STEP assembly products
 
@@ -548,33 +430,14 @@ Deferred.
 
 Persist model intent.
 
-Current persistent assembly intent includes component placement/state, local geometric constraints, local joint/limit/coordinate records, project-owned child assemblies, rigid subassembly occurrence placement/state, and Project-owned cross-hierarchy geometric constraints with exact occurrence-qualified endpoints.
+Current persistent assembly intent includes component placement/state, local geometric constraints, local Revolute joint/limit/coordinate records, project-owned child assemblies, rigid subassembly occurrence placement/state, and Project-owned cross-hierarchy geometric constraints with exact occurrence-qualified endpoints.
 
-Regenerate:
+Regenerate graph connectivity, combined motion groups, hierarchy traversal, parent transform chains, flattened leaves, resolved target geometry, residual descriptors, transform authorities, incidence/mappings, solve groups, mixed residuals/Jacobians, solve/motion results, freshness snapshots, proposals, rank products, diagnostics, shape caches, posed shapes, analysis products, and STEP compounds.
 
-```text
-local graph connectivity
-combined motion groups
-hierarchy traversal and parent transform chains
-flattened leaves
-cross-hierarchy target-resolution values
-root-space resolved geometry
-residual descriptors
-ComponentTransformAuthority identities
-relationship-to-authority incidence
-endpoint-authority mappings
-cross-hierarchy solve groups
-mixed numeric residuals and Jacobians
-cross-hierarchy solve state and proposals
-authority snapshots
-future application freshness snapshots and diagnostics
-shape caches and posed shapes
-analysis products
-STEP compounds
-```
+Block 28 may add persistent Project-level cross-hierarchy joint intent and its authored coordinate. It must not persist derived motion connectivity or solver products.
 
 ## Next technical step
 
-Implement Block 27 only: complete Block-26 result freshness validation, an explicit semantic target-geometry freshness contract, atomic authority-qualified direct-transform application, and rank/remaining-DOF diagnostics over exactly the Block-26 free-authority variable ordering.
+Implement Block 28 only: persistent occurrence-qualified Project-level cross-hierarchy Revolute joint intent, additive JSON, joint-to-transform-authority incidence, combined geometric/joint motion connectivity across assembly documents, root-space nested Revolute drive evaluation, shared authority-scoped numeric solving, and complete Block-27-style fresh atomic transform-plus-coordinate application.
 
-Do not introduce cross-hierarchy joints, nested motion propagation, occurrence-local internal pose overrides, or whole-subassembly transform variables in the same block.
+Do not add occurrence-local child pose overrides, whole-subassembly transform variables, component geometry instancing, or swept-motion contact analysis in Block 28.

@@ -1,5 +1,7 @@
 #include "assembly_numeric_solve_engine.hpp"
 
+#include "assembly_semantic_target_freshness.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
@@ -153,15 +155,16 @@ constexpr double kPivotTolerance = 1.0e-14;
     const AssemblyNumericSolveOutcome& outcome, const Project& source_project,
     const Project& solved_project, const std::vector<ComponentInstanceId>& connected_group,
     const std::vector<ComponentInstanceId>& fixed_components,
-    const std::vector<ComponentInstanceId>& variable_components) {
+    const std::vector<ComponentInstanceId>& variable_components,
+    std::vector<AssemblySemanticTargetPartSnapshot> semantic_target_part_snapshots) {
   std::vector<AssemblySolveComponentSnapshot> snapshots;
   snapshots.reserve(connected_group.size());
   for (const auto& component_id : connected_group) {
     const ComponentInstance* component =
         source_project.assembly().find_component_instance(component_id);
-    snapshots.push_back(AssemblySolveComponentSnapshot{component_id, component->grounding_state(),
-                                                       component->suppression_state(),
-                                                       component->transform()});
+    snapshots.push_back(AssemblySolveComponentSnapshot{
+        component_id, component->referenced_part_document(), component->grounding_state(),
+        component->suppression_state(), component->transform()});
   }
 
   std::vector<ProposedComponentTransform> proposals;
@@ -181,6 +184,7 @@ constexpr double kPivotTolerance = 1.0e-14;
       connected_group,
       fixed_components,
       std::move(snapshots),
+      std::move(semantic_target_part_snapshots),
       std::move(proposals),
       AssemblySolveResidualSummary{outcome.final_residuals.size(),
                                    residual_rms(outcome.initial_residuals),
@@ -306,12 +310,15 @@ Result<AssemblySolveResult> solve_numeric_relationships(
 
   std::vector<ComponentInstanceId> fixed_components;
   std::vector<ComponentInstanceId> variable_components;
+  std::vector<DocumentId> semantic_target_part_documents;
+  semantic_target_part_documents.reserve(connected_group.size());
   for (const auto& component_id : connected_group) {
     const ComponentInstance* component = project.assembly().find_component_instance(component_id);
     if (component == nullptr) {
       return Result<AssemblySolveResult>::failure(validation_error(
           component_id.value(), "solver connected-group component must exist in assembly"));
     }
+    semantic_target_part_documents.push_back(component->referenced_part_document());
     if (component->suppression_state() == ComponentSuppressionState::Suppressed) {
       continue;
     }
@@ -320,6 +327,12 @@ Result<AssemblySolveResult> solve_numeric_relationships(
     } else {
       variable_components.push_back(component_id);
     }
+  }
+
+  auto semantic_target_part_snapshots =
+      make_semantic_target_part_snapshots(project, std::move(semantic_target_part_documents));
+  if (semantic_target_part_snapshots.has_error()) {
+    return Result<AssemblySolveResult>::failure(semantic_target_part_snapshots.error());
   }
 
   const NumericVector initial_variables = read_variables(project, variable_components);
@@ -349,7 +362,7 @@ Result<AssemblySolveResult> solve_numeric_relationships(
 
   return Result<AssemblySolveResult>::success(make_solve_result(
       outcome.value(), project, solved_project, connected_group, fixed_components,
-      variable_components));
+      variable_components, std::move(semantic_target_part_snapshots.value())));
 }
 
 } // namespace blcad::geometry::detail

@@ -2,6 +2,7 @@
 
 #include "assembly_constraint_numeric_system.hpp"
 #include "assembly_numeric_solve_engine.hpp"
+#include "assembly_semantic_target_freshness.hpp"
 
 #include <algorithm>
 #include <string>
@@ -15,22 +16,28 @@ namespace {
   return Error::validation(std::move(object_id), std::move(message));
 }
 
-[[nodiscard]] bool contains_component(const std::vector<ComponentInstanceId>& components,
-                                       const ComponentInstanceId& component) {
-  return std::find(components.begin(), components.end(), component) != components.end();
-}
-
 [[nodiscard]] Result<std::size_t> validate_application_snapshot(const Project& project,
-                                                                 const AssemblySolveResult& result) {
-  std::vector<ComponentInstanceId> seen_snapshots;
-  seen_snapshots.reserve(result.component_snapshots.size());
-  for (const auto& snapshot : result.component_snapshots) {
-    if (contains_component(seen_snapshots, snapshot.component_instance)) {
-      return Result<std::size_t>::failure(
-          validation_error(snapshot.component_instance.value(),
-                           "assembly solve result contains duplicate snapshots"));
+                                                                const AssemblySolveResult& result) {
+  if (result.component_snapshots.size() != result.component_group.size()) {
+    return Result<std::size_t>::failure(validation_error(
+        "assembly.solver",
+        "assembly solve result component snapshot set is incomplete or contains extras"));
+  }
+
+  std::vector<ComponentInstanceId> expected_fixed_components;
+  std::vector<ComponentInstanceId> expected_variable_components;
+  std::vector<DocumentId> semantic_target_part_documents;
+  expected_fixed_components.reserve(result.component_snapshots.size());
+  expected_variable_components.reserve(result.component_snapshots.size());
+  semantic_target_part_documents.reserve(result.component_snapshots.size());
+
+  for (std::size_t index = 0U; index < result.component_snapshots.size(); ++index) {
+    const AssemblySolveComponentSnapshot& snapshot = result.component_snapshots[index];
+    if (snapshot.component_instance != result.component_group[index]) {
+      return Result<std::size_t>::failure(validation_error(
+          snapshot.component_instance.value(),
+          "assembly solve result component snapshots do not match exact component-group order"));
     }
-    seen_snapshots.push_back(snapshot.component_instance);
 
     const ComponentInstance* component =
         project.assembly().find_component_instance(snapshot.component_instance);
@@ -38,37 +45,61 @@ namespace {
       return Result<std::size_t>::failure(validation_error(
           snapshot.component_instance.value(), "assembly solve result component no longer exists"));
     }
-    if (component->transform() != snapshot.source_transform ||
+    if (component->referenced_part_document() != snapshot.referenced_part_document ||
+        component->transform() != snapshot.source_transform ||
         component->grounding_state() != snapshot.grounding_state ||
         component->suppression_state() != snapshot.suppression_state) {
       return Result<std::size_t>::failure(
           validation_error(snapshot.component_instance.value(),
                            "assembly solve result is stale because component solve input changed"));
     }
+
+    semantic_target_part_documents.push_back(snapshot.referenced_part_document);
+    if (snapshot.suppression_state != ComponentSuppressionState::Active) {
+      continue;
+    }
+    if (snapshot.grounding_state == ComponentGroundingState::Grounded) {
+      expected_fixed_components.push_back(snapshot.component_instance);
+    } else {
+      expected_variable_components.push_back(snapshot.component_instance);
+    }
   }
 
-  std::vector<ComponentInstanceId> seen_proposals;
-  seen_proposals.reserve(result.proposed_transforms.size());
-  for (const auto& proposal : result.proposed_transforms) {
-    if (contains_component(seen_proposals, proposal.component_instance)) {
-      return Result<std::size_t>::failure(
-          validation_error(proposal.component_instance.value(),
-                           "assembly solve result contains duplicate proposals"));
-    }
-    seen_proposals.push_back(proposal.component_instance);
+  if (result.fixed_components != expected_fixed_components) {
+    return Result<std::size_t>::failure(validation_error(
+        "assembly.solver",
+        "assembly solve result fixed-component order does not match complete component snapshots"));
+  }
 
-    const auto snapshot =
-        std::find_if(result.component_snapshots.begin(), result.component_snapshots.end(),
-                     [&proposal](const AssemblySolveComponentSnapshot& candidate) {
-                       return candidate.component_instance == proposal.component_instance;
-                     });
-    if (snapshot == result.component_snapshots.end() ||
-        snapshot->grounding_state != ComponentGroundingState::Free ||
-        snapshot->suppression_state != ComponentSuppressionState::Active ||
-        snapshot->source_transform != proposal.source_transform) {
+  auto semantic_freshness = detail::validate_semantic_target_part_snapshots(
+      project, semantic_target_part_documents, result.semantic_target_part_snapshots);
+  if (semantic_freshness.has_error()) {
+    return Result<std::size_t>::failure(semantic_freshness.error());
+  }
+
+  if (result.proposed_transforms.size() != expected_variable_components.size()) {
+    return Result<std::size_t>::failure(validation_error(
+        "assembly.solver",
+        "assembly solve result proposals must exactly cover active free component snapshots"));
+  }
+
+  for (std::size_t index = 0U; index < result.proposed_transforms.size(); ++index) {
+    const ProposedComponentTransform& proposal = result.proposed_transforms[index];
+    if (proposal.component_instance != expected_variable_components[index]) {
       return Result<std::size_t>::failure(validation_error(
           proposal.component_instance.value(),
-          "assembly solve proposal does not match a free active component snapshot"));
+          "assembly solve result proposal order does not match active free component snapshots"));
+    }
+
+    const AssemblySolveComponentSnapshot& snapshot = *std::find_if(
+        result.component_snapshots.begin(), result.component_snapshots.end(),
+        [&proposal](const AssemblySolveComponentSnapshot& candidate) {
+          return candidate.component_instance == proposal.component_instance;
+        });
+    if (snapshot.source_transform != proposal.source_transform) {
+      return Result<std::size_t>::failure(validation_error(
+          proposal.component_instance.value(),
+          "assembly solve proposal source transform does not match component snapshot"));
     }
 
     const ComponentInstance* component =

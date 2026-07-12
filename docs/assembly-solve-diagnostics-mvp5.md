@@ -1,21 +1,21 @@
 # Assembly Solve Diagnostics and Remaining DOF MVP-5
 
-Status: implemented read-only local Jacobian-rank and remaining-degree-of-freedom diagnostics for the shared Mate, Distance, and Concentric rigid-body numeric path. Insert residual semantics and a direct rank-five proof exist separately; shared Insert diagnostics integration is the next block.
+Status: implemented read-only local Jacobian-rank and remaining-degree-of-freedom diagnostics for the shared Mate, Distance, Concentric, Insert, and Angle rigid-body numeric path. Block 27 additionally reuses the same matrix-rank implementation for authority-scoped cross-hierarchy diagnostics.
 
 ## Goal
 
-This block answers:
+The local analyzer answers:
 
 ```text
 At the current locally solved assembly state,
-how many independent rigid-body variable directions are constrained
-by the supported active numeric constraint system,
+how many independent direct rigid-body variable directions are constrained
+by the supported active local numeric relationship system,
 and how many local DOF remain?
 ```
 
-The analyzer reuses the exact deterministic residual, variable, and central finite-difference Jacobian model used by `AssemblyRigidBodySolver`.
+The analyzer reuses the deterministic residual, variable, and central finite-difference Jacobian semantics used by `AssemblyRigidBodySolver`.
 
-It does not infer DOF from constraint type names.
+It does not infer DOF from relationship type names.
 
 The result is local, linearized, regenerable derived data and is not persisted.
 
@@ -58,74 +58,74 @@ AssemblySolveDiagnosticsAnalyzer
   analyze(Project, connected_group, options)
 ```
 
-Constraint-family integrations do not add a second diagnostics API.
+Block 27 adds a separate `AssemblyCrossHierarchySolveDiagnosticsAnalyzer` for transform-authority groups, but both analyzers reuse the same `AssemblyJacobianRankSummary`, classifications, option contract, and matrix-rank implementation.
 
-## Shared numeric-system path
+## Shared local numeric-system path
 
-Solver and diagnostics share:
+Local solver and diagnostics share:
 
 ```text
 src/geometry/assembly_constraint_numeric_system.hpp
 src/geometry/assembly_constraint_numeric_system.cpp
 ```
 
-The shared path owns:
+The local path owns deterministic constraint-id collection, all five geometric residual-builder selections, canonical scalar flattening, residual summaries, free-component variable extraction/application on Project copies, and central finite-difference Jacobian construction.
 
-- deterministic constraint-id collection
-- constraint-type residual-builder selection
-- Mate/Distance/Concentric scalar residual flattening
-- residual summaries
-- free-component variable extraction
-- numeric variable application to project copies
-- central finite-difference Jacobian construction
-
-The analyzer does not maintain a second residual or Jacobian interpretation.
-
-Current integrated numeric families are:
+Current integrated local numeric families are:
 
 ```text
 Mate
 Distance
 Concentric
+Insert
+Angle
 ```
 
-Insert is not yet integrated into this shared path.
+The analyzer does not maintain a second local residual or Jacobian interpretation.
 
 ## Analysis pipeline
 
-For one exact deterministic connected group:
+For one exact deterministic local connected group:
 
 ```text
 Project + connected group
   -> AssemblyRigidBodySolver::solve
   -> preserve solve state and residual summary
-  -> collect deterministic constraint order
+  -> collect deterministic active constraint order
   -> FixedGeometryInconsistent:
-       return explicit inconsistency
-       do not claim DOF rank
+       explicit inconsistency
+       no rank claim
   -> MaximumIterationsReached or NumericalFailure:
-       return explicit non-convergence
-       do not claim DOF rank
+       explicit non-convergence
+       no rank claim
   -> Converged:
-       apply proposals to a private Project copy
+       apply fresh proposals to a private Project copy
        evaluate shared variables/residuals/Jacobian
-       compute local Jacobian rank
+       compute Jacobian rank
        compute constrained and remaining DOF
        classify local variable state
 ```
 
-The input project remains unchanged.
+The source Project remains unchanged.
 
-An unsupported numeric family such as current Insert fails through the solver/shared-numeric boundary and therefore produces no false rank classification.
+Because diagnostics apply the solve result to a private Project copy through `AssemblySolveResultApplier`, exact component and canonical semantic target PartDocument freshness is validated before the evaluation pose is accepted.
 
-## Local Jacobian rank convention
+## Shared matrix-rank implementation
+
+Local and Block-27 cross-hierarchy diagnostics now call:
+
+```text
+compute_assembly_matrix_rank
+```
+
+The utility receives a finite dense Jacobian, expected column count, absolute tolerance, relative tolerance, and diagnostic object id.
 
 Let:
 
 ```text
 J = m x n numeric Jacobian
 m = residual component count
-n = free rigid-body variable count
+n = variable count
 ```
 
 ```text
@@ -152,11 +152,11 @@ Both tolerances must be finite and non-negative and may not both be zero.
 
 Rank is computed deterministically by row-echelon elimination with left-to-right columns and maximum-magnitude row pivot selection in the current column.
 
-Solver damping is excluded from rank because damping is solve stabilization and must not create artificial constrained directions.
+Solver damping is excluded because damping is numerical stabilization and must not create artificial constrained directions.
 
-## DOF counts
+## Local variable order and DOF counts
 
-Each free component contributes:
+Each free active local component contributes:
 
 ```text
 tx_mm
@@ -170,7 +170,7 @@ rz_deg
 Therefore:
 
 ```text
-variable_count = 6 * free_component_count
+variable_count = 6 * free_active_component_count
 ```
 
 For an evaluated Jacobian:
@@ -184,24 +184,23 @@ These are local rank/nullity values in direct persisted `RigidTransform` coordin
 
 They do not claim global configuration-space dimension across singularities, alternate assembly modes, or semantic-reference changes.
 
+Cross-hierarchy diagnostics use a different variable-owner identity (`ComponentTransformAuthority`) but the same six-variable block layout and shared rank utility.
+
 ## DOF classification
 
 ### NotEvaluated
 
-Used when no locally converged integrated numeric state is suitable for rank-based classification.
-
-Examples:
+Used when no converged numeric state is suitable for rank-based classification:
 
 ```text
 FixedGeometryInconsistent
 MaximumIterationsReached
 NumericalFailure
-unsupported shared numeric constraint family
 ```
 
 ### NoVariableDof
 
-Used for a converged group with zero free components. The absence of variables comes from grounding policy and is not a claim that constraints alone fully constrain bodies.
+Used for a converged group with zero free variables. The absence of variables comes from grounding policy and is not a claim that relationships alone constrain all bodies.
 
 ### Underconstrained
 
@@ -211,16 +210,28 @@ variable_count > 0
 remaining_dof > 0
 ```
 
-Proven shared-path examples:
+Covered regular one-free-body examples:
 
 ```text
 one Mate:
   rank 3/6
   remaining 3
 
+one Distance:
+  rank 3/6
+  remaining 3
+
 one Concentric:
   rank 4/6
   remaining 2
+
+one Insert:
+  rank 5/6
+  remaining 1
+
+one non-extremal Angle:
+  rank 1/6
+  remaining 5
 
 one aligned Distance + one Concentric:
   rank 5/6
@@ -235,7 +246,9 @@ variable_count > 0
 remaining_dof == 0
 ```
 
-Three orthogonal planar Mates provide the first proven rank-six case.
+Three orthogonal planar Mates provide a covered rank-six local case.
+
+`LocallyFullyConstrained` means full column rank in the finite-difference Jacobian at the evaluated pose.
 
 ## Consistency classification
 
@@ -243,11 +256,11 @@ DOF classification and consistency remain separate.
 
 ### LocallyConsistent
 
-The supported numeric system converged and rank was evaluated at the private converged state.
+The supported numeric system converged and rank was evaluated on a private converged Project copy.
 
 ### FixedGeometryInconsistent
 
-An all-grounded supported numeric group has residual RMS above convergence tolerance.
+An all-grounded active numeric group remains above convergence tolerance.
 
 The analyzer preserves the solver state and does not invent a DOF classification.
 
@@ -255,7 +268,7 @@ The analyzer preserves the solver state and does not invent a DOF classification
 
 Used for `MaximumIterationsReached` and `NumericalFailure`.
 
-Residual summary/order remain visible but `rank_evaluated` is false.
+Residual summary and deterministic relationship order remain visible, but `rank_evaluated` is false.
 
 ## Residual row rank is not semantic overconstraint
 
@@ -265,20 +278,34 @@ For an evaluated Jacobian:
 residual_row_redundancy = residual_component_count - jacobian_rank
 ```
 
-The result distinguishes:
+Classification:
 
 ```text
 FullRowRank
 RedundantResidualComponents
 ```
 
-`RedundantResidualComponents` means flattened residual rows are not all linearly independent at the evaluated state.
+`RedundantResidualComponents` means flattened scalar residual rows are not all linearly independent at the evaluated state.
 
 It does not mean the assembly is semantically overconstrained.
 
-Vector residuals commonly contain more scalar rows than independent geometric sensitivities.
+Vector residuals often contain more scalar rows than independent geometric sensitivities.
 
-## Proven Concentric rank behavior
+## Proven family behavior
+
+### Mate / Distance
+
+A regular planar relationship constrains one signed separation translation and two tilt rotations:
+
+```text
+residual components = 4
+variables = 6
+rank = 3
+remaining DOF = 3
+residual row redundancy = 1
+```
+
+### Concentric
 
 Canonical residual:
 
@@ -287,42 +314,19 @@ direction_parallelism = cross(dA, dB)
 axis_offset_mm         = cross(oB - oA, dA)
 ```
 
-A regular one-free-body Concentric relationship constrains two tilt rotations and two lateral translations. It leaves axial translation and axis rotation free.
-
-The actual shared Jacobian proves:
+A regular one-free-body Concentric relationship constrains two tilt rotations and two lateral translations. Axial translation and axis rotation remain free:
 
 ```text
-residual_component_count = 6
-variable_count           = 6
-jacobian_rank            = 4
-constrained_dof          = 4
-remaining_dof            = 2
-residual_row_redundancy  = 2
+residual components = 6
+variables = 6
+rank = 4
+remaining DOF = 2
+residual row redundancy = 2
 ```
 
-There is no `if Concentric then rank = 4` rule.
+### Insert
 
-## Proven mixed Distance plus Concentric behavior
-
-For one Concentric relationship and one planar Distance whose normal follows the common axis:
-
-```text
-residual_component_count = 10
-variable_count           = 6
-jacobian_rank            = 5
-constrained_dof          = 5
-remaining_dof            = 1
-```
-
-Distance adds axial separation while its orientation sensitivities overlap the existing Concentric tilt sensitivities.
-
-The remaining local freedom is rotation about the common axis.
-
-## Insert residual rank seed
-
-Canonical Insert document: `docs/assembly-insert-intent-composite-residuals-mvp5.md`.
-
-Insert residuals are implemented read-only:
+Canonical residual:
 
 ```text
 direction_parallelism       = cross(dA, dB)
@@ -330,28 +334,54 @@ axis_offset_mm               = cross(oB - oA, dA)
 signed_seating_separation_mm = dot(sB - sA, nA)
 ```
 
-The first two fields carry the four regular Concentric sensitivities. The seating scalar adds axial translation sensitivity.
-
-A focused geometry test directly central-finite-differences the seven raw Insert scalar residuals over all six direct transform variables and applies deterministic row-echelon rank evaluation.
-
-Proven regular result:
+The seating scalar adds axial translation sensitivity to the four regular Concentric sensitivities:
 
 ```text
-residual_component_count = 7
-variable_count           = 6
-jacobian_rank            = 5
-remaining_local_dof      = 1
+residual components = 7
+variables = 6
+rank = 5
+remaining DOF = 1
 ```
 
-Pure rotation about the common axis remains a zero-residual state.
+Pure rotation about the common axis remains free.
 
-This is an architecture seed, not an analyzer result. Because Insert is not yet flattened by `AssemblyConstraintNumericSystem`, `AssemblySolveDiagnosticsAnalyzer` does not currently report Insert rank.
+Insert is integrated into the shared numeric and diagnostics paths; this is no longer only a standalone rank seed.
 
-The next integration block must reproduce rank `5/6` through the exact shared solver/diagnostics Jacobian rather than hard-code it from the Insert type.
+### Angle
+
+The current planar Angle seed uses:
+
+```text
+angle_alignment = dot(nA, nB) - cos(target_angle_deg)
+```
+
+At a regular non-extremal target such as `90 deg`, one independent rotational sensitivity is present:
+
+```text
+residual components = 1
+variables = 6
+rank = 1
+remaining DOF = 5
+```
+
+At cosine extrema (`0 deg`, `180 deg`) the first-order derivative can be singular. Diagnostics report the actual finite-difference Jacobian rank at the evaluated pose rather than hard-coding one DOF from the family name.
+
+### Distance plus Concentric
+
+For one Concentric relationship and one planar Distance whose normal follows the common axis:
+
+```text
+residual components = 10
+variables = 6
+rank = 5
+remaining DOF = 1
+```
+
+Distance adds axial separation while orientation sensitivities overlap Concentric tilt sensitivities. Rotation about the common axis remains free.
 
 ## Deterministic ordering
 
-Diagnostics preserve:
+Local diagnostics preserve:
 
 ```text
 component_group
@@ -360,61 +390,63 @@ variable_components
 constraint_order
 ```
 
-Variable components use solver lexicographic order.
+`variable_components` follow the exact local solver proposal/variable order.
 
-Constraints use graph lexicographic `AssemblyConstraintId` order.
+`constraint_order` follows the deterministic active local graph/numeric relationship order.
 
-Mixed integrated constraint families do not change this ordering.
+Insertion-order changes do not change diagnostics.
 
-Repeated analysis of the same project/options produces equal descriptors.
+Cross-hierarchy diagnostics preserve separate authority and relationship identities and are canonical in `docs/assembly-cross-hierarchy-application-diagnostics-mvp5.md`.
 
-## Semantic target failure propagation
+## Failure policy
 
-Diagnostics consume the solver/shared numeric path rather than pre-validating semantic targets independently.
+Diagnostics fail closed on invalid options, solver validation/target-resolution failures, stale private result application, residual dimension changes during central finite differences, non-finite Jacobian entries, or Jacobian row-width mismatch.
 
-Unsupported semantic targets propagate their geometry-layer error unchanged.
+A valid non-converged solve state is returned as diagnostics with `rank_evaluated = false`; it is not converted into a generic error.
 
-Future Insert integration must preserve this behavior for malformed or unsupported `.seat` targets.
+## Persistence boundary
 
-## Read-only and persistence boundary
+Persist model intent, not diagnostic products.
 
-`AssemblySolveDiagnosticsAnalyzer::analyze` does not:
+Derived and unpersisted local diagnostics data includes:
 
-- mutate the input project
-- mutate component transforms
-- change component state
-- rewrite constraints or target order
-- change part intent
-- persist numeric Jacobians
-- persist rank or DOF values
-- persist local classifications
+```text
+solved evaluation Project copy
+free-component variable order
+scaled residual vector
+finite-difference Jacobian
+matrix rank
+pivot threshold
+constrained/remaining DOF
+residual row redundancy
+classification values
+```
 
-Analysis is regenerated from current persistent model intent, placement/state, semantic target geometry, canonical residual conventions, and configured numeric policy.
+The shared matrix-rank utility itself stores no cache.
 
-No assembly/project JSON field is added.
-
-The direct Insert rank proof is also unpersisted derived test evidence.
-
-## Tests
+## Focused coverage
 
 ```bash
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-diagnostics]"
-./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-concentric-solver]"
-./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-insert]"
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-cross-hierarchy-diagnostics]"
 ```
 
-Coverage includes Mate rank `3/6`, Distance rank `3/6`, three orthogonal Mates rank `6/6`, two-Mate chain rank `6/12`, deterministic ordering, all-grounded consistency/inconsistency, non-convergence propagation, rank tolerance, duplicate residual-row redundancy, read-only behavior, semantic target failures, Concentric rank `4/6`, mixed Distance+Concentric rank `5/6`, and the separate direct Insert rank-five seed.
+Local coverage proves option validation, deterministic order, Mate/Distance rank `3/6`, Concentric rank `4/6`, Insert rank `5/6`, non-extremal Angle rank `1/6`, mixed Distance+Concentric rank `5/6`, rank-six full constraint, all-grounded consistency/inconsistency, non-convergence classification, residual row redundancy semantics, and source Project immutability.
 
-## Next technical step
+Cross-hierarchy coverage proves authority-based variable counting, repeated-occurrence shared authority semantics, mixed local/cross relationship ordering, and reuse of the same matrix-rank contract.
 
-The next diagnostics increment is Insert integration through the one shared numeric system and solver.
+## Current boundary
 
-After successful Insert solve integration, `AssemblySolveDiagnosticsAnalyzer` must evaluate the same seven-scalar Insert residual/Jacobian path and prove:
+Local diagnostics remain local to one temporary solve view's root `AssemblyDocument` and count free local components.
 
-```text
-variable_count = 6
-jacobian_rank  = 5
-remaining_dof  = 1
-```
+Cross-hierarchy diagnostics count unique free `ComponentTransformAuthority` values.
 
-No Insert-specific DOF table or hard-coded nominal constraint count should be added.
+Neither analyzer persists a rank/null-space cache or exposes null-space basis vectors.
+
+## Next diagnostics-adjacent work
+
+Block 28 is cross-hierarchy Revolute motion, not a new rank algorithm.
+
+Any motion diagnostics introduced there must reuse the existing shared numeric Jacobian and matrix-rank semantics rather than infer constrained directions from joint family names.
+
+Per-authority/null-space basis presentation and free-motion direction extraction remain deferred.

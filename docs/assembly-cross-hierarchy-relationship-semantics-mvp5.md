@@ -1,6 +1,6 @@
 # Cross-Hierarchy Relationship Target and Residual Semantics MVP-5
 
-Status: implemented as Block 22. Blocks 23-26 are implemented follow-ups; Block 27 is next.
+Status: implemented as Block 22. Blocks 23-27 are implemented follow-ups; Block 28 is next.
 
 This document is canonical for read-only occurrence-qualified target resolution and root-assembly-space Mate, Distance, Angle, Concentric, and Insert residual semantics.
 
@@ -38,14 +38,12 @@ The empty occurrence path addresses the explicit root assembly occurrence.
 
 Non-empty paths are exact root-to-current `SubassemblyInstanceId` sequences.
 
-For repeated child occurrences:
+Repeated child occurrences may share local component and semantic reference while retaining distinct rooted endpoint identity:
 
 ```text
 ([subassembly.left],  component.child, feature.hole.axis)
 ([subassembly.right], component.child, feature.hole.axis)
 ```
-
-the local component and semantic reference can be identical while the rooted endpoint identities remain different.
 
 ## Exact occurrence resolution
 
@@ -55,9 +53,9 @@ An empty path selects the root assembly document.
 
 A non-empty path selects exactly one rooted occurrence descriptor produced by `AssemblyHierarchyTraversal`.
 
-The containing `AssemblyDocument` is the document reached by that exact path.
+The containing `AssemblyDocument` is the document reached by that path.
 
-The resolver does not globally search for a component id or occurrence id.
+The resolver does not globally search component or occurrence ids.
 
 ## Local semantic target reuse
 
@@ -65,16 +63,16 @@ Once the containing assembly document is known, the hierarchy resolver creates a
 
 ```text
 selected containing AssemblyDocument -> temporary root assembly
-Project-owned PartDocument records copied into the temporary Project
+Project-owned PartDocument records -> copied into temporary Project
 ```
 
-It then delegates semantic target meaning to the existing:
+It delegates semantic target meaning to:
 
 ```text
 AssemblyConstraintTargetResolver
 ```
 
-Supported local semantic families remain:
+Supported local families remain:
 
 ```text
 feature.<feature-id>.top|bottom|right|left|front|back
@@ -82,25 +80,25 @@ feature.<feature-id>.axis
 feature.<feature-id>.seat
 ```
 
-The hierarchy layer does not reparse feature history or infer a second semantic geometry contract.
+The hierarchy layer does not implement a second feature-history parser or semantic geometry contract.
 
 ## Root-space transform evaluation
 
-The local target resolver returns component-local geometry plus the direct authored component transform.
+The local resolver returns component-local geometry plus the direct component transform.
 
-For an occurrence descriptor with parent chain:
+For occurrence parent chain:
 
 ```text
 [T_inner_parent, ..., T_outer_parent]
 ```
 
-the complete hierarchy target chain is:
+the complete target chain is:
 
 ```text
 [T_component, T_inner_parent, ..., T_outer_parent]
 ```
 
-`AssemblyHierarchyTransformEvaluator` evaluates the chain exactly in inner-to-outer order.
+`AssemblyHierarchyTransformEvaluator` evaluates the chain exactly inner-to-outer.
 
 For point `p`:
 
@@ -108,24 +106,13 @@ For point `p`:
 T_outer(...T_inner(T_component(p)))
 ```
 
-Vectors, normals, and directions rotate only at each transform level.
+Vectors, normals, and directions rotate only.
 
 No composed matrix or recomputed Euler triple becomes persistent model intent.
 
 ## Resolved target descriptors
 
-Planar hierarchy targets preserve:
-
-```text
-occurrence path
-containing assembly document
-local component
-referenced part document
-source feature
-semantic face
-semantic reference text
-root-space plane
-```
+Planar hierarchy targets preserve occurrence path, containing assembly document, local component, referenced part, source feature, semantic face/reference, and root-space plane.
 
 Axis targets additionally preserve source profile and root-space axis.
 
@@ -135,7 +122,7 @@ All target descriptors are derived and unpersisted.
 
 ## Canonical residual semantics
 
-`AssemblyHierarchyConstraintEquationBuilder` reuses the established residual descriptor types and formulas.
+`AssemblyHierarchyConstraintEquationBuilder` reuses established residual descriptor types and formulas.
 
 ### Mate
 
@@ -182,30 +169,24 @@ signed_seating_separation_mm = dot(sB - sA, nA)
 
 Target A owns signed seating direction.
 
-Only endpoint identity and transform depth differ from the local builders. The residual mathematics are shared.
+Only endpoint identity and transform depth differ from local builders. The residual mathematics are shared.
 
 ## Visibility, suppression, and participation
 
-Target resolution answers a mathematical geometry query:
-
-```text
-where is this exact semantic endpoint in root-assembly space?
-```
-
-Visibility and suppression do not alter this geometry query.
+Target resolution answers a mathematical geometry query and does not filter by visibility or suppression.
 
 Block 25 separately implements solve participation:
 
 - inactive local/cross relationships do not participate;
-- local relationships touching a suppressed component do not participate;
-- cross-hierarchy relationships using a suppressed path boundary or addressed component do not participate;
+- local relationships touching suppressed components do not participate;
+- cross relationships using a suppressed path boundary or addressed component do not participate;
 - visibility does not filter solve participation.
 
-This keeps geometric resolution separate from solve-connectivity policy.
+This separation is retained by Block 27 freshness: visibility changes do not stale a result, while suppression/path participation changes do.
 
 ## Endpoint mappings and shared transform authority
 
-Block 25 maps each participating hierarchy endpoint to:
+Block 25 maps participating hierarchy endpoints to:
 
 ```text
 ComponentTransformAuthority =
@@ -213,9 +194,9 @@ ComponentTransformAuthority =
    local ComponentInstanceId)
 ```
 
-The complete endpoint identity remains in `AssemblyCrossHierarchyEndpointAuthorityMapping`.
+The complete endpoint remains in `AssemblyCrossHierarchyEndpointAuthorityMapping`.
 
-Therefore:
+Thus:
 
 ```text
 TargetA = ([left],  component.shaft, feature.left.axis)
@@ -225,28 +206,56 @@ both authority:
   (assembly.gearbox, component.shaft)
 ```
 
-can have one shared transform authority while retaining two distinct parent transform chains.
+can share one transform authority while retaining two parent chains.
 
 ## Numeric follow-up semantics
 
-Block 26 is canonical in `docs/assembly-cross-hierarchy-numeric-solver-mvp5.md`.
+Block 26 applies one candidate direct component transform once to its authority in a Project copy.
 
-During numeric evaluation, a candidate direct component transform is applied once to its `ComponentTransformAuthority` in a Project copy.
-
-Both same-authority endpoints read that same candidate transform, but each endpoint is then evaluated through its own exact parent chain.
-
-Thus:
+Same-authority endpoints read that candidate transform but each evaluates through its own exact path-specific parent chain:
 
 ```text
 same candidate direct transform
 + different occurrence path
 + different parent chain
-= potentially different root-space endpoint geometry
+= potentially different root-space geometry
 ```
 
-The existing hierarchy equation builder produces the residual descriptor, and the shared numeric system flattens it with the same scalar order and length scaling as local relationships.
+The hierarchy equation builder produces the residual descriptor and the shared numeric system flattens it with the same scalar order/length scaling as local relationships.
 
-Block 26 does not change the formulas documented here.
+## Freshness and application follow-up semantics
+
+Block 27 is canonical in `docs/assembly-cross-hierarchy-application-diagnostics-mvp5.md`.
+
+A solve result now protects:
+
+```text
+complete transform authority inputs
+complete local/cross relationship records
+exact current active solve-group participation
+every persistent hierarchy boundary on participating cross endpoint paths
+exact canonical model intent of participating referenced PartDocuments
+```
+
+Hierarchy boundary snapshots protect containing assembly, local `SubassemblyInstanceId`, referenced child assembly, suppression, and direct boundary transform.
+
+Visibility remains outside solve freshness.
+
+Semantic target-producing PartDocument freshness is exact and conservative: the solve result stores the byte-for-byte canonical `serialize_part_document_to_json(part)` payload for participating referenced parts and requires equality at application.
+
+Atomic application writes only direct component transforms addressed by `ComponentTransformAuthority` values. It never writes root-space target placements or `SubassemblyInstance::transform()` values.
+
+## Diagnostics follow-up semantics
+
+Cross-hierarchy diagnostics use the exact Block-26 free-authority order and the same authority candidate application, hierarchy target/equation evaluation, residual flattening, length scaling, and central finite differences as solving.
+
+```text
+variable_count = 6 * unique_free_active_transform_authority_count
+constrained_dof = rank(J)
+remaining_dof = variable_count - rank(J)
+```
+
+The count is authority-based, not occurrence-based.
 
 ## Persistence boundary
 
@@ -258,65 +267,30 @@ AssemblyHierarchyConstraint
 Project::cross_hierarchy_constraints
 ```
 
-Project JSON serializes those records in:
+Project JSON serializes these records through:
 
 ```text
 cross_hierarchy_constraints[]
 ```
 
-Project loading validates exact endpoint path structure and reached local component identity, but does not resolve semantic feature geometry.
+Derived and unpersisted products include hierarchy target/query descriptors, exact occurrence resolution, root-space target geometry, residual descriptors, transform authorities, incidence/mappings, solve groups, numeric residuals/Jacobians, solve state, authority/relationship/boundary/semantic-PartDocument snapshots, proposals, freshness products, and diagnostics.
 
-Derived and unpersisted data includes:
-
-```text
-AssemblyHierarchyConstraintTarget
-AssemblyHierarchyConstraintQuery
-exact occurrence selection
-local target-resolution Project view
-root-space hierarchy target descriptors
-hierarchy transform chains used for target evaluation
-AssemblyHierarchyConstraintEquationDescriptor
-cross-hierarchy residual descriptors
-ComponentTransformAuthority identities
-relationship-to-authority incidence
-endpoint-to-authority mappings
-cross-hierarchy solve groups
-mixed scaled residual vectors
-finite-difference Jacobians
-cross-hierarchy solve state
-authority snapshots
-authority transform proposals
-```
-
-No resolved geometry, composed transform, residual value, numeric state, or solve result becomes model intent.
+No resolved geometry, composed transform, residual, snapshot, or solver product becomes model intent.
 
 ## Failure policy
 
-The read-only Geometry path fails closed on invalid Project structure or cycles, missing occurrence paths, unresolved containing assemblies/components/parts, unsupported semantic target families, missing or wrong-type source features, invalid circular axis/seat producer geometry, workplane-resolution failures, target-family mismatches, and all existing local target-resolution failures.
+The read-only Geometry path fails closed on invalid Project structure/cycles, missing occurrence paths, unresolved assemblies/components/parts, unsupported semantic target families, missing or wrong-type source features, invalid circular axis/seat producer geometry, workplane resolution failures, target-family mismatch, and existing local target-resolution failures.
 
 The source Project is never mutated by target/equation resolution.
 
-Persistence and structural validation failure rules are canonical in `docs/assembly-cross-hierarchy-constraint-json-mvp5.md`.
-
 ## Focused coverage
-
-Geometry target/equation coverage:
 
 ```bash
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-cross-hierarchy]"
-```
-
-The suite proves exact repeated-occurrence path identity, different root-space positions for repeated child occurrences, root endpoint resolution, all five relationship families, Distance target-order signed semantics, different repeated-occurrence Concentric offsets, fail-closed target resolution, determinism, and source immutability.
-
-Numeric follow-up coverage:
-
-```bash
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-cross-hierarchy-solver]"
-```
-
-Core intent/JSON/connectivity coverage:
-
-```bash
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-cross-hierarchy-application]"
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-cross-hierarchy-diagnostics]"
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-semantic-freshness]"
 ./build/dev/blcad_core_tests "[core][assembly-cross-hierarchy-intent]"
 ./build/dev/blcad_core_tests "[core][assembly-cross-hierarchy-json]"
 ./build/dev/blcad_core_tests "[core][assembly-cross-hierarchy-graph]"
@@ -324,8 +298,6 @@ Core intent/JSON/connectivity coverage:
 
 ## Current handoff
 
-The current sequence source of truth is `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`.
+Blocks 22-27 complete the cross-hierarchy geometric intent/structure/connectivity/numeric/fresh-application/diagnostics chain.
 
-Block 26 now implements authority-scoped mixed local/root-space numeric solving and unapplied proposals.
-
-Next is Block 27 only: complete solve-result freshness validation, an explicit semantic target-producing geometry freshness contract, atomic authority-qualified direct-transform application, and cross-hierarchy rank/remaining-DOF diagnostics over the exact Block-26 free-authority variable order.
+Next is Block 28 only: occurrence-qualified Project-level cross-hierarchy Revolute joint intent, joint-to-transform-authority incidence, combined geometric/joint motion connectivity, root-space nested Revolute drive evaluation through exact parent chains, shared authority-scoped numeric solving, and Block-27-style fresh atomic transform-plus-coordinate application.
