@@ -169,9 +169,9 @@ AssemblyContactAnalyzer::analyze(const Project& project, AssemblyContactAnalysis
           return Result<AssemblyContactAnalysis>::failure(overlap.error());
         }
 
-        AssemblyContactRecord record;
-        record.pair = AssemblyComponentOccurrencePairIdentity{identity_a, identity_b};
-        record.overlap_volume_mm3 = overlap.value();
+        AssemblyContactRecord record{
+            AssemblyComponentOccurrencePairIdentity{identity_a, identity_b},
+            AssemblyContactClassification::Separated, overlap.value(), std::nullopt};
         if (overlap.value() > options.minimum_overlap_volume_mm3) {
           record.classification = AssemblyContactClassification::Interfering;
           analysis.records.push_back(std::move(record));
