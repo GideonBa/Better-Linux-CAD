@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 jobs:
   patch-and-test:
@@ -20,7 +21,7 @@ jobs:
           fetch-depth: 0
 
       - name: Apply Block 38 patch
-        run: python3 scripts/apply_block38.py
+        run: python3 scripts/apply_block38.py 2>&1 | tee /tmp/block38-apply.log
 
       - name: Format Block 38 files
         run: |
@@ -64,3 +65,20 @@ jobs:
           git diff --cached --check
           git commit -m "Add generic relationship intent and JSON"
           git push origin HEAD:block38-generic-relationship-intent
+
+      - name: Report patch failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          {
+            echo 'Block 38 patch workflow failed before verification.'
+            echo
+            echo '```text'
+            tail -n 60 /tmp/block38-apply.log 2>/dev/null || true
+            echo '```'
+          } > /tmp/block38-comment.md
+          if test -n "$PR_URL"; then
+            gh pr comment "$PR_URL" --body-file /tmp/block38-comment.md
+          fi
