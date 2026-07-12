@@ -1,6 +1,7 @@
 #pragma once
 
 #include "blcad/core/datum_plane.hpp"
+#include "blcad/core/generated_topology_reference.hpp"
 #include "blcad/core/id.hpp"
 #include "blcad/core/result.hpp"
 #include "blcad/core/spatial.hpp"
@@ -115,11 +116,22 @@ private:
   Point2 local_origin_;
 };
 
+// Read-only Block-35 recovery result. The semantic producer-role identity is
+// retained exactly; no OCCT topology id or traversal position is copied into
+// model intent or into this derived status value.
+struct GeneratedTopologyReferenceRecovery {
+  GeneratedTopologyReferenceIdentity target;
+  ReferenceStatusKind status = ReferenceStatusKind::Lost;
+  std::string message;
+};
+
 class ReferenceRecoveryEvaluator {
 public:
   [[nodiscard]] Result<ReferenceStatusRecord> evaluate(ReferenceStatusId id,
                                                        const PartDocument& document,
                                                        SemanticReferenceTarget target) const;
+  [[nodiscard]] Result<GeneratedTopologyReferenceRecovery>
+  evaluate(const PartDocument& document, GeneratedTopologyReferenceIdentity target) const;
 };
 
 } // namespace blcad
