@@ -237,6 +237,42 @@ TEST_CASE("Semantic target-producing PartDocument model intent invalidates solve
               .find_component_instance(ComponentInstanceId("component.b"))
               ->transform() == source_b);
   }
+
+  SECTION("Ordinary local result requires the exact complete component snapshot order") {
+    Project project = local_semantic_freshness_project();
+    const AssemblyRigidBodySolver solver;
+    auto solved = solver.solve(project, local_group());
+    REQUIRE(solved);
+    REQUIRE(solved.value().converged());
+    REQUIRE(solved.value().component_snapshots.size() == 2U);
+
+    auto missing_snapshot = solved.value();
+    missing_snapshot.component_snapshots.erase(missing_snapshot.component_snapshots.begin());
+    CHECK(AssemblySolveResultApplier{}.apply(project, missing_snapshot).has_error());
+
+    auto reordered_snapshots = solved.value();
+    std::swap(reordered_snapshots.component_snapshots[0],
+              reordered_snapshots.component_snapshots[1]);
+    CHECK(AssemblySolveResultApplier{}.apply(project, reordered_snapshots).has_error());
+  }
+
+  SECTION("Ordinary local result requires exact fixed and free proposal subsequences") {
+    Project project = local_semantic_freshness_project();
+    const AssemblyRigidBodySolver solver;
+    auto solved = solver.solve(project, local_group());
+    REQUIRE(solved);
+    REQUIRE(solved.value().converged());
+    REQUIRE(solved.value().fixed_components.size() == 1U);
+    REQUIRE(solved.value().proposed_transforms.size() == 1U);
+
+    auto missing_fixed = solved.value();
+    missing_fixed.fixed_components.clear();
+    CHECK(AssemblySolveResultApplier{}.apply(project, missing_fixed).has_error());
+
+    auto missing_proposal = solved.value();
+    missing_proposal.proposed_transforms.clear();
+    CHECK(AssemblySolveResultApplier{}.apply(project, missing_proposal).has_error());
+  }
 }
 
 TEST_CASE("Cross-hierarchy application rejects incomplete or contradictory result snapshots",
