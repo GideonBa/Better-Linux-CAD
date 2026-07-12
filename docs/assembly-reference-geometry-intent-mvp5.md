@@ -179,4 +179,4 @@ Local targets remain component-local and retain the direct component transform c
 
 ## Handoff
 
-The next block is Block 35: stable semantic generated topology identity and recovery. See `docs/assembly-general-geometric-target-roadmap.md`.
+Block 35 generated-topology identity and recovery is implemented in `docs/assembly-generated-topology-reference-mvp5.md`. The next block is Block 36: generated face/edge/vertex Geometry target resolution. See `docs/assembly-general-geometric-target-roadmap.md`.
