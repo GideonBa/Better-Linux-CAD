@@ -89,24 +89,6 @@ target_transform_chain(const RigidTransform& component_transform,
   return transforms;
 }
 
-[[nodiscard]] AssemblySpacePlanarDescriptor
-evaluate_plane(const std::vector<RigidTransform>& transforms,
-               const ComponentLocalPlanarDescriptor& local) {
-  const AssemblyHierarchyTransformEvaluator evaluator;
-  return AssemblySpacePlanarDescriptor{evaluator.evaluate_point(transforms, local.origin),
-                                       evaluator.evaluate_vector(transforms, local.x_axis),
-                                       evaluator.evaluate_vector(transforms, local.y_axis),
-                                       evaluator.evaluate_vector(transforms, local.normal)};
-}
-
-[[nodiscard]] AssemblySpaceAxisDescriptor
-evaluate_axis(const std::vector<RigidTransform>& transforms,
-              const ComponentLocalAxisDescriptor& local) {
-  const AssemblyHierarchyTransformEvaluator evaluator;
-  return AssemblySpaceAxisDescriptor{evaluator.evaluate_point(transforms, local.origin),
-                                     evaluator.evaluate_vector(transforms, local.direction)};
-}
-
 [[nodiscard]] AssemblyGeometricTargetDescriptor evaluate_geometric_descriptor(
     const std::vector<RigidTransform>& transforms,
     const AssemblyGeometricTargetDescriptor& descriptor) {
@@ -330,28 +312,26 @@ AssemblyHierarchyConstraintTargetResolver::resolve_planar(
   if (occurrence.has_error()) {
     return Result<AssemblyHierarchyPlanarConstraintTargetDescriptor>::failure(occurrence.error());
   }
-  auto local_project = make_local_target_view(project, *occurrence.value().assembly);
-  if (local_project.has_error()) {
-    return Result<AssemblyHierarchyPlanarConstraintTargetDescriptor>::failure(local_project.error());
+  auto typed = resolve_geometric(project, target);
+  if (typed.has_error()) {
+    return Result<AssemblyHierarchyPlanarConstraintTargetDescriptor>::failure(typed.error());
   }
-  auto local_target = make_local_target(target);
-  if (local_target.has_error()) {
-    return Result<AssemblyHierarchyPlanarConstraintTargetDescriptor>::failure(local_target.error());
+  auto plane = project_plane(typed.value());
+  if (plane.has_error()) {
+    return Result<AssemblyHierarchyPlanarConstraintTargetDescriptor>::failure(plane.error());
   }
-
-  const AssemblyConstraintTargetResolver local_resolver;
-  auto resolved = local_resolver.resolve(local_project.value(), local_target.value());
-  if (resolved.has_error()) {
-    return Result<AssemblyHierarchyPlanarConstraintTargetDescriptor>::failure(resolved.error());
+  const auto& source = typed.value().source_metadata;
+  if (!source.source_feature.has_value() || !source.semantic_face.has_value()) {
+    return Result<AssemblyHierarchyPlanarConstraintTargetDescriptor>::failure(validation_error(
+        target.semantic_reference(), "hierarchy planar target source metadata is incomplete"));
   }
-  const auto transforms =
-      target_transform_chain(resolved.value().component_transform, occurrence.value().occurrence);
   return Result<AssemblyHierarchyPlanarConstraintTargetDescriptor>::success(
       AssemblyHierarchyPlanarConstraintTargetDescriptor{
           target.occurrence_path(), occurrence.value().occurrence.assembly_document,
-          resolved.value().component_instance, resolved.value().referenced_part_document,
-          resolved.value().source_feature, resolved.value().face, target.semantic_reference(),
-          evaluate_plane(transforms, resolved.value().local_plane)});
+          target.component_instance(), source.referenced_part_document, source.source_feature.value(),
+          source.semantic_face.value(), target.semantic_reference(),
+          AssemblySpacePlanarDescriptor{plane.value().origin, plane.value().x_axis,
+                                        plane.value().y_axis, plane.value().normal}});
 }
 
 Result<AssemblyHierarchyAxisConstraintTargetDescriptor>
@@ -361,28 +341,26 @@ AssemblyHierarchyConstraintTargetResolver::resolve_axis(
   if (occurrence.has_error()) {
     return Result<AssemblyHierarchyAxisConstraintTargetDescriptor>::failure(occurrence.error());
   }
-  auto local_project = make_local_target_view(project, *occurrence.value().assembly);
-  if (local_project.has_error()) {
-    return Result<AssemblyHierarchyAxisConstraintTargetDescriptor>::failure(local_project.error());
+  auto typed = resolve_geometric(project, target);
+  if (typed.has_error()) {
+    return Result<AssemblyHierarchyAxisConstraintTargetDescriptor>::failure(typed.error());
   }
-  auto local_target = make_local_target(target);
-  if (local_target.has_error()) {
-    return Result<AssemblyHierarchyAxisConstraintTargetDescriptor>::failure(local_target.error());
+  auto axis = project_axis(typed.value());
+  if (axis.has_error()) {
+    return Result<AssemblyHierarchyAxisConstraintTargetDescriptor>::failure(axis.error());
   }
-
-  const AssemblyConstraintTargetResolver local_resolver;
-  auto resolved = local_resolver.resolve_axis(local_project.value(), local_target.value());
-  if (resolved.has_error()) {
-    return Result<AssemblyHierarchyAxisConstraintTargetDescriptor>::failure(resolved.error());
+  const auto& source = typed.value().source_metadata;
+  if (!source.source_feature.has_value() || !source.source_profile.has_value() ||
+      !source.semantic_axis.has_value()) {
+    return Result<AssemblyHierarchyAxisConstraintTargetDescriptor>::failure(validation_error(
+        target.semantic_reference(), "hierarchy axis target source metadata is incomplete"));
   }
-  const auto transforms =
-      target_transform_chain(resolved.value().component_transform, occurrence.value().occurrence);
   return Result<AssemblyHierarchyAxisConstraintTargetDescriptor>::success(
       AssemblyHierarchyAxisConstraintTargetDescriptor{
           target.occurrence_path(), occurrence.value().occurrence.assembly_document,
-          resolved.value().component_instance, resolved.value().referenced_part_document,
-          resolved.value().source_feature, resolved.value().source_profile, resolved.value().axis,
-          target.semantic_reference(), evaluate_axis(transforms, resolved.value().local_axis)});
+          target.component_instance(), source.referenced_part_document, source.source_feature.value(),
+          source.source_profile.value(), source.semantic_axis.value(), target.semantic_reference(),
+          AssemblySpaceAxisDescriptor{axis.value().origin, axis.value().direction}});
 }
 
 Result<AssemblyHierarchyInsertConstraintTargetDescriptor>
@@ -392,30 +370,33 @@ AssemblyHierarchyConstraintTargetResolver::resolve_insert(
   if (occurrence.has_error()) {
     return Result<AssemblyHierarchyInsertConstraintTargetDescriptor>::failure(occurrence.error());
   }
-  auto local_project = make_local_target_view(project, *occurrence.value().assembly);
-  if (local_project.has_error()) {
-    return Result<AssemblyHierarchyInsertConstraintTargetDescriptor>::failure(local_project.error());
+  auto typed = resolve_geometric(project, target);
+  if (typed.has_error()) {
+    return Result<AssemblyHierarchyInsertConstraintTargetDescriptor>::failure(typed.error());
   }
-  auto local_target = make_local_target(target);
-  if (local_target.has_error()) {
-    return Result<AssemblyHierarchyInsertConstraintTargetDescriptor>::failure(local_target.error());
+  auto axis = project_axis(typed.value());
+  if (axis.has_error()) {
+    return Result<AssemblyHierarchyInsertConstraintTargetDescriptor>::failure(axis.error());
   }
-
-  const AssemblyConstraintTargetResolver local_resolver;
-  auto resolved = local_resolver.resolve_insert(local_project.value(), local_target.value());
-  if (resolved.has_error()) {
-    return Result<AssemblyHierarchyInsertConstraintTargetDescriptor>::failure(resolved.error());
+  auto plane = project_plane(typed.value());
+  if (plane.has_error()) {
+    return Result<AssemblyHierarchyInsertConstraintTargetDescriptor>::failure(plane.error());
   }
-  const auto transforms =
-      target_transform_chain(resolved.value().component_transform, occurrence.value().occurrence);
+  const auto& source = typed.value().source_metadata;
+  if (!source.source_feature.has_value() || !source.source_profile.has_value() ||
+      !source.semantic_axis.has_value() || !source.semantic_seating_plane.has_value()) {
+    return Result<AssemblyHierarchyInsertConstraintTargetDescriptor>::failure(validation_error(
+        target.semantic_reference(), "hierarchy insert target source metadata is incomplete"));
+  }
   return Result<AssemblyHierarchyInsertConstraintTargetDescriptor>::success(
       AssemblyHierarchyInsertConstraintTargetDescriptor{
           target.occurrence_path(), occurrence.value().occurrence.assembly_document,
-          resolved.value().component_instance, resolved.value().referenced_part_document,
-          resolved.value().source_feature, resolved.value().source_profile, resolved.value().axis,
-          resolved.value().seating_plane, target.semantic_reference(),
-          evaluate_axis(transforms, resolved.value().local_axis),
-          evaluate_plane(transforms, resolved.value().local_seating_plane)});
+          target.component_instance(), source.referenced_part_document, source.source_feature.value(),
+          source.source_profile.value(), source.semantic_axis.value(),
+          source.semantic_seating_plane.value(), target.semantic_reference(),
+          AssemblySpaceAxisDescriptor{axis.value().origin, axis.value().direction},
+          AssemblySpacePlanarDescriptor{plane.value().origin, plane.value().x_axis,
+                                        plane.value().y_axis, plane.value().normal}});
 }
 
 Result<AssemblyHierarchyConstraintEquationDescriptor>
