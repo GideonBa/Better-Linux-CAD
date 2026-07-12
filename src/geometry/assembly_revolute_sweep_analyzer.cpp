@@ -187,10 +187,8 @@ Result<AssemblyRevoluteSweepAnalysis> AssemblyRevoluteSweepAnalyzer::analyze(
     return Result<AssemblyRevoluteSweepAnalysis>::failure(valid_joint.error());
   }
 
-  AssemblyRevoluteSweepAnalysis analysis;
-  analysis.joint = request.joint;
-  analysis.start_coordinate_deg = request.start_coordinate.degrees();
-  analysis.end_coordinate_deg = request.end_coordinate.degrees();
+  AssemblyRevoluteSweepAnalysis analysis{
+      request.joint, request.start_coordinate.degrees(), request.end_coordinate.degrees(), {}};
   analysis.samples.reserve(request.sample_count);
 
   const AssemblyContactAnalyzer contact_analyzer;
