@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - block38-generic-relationship-intent
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
