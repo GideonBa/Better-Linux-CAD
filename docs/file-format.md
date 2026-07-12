@@ -410,6 +410,17 @@ The first `.axis`/`.seat` producer is a single-circle `SubtractiveExtrude`.
 
 `.seat` resolves one primary axis plus one oriented seating plane from the same exact feature/profile. Insert and local/cross Revolute motion reuse this endpoint family.
 
+Block 32 adds the reference-geometry token family:
+
+```text
+ref:datum_plane:<encoded-id>
+ref:datum_axis:<encoded-id>
+ref:construction_line:<encoded-id>
+ref:construction_point:<encoded-id>
+```
+
+Encoded ids escape every byte outside `[A-Za-z0-9_-]` as uppercase `%HH`, so valid `ref:` tokens contain no `.` and stay disjoint from feature target tokens. Endpoints persist these strings verbatim; loading never resolves reference geometry.
+
 Fields such as these are not persistent:
 
 ```text
@@ -506,6 +517,33 @@ Semantic target-producing model freshness currently stores the exact canonical `
 ## Part document model intent
 
 Part-document persistence remains canonical in the existing single-part format sections/documents. Parameters, formulas, datum/workplane intent, construction geometry, sketches/profiles, semantic-reference recovery/remap intent, and feature history are model authority.
+
+### Datum axis JSON
+
+Block 33 adds the additive optional `datum_axes` part-document array:
+
+```json
+{
+  "datum_axes": [
+    {
+      "id": "datum_axis.spindle",
+      "name": "Spindle",
+      "kind": "explicit",
+      "origin": {"x": 4.0, "y": 5.0, "z": 6.0},
+      "direction": {"x": 0.0, "y": 0.0, "z": 1.0},
+      "parameter_dependencies": ["part.height"]
+    },
+    {
+      "id": "datum_axis.from_line",
+      "name": "FromLine",
+      "kind": "from_construction_line",
+      "source_construction_line": "construction.center"
+    }
+  ]
+}
+```
+
+Supported kinds are exactly `explicit` and `from_construction_line`. Historical part files without `datum_axes` load empty collections. Loading validates id uniqueness, declared parameter dependencies, and source-construction-line existence, and rebuilds dependency edges; it resolves no geometry.
 
 OCCT shapes and `ShapeCache` products remain derived.
 

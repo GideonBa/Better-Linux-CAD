@@ -1,6 +1,6 @@
 # Cross-Hierarchy Assembly Relationship Sequence MVP-5
 
-Status: Blocks 23–32 are implemented. Block 33 is the current next technical step. Blocks 33–47 remain the explicit general assembly target, relationship, and richer-joint continuation.
+Status: Blocks 23–33 are implemented. Block 34 is the current next technical step. Blocks 34–47 remain the explicit general assembly target, relationship, and richer-joint continuation.
 
 This document is the canonical numbered handoff sequence for cross-document assembly intent, solving, motion, exchange, posed analysis, and general geometric target architecture.
 
@@ -357,18 +357,20 @@ Focused tags:
 [core][assembly-reference-target-intent]
 ```
 
-## Block 33 — Reference geometry serialization and structure validation — Next
+## Block 33 — Reference geometry serialization and structure validation — implemented
 
-Serialize Block-32 PartDocument reference-geometry intent additively, preserve historical files, and prove local/cross endpoint semantic-reference strings roundtrip byte-for-byte. No target geometry resolution during load.
+Canonical document: `docs/assembly-reference-geometry-intent-mvp5.md`. Save-format authority: `docs/file-format.md`.
 
-Planned focused tags:
+Implemented the additive optional `datum_axes` part-document array for both DatumAxis families, historical-file compatibility, load-time ownership/family validation through `PartDocument::add_datum_axis`, unchanged local/cross endpoint JSON shapes, and byte-for-byte `ref:` spelling roundtrips. No target geometry resolution during load.
+
+Focused tags:
 
 ```text
 [core][datum-axis-json]
 [core][assembly-reference-target-json]
 ```
 
-## Block 34 — Datum/axis/line/point target resolution
+## Block 34 — Datum/axis/line/point target resolution — Next
 
 Resolve:
 
@@ -454,6 +456,6 @@ posed shapes/contact records/sweep analyses
 
 ## Next technical step
 
-Implement Block 33 only: additive DatumAxis PartDocument JSON, historical-file compatibility, byte-for-byte endpoint reference-spelling roundtrips, and load-time ownership/family validation.
+Implement Block 34 only: Geometry resolution of DatumPlane/DatumAxis/ConstructionLine/ConstructionPoint `ref:` sources into the Block-31 taxonomy, reusing existing workplane/construction execution and exact transform chains.
 
-Do not implement Block-34 Geometry resolution in Block 33.
+Do not implement Block-35 generated topology identity in Block 34.

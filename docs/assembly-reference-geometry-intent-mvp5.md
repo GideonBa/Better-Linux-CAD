@@ -1,10 +1,10 @@
-# Assembly Reference Geometry Intent (MVP 5, Block 32)
+# Assembly Reference Geometry Intent (MVP 5, Blocks 32–33)
 
 Status: implemented.
 
-This document is canonical for Block 32: assembly-selectable reference geometry Core intent, the first-class `DatumAxis` PartDocument model, and the frozen unambiguous semantic-reference grammar for DatumPlane, DatumAxis, ConstructionLine, and ConstructionPoint sources.
+This document is canonical for Block 32 — assembly-selectable reference geometry Core intent, the first-class `DatumAxis` PartDocument model, and the frozen unambiguous semantic-reference grammar for DatumPlane, DatumAxis, ConstructionLine, and ConstructionPoint sources — and for the Block-33 serialization contract on top of it.
 
-Serialization remains Block 33 (`docs/assembly-general-geometric-target-roadmap.md`). Geometry resolution into the Block-31 taxonomy remains Block 34.
+Geometry resolution into the Block-31 taxonomy remains Block 34.
 
 ## Scope
 
@@ -110,12 +110,37 @@ parse_assembly_reference_target_spelling(spelling) -> typed identity
 
 Assembly endpoints (`AssemblyConstraintTarget`, `AssemblyHierarchyConstraintEndpoint`) continue to persist only component/occurrence identity plus the semantic-reference string and carry reference spellings byte-for-byte unchanged.
 
-## Explicitly not in Block 32
+## Block 33 — Reference geometry serialization and structure validation
 
-- no JSON/serialization change (`cross_hierarchy_constraints[]`, `cross_hierarchy_joints[]`, and part JSON shapes are untouched);
+Save-format authority remains `docs/file-format.md`.
+
+Block 33 adds the additive optional `datum_axes` part-document JSON array:
+
+```text
+kind = explicit
+  id / name / origin / direction / parameter_dependencies[]
+
+kind = from_construction_line
+  id / name / source_construction_line
+```
+
+Contract:
+
+- historical part files without `datum_axes` load empty collections;
+- loading reuses `PartDocument::add_datum_axis`, so id uniqueness, declared parameter dependencies, source-construction-line existence, family rules, and dependency/invalidation edges are enforced and rebuilt at load;
+- unsupported kinds fail closed;
+- local and cross-hierarchy endpoint JSON shapes stay the existing occurrence/component/semantic trio;
+- `ref:` semantic-reference strings roundtrip byte-for-byte through local constraint and cross-hierarchy endpoint JSON, including adversarial ids containing `.`, `/`, `:`, and `%`;
+- loading and structure validation never resolve reference geometry — endpoints naming reference sources that do not (yet) exist in the referenced part remain valid persistent intent.
+
+Derived axes are serialized as identity only; no resolved origin/direction is persisted for `from_construction_line`.
+
+## Explicitly not in Blocks 32–33
+
 - no Geometry resolution, no descriptor/capability projection, no resolver support for `ref:` spellings yet;
 - no new relationship or joint family;
-- no change to existing `<feature>.<top|bottom|right|left|front|back|axis|seat>` spellings or their resolvers.
+- no change to existing `<feature>.<top|bottom|right|left|front|back|axis|seat>` spellings or their resolvers;
+- no change to existing endpoint JSON shapes.
 
 Geometry resolution of these sources into the Block-31 taxonomy (`DatumPlane -> Plane`, `DatumAxis -> Axis + Line`, `ConstructionLine -> Line`, `ConstructionPoint -> Point`) is Block 34.
 
@@ -124,12 +149,18 @@ Geometry resolution of these sources into the Block-31 taxonomy (`DatumPlane -> 
 ```text
 [core][datum-axis]
 [core][assembly-reference-target-intent]
+[core][datum-axis-json]
+[core][assembly-reference-target-json]
 ```
 
 `tests/core/datum_axis_tests.cpp` proves explicit/derived DatumAxis validation, PartDocument ownership/uniqueness, dependency-edge registration, and parameter plus source-line invalidation propagation into recompute plans.
 
 `tests/core/assembly_reference_target_tests.cpp` proves canonical spellings per family, exact roundtrips for ids containing `.`, `/`, `:`, `%`, and role keywords, escape-like id distinctness, disjointness from feature spellings, fail-closed malformed parsing, and unchanged endpoint carriage.
 
+`tests/core/datum_axis_json_tests.cpp` proves both-family JSON roundtrips with rebuilt dependency edges, historical-file compatibility, and fail-closed load validation for unsupported kinds, duplicate ids, missing source lines, non-unit directions, and missing parameter dependencies.
+
+`tests/core/assembly_reference_target_json_tests.cpp` proves byte-for-byte `ref:` spelling roundtrips through local constraint and cross-hierarchy endpoint JSON, unchanged endpoint JSON shape, and resolution-free loading.
+
 ## Handoff
 
-The next block is Block 33: additive DatumAxis PartDocument JSON, historical-file compatibility, byte-for-byte endpoint spelling roundtrips, and load-time ownership/family validation. See `docs/assembly-general-geometric-target-roadmap.md`.
+The next block is Block 34: Geometry resolution of DatumPlane/DatumAxis/ConstructionLine/ConstructionPoint sources into Block-31 capabilities (`DatumPlane -> Plane`, `DatumAxis -> Axis + Line`, `ConstructionLine -> Line`, `ConstructionPoint -> Point`). See `docs/assembly-general-geometric-target-roadmap.md`.

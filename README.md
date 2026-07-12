@@ -29,6 +29,7 @@ rooted Separated / Touching / Interfering classification
 bounded sampled local/cross-hierarchy Revolute sweep
 typed assembly geometric target taxonomy and capability projection
 assembly-selectable reference geometry intent and DatumAxis model
+additive DatumAxis JSON and reference-spelling endpoint roundtrips
 ```
 
 There is no GUI yet. Current work remains focused on CAD-core, Geometry query/execution, and headless application contracts.
@@ -199,9 +200,9 @@ ref:construction_point:<encoded-id>
 
 Every id byte outside `[A-Za-z0-9_-]` is escaped as uppercase `%HH`, so reference spellings contain no `.` and can never collide with feature target spellings; ids containing `.`, `/`, and `%` stay unambiguous and parsing fails closed.
 
-Reference-geometry JSON remains Block 33 and Geometry resolution of `ref:` sources remains Block 34.
+Block 33 serializes DatumAxis intent through the additive optional `datum_axes` part-document array and proves `ref:` endpoint spellings roundtrip byte-for-byte; loading validates ownership/family rules and resolves no geometry. Geometry resolution of `ref:` sources remains Block 34.
 
-Canonical Block-32 contract: `docs/assembly-reference-geometry-intent-mvp5.md`.
+Canonical Blocks-32/33 contract: `docs/assembly-reference-geometry-intent-mvp5.md`.
 
 ## Assembly solving and motion
 
@@ -374,8 +375,8 @@ Broader roadmaps:
 
 ## Next technical step
 
-Implement **Block 33 only** from `docs/assembly-general-geometric-target-roadmap.md`: reference geometry serialization and structure validation.
+Implement **Block 34 only** from `docs/assembly-general-geometric-target-roadmap.md`: datum, axis, line, and point target resolution.
 
-Block 33 must serialize the Block-32 `DatumAxis` intent additively, preserve historical part files, keep existing endpoint JSON shapes unchanged, roundtrip `ref:` semantic-reference strings byte-for-byte, and validate DatumAxis ownership/family rules at load.
+Block 34 must resolve `ref:` semantic sources into the Block-31 taxonomy (`DatumPlane -> Plane`, `DatumAxis -> Axis + Line`, `ConstructionLine -> Line`, `ConstructionPoint -> Point`), reusing existing workplane/construction execution, component-local and exact rooted transform chains, and canonical PartDocument snapshot freshness.
 
-Do not resolve Plane/Axis/Line/Point geometry during JSON load. Geometry resolution remains Block 34.
+Do not add stable generated topology identity in Block 34. That remains Block 35.

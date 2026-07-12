@@ -786,19 +786,16 @@ projection result
 
 Persistent endpoints continue to contain their existing semantic-reference strings.
 
-## Next technical step — Block 33
+## Next technical step — Block 34
 
-Block 32 is implemented; its canonical contract is `docs/assembly-reference-geometry-intent-mvp5.md`. First-class `DatumAxis` intent and the frozen `ref:<family>:<encoded-id>` semantic-source grammar now exist at the Core boundary, with existing feature target spellings, endpoint JSON shapes, and this document's resolution semantics unchanged.
+Blocks 32–33 are implemented; their canonical contract is `docs/assembly-reference-geometry-intent-mvp5.md`. First-class `DatumAxis` intent, the frozen `ref:<family>:<encoded-id>` semantic-source grammar, and additive `datum_axes` JSON now exist at the Core boundary, with existing feature target spellings, endpoint JSON shapes, and this document's resolution semantics unchanged.
 
-Implement Block 33 only from `docs/assembly-general-geometric-target-roadmap.md`: additive DatumAxis PartDocument JSON, historical-file compatibility, byte-for-byte endpoint reference-spelling roundtrips, and load-time ownership/family validation.
+Implement Block 34 only from `docs/assembly-general-geometric-target-roadmap.md`: resolve `ref:` sources into this document's source kinds and capabilities (`DatumPlane -> Plane`, `DatumAxis -> Axis + Line`, `ConstructionLine -> Line`, `ConstructionPoint -> Point`), reusing existing workplane/construction execution and exact transform chains.
 
-Geometry resolution of `ref:` sources into this document's source kinds and capabilities remains Block 34.
-
-Planned Block-33 tags:
+Planned Block-34 tag:
 
 ```text
-[core][datum-axis-json]
-[core][assembly-reference-target-json]
+[geometry][assembly-reference-target-resolution]
 ```
 
 Reference-geometry JSON belongs to Block 33. Geometry resolution into Block-31 capabilities belongs to Block 34.

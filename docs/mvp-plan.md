@@ -281,14 +281,28 @@ Focused tags:
 [core][assembly-reference-target-intent]
 ```
 
-## Blocks 33–47 — Planned general target, relationship, and joint continuation
+### Block 33 — Reference geometry serialization and structure validation — Implemented
+
+Canonical document: `docs/assembly-reference-geometry-intent-mvp5.md`. Save-format authority: `docs/file-format.md`.
+
+Implemented the additive optional `datum_axes` part-document JSON array for both frozen families. Historical files without the array load empty collections; loading reuses `PartDocument::add_datum_axis`, so ownership, id uniqueness, family rules, and dependency/invalidation edges are enforced and rebuilt, and unsupported kinds fail closed.
+
+Local and cross-hierarchy endpoint JSON shapes are unchanged and `ref:` semantic-reference strings roundtrip byte-for-byte, including adversarial ids. Loading and structure validation resolve no reference geometry.
+
+Focused tags:
+
+```text
+[core][datum-axis-json]
+[core][assembly-reference-target-json]
+```
+
+## Blocks 34–47 — Planned general target, relationship, and joint continuation
 
 Canonical roadmap: `docs/assembly-general-geometric-target-roadmap.md`.
 
 Mandatory order:
 
 ```text
-33 reference geometry serialization and structure validation
 34 datum/axis/line/point target resolution
 35 stable semantic generated topology identity/recovery
 36 generated face/edge/vertex target resolution
@@ -342,24 +356,30 @@ After Block 94 the first Part Construction MVP is considered complete. That mean
 
 It does not mean SolidWorks/Inventor Part product parity. Production GUI modeling, Class-A surfacing, arbitrary NURBS control cages, variable-radius fillets, advanced topology healing, direct modeling, sheet metal, weldments, and specialized manufacturing feature systems remain later work.
 
-## Current next technical step — Block 33
+## Current next technical step — Block 34
 
-Primary boundary: Core serialization and compatibility.
+Primary boundary: Geometry semantic target resolution.
 
-Block 33 must:
+Block 34 must:
 
-1. serialize `DatumAxis` PartDocument intent additively (`Explicit` and `FromConstructionLine` families);
-2. preserve historical part files without DatumAxis data;
-3. keep existing local and cross-hierarchy endpoint JSON shapes unchanged;
-4. roundtrip Block-32 `ref:` semantic-reference strings byte-for-byte through endpoint JSON;
-5. validate DatumAxis ownership, id uniqueness, and family rules at load;
-6. resolve no Plane/Axis/Line/Point geometry during JSON load or structure validation.
-
-Planned focused tags:
+1. resolve `ref:` semantic sources into the Block-31 taxonomy:
 
 ```text
-[core][datum-axis-json]
-[core][assembly-reference-target-json]
+DatumPlane        -> Plane
+DatumAxis         -> Axis + Line
+ConstructionLine  -> Line
+ConstructionPoint -> Point
 ```
 
-Geometry resolution into the Block-31 taxonomy remains Block 34.
+2. reuse the existing `WorkplaneResolver`, construction-line, and construction-point execution;
+3. keep local targets component-local and hierarchy targets on the exact existing component-plus-parent transform chain;
+4. keep canonical PartDocument snapshots as freshness authority;
+5. add no persistent record, JSON field, relationship type, or joint family.
+
+Planned focused tag:
+
+```text
+[geometry][assembly-reference-target-resolution]
+```
+
+Stable generated topology identity remains Block 35.

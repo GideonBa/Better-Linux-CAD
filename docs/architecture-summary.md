@@ -195,6 +195,8 @@ ref:construction_point:<encoded-id>
 
 Uppercase `%HH` escaping of every id byte outside `[A-Za-z0-9_-]` keeps valid reference spellings dot-free and therefore provably disjoint from `<feature-id>.<role>` spellings. Parsing fails closed at the Core boundary; assembly endpoints keep persisting only component/occurrence identity plus the semantic-reference string.
 
+Block 33 serializes DatumAxis intent through the additive optional `datum_axes` part-document array, preserves historical files, validates ownership/family rules at load, and roundtrips `ref:` endpoint spellings byte-for-byte without resolving geometry.
+
 ## Typed geometric target taxonomy and capability projection
 
 Block 31 adds the derived Geometry boundary between semantic target resolution and equation geometry.
@@ -429,11 +431,11 @@ STEP products/entities
 posed shapes/contact records/sweep analyses
 ```
 
-Blocks 31 and 32 add no JSON field. `docs/file-format.md` remains save-format authority.
+Block 33 adds the additive optional `datum_axes` part-document array. `docs/file-format.md` remains save-format authority.
 
 ## Current direction
 
-Blocks 23–32 of the current assembly sequence are implemented.
+Blocks 23–33 of the current assembly sequence are implemented.
 
 Canonical current target architecture:
 
@@ -447,8 +449,8 @@ Canonical numbered sequence:
 
 - `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`
 
-The next technical step is Block 33 only: additive DatumAxis PartDocument JSON, historical-file compatibility, byte-for-byte endpoint reference-spelling roundtrips, and load-time ownership/family validation.
+The next technical step is Block 34 only: Geometry resolution of DatumPlane/DatumAxis/ConstructionLine/ConstructionPoint `ref:` sources into Block-31 capabilities, reusing existing workplane/construction execution and exact transform chains.
 
-Geometry resolution of `ref:` sources into Block-31 capabilities remains Block 34.
+Stable generated topology identity remains Block 35.
 
 Occurrence-local child pose overrides, whole-subassembly solve variables, general physics, and richer joints remain deferred according to their roadmap blocks.

@@ -160,7 +160,7 @@ Current `.top/.bottom/.right/.left/.front/.back`, `.axis`, and `.seat` strings r
 
 Canonical implemented target contract: `docs/assembly-geometric-target-taxonomy-mvp5.md`.
 
-Block 32 established assembly-selectable reference geometry Core intent: first-class DatumAxis PartDocument intent plus the unambiguous `ref:` semantic source grammar. The next authority step is Block 33: additive DatumAxis JSON and byte-for-byte endpoint reference-spelling roundtrips; Geometry resolution remains Block 34.
+Blocks 32–33 established assembly-selectable reference geometry Core intent and serialization: first-class DatumAxis PartDocument intent, the unambiguous `ref:` semantic source grammar, and additive `datum_axes` JSON with byte-for-byte endpoint spelling roundtrips. The next authority step is Block 34: Geometry resolution of `ref:` sources into Block-31 capabilities.
 
 Canonical sequence: `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`.
 

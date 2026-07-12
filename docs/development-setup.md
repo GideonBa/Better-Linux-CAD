@@ -72,7 +72,9 @@ Core identity/model/connectivity:
 
 ```bash
 ./build/dev/blcad_core_tests "[core][datum-axis]"
+./build/dev/blcad_core_tests "[core][datum-axis-json]"
 ./build/dev/blcad_core_tests "[core][assembly-reference-target-intent]"
+./build/dev/blcad_core_tests "[core][assembly-reference-target-json]"
 ./build/dev/blcad_core_tests "[core][component-instance]"
 ./build/dev/blcad_core_tests "[core][assembly-constraint]"
 ./build/dev/blcad_core_tests "[core][assembly-constraint-graph]"
@@ -133,6 +135,7 @@ Current suites cover:
 - persistent component occurrence state and direct placement;
 - first-class DatumAxis intent, ownership, dependency, and invalidation;
 - canonical `ref:` reference-target spellings, roundtrips, and fail-closed parsing;
+- additive DatumAxis JSON, historical-file compatibility, and byte-for-byte endpoint spelling roundtrips;
 - local Mate/Distance/Angle/Concentric/Insert intent and solving;
 - exact local and occurrence-qualified endpoint identity;
 - typed target source classification and capability projection;
@@ -230,8 +233,8 @@ The typed target/capability layer is a public library query contract and intenti
 - `docs/file-format.md`: persistent save-format authority
 - `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`: numbered assembly sequence
 - `docs/assembly-geometric-target-taxonomy-mvp5.md`: Block-31 implemented target taxonomy/projection contract
-- `docs/assembly-reference-geometry-intent-mvp5.md`: Block-32 implemented reference-geometry intent/grammar contract
-- `docs/assembly-general-geometric-target-roadmap.md`: planned Blocks 33–47
+- `docs/assembly-reference-geometry-intent-mvp5.md`: Blocks-32/33 implemented reference-geometry intent/grammar/JSON contract
+- `docs/assembly-general-geometric-target-roadmap.md`: planned Blocks 34–47
 - `docs/project-goal.md`: long-term direction
 
 ## Formatting
@@ -258,7 +261,7 @@ rm -rf build/
 
 ## Current assembly development boundary
 
-Blocks 23–32 are implemented.
+Blocks 23–33 are implemented.
 
 Block 31 freezes:
 
@@ -295,4 +298,4 @@ valid reference spellings are dot-free
   -> provably disjoint from <feature-id>.<role> spellings
 ```
 
-The immediate next step is Block 33: additive DatumAxis PartDocument JSON, historical-file compatibility, and byte-for-byte endpoint reference-spelling roundtrips. Exact sequencing is maintained in `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md` and detailed target planning in `docs/assembly-general-geometric-target-roadmap.md`.
+The immediate next step is Block 34: Geometry resolution of `ref:` reference sources into the Block-31 taxonomy. Exact sequencing is maintained in `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md` and detailed target planning in `docs/assembly-general-geometric-target-roadmap.md`.

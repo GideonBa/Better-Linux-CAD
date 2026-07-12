@@ -1,10 +1,10 @@
 # General Assembly Geometric Target and Relationship Roadmap
 
-Status: Blocks 31 and 32 are implemented. Block 33 is the current next technical step. Blocks 33-47 remain planned headless architecture.
+Status: Blocks 31–33 are implemented. Block 34 is the current next technical step. Blocks 34-47 remain planned headless architecture.
 
 This document is the active status and sequencing authority for the expansion from the current assembly target layer to semantic reference geometry, stable generated topology targets, generic geometric relationships, and richer motion-joint families.
 
-Implemented Block-31 and Block-32 semantics are canonical in:
+Implemented Block-31 through Block-33 semantics are canonical in:
 
 - `docs/assembly-geometric-target-taxonomy-mvp5.md`
 - `docs/assembly-reference-geometry-intent-mvp5.md`
@@ -187,11 +187,11 @@ Block 31 adds no new persistent source kind, descriptor, capability vector, sour
 
 ## Mandatory continuation order
 
-Block 32 is implemented; the remaining order is unchanged.
+Blocks 32 and 33 are implemented; the remaining order is unchanged.
 
 ```text
 32 assembly-selectable reference geometry Core intent (implemented)
-  -> 33 reference geometry serialization and structure validation
+  -> 33 reference geometry serialization and structure validation (implemented)
   -> 34 datum/axis/line/point target resolution
   -> 35 stable semantic generated topology identity/recovery
   -> 36 generated face/edge/vertex target resolution
@@ -238,13 +238,20 @@ Focused acceptance tags:
 
 Block 32 added no JSON/serialization changes and performs no Geometry target resolution.
 
-## Block 33 — Reference geometry serialization and structure validation
+## Block 33 — Reference geometry serialization and structure validation — Implemented
 
-Primary boundary: Core serialization and compatibility.
+Canonical document: `docs/assembly-reference-geometry-intent-mvp5.md`. Save-format authority: `docs/file-format.md`.
 
-Serialize any new Block-32 PartDocument reference-geometry intent additively while preserving historical files. Existing local and cross-hierarchy endpoint JSON shapes remain unchanged and new semantic-reference strings roundtrip byte-for-byte.
+Implemented the additive optional `datum_axes` part-document array for both DatumAxis families with historical-file compatibility and load-time ownership/family validation through `PartDocument::add_datum_axis`. Existing local and cross-hierarchy endpoint JSON shapes are unchanged and `ref:` semantic-reference strings roundtrip byte-for-byte.
 
 No Plane/Axis/Line/Point geometry is resolved during JSON load or structure validation.
+
+Focused acceptance tags:
+
+```text
+[core][datum-axis-json]
+[core][assembly-reference-target-json]
+```
 
 ## Block 34 — Datum, axis, line, and point target resolution
 
@@ -537,8 +544,8 @@ posed geometry/contact records/sweep analyses
 
 ## Immediate next technical step
 
-Block 33 is the current next technical step.
+Block 34 is the current next technical step.
 
-Implement Block 33 only: additive DatumAxis PartDocument JSON, historical-file compatibility, byte-for-byte endpoint reference-spelling roundtrips, and load-time ownership/family validation.
+Implement Block 34 only: Geometry resolution of DatumPlane/DatumAxis/ConstructionLine/ConstructionPoint `ref:` sources into the implemented Block-31 taxonomy, reusing existing workplane/construction execution and exact transform chains.
 
-Geometry resolution into the implemented Block-31 taxonomy remains Block 34.
+Stable generated topology identity remains Block 35.

@@ -237,6 +237,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/assembly_joint_graph_tests.cpp
     tests/core/assembly_joint_tests.cpp
     tests/core/assembly_leaf_occurrence_tests.cpp
+    tests/core/assembly_reference_target_json_tests.cpp
     tests/core/assembly_reference_target_tests.cpp
     tests/core/chained_construction_relation_tests.cpp
     tests/core/circular_hole_pattern_tests.cpp
@@ -246,6 +247,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/composite_closed_profile_tests.cpp
     tests/core/construction_geometry_tests.cpp
     tests/core/construction_geometry_json_tests.cpp
+    tests/core/datum_axis_json_tests.cpp
     tests/core/datum_axis_tests.cpp
     tests/core/datum_plane_tests.cpp
     tests/core/dependency_graph_tests.cpp

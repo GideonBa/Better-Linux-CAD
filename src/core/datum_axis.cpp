@@ -57,11 +57,11 @@ validate_parameter_dependencies(const std::string& object_id,
 std::string_view to_string(DatumAxisKind kind) noexcept {
   switch (kind) {
   case DatumAxisKind::Explicit:
-    return "Explicit";
+    return "explicit";
   case DatumAxisKind::FromConstructionLine:
-    return "FromConstructionLine";
+    return "from_construction_line";
   }
-  return "Unknown";
+  return "explicit";
 }
 
 Result<DatumAxis> DatumAxis::create_explicit(DatumAxisId id, std::string name, Point3 origin,

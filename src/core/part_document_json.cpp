@@ -501,6 +501,21 @@ construction_relation_from_json(const json& relation_json) {
       json_error("unsupported construction line kind in part document json"));
 }
 
+[[nodiscard]] Result<DatumAxis> datum_axis_from_json(const json& axis_json) {
+  const auto kind = axis_json.at("kind").get<std::string>();
+  if (kind == "explicit")
+    return DatumAxis::create_explicit(
+        DatumAxisId(axis_json.at("id").get<std::string>()), axis_json.at("name").get<std::string>(),
+        point3_from_json(axis_json.at("origin")), vector3_from_json(axis_json.at("direction")),
+        parameter_dependencies_from_object(axis_json));
+  if (kind == "from_construction_line")
+    return DatumAxis::create_from_construction_line(
+        DatumAxisId(axis_json.at("id").get<std::string>()), axis_json.at("name").get<std::string>(),
+        ConstructionLineId(axis_json.at("source_construction_line").get<std::string>()));
+  return Result<DatumAxis>::failure(
+      json_error("unsupported datum axis kind in part document json"));
+}
+
 [[nodiscard]] Result<ConstructionPlane> construction_plane_from_json(const json& plane_json) {
   const auto kind = plane_json.at("kind").get<std::string>();
   if (kind == "explicit")
@@ -1093,6 +1108,21 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
       line_json["relation"] = construction_relation_to_json(line.relation().value());
     root["construction_lines"].push_back(std::move(line_json));
   }
+  root["datum_axes"] = json::array();
+  for (const auto& datum_axis : document.datum_axes()) {
+    json axis_json{{"id", datum_axis.id().value()},
+                   {"name", datum_axis.name()},
+                   {"kind", std::string(to_string(datum_axis.kind()))}};
+    if (datum_axis.kind() == DatumAxisKind::Explicit) {
+      axis_json["origin"] = point3_to_json(datum_axis.origin());
+      axis_json["direction"] = vector3_to_json(datum_axis.direction());
+      axis_json["parameter_dependencies"] =
+          parameter_ids_to_json(datum_axis.parameter_dependencies());
+    } else {
+      axis_json["source_construction_line"] = datum_axis.source_construction_line().value();
+    }
+    root["datum_axes"].push_back(std::move(axis_json));
+  }
   root["construction_planes"] = json::array();
   for (const auto& plane : document.construction_planes()) {
     json plane_json{{"id", plane.id().value()},
@@ -1390,6 +1420,14 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
       if (!progress)
         return Result<PartDocument>::failure(
             json_error("could not resolve part document json dependencies"));
+    }
+    for (const auto& axis_json : root.value("datum_axes", json::array())) {
+      auto axis = datum_axis_from_json(axis_json);
+      if (axis.has_error())
+        return Result<PartDocument>::failure(axis.error());
+      auto added = document.value().add_datum_axis(axis.value());
+      if (added.has_error())
+        return Result<PartDocument>::failure(added.error());
     }
     for (const auto& status_json : root.value("reference_statuses", json::array())) {
       auto status = reference_status_from_json(status_json);

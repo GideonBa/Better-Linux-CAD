@@ -1384,12 +1384,12 @@ The next phase after Block 94 must be planned from measured gaps in the integrat
 
 ## Immediate repository handoff
 
-Current next technical step remains Block 33.
+Current next technical step remains Block 34.
 
 The active sequence is:
 
 ```text
-Blocks 33-47
+Blocks 34-47
   finish Assembly MVP
 
 then
