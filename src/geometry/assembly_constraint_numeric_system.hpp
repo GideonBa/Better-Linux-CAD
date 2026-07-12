@@ -8,6 +8,7 @@
 #include "blcad/geometry/assembly_constraint_equation_builder.hpp"
 #include "blcad/geometry/assembly_hierarchy_constraint_equation_builder.hpp"
 #include "blcad/geometry/assembly_insert_constraint_equation_builder.hpp"
+#include "blcad/geometry/assembly_revolute_joint_equation_builder.hpp"
 
 #include <cstddef>
 #include <functional>
@@ -34,9 +35,6 @@ struct AssemblyRevoluteJointDrive {
                          const AssemblyRevoluteJointDrive&) = default;
 };
 
-// Derived numeric relationship selection. Persistent assembly constraints remain
-// distinct from persistent joint intent; a motion query may append deterministic
-// revolute drives to the same residual/Jacobian system.
 struct AssemblyNumericRelationshipSet {
   std::vector<AssemblyConstraintId> constraint_ids;
   std::vector<AssemblyRevoluteJointDrive> revolute_drives;
@@ -46,9 +44,6 @@ struct AssemblyNumericRelationshipSet {
   }
 };
 
-// Absolute candidate variable vector -> deterministically scaled residual vector.
-// Both ordinary local solving and cross-hierarchy authority solving adapt their
-// model-specific mutation/equation semantics to this shared numeric boundary.
 using AssemblyNumericResidualEvaluator =
     std::function<Result<NumericVector>(const NumericVector&)>;
 
@@ -70,6 +65,10 @@ using AssemblyNumericResidualEvaluator =
     NumericVector& residuals);
 [[nodiscard]] Result<std::size_t> append_scaled_residuals(
     const AssemblyHierarchyConstraintResidualDescriptor& residual,
+    double length_residual_scale_mm,
+    NumericVector& residuals);
+[[nodiscard]] Result<std::size_t> append_scaled_residuals(
+    const RevoluteJointResidualDescriptor& residual,
     double length_residual_scale_mm,
     NumericVector& residuals);
 
