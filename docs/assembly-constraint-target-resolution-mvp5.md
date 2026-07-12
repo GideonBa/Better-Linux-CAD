@@ -225,7 +225,7 @@ would be ambiguous.
 
 A future generated-topology target family must define stable per-instance semantic identity. The resolver does not infer identity from transient OCCT topology or hidden vector order.
 
-This requirement is now explicitly planned in Block 34 of `docs/assembly-general-geometric-target-roadmap.md`.
+This requirement is explicitly planned in Block 35 of `docs/assembly-general-geometric-target-roadmap.md`.
 
 ## Component-local versus assembly-space geometry
 
@@ -328,16 +328,26 @@ Canonical roadmap:
 
 `docs/assembly-general-geometric-target-roadmap.md`
 
-The planned post-Block-30 sequence is:
+The refined post-Block-30 sequence is:
 
 ```text
 31 typed geometric target taxonomy and capability projection
-  -> 32 assembly-selectable datum/reference geometry intent + serialization
-  -> 33 datum/axis/line/point target resolution
-  -> 34 stable semantic generated topology identity/recovery
-  -> 35 generated face/edge/vertex target resolution
-  -> 36 explicit compatibility matrix + generic geometric relationships
-  -> 37 joint target capability expansion + richer joint-family sequence
+  -> 32 assembly-selectable reference geometry Core intent
+  -> 33 reference geometry serialization and structure validation
+  -> 34 datum/axis/line/point target resolution
+  -> 35 stable semantic generated topology identity/recovery
+  -> 36 generated face/edge/vertex target resolution
+  -> 37 explicit target compatibility matrix
+  -> 38 generic geometric relationship Core intent + JSON
+  -> 39 generic relationship equations + shared solve integration
+  -> 40 joint target compatibility + oriented Frame contract
+  -> 41 general joint coordinate/limit Core model
+  -> 42 general joint coordinate JSON/backward compatibility
+  -> 43 vector joint drives + holding/freshness/atomic application
+  -> 44 Prismatic joint
+  -> 45 Cylindrical joint
+  -> 46 Planar joint
+  -> 47 Ball/Spherical joint
 ```
 
 The core distinction is:
@@ -364,12 +374,16 @@ DatumPlane
   -> Plane capability
 
 CircularFeatureSeat
-  -> SeatFrame capability
+  -> Frame capability
   -> Axis capability
   -> Plane capability
 ```
 
-Relationship equation builders should consume requested capabilities through one compatibility layer rather than branching on feature/source kind.
+Relationship equation builders consume requested capabilities through the Block-37 compatibility layer rather than branching on feature/source kind.
+
+The first new persistent generic relationship types are planned only in Block 38, after compatibility semantics are stable. Their equations and numeric integration follow in Block 39.
+
+Joint target compatibility is generalized in Block 40. Multi-coordinate joint model/JSON/drive semantics are then separated into Blocks 41-43 before Prismatic, Cylindrical, Planar, and Ball/Spherical are integrated one family per block.
 
 ## Failure behavior
 
@@ -386,7 +400,7 @@ Seat/Insert target failures use parallel explicit messages for malformed/unsuppo
 
 Failure values propagate through downstream builders unchanged.
 
-The future general target taxonomy must retain fail-closed unsupported capability projection and relationship compatibility behavior.
+The future general target taxonomy retains fail-closed unsupported capability projection and relationship/joint compatibility behavior.
 
 ## Read-only and persistence boundary
 
@@ -403,7 +417,7 @@ Resolved plane, axis, and seat descriptors are regenerated from current model in
 
 No solver or Jacobian cache owns persistent target bindings.
 
-Future Plane/Axis/Line/Point/Circle/Cylinder/SeatFrame capabilities likewise remain derived. Assembly endpoints continue to persist semantic reference identity, not resolved coordinates or raw OCCT topology.
+Future Plane/Axis/Line/Point/Circle/Cylinder/Frame capabilities likewise remain derived. Assembly endpoints continue to persist semantic reference identity, not resolved coordinates or raw OCCT topology.
 
 ## Tests
 
@@ -422,4 +436,4 @@ The implemented target resolver supports generated plane/axis/seat semantics and
 
 Block 30 remains the immediate next technical step for richer contact/swept-motion analysis.
 
-After Block 30, Block 31 begins the general assembly target roadmap with a typed derived geometric target taxonomy and explicit capability projection. Existing target strings and current relationship behavior must remain backward compatible.
+After Block 30, Block 31 begins the general assembly target roadmap with a typed derived geometric target taxonomy and explicit capability projection. Existing target strings and current relationship behavior remain backward compatible.
