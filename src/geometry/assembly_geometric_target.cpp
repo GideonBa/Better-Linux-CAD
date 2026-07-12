@@ -50,12 +50,18 @@ constexpr const char* kGeometricTargetId = "geometry.assembly_geometric_target";
   return std::abs(dot(lhs, rhs)) <= kDirectionTolerance;
 }
 
+[[nodiscard]] bool orthonormal_basis(const Vector3& x_axis,
+                                     const Vector3& y_axis,
+                                     const Vector3& z_axis) noexcept {
+  return unit_vector(x_axis) && unit_vector(y_axis) && unit_vector(z_axis) &&
+         orthogonal(x_axis, y_axis) && orthogonal(x_axis, z_axis) &&
+         orthogonal(y_axis, z_axis);
+}
+
 [[nodiscard]] bool right_handed_frame(const Vector3& x_axis,
                                       const Vector3& y_axis,
                                       const Vector3& z_axis) noexcept {
-  return unit_vector(x_axis) && unit_vector(y_axis) && unit_vector(z_axis) &&
-         orthogonal(x_axis, y_axis) && orthogonal(x_axis, z_axis) &&
-         orthogonal(y_axis, z_axis) &&
+  return orthonormal_basis(x_axis, y_axis, z_axis) &&
          dot(cross(x_axis, y_axis), z_axis) >= 1.0 - kDirectionTolerance;
 }
 
@@ -190,9 +196,9 @@ validate_descriptor(const AssemblyGeometricTargetDescriptor& descriptor) {
         using Descriptor = std::decay_t<decltype(value)>;
         if constexpr (std::is_same_v<Descriptor, AssemblyPlanarTargetDescriptor>) {
           if (!finite(value.origin) ||
-              !right_handed_frame(value.x_axis, value.y_axis, value.normal)) {
+              !orthonormal_basis(value.x_axis, value.y_axis, value.normal)) {
             return Result<std::size_t>::failure(validation_error(
-                "Plane target descriptor must be finite, orthonormal, and right-handed"));
+                "Plane target descriptor must be finite with unit pairwise-orthogonal axes"));
           }
         } else if constexpr (std::is_same_v<Descriptor, AssemblyAxisTargetDescriptor>) {
           if (!finite(value.origin) || !unit_vector(value.direction)) {
