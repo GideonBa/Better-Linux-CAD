@@ -6,6 +6,7 @@
 #include "blcad/core/project.hpp"
 #include "blcad/core/result.hpp"
 #include "blcad/core/spatial.hpp"
+#include "blcad/geometry/assembly_geometric_target.hpp"
 
 namespace blcad::geometry {
 
@@ -68,9 +69,13 @@ struct ResolvedAssemblyInsertConstraintTarget {
 };
 
 // Resolves supported persistent assembly target intent to component-local geometry.
-// The component transform remains separate placement intent and is not applied here.
+// The typed resolve_geometric path classifies semantic source kind separately from
+// solver capability. Existing family-specific methods remain compatibility APIs.
 class AssemblyConstraintTargetResolver {
 public:
+  [[nodiscard]] Result<AssemblyResolvedGeometricTarget>
+  resolve_geometric(const Project& project, const AssemblyConstraintTarget& target) const;
+
   [[nodiscard]] Result<ResolvedAssemblyConstraintTarget>
   resolve(const Project& project, const AssemblyConstraintTarget& target) const;
 
