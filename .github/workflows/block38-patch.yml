@@ -70,6 +70,11 @@ jobs:
       - name: Apply Block 38 patch
         run: python3 scripts/apply_block38.py 2>&1 | tee /tmp/block38-apply.log
 
+      - name: Install Core dependencies and formatter
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build nlohmann-json3-dev catch2 clang-format
+
       - name: Format Block 38 files
         run: |
           clang-format -i \
@@ -83,11 +88,6 @@ jobs:
             src/core/project_json.cpp \
             src/geometry/assembly_target_compatibility.cpp \
             tests/core/assembly_generic_relationship_tests.cpp
-
-      - name: Install Core dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y cmake ninja-build nlohmann-json3-dev catch2
 
       - name: Core build and tests
         run: cmake --workflow --preset dev-build-test
