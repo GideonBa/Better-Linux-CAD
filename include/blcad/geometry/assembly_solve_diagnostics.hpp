@@ -3,6 +3,7 @@
 #include "blcad/core/id.hpp"
 #include "blcad/core/project.hpp"
 #include "blcad/core/result.hpp"
+#include "blcad/geometry/assembly_cross_hierarchy_constraint_solver.hpp"
 #include "blcad/geometry/assembly_rigid_body_solver.hpp"
 
 #include <cstddef>
@@ -86,6 +87,34 @@ public:
   [[nodiscard]] Result<AssemblySolveDiagnostics> analyze(
       const Project& project,
       const std::vector<ComponentInstanceId>& connected_group,
+      AssemblySolveDiagnosticsOptions options = {}) const;
+};
+
+struct AssemblyCrossHierarchySolveDiagnostics {
+  AssemblySolveState solve_state = AssemblySolveState::NumericalFailure;
+  AssemblyDofClassification dof_classification = AssemblyDofClassification::NotEvaluated;
+  AssemblyConstraintConsistencyClassification consistency_classification =
+      AssemblyConstraintConsistencyClassification::SolverDidNotConverge;
+  AssemblyResidualRankStructure residual_rank_structure =
+      AssemblyResidualRankStructure::NotEvaluated;
+  std::vector<AssemblyRelationshipIdentity> relationship_order;
+  std::vector<ComponentTransformAuthority> fixed_authorities;
+  std::vector<ComponentTransformAuthority> variable_authorities;
+  AssemblyJacobianRankSummary rank_summary;
+  AssemblySolveResidualSummary residual_summary;
+
+  friend bool operator==(const AssemblyCrossHierarchySolveDiagnostics&,
+                         const AssemblyCrossHierarchySolveDiagnostics&) = default;
+};
+
+// Read-only Block-27 Jacobian-rank and remaining-DOF analysis over exactly the
+// same free-authority ordering and mixed residual evaluator used by
+// AssemblyCrossHierarchyConstraintSolver.
+class AssemblyCrossHierarchySolveDiagnosticsAnalyzer {
+public:
+  [[nodiscard]] Result<AssemblyCrossHierarchySolveDiagnostics> analyze(
+      const Project& project,
+      const AssemblyCrossHierarchySolveGroup& solve_group,
       AssemblySolveDiagnosticsOptions options = {}) const;
 };
 
