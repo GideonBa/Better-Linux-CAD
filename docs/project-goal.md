@@ -19,7 +19,7 @@ Persistent or explicitly authored model intent already includes substantial part
 - Project-level occurrence-qualified geometric constraints;
 - Project-level occurrence-qualified Revolute joints.
 
-Derived data such as OCCT shapes, residuals/Jacobians, hierarchy traversal descriptors, rooted exchange occurrence records, posed leaf shapes, XDE labels, STEP products/entities, and analysis records remains regenerable query/execution output rather than primary model authority.
+Derived data such as OCCT shapes, residuals/Jacobians, hierarchy traversal descriptors, rooted exchange occurrence records, posed leaf shapes, contact classifications, sample Project copies, sampled motion records, XDE labels, and STEP products/entities remains regenerable query/execution output rather than primary model authority.
 
 ## Direction
 
@@ -30,24 +30,25 @@ The project grows through controlled headless vertical slices. Historical phase 
 3. generated-face workplanes and semantic references;
 4. broader sketch/profile/feature support;
 5. sketch constraints and diagnostics;
-6. assembly relationships, motion, hierarchy, posed geometry, and structured exchange;
+6. assembly relationships, motion, hierarchy, posed geometry, analysis, and structured exchange;
 7. GUI/application workflows;
 8. engineering modules.
 
-Phases 1-6 now have implemented seeds. Current work is still centered on the CAD core and headless application boundary rather than GUI breadth.
+Phases 1-6 now have implemented seeds. Current work remains centered on CAD-core and headless application contracts rather than GUI breadth.
 
 Development rule:
 
 ```text
 model intent
   -> serialization compatibility
-  -> deterministic derived identity/connectivity
+  -> stable semantic identity
+  -> deterministic derived connectivity/query semantics
   -> geometry/numeric execution
   -> complete freshness / explicit application when mutation is required
   -> diagnostics, analysis, or exchange consumers
 ```
 
-A feature should be narrow enough to prove through focused headless tests before UI or broad topology support is added. When one feature crosses several authority boundaries, it is split into sequenced implementation blocks instead of becoming one large solver, hierarchy, or format rewrite.
+A feature should be narrow enough to prove through focused headless tests before UI or broad topology support is added. When one feature crosses several authority boundaries, it is split into sequenced implementation blocks instead of becoming one large solver, hierarchy, format, or motion rewrite.
 
 ## Current technical phase
 
@@ -58,14 +59,16 @@ local five-family geometric solving + diagnostics
 local Revolute motion
 rigid nested assembly hierarchy
 flattened posed STEP export
-interference + clearance analysis
+interference + clearance compatibility analysis
 document-scoped flexible child solving
 cross-hierarchy five-family geometric solving + fresh application + diagnostics
 Project-level occurrence-qualified Revolute motion
 structured assembly/product STEP export
+complete rooted Separated / Touching / Interfering contact classification
+bounded sampled local/cross-hierarchy Revolute sweep analysis
 ```
 
-Three different identity questions are now deliberately separated.
+Four different identity questions are deliberately separated.
 
 ### Semantic/geometric endpoint identity
 
@@ -82,27 +85,35 @@ Three different identity questions are now deliberately separated.
  local ComponentInstanceId)
 ```
 
-### Structured exchange occurrence/product identity
+### Structured exchange component occurrence identity
 
 ```text
-assembly occurrence
-  = exact rooted SubassemblyInstance path
-
-part component occurrence
-  = (containing rooted assembly path,
-     local ComponentInstanceId)
-
-part product definition
-  = PartDocumentId
+(containing rooted assembly path,
+ local ComponentInstanceId)
 ```
 
-For example, two rooted occurrences of the same child assembly can expose two geometrically and exchange-distinct shaft occurrences because their parent boundaries differ, while both still read and mutate one shared child-document `ComponentInstance::transform()` authority.
+### Static contact pair identity
 
-This distinction prevents both numeric variable duplication and exchange occurrence collapse.
+```text
+canonical ordered pair of exact rooted
+component exchange occurrence identities
+```
 
-Block 29 now emits structured XDE/STEP assembly/product relationships from those derived rooted exchange identities while reusing one recomputed part definition per unique `PartDocumentId`.
+Two rooted occurrences of the same child assembly can expose two geometrically, exchange-, and contact-distinct component occurrences because their parent boundaries differ while still reading and mutating one shared child-document `ComponentInstance::transform()` authority.
 
-The current next direction is richer posed contact classification and bounded deterministic swept-Revolute analysis over exact rooted component occurrence identities. The canonical implementation sequence is `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`.
+This prevents both numeric variable duplication and occurrence collapse in exchange/analysis consumers.
+
+Block 29 emits structured XDE/STEP assembly/product relationships from derived rooted exchange identities while reusing one recomputed part definition per unique `PartDocumentId`.
+
+Block 30 classifies every visible-active rooted component pair as `Separated`, `Touching`, or `Interfering` and can sample one supported local or Project-level Revolute coordinate interval. Every sample starts from a fresh source Project copy and reuses existing motion solver/application boundaries before posed contact analysis.
+
+This sweep is deliberately discrete sampled analysis rather than continuous collision detection.
+
+The current next direction is general assembly geometric target expressiveness: typed source taxonomy and capability projection are Block 31, followed by reference geometry, stable semantic generated topology targets, explicit compatibility, generic relationships, multi-coordinate joint infrastructure, and richer joint families through Block 47.
+
+Canonical implementation sequence: `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`.
+
+Canonical target/joint roadmap: `docs/assembly-general-geometric-target-roadmap.md`.
 
 ## Long-term scope
 
@@ -114,6 +125,7 @@ The system should eventually cover:
 - stable semantic references and reference recovery;
 - feature history and richer feature families;
 - assembly modeling with geometric constraints and joints;
+- surface/edge/vertex/plane/axis/line/point assembly target selection through semantic identity;
 - cross-hierarchy assembly solving and nested motion;
 - top-down design with assembly/cross-part parameter relationships;
 - engineering assistants for bolts, holes, shafts, bearings, and gears;
@@ -129,14 +141,14 @@ The aim is a modern engineering-oriented CAD system for Linux that combines clas
 
 The current phase should not attempt to deliver:
 
-- a production GUI before the core command/application contracts stabilize;
-- a full general topological naming solution;
-- arbitrary raw OCCT face/edge picking as persistent identity;
+- a production GUI before core command/application contracts stabilize;
+- arbitrary raw OCCT face/edge/vertex selection as persistent identity;
 - a second transform or occurrence-local pose authority without an explicit persistence/application design;
 - whole-subassembly rigid solve variables before grounding and application semantics are defined;
-- richer joint families or multi-turn coordinates inside the contact-analysis block;
+- generic relationship families before target capability compatibility exists;
+- richer joint families before typed coordinate slots and vector drive semantics exist;
 - a general-purpose physics constraint engine;
-- full contact dynamics, collision response, or rigid-body simulation;
+- full contact dynamics, collision response, friction, or rigid-body simulation;
 - continuous collision detection unless a continuous algorithm is actually implemented and proved;
 - production engineering assistants before underlying model intent is reliable.
 
@@ -150,4 +162,8 @@ These are sequencing boundaries, not permanent product exclusions.
 
 Feature-specific MVP documents are canonical for exact contracts, persistence boundaries, mathematical semantics, failure policies, and focused proofs.
 
-`docs/file-format.md` is canonical for currently implemented serialization semantics. Derived exchange identities, XDE labels, and STEP product relationships are not save-format fields merely because they are exported.
+`docs/assembly-contact-swept-motion-mvp5.md` is canonical for Block-30 contact and sampled motion semantics.
+
+`docs/assembly-general-geometric-target-roadmap.md` is canonical for planned Blocks 31-47.
+
+`docs/file-format.md` is canonical for currently implemented serialization semantics. Derived exchange identities, XDE labels, contact records, and sampled sweep products are not save-format fields merely because they are exported or queried.

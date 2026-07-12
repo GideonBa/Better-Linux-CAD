@@ -114,6 +114,8 @@ Posed geometry, analysis, and exchange:
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-nested-step-export]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-interference]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-clearance]"
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-contact]"
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-revolute-sweep]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-structured-step-export]"
 ```
 
@@ -134,7 +136,15 @@ At a high level the current suites cover:
 - Project-owned child assemblies, cycle-free rooted hierarchy, and exact parent transform chains;
 - visible-active leaf flattening and repeated child occurrence semantics;
 - flattened posed STEP export;
-- interference and clearance analysis over shared posed leaves;
+- historical interference and clearance analysis over shared posed leaves;
+- complete typed rooted `Separated`/`Touching`/`Interfering` pair classification;
+- exact rooted contact pair ordering independent from component insertion order;
+- explicit touching and overlap-volume tolerances;
+- bounded inclusive local Revolute sampling;
+- bounded inclusive Project-level cross-hierarchy Revolute sampling;
+- one fresh source Project copy per sampled coordinate;
+- existing motion solver/applier reuse before each sample contact analysis;
+- source Project transform and authored joint-coordinate immutability during sweep queries;
 - document-scoped flexible child solving;
 - persistent occurrence-qualified Project-level geometric constraints and Revolute joints;
 - deterministic relationship/joint-to-`ComponentTransformAuthority` incidence;
@@ -186,45 +196,42 @@ blcad_analyze_assembly <input.blcad.project.json> [clearance-threshold-mm]
 
 `blcad_export_project` updates one assembly parameter, propagates bindings, recomputes affected parts, and exports per-part STEP files.
 
-`blcad_export_posed_assembly` is the existing solved-root/local flattened compound flow.
+`blcad_export_posed_assembly` is the solved-root/local flattened compound flow.
 
-`blcad_export_structured_assembly` exports the current authored/persisted Project pose through structured XDE/STEP assembly/product relationships. It intentionally does not invoke solving implicitly.
+`blcad_export_structured_assembly` exports the current authored/persisted Project pose through structured XDE/STEP assembly/product relationships and does not invoke solving implicitly.
 
-`blcad_move_joint` remains the local root-assembly joint CLI seed. Project-level cross-hierarchy Revolute motion currently has a public library/API contract but no dedicated CLI.
+`blcad_move_joint` remains the local root-assembly joint CLI seed. Project-level cross-hierarchy Revolute motion has a public library/API contract but no dedicated CLI.
+
+Block 30 adds public library APIs for complete rooted contact classification and sampled local/cross-hierarchy Revolute analysis. It intentionally adds no CLI or persistent analysis format.
 
 ## Documentation entry points
 
 - `README.md`: short status and current next step
 - `docs/mvp-plan.md`: implementation sequence
-- `docs/architecture-summary.md`: condensed architecture
+- `docs/architecture-summary.md`: condensed implemented architecture
 - `docs/file-format.md`: persistent save-format authority
 - `docs/assembly-posed-step-export-mvp5.md`: flattened posed STEP compatibility contract
 - `docs/assembly-structured-step-products-mvp5.md`: Block-29 exchange identity and structured STEP contract
+- `docs/assembly-contact-swept-motion-mvp5.md`: Block-30 rooted contact and sampled Revolute sweep contract
 - `docs/assembly-cross-hierarchy-revolute-motion-mvp5.md`: Project-level occurrence-qualified Revolute motion
-- `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`: current assembly sequence and Block-30 handoff
+- `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`: current numbered sequence and Block-31 handoff
+- `docs/assembly-general-geometric-target-roadmap.md`: planned Blocks 31-47 target/relationship/joint sequence
 - `docs/project-goal.md`: long-term direction
 
 ## Formatting
 
 Formatting is configured by `.editorconfig` and `.clang-format`.
 
-For Block 29 production/test files:
+For Block 30 production/test files:
 
 ```bash
 clang-format -i \
-  include/blcad/core/assembly_exchange_graph.hpp \
-  include/blcad/geometry/assembly_structured_step_exporter.hpp \
-  examples/blcad_export_structured_assembly.cpp \
-  src/core/assembly_exchange_graph.cpp \
-  src/geometry/assembly_occt_rigid_transform.hpp \
-  src/geometry/assembly_occt_rigid_transform.cpp \
-  src/geometry/assembly_part_shape_definitions.hpp \
-  src/geometry/assembly_part_shape_definitions.cpp \
-  src/geometry/assembly_posed_leaf_shapes.cpp \
-  src/geometry/assembly_structured_step_exporter.cpp \
-  tests/core/assembly_exchange_graph_tests.cpp \
-  tests/core/assembly_exchange_name_tests.cpp \
-  tests/geometry/assembly_structured_step_exporter_tests.cpp
+  include/blcad/geometry/assembly_contact_analyzer.hpp \
+  include/blcad/geometry/assembly_revolute_sweep_analyzer.hpp \
+  src/geometry/assembly_contact_analyzer.cpp \
+  src/geometry/assembly_revolute_sweep_analyzer.cpp \
+  tests/geometry/assembly_contact_analyzer_tests.cpp \
+  tests/geometry/assembly_revolute_sweep_analyzer_tests.cpp
 ```
 
 ## Clean generated files
@@ -235,19 +242,24 @@ rm -rf build/
 
 ## Current assembly development boundary
 
-Blocks 23-29 of the current cross-hierarchy sequence are implemented.
+Blocks 23-30 of the current cross-hierarchy sequence are implemented.
 
-Block 29 freezes:
+Block 30 freezes:
 
 ```text
-assembly exchange occurrence
-  = exact rooted SubassemblyInstance path
+contact pair identity
+  = canonical ordered pair of exact rooted
+    AssemblyExchangeComponentOccurrenceIdentity values
 
-component exchange occurrence
-  = (containing rooted path, local ComponentInstanceId)
+static classification
+  = Interfering by strict positive-volume threshold
+    else Touching by inclusive distance tolerance
+    else Separated
 
-part product definition
-  = PartDocumentId
+sampled Revolute sweep
+  = 2..1001 inclusive requested-coordinate samples
+    over RootAssemblyLocal or ProjectCrossHierarchy motion
+    with one fresh source Project copy per sample
 ```
 
-The immediate next block is richer posed contact classification and bounded deterministic sampled swept-Revolute analysis. Exact sequencing is maintained in `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`.
+The immediate next block is Block 31: typed geometric target taxonomy and capability projection. Exact sequencing is maintained in `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md` and detailed target planning in `docs/assembly-general-geometric-target-roadmap.md`.
