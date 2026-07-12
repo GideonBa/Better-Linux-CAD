@@ -31,6 +31,7 @@ add_library(
   src/core/assembly_constraint.cpp
   src/core/assembly_constraint_graph.cpp
   src/core/assembly_cross_hierarchy_constraint_graph.cpp
+  src/core/assembly_cross_hierarchy_motion_graph.cpp
   src/core/assembly_document.cpp
   src/core/assembly_document_json.cpp
   src/core/assembly_hierarchy.cpp
@@ -51,6 +52,7 @@ add_library(
   src/core/parameter_expression.cpp
   src/core/project.cpp
   src/core/project_cross_hierarchy_constraints.cpp
+  src/core/project_cross_hierarchy_joints.cpp
   src/core/project_json.cpp
   src/core/quantity.cpp
   src/core/recompute_plan.cpp
@@ -101,8 +103,12 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/assembly_constraint_numeric_system.cpp
     src/geometry/assembly_constraint_target_resolver.cpp
     src/geometry/assembly_cross_hierarchy_constraint_solver.cpp
+    src/geometry/assembly_cross_hierarchy_freshness.cpp
+    src/geometry/assembly_cross_hierarchy_joint_motion_solver.cpp
+    src/geometry/assembly_cross_hierarchy_motion_numeric_system.cpp
     src/geometry/assembly_cross_hierarchy_numeric_system.cpp
     src/geometry/assembly_hierarchy_constraint_equation_builder.cpp
+    src/geometry/assembly_hierarchy_revolute_joint_equation_builder.cpp
     src/geometry/assembly_hierarchy_transform_evaluator.cpp
     src/geometry/assembly_insert_constraint_equation_builder.cpp
     src/geometry/assembly_interference_analyzer.cpp
@@ -111,6 +117,7 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/assembly_numeric_solve_engine.cpp
     src/geometry/assembly_posed_leaf_shapes.cpp
     src/geometry/assembly_revolute_joint_equation_builder.cpp
+    src/geometry/assembly_revolute_joint_residual.cpp
     src/geometry/assembly_rigid_body_solver.cpp
     src/geometry/assembly_semantic_target_freshness.cpp
     src/geometry/assembly_solve_diagnostics.cpp
@@ -203,6 +210,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/assembly_constraint_tests.cpp
     tests/core/assembly_cross_hierarchy_constraint_graph_tests.cpp
     tests/core/assembly_cross_hierarchy_constraint_tests.cpp
+    tests/core/assembly_cross_hierarchy_joint_tests.cpp
     tests/core/assembly_document_tests.cpp
     tests/core/assembly_hierarchy_tests.cpp
     tests/core/assembly_insert_constraint_tests.cpp
@@ -277,7 +285,9 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/assembly_cross_hierarchy_application_tests.cpp
       tests/geometry/assembly_cross_hierarchy_constraint_solver_tests.cpp
       tests/geometry/assembly_cross_hierarchy_diagnostics_tests.cpp
+      tests/geometry/assembly_cross_hierarchy_joint_motion_tests.cpp
       tests/geometry/assembly_hierarchy_constraint_equation_builder_tests.cpp
+      tests/geometry/assembly_hierarchy_revolute_joint_equation_builder_tests.cpp
       tests/geometry/assembly_hierarchy_transform_evaluator_tests.cpp
       tests/geometry/assembly_insert_constraint_equation_builder_tests.cpp
       tests/geometry/assembly_insert_numeric_solver_tests.cpp

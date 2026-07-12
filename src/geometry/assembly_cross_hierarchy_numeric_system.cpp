@@ -25,8 +25,10 @@ namespace {
                         Vector3{values[offset + 3U], values[offset + 4U], values[offset + 5U]}};
 }
 
-[[nodiscard]] Result<Project> make_local_evaluation_view(const Project& project,
-                                                         const DocumentId& assembly_document) {
+} // namespace
+
+Result<Project> make_cross_hierarchy_local_evaluation_view(
+    const Project& project, const DocumentId& assembly_document) {
   const AssemblyDocument* assembly = project.find_assembly_document(assembly_document);
   if (assembly == nullptr) {
     return Result<Project>::failure(validation_error(
@@ -47,10 +49,11 @@ namespace {
   return local_project;
 }
 
-[[nodiscard]] Result<std::size_t> append_local_relationship_residuals(
+Result<std::size_t> append_cross_hierarchy_local_relationship_residuals(
     const Project& project, const AssemblyLocalRelationshipIdentity& identity,
     double length_residual_scale_mm, NumericVector& residuals) {
-  auto local_project = make_local_evaluation_view(project, identity.assembly_document);
+  auto local_project =
+      make_cross_hierarchy_local_evaluation_view(project, identity.assembly_document);
   if (local_project.has_error()) {
     return Result<std::size_t>::failure(local_project.error());
   }
@@ -72,7 +75,7 @@ namespace {
   return Result<std::size_t>::success(appended_count);
 }
 
-[[nodiscard]] Result<std::size_t> append_cross_hierarchy_relationship_residuals(
+Result<std::size_t> append_cross_hierarchy_project_relationship_residuals(
     const Project& project,
     const AssemblyProjectCrossHierarchyRelationshipIdentity& identity,
     double length_residual_scale_mm, NumericVector& residuals) {
@@ -96,8 +99,6 @@ namespace {
   return append_scaled_residuals(equation.value().residual,
                                  length_residual_scale_mm, residuals);
 }
-
-} // namespace
 
 Result<const ComponentInstance*> resolve_cross_hierarchy_authority_component(
     const Project& project, const ComponentTransformAuthority& authority) {
@@ -173,10 +174,10 @@ Result<NumericVector> evaluate_cross_hierarchy_group_residuals(
   for (const AssemblyRelationshipIdentity& relationship : solve_group.relationships) {
     Result<std::size_t> appended =
         std::holds_alternative<AssemblyLocalRelationshipIdentity>(relationship)
-            ? append_local_relationship_residuals(
+            ? append_cross_hierarchy_local_relationship_residuals(
                   project, std::get<AssemblyLocalRelationshipIdentity>(relationship),
                   length_residual_scale_mm, residuals)
-            : append_cross_hierarchy_relationship_residuals(
+            : append_cross_hierarchy_project_relationship_residuals(
                   project,
                   std::get<AssemblyProjectCrossHierarchyRelationshipIdentity>(relationship),
                   length_residual_scale_mm, residuals);

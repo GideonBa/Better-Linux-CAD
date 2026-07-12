@@ -266,9 +266,12 @@ Result<std::size_t> Project::validate_assembly_structure() const {
   auto cross_hierarchy_constraints = validate_cross_hierarchy_constraints();
   if (cross_hierarchy_constraints.has_error()) return cross_hierarchy_constraints;
 
+  auto cross_hierarchy_joints = validate_cross_hierarchy_joints();
+  if (cross_hierarchy_joints.has_error()) return cross_hierarchy_joints;
+
   return Result<std::size_t>::success(
       members.value() + instances.value() + constraints.value() + joints.value() +
-      hierarchy.value() + cross_hierarchy_constraints.value());
+      hierarchy.value() + cross_hierarchy_constraints.value() + cross_hierarchy_joints.value());
 }
 
 Result<ProjectUpdateResult> Project::set_assembly_parameter_value(ParameterId id, Quantity value) {

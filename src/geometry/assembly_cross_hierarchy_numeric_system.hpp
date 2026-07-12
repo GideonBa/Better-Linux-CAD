@@ -11,6 +11,22 @@
 
 namespace blcad::geometry::detail {
 
+[[nodiscard]] Result<Project> make_cross_hierarchy_local_evaluation_view(
+    const Project& project,
+    const DocumentId& assembly_document);
+
+[[nodiscard]] Result<std::size_t> append_cross_hierarchy_local_relationship_residuals(
+    const Project& project,
+    const AssemblyLocalRelationshipIdentity& identity,
+    double length_residual_scale_mm,
+    NumericVector& residuals);
+
+[[nodiscard]] Result<std::size_t> append_cross_hierarchy_project_relationship_residuals(
+    const Project& project,
+    const AssemblyProjectCrossHierarchyRelationshipIdentity& identity,
+    double length_residual_scale_mm,
+    NumericVector& residuals);
+
 [[nodiscard]] Result<const ComponentInstance*> resolve_cross_hierarchy_authority_component(
     const Project& project,
     const ComponentTransformAuthority& authority);

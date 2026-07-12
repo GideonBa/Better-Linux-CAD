@@ -91,6 +91,37 @@ constexpr int k_version = 1;
       json_error("unsupported cross-hierarchy assembly constraint state"));
 }
 
+[[nodiscard]] Result<AssemblyJointType> joint_type_from_json(const json& value) {
+  const auto text = value.get<std::string>();
+  if (text == "revolute")
+    return Result<AssemblyJointType>::success(AssemblyJointType::Revolute);
+  return Result<AssemblyJointType>::failure(
+      json_error("unsupported cross-hierarchy assembly joint type"));
+}
+
+[[nodiscard]] Result<AssemblyJointState> joint_state_from_json(const json& value) {
+  const auto text = value.get<std::string>();
+  if (text == "active")
+    return Result<AssemblyJointState>::success(AssemblyJointState::Active);
+  if (text == "inactive")
+    return Result<AssemblyJointState>::success(AssemblyJointState::Inactive);
+  return Result<AssemblyJointState>::failure(
+      json_error("unsupported cross-hierarchy assembly joint state"));
+}
+
+[[nodiscard]] json angle_quantity_to_json(double degrees) {
+  return json{{"unit", "deg"}, {"value", degrees}};
+}
+
+[[nodiscard]] Result<Quantity> angle_quantity_from_json(const json& value,
+                                                        const std::string& object_id,
+                                                        std::string_view context) {
+  if (value.at("unit").get<std::string>() != "deg") {
+    return Result<Quantity>::failure(json_error(std::string(context) + " must use degrees"));
+  }
+  return Quantity::angle_deg(value.at("value").get<double>(), object_id);
+}
+
 [[nodiscard]] json endpoint_to_json(const AssemblyHierarchyConstraintEndpoint& endpoint) {
   json occurrence_path = json::array();
   for (const SubassemblyInstanceId& occurrence : endpoint.occurrence_path()) {
@@ -188,6 +219,62 @@ cross_hierarchy_constraint_from_json(const json& constraint_json) {
       std::move(distance), std::move(angle));
 }
 
+[[nodiscard]] json cross_hierarchy_joint_to_json(const AssemblyHierarchyJoint& joint) {
+  return json{{"id", joint.id().value()},
+              {"name", joint.name()},
+              {"type", std::string(to_string(joint.type()))},
+              {"target_a", endpoint_to_json(joint.target_a())},
+              {"target_b", endpoint_to_json(joint.target_b())},
+              {"state", std::string(to_string(joint.state()))},
+              {"limits",
+               json{{"lower", angle_quantity_to_json(joint.limits().lower_deg)},
+                    {"upper", angle_quantity_to_json(joint.limits().upper_deg)}}},
+              {"coordinate", angle_quantity_to_json(joint.coordinate_deg())}};
+}
+
+[[nodiscard]] Result<AssemblyHierarchyJoint>
+cross_hierarchy_joint_from_json(const json& joint_json) {
+  auto type = joint_type_from_json(joint_json.at("type"));
+  if (type.has_error()) {
+    return Result<AssemblyHierarchyJoint>::failure(type.error());
+  }
+  auto state = joint_state_from_json(joint_json.at("state"));
+  if (state.has_error()) {
+    return Result<AssemblyHierarchyJoint>::failure(state.error());
+  }
+  auto target_a = endpoint_from_json(joint_json.at("target_a"));
+  if (target_a.has_error()) {
+    return Result<AssemblyHierarchyJoint>::failure(target_a.error());
+  }
+  auto target_b = endpoint_from_json(joint_json.at("target_b"));
+  if (target_b.has_error()) {
+    return Result<AssemblyHierarchyJoint>::failure(target_b.error());
+  }
+
+  const std::string id = joint_json.at("id").get<std::string>();
+  const json& limits = joint_json.at("limits");
+  auto lower = angle_quantity_from_json(limits.at("lower"), id,
+                                        "cross-hierarchy assembly joint lower limit");
+  if (lower.has_error()) {
+    return Result<AssemblyHierarchyJoint>::failure(lower.error());
+  }
+  auto upper = angle_quantity_from_json(limits.at("upper"), id,
+                                        "cross-hierarchy assembly joint upper limit");
+  if (upper.has_error()) {
+    return Result<AssemblyHierarchyJoint>::failure(upper.error());
+  }
+  auto coordinate = angle_quantity_from_json(joint_json.at("coordinate"), id,
+                                             "cross-hierarchy assembly joint coordinate");
+  if (coordinate.has_error()) {
+    return Result<AssemblyHierarchyJoint>::failure(coordinate.error());
+  }
+
+  return AssemblyHierarchyJoint::create(
+      AssemblyJointId(id), joint_json.at("name").get<std::string>(), type.value(),
+      std::move(target_a.value()), std::move(target_b.value()), state.value(), lower.value(),
+      upper.value(), coordinate.value());
+}
+
 } // namespace
 
 Result<std::string> serialize_project_to_json(const Project& project) {
@@ -207,6 +294,11 @@ Result<std::string> serialize_project_to_json(const Project& project) {
     cross_hierarchy_constraints.push_back(cross_hierarchy_constraint_to_json(constraint));
   }
 
+  json cross_hierarchy_joints = json::array();
+  for (const AssemblyHierarchyJoint& joint : project.cross_hierarchy_joints()) {
+    cross_hierarchy_joints.push_back(cross_hierarchy_joint_to_json(joint));
+  }
+
   json parts = json::array();
   for (const PartDocument& part : project.part_documents()) {
     auto part_json = part_to_json(part);
@@ -220,6 +312,7 @@ Result<std::string> serialize_project_to_json(const Project& project) {
             {"assembly", std::move(root_assembly_json.value())},
             {"assemblies", std::move(assemblies)},
             {"cross_hierarchy_constraints", std::move(cross_hierarchy_constraints)},
+            {"cross_hierarchy_joints", std::move(cross_hierarchy_joints)},
             {"parts", std::move(parts)}};
   return Result<std::string>::success(root.dump(2));
 }
@@ -269,6 +362,15 @@ Result<Project> deserialize_project_from_json(std::string_view content) {
       }
       auto added =
           project.value().add_cross_hierarchy_constraint(std::move(constraint.value()));
+      if (added.has_error()) return Result<Project>::failure(added.error());
+    }
+
+    for (const auto& joint_json : root.value("cross_hierarchy_joints", json::array())) {
+      auto joint = cross_hierarchy_joint_from_json(joint_json);
+      if (joint.has_error()) {
+        return Result<Project>::failure(joint.error());
+      }
+      auto added = project.value().add_cross_hierarchy_joint(std::move(joint.value()));
       if (added.has_error()) return Result<Project>::failure(added.error());
     }
 
