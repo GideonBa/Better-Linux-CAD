@@ -2,7 +2,7 @@
 
 Status: planned post-Assembly-MVP sequence. Blocks 48-94 are not implemented yet.
 
-Current repository work remains on Block 38 of the assembly target/relationship/joint sequence. Blocks 38-47 remain mandatory before this sequence starts. Block 48 becomes the next technical step only after Block 47 is implemented and the Assembly MVP handoff is complete.
+Current repository work remains on Block 39 of the assembly target/relationship/joint sequence. Blocks 39-47 remain mandatory before this sequence starts. Block 48 becomes the next technical step only after Block 47 is implemented and the Assembly MVP handoff is complete.
 
 This document is the active status, phase-order, authority-boundary, and handoff summary for the first broad BLCAD Part Construction MVP after the Assembly MVP.
 

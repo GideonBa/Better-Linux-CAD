@@ -1,5 +1,7 @@
 #include "blcad/core/assembly_cross_hierarchy_constraint_graph.hpp"
 
+#include "assembly_constraint_graph_participation.hpp"
+
 #include "blcad/core/project.hpp"
 
 #include <algorithm>
@@ -40,10 +42,8 @@ struct ResolvedHierarchyEndpoint {
     return lhs_local.constraint.value() < rhs_local.constraint.value();
   }
 
-  return std::get<AssemblyProjectCrossHierarchyRelationshipIdentity>(lhs)
-             .constraint.value() <
-         std::get<AssemblyProjectCrossHierarchyRelationshipIdentity>(rhs)
-             .constraint.value();
+  return std::get<AssemblyProjectCrossHierarchyRelationshipIdentity>(lhs).constraint.value() <
+         std::get<AssemblyProjectCrossHierarchyRelationshipIdentity>(rhs).constraint.value();
 }
 
 [[nodiscard]] bool incidence_less(const AssemblyRelationshipAuthorityIncidence& lhs,
@@ -57,9 +57,9 @@ struct ResolvedHierarchyEndpoint {
   return authority_less(lhs.authority, rhs.authority);
 }
 
-[[nodiscard]] bool endpoint_mapping_less(
-    const AssemblyCrossHierarchyEndpointAuthorityMapping& lhs,
-    const AssemblyCrossHierarchyEndpointAuthorityMapping& rhs) {
+[[nodiscard]] bool
+endpoint_mapping_less(const AssemblyCrossHierarchyEndpointAuthorityMapping& lhs,
+                      const AssemblyCrossHierarchyEndpointAuthorityMapping& rhs) {
   if (lhs.constraint.value() != rhs.constraint.value()) {
     return lhs.constraint.value() < rhs.constraint.value();
   }
@@ -72,46 +72,42 @@ ordered_assembly_documents(const Project& project) {
   for (const AssemblyDocument& assembly : project.child_assembly_documents()) {
     assemblies.push_back(&assembly);
   }
-  std::sort(assemblies.begin(), assemblies.end(), [](const auto* lhs, const auto* rhs) {
-    return lhs->id().value() < rhs->id().value();
-  });
+  std::sort(assemblies.begin(), assemblies.end(),
+            [](const auto* lhs, const auto* rhs) { return lhs->id().value() < rhs->id().value(); });
   return assemblies;
 }
 
-[[nodiscard]] Result<ResolvedHierarchyEndpoint> resolve_endpoint(
-    const Project& project,
-    const AssemblyHierarchyConstraintEndpoint& endpoint,
-    const AssemblyConstraintId& constraint_id) {
+[[nodiscard]] Result<ResolvedHierarchyEndpoint>
+resolve_endpoint(const Project& project, const AssemblyHierarchyConstraintEndpoint& endpoint,
+                 const AssemblyConstraintId& constraint_id) {
   const AssemblyDocument* assembly = &project.assembly();
   bool active = true;
 
   for (const SubassemblyInstanceId& occurrence : endpoint.occurrence_path()) {
     const SubassemblyInstance* instance = assembly->find_subassembly_instance(occurrence);
     if (instance == nullptr) {
-      return Result<ResolvedHierarchyEndpoint>::failure(Error::validation(
-          constraint_id.value(),
-          "cross-hierarchy incidence endpoint occurrence path must resolve"));
+      return Result<ResolvedHierarchyEndpoint>::failure(
+          Error::validation(constraint_id.value(),
+                            "cross-hierarchy incidence endpoint occurrence path must resolve"));
     }
-    active = active &&
-             instance->suppression_state() == ComponentSuppressionState::Active;
+    active = active && instance->suppression_state() == ComponentSuppressionState::Active;
 
     assembly = project.find_assembly_document(instance->referenced_assembly_document());
     if (assembly == nullptr) {
-      return Result<ResolvedHierarchyEndpoint>::failure(Error::validation(
-          constraint_id.value(),
-          "cross-hierarchy incidence endpoint assembly document must resolve"));
+      return Result<ResolvedHierarchyEndpoint>::failure(
+          Error::validation(constraint_id.value(),
+                            "cross-hierarchy incidence endpoint assembly document must resolve"));
     }
   }
 
   const ComponentInstance* component =
       assembly->find_component_instance(endpoint.component_instance());
   if (component == nullptr) {
-    return Result<ResolvedHierarchyEndpoint>::failure(Error::validation(
-        constraint_id.value(),
-        "cross-hierarchy incidence endpoint component instance must resolve"));
+    return Result<ResolvedHierarchyEndpoint>::failure(
+        Error::validation(constraint_id.value(),
+                          "cross-hierarchy incidence endpoint component instance must resolve"));
   }
-  active = active &&
-           component->suppression_state() == ComponentSuppressionState::Active;
+  active = active && component->suppression_state() == ComponentSuppressionState::Active;
 
   return Result<ResolvedHierarchyEndpoint>::success(
       ResolvedHierarchyEndpoint{assembly, component, active});
@@ -119,16 +115,14 @@ ordered_assembly_documents(const Project& project) {
 
 void add_relationship(std::vector<AssemblyRelationshipIdentity>& relationships,
                       const AssemblyRelationshipIdentity& relationship) {
-  if (std::find(relationships.begin(), relationships.end(), relationship) ==
-      relationships.end()) {
+  if (std::find(relationships.begin(), relationships.end(), relationship) == relationships.end()) {
     relationships.push_back(relationship);
   }
 }
 
 void add_authority(std::vector<ComponentTransformAuthority>& authorities,
                    const ComponentTransformAuthority& authority) {
-  if (std::find(authorities.begin(), authorities.end(), authority) ==
-      authorities.end()) {
+  if (std::find(authorities.begin(), authorities.end(), authority) == authorities.end()) {
     authorities.push_back(authority);
   }
 }
@@ -142,24 +136,24 @@ void add_incidence(std::vector<AssemblyRelationshipAuthorityIncidence>& incidenc
   }
 }
 
-[[nodiscard]] std::size_t relationship_index(
-    const std::vector<AssemblyRelationshipIdentity>& relationships,
-    const AssemblyRelationshipIdentity& relationship) {
+[[nodiscard]] std::size_t
+relationship_index(const std::vector<AssemblyRelationshipIdentity>& relationships,
+                   const AssemblyRelationshipIdentity& relationship) {
   const auto found = std::find(relationships.begin(), relationships.end(), relationship);
   return static_cast<std::size_t>(found - relationships.begin());
 }
 
-[[nodiscard]] std::size_t authority_index(
-    const std::vector<ComponentTransformAuthority>& authorities,
-    const ComponentTransformAuthority& authority) {
+[[nodiscard]] std::size_t
+authority_index(const std::vector<ComponentTransformAuthority>& authorities,
+                const ComponentTransformAuthority& authority) {
   const auto found = std::find(authorities.begin(), authorities.end(), authority);
   return static_cast<std::size_t>(found - authorities.begin());
 }
 
-[[nodiscard]] std::vector<AssemblyCrossHierarchySolveGroup> derive_solve_groups(
-    const std::vector<AssemblyRelationshipIdentity>& relationships,
-    const std::vector<ComponentTransformAuthority>& authorities,
-    const std::vector<AssemblyRelationshipAuthorityIncidence>& incidences) {
+[[nodiscard]] std::vector<AssemblyCrossHierarchySolveGroup>
+derive_solve_groups(const std::vector<AssemblyRelationshipIdentity>& relationships,
+                    const std::vector<ComponentTransformAuthority>& authorities,
+                    const std::vector<AssemblyRelationshipAuthorityIncidence>& incidences) {
   struct PendingNode {
     bool relationship = true;
     std::size_t index = 0U;
@@ -188,8 +182,7 @@ void add_incidence(std::vector<AssemblyRelationshipAuthorityIncidence>& incidenc
         group.relationships.push_back(relationship);
         contains_cross_hierarchy_relationship =
             contains_cross_hierarchy_relationship ||
-            std::holds_alternative<AssemblyProjectCrossHierarchyRelationshipIdentity>(
-                relationship);
+            std::holds_alternative<AssemblyProjectCrossHierarchyRelationshipIdentity>(relationship);
 
         for (const AssemblyRelationshipAuthorityIncidence& incidence : incidences) {
           if (incidence.relationship != relationship) {
@@ -210,8 +203,7 @@ void add_incidence(std::vector<AssemblyRelationshipAuthorityIncidence>& incidenc
         if (incidence.authority != authority) {
           continue;
         }
-        const std::size_t index =
-            relationship_index(relationships, incidence.relationship);
+        const std::size_t index = relationship_index(relationships, incidence.relationship);
         if (index < relationships.size() && !visited_relationships[index]) {
           visited_relationships[index] = true;
           pending.push_back(PendingNode{true, index});
@@ -226,24 +218,25 @@ void add_incidence(std::vector<AssemblyRelationshipAuthorityIncidence>& incidenc
     }
   }
 
-  std::sort(groups.begin(), groups.end(), [](const AssemblyCrossHierarchySolveGroup& lhs,
-                                             const AssemblyCrossHierarchySolveGroup& rhs) {
-    if (!lhs.relationships.empty() && !rhs.relationships.empty()) {
-      if (relationship_less(lhs.relationships.front(), rhs.relationships.front())) {
-        return true;
-      }
-      if (relationship_less(rhs.relationships.front(), lhs.relationships.front())) {
-        return false;
-      }
-    }
-    if (lhs.authorities.empty()) {
-      return !rhs.authorities.empty();
-    }
-    if (rhs.authorities.empty()) {
-      return false;
-    }
-    return authority_less(lhs.authorities.front(), rhs.authorities.front());
-  });
+  std::sort(
+      groups.begin(), groups.end(),
+      [](const AssemblyCrossHierarchySolveGroup& lhs, const AssemblyCrossHierarchySolveGroup& rhs) {
+        if (!lhs.relationships.empty() && !rhs.relationships.empty()) {
+          if (relationship_less(lhs.relationships.front(), rhs.relationships.front())) {
+            return true;
+          }
+          if (relationship_less(rhs.relationships.front(), lhs.relationships.front())) {
+            return false;
+          }
+        }
+        if (lhs.authorities.empty()) {
+          return !rhs.authorities.empty();
+        }
+        if (rhs.authorities.empty()) {
+          return false;
+        }
+        return authority_less(lhs.authorities.front(), rhs.authorities.front());
+      });
 
   return groups;
 }
@@ -267,6 +260,9 @@ AssemblyCrossHierarchyConstraintGraph::build(const Project& project) {
       if (constraint.state() != AssemblyConstraintState::Active) {
         continue;
       }
+      if (!participates_in_current_assembly_constraint_graph(constraint.type())) {
+        continue;
+      }
 
       const ComponentInstance* component_a =
           assembly->find_component_instance(constraint.target_a().component_instance());
@@ -284,10 +280,8 @@ AssemblyCrossHierarchyConstraintGraph::build(const Project& project) {
 
       const AssemblyRelationshipIdentity relationship =
           AssemblyLocalRelationshipIdentity{assembly->id(), constraint.id()};
-      const ComponentTransformAuthority authority_a{
-          assembly->id(), component_a->id()};
-      const ComponentTransformAuthority authority_b{
-          assembly->id(), component_b->id()};
+      const ComponentTransformAuthority authority_a{assembly->id(), component_a->id()};
+      const ComponentTransformAuthority authority_b{assembly->id(), component_b->id()};
 
       add_relationship(relationships, relationship);
       add_authority(authorities, authority_a);
@@ -297,9 +291,11 @@ AssemblyCrossHierarchyConstraintGraph::build(const Project& project) {
     }
   }
 
-  for (const AssemblyHierarchyConstraint& constraint :
-       project.cross_hierarchy_constraints()) {
+  for (const AssemblyHierarchyConstraint& constraint : project.cross_hierarchy_constraints()) {
     if (constraint.state() != AssemblyConstraintState::Active) {
+      continue;
+    }
+    if (!participates_in_current_assembly_constraint_graph(constraint.type())) {
       continue;
     }
 
@@ -317,10 +313,10 @@ AssemblyCrossHierarchyConstraintGraph::build(const Project& project) {
 
     const AssemblyRelationshipIdentity relationship =
         AssemblyProjectCrossHierarchyRelationshipIdentity{constraint.id()};
-    const ComponentTransformAuthority authority_a{
-        target_a.value().assembly->id(), target_a.value().component->id()};
-    const ComponentTransformAuthority authority_b{
-        target_b.value().assembly->id(), target_b.value().component->id()};
+    const ComponentTransformAuthority authority_a{target_a.value().assembly->id(),
+                                                  target_a.value().component->id()};
+    const ComponentTransformAuthority authority_b{target_b.value().assembly->id(),
+                                                  target_b.value().component->id()};
 
     add_relationship(relationships, relationship);
     add_authority(authorities, authority_a);
@@ -329,11 +325,11 @@ AssemblyCrossHierarchyConstraintGraph::build(const Project& project) {
     add_incidence(incidences, relationship, authority_b);
 
     endpoint_mappings.push_back(AssemblyCrossHierarchyEndpointAuthorityMapping{
-        constraint.id(), AssemblyHierarchyConstraintEndpointRole::TargetA,
-        constraint.target_a(), authority_a});
+        constraint.id(), AssemblyHierarchyConstraintEndpointRole::TargetA, constraint.target_a(),
+        authority_a});
     endpoint_mappings.push_back(AssemblyCrossHierarchyEndpointAuthorityMapping{
-        constraint.id(), AssemblyHierarchyConstraintEndpointRole::TargetB,
-        constraint.target_b(), authority_b});
+        constraint.id(), AssemblyHierarchyConstraintEndpointRole::TargetB, constraint.target_b(),
+        authority_b});
   }
 
   std::sort(relationships.begin(), relationships.end(), relationship_less);
@@ -343,9 +339,9 @@ AssemblyCrossHierarchyConstraintGraph::build(const Project& project) {
 
   auto solve_groups = derive_solve_groups(relationships, authorities, incidences);
   return Result<AssemblyCrossHierarchyConstraintGraph>::success(
-      AssemblyCrossHierarchyConstraintGraph(
-          std::move(relationships), std::move(authorities), std::move(incidences),
-          std::move(endpoint_mappings), std::move(solve_groups)));
+      AssemblyCrossHierarchyConstraintGraph(std::move(relationships), std::move(authorities),
+                                            std::move(incidences), std::move(endpoint_mappings),
+                                            std::move(solve_groups)));
 }
 
 AssemblyCrossHierarchyConstraintGraph::AssemblyCrossHierarchyConstraintGraph(

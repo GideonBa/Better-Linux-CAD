@@ -1,5 +1,7 @@
 #include "blcad/core/assembly_constraint_graph.hpp"
 
+#include "assembly_constraint_graph_participation.hpp"
+
 #include <algorithm>
 #include <cstddef>
 #include <string>
@@ -40,8 +42,7 @@ const ComponentInstanceId& AssemblyConstraintGraphEdge::component_b() const noex
   return component_b_;
 }
 
-Result<AssemblyConstraintGraph>
-AssemblyConstraintGraph::build(const AssemblyDocument& assembly) {
+Result<AssemblyConstraintGraph> AssemblyConstraintGraph::build(const AssemblyDocument& assembly) {
   std::vector<ComponentInstanceId> nodes;
   nodes.reserve(assembly.component_instance_count());
   for (const ComponentInstance& instance : assembly.component_instances()) {
@@ -53,6 +54,9 @@ AssemblyConstraintGraph::build(const AssemblyDocument& assembly) {
   edges.reserve(assembly.constraint_count());
   for (const AssemblyConstraint& constraint : assembly.constraints()) {
     if (constraint.state() == AssemblyConstraintState::Inactive) {
+      continue;
+    }
+    if (!participates_in_current_assembly_constraint_graph(constraint.type())) {
       continue;
     }
 
@@ -72,8 +76,7 @@ AssemblyConstraintGraph::build(const AssemblyDocument& assembly) {
     edges.emplace_back(constraint.id(), component_a, component_b);
   }
   std::sort(edges.begin(), edges.end(),
-            [](const AssemblyConstraintGraphEdge& lhs,
-               const AssemblyConstraintGraphEdge& rhs) {
+            [](const AssemblyConstraintGraphEdge& lhs, const AssemblyConstraintGraphEdge& rhs) {
               return lhs.constraint().value() < rhs.constraint().value();
             });
 
@@ -81,9 +84,8 @@ AssemblyConstraintGraph::build(const AssemblyDocument& assembly) {
       AssemblyConstraintGraph(std::move(nodes), std::move(edges)));
 }
 
-AssemblyConstraintGraph::AssemblyConstraintGraph(
-    std::vector<ComponentInstanceId> nodes,
-    std::vector<AssemblyConstraintGraphEdge> edges)
+AssemblyConstraintGraph::AssemblyConstraintGraph(std::vector<ComponentInstanceId> nodes,
+                                                 std::vector<AssemblyConstraintGraphEdge> edges)
     : nodes_(std::move(nodes)), edges_(std::move(edges)) {}
 
 const std::vector<ComponentInstanceId>& AssemblyConstraintGraph::nodes() const noexcept {
@@ -94,17 +96,21 @@ const std::vector<AssemblyConstraintGraphEdge>& AssemblyConstraintGraph::edges()
   return edges_;
 }
 
-std::size_t AssemblyConstraintGraph::node_count() const noexcept { return nodes_.size(); }
+std::size_t AssemblyConstraintGraph::node_count() const noexcept {
+  return nodes_.size();
+}
 
-std::size_t AssemblyConstraintGraph::edge_count() const noexcept { return edges_.size(); }
+std::size_t AssemblyConstraintGraph::edge_count() const noexcept {
+  return edges_.size();
+}
 
 Result<std::vector<AssemblyConstraintId>>
 AssemblyConstraintGraph::adjacent_constraints(ComponentInstanceId component) const {
   if (find_node(component) == nullptr) {
     const auto object_id =
         component.empty() ? std::string("assembly_constraint_graph") : component.value();
-    return Result<std::vector<AssemblyConstraintId>>::failure(Error::validation(
-        object_id, "component instance must exist in assembly constraint graph"));
+    return Result<std::vector<AssemblyConstraintId>>::failure(
+        Error::validation(object_id, "component instance must exist in assembly constraint graph"));
   }
 
   std::vector<AssemblyConstraintId> adjacent;
@@ -153,10 +159,9 @@ AssemblyConstraintGraph::connected_components() const {
         }
       }
 
-      std::sort(neighbors.begin(), neighbors.end(),
-                [this](std::size_t lhs, std::size_t rhs) {
-                  return component_id_less(nodes_[lhs], nodes_[rhs]);
-                });
+      std::sort(neighbors.begin(), neighbors.end(), [this](std::size_t lhs, std::size_t rhs) {
+        return component_id_less(nodes_[lhs], nodes_[rhs]);
+      });
       neighbors.erase(std::unique(neighbors.begin(), neighbors.end()), neighbors.end());
       for (const std::size_t neighbor : neighbors) {
         if (!visited[neighbor]) {

@@ -1,6 +1,6 @@
 # General Assembly Geometric Target and Relationship Roadmap
 
-Status: Blocks 31–37 are implemented. Block 38 is the current next technical step. Blocks 38–47 remain planned headless architecture.
+Status: Blocks 31–38 are implemented. Block 39 is the current next technical step. Blocks 39–47 remain planned headless architecture.
 
 This document is the active status and sequencing authority for the expansion from the current assembly target layer to semantic reference geometry, stable generated topology targets, generic geometric relationships, and richer motion-joint families.
 
@@ -9,6 +9,7 @@ Implemented contracts are canonical in:
 - `docs/assembly-geometric-target-taxonomy-mvp5.md`
 - `docs/assembly-reference-geometry-intent-mvp5.md`
 - `docs/assembly-generated-topology-reference-mvp5.md`
+- `docs/assembly-generic-relationship-intent-mvp5.md`
 
 The complete pre-implementation planning detail for Blocks 32–47 is preserved byte-for-byte in:
 
@@ -154,7 +155,7 @@ Focused tag:
 
 ## Mandatory continuation order
 
-Blocks 32 through 37 are implemented. The remaining order is unchanged.
+Blocks 32 through 38 are implemented. The remaining order is unchanged.
 
 ```text
 32 assembly-selectable reference geometry Core intent (implemented)
@@ -163,7 +164,7 @@ Blocks 32 through 37 are implemented. The remaining order is unchanged.
   -> 35 stable semantic generated topology identity/recovery (implemented)
   -> 36 generated face/edge/vertex target resolution (implemented)
   -> 37 explicit target compatibility matrix (implemented)
-  -> 38 generic geometric relationship Core intent + JSON
+  -> 38 generic geometric relationship Core intent + JSON (implemented)
   -> 39 generic relationship equations + shared solve integration
   -> 40 joint target compatibility + oriented Frame contract
   -> 41 general joint coordinate/limit Core model
@@ -396,11 +397,13 @@ Focused tags:
 
 No new relationship enum, equation, JSON field, graph rule, or persisted Geometry query product is added in Block 37.
 
-## Block 38 — Generic geometric relationship Core intent and JSON
+## Block 38 — Generic geometric relationship Core intent and JSON — Implemented
+
+Canonical document: `docs/assembly-generic-relationship-intent-mvp5.md`.
 
 Primary boundary: persistent Core relationship model and serialization.
 
-Add local and Project-level:
+Implemented local and Project-level:
 
 ```text
 Coincident
@@ -408,7 +411,30 @@ Parallel
 Perpendicular
 ```
 
-Preserve endpoint shapes, target A/B order, active/inactive state semantics, local versus Project-level id scopes, and historical five-family compatibility. No equation or graph participation changes belong in Block 38.
+The shared `AssemblyConstraintType` enum now carries all three families. Local `AssemblyConstraint` and Project-level `AssemblyHierarchyConstraint` reuse unchanged endpoint records, preserve target A/B order, reuse active/inactive state semantics, and retain independent local versus Project-level id scopes.
+
+Canonical JSON spellings are:
+
+```text
+coincident
+parallel
+perpendicular
+```
+
+All three new families carry neither `distance` nor `angle`; typed Core construction remains value-family authority and JSON loading reuses it fail closed. Existing Mate/Concentric/Distance/Insert/Angle JSON spellings and shapes remain unchanged.
+
+Because existing graph builders are generic over `AssemblyConstraint`, Block 38 adds an explicit private participation guard preserving the historical five equation-enabled graph families. Coincident/Parallel/Perpendicular remain absent from current local solve, cross-hierarchy solve, and cross-hierarchy motion graphs until Block 39.
+
+Focused tags:
+
+```text
+[core][assembly-generic-relationship-intent]
+[core][assembly-generic-relationship-json]
+```
+
+`tests/core/assembly_generic_relationship_tests.cpp` proves local and occurrence-qualified intent, independent id scopes, target order, state, scalar rejection, lowercase JSON roundtrips, historical five-family compatibility, transform immutability, and persistent-only nonparticipation in current solve/motion graphs.
+
+Block 38 adds no residual/equation, no target compatibility entry for the new families, no JSON field/schema bump, and no Geometry resolution during Core construction or loading.
 
 ## Block 39 — Generic relationship equations and shared solve integration
 
@@ -548,8 +574,8 @@ posed geometry/contact records/sweep analyses
 
 ## Immediate next technical step
 
-Block 38 is the current next technical step.
+Block 39 is the current next technical step.
 
-Implement Block 38 only: generic geometric relationship Core intent and JSON for `Coincident`, `Parallel`, and `Perpendicular`, while preserving existing local and Project-level id scopes, endpoint shapes, target order, state/value validation, and historical five-family compatibility.
+Implement Block 39 only: generic relationship equations and shared solve integration for `Coincident`, `Parallel`, and `Perpendicular` through Block-37 capability compatibility, existing local/cross-hierarchy graphs, the shared residual/Jacobian engine, freshness, atomic application, and diagnostics.
 
-Do not add generic relationship equations in Block 38; Geometry execution begins at Block 39.
+Do not introduce a second graph, optimizer, finite-difference implementation, transform authority, or endpoint model in Block 39.

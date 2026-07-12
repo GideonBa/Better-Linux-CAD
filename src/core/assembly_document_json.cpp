@@ -141,7 +141,14 @@ subassembly_instance_from_json(const json& instance_json) {
     return Result<AssemblyConstraintType>::success(AssemblyConstraintType::Insert);
   if (text == "angle")
     return Result<AssemblyConstraintType>::success(AssemblyConstraintType::Angle);
-  return Result<AssemblyConstraintType>::failure(json_error("unsupported assembly constraint type"));
+  if (text == "coincident")
+    return Result<AssemblyConstraintType>::success(AssemblyConstraintType::Coincident);
+  if (text == "parallel")
+    return Result<AssemblyConstraintType>::success(AssemblyConstraintType::Parallel);
+  if (text == "perpendicular")
+    return Result<AssemblyConstraintType>::success(AssemblyConstraintType::Perpendicular);
+  return Result<AssemblyConstraintType>::failure(
+      json_error("unsupported assembly constraint type"));
 }
 
 [[nodiscard]] Result<AssemblyConstraintState> constraint_state_from_json(const json& value) {
@@ -150,7 +157,8 @@ subassembly_instance_from_json(const json& instance_json) {
     return Result<AssemblyConstraintState>::success(AssemblyConstraintState::Active);
   if (text == "inactive")
     return Result<AssemblyConstraintState>::success(AssemblyConstraintState::Inactive);
-  return Result<AssemblyConstraintState>::failure(json_error("unsupported assembly constraint state"));
+  return Result<AssemblyConstraintState>::failure(
+      json_error("unsupported assembly constraint state"));
 }
 
 [[nodiscard]] json constraint_target_to_json(const AssemblyConstraintTarget& target) {
@@ -170,8 +178,8 @@ constraint_target_from_json(const json& target_json) {
 }
 
 [[nodiscard]] Result<Quantity> angle_quantity_from_json(const json& value,
-                                                       const std::string& object_id,
-                                                       std::string_view context) {
+                                                        const std::string& object_id,
+                                                        std::string_view context) {
   if (value.at("unit").get<std::string>() != "deg") {
     return Result<Quantity>::failure(json_error(std::string(context) + " must use degrees"));
   }
@@ -229,8 +237,8 @@ assembly_constraint_from_json(const json& constraint_json) {
 
   std::optional<Quantity> angle;
   if (constraint_json.contains("angle")) {
-    auto quantity = angle_quantity_from_json(constraint_json.at("angle"), id,
-                                             "assembly constraint angle");
+    auto quantity =
+        angle_quantity_from_json(constraint_json.at("angle"), id, "assembly constraint angle");
     if (quantity.has_error())
       return Result<AssemblyConstraint>::failure(quantity.error());
     angle = quantity.value();
@@ -265,9 +273,8 @@ assembly_constraint_from_json(const json& constraint_json) {
               {"target_a", constraint_target_to_json(joint.target_a())},
               {"target_b", constraint_target_to_json(joint.target_b())},
               {"state", std::string(to_string(joint.state()))},
-              {"limits",
-               json{{"lower", angle_quantity_to_json(joint.limits().lower_deg)},
-                    {"upper", angle_quantity_to_json(joint.limits().upper_deg)}}},
+              {"limits", json{{"lower", angle_quantity_to_json(joint.limits().lower_deg)},
+                              {"upper", angle_quantity_to_json(joint.limits().upper_deg)}}},
               {"coordinate", angle_quantity_to_json(joint.coordinate_deg())}};
 }
 
@@ -293,8 +300,8 @@ assembly_constraint_from_json(const json& constraint_json) {
   auto upper = angle_quantity_from_json(limits.at("upper"), id, "assembly joint upper limit");
   if (upper.has_error())
     return Result<AssemblyJoint>::failure(upper.error());
-  auto coordinate = angle_quantity_from_json(joint_json.at("coordinate"), id,
-                                              "assembly joint coordinate");
+  auto coordinate =
+      angle_quantity_from_json(joint_json.at("coordinate"), id, "assembly joint coordinate");
   if (coordinate.has_error())
     return Result<AssemblyJoint>::failure(coordinate.error());
 
@@ -325,7 +332,8 @@ assembly_constraint_from_json(const json& constraint_json) {
                                    quantity.value(), ParameterScope::Assembly);
   }
   if (parameter_json.at("unit").get<std::string>() != "mm") {
-    return Result<Parameter>::failure(json_error("only millimeter length parameters are supported"));
+    return Result<Parameter>::failure(
+        json_error("only millimeter length parameters are supported"));
   }
   auto quantity = Quantity::length_mm(parameter_json.at("value").get<double>(), id);
   if (quantity.has_error())

@@ -43,17 +43,21 @@ constexpr int k_version = 1;
 
 [[nodiscard]] Result<json> assembly_to_json(const AssemblyDocument& assembly) {
   auto serialized = serialize_assembly_document_to_json(assembly);
-  if (serialized.has_error()) return Result<json>::failure(serialized.error());
+  if (serialized.has_error())
+    return Result<json>::failure(serialized.error());
   auto parsed = parse_json_document(serialized.value());
-  if (parsed.has_error()) return Result<json>::failure(parsed.error());
+  if (parsed.has_error())
+    return Result<json>::failure(parsed.error());
   return parsed;
 }
 
 [[nodiscard]] Result<json> part_to_json(const PartDocument& part) {
   auto serialized = serialize_part_document_to_json(part);
-  if (serialized.has_error()) return Result<json>::failure(serialized.error());
+  if (serialized.has_error())
+    return Result<json>::failure(serialized.error());
   auto parsed = parse_json_document(serialized.value());
-  if (parsed.has_error()) return Result<json>::failure(parsed.error());
+  if (parsed.has_error())
+    return Result<json>::failure(parsed.error());
   return parsed;
 }
 
@@ -77,6 +81,12 @@ constexpr int k_version = 1;
     return Result<AssemblyConstraintType>::success(AssemblyConstraintType::Insert);
   if (text == "angle")
     return Result<AssemblyConstraintType>::success(AssemblyConstraintType::Angle);
+  if (text == "coincident")
+    return Result<AssemblyConstraintType>::success(AssemblyConstraintType::Coincident);
+  if (text == "parallel")
+    return Result<AssemblyConstraintType>::success(AssemblyConstraintType::Parallel);
+  if (text == "perpendicular")
+    return Result<AssemblyConstraintType>::success(AssemblyConstraintType::Perpendicular);
   return Result<AssemblyConstraintType>::failure(
       json_error("unsupported cross-hierarchy assembly constraint type"));
 }
@@ -144,8 +154,8 @@ endpoint_from_json(const json& endpoint_json) {
       endpoint_json.at("semantic_reference").get<std::string>());
 }
 
-[[nodiscard]] json cross_hierarchy_constraint_to_json(
-    const AssemblyHierarchyConstraint& constraint) {
+[[nodiscard]] json
+cross_hierarchy_constraint_to_json(const AssemblyHierarchyConstraint& constraint) {
   json constraint_json{{"id", constraint.id().value()},
                        {"name", constraint.name()},
                        {"type", std::string(to_string(constraint.type()))},
@@ -153,14 +163,12 @@ endpoint_from_json(const json& endpoint_json) {
                        {"target_b", endpoint_to_json(constraint.target_b())},
                        {"state", std::string(to_string(constraint.state()))}};
   if (constraint.distance().has_value()) {
-    constraint_json["distance"] =
-        json{{"unit", std::string(constraint.distance()->unit())},
-             {"value", constraint.distance()->millimeters()}};
+    constraint_json["distance"] = json{{"unit", std::string(constraint.distance()->unit())},
+                                       {"value", constraint.distance()->millimeters()}};
   }
   if (constraint.angle().has_value()) {
-    constraint_json["angle"] =
-        json{{"unit", std::string(constraint.angle()->unit())},
-             {"value", constraint.angle()->degrees()}};
+    constraint_json["angle"] = json{{"unit", std::string(constraint.angle()->unit())},
+                                    {"value", constraint.angle()->degrees()}};
   }
   return constraint_json;
 }
@@ -215,8 +223,8 @@ cross_hierarchy_constraint_from_json(const json& constraint_json) {
 
   return AssemblyHierarchyConstraint::create(
       AssemblyConstraintId(id), constraint_json.at("name").get<std::string>(), type.value(),
-      std::move(target_a.value()), std::move(target_b.value()), state.value(),
-      std::move(distance), std::move(angle));
+      std::move(target_a.value()), std::move(target_b.value()), state.value(), std::move(distance),
+      std::move(angle));
 }
 
 [[nodiscard]] json cross_hierarchy_joint_to_json(const AssemblyHierarchyJoint& joint) {
@@ -226,9 +234,8 @@ cross_hierarchy_constraint_from_json(const json& constraint_json) {
               {"target_a", endpoint_to_json(joint.target_a())},
               {"target_b", endpoint_to_json(joint.target_b())},
               {"state", std::string(to_string(joint.state()))},
-              {"limits",
-               json{{"lower", angle_quantity_to_json(joint.limits().lower_deg)},
-                    {"upper", angle_quantity_to_json(joint.limits().upper_deg)}}},
+              {"limits", json{{"lower", angle_quantity_to_json(joint.limits().lower_deg)},
+                              {"upper", angle_quantity_to_json(joint.limits().upper_deg)}}},
               {"coordinate", angle_quantity_to_json(joint.coordinate_deg())}};
 }
 
@@ -285,7 +292,8 @@ Result<std::string> serialize_project_to_json(const Project& project) {
   json assemblies = json::array();
   for (const AssemblyDocument& assembly : project.child_assembly_documents()) {
     auto assembly_json = assembly_to_json(assembly);
-    if (assembly_json.has_error()) return Result<std::string>::failure(assembly_json.error());
+    if (assembly_json.has_error())
+      return Result<std::string>::failure(assembly_json.error());
     assemblies.push_back(std::move(assembly_json.value()));
   }
 
@@ -302,7 +310,8 @@ Result<std::string> serialize_project_to_json(const Project& project) {
   json parts = json::array();
   for (const PartDocument& part : project.part_documents()) {
     auto part_json = part_to_json(part);
-    if (part_json.has_error()) return Result<std::string>::failure(part_json.error());
+    if (part_json.has_error())
+      return Result<std::string>::failure(part_json.error());
     parts.push_back(std::move(part_json.value()));
   }
 
@@ -319,7 +328,8 @@ Result<std::string> serialize_project_to_json(const Project& project) {
 
 Result<Project> deserialize_project_from_json(std::string_view content) {
   auto parsed = parse_json_document(content);
-  if (parsed.has_error()) return Result<Project>::failure(parsed.error());
+  if (parsed.has_error())
+    return Result<Project>::failure(parsed.error());
 
   try {
     const json& root = parsed.value();
@@ -331,38 +341,41 @@ Result<Project> deserialize_project_from_json(std::string_view content) {
     }
 
     auto assembly = assembly_from_json(root.at("assembly"));
-    if (assembly.has_error()) return Result<Project>::failure(assembly.error());
+    if (assembly.has_error())
+      return Result<Project>::failure(assembly.error());
 
     auto project = Project::create(DocumentId(root.at("project").at("id").get<std::string>()),
                                    root.at("project").at("name").get<std::string>(),
                                    std::move(assembly.value()));
-    if (project.has_error()) return project;
+    if (project.has_error())
+      return project;
 
     for (const auto& assembly_json : root.value("assemblies", json::array())) {
       auto child_assembly = assembly_from_json(assembly_json);
       if (child_assembly.has_error())
         return Result<Project>::failure(child_assembly.error());
-      auto added =
-          project.value().add_child_assembly_document(std::move(child_assembly.value()));
-      if (added.has_error()) return Result<Project>::failure(added.error());
+      auto added = project.value().add_child_assembly_document(std::move(child_assembly.value()));
+      if (added.has_error())
+        return Result<Project>::failure(added.error());
     }
 
     for (const auto& part_json : root.value("parts", json::array())) {
       auto part = part_from_json(part_json);
-      if (part.has_error()) return Result<Project>::failure(part.error());
+      if (part.has_error())
+        return Result<Project>::failure(part.error());
       auto added = project.value().add_part_document(std::move(part.value()));
-      if (added.has_error()) return Result<Project>::failure(added.error());
+      if (added.has_error())
+        return Result<Project>::failure(added.error());
     }
 
-    for (const auto& constraint_json :
-         root.value("cross_hierarchy_constraints", json::array())) {
+    for (const auto& constraint_json : root.value("cross_hierarchy_constraints", json::array())) {
       auto constraint = cross_hierarchy_constraint_from_json(constraint_json);
       if (constraint.has_error()) {
         return Result<Project>::failure(constraint.error());
       }
-      auto added =
-          project.value().add_cross_hierarchy_constraint(std::move(constraint.value()));
-      if (added.has_error()) return Result<Project>::failure(added.error());
+      auto added = project.value().add_cross_hierarchy_constraint(std::move(constraint.value()));
+      if (added.has_error())
+        return Result<Project>::failure(added.error());
     }
 
     for (const auto& joint_json : root.value("cross_hierarchy_joints", json::array())) {
@@ -371,11 +384,13 @@ Result<Project> deserialize_project_from_json(std::string_view content) {
         return Result<Project>::failure(joint.error());
       }
       auto added = project.value().add_cross_hierarchy_joint(std::move(joint.value()));
-      if (added.has_error()) return Result<Project>::failure(added.error());
+      if (added.has_error())
+        return Result<Project>::failure(added.error());
     }
 
     auto valid_structure = project.value().validate_assembly_structure();
-    if (valid_structure.has_error()) return Result<Project>::failure(valid_structure.error());
+    if (valid_structure.has_error())
+      return Result<Project>::failure(valid_structure.error());
 
     return project;
   } catch (const std::exception& content_error) {
@@ -387,7 +402,8 @@ Result<Project> deserialize_project_from_json(std::string_view content) {
 Result<std::uintmax_t> write_project_json_file(const Project& project,
                                                const std::filesystem::path& path) {
   auto serialized = serialize_project_to_json(project);
-  if (serialized.has_error()) return Result<std::uintmax_t>::failure(serialized.error());
+  if (serialized.has_error())
+    return Result<std::uintmax_t>::failure(serialized.error());
 
   std::ofstream output(path);
   if (!output) {

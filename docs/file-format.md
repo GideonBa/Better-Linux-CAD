@@ -192,6 +192,9 @@ concentric
 distance
 insert
 angle
+coincident
+parallel
+perpendicular
 ```
 
 Every record stores id, name, type, target A, target B, and `active|inactive` state.
@@ -291,14 +294,17 @@ Angle is a finite degree quantity.
 Value-family rules:
 
 ```text
-Mate        -> omit distance and angle
-Concentric  -> omit distance and angle
-Insert      -> omit distance and angle
-Distance    -> require distance, omit angle
-Angle       -> require angle, omit distance
+Mate           -> omit distance and angle
+Concentric     -> omit distance and angle
+Insert         -> omit distance and angle
+Coincident     -> omit distance and angle
+Parallel       -> omit distance and angle
+Perpendicular  -> omit distance and angle
+Distance       -> require distance, omit angle
+Angle          -> require angle, omit distance
 ```
 
-Typed Core constructors remain authoritative after JSON parsing.
+Typed Core constructors remain authoritative after JSON parsing. Block 38 adds only the three accepted lowercase type spellings; local and Project-level relationship record shapes, endpoint shapes, target order, and state fields are unchanged. Historical five-family files remain compatible.
 
 ## Local Revolute joint JSON
 
@@ -453,7 +459,7 @@ source FeatureId
 
 The current endpoint serializers need no new JSON field because `semantic_reference` already stores opaque identity strings. `topo:` spellings roundtrip byte-for-byte through local and occurrence-qualified endpoints.
 
-Block 35 does not persist generated-topology role matrices, producer classification, validation results, recovery results, or OCCT topology. Block 36 Geometry resolution of `topo:` identities into typed descriptors/capabilities is derived query state and likewise adds no JSON field. Block 37 target compatibility selection is also derived query state and adds no JSON field.
+Block 35 does not persist generated-topology role matrices, producer classification, validation results, recovery results, or OCCT topology. Block 36 Geometry resolution of `topo:` identities into typed descriptors/capabilities is derived query state and likewise adds no JSON field. Block 37 target compatibility selection is also derived query state and adds no JSON field. Block 38 extends accepted relationship `type` values with `coincident`, `parallel`, and `perpendicular` without adding a field or changing schema/version markers.
 
 Fields such as these are not persistent:
 
@@ -489,7 +495,7 @@ Block 35 adds no PartDocument JSON field. Its generated-topology classification 
 
 ## Numeric solve and motion relationships remain derived
 
-Local numeric solving derives geometric relationship ids and optional transient local Revolute drives.
+Local numeric solving currently derives equation-enabled geometric relationship ids and optional transient local Revolute drives. Block-38 Coincident/Parallel/Perpendicular records remain persisted but excluded from solve/motion graph participation until Block 39.
 
 Cross-hierarchy geometric solving derives:
 

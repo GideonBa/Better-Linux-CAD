@@ -228,6 +228,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/assembly_angle_constraint_tests.cpp
     tests/core/assembly_constraint_graph_tests.cpp
     tests/core/assembly_constraint_tests.cpp
+    tests/core/assembly_generic_relationship_tests.cpp
     tests/core/assembly_cross_hierarchy_constraint_graph_tests.cpp
     tests/core/assembly_cross_hierarchy_constraint_tests.cpp
     tests/core/assembly_cross_hierarchy_joint_tests.cpp
