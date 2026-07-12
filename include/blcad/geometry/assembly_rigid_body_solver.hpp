@@ -5,6 +5,7 @@
 #include "blcad/core/result.hpp"
 
 #include <cstddef>
+#include <string>
 #include <vector>
 
 namespace blcad::geometry {
@@ -42,12 +43,25 @@ struct AssemblySolveResidualSummary {
 
 struct AssemblySolveComponentSnapshot {
   ComponentInstanceId component_instance;
+  DocumentId referenced_part_document;
   ComponentGroundingState grounding_state = ComponentGroundingState::Free;
   ComponentSuppressionState suppression_state = ComponentSuppressionState::Active;
   RigidTransform source_transform;
 
   friend bool operator==(const AssemblySolveComponentSnapshot&,
                          const AssemblySolveComponentSnapshot&) = default;
+};
+
+// Conservative exact model-intent snapshot for a PartDocument referenced by a
+// participating component/authority. The canonical persisted PartDocument JSON
+// payload is retained verbatim so stale-result detection has no hash collision
+// boundary and observes every serialized semantic target-producing model edit.
+struct AssemblySemanticTargetPartSnapshot {
+  DocumentId part_document;
+  std::string canonical_model_intent_json;
+
+  friend bool operator==(const AssemblySemanticTargetPartSnapshot&,
+                         const AssemblySemanticTargetPartSnapshot&) = default;
 };
 
 struct ProposedComponentTransform {
@@ -65,6 +79,7 @@ struct AssemblySolveResult {
   std::vector<ComponentInstanceId> component_group;
   std::vector<ComponentInstanceId> fixed_components;
   std::vector<AssemblySolveComponentSnapshot> component_snapshots;
+  std::vector<AssemblySemanticTargetPartSnapshot> semantic_target_part_snapshots;
   std::vector<ProposedComponentTransform> proposed_transforms;
   AssemblySolveResidualSummary residual_summary;
 
