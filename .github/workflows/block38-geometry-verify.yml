@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - block38-generic-relationship-intent
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
@@ -14,6 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: block38-generic-relationship-intent
           fetch-depth: 0
 
       - name: Install full development dependencies
