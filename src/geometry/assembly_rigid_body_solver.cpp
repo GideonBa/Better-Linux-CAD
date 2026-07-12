@@ -2,6 +2,7 @@
 
 #include "assembly_constraint_numeric_system.hpp"
 #include "assembly_numeric_solve_engine.hpp"
+#include "assembly_semantic_target_freshness.hpp"
 
 #include <algorithm>
 #include <string>
@@ -16,14 +17,16 @@ namespace {
 }
 
 [[nodiscard]] bool contains_component(const std::vector<ComponentInstanceId>& components,
-                                       const ComponentInstanceId& component) {
+                                      const ComponentInstanceId& component) {
   return std::find(components.begin(), components.end(), component) != components.end();
 }
 
 [[nodiscard]] Result<std::size_t> validate_application_snapshot(const Project& project,
-                                                                 const AssemblySolveResult& result) {
+                                                                const AssemblySolveResult& result) {
   std::vector<ComponentInstanceId> seen_snapshots;
+  std::vector<DocumentId> semantic_target_part_documents;
   seen_snapshots.reserve(result.component_snapshots.size());
+  semantic_target_part_documents.reserve(result.component_snapshots.size());
   for (const auto& snapshot : result.component_snapshots) {
     if (contains_component(seen_snapshots, snapshot.component_instance)) {
       return Result<std::size_t>::failure(
@@ -38,13 +41,21 @@ namespace {
       return Result<std::size_t>::failure(validation_error(
           snapshot.component_instance.value(), "assembly solve result component no longer exists"));
     }
-    if (component->transform() != snapshot.source_transform ||
+    if (component->referenced_part_document() != snapshot.referenced_part_document ||
+        component->transform() != snapshot.source_transform ||
         component->grounding_state() != snapshot.grounding_state ||
         component->suppression_state() != snapshot.suppression_state) {
       return Result<std::size_t>::failure(
           validation_error(snapshot.component_instance.value(),
                            "assembly solve result is stale because component solve input changed"));
     }
+    semantic_target_part_documents.push_back(snapshot.referenced_part_document);
+  }
+
+  auto semantic_freshness = detail::validate_semantic_target_part_snapshots(
+      project, semantic_target_part_documents, result.semantic_target_part_snapshots);
+  if (semantic_freshness.has_error()) {
+    return Result<std::size_t>::failure(semantic_freshness.error());
   }
 
   std::vector<ComponentInstanceId> seen_proposals;
