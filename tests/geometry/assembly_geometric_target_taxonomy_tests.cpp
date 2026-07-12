@@ -9,9 +9,8 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <array>
+#include <initializer_list>
 #include <limits>
-#include <optional>
-#include <string>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -33,9 +32,7 @@ AssemblyHierarchyConstraintTarget hierarchy_target(std::initializer_list<const c
                                                    const char* component,
                                                    const char* semantic_reference) {
   std::vector<SubassemblyInstanceId> occurrence_path;
-  for (const char* id : path) {
-    occurrence_path.emplace_back(id);
-  }
+  for (const char* id : path) occurrence_path.emplace_back(id);
   auto value = AssemblyHierarchyConstraintTarget::create(
       std::move(occurrence_path), ComponentInstanceId(component), semantic_reference);
   REQUIRE(value);
@@ -67,7 +64,8 @@ Project local_project() {
       "component.root", ComponentGroundingState::Free,
       RigidTransform{Vector3{10.0, 20.0, 30.0}, Vector3{5.0, 15.0, 25.0}})));
 
-  auto project = Project::create(DocumentId("project.target_taxonomy"), "TargetTaxonomy", root.value());
+  auto project =
+      Project::create(DocumentId("project.target_taxonomy"), "TargetTaxonomy", root.value());
   REQUIRE(project);
   REQUIRE(project.value().add_part_document(ts::solver_part()));
   REQUIRE(project.value().validate_assembly_structure());
@@ -77,17 +75,16 @@ Project local_project() {
 Project hierarchy_project() {
   auto root = AssemblyDocument::create(DocumentId("assembly.root"), "Root");
   REQUIRE(root);
-  const RigidTransform boundary{Vector3{100.0, -20.0, 7.0}, Vector3{0.0, 0.0, 90.0}};
-  REQUIRE(root.value().add_subassembly_instance(
-      occurrence("subassembly.left", "assembly.child", boundary)));
+  REQUIRE(root.value().add_subassembly_instance(occurrence(
+      "subassembly.left", "assembly.child",
+      RigidTransform{Vector3{100.0, -20.0, 7.0}, Vector3{0.0, 0.0, 90.0}})));
 
   auto child = AssemblyDocument::create(DocumentId("assembly.child"), "Child");
   REQUIRE(child);
   REQUIRE(child.value().add_member_part(DocumentId("part.block27_plate")));
-  const RigidTransform component_transform{Vector3{5.0, 3.0, 11.0},
-                                           Vector3{90.0, 0.0, 0.0}};
-  REQUIRE(child.value().add_component_instance(
-      component("component.child", ComponentGroundingState::Free, component_transform)));
+  REQUIRE(child.value().add_component_instance(component(
+      "component.child", ComponentGroundingState::Free,
+      RigidTransform{Vector3{5.0, 3.0, 11.0}, Vector3{90.0, 0.0, 0.0}})));
 
   auto project = Project::create(DocumentId("project.target_taxonomy.hierarchy"), "Hierarchy",
                                  root.value());
@@ -278,8 +275,8 @@ TEST_CASE("Geometric target capability projection follows one deterministic sour
   REQUIRE(projected_axis);
   REQUIRE(projected_line);
   CHECK(projected_axis.value() == datum_axis);
-  CHECK(projected_line.value() ==
-        AssemblyLineTargetDescriptor{datum_axis.origin, datum_axis.direction});
+  CHECK((projected_line.value() ==
+         AssemblyLineTargetDescriptor{datum_axis.origin, datum_axis.direction}));
 
   const AssemblyLineTargetDescriptor line{Point3{4.0, 5.0, 6.0},
                                           Vector3{1.0, 0.0, 0.0}};
@@ -305,8 +302,9 @@ TEST_CASE("Geometric target capability projection follows one deterministic sour
   REQUIRE(circle_axis);
   REQUIRE(circle_center);
   CHECK(projected_circle.value() == circle);
-  CHECK(circle_axis.value() == AssemblyAxisTargetDescriptor{circle.center, circle.normal});
-  CHECK(circle_center.value() == AssemblyPointTargetDescriptor{circle.center});
+  CHECK((circle_axis.value() ==
+         AssemblyAxisTargetDescriptor{circle.center, circle.normal}));
+  CHECK((circle_center.value() == AssemblyPointTargetDescriptor{circle.center}));
 
   const AssemblyCylindricalSurfaceTargetDescriptor cylinder{
       Point3{13.0, 14.0, 15.0}, Vector3{0.0, 1.0, 0.0}, 3.0};
@@ -315,8 +313,8 @@ TEST_CASE("Geometric target capability projection follows one deterministic sour
   REQUIRE(project_cylinder(cylinder_target));
   auto cylinder_axis = project_axis(cylinder_target);
   REQUIRE(cylinder_axis);
-  CHECK(cylinder_axis.value() ==
-        AssemblyAxisTargetDescriptor{cylinder.axis_origin, cylinder.axis_direction});
+  CHECK((cylinder_axis.value() ==
+         AssemblyAxisTargetDescriptor{cylinder.axis_origin, cylinder.axis_direction}));
 
   const AssemblyFrameTargetDescriptor frame{
       Point3{16.0, 17.0, 18.0}, Vector3{1.0, 0.0, 0.0},
@@ -344,15 +342,11 @@ TEST_CASE("Geometric target capability projection follows one deterministic sour
 
 TEST_CASE("Geometric target validation fails closed on malformed descriptors and capability state",
           "[geometry][assembly-geometric-target-taxonomy]") {
-  const AssemblyPlanarTargetDescriptor valid_plane{Point3{}, Vector3{1.0, 0.0, 0.0},
-                                                    Vector3{0.0, 1.0, 0.0},
-                                                    Vector3{0.0, 0.0, 1.0}};
-
-  auto wrong_order =
-      synthetic_target(AssemblyGeometricTargetSourceKind::CircularFeatureSeat,
-                       AssemblyFrameTargetDescriptor{Point3{}, Vector3{1.0, 0.0, 0.0},
-                                                     Vector3{0.0, 1.0, 0.0},
-                                                     Vector3{0.0, 0.0, 1.0}});
+  auto wrong_order = synthetic_target(
+      AssemblyGeometricTargetSourceKind::CircularFeatureSeat,
+      AssemblyFrameTargetDescriptor{Point3{}, Vector3{1.0, 0.0, 0.0},
+                                    Vector3{0.0, 1.0, 0.0},
+                                    Vector3{0.0, 0.0, 1.0}});
   std::swap(wrong_order.capabilities[0], wrong_order.capabilities[1]);
   CHECK(validate_resolved_geometric_target(wrong_order).has_error());
 
@@ -379,18 +373,26 @@ TEST_CASE("Geometric target validation fails closed on malformed descriptors and
       AssemblyCylindricalSurfaceTargetDescriptor{Point3{}, Vector3{0.0, 0.0, 1.0}, 0.0});
   CHECK(project_cylinder(zero_radius).has_error());
 
-  auto left_handed = synthetic_target(
+  auto left_handed_frame = synthetic_target(
       AssemblyGeometricTargetSourceKind::CircularFeatureSeat,
       AssemblyFrameTargetDescriptor{Point3{}, Vector3{1.0, 0.0, 0.0},
                                     Vector3{0.0, 1.0, 0.0},
                                     Vector3{0.0, 0.0, -1.0}});
-  CHECK(project_frame(left_handed).has_error());
+  CHECK(project_frame(left_handed_frame).has_error());
 
-  auto non_unit = synthetic_target(
+  auto left_handed_circle = synthetic_target(
+      AssemblyGeometricTargetSourceKind::GeneratedCircularEdge,
+      AssemblyCircularEdgeTargetDescriptor{Point3{}, Vector3{1.0, 0.0, 0.0},
+                                            Vector3{0.0, 1.0, 0.0},
+                                            Vector3{0.0, 0.0, -1.0}, 2.0});
+  CHECK(project_circle(left_handed_circle).has_error());
+
+  auto non_unit_plane = synthetic_target(
       AssemblyGeometricTargetSourceKind::GeneratedPlanarFace,
-      AssemblyPlanarTargetDescriptor{valid_plane.origin, Vector3{2.0, 0.0, 0.0},
-                                     valid_plane.y_axis, valid_plane.normal});
-  CHECK(project_plane(non_unit).has_error());
+      AssemblyPlanarTargetDescriptor{Point3{}, Vector3{2.0, 0.0, 0.0},
+                                     Vector3{0.0, 1.0, 0.0},
+                                     Vector3{0.0, 0.0, 1.0}});
+  CHECK(project_plane(non_unit_plane).has_error());
 }
 
 TEST_CASE("Hierarchy typed target projection preserves existing root-space geometry",
