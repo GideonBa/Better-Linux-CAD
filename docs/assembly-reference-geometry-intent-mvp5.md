@@ -1,10 +1,10 @@
-# Assembly Reference Geometry Intent (MVP 5, Blocks 32–33)
+# Assembly Reference Geometry Intent (MVP 5, Blocks 32–34)
 
 Status: implemented.
 
 This document is canonical for Block 32 — assembly-selectable reference geometry Core intent, the first-class `DatumAxis` PartDocument model, and the frozen unambiguous semantic-reference grammar for DatumPlane, DatumAxis, ConstructionLine, and ConstructionPoint sources — and for the Block-33 serialization contract on top of it.
 
-Geometry resolution into the Block-31 taxonomy remains Block 34.
+Block 34 now resolves those `ref:` sources into the Block-31 Geometry taxonomy. This document remains the Core persistence authority; `docs/assembly-general-geometric-target-roadmap.md` and `docs/assembly-geometric-target-taxonomy-mvp5.md` are the Geometry resolution authorities.
 
 ## Scope
 
@@ -142,7 +142,20 @@ Derived axes are serialized as identity only; no resolved origin/direction is pe
 - no change to existing `<feature>.<top|bottom|right|left|front|back|axis|seat>` spellings or their resolvers;
 - no change to existing endpoint JSON shapes.
 
-Geometry resolution of these sources into the Block-31 taxonomy (`DatumPlane -> Plane`, `DatumAxis -> Axis + Line`, `ConstructionLine -> Line`, `ConstructionPoint -> Point`) is Block 34.
+## Block 34 — Reference target Geometry resolution
+
+Block 34 implements Geometry resolution of these sources into the Block-31 taxonomy:
+
+```text
+DatumPlane        -> Plane
+DatumAxis         -> Axis + Line
+ConstructionLine  -> Line
+ConstructionPoint -> Point
+```
+
+The local resolver validates and decodes the canonical `ref:` spelling before the legacy `<feature>.<role>` grammar, so malformed reserved-prefix strings fail closed instead of being interpreted as feature ids. DatumPlane resolution reuses `WorkplaneResolver`; construction-line-derived DatumAxis and ConstructionLine reuse `ConstructionLineResolver`; ConstructionPoint reuses `ConstructionPointResolver`.
+
+Local targets remain component-local and retain the direct component transform context. Hierarchy targets reuse the existing component-plus-parent transform chain. Canonical PartDocument snapshots remain freshness authority. No persistent record, JSON field, relationship type, joint family, generated-topology identity, or compatibility matrix is added.
 
 ## Focused acceptance coverage
 
@@ -151,6 +164,7 @@ Geometry resolution of these sources into the Block-31 taxonomy (`DatumPlane -> 
 [core][assembly-reference-target-intent]
 [core][datum-axis-json]
 [core][assembly-reference-target-json]
+[geometry][assembly-reference-target-resolution]
 ```
 
 `tests/core/datum_axis_tests.cpp` proves explicit/derived DatumAxis validation, PartDocument ownership/uniqueness, dependency-edge registration, and parameter plus source-line invalidation propagation into recompute plans.
@@ -161,6 +175,8 @@ Geometry resolution of these sources into the Block-31 taxonomy (`DatumPlane -> 
 
 `tests/core/assembly_reference_target_json_tests.cpp` proves byte-for-byte `ref:` spelling roundtrips through local constraint and cross-hierarchy endpoint JSON, unchanged endpoint JSON shape, and resolution-free loading.
 
+`tests/geometry/assembly_geometric_target_taxonomy_tests.cpp` proves local and hierarchy `ref:` source resolution into Plane/Axis/Line/Point capabilities, exact rooted transform-chain evaluation, fail-closed malformed `ref:` parsing, source Project immutability, and stale detection through canonical PartDocument snapshots.
+
 ## Handoff
 
-The next block is Block 34: Geometry resolution of DatumPlane/DatumAxis/ConstructionLine/ConstructionPoint sources into Block-31 capabilities (`DatumPlane -> Plane`, `DatumAxis -> Axis + Line`, `ConstructionLine -> Line`, `ConstructionPoint -> Point`). See `docs/assembly-general-geometric-target-roadmap.md`.
+The next block is Block 35: stable semantic generated topology identity and recovery. See `docs/assembly-general-geometric-target-roadmap.md`.

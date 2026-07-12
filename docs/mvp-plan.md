@@ -296,14 +296,36 @@ Focused tags:
 [core][assembly-reference-target-json]
 ```
 
-## Blocks 34–47 — Planned general target, relationship, and joint continuation
+### Block 34 — Datum/axis/line/point target resolution — Implemented
+
+Canonical roadmap: `docs/assembly-general-geometric-target-roadmap.md`.
+
+Implemented Geometry resolution of `ref:` semantic sources into the Block-31 taxonomy:
+
+```text
+DatumPlane        -> Plane
+DatumAxis         -> Axis + Line
+ConstructionLine  -> Line
+ConstructionPoint -> Point
+```
+
+The resolver reuses existing workplane, construction-line, and construction-point execution. Local targets remain component-local; hierarchy targets use the exact existing component-plus-parent transform chain. Canonical PartDocument snapshots remain the freshness authority.
+
+Focused tag:
+
+```text
+[geometry][assembly-reference-target-resolution]
+```
+
+Block 34 adds no persistent record, JSON field, relationship type, joint family, generated-topology identity, or compatibility matrix.
+
+## Blocks 35–47 — Planned general target, relationship, and joint continuation
 
 Canonical roadmap: `docs/assembly-general-geometric-target-roadmap.md`.
 
 Mandatory order:
 
 ```text
-34 datum/axis/line/point target resolution
 35 stable semantic generated topology identity/recovery
 36 generated face/edge/vertex target resolution
 37 explicit target compatibility matrix
@@ -356,30 +378,26 @@ After Block 94 the first Part Construction MVP is considered complete. That mean
 
 It does not mean SolidWorks/Inventor Part product parity. Production GUI modeling, Class-A surfacing, arbitrary NURBS control cages, variable-radius fillets, advanced topology healing, direct modeling, sheet metal, weldments, and specialized manufacturing feature systems remain later work.
 
-## Current next technical step — Block 34
+## Current next technical step — Block 35
 
-Primary boundary: Geometry semantic target resolution.
+Primary boundary: Core semantic reference model and recovery rules.
 
-Block 34 must:
-
-1. resolve `ref:` semantic sources into the Block-31 taxonomy:
+Block 35 must define stable producer-driven semantic identities for:
 
 ```text
-DatumPlane        -> Plane
-DatumAxis         -> Axis + Line
-ConstructionLine  -> Line
-ConstructionPoint -> Point
+GeneratedCylindricalFace
+GeneratedLinearEdge
+GeneratedCircularEdge
+GeneratedVertex
 ```
 
-2. reuse the existing `WorkplaneResolver`, construction-line, and construction-point execution;
-3. keep local targets component-local and hierarchy targets on the exact existing component-plus-parent transform chain;
-4. keep canonical PartDocument snapshots as freshness authority;
-5. add no persistent record, JSON field, relationship type, or joint family.
+It must publish finite producer role matrices, expected cardinality, ambiguity/failure behavior, and recovery rules without persisting OCCT traversal/hash/map/XDE/STEP/memory identities.
 
-Planned focused tag:
+Planned focused tags:
 
 ```text
-[geometry][assembly-reference-target-resolution]
+[core][semantic-generated-topology-reference]
+[core][semantic-generated-topology-recovery]
 ```
 
-Stable generated topology identity remains Block 35.
+Generated topology target resolution remains Block 36.

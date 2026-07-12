@@ -1,6 +1,6 @@
 # Cross-Hierarchy Assembly Relationship Sequence MVP-5
 
-Status: Blocks 23–33 are implemented. Block 34 is the current next technical step. Blocks 34–47 remain the explicit general assembly target, relationship, and richer-joint continuation.
+Status: Blocks 23–34 are implemented. Block 35 is the current next technical step. Blocks 35–47 remain the explicit general assembly target, relationship, and richer-joint continuation.
 
 This document is the canonical numbered handoff sequence for cross-document assembly intent, solving, motion, exchange, posed analysis, and general geometric target architecture.
 
@@ -306,16 +306,16 @@ Focused tag:
 
 Block 31 adds no persistent source kind, descriptor, capability vector, source grammar, relationship family, joint family, or JSON field.
 
-## Blocks 32–47 — Planned continuation
+## Blocks 32–47 — General target, relationship, and richer-joint continuation
 
 Canonical detail roadmap: `docs/assembly-general-geometric-target-roadmap.md`.
 
 Mandatory order:
 
 ```text
-32 assembly-selectable reference geometry Core intent
-33 reference geometry serialization and structure validation
-34 datum/axis/line/point target resolution
+32 assembly-selectable reference geometry Core intent (implemented)
+33 reference geometry serialization and structure validation (implemented)
+34 datum/axis/line/point target resolution (implemented)
 35 stable semantic generated topology identity/recovery
 36 generated face/edge/vertex target resolution
 37 explicit target compatibility matrix
@@ -370,9 +370,9 @@ Focused tags:
 [core][assembly-reference-target-json]
 ```
 
-## Block 34 — Datum/axis/line/point target resolution — Next
+## Block 34 — Datum/axis/line/point target resolution — implemented
 
-Resolve:
+Implemented:
 
 ```text
 DatumPlane       -> Plane
@@ -381,7 +381,13 @@ ConstructionLine -> Line
 ConstructionPoint -> Point
 ```
 
-Reuse existing workplane/construction geometry execution. Local results remain component-local; hierarchy results reuse exact root-space transform chains. Existing canonical PartDocument snapshots remain freshness authority.
+Resolution reuses existing workplane/construction geometry execution. Local results remain component-local; hierarchy results reuse exact root-space transform chains. Existing canonical PartDocument snapshots remain freshness authority.
+
+Focused tag:
+
+```text
+[geometry][assembly-reference-target-resolution]
+```
 
 ## Blocks 35–36 — Stable generated topology identity and resolution
 
@@ -456,6 +462,6 @@ posed shapes/contact records/sweep analyses
 
 ## Next technical step
 
-Implement Block 34 only: Geometry resolution of DatumPlane/DatumAxis/ConstructionLine/ConstructionPoint `ref:` sources into the Block-31 taxonomy, reusing existing workplane/construction execution and exact transform chains.
+Implement Block 35 only: stable semantic generated topology identity and recovery for generated cylindrical faces, linear edges, circular edges, and vertices.
 
-Do not implement Block-35 generated topology identity in Block 34.
+Do not implement Block-36 generated topology target resolution in Block 35.

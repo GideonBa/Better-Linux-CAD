@@ -30,6 +30,7 @@ bounded sampled local/cross-hierarchy Revolute sweep
 typed assembly geometric target taxonomy and capability projection
 assembly-selectable reference geometry intent and DatumAxis model
 additive DatumAxis JSON and reference-spelling endpoint roundtrips
+reference geometry target resolution into Plane/Axis/Line/Point capabilities
 ```
 
 There is no GUI yet. Current work remains focused on CAD-core, Geometry query/execution, and headless application contracts.
@@ -200,7 +201,9 @@ ref:construction_point:<encoded-id>
 
 Every id byte outside `[A-Za-z0-9_-]` is escaped as uppercase `%HH`, so reference spellings contain no `.` and can never collide with feature target spellings; ids containing `.`, `/`, and `%` stay unambiguous and parsing fails closed.
 
-Block 33 serializes DatumAxis intent through the additive optional `datum_axes` part-document array and proves `ref:` endpoint spellings roundtrip byte-for-byte; loading validates ownership/family rules and resolves no geometry. Geometry resolution of `ref:` sources remains Block 34.
+Block 33 serializes DatumAxis intent through the additive optional `datum_axes` part-document array and proves `ref:` endpoint spellings roundtrip byte-for-byte; loading validates ownership/family rules and resolves no geometry.
+
+Block 34 resolves `ref:` sources through the derived Geometry target boundary: `DatumPlane -> Plane`, `DatumAxis -> Axis + Line`, `ConstructionLine -> Line`, and `ConstructionPoint -> Point`. Local results remain component-local, hierarchy results use the exact rooted transform chain, and canonical PartDocument snapshots remain freshness authority.
 
 Canonical Blocks-32/33 contract: `docs/assembly-reference-geometry-intent-mvp5.md`.
 
@@ -375,8 +378,8 @@ Broader roadmaps:
 
 ## Next technical step
 
-Implement **Block 34 only** from `docs/assembly-general-geometric-target-roadmap.md`: datum, axis, line, and point target resolution.
+Implement **Block 35 only** from `docs/assembly-general-geometric-target-roadmap.md`: stable semantic generated topology identity and recovery.
 
-Block 34 must resolve `ref:` semantic sources into the Block-31 taxonomy (`DatumPlane -> Plane`, `DatumAxis -> Axis + Line`, `ConstructionLine -> Line`, `ConstructionPoint -> Point`), reusing existing workplane/construction execution, component-local and exact rooted transform chains, and canonical PartDocument snapshot freshness.
+Block 35 must define producer-driven semantic identities for generated cylindrical faces, linear edges, circular edges, and vertices, including supported producer role matrices, expected cardinality, ambiguity/failure behavior, and recovery rules.
 
-Do not add stable generated topology identity in Block 34. That remains Block 35.
+Do not add generated topology target resolution in Block 35. That remains Block 36.

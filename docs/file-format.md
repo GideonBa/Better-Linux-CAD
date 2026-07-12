@@ -419,7 +419,7 @@ ref:construction_line:<encoded-id>
 ref:construction_point:<encoded-id>
 ```
 
-Encoded ids escape every byte outside `[A-Za-z0-9_-]` as uppercase `%HH`, so valid `ref:` tokens contain no `.` and stay disjoint from feature target tokens. Endpoints persist these strings verbatim; loading never resolves reference geometry.
+Encoded ids escape every byte outside `[A-Za-z0-9_-]` as uppercase `%HH`, so valid `ref:` tokens contain no `.` and stay disjoint from feature target tokens. Endpoints persist these strings verbatim; loading never resolves reference geometry. Block-34 Geometry resolution of these strings into Plane/Axis/Line/Point capabilities is derived query state and adds no JSON field.
 
 Fields such as these are not persistent:
 

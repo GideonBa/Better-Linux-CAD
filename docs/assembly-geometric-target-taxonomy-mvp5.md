@@ -786,16 +786,23 @@ projection result
 
 Persistent endpoints continue to contain their existing semantic-reference strings.
 
-## Next technical step — Block 34
+## Block 34 reference-source resolution
 
-Blocks 32–33 are implemented; their canonical contract is `docs/assembly-reference-geometry-intent-mvp5.md`. First-class `DatumAxis` intent, the frozen `ref:<family>:<encoded-id>` semantic-source grammar, and additive `datum_axes` JSON now exist at the Core boundary, with existing feature target spellings, endpoint JSON shapes, and this document's resolution semantics unchanged.
+Blocks 32–33 implemented first-class `DatumAxis` intent, the frozen `ref:<family>:<encoded-id>` semantic-source grammar, and additive `datum_axes` JSON at the Core boundary. Block 34 now resolves those `ref:` sources into this document's source kinds and capabilities:
 
-Implement Block 34 only from `docs/assembly-general-geometric-target-roadmap.md`: resolve `ref:` sources into this document's source kinds and capabilities (`DatumPlane -> Plane`, `DatumAxis -> Axis + Line`, `ConstructionLine -> Line`, `ConstructionPoint -> Point`), reusing existing workplane/construction execution and exact transform chains.
+```text
+DatumPlane        -> Plane
+DatumAxis         -> Axis + Line
+ConstructionLine  -> Line
+ConstructionPoint -> Point
+```
 
-Planned Block-34 tag:
+Resolution reuses existing workplane/construction execution, keeps local targets component-local, evaluates hierarchy targets through the exact rooted transform chain, and keeps canonical PartDocument snapshots as freshness authority.
+
+Focused Block-34 tag:
 
 ```text
 [geometry][assembly-reference-target-resolution]
 ```
 
-Reference-geometry JSON belongs to Block 33. Geometry resolution into Block-31 capabilities belongs to Block 34.
+Reference-geometry JSON remains Block 33 persistence. Block 34 adds no persistent record, JSON field, relationship type, joint family, generated-topology identity, or compatibility matrix. The next technical step is Block 35 stable semantic generated topology identity and recovery.

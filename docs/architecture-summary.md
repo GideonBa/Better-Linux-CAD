@@ -435,7 +435,7 @@ Block 33 adds the additive optional `datum_axes` part-document array. `docs/file
 
 ## Current direction
 
-Blocks 23–33 of the current assembly sequence are implemented.
+Blocks 23–34 of the current assembly sequence are implemented.
 
 Canonical current target architecture:
 
@@ -449,8 +449,8 @@ Canonical numbered sequence:
 
 - `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`
 
-The next technical step is Block 34 only: Geometry resolution of DatumPlane/DatumAxis/ConstructionLine/ConstructionPoint `ref:` sources into Block-31 capabilities, reusing existing workplane/construction execution and exact transform chains.
+The next technical step is Block 35 only: stable semantic generated topology identity and recovery for generated cylindrical faces, linear edges, circular edges, and vertices.
 
-Stable generated topology identity remains Block 35.
+Generated topology target resolution remains Block 36.
 
 Occurrence-local child pose overrides, whole-subassembly solve variables, general physics, and richer joints remain deferred according to their roadmap blocks.

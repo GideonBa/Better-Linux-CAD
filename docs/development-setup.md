@@ -136,6 +136,7 @@ Current suites cover:
 - first-class DatumAxis intent, ownership, dependency, and invalidation;
 - canonical `ref:` reference-target spellings, roundtrips, and fail-closed parsing;
 - additive DatumAxis JSON, historical-file compatibility, and byte-for-byte endpoint spelling roundtrips;
+- Geometry resolution of DatumPlane/DatumAxis/ConstructionLine/ConstructionPoint `ref:` sources into Block-31 Plane/Axis/Line/Point capabilities;
 - local Mate/Distance/Angle/Concentric/Insert intent and solving;
 - exact local and occurrence-qualified endpoint identity;
 - typed target source classification and capability projection;
@@ -233,8 +234,8 @@ The typed target/capability layer is a public library query contract and intenti
 - `docs/file-format.md`: persistent save-format authority
 - `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`: numbered assembly sequence
 - `docs/assembly-geometric-target-taxonomy-mvp5.md`: Block-31 implemented target taxonomy/projection contract
-- `docs/assembly-reference-geometry-intent-mvp5.md`: Blocks-32/33 implemented reference-geometry intent/grammar/JSON contract
-- `docs/assembly-general-geometric-target-roadmap.md`: planned Blocks 34–47
+- `docs/assembly-reference-geometry-intent-mvp5.md`: Blocks-32/33 implemented reference-geometry intent/grammar/JSON contract plus Block-34 resolution handoff
+- `docs/assembly-general-geometric-target-roadmap.md`: implemented Blocks 31–34 and planned Blocks 35–47
 - `docs/project-goal.md`: long-term direction
 
 ## Formatting
@@ -261,7 +262,7 @@ rm -rf build/
 
 ## Current assembly development boundary
 
-Blocks 23–33 are implemented.
+Blocks 23–34 are implemented.
 
 Block 31 freezes:
 
@@ -298,4 +299,24 @@ valid reference spellings are dot-free
   -> provably disjoint from <feature-id>.<role> spellings
 ```
 
-The immediate next step is Block 34: Geometry resolution of `ref:` reference sources into the Block-31 taxonomy. Exact sequencing is maintained in `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md` and detailed target planning in `docs/assembly-general-geometric-target-roadmap.md`.
+Block 34 freezes:
+
+```text
+ref: target resolution
+  = DatumPlane -> Plane
+    DatumAxis -> Axis + Line
+    ConstructionLine -> Line
+    ConstructionPoint -> Point
+
+local reference targets remain component-local
+hierarchy reference targets use the exact component-plus-parent transform chain
+canonical PartDocument snapshots remain freshness authority
+```
+
+Focused Block-34 tests:
+
+```bash
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-reference-target-resolution]"
+```
+
+The immediate next step is Block 35: stable semantic generated topology identity and recovery. Exact sequencing is maintained in `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md` and detailed target planning in `docs/assembly-general-geometric-target-roadmap.md`.

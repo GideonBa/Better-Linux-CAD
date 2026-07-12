@@ -1,10 +1,10 @@
 # General Assembly Geometric Target and Relationship Roadmap
 
-Status: Blocks 31–33 are implemented. Block 34 is the current next technical step. Blocks 34-47 remain planned headless architecture.
+Status: Blocks 31–34 are implemented. Block 35 is the current next technical step. Blocks 35-47 remain planned headless architecture.
 
 This document is the active status and sequencing authority for the expansion from the current assembly target layer to semantic reference geometry, stable generated topology targets, generic geometric relationships, and richer motion-joint families.
 
-Implemented Block-31 through Block-33 semantics are canonical in:
+Implemented Block-31 through Block-34 semantics are canonical in:
 
 - `docs/assembly-geometric-target-taxonomy-mvp5.md`
 - `docs/assembly-reference-geometry-intent-mvp5.md`
@@ -187,12 +187,12 @@ Block 31 adds no new persistent source kind, descriptor, capability vector, sour
 
 ## Mandatory continuation order
 
-Blocks 32 and 33 are implemented; the remaining order is unchanged.
+Blocks 32 through 34 are implemented; the remaining order is unchanged.
 
 ```text
 32 assembly-selectable reference geometry Core intent (implemented)
   -> 33 reference geometry serialization and structure validation (implemented)
-  -> 34 datum/axis/line/point target resolution
+  -> 34 datum/axis/line/point target resolution (implemented)
   -> 35 stable semantic generated topology identity/recovery
   -> 36 generated face/edge/vertex target resolution
   -> 37 explicit target compatibility matrix
@@ -253,11 +253,11 @@ Focused acceptance tags:
 [core][assembly-reference-target-json]
 ```
 
-## Block 34 — Datum, axis, line, and point target resolution
+## Block 34 — Datum, axis, line, and point target resolution — Implemented
 
 Primary boundary: Geometry semantic target resolution.
 
-Resolve Block-32 semantic sources into Block-31 capabilities:
+Implemented Geometry resolution of Block-32 semantic sources into Block-31 capabilities:
 
 ```text
 DatumPlane
@@ -273,7 +273,15 @@ ConstructionPoint
   -> Point
 ```
 
-Reuse the existing `WorkplaneResolver`, construction-line resolver, and construction-point resolver. Local targets remain component-local; hierarchy targets reuse the exact existing component-plus-parent transform chain. Existing canonical PartDocument snapshots remain freshness authority.
+Resolution reuses the existing `WorkplaneResolver`, construction-line resolver, and construction-point resolver. Local targets remain component-local; hierarchy targets reuse the exact existing component-plus-parent transform chain. Existing canonical PartDocument snapshots remain freshness authority.
+
+Focused acceptance tag:
+
+```text
+[geometry][assembly-reference-target-resolution]
+```
+
+Block 34 adds no persistent record, JSON field, relationship type, joint family, generated-topology identity, or compatibility matrix.
 
 ## Block 35 — Stable semantic generated topology identity and recovery
 
@@ -544,8 +552,8 @@ posed geometry/contact records/sweep analyses
 
 ## Immediate next technical step
 
-Block 34 is the current next technical step.
+Block 35 is the current next technical step.
 
-Implement Block 34 only: Geometry resolution of DatumPlane/DatumAxis/ConstructionLine/ConstructionPoint `ref:` sources into the implemented Block-31 taxonomy, reusing existing workplane/construction execution and exact transform chains.
+Implement Block 35 only: stable semantic generated topology identity and recovery for generated cylindrical faces, linear edges, circular edges, and vertices.
 
-Stable generated topology identity remains Block 35.
+Do not implement Block-36 generated topology target resolution in Block 35.
