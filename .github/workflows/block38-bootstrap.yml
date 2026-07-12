@@ -14,7 +14,6 @@ permissions:
 jobs:
   patch-and-test:
     if: >-
-      github.event.pull_request.number == 34 &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'block38-generic-relationship-intent'
     runs-on: ubuntu-24.04
