@@ -1,6 +1,6 @@
 # Assembly Constraint Target Resolution MVP-5
 
-Status: implemented read-only generated planar-face resolution, primary circular-feature axis resolution, and primary circular-feature seating/composite Insert endpoint resolution.
+Status: implemented read-only generated planar-face resolution, primary circular-feature axis resolution, and primary circular-feature seating/composite Insert endpoint resolution. The broader typed target/capability expansion is planned in `docs/assembly-general-geometric-target-roadmap.md`.
 
 ## Goal
 
@@ -8,7 +8,7 @@ Status: implemented read-only generated planar-face resolution, primary circular
 
 It owns semantic target lookup and local geometry construction only. It does not apply component placement, construct residuals, decide solver participation, optimize transforms, or compute DOF.
 
-## API
+## Current API
 
 Planar target types:
 
@@ -117,13 +117,13 @@ The result remains component-local and preserves component placement separately.
 
 Canonical detail: `docs/assembly-semantic-axis-concentric-residuals-mvp5.md`.
 
-Supported first token:
+Supported current token:
 
 ```text
 feature.<feature-id>.axis
 ```
 
-The first producer is:
+The current producer is:
 
 ```text
 FeatureType::SubtractiveExtrude
@@ -136,7 +136,6 @@ Axis geometry uses the source sketch workplane:
 
 ```text
 origin = WorkplaneResolver::evaluate_point(workplane, CircleProfile.center)
-
 direction = workplane.normal
           or -workplane.normal for OppositeSketchNormal
 ```
@@ -147,7 +146,7 @@ The result preserves source feature and source `CircleProfile` identity.
 
 Canonical detail: `docs/assembly-insert-intent-composite-residuals-mvp5.md`.
 
-Supported first token:
+Supported current token:
 
 ```text
 feature.<feature-id>.seat
@@ -203,15 +202,15 @@ No OCCT opening face is queried to define the seat.
 
 ## Why one seat target derives two geometry descriptors
 
-Insert requires axis-line alignment plus axial seating.
+Insert and the current Revolute joint seed require axis-line alignment plus an oriented seating/reference frame.
 
-A persistent endpoint such as `feature.hole.seat` identifies one exact circular feature/profile. From that constructive identity, the primary axis and seating plane are deterministic and inseparable for this first feature family.
+A persistent endpoint such as `feature.hole.seat` identifies one exact circular feature/profile. From that constructive identity, the primary axis and seating plane are deterministic and inseparable for this feature family.
 
 The record therefore does not store a hidden second target and does not expand Insert into four target strings.
 
 The composite derived descriptor makes the coupling explicit while keeping persistent intent compact.
 
-## Why circular-hole patterns are excluded
+## Why circular-hole patterns are currently excluded
 
 `CircularHolePattern` produces several distinct holes.
 
@@ -224,7 +223,9 @@ feature.pattern.seat
 
 would be ambiguous.
 
-A future pattern target family must define stable per-instance semantic identity. The resolver does not infer identity from transient OCCT topology or hidden vector order.
+A future generated-topology target family must define stable per-instance semantic identity. The resolver does not infer identity from transient OCCT topology or hidden vector order.
+
+This requirement is now explicitly planned in Block 34 of `docs/assembly-general-geometric-target-roadmap.md`.
 
 ## Component-local versus assembly-space geometry
 
@@ -253,7 +254,9 @@ local_axis + local_seating_plane + component_transform
 
 This centralizes persisted placement semantics in `AssemblyTransformEvaluator`.
 
-## Downstream use
+Occurrence-qualified cross-hierarchy target resolution later reuses the same local semantic meaning and applies the exact component plus parent transform chain into root-assembly space.
+
+## Current downstream use
 
 Planar branch:
 
@@ -261,7 +264,7 @@ Planar branch:
 resolve
   -> evaluate_plane
   -> AssemblyConstraintEquationBuilder
-  -> Mate/Distance residuals
+  -> Mate / Distance / Angle residuals
   -> shared numeric system
   -> solver / DOF diagnostics
 ```
@@ -277,23 +280,103 @@ resolve_axis
   -> solver / DOF diagnostics
 ```
 
-Insert branch:
+Seat branch:
 
 ```text
 resolve_insert
   -> evaluate_axis + evaluate_plane
   -> AssemblyInsertConstraintEquationBuilder
   -> Insert residuals
+  -> shared numeric system
+  -> solver / DOF diagnostics
 ```
 
-Insert numeric/solver/DOF consumption is the next block.
+The same `.seat` semantic family also feeds the shared local/cross-hierarchy Revolute residual path.
+
+Mate, Distance, Angle, Concentric, Insert, and Revolute execution are already integrated in their documented local/cross-hierarchy numeric or motion paths.
+
+## Current expressiveness boundary
+
+The current resolver is intentionally narrower than an Inventor-/SolidWorks-like assembly selector.
+
+Current assembly-selectable source families are effectively:
+
+```text
+generated planar feature face
+narrow generated circular-feature axis
+narrow generated circular-feature seat frame
+```
+
+The following are not yet general assembly target sources:
+
+```text
+DatumPlane
+DatumAxis
+construction line
+construction point
+generated cylindrical face
+generated linear edge
+generated circular edge
+generated vertex
+```
+
+The solver architecture is not the primary blocker. The missing layer is a general semantic geometric target taxonomy, stable source identity for generated subelements, and an explicit target compatibility matrix.
+
+## Planned general target architecture
+
+Canonical roadmap:
+
+`docs/assembly-general-geometric-target-roadmap.md`
+
+The planned post-Block-30 sequence is:
+
+```text
+31 typed geometric target taxonomy and capability projection
+  -> 32 assembly-selectable datum/reference geometry intent + serialization
+  -> 33 datum/axis/line/point target resolution
+  -> 34 stable semantic generated topology identity/recovery
+  -> 35 generated face/edge/vertex target resolution
+  -> 36 explicit compatibility matrix + generic geometric relationships
+  -> 37 joint target capability expansion + richer joint-family sequence
+```
+
+The core distinction is:
+
+```text
+selected semantic source kind
+  !=
+solver geometric capability
+```
+
+Examples:
+
+```text
+GeneratedCylindricalFace
+  -> Axis capability
+  -> Cylinder capability
+
+GeneratedCircularEdge
+  -> Circle capability
+  -> Axis capability
+  -> center Point capability
+
+DatumPlane
+  -> Plane capability
+
+CircularFeatureSeat
+  -> SeatFrame capability
+  -> Axis capability
+  -> Plane capability
+```
+
+Relationship equation builders should consume requested capabilities through one compatibility layer rather than branching on feature/source kind.
 
 ## Failure behavior
 
 Shared failures include:
 
-- target component does not exist
-- referenced part is not project-owned
+- target component does not exist;
+- referenced part is not project-owned.
 
 Planar failures include malformed/unsupported face tokens, missing source features, unsupported feature type, and generated-face resolution failures.
 
@@ -303,20 +386,24 @@ Seat/Insert target failures use parallel explicit messages for malformed/unsuppo
 
 Failure values propagate through downstream builders unchanged.
 
+The future general target taxonomy must retain fail-closed unsupported capability projection and relationship compatibility behavior.
+
 ## Read-only and persistence boundary
 
 Resolution does not:
 
-- mutate component transforms or state
-- change constraints or target strings
-- modify part parameters, sketches, profiles, features, or workplanes
-- execute a solver
-- own `ShapeCache`
-- persist resolved descriptors
+- mutate component transforms or state;
+- change constraints or target strings;
+- modify part parameters, sketches, profiles, features, or workplanes;
+- execute a solver;
+- own `ShapeCache`;
+- persist resolved descriptors.
 
 Resolved plane, axis, and seat descriptors are regenerated from current model intent.
 
 No solver or Jacobian cache owns persistent target bindings.
+
+Future Plane/Axis/Line/Point/Circle/Cylinder/SeatFrame capabilities likewise remain derived. Assembly endpoints continue to persist semantic reference identity, not resolved coordinates or raw OCCT topology.
 
 ## Tests
 
@@ -327,10 +414,12 @@ No solver or Jacobian cache owns persistent target bindings.
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-insert]"
 ```
 
-Coverage includes all six generated faces, primary circular axis identity, primary circular seat identity, CircleProfile-center mapping, extrude-direction orientation, right-handed opposite seat frames, source feature/profile preservation, unsupported source families, determinism, read-only behavior, and downstream assembly-space evaluation.
+Current coverage includes all six generated faces, primary circular axis identity, primary circular seat identity, `CircleProfile`-center mapping, extrude-direction orientation, right-handed opposite seat frames, source feature/profile preservation, unsupported source families, determinism, read-only behavior, and downstream assembly-space evaluation.
 
-## Current downstream boundary
+## Current handoff
 
-Generated planar-face, circular-axis, and circular-seat/composite Insert endpoint resolution are implemented.
+The implemented target resolver supports generated plane/axis/seat semantics and all current Mate/Distance/Angle/Concentric/Insert/Revolute consumers.
 
-Mate, Distance, and Concentric already join the shared numeric solver/DOF path. Insert target/residual semantics are stable and read-only; the next step is Insert integration into that existing shared numeric path.
+Block 30 remains the immediate next technical step for richer contact/swept-motion analysis.
+
+After Block 30, Block 31 begins the general assembly target roadmap with a typed derived geometric target taxonomy and explicit capability projection. Existing target strings and current relationship behavior must remain backward compatible.
