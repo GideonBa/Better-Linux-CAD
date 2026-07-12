@@ -87,7 +87,8 @@ struct AssemblyGeometricTargetSourceMetadata {
 };
 
 // All directions/axes in resolved target descriptors are finite unit vectors.
-// Plane, Circle, and Frame axes are orthonormal and right-handed.
+// Plane axes are pairwise orthogonal and preserve the existing independently
+// oriented face normal. Circle and Frame axes are additionally right-handed.
 struct AssemblyPlanarTargetDescriptor {
   Point3 origin;
   Vector3 x_axis;
