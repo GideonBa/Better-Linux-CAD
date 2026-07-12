@@ -506,6 +506,42 @@ Result<std::size_t> PartDocument::add_datum_plane(DatumPlane datum_plane) {
   return Result<std::size_t>::success(datum_planes_.size() - 1U);
 }
 
+Result<std::size_t> PartDocument::add_datum_axis(DatumAxis datum_axis) {
+  if (has_datum_axis_id(datum_axis.id()))
+    return Result<std::size_t>::failure(Error::validation(
+        datum_axis.id().value(), "datum axis id must be unique within part document"));
+  for (const auto& parameter_id : datum_axis.parameter_dependencies())
+    if (!has_parameter_id(parameter_id))
+      return Result<std::size_t>::failure(Error::validation(
+          datum_axis.id().value(), "datum axis parameter dependency must exist in part document"));
+  if (datum_axis.kind() == DatumAxisKind::FromConstructionLine &&
+      !has_construction_line_id(datum_axis.source_construction_line()))
+    return Result<std::size_t>::failure(Error::validation(
+        datum_axis.id().value(),
+        "construction-line-derived datum axis source line must exist in part document"));
+  auto graph = dependency_graph_;
+  auto added_node = graph.add_node(datum_axis.id().value());
+  if (added_node.has_error())
+    return Result<std::size_t>::failure(added_node.error());
+  auto parameter_dependencies = add_parameter_dependencies(
+      graph, datum_axis.parameter_dependencies(), datum_axis.id().value());
+  if (parameter_dependencies.has_error())
+    return Result<std::size_t>::failure(parameter_dependencies.error());
+  if (datum_axis.kind() == DatumAxisKind::FromConstructionLine) {
+    auto line_dependency = add_dependency_if_missing(
+        graph, datum_axis.source_construction_line().value(), datum_axis.id().value());
+    if (line_dependency.has_error())
+      return Result<std::size_t>::failure(line_dependency.error());
+  }
+  auto invalidation_state = invalidation_state_;
+  auto synced = sync_graph(std::move(graph), invalidation_state, dependency_graph_);
+  if (synced.has_error())
+    return Result<std::size_t>::failure(synced.error());
+  invalidation_state_ = std::move(invalidation_state);
+  datum_axes_.push_back(std::move(datum_axis));
+  return Result<std::size_t>::success(datum_axes_.size() - 1U);
+}
+
 Result<std::size_t> PartDocument::add_construction_point(ConstructionPoint point) {
   if (has_construction_point_id(point.id()))
     return Result<std::size_t>::failure(Error::validation(
@@ -1051,6 +1087,9 @@ const std::vector<Parameter>& PartDocument::parameters() const noexcept {
 const std::vector<DatumPlane>& PartDocument::datum_planes() const noexcept {
   return datum_planes_;
 }
+const std::vector<DatumAxis>& PartDocument::datum_axes() const noexcept {
+  return datum_axes_;
+}
 const std::vector<ConstructionPoint>& PartDocument::construction_points() const noexcept {
   return construction_points_;
 }
@@ -1090,6 +1129,9 @@ std::size_t PartDocument::parameter_count() const noexcept {
 }
 std::size_t PartDocument::datum_plane_count() const noexcept {
   return datum_planes_.size();
+}
+std::size_t PartDocument::datum_axis_count() const noexcept {
+  return datum_axes_.size();
 }
 std::size_t PartDocument::construction_point_count() const noexcept {
   return construction_points_.size();
@@ -1134,6 +1176,12 @@ const DatumPlane* PartDocument::find_datum_plane(DatumPlaneId id) const noexcept
   for (const auto& datum_plane : datum_planes_)
     if (datum_plane.id() == id)
       return &datum_plane;
+  return nullptr;
+}
+const DatumAxis* PartDocument::find_datum_axis(DatumAxisId id) const noexcept {
+  for (const auto& datum_axis : datum_axes_)
+    if (datum_axis.id() == id)
+      return &datum_axis;
   return nullptr;
 }
 const ConstructionPoint*
@@ -1208,6 +1256,9 @@ bool PartDocument::has_parameter_name(std::string_view name) const noexcept {
 }
 bool PartDocument::has_datum_plane_id(const DatumPlaneId& id) const noexcept {
   return find_datum_plane(id) != nullptr;
+}
+bool PartDocument::has_datum_axis_id(const DatumAxisId& id) const noexcept {
+  return find_datum_axis(id) != nullptr;
 }
 bool PartDocument::has_construction_point_id(const ConstructionPointId& id) const noexcept {
   return find_construction_point(id) != nullptr;

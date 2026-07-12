@@ -1,12 +1,13 @@
 # General Assembly Geometric Target and Relationship Roadmap
 
-Status: Block 31 is implemented. Block 32 is the current next technical step. Blocks 32-47 remain planned headless architecture.
+Status: Blocks 31 and 32 are implemented. Block 33 is the current next technical step. Blocks 33-47 remain planned headless architecture.
 
 This document is the active status and sequencing authority for the expansion from the current assembly target layer to semantic reference geometry, stable generated topology targets, generic geometric relationships, and richer motion-joint families.
 
-Implemented Block-31 semantics are canonical in:
+Implemented Block-31 and Block-32 semantics are canonical in:
 
 - `docs/assembly-geometric-target-taxonomy-mvp5.md`
+- `docs/assembly-reference-geometry-intent-mvp5.md`
 
 The complete pre-implementation planning detail for Blocks 32-47 is preserved byte-for-byte in:
 
@@ -186,8 +187,10 @@ Block 31 adds no new persistent source kind, descriptor, capability vector, sour
 
 ## Mandatory continuation order
 
+Block 32 is implemented; the remaining order is unchanged.
+
 ```text
-32 assembly-selectable reference geometry Core intent
+32 assembly-selectable reference geometry Core intent (implemented)
   -> 33 reference geometry serialization and structure validation
   -> 34 datum/axis/line/point target resolution
   -> 35 stable semantic generated topology identity/recovery
@@ -207,47 +210,24 @@ Block 31 adds no new persistent source kind, descriptor, capability vector, sour
 
 Do not merge these blocks into one feature block.
 
-## Block 32 — Assembly-selectable reference geometry Core intent — Next
+## Block 32 — Assembly-selectable reference geometry Core intent — Implemented
 
-Primary boundary: Core persistent model intent and semantic source identity.
+Canonical document: `docs/assembly-reference-geometry-intent-mvp5.md`.
 
-BLCAD already owns persistent `DatumPlane`, construction-line, and construction-point identities. Block 32 reuses those records as semantic source authorities rather than creating assembly-specific geometry copies.
+Implemented first-class `DatumAxis` PartDocument intent with the two frozen definition families `Explicit` (finite origin, unit direction, optional unique parameter dependencies) and `FromConstructionLine` (owned `ConstructionLineId` identity only). Ownership, id uniqueness, dependency edges, and invalidation propagation follow existing construction-geometry semantics.
 
-If no first-class `DatumAxis` exists, Block 32 adds one to `PartDocument` and freezes the first deliberately narrow definition family or families before implementation.
-
-The implementation must define:
+Implemented the frozen reference semantic-source grammar:
 
 ```text
-DatumAxisId
-name
-axis definition
-validation
-PartDocument ownership
-dependency edges
-invalidation propagation
-removal/dependent behavior
+ref:datum_plane:<encoded-id>
+ref:datum_axis:<encoded-id>
+ref:construction_line:<encoded-id>
+ref:construction_point:<encoded-id>
 ```
 
-Block 32 also freezes exact persistent semantic-reference spellings for:
+Every id byte outside `[A-Za-z0-9_-]` is escaped as uppercase `%HH`, so valid reference spellings contain no `.` while every feature spelling contains one: the two grammars accept provably disjoint string sets and arbitrary ids containing `.`, `/`, and `%` remain unambiguous. Parsing fails closed and each identity has exactly one canonical spelling.
 
-```text
-DatumPlane
-DatumAxis
-ConstructionLine
-ConstructionPoint
-```
-
-The grammar must remain unambiguous for arbitrary non-empty typed ids, including ids containing:
-
-```text
-.
-/
-%
-```
-
-Existing feature target spellings remain unchanged.
-
-Assembly endpoints continue to persist only component/occurrence identity plus the semantic-reference string. No resolved Plane/Axis/Line/Point geometry is copied into constraints or joints.
+Assembly endpoints persist only component/occurrence identity plus the semantic-reference string. No resolved Plane/Axis/Line/Point geometry is copied into constraints or joints.
 
 Focused acceptance tags:
 
@@ -256,7 +236,7 @@ Focused acceptance tags:
 [core][assembly-reference-target-intent]
 ```
 
-Block 32 explicitly adds no JSON/serialization changes and performs no Geometry target resolution.
+Block 32 added no JSON/serialization changes and performs no Geometry target resolution.
 
 ## Block 33 — Reference geometry serialization and structure validation
 
@@ -557,8 +537,8 @@ posed geometry/contact records/sweep analyses
 
 ## Immediate next technical step
 
-Block 32 is the current next technical step.
+Block 33 is the current next technical step.
 
-Implement Block 32 only: assembly-selectable reference geometry Core intent and unambiguous semantic source identity.
+Implement Block 33 only: additive DatumAxis PartDocument JSON, historical-file compatibility, byte-for-byte endpoint reference-spelling roundtrips, and load-time ownership/family validation.
 
-Reference-geometry JSON remains Block 33. Geometry resolution into the implemented Block-31 taxonomy remains Block 34.
+Geometry resolution into the implemented Block-31 taxonomy remains Block 34.

@@ -31,6 +31,7 @@ private:
 struct DocumentIdTag;
 struct ParameterIdTag;
 struct DatumPlaneIdTag;
+struct DatumAxisIdTag;
 struct ConstructionPointIdTag;
 struct ConstructionLineIdTag;
 struct ConstructionPlaneIdTag;
@@ -54,6 +55,7 @@ struct AssemblyJointIdTag;
 using DocumentId = TypedId<DocumentIdTag>;
 using ParameterId = TypedId<ParameterIdTag>;
 using DatumPlaneId = TypedId<DatumPlaneIdTag>;
+using DatumAxisId = TypedId<DatumAxisIdTag>;
 using ConstructionPointId = TypedId<ConstructionPointIdTag>;
 using ConstructionLineId = TypedId<ConstructionLineIdTag>;
 using ConstructionPlaneId = TypedId<ConstructionPlaneIdTag>;

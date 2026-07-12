@@ -28,6 +28,7 @@ structured XDE/STEP assembly/product export
 rooted Separated / Touching / Interfering classification
 bounded sampled local/cross-hierarchy Revolute sweep
 typed assembly geometric target taxonomy and capability projection
+assembly-selectable reference geometry intent and DatumAxis model
 ```
 
 There is no GUI yet. Current work remains focused on CAD-core, Geometry query/execution, and headless application contracts.
@@ -184,6 +185,23 @@ The currently supported `.axis` producer remains the narrow single-CircleProfile
 Existing local and hierarchy `resolve`, `resolve_axis`, and `resolve_insert` APIs remain compatibility adapters, but now obtain geometry through the typed capability projection boundary. Mate/Distance/Angle/Concentric/Insert/Revolute residual formulas and numeric execution remain unchanged.
 
 Canonical Block-31 contract: `docs/assembly-geometric-target-taxonomy-mvp5.md`.
+
+## Reference geometry sources
+
+Block 32 adds first-class `DatumAxis` PartDocument intent (`Explicit` and `FromConstructionLine` families) and freezes one canonical semantic-source spelling per reference family:
+
+```text
+ref:datum_plane:<encoded-id>
+ref:datum_axis:<encoded-id>
+ref:construction_line:<encoded-id>
+ref:construction_point:<encoded-id>
+```
+
+Every id byte outside `[A-Za-z0-9_-]` is escaped as uppercase `%HH`, so reference spellings contain no `.` and can never collide with feature target spellings; ids containing `.`, `/`, and `%` stay unambiguous and parsing fails closed.
+
+Reference-geometry JSON remains Block 33 and Geometry resolution of `ref:` sources remains Block 34.
+
+Canonical Block-32 contract: `docs/assembly-reference-geometry-intent-mvp5.md`.
 
 ## Assembly solving and motion
 
@@ -345,6 +363,7 @@ Current assembly handoff:
 - `docs/assembly-structured-step-products-mvp5.md`
 - `docs/assembly-contact-swept-motion-mvp5.md`
 - `docs/assembly-geometric-target-taxonomy-mvp5.md`
+- `docs/assembly-reference-geometry-intent-mvp5.md`
 - `docs/assembly-general-geometric-target-roadmap.md`
 
 Broader roadmaps:
@@ -355,8 +374,8 @@ Broader roadmaps:
 
 ## Next technical step
 
-Implement **Block 32 only** from `docs/assembly-general-geometric-target-roadmap.md`: assembly-selectable reference geometry Core intent and semantic source identity.
+Implement **Block 33 only** from `docs/assembly-general-geometric-target-roadmap.md`: reference geometry serialization and structure validation.
 
-Block 32 must reuse existing DatumPlane/construction geometry identities, add first-class `DatumAxis` PartDocument intent if still absent, and freeze unambiguous persistent semantic-reference spellings for DatumPlane, DatumAxis, ConstructionLine, and ConstructionPoint. IDs containing `.`, `/`, and `%` must remain unambiguous.
+Block 33 must serialize the Block-32 `DatumAxis` intent additively, preserve historical part files, keep existing endpoint JSON shapes unchanged, roundtrip `ref:` semantic-reference strings byte-for-byte, and validate DatumAxis ownership/family rules at load.
 
-Do not add reference-geometry JSON or Geometry target resolution in Block 32. Those remain Blocks 33 and 34 respectively.
+Do not resolve Plane/Axis/Line/Point geometry during JSON load. Geometry resolution remains Block 34.

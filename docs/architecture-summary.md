@@ -173,6 +173,28 @@ Local relationships evaluate in the containing assembly-document space. Project-
 
 The shared numeric engine owns scaled residual flattening, central finite differences, damped Gauss-Newton normal equations, dense elimination, damping escalation, backtracking, and solve-state classification. There is no second cross-hierarchy optimizer.
 
+## Reference geometry intent and semantic source identity
+
+Block 32 adds first-class `DatumAxis` PartDocument intent with two frozen definition families:
+
+```text
+Explicit               finite origin + unit direction + parameter dependencies
+FromConstructionLine   owned ConstructionLineId identity only
+```
+
+Datum axes join the existing PartDocument dependency graph and recompute planning through their parameter and source-line edges.
+
+Block 32 also freezes one canonical assembly semantic-source spelling per reference family:
+
+```text
+ref:datum_plane:<encoded-id>
+ref:datum_axis:<encoded-id>
+ref:construction_line:<encoded-id>
+ref:construction_point:<encoded-id>
+```
+
+Uppercase `%HH` escaping of every id byte outside `[A-Za-z0-9_-]` keeps valid reference spellings dot-free and therefore provably disjoint from `<feature-id>.<role>` spellings. Parsing fails closed at the Core boundary; assembly endpoints keep persisting only component/occurrence identity plus the semantic-reference string.
+
 ## Typed geometric target taxonomy and capability projection
 
 Block 31 adds the derived Geometry boundary between semantic target resolution and equation geometry.
@@ -407,15 +429,16 @@ STEP products/entities
 posed shapes/contact records/sweep analyses
 ```
 
-Block 31 adds no JSON field. `docs/file-format.md` remains save-format authority.
+Blocks 31 and 32 add no JSON field. `docs/file-format.md` remains save-format authority.
 
 ## Current direction
 
-Blocks 23–31 of the current assembly sequence are implemented.
+Blocks 23–32 of the current assembly sequence are implemented.
 
 Canonical current target architecture:
 
 - `docs/assembly-geometric-target-taxonomy-mvp5.md`
+- `docs/assembly-reference-geometry-intent-mvp5.md`
 - `docs/assembly-general-geometric-target-roadmap.md`
 
 The complete original detailed planning baseline for Blocks 32–47 is preserved in `docs/assembly-general-geometric-target-roadmap-planning-baseline.md` and incorporated by the active roadmap for still-planned block acceptance/failure details.
@@ -424,10 +447,8 @@ Canonical numbered sequence:
 
 - `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`
 
-The next technical step is Block 32 only: assembly-selectable reference geometry Core intent and unambiguous semantic source identity.
+The next technical step is Block 33 only: additive DatumAxis PartDocument JSON, historical-file compatibility, byte-for-byte endpoint reference-spelling roundtrips, and load-time ownership/family validation.
 
-Block 32 reuses existing DatumPlane/construction geometry identities, introduces first-class DatumAxis PartDocument intent if still absent, and freezes persistent semantic-reference grammar for DatumPlane, DatumAxis, ConstructionLine, and ConstructionPoint.
-
-Reference-geometry JSON remains Block 33. Geometry resolution into Block-31 capabilities remains Block 34.
+Geometry resolution of `ref:` sources into Block-31 capabilities remains Block 34.
 
 Occurrence-local child pose overrides, whole-subassembly solve variables, general physics, and richer joints remain deferred according to their roadmap blocks.

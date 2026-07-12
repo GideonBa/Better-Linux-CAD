@@ -244,7 +244,7 @@ CircularFeatureSeat
   + semantic_axis + semantic_seating_plane
 ```
 
-Datum/reference source-specific ids and semantic-reference grammar are intentionally deferred to Block 32.
+Datum/reference source-specific ids and semantic-reference grammar are frozen by Block 32 in `docs/assembly-reference-geometry-intent-mvp5.md`.
 
 ## Typed descriptor variant
 
@@ -786,27 +786,19 @@ projection result
 
 Persistent endpoints continue to contain their existing semantic-reference strings.
 
-## Next technical step — Block 32
+## Next technical step — Block 33
 
-Implement Block 32 only from `docs/assembly-general-geometric-target-roadmap.md`: assembly-selectable reference geometry Core intent and semantic source identity.
+Block 32 is implemented; its canonical contract is `docs/assembly-reference-geometry-intent-mvp5.md`. First-class `DatumAxis` intent and the frozen `ref:<family>:<encoded-id>` semantic-source grammar now exist at the Core boundary, with existing feature target spellings, endpoint JSON shapes, and this document's resolution semantics unchanged.
 
-Block 32 must:
+Implement Block 33 only from `docs/assembly-general-geometric-target-roadmap.md`: additive DatumAxis PartDocument JSON, historical-file compatibility, byte-for-byte endpoint reference-spelling roundtrips, and load-time ownership/family validation.
 
-- reuse existing persistent DatumPlane, construction-line, and construction-point identities;
-- add first-class `DatumAxis` PartDocument intent if still absent;
-- freeze the first supported DatumAxis definition family/families, validation, ownership, dependency, invalidation, and removal behavior;
-- freeze unambiguous persistent semantic-reference grammar for DatumPlane, DatumAxis, ConstructionLine, and ConstructionPoint;
-- prove ids containing `.`, `/`, and `%` cannot make parsing ambiguous;
-- preserve existing feature target spellings;
-- keep assembly endpoint JSON shape unchanged;
-- perform no Geometry target resolution;
-- make no JSON serialization change yet.
+Geometry resolution of `ref:` sources into this document's source kinds and capabilities remains Block 34.
 
-Planned tags:
+Planned Block-33 tags:
 
 ```text
-[core][datum-axis]
-[core][assembly-reference-target-intent]
+[core][datum-axis-json]
+[core][assembly-reference-target-json]
 ```
 
 Reference-geometry JSON belongs to Block 33. Geometry resolution into Block-31 capabilities belongs to Block 34.

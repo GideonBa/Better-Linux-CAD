@@ -71,6 +71,8 @@ build/release
 Core identity/model/connectivity:
 
 ```bash
+./build/dev/blcad_core_tests "[core][datum-axis]"
+./build/dev/blcad_core_tests "[core][assembly-reference-target-intent]"
 ./build/dev/blcad_core_tests "[core][component-instance]"
 ./build/dev/blcad_core_tests "[core][assembly-constraint]"
 ./build/dev/blcad_core_tests "[core][assembly-constraint-graph]"
@@ -129,6 +131,8 @@ The exact source/test registration in `CMakeLists.txt` remains authoritative.
 Current suites cover:
 
 - persistent component occurrence state and direct placement;
+- first-class DatumAxis intent, ownership, dependency, and invalidation;
+- canonical `ref:` reference-target spellings, roundtrips, and fail-closed parsing;
 - local Mate/Distance/Angle/Concentric/Insert intent and solving;
 - exact local and occurrence-qualified endpoint identity;
 - typed target source classification and capability projection;
@@ -171,6 +175,13 @@ Block 31 public target API lives in:
 
 ```text
 include/blcad/geometry/assembly_geometric_target.hpp
+```
+
+Block 32 public Core reference-geometry APIs live in:
+
+```text
+include/blcad/core/datum_axis.hpp
+include/blcad/core/assembly_reference_target.hpp
 ```
 
 Current typed resolvers are exposed through:
@@ -219,24 +230,24 @@ The typed target/capability layer is a public library query contract and intenti
 - `docs/file-format.md`: persistent save-format authority
 - `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`: numbered assembly sequence
 - `docs/assembly-geometric-target-taxonomy-mvp5.md`: Block-31 implemented target taxonomy/projection contract
-- `docs/assembly-general-geometric-target-roadmap.md`: planned Blocks 32–47
+- `docs/assembly-reference-geometry-intent-mvp5.md`: Block-32 implemented reference-geometry intent/grammar contract
+- `docs/assembly-general-geometric-target-roadmap.md`: planned Blocks 33–47
 - `docs/project-goal.md`: long-term direction
 
 ## Formatting
 
 Formatting is configured by `.editorconfig` and `.clang-format`.
 
-For Block 31 production/test files:
+For Block 32 production/test files:
 
 ```bash
 clang-format -i \
-  include/blcad/geometry/assembly_geometric_target.hpp \
-  include/blcad/geometry/assembly_constraint_target_resolver.hpp \
-  include/blcad/geometry/assembly_hierarchy_constraint_equation_builder.hpp \
-  src/geometry/assembly_geometric_target.cpp \
-  src/geometry/assembly_constraint_target_resolver.cpp \
-  src/geometry/assembly_hierarchy_constraint_equation_builder.cpp \
-  tests/geometry/assembly_geometric_target_taxonomy_tests.cpp
+  include/blcad/core/datum_axis.hpp \
+  include/blcad/core/assembly_reference_target.hpp \
+  src/core/datum_axis.cpp \
+  src/core/assembly_reference_target.cpp \
+  tests/core/datum_axis_tests.cpp \
+  tests/core/assembly_reference_target_tests.cpp
 ```
 
 ## Clean generated files
@@ -247,7 +258,7 @@ rm -rf build/
 
 ## Current assembly development boundary
 
-Blocks 23–31 are implemented.
+Blocks 23–32 are implemented.
 
 Block 31 freezes:
 
@@ -269,4 +280,19 @@ supported projection path
     / project_point / project_circle / project_cylinder / project_frame
 ```
 
-The immediate next step is Block 32: assembly-selectable reference geometry Core intent and unambiguous semantic source identity. Exact sequencing is maintained in `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md` and detailed target planning in `docs/assembly-general-geometric-target-roadmap.md`.
+Block 32 freezes:
+
+```text
+DatumAxis
+  = Explicit (finite origin + unit direction + parameter dependencies)
+    | FromConstructionLine (owned ConstructionLineId identity)
+
+reference semantic source spelling
+  = ref:<family>:<encoded-id>
+    with uppercase %HH escaping outside [A-Za-z0-9_-]
+
+valid reference spellings are dot-free
+  -> provably disjoint from <feature-id>.<role> spellings
+```
+
+The immediate next step is Block 33: additive DatumAxis PartDocument JSON, historical-file compatibility, and byte-for-byte endpoint reference-spelling roundtrips. Exact sequencing is maintained in `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md` and detailed target planning in `docs/assembly-general-geometric-target-roadmap.md`.

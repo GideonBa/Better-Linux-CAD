@@ -1,6 +1,7 @@
 #pragma once
 
 #include "blcad/core/construction_geometry.hpp"
+#include "blcad/core/datum_axis.hpp"
 #include "blcad/core/datum_plane.hpp"
 #include "blcad/core/dependency_graph.hpp"
 #include "blcad/core/feature.hpp"
@@ -32,6 +33,7 @@ public:
                                                              ParameterType type,
                                                              std::string formula);
   [[nodiscard]] Result<std::size_t> add_datum_plane(DatumPlane datum_plane);
+  [[nodiscard]] Result<std::size_t> add_datum_axis(DatumAxis datum_axis);
   [[nodiscard]] Result<std::size_t> add_construction_point(ConstructionPoint point);
   [[nodiscard]] Result<std::size_t> add_construction_line(ConstructionLine line);
   [[nodiscard]] Result<std::size_t> add_construction_plane(ConstructionPlane plane);
@@ -62,6 +64,7 @@ public:
   [[nodiscard]] const std::string& name() const noexcept;
   [[nodiscard]] const std::vector<Parameter>& parameters() const noexcept;
   [[nodiscard]] const std::vector<DatumPlane>& datum_planes() const noexcept;
+  [[nodiscard]] const std::vector<DatumAxis>& datum_axes() const noexcept;
   [[nodiscard]] const std::vector<ConstructionPoint>& construction_points() const noexcept;
   [[nodiscard]] const std::vector<ConstructionLine>& construction_lines() const noexcept;
   [[nodiscard]] const std::vector<ConstructionPlane>& construction_planes() const noexcept;
@@ -76,6 +79,7 @@ public:
   [[nodiscard]] const InvalidationState& invalidation_state() const noexcept;
   [[nodiscard]] std::size_t parameter_count() const noexcept;
   [[nodiscard]] std::size_t datum_plane_count() const noexcept;
+  [[nodiscard]] std::size_t datum_axis_count() const noexcept;
   [[nodiscard]] std::size_t construction_point_count() const noexcept;
   [[nodiscard]] std::size_t construction_line_count() const noexcept;
   [[nodiscard]] std::size_t construction_plane_count() const noexcept;
@@ -89,6 +93,7 @@ public:
   [[nodiscard]] const Parameter* find_parameter(ParameterId id) const noexcept;
   [[nodiscard]] const Parameter* find_parameter(std::string_view name) const noexcept;
   [[nodiscard]] const DatumPlane* find_datum_plane(DatumPlaneId id) const noexcept;
+  [[nodiscard]] const DatumAxis* find_datum_axis(DatumAxisId id) const noexcept;
   [[nodiscard]] const ConstructionPoint*
   find_construction_point(ConstructionPointId id) const noexcept;
   [[nodiscard]] const ConstructionLine*
@@ -114,6 +119,7 @@ private:
   [[nodiscard]] bool has_parameter_id(const ParameterId& id) const noexcept;
   [[nodiscard]] bool has_parameter_name(std::string_view name) const noexcept;
   [[nodiscard]] bool has_datum_plane_id(const DatumPlaneId& id) const noexcept;
+  [[nodiscard]] bool has_datum_axis_id(const DatumAxisId& id) const noexcept;
   [[nodiscard]] bool has_construction_point_id(const ConstructionPointId& id) const noexcept;
   [[nodiscard]] bool has_construction_line_id(const ConstructionLineId& id) const noexcept;
   [[nodiscard]] bool has_construction_plane_id(const ConstructionPlaneId& id) const noexcept;
@@ -128,6 +134,7 @@ private:
   std::string name_;
   std::vector<Parameter> parameters_;
   std::vector<DatumPlane> datum_planes_;
+  std::vector<DatumAxis> datum_axes_;
   std::vector<ConstructionPoint> construction_points_;
   std::vector<ConstructionLine> construction_lines_;
   std::vector<ConstructionPlane> construction_planes_;

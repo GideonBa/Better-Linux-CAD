@@ -248,14 +248,46 @@ Canonical document: `docs/parameter-expression-mvp.md`.
 
 Implemented unit-aware formulas, parameter dependency edges, topological evaluation, cycle rejection, JSON roundtrip with re-derived edges, incremental recompute, and transactional editing.
 
-## Blocks 32–47 — Planned general target, relationship, and joint continuation
+### Block 32 — Assembly-selectable reference geometry Core intent — Implemented
+
+Canonical document: `docs/assembly-reference-geometry-intent-mvp5.md`.
+
+Implemented first-class `DatumAxis` PartDocument intent with two frozen definition families:
+
+```text
+Explicit               finite origin + unit direction + parameter dependencies
+FromConstructionLine   owned ConstructionLineId identity only
+```
+
+Ownership, id uniqueness, dependency edges, and invalidation propagation follow existing construction-geometry semantics; derived axes join recompute plans through their parameter and source-line edges.
+
+Implemented the frozen reference semantic-source grammar:
+
+```text
+ref:datum_plane:<encoded-id>
+ref:datum_axis:<encoded-id>
+ref:construction_line:<encoded-id>
+ref:construction_point:<encoded-id>
+```
+
+Every id byte outside `[A-Za-z0-9_-]` is escaped as uppercase `%HH`. Valid reference spellings therefore contain no `.`, while every feature spelling contains one, so the grammars accept provably disjoint string sets and ids containing `.`, `/`, and `%` stay unambiguous. Parsing fails closed; each identity has exactly one canonical spelling.
+
+Assembly endpoints keep persisting component/occurrence identity plus the semantic-reference string. Block 32 adds no JSON field and performs no Geometry resolution.
+
+Focused tags:
+
+```text
+[core][datum-axis]
+[core][assembly-reference-target-intent]
+```
+
+## Blocks 33–47 — Planned general target, relationship, and joint continuation
 
 Canonical roadmap: `docs/assembly-general-geometric-target-roadmap.md`.
 
 Mandatory order:
 
 ```text
-32 assembly-selectable reference geometry Core intent
 33 reference geometry serialization and structure validation
 34 datum/axis/line/point target resolution
 35 stable semantic generated topology identity/recovery
@@ -310,27 +342,24 @@ After Block 94 the first Part Construction MVP is considered complete. That mean
 
 It does not mean SolidWorks/Inventor Part product parity. Production GUI modeling, Class-A surfacing, arbitrary NURBS control cages, variable-radius fillets, advanced topology healing, direct modeling, sheet metal, weldments, and specialized manufacturing feature systems remain later work.
 
-## Current next technical step — Block 32
+## Current next technical step — Block 33
 
-Primary boundary: Core persistent semantic source identity.
+Primary boundary: Core serialization and compatibility.
 
-Block 32 must:
+Block 33 must:
 
-1. reuse existing persistent `DatumPlane`, construction-line, and construction-point identities;
-2. add first-class `DatumAxis` PartDocument intent if still absent;
-3. freeze the first supported DatumAxis definition family/families, validation, ownership, dependency, and invalidation semantics;
-4. freeze exact unambiguous semantic-reference spellings for DatumPlane, DatumAxis, ConstructionLine, and ConstructionPoint;
-5. prove ids containing `.`, `/`, and `%` remain unambiguous;
-6. preserve all existing feature semantic target spellings;
-7. keep assembly endpoints as component/occurrence identity plus semantic-reference string;
-8. perform no Geometry target resolution;
-9. make no JSON change yet.
+1. serialize `DatumAxis` PartDocument intent additively (`Explicit` and `FromConstructionLine` families);
+2. preserve historical part files without DatumAxis data;
+3. keep existing local and cross-hierarchy endpoint JSON shapes unchanged;
+4. roundtrip Block-32 `ref:` semantic-reference strings byte-for-byte through endpoint JSON;
+5. validate DatumAxis ownership, id uniqueness, and family rules at load;
+6. resolve no Plane/Axis/Line/Point geometry during JSON load or structure validation.
 
 Planned focused tags:
 
 ```text
-[core][datum-axis]
-[core][assembly-reference-target-intent]
+[core][datum-axis-json]
+[core][assembly-reference-target-json]
 ```
 
-Reference-geometry serialization remains Block 33. Geometry resolution into the Block-31 taxonomy remains Block 34.
+Geometry resolution into the Block-31 taxonomy remains Block 34.

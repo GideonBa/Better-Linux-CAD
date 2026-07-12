@@ -1,6 +1,6 @@
 # Cross-Hierarchy Assembly Relationship Sequence MVP-5
 
-Status: Blocks 23–31 are implemented. Block 32 is the current next technical step. Blocks 32–47 remain the explicit general assembly target, relationship, and richer-joint continuation.
+Status: Blocks 23–32 are implemented. Block 33 is the current next technical step. Blocks 33–47 remain the explicit general assembly target, relationship, and richer-joint continuation.
 
 This document is the canonical numbered handoff sequence for cross-document assembly intent, solving, motion, exchange, posed analysis, and general geometric target architecture.
 
@@ -333,33 +333,40 @@ Mandatory order:
 
 Do not merge these blocks.
 
-## Block 32 — Assembly-selectable reference geometry Core intent — Next
+## Block 32 — Assembly-selectable reference geometry Core intent — implemented
+
+Canonical document: `docs/assembly-reference-geometry-intent-mvp5.md`.
 
 Primary boundary: Core persistent model intent and semantic source identity.
 
-Required work:
+Implemented first-class `DatumAxis` PartDocument intent with the frozen `Explicit` and `FromConstructionLine` definition families, existing-construction-geometry ownership/dependency/invalidation semantics, and the frozen reference semantic-source grammar:
 
-1. reuse existing persistent `DatumPlane`, construction-line, and construction-point identities;
-2. add first-class `DatumAxis` PartDocument intent if still absent;
-3. freeze the first supported DatumAxis definition family/families;
-4. define validation, PartDocument ownership, dependency, invalidation, and removal behavior for DatumAxis intent;
-5. freeze exact persistent semantic-reference spellings for DatumPlane, DatumAxis, ConstructionLine, and ConstructionPoint;
-6. make grammar unambiguous for arbitrary non-empty typed ids, including ids containing `.`, `/`, and `%`;
-7. preserve current feature target spellings byte-for-byte;
-8. keep local/cross endpoint JSON shapes unchanged;
-9. perform no Geometry target resolution;
-10. make no JSON serialization change yet.
+```text
+ref:datum_plane:<encoded-id>
+ref:datum_axis:<encoded-id>
+ref:construction_line:<encoded-id>
+ref:construction_point:<encoded-id>
+```
 
-Planned focused tags:
+Uppercase `%HH` escaping of every id byte outside `[A-Za-z0-9_-]` keeps valid reference spellings dot-free and therefore provably disjoint from feature target spellings; ids containing `.`, `/`, and `%` stay unambiguous and parsing fails closed. Existing feature target spellings and local/cross endpoint JSON shapes are unchanged. Block 32 performs no Geometry target resolution and adds no JSON field.
+
+Focused tags:
 
 ```text
 [core][datum-axis]
 [core][assembly-reference-target-intent]
 ```
 
-## Block 33 — Reference geometry serialization and structure validation
+## Block 33 — Reference geometry serialization and structure validation — Next
 
 Serialize Block-32 PartDocument reference-geometry intent additively, preserve historical files, and prove local/cross endpoint semantic-reference strings roundtrip byte-for-byte. No target geometry resolution during load.
+
+Planned focused tags:
+
+```text
+[core][datum-axis-json]
+[core][assembly-reference-target-json]
+```
 
 ## Block 34 — Datum/axis/line/point target resolution
 
@@ -447,6 +454,6 @@ posed shapes/contact records/sweep analyses
 
 ## Next technical step
 
-Implement Block 32 only: assembly-selectable reference geometry Core intent and unambiguous semantic source identity.
+Implement Block 33 only: additive DatumAxis PartDocument JSON, historical-file compatibility, byte-for-byte endpoint reference-spelling roundtrips, and load-time ownership/family validation.
 
-Do not implement Block-33 JSON or Block-34 Geometry resolution in Block 32.
+Do not implement Block-34 Geometry resolution in Block 33.
