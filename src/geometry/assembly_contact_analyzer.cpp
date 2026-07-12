@@ -22,6 +22,11 @@ namespace {
 
 constexpr const char* kContactAnalyzerId = "geometry.assembly_contact_analyzer";
 
+struct OrderedPosedOccurrence {
+  AssemblyExchangeComponentOccurrenceIdentity identity;
+  const detail::PosedLeafShape* posed = nullptr;
+};
+
 [[nodiscard]] Error make_geometry_error(std::string message) {
   return Error::geometry(kContactAnalyzerId, std::move(message));
 }
@@ -34,33 +39,11 @@ constexpr const char* kContactAnalyzerId = "geometry.assembly_contact_analyzer";
   return message;
 }
 
-[[nodiscard]] bool path_less(const std::vector<SubassemblyInstanceId>& lhs,
-                             const std::vector<SubassemblyInstanceId>& rhs) {
-  return std::lexicographical_compare(
-      lhs.begin(), lhs.end(), rhs.begin(), rhs.end(),
-      [](const SubassemblyInstanceId& left, const SubassemblyInstanceId& right) {
-        return left.value() < right.value();
-      });
-}
-
-[[nodiscard]] AssemblyExchangeComponentOccurrenceIdentity occurrence_identity(
-    const detail::PosedLeafShape& posed) {
-  return AssemblyExchangeComponentOccurrenceIdentity{
-      AssemblyExchangeAssemblyOccurrenceIdentity{posed.leaf.subassembly_path},
-      posed.leaf.component_instance};
-}
-
-[[nodiscard]] bool occurrence_less(const AssemblyExchangeComponentOccurrenceIdentity& lhs,
-                                   const AssemblyExchangeComponentOccurrenceIdentity& rhs) {
-  const auto& lhs_path = lhs.containing_assembly_occurrence.occurrence_path;
-  const auto& rhs_path = rhs.containing_assembly_occurrence.occurrence_path;
-  if (path_less(lhs_path, rhs_path)) {
-    return true;
-  }
-  if (path_less(rhs_path, lhs_path)) {
-    return false;
-  }
-  return lhs.component_instance.value() < rhs.component_instance.value();
+[[nodiscard]] bool leaf_matches_occurrence(
+    const detail::PosedLeafShape& posed,
+    const AssemblyExchangeComponentOccurrenceIdentity& identity) {
+  return posed.leaf.subassembly_path == identity.containing_assembly_occurrence.occurrence_path &&
+         posed.leaf.component_instance == identity.component_instance;
 }
 
 [[nodiscard]] std::string occurrence_debug_text(
@@ -117,6 +100,36 @@ constexpr const char* kContactAnalyzerId = "geometry.assembly_contact_analyzer";
   return Result<double>::success(distance);
 }
 
+[[nodiscard]] Result<std::vector<OrderedPosedOccurrence>> build_ordered_posed_occurrences(
+    const Project& project, const detail::PosedLeafShapeBuildResult& posed_leaves) {
+  auto exchange_graph = AssemblyExchangeGraph::build(project);
+  if (exchange_graph.has_error()) {
+    return Result<std::vector<OrderedPosedOccurrence>>::failure(exchange_graph.error());
+  }
+  if (exchange_graph.value().component_occurrence_count() != posed_leaves.leaves.size()) {
+    return Result<std::vector<OrderedPosedOccurrence>>::failure(make_geometry_error(
+        "contact posed-leaf set does not match canonical exchange component occurrence set"));
+  }
+
+  std::vector<OrderedPosedOccurrence> ordered;
+  ordered.reserve(exchange_graph.value().component_occurrence_count());
+  for (const AssemblyExchangeComponentOccurrence& occurrence :
+       exchange_graph.value().component_occurrences()) {
+    const auto found = std::find_if(
+        posed_leaves.leaves.begin(), posed_leaves.leaves.end(),
+        [&occurrence](const detail::PosedLeafShape& posed) {
+          return leaf_matches_occurrence(posed, occurrence.identity);
+        });
+    if (found == posed_leaves.leaves.end()) {
+      return Result<std::vector<OrderedPosedOccurrence>>::failure(make_geometry_error(
+          "contact exchange component occurrence does not resolve to one posed leaf: " +
+          occurrence_debug_text(occurrence.identity)));
+    }
+    ordered.push_back(OrderedPosedOccurrence{occurrence.identity, &*found});
+  }
+  return Result<std::vector<OrderedPosedOccurrence>>::success(std::move(ordered));
+}
+
 } // namespace
 
 Result<AssemblyContactAnalysis>
@@ -135,42 +148,37 @@ AssemblyContactAnalyzer::analyze(const Project& project, AssemblyContactAnalysis
   if (posed_leaves.has_error()) {
     return Result<AssemblyContactAnalysis>::failure(posed_leaves.error());
   }
-
-  std::vector<const detail::PosedLeafShape*> ordered_leaves;
-  ordered_leaves.reserve(posed_leaves.value().leaves.size());
-  for (const detail::PosedLeafShape& posed : posed_leaves.value().leaves) {
-    ordered_leaves.push_back(&posed);
+  auto ordered_occurrences = build_ordered_posed_occurrences(project, posed_leaves.value());
+  if (ordered_occurrences.has_error()) {
+    return Result<AssemblyContactAnalysis>::failure(ordered_occurrences.error());
   }
-  std::sort(ordered_leaves.begin(), ordered_leaves.end(),
-            [](const detail::PosedLeafShape* lhs, const detail::PosedLeafShape* rhs) {
-              return occurrence_less(occurrence_identity(*lhs), occurrence_identity(*rhs));
-            });
 
   AssemblyContactAnalysis analysis;
-  analysis.component_occurrence_count = ordered_leaves.size();
+  analysis.component_occurrence_count = ordered_occurrences.value().size();
   analysis.recomputed_part_count = posed_leaves.value().recomputed_part_count;
-  if (ordered_leaves.size() > 1U) {
-    analysis.records.reserve((ordered_leaves.size() * (ordered_leaves.size() - 1U)) / 2U);
+  if (ordered_occurrences.value().size() > 1U) {
+    analysis.records.reserve((ordered_occurrences.value().size() *
+                              (ordered_occurrences.value().size() - 1U)) /
+                             2U);
   }
 
   try {
-    for (std::size_t first = 0U; first < ordered_leaves.size(); ++first) {
-      for (std::size_t second = first + 1U; second < ordered_leaves.size(); ++second) {
-        const detail::PosedLeafShape& leaf_a = *ordered_leaves[first];
-        const detail::PosedLeafShape& leaf_b = *ordered_leaves[second];
-        const AssemblyExchangeComponentOccurrenceIdentity identity_a = occurrence_identity(leaf_a);
-        const AssemblyExchangeComponentOccurrenceIdentity identity_b = occurrence_identity(leaf_b);
-        const std::string pair_text = occurrence_debug_text(identity_a) + " x " +
-                                      occurrence_debug_text(identity_b);
+    for (std::size_t first = 0U; first < ordered_occurrences.value().size(); ++first) {
+      for (std::size_t second = first + 1U; second < ordered_occurrences.value().size(); ++second) {
+        const OrderedPosedOccurrence& occurrence_a = ordered_occurrences.value()[first];
+        const OrderedPosedOccurrence& occurrence_b = ordered_occurrences.value()[second];
+        const std::string pair_text = occurrence_debug_text(occurrence_a.identity) + " x " +
+                                      occurrence_debug_text(occurrence_b.identity);
         ++analysis.evaluated_pair_count;
 
-        auto overlap = common_solid_volume_mm3(leaf_a.shape, leaf_b.shape, pair_text);
+        auto overlap = common_solid_volume_mm3(occurrence_a.posed->shape,
+                                               occurrence_b.posed->shape, pair_text);
         if (overlap.has_error()) {
           return Result<AssemblyContactAnalysis>::failure(overlap.error());
         }
 
         AssemblyContactRecord record{
-            AssemblyComponentOccurrencePairIdentity{identity_a, identity_b},
+            AssemblyComponentOccurrencePairIdentity{occurrence_a.identity, occurrence_b.identity},
             AssemblyContactClassification::Separated, overlap.value(), std::nullopt};
         if (overlap.value() > options.minimum_overlap_volume_mm3) {
           record.classification = AssemblyContactClassification::Interfering;
@@ -178,7 +186,8 @@ AssemblyContactAnalyzer::analyze(const Project& project, AssemblyContactAnalysis
           continue;
         }
 
-        auto distance = minimum_distance_mm(leaf_a.shape, leaf_b.shape, pair_text);
+        auto distance = minimum_distance_mm(occurrence_a.posed->shape,
+                                            occurrence_b.posed->shape, pair_text);
         if (distance.has_error()) {
           return Result<AssemblyContactAnalysis>::failure(distance.error());
         }
