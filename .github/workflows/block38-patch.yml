@@ -77,6 +77,7 @@ jobs:
 
       - name: Format Block 38 files
         run: |
+          set -o pipefail
           clang-format -i \
             include/blcad/core/assembly_constraint.hpp \
             src/core/assembly_constraint.cpp \
@@ -87,7 +88,8 @@ jobs:
             src/core/assembly_document_json.cpp \
             src/core/project_json.cpp \
             src/geometry/assembly_target_compatibility.cpp \
-            tests/core/assembly_generic_relationship_tests.cpp
+            tests/core/assembly_generic_relationship_tests.cpp \
+            2>&1 | tee /tmp/block38-format.log
 
       - name: Core build and tests
         run: cmake --workflow --preset dev-build-test
@@ -123,7 +125,10 @@ jobs:
             echo 'Block 38 patch workflow failed before verification.'
             echo
             echo '```text'
-            tail -n 60 /tmp/block38-apply.log 2>/dev/null || true
+            echo '--- apply ---'
+            tail -n 40 /tmp/block38-apply.log 2>/dev/null || true
+            echo '--- format ---'
+            tail -n 40 /tmp/block38-format.log 2>/dev/null || true
             echo '```'
           } > /tmp/block38-comment.md
           if test -n "$PR_URL"; then
