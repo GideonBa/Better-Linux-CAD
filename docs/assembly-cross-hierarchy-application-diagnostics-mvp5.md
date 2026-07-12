@@ -1,45 +1,184 @@
 # Cross-Hierarchy Fresh-Result Application and Diagnostics MVP-5
 
-Status: implemented as Block 27 of `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`.
+Status: implemented as Block 27. Block 28 now reuses the same authority/proposal, hierarchy-boundary, and semantic PartDocument freshness boundaries for Project-level cross-hierarchy Revolute motion.
 
-This document is canonical for complete modeled-input freshness of assembly solve results, atomic application of Block-26 cross-hierarchy transform-authority proposals, and Jacobian-rank/remaining-DOF diagnostics over the exact Block-26 free-authority variable order.
+This document is canonical for modeled-input freshness, atomic authority-qualified geometric solve-result application, and cross-hierarchy Jacobian-rank/remaining-DOF diagnostics.
+
+Cross-hierarchy motion follow-up is canonical in `docs/assembly-cross-hierarchy-revolute-motion-mvp5.md`.
 
 ## Scope
 
-Implemented:
+Implemented for cross-hierarchy geometric solve results:
 
-- complete participating `ComponentTransformAuthority` freshness;
-- referenced-part identity protection on authority/component snapshots;
-- complete local relationship record snapshots;
-- complete Project-level cross-hierarchy relationship record snapshots;
-- exact active solve-group revalidation before cross-hierarchy application;
-- exact participating hierarchy path-boundary snapshots;
-- visibility-independent solve freshness;
-- an explicit semantic target-producing PartDocument freshness contract;
-- the same semantic PartDocument freshness for ordinary local solve results;
-- atomic authority-qualified cross-hierarchy direct-transform application;
-- one shared matrix-rank implementation for local and cross-hierarchy diagnostics;
-- cross-hierarchy diagnostics over the exact Block-26 free-authority order;
-- exact reuse of Block-26 authority candidate and mixed residual evaluation semantics.
+```text
+complete ComponentTransformAuthority freshness
+referenced PartDocument identity protection
+complete local relationship record snapshots
+complete Project-level cross geometric relationship snapshots
+exact current active geometric solve-group revalidation
+all persistent hierarchy boundaries on participating cross paths
+visibility-independent solve freshness
+exact semantic target-producing PartDocument model-intent freshness
+one proposal per free authority
+atomic direct-transform authority application
+shared matrix-rank diagnostics
+```
 
-Still deferred:
+The same exact semantic PartDocument freshness is also used by ordinary local solve results, flexible-child application, and local Revolute motion.
 
-- project-level cross-hierarchy joint intent;
-- nested motion propagation;
-- whole-`SubassemblyInstance` transform variables or grounding;
-- occurrence-local internal child pose overrides;
-- null-space basis vectors or per-authority free-motion directions;
-- sparse rank/solve machinery;
-- component geometry instancing and structured STEP product hierarchy;
-- swept-motion contact analysis.
+Block 28 extracts the common authority/proposal and hierarchy-boundary freshness helpers so cross-hierarchy geometric application and cross-hierarchy motion application use one implementation.
 
-## Semantic target-producing model freshness: Option A
+## Authority freshness
 
-Block 27 deliberately chooses Option A from the sequence plan.
+One `AssemblyCrossHierarchyTransformAuthoritySnapshot` protects:
 
-Every solve result now protects the model intent of every referenced `PartDocument` whose participating component/authority can supply semantic target geometry.
+```text
+ComponentTransformAuthority
+referenced PartDocumentId
+grounding state
+component suppression state
+source direct RigidTransform
+```
 
-The snapshot is:
+`ComponentTransformAuthority` remains:
+
+```text
+(assembly_document: DocumentId,
+ local ComponentInstanceId)
+```
+
+Application rejects duplicate authority snapshots.
+
+Every snapshotted assembly document and component must still exist. Referenced part, grounding, suppression, and direct transform must match exactly.
+
+Participating authority snapshots must remain active.
+
+The exact grounded authority subsequence must equal `fixed_authorities`.
+
+The exact free authority subsequence defines required proposal order.
+
+## Proposal freshness
+
+One proposal stores:
+
+```text
+ComponentTransformAuthority
+source direct transform
+proposed direct transform
+```
+
+Application requires:
+
+```text
+one proposal per free active authority snapshot
+no proposal for grounded authorities
+no duplicate authority proposals
+proposal authority order == exact free authority subsequence
+proposal source transform == matching snapshot source transform
+proposed transform valid through ComponentInstance::with_transform
+```
+
+The count is authority-based, not rooted-occurrence-based.
+
+Repeated rooted endpoints that map to one authority yield at most one proposal.
+
+## Geometric relationship freshness
+
+Local geometric relationship identity:
+
+```text
+(assembly_document: DocumentId,
+ AssemblyConstraintId)
+```
+
+The complete local `AssemblyConstraint` input is snapshotted:
+
+```text
+id
+name
+type
+target A
+target B
+state
+Distance value
+Angle value
+```
+
+Project-level cross geometric snapshots protect complete `AssemblyHierarchyConstraint` records, including both exact occurrence-qualified endpoints.
+
+Result relationship snapshots must exactly match the selected relationship identity count and order and contain no duplicate relationship identity.
+
+At application each current persistent relationship record is reconstructed into the same snapshot value and compared exactly.
+
+Removal, replacement, state, type, target, occurrence path, semantic reference, explicit quantity, or name changes stale the result.
+
+## Exact active solve-group freshness
+
+After authority and relationship freshness, application rebuilds:
+
+```text
+AssemblyCrossHierarchyConstraintGraph::build(project)
+```
+
+It reconstructs:
+
+```text
+AssemblyCrossHierarchySolveGroup{
+  result.relationships,
+  current_authorities
+}
+```
+
+and requires that exact group to remain in current `solve_groups()`.
+
+Therefore graph participation is solve input.
+
+Examples that stale an old result:
+
+```text
+new active relationship joins one authority
+suppression removes one endpoint path
+participation merges two groups
+participation splits one group
+relationship becomes inactive
+```
+
+Visibility is not solve participation and does not stale the result.
+
+## Hierarchy-boundary freshness
+
+Every persistent `SubassemblyInstance` boundary on a participating Project-level cross endpoint path is protected.
+
+Boundary identity:
+
+```text
+(containing AssemblyDocumentId,
+ local SubassemblyInstanceId)
+```
+
+Snapshot:
+
+```text
+containing assembly document
+subassembly instance id
+referenced child assembly document
+suppression state
+source direct boundary RigidTransform
+```
+
+Snapshots are deduplicated by boundary identity and sorted by containing assembly document id, then local occurrence id.
+
+Current boundary snapshots are regenerated from the exact persistent endpoints and compared exactly.
+
+Boundary removal, child retargeting, suppression, or direct transform changes stale the result.
+
+Visibility is deliberately absent from the boundary freshness snapshot.
+
+## Exact semantic target-producing PartDocument freshness
+
+The implemented freshness contract deliberately chose the strong exact-model-intent option.
+
+One derived snapshot stores:
 
 ```text
 AssemblySemanticTargetPartSnapshot
@@ -47,275 +186,68 @@ AssemblySemanticTargetPartSnapshot
   canonical_model_intent_json: string
 ```
 
-The payload is the exact result of:
+The payload is exactly:
 
 ```text
 serialize_part_document_to_json(part)
 ```
 
-No hash is stored. There is therefore no hash-collision boundary.
+At application the current PartDocument is serialized again and compared byte-for-byte.
 
-No mutable revision counter is added to `PartDocument`.
+This protects the complete currently persisted PartDocument model intent, including parameters/formulas, datum/workplane intent, construction geometry, sketches/profiles, semantic-reference recovery/remap intent, and feature history.
 
-The existing canonical PartDocument JSON serializer already covers persistent part-model intent including parameters/formulas, datum/workplane definitions, construction geometry, sketches and profile producers, semantic-reference recovery/remap intent, and feature history.
+The contract is conservative: a serialized edit in a participating referenced part may stale a result even when one specific semantic target would not change.
 
-At solve-result application the current PartDocument is serialized again and compared byte-for-byte with the stored canonical payload.
+This avoids a false geometry-complete freshness claim without a general target dependency/revision graph.
 
-Any serialized PartDocument model-intent change makes the result stale.
+No hash and no mutable revision counter are used.
 
-This is intentionally conservative. The snapshot is not a minimal semantic-target dependency closure. A serialized edit elsewhere in the same participating PartDocument can invalidate the result even when the selected target geometry would be unchanged.
+The payload remains derived and is never serialized as additional Project state.
 
-The conservative contract is preferred to claiming geometry-complete freshness without a target-dependency revision model.
+## Shared cross-hierarchy freshness helpers
 
-The snapshots are derived and unpersisted.
-
-## Shared local solve-result freshness extension
-
-`AssemblySolveComponentSnapshot` now also stores:
+Block 28 extracts the following common internal boundary:
 
 ```text
-referenced_part_document
+make_cross_hierarchy_authority_snapshots
+semantic_part_documents_from_authority_snapshots
+make_cross_hierarchy_boundary_snapshots
+validate_cross_hierarchy_authority_and_proposal_freshness
+validate_cross_hierarchy_boundary_freshness
+apply_cross_hierarchy_authority_proposals
 ```
 
-`AssemblySolveResult` now also stores canonical semantic target PartDocument snapshots.
+The Block-27 geometric applier and Block-28 cross-hierarchy motion applier both use these functions.
 
-The ordinary `AssemblySolveResultApplier` validates:
+This freezes one implementation for:
 
 ```text
-component identity
-referenced PartDocument identity
-grounding
-suppression
-source direct transform
-exact participating PartDocument canonical model intent
+complete authority snapshots
+exact fixed/free authority subsequences
+one proposal per free authority
+proposed transform validation
+hierarchy path-boundary snapshot identity/order
+hierarchy boundary freshness
+atomic authority proposal writes on a supplied Project copy
 ```
 
-before proposal validation or mutation.
+Motion adds its own complete local/cross geometric/joint relationship snapshots and selected-coordinate semantics, but does not duplicate transform/boundary freshness.
 
-Because flexible-child solving delegates to `AssemblySolveResultApplier`, the same PartDocument freshness contract automatically applies to document-scoped flexible child results.
+## Atomic geometric application
 
-Because `AssemblyJointMotionResultApplier` applies its embedded `AssemblySolveResult` through the same local applier, local Revolute motion also inherits the same semantic target-producing PartDocument freshness.
-
-There is one local semantic model freshness boundary rather than separate family-specific checks.
-
-## Cross-hierarchy authority snapshots
-
-Every participating Block-25 authority has one snapshot:
-
-```text
-AssemblyCrossHierarchyTransformAuthoritySnapshot
-  authority:
-    assembly_document
-    local ComponentInstanceId
-  referenced_part_document
-  grounding_state
-  suppression_state
-  source_transform
-```
-
-Application rejects:
-
-- duplicate authority snapshots;
-- missing assembly documents;
-- missing local components;
-- referenced-part retargeting;
-- grounding changes;
-- suppression changes;
-- direct component-transform changes;
-- inactive authority snapshots;
-- a `fixed_authorities` vector that does not exactly equal the grounded snapshot subsequence.
-
-Visibility is intentionally absent because Block 25 and Block 26 do not use visibility for solve participation or residual evaluation.
-
-## Exact free-authority proposal coverage
-
-A fresh converged result must contain exactly one proposal for every free active authority snapshot, in the exact free-authority order derived from the canonical authority snapshot order.
-
-For each proposal:
-
-```text
-ComponentTransformAuthority
-source direct RigidTransform
-proposed direct RigidTransform
-```
-
-Application rejects:
-
-- duplicate proposal authorities;
-- proposals for missing snapshots;
-- proposals for grounded or suppressed authorities;
-- source-transform mismatch;
-- missing free-authority proposals;
-- extra proposals;
-- reordered proposal-authority identity;
-- proposed transforms rejected by `ComponentInstance::with_transform`.
-
-This strengthens the Block-26 generation guarantee into a fail-closed application contract.
-
-## Complete relationship snapshots
-
-### Local relationship snapshot
-
-One local snapshot stores:
-
-```text
-assembly_document
-AssemblyConstraintId
-name
-type
-target A
-target B
-state
-optional distance_mm
-optional angle_deg
-```
-
-The identity is:
-
-```text
-(assembly_document, AssemblyConstraintId)
-```
-
-The current exact local `AssemblyConstraint` record must reproduce the snapshot.
-
-### Project-level cross-hierarchy relationship snapshot
-
-One Project-level snapshot stores:
-
-```text
-AssemblyConstraintId
-name
-type
-exact occurrence-qualified target A
-exact occurrence-qualified target B
-state
-optional distance_mm
-optional angle_deg
-```
-
-The current exact persistent `AssemblyHierarchyConstraint` must reproduce the snapshot.
-
-Distance and Angle quantities are compared through their canonical family values in millimeters/degrees because `Quantity` is validated family intent rather than a public equality value type.
-
-Relationship snapshots are stored in exact `AssemblyCrossHierarchySolveResult::relationships` order.
-
-Application rejects:
-
-- incomplete or extra relationship snapshots;
-- duplicate relationship identities;
-- snapshot identity/order mismatch;
-- relationship removal;
-- relationship replacement;
-- name changes;
-- type changes;
-- state changes;
-- target A/B changes;
-- endpoint occurrence-path changes;
-- semantic-reference changes;
-- Distance value changes;
-- Angle value changes.
-
-## Exact active solve-group freshness
-
-Record equality alone is not enough.
-
-An additional active relationship can connect to an authority after a result is produced. That changes the numeric problem even if every original relationship record remains unchanged.
-
-Block 27 therefore rebuilds:
-
-```text
-AssemblyCrossHierarchyConstraintGraph::build(current_project)
-```
-
-and reconstructs the result's expected group from:
-
-```text
-result.relationships
-result.authority_snapshots[].authority
-```
-
-That exact `AssemblyCrossHierarchySolveGroup` must still exist in the current deterministic `solve_groups()` collection.
-
-This rejects participation changes caused by:
-
-- new active relationships joining the group;
-- relationships becoming inactive;
-- component suppression changes;
-- cross-hierarchy path suppression changes;
-- connectivity changes that merge or split the group.
-
-## Hierarchy path-boundary snapshots
-
-Every `SubassemblyInstance` boundary occurring on target A or target B of a participating Project-level cross-hierarchy relationship is snapshotted.
-
-Boundary authority identity is:
-
-```text
-(containing AssemblyDocumentId,
- local SubassemblyInstanceId)
-```
-
-The snapshot stores:
-
-```text
-containing_assembly_document
-subassembly_instance
-referenced_assembly_document
-suppression_state
-source boundary RigidTransform
-```
-
-A boundary can appear on multiple endpoints or through repeated rooted contexts while still being one persistent direct boundary record. Snapshots are therefore unique by persistent boundary authority identity and canonically ordered by:
-
-```text
-containing assembly document id
-then SubassemblyInstanceId
-```
-
-At application the exact endpoint paths from the relationship snapshots are followed again from the explicit root and the canonical boundary snapshot set is rebuilt.
-
-Application rejects:
-
-- missing path boundaries;
-- boundary retargeting to another child document;
-- suppression changes;
-- boundary transform changes;
-- missing snapshots;
-- extra snapshots;
-- duplicate/tampered snapshot identity.
-
-Visibility is not stored and does not invalidate a solve result.
-
-No boundary transform is ever a component solve proposal.
-
-## Atomic cross-hierarchy application
-
-Public mutation boundary:
-
-```text
-AssemblyCrossHierarchySolveResultApplier
-```
-
-Application order is:
+`AssemblyCrossHierarchySolveResultApplier` performs:
 
 ```text
 require Converged
-  -> validate current Project structure
-  -> validate authority + proposal freshness
-  -> validate complete relationship freshness
-  -> validate exact current active solve group
-  -> validate exact hierarchy boundary freshness
-  -> validate exact semantic target PartDocument model intent
+  -> validate complete Project structure
+  -> validate authority/proposal freshness
+  -> validate complete geometric relationship freshness
+  -> validate exact current geometric solve group
+  -> validate hierarchy path boundaries
+  -> validate exact semantic PartDocument model intent
   -> copy Project
-  -> write each proposed direct component transform to its authority
-  -> replace source Project only after every write succeeds
-```
-
-A proposal writes only:
-
-```text
-project.find_assembly_document(authority.assembly_document)
-  -> set_component_instance_transform(authority.component_instance, proposed_transform)
+  -> apply direct authority transform proposals
+  -> replace source Project
 ```
 
 The applier never writes:
@@ -327,48 +259,39 @@ SubassemblyInstance::transform()
 occurrence-local pose overrides
 ```
 
-The source Project remains unchanged on every validation or write failure.
+The source Project remains unchanged on every validation or candidate-write failure.
 
 ## Shared matrix-rank implementation
 
-The previous local diagnostics matrix-rank elimination has been moved into one internal utility:
+Local and cross-hierarchy diagnostics use:
 
 ```text
 compute_assembly_matrix_rank
 ```
 
-It retains the established deterministic partial-pivot elimination semantics.
-
-For Jacobian `J`:
+For finite Jacobian `J`:
 
 ```text
 maximum_abs_entry = max(abs(J[i,j]))
-pivot_threshold = max(rank_absolute_tolerance,
-                      rank_relative_tolerance * maximum_abs_entry)
+pivot_threshold = max(
+  rank_absolute_tolerance,
+  rank_relative_tolerance * maximum_abs_entry
+)
 ```
 
-Entries must be finite and every row width must match the expected variable count.
+Deterministic partial-pivot row-echelon elimination computes rank.
 
-Local and cross-hierarchy diagnostics use the same rank implementation.
+Solver damping is excluded from rank because damping is numerical stabilization, not a geometric constrained direction.
 
 ## Cross-hierarchy diagnostics variable order
 
-Public read-only analyzer:
+`AssemblyCrossHierarchySolveDiagnosticsAnalyzer` first obtains one Block-26 solve result.
 
-```text
-AssemblyCrossHierarchySolveDiagnosticsAnalyzer
-```
-
-The analyzer first calls the Block-26 solver on one exact current solve group.
-
-Free authority order is taken directly from the solve result proposal order.
-
-Because Block 26 creates proposals in canonical `variable_authorities` order, diagnostics use exactly:
+The free-authority order is the proposal order, which is exactly the canonical solve-group authority list filtered to `Free`:
 
 ```text
 solve_group.authorities
-  -> filter Grounded
-  -> retain Free in original authority order
+  -> retain free active authorities in original order
 ```
 
 Each free authority contributes:
@@ -382,59 +305,29 @@ ry_deg
 rz_deg
 ```
 
-Thus:
+Therefore:
 
 ```text
 variable_count = 6 * unique_free_active_transform_authority_count
 ```
 
-The count is never based on rooted geometric occurrence count.
-
-For repeated occurrences:
-
-```text
-([left],  component.child)
-([right], component.child)
-
-both -> (assembly.child, component.child)
-```
-
-one free shared authority means:
-
-```text
-variable_count = 6
-```
-
-not `12`.
+Repeated rooted occurrences that share one authority contribute six variables, not twelve.
 
 ## Diagnostics residual and Jacobian identity
 
 For a converged result the analyzer:
 
 1. copies the source Project;
-2. applies the fresh Block-26 result to that copy through `AssemblyCrossHierarchySolveResultApplier`;
-3. reads the solved free-authority vector through `read_cross_hierarchy_authority_variables`;
-4. evaluates the exact mixed residual vector through `evaluate_cross_hierarchy_group_residuals`;
-5. constructs the finite-difference evaluator by applying candidate authority vectors through `apply_cross_hierarchy_authority_variables` to Project copies;
-6. evaluates the same mixed residual function;
-7. calls the shared central finite-difference Jacobian builder;
-8. computes rank through the shared matrix-rank utility.
+2. applies the fresh Block-26 result to that copy;
+3. reads the solved free-authority vector through the shared authority helper;
+4. evaluates the exact mixed local/root-space geometric residual vector;
+5. applies candidate authority vectors to Project copies;
+6. calls the shared central finite-difference Jacobian builder;
+7. computes rank through the shared matrix-rank utility.
 
-The solver and diagnostics therefore share:
+Solver and diagnostics share authority resolution, six-variable layout, candidate application, local relationship evaluation, Project cross root-space evaluation, relationship order, scalar flattening, length scaling, and central finite differences.
 
-```text
-authority resolution
-six-variable direct-transform layout
-authority candidate application
-local relationship local-space evaluation
-cross-hierarchy root-space evaluation
-relationship ordering
-residual family flattening
-length scaling
-central finite differences
-```
-
-Diagnostics do not rebuild a second residual/Jacobian contract.
+Diagnostics do not own a second residual/Jacobian contract.
 
 ## Rank and DOF semantics
 
@@ -446,7 +339,7 @@ remaining_dof = variable_count - rank(J)
 residual_row_redundancy = residual_component_count - rank(J)
 ```
 
-The existing classifications are reused:
+DOF classifications remain:
 
 ```text
 NoVariableDof
@@ -454,9 +347,7 @@ Underconstrained
 LocallyFullyConstrained
 ```
 
-`LocallyFullyConstrained` means full column rank in the local Jacobian linearization around the solved pose. It does not mean the relationships belong to one local AssemblyDocument.
-
-Residual-rank classification remains:
+Residual rank classifications remain:
 
 ```text
 FullRowRank
@@ -474,117 +365,81 @@ remaining DOF = 3
 residual row redundancy = 1
 ```
 
-The rank is computed, not family-hard-coded.
+Rank is computed from the actual shared Jacobian and is not hard-coded by relationship family.
 
-## Fixed and non-converged diagnostics
+For `FixedGeometryInconsistent` or another non-converged solve state, rank is not evaluated and DOF classification is `NotEvaluated`.
 
-For `FixedGeometryInconsistent`:
+A converged all-grounded satisfied group has zero variables, rank zero, remaining DOF zero, and `NoVariableDof`.
 
-```text
-consistency = FixedGeometryInconsistent
-DOF classification = NotEvaluated
-rank_evaluated = false
-```
+## Block-28 cross-hierarchy motion reuse
 
-For another non-converged solve state:
+Implemented follow-up:
 
 ```text
-consistency = SolverDidNotConverge
-DOF classification = NotEvaluated
-rank_evaluated = false
+AssemblyHierarchyJoint
+cross_hierarchy_joints[]
+AssemblyCrossHierarchyMotionGraph
+AssemblyHierarchyRevoluteJointEquationBuilder
+AssemblyCrossHierarchyJointMotionSolver
+AssemblyCrossHierarchyJointMotionResultApplier
 ```
 
-For a converged all-grounded satisfied group:
+The Block-28 motion result protects complete four-family relationship records:
 
 ```text
-variable_count = 0
-rank = 0
-remaining_dof = 0
-DOF classification = NoVariableDof
+local geometry
+local joints
+Project cross geometry
+Project cross joints
 ```
+
+It also protects exact current combined motion-group participation and selected source/request coordinate semantics.
+
+Authority/proposal freshness, hierarchy path-boundary freshness, semantic PartDocument freshness, and atomic direct-authority writes reuse Block-27 boundaries exactly.
+
+Motion application then updates only the selected Project-level joint authored coordinate after authority proposals succeed on the same Project copy.
 
 ## Focused coverage
 
-Application/freshness:
+Block-27 application/freshness:
 
 ```bash
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-cross-hierarchy-application]"
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-semantic-freshness]"
 ```
 
-Diagnostics:
+Block-27 diagnostics:
 
 ```bash
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-cross-hierarchy-diagnostics]"
 ```
 
-Shared semantic PartDocument freshness:
+Block-28 shared-freshness follow-up:
 
 ```bash
-./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-semantic-freshness]"
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-cross-hierarchy-motion]"
 ```
 
-The suites prove:
-
-- fresh cross-hierarchy result application;
-- exactly one direct child authority write;
-- unchanged rigid subassembly boundary transforms;
-- visibility changes do not stale a result;
-- authority transform, grounding, suppression, and referenced-part identity are protected;
-- complete relationship records are protected;
-- new active relationship participation stales an old result;
-- hierarchy boundary transform and suppression are protected;
-- exact canonical PartDocument model-intent edits stale cross-hierarchy results;
-- ordinary local solve results use the same semantic PartDocument freshness;
-- duplicate/missing/tampered authority, relationship, boundary, PartDocument, and proposal result data fails closed;
-- invalid proposed transforms fail before source mutation;
-- one planar Distance authority has six variables and rank three;
-- repeated rooted occurrences sharing one authority still have six variables, not twelve;
-- mixed local/cross relationship order is retained in diagnostics;
-- all-grounded consistent and inconsistent states preserve established diagnostics semantics;
-- rank option validation is shared.
+Coverage proves fresh atomic application, unchanged rigid boundaries, visibility-independent freshness, complete authority/relationship/path/PartDocument protection, current-group participation freshness, invalid proposal rejection, authority-based variable count/rank/nullity, repeated-occurrence shared-authority semantics, and Block-28 reuse of the same authority/boundary/semantic freshness boundary.
 
 ## Persistence boundary
 
-Block 27 adds no JSON field.
+Block 27 adds no persistent field.
 
-Persistent model intent remains unchanged.
-
-After explicit successful application the only cross-hierarchy solve mutation is an already-existing direct:
+After explicit geometric solve application the only persistent mutation is an existing direct:
 
 ```text
 ComponentInstance::transform()
 ```
 
-The following remain derived and unpersisted:
+Derived products include semantic PartDocument snapshots, authority snapshots, local/cross geometric relationship snapshots, hierarchy-boundary snapshots, proposals, residual/Jacobian values, rank products, and diagnostics.
 
-```text
-AssemblySemanticTargetPartSnapshot
-canonical PartDocument freshness payloads
-cross-hierarchy authority snapshots
-local/cross relationship input snapshots
-hierarchy boundary snapshots
-cross-hierarchy proposals
-freshness validation products
-mixed residual vectors
-finite-difference Jacobians
-matrix-rank products
-cross-hierarchy diagnostics
-```
+Block 28 adds persistent Project-level Revolute joint intent separately; its snapshots and motion results remain derived.
 
-## Next technical step
+## Current handoff
 
-Implement Block 28 only:
+Block 28 is implemented and reuses the Block-27 freshness/application boundary.
 
-```text
-persistent project-level cross-hierarchy joint intent
-  -> exact occurrence-qualified joint endpoints
-  -> joint-to-ComponentTransformAuthority incidence
-  -> combined geometric + joint motion connectivity across assembly documents
-  -> nested Revolute motion propagation through exact parent transform chains
-  -> shared numeric engine and authority-scoped proposals
-  -> complete fresh-result snapshots and atomic application
-```
+Next is Block 29 only from `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`: freeze derived assembly/component/product occurrence identities and emit deterministic structured STEP assembly/product relationships while reusing canonical posed-leaf transform chains and one recomputed shape/cache per unique referenced PartDocument.
 
-Reuse the frozen endpoint/occurrence/transform-authority identity split and the Block-27 freshness/application boundaries.
-
-Do not add occurrence-local child pose overrides, whole-subassembly transform variables, component geometry instancing, or swept-motion contact analysis in Block 28.
+Occurrence-local child pose overrides, whole-subassembly solve variables, and swept-motion contact simulation remain deferred.
