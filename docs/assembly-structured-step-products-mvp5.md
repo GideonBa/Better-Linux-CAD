@@ -18,7 +18,7 @@ Implemented:
 - XDE assembly/product labels and component references;
 - nested and repeated assembly occurrence products;
 - repeated component occurrences referencing shared part product definitions;
-- AP214 STEPCAF transfer with names;
+- AP214 STEPCAF transfer with names for exported product labels and writer-supported occurrence labels;
 - source Project immutability;
 - retained flattened-compound `AssemblyStepExporter` compatibility path;
 - `blcad_export_structured_assembly` headless consumer.
@@ -409,6 +409,43 @@ shared part product definitions
 
 The product/reference graph is derived from BLCAD identity. It is never derived from raw OCCT topology ids.
 
+## STEPCAF component-instance name boundary
+
+BLCAD assigns deterministic `TDataStd_Name` values to XDE part-definition labels, assembly occurrence product labels, and component reference labels before transfer.
+
+The exact BLCAD component occurrence name remains authoritative in `AssemblyExchangeGraph`:
+
+```text
+blcad:component-occurrence:<exact rooted path>/<local component id>
+```
+
+However, OCCT's `STEPCAFControl_Writer` documents a current writer limitation: names and validation properties are supported for top-level shapes only. Nested XDE component-reference label names are therefore not guaranteed to appear verbatim in the written STEP Part 21 text.
+
+Consequences:
+
+```text
+AssemblyExchangeGraph occurrence_name
+  -> exact deterministic BLCAD derived name
+
+XDE component label TDataStd_Name
+  -> assigned before transfer
+
+written STEP nested component instance name
+  -> writer-dependent; not a Block-29 identity guarantee
+```
+
+Structured STEP correctness for nested components is instead proven through:
+
+```text
+exact AssemblyExchangeGraph occurrence identities/names
+nested assembly product names
+shared part-definition name
+complete STEP NEXT_ASSEMBLY_USAGE_OCCURRENCE relationships
+STEP re-imported posed geometry equivalence
+```
+
+Do not treat raw STEP text presence of every nested component occurrence name as BLCAD model or exchange identity authority.
+
 ## Compatibility flattened export
 
 `AssemblyStepExporter` remains available.
@@ -484,7 +521,9 @@ The suites prove:
 - hidden/suppressed export filtering inherited from the leaf resolver;
 - source Project model-intent immutability;
 - collision-free percent-encoded generated names including slash, percent, and reserved-root cases;
-- structured STEP text contains BLCAD assembly/component/part names and assembly usage relationships;
+- exact nested component occurrence names at the derived `AssemblyExchangeGraph` layer;
+- structured STEP text contains exported assembly product names, shared part-definition names, writer-supported top-level component names, and assembly usage relationships;
+- nested STEP usage relationships remain complete without assuming unsupported verbatim nested component-reference names;
 - structured STEP can be read back through `STEPControl_Reader`;
 - structured and flattened exporters produce equivalent posed solid count, volume, and bounds for repeated root and nested assembly fixtures;
 - empty output path and empty exported assembly fail closed.
