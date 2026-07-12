@@ -149,9 +149,9 @@ AssemblyContactAnalyzer::analyze(const Project& project, AssemblyContactAnalysis
   AssemblyContactAnalysis analysis;
   analysis.component_occurrence_count = ordered_leaves.size();
   analysis.recomputed_part_count = posed_leaves.value().recomputed_part_count;
-  analysis.contacts.reserve((ordered_leaves.size() * (ordered_leaves.size() -
-                                                       (ordered_leaves.empty() ? 0U : 1U))) /
-                            2U);
+  if (ordered_leaves.size() > 1U) {
+    analysis.records.reserve((ordered_leaves.size() * (ordered_leaves.size() - 1U)) / 2U);
+  }
 
   try {
     for (std::size_t first = 0U; first < ordered_leaves.size(); ++first) {
@@ -174,7 +174,7 @@ AssemblyContactAnalyzer::analyze(const Project& project, AssemblyContactAnalysis
         record.overlap_volume_mm3 = overlap.value();
         if (overlap.value() > options.minimum_overlap_volume_mm3) {
           record.classification = AssemblyContactClassification::Interfering;
-          analysis.contacts.push_back(std::move(record));
+          analysis.records.push_back(std::move(record));
           continue;
         }
 
@@ -186,7 +186,7 @@ AssemblyContactAnalyzer::analyze(const Project& project, AssemblyContactAnalysis
         record.classification = distance.value() <= options.touching_tolerance_mm
                                     ? AssemblyContactClassification::Touching
                                     : AssemblyContactClassification::Separated;
-        analysis.contacts.push_back(std::move(record));
+        analysis.records.push_back(std::move(record));
       }
     }
   } catch (const Standard_Failure& failure) {
