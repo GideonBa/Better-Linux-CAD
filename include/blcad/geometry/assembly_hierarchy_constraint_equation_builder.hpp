@@ -186,6 +186,10 @@ struct AssemblyHierarchyConstraintEquationDescriptor {
 // graph/solver integration owns relationship participation filtering.
 class AssemblyHierarchyConstraintTargetResolver {
 public:
+  [[nodiscard]] Result<AssemblyResolvedGeometricTarget>
+  resolve_geometric(const Project& project,
+                    const AssemblyHierarchyConstraintTarget& target) const;
+
   [[nodiscard]] Result<AssemblyHierarchyPlanarConstraintTargetDescriptor>
   resolve_planar(const Project& project,
                  const AssemblyHierarchyConstraintTarget& target) const;
