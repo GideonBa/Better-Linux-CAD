@@ -1,0 +1,186 @@
+name: Block 38 Patch
+
+on:
+  push:
+    branches:
+      - block38-generic-relationship-intent
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  patch-and-test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Normalize Block 38 patch seeds
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("scripts/apply_block38.py")
+          text = path.read_text(encoding="utf-8")
+
+          start = text.index("for path, error_text in (")
+          marker = '\ncreate_exact(\n    "src/core/assembly_constraint_graph_participation.hpp"'
+          end = text.index(marker, start)
+          parser_replacement = r'''replace_exact(
+              "src/core/assembly_document_json.cpp",
+              "  if (text == \"angle\")\n"
+              "    return Result<AssemblyConstraintType>::success(AssemblyConstraintType::Angle);\n"
+              "  return Result<AssemblyConstraintType>::failure(json_error(\"unsupported assembly constraint type\"));",
+              "  if (text == \"angle\")\n"
+              "    return Result<AssemblyConstraintType>::success(AssemblyConstraintType::Angle);\n"
+              "  if (text == \"coincident\")\n"
+              "    return Result<AssemblyConstraintType>::success(AssemblyConstraintType::Coincident);\n"
+              "  if (text == \"parallel\")\n"
+              "    return Result<AssemblyConstraintType>::success(AssemblyConstraintType::Parallel);\n"
+              "  if (text == \"perpendicular\")\n"
+              "    return Result<AssemblyConstraintType>::success(AssemblyConstraintType::Perpendicular);\n"
+              "  return Result<AssemblyConstraintType>::failure(json_error(\"unsupported assembly constraint type\"));",
+          )
+
+          replace_exact(
+              "src/core/project_json.cpp",
+              "  if (text == \"angle\")\n"
+              "    return Result<AssemblyConstraintType>::success(AssemblyConstraintType::Angle);\n"
+              "  return Result<AssemblyConstraintType>::failure(\n"
+              "      json_error(\"unsupported cross-hierarchy assembly constraint type\"));",
+              "  if (text == \"angle\")\n"
+              "    return Result<AssemblyConstraintType>::success(AssemblyConstraintType::Angle);\n"
+              "  if (text == \"coincident\")\n"
+              "    return Result<AssemblyConstraintType>::success(AssemblyConstraintType::Coincident);\n"
+              "  if (text == \"parallel\")\n"
+              "    return Result<AssemblyConstraintType>::success(AssemblyConstraintType::Parallel);\n"
+              "  if (text == \"perpendicular\")\n"
+              "    return Result<AssemblyConstraintType>::success(AssemblyConstraintType::Perpendicular);\n"
+              "  return Result<AssemblyConstraintType>::failure(\n"
+              "      json_error(\"unsupported cross-hierarchy assembly constraint type\"));",
+          )
+          '''
+          text = text[:start] + parser_replacement + text[end:]
+
+          start = text.index(
+              'for path in (\n    "src/core/assembly_cross_hierarchy_constraint_graph.cpp",'
+          )
+          marker = '\nreplace_exact(\n    "src/geometry/assembly_target_compatibility.cpp"'
+          end = text.index(marker, start)
+          graph_replacement = r'''for path in (
+              "src/core/assembly_cross_hierarchy_constraint_graph.cpp",
+              "src/core/assembly_cross_hierarchy_motion_graph.cpp",
+          ):
+              first_include = (
+                  '#include "blcad/core/assembly_cross_hierarchy_constraint_graph.hpp"\n'
+                  if "constraint_graph" in path
+                  else '#include "blcad/core/assembly_cross_hierarchy_motion_graph.hpp"\n'
+              )
+              replace_exact(
+                  path,
+                  first_include,
+                  first_include + '\n#include "assembly_constraint_graph_participation.hpp"\n',
+              )
+              replace_exact(
+                  path,
+                  "      if (constraint.state() != AssemblyConstraintState::Active) {\n"
+                  "        continue;\n"
+                  "      }",
+                  "      if (constraint.state() != AssemblyConstraintState::Active) {\n"
+                  "        continue;\n"
+                  "      }\n"
+                  "      if (!participates_in_current_assembly_constraint_graph(constraint.type())) {\n"
+                  "        continue;\n"
+                  "      }",
+              )
+              replace_exact(
+                  path,
+                  "    if (constraint.state() != AssemblyConstraintState::Active) {\n"
+                  "      continue;\n"
+                  "    }",
+                  "    if (constraint.state() != AssemblyConstraintState::Active) {\n"
+                  "      continue;\n"
+                  "    }\n"
+                  "    if (!participates_in_current_assembly_constraint_graph(constraint.type())) {\n"
+                  "      continue;\n"
+                  "    }",
+              )
+          '''
+          text = text[:start] + graph_replacement + text[end:]
+          path.write_text(text, encoding="utf-8")
+          PY
+
+      - name: Apply Block 38 patch
+        run: |
+          set -o pipefail
+          python3 scripts/apply_block38.py 2>&1 | tee /tmp/block38-apply.log
+
+      - name: Install Core dependencies and formatter
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build nlohmann-json3-dev catch2 clang-format
+
+      - name: Format Block 38 files
+        run: |
+          set -o pipefail
+          clang-format -i \
+            include/blcad/core/assembly_constraint.hpp \
+            src/core/assembly_constraint.cpp \
+            src/core/assembly_constraint_graph.cpp \
+            src/core/assembly_cross_hierarchy_constraint_graph.cpp \
+            src/core/assembly_cross_hierarchy_motion_graph.cpp \
+            src/core/assembly_constraint_graph_participation.hpp \
+            src/core/assembly_document_json.cpp \
+            src/core/project_json.cpp \
+            src/geometry/assembly_target_compatibility.cpp \
+            tests/core/assembly_generic_relationship_tests.cpp \
+            2>&1 | tee /tmp/block38-format.log
+
+      - name: Core build and tests
+        run: cmake --workflow --preset dev-build-test
+
+      - name: Focused Block 38 tests
+        run: |
+          ./build/dev/blcad_core_tests "[core][assembly-generic-relationship-intent]"
+          ./build/dev/blcad_core_tests "[core][assembly-generic-relationship-json]"
+
+      - name: Verify patch integrity
+        run: |
+          git diff --check
+          test ! -e scripts/apply_block38.py
+          test ! -e .github/workflows/block38-patch.yml
+          grep -R "AssemblyConstraintType::Coincident\|AssemblyConstraintType::Parallel\|AssemblyConstraintType::Perpendicular" -n include src tests
+
+      - name: Commit Block 38
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "Add generic relationship intent and JSON"
+          git push origin HEAD:block38-generic-relationship-intent
+
+      - name: Report patch failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          {
+            echo 'Block 38 patch workflow failed before verification.'
+            echo
+            echo '```text'
+            echo '--- apply ---'
+            tail -n 40 /tmp/block38-apply.log 2>/dev/null || true
+            echo '--- format ---'
+            tail -n 40 /tmp/block38-format.log 2>/dev/null || true
+            echo '```'
+          } > /tmp/block38-comment.md
+          if test -n "$PR_URL"; then
+            gh pr comment "$PR_URL" --body-file /tmp/block38-comment.md
+          fi
