@@ -4,15 +4,21 @@ Status: planned post-Assembly-MVP sequence. Blocks 48-94 are not implemented yet
 
 Current repository work remains on Block 36 of the assembly target/relationship/joint sequence. Blocks 36-47 remain mandatory before this sequence starts. Block 48 becomes the next technical step only after Block 47 is implemented and the Assembly MVP handoff is complete.
 
-This document is the canonical numbered implementation sequence for the first broad BLCAD Part Construction MVP after the Assembly MVP.
+This document is the active status, phase-order, authority-boundary, and handoff summary for the first broad BLCAD Part Construction MVP after the Assembly MVP.
 
-It consolidates and sequences existing target architecture from:
+The complete original Blocks 48-94 per-block planning detail is preserved byte-for-byte in:
+
+- `docs/part-construction-sequence-mvp6-planning-detail.md`
+
+That companion document's block goals, required work, failure policies, acceptance tags, proofs, and explicit deferrals are incorporated by reference here. Its historical top-level statement that repository work was on Block 35 is preserved planning context, not current status authority.
+
+This sequence consolidates architecture from:
 
 - `docs/multi-body-transform-and-path-features-roadmap.md`
 - `docs/inventor-like-sketcher-and-feature-roadmap.md`
 - `docs/advanced-surfacing-and-3d-sketch-mvp.md`
 
-Those documents remain canonical planning sources for detailed use cases and long-term capability breadth. This document is authoritative for block order, authority boundaries, MVP cuts, and implementation handoffs.
+Those documents remain canonical planning sources for detailed use cases and long-term capability breadth. This active sequence is authoritative for current block order, authority boundaries, MVP cuts, and implementation handoffs.
 
 ## Goal
 
@@ -68,3 +74,33 @@ The goal is not to clone SolidWorks or Inventor feature-for-feature. The goal is
 15. Sweep and path-following extrude may share internal Geometry helpers while remaining distinct user/model feature types.
 16. Loft section order, alignment/seam intent, and continuity intent are persistent and deterministic.
 17. Surface bodies are first-class `Body` values, not temporary unaddressable OCCT faces.
+18. Surface stitching and shell-to-solid conversion are explicit features with strict validation.
+19. Existing straight Extrude/Cut remain simple fast paths.
+20. No block silently broadens into GUI editing, direct modeling, Class-A surfacing, sheet metal, or topology healing.
+
+## Frozen phase order
+
+```text
+48-57   multi-body/result/transform authority
+58-60   shared Part feature inputs and richer Extrude/Cut
+61-62   Revolve / RevolveCut
+63-65   general Linear/Circular Pattern
+66-67   Mirror Feature
+68-70   Fillet and Chamfer
+71-74   Shell and Draft
+75-78   3D Sketch
+79      PathCurve
+80-83   Sweep and path-following Extrude/Cut
+84-87   Loft
+88-92   Surface Features and surface-to-solid
+93      multi-body STEP exchange
+94      integrated Part Construction MVP acceptance
+```
+
+Do not merge these phases into one feature branch.
+
+## Current handoff
+
+Block 35 stable generated-topology semantic identity and recovery is implemented. Block 36 Geometry resolution of those semantic generated topology identities is the current assembly next technical step.
+
+Blocks 36-47 remain mandatory before this Part Construction sequence begins. After Block 47, Block 48 — Body identity and `PartDocument` ownership — becomes the next technical step. The complete Block 48-94 implementation contracts remain in `docs/part-construction-sequence-mvp6-planning-detail.md`.
