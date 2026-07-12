@@ -47,6 +47,10 @@ compatibility_matrix(AssemblyConstraintType relationship_type) {
     return {{Capability::Axis, Capability::Axis}};
   case AssemblyConstraintType::Insert:
     return {{Capability::Frame, Capability::Frame}};
+  case AssemblyConstraintType::Coincident:
+  case AssemblyConstraintType::Parallel:
+  case AssemblyConstraintType::Perpendicular:
+    return {};
   }
   return {};
 }

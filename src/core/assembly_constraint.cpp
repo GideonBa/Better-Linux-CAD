@@ -16,6 +16,12 @@ std::string_view to_string(AssemblyConstraintType type) noexcept {
     return "insert";
   case AssemblyConstraintType::Angle:
     return "angle";
+  case AssemblyConstraintType::Coincident:
+    return "coincident";
+  case AssemblyConstraintType::Parallel:
+    return "parallel";
+  case AssemblyConstraintType::Perpendicular:
+    return "perpendicular";
   }
   return "mate";
 }
@@ -60,15 +66,15 @@ const std::string& AssemblyConstraintTarget::semantic_reference() const noexcept
   return semantic_reference_;
 }
 
-Result<AssemblyHierarchyConstraintEndpoint> AssemblyHierarchyConstraintEndpoint::create(
-    std::vector<SubassemblyInstanceId> occurrence_path,
-    ComponentInstanceId component_instance,
-    std::string semantic_reference) {
+Result<AssemblyHierarchyConstraintEndpoint>
+AssemblyHierarchyConstraintEndpoint::create(std::vector<SubassemblyInstanceId> occurrence_path,
+                                            ComponentInstanceId component_instance,
+                                            std::string semantic_reference) {
   for (const SubassemblyInstanceId& occurrence : occurrence_path) {
     if (occurrence.empty()) {
-      return Result<AssemblyHierarchyConstraintEndpoint>::failure(Error::validation(
-          "assembly_hierarchy_constraint_endpoint",
-          "cross-hierarchy relationship occurrence path ids must not be empty"));
+      return Result<AssemblyHierarchyConstraintEndpoint>::failure(
+          Error::validation("assembly_hierarchy_constraint_endpoint",
+                            "cross-hierarchy relationship occurrence path ids must not be empty"));
     }
   }
 
@@ -77,15 +83,12 @@ Result<AssemblyHierarchyConstraintEndpoint> AssemblyHierarchyConstraintEndpoint:
     return Result<AssemblyHierarchyConstraintEndpoint>::failure(local_target.error());
   }
 
-  return Result<AssemblyHierarchyConstraintEndpoint>::success(
-      AssemblyHierarchyConstraintEndpoint(std::move(occurrence_path),
-                                          std::move(component_instance),
-                                          std::move(semantic_reference)));
+  return Result<AssemblyHierarchyConstraintEndpoint>::success(AssemblyHierarchyConstraintEndpoint(
+      std::move(occurrence_path), std::move(component_instance), std::move(semantic_reference)));
 }
 
 AssemblyHierarchyConstraintEndpoint::AssemblyHierarchyConstraintEndpoint(
-    std::vector<SubassemblyInstanceId> occurrence_path,
-    ComponentInstanceId component_instance,
+    std::vector<SubassemblyInstanceId> occurrence_path, ComponentInstanceId component_instance,
     std::string semantic_reference)
     : occurrence_path_(std::move(occurrence_path)),
       component_instance_(std::move(component_instance)),
@@ -195,25 +198,23 @@ const std::optional<Quantity>& AssemblyConstraint::angle() const noexcept {
 
 Result<AssemblyHierarchyConstraint> AssemblyHierarchyConstraint::create(
     AssemblyConstraintId id, std::string name, AssemblyConstraintType type,
-    AssemblyHierarchyConstraintEndpoint target_a,
-    AssemblyHierarchyConstraintEndpoint target_b,
-    AssemblyConstraintState state,
-    std::optional<Quantity> distance,
+    AssemblyHierarchyConstraintEndpoint target_a, AssemblyHierarchyConstraintEndpoint target_b,
+    AssemblyConstraintState state, std::optional<Quantity> distance,
     std::optional<Quantity> angle) {
-  auto local_target_a =
-      AssemblyConstraintTarget::create(target_a.component_instance(), target_a.semantic_reference());
+  auto local_target_a = AssemblyConstraintTarget::create(target_a.component_instance(),
+                                                         target_a.semantic_reference());
   if (local_target_a.has_error()) {
     return Result<AssemblyHierarchyConstraint>::failure(local_target_a.error());
   }
-  auto local_target_b =
-      AssemblyConstraintTarget::create(target_b.component_instance(), target_b.semantic_reference());
+  auto local_target_b = AssemblyConstraintTarget::create(target_b.component_instance(),
+                                                         target_b.semantic_reference());
   if (local_target_b.has_error()) {
     return Result<AssemblyHierarchyConstraint>::failure(local_target_b.error());
   }
 
-  auto validated = AssemblyConstraint::create(id, name, type, std::move(local_target_a.value()),
-                                              std::move(local_target_b.value()), state, distance,
-                                              angle);
+  auto validated =
+      AssemblyConstraint::create(id, name, type, std::move(local_target_a.value()),
+                                 std::move(local_target_b.value()), state, distance, angle);
   if (validated.has_error()) {
     return Result<AssemblyHierarchyConstraint>::failure(validated.error());
   }
@@ -225,11 +226,8 @@ Result<AssemblyHierarchyConstraint> AssemblyHierarchyConstraint::create(
 
 AssemblyHierarchyConstraint::AssemblyHierarchyConstraint(
     AssemblyConstraintId id, std::string name, AssemblyConstraintType type,
-    AssemblyHierarchyConstraintEndpoint target_a,
-    AssemblyHierarchyConstraintEndpoint target_b,
-    AssemblyConstraintState state,
-    std::optional<Quantity> distance,
-    std::optional<Quantity> angle)
+    AssemblyHierarchyConstraintEndpoint target_a, AssemblyHierarchyConstraintEndpoint target_b,
+    AssemblyConstraintState state, std::optional<Quantity> distance, std::optional<Quantity> angle)
     : id_(std::move(id)), name_(std::move(name)), type_(type), target_a_(std::move(target_a)),
       target_b_(std::move(target_b)), state_(state), distance_(std::move(distance)),
       angle_(std::move(angle)) {}

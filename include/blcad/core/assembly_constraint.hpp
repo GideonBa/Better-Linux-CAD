@@ -11,7 +11,16 @@
 
 namespace blcad {
 
-enum class AssemblyConstraintType { Mate, Concentric, Distance, Insert, Angle };
+enum class AssemblyConstraintType {
+  Mate,
+  Concentric,
+  Distance,
+  Insert,
+  Angle,
+  Coincident,
+  Parallel,
+  Perpendicular
+};
 [[nodiscard]] std::string_view to_string(AssemblyConstraintType type) noexcept;
 
 enum class AssemblyConstraintState { Active, Inactive };
@@ -45,8 +54,7 @@ private:
 class AssemblyHierarchyConstraintEndpoint {
 public:
   [[nodiscard]] static Result<AssemblyHierarchyConstraintEndpoint>
-  create(std::vector<SubassemblyInstanceId> occurrence_path,
-         ComponentInstanceId component_instance,
+  create(std::vector<SubassemblyInstanceId> occurrence_path, ComponentInstanceId component_instance,
          std::string semantic_reference);
 
   [[nodiscard]] const std::vector<SubassemblyInstanceId>& occurrence_path() const noexcept;
@@ -68,7 +76,9 @@ private:
 
 // Solver-independent local assembly relationship intent. Distance constraints
 // carry one length quantity and Angle constraints carry one angle quantity;
-// Mate, Concentric, and Insert intentionally carry no value.
+// Mate, Concentric, Insert, Coincident, Parallel, and Perpendicular intentionally
+// carry no scalar value. Generic Block-38 families remain persistent-only until
+// Block 39 adds equation and graph participation semantics.
 class AssemblyConstraint {
 public:
   [[nodiscard]] static Result<AssemblyConstraint>
@@ -110,8 +120,7 @@ class AssemblyHierarchyConstraint {
 public:
   [[nodiscard]] static Result<AssemblyHierarchyConstraint>
   create(AssemblyConstraintId id, std::string name, AssemblyConstraintType type,
-         AssemblyHierarchyConstraintEndpoint target_a,
-         AssemblyHierarchyConstraintEndpoint target_b,
+         AssemblyHierarchyConstraintEndpoint target_a, AssemblyHierarchyConstraintEndpoint target_b,
          AssemblyConstraintState state = AssemblyConstraintState::Active,
          std::optional<Quantity> distance = std::nullopt,
          std::optional<Quantity> angle = std::nullopt);
@@ -130,8 +139,7 @@ private:
                               AssemblyConstraintType type,
                               AssemblyHierarchyConstraintEndpoint target_a,
                               AssemblyHierarchyConstraintEndpoint target_b,
-                              AssemblyConstraintState state,
-                              std::optional<Quantity> distance,
+                              AssemblyConstraintState state, std::optional<Quantity> distance,
                               std::optional<Quantity> angle);
 
   AssemblyConstraintId id_;

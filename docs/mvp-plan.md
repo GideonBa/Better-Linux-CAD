@@ -4,16 +4,16 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 37
-current_block: 38
-current_boundary: Generic geometric relationship Core intent and JSON
-current_tag: "(assigned when Block 38 starts)"
+implemented_through: Block 38
+current_block: 39
+current_boundary: Generic relationship equations and shared solve integration
+current_tag: "(assigned when Block 39 starts)"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
   mvp_3: "Parametric bolt circle pattern — implemented"
   mvp_4: "Assembly parameters and Project container — implemented"
-  mvp_5: "Assembly relationships, motion, hierarchy, analysis, exchange — Blocks 1–37 implemented, Blocks 38–47 planned"
+  mvp_5: "Assembly relationships, motion, hierarchy, analysis, exchange — Blocks 1–38 implemented, Blocks 39–47 planned"
   mvp_6: "Part Construction — Blocks 48–94 planned, starts after Block 47"
 ---
 
@@ -428,7 +428,33 @@ Existing local and cross-hierarchy Mate/Distance/Angle/Concentric/Insert equatio
 [geometry][assembly-cross-hierarchy-target-compatibility]
 ```
 
-## Blocks 38–47 — Planned general relationship and joint continuation
+### Block 38 — Generic geometric relationship Core intent and JSON
+
+**Status:** Implemented
+**Canonical:** `docs/assembly-generic-relationship-intent-mvp5.md`
+
+Implemented shared local and Project-level persistent `Coincident`, `Parallel`, and `Perpendicular` relationship intent. The three families reuse existing local and occurrence-qualified endpoint shapes, target A/B order, active/inactive state semantics, and independent local/Project id scopes.
+
+Canonical JSON spellings are:
+
+```text
+coincident
+parallel
+perpendicular
+```
+
+All three families carry neither `distance` nor `angle`; typed Core construction and JSON loading fail closed on scalar injection. Existing five-family spellings and JSON shapes remain unchanged.
+
+Until Block 39 adds equations, the three generic families remain persistent-only and are explicitly excluded from current local solve, cross-hierarchy solve, and cross-hierarchy motion graph participation.
+
+**Focused tags:**
+
+```text
+[core][assembly-generic-relationship-intent]
+[core][assembly-generic-relationship-json]
+```
+
+## Blocks 39–47 — Planned general relationship and joint continuation
 
 **Status:** Planned
 **Canonical:** roadmap `docs/assembly-general-geometric-target-roadmap.md`
@@ -436,7 +462,6 @@ Existing local and cross-hierarchy Mate/Distance/Angle/Concentric/Insert equatio
 Mandatory order:
 
 ```text
-38 generic geometric relationship Core intent + JSON
 39 generic relationship equations + shared solve integration
 40 joint target compatibility + oriented Frame contract
 41 general joint coordinate/limit Core model

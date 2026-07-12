@@ -1,10 +1,10 @@
 # Assembly Geometric Target Taxonomy and Capability Projection MVP-5
 
-Status: implemented as Block 31 of `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`. Blocks 32–37 have since extended semantic source identity, generated-topology resolution, and explicit target compatibility without changing persistent endpoint authority.
+Status: implemented as Block 31 of `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`. Blocks 32–38 have since extended semantic source identity, generated-topology resolution, explicit target compatibility, and generic relationship intent without changing persistent endpoint authority.
 
 This document is canonical for the Geometry-layer derived assembly target taxonomy, typed geometric descriptors, source-to-capability projection matrix, local/root-space resolved target contract, target compatibility selection, and compatibility adaptation of the existing generated face, `.axis`, and `.seat` families.
 
-Generated-topology Core identity/recovery is canonical in `docs/assembly-generated-topology-reference-mvp5.md`. Geometry resolution of those Block-35 `topo:` identities through this taxonomy is implemented as Block 36; explicit relationship target compatibility is implemented as Block 37. Their canonical contracts live in `docs/assembly-general-geometric-target-roadmap.md`.
+Generated-topology Core identity/recovery is canonical in `docs/assembly-generated-topology-reference-mvp5.md`. Geometry resolution of those Block-35 `topo:` identities through this taxonomy is implemented as Block 36; explicit relationship target compatibility is implemented as Block 37. Block 38 adds persistent generic relationship intent without extending the compatibility matrix. Their canonical contracts live in `docs/assembly-general-geometric-target-roadmap.md` and `docs/assembly-generic-relationship-intent-mvp5.md`.
 
 ## Scope
 
@@ -571,6 +571,14 @@ Focused tags:
 [geometry][assembly-cross-hierarchy-target-compatibility]
 ```
 
-## Next technical step — Block 38
+## Block 38 — generic relationship intent — Implemented
 
-The next technical step is Block 38: generic geometric relationship Core intent and JSON for `Coincident`, `Parallel`, and `Perpendicular`.
+Block 38 adds persistent `Coincident`, `Parallel`, and `Perpendicular` relationship types and JSON spellings at Core level. It does not change this target taxonomy or the Block-37 compatibility matrix.
+
+`AssemblyTargetCompatibilityResolver` therefore has no compatibility entries for the three generic families yet. Direct compatibility/equation requests remain explicitly incompatible until Block 39 integrates their documented capability pairs and equations.
+
+Canonical Block-38 contract: `docs/assembly-generic-relationship-intent-mvp5.md`.
+
+## Next technical step — Block 39
+
+The next technical step is Block 39: generic relationship equations and shared solve integration for `Coincident`, `Parallel`, and `Perpendicular`.

@@ -1,5 +1,7 @@
 #include "blcad/core/assembly_cross_hierarchy_motion_graph.hpp"
 
+#include "assembly_constraint_graph_participation.hpp"
+
 #include "blcad/core/project.hpp"
 
 #include <algorithm>
@@ -66,9 +68,9 @@ struct ResolvedMotionEndpoint {
   return authority_less(lhs.authority, rhs.authority);
 }
 
-[[nodiscard]] bool joint_mapping_less(
-    const AssemblyCrossHierarchyJointEndpointAuthorityMapping& lhs,
-    const AssemblyCrossHierarchyJointEndpointAuthorityMapping& rhs) {
+[[nodiscard]] bool
+joint_mapping_less(const AssemblyCrossHierarchyJointEndpointAuthorityMapping& lhs,
+                   const AssemblyCrossHierarchyJointEndpointAuthorityMapping& rhs) {
   if (lhs.joint.value() != rhs.joint.value()) {
     return lhs.joint.value() < rhs.joint.value();
   }
@@ -81,15 +83,14 @@ ordered_assembly_documents(const Project& project) {
   for (const AssemblyDocument& assembly : project.child_assembly_documents()) {
     assemblies.push_back(&assembly);
   }
-  std::sort(assemblies.begin(), assemblies.end(), [](const auto* lhs, const auto* rhs) {
-    return lhs->id().value() < rhs->id().value();
-  });
+  std::sort(assemblies.begin(), assemblies.end(),
+            [](const auto* lhs, const auto* rhs) { return lhs->id().value() < rhs->id().value(); });
   return assemblies;
 }
 
-[[nodiscard]] Result<ResolvedMotionEndpoint> resolve_endpoint(
-    const Project& project, const AssemblyHierarchyConstraintEndpoint& endpoint,
-    const std::string& relationship_id) {
+[[nodiscard]] Result<ResolvedMotionEndpoint>
+resolve_endpoint(const Project& project, const AssemblyHierarchyConstraintEndpoint& endpoint,
+                 const std::string& relationship_id) {
   const AssemblyDocument* assembly = &project.assembly();
   bool active = true;
 
@@ -99,8 +100,7 @@ ordered_assembly_documents(const Project& project) {
       return Result<ResolvedMotionEndpoint>::failure(Error::validation(
           relationship_id, "cross-hierarchy motion endpoint occurrence path must resolve"));
     }
-    active = active &&
-             instance->suppression_state() == ComponentSuppressionState::Active;
+    active = active && instance->suppression_state() == ComponentSuppressionState::Active;
     assembly = project.find_assembly_document(instance->referenced_assembly_document());
     if (assembly == nullptr) {
       return Result<ResolvedMotionEndpoint>::failure(Error::validation(
@@ -142,12 +142,12 @@ void add_incidence(std::vector<AssemblyMotionRelationshipAuthorityIncidence>& in
   }
 }
 
-void add_local_dependency(
-    std::vector<AssemblyMotionRelationshipIdentity>& relationships,
-    std::vector<ComponentTransformAuthority>& authorities,
-    std::vector<AssemblyMotionRelationshipAuthorityIncidence>& incidences,
-    const AssemblyMotionRelationshipIdentity& relationship, const DocumentId& assembly_document,
-    const ComponentInstance& component_a, const ComponentInstance& component_b) {
+void add_local_dependency(std::vector<AssemblyMotionRelationshipIdentity>& relationships,
+                          std::vector<ComponentTransformAuthority>& authorities,
+                          std::vector<AssemblyMotionRelationshipAuthorityIncidence>& incidences,
+                          const AssemblyMotionRelationshipIdentity& relationship,
+                          const DocumentId& assembly_document, const ComponentInstance& component_a,
+                          const ComponentInstance& component_b) {
   const ComponentTransformAuthority authority_a{assembly_document, component_a.id()};
   const ComponentTransformAuthority authority_b{assembly_document, component_b.id()};
   add_relationship(relationships, relationship);
@@ -157,14 +157,16 @@ void add_local_dependency(
   add_incidence(incidences, relationship, authority_b);
 }
 
-void add_cross_dependency(
-    std::vector<AssemblyMotionRelationshipIdentity>& relationships,
-    std::vector<ComponentTransformAuthority>& authorities,
-    std::vector<AssemblyMotionRelationshipAuthorityIncidence>& incidences,
-    const AssemblyMotionRelationshipIdentity& relationship,
-    const ResolvedMotionEndpoint& endpoint_a, const ResolvedMotionEndpoint& endpoint_b) {
-  const ComponentTransformAuthority authority_a{endpoint_a.assembly->id(), endpoint_a.component->id()};
-  const ComponentTransformAuthority authority_b{endpoint_b.assembly->id(), endpoint_b.component->id()};
+void add_cross_dependency(std::vector<AssemblyMotionRelationshipIdentity>& relationships,
+                          std::vector<ComponentTransformAuthority>& authorities,
+                          std::vector<AssemblyMotionRelationshipAuthorityIncidence>& incidences,
+                          const AssemblyMotionRelationshipIdentity& relationship,
+                          const ResolvedMotionEndpoint& endpoint_a,
+                          const ResolvedMotionEndpoint& endpoint_b) {
+  const ComponentTransformAuthority authority_a{endpoint_a.assembly->id(),
+                                                endpoint_a.component->id()};
+  const ComponentTransformAuthority authority_b{endpoint_b.assembly->id(),
+                                                endpoint_b.component->id()};
   add_relationship(relationships, relationship);
   add_authority(authorities, authority_a);
   add_authority(authorities, authority_b);
@@ -172,24 +174,24 @@ void add_cross_dependency(
   add_incidence(incidences, relationship, authority_b);
 }
 
-[[nodiscard]] std::size_t relationship_index(
-    const std::vector<AssemblyMotionRelationshipIdentity>& relationships,
-    const AssemblyMotionRelationshipIdentity& relationship) {
+[[nodiscard]] std::size_t
+relationship_index(const std::vector<AssemblyMotionRelationshipIdentity>& relationships,
+                   const AssemblyMotionRelationshipIdentity& relationship) {
   const auto found = std::find(relationships.begin(), relationships.end(), relationship);
   return static_cast<std::size_t>(found - relationships.begin());
 }
 
-[[nodiscard]] std::size_t authority_index(
-    const std::vector<ComponentTransformAuthority>& authorities,
-    const ComponentTransformAuthority& authority) {
+[[nodiscard]] std::size_t
+authority_index(const std::vector<ComponentTransformAuthority>& authorities,
+                const ComponentTransformAuthority& authority) {
   const auto found = std::find(authorities.begin(), authorities.end(), authority);
   return static_cast<std::size_t>(found - authorities.begin());
 }
 
-[[nodiscard]] std::vector<AssemblyCrossHierarchyMotionGroup> derive_motion_groups(
-    const std::vector<AssemblyMotionRelationshipIdentity>& relationships,
-    const std::vector<ComponentTransformAuthority>& authorities,
-    const std::vector<AssemblyMotionRelationshipAuthorityIncidence>& incidences) {
+[[nodiscard]] std::vector<AssemblyCrossHierarchyMotionGroup>
+derive_motion_groups(const std::vector<AssemblyMotionRelationshipIdentity>& relationships,
+                     const std::vector<ComponentTransformAuthority>& authorities,
+                     const std::vector<AssemblyMotionRelationshipAuthorityIncidence>& incidences) {
   struct PendingNode {
     bool relationship = true;
     std::size_t index = 0U;
@@ -293,22 +295,25 @@ AssemblyCrossHierarchyMotionGraph::build(const Project& project) {
       if (constraint.state() != AssemblyConstraintState::Active) {
         continue;
       }
+      if (!participates_in_current_assembly_constraint_graph(constraint.type())) {
+        continue;
+      }
       const ComponentInstance* component_a =
           assembly->find_component_instance(constraint.target_a().component_instance());
       const ComponentInstance* component_b =
           assembly->find_component_instance(constraint.target_b().component_instance());
       if (component_a == nullptr || component_b == nullptr) {
-        return Result<AssemblyCrossHierarchyMotionGraph>::failure(Error::validation(
-            constraint.id().value(), "local geometric motion relationship components must resolve"));
+        return Result<AssemblyCrossHierarchyMotionGraph>::failure(
+            Error::validation(constraint.id().value(),
+                              "local geometric motion relationship components must resolve"));
       }
       if (component_a->suppression_state() != ComponentSuppressionState::Active ||
           component_b->suppression_state() != ComponentSuppressionState::Active) {
         continue;
       }
-      add_local_dependency(
-          relationships, authorities, incidences,
-          AssemblyLocalRelationshipIdentity{assembly->id(), constraint.id()}, assembly->id(),
-          *component_a, *component_b);
+      add_local_dependency(relationships, authorities, incidences,
+                           AssemblyLocalRelationshipIdentity{assembly->id(), constraint.id()},
+                           assembly->id(), *component_a, *component_b);
     }
 
     for (const AssemblyJoint& joint : assembly->joints()) {
@@ -337,6 +342,9 @@ AssemblyCrossHierarchyMotionGraph::build(const Project& project) {
     if (constraint.state() != AssemblyConstraintState::Active) {
       continue;
     }
+    if (!participates_in_current_assembly_constraint_graph(constraint.type())) {
+      continue;
+    }
     auto target_a = resolve_endpoint(project, constraint.target_a(), constraint.id().value());
     if (target_a.has_error()) {
       return Result<AssemblyCrossHierarchyMotionGraph>::failure(target_a.error());
@@ -348,10 +356,9 @@ AssemblyCrossHierarchyMotionGraph::build(const Project& project) {
     if (!target_a.value().active || !target_b.value().active) {
       continue;
     }
-    add_cross_dependency(
-        relationships, authorities, incidences,
-        AssemblyProjectCrossHierarchyRelationshipIdentity{constraint.id()}, target_a.value(),
-        target_b.value());
+    add_cross_dependency(relationships, authorities, incidences,
+                         AssemblyProjectCrossHierarchyRelationshipIdentity{constraint.id()},
+                         target_a.value(), target_b.value());
   }
 
   for (const AssemblyHierarchyJoint& joint : project.cross_hierarchy_joints()) {
@@ -376,9 +383,9 @@ AssemblyCrossHierarchyMotionGraph::build(const Project& project) {
                          target_b.value());
 
     const ComponentTransformAuthority authority_a{target_a.value().assembly->id(),
-                                                   target_a.value().component->id()};
+                                                  target_a.value().component->id()};
     const ComponentTransformAuthority authority_b{target_b.value().assembly->id(),
-                                                   target_b.value().component->id()};
+                                                  target_b.value().component->id()};
     joint_endpoint_mappings.push_back(AssemblyCrossHierarchyJointEndpointAuthorityMapping{
         joint.id(), AssemblyHierarchyJointEndpointRole::TargetA, joint.target_a(), authority_a});
     joint_endpoint_mappings.push_back(AssemblyCrossHierarchyJointEndpointAuthorityMapping{
