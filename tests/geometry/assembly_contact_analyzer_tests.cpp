@@ -103,8 +103,8 @@ Project repeated_child_project() {
 }
 
 const AssemblyContactRecord& only_contact(const AssemblyContactAnalysis& analysis) {
-  REQUIRE(analysis.contacts.size() == 1U);
-  return analysis.contacts.front();
+  REQUIRE(analysis.records.size() == 1U);
+  return analysis.records.front();
 }
 
 } // namespace
