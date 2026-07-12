@@ -1,8 +1,10 @@
 # Cross-Hierarchy Relationship-to-Authority Incidence and Solve Groups MVP-5
 
-Status: implemented as Block 25. Blocks 26 and 27 are implemented follow-ups; Block 28 is next.
+Status: implemented as Block 25. Blocks 26-28 are implemented follow-ups; Block 29 is next.
 
-This document is canonical for the Core-derived active relationship-to-`ComponentTransformAuthority` incidence model and deterministic cross-hierarchy geometric solve groups.
+This document is canonical for the Core-derived active geometric relationship-to-`ComponentTransformAuthority` incidence model and deterministic cross-hierarchy geometric solve groups.
+
+Block 28 adds a separate combined motion graph; it does not replace or change the geometric graph contract defined here.
 
 ## Purpose
 
@@ -13,14 +15,14 @@ A pure transform-authority graph preserves mutation ownership but loses occurren
 Block 25 therefore derives:
 
 ```text
-relationship node
+geometric relationship node
     |
     | residual depends on
     v
 ComponentTransformAuthority node
 ```
 
-This layer owns connectivity and participation only. It does not resolve semantic target geometry or execute numeric solving.
+This layer owns active geometric connectivity only. It does not resolve semantic target geometry or execute numeric solving.
 
 ## Transform-authority identity
 
@@ -32,7 +34,7 @@ ComponentTransformAuthority =
 
 It identifies the persistent component record whose direct transform, grounding, suppression, and referenced-part identity are solve inputs.
 
-The authority identity itself is derived and unpersisted.
+The authority value itself is derived and unpersisted.
 
 Repeated rooted occurrences can map to one authority:
 
@@ -44,7 +46,7 @@ both ->
 (assembly.gearbox, component.shaft)
 ```
 
-## Relationship identities
+## Geometric relationship identities
 
 Local relationship:
 
@@ -56,24 +58,38 @@ AssemblyLocalRelationshipIdentity =
 
 A local relationship is collected once from its containing `AssemblyDocument`, not once per rooted occurrence.
 
-Project-level cross-hierarchy relationship:
+Project-level cross relationship:
 
 ```text
 AssemblyProjectCrossHierarchyRelationshipIdentity =
   Project-level AssemblyConstraintId
 ```
 
-`AssemblyRelationshipIdentity` is the variant of these two identities.
+`AssemblyRelationshipIdentity` is the variant of these two geometric relationship identities.
 
 ## Participation rules
 
 Complete Project structure validates before graph derivation.
 
-A local relationship participates when its constraint is Active and both local target components are Active.
+A local relationship participates when:
 
-A Project-level cross relationship participates when the relationship is Active, every `SubassemblyInstance` on both exact endpoint paths is Active, and both addressed components are Active.
+```text
+constraint state == Active
+AND target A local component suppression == Active
+AND target B local component suppression == Active
+```
 
-Visibility does not filter solve participation.
+A Project-level cross relationship participates when:
+
+```text
+constraint state == Active
+AND every SubassemblyInstance on target A exact path is Active
+AND target A addressed component is Active
+AND every SubassemblyInstance on target B exact path is Active
+AND target B addressed component is Active
+```
+
+Visibility does not filter geometric solve participation.
 
 Suppression is the participation boundary.
 
@@ -94,7 +110,7 @@ The complete occurrence-qualified endpoint remains in:
 AssemblyCrossHierarchyEndpointAuthorityMapping
 ```
 
-A mapping stores constraint id, TargetA/TargetB role, complete endpoint identity, and transform authority.
+A mapping stores Project cross constraint id, TargetA/TargetB role, complete endpoint identity, and transform authority.
 
 ## Unique incidence versus endpoint context
 
@@ -112,29 +128,34 @@ Target A = ([left],  component.shaft, feature.left.axis)
 Target B = ([right], component.shaft, feature.right.axis)
 ```
 
-when both endpoints map to:
+when both map to:
 
 ```text
 (assembly.gearbox, component.shaft)
 ```
 
-the relationship has one unique authority incidence but two endpoint mappings.
+the relationship has:
 
-No synthetic residual row represents shared authority.
+```text
+1 unique relationship-to-authority incidence
+2 endpoint-to-authority mappings
+```
+
+No duplicate graph edge or synthetic residual row represents shared authority.
 
 ## Deterministic ordering
 
-Canonical order:
+Canonical geometric graph order:
 
 ```text
 relationship kind:
-  local before cross-hierarchy
+  local before Project cross geometry
 
 local relationship:
   assembly document id
   constraint id
 
-cross relationship:
+Project cross relationship:
   Project-level constraint id
 
 authority:
@@ -146,87 +167,104 @@ incidence:
   authority key
 
 endpoint mapping:
-  cross constraint id
+  Project cross constraint id
   TargetA before TargetB
 ```
 
 All textual keys sort lexicographically ascending. Persistent insertion order does not affect derived products.
 
-## Connected solve groups
+## Connected geometric solve groups
 
-Connected components are derived across relationship and authority nodes.
+Connected components are derived across geometric relationship and authority nodes.
 
 A component may contain:
 
 ```text
 child-local relationship
   -> shared child authority
-  -> Project-level cross relationship
+  -> Project cross geometric relationship
   -> root authority
 ```
 
-These relationships belong to one numeric solve group because their residuals depend on overlapping transform authorities.
+`AssemblyCrossHierarchySolveGroup` stores ordered geometric relationship identities and ordered unique authorities.
 
-`AssemblyCrossHierarchySolveGroup` stores ordered relationship identities and ordered unique authorities.
+Only connected components containing at least one Project-level cross geometric relationship appear in `solve_groups()`.
 
-Only connected components containing at least one active Project-level cross-hierarchy relationship appear in `solve_groups()`.
+Pure-local geometric components remain ordinary local solver work.
 
-Pure-local components remain ordinary local solver work.
+## Block-28 motion graph follow-up
+
+`AssemblyCrossHierarchyMotionGraph` is a separate derived graph because motion closes over four relationship classes:
+
+```text
+1. local geometry
+2. local joint
+3. Project cross geometry
+4. Project cross joint
+```
+
+The established `AssemblyCrossHierarchyConstraintGraph` remains authoritative for geometric solve groups and its ordering is unchanged.
+
+The motion graph reuses the same `ComponentTransformAuthority` identity and same suppression/visibility policy.
+
+Project cross-joint TargetA/TargetB endpoint mappings use the same one-incidence/two-mapping rule when two rooted endpoints map to one authority.
+
+Only connected motion components containing a Project-level cross joint become Block-28 motion groups.
+
+## Block-26/27 numeric and application follow-ups
+
+Block 26 consumes one exact current geometric solve group, filters canonical authority order to free authorities, allocates six direct-transform variables per unique free authority, and evaluates mixed document-local/root-space geometric residuals through the shared numeric engine.
+
+Block 27 rebuilds this geometric graph during application and requires the exact result relationship/authority group to still exist.
+
+A newly active geometric relationship joining the group, suppression change, or connectivity merge/split therefore invalidates an old result.
+
+Geometric diagnostics use the canonical authority order filtered to free authorities. Repeated rooted occurrences sharing one authority contribute one six-variable block.
+
+Block 28 applies the same authority ownership principle to combined motion groups and reuses shared authority/proposal and boundary freshness helpers.
 
 ## Persistence boundary
 
-Persistent inputs remain local `AssemblyConstraint` records, Project-owned `AssemblyHierarchyConstraint` records, component model state, and `SubassemblyInstance` path-boundary model state.
+Persistent inputs remain local `AssemblyConstraint` records, Project-owned `AssemblyHierarchyConstraint` records, component model state, and `SubassemblyInstance` path-boundary state.
 
-Derived and unpersisted Block-25 products are:
+Derived and unpersisted Block-25 products:
 
 ```text
 ComponentTransformAuthority values
 AssemblyRelationshipIdentity values
-relationship-to-authority incidences
-cross-hierarchy endpoint-to-authority mappings
-connected cross-hierarchy solve groups
+geometric relationship-to-authority incidences
+cross-geometric endpoint-to-authority mappings
+connected geometric solve groups
 ```
 
-None is emitted to Project JSON.
+Block-28 motion graph identities/incidences/mappings/groups are also derived and are not emitted to Project JSON.
 
 ## Failure policy
 
 Graph construction fails closed when complete Project structure is invalid.
 
-After successful structure validation it also fails when an expected local target component, cross-hierarchy occurrence path, reached assembly document, or addressed endpoint component cannot be reproduced.
+After successful structure validation it also fails when an expected local target component, exact cross-hierarchy occurrence path, reached assembly document, or addressed endpoint component cannot be reproduced.
 
-Unsupported semantic feature strings are not graph errors because this layer does not evaluate semantic geometry.
+Unsupported semantic feature strings are not graph errors because graph derivation does not evaluate semantic geometry.
 
 ## Focused coverage
+
+Geometric graph:
 
 ```bash
 ./build/dev/blcad_core_tests "[core][assembly-cross-hierarchy-graph]"
 ```
 
-Coverage proves root/child/nested authority mapping, repeated path preservation, shared authority deduplication, same-authority one-incidence/two-mapping semantics, one child-local relationship despite repeated child occurrences, mixed local/cross connectivity, suppression and visibility policy, inactive relationship exclusion, pure-local filtering, insertion-order independence, source immutability, and fail-closed invalid Project structure.
+Motion graph follow-up:
 
-## Implemented numeric and application follow-ups
+```bash
+./build/dev/blcad_core_tests "[core][assembly-cross-hierarchy-motion-graph]"
+```
 
-Block 26 (`docs/assembly-cross-hierarchy-numeric-solver-mvp5.md`) consumes one exact current solve group, filters canonical authority order to free authorities, allocates six direct-transform variables per unique free authority, and evaluates mixed document-local/root-space residuals through the shared numeric engine.
-
-Block 27 (`docs/assembly-cross-hierarchy-application-diagnostics-mvp5.md`) rebuilds this graph during result application and requires the exact relationship/authority group encoded by the result snapshots to still exist.
-
-This means graph participation itself is now a freshness input. A newly active relationship joining the group, suppression change, or connectivity merge/split invalidates an old solve result even when the original relationship records are unchanged.
-
-Cross-hierarchy diagnostics also use the canonical Block-25 authority order filtered to free authorities. Repeated rooted occurrences mapping to one authority therefore contribute one six-variable diagnostics block.
-
-## Explicitly deferred from this connectivity layer
-
-- cross-hierarchy joint-to-authority incidence;
-- combined local/cross geometric/joint motion connectivity;
-- nested motion propagation;
-- occurrence-local child pose overrides;
-- whole-subassembly variables.
+Coverage proves exact authority mapping, repeated path preservation, shared authority deduplication, same-authority one-incidence/two-mapping semantics, one child-local relationship despite repeated child occurrences, mixed local/Project connectivity, suppression and visibility policy, pure-local filtering, deterministic ordering, and Block-28 four-class motion closure.
 
 ## Current handoff
 
-Next is Block 28 only.
+The geometric incidence contract remains frozen and is reused by Blocks 26-27. Block 28 is implemented with a separate motion-specific graph that reuses transform-authority identity without changing geometric solve groups.
 
-Block 28 must extend the relationship/authority incidence discipline to persistent Project-level occurrence-qualified Revolute joints and derive combined motion connectivity across local geometric relationships, local joints, Project-level cross geometric relationships, and Project-level cross-hierarchy joints.
-
-The existing geometric `AssemblyCrossHierarchyConstraintGraph` should remain authoritative for geometric solve groups unless a deliberately generalized shared relationship/authority graph abstraction is introduced without changing established ordering.
+Next is Block 29 only: derive stable structured exchange assembly/component/product occurrence identities from the canonical hierarchy and posed-leaf boundaries, then emit structured STEP assembly/product relationships.
