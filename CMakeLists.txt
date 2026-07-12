@@ -313,6 +313,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/assembly_cross_hierarchy_constraint_solver_tests.cpp
       tests/geometry/assembly_cross_hierarchy_diagnostics_tests.cpp
       tests/geometry/assembly_cross_hierarchy_joint_motion_tests.cpp
+      tests/geometry/assembly_generated_topology_target_resolver_tests.cpp
       tests/geometry/assembly_geometric_target_taxonomy_tests.cpp
       tests/geometry/assembly_hierarchy_constraint_equation_builder_tests.cpp
       tests/geometry/assembly_hierarchy_revolute_joint_equation_builder_tests.cpp

@@ -343,7 +343,7 @@ current .seat -> CircularFeatureSeat -> Plane + Axis + Frame
 
 The legacy target strings remain unchanged. Historical local/hierarchy `resolve`, `resolve_axis`, and `resolve_insert` APIs remain compatibility adapters whose geometry originates at the typed projection boundary.
 
-Block 35 does not yet add `topo:` Geometry target resolution. That is Block 36.
+Block 36 adds `topo:` Geometry target resolution: `resolve_geometric` parses canonical generated-topology producer identity before the legacy grammar and builds Cylinder/Axis, Line, Circle/Axis/center Point, and Point descriptors analytically from validated feature/sketch/profile intent, for both component-local and exact rooted transform semantics.
 
 Canonical target contract: `docs/assembly-geometric-target-taxonomy-mvp5.md`.
 
@@ -495,6 +495,6 @@ Canonical numbered sequence:
 
 - `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`
 
-The next technical step is Block 36 only: Geometry resolution of Block-35 semantic generated topology identities into generated cylindrical-face, linear-edge, circular-edge, and vertex target descriptors/capabilities with exact current topology type/cardinality checks.
+The next technical step is Block 37 only: the explicit target compatibility matrix — one deterministic resolver from relationship type plus target A/B capability sets to one exact ordered capability pair/bundle or explicit incompatibility, consumed by the existing equation builders.
 
-Target compatibility remains Block 37. Occurrence-local child pose overrides, whole-subassembly solve variables, general physics, and richer joints remain deferred according to their roadmap blocks.
+Block 36 generated-topology target resolution is implemented. Occurrence-local child pose overrides, whole-subassembly solve variables, general physics, and richer joints remain deferred according to their roadmap blocks.

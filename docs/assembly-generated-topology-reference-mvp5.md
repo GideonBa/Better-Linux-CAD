@@ -22,14 +22,14 @@ Implemented:
 - byte-for-byte assembly endpoint JSON roundtrips through the unchanged endpoint shape;
 - focused Core acceptance coverage.
 
-Not implemented:
+Not implemented in Block 35 (Block 36 status noted inline):
 
-- OCCT face/edge/vertex lookup for these identities;
-- `AssemblyConstraintTargetResolver` or hierarchy resolver branches for `topo:` sources;
-- Plane/Axis/Line/Point/Circle/Cylinder descriptor construction from Block-35 identities;
-- capability compatibility changes;
-- new relationship or joint families;
-- pattern-instance semantic identity.
+- OCCT face/edge/vertex lookup for these identities — intentionally still not done; Block 36 computes descriptors analytically from validated model intent rather than consulting kernel topology;
+- `AssemblyConstraintTargetResolver` or hierarchy resolver branches for `topo:` sources — **implemented in Block 36**;
+- Plane/Axis/Line/Point/Circle/Cylinder descriptor construction from Block-35 identities — **implemented in Block 36**;
+- capability compatibility changes — remains Block 37;
+- new relationship or joint families — remains Block 38 and later;
+- pattern-instance semantic identity — remains deferred.
 
 ## Authority boundary
 
@@ -220,7 +220,7 @@ expected cardinality is exactly one
 profile-derived references retain the exact source ProfileId
 ```
 
-Validation does not probe OCCT topology. Block 36 must start from this validated producer identity and then prove the corresponding current generated topology has the expected type and cardinality before producing a geometric descriptor.
+Validation does not probe OCCT topology. Block 36 starts from this validated producer identity and then derives the corresponding geometric descriptor analytically from current model intent, without consulting kernel topology.
 
 ## Ambiguity and failure policy
 
@@ -329,16 +329,15 @@ Generated topology producer matrices, classification results, validation results
 
 ## Handoff
 
-The next technical step is Block 36: generated face/edge/vertex Geometry target resolution.
-
-Block 36 must parse `topo:` sources before legacy feature-role parsing, validate Block-35 producer identity/recovery, identify the exact current generated subelement from the supported producer role, prove topology type and cardinality, and project:
+Block 36 (generated face/edge/vertex Geometry target resolution) is implemented. Its canonical contract lives in `docs/assembly-general-geometric-target-roadmap.md`. `AssemblyConstraintTargetResolver::resolve_geometric` parses `topo:` sources before legacy feature-role parsing, validates Block-35 producer identity through `validate_generated_topology_reference`, and projects:
 
 ```text
-GeneratedPlanarFace      -> Plane
 GeneratedCylindricalFace -> Cylinder + Axis
 GeneratedLinearEdge      -> Line
 GeneratedCircularEdge    -> Circle + Axis + Point(center)
 GeneratedVertex          -> Point
 ```
 
-Block 36 must not add compatibility rules or new relationship families. Those remain Block 37 and later.
+Descriptors are computed analytically from validated feature/sketch/profile intent for both component-local and exact rooted transform semantics; acceptance is `[geometry][assembly-generated-topology-target-resolution]`. Block 36 added no compatibility rule, relationship family, or JSON field.
+
+The next technical step is Block 37: the explicit target compatibility matrix.

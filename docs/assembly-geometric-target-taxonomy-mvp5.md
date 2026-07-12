@@ -4,7 +4,7 @@ Status: implemented as Block 31 of `docs/assembly-cross-hierarchy-solver-sequenc
 
 This document is canonical for the Geometry-layer derived assembly target taxonomy, typed geometric descriptors, source-to-capability projection matrix, local/root-space resolved target contract, and compatibility adaptation of the existing generated face, `.axis`, and `.seat` families.
 
-Generated-topology Core identity/recovery is canonical in `docs/assembly-generated-topology-reference-mvp5.md`. Geometry resolution of those Block-35 `topo:` identities is the Block-36 next technical step.
+Generated-topology Core identity/recovery is canonical in `docs/assembly-generated-topology-reference-mvp5.md`. Geometry resolution of those Block-35 `topo:` identities through this taxonomy is implemented as Block 36; its canonical contract lives in `docs/assembly-general-geometric-target-roadmap.md`.
 
 ## Scope
 
@@ -490,7 +490,7 @@ The hierarchy result retains exact endpoint identity, source kind, source metada
 
 Typed local/hierarchy resolution and projection fail closed on missing model context, malformed or unsupported semantic source, invalid producer inputs, unresolved workplanes, invalid hierarchy path, invalid source metadata, source-kind/descriptor mismatch, invalid descriptor geometry, non-canonical capability order, invalid transform context, and unsupported projection.
 
-Block 36 must additionally fail closed on malformed `topo:` sources, unsupported Block-35 producer roles, current topology type mismatch, and current cardinality different from the producer contract.
+Block 36 additionally fails closed on malformed `topo:` sources, unsupported Block-35 producer roles, wrong source profile identity, and family/role mismatches, via `validate_generated_topology_reference`.
 
 ## Focused coverage
 
@@ -533,20 +533,21 @@ Persistent endpoints retain their exact semantic-reference strings. Block 35 add
 
 `docs/file-format.md` remains save-format authority.
 
-## Next technical step — Block 36
+## Block 36 — generated-topology resolution — Implemented
 
-Implement Block 36 only: parse and resolve Block-35 `topo:` generated-topology identities through the Block-31 taxonomy.
+Block 36 parses and resolves Block-35 `topo:` generated-topology identities through this Block-31 taxonomy.
 
-Required mapping:
+Implemented mapping:
 
 ```text
-GeneratedPlanarFace      -> Plane
 GeneratedCylindricalFace -> Cylinder + Axis
 GeneratedLinearEdge      -> Line
 GeneratedCircularEdge    -> Circle + Axis + Point(center)
 GeneratedVertex          -> Point
 ```
 
-Resolution must start from producer semantic identity, verify exact current topology type and expected cardinality, preserve component-local versus exact rooted transform semantics, and mutate no source model.
+Resolution starts from validated producer semantic identity, computes descriptors analytically from current feature/sketch/profile model intent, preserves component-local versus exact rooted transform semantics, and mutates no source model. The canonical Block-36 contract lives in `docs/assembly-general-geometric-target-roadmap.md`.
 
-Target compatibility remains Block 37.
+## Next technical step — Block 37
+
+The next technical step is Block 37: the explicit target compatibility matrix.

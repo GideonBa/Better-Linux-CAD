@@ -1,6 +1,6 @@
 # General Assembly Geometric Target and Relationship Roadmap
 
-Status: Blocks 31–35 are implemented. Block 36 is the current next technical step. Blocks 36–47 remain planned headless architecture.
+Status: Blocks 31–36 are implemented. Block 37 is the current next technical step. Blocks 37–47 remain planned headless architecture.
 
 This document is the active status and sequencing authority for the expansion from the current assembly target layer to semantic reference geometry, stable generated topology targets, generic geometric relationships, and richer motion-joint families.
 
@@ -154,14 +154,14 @@ Focused tag:
 
 ## Mandatory continuation order
 
-Blocks 32 through 35 are implemented. The remaining order is unchanged.
+Blocks 32 through 36 are implemented. The remaining order is unchanged.
 
 ```text
 32 assembly-selectable reference geometry Core intent (implemented)
   -> 33 reference geometry serialization and structure validation (implemented)
   -> 34 datum/axis/line/point target resolution (implemented)
   -> 35 stable semantic generated topology identity/recovery (implemented)
-  -> 36 generated face/edge/vertex target resolution
+  -> 36 generated face/edge/vertex target resolution (implemented)
   -> 37 explicit target compatibility matrix
   -> 38 generic geometric relationship Core intent + JSON
   -> 39 generic relationship equations + shared solve integration
@@ -291,36 +291,38 @@ Focused tags:
 
 Block 35 adds no Geometry target resolver branch, equation, compatibility rule, relationship type, or joint family.
 
-## Block 36 — Generated face, edge, and vertex target resolution — Next
+## Block 36 — Generated face, edge, and vertex target resolution — Implemented
 
 Primary boundary: Geometry semantic target resolution.
 
-Resolve Block-35 semantic sources into Block-31 descriptors/capabilities:
+Implemented resolution of the four Block-35 `topo:` generated-topology families into Block-31 descriptors/capabilities (generated planar faces already resolve through the unchanged legacy `.top/.bottom/...` path):
 
 ```text
-GeneratedPlanarFace      -> Plane
 GeneratedCylindricalFace -> Cylinder + Axis
 GeneratedLinearEdge      -> Line
 GeneratedCircularEdge    -> Circle + Axis + Point(center)
 GeneratedVertex          -> Point
 ```
 
-Resolution must start from canonical semantic producer identity. For `topo:` sources the resolver must parse before the legacy feature-role grammar, validate the Block-35 identity/recovery contract, identify the exact current generated subelement for the producer role, and prove current topology type and expected cardinality before descriptor construction.
+`AssemblyConstraintTargetResolver::resolve_geometric` parses canonical `topo:` producer identity before the legacy feature-role grammar (valid `topo:` spellings contain no `.`), validates the Block-35 identity/recovery contract through `validate_generated_topology_reference`, then builds each descriptor from current model intent:
 
-Semantic producer identity remains authoritative. OCCT topology is execution data only after semantic resolution identifies the intended generated subelement.
+- the single-circle cylindrical wall reuses the existing circular-feature geometry (axis origin/direction and radius) already shared with the legacy `.axis` producer;
+- circular rims are the two coaxial circles at the box faces the through-all cut passes through — `source_rim` is the plane nearest the sketched circle and `opposite_rim` the far plane, obtained by projecting the target box onto the hole axis exactly as `CircularCutAdapter` does;
+- rectangular linear edges and vertices are derived from the target box extent (rectangle center/width/height plus extrude thickness) under the established Right=+x, Front=+y, Top=+z box convention.
 
-Geometric validation remains:
+Semantic producer identity remains authoritative. OCCT topology is not consulted; descriptors are computed analytically from validated feature/sketch/profile intent.
+
+Geometric validation is enforced by the Block-31 descriptor validators:
 
 ```text
 Line      finite non-degenerate unit direction
 Circle    finite positive radius and right-handed frame
 Cylinder  finite positive radius and non-degenerate unit axis
-Plane     finite orthogonal frame under the established Plane convention
 Point     finite
-source topology type matches semantic producer role
+descriptor variant matches the semantic producer family
 ```
 
-Local resolution returns component-local descriptors. Hierarchy resolution evaluates requested capabilities through the exact rooted occurrence transform chain. Repeated rooted occurrences may share one PartDocument semantic target while retaining distinct root-space geometry.
+Local resolution returns component-local descriptors. Hierarchy resolution reuses the same local resolver and evaluates the descriptor through the exact rooted occurrence transform chain. Repeated rooted occurrences share one PartDocument semantic target while retaining distinct root-space geometry.
 
 Focused acceptance tag:
 
@@ -328,9 +330,9 @@ Focused acceptance tag:
 [geometry][assembly-generated-topology-target-resolution]
 ```
 
-Required proofs remain the Block-36 proofs from the planning baseline: cylinder Axis/Cylinder projection, circular edge Circle/Axis/center Point projection, linear edge Line projection, vertex Point projection, exact local/root transform semantics, repeated-root occurrence behavior, unsupported producer failure, and source-model immutability.
+`tests/geometry/assembly_generated_topology_target_resolver_tests.cpp` proves cylinder Axis/Cylinder projection, circular source/opposite rim Circle/Axis/center Point projection, all twelve linear-edge Line projections, all eight vertex Point projections, exact local and rooted transform semantics, repeated-root occurrence behaviour, fail-closed unsupported producer/profile/role/spelling handling, and source-model immutability.
 
-Block 36 adds no compatibility rule and no new relationship type.
+Block 36 adds no compatibility rule, no new relationship type, and no JSON field.
 
 ## Block 37 — Explicit target compatibility matrix
 
@@ -526,8 +528,8 @@ posed geometry/contact records/sweep analyses
 
 ## Immediate next technical step
 
-Block 36 is the current next technical step.
+Block 37 is the current next technical step.
 
-Implement Block 36 only: Geometry resolution of Block-35 semantic generated topology references into generated cylindrical-face, linear-edge, circular-edge, and vertex descriptors/capabilities, including exact producer-role topology type/cardinality checks and local/root-space transform behavior.
+Implement Block 37 only: the explicit target compatibility matrix — one deterministic resolver from relationship type plus target A/B capability sets to one exact ordered capability pair/bundle or explicit incompatibility, consumed by the existing equation builders. See the Block 37 section above for the initial matrix.
 
-Do not implement Block-37 compatibility rules in Block 36.
+Do not add new relationship enums or equations in Block 37; that begins at Block 38.

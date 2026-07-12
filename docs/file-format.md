@@ -453,7 +453,7 @@ source FeatureId
 
 The current endpoint serializers need no new JSON field because `semantic_reference` already stores opaque identity strings. `topo:` spellings roundtrip byte-for-byte through local and occurrence-qualified endpoints.
 
-Block 35 does not persist generated-topology role matrices, producer classification, validation results, recovery results, or OCCT topology. Block-36 Geometry resolution of `topo:` identities is derived query state.
+Block 35 does not persist generated-topology role matrices, producer classification, validation results, recovery results, or OCCT topology. Block 36 Geometry resolution of `topo:` identities into typed descriptors/capabilities is derived query state and likewise adds no JSON field.
 
 Fields such as these are not persistent:
 

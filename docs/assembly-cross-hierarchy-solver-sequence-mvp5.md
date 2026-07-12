@@ -1,6 +1,6 @@
 # Cross-Hierarchy Assembly Relationship Sequence MVP-5
 
-Status: Blocks 23–35 are implemented. Block 36 is the current next technical step. Blocks 36–47 remain the explicit general assembly target, relationship, and richer-joint continuation.
+Status: Blocks 23–36 are implemented. Block 37 is the current next technical step. Blocks 37–47 remain the explicit general assembly target, relationship, and richer-joint continuation.
 
 This document is the canonical numbered handoff sequence for cross-document assembly intent, solving, motion, exchange, posed analysis, and general geometric target architecture.
 
@@ -399,23 +399,22 @@ Focused tags:
 
 Block 35 adds no Geometry target resolver branch or equation.
 
-## Block 36 — Generated face, edge, and vertex target resolution — Next
+## Block 36 — Generated face, edge, and vertex target resolution — Implemented
 
 Primary boundary: Geometry semantic target resolution.
 
-Resolve only Block-35 supported semantic producers into Block-31 descriptors/capabilities:
+Implemented resolution of the four Block-35 `topo:` semantic producers into Block-31 descriptors/capabilities (generated planar faces already resolve through the unchanged legacy `.top/.bottom/...` path):
 
 ```text
-GeneratedPlanarFace      -> Plane
 GeneratedCylindricalFace -> Cylinder + Axis
 GeneratedLinearEdge      -> Line
 GeneratedCircularEdge    -> Circle + Axis + Point(center)
 GeneratedVertex          -> Point
 ```
 
-`topo:` spellings must be parsed before legacy feature-role parsing. Resolution starts from validated producer identity and then identifies the exact current generated subelement, verifies topology type and expected cardinality, and constructs typed descriptors. OCCT topology is execution data only after semantic resolution identifies the intended producer role.
+`topo:` spellings are parsed before legacy feature-role parsing. Resolution starts from `validate_generated_topology_reference` producer identity and then constructs typed descriptors analytically from validated feature/sketch/profile intent — the single-circle wall reuses the existing circular-feature geometry, circular rims are the two coaxial circles at the box faces the through-all cut passes through, and rectangular linear edges/vertices are derived from the target box extent. OCCT topology is not consulted.
 
-Local targets remain component-local. Hierarchy targets use the exact component-plus-parent transform chain. Repeated rooted occurrences may have different root-space geometry while sharing one PartDocument semantic source identity.
+Local targets remain component-local. Hierarchy targets reuse the local resolver through the exact component-plus-parent transform chain. Repeated rooted occurrences have different root-space geometry while sharing one PartDocument semantic source identity.
 
 Focused tag:
 
@@ -423,7 +422,7 @@ Focused tag:
 [geometry][assembly-generated-topology-target-resolution]
 ```
 
-Block 36 adds no compatibility rule and no new relationship type.
+Block 36 adds no compatibility rule, no new relationship type, and no JSON field.
 
 ## Blocks 37–40 — Compatibility and generic relationship/joint target semantics
 
@@ -494,6 +493,6 @@ posed shapes/contact records/sweep analyses
 
 ## Next technical step
 
-Implement Block 36 only: Geometry resolution of canonical Block-35 generated-topology references into generated cylindrical-face, linear-edge, circular-edge, and vertex target descriptors/capabilities with exact producer-role topology type/cardinality checks.
+Implement Block 37 only: the explicit target compatibility matrix — one deterministic resolver from relationship type plus target A/B capability sets to one exact ordered capability pair/bundle or explicit incompatibility, consumed by the existing equation builders.
 
-Do not implement Block-37 compatibility rules in Block 36.
+Do not add new relationship enums or equations in Block 37; those begin at Block 38.

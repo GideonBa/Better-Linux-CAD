@@ -117,10 +117,10 @@ Geometry target/equation/solve/motion/freshness:
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-semantic-freshness]"
 ```
 
-The Block-36 tag is reserved for the next implementation step:
+The Block-36 generated-topology target resolution tag:
 
-```text
-[geometry][assembly-generated-topology-target-resolution]
+```bash
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-generated-topology-target-resolution]"
 ```
 
 Posed geometry, analysis, and exchange:
@@ -217,7 +217,7 @@ AssemblyHierarchyConstraintTargetResolver::resolve_geometric
 
 Legacy `resolve`, `resolve_axis`, and `resolve_insert` methods remain compatibility APIs and adapt from typed projections.
 
-Block 35 intentionally does not add a `topo:` branch to these resolvers. That branch belongs to Block 36.
+Block 36 adds the `topo:` branch to these resolvers: canonical generated-topology producer identity is parsed before the legacy grammar and resolved into typed descriptors from validated model intent.
 
 ## Headless tools
 
@@ -319,4 +319,4 @@ Focused Block-35 tests:
 ./build/dev/blcad_core_tests "[core][semantic-generated-topology-recovery]"
 ```
 
-The immediate next step is Block 36: generated face/edge/vertex Geometry target resolution. Exact sequencing is maintained in `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md` and detailed target planning in `docs/assembly-general-geometric-target-roadmap.md`.
+The immediate next step is Block 37: the explicit target compatibility matrix. Block 36 generated face/edge/vertex Geometry target resolution is implemented. Exact sequencing is maintained in `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md` and detailed target planning in `docs/assembly-general-geometric-target-roadmap.md`.

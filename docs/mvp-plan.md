@@ -4,16 +4,16 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 35
-current_block: 36
-current_boundary: Geometry semantic target resolution
-current_tag: "[geometry][assembly-generated-topology-target-resolution]"
+implemented_through: Block 36
+current_block: 37
+current_boundary: Derived relationship compatibility semantics (explicit target compatibility matrix)
+current_tag: "(assigned when Block 37 starts)"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
   mvp_3: "Parametric bolt circle pattern — implemented"
   mvp_4: "Assembly parameters and Project container — implemented"
-  mvp_5: "Assembly relationships, motion, hierarchy, analysis, exchange — Blocks 1–35 implemented, Blocks 36–47 planned"
+  mvp_5: "Assembly relationships, motion, hierarchy, analysis, exchange — Blocks 1–36 implemented, Blocks 37–47 planned"
   mvp_6: "Part Construction — Blocks 48–94 planned, starts after Block 47"
 ---
 
@@ -378,9 +378,33 @@ The single-circle producer retains the exact source `CircleProfileId`. Unsupport
 [core][semantic-generated-topology-recovery]
 ```
 
-**Notes:** Block 35 adds no generated-topology Geometry resolver branch. Geometry target resolution remains Block 36.
+**Notes:** Block 35 adds no generated-topology Geometry resolver branch. Geometry target resolution is Block 36.
 
-## Blocks 36–47 — Planned general target, relationship, and joint continuation
+### Block 36 — Generated face/edge/vertex target resolution
+
+**Status:** Implemented
+**Canonical:** roadmap `docs/assembly-general-geometric-target-roadmap.md`
+
+Implemented `resolve_geometric` resolution of the four Block-35 `topo:` families into Block-31 descriptors/capabilities (generated planar faces already resolve through the unchanged legacy `.top/.bottom/...` path):
+
+```text
+GeneratedCylindricalFace -> Cylinder + Axis
+GeneratedLinearEdge      -> Line
+GeneratedCircularEdge    -> Circle + Axis + Point(center)
+GeneratedVertex          -> Point
+```
+
+Canonical `topo:` producer identity is parsed before the legacy feature-role grammar and validated through `validate_generated_topology_reference`. The single-circle wall reuses the existing circular-feature geometry; circular rims are the two coaxial circles at the box faces the through-all cut passes through; rectangular linear edges/vertices are derived from the target box extent under the Right=+x, Front=+y, Top=+z convention. Descriptors are computed analytically from validated feature/sketch/profile intent — OCCT topology is not consulted. Local resolution stays component-local; hierarchy resolution reuses the local resolver through the exact rooted occurrence transform chain, and repeated rooted occurrences share one PartDocument target while retaining distinct root-space geometry.
+
+**Focused tag:**
+
+```text
+[geometry][assembly-generated-topology-target-resolution]
+```
+
+**Notes:** Block 36 adds no compatibility rule, no new relationship type, and no JSON field. Target compatibility is Block 37.
+
+## Blocks 37–47 — Planned general target, relationship, and joint continuation
 
 **Status:** Planned
 **Canonical:** roadmap `docs/assembly-general-geometric-target-roadmap.md`
@@ -388,7 +412,6 @@ The single-circle producer retains the exact source `CircleProfileId`. Unsupport
 Mandatory order:
 
 ```text
-36 generated face/edge/vertex target resolution
 37 explicit target compatibility matrix
 38 generic geometric relationship Core intent + JSON
 39 generic relationship equations + shared solve integration
@@ -440,27 +463,21 @@ After Block 94 the first Part Construction MVP is considered complete. That mean
 
 It does not mean SolidWorks/Inventor Part product parity. Production GUI modeling, Class-A surfacing, arbitrary NURBS control cages, variable-radius fillets, advanced topology healing, direct modeling, sheet metal, weldments, and specialized manufacturing feature systems remain later work.
 
-## Current next technical step — Block 36
+## Current next technical step — Block 37
 
 **Status:** Current
-**Primary boundary:** Geometry semantic target resolution.
+**Primary boundary:** Derived relationship compatibility semantics.
 
-Block 36 must resolve validated Block-35 semantic generated topology identities into the Block-31 target taxonomy:
-
-```text
-GeneratedPlanarFace      -> Plane
-GeneratedCylindricalFace -> Cylinder + Axis
-GeneratedLinearEdge      -> Line
-GeneratedCircularEdge    -> Circle + Axis + Point(center)
-GeneratedVertex          -> Point
-```
-
-The resolver must parse canonical `topo:` spellings before legacy feature-role parsing, validate the producer-role identity, identify the exact current generated subelement, prove topology type and expected cardinality, and preserve component-local versus exact rooted transform semantics.
-
-**Focused tag:**
+Block 37 must introduce one deterministic resolver from relationship type plus target A/B capability sets to one exact ordered capability pair/bundle, or an explicit incompatibility:
 
 ```text
-[geometry][assembly-generated-topology-target-resolution]
+Mate         Plane <-> Plane
+Distance     Plane <-> Plane | Point <-> Point | Point <-> Plane | Plane <-> Point
+Angle        Plane <-> Plane | Line <-> Line | Axis <-> Axis | Line <-> Axis | Axis <-> Line
+Concentric   Axis <-> Axis
+Insert       Frame <-> Frame
 ```
 
-**Notes:** Target compatibility remains Block 37.
+Capability choice is deterministic for multi-capability targets. Existing equation builders consume the compatibility result rather than source-kind enums.
+
+**Notes:** Block 37 adds no new relationship enum or equation; new relationship families begin at Block 38.
