@@ -126,6 +126,12 @@ parse_generated_seating_plane_reference(std::string_view semantic_reference) {
   return Vector3{-vector.x, -vector.y, -vector.z};
 }
 
+[[nodiscard]] Vector3 cross(const Vector3& lhs, const Vector3& rhs) noexcept {
+  return Vector3{lhs.y * rhs.z - lhs.z * rhs.y,
+                 lhs.z * rhs.x - lhs.x * rhs.z,
+                 lhs.x * rhs.y - lhs.y * rhs.x};
+}
+
 [[nodiscard]] Vector3 extrude_direction(const ResolvedWorkplane& workplane,
                                          ExtrudeDirection direction) noexcept {
   if (direction == ExtrudeDirection::OppositeSketchNormal) {
@@ -328,6 +334,7 @@ Result<AssemblyResolvedGeometricTarget> AssemblyConstraintTargetResolver::resolv
       return Result<AssemblyResolvedGeometricTarget>::failure(circular.error());
     }
     const auto& value = circular.value();
+    const Vector3 frame_y = cross(value.local_axis.direction, value.local_seating_plane.x_axis);
     return validated_geometric_target(AssemblyResolvedGeometricTarget{
         endpoint,
         AssemblyGeometricTargetSourceKind::CircularFeatureSeat,
@@ -339,7 +346,7 @@ Result<AssemblyResolvedGeometricTarget> AssemblyConstraintTargetResolver::resolv
                                               seating_reference.value().plane()},
         AssemblyFrameTargetDescriptor{value.local_seating_plane.origin,
                                       value.local_seating_plane.x_axis,
-                                      value.local_seating_plane.y_axis,
+                                      frame_y,
                                       value.local_axis.direction},
         assembly_geometric_target_capabilities(
             AssemblyGeometricTargetSourceKind::CircularFeatureSeat),
