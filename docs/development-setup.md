@@ -250,7 +250,7 @@ The typed target/capability and generated-topology identity layers are public li
 
 ## Documentation entry points
 
-- `README.md`: short status and current next step
+- `README.md`: short repository entry point
 - `docs/mvp-plan.md`: implementation sequence
 - `docs/architecture-summary.md`: condensed implemented architecture
 - `docs/file-format.md`: persistent save-format authority
@@ -258,7 +258,7 @@ The typed target/capability and generated-topology identity layers are public li
 - `docs/assembly-geometric-target-taxonomy-mvp5.md`: Block-31 target taxonomy/projection contract
 - `docs/assembly-reference-geometry-intent-mvp5.md`: Blocks 32–34 reference-geometry contract
 - `docs/assembly-generated-topology-reference-mvp5.md`: Block-35 generated-topology identity/recovery contract
-- `docs/assembly-general-geometric-target-roadmap.md`: implemented Blocks 31–35 and planned Blocks 36–47
+- `docs/assembly-general-geometric-target-roadmap.md`: implemented Blocks 31–37 and planned Blocks 38–47
 - `docs/project-goal.md`: long-term direction
 
 ## Formatting
@@ -284,7 +284,7 @@ rm -rf build/
 
 ## Current assembly development boundary
 
-Blocks 23–35 are implemented.
+Blocks 23–37 are implemented.
 
 Block 35 freezes:
 
@@ -312,6 +312,8 @@ recovery
   -> Resolved | Lost
 ```
 
+Block 36 resolves those identities into typed Geometry descriptors. Block 37 freezes deterministic target compatibility selection for existing relationship types.
+
 Focused Block-35 tests:
 
 ```bash
@@ -319,4 +321,12 @@ Focused Block-35 tests:
 ./build/dev/blcad_core_tests "[core][semantic-generated-topology-recovery]"
 ```
 
-The immediate next step is Block 37: the explicit target compatibility matrix. Block 36 generated face/edge/vertex Geometry target resolution is implemented. Exact sequencing is maintained in `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md` and detailed target planning in `docs/assembly-general-geometric-target-roadmap.md`.
+Focused Block-36 and Block-37 tests:
+
+```bash
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-generated-topology-target-resolution]"
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-target-compatibility]"
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-cross-hierarchy-target-compatibility]"
+```
+
+The immediate next step is Block 38: generic geometric relationship Core intent and JSON. Block 37 explicit target compatibility is implemented without adding new equations or JSON fields. Exact sequencing is maintained in `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md` and detailed target planning in `docs/assembly-general-geometric-target-roadmap.md`.

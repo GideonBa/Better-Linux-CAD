@@ -179,4 +179,4 @@ Local targets remain component-local and retain the direct component transform c
 
 ## Handoff
 
-Block 35 generated-topology identity and recovery is implemented in `docs/assembly-generated-topology-reference-mvp5.md`, and Block 36 generated face/edge/vertex Geometry target resolution is implemented (canonical contract in `docs/assembly-general-geometric-target-roadmap.md`). The next block is Block 37: the explicit target compatibility matrix.
+Block 35 generated-topology identity and recovery is implemented in `docs/assembly-generated-topology-reference-mvp5.md`, Block 36 generated face/edge/vertex Geometry target resolution is implemented, and Block 37 explicit target compatibility is implemented (canonical contract in `docs/assembly-general-geometric-target-roadmap.md`). The next block is Block 38: generic geometric relationship Core intent and JSON.

@@ -1,14 +1,22 @@
 #include "blcad/geometry/assembly_constraint_equation_builder.hpp"
 
 #include "blcad/geometry/assembly_constraint_target_resolver.hpp"
+#include "blcad/geometry/assembly_target_compatibility.hpp"
 
 #include <cmath>
 #include <numbers>
 #include <string>
+#include <string_view>
 #include <utility>
 
 namespace blcad::geometry {
 namespace {
+
+struct ResolvedAssemblySpaceGeometricTarget {
+  ComponentInstanceId component_instance;
+  std::string semantic_reference;
+  AssemblyResolvedGeometricTarget target;
+};
 
 [[nodiscard]] Error validation_error(std::string object_id, std::string message) {
   return Error::validation(std::move(object_id), std::move(message));
@@ -31,20 +39,48 @@ namespace {
                  lhs.x * rhs.y - lhs.y * rhs.x};
 }
 
-[[nodiscard]] Result<AssemblySpaceConstraintTargetDescriptor>
-resolve_assembly_space_target(const Project& project, const AssemblyConstraintTarget& target) {
-  const AssemblyConstraintTargetResolver target_resolver;
-  auto resolved_target = target_resolver.resolve(project, target);
-  if (resolved_target.has_error()) {
-    return Result<AssemblySpaceConstraintTargetDescriptor>::failure(resolved_target.error());
-  }
+[[nodiscard]] bool legacy_feature_target(std::string_view semantic_reference) noexcept {
+  return !semantic_reference.starts_with("ref:") && !semantic_reference.starts_with("topo:");
+}
 
+[[nodiscard]] Result<ResolvedAssemblySpaceGeometricTarget>
+resolve_assembly_space_geometric_target(const Project& project,
+                                        const AssemblyConstraintTarget& target) {
+  const AssemblyConstraintTargetResolver target_resolver;
+  auto resolved_target = target_resolver.resolve_geometric(project, target);
+  if (resolved_target.has_error()) {
+    if (legacy_feature_target(target.semantic_reference())) {
+      auto legacy_error = target_resolver.resolve(project, target);
+      if (legacy_error.has_error()) {
+        return Result<ResolvedAssemblySpaceGeometricTarget>::failure(legacy_error.error());
+      }
+    }
+    return Result<ResolvedAssemblySpaceGeometricTarget>::failure(resolved_target.error());
+  }
+  return Result<ResolvedAssemblySpaceGeometricTarget>::success(
+      ResolvedAssemblySpaceGeometricTarget{target.component_instance(), target.semantic_reference(),
+                                           std::move(resolved_target.value())});
+}
+
+[[nodiscard]] Result<AssemblySpaceConstraintTargetDescriptor>
+project_assembly_space_planar_target(const ResolvedAssemblySpaceGeometricTarget& resolved) {
+  auto plane = project_plane(resolved.target);
+  if (plane.has_error()) {
+    return Result<AssemblySpaceConstraintTargetDescriptor>::failure(plane.error());
+  }
   const AssemblyTransformEvaluator transform_evaluator;
-  const ResolvedAssemblyConstraintTarget& resolved = resolved_target.value();
   return Result<AssemblySpaceConstraintTargetDescriptor>::success(
       AssemblySpaceConstraintTargetDescriptor{
-          resolved.component_instance, target.semantic_reference(),
-          transform_evaluator.evaluate_plane(resolved.component_transform, resolved.local_plane)});
+          resolved.component_instance, resolved.semantic_reference,
+          transform_evaluator.evaluate_plane(
+              resolved.target.transforms_inner_to_outer.front(),
+              ComponentLocalPlanarDescriptor{plane.value().origin, plane.value().x_axis,
+                                             plane.value().y_axis, plane.value().normal})});
+}
+
+[[nodiscard]] bool selected_plane_pair(const AssemblyTargetCompatibility& compatibility) noexcept {
+  return compatibility.target_a_capability == AssemblyGeometricTargetCapability::Plane &&
+         compatibility.target_b_capability == AssemblyGeometricTargetCapability::Plane;
 }
 
 } // namespace
@@ -69,12 +105,34 @@ AssemblyConstraintEquationBuilder::build(const Project& project,
         "Insert equation construction requires dedicated composite target support"));
   }
 
-  auto target_a = resolve_assembly_space_target(project, constraint.target_a());
+  auto geometric_target_a = resolve_assembly_space_geometric_target(project, constraint.target_a());
+  if (geometric_target_a.has_error()) {
+    return Result<AssemblyConstraintEquationDescriptor>::failure(geometric_target_a.error());
+  }
+
+  auto geometric_target_b = resolve_assembly_space_geometric_target(project, constraint.target_b());
+  if (geometric_target_b.has_error()) {
+    return Result<AssemblyConstraintEquationDescriptor>::failure(geometric_target_b.error());
+  }
+
+  const AssemblyTargetCompatibilityResolver compatibility_resolver;
+  auto compatibility = compatibility_resolver.resolve(
+      constraint.type(), geometric_target_a.value().target, geometric_target_b.value().target);
+  if (compatibility.has_error()) {
+    return Result<AssemblyConstraintEquationDescriptor>::failure(compatibility.error());
+  }
+  if (!selected_plane_pair(compatibility.value())) {
+    return Result<AssemblyConstraintEquationDescriptor>::failure(validation_error(
+        constraint.id().value(),
+        "planar equation construction currently requires Plane/Plane target compatibility"));
+  }
+
+  auto target_a = project_assembly_space_planar_target(geometric_target_a.value());
   if (target_a.has_error()) {
     return Result<AssemblyConstraintEquationDescriptor>::failure(target_a.error());
   }
 
-  auto target_b = resolve_assembly_space_target(project, constraint.target_b());
+  auto target_b = project_assembly_space_planar_target(geometric_target_b.value());
   if (target_b.has_error()) {
     return Result<AssemblyConstraintEquationDescriptor>::failure(target_b.error());
   }

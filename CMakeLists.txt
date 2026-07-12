@@ -132,6 +132,7 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/assembly_solve_diagnostics.cpp
     src/geometry/assembly_step_exporter.cpp
     src/geometry/assembly_structured_step_exporter.cpp
+    src/geometry/assembly_target_compatibility.cpp
     src/geometry/assembly_transform_evaluator.cpp
     src/geometry/circular_cut_adapter.cpp
     src/geometry/closed_profile_adapter.cpp
@@ -331,6 +332,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/assembly_step_exporter_tests.cpp
       tests/geometry/assembly_structured_step_exporter_tests.cpp
       tests/geometry/assembly_suppressed_component_solver_tests.cpp
+      tests/geometry/assembly_target_compatibility_tests.cpp
       tests/geometry/assembly_transform_evaluator_tests.cpp
       tests/geometry/back_workplane_pipeline_tests.cpp
       tests/geometry/bolt_circle_pattern_pipeline_tests.cpp

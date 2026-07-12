@@ -439,8 +439,7 @@ TEST_CASE("Insert construction is deterministic read-only and validates target f
                                         "component.b", "feature.hole.seat");
   const auto wrong_family_result = builder.build(project, wrong_family);
   REQUIRE(wrong_family_result.has_error());
-  CHECK(wrong_family_result.error().message() ==
-        "unsupported assembly semantic seating reference family");
+  CHECK(wrong_family_result.error().object_id() == "geometry.assembly_target_compatibility");
 
   const Project non_circle_project = make_project(
       {{"component.a", identity_rigid_transform()}, {"component.b", identity_rigid_transform()}},

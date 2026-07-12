@@ -1,6 +1,6 @@
 # Cross-Hierarchy Assembly Relationship Sequence MVP-5
 
-Status: Blocks 23–36 are implemented. Block 37 is the current next technical step. Blocks 37–47 remain the explicit general assembly target, relationship, and richer-joint continuation.
+Status: Blocks 23–37 are implemented. Block 38 is the current next technical step. Blocks 38–47 remain the explicit general assembly relationship and richer-joint continuation.
 
 This document is the canonical numbered handoff sequence for cross-document assembly intent, solving, motion, exchange, posed analysis, and general geometric target architecture.
 
@@ -297,8 +297,8 @@ Mandatory order:
 33 reference geometry serialization and structure validation (implemented)
 34 datum/axis/line/point target resolution (implemented)
 35 stable semantic generated topology identity/recovery (implemented)
-36 generated face/edge/vertex target resolution
-37 explicit target compatibility matrix
+36 generated face/edge/vertex target resolution (implemented)
+37 explicit target compatibility matrix (implemented)
 38 generic geometric relationship Core intent + JSON
 39 generic relationship equations + shared solve integration
 40 joint target compatibility + oriented Frame contract
@@ -424,9 +424,28 @@ Focused tag:
 
 Block 36 adds no compatibility rule, no new relationship type, and no JSON field.
 
-## Blocks 37–40 — Compatibility and generic relationship/joint target semantics
+## Block 37 — Explicit target compatibility matrix — Implemented
 
-Block 37 introduces one deterministic relationship compatibility resolver from relationship type plus target capability sets to one exact ordered capability pair/bundle or explicit incompatibility.
+Implemented one deterministic relationship compatibility resolver from relationship type plus target capability sets to one exact ordered capability pair/bundle or explicit incompatibility:
+
+```text
+Mate         Plane <-> Plane
+Distance     Plane <-> Plane | Point <-> Point | Point <-> Plane | Plane <-> Point
+Angle        Plane <-> Plane | Line <-> Line | Axis <-> Axis | Line <-> Axis | Axis <-> Line
+Concentric   Axis <-> Axis
+Insert       Frame <-> Frame
+```
+
+Local and cross-hierarchy equation builders consume compatibility before projection. Block 37 adds no new relationship enum, equation, graph rule, JSON field, or persisted Geometry query product.
+
+Focused tags:
+
+```text
+[geometry][assembly-target-compatibility]
+[geometry][assembly-cross-hierarchy-target-compatibility]
+```
+
+## Blocks 38–40 — Generic relationship and joint target semantics
 
 Block 38 adds persistent local/Project-level `Coincident`, `Parallel`, and `Perpendicular` intent plus JSON.
 
@@ -493,6 +512,6 @@ posed shapes/contact records/sweep analyses
 
 ## Next technical step
 
-Implement Block 37 only: the explicit target compatibility matrix — one deterministic resolver from relationship type plus target A/B capability sets to one exact ordered capability pair/bundle or explicit incompatibility, consumed by the existing equation builders.
+Implement Block 38 only: generic geometric relationship Core intent and JSON for `Coincident`, `Parallel`, and `Perpendicular`.
 
-Do not add new relationship enums or equations in Block 37; those begin at Block 38.
+Do not add generic relationship equations in Block 38; those begin at Block 39.

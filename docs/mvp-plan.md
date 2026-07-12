@@ -4,16 +4,16 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 36
-current_block: 37
-current_boundary: Derived relationship compatibility semantics (explicit target compatibility matrix)
-current_tag: "(assigned when Block 37 starts)"
+implemented_through: Block 37
+current_block: 38
+current_boundary: Generic geometric relationship Core intent and JSON
+current_tag: "(assigned when Block 38 starts)"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
   mvp_3: "Parametric bolt circle pattern — implemented"
   mvp_4: "Assembly parameters and Project container — implemented"
-  mvp_5: "Assembly relationships, motion, hierarchy, analysis, exchange — Blocks 1–36 implemented, Blocks 37–47 planned"
+  mvp_5: "Assembly relationships, motion, hierarchy, analysis, exchange — Blocks 1–37 implemented, Blocks 38–47 planned"
   mvp_6: "Part Construction — Blocks 48–94 planned, starts after Block 47"
 ---
 
@@ -404,7 +404,31 @@ Canonical `topo:` producer identity is parsed before the legacy feature-role gra
 
 **Notes:** Block 36 adds no compatibility rule, no new relationship type, and no JSON field. Target compatibility is Block 37.
 
-## Blocks 37–47 — Planned general target, relationship, and joint continuation
+### Block 37 — Explicit target compatibility matrix
+
+**Status:** Implemented
+**Canonical:** roadmap `docs/assembly-general-geometric-target-roadmap.md`
+
+Implemented `AssemblyTargetCompatibilityResolver`, which maps relationship type plus resolved target A/B capability vectors to one deterministic ordered capability pair or an explicit incompatibility:
+
+```text
+Mate         Plane <-> Plane
+Distance     Plane <-> Plane | Point <-> Point | Point <-> Plane | Plane <-> Point
+Angle        Plane <-> Plane | Line <-> Line | Axis <-> Axis | Line <-> Axis | Axis <-> Line
+Concentric   Axis <-> Axis
+Insert       Frame <-> Frame
+```
+
+Existing local and cross-hierarchy Mate/Distance/Angle/Concentric/Insert equation builders now consume compatibility before projection. Block 37 adds no new relationship enum, residual equation, graph rule, JSON field, or persisted Geometry query product.
+
+**Focused tags:**
+
+```text
+[geometry][assembly-target-compatibility]
+[geometry][assembly-cross-hierarchy-target-compatibility]
+```
+
+## Blocks 38–47 — Planned general relationship and joint continuation
 
 **Status:** Planned
 **Canonical:** roadmap `docs/assembly-general-geometric-target-roadmap.md`
@@ -412,7 +436,6 @@ Canonical `topo:` producer identity is parsed before the legacy feature-role gra
 Mandatory order:
 
 ```text
-37 explicit target compatibility matrix
 38 generic geometric relationship Core intent + JSON
 39 generic relationship equations + shared solve integration
 40 joint target compatibility + oriented Frame contract
@@ -463,21 +486,19 @@ After Block 94 the first Part Construction MVP is considered complete. That mean
 
 It does not mean SolidWorks/Inventor Part product parity. Production GUI modeling, Class-A surfacing, arbitrary NURBS control cages, variable-radius fillets, advanced topology healing, direct modeling, sheet metal, weldments, and specialized manufacturing feature systems remain later work.
 
-## Current next technical step — Block 37
+## Current next technical step — Block 38
 
 **Status:** Current
-**Primary boundary:** Derived relationship compatibility semantics.
+**Primary boundary:** Persistent Core relationship model and serialization.
 
-Block 37 must introduce one deterministic resolver from relationship type plus target A/B capability sets to one exact ordered capability pair/bundle, or an explicit incompatibility:
+Block 38 must add local and Project-level persistent intent plus JSON for:
 
 ```text
-Mate         Plane <-> Plane
-Distance     Plane <-> Plane | Point <-> Point | Point <-> Plane | Plane <-> Point
-Angle        Plane <-> Plane | Line <-> Line | Axis <-> Axis | Line <-> Axis | Axis <-> Line
-Concentric   Axis <-> Axis
-Insert       Frame <-> Frame
+Coincident
+Parallel
+Perpendicular
 ```
 
-Capability choice is deterministic for multi-capability targets. Existing equation builders consume the compatibility result rather than source-kind enums.
+Preserve endpoint shapes, target A/B order, active/inactive state semantics, local versus Project-level id scopes, existing value validation, and historical Mate/Distance/Angle/Concentric/Insert compatibility.
 
-**Notes:** Block 37 adds no new relationship enum or equation; new relationship families begin at Block 38.
+**Notes:** Block 38 adds no new equation; Geometry execution begins at Block 39.

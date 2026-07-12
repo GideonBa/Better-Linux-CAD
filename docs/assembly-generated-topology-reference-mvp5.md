@@ -27,7 +27,7 @@ Not implemented in Block 35 (Block 36 status noted inline):
 - OCCT face/edge/vertex lookup for these identities — intentionally still not done; Block 36 computes descriptors analytically from validated model intent rather than consulting kernel topology;
 - `AssemblyConstraintTargetResolver` or hierarchy resolver branches for `topo:` sources — **implemented in Block 36**;
 - Plane/Axis/Line/Point/Circle/Cylinder descriptor construction from Block-35 identities — **implemented in Block 36**;
-- capability compatibility changes — remains Block 37;
+- capability compatibility changes — **implemented in Block 37**;
 - new relationship or joint families — remains Block 38 and later;
 - pattern-instance semantic identity — remains deferred.
 
@@ -340,4 +340,6 @@ GeneratedVertex          -> Point
 
 Descriptors are computed analytically from validated feature/sketch/profile intent for both component-local and exact rooted transform semantics; acceptance is `[geometry][assembly-generated-topology-target-resolution]`. Block 36 added no compatibility rule, relationship family, or JSON field.
 
-The next technical step is Block 37: the explicit target compatibility matrix.
+Block 37 explicit target compatibility is now implemented. Its focused tags are `[geometry][assembly-target-compatibility]` and `[geometry][assembly-cross-hierarchy-target-compatibility]`; it adds no generated-topology JSON field or new equation.
+
+The next technical step is Block 38: generic geometric relationship Core intent and JSON.

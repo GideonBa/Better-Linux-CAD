@@ -1,6 +1,6 @@
 # General Assembly Geometric Target and Relationship Roadmap
 
-Status: Blocks 31–36 are implemented. Block 37 is the current next technical step. Blocks 37–47 remain planned headless architecture.
+Status: Blocks 31–37 are implemented. Block 38 is the current next technical step. Blocks 38–47 remain planned headless architecture.
 
 This document is the active status and sequencing authority for the expansion from the current assembly target layer to semantic reference geometry, stable generated topology targets, generic geometric relationships, and richer motion-joint families.
 
@@ -154,7 +154,7 @@ Focused tag:
 
 ## Mandatory continuation order
 
-Blocks 32 through 36 are implemented. The remaining order is unchanged.
+Blocks 32 through 37 are implemented. The remaining order is unchanged.
 
 ```text
 32 assembly-selectable reference geometry Core intent (implemented)
@@ -162,7 +162,7 @@ Blocks 32 through 36 are implemented. The remaining order is unchanged.
   -> 34 datum/axis/line/point target resolution (implemented)
   -> 35 stable semantic generated topology identity/recovery (implemented)
   -> 36 generated face/edge/vertex target resolution (implemented)
-  -> 37 explicit target compatibility matrix
+  -> 37 explicit target compatibility matrix (implemented)
   -> 38 generic geometric relationship Core intent + JSON
   -> 39 generic relationship equations + shared solve integration
   -> 40 joint target compatibility + oriented Frame contract
@@ -334,11 +334,11 @@ Focused acceptance tag:
 
 Block 36 adds no compatibility rule, no new relationship type, and no JSON field.
 
-## Block 37 — Explicit target compatibility matrix
+## Block 37 — Explicit target compatibility matrix — Implemented
 
 Primary boundary: derived relationship compatibility semantics.
 
-Introduce one deterministic resolver:
+Implemented one deterministic resolver:
 
 ```text
 relationship type
@@ -374,7 +374,27 @@ Insert
   Frame <-> Frame
 ```
 
-Capability choice is deterministic for multi-capability targets. Equation builders consume the compatibility result, not source-kind enums. No new relationship enum or equation is added in Block 37.
+Capability choice is deterministic for multi-capability targets. Implemented API:
+
+```text
+AssemblyTargetCompatibilityResolver
+  relationship type + target A/B resolved capability vectors
+  -> AssemblyTargetCompatibility ordered capability pair
+  -> explicit incompatibility error
+```
+
+Existing local and cross-hierarchy Mate/Distance/Angle/Concentric/Insert equation builders consume the compatibility result before projection. They still only construct the pre-Block-37 equation families; compatible non-Plane Distance/Angle combinations are selected by the compatibility layer but do not gain new residual equations in this block.
+
+Focused tags:
+
+```text
+[geometry][assembly-target-compatibility]
+[geometry][assembly-cross-hierarchy-target-compatibility]
+```
+
+`tests/geometry/assembly_target_compatibility_tests.cpp` proves the supported matrix, incompatible matrix representatives, deterministic multi-capability choices, DatumPlane-to-generated-face Mate, DatumAxis-to-cylindrical-face Concentric, circular-edge-to-DatumAxis Concentric, current `.seat` Insert as Frame/Frame, local/hierarchy compatibility agreement, compatibility failure before equation construction, and source-model immutability.
+
+No new relationship enum, equation, JSON field, graph rule, or persisted Geometry query product is added in Block 37.
 
 ## Block 38 — Generic geometric relationship Core intent and JSON
 
@@ -528,8 +548,8 @@ posed geometry/contact records/sweep analyses
 
 ## Immediate next technical step
 
-Block 37 is the current next technical step.
+Block 38 is the current next technical step.
 
-Implement Block 37 only: the explicit target compatibility matrix — one deterministic resolver from relationship type plus target A/B capability sets to one exact ordered capability pair/bundle or explicit incompatibility, consumed by the existing equation builders. See the Block 37 section above for the initial matrix.
+Implement Block 38 only: generic geometric relationship Core intent and JSON for `Coincident`, `Parallel`, and `Perpendicular`, while preserving existing local and Project-level id scopes, endpoint shapes, target order, state/value validation, and historical five-family compatibility.
 
-Do not add new relationship enums or equations in Block 37; that begins at Block 38.
+Do not add generic relationship equations in Block 38; Geometry execution begins at Block 39.

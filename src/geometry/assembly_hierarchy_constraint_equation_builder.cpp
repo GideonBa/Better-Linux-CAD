@@ -2,6 +2,7 @@
 
 #include "blcad/geometry/assembly_constraint_target_resolver.hpp"
 #include "blcad/geometry/assembly_hierarchy_transform_evaluator.hpp"
+#include "blcad/geometry/assembly_target_compatibility.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -19,12 +20,20 @@ struct ResolvedOccurrenceContext {
   const AssemblyDocument* assembly = nullptr;
 };
 
+struct ResolvedHierarchyGeometricTarget {
+  std::vector<SubassemblyInstanceId> occurrence_path;
+  DocumentId assembly_document;
+  ComponentInstanceId component_instance;
+  std::string semantic_reference;
+  AssemblyResolvedGeometricTarget target;
+};
+
 [[nodiscard]] Error validation_error(std::string object_id, std::string message) {
   return Error::validation(std::move(object_id), std::move(message));
 }
 
-[[nodiscard]] std::string occurrence_object_id(
-    const std::vector<SubassemblyInstanceId>& occurrence_path) {
+[[nodiscard]] std::string
+occurrence_object_id(const std::vector<SubassemblyInstanceId>& occurrence_path) {
   if (occurrence_path.empty()) {
     return "assembly.root";
   }
@@ -39,11 +48,11 @@ resolve_occurrence(const Project& project,
     return Result<ResolvedOccurrenceContext>::failure(hierarchy.error());
   }
 
-  const auto found = std::find_if(
-      hierarchy.value().occurrences().begin(), hierarchy.value().occurrences().end(),
-      [&occurrence_path](const AssemblyHierarchyOccurrenceDescriptor& occurrence) {
-        return occurrence.occurrence_path == occurrence_path;
-      });
+  const auto found =
+      std::find_if(hierarchy.value().occurrences().begin(), hierarchy.value().occurrences().end(),
+                   [&occurrence_path](const AssemblyHierarchyOccurrenceDescriptor& occurrence) {
+                     return occurrence.occurrence_path == occurrence_path;
+                   });
   if (found == hierarchy.value().occurrences().end()) {
     return Result<ResolvedOccurrenceContext>::failure(validation_error(
         occurrence_object_id(occurrence_path),
@@ -52,9 +61,9 @@ resolve_occurrence(const Project& project,
 
   const AssemblyDocument* assembly = project.find_assembly_document(found->assembly_document);
   if (assembly == nullptr) {
-    return Result<ResolvedOccurrenceContext>::failure(validation_error(
-        found->assembly_document.value(),
-        "cross-hierarchy relationship target assembly must resolve in project"));
+    return Result<ResolvedOccurrenceContext>::failure(
+        validation_error(found->assembly_document.value(),
+                         "cross-hierarchy relationship target assembly must resolve in project"));
   }
 
   return Result<ResolvedOccurrenceContext>::success(ResolvedOccurrenceContext{*found, assembly});
@@ -89,9 +98,9 @@ target_transform_chain(const RigidTransform& component_transform,
   return transforms;
 }
 
-[[nodiscard]] AssemblyGeometricTargetDescriptor evaluate_geometric_descriptor(
-    const std::vector<RigidTransform>& transforms,
-    const AssemblyGeometricTargetDescriptor& descriptor) {
+[[nodiscard]] AssemblyGeometricTargetDescriptor
+evaluate_geometric_descriptor(const std::vector<RigidTransform>& transforms,
+                              const AssemblyGeometricTargetDescriptor& descriptor) {
   const AssemblyHierarchyTransformEvaluator evaluator;
   return std::visit(
       [&](const auto& value) -> AssemblyGeometricTargetDescriptor {
@@ -118,17 +127,16 @@ target_transform_chain(const RigidTransform& component_transform,
               evaluator.evaluate_vector(transforms, value.x_axis),
               evaluator.evaluate_vector(transforms, value.y_axis),
               evaluator.evaluate_vector(transforms, value.normal), value.radius_mm};
-        } else if constexpr (
-            std::is_same_v<Descriptor, AssemblyCylindricalSurfaceTargetDescriptor>) {
+        } else if constexpr (std::is_same_v<Descriptor,
+                                            AssemblyCylindricalSurfaceTargetDescriptor>) {
           return AssemblyCylindricalSurfaceTargetDescriptor{
               evaluator.evaluate_point(transforms, value.axis_origin),
               evaluator.evaluate_vector(transforms, value.axis_direction), value.radius_mm};
         } else {
-          return AssemblyFrameTargetDescriptor{
-              evaluator.evaluate_point(transforms, value.origin),
-              evaluator.evaluate_vector(transforms, value.x_axis),
-              evaluator.evaluate_vector(transforms, value.y_axis),
-              evaluator.evaluate_vector(transforms, value.z_axis)};
+          return AssemblyFrameTargetDescriptor{evaluator.evaluate_point(transforms, value.origin),
+                                               evaluator.evaluate_vector(transforms, value.x_axis),
+                                               evaluator.evaluate_vector(transforms, value.y_axis),
+                                               evaluator.evaluate_vector(transforms, value.z_axis)};
         }
       },
       descriptor);
@@ -151,12 +159,96 @@ target_transform_chain(const RigidTransform& component_transform,
                  lhs.x * rhs.y - lhs.y * rhs.x};
 }
 
+[[nodiscard]] Result<ResolvedHierarchyGeometricTarget>
+resolve_hierarchy_geometric_target(const Project& project,
+                                   const AssemblyHierarchyConstraintTarget& target) {
+  auto occurrence = resolve_occurrence(project, target.occurrence_path());
+  if (occurrence.has_error()) {
+    return Result<ResolvedHierarchyGeometricTarget>::failure(occurrence.error());
+  }
+
+  const AssemblyHierarchyConstraintTargetResolver resolver;
+  auto resolved = resolver.resolve_geometric(project, target);
+  if (resolved.has_error()) {
+    return Result<ResolvedHierarchyGeometricTarget>::failure(resolved.error());
+  }
+
+  return Result<ResolvedHierarchyGeometricTarget>::success(ResolvedHierarchyGeometricTarget{
+      target.occurrence_path(), occurrence.value().occurrence.assembly_document,
+      target.component_instance(), target.semantic_reference(), std::move(resolved.value())});
+}
+
+[[nodiscard]] Result<AssemblyHierarchyPlanarConstraintTargetDescriptor>
+project_hierarchy_planar_target(const ResolvedHierarchyGeometricTarget& resolved) {
+  auto plane = project_plane(resolved.target);
+  if (plane.has_error()) {
+    return Result<AssemblyHierarchyPlanarConstraintTargetDescriptor>::failure(plane.error());
+  }
+  const AssemblyGeometricTargetSourceMetadata& source = resolved.target.source_metadata;
+  return Result<AssemblyHierarchyPlanarConstraintTargetDescriptor>::success(
+      AssemblyHierarchyPlanarConstraintTargetDescriptor{
+          resolved.occurrence_path, resolved.assembly_document, resolved.component_instance,
+          source.referenced_part_document, source.source_feature.value_or(FeatureId{}),
+          source.semantic_face.value_or(SemanticFace::Top), resolved.semantic_reference,
+          AssemblySpacePlanarDescriptor{plane.value().origin, plane.value().x_axis,
+                                        plane.value().y_axis, plane.value().normal}});
+}
+
+[[nodiscard]] Result<AssemblyHierarchyAxisConstraintTargetDescriptor>
+project_hierarchy_axis_target(const ResolvedHierarchyGeometricTarget& resolved) {
+  auto axis = project_axis(resolved.target);
+  if (axis.has_error()) {
+    return Result<AssemblyHierarchyAxisConstraintTargetDescriptor>::failure(axis.error());
+  }
+  const AssemblyGeometricTargetSourceMetadata& source = resolved.target.source_metadata;
+  return Result<AssemblyHierarchyAxisConstraintTargetDescriptor>::success(
+      AssemblyHierarchyAxisConstraintTargetDescriptor{
+          resolved.occurrence_path, resolved.assembly_document, resolved.component_instance,
+          source.referenced_part_document, source.source_feature.value_or(FeatureId{}),
+          source.source_profile.value_or(ProfileId{}),
+          source.semantic_axis.value_or(SemanticAxis::Primary), resolved.semantic_reference,
+          AssemblySpaceAxisDescriptor{axis.value().origin, axis.value().direction}});
+}
+
+[[nodiscard]] Result<AssemblyHierarchyInsertConstraintTargetDescriptor>
+project_hierarchy_insert_target(const ResolvedHierarchyGeometricTarget& resolved) {
+  auto frame = project_frame(resolved.target);
+  if (frame.has_error()) {
+    return Result<AssemblyHierarchyInsertConstraintTargetDescriptor>::failure(frame.error());
+  }
+  auto axis = project_axis(resolved.target);
+  if (axis.has_error()) {
+    return Result<AssemblyHierarchyInsertConstraintTargetDescriptor>::failure(axis.error());
+  }
+  auto plane = project_plane(resolved.target);
+  if (plane.has_error()) {
+    return Result<AssemblyHierarchyInsertConstraintTargetDescriptor>::failure(plane.error());
+  }
+  const AssemblyGeometricTargetSourceMetadata& source = resolved.target.source_metadata;
+  return Result<AssemblyHierarchyInsertConstraintTargetDescriptor>::success(
+      AssemblyHierarchyInsertConstraintTargetDescriptor{
+          resolved.occurrence_path, resolved.assembly_document, resolved.component_instance,
+          source.referenced_part_document, source.source_feature.value_or(FeatureId{}),
+          source.source_profile.value_or(ProfileId{}),
+          source.semantic_axis.value_or(SemanticAxis::Primary),
+          source.semantic_seating_plane.value_or(SemanticSeatingPlane::Primary),
+          resolved.semantic_reference,
+          AssemblySpaceAxisDescriptor{axis.value().origin, axis.value().direction},
+          AssemblySpacePlanarDescriptor{plane.value().origin, plane.value().x_axis,
+                                        plane.value().y_axis, plane.value().normal}});
+}
+
+[[nodiscard]] bool selected_plane_pair(const AssemblyTargetCompatibility& compatibility) noexcept {
+  return compatibility.target_a_capability == AssemblyGeometricTargetCapability::Plane &&
+         compatibility.target_b_capability == AssemblyGeometricTargetCapability::Plane;
+}
+
 } // namespace
 
-Result<AssemblyHierarchyConstraintTarget> AssemblyHierarchyConstraintTarget::create(
-    std::vector<SubassemblyInstanceId> occurrence_path,
-    ComponentInstanceId component_instance,
-    std::string semantic_reference) {
+Result<AssemblyHierarchyConstraintTarget>
+AssemblyHierarchyConstraintTarget::create(std::vector<SubassemblyInstanceId> occurrence_path,
+                                          ComponentInstanceId component_instance,
+                                          std::string semantic_reference) {
   for (const SubassemblyInstanceId& occurrence : occurrence_path) {
     if (occurrence.empty()) {
       return Result<AssemblyHierarchyConstraintTarget>::failure(
@@ -175,8 +267,7 @@ Result<AssemblyHierarchyConstraintTarget> AssemblyHierarchyConstraintTarget::cre
 }
 
 AssemblyHierarchyConstraintTarget::AssemblyHierarchyConstraintTarget(
-    std::vector<SubassemblyInstanceId> occurrence_path,
-    ComponentInstanceId component_instance,
+    std::vector<SubassemblyInstanceId> occurrence_path, ComponentInstanceId component_instance,
     std::string semantic_reference)
     : occurrence_path_(std::move(occurrence_path)),
       component_instance_(std::move(component_instance)),
@@ -187,8 +278,7 @@ AssemblyHierarchyConstraintTarget::occurrence_path() const noexcept {
   return occurrence_path_;
 }
 
-const ComponentInstanceId&
-AssemblyHierarchyConstraintTarget::component_instance() const noexcept {
+const ComponentInstanceId& AssemblyHierarchyConstraintTarget::component_instance() const noexcept {
   return component_instance_;
 }
 
@@ -197,19 +287,16 @@ const std::string& AssemblyHierarchyConstraintTarget::semantic_reference() const
 }
 
 Result<AssemblyHierarchyConstraintQuery> AssemblyHierarchyConstraintQuery::create(
-    AssemblyConstraintId id,
-    AssemblyConstraintType type,
-    AssemblyHierarchyConstraintTarget target_a,
-    AssemblyHierarchyConstraintTarget target_b,
-    std::optional<Quantity> distance,
-    std::optional<Quantity> angle) {
-  auto local_target_a =
-      AssemblyConstraintTarget::create(target_a.component_instance(), target_a.semantic_reference());
+    AssemblyConstraintId id, AssemblyConstraintType type,
+    AssemblyHierarchyConstraintTarget target_a, AssemblyHierarchyConstraintTarget target_b,
+    std::optional<Quantity> distance, std::optional<Quantity> angle) {
+  auto local_target_a = AssemblyConstraintTarget::create(target_a.component_instance(),
+                                                         target_a.semantic_reference());
   if (local_target_a.has_error()) {
     return Result<AssemblyHierarchyConstraintQuery>::failure(local_target_a.error());
   }
-  auto local_target_b =
-      AssemblyConstraintTarget::create(target_b.component_instance(), target_b.semantic_reference());
+  auto local_target_b = AssemblyConstraintTarget::create(target_b.component_instance(),
+                                                         target_b.semantic_reference());
   if (local_target_b.has_error()) {
     return Result<AssemblyHierarchyConstraintQuery>::failure(local_target_b.error());
   }
@@ -228,18 +315,19 @@ Result<AssemblyHierarchyConstraintQuery> AssemblyHierarchyConstraintQuery::creat
 }
 
 AssemblyHierarchyConstraintQuery::AssemblyHierarchyConstraintQuery(
-    AssemblyConstraintId id,
-    AssemblyConstraintType type,
-    AssemblyHierarchyConstraintTarget target_a,
-    AssemblyHierarchyConstraintTarget target_b,
-    std::optional<Quantity> distance,
-    std::optional<Quantity> angle)
+    AssemblyConstraintId id, AssemblyConstraintType type,
+    AssemblyHierarchyConstraintTarget target_a, AssemblyHierarchyConstraintTarget target_b,
+    std::optional<Quantity> distance, std::optional<Quantity> angle)
     : id_(std::move(id)), type_(type), target_a_(std::move(target_a)),
       target_b_(std::move(target_b)), distance_(std::move(distance)), angle_(std::move(angle)) {}
 
-const AssemblyConstraintId& AssemblyHierarchyConstraintQuery::id() const noexcept { return id_; }
+const AssemblyConstraintId& AssemblyHierarchyConstraintQuery::id() const noexcept {
+  return id_;
+}
 
-AssemblyConstraintType AssemblyHierarchyConstraintQuery::type() const noexcept { return type_; }
+AssemblyConstraintType AssemblyHierarchyConstraintQuery::type() const noexcept {
+  return type_;
+}
 
 const AssemblyHierarchyConstraintTarget&
 AssemblyHierarchyConstraintQuery::target_a() const noexcept {
@@ -281,17 +369,16 @@ AssemblyHierarchyConstraintTargetResolver::resolve_geometric(
     return Result<AssemblyResolvedGeometricTarget>::failure(resolved.error());
   }
   if (resolved.value().transforms_inner_to_outer.size() != 1U) {
-    return Result<AssemblyResolvedGeometricTarget>::failure(validation_error(
-        target.semantic_reference(),
-        "local typed target must retain exactly one direct component transform"));
+    return Result<AssemblyResolvedGeometricTarget>::failure(
+        validation_error(target.semantic_reference(),
+                         "local typed target must retain exactly one direct component transform"));
   }
 
-  const auto transforms = target_transform_chain(
-      resolved.value().transforms_inner_to_outer.front(), occurrence.value().occurrence);
+  const auto transforms = target_transform_chain(resolved.value().transforms_inner_to_outer.front(),
+                                                 occurrence.value().occurrence);
   AssemblyResolvedGeometricTarget hierarchy_target{
-      AssemblyHierarchyGeometricTargetEndpointIdentity{target.occurrence_path(),
-                                                       target.component_instance(),
-                                                       target.semantic_reference()},
+      AssemblyHierarchyGeometricTargetEndpointIdentity{
+          target.occurrence_path(), target.component_instance(), target.semantic_reference()},
       resolved.value().source_kind,
       resolved.value().source_metadata,
       evaluate_geometric_descriptor(transforms, resolved.value().descriptor),
@@ -328,8 +415,8 @@ AssemblyHierarchyConstraintTargetResolver::resolve_planar(
   return Result<AssemblyHierarchyPlanarConstraintTargetDescriptor>::success(
       AssemblyHierarchyPlanarConstraintTargetDescriptor{
           target.occurrence_path(), occurrence.value().occurrence.assembly_document,
-          target.component_instance(), source.referenced_part_document, source.source_feature.value(),
-          source.semantic_face.value(), target.semantic_reference(),
+          target.component_instance(), source.referenced_part_document,
+          source.source_feature.value(), source.semantic_face.value(), target.semantic_reference(),
           AssemblySpacePlanarDescriptor{plane.value().origin, plane.value().x_axis,
                                         plane.value().y_axis, plane.value().normal}});
 }
@@ -358,8 +445,9 @@ AssemblyHierarchyConstraintTargetResolver::resolve_axis(
   return Result<AssemblyHierarchyAxisConstraintTargetDescriptor>::success(
       AssemblyHierarchyAxisConstraintTargetDescriptor{
           target.occurrence_path(), occurrence.value().occurrence.assembly_document,
-          target.component_instance(), source.referenced_part_document, source.source_feature.value(),
-          source.source_profile.value(), source.semantic_axis.value(), target.semantic_reference(),
+          target.component_instance(), source.referenced_part_document,
+          source.source_feature.value(), source.source_profile.value(),
+          source.semantic_axis.value(), target.semantic_reference(),
           AssemblySpaceAxisDescriptor{axis.value().origin, axis.value().direction}});
 }
 
@@ -391,9 +479,10 @@ AssemblyHierarchyConstraintTargetResolver::resolve_insert(
   return Result<AssemblyHierarchyInsertConstraintTargetDescriptor>::success(
       AssemblyHierarchyInsertConstraintTargetDescriptor{
           target.occurrence_path(), occurrence.value().occurrence.assembly_document,
-          target.component_instance(), source.referenced_part_document, source.source_feature.value(),
-          source.source_profile.value(), source.semantic_axis.value(),
-          source.semantic_seating_plane.value(), target.semantic_reference(),
+          target.component_instance(), source.referenced_part_document,
+          source.source_feature.value(), source.source_profile.value(),
+          source.semantic_axis.value(), source.semantic_seating_plane.value(),
+          target.semantic_reference(),
           AssemblySpaceAxisDescriptor{axis.value().origin, axis.value().direction},
           AssemblySpacePlanarDescriptor{plane.value().origin, plane.value().x_axis,
                                         plane.value().y_axis, plane.value().normal}});
@@ -402,14 +491,30 @@ AssemblyHierarchyConstraintTargetResolver::resolve_insert(
 Result<AssemblyHierarchyConstraintEquationDescriptor>
 AssemblyHierarchyConstraintEquationBuilder::build(
     const Project& project, const AssemblyHierarchyConstraintQuery& query) const {
-  const AssemblyHierarchyConstraintTargetResolver resolver;
-
   if (query.type() == AssemblyConstraintType::Concentric) {
-    auto target_a = resolver.resolve_axis(project, query.target_a());
+    auto geometric_target_a = resolve_hierarchy_geometric_target(project, query.target_a());
+    if (geometric_target_a.has_error()) {
+      return Result<AssemblyHierarchyConstraintEquationDescriptor>::failure(
+          geometric_target_a.error());
+    }
+    auto geometric_target_b = resolve_hierarchy_geometric_target(project, query.target_b());
+    if (geometric_target_b.has_error()) {
+      return Result<AssemblyHierarchyConstraintEquationDescriptor>::failure(
+          geometric_target_b.error());
+    }
+
+    const AssemblyTargetCompatibilityResolver compatibility_resolver;
+    auto compatibility = compatibility_resolver.resolve(
+        query.type(), geometric_target_a.value().target, geometric_target_b.value().target);
+    if (compatibility.has_error()) {
+      return Result<AssemblyHierarchyConstraintEquationDescriptor>::failure(compatibility.error());
+    }
+
+    auto target_a = project_hierarchy_axis_target(geometric_target_a.value());
     if (target_a.has_error()) {
       return Result<AssemblyHierarchyConstraintEquationDescriptor>::failure(target_a.error());
     }
-    auto target_b = resolver.resolve_axis(project, query.target_b());
+    auto target_b = project_hierarchy_axis_target(geometric_target_b.value());
     if (target_b.has_error()) {
       return Result<AssemblyHierarchyConstraintEquationDescriptor>::failure(target_b.error());
     }
@@ -424,11 +529,29 @@ AssemblyHierarchyConstraintEquationBuilder::build(
   }
 
   if (query.type() == AssemblyConstraintType::Insert) {
-    auto target_a = resolver.resolve_insert(project, query.target_a());
+    auto geometric_target_a = resolve_hierarchy_geometric_target(project, query.target_a());
+    if (geometric_target_a.has_error()) {
+      return Result<AssemblyHierarchyConstraintEquationDescriptor>::failure(
+          geometric_target_a.error());
+    }
+    auto geometric_target_b = resolve_hierarchy_geometric_target(project, query.target_b());
+    if (geometric_target_b.has_error()) {
+      return Result<AssemblyHierarchyConstraintEquationDescriptor>::failure(
+          geometric_target_b.error());
+    }
+
+    const AssemblyTargetCompatibilityResolver compatibility_resolver;
+    auto compatibility = compatibility_resolver.resolve(
+        query.type(), geometric_target_a.value().target, geometric_target_b.value().target);
+    if (compatibility.has_error()) {
+      return Result<AssemblyHierarchyConstraintEquationDescriptor>::failure(compatibility.error());
+    }
+
+    auto target_a = project_hierarchy_insert_target(geometric_target_a.value());
     if (target_a.has_error()) {
       return Result<AssemblyHierarchyConstraintEquationDescriptor>::failure(target_a.error());
     }
-    auto target_b = resolver.resolve_insert(project, query.target_b());
+    auto target_b = project_hierarchy_insert_target(geometric_target_b.value());
     if (target_b.has_error()) {
       return Result<AssemblyHierarchyConstraintEquationDescriptor>::failure(target_b.error());
     }
@@ -445,11 +568,34 @@ AssemblyHierarchyConstraintEquationBuilder::build(
                 dot(seat_origin_delta, target_a.value().seating_plane.normal)}});
   }
 
-  auto target_a = resolver.resolve_planar(project, query.target_a());
+  auto geometric_target_a = resolve_hierarchy_geometric_target(project, query.target_a());
+  if (geometric_target_a.has_error()) {
+    return Result<AssemblyHierarchyConstraintEquationDescriptor>::failure(
+        geometric_target_a.error());
+  }
+  auto geometric_target_b = resolve_hierarchy_geometric_target(project, query.target_b());
+  if (geometric_target_b.has_error()) {
+    return Result<AssemblyHierarchyConstraintEquationDescriptor>::failure(
+        geometric_target_b.error());
+  }
+
+  const AssemblyTargetCompatibilityResolver compatibility_resolver;
+  auto compatibility = compatibility_resolver.resolve(
+      query.type(), geometric_target_a.value().target, geometric_target_b.value().target);
+  if (compatibility.has_error()) {
+    return Result<AssemblyHierarchyConstraintEquationDescriptor>::failure(compatibility.error());
+  }
+  if (!selected_plane_pair(compatibility.value())) {
+    return Result<AssemblyHierarchyConstraintEquationDescriptor>::failure(validation_error(
+        query.id().value(),
+        "cross-hierarchy planar equation currently requires Plane/Plane target compatibility"));
+  }
+
+  auto target_a = project_hierarchy_planar_target(geometric_target_a.value());
   if (target_a.has_error()) {
     return Result<AssemblyHierarchyConstraintEquationDescriptor>::failure(target_a.error());
   }
-  auto target_b = resolver.resolve_planar(project, query.target_b());
+  auto target_b = project_hierarchy_planar_target(geometric_target_b.value());
   if (target_b.has_error()) {
     return Result<AssemblyHierarchyConstraintEquationDescriptor>::failure(target_b.error());
   }
@@ -461,9 +607,9 @@ AssemblyHierarchyConstraintEquationBuilder::build(
     return Result<AssemblyHierarchyConstraintEquationDescriptor>::success(
         AssemblyHierarchyConstraintEquationDescriptor{
             query.id(), query.type(), target_a.value(), target_b.value(),
-            PlanarMateResidualDescriptor{add(target_a.value().plane.normal,
-                                             target_b.value().plane.normal),
-                                         signed_separation_mm}});
+            PlanarMateResidualDescriptor{
+                add(target_a.value().plane.normal, target_b.value().plane.normal),
+                signed_separation_mm}});
   }
 
   if (query.type() == AssemblyConstraintType::Angle) {
@@ -473,8 +619,7 @@ AssemblyHierarchyConstraintEquationBuilder::build(
           "cross-hierarchy planar Angle equation requires an angle value in degrees"));
     }
     const double target_angle_deg = query.angle()->degrees();
-    const double target_cosine =
-        std::cos(target_angle_deg * (std::numbers::pi_v<double> / 180.0));
+    const double target_cosine = std::cos(target_angle_deg * (std::numbers::pi_v<double> / 180.0));
     const double normal_dot = dot(target_a.value().plane.normal, target_b.value().plane.normal);
     return Result<AssemblyHierarchyConstraintEquationDescriptor>::success(
         AssemblyHierarchyConstraintEquationDescriptor{

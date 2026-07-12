@@ -1,10 +1,10 @@
 # Assembly Geometric Target Taxonomy and Capability Projection MVP-5
 
-Status: implemented as Block 31 of `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`. Blocks 32–35 have since extended semantic source identity and reference resolution without changing this derived target taxonomy.
+Status: implemented as Block 31 of `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`. Blocks 32–37 have since extended semantic source identity, generated-topology resolution, and explicit target compatibility without changing persistent endpoint authority.
 
-This document is canonical for the Geometry-layer derived assembly target taxonomy, typed geometric descriptors, source-to-capability projection matrix, local/root-space resolved target contract, and compatibility adaptation of the existing generated face, `.axis`, and `.seat` families.
+This document is canonical for the Geometry-layer derived assembly target taxonomy, typed geometric descriptors, source-to-capability projection matrix, local/root-space resolved target contract, target compatibility selection, and compatibility adaptation of the existing generated face, `.axis`, and `.seat` families.
 
-Generated-topology Core identity/recovery is canonical in `docs/assembly-generated-topology-reference-mvp5.md`. Geometry resolution of those Block-35 `topo:` identities through this taxonomy is implemented as Block 36; its canonical contract lives in `docs/assembly-general-geometric-target-roadmap.md`.
+Generated-topology Core identity/recovery is canonical in `docs/assembly-generated-topology-reference-mvp5.md`. Geometry resolution of those Block-35 `topo:` identities through this taxonomy is implemented as Block 36; explicit relationship target compatibility is implemented as Block 37. Their canonical contracts live in `docs/assembly-general-geometric-target-roadmap.md`.
 
 ## Scope
 
@@ -22,16 +22,16 @@ Implemented in the target taxonomy:
 - the historical single-circle subtractive `.axis` path as `GeneratedCylindricalFace -> Axis + Cylinder`;
 - current `.seat` as `CircularFeatureSeat -> Plane + Axis + Frame`;
 - Block-34 DatumPlane/DatumAxis/ConstructionLine/ConstructionPoint resolution;
+- Block-36 `topo:` generated cylindrical-face/linear-edge/circular-edge/vertex target resolution;
 - local component-space typed resolution;
 - exact hierarchy/root-space typed resolution;
+- deterministic Block-37 `AssemblyTargetCompatibilityResolver` selection for existing relationship types;
 - compatibility adapters for existing local/hierarchy `resolve`, `resolve_axis`, and `resolve_insert` APIs;
 - existing equation/residual consumers routed through capability projection;
 - source Project immutability.
 
 Not implemented at this Geometry boundary yet:
 
-- Block-35 `topo:` generated cylindrical-face/linear-edge/circular-edge/vertex target resolution;
-- explicit relationship compatibility matrix;
 - Coincident, Parallel, or Perpendicular equations;
 - richer joint families.
 
@@ -548,6 +548,29 @@ GeneratedVertex          -> Point
 
 Resolution starts from validated producer semantic identity, computes descriptors analytically from current feature/sketch/profile model intent, preserves component-local versus exact rooted transform semantics, and mutates no source model. The canonical Block-36 contract lives in `docs/assembly-general-geometric-target-roadmap.md`.
 
-## Next technical step — Block 37
+## Block 37 — target compatibility selection — Implemented
 
-The next technical step is Block 37: the explicit target compatibility matrix.
+Block 37 adds `AssemblyTargetCompatibilityResolver`, which consumes already-resolved target capability vectors and relationship type, then returns one exact ordered capability pair or an explicit incompatibility.
+
+Implemented matrix:
+
+```text
+Mate         Plane <-> Plane
+Distance     Plane <-> Plane | Point <-> Point | Point <-> Plane | Plane <-> Point
+Angle        Plane <-> Plane | Line <-> Line | Axis <-> Axis | Line <-> Axis | Axis <-> Line
+Concentric   Axis <-> Axis
+Insert       Frame <-> Frame
+```
+
+Local and cross-hierarchy equation builders now resolve typed targets, select compatibility, and then project only the selected existing equation shape. No new relationship enum, residual equation, JSON field, or persisted Geometry query product is introduced by Block 37.
+
+Focused tags:
+
+```text
+[geometry][assembly-target-compatibility]
+[geometry][assembly-cross-hierarchy-target-compatibility]
+```
+
+## Next technical step — Block 38
+
+The next technical step is Block 38: generic geometric relationship Core intent and JSON for `Coincident`, `Parallel`, and `Perpendicular`.

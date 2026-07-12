@@ -345,6 +345,8 @@ The legacy target strings remain unchanged. Historical local/hierarchy `resolve`
 
 Block 36 adds `topo:` Geometry target resolution: `resolve_geometric` parses canonical generated-topology producer identity before the legacy grammar and builds Cylinder/Axis, Line, Circle/Axis/center Point, and Point descriptors analytically from validated feature/sketch/profile intent, for both component-local and exact rooted transform semantics.
 
+Block 37 adds deterministic target compatibility selection through `AssemblyTargetCompatibilityResolver`: relationship type plus target A/B capability vectors produce one ordered capability pair or an explicit incompatibility. Existing local and cross-hierarchy Mate/Distance/Angle/Concentric/Insert equation builders consume that compatibility result before projection, without adding new equations or JSON.
+
 Canonical target contract: `docs/assembly-geometric-target-taxonomy-mvp5.md`.
 
 ## Semantic target freshness
@@ -480,7 +482,7 @@ Block 33 adds `datum_axes` PartDocument persistence. Block 35 adds canonical sem
 
 ## Current direction
 
-Blocks 23–35 of the current assembly sequence are implemented.
+Blocks 23–37 of the current assembly sequence are implemented.
 
 Canonical current target architecture:
 
@@ -495,6 +497,6 @@ Canonical numbered sequence:
 
 - `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`
 
-The next technical step is Block 37 only: the explicit target compatibility matrix — one deterministic resolver from relationship type plus target A/B capability sets to one exact ordered capability pair/bundle or explicit incompatibility, consumed by the existing equation builders.
+The next technical step is Block 38 only: generic geometric relationship Core intent and JSON for `Coincident`, `Parallel`, and `Perpendicular`.
 
-Block 36 generated-topology target resolution is implemented. Occurrence-local child pose overrides, whole-subassembly solve variables, general physics, and richer joints remain deferred according to their roadmap blocks.
+Block 37 target compatibility is implemented. Generic relationship equations, occurrence-local child pose overrides, whole-subassembly solve variables, general physics, and richer joints remain deferred according to their roadmap blocks.
