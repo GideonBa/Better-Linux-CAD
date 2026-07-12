@@ -1,6 +1,8 @@
 #include "blcad/geometry/assembly_solve_diagnostics.hpp"
 
 #include "assembly_constraint_numeric_system.hpp"
+#include "assembly_cross_hierarchy_numeric_system.hpp"
+#include "assembly_matrix_rank.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -12,18 +14,8 @@
 namespace blcad::geometry {
 namespace {
 
-struct MatrixRankResult {
-  std::size_t rank = 0U;
-  double maximum_abs_entry = 0.0;
-  double pivot_threshold = 0.0;
-};
-
 [[nodiscard]] Error validation_error(std::string object_id, std::string message) {
   return Error::validation(std::move(object_id), std::move(message));
-}
-
-[[nodiscard]] Error internal_error(std::string object_id, std::string message) {
-  return Error::internal(std::move(object_id), std::move(message));
 }
 
 [[nodiscard]] Result<std::size_t> validate_options(const AssemblySolveDiagnosticsOptions& options) {
@@ -50,72 +42,21 @@ variable_components_from(const AssemblySolveResult& solve_result) {
   return variable_components;
 }
 
-[[nodiscard]] Result<MatrixRankResult> compute_matrix_rank(detail::NumericMatrix matrix,
-                                                           std::size_t expected_column_count,
-                                                           double absolute_tolerance,
-                                                           double relative_tolerance) {
-  double maximum_abs_entry = 0.0;
-  for (const auto& row : matrix) {
-    if (row.size() != expected_column_count) {
-      return Result<MatrixRankResult>::failure(
-          internal_error("assembly.solve_diagnostics",
-                         "assembly diagnostics Jacobian row width does not match variable count"));
-    }
-    for (double entry : row) {
-      if (!std::isfinite(entry)) {
-        return Result<MatrixRankResult>::failure(internal_error(
-            "assembly.solve_diagnostics", "assembly diagnostics Jacobian must be finite"));
-      }
-      maximum_abs_entry = std::max(maximum_abs_entry, std::abs(entry));
-    }
+[[nodiscard]] std::vector<ComponentTransformAuthority>
+variable_authorities_from(const AssemblyCrossHierarchySolveResult& solve_result) {
+  std::vector<ComponentTransformAuthority> variable_authorities;
+  variable_authorities.reserve(solve_result.proposed_transforms.size());
+  for (const auto& proposal : solve_result.proposed_transforms) {
+    variable_authorities.push_back(proposal.authority);
   }
-
-  const double pivot_threshold =
-      std::max(absolute_tolerance, relative_tolerance * maximum_abs_entry);
-  std::size_t rank = 0U;
-  std::size_t column = 0U;
-
-  while (rank < matrix.size() && column < expected_column_count) {
-    std::size_t pivot_row = rank;
-    double pivot_magnitude = std::abs(matrix[rank][column]);
-    for (std::size_t row = rank + 1U; row < matrix.size(); ++row) {
-      const double magnitude = std::abs(matrix[row][column]);
-      if (magnitude > pivot_magnitude) {
-        pivot_magnitude = magnitude;
-        pivot_row = row;
-      }
-    }
-
-    if (pivot_magnitude <= pivot_threshold) {
-      ++column;
-      continue;
-    }
-
-    if (pivot_row != rank) {
-      std::swap(matrix[pivot_row], matrix[rank]);
-    }
-
-    const double pivot = matrix[rank][column];
-    for (std::size_t row = rank + 1U; row < matrix.size(); ++row) {
-      const double factor = matrix[row][column] / pivot;
-      matrix[row][column] = 0.0;
-      for (std::size_t entry = column + 1U; entry < expected_column_count; ++entry) {
-        matrix[row][entry] -= factor * matrix[rank][entry];
-      }
-    }
-
-    ++rank;
-    ++column;
-  }
-
-  return Result<MatrixRankResult>::success(
-      MatrixRankResult{rank, maximum_abs_entry, pivot_threshold});
+  return variable_authorities;
 }
 
 [[nodiscard]] AssemblyJacobianRankSummary
-unevaluated_rank_summary(const AssemblySolveResult& solve_result, std::size_t variable_count) {
+unevaluated_rank_summary(const AssemblySolveResidualSummary& residual_summary,
+                         std::size_t variable_count) {
   return AssemblyJacobianRankSummary{false,
-                                     solve_result.residual_summary.residual_component_count,
+                                     residual_summary.residual_component_count,
                                      variable_count,
                                      0U,
                                      0U,
@@ -123,6 +64,19 @@ unevaluated_rank_summary(const AssemblySolveResult& solve_result, std::size_t va
                                      0U,
                                      0.0,
                                      0.0};
+}
+
+[[nodiscard]] AssemblyDofClassification classify_dof(std::size_t variable_count,
+                                                     std::size_t remaining_dof) noexcept {
+  return variable_count == 0U ? AssemblyDofClassification::NoVariableDof
+         : remaining_dof > 0U ? AssemblyDofClassification::Underconstrained
+                              : AssemblyDofClassification::LocallyFullyConstrained;
+}
+
+[[nodiscard]] AssemblyResidualRankStructure classify_rank_structure(
+    std::size_t residual_row_redundancy) noexcept {
+  return residual_row_redundancy == 0U ? AssemblyResidualRankStructure::FullRowRank
+                                       : AssemblyResidualRankStructure::RedundantResidualComponents;
 }
 
 } // namespace
@@ -187,8 +141,6 @@ AssemblySolveDiagnosticsAnalyzer::analyze(const Project& project,
   if (graph.has_error()) {
     return Result<AssemblySolveDiagnostics>::failure(graph.error());
   }
-  // Match the solver's suppression policy: constraints touching suppressed
-  // components vanish, and rank/DOF cover only non-suppressed components.
   std::vector<ComponentInstanceId> active_subgroup;
   active_subgroup.reserve(connected_group.size());
   for (const auto& component_id : connected_group) {
@@ -209,7 +161,8 @@ AssemblySolveDiagnosticsAnalyzer::analyze(const Project& project,
         AssemblyConstraintConsistencyClassification::FixedGeometryInconsistent,
         AssemblyResidualRankStructure::NotEvaluated, solve_result.component_group,
         solve_result.fixed_components, std::move(variable_components),
-        std::move(constraint_ids.value()), unevaluated_rank_summary(solve_result, 0U),
+        std::move(constraint_ids.value()),
+        unevaluated_rank_summary(solve_result.residual_summary, 0U),
         solve_result.residual_summary});
   }
 
@@ -221,7 +174,8 @@ AssemblySolveDiagnosticsAnalyzer::analyze(const Project& project,
         AssemblyConstraintConsistencyClassification::SolverDidNotConverge,
         AssemblyResidualRankStructure::NotEvaluated, solve_result.component_group,
         solve_result.fixed_components, std::move(variable_components),
-        std::move(constraint_ids.value()), unevaluated_rank_summary(solve_result, variable_count),
+        std::move(constraint_ids.value()),
+        unevaluated_rank_summary(solve_result.residual_summary, variable_count),
         solve_result.residual_summary});
   }
 
@@ -250,8 +204,9 @@ AssemblySolveDiagnosticsAnalyzer::analyze(const Project& project,
     return Result<AssemblySolveDiagnostics>::failure(jacobian.error());
   }
 
-  auto rank = compute_matrix_rank(jacobian.value(), variables.size(),
-                                  options.rank_absolute_tolerance, options.rank_relative_tolerance);
+  auto rank = detail::compute_assembly_matrix_rank(
+      jacobian.value(), variables.size(), options.rank_absolute_tolerance,
+      options.rank_relative_tolerance, "assembly.solve_diagnostics");
   if (rank.has_error()) {
     return Result<AssemblySolveDiagnostics>::failure(rank.error());
   }
@@ -259,24 +214,126 @@ AssemblySolveDiagnosticsAnalyzer::analyze(const Project& project,
   const std::size_t constrained_dof = rank.value().rank;
   const std::size_t remaining_dof = variables.size() - constrained_dof;
   const std::size_t residual_row_redundancy = residuals.value().size() - constrained_dof;
-  const AssemblyDofClassification dof_classification =
-      variables.empty()    ? AssemblyDofClassification::NoVariableDof
-      : remaining_dof > 0U ? AssemblyDofClassification::Underconstrained
-                           : AssemblyDofClassification::LocallyFullyConstrained;
-  const AssemblyResidualRankStructure rank_structure =
-      residual_row_redundancy == 0U ? AssemblyResidualRankStructure::FullRowRank
-                                    : AssemblyResidualRankStructure::RedundantResidualComponents;
 
   return Result<AssemblySolveDiagnostics>::success(AssemblySolveDiagnostics{
-      solve_result.state, dof_classification,
-      AssemblyConstraintConsistencyClassification::LocallyConsistent, rank_structure,
-      solve_result.component_group, solve_result.fixed_components, std::move(variable_components),
+      solve_result.state, classify_dof(variables.size(), remaining_dof),
+      AssemblyConstraintConsistencyClassification::LocallyConsistent,
+      classify_rank_structure(residual_row_redundancy), solve_result.component_group,
+      solve_result.fixed_components, std::move(variable_components),
       std::move(constraint_ids.value()),
       AssemblyJacobianRankSummary{true, residuals.value().size(), variables.size(),
                                   rank.value().rank, constrained_dof, remaining_dof,
                                   residual_row_redundancy, rank.value().maximum_abs_entry,
                                   rank.value().pivot_threshold},
       solve_result.residual_summary});
+}
+
+Result<AssemblyCrossHierarchySolveDiagnostics>
+AssemblyCrossHierarchySolveDiagnosticsAnalyzer::analyze(
+    const Project& project, const AssemblyCrossHierarchySolveGroup& solve_group,
+    AssemblySolveDiagnosticsOptions options) const {
+  auto options_validation = validate_options(options);
+  if (options_validation.has_error()) {
+    return Result<AssemblyCrossHierarchySolveDiagnostics>::failure(options_validation.error());
+  }
+
+  const AssemblyCrossHierarchyConstraintSolver solver;
+  auto solved = solver.solve(project, solve_group, options.solver_options);
+  if (solved.has_error()) {
+    return Result<AssemblyCrossHierarchySolveDiagnostics>::failure(solved.error());
+  }
+
+  const AssemblyCrossHierarchySolveResult& solve_result = solved.value();
+  std::vector<ComponentTransformAuthority> variable_authorities =
+      variable_authorities_from(solve_result);
+
+  if (solve_result.state == AssemblySolveState::FixedGeometryInconsistent) {
+    return Result<AssemblyCrossHierarchySolveDiagnostics>::success(
+        AssemblyCrossHierarchySolveDiagnostics{
+            solve_result.state, AssemblyDofClassification::NotEvaluated,
+            AssemblyConstraintConsistencyClassification::FixedGeometryInconsistent,
+            AssemblyResidualRankStructure::NotEvaluated, solve_result.relationships,
+            solve_result.fixed_authorities, std::move(variable_authorities),
+            unevaluated_rank_summary(solve_result.residual_summary, 0U),
+            solve_result.residual_summary});
+  }
+
+  if (!solve_result.converged()) {
+    const std::size_t variable_count =
+        variable_authorities.size() * detail::kAssemblyTransformVariableCount;
+    return Result<AssemblyCrossHierarchySolveDiagnostics>::success(
+        AssemblyCrossHierarchySolveDiagnostics{
+            solve_result.state, AssemblyDofClassification::NotEvaluated,
+            AssemblyConstraintConsistencyClassification::SolverDidNotConverge,
+            AssemblyResidualRankStructure::NotEvaluated, solve_result.relationships,
+            solve_result.fixed_authorities, std::move(variable_authorities),
+            unevaluated_rank_summary(solve_result.residual_summary, variable_count),
+            solve_result.residual_summary});
+  }
+
+  Project evaluation_project = project;
+  const AssemblyCrossHierarchySolveResultApplier applier;
+  auto applied = applier.apply(evaluation_project, solve_result);
+  if (applied.has_error()) {
+    return Result<AssemblyCrossHierarchySolveDiagnostics>::failure(applied.error());
+  }
+
+  auto variables = detail::read_cross_hierarchy_authority_variables(
+      evaluation_project, variable_authorities);
+  if (variables.has_error()) {
+    return Result<AssemblyCrossHierarchySolveDiagnostics>::failure(variables.error());
+  }
+  auto residuals = detail::evaluate_cross_hierarchy_group_residuals(
+      evaluation_project, solve_group, options.solver_options.length_residual_scale_mm);
+  if (residuals.has_error()) {
+    return Result<AssemblyCrossHierarchySolveDiagnostics>::failure(residuals.error());
+  }
+
+  const detail::AssemblyNumericSystemOptions numeric_options{
+      options.solver_options.length_residual_scale_mm,
+      options.solver_options.finite_difference_translation_step_mm,
+      options.solver_options.finite_difference_rotation_step_deg};
+  const detail::AssemblyNumericResidualEvaluator evaluator =
+      [&evaluation_project, &solve_group, &variable_authorities,
+       length_scale = options.solver_options.length_residual_scale_mm](
+          const detail::NumericVector& candidate_values) {
+        Project candidate_project = evaluation_project;
+        auto candidate_applied = detail::apply_cross_hierarchy_authority_variables(
+            candidate_project, variable_authorities, candidate_values);
+        if (candidate_applied.has_error()) {
+          return Result<detail::NumericVector>::failure(candidate_applied.error());
+        }
+        return detail::evaluate_cross_hierarchy_group_residuals(
+            candidate_project, solve_group, length_scale);
+      };
+  auto jacobian = detail::build_central_difference_jacobian(
+      variables.value(), residuals.value(), numeric_options, evaluator);
+  if (jacobian.has_error()) {
+    return Result<AssemblyCrossHierarchySolveDiagnostics>::failure(jacobian.error());
+  }
+
+  auto rank = detail::compute_assembly_matrix_rank(
+      jacobian.value(), variables.value().size(), options.rank_absolute_tolerance,
+      options.rank_relative_tolerance, "assembly.cross_hierarchy_diagnostics");
+  if (rank.has_error()) {
+    return Result<AssemblyCrossHierarchySolveDiagnostics>::failure(rank.error());
+  }
+
+  const std::size_t constrained_dof = rank.value().rank;
+  const std::size_t remaining_dof = variables.value().size() - constrained_dof;
+  const std::size_t residual_row_redundancy = residuals.value().size() - constrained_dof;
+
+  return Result<AssemblyCrossHierarchySolveDiagnostics>::success(
+      AssemblyCrossHierarchySolveDiagnostics{
+          solve_result.state, classify_dof(variables.value().size(), remaining_dof),
+          AssemblyConstraintConsistencyClassification::LocallyConsistent,
+          classify_rank_structure(residual_row_redundancy), solve_result.relationships,
+          solve_result.fixed_authorities, std::move(variable_authorities),
+          AssemblyJacobianRankSummary{true, residuals.value().size(), variables.value().size(),
+                                      rank.value().rank, constrained_dof, remaining_dof,
+                                      residual_row_redundancy, rank.value().maximum_abs_entry,
+                                      rank.value().pivot_threshold},
+          solve_result.residual_summary});
 }
 
 } // namespace blcad::geometry
