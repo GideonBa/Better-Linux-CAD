@@ -6,10 +6,8 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <limits>
-#include <optional>
 #include <utility>
 #include <variant>
-#include <vector>
 
 using namespace blcad;
 using namespace blcad::geometry;
@@ -72,6 +70,14 @@ AssemblyHierarchyConstraint cross_concentric(const char* id) {
   return value.value();
 }
 
+RigidTransform rotate_30_deg_about_hole_axis() {
+  // Hole axis origin is (4, -6, z). For T(p) = Rz(30 deg) p + t to keep the
+  // axis origin fixed, t = p - Rz(30 deg) p.
+  return RigidTransform{
+      Vector3{-2.4641016151377544, -2.803847577293368, 0.0},
+      Vector3{0.0, 0.0, 30.0}};
+}
+
 Project motion_project(RigidTransform left_boundary = identity_rigid_transform(),
                        bool repeated = false,
                        RigidTransform right_boundary = identity_rigid_transform()) {
@@ -80,8 +86,7 @@ Project motion_project(RigidTransform left_boundary = identity_rigid_transform()
   REQUIRE(root.value().add_member_part(DocumentId("part.block27_plate")));
   REQUIRE(root.value().add_component_instance(
       component("component.root", ComponentGroundingState::Grounded)));
-  REQUIRE(root.value().add_subassembly_instance(
-      occurrence("subassembly.left", left_boundary)));
+  REQUIRE(root.value().add_subassembly_instance(occurrence("subassembly.left", left_boundary)));
   if (repeated) {
     REQUIRE(root.value().add_subassembly_instance(
         occurrence("subassembly.right", right_boundary)));
@@ -108,7 +113,8 @@ void add_joint(Project& project, AssemblyHierarchyJoint joint) {
   REQUIRE(project.validate_assembly_structure());
 }
 
-AssemblyCrossHierarchyJointMotionResult move(Project const& project, const char* id, double degrees) {
+AssemblyCrossHierarchyJointMotionResult move(const Project& project, const char* id,
+                                             double degrees) {
   const AssemblyCrossHierarchyJointMotionSolver solver;
   auto requested = Quantity::angle_deg(degrees, id);
   REQUIRE(requested);
@@ -134,10 +140,10 @@ Project mixed_motion_project(double second_cross_coordinate = 0.0) {
   AssemblyDocument* child = project.find_assembly_document(DocumentId("assembly.child"));
   REQUIRE(child != nullptr);
   REQUIRE(child->add_constraint(local_concentric("constraint.local.concentric")));
-  REQUIRE(child->add_joint(local_joint("joint.local.hold", 0.0)));
+  REQUIRE(child->add_joint(local_joint("joint.local.hold")));
   REQUIRE(project.add_cross_hierarchy_constraint(
       cross_concentric("constraint.cross.concentric")));
-  REQUIRE(project.add_cross_hierarchy_joint(cross_joint("joint.cross.selected", 0.0)));
+  REQUIRE(project.add_cross_hierarchy_joint(cross_joint("joint.cross.selected")));
   REQUIRE(project.add_cross_hierarchy_joint(
       cross_joint("joint.cross.hold", second_cross_coordinate)));
   REQUIRE(project.validate_assembly_structure());
@@ -197,7 +203,8 @@ TEST_CASE("Nested cross-hierarchy Revolute motion evaluates exact parent transfo
   auto child = AssemblyDocument::create(DocumentId("assembly.child"), "Child");
   REQUIRE(child);
   REQUIRE(child.value().add_member_part(DocumentId("part.block27_plate")));
-  REQUIRE(child.value().add_component_instance(component("component.child")));
+  REQUIRE(child.value().add_component_instance(
+      component("component.child", ComponentGroundingState::Free)));
 
   auto project = Project::create(DocumentId("project.nested_motion"), "NestedMotion", root.value());
   REQUIRE(project);
@@ -220,7 +227,7 @@ TEST_CASE("Nested cross-hierarchy Revolute motion evaluates exact parent transfo
 TEST_CASE("Repeated occurrences share one authority variable block and proposal in motion",
           "[geometry][assembly-cross-hierarchy-motion]") {
   Project project = motion_project(identity_rigid_transform(), true,
-                                   RigidTransform{Vector3{}, Vector3{0.0, 0.0, 30.0}});
+                                   rotate_30_deg_about_hole_axis());
   REQUIRE(project.add_cross_hierarchy_constraint(
       cross_concentric("constraint.cross.anchor")));
   add_joint(project, cross_joint(
@@ -234,6 +241,7 @@ TEST_CASE("Repeated occurrences share one authority variable block and proposal 
   REQUIRE(result.proposed_transforms.size() == 1U);
   CHECK(result.proposed_transforms.front().authority.assembly_document.value() == "assembly.child");
   CHECK(result.residual_summary.residual_component_count == 15U);
+  CHECK(result.residual_summary.final_rms <= 1.0e-8);
 }
 
 TEST_CASE("Combined motion keeps canonical four-family order and authored holding drives",
@@ -276,7 +284,7 @@ TEST_CASE("Cross-hierarchy motion applies transforms and selected coordinate ato
   CHECK(left_boundary(project) == source_boundary);
 }
 
-TEST_CASE("Cross-hierarchy motion application protects complete relationship and path inputs",
+TEST_CASE("Cross-hierarchy motion application protects relationships paths and semantic inputs",
           "[geometry][assembly-cross-hierarchy-motion]") {
   const AssemblyCrossHierarchyJointMotionResultApplier applier;
 
@@ -341,7 +349,7 @@ TEST_CASE("Cross-hierarchy motion application protects complete relationship and
     CHECK(applier.apply(project, result).has_error());
   }
 
-  SECTION("New active relationship joins motion group") {
+  SECTION("New active relationship joins the current motion group") {
     Project project = motion_project();
     add_joint(project, cross_joint());
     const auto result = move(project, "joint.cross.revolute", 45.0);
@@ -367,7 +375,8 @@ TEST_CASE("Cross-hierarchy motion rejects invalid selection and tampered results
 
   SECTION("Inactive selected joint") {
     Project project = motion_project();
-    add_joint(project, cross_joint("joint.cross.inactive", 0.0, AssemblyJointState::Inactive));
+    add_joint(project, cross_joint("joint.cross.inactive", 0.0,
+                                   AssemblyJointState::Inactive));
     CHECK(solver.move(project, AssemblyJointId("joint.cross.inactive"),
                       angle(0.0, "joint.cross.inactive"))
               .has_error());
@@ -383,7 +392,7 @@ TEST_CASE("Cross-hierarchy motion rejects invalid selection and tampered results
               .has_error());
   }
 
-  SECTION("Missing snapshots and proposals") {
+  SECTION("Missing result snapshots or proposal") {
     Project project = motion_project();
     add_joint(project, cross_joint());
     const auto valid = move(project, "joint.cross.revolute", 45.0);
@@ -405,7 +414,7 @@ TEST_CASE("Cross-hierarchy motion rejects invalid selection and tampered results
     CHECK(applier.apply(project, missing_proposal).has_error());
   }
 
-  SECTION("Invalid proposed transform") {
+  SECTION("Invalid proposed transform is atomic") {
     Project project = motion_project();
     add_joint(project, cross_joint());
     auto result = move(project, "joint.cross.revolute", 45.0);
