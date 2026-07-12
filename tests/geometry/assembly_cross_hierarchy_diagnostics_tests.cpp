@@ -161,10 +161,14 @@ TEST_CASE("Cross-hierarchy diagnostics classify all-grounded consistency before 
   }
 
   SECTION("Satisfied fixed geometry has no variable DOF") {
-    Project project = distance_project(0.0);
-    REQUIRE(project.find_assembly_document(DocumentId("assembly.child"))
-                ->set_component_instance_grounding_state(
-                    ComponentInstanceId("component.child"), ComponentGroundingState::Grounded));
+    Project project = distance_project(20.0);
+    AssemblyDocument* child = project.find_assembly_document(DocumentId("assembly.child"));
+    REQUIRE(child != nullptr);
+    REQUIRE(child->set_component_instance_transform(
+        ComponentInstanceId("component.child"),
+        RigidTransform{Vector3{0.0, 0.0, 20.0}, Vector3{}}));
+    REQUIRE(child->set_component_instance_grounding_state(
+        ComponentInstanceId("component.child"), ComponentGroundingState::Grounded));
     auto diagnostics = analyzer.analyze(project, only_group(project));
     REQUIRE(diagnostics);
     CHECK(diagnostics.value().solve_state == AssemblySolveState::Converged);
