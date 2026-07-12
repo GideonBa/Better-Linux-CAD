@@ -6,6 +6,8 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <string>
+
 using namespace blcad;
 using namespace blcad::geometry;
 using Catch::Approx;
@@ -119,8 +121,8 @@ AssemblyRevoluteSweepRequest cross_request(double start_deg, double end_deg,
 }
 
 const AssemblyContactRecord& only_contact(const AssemblyRevoluteSweepSample& sample) {
-  REQUIRE(sample.contact_analysis.contacts.size() == 1U);
-  return sample.contact_analysis.contacts.front();
+  REQUIRE(sample.contact_analysis.records.size() == 1U);
+  return sample.contact_analysis.records.front();
 }
 
 } // namespace
