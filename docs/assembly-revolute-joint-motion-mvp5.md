@@ -1,6 +1,6 @@
 # Revolute Joint, Limits, and First Motion Seed MVP-5
 
-Status: implemented the first persistent assembly motion relationship family: local Revolute joint intent with limits and authored coordinate, deterministic joint connectivity, signed drive residuals, shared numeric solve-engine reuse, complete component/joint stale snapshots, atomic transform-plus-coordinate application, and a headless motion command.
+Status: implemented the first persistent assembly motion relationship family: local Revolute joint intent with limits and authored coordinate, deterministic joint connectivity, signed drive residuals, shared numeric solve-engine reuse, complete component/joint/semantic-PartDocument freshness, atomic transform-plus-coordinate application, and a headless motion command.
 
 ## Separation from geometric constraints
 
@@ -37,7 +37,7 @@ The current seed uses the principal degree domain:
 lower <= coordinate <= upper
 ```
 
-Requested motion outside the persistent limits is rejected rather than clamped.
+Requested motion outside persistent limits is rejected rather than clamped.
 
 The coordinate is persistent authored motion state.
 
@@ -53,22 +53,15 @@ The first Revolute geometry producer is:
 feature.<feature-id>.seat
 ```
 
-The existing seating-target resolver provides:
+The existing seating-target resolver provides one primary axis and oriented seating plane from the same exact circular feature/profile identity.
 
-```text
-primary axis
-oriented seating plane
-```
-
-from the same exact circular feature/profile identity.
-
-Revolute reuses this semantic geometry rather than persisting an OCCT cylinder face or raw topology id.
+Revolute reuses this semantic geometry rather than persisting OCCT topology identity.
 
 ## Directed axis and signed coordinate
 
-Concentric and Insert accept equal or opposed axis directions. A signed Revolute coordinate requires an oriented positive axis.
+Concentric and Insert accept equal or opposed axis directions. Signed Revolute coordinates require an oriented positive axis.
 
-The Revolute drive therefore uses directed alignment:
+The drive therefore uses:
 
 ```text
 direction_alignment = dA - dB
@@ -76,7 +69,7 @@ direction_alignment = dA - dB
 
 Target A owns positive rotation direction.
 
-The remaining seating terms are:
+Remaining seating terms are:
 
 ```text
 axis_offset_mm               = cross(oB - oA, dA)
@@ -85,14 +78,14 @@ signed_seating_separation_mm = dot(sB - sA, nA)
 
 ## Signed twist residual
 
-Let `xA` and `xB` be the oriented seating-plane x axes and `dA` the target-A directed axis.
+For oriented seating-plane x axes `xA`, `xB` and target-A directed axis `dA`:
 
 ```text
 reference_cosine = dot(xA, xB)
 reference_sine   = dot(dA, cross(xA, xB))
 ```
 
-The target coordinate is enforced with a periodic sine/cosine pair:
+The requested coordinate is enforced with:
 
 ```text
 twist_alignment_sine   = sin(phi - target)
@@ -101,7 +94,7 @@ twist_alignment_cosine = cos(phi - target) - 1
 
 The pair avoids an `atan2` branch cut inside the residual path.
 
-One driven Revolute query contributes nine scalar residual components:
+One driven Revolute query contributes nine scalar residuals:
 
 ```text
 direction_alignment.x
@@ -115,9 +108,9 @@ twist_alignment_sine
 twist_alignment_cosine
 ```
 
-A regular one-free-body driven query is covered as a `9 x 6` finite-difference Jacobian of rank `6` because the requested coordinate temporarily constrains the joint's one free motion coordinate.
+A regular one-free-body driven query has a covered `9 x 6` finite-difference Jacobian of rank `6` because the query temporarily constrains the one free joint coordinate.
 
-This rank is query-time drive behavior, not persistent authority that the undriven joint has zero free DOF.
+This is query-time drive behavior, not persistent authority that an undriven Revolute joint has zero free DOF.
 
 ## Deterministic joint graph
 
@@ -125,15 +118,13 @@ This rank is query-time drive behavior, not persistent authority that the undriv
 
 It preserves multi-edges, sorts deterministically, and exposes local connected groups.
 
-Inactive joints do not contribute graph edges.
+Inactive joints do not contribute edges.
 
 The graph is derived and unpersisted.
 
 ## Combined motion relationship groups
 
-Motion cannot partition on the joint graph alone because local geometric constraints and local joints may transitively couple the same components.
-
-The motion path derives a combined local relationship closure over:
+Motion partitions over the combined closure of:
 
 ```text
 active local geometric constraint edges
@@ -157,7 +148,7 @@ numeric drives:
   joint.z -> 35 deg
 ```
 
-This prevents one motion request from silently releasing another active joint in the same coupled local mechanism.
+This prevents one motion request from silently releasing another active joint in the coupled local mechanism.
 
 ## Suppression participation
 
@@ -165,39 +156,33 @@ The selected joint requires active, non-suppressed endpoints.
 
 A selected joint touching a suppressed component is rejected.
 
-Non-selected joint drives touching suppressed components vanish from the active numeric motion subgroup under the documented suppression policy.
+Non-selected joint drives touching suppressed components vanish from the active numeric subgroup.
 
-Complete component snapshots still include suppressed group components for stale-result validation.
+Complete component snapshots still preserve the complete combined component group for stale-result validation.
 
 ## Shared numeric solve engine
 
-Both ordinary geometric solving and joint motion use:
+Ordinary geometric solving and joint motion both call:
 
 ```text
 detail::solve_numeric_relationships
 ```
 
-```text
-AssemblyRigidBodySolver
-  -> geometric constraint ids
-  -> empty Revolute drive set
+The local adapter delegates to the shared absolute-variable evaluator engine used by cross-hierarchy solving as well.
 
-AssemblyJointMotionSolver
-  -> geometric constraint ids
-  -> deterministic Revolute drive set
-```
-
-The shared engine preserves:
+The path preserves:
 
 - six direct transform variables per free active local component;
 - deterministic relationship/component ordering;
+- shared residual flattening for geometric relationships;
 - central finite differences;
 - damped Gauss-Newton normal equations;
-- partial-pivot Gaussian elimination;
+- partial-pivot dense solve;
 - damping escalation and backtracking;
 - existing solve states;
-- source-project immutability;
+- source Project immutability;
 - complete component snapshots;
+- canonical semantic target PartDocument snapshots;
 - transform proposals for free active components.
 
 There is no Revolute-specific optimizer.
@@ -227,29 +212,59 @@ limits
 source coordinate
 ```
 
+The embedded `AssemblySolveResult` additionally owns complete component and canonical semantic target PartDocument freshness context.
+
 Motion results and snapshots are derived and unpersisted.
 
 ## Atomic application
 
-`AssemblyJointMotionResultApplier` rejects:
+`AssemblyJointMotionResultApplier` first validates complete driven-joint input snapshots.
+
+It rejects:
 
 - non-converged motion results;
 - duplicate joint snapshots;
 - deleted driven joints;
-- any driven-joint type/state/target/limit/coordinate change;
-- inconsistent selected-joint identity/context;
-- every component stale condition enforced by `AssemblySolveResultApplier`.
+- driven-joint type/state/target/limit/coordinate changes;
+- inconsistent selected-joint identity/context.
+
+It then creates a candidate Project and delegates the embedded component solve result to `AssemblySolveResultApplier`.
+
+That shared local applier additionally rejects:
+
+- stale component referenced-part/transform/grounding/suppression inputs;
+- changed canonical PartDocument model intent for participating semantic target producers;
+- duplicate or inconsistent transform proposals;
+- invalid proposed transforms.
 
 Successful application is atomic:
 
 ```text
 copy Project
-  -> apply embedded direct component-transform proposals
+  -> validate/apply embedded direct component transforms
   -> replace selected persistent joint coordinate
   -> commit Project copy
 ```
 
-If either step fails, the source project remains unchanged.
+If either transform or coordinate application fails, the source Project remains unchanged.
+
+## Semantic target PartDocument freshness
+
+Block 27 deliberately applies the same Option-A freshness contract to ordinary local solve results used by joint motion.
+
+For every unique PartDocument referenced by the complete combined component group, the embedded result stores the exact canonical:
+
+```text
+serialize_part_document_to_json(part)
+```
+
+payload.
+
+At motion application the current payload must compare byte-for-byte equal.
+
+A participating target-producing part parameter, formula, workplane, sketch/profile, reference-recovery/remap, or feature-history model-intent edit therefore invalidates the old motion result before any component transform or joint coordinate changes.
+
+This is conservative and unpersisted. It is not a minimal target dependency closure.
 
 ## JSON persistence
 
@@ -283,11 +298,11 @@ Representative record:
 }
 ```
 
-Files without `assembly_joints` load with an empty joint collection.
+Files without `assembly_joints` load with an empty collection.
 
 Persistent intent includes joint identity/family/endpoints/state/limits/current coordinate and direct component transforms after explicit successful application.
 
-Derived data includes joint graph connectivity, combined groups, resolved seat geometry, Revolute residuals, transient drive sets, numeric residuals/Jacobians, solve state, motion results, joint snapshots, and unapplied proposals.
+Derived data includes joint graph connectivity, combined groups, resolved seat geometry, Revolute residuals, transient drives, numeric residuals/Jacobians, solve state, motion results, joint/component/semantic-PartDocument snapshots, and unapplied proposals.
 
 ## Headless motion example
 
@@ -299,60 +314,55 @@ Derived data includes joint graph connectivity, combined groups, resolved seat g
   build/revolute_joint_45.blcad.project.json
 ```
 
-The output project persists the applied direct component transform and selected joint coordinate `45 deg`.
+The output Project persists the applied direct component transform and selected joint coordinate `45 deg`.
 
 It can be passed directly to the posed assembly STEP exporter.
 
 ## Proven behavior
 
-Core coverage includes:
+Core coverage includes joint identity/endpoint validation, Angle quantity enforcement, principal-domain/limit validation, coordinate validation/update, local joint endpoint validation, JSON roundtrip/backward compatibility, and deterministic active joint graph behavior.
 
-- joint identity/endpoint validation;
-- Angle quantity enforcement;
-- principal-domain and ordered-limit validation;
-- coordinate-in-range validation;
-- immutable coordinate update;
-- local `AssemblyDocument` joint endpoint validation;
-- assembly/project JSON roundtrip and backward-compatible loading;
-- deterministic active joint graph behavior.
+Geometry coverage includes zero and signed twist residuals, exact nine-component flattening, regular driven rank `6/6`, deterministic in-range motion solving, source immutability, atomic transform plus coordinate application, hard limit rejection, grounding, inactive/suppressed selected-joint rejection, non-selected suppressed-drive filtering, stale component/joint snapshot rejection, multi-joint holding drives, and inherited semantic PartDocument freshness through the embedded local solve result.
 
-Geometry coverage includes:
+Focused commands:
 
-- zero and signed twist residuals;
-- exact nine-component flattening;
-- regular driven rank `6/6`;
-- deterministic in-range motion solving;
-- source-project immutability;
-- atomic transform plus coordinate application;
-- hard limit rejection;
-- grounded participation;
-- inactive selected-joint rejection;
-- selected-endpoint suppression rejection;
-- non-selected suppressed-drive filtering;
-- stale component and joint snapshot rejection;
-- multi-joint holding drives.
+```bash
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-revolute-joint]"
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-semantic-freshness]"
+```
 
 ## Locality and hierarchy boundary
 
-This joint seed remains local to one temporary solve view's root `AssemblyDocument`.
+The current Revolute seed remains local to one temporary solve view's root `AssemblyDocument`.
 
-Rigid subassembly hierarchy and document-scoped flexible child solving were implemented later as separate blocks, but Revolute endpoint identity is still local and motion does not propagate through cross-hierarchy joint relationships.
+Rigid subassembly hierarchy, document-scoped flexible child solving, and complete cross-hierarchy geometric solving/application/diagnostics are implemented separately.
 
-Repeated occurrences of one child document share child-local joint records and component transform authority because the child document is one shared model definition.
+Repeated occurrences of one child document share child-local joint records and direct component transform authority because the child document remains one shared model definition.
 
-The current cross-hierarchy geometric planning distinguishes occurrence identity from transform authority in `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`. Cross-hierarchy joints must reuse that distinction after geometric solve connectivity is stable.
+Cross-hierarchy joint intent must preserve occurrence-qualified geometric endpoints while mapping motion variables/proposals to `ComponentTransformAuthority` values.
 
-## Still deferred
+## Next motion block
+
+Block 28 from `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md` is now the next assembly technical step:
+
+```text
+persistent project-level cross-hierarchy joint intent
+  -> exact occurrence-qualified Revolute endpoints
+  -> joint-to-ComponentTransformAuthority incidence
+  -> combined local geometric + local joint + cross-hierarchy geometric + cross-hierarchy joint motion closure
+  -> nested root-space Revolute drive residual evaluation
+  -> shared numeric engine
+  -> complete Block-27-style freshness and atomic transform + coordinate application
+```
+
+Still deferred beyond Block 28:
 
 - prismatic, cylindrical, planar, ball, pin-slot, or richer joint families;
 - multi-turn Revolute coordinates and persisted wrap counts;
-- joint velocity, acceleration, time, torque, force, spring, damper, or actuator intent;
-- continuous simulation or integration caches;
+- velocity, acceleration, time, torque, force, spring, damper, or actuator intent;
+- continuous simulation/integration caches;
 - motion trajectories, studies, or animation timelines;
-- project-level cross-hierarchy joint intent;
-- nested motion propagation across assembly-document boundaries;
+- occurrence-local child pose overrides;
 - whole-subassembly motion variables;
-- collision/interference checking during motion or swept-motion analysis;
+- swept-motion contact analysis;
 - null-space motion exploration without an explicit requested coordinate.
-
-Cross-hierarchy joint semantics are intentionally deferred until cross-hierarchy geometric blocks 23-27 are complete.
