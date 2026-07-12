@@ -7,6 +7,7 @@
 #include <cmath>
 #include <numbers>
 #include <string>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -104,6 +105,51 @@ evaluate_axis(const std::vector<RigidTransform>& transforms,
   const AssemblyHierarchyTransformEvaluator evaluator;
   return AssemblySpaceAxisDescriptor{evaluator.evaluate_point(transforms, local.origin),
                                      evaluator.evaluate_vector(transforms, local.direction)};
+}
+
+[[nodiscard]] AssemblyGeometricTargetDescriptor evaluate_geometric_descriptor(
+    const std::vector<RigidTransform>& transforms,
+    const AssemblyGeometricTargetDescriptor& descriptor) {
+  const AssemblyHierarchyTransformEvaluator evaluator;
+  return std::visit(
+      [&](const auto& value) -> AssemblyGeometricTargetDescriptor {
+        using Descriptor = std::decay_t<decltype(value)>;
+        if constexpr (std::is_same_v<Descriptor, AssemblyPlanarTargetDescriptor>) {
+          return AssemblyPlanarTargetDescriptor{
+              evaluator.evaluate_point(transforms, value.origin),
+              evaluator.evaluate_vector(transforms, value.x_axis),
+              evaluator.evaluate_vector(transforms, value.y_axis),
+              evaluator.evaluate_vector(transforms, value.normal)};
+        } else if constexpr (std::is_same_v<Descriptor, AssemblyAxisTargetDescriptor>) {
+          return AssemblyAxisTargetDescriptor{
+              evaluator.evaluate_point(transforms, value.origin),
+              evaluator.evaluate_vector(transforms, value.direction)};
+        } else if constexpr (std::is_same_v<Descriptor, AssemblyLineTargetDescriptor>) {
+          return AssemblyLineTargetDescriptor{
+              evaluator.evaluate_point(transforms, value.origin),
+              evaluator.evaluate_vector(transforms, value.direction)};
+        } else if constexpr (std::is_same_v<Descriptor, AssemblyPointTargetDescriptor>) {
+          return AssemblyPointTargetDescriptor{evaluator.evaluate_point(transforms, value.point)};
+        } else if constexpr (std::is_same_v<Descriptor, AssemblyCircularEdgeTargetDescriptor>) {
+          return AssemblyCircularEdgeTargetDescriptor{
+              evaluator.evaluate_point(transforms, value.center),
+              evaluator.evaluate_vector(transforms, value.x_axis),
+              evaluator.evaluate_vector(transforms, value.y_axis),
+              evaluator.evaluate_vector(transforms, value.normal), value.radius_mm};
+        } else if constexpr (
+            std::is_same_v<Descriptor, AssemblyCylindricalSurfaceTargetDescriptor>) {
+          return AssemblyCylindricalSurfaceTargetDescriptor{
+              evaluator.evaluate_point(transforms, value.axis_origin),
+              evaluator.evaluate_vector(transforms, value.axis_direction), value.radius_mm};
+        } else {
+          return AssemblyFrameTargetDescriptor{
+              evaluator.evaluate_point(transforms, value.origin),
+              evaluator.evaluate_vector(transforms, value.x_axis),
+              evaluator.evaluate_vector(transforms, value.y_axis),
+              evaluator.evaluate_vector(transforms, value.z_axis)};
+        }
+      },
+      descriptor);
 }
 
 [[nodiscard]] Vector3 difference(const Point3& target, const Point3& source) noexcept {
@@ -229,6 +275,52 @@ const std::optional<Quantity>& AssemblyHierarchyConstraintQuery::distance() cons
 
 const std::optional<Quantity>& AssemblyHierarchyConstraintQuery::angle() const noexcept {
   return angle_;
+}
+
+Result<AssemblyResolvedGeometricTarget>
+AssemblyHierarchyConstraintTargetResolver::resolve_geometric(
+    const Project& project, const AssemblyHierarchyConstraintTarget& target) const {
+  auto occurrence = resolve_occurrence(project, target.occurrence_path());
+  if (occurrence.has_error()) {
+    return Result<AssemblyResolvedGeometricTarget>::failure(occurrence.error());
+  }
+  auto local_project = make_local_target_view(project, *occurrence.value().assembly);
+  if (local_project.has_error()) {
+    return Result<AssemblyResolvedGeometricTarget>::failure(local_project.error());
+  }
+  auto local_target = make_local_target(target);
+  if (local_target.has_error()) {
+    return Result<AssemblyResolvedGeometricTarget>::failure(local_target.error());
+  }
+
+  const AssemblyConstraintTargetResolver local_resolver;
+  auto resolved = local_resolver.resolve_geometric(local_project.value(), local_target.value());
+  if (resolved.has_error()) {
+    return Result<AssemblyResolvedGeometricTarget>::failure(resolved.error());
+  }
+  if (resolved.value().transforms_inner_to_outer.size() != 1U) {
+    return Result<AssemblyResolvedGeometricTarget>::failure(validation_error(
+        target.semantic_reference(),
+        "local typed target must retain exactly one direct component transform"));
+  }
+
+  const auto transforms = target_transform_chain(
+      resolved.value().transforms_inner_to_outer.front(), occurrence.value().occurrence);
+  AssemblyResolvedGeometricTarget hierarchy_target{
+      AssemblyHierarchyGeometricTargetEndpointIdentity{target.occurrence_path(),
+                                                       target.component_instance(),
+                                                       target.semantic_reference()},
+      resolved.value().source_kind,
+      resolved.value().source_metadata,
+      evaluate_geometric_descriptor(transforms, resolved.value().descriptor),
+      resolved.value().capabilities,
+      AssemblyGeometricTargetCoordinateSpace::RootAssembly,
+      transforms};
+  auto valid = validate_resolved_geometric_target(hierarchy_target);
+  if (valid.has_error()) {
+    return Result<AssemblyResolvedGeometricTarget>::failure(valid.error());
+  }
+  return Result<AssemblyResolvedGeometricTarget>::success(std::move(hierarchy_target));
 }
 
 Result<AssemblyHierarchyPlanarConstraintTargetDescriptor>
