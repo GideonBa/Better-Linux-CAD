@@ -19,6 +19,18 @@ report_failure() {
 }
 trap report_failure EXIT
 
+if [[ ! -f debug/block39-run23.log ]]; then
+  mkdir -p debug
+  gh run view 29243146119 --repo "$GITHUB_REPOSITORY" --log > debug/block39-run23.log
+  git config user.name "github-actions[bot]"
+  git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+  git add debug/block39-run23.log
+  git commit -m "Capture Block 39 verification diagnostics"
+  git push origin HEAD:block39-generic-relationship-equations
+  trap - EXIT
+  exit 1
+fi
+
 python3 - <<'PY'
 from pathlib import Path
 
@@ -115,6 +127,7 @@ if [[ $geometry_status -ne 0 || $focused_status -ne 0 ]]; then
   exit 1
 fi
 
+rm -rf debug
 rm scripts/normalize_block39.py \
    scripts/normalize_block39_numeric.py \
    scripts/normalize_block39_hierarchy.py \
@@ -139,6 +152,7 @@ test ! -e scripts/normalize_block39_synthetic_targets.py
 test ! -e scripts/normalize_block39_solver_assertions.py
 test ! -e scripts/run_block39_ci.sh
 test ! -e .github/workflows/block39-patch.yml
+test ! -e debug
 grep -R "AssemblyGenericRelationshipEquationBuilder" -n include src tests
 grep -R "assembly-generic-relationships" -n tests docs
 
