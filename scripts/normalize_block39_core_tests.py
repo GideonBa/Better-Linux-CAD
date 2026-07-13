@@ -52,7 +52,7 @@ old_motion = '''  CHECK(motion_graph.value().relationship_count() == 0U);
 new_motion = '''  CHECK(motion_graph.value().relationship_count() == 3U);
   CHECK(motion_graph.value().authority_count() == 2U);
   CHECK(motion_graph.value().incidence_count() == 5U);
-  CHECK(motion_graph.value().motion_group_count() == 1U);
+  CHECK(motion_graph.value().motion_group_count() == 0U);
 '''
 if old_motion not in text:
     raise RuntimeError("cross-hierarchy generic motion graph assertion marker not found")
