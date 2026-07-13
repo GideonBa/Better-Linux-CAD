@@ -10,7 +10,7 @@ report_failure() {
       echo 'Block 39 verification failed.'
       echo
       echo '```text'
-      tail -n 140 /tmp/block39-ci.log || true
+      tail -n 160 /tmp/block39-ci.log || true
       echo '```'
     } > /tmp/block39-comment.md
     gh pr comment 36 --repo "$GITHUB_REPOSITORY" --body-file /tmp/block39-comment.md || true
@@ -24,20 +24,34 @@ from pathlib import Path
 
 path = Path("scripts/apply_block39.py")
 text = path.read_text(encoding="utf-8")
-start = text.index(
+
+numeric_start = text.index(
     'replace_exact(\n    "src/geometry/assembly_constraint_numeric_system.cpp",\n'
     "    '''Result<std::size_t> append_scaled_residuals(const InsertResidualDescriptor& residual,"
 )
-end = text.index(
+numeric_end = text.index(
     "\n# ---------------------------------------------------------------------------\n"
     "# Cross-hierarchy equation descriptor and builder integration.",
-    start,
+    numeric_start,
 )
-path.write_text(text[:start] + text[end:], encoding="utf-8")
+text = text[:numeric_start] + text[numeric_end:]
+
+hierarchy_start = text.index(
+    "# ---------------------------------------------------------------------------\n"
+    "# Cross-hierarchy equation descriptor and builder integration."
+)
+hierarchy_end = text.index(
+    "# ---------------------------------------------------------------------------\n"
+    "# CMake integration.",
+    hierarchy_start,
+)
+text = text[:hierarchy_start] + text[hierarchy_end:]
+path.write_text(text, encoding="utf-8")
 PY
 
 python3 scripts/apply_block39.py
 python3 scripts/normalize_block39_numeric.py
+python3 scripts/normalize_block39_hierarchy.py
 python3 scripts/normalize_block39.py
 
 sudo apt-get update
@@ -67,12 +81,16 @@ cmake --workflow --preset dev-geometry-build-test
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-target-compatibility]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-cross-hierarchy-target-compatibility]"
 
-rm scripts/normalize_block39.py scripts/normalize_block39_numeric.py scripts/run_block39_ci.sh
+rm scripts/normalize_block39.py \
+   scripts/normalize_block39_numeric.py \
+   scripts/normalize_block39_hierarchy.py \
+   scripts/run_block39_ci.sh
 
 git diff --check
 test ! -e scripts/apply_block39.py
 test ! -e scripts/normalize_block39.py
 test ! -e scripts/normalize_block39_numeric.py
+test ! -e scripts/normalize_block39_hierarchy.py
 test ! -e scripts/run_block39_ci.sh
 test ! -e .github/workflows/block39-patch.yml
 grep -R "AssemblyGenericRelationshipEquationBuilder" -n include src tests
