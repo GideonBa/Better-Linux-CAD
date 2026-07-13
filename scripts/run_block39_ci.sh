@@ -10,7 +10,7 @@ report_failure() {
       echo 'Block 39 verification failed.'
       echo
       echo '```text'
-      tail -n 180 /tmp/block39-ci.log || true
+      tail -n 220 /tmp/block39-ci.log || true
       echo '```'
     } > /tmp/block39-comment.md
     gh pr comment 36 --repo "$GITHUB_REPOSITORY" --body-file /tmp/block39-comment.md || true
@@ -50,8 +50,16 @@ text = text[:hierarchy_start] + text[hierarchy_end:]
 dev_start = text.index('replace_exact(\n    "docs/development-setup.md",')
 dev_end = text.index('replace_exact(\n    "docs/project-goal.md",', dev_start)
 text = text[:dev_start] + text[dev_end:]
-
 path.write_text(text, encoding="utf-8")
+
+normalize = Path("scripts/normalize_block39.py")
+normalize_text = normalize.read_text(encoding="utf-8")
+normalize_text = normalize_text.replace(
+    'AssemblyGeometricTargetDescriptor\\nevaluate_descriptor(',
+    'AssemblyGeometricTargetDescriptor evaluate_descriptor(',
+    1,
+)
+normalize.write_text(normalize_text, encoding="utf-8")
 PY
 
 python3 scripts/apply_block39.py
