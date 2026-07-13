@@ -208,3 +208,10 @@ Block 59 is the first such consumer: every Extrude extent/thin Length parameter 
 and every ToFace/Between semantic face producer Feature feeds the consuming Extrude. JSON loading
 defers those consumers until referenced producer Features exist; missing or cyclic dependencies
 fail closed.
+Block 60 consumes that ordering in Geometry. In-place Join/Cut/Intersect execution identifies the
+preceding target-Body producer among the Feature dependencies, so incremental re-execution starts
+from the same predecessor rather than applying the operation repeatedly to its own result.
+Block 61 applies the same graph contract to Revolve/RevolveCut: profile Sketch and typed axis source
+feed the Revolve Feature, target/prior Body producers precede modifying operations, and the Feature
+produces `body:<effective-result-body>`. Source changes therefore invalidate rotational intent and
+its Body result before Block-62 Geometry consumes the plan.

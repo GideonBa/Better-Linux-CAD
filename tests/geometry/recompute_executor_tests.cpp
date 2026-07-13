@@ -222,7 +222,7 @@ TEST_CASE("GeometryRecomputeExecutor executes an additive extrude into the shape
   CHECK(summary.solid_count == 1);
 }
 
-TEST_CASE("GeometryRecomputeExecutor fails closed on Block 59 Extrude intent before Block 60",
+TEST_CASE("GeometryRecomputeExecutor accepts Block 59 Extrude intent in Block 60",
           "[geometry][extrude-extent]") {
   auto document = PartDocument::create(DocumentId("part.symmetric"), "Symmetric");
   REQUIRE(document);
@@ -244,12 +244,10 @@ TEST_CASE("GeometryRecomputeExecutor fails closed on Block 59 Extrude intent bef
   ShapeCache cache = make_shape_cache();
   const auto result = GeometryRecomputeExecutor{}.execute_additive_extrude(
       document.value(), FeatureId("feature.symmetric"), cache);
-  REQUIRE(result.has_error());
-  CHECK(result.error().message() ==
-        "richer additive extrude extent, taper, and thin geometry starts in Block 60");
-  CHECK(cache.feature_shape_count() == 0U);
+  REQUIRE(result);
+  CHECK(cache.feature_shape_count() == 1U);
   CHECK(cache.body_shape_count() == 0U);
-  CHECK_FALSE(cache.has_final_shape());
+  CHECK(cache.has_final_shape());
 }
 
 TEST_CASE("GeometryRecomputeExecutor executes additive feature nodes from a recompute plan",
@@ -511,4 +509,48 @@ TEST_CASE("GeometryRecomputeExecutor cuts a target body and fails closed when it
   const auto failed_plan = executor.execute_plan(rebuilt.value(), plan.value(), cache);
   REQUIRE(failed_plan.has_error());
   CHECK(cache.find_feature_shape(FeatureId("feature.center_hole_cut")) != nullptr);
+}
+
+TEST_CASE("GeometryRecomputeExecutor rejects Block 61 Revolve intent until Geometry exists",
+          "[geometry][revolve-feature-boundary]") {
+  auto document = PartDocument::create(DocumentId("part.revolve_boundary"), "RevolveBoundary");
+  REQUIRE(document);
+  REQUIRE(document.value().add_parameter(make_length_parameter("width", "width", 20.0)));
+  REQUIRE(document.value().add_parameter(make_length_parameter("height", "height", 10.0)));
+  REQUIRE(document.value().add_datum_plane(DatumPlane::xy().value()));
+  auto sketch = Sketch::create(SketchId("sketch.revolve"), "Revolve", DatumPlaneId("datum.xy"));
+  REQUIRE(sketch);
+  auto rectangle =
+      RectangleProfile::create(ProfileId("profile.revolve"), ParameterId("width"),
+                               ParameterId("height"));
+  REQUIRE(rectangle);
+  REQUIRE(sketch.value().add_profile(rectangle.value()));
+  REQUIRE(document.value().add_sketch(sketch.value()));
+  auto axis = DatumAxis::create_explicit(DatumAxisId("axis.z"), "Z", {}, {0.0, 0.0, 1.0});
+  REQUIRE(axis);
+  REQUIRE(document.value().add_datum_axis(axis.value()));
+  REQUIRE(document.value().add_body(make_solid_body("body.revolve")));
+  auto profile = ProfileRegionReference::create(
+      SketchId("sketch.revolve"), ProfileId("profile.revolve"),
+      PartFeatureInputRole::RevolveProfile);
+  auto axis_reference = AxisReference::create_datum_axis(PartFeatureInputRole::RevolveAxis,
+                                                        DatumAxisId("axis.z"));
+  auto context = FeatureBodyResultContext::create(FeatureBodyOperationMode::NewBody, std::nullopt,
+                                                  BodyId("body.revolve"));
+  REQUIRE(profile);
+  REQUIRE(axis_reference);
+  REQUIRE(context);
+  auto revolve = RevolveFeature::create_revolve(
+      FeatureId("revolve.main"), "Main", profile.value(), axis_reference.value(),
+      RevolveAngleExtent::full(), context.value());
+  REQUIRE(revolve);
+  REQUIRE(document.value().add_revolve_feature(revolve.value()));
+
+  ShapeCache cache = make_shape_cache();
+  const auto result = GeometryRecomputeExecutor().execute_document(document.value(), cache);
+  REQUIRE(result.has_error());
+  CHECK(result.error().object_id() == "revolve.main");
+  CHECK(result.error().message() ==
+        "Revolve/RevolveCut geometry is not available until Block 62");
+  CHECK(cache.body_shape_count() == 0U);
 }

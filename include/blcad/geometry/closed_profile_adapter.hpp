@@ -5,6 +5,7 @@
 #include "blcad/core/spatial.hpp"
 #include "blcad/geometry/rectangle_extrusion_adapter.hpp"
 
+#include <optional>
 #include <string_view>
 #include <vector>
 
@@ -24,11 +25,28 @@ struct ClosedProfileCurveSegment {
   Point3 control2{};
 };
 
+struct AxisProjectionSpan {
+  double minimum = 0.0;
+  double maximum = 0.0;
+};
+
 class ClosedProfileAdapter {
 public:
   [[nodiscard]] Result<GeometryShape> make_extruded_profile(const std::vector<Point3>& vertices,
                                                             Vector3 direction,
                                                             const Quantity& depth) const;
+
+  [[nodiscard]] Result<GeometryShape>
+  make_extruded_profile_span(const std::vector<Point3>& vertices, Vector3 direction,
+                             double start_distance_mm, double end_distance_mm,
+                             std::optional<double> taper_angle_deg = std::nullopt) const;
+
+  [[nodiscard]] Result<AxisProjectionSpan>
+  projection_span(const GeometryShape& target, Point3 origin, Vector3 axis_direction) const;
+
+  [[nodiscard]] Result<double> first_intersection_distance(const GeometryShape& target,
+                                                           Point3 origin,
+                                                           Vector3 axis_direction) const;
 
   [[nodiscard]] Result<GeometryShape>
   make_extruded_profile_with_holes(const std::vector<Point3>& outer_vertices,

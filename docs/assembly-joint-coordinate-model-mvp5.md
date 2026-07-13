@@ -111,6 +111,7 @@ Slots now serialize additively for local and Project-level joints with canonical
 
 Block 43 vector motion drives, Blocks 44–46 Prismatic/Cylindrical/Planar execution, and Block 47
 passive Spherical with an empty family slot signature are implemented in their canonical documents.
-Blocks 48–59 Body identity, body-scoped recompute/inspection, Body Booleans, associative Body
-transforms, and reusable Part-feature input references are implemented. The next technical step is
-Block 60 richer Extrude/Cut Geometry; Block 59 intent and JSON are implemented.
+Blocks 48–61 Body identity, body-scoped recompute/inspection, Body Booleans, associative Body
+transforms, reusable Part-feature input references, and persistent Revolve/RevolveCut intent are
+implemented. The next technical step is Block 62 Revolve/RevolveCut Geometry; Blocks 59–60
+Extrude/Cut intent and Geometry are implemented.

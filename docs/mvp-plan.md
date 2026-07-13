@@ -4,17 +4,17 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 59
-current_block: 60
-current_boundary: Richer Extrude/Cut Geometry
-current_tag: "[geometry][extrude-extent]"
+implemented_through: Block 61
+current_block: 62
+current_boundary: Revolve/RevolveCut Geometry
+current_tag: "[geometry][revolve-feature]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
   mvp_3: "Parametric bolt circle pattern — implemented"
   mvp_4: "Assembly parameters and Project container — implemented"
   mvp_5: "Assembly relationships, motion, hierarchy, analysis, exchange — Blocks 1–47 implemented"
-  mvp_6: "Part Construction — Blocks 48–59 implemented, Blocks 60–94 planned, Block 60 next"
+  mvp_6: "Part Construction — Blocks 48–61 implemented, Blocks 62–94 planned, Block 62 next"
   mvp_7: "STEP Import — Blocks 95–101 planned after Block 94"
 ---
 
@@ -552,10 +552,10 @@ motion solvers reject Spherical as the selected drive.
 
 ## MVP 6 — Part Construction MVP after Block 47
 
-**Status:** In progress — Blocks 48–59 implemented
+**Status:** In progress — Blocks 48–61 implemented
 **Canonical:** sequence `docs/part-construction-sequence-mvp6.md`
 
-Blocks 48–59 are complete. Block 60 is the current next technical step.
+Blocks 48–61 are complete. Block 62 is the current next technical step.
 
 Mandatory Part Construction phase order:
 
@@ -826,7 +826,38 @@ Canonical contract: `docs/part-extrude-extent-intent-mvp6.md`.
 [core][extrude-extent]
 ```
 
-## Current next technical step — Block 60
+## Block 60 — Richer Extrude/Cut Geometry — Implemented
 
-Execute the Block-59 extent, taper, thin, and NewBody/Join/Cut/Intersect matrix in OCCT according
-to `docs/part-construction-sequence-mvp6-planning-detail.md`.
+Block 60 resolves the seven Block-59 extent modes into deterministic axial spans, builds straight
+or tapered OCCT solids, supports the first open-line thin profile, and applies
+NewBody/Join/Cut/Intersect through the existing Body-result authority. ToNext uses an exact forward
+face intersection; ToFace/Between resolve semantic planar limits. In-place modifying operations
+recover their preceding producer and remain incrementally idempotent. Historical straight
+Extrude/Cut fast paths remain unchanged.
+
+Canonical contract: `docs/part-extrude-extent-geometry-mvp6.md`.
+
+```text
+[geometry][extrude-extent]
+```
+
+## Block 61 — Revolve/RevolveCut Core intent and JSON — Implemented
+
+Block 61 adds typed persistent `RevolveFeature`/`RevolveCut` intent over shared profile-region and
+axis references. Full, partial positive/negative, and symmetric extents have unambiguous angle
+storage; Body result context is mandatory and kind/operation combinations fail closed.
+`PartDocument` validates sources, advances Body producer chains, records profile/axis/Body graph
+edges, and propagates invalidation. Strict `revolve_features[]` JSON roundtrips all supported axis
+and extent forms while omission preserves pre-Block-61 compatibility. Geometric
+self-intersection remains a transactional Block-62 check.
+
+Canonical contract: `docs/part-revolve-intent-mvp6.md`.
+
+```text
+[core][revolve-feature]
+```
+
+## Current next technical step — Block 62
+
+Implement profile-to-model-space mapping and transactional OCCT Revolve/RevolveCut Geometry
+according to `docs/part-construction-sequence-mvp6-planning-detail.md`.

@@ -59,7 +59,15 @@ Block 59 broadens both existing Extrude Feature records without introducing a se
 `ToFace`, or `Between`, plus optional signed taper and thin intent. Distance/thickness fields are
 Length-parameter references; ToFace/Between use Block-58 typed semantic face references. The
 existing `FeatureBodyResultContext` remains the NewBody/Join/Cut/Intersect authority. Block 60 owns
-the richer Geometry; historical straight Extrude/Cut remains the current executable fast path.
+the richer Geometry: deterministic spans, semantic planar limits, taper, the first open-line thin
+profile, and all four Body operations. Historical straight Extrude/Cut remains an unchanged fast
+path.
+
+Block 61 adds persistent `RevolveFeature` intent with an explicit `Revolve`/`RevolveCut` kind,
+typed `RevolveProfile` and `RevolveAxis` inputs, canonical Full/partial/symmetric angle semantics,
+and mandatory Body result context. The document owns validation, graph/invalidation semantics, and
+strict compatible JSON. Block 62 owns OCCT revolution, rotational cuts, and self-intersection
+failure.
 
 The long-term sketcher and feature parity target is documented in `docs/inventor-like-sketcher-and-feature-roadmap.md`.
 

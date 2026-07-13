@@ -81,7 +81,7 @@ construction, Feature, Body, and unsupported topology sources fail explicitly.
 
 Block 58 defines reusable persistent value types but adds no orphan top-level Part JSON arrays.
 Each consuming feature serializes its references inside its own JSON record when introduced—for
-example Revolve in Block 61, Mirror in Block 66, edge treatments in Block 68, and Shell/Draft in
+Revolve now consumes these values in Block 61; Mirror follows in Block 66, edge treatments in Block 68, and Shell/Draft in
 Blocks 71/73. This keeps role and ownership inside the feature that gives them meaning.
 
 Focused proof:

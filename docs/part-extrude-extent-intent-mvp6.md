@@ -5,9 +5,8 @@ Status: implemented in Block 59.
 ## Boundary
 
 Block 59 freezes persistent AdditiveExtrude/SubtractiveExtrude breadth. Geometry execution for the
-new modes belongs to Block 60. The historical additive Distance and subtractive ThroughAll paths
-continue to execute unchanged; Geometry rejects every richer combination explicitly until that
-next boundary is implemented.
+new modes is implemented by Block 60 in `docs/part-extrude-extent-geometry-mvp6.md`. The historical
+additive Distance and subtractive ThroughAll paths continue to execute unchanged.
 
 `Feature` owns one `ExtrudeFeatureIntent` with:
 
@@ -43,8 +42,7 @@ dependency edge, so invalidation reaches the Extrude deterministically.
 ## Taper and thin intent
 
 `taper_angle_deg`, when present, is a finite signed degree value strictly between -90 and +90.
-The sign is persistent user intent; its exact geometric direction is resolved in Block 60 together
-with the Extrude direction and extent.
+The sign is persistent user intent; Block 60 resolves it together with Extrude direction and extent.
 
 Thin mode is optional:
 
@@ -56,7 +54,7 @@ two_sided -> two distinct thickness Length parameters
 
 One-sided and mid-plane modes reject a second thickness. Two-sided mode requires it. Open-profile
 eligibility, offset construction, self-intersection, and solid validity are Geometry concerns for
-Block 60.
+Block 60, now implemented in `docs/part-extrude-extent-geometry-mvp6.md`.
 
 ## JSON
 
@@ -102,7 +100,7 @@ unresolvable face producers fail closed.
 - Existing Feature factories remain source-compatible and construct the historical defaults.
 - Existing `length_parameter()` and `subtractive_depth()` access remain compatibility views.
 - Straight historical Geometry results are unchanged.
-- New extent, taper, thin, and all four body-operation Geometry proofs are Block 60.
+- New extent, taper, thin, and all four body-operation Geometry proofs are implemented in Block 60.
 - Path-following Extrude/Cut remains Blocks 80–83.
 - No raw OCCT face identity is persistent.
 
@@ -115,4 +113,4 @@ Focused proof:
 
 The proof covers stable spellings, factory invariants, Feature retention, document validation and
 dependency edges, every extent's JSON roundtrip, legacy defaults, malformed JSON, taper, and thin
-intent. The Geometry proof locks the fail-closed Block-59/60 handoff.
+intent. The Geometry proof covers the implemented Block-60 execution boundary.

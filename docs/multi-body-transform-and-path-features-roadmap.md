@@ -381,8 +381,8 @@ These records are future target architecture. They are not part of the current `
 
 Feature Body-operation persistence, body-scoped recompute/inspection, Body Booleans,
 BodyTransform/SketchOwnership intent plus associative Geometry execution, reusable semantic inputs,
-and richer Extrude/Cut intent/JSON are implemented through Block 59. The current handoff is Block
-60 richer Extrude/Cut Geometry.
+and richer Extrude/Cut intent/JSON plus Geometry and persistent Revolve/RevolveCut intent are
+implemented through Block 61. The current handoff is Block 62 Revolve/RevolveCut Geometry.
 Canonical implemented contracts include `docs/part-body-identity-mvp6.md`,
 `docs/part-body-json-mvp6.md`,
 `docs/part-feature-body-operation-mvp6.md`, `docs/part-feature-body-dependency-mvp6.md`, and
@@ -390,7 +390,9 @@ Canonical implemented contracts include `docs/part-body-identity-mvp6.md`,
 `docs/part-body-boolean-mvp6.md`, `docs/part-body-boolean-geometry-mvp6.md`, and
 `docs/part-body-transform-ownership-mvp6.md`, and
 `docs/part-body-transform-geometry-mvp6.md`, `docs/part-feature-input-reference-mvp6.md`, and
-`docs/part-extrude-extent-intent-mvp6.md`; the
+`docs/part-extrude-extent-intent-mvp6.md`, and
+`docs/part-extrude-extent-geometry-mvp6.md`, and
+`docs/part-revolve-intent-mvp6.md`; the
 numbered Part Construction sequence is authoritative where this older roadmap groups work
 differently.
 

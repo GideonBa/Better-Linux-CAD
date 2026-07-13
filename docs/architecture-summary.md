@@ -65,8 +65,13 @@ Block 58 adds the reusable Core boundary for typed Part-feature input sources, e
 capabilities, feature-specific roles, dependency node identity, and read-only document validation.
 Block 59 extends both Extrude families with persistent seven-mode extent intent, optional taper and
 thin intent, typed limit-face references, Length-parameter validation/dependencies, and compatible
-JSON. Exact historical Distance/ThroughAll records and Geometry remain unchanged; richer Geometry
-is the Block-60 boundary.
+JSON. Block 60 resolves that intent into deterministic OCCT spans/tools, exact ToNext intersection,
+semantic planar limits, tapered/thin solids, and the four Body operations. Exact historical
+Distance/ThroughAll fast paths remain unchanged.
+Block 61 adds typed persistent Revolve/RevolveCut profile-region, axis, angle/side, and Body-result
+intent. Its profile/axis/body dependencies participate in the same graph and invalidation authority;
+strict optional-on-read `revolve_features[]` JSON preserves older files. OCCT revolution and
+self-intersection checks remain the Block-62 Geometry boundary.
 
 `Project` owns:
 
@@ -575,12 +580,15 @@ Canonical numbered sequence:
 - `docs/part-body-transform-geometry-mvp6.md`
 - `docs/part-feature-input-reference-mvp6.md`
 - `docs/part-extrude-extent-intent-mvp6.md`
+- `docs/part-extrude-extent-geometry-mvp6.md`
+- `docs/part-revolve-intent-mvp6.md`
 - `docs/step-import-sequence-mvp7.md`
 
-Block 47 Spherical completes the Assembly MVP sequence. Blocks 48–59 Body identity, body-scoped
+Block 47 Spherical completes the Assembly MVP sequence. Blocks 48–61 Body identity, body-scoped
 recompute/inspection, Body Booleans, associative BodyTransform/SketchOwnership execution, and
-reusable Part-feature semantic input references plus richer persistent Extrude/Cut intent are
-implemented. The next technical step is Block 60 richer Extrude/Cut Geometry.
+reusable Part-feature semantic input references plus richer Extrude/Cut intent/Geometry and
+persistent Revolve/RevolveCut intent are implemented. The next technical step is Block 62
+Revolve/RevolveCut Geometry.
 
 Block 47 adds passive Point/Point Spherical intent through the shared local/root-space path. Scalar
 Revolute APIs remain adapters; transform variables and the shared numeric engine are unchanged.

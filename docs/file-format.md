@@ -714,6 +714,16 @@ identity. Exact historical additive Distance records keep `length_parameter` and
 exact historical subtractive ThroughAll records keep `depth: "through_all"` and omit `extrude`.
 Missing richer fields therefore continue to restore the historical defaults.
 
+Block 61 adds the always-emitted, optional-on-read top-level `revolve_features` array. Each record
+stores `revolve` or `revolve_cut`, a typed sketch/profile-region identity, one typed axis payload,
+one strict `full`, `angle`, or `symmetric` extent object, and the mandatory Body operation/result
+fields. Partial Angle stores `angle_deg` plus `positive|negative` side; Symmetric stores the total
+included `angle_deg`; Full stores neither. Axis source kinds are `datum_axis`,
+`construction_line`, `semantic_axis`, and `semantic_linear_edge`, each with only its matching
+identity payload. Missing arrays restore zero Revolve records. Malformed mode-specific fields,
+unsupported sources, invalid body-operation pairings, and unresolved references fail closed.
+Canonical details are in `docs/part-revolve-intent-mvp6.md`.
+
 ## Planned STEP import persistence after Block 94
 
 This section is planned architecture, not part of the current schema. Blocks 95–101 in

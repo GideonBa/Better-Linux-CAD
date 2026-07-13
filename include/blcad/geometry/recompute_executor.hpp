@@ -47,6 +47,10 @@ public:
                                                                   ShapeCache& shape_cache) const;
 
 private:
+  [[nodiscard]] Result<std::size_t> execute_richer_extrude(const PartDocument& document,
+                                                           const Feature& feature,
+                                                           ShapeCache& shape_cache) const;
+
   [[nodiscard]] Result<std::size_t> execute_feature(const PartDocument& document,
                                                     const Feature& feature,
                                                     ShapeCache& shape_cache) const;

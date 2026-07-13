@@ -1308,6 +1308,165 @@ feature_body_result_context_from_json(const json& feature_json) {
   return feature.value().with_body_result_context(std::move(context.value().value()));
 }
 
+[[nodiscard]] json revolve_profile_to_json(const ProfileRegionReference& profile) {
+  return json{{"sketch", profile.sketch().value()}, {"profile", profile.profile().value()}};
+}
+
+[[nodiscard]] json revolve_axis_to_json(const AxisReference& axis) {
+  json value{{"source_kind", std::string(to_string(axis.source_kind()))}};
+  switch (axis.source_kind()) {
+  case PartFeatureInputSourceKind::DatumAxis:
+    value["datum_axis"] = std::get<DatumAxisId>(axis.source()).value();
+    break;
+  case PartFeatureInputSourceKind::ConstructionLine:
+    value["construction_line"] = std::get<ConstructionLineId>(axis.source()).value();
+    break;
+  case PartFeatureInputSourceKind::SemanticAxis: {
+    const auto& semantic = std::get<SemanticAxisReference>(axis.source());
+    value["source_feature"] = semantic.source_feature().value();
+    value["axis"] = std::string(to_string(semantic.axis()));
+    break;
+  }
+  case PartFeatureInputSourceKind::SemanticLinearEdge:
+    value["semantic_edge"] =
+        semantic_edge_reference_to_json(std::get<SemanticEdgeReference>(axis.source()));
+    break;
+  default:
+    break;
+  }
+  return value;
+}
+
+[[nodiscard]] json revolve_feature_to_json(const RevolveFeature& feature) {
+  json value{{"id", feature.id().value()},
+             {"name", feature.name()},
+             {"type", std::string(to_string(feature.kind()))},
+             {"profile", revolve_profile_to_json(feature.profile())},
+             {"axis", revolve_axis_to_json(feature.axis())}};
+  json extent{{"mode", std::string(to_string(feature.extent().mode()))}};
+  if (feature.extent().angle_deg().has_value())
+    extent["angle_deg"] = *feature.extent().angle_deg();
+  if (feature.extent().side().has_value())
+    extent["side"] = std::string(to_string(*feature.extent().side()));
+  value["extent"] = std::move(extent);
+  const auto& context = feature.body_result_context();
+  value["operation_mode"] = std::string(to_string(context.operation_mode()));
+  if (context.target_body().has_value())
+    value["target_body"] = context.target_body()->value();
+  if (context.produced_body().has_value())
+    value["produced_body"] = context.produced_body()->value();
+  return value;
+}
+
+[[nodiscard]] Result<RevolveFeature> revolve_feature_from_json(const json& value) {
+  if (!value.is_object() || !value.contains("id") || !value.contains("name") ||
+      !value.contains("type") || !value.contains("profile") || !value.contains("axis") ||
+      !value.contains("extent") || !value.contains("operation_mode"))
+    return Result<RevolveFeature>::failure(
+        json_error("revolve feature requires all mandatory intent fields"));
+  if (!value.at("id").is_string() || !value.at("name").is_string() ||
+      !value.at("type").is_string() || !value.at("profile").is_object() ||
+      !value.at("axis").is_object() || !value.at("extent").is_object())
+    return Result<RevolveFeature>::failure(
+        json_error("revolve feature fields have invalid json types"));
+
+  const auto& profile_json = value.at("profile");
+  if (profile_json.size() != 2U || !profile_json.contains("sketch") ||
+      !profile_json.contains("profile") || !profile_json.at("sketch").is_string() ||
+      !profile_json.at("profile").is_string())
+    return Result<RevolveFeature>::failure(
+        json_error("revolve profile requires only string sketch and profile fields"));
+  auto profile = ProfileRegionReference::create(
+      SketchId(profile_json.at("sketch").get<std::string>()),
+      ProfileId(profile_json.at("profile").get<std::string>()),
+      PartFeatureInputRole::RevolveProfile);
+  if (profile.has_error())
+    return Result<RevolveFeature>::failure(profile.error());
+
+  const auto& axis_json = value.at("axis");
+  if (!axis_json.contains("source_kind") || !axis_json.at("source_kind").is_string())
+    return Result<RevolveFeature>::failure(json_error("revolve axis requires source_kind"));
+  const std::string source_kind = axis_json.at("source_kind").get<std::string>();
+  Result<AxisReference> axis = Result<AxisReference>::failure(
+      json_error("unsupported revolve axis source kind"));
+  if (source_kind == "datum_axis" && axis_json.size() == 2U &&
+      axis_json.contains("datum_axis") && axis_json.at("datum_axis").is_string())
+    axis = AxisReference::create_datum_axis(
+        PartFeatureInputRole::RevolveAxis,
+        DatumAxisId(axis_json.at("datum_axis").get<std::string>()));
+  else if (source_kind == "construction_line" && axis_json.size() == 2U &&
+           axis_json.contains("construction_line") &&
+           axis_json.at("construction_line").is_string())
+    axis = AxisReference::create_construction_line(
+        PartFeatureInputRole::RevolveAxis,
+        ConstructionLineId(axis_json.at("construction_line").get<std::string>()),
+        PartFeatureInputCapability::Axis);
+  else if (source_kind == "semantic_axis" && axis_json.size() == 3U &&
+           axis_json.contains("source_feature") && axis_json.contains("axis") &&
+           axis_json.at("source_feature").is_string() && axis_json.at("axis").is_string()) {
+    if (axis_json.at("axis").get<std::string>() != "axis")
+      return Result<RevolveFeature>::failure(json_error("unsupported semantic revolve axis"));
+    auto semantic = SemanticAxisReference::create(
+        FeatureId(axis_json.at("source_feature").get<std::string>()));
+    if (semantic.has_error())
+      return Result<RevolveFeature>::failure(semantic.error());
+    axis = AxisReference::create_semantic_axis(PartFeatureInputRole::RevolveAxis,
+                                               std::move(semantic.value()));
+  } else if (source_kind == "semantic_linear_edge" && axis_json.size() == 2U &&
+             axis_json.contains("semantic_edge") && axis_json.at("semantic_edge").is_object()) {
+    auto edge = semantic_edge_reference_from_json(axis_json.at("semantic_edge"));
+    if (edge.has_error())
+      return Result<RevolveFeature>::failure(edge.error());
+    axis = AxisReference::create_semantic_edge(
+        PartFeatureInputRole::RevolveAxis, std::move(edge.value()),
+        PartFeatureInputCapability::Axis);
+  }
+  if (axis.has_error())
+    return Result<RevolveFeature>::failure(axis.error());
+
+  const auto& extent_json = value.at("extent");
+  if (!extent_json.contains("mode") || !extent_json.at("mode").is_string())
+    return Result<RevolveFeature>::failure(json_error("revolve extent requires mode"));
+  const std::string mode = extent_json.at("mode").get<std::string>();
+  Result<RevolveAngleExtent> extent = Result<RevolveAngleExtent>::failure(
+      json_error("unsupported revolve extent mode"));
+  if (mode == "full" && extent_json.size() == 1U)
+    extent = Result<RevolveAngleExtent>::success(RevolveAngleExtent::full());
+  else if (mode == "angle" && extent_json.size() == 3U &&
+           extent_json.contains("angle_deg") && extent_json.at("angle_deg").is_number() &&
+           extent_json.contains("side") && extent_json.at("side").is_string()) {
+    const std::string side = extent_json.at("side").get<std::string>();
+    if (side != "positive" && side != "negative")
+      return Result<RevolveFeature>::failure(json_error("unsupported revolve side"));
+    extent = RevolveAngleExtent::angle(
+        extent_json.at("angle_deg").get<double>(),
+        side == "positive" ? RevolveSide::Positive : RevolveSide::Negative);
+  } else if (mode == "symmetric" && extent_json.size() == 2U &&
+             extent_json.contains("angle_deg") && extent_json.at("angle_deg").is_number())
+    extent = RevolveAngleExtent::symmetric(extent_json.at("angle_deg").get<double>());
+  if (extent.has_error())
+    return Result<RevolveFeature>::failure(extent.error());
+
+  auto context = feature_body_result_context_from_json(value);
+  if (context.has_error())
+    return Result<RevolveFeature>::failure(context.error());
+  if (!context.value().has_value())
+    return Result<RevolveFeature>::failure(
+        json_error("revolve feature requires body result context"));
+  const std::string type = value.at("type").get<std::string>();
+  if (type == "revolve")
+    return RevolveFeature::create_revolve(
+        FeatureId(value.at("id").get<std::string>()), value.at("name").get<std::string>(),
+        std::move(profile.value()), std::move(axis.value()), std::move(extent.value()),
+        std::move(context.value().value()));
+  if (type == "revolve_cut")
+    return RevolveFeature::create_revolve_cut(
+        FeatureId(value.at("id").get<std::string>()), value.at("name").get<std::string>(),
+        std::move(profile.value()), std::move(axis.value()), std::move(extent.value()),
+        std::move(context.value().value()));
+  return Result<RevolveFeature>::failure(json_error("unsupported revolve feature type"));
+}
+
 [[nodiscard]] bool extrude_reference_features_available(const PartDocument& document,
                                                         const Feature& feature) {
   const auto available = [&document](const std::optional<FaceReference>& face) {
@@ -1765,6 +1924,9 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
     }
     root["features"].push_back(std::move(feature_json));
   }
+  root["revolve_features"] = json::array();
+  for (const auto& feature : document.revolve_features())
+    root["revolve_features"].push_back(revolve_feature_to_json(feature));
   root["body_booleans"] = json::array();
   for (const auto& feature : document.body_boolean_features()) {
     json feature_json{{"id", feature.id().value()},
@@ -2006,6 +2168,26 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
         return Result<PartDocument>::failure(
             json_error("could not resolve part document json dependencies"));
     }
+    for (const auto& axis_json : root.value("datum_axes", json::array())) {
+      auto axis = datum_axis_from_json(axis_json);
+      if (axis.has_error())
+        return Result<PartDocument>::failure(axis.error());
+      auto added = document.value().add_datum_axis(axis.value());
+      if (added.has_error())
+        return Result<PartDocument>::failure(added.error());
+    }
+    const json revolve_array = root.value("revolve_features", json::array());
+    if (!revolve_array.is_array())
+      return Result<PartDocument>::failure(
+          json_error("revolve_features must be an array in part document json"));
+    for (const auto& revolve_json : revolve_array) {
+      auto feature = revolve_feature_from_json(revolve_json);
+      if (feature.has_error())
+        return Result<PartDocument>::failure(feature.error());
+      auto added = document.value().add_revolve_feature(std::move(feature.value()));
+      if (added.has_error())
+        return Result<PartDocument>::failure(added.error());
+    }
     const json body_boolean_array = root.value("body_booleans", json::array());
     if (!body_boolean_array.is_array())
       return Result<PartDocument>::failure(
@@ -2015,14 +2197,6 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
       if (feature.has_error())
         return Result<PartDocument>::failure(feature.error());
       auto added = document.value().add_body_boolean_feature(std::move(feature.value()));
-      if (added.has_error())
-        return Result<PartDocument>::failure(added.error());
-    }
-    for (const auto& axis_json : root.value("datum_axes", json::array())) {
-      auto axis = datum_axis_from_json(axis_json);
-      if (axis.has_error())
-        return Result<PartDocument>::failure(axis.error());
-      auto added = document.value().add_datum_axis(axis.value());
       if (added.has_error())
         return Result<PartDocument>::failure(added.error());
     }

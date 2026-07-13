@@ -67,6 +67,7 @@ add_library(
   src/core/recompute_plan.cpp
   src/core/reference_generated_line.cpp
   src/core/reference_recovery.cpp
+  src/core/revolve_feature.cpp
   src/core/sketch.cpp
   src/core/sketch_ownership.cpp
   src/core/sketch_arc_profile.cpp
@@ -195,6 +196,7 @@ if(BLCAD_BUILD_GEOMETRY)
       TKBool
       TKTopAlgo
       TKGeomAlgo
+      TKOffset
       TKXDESTEP
       TKXCAF
       TKCAF
@@ -305,6 +307,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/reference_driven_sketch_constraint_tests.cpp
     tests/core/reference_generated_line_json_tests.cpp
     tests/core/reference_recovery_tests.cpp
+    tests/core/revolve_feature_tests.cpp
     tests/core/semantic_reference_invalidation_tests.cpp
     tests/core/semantic_reference_json_tests.cpp
     tests/core/sketch_arc_profile_json_tests.cpp
@@ -380,6 +383,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/composite_closed_profile_pipeline_tests.cpp
       tests/geometry/construction_plane_pipeline_tests.cpp
       tests/geometry/derived_workplane_pipeline_tests.cpp
+      tests/geometry/extrude_extent_pipeline_tests.cpp
       tests/geometry/dimension_driven_profile_resolver_tests.cpp
       tests/geometry/front_workplane_pipeline_tests.cpp
       tests/geometry/left_workplane_pipeline_tests.cpp

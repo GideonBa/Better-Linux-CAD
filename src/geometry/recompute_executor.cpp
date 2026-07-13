@@ -267,6 +267,214 @@ resolve_boolean_target_input(const PartDocument& document, const ShapeCache& sha
   return workplane.normal;
 }
 
+struct ResolvedExtrudeSpan {
+  double start_mm = 0.0;
+  double end_mm = 0.0;
+};
+
+[[nodiscard]] double point_projection(Point3 from, Point3 to, Vector3 axis) noexcept {
+  return (to.x - from.x) * axis.x + (to.y - from.y) * axis.y + (to.z - from.z) * axis.z;
+}
+
+[[nodiscard]] Result<const GeometryShape*> resolve_extrude_target(const PartDocument& document,
+                                                                  const Feature& feature,
+                                                                  const ShapeCache& shape_cache) {
+  if (feature.body_result_context().has_value() &&
+      feature.body_result_context()->target_body().has_value()) {
+    const BodyId& body = *feature.body_result_context()->target_body();
+    for (const auto& [producer, dependent] : document.dependency_graph().dependencies()) {
+      if (dependent != feature.id().value() || producer.starts_with("body:"))
+        continue;
+      bool produces_target = false;
+      if (const Feature* previous = document.find_feature(FeatureId(producer));
+          previous != nullptr && previous->body_result_context().has_value())
+        produces_target = previous->body_result_context()->effective_produced_body() == body;
+      if (const BodyBooleanFeature* previous =
+              document.find_body_boolean_feature(FeatureId(producer));
+          previous != nullptr)
+        produces_target = previous->effective_result_body() == body;
+      if (const BodyTransform* previous = document.find_body_transform(BodyTransformId(producer));
+          previous != nullptr)
+        produces_target = previous->body() == body;
+      if (!produces_target)
+        continue;
+      if (const GeometryShape* previous = shape_cache.find_feature_shape(FeatureId(producer));
+          previous != nullptr)
+        return Result<const GeometryShape*>::success(previous);
+    }
+    const GeometryShape* shape = shape_cache.find_body_shape(body);
+    if (shape == nullptr)
+      return Result<const GeometryShape*>::failure(
+          geometry_error(body.value(), "extrude target body shape must exist in shape cache"));
+    return Result<const GeometryShape*>::success(shape);
+  }
+  if (feature.type() == FeatureType::SubtractiveExtrude) {
+    const GeometryShape* shape = shape_cache.find_feature_shape(feature.target_feature());
+    if (shape == nullptr)
+      return Result<const GeometryShape*>::failure(
+          geometry_error(feature.target_feature().value(),
+                         "extrude target feature shape must exist in shape cache"));
+    return Result<const GeometryShape*>::success(shape);
+  }
+  return Result<const GeometryShape*>::success(nullptr);
+}
+
+[[nodiscard]] Result<ResolvedWorkplane>
+resolve_limit_face_workplane(const PartDocument& document, const FaceReference& reference,
+                             const WorkplaneResolver& resolver) {
+  if (reference.source_kind() != PartFeatureInputSourceKind::SemanticPlanarFace)
+    return Result<ResolvedWorkplane>::failure(geometry_error(
+        reference.source_node_id(), "extrude limit Geometry currently requires a planar face"));
+  return resolver.resolve_generated_face(document,
+                                         std::get<SemanticFaceReference>(reference.source()));
+}
+
+[[nodiscard]] Result<ResolvedExtrudeSpan>
+resolve_extrude_span(const PartDocument& document, const Feature& feature,
+                     const ResolvedWorkplane& sketch_workplane, Vector3 direction,
+                     const GeometryShape* target, const ClosedProfileAdapter& adapter,
+                     const WorkplaneResolver& workplane_resolver) {
+  constexpr double kThroughAllMargin = 1.0;
+  const auto& extent = feature.extrude_intent().extent();
+  const auto distance = [&document, &feature](const std::optional<ParameterId>& id,
+                                              std::string_view role) -> Result<double> {
+    if (!id.has_value())
+      return Result<double>::failure(
+          geometry_error(feature.id().value(), std::string(role) + " parameter is missing"));
+    const Parameter* parameter = document.find_parameter(*id);
+    if (parameter == nullptr || parameter->type() != ParameterType::Length ||
+        parameter->value().millimeters() <= k_tolerance)
+      return Result<double>::failure(
+          geometry_error(id->value(), std::string(role) + " must be a positive Length parameter"));
+    return Result<double>::success(parameter->value().millimeters());
+  };
+
+  switch (extent.mode()) {
+  case ExtrudeExtentMode::Distance: {
+    auto value = distance(extent.first_distance_parameter(), "distance extent");
+    if (value.has_error())
+      return Result<ResolvedExtrudeSpan>::failure(value.error());
+    return Result<ResolvedExtrudeSpan>::success({0.0, value.value()});
+  }
+  case ExtrudeExtentMode::Symmetric: {
+    auto value = distance(extent.first_distance_parameter(), "symmetric extent");
+    if (value.has_error())
+      return Result<ResolvedExtrudeSpan>::failure(value.error());
+    return Result<ResolvedExtrudeSpan>::success({-value.value() / 2.0, value.value() / 2.0});
+  }
+  case ExtrudeExtentMode::TwoSided: {
+    auto first = distance(extent.first_distance_parameter(), "first two-sided extent");
+    auto second = distance(extent.second_distance_parameter(), "second two-sided extent");
+    if (first.has_error())
+      return Result<ResolvedExtrudeSpan>::failure(first.error());
+    if (second.has_error())
+      return Result<ResolvedExtrudeSpan>::failure(second.error());
+    return Result<ResolvedExtrudeSpan>::success({-second.value(), first.value()});
+  }
+  case ExtrudeExtentMode::ThroughAll:
+  case ExtrudeExtentMode::ToNext: {
+    if (target == nullptr)
+      return Result<ResolvedExtrudeSpan>::failure(geometry_error(
+          feature.id().value(), "through-all and to-next extents require a target body"));
+    if (extent.mode() == ExtrudeExtentMode::ThroughAll) {
+      auto projected = adapter.projection_span(*target, sketch_workplane.origin, direction);
+      if (projected.has_error())
+        return Result<ResolvedExtrudeSpan>::failure(projected.error());
+      return Result<ResolvedExtrudeSpan>::success({projected.value().minimum - kThroughAllMargin,
+                                                   projected.value().maximum + kThroughAllMargin});
+    }
+    auto next = adapter.first_intersection_distance(*target, sketch_workplane.origin, direction);
+    if (next.has_error())
+      return Result<ResolvedExtrudeSpan>::failure(next.error());
+    return Result<ResolvedExtrudeSpan>::success({0.0, next.value()});
+  }
+  case ExtrudeExtentMode::ToFace: {
+    auto limit = resolve_limit_face_workplane(document, *extent.first_face(), workplane_resolver);
+    if (limit.has_error())
+      return Result<ResolvedExtrudeSpan>::failure(limit.error());
+    const double alignment =
+        std::abs(limit.value().normal.x * direction.x + limit.value().normal.y * direction.y +
+                 limit.value().normal.z * direction.z);
+    if (alignment < 1.0 - k_tolerance)
+      return Result<ResolvedExtrudeSpan>::failure(geometry_error(
+          feature.id().value(), "to-face limit plane must be normal to the extrusion direction"));
+    const double end = point_projection(sketch_workplane.origin, limit.value().origin, direction);
+    if (end <= k_tolerance)
+      return Result<ResolvedExtrudeSpan>::failure(
+          geometry_error(feature.id().value(), "to-face limit must lie in extrude direction"));
+    return Result<ResolvedExtrudeSpan>::success({0.0, end});
+  }
+  case ExtrudeExtentMode::Between: {
+    auto first = resolve_limit_face_workplane(document, *extent.first_face(), workplane_resolver);
+    auto second = resolve_limit_face_workplane(document, *extent.second_face(), workplane_resolver);
+    if (first.has_error())
+      return Result<ResolvedExtrudeSpan>::failure(first.error());
+    if (second.has_error())
+      return Result<ResolvedExtrudeSpan>::failure(second.error());
+    const auto aligned = [direction](const ResolvedWorkplane& plane) {
+      return std::abs(plane.normal.x * direction.x + plane.normal.y * direction.y +
+                      plane.normal.z * direction.z) >= 1.0 - k_tolerance;
+    };
+    if (!aligned(first.value()) || !aligned(second.value()))
+      return Result<ResolvedExtrudeSpan>::failure(geometry_error(
+          feature.id().value(), "between limit planes must be normal to extrusion direction"));
+    const double first_distance =
+        point_projection(sketch_workplane.origin, first.value().origin, direction);
+    const double second_distance =
+        point_projection(sketch_workplane.origin, second.value().origin, direction);
+    if (std::abs(first_distance - second_distance) <= k_tolerance)
+      return Result<ResolvedExtrudeSpan>::failure(
+          geometry_error(feature.id().value(), "between limit planes must be distinct"));
+    return Result<ResolvedExtrudeSpan>::success(
+        {std::min(first_distance, second_distance), std::max(first_distance, second_distance)});
+  }
+  }
+  return Result<ResolvedExtrudeSpan>::failure(
+      geometry_error(feature.id().value(), "unsupported extrude extent mode"));
+}
+
+[[nodiscard]] Result<std::vector<Point3>>
+evaluate_thin_profile_vertices(const PartDocument& document, const Sketch& sketch,
+                               const ResolvedWorkplane& workplane, const ExtrudeThinIntent& thin,
+                               const WorkplaneResolver& resolver) {
+  if (sketch.line_segments().size() != 1U || sketch.profile_count() != 0U)
+    return Result<std::vector<Point3>>::failure(geometry_error(
+        sketch.id().value(), "thin extrusion currently requires exactly one open line segment"));
+  const LineSegment& line = sketch.line_segments().front();
+  const double dx = line.end().x - line.start().x;
+  const double dy = line.end().y - line.start().y;
+  const double line_length = std::sqrt(dx * dx + dy * dy);
+  if (line_length <= k_tolerance)
+    return Result<std::vector<Point3>>::failure(
+        geometry_error(line.id().value(), "thin profile line must not be degenerate"));
+  const Parameter* first = document.find_parameter(thin.first_thickness_parameter());
+  const Parameter* second = thin.second_thickness_parameter().has_value()
+                                ? document.find_parameter(*thin.second_thickness_parameter())
+                                : nullptr;
+  if (first == nullptr || first->value().millimeters() <= k_tolerance ||
+      (thin.mode() == ExtrudeThinMode::TwoSided &&
+       (second == nullptr || second->value().millimeters() <= k_tolerance)))
+    return Result<std::vector<Point3>>::failure(
+        geometry_error(sketch.id().value(), "thin thicknesses must be positive"));
+  double left = first->value().millimeters();
+  double right = 0.0;
+  if (thin.mode() == ExtrudeThinMode::MidPlane) {
+    left /= 2.0;
+    right = left;
+  } else if (thin.mode() == ExtrudeThinMode::TwoSided) {
+    right = second->value().millimeters();
+  }
+  const Point2 normal{-dy / line_length, dx / line_length};
+  const auto shifted = [normal](Point2 point, double amount) {
+    return Point2{point.x + normal.x * amount, point.y + normal.y * amount};
+  };
+  return Result<std::vector<Point3>>::success(
+      {resolver.evaluate_point(workplane, shifted(line.start(), left)),
+       resolver.evaluate_point(workplane, shifted(line.end(), left)),
+       resolver.evaluate_point(workplane, shifted(line.end(), -right)),
+       resolver.evaluate_point(workplane, shifted(line.start(), -right))});
+}
+
 [[nodiscard]] bool has_no_profiles(const Sketch& sketch) noexcept {
   return sketch.rectangle_profiles().empty() && sketch.circle_profiles().empty() &&
          sketch.closed_profiles().empty() && sketch.arc_closed_profiles().empty() &&
@@ -672,6 +880,99 @@ template <typename KindSize>
 
 } // namespace
 
+Result<std::size_t> GeometryRecomputeExecutor::execute_richer_extrude(
+    const PartDocument& document, const Feature& feature, ShapeCache& shape_cache) const {
+  const Sketch* sketch = document.find_sketch(feature.input_sketch());
+  if (sketch == nullptr)
+    return Result<std::size_t>::failure(
+        validation_error(feature.id().value(), "feature input sketch must exist in part document"));
+  auto workplane = workplane_resolver_.resolve_for_sketch(document, *sketch, shape_cache);
+  if (workplane.has_error())
+    return Result<std::size_t>::failure(workplane.error());
+  const Vector3 direction = extrude_direction_vector(workplane.value(), feature.direction());
+  auto target = resolve_extrude_target(document, feature, shape_cache);
+  if (target.has_error())
+    return Result<std::size_t>::failure(target.error());
+
+  Result<std::vector<Point3>> vertices = Result<std::vector<Point3>>::failure(
+      geometry_error(sketch->id().value(), "unsupported richer extrude profile"));
+  if (feature.extrude_intent().thin().has_value()) {
+    vertices =
+        evaluate_thin_profile_vertices(document, *sketch, workplane.value(),
+                                       *feature.extrude_intent().thin(), workplane_resolver_);
+  } else if (has_exactly_one_rectangle_profile(*sketch)) {
+    const RectangleProfile& rectangle = sketch->rectangle_profiles().front();
+    const Parameter* width = document.find_parameter(rectangle.width_parameter());
+    const Parameter* height = document.find_parameter(rectangle.height_parameter());
+    if (width == nullptr || height == nullptr)
+      return Result<std::size_t>::failure(geometry_error(
+          rectangle.id().value(), "rectangle dimensions must exist for richer extrusion"));
+    vertices = map_bounded_local_vertices(
+        workplane_resolver_, workplane.value(), rectangle.id().value(),
+        rectangle_local_vertices(rectangle, width->value(), height->value()));
+  } else if (has_exactly_one_closed_profile(*sketch)) {
+    vertices =
+        evaluate_bounded_closed_profile_vertices(document, workplane_resolver_, workplane.value(),
+                                                 *sketch, sketch->closed_profiles().front());
+  } else if (has_no_profiles(*sketch)) {
+    vertices = evaluate_bounded_detected_region_vertices(document, workplane_resolver_,
+                                                         workplane.value(), *sketch);
+  } else {
+    return Result<std::size_t>::failure(geometry_error(
+        sketch->id().value(),
+        "richer extrusion currently supports rectangle, line-based closed region, detected "
+        "region, or one-line thin profiles"));
+  }
+  if (vertices.has_error())
+    return Result<std::size_t>::failure(vertices.error());
+
+  Point3 profile_center;
+  for (const Point3 vertex : vertices.value()) {
+    profile_center.x += vertex.x;
+    profile_center.y += vertex.y;
+    profile_center.z += vertex.z;
+  }
+  const double vertex_count = static_cast<double>(vertices.value().size());
+  profile_center.x /= vertex_count;
+  profile_center.y /= vertex_count;
+  profile_center.z /= vertex_count;
+  ResolvedWorkplane span_workplane = workplane.value();
+  span_workplane.origin = profile_center;
+  auto span = resolve_extrude_span(document, feature, span_workplane, direction, target.value(),
+                                   closed_profile_adapter_, workplane_resolver_);
+  if (span.has_error())
+    return Result<std::size_t>::failure(span.error());
+
+  auto tool = closed_profile_adapter_.make_extruded_profile_span(
+      vertices.value(), direction, span.value().start_mm, span.value().end_mm,
+      feature.extrude_intent().taper_angle_deg());
+  if (tool.has_error())
+    return Result<std::size_t>::failure(tool.error());
+
+  const FeatureBodyOperationMode mode =
+      feature.body_result_context().has_value()
+          ? feature.body_result_context()->operation_mode()
+          : (feature.type() == FeatureType::AdditiveExtrude ? FeatureBodyOperationMode::NewBody
+                                                            : FeatureBodyOperationMode::Cut);
+  GeometryShape result = tool.value();
+  if (mode != FeatureBodyOperationMode::NewBody) {
+    if (target.value() == nullptr)
+      return Result<std::size_t>::failure(
+          geometry_error(feature.id().value(), "modifying extrusion requires a target shape"));
+    BodyBooleanOperation operation = BodyBooleanOperation::Add;
+    if (mode == FeatureBodyOperationMode::Cut)
+      operation = BodyBooleanOperation::Subtract;
+    else if (mode == FeatureBodyOperationMode::Intersect)
+      operation = BodyBooleanOperation::Intersect;
+    auto combined = body_boolean_adapter_.combine(feature.id(), operation, *target.value(),
+                                                  std::vector<GeometryShape>{tool.value()});
+    if (combined.has_error())
+      return Result<std::size_t>::failure(combined.error());
+    result = std::move(combined.value());
+  }
+  return store_feature_result(document, feature, std::move(result), shape_cache);
+}
+
 Result<std::size_t> GeometryRecomputeExecutor::execute_additive_extrude(
     const PartDocument& document, FeatureId feature_id, ShapeCache& shape_cache) const {
   if (feature_id.empty()) {
@@ -688,17 +989,10 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_additive_extrude(
     return Result<std::size_t>::failure(
         geometry_error(feature->id().value(), "only additive extrude features are supported"));
   }
-  if (!feature->extrude_intent().is_historical_additive_default()) {
-    return Result<std::size_t>::failure(geometry_error(
-        feature->id().value(),
-        "richer additive extrude extent, taper, and thin geometry starts in Block 60"));
-  }
-  if (feature->body_result_context().has_value() &&
-      feature->body_result_context()->operation_mode() != FeatureBodyOperationMode::NewBody) {
-    return Result<std::size_t>::failure(geometry_error(
-        feature->id().value(),
-        "additive extrude body execution currently requires new_body operation mode"));
-  }
+  if (!feature->extrude_intent().is_historical_additive_default() ||
+      (feature->body_result_context().has_value() &&
+       feature->body_result_context()->operation_mode() != FeatureBodyOperationMode::NewBody))
+    return execute_richer_extrude(document, *feature, shape_cache);
 
   const Sketch* sketch = document.find_sketch(feature->input_sketch());
   if (sketch == nullptr) {
@@ -832,17 +1126,10 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_subtractive_extrude(
     return Result<std::size_t>::failure(
         geometry_error(feature->id().value(), "only subtractive extrude features are supported"));
   }
-  if (!feature->extrude_intent().is_historical_subtractive_default()) {
-    return Result<std::size_t>::failure(geometry_error(
-        feature->id().value(),
-        "richer subtractive extrude extent, taper, and thin geometry starts in Block 60"));
-  }
-  if (feature->body_result_context().has_value() &&
-      feature->body_result_context()->operation_mode() != FeatureBodyOperationMode::Cut) {
-    return Result<std::size_t>::failure(
-        geometry_error(feature->id().value(),
-                       "subtractive extrude body execution currently requires cut operation mode"));
-  }
+  if (!feature->extrude_intent().is_historical_subtractive_default() ||
+      (feature->body_result_context().has_value() &&
+       feature->body_result_context()->operation_mode() != FeatureBodyOperationMode::Cut))
+    return execute_richer_extrude(document, *feature, shape_cache);
 
   const Sketch* sketch = document.find_sketch(feature->input_sketch());
   if (sketch == nullptr) {
@@ -1198,6 +1485,10 @@ GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const Reco
   GeometryRecomputeSummary summary;
   for (const RecomputeStep& step : plan.steps()) {
     const Feature* feature = document.find_feature(FeatureId(step.node_id));
+    const RevolveFeature* revolve = document.find_revolve_feature(FeatureId(step.node_id));
+    if (revolve != nullptr)
+      return Result<GeometryRecomputeSummary>::failure(geometry_error(
+          revolve->id().value(), "Revolve/RevolveCut geometry is not available until Block 62"));
     const BodyBooleanFeature* body_boolean =
         document.find_body_boolean_feature(FeatureId(step.node_id));
     const BodyTransform* body_transform =
@@ -1249,6 +1540,10 @@ GeometryRecomputeExecutor::execute_document(const PartDocument& document,
 
   for (const std::string& executable_id : executable_ids) {
     const Feature* feature = document.find_feature(FeatureId(executable_id));
+    const RevolveFeature* revolve = document.find_revolve_feature(FeatureId(executable_id));
+    if (revolve != nullptr)
+      return Result<GeometryRecomputeSummary>::failure(geometry_error(
+          revolve->id().value(), "Revolve/RevolveCut geometry is not available until Block 62"));
     const BodyBooleanFeature* body_boolean =
         document.find_body_boolean_feature(FeatureId(executable_id));
     const BodyTransform* body_transform =

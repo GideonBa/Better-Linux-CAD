@@ -14,6 +14,7 @@
 #include "blcad/core/quantity.hpp"
 #include "blcad/core/recompute_plan.hpp"
 #include "blcad/core/reference_recovery.hpp"
+#include "blcad/core/revolve_feature.hpp"
 #include "blcad/core/result.hpp"
 #include "blcad/core/sketch.hpp"
 #include "blcad/core/sketch_ownership.hpp"
@@ -44,6 +45,7 @@ public:
   [[nodiscard]] Result<std::size_t> add_derived_workplane(DerivedWorkplane workplane);
   [[nodiscard]] Result<std::size_t> add_sketch(Sketch sketch);
   [[nodiscard]] Result<std::size_t> add_feature(Feature feature);
+  [[nodiscard]] Result<std::size_t> add_revolve_feature(RevolveFeature feature);
   [[nodiscard]] Result<std::size_t> add_body_boolean_feature(BodyBooleanFeature feature);
   [[nodiscard]] Result<std::size_t> add_sketch_ownership(SketchOwnership ownership);
   [[nodiscard]] Result<std::size_t> add_body_transform(BodyTransform transform);
@@ -85,6 +87,7 @@ public:
   [[nodiscard]] const std::vector<DerivedWorkplane>& derived_workplanes() const noexcept;
   [[nodiscard]] const std::vector<Sketch>& sketches() const noexcept;
   [[nodiscard]] const std::vector<Feature>& features() const noexcept;
+  [[nodiscard]] const std::vector<RevolveFeature>& revolve_features() const noexcept;
   [[nodiscard]] const std::vector<BodyBooleanFeature>& body_boolean_features() const noexcept;
   [[nodiscard]] const std::vector<SketchOwnership>& sketch_ownerships() const noexcept;
   [[nodiscard]] const std::vector<BodyTransform>& body_transforms() const noexcept;
@@ -105,6 +108,7 @@ public:
   [[nodiscard]] std::size_t derived_workplane_count() const noexcept;
   [[nodiscard]] std::size_t sketch_count() const noexcept;
   [[nodiscard]] std::size_t feature_count() const noexcept;
+  [[nodiscard]] std::size_t revolve_feature_count() const noexcept;
   [[nodiscard]] std::size_t body_boolean_feature_count() const noexcept;
   [[nodiscard]] std::size_t sketch_ownership_count() const noexcept;
   [[nodiscard]] std::size_t body_transform_count() const noexcept;
@@ -126,6 +130,7 @@ public:
   [[nodiscard]] const DerivedWorkplane* find_derived_workplane(DatumPlaneId id) const noexcept;
   [[nodiscard]] const Sketch* find_sketch(SketchId id) const noexcept;
   [[nodiscard]] const Feature* find_feature(FeatureId id) const noexcept;
+  [[nodiscard]] const RevolveFeature* find_revolve_feature(FeatureId id) const noexcept;
   [[nodiscard]] const BodyBooleanFeature* find_body_boolean_feature(FeatureId id) const noexcept;
   [[nodiscard]] const SketchOwnership* find_sketch_ownership(SketchId id) const noexcept;
   [[nodiscard]] const BodyTransform* find_body_transform(BodyTransformId id) const noexcept;
@@ -153,6 +158,7 @@ private:
   [[nodiscard]] bool has_derived_workplane_id(const DatumPlaneId& id) const noexcept;
   [[nodiscard]] bool has_sketch_id(const SketchId& id) const noexcept;
   [[nodiscard]] bool has_feature_id(const FeatureId& id) const noexcept;
+  [[nodiscard]] bool has_revolve_feature_id(const FeatureId& id) const noexcept;
   [[nodiscard]] bool has_body_boolean_feature_id(const FeatureId& id) const noexcept;
   [[nodiscard]] bool has_sketch_ownership_id(const SketchId& id) const noexcept;
   [[nodiscard]] bool has_body_transform_id(const BodyTransformId& id) const noexcept;
@@ -173,6 +179,7 @@ private:
   std::vector<DerivedWorkplane> derived_workplanes_;
   std::vector<Sketch> sketches_;
   std::vector<Feature> features_;
+  std::vector<RevolveFeature> revolve_features_;
   std::vector<BodyBooleanFeature> body_boolean_features_;
   std::vector<SketchOwnership> sketch_ownerships_;
   std::vector<BodyTransform> body_transforms_;

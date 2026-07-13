@@ -25,7 +25,8 @@ namespace {
 [[nodiscard]] Result<std::size_t> validate_feature_source(const PartDocument& document,
                                                           const FeatureId& feature_id,
                                                           std::string_view context) {
-  if (document.find_feature(feature_id) == nullptr)
+  if (document.find_feature(feature_id) == nullptr &&
+      document.find_revolve_feature(feature_id) == nullptr)
     return Result<std::size_t>::failure(
         validation_error(feature_id.value(), std::string(context) + " source feature must exist"));
   return Result<std::size_t>::success(1U);

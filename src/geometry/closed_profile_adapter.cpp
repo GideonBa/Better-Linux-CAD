@@ -6,12 +6,16 @@
 #include <BRepBndLib.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepBuilderAPI_MakePolygon.hxx>
+#include <BRepOffsetAPI_ThruSections.hxx>
 #include <BRepPrimAPI_MakePrism.hxx>
 #include <Bnd_Box.hxx>
+#include <IntCurvesFace_ShapeIntersector.hxx>
 #include <Standard_Failure.hxx>
 #include <TopoDS.hxx>
 #include <TopoDS_Shape.hxx>
 #include <TopoDS_Wire.hxx>
+#include <gp_Dir.hxx>
+#include <gp_Lin.hxx>
 #include <gp_Pnt.hxx>
 #include <gp_Vec.hxx>
 
@@ -101,6 +105,119 @@ struct ThroughAllPlacement {
 
 [[nodiscard]] Point3 translate_along_axis(Point3 point, Vector3 axis, double delta) noexcept {
   return Point3{point.x + axis.x * delta, point.y + axis.y * delta, point.z + axis.z * delta};
+}
+
+[[nodiscard]] Result<TopoDS_Wire> make_profile_wire(const std::vector<Point3>& vertices,
+                                                    std::string_view contour_kind);
+
+[[nodiscard]] std::vector<Point3> translated_vertices(const std::vector<Point3>& vertices,
+                                                      Vector3 axis, double distance) {
+  std::vector<Point3> result;
+  result.reserve(vertices.size());
+  for (const Point3 vertex : vertices)
+    result.push_back(translate_along_axis(vertex, axis, distance));
+  return result;
+}
+
+[[nodiscard]] Result<TopoDS_Shape> make_tapered_shape(const std::vector<Point3>& base_vertices,
+                                                      Vector3 axis, double depth,
+                                                      double taper_angle_deg) {
+  const Point3 origin = base_vertices.front();
+  Vector3 u;
+  bool found_basis = false;
+  for (std::size_t index = 1U; index < base_vertices.size(); ++index) {
+    const Vector3 edge{base_vertices[index].x - origin.x, base_vertices[index].y - origin.y,
+                       base_vertices[index].z - origin.z};
+    const double edge_length = length(edge);
+    if (edge_length > kAxisTolerance) {
+      u = {edge.x / edge_length, edge.y / edge_length, edge.z / edge_length};
+      found_basis = true;
+      break;
+    }
+  }
+  if (!found_basis)
+    return Result<TopoDS_Shape>::failure(
+        make_geometry_error("tapered profile requires a non-degenerate radial extent"));
+  const Vector3 v{axis.y * u.z - axis.z * u.y, axis.z * u.x - axis.x * u.z,
+                  axis.x * u.y - axis.y * u.x};
+  std::vector<Point2> polygon;
+  polygon.reserve(base_vertices.size());
+  for (const Point3 vertex : base_vertices) {
+    const Vector3 relative{vertex.x - origin.x, vertex.y - origin.y, vertex.z - origin.z};
+    polygon.push_back({relative.x * u.x + relative.y * u.y + relative.z * u.z,
+                       relative.x * v.x + relative.y * v.y + relative.z * v.z});
+  }
+  double signed_area = 0.0;
+  for (std::size_t index = 0U; index < polygon.size(); ++index) {
+    const Point2 current = polygon[index];
+    const Point2 next = polygon[(index + 1U) % polygon.size()];
+    signed_area += current.x * next.y - next.x * current.y;
+  }
+  if (std::abs(signed_area) <= kAxisTolerance)
+    return Result<TopoDS_Shape>::failure(
+        make_geometry_error("tapered profile requires a nonzero planar area"));
+  constexpr double kPi = 3.14159265358979323846;
+  const double offset = std::tan(taper_angle_deg * kPi / 180.0) * depth;
+  if (!std::isfinite(offset))
+    return Result<TopoDS_Shape>::failure(make_geometry_error("taper offset must be finite"));
+
+  const double orientation = signed_area > 0.0 ? 1.0 : -1.0;
+  std::vector<Point2> offset_polygon;
+  offset_polygon.reserve(polygon.size());
+  for (std::size_t index = 0U; index < polygon.size(); ++index) {
+    const Point2 previous = polygon[(index + polygon.size() - 1U) % polygon.size()];
+    const Point2 current = polygon[index];
+    const Point2 next = polygon[(index + 1U) % polygon.size()];
+    const Point2 previous_direction{current.x - previous.x, current.y - previous.y};
+    const Point2 current_direction{next.x - current.x, next.y - current.y};
+    const double previous_length = std::sqrt(previous_direction.x * previous_direction.x +
+                                             previous_direction.y * previous_direction.y);
+    const double current_length = std::sqrt(current_direction.x * current_direction.x +
+                                            current_direction.y * current_direction.y);
+    if (previous_length <= kAxisTolerance || current_length <= kAxisTolerance)
+      return Result<TopoDS_Shape>::failure(
+          make_geometry_error("tapered profile contains a degenerate edge"));
+    const Point2 previous_normal{orientation * previous_direction.y / previous_length,
+                                 -orientation * previous_direction.x / previous_length};
+    const Point2 current_normal{orientation * current_direction.y / current_length,
+                                -orientation * current_direction.x / current_length};
+    const Point2 first{previous.x + previous_normal.x * offset,
+                       previous.y + previous_normal.y * offset};
+    const Point2 second{current.x + current_normal.x * offset,
+                        current.y + current_normal.y * offset};
+    const double denominator =
+        previous_direction.x * current_direction.y - previous_direction.y * current_direction.x;
+    if (std::abs(denominator) <= kAxisTolerance)
+      return Result<TopoDS_Shape>::failure(
+          make_geometry_error("tapered profile adjacent edges must not be collinear"));
+    const double t =
+        ((second.x - first.x) * current_direction.y - (second.y - first.y) * current_direction.x) /
+        denominator;
+    offset_polygon.push_back(
+        {first.x + previous_direction.x * t, first.y + previous_direction.y * t});
+  }
+
+  std::vector<Point3> top_vertices;
+  top_vertices.reserve(offset_polygon.size());
+  for (const Point2 vertex : offset_polygon) {
+    top_vertices.push_back(Point3{origin.x + u.x * vertex.x + v.x * vertex.y + axis.x * depth,
+                                  origin.y + u.y * vertex.x + v.y * vertex.y + axis.y * depth,
+                                  origin.z + u.z * vertex.x + v.z * vertex.y + axis.z * depth});
+  }
+  auto base_wire = make_profile_wire(base_vertices, "base tapered");
+  auto top_wire = make_profile_wire(top_vertices, "end tapered");
+  if (base_wire.has_error())
+    return Result<TopoDS_Shape>::failure(base_wire.error());
+  if (top_wire.has_error())
+    return Result<TopoDS_Shape>::failure(top_wire.error());
+  BRepOffsetAPI_ThruSections loft(true, false);
+  loft.AddWire(base_wire.value());
+  loft.AddWire(top_wire.value());
+  loft.Build();
+  if (!loft.IsDone() || loft.Shape().IsNull())
+    return Result<TopoDS_Shape>::failure(
+        make_geometry_error("could not build tapered profile extrusion"));
+  return Result<TopoDS_Shape>::success(loft.Shape());
 }
 
 [[nodiscard]] Result<TopoDS_Wire> make_profile_wire(const std::vector<Point3>& vertices,
@@ -264,6 +381,122 @@ ClosedProfileAdapter::make_extruded_profile(const std::vector<Point3>& vertices,
     return Result<GeometryShape>::failure(make_geometry_error(exception.what()));
   } catch (...) {
     return Result<GeometryShape>::failure(make_geometry_error("unknown geometry error"));
+  }
+}
+
+Result<GeometryShape> ClosedProfileAdapter::make_extruded_profile_span(
+    const std::vector<Point3>& vertices, Vector3 direction, double start_distance_mm,
+    double end_distance_mm, std::optional<double> taper_angle_deg) const {
+  if (vertices.size() < 3U)
+    return Result<GeometryShape>::failure(
+        make_geometry_error("finite profile extrusion requires at least three vertices"));
+  auto axis = normalize_axis(direction);
+  if (axis.has_error())
+    return Result<GeometryShape>::failure(axis.error());
+  const double depth = end_distance_mm - start_distance_mm;
+  if (!std::isfinite(start_distance_mm) || !std::isfinite(end_distance_mm) ||
+      depth <= kAxisTolerance)
+    return Result<GeometryShape>::failure(
+        make_geometry_error("finite profile extrusion requires an increasing nonzero span"));
+  try {
+    const auto base = translated_vertices(vertices, axis.value(), start_distance_mm);
+    Result<TopoDS_Shape> shape = Result<TopoDS_Shape>::failure(
+        make_geometry_error("could not build finite profile extrusion"));
+    if (taper_angle_deg.has_value() && std::abs(*taper_angle_deg) > kAxisTolerance) {
+      shape = make_tapered_shape(base, axis.value(), depth, *taper_angle_deg);
+    } else {
+      auto face = make_profile_face(base);
+      if (face.has_error())
+        return Result<GeometryShape>::failure(face.error());
+      auto quantity = Quantity::length_mm(depth, "geometry.extrude.span");
+      if (quantity.has_error())
+        return Result<GeometryShape>::failure(quantity.error());
+      shape = make_prism_shape_from_face(face.value(), axis.value(), quantity.value());
+    }
+    if (shape.has_error())
+      return Result<GeometryShape>::failure(shape.error());
+    return Result<GeometryShape>::success(
+        GeometryShape(std::make_shared<GeometryShape::Impl>(std::move(shape.value()))));
+  } catch (const Standard_Failure& failure) {
+    return Result<GeometryShape>::failure(make_geometry_error(standard_failure_message(failure)));
+  } catch (const std::exception& exception) {
+    return Result<GeometryShape>::failure(make_geometry_error(exception.what()));
+  } catch (...) {
+    return Result<GeometryShape>::failure(make_geometry_error("unknown geometry error"));
+  }
+}
+
+Result<AxisProjectionSpan> ClosedProfileAdapter::projection_span(const GeometryShape& target,
+                                                                 Point3 origin,
+                                                                 Vector3 axis_direction) const {
+  if (target.empty())
+    return Result<AxisProjectionSpan>::failure(
+        make_geometry_error("projection span requires a non-empty target shape"));
+  auto axis = normalize_axis(axis_direction);
+  if (axis.has_error())
+    return Result<AxisProjectionSpan>::failure(axis.error());
+  try {
+    Bnd_Box bounds;
+    BRepBndLib::Add(target.impl_->shape, bounds);
+    if (bounds.IsVoid())
+      return Result<AxisProjectionSpan>::failure(
+          make_geometry_error("target shape has no bounding volume"));
+    double x_min = 0.0;
+    double y_min = 0.0;
+    double z_min = 0.0;
+    double x_max = 0.0;
+    double y_max = 0.0;
+    double z_max = 0.0;
+    bounds.Get(x_min, y_min, z_min, x_max, y_max, z_max);
+    AxisProjectionSpan span;
+    bool first = true;
+    for (const Point3 corner : bounding_box_corners(x_min, y_min, z_min, x_max, y_max, z_max)) {
+      const double projection = (corner.x - origin.x) * axis.value().x +
+                                (corner.y - origin.y) * axis.value().y +
+                                (corner.z - origin.z) * axis.value().z;
+      if (first) {
+        span.minimum = projection;
+        span.maximum = projection;
+        first = false;
+      } else {
+        span.minimum = std::min(span.minimum, projection);
+        span.maximum = std::max(span.maximum, projection);
+      }
+    }
+    return Result<AxisProjectionSpan>::success(span);
+  } catch (const Standard_Failure& failure) {
+    return Result<AxisProjectionSpan>::failure(
+        make_geometry_error(standard_failure_message(failure)));
+  }
+}
+
+Result<double> ClosedProfileAdapter::first_intersection_distance(const GeometryShape& target,
+                                                                 Point3 origin,
+                                                                 Vector3 axis_direction) const {
+  if (target.empty())
+    return Result<double>::failure(
+        make_geometry_error("to-next intersection requires a non-empty target shape"));
+  auto axis = normalize_axis(axis_direction);
+  if (axis.has_error())
+    return Result<double>::failure(axis.error());
+  try {
+    IntCurvesFace_ShapeIntersector intersector;
+    intersector.Load(target.impl_->shape, kAxisTolerance);
+    intersector.Perform(
+        gp_Lin(to_gp_point(origin), gp_Dir(axis.value().x, axis.value().y, axis.value().z)),
+        kAxisTolerance, 1.0e100);
+    double nearest = 0.0;
+    for (int index = 1; index <= intersector.NbPnt(); ++index) {
+      const double distance = intersector.WParameter(index);
+      if (distance > kAxisTolerance && (nearest == 0.0 || distance < nearest))
+        nearest = distance;
+    }
+    if (nearest == 0.0)
+      return Result<double>::failure(
+          make_geometry_error("to-next target has no forward face intersection"));
+    return Result<double>::success(nearest);
+  } catch (const Standard_Failure& failure) {
+    return Result<double>::failure(make_geometry_error(standard_failure_message(failure)));
   }
 }
 
