@@ -10,7 +10,7 @@ report_failure() {
       echo 'Block 39 verification failed.'
       echo
       echo '```text'
-      tail -n 160 /tmp/block39-ci.log || true
+      tail -n 180 /tmp/block39-ci.log || true
       echo '```'
     } > /tmp/block39-comment.md
     gh pr comment 36 --repo "$GITHUB_REPOSITORY" --body-file /tmp/block39-comment.md || true
@@ -46,12 +46,18 @@ hierarchy_end = text.index(
     hierarchy_start,
 )
 text = text[:hierarchy_start] + text[hierarchy_end:]
+
+dev_start = text.index('replace_exact(\n    "docs/development-setup.md",')
+dev_end = text.index('replace_exact(\n    "docs/project-goal.md",', dev_start)
+text = text[:dev_start] + text[dev_end:]
+
 path.write_text(text, encoding="utf-8")
 PY
 
 python3 scripts/apply_block39.py
 python3 scripts/normalize_block39_numeric.py
 python3 scripts/normalize_block39_hierarchy.py
+python3 scripts/normalize_block39_development_setup.py
 python3 scripts/normalize_block39.py
 
 sudo apt-get update
@@ -84,6 +90,7 @@ cmake --workflow --preset dev-geometry-build-test
 rm scripts/normalize_block39.py \
    scripts/normalize_block39_numeric.py \
    scripts/normalize_block39_hierarchy.py \
+   scripts/normalize_block39_development_setup.py \
    scripts/run_block39_ci.sh
 
 git diff --check
@@ -91,6 +98,7 @@ test ! -e scripts/apply_block39.py
 test ! -e scripts/normalize_block39.py
 test ! -e scripts/normalize_block39_numeric.py
 test ! -e scripts/normalize_block39_hierarchy.py
+test ! -e scripts/normalize_block39_development_setup.py
 test ! -e scripts/run_block39_ci.sh
 test ! -e .github/workflows/block39-patch.yml
 grep -R "AssemblyGenericRelationshipEquationBuilder" -n include src tests
