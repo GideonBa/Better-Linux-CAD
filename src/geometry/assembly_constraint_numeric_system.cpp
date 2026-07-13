@@ -184,19 +184,38 @@ append_constraint_residuals(const Project& project, const AssemblyConstraintId& 
 }
 
 [[nodiscard]] Result<std::size_t>
-append_revolute_drive_residuals(const Project& project, const AssemblyRevoluteJointDrive& drive,
-                                double length_residual_scale_mm, NumericVector& residuals) {
+append_joint_drive_residuals(const Project& project, const AssemblyNumericJointDrive& drive,
+                             double length_residual_scale_mm, NumericVector& residuals) {
   const AssemblyJoint* joint = project.assembly().find_joint(drive.joint);
   if (joint == nullptr) {
     return Result<std::size_t>::failure(
-        internal_error(drive.joint.value(), "assembly numeric revolute drive joint must exist"));
+        internal_error(drive.joint.value(), "assembly numeric joint drive joint must exist"));
   }
-  auto requested = Quantity::angle_deg(drive.requested_coordinate_deg, drive.joint.value());
-  if (requested.has_error())
-    return Result<std::size_t>::failure(requested.error());
-
-  const AssemblyRevoluteJointEquationBuilder builder;
-  auto equation = builder.build(project, *joint, requested.value());
+  const auto coordinate = [&](AssemblyJointCoordinateRole role) -> const Quantity* {
+    const auto found = std::find_if(drive.coordinates.begin(), drive.coordinates.end(),
+                                    [role](const auto& value) { return value.role == role; });
+    return found == drive.coordinates.end() ? nullptr : &found->requested_value;
+  };
+  if (joint->type() == AssemblyJointType::Revolute) {
+    const AssemblyRevoluteJointEquationBuilder builder;
+    auto equation =
+        builder.build(project, *joint, *coordinate(AssemblyJointCoordinateRole::Rotation));
+    if (equation.has_error())
+      return Result<std::size_t>::failure(equation.error());
+    return append_scaled_residuals(equation.value().residual, length_residual_scale_mm, residuals);
+  }
+  if (joint->type() == AssemblyJointType::Prismatic) {
+    const AssemblyPrismaticJointEquationBuilder builder;
+    auto equation =
+        builder.build(project, *joint, *coordinate(AssemblyJointCoordinateRole::Translation));
+    if (equation.has_error())
+      return Result<std::size_t>::failure(equation.error());
+    return append_scaled_residuals(equation.value().residual, length_residual_scale_mm, residuals);
+  }
+  const AssemblyCylindricalJointEquationBuilder builder;
+  auto equation =
+      builder.build(project, *joint, *coordinate(AssemblyJointCoordinateRole::Translation),
+                    *coordinate(AssemblyJointCoordinateRole::Rotation));
   if (equation.has_error())
     return Result<std::size_t>::failure(equation.error());
   return append_scaled_residuals(equation.value().residual, length_residual_scale_mm, residuals);
@@ -270,6 +289,36 @@ Result<std::size_t> append_scaled_residuals(const RevoluteJointResidualDescripto
   return Result<std::size_t>::success(9U);
 }
 
+Result<std::size_t> append_scaled_residuals(const PrismaticJointResidualDescriptor& residual,
+                                            double length_residual_scale_mm,
+                                            NumericVector& residuals) {
+  residuals.push_back(residual.direction_alignment.x);
+  residuals.push_back(residual.direction_alignment.y);
+  residuals.push_back(residual.direction_alignment.z);
+  residuals.push_back(residual.transverse_offset_mm.x / length_residual_scale_mm);
+  residuals.push_back(residual.transverse_offset_mm.y / length_residual_scale_mm);
+  residuals.push_back(residual.transverse_offset_mm.z / length_residual_scale_mm);
+  residuals.push_back(residual.orientation_alignment_sine);
+  residuals.push_back(residual.orientation_alignment_cosine);
+  residuals.push_back(residual.translation_error_mm / length_residual_scale_mm);
+  return Result<std::size_t>::success(9U);
+}
+
+Result<std::size_t> append_scaled_residuals(const CylindricalJointResidualDescriptor& residual,
+                                            double length_residual_scale_mm,
+                                            NumericVector& residuals) {
+  residuals.push_back(residual.direction_alignment.x);
+  residuals.push_back(residual.direction_alignment.y);
+  residuals.push_back(residual.direction_alignment.z);
+  residuals.push_back(residual.transverse_offset_mm.x / length_residual_scale_mm);
+  residuals.push_back(residual.transverse_offset_mm.y / length_residual_scale_mm);
+  residuals.push_back(residual.transverse_offset_mm.z / length_residual_scale_mm);
+  residuals.push_back(residual.translation_error_mm / length_residual_scale_mm);
+  residuals.push_back(residual.twist_alignment_sine);
+  residuals.push_back(residual.twist_alignment_cosine);
+  return Result<std::size_t>::success(9U);
+}
+
 Result<NumericVector> evaluate_residuals(const Project& project,
                                          const std::vector<AssemblyConstraintId>& constraint_ids,
                                          double length_residual_scale_mm) {
@@ -282,7 +331,7 @@ Result<NumericVector> evaluate_residuals(const Project& project,
                                          double length_residual_scale_mm) {
   NumericVector residuals;
   residuals.reserve(relationships.constraint_ids.size() * 7U +
-                    relationships.revolute_drives.size() * 9U);
+                    relationships.joint_drives.size() * 9U);
 
   for (const auto& constraint_id : relationships.constraint_ids) {
     auto appended =
@@ -290,9 +339,9 @@ Result<NumericVector> evaluate_residuals(const Project& project,
     if (appended.has_error())
       return Result<NumericVector>::failure(appended.error());
   }
-  for (const auto& drive : relationships.revolute_drives) {
+  for (const auto& drive : relationships.joint_drives) {
     auto appended =
-        append_revolute_drive_residuals(project, drive, length_residual_scale_mm, residuals);
+        append_joint_drive_residuals(project, drive, length_residual_scale_mm, residuals);
     if (appended.has_error())
       return Result<NumericVector>::failure(appended.error());
   }

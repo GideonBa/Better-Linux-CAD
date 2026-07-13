@@ -130,6 +130,12 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/assembly_posed_leaf_shapes.cpp
     src/geometry/assembly_revolute_joint_equation_builder.cpp
     src/geometry/assembly_revolute_joint_residual.cpp
+    src/geometry/assembly_prismatic_joint_equation_builder.cpp
+    src/geometry/assembly_prismatic_joint_residual.cpp
+    src/geometry/assembly_hierarchy_prismatic_joint_equation_builder.cpp
+    src/geometry/assembly_cylindrical_joint_equation_builder.cpp
+    src/geometry/assembly_cylindrical_joint_residual.cpp
+    src/geometry/assembly_hierarchy_cylindrical_joint_equation_builder.cpp
     src/geometry/assembly_revolute_sweep_analyzer.cpp
     src/geometry/assembly_rigid_body_solver.cpp
     src/geometry/assembly_semantic_target_freshness.cpp

@@ -82,7 +82,7 @@ namespace {
 validate_family_coordinates(const std::string& object_id, AssemblyJointType type,
                             const std::vector<AssemblyJointCoordinateSlot>& slots) {
   switch (type) {
-  case AssemblyJointType::Revolute:
+  case AssemblyJointType::Revolute: {
     if (slots.size() != 1U || slots.front().role() != AssemblyJointCoordinateRole::Rotation ||
         slots.front().kind() != AssemblyJointCoordinateKind::Angular) {
       return Result<AssemblyJointLimits>::failure(Error::validation(
@@ -100,6 +100,39 @@ validate_family_coordinates(const std::string& object_id, AssemblyJointType type
           "revolute joint seed limits must stay within the principal -180 to 180 degree range"));
     }
     return Result<AssemblyJointLimits>::success({lower_deg, upper_deg});
+  }
+  case AssemblyJointType::Prismatic:
+    if (slots.size() != 1U || slots.front().role() != AssemblyJointCoordinateRole::Translation ||
+        slots.front().kind() != AssemblyJointCoordinateKind::Linear) {
+      return Result<AssemblyJointLimits>::failure(Error::validation(
+          object_id, "prismatic joint requires exactly one linear translation coordinate slot"));
+    }
+    if (!slots.front().lower_limit() || !slots.front().upper_limit()) {
+      return Result<AssemblyJointLimits>::failure(Error::validation(
+          object_id, "prismatic joint translation coordinate requires lower and upper limits"));
+    }
+    return Result<AssemblyJointLimits>::success({});
+  case AssemblyJointType::Cylindrical: {
+    if (slots.size() != 2U || slots[0].role() != AssemblyJointCoordinateRole::Translation ||
+        slots[0].kind() != AssemblyJointCoordinateKind::Linear ||
+        slots[1].role() != AssemblyJointCoordinateRole::Rotation ||
+        slots[1].kind() != AssemblyJointCoordinateKind::Angular) {
+      return Result<AssemblyJointLimits>::failure(Error::validation(
+          object_id,
+          "cylindrical joint requires ordered linear translation and angular rotation slots"));
+    }
+    if (!slots[0].lower_limit() || !slots[0].upper_limit() || !slots[1].lower_limit() ||
+        !slots[1].upper_limit()) {
+      return Result<AssemblyJointLimits>::failure(Error::validation(
+          object_id, "cylindrical joint coordinates require lower and upper limits"));
+    }
+    if (slots[1].lower_limit()->degrees() < -180.0 || slots[1].upper_limit()->degrees() > 180.0) {
+      return Result<AssemblyJointLimits>::failure(Error::validation(
+          object_id,
+          "cylindrical rotation limits must stay within the principal -180 to 180 degree range"));
+    }
+    return Result<AssemblyJointLimits>::success({});
+  }
   }
   return Result<AssemblyJointLimits>::failure(
       Error::validation(object_id, "unsupported assembly joint family"));
@@ -120,6 +153,10 @@ std::string_view to_string(AssemblyJointType type) noexcept {
   switch (type) {
   case AssemblyJointType::Revolute:
     return "revolute";
+  case AssemblyJointType::Prismatic:
+    return "prismatic";
+  case AssemblyJointType::Cylindrical:
+    return "cylindrical";
   }
   return "revolute";
 }
@@ -276,6 +313,10 @@ AssemblyJoint::create(AssemblyJointId id, std::string name, AssemblyJointType ty
 }
 
 Result<AssemblyJoint> AssemblyJoint::with_coordinate(Quantity coordinate) const {
+  if (type_ != AssemblyJointType::Revolute) {
+    return Result<AssemblyJoint>::failure(Error::validation(
+        id_.value(), "scalar assembly joint coordinate updates support only Revolute joints"));
+  }
   return with_coordinate_value(AssemblyJointCoordinateRole::Rotation, std::move(coordinate));
 }
 
@@ -337,7 +378,7 @@ const AssemblyJointLimits& AssemblyJoint::limits() const noexcept {
   return legacy_limits_;
 }
 double AssemblyJoint::coordinate_deg() const noexcept {
-  return coordinate_slots_.front().value().degrees();
+  return type_ == AssemblyJointType::Revolute ? coordinate_slots_.front().value().degrees() : 0.0;
 }
 
 Result<AssemblyHierarchyJoint> AssemblyHierarchyJoint::create(
@@ -383,6 +424,11 @@ Result<AssemblyHierarchyJoint> AssemblyHierarchyJoint::create(
 }
 
 Result<AssemblyHierarchyJoint> AssemblyHierarchyJoint::with_coordinate(Quantity coordinate) const {
+  if (type_ != AssemblyJointType::Revolute) {
+    return Result<AssemblyHierarchyJoint>::failure(Error::validation(
+        id_.value(),
+        "scalar cross-hierarchy joint coordinate updates support only Revolute joints"));
+  }
   return with_coordinate_value(AssemblyJointCoordinateRole::Rotation, std::move(coordinate));
 }
 
@@ -448,7 +494,7 @@ const AssemblyJointLimits& AssemblyHierarchyJoint::limits() const noexcept {
   return legacy_limits_;
 }
 double AssemblyHierarchyJoint::coordinate_deg() const noexcept {
-  return coordinate_slots_.front().value().degrees();
+  return type_ == AssemblyJointType::Revolute ? coordinate_slots_.front().value().degrees() : 0.0;
 }
 
 } // namespace blcad

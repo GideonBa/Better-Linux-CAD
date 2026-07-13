@@ -270,8 +270,8 @@ validate_selected_joint_snapshot(const Project& project,
         result.joint.value(), "cross-hierarchy motion result must snapshot the selected joint"));
   }
   if (selected->state != AssemblyJointState::Active ||
-      selected->type != AssemblyJointType::Revolute ||
-      selected->coordinate_deg != result.source_coordinate_deg) {
+      (selected->type == AssemblyJointType::Revolute &&
+       selected->coordinate_deg != result.source_coordinate_deg)) {
     return Result<std::size_t>::failure(validation_error(
         result.joint.value(), "cross-hierarchy motion selected joint snapshot is inconsistent"));
   }
@@ -292,11 +292,13 @@ validate_selected_joint_snapshot(const Project& project,
     return Result<std::size_t>::failure(validation_error(
         result.joint.value(), "cross-hierarchy motion selected drive order is not canonical"));
   }
-  auto rotation =
-      detail::revolute_rotation_degrees(drive.value().complete_coordinates, result.joint);
-  if (rotation.has_error() || rotation.value() != result.requested_coordinate_deg) {
-    return Result<std::size_t>::failure(validation_error(
-        result.joint.value(), "cross-hierarchy motion selected drive snapshot is inconsistent"));
+  if (current->type() == AssemblyJointType::Revolute) {
+    auto rotation =
+        detail::revolute_rotation_degrees(drive.value().complete_coordinates, result.joint);
+    if (rotation.has_error() || rotation.value() != result.requested_coordinate_deg) {
+      return Result<std::size_t>::failure(validation_error(
+          result.joint.value(), "cross-hierarchy motion selected drive snapshot is inconsistent"));
+    }
   }
   return Result<std::size_t>::success(1U);
 }
@@ -368,6 +370,11 @@ Result<AssemblyCrossHierarchyJointMotionResult>
 AssemblyCrossHierarchyJointMotionSolver::move(const Project& project, AssemblyJointId joint_id,
                                               Quantity requested_coordinate,
                                               AssemblyRigidBodySolverOptions options) const {
+  const AssemblyHierarchyJoint* joint = project.find_cross_hierarchy_joint(joint_id);
+  if (joint != nullptr && joint->type() != AssemblyJointType::Revolute) {
+    return Result<AssemblyCrossHierarchyJointMotionResult>::failure(validation_error(
+        joint_id.value(), "scalar cross-hierarchy motion overload supports only Revolute joints"));
+  }
   std::vector<AssemblyJointCoordinateDrive> requested;
   requested.push_back({AssemblyJointCoordinateRole::Rotation, std::move(requested_coordinate)});
   return move(project, AssemblyJointDrive{std::move(joint_id), std::move(requested)}, options);
@@ -392,21 +399,20 @@ AssemblyCrossHierarchyJointMotionSolver::move(const Project& project, AssemblyJo
   }
   if (selected_joint->state() != AssemblyJointState::Active) {
     return Result<AssemblyCrossHierarchyJointMotionResult>::failure(validation_error(
-        joint_id.value(), "cross-hierarchy Revolute motion requires an active joint"));
+        joint_id.value(), "cross-hierarchy " + std::string(to_string(selected_joint->type())) +
+                              " motion requires an active joint"));
   }
-  if (selected_joint->type() != AssemblyJointType::Revolute) {
-    return Result<AssemblyCrossHierarchyJointMotionResult>::failure(
-        validation_error(joint_id.value(), "cross-hierarchy motion supports only Revolute joints"));
-  }
-
   auto selected_drive = detail::resolve_joint_drive(*selected_joint, drive);
   if (selected_drive.has_error())
     return Result<AssemblyCrossHierarchyJointMotionResult>::failure(selected_drive.error());
-  auto requested_rotation =
-      detail::revolute_rotation_degrees(selected_drive.value().complete_coordinates, joint_id);
-  if (requested_rotation.has_error())
-    return Result<AssemblyCrossHierarchyJointMotionResult>::failure(requested_rotation.error());
-  const double requested_deg = requested_rotation.value();
+  double requested_deg = 0.0;
+  if (selected_joint->type() == AssemblyJointType::Revolute) {
+    auto requested_rotation =
+        detail::revolute_rotation_degrees(selected_drive.value().complete_coordinates, joint_id);
+    if (requested_rotation.has_error())
+      return Result<AssemblyCrossHierarchyJointMotionResult>::failure(requested_rotation.error());
+    requested_deg = requested_rotation.value();
+  }
 
   auto graph = AssemblyCrossHierarchyMotionGraph::build(project);
   if (graph.has_error()) {
@@ -459,7 +465,8 @@ AssemblyCrossHierarchyJointMotionSolver::move(const Project& project, AssemblyJo
   }
 
   const detail::AssemblyNumericResidualEvaluator evaluator =
-      [&project, motion_group, &variable_authorities, joint_id, requested_deg,
+      [&project, motion_group, &variable_authorities, joint_id,
+       requested_coordinates = selected_drive.value().complete_coordinates,
        length_scale = options.length_residual_scale_mm](const detail::NumericVector& values) {
         Project candidate_project = project;
         auto applied = detail::apply_cross_hierarchy_authority_variables(
@@ -468,7 +475,7 @@ AssemblyCrossHierarchyJointMotionSolver::move(const Project& project, AssemblyJo
           return Result<detail::NumericVector>::failure(applied.error());
         }
         return detail::evaluate_cross_hierarchy_motion_group_residuals(
-            candidate_project, *motion_group, joint_id, requested_deg, length_scale);
+            candidate_project, *motion_group, joint_id, requested_coordinates, length_scale);
       };
 
   auto outcome = detail::solve_numeric_variables(initial_variables.value(),

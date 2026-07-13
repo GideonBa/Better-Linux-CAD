@@ -41,7 +41,8 @@ Result<AssemblyJointTargetCompatibility> AssemblyJointTargetCompatibilityResolve
     return Result<AssemblyJointTargetCompatibility>::failure(valid_b.error());
   }
 
-  if (joint_type == AssemblyJointType::Revolute &&
+  if ((joint_type == AssemblyJointType::Revolute || joint_type == AssemblyJointType::Prismatic ||
+       joint_type == AssemblyJointType::Cylindrical) &&
       has_capability(target_a, AssemblyGeometricTargetCapability::Frame) &&
       has_capability(target_b, AssemblyGeometricTargetCapability::Frame)) {
     return Result<AssemblyJointTargetCompatibility>::success(
@@ -51,8 +52,9 @@ Result<AssemblyJointTargetCompatibility> AssemblyJointTargetCompatibilityResolve
 
   return Result<AssemblyJointTargetCompatibility>::failure(Error::validation(
       kCompatibilityObjectId,
-      "assembly Revolute joint target capabilities are incompatible: oriented Frame/Frame is "
-      "required; Axis alone has no deterministic reference X direction; target A exposes " +
+      "assembly " + std::string(to_string(joint_type)) +
+          " joint target capabilities are incompatible: oriented Frame/Frame is "
+          "required; Axis alone has no deterministic reference X direction; target A exposes " +
           describe_capabilities(target_a.capabilities) + ", target B exposes " +
           describe_capabilities(target_b.capabilities)));
 }

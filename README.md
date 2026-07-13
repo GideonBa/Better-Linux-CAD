@@ -4,7 +4,7 @@ BLCAD will be an independent, headless parametric CAD system for Linux, in activ
 
 All architecture, feature contracts, persistence semantics, roadmaps, and current implementation status live in [`docs/`](docs/). This README is intentionally kept small and evergreen — it is not a status page.
 
-The assembly sequence is implemented through Block 43. Block 44 — the Prismatic joint family — is the next technical step. The canonical Block-43 contract is [`docs/assembly-vector-joint-drive-mvp5.md`](docs/assembly-vector-joint-drive-mvp5.md).
+The assembly sequence is implemented through Block 45. Block 46 — the Planar joint family — is the next technical step. The canonical Block-45 contract is [`docs/assembly-cylindrical-joint-mvp5.md`](docs/assembly-cylindrical-joint-mvp5.md).
 
 ## Repository layout
 

@@ -105,4 +105,4 @@ Coverage proves canonical writer shape, deterministic reserialization, slot-only
 
 Block 43 is implemented in `docs/assembly-vector-joint-drive-mvp5.md`.
 
-Coordinates are now driven by stable role; omitted selected and non-selected active slots hold authored values; result freshness includes complete slot and explicit drive state; and transforms plus exactly driven selected coordinates apply atomically. The next technical step is Block 44 Prismatic.
+Coordinates are now driven by stable role; omitted selected and non-selected active slots hold authored values; result freshness includes complete slot and explicit drive state; and transforms plus exactly driven selected coordinates apply atomically. Blocks 44–45 Prismatic and Cylindrical are implemented in their canonical documents. The next technical step is Block 46 Planar.

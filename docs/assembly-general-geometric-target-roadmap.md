@@ -1,6 +1,6 @@
 # General Assembly Geometric Target and Relationship Roadmap
 
-Status: Blocks 31–43 are implemented. Block 44 is the current next technical step. Blocks 44–47 remain planned headless architecture.
+Status: Blocks 31–45 are implemented. Block 46 is the current next technical step. Blocks 46–47 remain planned headless architecture.
 
 This document is the active status and sequencing authority for the expansion from the current assembly target layer to semantic reference geometry, stable generated topology targets, generic geometric relationships, and richer motion-joint families.
 
@@ -547,19 +547,27 @@ Focused tags:
 
 Authority variables remain six direct component-transform variables per unique free authority. Joint coordinates remain drive parameters.
 
-## Blocks 44–47 — Richer joint families
+## Block 44 — Prismatic joint family — Implemented
+
+Canonical contract: `docs/assembly-prismatic-joint-mvp5.md`.
+
+Prismatic uses oriented `Frame <-> Frame` endpoints and exactly one bounded Linear
+`translation` coordinate. It participates in local and cross-hierarchy graphs and shared
+vector-drive motion, freshness, and atomic application.
+
+## Block 45 — Cylindrical joint family — Implemented
+
+Canonical contract: `docs/assembly-cylindrical-joint-mvp5.md`.
+
+Cylindrical composes bounded Linear `translation` and Angular `rotation` coordinates on oriented
+`Frame <-> Frame` endpoints. Both roles share the local/root-space graph, numeric, holding,
+freshness, and atomic application paths.
+
+## Blocks 46–47 — Richer joint families
 
 One family per block:
 
 ```text
-44 Prismatic
-  preferred first compatibility: Frame <-> Frame
-  translation : LinearDisplacementMm
-
-45 Cylindrical
-  translation : LinearDisplacementMm
-  rotation    : AngleDeg
-
 46 Planar
   Frame <-> Frame
   translation_u   : LinearDisplacementMm
@@ -628,10 +636,7 @@ exchange products
 posed geometry/contact records/sweep analyses
 ```
 
-## Immediate next technical step
+## Current next technical step — Block 46
 
-Block 44 is the current next technical step.
-
-Implement Block 44 only: add the Prismatic family across Core intent, JSON, oriented target compatibility, deterministic equations, graph participation, and shared Block-43 vector-drive execution.
-
-Freeze the one-coordinate Linear `translation` contract and reuse the existing transform-authority/numeric/application paths. Do not introduce Cylindrical; it remains Block 45.
+Block 45 is implemented in `docs/assembly-cylindrical-joint-mvp5.md`. Implement Block 46 Planar
+only; Ball/Spherical remains Block 47.

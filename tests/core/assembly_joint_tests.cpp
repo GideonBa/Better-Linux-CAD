@@ -121,6 +121,149 @@ TEST_CASE("AssemblyJoint validates revolute limits and authored coordinates",
   CHECK(joint.with_coordinate(angle(91.0, "joint.valid")).has_error());
 }
 
+TEST_CASE("Prismatic joint intent owns one bounded linear translation coordinate",
+          "[core][assembly-prismatic-joint]") {
+  auto slot = AssemblyJointCoordinateSlot::create(
+      AssemblyJointCoordinateRole::Translation, AssemblyJointCoordinateKind::Linear,
+      displacement(12.0, "joint.slider"), displacement(-25.0, "joint.slider"),
+      displacement(40.0, "joint.slider"));
+  REQUIRE(slot);
+  auto joint = AssemblyJoint::create(AssemblyJointId("joint.slider"), "Slider",
+                                     AssemblyJointType::Prismatic, make_target("component.a"),
+                                     make_target("component.b"), AssemblyJointState::Active,
+                                     std::vector<AssemblyJointCoordinateSlot>{slot.value()});
+  REQUIRE(joint);
+  CHECK(to_string(joint.value().type()) == "prismatic");
+  REQUIRE(joint.value().find_coordinate_slot(AssemblyJointCoordinateRole::Translation));
+  CHECK(joint.value()
+            .find_coordinate_slot(AssemblyJointCoordinateRole::Translation)
+            ->value()
+            .millimeters() == 12.0);
+  auto updated = joint.value().with_coordinate_value(AssemblyJointCoordinateRole::Translation,
+                                                     displacement(-5.0, "joint.slider"));
+  REQUIRE(updated);
+  CHECK(updated.value()
+            .find_coordinate_slot(AssemblyJointCoordinateRole::Translation)
+            ->value()
+            .millimeters() == -5.0);
+
+  CHECK(AssemblyJoint::create(AssemblyJointId("joint.bad"), "Bad", AssemblyJointType::Prismatic,
+                              make_target("component.a"), make_target("component.b"),
+                              AssemblyJointState::Active,
+                              std::vector<AssemblyJointCoordinateSlot>{})
+            .has_error());
+
+  auto assembly = make_assembly();
+  REQUIRE(assembly.add_joint(joint.value()));
+  auto serialized = serialize_assembly_document_to_json(assembly);
+  REQUIRE(serialized);
+  const auto json = nlohmann::json::parse(serialized.value());
+  const auto& record = json.at("assembly_joints").front();
+  CHECK(record.at("type") == "prismatic");
+  CHECK_FALSE(record.contains("limits"));
+  CHECK_FALSE(record.contains("coordinate"));
+  CHECK(record.at("coordinates").front().at("role") == "translation");
+  CHECK(record.at("coordinates").front().at("value").at("unit") == "mm");
+  auto restored = deserialize_assembly_document_from_json(serialized.value());
+  REQUIRE(restored);
+  CHECK(restored.value().find_joint(AssemblyJointId("joint.slider"))->coordinate_slots() ==
+        joint.value().coordinate_slots());
+}
+
+TEST_CASE("Cross-hierarchy Prismatic intent uses the same coordinate family",
+          "[core][assembly-cross-hierarchy-prismatic-joint]") {
+  auto a = AssemblyHierarchyConstraintEndpoint::create({}, ComponentInstanceId("component.a"),
+                                                       "feature.hole.seat");
+  auto b = AssemblyHierarchyConstraintEndpoint::create({SubassemblyInstanceId("subassembly.child")},
+                                                       ComponentInstanceId("component.b"),
+                                                       "feature.hole.seat");
+  REQUIRE(a);
+  REQUIRE(b);
+  auto slot = AssemblyJointCoordinateSlot::create(
+      AssemblyJointCoordinateRole::Translation, AssemblyJointCoordinateKind::Linear,
+      displacement(0.0, "joint.cross.slider"), displacement(-10.0, "joint.cross.slider"),
+      displacement(30.0, "joint.cross.slider"));
+  REQUIRE(slot);
+  auto joint = AssemblyHierarchyJoint::create(
+      AssemblyJointId("joint.cross.slider"), "CrossSlider", AssemblyJointType::Prismatic, a.value(),
+      b.value(), AssemblyJointState::Active,
+      std::vector<AssemblyJointCoordinateSlot>{slot.value()});
+  REQUIRE(joint);
+  CHECK(joint.value().type() == AssemblyJointType::Prismatic);
+}
+
+TEST_CASE("Cylindrical joint intent composes bounded translation and rotation slots",
+          "[core][assembly-cylindrical-joint]") {
+  auto translation = AssemblyJointCoordinateSlot::create(
+      AssemblyJointCoordinateRole::Translation, AssemblyJointCoordinateKind::Linear,
+      displacement(5.0, "joint.cylindrical"), displacement(-20.0, "joint.cylindrical"),
+      displacement(40.0, "joint.cylindrical"));
+  auto rotation = AssemblyJointCoordinateSlot::create(
+      AssemblyJointCoordinateRole::Rotation, AssemblyJointCoordinateKind::Angular,
+      angle(15.0, "joint.cylindrical"), angle(-90.0, "joint.cylindrical"),
+      angle(90.0, "joint.cylindrical"));
+  REQUIRE(translation);
+  REQUIRE(rotation);
+  auto joint = AssemblyJoint::create(
+      AssemblyJointId("joint.cylindrical"), "Cylindrical", AssemblyJointType::Cylindrical,
+      make_target("component.a"), make_target("component.b"), AssemblyJointState::Active,
+      std::vector<AssemblyJointCoordinateSlot>{translation.value(), rotation.value()});
+  REQUIRE(joint);
+  CHECK(to_string(joint.value().type()) == "cylindrical");
+  REQUIRE(joint.value().coordinate_slots().size() == 2U);
+  CHECK(joint.value().coordinate_slots()[0].role() == AssemblyJointCoordinateRole::Translation);
+  CHECK(joint.value().coordinate_slots()[1].role() == AssemblyJointCoordinateRole::Rotation);
+
+  CHECK(AssemblyJoint::create(
+            AssemblyJointId("joint.bad-order"), "BadOrder", AssemblyJointType::Cylindrical,
+            make_target("component.a"), make_target("component.b"), AssemblyJointState::Active,
+            std::vector<AssemblyJointCoordinateSlot>{rotation.value(), translation.value()})
+            .has_error());
+
+  auto assembly = make_assembly();
+  REQUIRE(assembly.add_joint(joint.value()));
+  auto serialized = serialize_assembly_document_to_json(assembly);
+  REQUIRE(serialized);
+  const auto json = nlohmann::json::parse(serialized.value());
+  const auto& record = json.at("assembly_joints").front();
+  CHECK(record.at("type") == "cylindrical");
+  CHECK_FALSE(record.contains("limits"));
+  CHECK_FALSE(record.contains("coordinate"));
+  CHECK(record.at("coordinates")[0].at("role") == "translation");
+  CHECK(record.at("coordinates")[1].at("role") == "rotation");
+  auto restored = deserialize_assembly_document_from_json(serialized.value());
+  REQUIRE(restored);
+  CHECK(restored.value().find_joint(AssemblyJointId("joint.cylindrical"))->coordinate_slots() ==
+        joint.value().coordinate_slots());
+}
+
+TEST_CASE("Cross-hierarchy Cylindrical intent preserves both coordinate slots",
+          "[core][assembly-cross-hierarchy-cylindrical-joint]") {
+  auto a = AssemblyHierarchyConstraintEndpoint::create({}, ComponentInstanceId("component.a"),
+                                                       "feature.hole.seat");
+  auto b = AssemblyHierarchyConstraintEndpoint::create({SubassemblyInstanceId("subassembly.child")},
+                                                       ComponentInstanceId("component.b"),
+                                                       "feature.hole.seat");
+  auto translation = AssemblyJointCoordinateSlot::create(
+      AssemblyJointCoordinateRole::Translation, AssemblyJointCoordinateKind::Linear,
+      displacement(0.0, "joint.cross.cylindrical"), displacement(-20.0, "joint.cross.cylindrical"),
+      displacement(40.0, "joint.cross.cylindrical"));
+  auto rotation = AssemblyJointCoordinateSlot::create(
+      AssemblyJointCoordinateRole::Rotation, AssemblyJointCoordinateKind::Angular,
+      angle(0.0, "joint.cross.cylindrical"), angle(-90.0, "joint.cross.cylindrical"),
+      angle(90.0, "joint.cross.cylindrical"));
+  REQUIRE(a);
+  REQUIRE(b);
+  REQUIRE(translation);
+  REQUIRE(rotation);
+  auto joint = AssemblyHierarchyJoint::create(
+      AssemblyJointId("joint.cross.cylindrical"), "CrossCylindrical",
+      AssemblyJointType::Cylindrical, a.value(), b.value(), AssemblyJointState::Active,
+      std::vector<AssemblyJointCoordinateSlot>{translation.value(), rotation.value()});
+  REQUIRE(joint);
+  CHECK(joint.value().coordinate_slots().size() == 2U);
+}
+
 TEST_CASE("Assembly joint coordinate slots preserve family roles and physical kinds",
           "[core][assembly-joint-coordinate-model]") {
   CHECK(to_string(AssemblyJointCoordinateKind::Angular) == "angular");

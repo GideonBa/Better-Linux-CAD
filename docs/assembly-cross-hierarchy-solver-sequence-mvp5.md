@@ -1,6 +1,6 @@
 # Cross-Hierarchy Assembly Relationship Sequence MVP-5
 
-Status: Blocks 23–43 are implemented. Block 44 is the current next technical step. Blocks 44–47 remain the explicit richer-joint continuation.
+Status: Blocks 23–45 are implemented. Block 46 is the current next technical step. Blocks 46–47 remain the explicit richer-joint continuation.
 
 This document is the canonical numbered handoff sequence for cross-document assembly intent, solving, motion, exchange, posed analysis, and general geometric target architecture.
 
@@ -515,13 +515,21 @@ Focused tags: `[geometry][assembly-vector-joint-drive]`, `[geometry][assembly-cr
 
 Authority variables remain six direct component-transform variables per free authority. Joint coordinates remain drive parameters.
 
-## Blocks 44–47 — Richer joint families
+## Blocks 44–45 — Implemented richer joint families
 
 One family per block:
 
 ```text
 44 Prismatic
 45 Cylindrical
+```
+
+Canonical contracts: `docs/assembly-prismatic-joint-mvp5.md` and
+`docs/assembly-cylindrical-joint-mvp5.md`.
+
+## Blocks 46–47 — Remaining richer joint families
+
+```text
 46 Planar
 47 Ball/Spherical
 ```
@@ -537,7 +545,7 @@ Current persistent assembly intent includes:
 ```text
 component placement/state
 local geometric relationships including persistent Coincident/Parallel/Perpendicular intent
-local Revolute joints/limits/coordinate
+local Revolute, Prismatic, and Cylindrical joint coordinate intent
 Project-owned child assemblies
 SubassemblyInstance placement/state
 cross_hierarchy_constraints[]
@@ -562,8 +570,10 @@ XDE labels and STEP entities
 posed shapes/contact records/sweep analyses
 ```
 
-## Next technical step
+## Block 45 — Cylindrical joint family — Implemented
 
-Implement Block 44 only: the Prismatic family with local/Project-level intent, JSON, oriented target compatibility, deterministic equations, graph participation, and shared vector-drive motion.
+Block 45 is implemented in `docs/assembly-cylindrical-joint-mvp5.md`: two-coordinate local and
+Project-level Cylindrical intent, JSON, Frame/Frame equations, and shared vector-drive motion.
 
-Preserve Blocks 40–43 compatibility, persistence, numeric, freshness, and application contracts. Add no Cylindrical family in Block 44.
+The current next technical step is Block 46 Planar. Blocks 40–45 compatibility, persistence,
+numeric, freshness, and application contracts remain authoritative.

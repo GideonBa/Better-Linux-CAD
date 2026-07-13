@@ -6,9 +6,12 @@
 #include "blcad/core/result.hpp"
 #include "blcad/geometry/assembly_concentric_constraint_equation_builder.hpp"
 #include "blcad/geometry/assembly_constraint_equation_builder.hpp"
+#include "blcad/geometry/assembly_cylindrical_joint_equation_builder.hpp"
 #include "blcad/geometry/assembly_generic_relationship_equation_builder.hpp"
 #include "blcad/geometry/assembly_hierarchy_constraint_equation_builder.hpp"
 #include "blcad/geometry/assembly_insert_constraint_equation_builder.hpp"
+#include "blcad/geometry/assembly_joint_drive.hpp"
+#include "blcad/geometry/assembly_prismatic_joint_equation_builder.hpp"
 #include "blcad/geometry/assembly_revolute_joint_equation_builder.hpp"
 
 #include <cstddef>
@@ -28,20 +31,20 @@ struct AssemblyNumericSystemOptions {
   double finite_difference_rotation_step_deg = 1.0e-4;
 };
 
-struct AssemblyRevoluteJointDrive {
+struct AssemblyNumericJointDrive {
   AssemblyJointId joint;
-  double requested_coordinate_deg = 0.0;
+  std::vector<AssemblyJointCoordinateDrive> coordinates;
 
-  friend bool operator==(const AssemblyRevoluteJointDrive&,
-                         const AssemblyRevoluteJointDrive&) = default;
+  friend bool operator==(const AssemblyNumericJointDrive&,
+                         const AssemblyNumericJointDrive&) = default;
 };
 
 struct AssemblyNumericRelationshipSet {
   std::vector<AssemblyConstraintId> constraint_ids;
-  std::vector<AssemblyRevoluteJointDrive> revolute_drives;
+  std::vector<AssemblyNumericJointDrive> joint_drives;
 
   [[nodiscard]] bool empty() const noexcept {
-    return constraint_ids.empty() && revolute_drives.empty();
+    return constraint_ids.empty() && joint_drives.empty();
   }
 };
 
@@ -68,6 +71,12 @@ append_scaled_residuals(const AssemblyHierarchyConstraintResidualDescriptor& res
                         double length_residual_scale_mm, NumericVector& residuals);
 [[nodiscard]] Result<std::size_t>
 append_scaled_residuals(const RevoluteJointResidualDescriptor& residual,
+                        double length_residual_scale_mm, NumericVector& residuals);
+[[nodiscard]] Result<std::size_t>
+append_scaled_residuals(const PrismaticJointResidualDescriptor& residual,
+                        double length_residual_scale_mm, NumericVector& residuals);
+[[nodiscard]] Result<std::size_t>
+append_scaled_residuals(const CylindricalJointResidualDescriptor& residual,
                         double length_residual_scale_mm, NumericVector& residuals);
 
 [[nodiscard]] Result<NumericVector>

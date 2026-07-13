@@ -103,6 +103,6 @@ Coverage proves scalar/vector adapter equivalence, typed role validation, duplic
 
 ## Block 44 handoff
 
-The next technical step is Block 44: Prismatic joint family.
+Blocks 44–45 Prismatic and Cylindrical are implemented in their canonical documents. The next technical step is Block 46 Planar.
 
 Block 44 must add one `translation` Linear coordinate, persistent local/Project intent and JSON spelling, an explicit oriented target compatibility contract, deterministic residual order, shared local/root-space equations, graph participation, vector-drive execution, complete freshness, and atomic application. It must reuse the Block-43 drive boundary rather than adding a family-specific motion API.

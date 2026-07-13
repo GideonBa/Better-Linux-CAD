@@ -22,6 +22,12 @@ Quantity angle(double degrees, const char* id) {
   return value.value();
 }
 
+Quantity displacement(double millimeters, const char* id) {
+  auto value = Quantity::linear_displacement_mm(millimeters, id);
+  REQUIRE(value);
+  return value.value();
+}
+
 AssemblyConstraintTarget local_target(const char* component_id, const char* reference) {
   auto value = AssemblyConstraintTarget::create(ComponentInstanceId(component_id), reference);
   REQUIRE(value);
@@ -38,6 +44,39 @@ AssemblyHierarchyJoint cross_joint(
   auto value = AssemblyHierarchyJoint::create(
       AssemblyJointId(id), id, AssemblyJointType::Revolute, std::move(target_a),
       std::move(target_b), state, angle(-90.0, id), angle(90.0, id), angle(coordinate, id));
+  REQUIRE(value);
+  return value.value();
+}
+
+AssemblyHierarchyJoint cross_prismatic_joint(const char* id = "joint.cross.slider") {
+  auto slot = AssemblyJointCoordinateSlot::create(
+      AssemblyJointCoordinateRole::Translation, AssemblyJointCoordinateKind::Linear,
+      displacement(0.0, id), displacement(-50.0, id), displacement(50.0, id));
+  REQUIRE(slot);
+  auto value = AssemblyHierarchyJoint::create(
+      AssemblyJointId(id), id, AssemblyJointType::Prismatic,
+      endpoint({}, "component.root", "feature.hole.seat"),
+      endpoint({"subassembly.left"}, "component.child", "feature.hole.seat"),
+      AssemblyJointState::Active, std::vector<AssemblyJointCoordinateSlot>{slot.value()});
+  REQUIRE(value);
+  return value.value();
+}
+
+AssemblyHierarchyJoint cross_cylindrical_joint(const char* id = "joint.cross.cylindrical") {
+  auto translation = AssemblyJointCoordinateSlot::create(
+      AssemblyJointCoordinateRole::Translation, AssemblyJointCoordinateKind::Linear,
+      displacement(0.0, id), displacement(-50.0, id), displacement(50.0, id));
+  auto rotation = AssemblyJointCoordinateSlot::create(
+      AssemblyJointCoordinateRole::Rotation, AssemblyJointCoordinateKind::Angular, angle(0.0, id),
+      angle(-90.0, id), angle(90.0, id));
+  REQUIRE(translation);
+  REQUIRE(rotation);
+  auto value = AssemblyHierarchyJoint::create(
+      AssemblyJointId(id), id, AssemblyJointType::Cylindrical,
+      endpoint({}, "component.root", "feature.hole.seat"),
+      endpoint({"subassembly.left"}, "component.child", "feature.hole.seat"),
+      AssemblyJointState::Active,
+      std::vector<AssemblyJointCoordinateSlot>{translation.value(), rotation.value()});
   REQUIRE(value);
   return value.value();
 }
@@ -173,6 +212,58 @@ TEST_CASE("Cross-hierarchy Revolute motion solves one authority-scoped root-to-c
   CHECK(left_boundary(project) == source_boundary);
   CHECK(project.find_cross_hierarchy_joint(AssemblyJointId("joint.cross.revolute"))
             ->coordinate_deg() == 0.0);
+}
+
+TEST_CASE("Cross-hierarchy Prismatic motion drives and applies root-space translation",
+          "[geometry][assembly-cross-hierarchy-prismatic-motion]") {
+  Project project = motion_project();
+  add_joint(project, cross_prismatic_joint());
+  const AssemblyJointDrive drive{
+      AssemblyJointId("joint.cross.slider"),
+      {{AssemblyJointCoordinateRole::Translation, displacement(14.0, "joint.cross.slider")}}};
+  auto result = AssemblyCrossHierarchyJointMotionSolver{}.move(project, drive);
+  REQUIRE(result);
+  REQUIRE(result.value().converged());
+  REQUIRE(result.value().proposed_transforms.size() == 1U);
+  CHECK(result.value().proposed_transforms.front().proposed_transform.translation_mm.z ==
+        Approx(14.0).margin(1.0e-4));
+  auto applied = AssemblyCrossHierarchyJointMotionResultApplier{}.apply(project, result.value());
+  REQUIRE(applied);
+  const auto* slot = project.find_cross_hierarchy_joint(AssemblyJointId("joint.cross.slider"))
+                         ->find_coordinate_slot(AssemblyJointCoordinateRole::Translation);
+  REQUIRE(slot);
+  CHECK(slot->value().millimeters() == 14.0);
+}
+
+TEST_CASE("Cross-hierarchy Cylindrical motion drives both root-space coordinates atomically",
+          "[geometry][assembly-cross-hierarchy-cylindrical-motion]") {
+  Project project = motion_project();
+  add_joint(project, cross_cylindrical_joint());
+  const AssemblyJointDrive drive{
+      AssemblyJointId("joint.cross.cylindrical"),
+      {{AssemblyJointCoordinateRole::Rotation, angle(-25.0, "joint.cross.cylindrical")},
+       {AssemblyJointCoordinateRole::Translation, displacement(14.0, "joint.cross.cylindrical")}}};
+  auto result = AssemblyCrossHierarchyJointMotionSolver{}.move(project, drive);
+  REQUIRE(result);
+  REQUIRE(result.value().converged());
+  REQUIRE(result.value().requested_coordinates.size() == 2U);
+  CHECK(result.value().requested_coordinates[0].role == AssemblyJointCoordinateRole::Translation);
+  CHECK(result.value().requested_coordinates[1].role == AssemblyJointCoordinateRole::Rotation);
+  REQUIRE(result.value().proposed_transforms.size() == 1U);
+  CHECK(result.value().proposed_transforms.front().proposed_transform.translation_mm.z ==
+        Approx(14.0).margin(1.0e-4));
+  CHECK(result.value().proposed_transforms.front().proposed_transform.rotation_deg.z ==
+        Approx(-25.0).margin(1.0e-4));
+  auto applied = AssemblyCrossHierarchyJointMotionResultApplier{}.apply(project, result.value());
+  REQUIRE(applied);
+  const auto* joint =
+      project.find_cross_hierarchy_joint(AssemblyJointId("joint.cross.cylindrical"));
+  REQUIRE(joint);
+  CHECK(joint->find_coordinate_slot(AssemblyJointCoordinateRole::Translation)
+            ->value()
+            .millimeters() == 14.0);
+  CHECK(joint->find_coordinate_slot(AssemblyJointCoordinateRole::Rotation)->value().degrees() ==
+        -25.0);
 }
 
 TEST_CASE("Cross-hierarchy vector drives preserve role order freshness and atomic application",

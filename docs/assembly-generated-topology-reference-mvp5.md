@@ -342,4 +342,4 @@ Descriptors are computed analytically from validated feature/sketch/profile inte
 
 Block 37 explicit relationship compatibility, Block 38 generic relationship intent/JSON, Block 39 generic equations/shared solve integration, and Block 40 joint target compatibility are implemented. Blocks 39–40 consume generated target capabilities through the same projection contract and add no generated-topology JSON field.
 
-Blocks 41–43 typed coordinates, additive compatible JSON, and shared vector drives are implemented in their canonical joint documents. The next technical step is Block 44: the Prismatic joint family.
+Blocks 41–43 typed coordinates, additive compatible JSON, and shared vector drives are implemented in their canonical joint documents. Blocks 44–45 Prismatic and Cylindrical are implemented in their canonical documents. The next technical step is Block 46 Planar.

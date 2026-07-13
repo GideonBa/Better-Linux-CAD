@@ -60,7 +60,7 @@ Lower and upper bounds are independently optional in the general slot model. A j
 
 ## Current Revolute family
 
-The only implemented joint family remains Revolute. Its exact slot signature is:
+Block 41 initially implemented only Revolute. Its exact slot signature is:
 
 ```text
 0: rotation, Angular, AngleDeg value, required AngleDeg lower/upper bounds
@@ -69,6 +69,9 @@ The only implemented joint family remains Revolute. Its exact slot signature is:
 The existing seed-limit restriction to the principal `[-180 deg, 180 deg]` interval remains unchanged. The authored value must remain inside both bounds.
 
 No Prismatic, Cylindrical, Planar, or Ball/Spherical execution is introduced by this model. Their planned roles merely have stable identities available for later family blocks.
+
+Block 44 subsequently activates Prismatic with exactly one bounded Linear `translation` slot;
+its canonical execution contract is `docs/assembly-prismatic-joint-mvp5.md`.
 
 ## Compatibility adapter
 
@@ -106,4 +109,6 @@ Block 42 is implemented in `docs/assembly-joint-coordinate-json-mvp5.md`.
 
 Slots now serialize additively for local and Project-level joints with canonical role spellings, typed units, deterministic family order, historical scalar Revolute loading, a dual compatibility writer, and explicit malformed-role failures.
 
-Block 43 vector motion drives are implemented in `docs/assembly-vector-joint-drive-mvp5.md`. The next technical step is Block 44 Prismatic; the remaining richer families stay Blocks 45–47.
+Block 43 vector motion drives and Blocks 44–45 Prismatic/Cylindrical execution are implemented in
+their canonical documents. The next technical step is Block 46 Planar; Ball/Spherical remains
+Block 47.

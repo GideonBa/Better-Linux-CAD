@@ -42,6 +42,12 @@ Quantity angle(double degrees, const char* id) {
   return quantity.value();
 }
 
+Quantity displacement(double millimeters, const char* id) {
+  auto quantity = Quantity::linear_displacement_mm(millimeters, id);
+  REQUIRE(quantity);
+  return quantity.value();
+}
+
 PartDocument make_hole_part() {
   auto part = PartDocument::create(DocumentId("part.revolute_plate"), "RevolutePlate");
   REQUIRE(part);
@@ -98,6 +104,39 @@ AssemblyJoint make_joint(const char* id, const char* component_a, const char* co
   auto value = AssemblyJoint::create(AssemblyJointId(id), id, AssemblyJointType::Revolute,
                                      target(component_a), target(component_b), state,
                                      angle(-90.0, id), angle(90.0, id), angle(coordinate_deg, id));
+  REQUIRE(value);
+  return value.value();
+}
+
+AssemblyJoint make_prismatic_joint(const char* id, const char* component_a,
+                                   const char* component_b) {
+  auto slot = AssemblyJointCoordinateSlot::create(
+      AssemblyJointCoordinateRole::Translation, AssemblyJointCoordinateKind::Linear,
+      displacement(0.0, id), displacement(-50.0, id), displacement(50.0, id));
+  REQUIRE(slot);
+  auto value =
+      AssemblyJoint::create(AssemblyJointId(id), id, AssemblyJointType::Prismatic,
+                            target(component_a), target(component_b), AssemblyJointState::Active,
+                            std::vector<AssemblyJointCoordinateSlot>{slot.value()});
+  REQUIRE(value);
+  return value.value();
+}
+
+AssemblyJoint make_cylindrical_joint(const char* id, const char* component_a,
+                                     const char* component_b, double translation_mm = 0.0,
+                                     double rotation_deg = 0.0) {
+  auto translation = AssemblyJointCoordinateSlot::create(
+      AssemblyJointCoordinateRole::Translation, AssemblyJointCoordinateKind::Linear,
+      displacement(translation_mm, id), displacement(-50.0, id), displacement(50.0, id));
+  auto rotation = AssemblyJointCoordinateSlot::create(
+      AssemblyJointCoordinateRole::Rotation, AssemblyJointCoordinateKind::Angular,
+      angle(rotation_deg, id), angle(-90.0, id), angle(90.0, id));
+  REQUIRE(translation);
+  REQUIRE(rotation);
+  auto value = AssemblyJoint::create(
+      AssemblyJointId(id), id, AssemblyJointType::Cylindrical, target(component_a),
+      target(component_b), AssemblyJointState::Active,
+      std::vector<AssemblyJointCoordinateSlot>{translation.value(), rotation.value()});
   REQUIRE(value);
   return value.value();
 }
@@ -218,7 +257,9 @@ TEST_CASE("Shared numeric system gives a regular rank six revolute drive",
   REQUIRE(project.assembly().add_joint(make_joint("joint.revolute", "component.a", "component.b")));
 
   const detail::AssemblyNumericRelationshipSet relationships{
-      {}, {{AssemblyJointId("joint.revolute"), 0.0}}};
+      {},
+      {{AssemblyJointId("joint.revolute"),
+        {{AssemblyJointCoordinateRole::Rotation, angle(0.0, "joint.revolute")}}}}};
   const auto residuals = detail::evaluate_residuals(project, relationships, 1.0);
   REQUIRE(residuals);
   REQUIRE(residuals.value().size() == 9U);
@@ -294,6 +335,78 @@ TEST_CASE("Revolute motion solver moves and atomically applies an in-range joint
   CHECK(equation.value().residual.signed_seating_separation_mm == Approx(0.0).margin(kTolerance));
   CHECK(equation.value().residual.twist_alignment_sine == Approx(0.0).margin(kTolerance));
   CHECK(equation.value().residual.twist_alignment_cosine == Approx(0.0).margin(kTolerance));
+}
+
+TEST_CASE("Prismatic vector motion drives and atomically applies signed axial translation",
+          "[geometry][assembly-prismatic-joint]") {
+  Project project =
+      make_project({{"component.a", identity_rigid_transform(), ComponentGroundingState::Grounded},
+                    {"component.b"}});
+  REQUIRE(project.assembly().add_joint(
+      make_prismatic_joint("joint.slider", "component.a", "component.b")));
+  const AssemblyJointDrive drive{
+      AssemblyJointId("joint.slider"),
+      {{AssemblyJointCoordinateRole::Translation, displacement(12.0, "joint.slider")}}};
+  auto result = AssemblyJointMotionSolver{}.move(project, drive);
+  REQUIRE(result);
+  REQUIRE(result.value().converged());
+  const auto& proposal = proposal_for(result.value().solve_result, "component.b");
+  CHECK(proposal.proposed_transform.translation_mm.x == Approx(0.0).margin(kTolerance));
+  CHECK(proposal.proposed_transform.translation_mm.y == Approx(0.0).margin(kTolerance));
+  CHECK(proposal.proposed_transform.translation_mm.z == Approx(12.0).margin(kTolerance));
+  CHECK(proposal.proposed_transform.rotation_deg == Vector3{});
+  auto applied = AssemblyJointMotionResultApplier{}.apply(project, result.value());
+  REQUIRE(applied);
+  const auto* slot = project.assembly()
+                         .find_joint(AssemblyJointId("joint.slider"))
+                         ->find_coordinate_slot(AssemblyJointCoordinateRole::Translation);
+  REQUIRE(slot);
+  CHECK(slot->value().millimeters() == 12.0);
+}
+
+TEST_CASE("Cylindrical vector motion coexists for translation and twist and applies atomically",
+          "[geometry][assembly-cylindrical-joint]") {
+  Project project =
+      make_project({{"component.a", identity_rigid_transform(), ComponentGroundingState::Grounded},
+                    {"component.b"}});
+  REQUIRE(project.assembly().add_joint(
+      make_cylindrical_joint("joint.cylindrical", "component.a", "component.b")));
+  const AssemblyJointDrive drive{
+      AssemblyJointId("joint.cylindrical"),
+      {{AssemblyJointCoordinateRole::Rotation, angle(30.0, "joint.cylindrical")},
+       {AssemblyJointCoordinateRole::Translation, displacement(12.0, "joint.cylindrical")}}};
+  auto result = AssemblyJointMotionSolver{}.move(project, drive);
+  REQUIRE(result);
+  REQUIRE(result.value().converged());
+  REQUIRE(result.value().requested_coordinates.size() == 2U);
+  CHECK(result.value().requested_coordinates[0].role == AssemblyJointCoordinateRole::Translation);
+  CHECK(result.value().requested_coordinates[1].role == AssemblyJointCoordinateRole::Rotation);
+  const auto& proposal = proposal_for(result.value().solve_result, "component.b");
+  CHECK(proposal.proposed_transform.translation_mm.z == Approx(12.0).margin(kTolerance));
+  CHECK(proposal.proposed_transform.rotation_deg.z == Approx(30.0).margin(kTolerance));
+  auto applied = AssemblyJointMotionResultApplier{}.apply(project, result.value());
+  REQUIRE(applied);
+  const auto* joint = project.assembly().find_joint(AssemblyJointId("joint.cylindrical"));
+  REQUIRE(joint);
+  CHECK(joint->find_coordinate_slot(AssemblyJointCoordinateRole::Translation)
+            ->value()
+            .millimeters() == 12.0);
+  CHECK(joint->find_coordinate_slot(AssemblyJointCoordinateRole::Rotation)->value().degrees() ==
+        30.0);
+
+  Project partial =
+      make_project({{"component.a", identity_rigid_transform(), ComponentGroundingState::Grounded},
+                    {"component.b"}});
+  REQUIRE(partial.assembly().add_joint(
+      make_cylindrical_joint("joint.cylindrical", "component.a", "component.b")));
+  auto translation_only = AssemblyJointMotionSolver{}.move(
+      partial, AssemblyJointDrive{AssemblyJointId("joint.cylindrical"),
+                                  {{AssemblyJointCoordinateRole::Translation,
+                                    displacement(-8.0, "joint.cylindrical")}}});
+  REQUIRE(translation_only);
+  const auto& held = proposal_for(translation_only.value().solve_result, "component.b");
+  CHECK(held.proposed_transform.translation_mm.z == Approx(-8.0).margin(kTolerance));
+  CHECK(held.proposed_transform.rotation_deg.z == Approx(0.0).margin(kTolerance));
 }
 
 TEST_CASE("Local vector joint drives validate roles snapshot all slots and apply atomically",

@@ -256,6 +256,10 @@ assembly_constraint_from_json(const json& constraint_json) {
   const auto text = value.get<std::string>();
   if (text == "revolute")
     return Result<AssemblyJointType>::success(AssemblyJointType::Revolute);
+  if (text == "prismatic")
+    return Result<AssemblyJointType>::success(AssemblyJointType::Prismatic);
+  if (text == "cylindrical")
+    return Result<AssemblyJointType>::success(AssemblyJointType::Cylindrical);
   return Result<AssemblyJointType>::failure(json_error("unsupported assembly joint type"));
 }
 
@@ -269,17 +273,20 @@ assembly_constraint_from_json(const json& constraint_json) {
 }
 
 [[nodiscard]] json assembly_joint_to_json(const AssemblyJoint& joint) {
-  return json{
+  json result{
       {"id", joint.id().value()},
       {"name", joint.name()},
       {"type", std::string(to_string(joint.type()))},
       {"target_a", constraint_target_to_json(joint.target_a())},
       {"target_b", constraint_target_to_json(joint.target_b())},
       {"state", std::string(to_string(joint.state()))},
-      {"coordinates", detail::assembly_joint_coordinate_slots_to_json(joint.coordinate_slots())},
-      {"limits", json{{"lower", angle_quantity_to_json(joint.limits().lower_deg)},
-                      {"upper", angle_quantity_to_json(joint.limits().upper_deg)}}},
-      {"coordinate", angle_quantity_to_json(joint.coordinate_deg())}};
+      {"coordinates", detail::assembly_joint_coordinate_slots_to_json(joint.coordinate_slots())}};
+  if (joint.type() == AssemblyJointType::Revolute) {
+    result["limits"] = json{{"lower", angle_quantity_to_json(joint.limits().lower_deg)},
+                            {"upper", angle_quantity_to_json(joint.limits().upper_deg)}};
+    result["coordinate"] = angle_quantity_to_json(joint.coordinate_deg());
+  }
+  return result;
 }
 
 [[nodiscard]] Result<AssemblyJoint> assembly_joint_from_json(const json& joint_json) {
@@ -306,6 +313,10 @@ assembly_constraint_from_json(const json& constraint_json) {
 
   std::optional<AssemblyJoint> legacy_joint;
   if (has_legacy_limits) {
+    if (type.value() != AssemblyJointType::Revolute) {
+      return Result<AssemblyJoint>::failure(
+          json_error("legacy assembly joint fields are valid only for Revolute joints"));
+    }
     const json& limits = joint_json.at("limits");
     auto lower = angle_quantity_from_json(limits.at("lower"), id, "assembly joint lower limit");
     if (lower.has_error())
@@ -317,10 +328,10 @@ assembly_constraint_from_json(const json& constraint_json) {
         angle_quantity_from_json(joint_json.at("coordinate"), id, "assembly joint coordinate");
     if (coordinate.has_error())
       return Result<AssemblyJoint>::failure(coordinate.error());
-    auto created = AssemblyJoint::create(
-        AssemblyJointId(id), joint_json.at("name").get<std::string>(), type.value(),
-        target_a.value(), target_b.value(), state.value(), lower.value(), upper.value(),
-        coordinate.value());
+    auto created =
+        AssemblyJoint::create(AssemblyJointId(id), joint_json.at("name").get<std::string>(),
+                              type.value(), target_a.value(), target_b.value(), state.value(),
+                              lower.value(), upper.value(), coordinate.value());
     if (created.has_error())
       return created;
     legacy_joint = created.value();
@@ -337,10 +348,10 @@ assembly_constraint_from_json(const json& constraint_json) {
   auto slots = detail::assembly_joint_coordinate_slots_from_json(joint_json.at("coordinates"), id);
   if (slots.has_error())
     return Result<AssemblyJoint>::failure(slots.error());
-  auto joint = AssemblyJoint::create(
-      AssemblyJointId(id), joint_json.at("name").get<std::string>(), type.value(),
-      std::move(target_a.value()), std::move(target_b.value()), state.value(),
-      std::move(slots.value()));
+  auto joint =
+      AssemblyJoint::create(AssemblyJointId(id), joint_json.at("name").get<std::string>(),
+                            type.value(), std::move(target_a.value()), std::move(target_b.value()),
+                            state.value(), std::move(slots.value()));
   if (joint.has_error())
     return joint;
   if (legacy_joint && legacy_joint->coordinate_slots() != joint.value().coordinate_slots()) {

@@ -2,6 +2,7 @@
 
 #include "blcad/geometry/assembly_hierarchy_revolute_joint_equation_builder.hpp"
 #include "blcad/geometry/assembly_joint_target_compatibility.hpp"
+#include "blcad/geometry/assembly_prismatic_joint_equation_builder.hpp"
 #include "blcad/geometry/assembly_revolute_joint_equation_builder.hpp"
 
 #include <catch2/catch_approx.hpp>
@@ -140,6 +141,49 @@ TEST_CASE("Joint target compatibility freezes oriented Frame requirements",
   REQUIRE(axis_axis.has_error());
   CHECK(axis_axis.error().object_id() == kCompatibilityObjectId);
   CHECK(axis_axis.error().message().find("reference X direction") != std::string::npos);
+}
+
+TEST_CASE("Prismatic Frame equations preserve orientation and drive signed axial translation",
+          "[geometry][assembly-prismatic-joint]") {
+  const AssemblyJointTargetCompatibilityResolver compatibility;
+  REQUIRE(compatibility.resolve(AssemblyJointType::Prismatic, frame_target("frame.a"),
+                                frame_target("frame.b")));
+  CHECK(compatibility
+            .resolve(AssemblyJointType::Prismatic, axis_target("axis.a"), axis_target("axis.b"))
+            .has_error());
+  REQUIRE(compatibility.resolve(AssemblyJointType::Cylindrical, frame_target("frame.a"),
+                                frame_target("frame.b")));
+  CHECK(compatibility
+            .resolve(AssemblyJointType::Cylindrical, axis_target("axis.a"), axis_target("axis.b"))
+            .has_error());
+
+  auto requested = Quantity::linear_displacement_mm(15.0, "joint.slider");
+  REQUIRE(requested);
+  auto target_b = frame_target("frame.b");
+  std::get<AssemblyFrameTargetDescriptor>(target_b.descriptor).origin.z = 15.0;
+  const AssemblyPrismaticJointEquationBuilder builder;
+  auto equation = builder.build(AssemblyJointId("joint.slider"), AssemblyJointType::Prismatic,
+                                frame_target("frame.a"), target_b, requested.value());
+  REQUIRE(equation);
+  CHECK(equation.value().requested_translation_mm == 15.0);
+  CHECK(equation.value().residual.direction_alignment == Vector3{});
+  CHECK(equation.value().residual.transverse_offset_mm == Vector3{});
+  CHECK(equation.value().residual.orientation_alignment_sine == Approx(0.0));
+  CHECK(equation.value().residual.orientation_alignment_cosine == Approx(0.0));
+  CHECK(equation.value().residual.translation_error_mm == Approx(0.0));
+}
+
+TEST_CASE("Prismatic root-space equations use the shared signed translation convention",
+          "[geometry][assembly-cross-hierarchy-prismatic-motion]") {
+  auto requested = Quantity::linear_displacement_mm(-8.0, "joint.cross.slider");
+  REQUIRE(requested);
+  auto target_b = frame_target("frame.b");
+  std::get<AssemblyFrameTargetDescriptor>(target_b.descriptor).origin.z = -8.0;
+  const AssemblyPrismaticJointEquationBuilder builder;
+  auto equation = builder.build(AssemblyJointId("joint.cross.slider"), AssemblyJointType::Prismatic,
+                                frame_target("frame.a"), target_b, requested.value());
+  REQUIRE(equation);
+  CHECK(equation.value().residual.translation_error_mm == Approx(0.0));
 }
 
 TEST_CASE("Revolute equations consume compatibility before Frame projection",

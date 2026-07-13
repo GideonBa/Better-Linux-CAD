@@ -4,7 +4,7 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 43
+implemented_through: Block 45
 current_block: 44
 current_boundary: Prismatic joint family across Core, JSON, Geometry, and motion
 current_tag: "[core][assembly-prismatic-joint]"
@@ -531,7 +531,7 @@ Both local and Project-level motion solvers now accept `AssemblyJointDrive` with
 [geometry][assembly-vector-joint-drive-application]
 ```
 
-### Blocks 44–47 — Planned joint continuation
+### Blocks 46–47 — Planned joint continuation
 
 **Status:** Planned
 **Canonical:** roadmap `docs/assembly-general-geometric-target-roadmap.md`
@@ -539,8 +539,6 @@ Both local and Project-level motion solvers now accept `AssemblyJointDrive` with
 Mandatory order:
 
 ```text
-44 Prismatic joint
-45 Cylindrical joint
 46 Planar joint
 47 Ball/Spherical joint
 ```
@@ -583,12 +581,12 @@ After Block 94 the first Part Construction MVP is considered complete. That mean
 
 It does not mean SolidWorks/Inventor Part product parity. Production GUI modeling, Class-A surfacing, arbitrary NURBS control cages, variable-radius fillets, advanced topology healing, direct modeling, sheet metal, weldments, and specialized manufacturing feature systems remain later work.
 
-## Current next technical step — Block 44
+## Block 44 — Prismatic joint family — Implemented
 
-**Status:** Current
+**Status:** Implemented
 **Primary boundary:** One Prismatic family across Core intent, JSON, target compatibility, equations, and shared vector-drive motion.
 
-Block 44 must add:
+Block 44 adds:
 
 ```text
 Prismatic local and Project-level persistent intent
@@ -602,4 +600,15 @@ complete freshness and atomic application
 
 The preferred first target contract is `Frame <-> Frame`; a reduced Axis/Line contract requires an explicit remaining-orientation policy. Authority variables and the shared numeric engine remain unchanged.
 
-**Notes:** Implement Prismatic only. Cylindrical remains Block 45.
+**Status:** Implemented. The canonical contract is `docs/assembly-prismatic-joint-mvp5.md`.
+
+## Block 45 — Cylindrical joint family — Implemented
+
+Block 45 composes bounded Linear `translation` and Angular `rotation` coordinates on the shared
+Frame/Frame, vector-drive, graph, solver, freshness, and atomic application paths. Canonical
+contract: `docs/assembly-cylindrical-joint-mvp5.md`.
+
+## Current next technical step — Block 46
+
+Implement the Planar joint family only with bounded Linear `translation_u`, Linear
+`translation_v`, and Angular `rotation_normal` coordinates. Ball/Spherical remains Block 47.

@@ -306,14 +306,16 @@ Angle          -> require angle, omit distance
 
 Typed Core constructors remain authoritative after JSON parsing. Block 38 adds only the three accepted lowercase type spellings; local and Project-level relationship record shapes, endpoint shapes, target order, and state fields are unchanged. Historical five-family files remain compatible. Block 39 adds equations and solve participation only and makes no persistence, schema, version, or JSON-shape change.
 
-## Local Revolute joint JSON
+## Local joint JSON
 
 Local joint intent is separate from geometric constraints and uses `assembly_joints[]`.
 
-Current supported type:
+Current supported types:
 
 ```text
 revolute
+prismatic
+cylindrical
 ```
 
 Representative record:
@@ -353,9 +355,20 @@ Local joints target distinct local component ids in one containing assembly docu
 
 `coordinates[]` is the canonical Block-42 coordinate representation. Current Revolute writers retain `limits` and scalar `coordinate` additively for older readers.
 
-## Project-level cross-hierarchy Revolute joint JSON
+Prismatic uses the same record envelope with `"type": "prismatic"` and exactly one bounded
+coordinate `{ "role": "translation", "kind": "linear", ... }` whose value and limits use
+`"unit": "mm"`. Revolute-only scalar `limits` and `coordinate` fields are omitted.
+
+Cylindrical uses `"type": "cylindrical"` and two bounded coordinates in canonical order:
+Linear `translation` in `mm`, then Angular `rotation` in `deg`. Revolute-only scalar fields are
+also omitted for Cylindrical.
+
+## Project-level cross-hierarchy joint JSON
 
 `cross_hierarchy_joints[]` is additive Project-level motion intent.
+
+`revolute`, `prismatic`, and `cylindrical` use this endpoint envelope. Project-level coordinate
+signatures are identical to their local family signatures.
 
 Representative record:
 
@@ -404,10 +417,12 @@ Additional rules:
 - canonical roles are `rotation`, `translation`, `translation_u`, `translation_v`, and `rotation_normal`;
 - canonical kinds are `angular` and `linear`, with exact units `deg` and `mm` respectively;
 - slot order is family-defined and persisted unchanged;
-- current Revolute requires exactly one bounded Angular `rotation` slot;
+- Revolute requires exactly one bounded Angular `rotation` slot;
+- Prismatic requires exactly one bounded Linear `translation` slot;
+- Cylindrical requires bounded Linear `translation` then bounded Angular `rotation` slots;
 - readers accept slot-only, historical-only, or exactly matching dual Revolute records;
 - partial legacy fields, conflicting dual records, and duplicate/missing/unknown roles fail closed;
-- only `revolute` is supported in the current cross-hierarchy joint seed;
+- `revolute`, `prismatic`, and `cylindrical` are supported at local and cross-hierarchy scope;
 - state is `active|inactive`;
 - ids are unique inside the Project-level cross-hierarchy joint collection;
 - local document-scoped `AssemblyJointId` values may use the same text;

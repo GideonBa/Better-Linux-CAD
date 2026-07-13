@@ -106,6 +106,10 @@ constexpr int k_version = 1;
   const auto text = value.get<std::string>();
   if (text == "revolute")
     return Result<AssemblyJointType>::success(AssemblyJointType::Revolute);
+  if (text == "prismatic")
+    return Result<AssemblyJointType>::success(AssemblyJointType::Prismatic);
+  if (text == "cylindrical")
+    return Result<AssemblyJointType>::success(AssemblyJointType::Cylindrical);
   return Result<AssemblyJointType>::failure(
       json_error("unsupported cross-hierarchy assembly joint type"));
 }
@@ -229,17 +233,20 @@ cross_hierarchy_constraint_from_json(const json& constraint_json) {
 }
 
 [[nodiscard]] json cross_hierarchy_joint_to_json(const AssemblyHierarchyJoint& joint) {
-  return json{
+  json result{
       {"id", joint.id().value()},
       {"name", joint.name()},
       {"type", std::string(to_string(joint.type()))},
       {"target_a", endpoint_to_json(joint.target_a())},
       {"target_b", endpoint_to_json(joint.target_b())},
       {"state", std::string(to_string(joint.state()))},
-      {"coordinates", detail::assembly_joint_coordinate_slots_to_json(joint.coordinate_slots())},
-      {"limits", json{{"lower", angle_quantity_to_json(joint.limits().lower_deg)},
-                      {"upper", angle_quantity_to_json(joint.limits().upper_deg)}}},
-      {"coordinate", angle_quantity_to_json(joint.coordinate_deg())}};
+      {"coordinates", detail::assembly_joint_coordinate_slots_to_json(joint.coordinate_slots())}};
+  if (joint.type() == AssemblyJointType::Revolute) {
+    result["limits"] = json{{"lower", angle_quantity_to_json(joint.limits().lower_deg)},
+                            {"upper", angle_quantity_to_json(joint.limits().upper_deg)}};
+    result["coordinate"] = angle_quantity_to_json(joint.coordinate_deg());
+  }
+  return result;
 }
 
 [[nodiscard]] Result<AssemblyHierarchyJoint>
@@ -271,6 +278,10 @@ cross_hierarchy_joint_from_json(const json& joint_json) {
 
   std::optional<AssemblyHierarchyJoint> legacy_joint;
   if (has_legacy_limits) {
+    if (type.value() != AssemblyJointType::Revolute) {
+      return Result<AssemblyHierarchyJoint>::failure(
+          json_error("legacy cross-hierarchy joint fields are valid only for Revolute joints"));
+    }
     const json& limits = joint_json.at("limits");
     auto lower = angle_quantity_from_json(limits.at("lower"), id,
                                           "cross-hierarchy assembly joint lower limit");

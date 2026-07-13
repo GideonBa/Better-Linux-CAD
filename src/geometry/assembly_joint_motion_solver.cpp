@@ -102,6 +102,10 @@ AssemblyJointMotionSolver::move(const Project& project, AssemblyJointId joint_id
         validation_error(joint_id.value(), "revolute joint motion coordinate must use degrees"));
   }
   const AssemblyJoint* joint = project.assembly().find_joint(joint_id);
+  if (joint != nullptr && joint->type() != AssemblyJointType::Revolute) {
+    return Result<AssemblyJointMotionResult>::failure(validation_error(
+        joint_id.value(), "scalar joint motion overload supports only Revolute joints"));
+  }
   if (joint != nullptr && (requested_coordinate.degrees() < joint->limits().lower_deg ||
                            requested_coordinate.degrees() > joint->limits().upper_deg)) {
     return Result<AssemblyJointMotionResult>::failure(validation_error(
@@ -130,22 +134,25 @@ AssemblyJointMotionSolver::move(const Project& project, AssemblyJointDrive drive
         validation_error(joint_id.value(), "assembly joint must exist in project assembly"));
   }
   if (joint->state() != AssemblyJointState::Active) {
-    return Result<AssemblyJointMotionResult>::failure(
-        validation_error(joint_id.value(), "revolute joint motion requires an active joint"));
-  }
-  if (joint->type() != AssemblyJointType::Revolute) {
-    return Result<AssemblyJointMotionResult>::failure(
-        validation_error(joint_id.value(), "joint motion seed supports only Revolute joints"));
+    return Result<AssemblyJointMotionResult>::failure(validation_error(
+        joint_id.value(), joint->type() == AssemblyJointType::Revolute
+                              ? "revolute joint motion requires an active joint"
+                          : joint->type() == AssemblyJointType::Prismatic
+                              ? "prismatic joint motion requires an active joint"
+                              : "cylindrical joint motion requires an active joint"));
   }
 
   auto selected_drive = detail::resolve_joint_drive(*joint, drive);
   if (selected_drive.has_error())
     return Result<AssemblyJointMotionResult>::failure(selected_drive.error());
-  auto requested_rotation =
-      detail::revolute_rotation_degrees(selected_drive.value().complete_coordinates, joint_id);
-  if (requested_rotation.has_error())
-    return Result<AssemblyJointMotionResult>::failure(requested_rotation.error());
-  const double requested_deg = requested_rotation.value();
+  double requested_deg = 0.0;
+  if (joint->type() == AssemblyJointType::Revolute) {
+    auto requested_rotation =
+        detail::revolute_rotation_degrees(selected_drive.value().complete_coordinates, joint_id);
+    if (requested_rotation.has_error())
+      return Result<AssemblyJointMotionResult>::failure(requested_rotation.error());
+    requested_deg = requested_rotation.value();
+  }
 
   const ComponentInstance* target_a =
       project.assembly().find_component_instance(joint->target_a().component_instance());
@@ -153,13 +160,14 @@ AssemblyJointMotionSolver::move(const Project& project, AssemblyJointDrive drive
       project.assembly().find_component_instance(joint->target_b().component_instance());
   if (target_a == nullptr || target_b == nullptr) {
     return Result<AssemblyJointMotionResult>::failure(
-        validation_error(joint_id.value(), "revolute joint motion target components must exist"));
+        validation_error(joint_id.value(), std::string(to_string(joint->type())) +
+                                               " joint motion target components must exist"));
   }
   if (target_a->suppression_state() == ComponentSuppressionState::Suppressed ||
       target_b->suppression_state() == ComponentSuppressionState::Suppressed) {
-    return Result<AssemblyJointMotionResult>::failure(
-        validation_error(joint_id.value(),
-                         "revolute joint motion requires active non-suppressed target components"));
+    return Result<AssemblyJointMotionResult>::failure(validation_error(
+        joint_id.value(), std::string(to_string(joint->type())) +
+                              " joint motion requires active non-suppressed target components"));
   }
 
   auto constraint_graph = AssemblyConstraintGraph::build(project.assembly());
@@ -187,7 +195,7 @@ AssemblyJointMotionSolver::move(const Project& project, AssemblyJointDrive drive
     return Result<AssemblyJointMotionResult>::failure(constraint_ids.error());
   }
 
-  std::vector<detail::AssemblyRevoluteJointDrive> drives;
+  std::vector<detail::AssemblyNumericJointDrive> drives;
   std::vector<AssemblyJointMotionInputSnapshot> joint_snapshots;
   for (const auto& edge : joint_graph.value().edges()) {
     if (!contains_component(active_subgroup, edge.component_a()) ||
@@ -199,13 +207,15 @@ AssemblyJointMotionSolver::move(const Project& project, AssemblyJointDrive drive
       return Result<AssemblyJointMotionResult>::failure(validation_error(
           edge.joint().value(), "active joint graph edge must resolve to assembly joint intent"));
     }
-    if (active_joint->type() != AssemblyJointType::Revolute) {
-      return Result<AssemblyJointMotionResult>::failure(validation_error(
-          active_joint->id().value(), "joint motion seed supports only Revolute joints"));
+    std::vector<AssemblyJointCoordinateDrive> coordinates;
+    if (active_joint->id() == joint_id) {
+      coordinates = selected_drive.value().complete_coordinates;
+    } else {
+      coordinates.reserve(active_joint->coordinate_slots().size());
+      for (const auto& slot : active_joint->coordinate_slots())
+        coordinates.push_back({slot.role(), slot.value()});
     }
-    drives.push_back(detail::AssemblyRevoluteJointDrive{
-        active_joint->id(),
-        active_joint->id() == joint_id ? requested_deg : active_joint->coordinate_deg()});
+    drives.push_back(detail::AssemblyNumericJointDrive{active_joint->id(), std::move(coordinates)});
     joint_snapshots.push_back(make_joint_snapshot(*active_joint));
   }
 
@@ -252,7 +262,8 @@ AssemblyJointMotionResultApplier::apply(Project& project,
 
     if (snapshot.joint == result.joint) {
       selected_joint_snapshot_found = true;
-      if (snapshot.coordinate_deg != result.source_coordinate_deg) {
+      if (snapshot.type == AssemblyJointType::Revolute &&
+          snapshot.coordinate_deg != result.source_coordinate_deg) {
         return Result<std::size_t>::failure(validation_error(
             result.joint.value(), "joint motion result selected joint snapshot is inconsistent"));
       }
@@ -281,12 +292,14 @@ AssemblyJointMotionResultApplier::apply(Project& project,
     return Result<std::size_t>::failure(validation_error(
         result.joint.value(), "joint motion result selected drive order is not canonical"));
   }
-  auto requested_rotation =
-      detail::revolute_rotation_degrees(selected_drive.value().complete_coordinates, result.joint);
-  if (requested_rotation.has_error() ||
-      requested_rotation.value() != result.requested_coordinate_deg) {
-    return Result<std::size_t>::failure(validation_error(
-        result.joint.value(), "joint motion result selected drive snapshot is inconsistent"));
+  if (selected_joint->type() == AssemblyJointType::Revolute) {
+    auto requested_rotation = detail::revolute_rotation_degrees(
+        selected_drive.value().complete_coordinates, result.joint);
+    if (requested_rotation.has_error() ||
+        requested_rotation.value() != result.requested_coordinate_deg) {
+      return Result<std::size_t>::failure(validation_error(
+          result.joint.value(), "joint motion result selected drive snapshot is inconsistent"));
+    }
   }
 
   Project candidate_project = project;
