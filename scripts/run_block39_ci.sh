@@ -10,7 +10,7 @@ report_failure() {
       echo 'Block 39 verification failed.'
       echo
       echo '```text'
-      tail -n 360 /tmp/block39-ci.log || true
+      tail -n 380 /tmp/block39-ci.log || true
       echo '```'
     } > /tmp/block39-comment.md
     gh pr comment 36 --repo "$GITHUB_REPOSITORY" --body-file /tmp/block39-comment.md || true
@@ -71,6 +71,7 @@ python3 scripts/normalize_block39.py
 python3 scripts/normalize_block39_builder_returns.py
 python3 scripts/normalize_block39_diagnostics_tests.py
 python3 scripts/normalize_block39_synthetic_targets.py
+python3 scripts/normalize_block39_solver_assertions.py
 
 sudo apt-get update
 sudo apt-get install -y build-essential cmake ninja-build pkg-config git clang-format clang-tidy \
@@ -122,6 +123,7 @@ rm scripts/normalize_block39.py \
    scripts/normalize_block39_builder_returns.py \
    scripts/normalize_block39_diagnostics_tests.py \
    scripts/normalize_block39_synthetic_targets.py \
+   scripts/normalize_block39_solver_assertions.py \
    scripts/run_block39_ci.sh
 
 git diff --check
@@ -134,6 +136,7 @@ test ! -e scripts/normalize_block39_core_tests.py
 test ! -e scripts/normalize_block39_builder_returns.py
 test ! -e scripts/normalize_block39_diagnostics_tests.py
 test ! -e scripts/normalize_block39_synthetic_targets.py
+test ! -e scripts/normalize_block39_solver_assertions.py
 test ! -e scripts/run_block39_ci.sh
 test ! -e .github/workflows/block39-patch.yml
 grep -R "AssemblyGenericRelationshipEquationBuilder" -n include src tests
