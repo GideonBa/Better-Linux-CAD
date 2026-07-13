@@ -55,7 +55,8 @@ adds explicit NewBody/Join/Cut/Intersect result intent; Block 51 persists that c
 `body:<BodyId>` producer/consumer chains to invalidation and recompute planning. Block 52 executes
 NewBody/Cut results into deterministic Body-scoped cache entries without moving shape identity into
 Core. Block 53 exposes those products through checked Body metadata/summary inspection and rejects
-ambiguous historical final-shape consumption.
+ambiguous historical final-shape consumption. Block 54 adds persistent BodyBooleanFeature intent,
+JSON, and target/tool/result graph authority; Geometry execution remains Block 55.
 
 `Project` owns:
 
@@ -558,11 +559,12 @@ Canonical numbered sequence:
 - `docs/part-feature-body-dependency-mvp6.md`
 - `docs/part-multi-body-recompute-mvp6.md`
 - `docs/part-multi-body-inspection-mvp6.md`
+- `docs/part-body-boolean-mvp6.md`
 - `docs/step-import-sequence-mvp7.md`
 
-Block 47 Spherical completes the Assembly MVP sequence. Blocks 48–53 Body identity, persistent
-feature Body-result operations, body-scoped recompute, and checked result inspection are
-implemented. The next technical step is Block 54 BodyBooleanFeature Core intent and JSON.
+Block 47 Spherical completes the Assembly MVP sequence. Blocks 48–54 Body identity, body-scoped
+recompute/inspection, and persistent BodyBooleanFeature intent are implemented. The next technical
+step is Block 55 Body boolean Geometry and recompute.
 
 Block 47 adds passive Point/Point Spherical intent through the shared local/root-space path. Scalar
 Revolute APIs remain adapters; transform variables and the shared numeric engine are unchanged.

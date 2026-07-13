@@ -71,5 +71,5 @@ and all structural failures listed above.
 
 ## Handoff
 
-Blocks 50–53 feature Body-operation intent, dependencies, multi-body recompute, and checked
-inspection are implemented. Block 54 now adds BodyBooleanFeature Core intent and JSON.
+Blocks 50–54 feature Body-operation intent, multi-body recompute/inspection, and BodyBooleanFeature
+Core intent are implemented. Block 55 now executes Body booleans in Geometry.

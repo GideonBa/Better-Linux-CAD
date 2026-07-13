@@ -668,6 +668,29 @@ missing Body IDs, duplicate producers, and dependency cycles fail closed. Histor
 all three fields absent restore the exact null Body context and synthesize nothing. Geometry,
 `ShapeCache`, and raw OCCT shapes remain outside the save format.
 
+Block 54 adds the always-emitted, optional-on-read top-level `body_booleans` array:
+
+```json
+{
+  "body_booleans": [
+    {
+      "id": "boolean.subtract_tool",
+      "operation": "subtract",
+      "target_body": "body.base",
+      "tool_bodies": ["body.tool"],
+      "result_mode": "modify_target",
+      "keep_tool_bodies": false
+    }
+  ]
+}
+```
+
+Operations are `add`, `subtract`, or `intersect`; result modes are `modify_target` or `new_body`.
+`new_body` additionally requires `produced_body`, while `modify_target` forbids it. Tool IDs are
+serialized in canonical lexicographic order. Target/tool/result references, Feature ID uniqueness,
+producer/cycle rules, and the Boolean structural rules fail closed during load. Historical files
+without the array restore zero BodyBooleanFeature records.
+
 ## Planned STEP import persistence after Block 94
 
 This section is planned architecture, not part of the current schema. Blocks 95–101 in

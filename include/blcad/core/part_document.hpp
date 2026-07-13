@@ -1,6 +1,7 @@
 #pragma once
 
 #include "blcad/core/body.hpp"
+#include "blcad/core/body_boolean_feature.hpp"
 #include "blcad/core/construction_geometry.hpp"
 #include "blcad/core/datum_axis.hpp"
 #include "blcad/core/datum_plane.hpp"
@@ -41,6 +42,7 @@ public:
   [[nodiscard]] Result<std::size_t> add_derived_workplane(DerivedWorkplane workplane);
   [[nodiscard]] Result<std::size_t> add_sketch(Sketch sketch);
   [[nodiscard]] Result<std::size_t> add_feature(Feature feature);
+  [[nodiscard]] Result<std::size_t> add_body_boolean_feature(BodyBooleanFeature feature);
   [[nodiscard]] Result<std::size_t> add_body(Body body);
   [[nodiscard]] Result<std::size_t> remove_body(BodyId id);
   [[nodiscard]] Result<std::size_t> set_body_visibility(BodyId id, BodyVisibility visibility);
@@ -77,6 +79,7 @@ public:
   [[nodiscard]] const std::vector<DerivedWorkplane>& derived_workplanes() const noexcept;
   [[nodiscard]] const std::vector<Sketch>& sketches() const noexcept;
   [[nodiscard]] const std::vector<Feature>& features() const noexcept;
+  [[nodiscard]] const std::vector<BodyBooleanFeature>& body_boolean_features() const noexcept;
   // Body order is canonical lexicographic BodyId order, independent of insertion order.
   [[nodiscard]] const std::vector<Body>& bodies() const noexcept;
   [[nodiscard]] const std::vector<ReferenceStatusRecord>& reference_statuses() const noexcept;
@@ -94,6 +97,7 @@ public:
   [[nodiscard]] std::size_t derived_workplane_count() const noexcept;
   [[nodiscard]] std::size_t sketch_count() const noexcept;
   [[nodiscard]] std::size_t feature_count() const noexcept;
+  [[nodiscard]] std::size_t body_boolean_feature_count() const noexcept;
   [[nodiscard]] std::size_t body_count() const noexcept;
   [[nodiscard]] std::size_t reference_status_count() const noexcept;
   [[nodiscard]] std::size_t reference_remap_count() const noexcept;
@@ -112,6 +116,7 @@ public:
   [[nodiscard]] const DerivedWorkplane* find_derived_workplane(DatumPlaneId id) const noexcept;
   [[nodiscard]] const Sketch* find_sketch(SketchId id) const noexcept;
   [[nodiscard]] const Feature* find_feature(FeatureId id) const noexcept;
+  [[nodiscard]] const BodyBooleanFeature* find_body_boolean_feature(FeatureId id) const noexcept;
   [[nodiscard]] const Body* find_body(BodyId id) const noexcept;
   [[nodiscard]] const ReferenceStatusRecord*
   find_reference_status(ReferenceStatusId id) const noexcept;
@@ -136,6 +141,8 @@ private:
   [[nodiscard]] bool has_derived_workplane_id(const DatumPlaneId& id) const noexcept;
   [[nodiscard]] bool has_sketch_id(const SketchId& id) const noexcept;
   [[nodiscard]] bool has_feature_id(const FeatureId& id) const noexcept;
+  [[nodiscard]] bool has_body_boolean_feature_id(const FeatureId& id) const noexcept;
+  [[nodiscard]] bool has_any_feature_id(const FeatureId& id) const noexcept;
   [[nodiscard]] bool has_body_id(const BodyId& id) const noexcept;
   [[nodiscard]] bool has_reference_status_id(const ReferenceStatusId& id) const noexcept;
   [[nodiscard]] bool has_reference_remap_id(const ReferenceRemapId& id) const noexcept;
@@ -152,6 +159,7 @@ private:
   std::vector<DerivedWorkplane> derived_workplanes_;
   std::vector<Sketch> sketches_;
   std::vector<Feature> features_;
+  std::vector<BodyBooleanFeature> body_boolean_features_;
   std::vector<Body> bodies_;
   std::vector<ReferenceStatusRecord> reference_statuses_;
   std::vector<ReferenceRemapRecord> reference_remaps_;

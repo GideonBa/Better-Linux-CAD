@@ -111,4 +111,4 @@ Slots now serialize additively for local and Project-level joints with canonical
 
 Block 43 vector motion drives, Blocks 44–46 Prismatic/Cylindrical/Planar execution, and Block 47
 passive Spherical with an empty family slot signature are implemented in their canonical documents.
-Blocks 48–53 Body identity, persistent feature Body-result operations, body-scoped recompute, and checked inspection are implemented. The next technical step is Block 54 BodyBooleanFeature Core intent and JSON.
+Blocks 48–54 Body identity, body-scoped recompute/inspection, and BodyBooleanFeature Core intent are implemented. The next technical step is Block 55 Body boolean Geometry and recompute.

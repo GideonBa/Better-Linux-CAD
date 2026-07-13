@@ -828,7 +828,7 @@ Result<std::size_t> PartDocument::add_sketch(Sketch sketch) {
 }
 
 Result<std::size_t> PartDocument::add_feature(Feature feature) {
-  if (has_feature_id(feature.id()))
+  if (has_any_feature_id(feature.id()))
     return Result<std::size_t>::failure(
         Error::validation(feature.id().value(), "feature id must be unique within part document"));
   if (!has_sketch_id(feature.input_sketch()))
@@ -912,6 +912,67 @@ Result<std::size_t> PartDocument::add_feature(Feature feature) {
   return Result<std::size_t>::success(features_.size() - 1U);
 }
 
+Result<std::size_t> PartDocument::add_body_boolean_feature(BodyBooleanFeature feature) {
+  if (has_any_feature_id(feature.id()))
+    return Result<std::size_t>::failure(
+        Error::validation(feature.id().value(), "feature id must be unique within part document"));
+  if (!has_body_id(feature.target_body()))
+    return Result<std::size_t>::failure(Error::validation(
+        feature.id().value(), "body boolean target body must exist in part document"));
+  for (const BodyId& tool : feature.tool_bodies())
+    if (!has_body_id(tool))
+      return Result<std::size_t>::failure(Error::validation(
+          feature.id().value(), "body boolean tool bodies must exist in part document"));
+  if (!has_body_id(feature.effective_result_body()))
+    return Result<std::size_t>::failure(Error::validation(
+        feature.id().value(), "body boolean result body must exist in part document"));
+
+  auto graph = dependency_graph_;
+  auto added_node = graph.add_node(feature.id().value());
+  if (added_node.has_error())
+    return Result<std::size_t>::failure(added_node.error());
+
+  const std::string result_node = body_dependency_node_id(feature.effective_result_body());
+  if (feature.result_mode() == BodyBooleanResultMode::ModifyTarget) {
+    const auto previous_producers = dependency_sources_of(graph, result_node);
+    graph.remove_dependencies_of_dependent(result_node);
+    for (const auto& producer : previous_producers) {
+      auto dependency = add_dependency_if_missing(graph, producer, feature.id().value());
+      if (dependency.has_error())
+        return Result<std::size_t>::failure(dependency.error());
+    }
+  } else {
+    if (!dependency_sources_of(graph, result_node).empty())
+      return Result<std::size_t>::failure(Error::dependency(
+          feature.id().value(), "body boolean result body already has a producing feature"));
+    auto target_dependency = add_dependency_if_missing(
+        graph, body_dependency_node_id(feature.target_body()), feature.id().value());
+    if (target_dependency.has_error())
+      return Result<std::size_t>::failure(target_dependency.error());
+  }
+
+  for (const BodyId& tool : feature.tool_bodies()) {
+    auto tool_dependency =
+        add_dependency_if_missing(graph, body_dependency_node_id(tool), feature.id().value());
+    if (tool_dependency.has_error())
+      return Result<std::size_t>::failure(tool_dependency.error());
+  }
+  auto result_dependency = add_dependency_if_missing(graph, feature.id().value(), result_node);
+  if (result_dependency.has_error())
+    return Result<std::size_t>::failure(result_dependency.error());
+  if (graph.has_cycle())
+    return Result<std::size_t>::failure(Error::dependency(
+        feature.id().value(), "body boolean feature must not create a dependency cycle"));
+
+  auto invalidation_state = invalidation_state_;
+  auto synced = sync_graph(std::move(graph), invalidation_state, dependency_graph_);
+  if (synced.has_error())
+    return Result<std::size_t>::failure(synced.error());
+  invalidation_state_ = std::move(invalidation_state);
+  body_boolean_features_.push_back(std::move(feature));
+  return Result<std::size_t>::success(body_boolean_features_.size() - 1U);
+}
+
 Result<std::size_t> PartDocument::add_body(Body body) {
   if (has_body_id(body.id())) {
     return Result<std::size_t>::failure(
@@ -951,6 +1012,13 @@ Result<std::size_t> PartDocument::remove_body(BodyId id) {
     const auto& context = feature.body_result_context().value();
     if ((context.target_body().has_value() && context.target_body().value() == id) ||
         context.effective_produced_body() == id)
+      return Result<std::size_t>::failure(
+          Error::dependency(id.value(), "body with dependent model intent cannot be removed"));
+  }
+  for (const auto& feature : body_boolean_features_) {
+    if (feature.target_body() == id || feature.effective_result_body() == id ||
+        std::find(feature.tool_bodies().begin(), feature.tool_bodies().end(), id) !=
+            feature.tool_bodies().end())
       return Result<std::size_t>::failure(
           Error::dependency(id.value(), "body with dependent model intent cannot be removed"));
   }
@@ -1089,7 +1157,7 @@ Result<std::vector<std::string>> PartDocument::mark_feature_changed(FeatureId id
   if (id.empty())
     return Result<std::vector<std::string>>::failure(
         Error::validation("feature", "feature id must not be empty"));
-  if (!has_feature_id(id))
+  if (!has_any_feature_id(id))
     return Result<std::vector<std::string>>::failure(
         Error::validation(id.value(), "feature must exist in part document"));
   return invalidation_state_.mark_changed(dependency_graph_, id.value());
@@ -1258,6 +1326,9 @@ const std::vector<Sketch>& PartDocument::sketches() const noexcept {
 const std::vector<Feature>& PartDocument::features() const noexcept {
   return features_;
 }
+const std::vector<BodyBooleanFeature>& PartDocument::body_boolean_features() const noexcept {
+  return body_boolean_features_;
+}
 const std::vector<Body>& PartDocument::bodies() const noexcept {
   return bodies_;
 }
@@ -1303,6 +1374,9 @@ std::size_t PartDocument::sketch_count() const noexcept {
 }
 std::size_t PartDocument::feature_count() const noexcept {
   return features_.size();
+}
+std::size_t PartDocument::body_boolean_feature_count() const noexcept {
+  return body_boolean_features_.size();
 }
 std::size_t PartDocument::body_count() const noexcept {
   return bodies_.size();
@@ -1378,6 +1452,12 @@ const Feature* PartDocument::find_feature(FeatureId id) const noexcept {
       return &feature;
   return nullptr;
 }
+const BodyBooleanFeature* PartDocument::find_body_boolean_feature(FeatureId id) const noexcept {
+  for (const auto& feature : body_boolean_features_)
+    if (feature.id() == id)
+      return &feature;
+  return nullptr;
+}
 const Body* PartDocument::find_body(BodyId id) const noexcept {
   const auto found = std::lower_bound(
       bodies_.begin(), bodies_.end(), id.value(),
@@ -1439,6 +1519,12 @@ bool PartDocument::has_sketch_id(const SketchId& id) const noexcept {
 }
 bool PartDocument::has_feature_id(const FeatureId& id) const noexcept {
   return find_feature(id) != nullptr;
+}
+bool PartDocument::has_body_boolean_feature_id(const FeatureId& id) const noexcept {
+  return find_body_boolean_feature(id) != nullptr;
+}
+bool PartDocument::has_any_feature_id(const FeatureId& id) const noexcept {
+  return has_feature_id(id) || has_body_boolean_feature_id(id);
 }
 bool PartDocument::has_body_id(const BodyId& id) const noexcept {
   return find_body(id) != nullptr;

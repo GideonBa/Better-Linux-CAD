@@ -1,6 +1,6 @@
 # JSON Serialization
 
-Status: core serialization for `PartDocument` model intent, including file-level helpers, persistent Solid/Surface Body records, Feature Body-result operations, derived workplanes, line-based closed sketch profiles, arc closed profiles, spline curve segments, tangent-continuity metadata, composite closed profiles with inner contours, explicit construction geometry, relation-driven construction geometry, chained construction relations, semantic generated edge/vertex references, projected sketch reference entities, reference-driven sketch constraints, reference-generated sketch helper lines, sketch geometric constraints, sketch driving dimensions, generated-region profile selections, reference recovery metadata, reference remap records, and sketch-origin override records.
+Status: core serialization for `PartDocument` model intent, including file-level helpers, persistent Solid/Surface Body records, Feature Body-result operations, Body-Boolean intent, derived workplanes, line-based closed sketch profiles, arc closed profiles, spline curve segments, tangent-continuity metadata, composite closed profiles with inner contours, explicit construction geometry, relation-driven construction geometry, chained construction relations, semantic generated edge/vertex references, projected sketch reference entities, reference-driven sketch constraints, reference-generated sketch helper lines, sketch geometric constraints, sketch driving dimensions, generated-region profile selections, reference recovery metadata, reference remap records, and sketch-origin override records.
 
 The JSON serialization layer persists model intent only. It does not serialize OCCT shapes, `GeometryShape`, `ShapeCache` contents, raw face IDs, raw edge IDs, raw vertex IDs, BRep handles, resolved projected coordinates, solver state, automatic region-search caches, trim-solver caches, tessellated arc caches, tessellated spline caches, tangent-solver caches, or exported STEP data.
 
@@ -52,6 +52,8 @@ The current JSON format stores:
 - circle profiles
 - line-based closed profiles
 - additive and subtractive extrude features
+- Body-Boolean intent for `add`, `subtract`, and `intersect`, including target/tool Bodies,
+  result mode, optional result Body, and tool-retention policy
 
 The current JSON format does not store final BRep geometry, ShapeCache contents, exported STEP data, GUI state, full sketch solver state, resolved projection caches, automatic region-search caches, automatic topology matching state, general relation collections independent from construction objects, or assembly data.
 
@@ -59,6 +61,12 @@ Block 51 now stores explicit Feature Body-result context through optional `opera
 `target_body`, and `produced_body` fields. Existing Feature records with all three absent restore a
 null Body context and retain their historical single-final-shape compatibility behavior. Exact
 combinations and failure policy are canonical in `docs/part-feature-body-dependency-mvp6.md`.
+
+Block 54 adds the top-level `body_booleans` array. It is optional when reading older files and is
+always emitted when writing. Deserialization restores every record through the validated
+`PartDocument::add_body_boolean_feature()` path; Boolean BRep results remain outside the file and
+are deferred to the Block-55 Geometry executor. The canonical contract is documented in
+`docs/part-body-boolean-mvp6.md`.
 
 ## Bodies
 

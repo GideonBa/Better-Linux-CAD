@@ -90,6 +90,11 @@ PartDocument::mark_body_changed(body.base)
 Dirty `body:<BodyId>` nodes are included in topological order. They remain planning records in Core;
 Blocks 52–53 supply body-scoped ShapeCache execution and public checked inspection.
 
+Block 54 also registers Body-Boolean feature nodes in the same graph. Target and tool Bodies feed
+the Boolean node, and the node feeds either the modified target Body or a distinct result Body.
+Consequently, invalidation and recompute planning already order Boolean work deterministically;
+actual OCCT Boolean execution is the Block-55 boundary.
+
 `PartDocument::mark_all_clean()` indirectly clears the plan because no `dirty` nodes remain afterward.
 
 ## Error behavior
@@ -112,16 +117,18 @@ Current tests check:
 - `PartDocument` creates a plan from its internal state
 - `PartDocument::mark_all_clean()` leads to an empty plan
 - Body producer/consumer chains yield deterministic Feature/Body step order
+- Body-Boolean target/tool/result chains yield deterministic invalidation and plan order
 
 ## Connection to geometry
 
 The first geometry adapter for rectangle extrusion, a small `ShapeCache`, and a narrow
 `AdditiveExtrude` execution exist in the optional target `blcad_geometry`. The recompute plan remains
-separate and now also describes Body-state work. Block 52 executes that work.
+separate and now also describes Body-state work. Blocks 52–53 execute and inspect the existing
+Body-scoped extrude path; Block 55 will execute the Boolean steps introduced by Block 54.
 
 Next steps may use the plan but should stay small:
 
-- execute Body-scoped Feature/Body steps
+- execute Body-Boolean Feature/Body steps
 - update deterministic Body entries in a generalized `ShapeCache`
 - continue to use OCCT only behind `blcad_geometry`
 - do not build a GUI yet

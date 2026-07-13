@@ -43,6 +43,7 @@ add_library(
   src/core/assembly_reference_target.cpp
   src/core/assembly_subassembly_instances.cpp
   src/core/body.cpp
+  src/core/body_boolean_feature.cpp
   src/core/composite_closed_profile.cpp
   src/core/construction_geometry.cpp
   src/core/datum_axis.cpp
@@ -260,6 +261,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/assembly_reference_target_json_tests.cpp
     tests/core/assembly_reference_target_tests.cpp
     tests/core/body_tests.cpp
+    tests/core/body_boolean_feature_tests.cpp
     tests/core/body_json_tests.cpp
     tests/core/chained_construction_relation_tests.cpp
     tests/core/circular_hole_pattern_tests.cpp

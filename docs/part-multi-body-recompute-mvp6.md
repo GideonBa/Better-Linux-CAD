@@ -56,5 +56,5 @@ target-shape failure, and disabled final-shape compatibility for a multi-body do
 
 ## Handoff
 
-Block 53 inspection is implemented. Block 54 now introduces persistent BodyBooleanFeature Core
-intent and JSON.
+Blocks 53–54 inspection and BodyBooleanFeature Core intent are implemented. Block 55 now executes
+Body booleans in Geometry.

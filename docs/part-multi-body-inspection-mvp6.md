@@ -55,5 +55,5 @@ Focused acceptance tag:
 
 ## Handoff
 
-Block 54 introduces persistent `BodyBooleanFeature` Core intent and JSON for Add, Subtract, and
-Intersect with deterministic tool Bodies, explicit result identity, and tool-retention semantics.
+Block 54 persistent `BodyBooleanFeature` Core intent and JSON are implemented in
+`docs/part-body-boolean-mvp6.md`. Block 55 now executes that intent in Geometry.

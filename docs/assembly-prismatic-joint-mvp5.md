@@ -56,6 +56,5 @@ coordinate-slot snapshots as the authority.
 ## Block 45 handoff
 
 Blocks 45–47 Cylindrical, Planar, and passive Spherical are implemented in their canonical
-documents. Blocks 48–53 Body identity, persistent feature Body-result operations, body-scoped
-recompute, and checked inspection are implemented; Block 54 BodyBooleanFeature Core intent and JSON
-is the next technical step.
+documents. Blocks 48–54 Body identity, body-scoped recompute/inspection, and BodyBooleanFeature Core
+intent are implemented; Block 55 Body boolean Geometry and recompute is the next technical step.

@@ -1,6 +1,6 @@
 # Feature System
 
-Status: target architecture. MVP-1 implements `AdditiveExtrude` and `SubtractiveExtrude` intent models; line-based closed profiles are supported as first general-profile inputs. The richer feature tree, multi-body part modeling, body transforms, body booleans, path-following features, sweep, and loft remain future blocks.
+Status: target architecture. Additive/Subtractive Extrude, multi-body identity/results, and Block-54 BodyBooleanFeature Core intent are implemented; Body Boolean Geometry is the Block-55 boundary.
 
 Features are the parametric operations a part is built from. Each feature has inputs, parameters, references, and a computed geometry output. The central rule is that a feature stores the *rule* for computing geometry, not only the finished body. The OCCT shape is a cache.
 
@@ -83,7 +83,10 @@ Target behavior:
 - Block 49 persists that seed in deterministic, backward-compatible `bodies[]` JSON.
 - Blocks 50–51 add explicit NewBody/Join/Cut/Intersect Feature result context, compatible JSON,
   target/effective-result Body validation, producer/consumer graph edges, and invalidation.
-- Source features, transform stack, material override, cache key, and recomputable body shapes remain planned.
+- Blocks 52–53 add recomputable Body shapes and checked inspection.
+- Block 54 adds persistent Add/Subtract/Intersect BodyBooleanFeature intent, JSON, graph ordering,
+  invalidation, removal protection, and explicit tool retention.
+- Source-feature catalogs, transform stack, material override, and cache key remain planned.
 - Features support `operation_mode = new_body | join | cut | intersect`.
 - Body transform records support translate, rotate, uniform scale, optional non-uniform scale, and later matrix transforms.
 - Transform order is stored explicitly in a `BodyTransformStack`.
@@ -155,7 +158,7 @@ A feature depends on its input sketch, selected profile region, parameters, targ
 5. Use the implemented Block-52 `ShapeCache` support for multiple body shapes.
 6. Add body transform records for translate, rotate, and uniform scale.
 7. Add sketch ownership records so body transforms can move owned sketch workplanes when requested.
-8. Add body boolean features for add/subtract/intersect.
+8. Execute the implemented Block-54 body boolean features in Geometry (Block 55).
 9. Add `RevolveFeature` and `RevolveCutFeature`.
 10. Extend the implemented circular-hole-pattern seed (`docs/bolt-circle-pattern-mvp3.md`) with assembly-scoped parameters, skip instances, and hole semantics.
 11. Add richer extrude/cut extents: symmetric, two-sided, to-object, to-next, taper/draft, and thin features.

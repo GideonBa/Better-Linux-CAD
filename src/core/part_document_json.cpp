@@ -1119,6 +1119,58 @@ feature_body_result_context_from_json(const json& feature_json) {
   return feature.value().with_body_result_context(std::move(context.value().value()));
 }
 
+[[nodiscard]] Result<BodyBooleanFeature> body_boolean_feature_from_json(const json& value) {
+  if (!value.is_object() || !value.contains("id") || !value.contains("operation") ||
+      !value.contains("target_body") || !value.contains("tool_bodies") ||
+      !value.contains("result_mode") || !value.contains("keep_tool_bodies"))
+    return Result<BodyBooleanFeature>::failure(
+        json_error("body boolean feature requires all mandatory fields"));
+  if (!value.at("id").is_string() || !value.at("operation").is_string() ||
+      !value.at("target_body").is_string() || !value.at("tool_bodies").is_array() ||
+      !value.at("result_mode").is_string() || !value.at("keep_tool_bodies").is_boolean() ||
+      (value.contains("produced_body") && !value.at("produced_body").is_string()))
+    return Result<BodyBooleanFeature>::failure(
+        json_error("body boolean feature fields have invalid json types"));
+
+  BodyBooleanOperation operation;
+  const std::string operation_spelling = value.at("operation").get<std::string>();
+  if (operation_spelling == "add")
+    operation = BodyBooleanOperation::Add;
+  else if (operation_spelling == "subtract")
+    operation = BodyBooleanOperation::Subtract;
+  else if (operation_spelling == "intersect")
+    operation = BodyBooleanOperation::Intersect;
+  else
+    return Result<BodyBooleanFeature>::failure(
+        json_error("unsupported body boolean operation in part document json"));
+
+  BodyBooleanResultMode result_mode;
+  const std::string mode_spelling = value.at("result_mode").get<std::string>();
+  if (mode_spelling == "modify_target")
+    result_mode = BodyBooleanResultMode::ModifyTarget;
+  else if (mode_spelling == "new_body")
+    result_mode = BodyBooleanResultMode::NewBody;
+  else
+    return Result<BodyBooleanFeature>::failure(
+        json_error("unsupported body boolean result mode in part document json"));
+
+  std::vector<BodyId> tools;
+  tools.reserve(value.at("tool_bodies").size());
+  for (const auto& tool : value.at("tool_bodies")) {
+    if (!tool.is_string())
+      return Result<BodyBooleanFeature>::failure(
+          json_error("body boolean tool body ids must be strings"));
+    tools.emplace_back(tool.get<std::string>());
+  }
+  std::optional<BodyId> produced;
+  if (value.contains("produced_body"))
+    produced = BodyId(value.at("produced_body").get<std::string>());
+  return BodyBooleanFeature::create(FeatureId(value.at("id").get<std::string>()), operation,
+                                    BodyId(value.at("target_body").get<std::string>()),
+                                    std::move(tools), result_mode, std::move(produced),
+                                    value.at("keep_tool_bodies").get<bool>());
+}
+
 [[nodiscard]] bool sketch_dependencies_available(const PartDocument& document,
                                                  const Sketch& sketch) {
   if (!document.has_workplane_id(sketch.workplane()))
@@ -1346,6 +1398,20 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
     }
     root["features"].push_back(std::move(feature_json));
   }
+  root["body_booleans"] = json::array();
+  for (const auto& feature : document.body_boolean_features()) {
+    json feature_json{{"id", feature.id().value()},
+                      {"operation", std::string(to_string(feature.operation()))},
+                      {"target_body", feature.target_body().value()},
+                      {"tool_bodies", json::array()},
+                      {"result_mode", std::string(to_string(feature.result_mode()))},
+                      {"keep_tool_bodies", feature.keep_tool_bodies()}};
+    for (const BodyId& tool : feature.tool_bodies())
+      feature_json["tool_bodies"].push_back(tool.value());
+    if (feature.produced_body().has_value())
+      feature_json["produced_body"] = feature.produced_body()->value();
+    root["body_booleans"].push_back(std::move(feature_json));
+  }
   root["reference_statuses"] = json::array();
   for (const auto& status : document.reference_statuses())
     root["reference_statuses"].push_back(reference_status_to_json(status));
@@ -1537,6 +1603,18 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
       if (!progress)
         return Result<PartDocument>::failure(
             json_error("could not resolve part document json dependencies"));
+    }
+    const json body_boolean_array = root.value("body_booleans", json::array());
+    if (!body_boolean_array.is_array())
+      return Result<PartDocument>::failure(
+          json_error("body_booleans must be an array in part document json"));
+    for (const auto& boolean_json : body_boolean_array) {
+      auto feature = body_boolean_feature_from_json(boolean_json);
+      if (feature.has_error())
+        return Result<PartDocument>::failure(feature.error());
+      auto added = document.value().add_body_boolean_feature(std::move(feature.value()));
+      if (added.has_error())
+        return Result<PartDocument>::failure(added.error());
     }
     for (const auto& axis_json : root.value("datum_axes", json::array())) {
       auto axis = datum_axis_from_json(axis_json);

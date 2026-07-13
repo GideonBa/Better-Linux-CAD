@@ -99,5 +99,5 @@ removal cleanup/rejection, duplicate producers, and transactional cycle rejectio
 
 ## Handoff
 
-Blocks 52–53 body-scoped recompute and checked result inspection are implemented. Block 54 now
-introduces BodyBooleanFeature Core intent and JSON.
+Blocks 52–54 body-scoped recompute/inspection and BodyBooleanFeature Core intent are implemented.
+Block 55 now executes Body booleans in Geometry.
