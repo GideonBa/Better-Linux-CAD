@@ -21,7 +21,7 @@ trap report_failure EXIT
 
 if [[ ! -f debug/block39-run23.log ]]; then
   mkdir -p debug
-  gh run view 29243146119 --repo "$GITHUB_REPOSITORY" --log > debug/block39-run23.log
+  gh api "repos/${GITHUB_REPOSITORY}/actions/jobs/86793699037/logs" > debug/block39-run23.log
   git config user.name "github-actions[bot]"
   git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
   git add debug/block39-run23.log
