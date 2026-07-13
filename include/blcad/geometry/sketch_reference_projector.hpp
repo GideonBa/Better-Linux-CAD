@@ -7,6 +7,8 @@
 
 namespace blcad::geometry {
 
+class ShapeCache;
+
 struct ResolvedSketchPointReference {
   SketchEntityId id;
   Point2 position;
@@ -23,10 +25,16 @@ public:
   [[nodiscard]] Result<ResolvedSketchPointReference>
   resolve_point(const PartDocument& document, const Sketch& sketch,
                 const ProjectedSketchPoint& reference) const;
+  [[nodiscard]] Result<ResolvedSketchPointReference>
+  resolve_point(const PartDocument& document, const Sketch& sketch,
+                const ProjectedSketchPoint& reference, const ShapeCache& shape_cache) const;
 
   [[nodiscard]] Result<ResolvedSketchLineReference>
   resolve_line(const PartDocument& document, const Sketch& sketch,
                const ProjectedSketchLine& reference) const;
+  [[nodiscard]] Result<ResolvedSketchLineReference>
+  resolve_line(const PartDocument& document, const Sketch& sketch,
+               const ProjectedSketchLine& reference, const ShapeCache& shape_cache) const;
 };
 
 } // namespace blcad::geometry

@@ -99,5 +99,5 @@ removal cleanup/rejection, duplicate producers, and transactional cycle rejectio
 
 ## Handoff
 
-Blocks 52–54 body-scoped recompute/inspection and BodyBooleanFeature Core intent are implemented.
-Block 55 now executes Body booleans in Geometry.
+Blocks 52–56 body-scoped recompute/inspection, Boolean execution, and BodyTransform/SketchOwnership
+intent are implemented. Block 57 is the transform Geometry handoff.

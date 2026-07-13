@@ -1,7 +1,9 @@
 #include "blcad/geometry/recompute_executor.hpp"
 
+#include "blcad/geometry/construction_line_resolver.hpp"
 #include "blcad/geometry/dimension_driven_profile_resolver.hpp"
 #include "blcad/geometry/reference_generated_profile_resolver.hpp"
+#include "blcad/geometry/semantic_reference_evaluator.hpp"
 #include "blcad/geometry/sketch_region_finder.hpp"
 
 #include <algorithm>
@@ -27,12 +29,166 @@ struct GlobalCompositeProfileVertices {
   std::vector<std::vector<Point3>> inner;
 };
 
+struct TransformFrame {
+  Point3 origin;
+  Vector3 x_axis{1.0, 0.0, 0.0};
+  Vector3 y_axis{0.0, 1.0, 0.0};
+  Vector3 z_axis{0.0, 0.0, 1.0};
+};
+
+[[nodiscard]] Vector3 normalized(Vector3 value) noexcept {
+  const double magnitude = std::sqrt(value.x * value.x + value.y * value.y + value.z * value.z);
+  return {value.x / magnitude, value.y / magnitude, value.z / magnitude};
+}
+
+[[nodiscard]] Vector3 frame_vector(const TransformFrame& frame, Vector3 value) noexcept {
+  return {frame.x_axis.x * value.x + frame.y_axis.x * value.y + frame.z_axis.x * value.z,
+          frame.x_axis.y * value.x + frame.y_axis.y * value.y + frame.z_axis.y * value.z,
+          frame.x_axis.z * value.x + frame.y_axis.z * value.y + frame.z_axis.z * value.z};
+}
+
+[[nodiscard]] Point3 frame_point(const TransformFrame& frame, Point3 value) noexcept {
+  const Vector3 offset = frame_vector(frame, {value.x, value.y, value.z});
+  return {frame.origin.x + offset.x, frame.origin.y + offset.y, frame.origin.z + offset.z};
+}
+
 [[nodiscard]] Error validation_error(std::string object_id, std::string message) {
   return Error::validation(std::move(object_id), std::move(message));
 }
 
 [[nodiscard]] Error geometry_error(std::string object_id, std::string message) {
   return Error::geometry(std::move(object_id), std::move(message));
+}
+
+struct TransformInput {
+  GeometryShape shape;
+  std::optional<BodyTransformId> previous_transform;
+  GeometryAffineTransform cumulative_transform;
+};
+
+[[nodiscard]] Result<TransformInput> resolve_transform_input(const PartDocument& document,
+                                                             const ShapeCache& shape_cache,
+                                                             const BodyTransform& transform) {
+  for (const auto& [producer, dependent] : document.dependency_graph().dependencies()) {
+    if (dependent != transform.id().value())
+      continue;
+    const GeometryShape* shape = shape_cache.find_feature_shape(FeatureId(producer));
+    if (shape == nullptr)
+      continue;
+    const BodyTransform* previous = document.find_body_transform(BodyTransformId(producer));
+    if (previous == nullptr)
+      return Result<TransformInput>::success(
+          TransformInput{*shape, std::nullopt, GeometryAffineTransform::identity()});
+    const CachedBodyTransformState* state = shape_cache.find_body_transform_state(previous->id());
+    if (state == nullptr)
+      return Result<TransformInput>::failure(geometry_error(
+          transform.id().value(), "previous body transform state must exist in shape cache"));
+    return Result<TransformInput>::success(
+        TransformInput{*shape, previous->id(), state->cumulative_transform});
+  }
+  return Result<TransformInput>::failure(geometry_error(
+      transform.id().value(), "body transform input shape must exist in dependency order"));
+}
+
+[[nodiscard]] TransformFrame frame_from_affine(const GeometryAffineTransform& transform) noexcept {
+  return {transform.transform_point({}), normalized(transform.transform_vector({1.0, 0.0, 0.0})),
+          normalized(transform.transform_vector({0.0, 1.0, 0.0})),
+          normalized(transform.transform_vector({0.0, 0.0, 1.0}))};
+}
+
+[[nodiscard]] Result<TransformFrame>
+resolve_transform_frame(const PartDocument& document, const ShapeCache& cache,
+                        const BodyTransform& transform,
+                        const GeometryAffineTransform& body_transform) {
+  if (transform.coordinate_space() == BodyTransformCoordinateSpace::World)
+    return Result<TransformFrame>::success(TransformFrame{});
+  if (transform.coordinate_space() == BodyTransformCoordinateSpace::BodyLocal)
+    return Result<TransformFrame>::success(frame_from_affine(body_transform));
+  if (transform.coordinate_space() == BodyTransformCoordinateSpace::SketchLocal) {
+    const Sketch* sketch = document.find_sketch(SketchId(*transform.coordinate_reference()));
+    auto workplane = WorkplaneResolver{}.resolve_for_sketch(document, *sketch, cache);
+    if (workplane.has_error())
+      return Result<TransformFrame>::failure(workplane.error());
+    return Result<TransformFrame>::success(
+        {workplane.value().origin, normalized(workplane.value().x_axis),
+         normalized(workplane.value().y_axis), normalized(workplane.value().normal)});
+  }
+
+  const std::string& reference = *transform.coordinate_reference();
+  if (document.find_datum_plane(DatumPlaneId(reference)) != nullptr ||
+      document.find_construction_plane(ConstructionPlaneId(reference)) != nullptr) {
+    auto plane = WorkplaneResolver{}.resolve(document, DatumPlaneId(reference));
+    if (plane.has_error())
+      return Result<TransformFrame>::failure(plane.error());
+    TransformFrame frame{plane.value().origin, normalized(plane.value().x_axis),
+                         normalized(plane.value().y_axis), normalized(plane.value().normal)};
+    if (const auto* cached = cache.find_reference_transform(reference))
+      frame = frame_from_affine(
+          GeometryAffineTransform::translation({frame.origin.x, frame.origin.y, frame.origin.z})
+              .followed_by(cached->cumulative_transform));
+    return Result<TransformFrame>::success(frame);
+  }
+
+  Point3 point;
+  Vector3 direction;
+  if (const DatumAxis* axis = document.find_datum_axis(DatumAxisId(reference))) {
+    if (axis->kind() == DatumAxisKind::Explicit) {
+      point = axis->origin();
+      direction = axis->direction();
+    } else {
+      auto line = ConstructionLineResolver{}.resolve(document, axis->source_construction_line());
+      if (line.has_error())
+        return Result<TransformFrame>::failure(line.error());
+      point = line.value().point;
+      direction = line.value().direction;
+    }
+  } else {
+    auto line = ConstructionLineResolver{}.resolve(document, ConstructionLineId(reference));
+    if (line.has_error())
+      return Result<TransformFrame>::failure(line.error());
+    point = line.value().point;
+    direction = line.value().direction;
+  }
+  const Vector3 z = normalized(direction);
+  const Vector3 helper = std::abs(z.z) < 0.9 ? Vector3{0.0, 0.0, 1.0} : Vector3{0.0, 1.0, 0.0};
+  const Vector3 x = normalized({helper.y * z.z - helper.z * z.y, helper.z * z.x - helper.x * z.z,
+                                helper.x * z.y - helper.y * z.x});
+  const Vector3 y = {z.y * x.z - z.z * x.y, z.z * x.x - z.x * x.z, z.x * x.y - z.y * x.x};
+  return Result<TransformFrame>::success({point, x, y, z});
+}
+
+[[nodiscard]] Result<std::pair<Point3, Vector3>>
+resolve_rotation_axis(const PartDocument& document, const BodyTransform& transform,
+                      const TransformFrame& frame, const ShapeCache& cache) {
+  const BodyTransformRotationAxis& axis = *transform.rotation_axis();
+  if (axis.kind() == BodyTransformRotationAxisKind::Explicit)
+    return Result<std::pair<Point3, Vector3>>::success(
+        {frame_point(frame, axis.explicit_origin()),
+         normalized(frame_vector(frame, axis.explicit_direction()))});
+  if (axis.kind() == BodyTransformRotationAxisKind::DatumAxis) {
+    const DatumAxis* datum = document.find_datum_axis(axis.datum_axis());
+    if (datum->kind() == DatumAxisKind::Explicit)
+      return Result<std::pair<Point3, Vector3>>::success({datum->origin(), datum->direction()});
+    auto line = ConstructionLineResolver{}.resolve(document, datum->source_construction_line());
+    if (line.has_error())
+      return Result<std::pair<Point3, Vector3>>::failure(line.error());
+    return Result<std::pair<Point3, Vector3>>::success(
+        {line.value().point, line.value().direction});
+  }
+  if (axis.kind() == BodyTransformRotationAxisKind::ConstructionLine) {
+    auto line = ConstructionLineResolver{}.resolve(document, axis.construction_line());
+    if (line.has_error())
+      return Result<std::pair<Point3, Vector3>>::failure(line.error());
+    return Result<std::pair<Point3, Vector3>>::success(
+        {line.value().point, line.value().direction});
+  }
+  auto edge = SemanticReferenceEvaluator{}.resolve_edge(document, *axis.semantic_edge(), cache);
+  if (edge.has_error())
+    return Result<std::pair<Point3, Vector3>>::failure(edge.error());
+  return Result<std::pair<Point3, Vector3>>::success(
+      {edge.value().start, normalized({edge.value().end.x - edge.value().start.x,
+                                       edge.value().end.y - edge.value().start.y,
+                                       edge.value().end.z - edge.value().start.z})});
 }
 
 [[nodiscard]] Result<GeometryShape> resolve_cached_body_input(const PartDocument& document,
@@ -50,9 +206,8 @@ struct GlobalCompositeProfileVertices {
       return Result<GeometryShape>::success(*shape);
   }
 
-  return Result<GeometryShape>::failure(
-      geometry_error(body_id.value(),
-                     std::string(role) + " body shape must exist in the shape cache"));
+  return Result<GeometryShape>::failure(geometry_error(
+      body_id.value(), std::string(role) + " body shape must exist in the shape cache"));
 }
 
 [[nodiscard]] Result<GeometryShape>
@@ -569,7 +724,8 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_additive_extrude(
                            "rectangle height parameter must exist in part document"));
     }
 
-    auto resolved_workplane = workplane_resolver_.resolve_for_sketch(document, *sketch);
+    auto resolved_workplane =
+        workplane_resolver_.resolve_for_sketch(document, *sketch, shape_cache);
     if (resolved_workplane.has_error()) {
       return Result<std::size_t>::failure(resolved_workplane.error());
     }
@@ -593,7 +749,8 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_additive_extrude(
   if (has_exactly_one_closed_profile(*sketch) || has_no_profiles(*sketch) ||
       has_exactly_one_arc_closed_profile(*sketch) ||
       has_exactly_one_composite_closed_profile(*sketch)) {
-    auto resolved_workplane = workplane_resolver_.resolve_for_sketch(document, *sketch);
+    auto resolved_workplane =
+        workplane_resolver_.resolve_for_sketch(document, *sketch, shape_cache);
     if (resolved_workplane.has_error()) {
       return Result<std::size_t>::failure(resolved_workplane.error());
     }
@@ -713,7 +870,7 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_subtractive_extrude(
                               : "target feature shape must exist in the shape cache"));
   }
 
-  auto resolved_workplane = workplane_resolver_.resolve_for_sketch(document, *sketch);
+  auto resolved_workplane = workplane_resolver_.resolve_for_sketch(document, *sketch, shape_cache);
   if (resolved_workplane.has_error()) {
     return Result<std::size_t>::failure(resolved_workplane.error());
   }
@@ -839,8 +996,9 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_subtractive_extrude(
   return store_feature_result(document, *feature, std::move(shape.value()), shape_cache);
 }
 
-Result<std::size_t> GeometryRecomputeExecutor::execute_body_boolean(
-    const PartDocument& document, FeatureId feature_id, ShapeCache& shape_cache) const {
+Result<std::size_t> GeometryRecomputeExecutor::execute_body_boolean(const PartDocument& document,
+                                                                    FeatureId feature_id,
+                                                                    ShapeCache& shape_cache) const {
   if (feature_id.empty()) {
     return Result<std::size_t>::failure(
         validation_error("body_boolean", "feature id must not be empty"));
@@ -865,8 +1023,8 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_body_boolean(
     tools.push_back(std::move(tool.value()));
   }
 
-  auto result = body_boolean_adapter_.combine(feature->id(), feature->operation(), target.value(),
-                                              tools);
+  auto result =
+      body_boolean_adapter_.combine(feature->id(), feature->operation(), target.value(), tools);
   if (result.has_error())
     return Result<std::size_t>::failure(result.error());
 
@@ -888,6 +1046,124 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_body_boolean(
   working_cache.clear_final_shape();
   shape_cache = std::move(working_cache);
   return stored_body;
+}
+
+Result<std::size_t> GeometryRecomputeExecutor::execute_body_transform(
+    const PartDocument& document, BodyTransformId transform_id, ShapeCache& shape_cache) const {
+  if (transform_id.empty())
+    return Result<std::size_t>::failure(
+        validation_error("body_transform", "transform id must not be empty"));
+  const BodyTransform* transform = document.find_body_transform(transform_id);
+  if (transform == nullptr)
+    return Result<std::size_t>::failure(
+        validation_error(transform_id.value(), "body transform must exist in part document"));
+
+  ShapeCache working_cache = shape_cache;
+  auto input = resolve_transform_input(document, working_cache, *transform);
+  if (input.has_error())
+    return Result<std::size_t>::failure(input.error());
+  auto frame = resolve_transform_frame(document, working_cache, *transform,
+                                       input.value().cumulative_transform);
+  if (frame.has_error())
+    return Result<std::size_t>::failure(frame.error());
+
+  GeometryAffineTransform operation;
+  Result<GeometryShape> transformed = Result<GeometryShape>::failure(
+      geometry_error(transform->id().value(), "unsupported body transform kind"));
+  if (transform->kind() == BodyTransformKind::Translate) {
+    const Vector3 offset = frame_vector(frame.value(), transform->translation_mm());
+    operation = GeometryAffineTransform::translation(offset);
+    transformed = body_transform_adapter_.translate(input.value().shape, offset);
+  } else if (transform->kind() == BodyTransformKind::Rotate) {
+    auto axis = resolve_rotation_axis(document, *transform, frame.value(), working_cache);
+    if (axis.has_error())
+      return Result<std::size_t>::failure(axis.error());
+    operation = GeometryAffineTransform::rotation(axis.value().first, axis.value().second,
+                                                  transform->angle_deg());
+    transformed = body_transform_adapter_.rotate(input.value().shape, axis.value().first,
+                                                 axis.value().second, transform->angle_deg());
+  } else {
+    const Point3 center = frame_point(frame.value(), transform->scale_center());
+    operation = GeometryAffineTransform::uniform_scale(center, transform->scale_factor());
+    transformed = body_transform_adapter_.uniform_scale(input.value().shape, center,
+                                                        transform->scale_factor());
+  }
+  if (transformed.has_error())
+    return Result<std::size_t>::failure(transformed.error());
+
+  const GeometryAffineTransform cumulative =
+      input.value().cumulative_transform.followed_by(operation);
+  const FeatureId cache_id(transform->id().value());
+  auto feature_result = working_cache.store_feature_shape(cache_id, transformed.value());
+  if (feature_result.has_error())
+    return feature_result;
+  auto body_result =
+      working_cache.store_body_shape(transform->body(), cache_id, std::move(transformed.value()));
+  if (body_result.has_error())
+    return body_result;
+  auto state_result =
+      working_cache.store_body_transform_state(transform->id(), transform->body(), cumulative);
+  if (state_result.has_error())
+    return state_result;
+
+  for (const SketchOwnership& ownership : document.sketch_ownerships()) {
+    if (ownership.owning_body() != transform->body())
+      continue;
+    const auto advanced_reference = [&](std::string_view reference_id, bool applies) {
+      GeometryAffineTransform prior = GeometryAffineTransform::identity();
+      if (input.value().previous_transform.has_value()) {
+        if (const auto* cached = working_cache.find_reference_transform(
+                reference_id, *input.value().previous_transform))
+          prior = cached->cumulative_transform;
+      }
+      return applies ? prior.followed_by(operation) : prior;
+    };
+
+    auto stored = working_cache.store_reference_transform(
+        ownership.sketch().value(), transform->body(), transform->id(),
+        advanced_reference(ownership.sketch().value(), transform->apply_to_owned_sketches()));
+    if (stored.has_error())
+      return stored;
+
+    const Sketch* sketch = document.find_sketch(ownership.sketch());
+    stored = working_cache.store_reference_transform(
+        sketch->workplane().value(), transform->body(), transform->id(),
+        advanced_reference(sketch->workplane().value(),
+                           transform->apply_to_owned_construction_geometry()));
+    if (stored.has_error())
+      return stored;
+    for (const ProjectedSketchPoint& projected : sketch->projected_points()) {
+      if (projected.source() != ProjectedSketchPointSource::ConstructionPoint)
+        continue;
+      stored = working_cache.store_reference_transform(
+          projected.construction_point().value(), transform->body(), transform->id(),
+          advanced_reference(projected.construction_point().value(),
+                             transform->apply_to_owned_construction_geometry()));
+      if (stored.has_error())
+        return stored;
+    }
+    for (const ProjectedSketchLine& projected : sketch->projected_lines()) {
+      if (projected.source() != ProjectedSketchLineSource::ConstructionLine)
+        continue;
+      stored = working_cache.store_reference_transform(
+          projected.construction_line().value(), transform->body(), transform->id(),
+          advanced_reference(projected.construction_line().value(),
+                             transform->apply_to_owned_construction_geometry()));
+      if (stored.has_error())
+        return stored;
+    }
+  }
+
+  if (document.bodies().size() == 1U && document.bodies().front().kind() == BodyKind::Solid) {
+    const GeometryShape* body_shape = working_cache.find_body_shape(transform->body());
+    auto final_result = working_cache.set_final_shape(cache_id, *body_shape);
+    if (final_result.has_error())
+      return final_result;
+  } else {
+    working_cache.clear_final_shape();
+  }
+  shape_cache = std::move(working_cache);
+  return body_result;
 }
 
 Result<std::size_t> GeometryRecomputeExecutor::execute_feature(const PartDocument& document,
@@ -914,18 +1190,24 @@ GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const Reco
     const Feature* feature = document.find_feature(FeatureId(step.node_id));
     const BodyBooleanFeature* body_boolean =
         document.find_body_boolean_feature(FeatureId(step.node_id));
-    if (feature == nullptr && body_boolean == nullptr)
+    const BodyTransform* body_transform =
+        document.find_body_transform(BodyTransformId(step.node_id));
+    if (feature == nullptr && body_boolean == nullptr && body_transform == nullptr)
       continue;
 
-    const FeatureId& executable_id = feature != nullptr ? feature->id() : body_boolean->id();
+    const FeatureId executable_id = feature != nullptr ? feature->id()
+                                    : body_boolean != nullptr
+                                        ? body_boolean->id()
+                                        : FeatureId(body_transform->id().value());
     auto removed_stale_shape = execution_cache.remove_feature_shape(executable_id);
     if (removed_stale_shape.has_error()) {
       return Result<GeometryRecomputeSummary>::failure(removed_stale_shape.error());
     }
 
-    auto executed = feature != nullptr
-                        ? execute_feature(document, *feature, execution_cache)
-                        : execute_body_boolean(document, body_boolean->id(), execution_cache);
+    auto executed = feature != nullptr ? execute_feature(document, *feature, execution_cache)
+                    : body_boolean != nullptr
+                        ? execute_body_boolean(document, body_boolean->id(), execution_cache)
+                        : execute_body_transform(document, body_transform->id(), execution_cache);
     if (executed.has_error())
       return Result<GeometryRecomputeSummary>::failure(executed.error());
 
@@ -959,18 +1241,24 @@ GeometryRecomputeExecutor::execute_document(const PartDocument& document,
     const Feature* feature = document.find_feature(FeatureId(executable_id));
     const BodyBooleanFeature* body_boolean =
         document.find_body_boolean_feature(FeatureId(executable_id));
-    if (feature == nullptr && body_boolean == nullptr)
+    const BodyTransform* body_transform =
+        document.find_body_transform(BodyTransformId(executable_id));
+    if (feature == nullptr && body_boolean == nullptr && body_transform == nullptr)
       continue;
 
-    const FeatureId& feature_id = feature != nullptr ? feature->id() : body_boolean->id();
+    const FeatureId feature_id = feature != nullptr ? feature->id()
+                                 : body_boolean != nullptr
+                                     ? body_boolean->id()
+                                     : FeatureId(body_transform->id().value());
     auto removed_stale_shape = execution_cache.remove_feature_shape(feature_id);
     if (removed_stale_shape.has_error()) {
       return Result<GeometryRecomputeSummary>::failure(removed_stale_shape.error());
     }
 
-    auto executed = feature != nullptr
-                        ? execute_feature(document, *feature, execution_cache)
-                        : execute_body_boolean(document, body_boolean->id(), execution_cache);
+    auto executed = feature != nullptr ? execute_feature(document, *feature, execution_cache)
+                    : body_boolean != nullptr
+                        ? execute_body_boolean(document, body_boolean->id(), execution_cache)
+                        : execute_body_transform(document, body_transform->id(), execution_cache);
     if (executed.has_error())
       return Result<GeometryRecomputeSummary>::failure(executed.error());
 

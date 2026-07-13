@@ -71,5 +71,5 @@ and all structural failures listed above.
 
 ## Handoff
 
-Blocks 50–54 feature Body-operation intent, multi-body recompute/inspection, and BodyBooleanFeature
-Core intent are implemented. Block 55 now executes Body booleans in Geometry.
+Blocks 50–56 feature/Boolean execution and persistent BodyTransform/SketchOwnership intent are
+implemented. Block 57 is the transform Geometry handoff.

@@ -3,6 +3,7 @@
 #include "blcad/geometry/construction_line_resolver.hpp"
 #include "blcad/geometry/construction_point_resolver.hpp"
 #include "blcad/geometry/semantic_reference_evaluator.hpp"
+#include "blcad/geometry/shape_cache.hpp"
 
 #include <cmath>
 #include <string>
@@ -154,6 +155,65 @@ SketchReferenceProjector::resolve_line(const PartDocument& document, const Sketc
 
   const Vector3 direction = vector_between(resolved.value().start, resolved.value().end);
   return make_projected_line(reference.id(), workplane.value(), resolved.value().start, direction);
+}
+
+Result<ResolvedSketchPointReference>
+SketchReferenceProjector::resolve_point(const PartDocument& document, const Sketch& sketch,
+                                        const ProjectedSketchPoint& reference,
+                                        const ShapeCache& shape_cache) const {
+  WorkplaneResolver workplane_resolver;
+  auto workplane = workplane_resolver.resolve_for_sketch(document, sketch, shape_cache);
+  if (workplane.has_error())
+    return Result<ResolvedSketchPointReference>::failure(workplane.error());
+  Point3 source_point{};
+  if (reference.source() == ProjectedSketchPointSource::ConstructionPoint) {
+    auto resolved = ConstructionPointResolver{}.resolve(document, reference.construction_point());
+    if (resolved.has_error())
+      return Result<ResolvedSketchPointReference>::failure(resolved.error());
+    source_point = resolved.value().position;
+    if (const auto* transform =
+            shape_cache.find_reference_transform(reference.construction_point().value()))
+      source_point = transform->cumulative_transform.transform_point(source_point);
+  } else {
+    auto resolved = SemanticReferenceEvaluator{}.resolve_vertex(
+        document, reference.semantic_vertex().value(), shape_cache);
+    if (resolved.has_error())
+      return Result<ResolvedSketchPointReference>::failure(resolved.error());
+    source_point = resolved.value().position;
+  }
+  auto local = project_point_to_workplane(workplane.value(), source_point, reference.id().value());
+  if (local.has_error())
+    return Result<ResolvedSketchPointReference>::failure(local.error());
+  return Result<ResolvedSketchPointReference>::success({reference.id(), local.value()});
+}
+
+Result<ResolvedSketchLineReference>
+SketchReferenceProjector::resolve_line(const PartDocument& document, const Sketch& sketch,
+                                       const ProjectedSketchLine& reference,
+                                       const ShapeCache& shape_cache) const {
+  WorkplaneResolver workplane_resolver;
+  auto workplane = workplane_resolver.resolve_for_sketch(document, sketch, shape_cache);
+  if (workplane.has_error())
+    return Result<ResolvedSketchLineReference>::failure(workplane.error());
+  if (reference.source() == ProjectedSketchLineSource::ConstructionLine) {
+    auto resolved = ConstructionLineResolver{}.resolve(document, reference.construction_line());
+    if (resolved.has_error())
+      return Result<ResolvedSketchLineReference>::failure(resolved.error());
+    Point3 point = resolved.value().point;
+    Vector3 direction = resolved.value().direction;
+    if (const auto* transform =
+            shape_cache.find_reference_transform(reference.construction_line().value())) {
+      point = transform->cumulative_transform.transform_point(point);
+      direction = transform->cumulative_transform.transform_vector(direction);
+    }
+    return make_projected_line(reference.id(), workplane.value(), point, direction);
+  }
+  auto resolved = SemanticReferenceEvaluator{}.resolve_edge(
+      document, reference.semantic_edge().value(), shape_cache);
+  if (resolved.has_error())
+    return Result<ResolvedSketchLineReference>::failure(resolved.error());
+  return make_projected_line(reference.id(), workplane.value(), resolved.value().start,
+                             vector_between(resolved.value().start, resolved.value().end));
 }
 
 } // namespace blcad::geometry

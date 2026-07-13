@@ -1,5 +1,6 @@
 #include "blcad/geometry/semantic_reference_evaluator.hpp"
 
+#include "blcad/geometry/shape_cache.hpp"
 #include "blcad/geometry/workplane_resolver.hpp"
 
 #include <string>
@@ -154,6 +155,19 @@ resolve_rectangular_additive_extrude_corners(const PartDocument& document, Featu
 
 } // namespace
 
+namespace {
+[[nodiscard]] const GeometryAffineTransform*
+source_transform(const PartDocument& document, const ShapeCache& cache,
+                 const FeatureId& feature_id) noexcept {
+  const Feature* feature = document.find_feature(feature_id);
+  if (feature == nullptr || !feature->body_result_context().has_value())
+    return nullptr;
+  const BodyId body = feature->body_result_context()->effective_produced_body();
+  const CachedBodyTransformState* state = cache.find_latest_body_transform_state(body);
+  return state == nullptr ? nullptr : &state->cumulative_transform;
+}
+} // namespace
+
 Result<ResolvedSemanticEdge>
 SemanticReferenceEvaluator::resolve_edge(const PartDocument& document,
                                          SemanticEdgeReference reference) const {
@@ -163,6 +177,21 @@ SemanticReferenceEvaluator::resolve_edge(const PartDocument& document,
   }
 
   return Result<ResolvedSemanticEdge>::success(select_edge(corners.value(), std::move(reference)));
+}
+
+Result<ResolvedSemanticEdge>
+SemanticReferenceEvaluator::resolve_edge(const PartDocument& document,
+                                         SemanticEdgeReference reference,
+                                         const ShapeCache& shape_cache) const {
+  const FeatureId source = reference.source_feature();
+  auto resolved = resolve_edge(document, std::move(reference));
+  if (resolved.has_error())
+    return resolved;
+  if (const GeometryAffineTransform* transform = source_transform(document, shape_cache, source)) {
+    resolved.value().start = transform->transform_point(resolved.value().start);
+    resolved.value().end = transform->transform_point(resolved.value().end);
+  }
+  return resolved;
 }
 
 Result<ResolvedSemanticVertex>
@@ -175,6 +204,19 @@ SemanticReferenceEvaluator::resolve_vertex(const PartDocument& document,
 
   return Result<ResolvedSemanticVertex>::success(
       ResolvedSemanticVertex{reference, select_vertex(corners.value(), reference.vertex())});
+}
+
+Result<ResolvedSemanticVertex>
+SemanticReferenceEvaluator::resolve_vertex(const PartDocument& document,
+                                           SemanticVertexReference reference,
+                                           const ShapeCache& shape_cache) const {
+  const FeatureId source = reference.source_feature();
+  auto resolved = resolve_vertex(document, std::move(reference));
+  if (resolved.has_error())
+    return resolved;
+  if (const GeometryAffineTransform* transform = source_transform(document, shape_cache, source))
+    resolved.value().position = transform->transform_point(resolved.value().position);
+  return resolved;
 }
 
 } // namespace blcad::geometry

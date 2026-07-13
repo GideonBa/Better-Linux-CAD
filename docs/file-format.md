@@ -1,6 +1,6 @@
 # Project and Save File Format
 
-Status: implemented save-format seeds exist for single-part model intent including persistent Solid/Surface Body records and Feature Body-result operations, assembly parameters, embedded Project JSON, part component occurrences, rigid child assembly occurrences, local Mate/Concentric/Distance/Insert/Angle intent, Project-level cross-hierarchy geometric intent, local and occurrence-qualified Revolute joint intent with typed `coordinates[]` plus historical scalar compatibility, semantic generated feature/axis/seat targets, `ref:` reference-geometry targets, canonical `topo:` generated-topology semantic targets, and authored transform/state records.
+Status: implemented save-format seeds exist for single-part model intent including persistent Solid/Surface Body records, Feature Body-result operations, Body Booleans, BodyTransform stacks, and SketchOwnership records; assembly parameters, embedded Project JSON, part component occurrences, rigid child assembly occurrences, local Mate/Concentric/Distance/Insert/Angle intent, Project-level cross-hierarchy geometric intent, local and occurrence-qualified Revolute joint intent with typed `coordinates[]` plus historical scalar compatibility, semantic generated feature/axis/seat targets, `ref:` reference-geometry targets, canonical `topo:` generated-topology semantic targets, and authored transform/state records.
 
 The save format stores parametric and semantic model intent. OCCT shapes, hierarchy traversal state, occurrence graphs, transform authorities, generated-topology producer classification/recovery results, resolved geometry, residuals, Jacobians, solve/motion results, freshness snapshots, proposals, diagnostics, and exchange products are derived.
 
@@ -690,6 +690,15 @@ Operations are `add`, `subtract`, or `intersect`; result modes are `modify_targe
 serialized in canonical lexicographic order. Target/tool/result references, Feature ID uniqueness,
 producer/cycle rules, and the Boolean structural rules fail closed during load. Historical files
 without the array restore zero BodyBooleanFeature records.
+
+Block 56 adds always-emitted, optional-on-read `sketch_ownerships` and `body_transforms` arrays.
+Ownership records store `sketch`, `owning_body`, and one of `drives_body`, `consumed_by_body`, or
+`reference_only`. Transform records store stable id/body identity, `translate`, `rotate`, or
+`uniform_scale`, coordinate space, optional referenced coordinate frame, the selected kind's exact
+numeric/axis fields, and both associative-application flags. Transform array order is the persistent
+stack order. Rotation axes use `explicit`, `datum_axis`, `construction_line`, or `semantic_edge`
+identity. Older files missing either array restore empty collections; no Body, ownership, or
+transform is inferred.
 
 ## Planned STEP import persistence after Block 94
 

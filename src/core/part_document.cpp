@@ -16,6 +16,10 @@ constexpr double k_tolerance = 1.0e-9;
   return "body:" + id.value();
 }
 
+[[nodiscard]] std::string sketch_ownership_node_id(const SketchId& id) {
+  return "sketch_ownership:" + id.value();
+}
+
 [[nodiscard]] std::vector<std::string> dependency_sources_of(const DependencyGraph& graph,
                                                              std::string_view dependent) {
   std::vector<std::string> sources;
@@ -973,6 +977,150 @@ Result<std::size_t> PartDocument::add_body_boolean_feature(BodyBooleanFeature fe
   return Result<std::size_t>::success(body_boolean_features_.size() - 1U);
 }
 
+Result<std::size_t> PartDocument::add_sketch_ownership(SketchOwnership ownership) {
+  if (has_sketch_ownership_id(ownership.sketch()))
+    return Result<std::size_t>::failure(Error::validation(
+        ownership.sketch().value(), "sketch ownership must be unique per sketch"));
+  if (!has_sketch_id(ownership.sketch()))
+    return Result<std::size_t>::failure(Error::validation(
+        ownership.sketch().value(), "owned sketch must exist in part document"));
+  if (!has_body_id(ownership.owning_body()))
+    return Result<std::size_t>::failure(Error::validation(
+        ownership.sketch().value(), "sketch owning body must exist in part document"));
+
+  auto graph = dependency_graph_;
+  const std::string node_id = sketch_ownership_node_id(ownership.sketch());
+  auto added_node = graph.add_node(node_id);
+  if (added_node.has_error())
+    return Result<std::size_t>::failure(added_node.error());
+  auto sketch_dependency =
+      add_dependency_if_missing(graph, ownership.sketch().value(), node_id);
+  if (sketch_dependency.has_error())
+    return Result<std::size_t>::failure(sketch_dependency.error());
+  for (const BodyTransform& transform : body_transforms_) {
+    if (transform.body() != ownership.owning_body() || !transform.apply_to_owned_sketches())
+      continue;
+    auto dependency = add_dependency_if_missing(graph, node_id, transform.id().value());
+    if (dependency.has_error())
+      return Result<std::size_t>::failure(dependency.error());
+  }
+  if (graph.has_cycle())
+    return Result<std::size_t>::failure(Error::dependency(
+        ownership.sketch().value(), "sketch ownership must not create a dependency cycle"));
+
+  auto invalidation_state = invalidation_state_;
+  auto synced = sync_graph(std::move(graph), invalidation_state, dependency_graph_);
+  if (synced.has_error())
+    return Result<std::size_t>::failure(synced.error());
+  invalidation_state_ = std::move(invalidation_state);
+  const auto position = std::lower_bound(
+      sketch_ownerships_.begin(), sketch_ownerships_.end(), ownership.sketch(),
+      [](const SketchOwnership& existing, const SketchId& id) {
+        return existing.sketch().value() < id.value();
+      });
+  const auto index = static_cast<std::size_t>(std::distance(sketch_ownerships_.begin(), position));
+  sketch_ownerships_.insert(position, std::move(ownership));
+  return Result<std::size_t>::success(index);
+}
+
+Result<std::size_t> PartDocument::add_body_transform(BodyTransform transform) {
+  if (has_body_transform_id(transform.id()) ||
+      dependency_graph_.has_node(transform.id().value()))
+    return Result<std::size_t>::failure(Error::validation(
+        transform.id().value(), "body transform id must be unique within part document"));
+  if (!has_body_id(transform.body()))
+    return Result<std::size_t>::failure(Error::validation(
+        transform.id().value(), "body transform body must exist in part document"));
+
+  std::optional<std::string> coordinate_dependency;
+  if (transform.coordinate_space() == BodyTransformCoordinateSpace::SketchLocal) {
+    const SketchId sketch(*transform.coordinate_reference());
+    if (!has_sketch_id(sketch))
+      return Result<std::size_t>::failure(Error::validation(
+          transform.id().value(), "sketch-local coordinate reference must exist"));
+    coordinate_dependency = sketch.value();
+  } else if (transform.coordinate_space() ==
+             BodyTransformCoordinateSpace::ConstructionReference) {
+    const std::string& reference = *transform.coordinate_reference();
+    const bool exists = has_datum_plane_id(DatumPlaneId(reference)) ||
+                        has_datum_axis_id(DatumAxisId(reference)) ||
+                        has_construction_line_id(ConstructionLineId(reference)) ||
+                        has_construction_plane_id(ConstructionPlaneId(reference));
+    if (!exists)
+      return Result<std::size_t>::failure(Error::validation(
+          transform.id().value(), "construction coordinate reference must exist"));
+    coordinate_dependency = reference;
+  }
+
+  std::optional<std::string> axis_dependency;
+  if (transform.kind() == BodyTransformKind::Rotate) {
+    const BodyTransformRotationAxis& axis = *transform.rotation_axis();
+    if (axis.kind() == BodyTransformRotationAxisKind::DatumAxis) {
+      if (!has_datum_axis_id(axis.datum_axis()))
+        return Result<std::size_t>::failure(Error::validation(
+            transform.id().value(), "rotation datum axis must exist in part document"));
+      axis_dependency = axis.datum_axis().value();
+    } else if (axis.kind() == BodyTransformRotationAxisKind::ConstructionLine) {
+      if (!has_construction_line_id(axis.construction_line()))
+        return Result<std::size_t>::failure(Error::validation(
+            transform.id().value(), "rotation construction line must exist in part document"));
+      axis_dependency = axis.construction_line().value();
+    } else if (axis.kind() == BodyTransformRotationAxisKind::SemanticEdge) {
+      auto valid = validate_generated_edge_reference(*this, *axis.semantic_edge(),
+                                                     transform.id().value());
+      if (valid.has_error())
+        return Result<std::size_t>::failure(valid.error());
+      axis_dependency = axis.semantic_edge()->source_feature().value();
+    }
+  }
+
+  auto graph = dependency_graph_;
+  auto added_node = graph.add_node(transform.id().value());
+  if (added_node.has_error())
+    return Result<std::size_t>::failure(added_node.error());
+  const std::string result_node = body_dependency_node_id(transform.body());
+  const auto previous_producers = dependency_sources_of(graph, result_node);
+  graph.remove_dependencies_of_dependent(result_node);
+  for (const std::string& producer : previous_producers) {
+    auto dependency = add_dependency_if_missing(graph, producer, transform.id().value());
+    if (dependency.has_error())
+      return Result<std::size_t>::failure(dependency.error());
+  }
+  for (const auto& dependency_id : {coordinate_dependency, axis_dependency}) {
+    if (!dependency_id.has_value())
+      continue;
+    auto dependency =
+        add_dependency_if_missing(graph, *dependency_id, transform.id().value());
+    if (dependency.has_error())
+      return Result<std::size_t>::failure(dependency.error());
+  }
+  if (transform.apply_to_owned_sketches()) {
+    for (const SketchOwnership& ownership : sketch_ownerships_) {
+      if (ownership.owning_body() != transform.body())
+        continue;
+      auto dependency = add_dependency_if_missing(
+          graph, sketch_ownership_node_id(ownership.sketch()), transform.id().value());
+      if (dependency.has_error())
+        return Result<std::size_t>::failure(dependency.error());
+    }
+  }
+  auto result_dependency =
+      add_dependency_if_missing(graph, transform.id().value(), result_node);
+  if (result_dependency.has_error())
+    return Result<std::size_t>::failure(result_dependency.error());
+  if (graph.has_cycle())
+    return Result<std::size_t>::failure(Error::dependency(
+        transform.id().value(), "body transform must not create a dependency cycle"));
+
+  auto invalidation_state = invalidation_state_;
+  auto synced = sync_graph(std::move(graph), invalidation_state, dependency_graph_);
+  if (synced.has_error())
+    return Result<std::size_t>::failure(synced.error());
+  invalidation_state_ = std::move(invalidation_state);
+  body_transforms_.push_back(std::move(transform));
+  return Result<std::size_t>::success(body_transforms_.size() - 1U);
+}
+
 Result<std::size_t> PartDocument::add_body(Body body) {
   if (has_body_id(body.id())) {
     return Result<std::size_t>::failure(
@@ -1022,6 +1170,14 @@ Result<std::size_t> PartDocument::remove_body(BodyId id) {
       return Result<std::size_t>::failure(
           Error::dependency(id.value(), "body with dependent model intent cannot be removed"));
   }
+  for (const auto& ownership : sketch_ownerships_)
+    if (ownership.owning_body() == id)
+      return Result<std::size_t>::failure(
+          Error::dependency(id.value(), "body is referenced by sketch ownership"));
+  for (const auto& transform : body_transforms_)
+    if (transform.body() == id)
+      return Result<std::size_t>::failure(
+          Error::dependency(id.value(), "body is referenced by body transform"));
   const auto dependents = dependency_graph_.direct_dependents(body_dependency_node_id(id));
   if (!dependents.empty()) {
     return Result<std::size_t>::failure(
@@ -1170,6 +1326,17 @@ Result<std::vector<std::string>> PartDocument::mark_body_changed(BodyId id) {
     return Result<std::vector<std::string>>::failure(
         Error::validation(id.value(), "body must exist in part document"));
   return invalidation_state_.mark_changed(dependency_graph_, body_dependency_node_id(id));
+}
+
+Result<std::vector<std::string>>
+PartDocument::mark_body_transform_changed(BodyTransformId id) {
+  if (id.empty())
+    return Result<std::vector<std::string>>::failure(
+        Error::validation("body_transform", "body transform id must not be empty"));
+  if (!has_body_transform_id(id))
+    return Result<std::vector<std::string>>::failure(
+        Error::validation(id.value(), "body transform must exist in part document"));
+  return invalidation_state_.mark_changed(dependency_graph_, id.value());
 }
 Result<std::vector<std::string>> PartDocument::set_parameter_value(ParameterId id, Quantity value) {
   if (id.empty())
@@ -1329,6 +1496,14 @@ const std::vector<Feature>& PartDocument::features() const noexcept {
 const std::vector<BodyBooleanFeature>& PartDocument::body_boolean_features() const noexcept {
   return body_boolean_features_;
 }
+
+const std::vector<SketchOwnership>& PartDocument::sketch_ownerships() const noexcept {
+  return sketch_ownerships_;
+}
+
+const std::vector<BodyTransform>& PartDocument::body_transforms() const noexcept {
+  return body_transforms_;
+}
 const std::vector<Body>& PartDocument::bodies() const noexcept {
   return bodies_;
 }
@@ -1377,6 +1552,14 @@ std::size_t PartDocument::feature_count() const noexcept {
 }
 std::size_t PartDocument::body_boolean_feature_count() const noexcept {
   return body_boolean_features_.size();
+}
+
+std::size_t PartDocument::sketch_ownership_count() const noexcept {
+  return sketch_ownerships_.size();
+}
+
+std::size_t PartDocument::body_transform_count() const noexcept {
+  return body_transforms_.size();
 }
 std::size_t PartDocument::body_count() const noexcept {
   return bodies_.size();
@@ -1458,6 +1641,22 @@ const BodyBooleanFeature* PartDocument::find_body_boolean_feature(FeatureId id) 
       return &feature;
   return nullptr;
 }
+
+const SketchOwnership* PartDocument::find_sketch_ownership(SketchId id) const noexcept {
+  const auto position = std::lower_bound(
+      sketch_ownerships_.begin(), sketch_ownerships_.end(), id,
+      [](const SketchOwnership& ownership, const SketchId& candidate) {
+        return ownership.sketch().value() < candidate.value();
+      });
+  return position != sketch_ownerships_.end() && position->sketch() == id ? &*position : nullptr;
+}
+
+const BodyTransform* PartDocument::find_body_transform(BodyTransformId id) const noexcept {
+  for (const auto& transform : body_transforms_)
+    if (transform.id() == id)
+      return &transform;
+  return nullptr;
+}
 const Body* PartDocument::find_body(BodyId id) const noexcept {
   const auto found = std::lower_bound(
       bodies_.begin(), bodies_.end(), id.value(),
@@ -1522,6 +1721,14 @@ bool PartDocument::has_feature_id(const FeatureId& id) const noexcept {
 }
 bool PartDocument::has_body_boolean_feature_id(const FeatureId& id) const noexcept {
   return find_body_boolean_feature(id) != nullptr;
+}
+
+bool PartDocument::has_sketch_ownership_id(const SketchId& id) const noexcept {
+  return find_sketch_ownership(id) != nullptr;
+}
+
+bool PartDocument::has_body_transform_id(const BodyTransformId& id) const noexcept {
+  return find_body_transform(id) != nullptr;
 }
 bool PartDocument::has_any_feature_id(const FeatureId& id) const noexcept {
   return has_feature_id(id) || has_body_boolean_feature_id(id);

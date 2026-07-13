@@ -56,5 +56,5 @@ target-shape failure, and disabled final-shape compatibility for a multi-body do
 
 ## Handoff
 
-Blocks 53–54 inspection and BodyBooleanFeature Core intent are implemented. Block 55 now executes
-Body booleans in Geometry.
+Blocks 53–56 inspection, Body Boolean execution, and BodyTransform/SketchOwnership intent are
+implemented. Block 57 is the transform Geometry handoff.

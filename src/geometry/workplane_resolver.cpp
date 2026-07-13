@@ -1,4 +1,5 @@
 #include "blcad/geometry/workplane_resolver.hpp"
+#include "blcad/geometry/shape_cache.hpp"
 
 #include <cmath>
 #include <string>
@@ -15,7 +16,7 @@ constexpr double k_tolerance = 1.0e-9;
 }
 
 [[nodiscard]] const Parameter* find_parameter(const PartDocument& document,
-                                               const ParameterId& parameter_id) noexcept {
+                                              const ParameterId& parameter_id) noexcept {
   return document.find_parameter(parameter_id);
 }
 
@@ -70,8 +71,7 @@ resolve_explicit_construction_plane(const ConstructionPlane& plane) {
 
 [[nodiscard]] Result<ResolvedWorkplane>
 resolve_additive_extrude_face(const PartDocument& document,
-                              const SemanticFaceReference& face_reference,
-                              DatumPlaneId resolved_id,
+                              const SemanticFaceReference& face_reference, DatumPlaneId resolved_id,
                               std::string_view context) {
   const FeatureId& source_feature_id = face_reference.source_feature();
   const Feature* source_feature = document.find_feature(source_feature_id);
@@ -280,6 +280,47 @@ Result<ResolvedWorkplane> WorkplaneResolver::resolve_for_sketch(const PartDocume
     workplane.value().bounds.center.x -= override_origin.x;
     workplane.value().bounds.center.y -= override_origin.y;
   }
+  return workplane;
+}
+
+Result<ResolvedWorkplane>
+WorkplaneResolver::resolve_for_sketch(const PartDocument& document, const Sketch& sketch,
+                                      const ShapeCache& shape_cache) const {
+  auto workplane = resolve_for_sketch(document, sketch);
+  if (workplane.has_error())
+    return workplane;
+  std::optional<BodyId> semantic_source_body;
+  if (const DerivedWorkplane* derived = document.find_derived_workplane(sketch.workplane())) {
+    const Feature* source = document.find_feature(derived->face_reference().source_feature());
+    if (source != nullptr && source->body_result_context().has_value()) {
+      semantic_source_body = source->body_result_context()->effective_produced_body();
+      if (const CachedBodyTransformState* state =
+              shape_cache.find_latest_body_transform_state(*semantic_source_body)) {
+        workplane.value().origin =
+            state->cumulative_transform.transform_point(workplane.value().origin);
+        workplane.value().x_axis =
+            state->cumulative_transform.transform_vector(workplane.value().x_axis);
+        workplane.value().y_axis =
+            state->cumulative_transform.transform_vector(workplane.value().y_axis);
+        workplane.value().normal =
+            state->cumulative_transform.transform_vector(workplane.value().normal);
+      }
+    }
+  }
+  const CachedReferenceTransform* transform =
+      shape_cache.find_reference_transform(sketch.id().value());
+  if (transform == nullptr)
+    return workplane;
+  if (semantic_source_body.has_value() && transform->body_id == *semantic_source_body)
+    return workplane;
+  workplane.value().origin =
+      transform->cumulative_transform.transform_point(workplane.value().origin);
+  workplane.value().x_axis =
+      transform->cumulative_transform.transform_vector(workplane.value().x_axis);
+  workplane.value().y_axis =
+      transform->cumulative_transform.transform_vector(workplane.value().y_axis);
+  workplane.value().normal =
+      transform->cumulative_transform.transform_vector(workplane.value().normal);
   return workplane;
 }
 

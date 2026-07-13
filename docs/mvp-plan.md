@@ -4,17 +4,17 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 55
-current_block: 56
-current_boundary: BodyTransform and SketchOwnership Core intent plus JSON
-current_tag: "[core][body-transform] [core][sketch-ownership]"
+implemented_through: Block 57
+current_block: 58
+current_boundary: Part feature semantic input reference contract
+current_tag: "[core][part-feature-input-reference]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
   mvp_3: "Parametric bolt circle pattern — implemented"
   mvp_4: "Assembly parameters and Project container — implemented"
   mvp_5: "Assembly relationships, motion, hierarchy, analysis, exchange — Blocks 1–47 implemented"
-  mvp_6: "Part Construction — Blocks 48–55 implemented, Blocks 56–94 planned, Block 56 next"
+  mvp_6: "Part Construction — Blocks 48–57 implemented, Blocks 58–94 planned, Block 58 next"
   mvp_7: "STEP Import — Blocks 95–101 planned after Block 94"
 ---
 
@@ -552,10 +552,10 @@ motion solvers reject Spherical as the selected drive.
 
 ## MVP 6 — Part Construction MVP after Block 47
 
-**Status:** In progress — Blocks 48–55 implemented
+**Status:** In progress — Blocks 48–57 implemented
 **Canonical:** sequence `docs/part-construction-sequence-mvp6.md`
 
-Blocks 48–55 are complete. Block 56 is the current next technical step.
+Blocks 48–57 are complete. Block 58 is the current next technical step.
 
 Mandatory Part Construction phase order:
 
@@ -767,7 +767,35 @@ Canonical contract: `docs/part-body-boolean-geometry-mvp6.md`.
 [geometry][body-boolean]
 ```
 
-## Current next technical step — Block 56
+## Block 56 — BodyTransform and SketchOwnership Core intent plus JSON — Implemented
 
-Add BodyTransform and SketchOwnership Core intent plus JSON according to
-`docs/part-construction-sequence-mvp6.md`.
+Block 56 adds ordered Translate/Rotate/UniformScale intent, explicit coordinate-space and rotation-
+axis identity, SketchOwnership associations, producer-chain graph semantics, invalidation/removal
+protection, and additive compatible JSON.
+
+Canonical contract: `docs/part-body-transform-ownership-mvp6.md`.
+
+```text
+[core][body-transform]
+[core][sketch-ownership]
+```
+
+## Block 57 — Body transform Geometry and associative ownership behavior — Implemented
+
+Block 57 executes Translate/Rotate/UniformScale through graph-ordered full and incremental
+recompute. OCCT results and cumulative affine/reference states remain derived `ShapeCache`
+products. Owned Sketch frames and their associated construction-reference closure move without
+changing Sketch-local coordinates; unowned Sketches remain fixed. Cache-aware semantic and
+projected-reference resolution follows the transformed Body, and transform-stack order is covered
+as a non-commutative Geometry invariant.
+
+Canonical contract: `docs/part-body-transform-geometry-mvp6.md`.
+
+```text
+[geometry][body-transform]
+```
+
+## Current next technical step — Block 58
+
+Freeze the reusable Part feature semantic input reference contract according to
+`docs/part-construction-sequence-mvp6-planning-detail.md`.

@@ -49,6 +49,8 @@ feature.base_extrude
 feature.center_hole_cut
 body:body.base
 body:body.result
+sketch_ownership:sketch.base
+transform.move_body
 ```
 
 The graph deliberately uses no OCCT or GUI types. Internally, it also knows no concrete `ParameterId`, `SketchId`, or `FeatureId` classes. `PartDocument` translates the typed IDs into these stable node IDs.
@@ -181,6 +183,9 @@ Current tests check:
 - in-place Body updates remain acyclic and topologically ordered
 - duplicate producers and real cycles fail before graph mutation
 - dependent Body removal is rejected and unused Body-node removal is complete
+- BodyTransform stacks advance Body producers in authored order without a self-cycle
+- coordinate/rotation references and matching SketchOwnership nodes feed transform nodes
+- transform invalidation propagates through later transforms into the Body result
 
 ## Next useful step
 
@@ -193,3 +198,5 @@ execution boundary:
 
 Block 53 freezes public Body-result inspection. Block 54 adds BodyBooleanFeature target/tool/result
 dependencies, in-place producer advancement, invalidation, cycle rejection, and removal protection.
+Block 56 adds ordered BodyTransform producer advancement and SketchOwnership association nodes;
+Block 57 executes those planned transform nodes in Geometry.

@@ -7,6 +7,8 @@
 
 namespace blcad::geometry {
 
+class ShapeCache;
+
 struct ResolvedSemanticEdge {
   SemanticEdgeReference reference;
   Point3 start;
@@ -22,9 +24,15 @@ class SemanticReferenceEvaluator {
 public:
   [[nodiscard]] Result<ResolvedSemanticEdge> resolve_edge(const PartDocument& document,
                                                           SemanticEdgeReference reference) const;
+  [[nodiscard]] Result<ResolvedSemanticEdge> resolve_edge(const PartDocument& document,
+                                                          SemanticEdgeReference reference,
+                                                          const ShapeCache& shape_cache) const;
 
   [[nodiscard]] Result<ResolvedSemanticVertex>
   resolve_vertex(const PartDocument& document, SemanticVertexReference reference) const;
+  [[nodiscard]] Result<ResolvedSemanticVertex> resolve_vertex(const PartDocument& document,
+                                                              SemanticVertexReference reference,
+                                                              const ShapeCache& shape_cache) const;
 };
 
 } // namespace blcad::geometry

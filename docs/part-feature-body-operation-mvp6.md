@@ -75,5 +75,5 @@ Body graph nodes, and unchanged historical feature JSON.
 
 ## Handoff
 
-Blocks 51–54 persistence, body-scoped execution/inspection, and BodyBooleanFeature Core intent are
-implemented. Block 55 now executes Body booleans in Geometry.
+Blocks 51–56 persistence, body-scoped Boolean execution, and BodyTransform/SketchOwnership intent
+are implemented. Block 57 is the transform Geometry handoff.

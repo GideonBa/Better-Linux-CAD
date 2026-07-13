@@ -67,5 +67,5 @@ unchanged Core intent, contextual errors, and transactional failure.
 
 ## Handoff
 
-Block 56 introduces persistent `BodyTransform` and `SketchOwnership` Core intent plus JSON. It does
-not broaden Block 55 into transform Geometry, non-uniform scaling, GUI editing, or direct modeling.
+Block 56 now introduces persistent `BodyTransform` and `SketchOwnership` Core intent plus JSON.
+Transform Geometry, non-uniform scaling, GUI editing, and direct modeling remain outside Block 55.

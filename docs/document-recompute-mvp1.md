@@ -52,6 +52,11 @@ retain the original partial-result-on-failure compatibility behavior.
 `BodyResultInspector` provides the public headless post-recompute view of Body IDs, kind,
 visibility, producing Feature, shape summary, and Solid/Surface counts.
 
+Block 55 also executes graph-ordered `BodyBooleanFeature` nodes transactionally. Block 56 adds
+ordered `BodyTransform` nodes and SketchOwnership dependencies to Core planning. Block 57 executes
+those nodes transactionally, stores transform-scoped/body-scoped shapes plus derived affine
+reference state, and keeps persistent Sketch coordinates unchanged.
+
 ## Recompute lifecycle
 
 The executor works on a `const PartDocument` and does not modify its invalidation state. Calling `mark_all_clean()` after a successful recompute remains the caller's responsibility. This keeps execution free of document mutation.

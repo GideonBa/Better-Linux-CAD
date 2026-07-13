@@ -1,6 +1,6 @@
 # Feature System
 
-Status: target architecture. Additive/Subtractive Extrude, multi-body identity/results, Block-54 BodyBooleanFeature Core intent, and Block-55 Body Boolean Geometry are implemented; BodyTransform and SketchOwnership intent is the Block-56 boundary.
+Status: target architecture. Additive/Subtractive Extrude, multi-body identity/results, Body Booleans, and Block-57 associative BodyTransform/SketchOwnership execution are implemented; reusable Part feature semantic inputs are the Block-58 boundary.
 
 Features are the parametric operations a part is built from. Each feature has inputs, parameters, references, and a computed geometry output. The central rule is that a feature stores the *rule* for computing geometry, not only the finished body. The OCCT shape is a cache.
 
@@ -86,7 +86,9 @@ Target behavior:
 - Blocks 52–53 add recomputable Body shapes and checked inspection.
 - Block 54 adds persistent Add/Subtract/Intersect BodyBooleanFeature intent, JSON, graph ordering,
   invalidation, removal protection, and explicit tool retention.
-- Source-feature catalogs, transform stack, material override, and cache key remain planned.
+- Blocks 56–57 add the persistent transform stack, ownership intent, OCCT execution, and derived
+  affine/reference cache state.
+- Source-feature catalogs, material override, and richer cache keys remain planned.
 - Features support `operation_mode = new_body | join | cut | intersect`.
 - Body transform records support translate, rotate, uniform scale, optional non-uniform scale, and later matrix transforms.
 - Transform order is stored explicitly in a `BodyTransformStack`.
@@ -94,7 +96,9 @@ Target behavior:
 - Tool-body consumption or preservation is explicit.
 - Body operations remain semantic model intent and never directly persist raw OCCT shapes.
 
-When a body is transformed, a future `SketchOwnership` record should control whether sketches and construction geometry associated with that body move with the body. If `apply_to_owned_sketches = true`, the sketch workplane frame moves, rotates, or scales with the body while sketch-local 2D coordinates remain unchanged.
+When a body is transformed, `SketchOwnership` controls whether sketches and associated construction
+references move with the body. If `apply_to_owned_sketches = true`, the derived sketch workplane
+frame moves, rotates, or scales while sketch-local 2D coordinates remain unchanged.
 
 The detailed roadmap is in `docs/multi-body-transform-and-path-features-roadmap.md`.
 
@@ -156,8 +160,8 @@ A feature depends on its input sketch, selected profile region, parameters, targ
 3. Add selected `ProfileRegion` inputs after automatic region detection exists.
 4. Add `BodyId`, `Body`, and feature output-body metadata so a part can own multiple bodies. Body identity/ownership, output-body intent, persistence, and dependency semantics are implemented through Block 51.
 5. Use the implemented Block-52 `ShapeCache` support for multiple body shapes.
-6. Add body transform records for translate, rotate, and uniform scale.
-7. Add sketch ownership records so body transforms can move owned sketch workplanes when requested.
+6. Execute the implemented Block-56 body transform records for translate, rotate, and uniform scale.
+7. Apply the implemented SketchOwnership intent to owned workplane frames when explicitly requested.
 8. Extend the implemented Block-55 body boolean Geometry only through explicit later feature contracts.
 9. Add `RevolveFeature` and `RevolveCutFeature`.
 10. Extend the implemented circular-hole-pattern seed (`docs/bolt-circle-pattern-mvp3.md`) with assembly-scoped parameters, skip instances, and hole semantics.

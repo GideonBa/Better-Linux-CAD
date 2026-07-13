@@ -52,6 +52,7 @@ struct SubassemblyInstanceIdTag;
 struct AssemblyConstraintIdTag;
 struct AssemblyJointIdTag;
 struct BodyIdTag;
+struct BodyTransformIdTag;
 
 using DocumentId = TypedId<DocumentIdTag>;
 using ParameterId = TypedId<ParameterIdTag>;
@@ -77,5 +78,6 @@ using SubassemblyInstanceId = TypedId<SubassemblyInstanceIdTag>;
 using AssemblyConstraintId = TypedId<AssemblyConstraintIdTag>;
 using AssemblyJointId = TypedId<AssemblyJointIdTag>;
 using BodyId = TypedId<BodyIdTag>;
+using BodyTransformId = TypedId<BodyTransformIdTag>;
 
 } // namespace blcad

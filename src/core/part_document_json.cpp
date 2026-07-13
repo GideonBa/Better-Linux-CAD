@@ -1171,6 +1171,174 @@ feature_body_result_context_from_json(const json& feature_json) {
                                     value.at("keep_tool_bodies").get<bool>());
 }
 
+[[nodiscard]] Result<BodyTransformCoordinateSpace>
+body_transform_coordinate_space_from_json(const json& value) {
+  if (!value.is_string())
+    return Result<BodyTransformCoordinateSpace>::failure(
+        json_error("body transform coordinate_space must be a string"));
+  const std::string spelling = value.get<std::string>();
+  if (spelling == "world")
+    return Result<BodyTransformCoordinateSpace>::success(BodyTransformCoordinateSpace::World);
+  if (spelling == "body_local")
+    return Result<BodyTransformCoordinateSpace>::success(BodyTransformCoordinateSpace::BodyLocal);
+  if (spelling == "sketch_local")
+    return Result<BodyTransformCoordinateSpace>::success(
+        BodyTransformCoordinateSpace::SketchLocal);
+  if (spelling == "construction_reference")
+    return Result<BodyTransformCoordinateSpace>::success(
+        BodyTransformCoordinateSpace::ConstructionReference);
+  return Result<BodyTransformCoordinateSpace>::failure(
+      json_error("unsupported body transform coordinate space"));
+}
+
+[[nodiscard]] Result<BodyTransformRotationAxis>
+body_transform_rotation_axis_from_json(const json& value) {
+  if (!value.is_object() || !value.contains("kind") || !value.at("kind").is_string())
+    return Result<BodyTransformRotationAxis>::failure(
+        json_error("body transform rotation axis requires a kind"));
+  const std::string kind = value.at("kind").get<std::string>();
+  if (kind == "explicit") {
+    if (!value.contains("origin") || !value.contains("direction"))
+      return Result<BodyTransformRotationAxis>::failure(
+          json_error("explicit body rotation axis requires origin and direction"));
+    return BodyTransformRotationAxis::create_explicit(point3_from_json(value.at("origin")),
+                                                       vector3_from_json(value.at("direction")));
+  }
+  if (kind == "datum_axis") {
+    if (!value.contains("datum_axis") || !value.at("datum_axis").is_string())
+      return Result<BodyTransformRotationAxis>::failure(
+          json_error("body rotation datum axis requires a string id"));
+    return BodyTransformRotationAxis::create_datum_axis(
+        DatumAxisId(value.at("datum_axis").get<std::string>()));
+  }
+  if (kind == "construction_line") {
+    if (!value.contains("construction_line") || !value.at("construction_line").is_string())
+      return Result<BodyTransformRotationAxis>::failure(
+          json_error("body rotation construction line requires a string id"));
+    return BodyTransformRotationAxis::create_construction_line(
+        ConstructionLineId(value.at("construction_line").get<std::string>()));
+  }
+  if (kind == "semantic_edge") {
+    if (!value.contains("semantic_edge"))
+      return Result<BodyTransformRotationAxis>::failure(
+          json_error("body rotation semantic edge requires a reference"));
+    auto edge = semantic_edge_reference_from_json(value.at("semantic_edge"));
+    if (edge.has_error())
+      return Result<BodyTransformRotationAxis>::failure(edge.error());
+    return BodyTransformRotationAxis::create_semantic_edge(std::move(edge.value()));
+  }
+  return Result<BodyTransformRotationAxis>::failure(
+      json_error("unsupported body transform rotation axis kind"));
+}
+
+[[nodiscard]] Result<BodyTransform> body_transform_from_json(const json& value) {
+  if (!value.is_object() || !value.contains("id") || !value.contains("body") ||
+      !value.contains("kind") || !value.contains("coordinate_space") ||
+      !value.contains("apply_to_owned_sketches") ||
+      !value.contains("apply_to_owned_construction_geometry"))
+    return Result<BodyTransform>::failure(
+        json_error("body transform requires all mandatory fields"));
+  if (!value.at("id").is_string() || !value.at("body").is_string() ||
+      !value.at("kind").is_string() ||
+      !value.at("apply_to_owned_sketches").is_boolean() ||
+      !value.at("apply_to_owned_construction_geometry").is_boolean() ||
+      (value.contains("coordinate_reference") &&
+       !value.at("coordinate_reference").is_string()))
+    return Result<BodyTransform>::failure(json_error("body transform fields have invalid types"));
+
+  auto coordinate_space =
+      body_transform_coordinate_space_from_json(value.at("coordinate_space"));
+  if (coordinate_space.has_error())
+    return Result<BodyTransform>::failure(coordinate_space.error());
+  std::optional<std::string> coordinate_reference;
+  if (value.contains("coordinate_reference"))
+    coordinate_reference = value.at("coordinate_reference").get<std::string>();
+  const BodyTransformId id(value.at("id").get<std::string>());
+  const BodyId body(value.at("body").get<std::string>());
+  const bool apply_sketches = value.at("apply_to_owned_sketches").get<bool>();
+  const bool apply_construction =
+      value.at("apply_to_owned_construction_geometry").get<bool>();
+  const std::string kind = value.at("kind").get<std::string>();
+  if (kind == "translate") {
+    if (!value.contains("translation_mm") || value.contains("rotation_axis") ||
+        value.contains("angle_deg") || value.contains("scale_factor") ||
+        value.contains("center"))
+      return Result<BodyTransform>::failure(
+          json_error("translate body transform requires only translation_mm parameters"));
+    return BodyTransform::create_translate(
+        id, body, coordinate_space.value(), std::move(coordinate_reference),
+        vector3_from_json(value.at("translation_mm")), apply_sketches, apply_construction);
+  }
+  if (kind == "rotate") {
+    if (!value.contains("rotation_axis") || !value.contains("angle_deg") ||
+        !value.at("angle_deg").is_number() || value.contains("translation_mm") ||
+        value.contains("scale_factor") || value.contains("center"))
+      return Result<BodyTransform>::failure(
+          json_error("rotate body transform requires only rotation_axis and angle_deg parameters"));
+    auto axis = body_transform_rotation_axis_from_json(value.at("rotation_axis"));
+    if (axis.has_error())
+      return Result<BodyTransform>::failure(axis.error());
+    return BodyTransform::create_rotate(
+        id, body, coordinate_space.value(), std::move(coordinate_reference),
+        std::move(axis.value()), value.at("angle_deg").get<double>(), apply_sketches,
+        apply_construction);
+  }
+  if (kind == "uniform_scale") {
+    if (!value.contains("scale_factor") || !value.at("scale_factor").is_number() ||
+        !value.contains("center") || value.contains("translation_mm") ||
+        value.contains("rotation_axis") || value.contains("angle_deg"))
+      return Result<BodyTransform>::failure(
+          json_error("uniform_scale body transform requires only factor and center parameters"));
+    return BodyTransform::create_uniform_scale(
+        id, body, coordinate_space.value(), std::move(coordinate_reference),
+        value.at("scale_factor").get<double>(), point3_from_json(value.at("center")),
+        apply_sketches, apply_construction);
+  }
+  return Result<BodyTransform>::failure(json_error("unsupported body transform kind"));
+}
+
+[[nodiscard]] Result<SketchOwnership> sketch_ownership_from_json(const json& value) {
+  if (!value.is_object() || !value.contains("sketch") || !value.contains("owning_body") ||
+      !value.contains("association") || !value.at("sketch").is_string() ||
+      !value.at("owning_body").is_string() || !value.at("association").is_string())
+    return Result<SketchOwnership>::failure(
+        json_error("sketch ownership requires string sketch owning_body and association fields"));
+  const std::string spelling = value.at("association").get<std::string>();
+  SketchAssociation association;
+  if (spelling == "drives_body")
+    association = SketchAssociation::DrivesBody;
+  else if (spelling == "consumed_by_body")
+    association = SketchAssociation::ConsumedByBody;
+  else if (spelling == "reference_only")
+    association = SketchAssociation::ReferenceOnly;
+  else
+    return Result<SketchOwnership>::failure(
+        json_error("unsupported sketch ownership association"));
+  return SketchOwnership::create(SketchId(value.at("sketch").get<std::string>()),
+                                 BodyId(value.at("owning_body").get<std::string>()), association);
+}
+
+[[nodiscard]] json body_transform_rotation_axis_to_json(
+    const BodyTransformRotationAxis& axis) {
+  json value{{"kind", std::string(to_string(axis.kind()))}};
+  switch (axis.kind()) {
+  case BodyTransformRotationAxisKind::Explicit:
+    value["origin"] = point3_to_json(axis.explicit_origin());
+    value["direction"] = vector3_to_json(axis.explicit_direction());
+    break;
+  case BodyTransformRotationAxisKind::DatumAxis:
+    value["datum_axis"] = axis.datum_axis().value();
+    break;
+  case BodyTransformRotationAxisKind::ConstructionLine:
+    value["construction_line"] = axis.construction_line().value();
+    break;
+  case BodyTransformRotationAxisKind::SemanticEdge:
+    value["semantic_edge"] = semantic_edge_reference_to_json(*axis.semantic_edge());
+    break;
+  }
+  return value;
+}
+
 [[nodiscard]] bool sketch_dependencies_available(const PartDocument& document,
                                                  const Sketch& sketch) {
   if (!document.has_workplane_id(sketch.workplane()))
@@ -1412,6 +1580,39 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
       feature_json["produced_body"] = feature.produced_body()->value();
     root["body_booleans"].push_back(std::move(feature_json));
   }
+  root["sketch_ownerships"] = json::array();
+  for (const SketchOwnership& ownership : document.sketch_ownerships())
+    root["sketch_ownerships"].push_back(
+        json{{"sketch", ownership.sketch().value()},
+             {"owning_body", ownership.owning_body().value()},
+             {"association", std::string(to_string(ownership.association()))}});
+  root["body_transforms"] = json::array();
+  for (const BodyTransform& transform : document.body_transforms()) {
+    json value{{"id", transform.id().value()},
+               {"body", transform.body().value()},
+               {"kind", std::string(to_string(transform.kind()))},
+               {"coordinate_space", std::string(to_string(transform.coordinate_space()))},
+               {"apply_to_owned_sketches", transform.apply_to_owned_sketches()},
+               {"apply_to_owned_construction_geometry",
+                transform.apply_to_owned_construction_geometry()}};
+    if (transform.coordinate_reference().has_value())
+      value["coordinate_reference"] = *transform.coordinate_reference();
+    switch (transform.kind()) {
+    case BodyTransformKind::Translate:
+      value["translation_mm"] = vector3_to_json(transform.translation_mm());
+      break;
+    case BodyTransformKind::Rotate:
+      value["rotation_axis"] =
+          body_transform_rotation_axis_to_json(*transform.rotation_axis());
+      value["angle_deg"] = transform.angle_deg();
+      break;
+    case BodyTransformKind::UniformScale:
+      value["scale_factor"] = transform.scale_factor();
+      value["center"] = point3_to_json(transform.scale_center());
+      break;
+    }
+    root["body_transforms"].push_back(std::move(value));
+  }
   root["reference_statuses"] = json::array();
   for (const auto& status : document.reference_statuses())
     root["reference_statuses"].push_back(reference_status_to_json(status));
@@ -1621,6 +1822,30 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
       if (axis.has_error())
         return Result<PartDocument>::failure(axis.error());
       auto added = document.value().add_datum_axis(axis.value());
+      if (added.has_error())
+        return Result<PartDocument>::failure(added.error());
+    }
+    const json ownership_array = root.value("sketch_ownerships", json::array());
+    if (!ownership_array.is_array())
+      return Result<PartDocument>::failure(
+          json_error("sketch_ownerships must be an array in part document json"));
+    for (const auto& ownership_json : ownership_array) {
+      auto ownership = sketch_ownership_from_json(ownership_json);
+      if (ownership.has_error())
+        return Result<PartDocument>::failure(ownership.error());
+      auto added = document.value().add_sketch_ownership(std::move(ownership.value()));
+      if (added.has_error())
+        return Result<PartDocument>::failure(added.error());
+    }
+    const json transform_array = root.value("body_transforms", json::array());
+    if (!transform_array.is_array())
+      return Result<PartDocument>::failure(
+          json_error("body_transforms must be an array in part document json"));
+    for (const auto& transform_json : transform_array) {
+      auto transform = body_transform_from_json(transform_json);
+      if (transform.has_error())
+        return Result<PartDocument>::failure(transform.error());
+      auto added = document.value().add_body_transform(std::move(transform.value()));
       if (added.has_error())
         return Result<PartDocument>::failure(added.error());
     }

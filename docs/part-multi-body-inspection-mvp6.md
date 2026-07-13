@@ -55,5 +55,5 @@ Focused acceptance tag:
 
 ## Handoff
 
-Block 54 persistent `BodyBooleanFeature` Core intent and JSON are implemented in
-`docs/part-body-boolean-mvp6.md`. Block 55 now executes that intent in Geometry.
+Blocks 54–56 Body Boolean intent/execution and BodyTransform/SketchOwnership intent are implemented.
+Block 57 is the transform Geometry handoff.

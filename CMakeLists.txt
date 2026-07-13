@@ -44,6 +44,7 @@ add_library(
   src/core/assembly_subassembly_instances.cpp
   src/core/body.cpp
   src/core/body_boolean_feature.cpp
+  src/core/body_transform.cpp
   src/core/composite_closed_profile.cpp
   src/core/construction_geometry.cpp
   src/core/datum_axis.cpp
@@ -66,6 +67,7 @@ add_library(
   src/core/reference_generated_line.cpp
   src/core/reference_recovery.cpp
   src/core/sketch.cpp
+  src/core/sketch_ownership.cpp
   src/core/sketch_arc_profile.cpp
   src/core/sketch_constraints.cpp
   src/core/sketch_diagnostics.cpp
@@ -152,6 +154,7 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/assembly_target_compatibility.cpp
     src/geometry/assembly_transform_evaluator.cpp
     src/geometry/body_result_inspector.cpp
+    src/geometry/body_transform_adapter.cpp
     src/geometry/body_boolean_adapter.cpp
     src/geometry/circular_cut_adapter.cpp
     src/geometry/closed_profile_adapter.cpp
@@ -263,6 +266,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/assembly_reference_target_tests.cpp
     tests/core/body_tests.cpp
     tests/core/body_boolean_feature_tests.cpp
+    tests/core/body_transform_tests.cpp
     tests/core/body_json_tests.cpp
     tests/core/chained_construction_relation_tests.cpp
     tests/core/circular_hole_pattern_tests.cpp
@@ -364,6 +368,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/assembly_transform_evaluator_tests.cpp
       tests/geometry/back_workplane_pipeline_tests.cpp
       tests/geometry/body_result_inspector_tests.cpp
+      tests/geometry/body_transform_pipeline_tests.cpp
       tests/geometry/body_boolean_pipeline_tests.cpp
       tests/geometry/bolt_circle_pattern_pipeline_tests.cpp
       tests/geometry/chained_construction_plane_resolver_tests.cpp

@@ -4,6 +4,7 @@
 #include "blcad/core/recompute_plan.hpp"
 #include "blcad/core/result.hpp"
 #include "blcad/geometry/body_boolean_adapter.hpp"
+#include "blcad/geometry/body_transform_adapter.hpp"
 #include "blcad/geometry/circular_cut_adapter.hpp"
 #include "blcad/geometry/closed_profile_adapter.hpp"
 #include "blcad/geometry/rectangle_extrusion_adapter.hpp"
@@ -34,6 +35,10 @@ public:
                                                          FeatureId feature_id,
                                                          ShapeCache& shape_cache) const;
 
+  [[nodiscard]] Result<std::size_t> execute_body_transform(const PartDocument& document,
+                                                           BodyTransformId transform_id,
+                                                           ShapeCache& shape_cache) const;
+
   [[nodiscard]] Result<GeometryRecomputeSummary> execute_plan(const PartDocument& document,
                                                               const RecomputePlan& plan,
                                                               ShapeCache& shape_cache) const;
@@ -50,6 +55,7 @@ private:
   CircularCutAdapter circular_cut_adapter_;
   ClosedProfileAdapter closed_profile_adapter_;
   BodyBooleanAdapter body_boolean_adapter_;
+  BodyTransformAdapter body_transform_adapter_;
   WorkplaneResolver workplane_resolver_;
 };
 

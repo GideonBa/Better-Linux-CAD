@@ -6,6 +6,8 @@
 
 namespace blcad::geometry {
 
+class ShapeCache;
+
 struct RectangularWorkplaneBounds {
   bool enabled = false;
   Point2 center;
@@ -33,6 +35,10 @@ public:
 
   [[nodiscard]] Result<ResolvedWorkplane> resolve_for_sketch(const PartDocument& document,
                                                              const Sketch& sketch) const;
+
+  [[nodiscard]] Result<ResolvedWorkplane> resolve_for_sketch(const PartDocument& document,
+                                                             const Sketch& sketch,
+                                                             const ShapeCache& shape_cache) const;
 
   [[nodiscard]] Point3 evaluate_point(const ResolvedWorkplane& workplane,
                                       Point2 local_point) const noexcept;

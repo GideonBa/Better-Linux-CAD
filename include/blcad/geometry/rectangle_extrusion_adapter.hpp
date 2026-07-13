@@ -18,13 +18,14 @@ class RectangleExtrusionAdapter;
 class BodyBooleanAdapter;
 class CircularCutAdapter;
 class ClosedProfileAdapter;
+class BodyTransformAdapter;
 class StepExporter;
 class AssemblyStepExporter;
 
 namespace detail {
 class AssemblyPartShapeDefinitionBuilder;
 class AssemblyPosedLeafShapeBuilder;
-}
+} // namespace detail
 
 class GeometryShape {
 public:
@@ -45,6 +46,7 @@ private:
   friend class BodyBooleanAdapter;
   friend class CircularCutAdapter;
   friend class ClosedProfileAdapter;
+  friend class BodyTransformAdapter;
   friend class StepExporter;
   friend class AssemblyStepExporter;
   friend class detail::AssemblyPartShapeDefinitionBuilder;

@@ -57,7 +57,10 @@ NewBody/Cut results into deterministic Body-scoped cache entries without moving 
 Core. Block 53 exposes those products through checked Body metadata/summary inspection and rejects
 ambiguous historical final-shape consumption. Block 54 adds persistent BodyBooleanFeature intent,
 JSON, and target/tool/result graph authority. Block 55 executes those operations transactionally in
-OCCT with deterministic multi-tool and incremental-recompute behavior.
+OCCT with deterministic multi-tool and incremental-recompute behavior. Block 56 adds ordered
+BodyTransform and SketchOwnership intent, compatible JSON, producer advancement, and reference
+dependencies. Block 57 executes those transforms transactionally and keeps cumulative Body,
+owned-frame, construction-reference, semantic, and projected results derived in `ShapeCache`.
 
 `Project` owns:
 
@@ -562,11 +565,14 @@ Canonical numbered sequence:
 - `docs/part-multi-body-inspection-mvp6.md`
 - `docs/part-body-boolean-mvp6.md`
 - `docs/part-body-boolean-geometry-mvp6.md`
+- `docs/part-body-transform-ownership-mvp6.md`
+- `docs/part-body-transform-geometry-mvp6.md`
 - `docs/step-import-sequence-mvp7.md`
 
-Block 47 Spherical completes the Assembly MVP sequence. Blocks 48–55 Body identity, body-scoped
-recompute/inspection, persistent BodyBooleanFeature intent, and Boolean Geometry are implemented.
-The next technical step is Block 56 BodyTransform and SketchOwnership Core intent plus JSON.
+Block 47 Spherical completes the Assembly MVP sequence. Blocks 48–57 Body identity, body-scoped
+recompute/inspection, Body Booleans, and persistent plus associative BodyTransform/SketchOwnership
+execution are implemented. The next technical step is Block 58 reusable Part feature semantic
+input references.
 
 Block 47 adds passive Point/Point Spherical intent through the shared local/root-space path. Scalar
 Revolute APIs remain adapters; transform variables and the shared numeric engine are unchanged.

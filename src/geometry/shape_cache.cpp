@@ -122,6 +122,49 @@ Result<bool> ShapeCache::remove_body_shape(BodyId body_id) {
   return Result<bool>::success(true);
 }
 
+Result<std::size_t>
+ShapeCache::store_body_transform_state(BodyTransformId transform_id, BodyId body_id,
+                                       GeometryAffineTransform cumulative_transform) {
+  if (transform_id.empty() || body_id.empty())
+    return Result<std::size_t>::failure(
+        Error::validation(kShapeCacheObjectId, "body transform and body ids must not be empty"));
+  const auto existing = std::find_if(
+      body_transform_states_.begin(), body_transform_states_.end(),
+      [&](const CachedBodyTransformState& state) { return state.transform_id == transform_id; });
+  if (existing != body_transform_states_.end()) {
+    existing->body_id = std::move(body_id);
+    existing->cumulative_transform = cumulative_transform;
+    return Result<std::size_t>::success(
+        static_cast<std::size_t>(std::distance(body_transform_states_.begin(), existing)));
+  }
+  body_transform_states_.push_back(
+      {std::move(transform_id), std::move(body_id), cumulative_transform});
+  return Result<std::size_t>::success(body_transform_states_.size() - 1U);
+}
+
+Result<std::size_t>
+ShapeCache::store_reference_transform(std::string reference_id, BodyId body_id,
+                                      BodyTransformId source_transform_id,
+                                      GeometryAffineTransform cumulative_transform) {
+  if (reference_id.empty() || body_id.empty() || source_transform_id.empty())
+    return Result<std::size_t>::failure(
+        Error::validation(kShapeCacheObjectId, "reference transform ids must not be empty"));
+  const auto existing = std::find_if(reference_transforms_.begin(), reference_transforms_.end(),
+                                     [&](const CachedReferenceTransform& state) {
+                                       return state.reference_id == reference_id &&
+                                              state.source_transform_id == source_transform_id;
+                                     });
+  if (existing != reference_transforms_.end()) {
+    *existing = {std::move(reference_id), std::move(body_id), std::move(source_transform_id),
+                 cumulative_transform};
+    return Result<std::size_t>::success(
+        static_cast<std::size_t>(std::distance(reference_transforms_.begin(), existing)));
+  }
+  reference_transforms_.push_back({std::move(reference_id), std::move(body_id),
+                                   std::move(source_transform_id), cumulative_transform});
+  return Result<std::size_t>::success(reference_transforms_.size() - 1U);
+}
+
 void ShapeCache::clear_final_shape() noexcept {
   has_final_shape_ = false;
   final_feature_id_ = FeatureId();
@@ -131,6 +174,8 @@ void ShapeCache::clear_final_shape() noexcept {
 void ShapeCache::clear() noexcept {
   feature_shapes_.clear();
   body_shapes_.clear();
+  body_transform_states_.clear();
+  reference_transforms_.clear();
   clear_final_shape();
 }
 
@@ -178,6 +223,41 @@ const CachedBodyShape* ShapeCache::find_body_result(const BodyId& body_id) const
 const GeometryShape* ShapeCache::find_body_shape(const BodyId& body_id) const noexcept {
   const CachedBodyShape* result = find_body_result(body_id);
   return result == nullptr ? nullptr : &result->shape;
+}
+
+const CachedBodyTransformState*
+ShapeCache::find_body_transform_state(const BodyTransformId& transform_id) const noexcept {
+  const auto existing = std::find_if(
+      body_transform_states_.begin(), body_transform_states_.end(),
+      [&](const CachedBodyTransformState& state) { return state.transform_id == transform_id; });
+  return existing == body_transform_states_.end() ? nullptr : &*existing;
+}
+
+const CachedBodyTransformState*
+ShapeCache::find_latest_body_transform_state(const BodyId& body_id) const noexcept {
+  const auto existing =
+      std::find_if(body_transform_states_.rbegin(), body_transform_states_.rend(),
+                   [&](const CachedBodyTransformState& state) { return state.body_id == body_id; });
+  return existing == body_transform_states_.rend() ? nullptr : &*existing;
+}
+
+const CachedReferenceTransform*
+ShapeCache::find_reference_transform(std::string_view reference_id) const noexcept {
+  const auto existing = std::find_if(
+      reference_transforms_.rbegin(), reference_transforms_.rend(),
+      [&](const CachedReferenceTransform& state) { return state.reference_id == reference_id; });
+  return existing == reference_transforms_.rend() ? nullptr : &*existing;
+}
+
+const CachedReferenceTransform*
+ShapeCache::find_reference_transform(std::string_view reference_id,
+                                     const BodyTransformId& source_transform_id) const noexcept {
+  const auto existing = std::find_if(reference_transforms_.begin(), reference_transforms_.end(),
+                                     [&](const CachedReferenceTransform& state) {
+                                       return state.reference_id == reference_id &&
+                                              state.source_transform_id == source_transform_id;
+                                     });
+  return existing == reference_transforms_.end() ? nullptr : &*existing;
 }
 
 bool ShapeCache::has_final_shape() const noexcept {

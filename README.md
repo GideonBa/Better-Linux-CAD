@@ -4,7 +4,7 @@ BLCAD will be an independent, headless parametric CAD system for Linux, in activ
 
 All architecture, feature contracts, persistence semantics, roadmaps, and current implementation status live in [`docs/`](docs/). This README is intentionally kept small and evergreen — it is not a status page.
 
-The assembly sequence is implemented through Block 47. Part Construction Blocks 48–55 add Body identity, body-scoped recompute/inspection, persistent BodyBooleanFeature intent, and transactional OCCT Boolean execution; the current contract is [`docs/part-body-boolean-geometry-mvp6.md`](docs/part-body-boolean-geometry-mvp6.md). Block 56 — BodyTransform and SketchOwnership Core intent plus JSON — is the next technical step.
+The assembly sequence is implemented through Block 47. Part Construction Blocks 48–57 add Body identity, body-scoped recompute/inspection, Body Booleans, persistent BodyTransform/SketchOwnership intent, and associative OCCT transform execution; the current contract is [`docs/part-body-transform-geometry-mvp6.md`](docs/part-body-transform-geometry-mvp6.md). Block 58 — reusable Part feature semantic input references — is the next technical step.
 
 ## Repository layout
 

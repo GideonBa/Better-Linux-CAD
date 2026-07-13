@@ -95,6 +95,11 @@ the Boolean node, and the node feeds either the modified target Body or a distin
 Consequently, invalidation and recompute planning order Boolean work deterministically. Block 55
 now executes those steps through the body-scoped OCCT Boolean path.
 
+Block 56 registers authored BodyTransform stacks after the current Body producer. Coordinate-space
+references, rotation-axis references, and matching `sketch_ownership:<SketchId>` nodes feed each
+transform. Later transforms and the target Body therefore enter the plan in persistent stack order;
+Block 57 supplies their Geometry execution.
+
 `PartDocument::mark_all_clean()` indirectly clears the plan because no `dirty` nodes remain afterward.
 
 ## Error behavior
@@ -118,6 +123,7 @@ Current tests check:
 - `PartDocument::mark_all_clean()` leads to an empty plan
 - Body producer/consumer chains yield deterministic Feature/Body step order
 - Body-Boolean target/tool/result chains yield deterministic invalidation and plan order
+- BodyTransform stacks and SketchOwnership inputs yield deterministic invalidation and plan order
 
 ## Connection to geometry
 
