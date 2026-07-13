@@ -48,9 +48,18 @@ compatibility_matrix(AssemblyConstraintType relationship_type) {
   case AssemblyConstraintType::Insert:
     return {{Capability::Frame, Capability::Frame}};
   case AssemblyConstraintType::Coincident:
+    return {{Capability::Point, Capability::Point},
+            {Capability::Point, Capability::Line},
+            {Capability::Line, Capability::Point},
+            {Capability::Point, Capability::Plane},
+            {Capability::Plane, Capability::Point}};
   case AssemblyConstraintType::Parallel:
   case AssemblyConstraintType::Perpendicular:
-    return {};
+    return {{Capability::Line, Capability::Line},
+            {Capability::Axis, Capability::Axis},
+            {Capability::Line, Capability::Axis},
+            {Capability::Axis, Capability::Line},
+            {Capability::Plane, Capability::Plane}};
   }
   return {};
 }

@@ -2,7 +2,7 @@
 
 Status: implemented as Block 27. Block 28 now reuses the same authority/proposal, hierarchy-boundary, and semantic PartDocument freshness boundaries for Project-level cross-hierarchy Revolute motion.
 
-This document is canonical for modeled-input freshness, atomic authority-qualified geometric solve-result application, and cross-hierarchy Jacobian-rank/remaining-DOF diagnostics.
+This document is canonical for modeled-input freshness, atomic authority-qualified geometric solve-result application, and cross-hierarchy Jacobian-rank/remaining-DOF diagnostics. Block 39 reuses these boundaries unchanged for Coincident, Parallel, and Perpendicular solve results.
 
 Cross-hierarchy motion follow-up is canonical in `docs/assembly-cross-hierarchy-revolute-motion-mvp5.md`.
 
@@ -131,7 +131,7 @@ AssemblyCrossHierarchySolveGroup{
 
 and requires that exact group to remain in current `solve_groups()`.
 
-Therefore graph participation is solve input.
+Therefore graph participation is solve input. Block 39 enables Coincident/Parallel/Perpendicular graph participation, so adding, removing, activating, or deactivating those relationships affects freshness through this same exact-group rule.
 
 Examples that stale an old result:
 
@@ -263,7 +263,7 @@ The source Project remains unchanged on every validation or candidate-write fail
 
 ## Shared matrix-rank implementation
 
-Local and cross-hierarchy diagnostics use:
+Local and cross-hierarchy diagnostics, including Block-39 generic relationship diagnostics, use:
 
 ```text
 compute_assembly_matrix_rank

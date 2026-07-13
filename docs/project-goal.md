@@ -195,7 +195,7 @@ Blocks 32–34 established assembly-selectable reference geometry Core intent, s
 
 Block 35 establishes stable generated topology identity and recovery before Geometry topology lookup. Canonical `topo:` spellings encode exact semantic producer identities for cylindrical wall, rectangular linear-edge/vertex roles, and circular source/opposite rim roles. Producer role matrices publish expected cardinality and unsupported/ambiguous/patterned sources fail closed. Recovery is read-only and never writes raw kernel topology ids.
 
-Block 36 resolves the supported Block-35 semantic producers into Cylinder/Axis, Line, Circle/Axis/center Point, and Point capabilities, computed analytically from validated model intent for both component-local and exact rooted transform semantics. Block 37 adds deterministic relationship/target compatibility selection for existing relationship types. Block 38 adds persistent local and Project-level Coincident/Parallel/Perpendicular intent plus lowercase JSON spellings while deliberately deferring equations and graph participation. The next authority step is Block 39: generic relationship equations and shared solve integration.
+Block 36 resolves the supported Block-35 semantic producers into Cylinder/Axis, Line, Circle/Axis/center Point, and Point capabilities, computed analytically from validated model intent for both component-local and exact rooted transform semantics. Block 37 adds deterministic relationship/target compatibility selection. Block 38 adds persistent local and Project-level Coincident/Parallel/Perpendicular intent plus lowercase JSON spellings. Block 39 adds capability-driven generic equations, shared local/cross-hierarchy graph and solver integration, freshness/application reuse, measured Jacobian-rank diagnostics, and non-planar Line/Axis Angle execution. The next authority step is Block 40: joint target compatibility and the oriented `Frame` contract.
 
 Canonical sequence: `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`.
 
@@ -233,7 +233,7 @@ The current phase should not attempt to deliver:
 - arbitrary raw OCCT face/edge/vertex selection as persistent identity;
 - a second transform or occurrence-local pose authority without explicit persistence/application design;
 - whole-subassembly rigid solve variables before grounding and application semantics exist;
-- generic relationship equations before persistent generic relationship intent and target capability compatibility exist;
+- generic relationship or joint equations before persistent intent and target capability compatibility exist;
 - richer joint families before typed coordinate slots and vector-drive semantics exist;
 - a general-purpose physics constraint engine;
 - full contact dynamics, collision response, friction, or rigid-body simulation;
@@ -258,6 +258,8 @@ Feature-specific MVP documents are canonical for exact contracts, persistence bo
 
 `docs/assembly-generic-relationship-intent-mvp5.md` is canonical for Block-38 persistent Coincident/Parallel/Perpendicular intent and JSON.
 
-`docs/assembly-general-geometric-target-roadmap.md` is canonical for implemented Blocks 31–38 and planned Blocks 39–47.
+`docs/assembly-generic-relationship-equations-mvp5.md` is canonical for Block-39 generic relationship compatibility, equations, shared solve integration, freshness/application reuse, and rank diagnostics.
+
+`docs/assembly-general-geometric-target-roadmap.md` is canonical for implemented Blocks 31–39 and planned Blocks 40–47.
 
 `docs/file-format.md` is canonical for implemented serialization. Derived target source kinds/descriptors/capabilities/projections, producer matrices/classification, and recovery query results are not save-format fields.

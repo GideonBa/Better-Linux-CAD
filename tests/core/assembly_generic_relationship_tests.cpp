@@ -150,8 +150,8 @@ std::vector<std::string> relationship_type_spellings(const json& constraints) {
 
 } // namespace
 
-TEST_CASE("Generic assembly relationship intent is persistent-only before Block 39",
-          "[core][assembly-generic-relationship-intent]") {
+TEST_CASE("Generic assembly relationship intent participates in graphs after Block 39",
+          "[core][assembly-generic-relationship][assembly-generic-relationship-intent]") {
   CHECK(to_string(AssemblyConstraintType::Coincident) == "coincident");
   CHECK(to_string(AssemblyConstraintType::Parallel) == "parallel");
   CHECK(to_string(AssemblyConstraintType::Perpendicular) == "perpendicular");
@@ -205,13 +205,15 @@ TEST_CASE("Generic assembly relationship intent is persistent-only before Block 
 
   auto graph = AssemblyConstraintGraph::build(assembly);
   REQUIRE(graph);
-  CHECK(graph.value().edge_count() == 1U);
-  REQUIRE(graph.value().edges().size() == 1U);
-  CHECK(graph.value().edges().front().constraint() == AssemblyConstraintId("constraint.mate"));
+  CHECK(graph.value().edge_count() == 3U);
+  REQUIRE(graph.value().edges().size() == 3U);
+  CHECK(graph.value().edges()[0].constraint() == AssemblyConstraintId("constraint.coincident"));
+  CHECK(graph.value().edges()[1].constraint() == AssemblyConstraintId("constraint.mate"));
+  CHECK(graph.value().edges()[2].constraint() == AssemblyConstraintId("constraint.perpendicular"));
 }
 
-TEST_CASE("Generic Project relationships preserve rooted identity and stay out of current graphs",
-          "[core][assembly-generic-relationship-intent]") {
+TEST_CASE("Generic Project relationships preserve identity and participate in Block 39 graphs",
+          "[core][assembly-generic-relationship][assembly-generic-relationship-intent]") {
   auto project = generic_project();
 
   const RigidTransform root_transform =
@@ -274,21 +276,21 @@ TEST_CASE("Generic Project relationships preserve rooted identity and stay out o
 
   auto solve_graph = AssemblyCrossHierarchyConstraintGraph::build(project);
   REQUIRE(solve_graph);
-  CHECK(solve_graph.value().relationship_count() == 0U);
-  CHECK(solve_graph.value().authority_count() == 0U);
-  CHECK(solve_graph.value().incidence_count() == 0U);
-  CHECK(solve_graph.value().solve_group_count() == 0U);
+  CHECK(solve_graph.value().relationship_count() == 3U);
+  CHECK(solve_graph.value().authority_count() == 2U);
+  CHECK(solve_graph.value().incidence_count() == 5U);
+  CHECK(solve_graph.value().solve_group_count() == 1U);
 
   auto motion_graph = AssemblyCrossHierarchyMotionGraph::build(project);
   REQUIRE(motion_graph);
-  CHECK(motion_graph.value().relationship_count() == 0U);
-  CHECK(motion_graph.value().authority_count() == 0U);
-  CHECK(motion_graph.value().incidence_count() == 0U);
+  CHECK(motion_graph.value().relationship_count() == 3U);
+  CHECK(motion_graph.value().authority_count() == 2U);
+  CHECK(motion_graph.value().incidence_count() == 5U);
   CHECK(motion_graph.value().motion_group_count() == 0U);
 }
 
 TEST_CASE("Generic relationship JSON roundtrips local and occurrence-qualified intent",
-          "[core][assembly-generic-relationship-json]") {
+          "[core][assembly-generic-relationship][assembly-generic-relationship-json]") {
   auto assembly = local_assembly();
   REQUIRE(assembly.add_constraint(
       local_relationship("constraint.coincident", AssemblyConstraintType::Coincident)));
@@ -369,7 +371,7 @@ TEST_CASE("Generic relationship JSON roundtrips local and occurrence-qualified i
 }
 
 TEST_CASE("Generic relationship JSON rejects scalar values and preserves historical five families",
-          "[core][assembly-generic-relationship-json]") {
+          "[core][assembly-generic-relationship][assembly-generic-relationship-json]") {
   auto assembly = local_assembly();
   REQUIRE(assembly.add_constraint(
       local_relationship("constraint.coincident", AssemblyConstraintType::Coincident)));

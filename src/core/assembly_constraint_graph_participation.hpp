@@ -4,9 +4,9 @@
 
 namespace blcad {
 
-// Block 38 adds persistent generic relationship intent only. Keep the existing
-// five equation-enabled families in solve/motion connectivity until Block 39
-// implements generic relationship equations and shared graph integration.
+// Equation-enabled geometric relationship participation authority. Block 39
+// enables the three generic relationship families in the same local, hierarchy,
+// and motion connectivity used by the historical five families.
 [[nodiscard]] inline bool
 participates_in_current_assembly_constraint_graph(AssemblyConstraintType type) noexcept {
   switch (type) {
@@ -15,11 +15,10 @@ participates_in_current_assembly_constraint_graph(AssemblyConstraintType type) n
   case AssemblyConstraintType::Distance:
   case AssemblyConstraintType::Insert:
   case AssemblyConstraintType::Angle:
-    return true;
   case AssemblyConstraintType::Coincident:
   case AssemblyConstraintType::Parallel:
   case AssemblyConstraintType::Perpendicular:
-    return false;
+    return true;
   }
   return false;
 }

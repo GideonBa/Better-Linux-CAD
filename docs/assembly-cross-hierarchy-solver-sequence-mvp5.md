@@ -1,6 +1,6 @@
 # Cross-Hierarchy Assembly Relationship Sequence MVP-5
 
-Status: Blocks 23–38 are implemented. Block 39 is the current next technical step. Blocks 39–47 remain the explicit general assembly relationship and richer-joint continuation.
+Status: Blocks 23–39 are implemented. Block 40 is the current next technical step. Blocks 40–47 remain the explicit richer-joint continuation.
 
 This document is the canonical numbered handoff sequence for cross-document assembly intent, solving, motion, exchange, posed analysis, and general geometric target architecture.
 
@@ -18,6 +18,7 @@ Implemented contracts are canonical in:
 - `docs/assembly-reference-geometry-intent-mvp5.md`
 - `docs/assembly-generated-topology-reference-mvp5.md`
 - `docs/assembly-generic-relationship-intent-mvp5.md`
+- `docs/assembly-generic-relationship-equations-mvp5.md`
 - `docs/file-format.md`
 
 Future target/relationship/joint details are canonical in:
@@ -301,7 +302,7 @@ Mandatory order:
 36 generated face/edge/vertex target resolution (implemented)
 37 explicit target compatibility matrix (implemented)
 38 generic geometric relationship Core intent + JSON (implemented)
-39 generic relationship equations + shared solve integration
+39 generic relationship equations + shared solve integration (implemented)
 40 joint target compatibility + oriented Frame contract
 41 general joint coordinate/limit Core model
 42 general joint coordinate JSON/backward compatibility
@@ -463,9 +464,26 @@ Focused tags:
 [core][assembly-generic-relationship-json]
 ```
 
-## Blocks 39–40 — Generic relationship execution and joint target semantics
+## Block 39 — Generic relationship equations and shared solve integration — Implemented
 
-Block 39 adds Coincident/Parallel/Perpendicular equations through existing graph, authority, residual/Jacobian, freshness, atomic application, and diagnostics paths.
+Canonical: `docs/assembly-generic-relationship-equations-mvp5.md`.
+
+Coincident, Parallel, and Perpendicular now consume Block-37 capability compatibility and produce shared residual descriptors over Point/Line/Axis/Plane projections. Local and cross-hierarchy numeric paths flatten those residuals through the existing scale rules and reuse the single central-difference/Gauss-Newton engine.
+
+The three Block-38 families now participate in existing solve/motion graphs. Repeated occurrence authority identity, semantic PartDocument freshness, relationship/group freshness, atomic application, and actual Jacobian-rank diagnostics remain unchanged and apply to the new families automatically.
+
+Block 39 also executes non-planar Line/Axis Angle compatibility selected in Block 37 through the same direction-dot equation semantics.
+
+Focused tags:
+
+```text
+[geometry][assembly-generic-relationships]
+[geometry][assembly-generic-relationships-solver]
+[geometry][assembly-generic-relationships-cross-hierarchy]
+[geometry][assembly-generic-relationships-diagnostics]
+```
+
+## Block 40 — Joint target compatibility and oriented Frame contract
 
 Block 40 migrates joint target compatibility to capability semantics and freezes oriented `Frame` requirements. Current Revolute remains `Frame <-> Frame`; Axis alone is insufficient for signed twist.
 
@@ -528,6 +546,6 @@ posed shapes/contact records/sweep analyses
 
 ## Next technical step
 
-Implement Block 39 only: generic relationship equations and shared solve integration for `Coincident`, `Parallel`, and `Perpendicular`.
+Implement Block 40 only: joint target compatibility and the oriented `Frame` contract.
 
-Reuse Block-37 compatibility, existing local/cross-hierarchy graphs and authority mapping, the shared residual/Jacobian engine, freshness, atomic application, and diagnostics. Do not introduce parallel execution infrastructure.
+Preserve current Revolute `Frame <-> Frame` execution, migrate compatibility selection onto typed target capabilities, and do not change joint persistence or add a new joint family.

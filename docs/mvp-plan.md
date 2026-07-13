@@ -4,16 +4,16 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 38
-current_block: 39
-current_boundary: Generic relationship equations and shared solve integration
-current_tag: "(assigned when Block 39 starts)"
+implemented_through: Block 39
+current_block: 40
+current_boundary: Joint target compatibility and oriented Frame contract
+current_tag: "(assigned when Block 40 starts)"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
   mvp_3: "Parametric bolt circle pattern — implemented"
   mvp_4: "Assembly parameters and Project container — implemented"
-  mvp_5: "Assembly relationships, motion, hierarchy, analysis, exchange — Blocks 1–38 implemented, Blocks 39–47 planned"
+  mvp_5: "Assembly relationships, motion, hierarchy, analysis, exchange — Blocks 1–39 implemented, Blocks 40–47 planned"
   mvp_6: "Part Construction — Blocks 48–94 planned, starts after Block 47"
 ---
 
@@ -445,7 +445,7 @@ perpendicular
 
 All three families carry neither `distance` nor `angle`; typed Core construction and JSON loading fail closed on scalar injection. Existing five-family spellings and JSON shapes remain unchanged.
 
-Until Block 39 adds equations, the three generic families remain persistent-only and are explicitly excluded from current local solve, cross-hierarchy solve, and cross-hierarchy motion graph participation.
+Block 38 originally left the three generic families persistent-only. Block 39 now enables their participation in the existing local and cross-hierarchy constraint connectivity while preserving the rule that purely geometric cross-hierarchy relationships do not create motion groups without a Project-level cross-hierarchy joint.
 
 **Focused tags:**
 
@@ -454,7 +454,27 @@ Until Block 39 adds equations, the three generic families remain persistent-only
 [core][assembly-generic-relationship-json]
 ```
 
-## Blocks 39–47 — Planned general relationship and joint continuation
+### Block 39 — Generic relationship equations and shared solve integration
+
+**Status:** Implemented
+**Canonical:** `docs/assembly-generic-relationship-equations-mvp5.md`
+
+Implemented capability-driven Coincident, Parallel, and Perpendicular equations for the documented Point/Line/Axis/Plane matrix. The same builder closes non-planar Line/Axis Angle execution selected by Block 37.
+
+The new families now participate in existing local, cross-hierarchy solve, and cross-hierarchy motion connectivity. Residuals use existing scaling, central finite differences, Gauss-Newton solving, semantic PartDocument freshness, atomic application, and measured Jacobian-rank diagnostics.
+
+No new graph, transform authority, optimizer, finite-difference engine, endpoint model, persistence field, or JSON spelling was introduced.
+
+**Focused tags:**
+
+```text
+[geometry][assembly-generic-relationships]
+[geometry][assembly-generic-relationships-solver]
+[geometry][assembly-generic-relationships-cross-hierarchy]
+[geometry][assembly-generic-relationships-diagnostics]
+```
+
+## Blocks 40–47 — Planned joint continuation
 
 **Status:** Planned
 **Canonical:** roadmap `docs/assembly-general-geometric-target-roadmap.md`
@@ -462,7 +482,6 @@ Until Block 39 adds equations, the three generic families remain persistent-only
 Mandatory order:
 
 ```text
-39 generic relationship equations + shared solve integration
 40 joint target compatibility + oriented Frame contract
 41 general joint coordinate/limit Core model
 42 general joint coordinate JSON/backward compatibility
@@ -511,19 +530,17 @@ After Block 94 the first Part Construction MVP is considered complete. That mean
 
 It does not mean SolidWorks/Inventor Part product parity. Production GUI modeling, Class-A surfacing, arbitrary NURBS control cages, variable-radius fillets, advanced topology healing, direct modeling, sheet metal, weldments, and specialized manufacturing feature systems remain later work.
 
-## Current next technical step — Block 38
+## Current next technical step — Block 40
 
 **Status:** Current
-**Primary boundary:** Persistent Core relationship model and serialization.
+**Primary boundary:** Joint target compatibility and the oriented `Frame` contract.
 
-Block 38 must add local and Project-level persistent intent plus JSON for:
+Block 40 must migrate joint target compatibility to typed target-capability semantics while preserving current Revolute execution as:
 
 ```text
-Coincident
-Parallel
-Perpendicular
+Frame <-> Frame
 ```
 
-Preserve endpoint shapes, target A/B order, active/inactive state semantics, local versus Project-level id scopes, existing value validation, and historical Mate/Distance/Angle/Concentric/Insert compatibility.
+Freeze the oriented-frame requirements needed for deterministic signed twist. An Axis alone is insufficient because it does not provide the reference X direction required by the current Revolute residual semantics.
 
-**Notes:** Block 38 adds no new equation; Geometry execution begins at Block 39.
+**Notes:** Block 40 adds no joint persistence change, no new joint family, and no arbitrary world-axis synthesis of a `Frame` from an `Axis`.

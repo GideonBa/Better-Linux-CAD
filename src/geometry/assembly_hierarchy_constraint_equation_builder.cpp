@@ -238,6 +238,20 @@ project_hierarchy_insert_target(const ResolvedHierarchyGeometricTarget& resolved
                                         plane.value().y_axis, plane.value().normal}});
 }
 
+[[nodiscard]] bool generic_relationship_type(AssemblyConstraintType type) noexcept {
+  return type == AssemblyConstraintType::Coincident || type == AssemblyConstraintType::Parallel ||
+         type == AssemblyConstraintType::Perpendicular;
+}
+
+[[nodiscard]] AssemblyHierarchyGenericConstraintTargetDescriptor
+project_hierarchy_generic_target(const ResolvedHierarchyGeometricTarget& resolved,
+                                 const AssemblyGenericRelationshipTargetDescriptor& target) {
+  return AssemblyHierarchyGenericConstraintTargetDescriptor{
+      resolved.occurrence_path,      resolved.assembly_document,  resolved.component_instance,
+      target.target.source_metadata, resolved.semantic_reference, target.selected_capability,
+      target.target.descriptor};
+}
+
 [[nodiscard]] bool selected_plane_pair(const AssemblyTargetCompatibility& compatibility) noexcept {
   return compatibility.target_a_capability == AssemblyGeometricTargetCapability::Plane &&
          compatibility.target_b_capability == AssemblyGeometricTargetCapability::Plane;
@@ -491,6 +505,33 @@ AssemblyHierarchyConstraintTargetResolver::resolve_insert(
 Result<AssemblyHierarchyConstraintEquationDescriptor>
 AssemblyHierarchyConstraintEquationBuilder::build(
     const Project& project, const AssemblyHierarchyConstraintQuery& query) const {
+  if (generic_relationship_type(query.type())) {
+    auto geometric_target_a = resolve_hierarchy_geometric_target(project, query.target_a());
+    if (geometric_target_a.has_error()) {
+      return Result<AssemblyHierarchyConstraintEquationDescriptor>::failure(
+          geometric_target_a.error());
+    }
+    auto geometric_target_b = resolve_hierarchy_geometric_target(project, query.target_b());
+    if (geometric_target_b.has_error()) {
+      return Result<AssemblyHierarchyConstraintEquationDescriptor>::failure(
+          geometric_target_b.error());
+    }
+
+    const AssemblyGenericRelationshipEquationBuilder generic_builder;
+    auto equation =
+        generic_builder.build(query.id(), query.type(), geometric_target_a.value().target,
+                              geometric_target_b.value().target, query.angle());
+    if (equation.has_error()) {
+      return Result<AssemblyHierarchyConstraintEquationDescriptor>::failure(equation.error());
+    }
+    return Result<AssemblyHierarchyConstraintEquationDescriptor>::success(
+        AssemblyHierarchyConstraintEquationDescriptor{
+            query.id(), query.type(),
+            project_hierarchy_generic_target(geometric_target_a.value(), equation.value().target_a),
+            project_hierarchy_generic_target(geometric_target_b.value(), equation.value().target_b),
+            equation.value().residual});
+  }
+
   if (query.type() == AssemblyConstraintType::Concentric) {
     auto geometric_target_a = resolve_hierarchy_geometric_target(project, query.target_a());
     if (geometric_target_a.has_error()) {
@@ -584,6 +625,22 @@ AssemblyHierarchyConstraintEquationBuilder::build(
       query.type(), geometric_target_a.value().target, geometric_target_b.value().target);
   if (compatibility.has_error()) {
     return Result<AssemblyHierarchyConstraintEquationDescriptor>::failure(compatibility.error());
+  }
+  if (query.type() == AssemblyConstraintType::Angle &&
+      !selected_plane_pair(compatibility.value())) {
+    const AssemblyGenericRelationshipEquationBuilder generic_builder;
+    auto equation =
+        generic_builder.build(query.id(), query.type(), geometric_target_a.value().target,
+                              geometric_target_b.value().target, query.angle());
+    if (equation.has_error()) {
+      return Result<AssemblyHierarchyConstraintEquationDescriptor>::failure(equation.error());
+    }
+    return Result<AssemblyHierarchyConstraintEquationDescriptor>::success(
+        AssemblyHierarchyConstraintEquationDescriptor{
+            query.id(), query.type(),
+            project_hierarchy_generic_target(geometric_target_a.value(), equation.value().target_a),
+            project_hierarchy_generic_target(geometric_target_b.value(), equation.value().target_b),
+            equation.value().residual});
   }
   if (!selected_plane_pair(compatibility.value())) {
     return Result<AssemblyHierarchyConstraintEquationDescriptor>::failure(validation_error(

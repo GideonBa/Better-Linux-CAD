@@ -1,10 +1,10 @@
 # Assembly Geometric Target Taxonomy and Capability Projection MVP-5
 
-Status: implemented as Block 31 of `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`. Blocks 32–38 have since extended semantic source identity, generated-topology resolution, explicit target compatibility, and generic relationship intent without changing persistent endpoint authority.
+Status: implemented as Block 31 of `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`. Blocks 32–39 have since extended semantic source identity, generated-topology resolution, explicit target compatibility, generic relationship intent, and shared generic equations without changing persistent endpoint authority.
 
 This document is canonical for the Geometry-layer derived assembly target taxonomy, typed geometric descriptors, source-to-capability projection matrix, local/root-space resolved target contract, target compatibility selection, and compatibility adaptation of the existing generated face, `.axis`, and `.seat` families.
 
-Generated-topology Core identity/recovery is canonical in `docs/assembly-generated-topology-reference-mvp5.md`. Geometry resolution of those Block-35 `topo:` identities through this taxonomy is implemented as Block 36; explicit relationship target compatibility is implemented as Block 37. Block 38 adds persistent generic relationship intent without extending the compatibility matrix. Their canonical contracts live in `docs/assembly-general-geometric-target-roadmap.md` and `docs/assembly-generic-relationship-intent-mvp5.md`.
+Generated-topology Core identity/recovery is canonical in `docs/assembly-generated-topology-reference-mvp5.md`. Geometry resolution of those Block-35 `topo:` identities through this taxonomy is implemented as Block 36; explicit relationship target compatibility is implemented as Block 37. Block 38 adds persistent generic relationship intent. Block 39 extends capability compatibility and shared equation execution for the documented Point/Line/Axis/Plane generic relationship matrix. Their canonical contracts live in `docs/assembly-general-geometric-target-roadmap.md`, `docs/assembly-generic-relationship-intent-mvp5.md`, and `docs/assembly-generic-relationship-equations-mvp5.md`.
 
 ## Scope
 
@@ -571,14 +571,19 @@ Focused tags:
 [geometry][assembly-cross-hierarchy-target-compatibility]
 ```
 
-## Block 38 — generic relationship intent — Implemented
+## Blocks 38–39 — generic relationship intent and equations — Implemented
 
-Block 38 adds persistent `Coincident`, `Parallel`, and `Perpendicular` relationship types and JSON spellings at Core level. It does not change this target taxonomy or the Block-37 compatibility matrix.
+Block 38 adds persistent `Coincident`, `Parallel`, and `Perpendicular` relationship types and JSON spellings at Core level.
 
-`AssemblyTargetCompatibilityResolver` therefore has no compatibility entries for the three generic families yet. Direct compatibility/equation requests remain explicitly incompatible until Block 39 integrates their documented capability pairs and equations.
+Block 39 extends `AssemblyTargetCompatibilityResolver` for the documented Coincident Point/Line/Plane pairs and Parallel/Perpendicular Line/Axis/Plane direction pairs. The selected capability pair is projected through this taxonomy and consumed by `AssemblyGenericRelationshipEquationBuilder`.
 
-Canonical Block-38 contract: `docs/assembly-generic-relationship-intent-mvp5.md`.
+The same builder closes non-planar Line/Axis Angle execution already selected by Block 37. No source-kind-specific equation table is introduced: source kinds expose capabilities, compatibility selects a pair, and equation semantics consume the selected projection.
 
-## Next technical step — Block 39
+Canonical contracts:
 
-The next technical step is Block 39: generic relationship equations and shared solve integration for `Coincident`, `Parallel`, and `Perpendicular`.
+- `docs/assembly-generic-relationship-intent-mvp5.md`
+- `docs/assembly-generic-relationship-equations-mvp5.md`
+
+## Next technical step — Block 40
+
+The next technical step is Block 40: joint target compatibility and the oriented `Frame` contract.

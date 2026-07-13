@@ -304,7 +304,7 @@ Distance       -> require distance, omit angle
 Angle          -> require angle, omit distance
 ```
 
-Typed Core constructors remain authoritative after JSON parsing. Block 38 adds only the three accepted lowercase type spellings; local and Project-level relationship record shapes, endpoint shapes, target order, and state fields are unchanged. Historical five-family files remain compatible.
+Typed Core constructors remain authoritative after JSON parsing. Block 38 adds only the three accepted lowercase type spellings; local and Project-level relationship record shapes, endpoint shapes, target order, and state fields are unchanged. Historical five-family files remain compatible. Block 39 adds equations and solve participation only and makes no persistence, schema, version, or JSON-shape change.
 
 ## Local Revolute joint JSON
 
@@ -495,7 +495,7 @@ Block 35 adds no PartDocument JSON field. Its generated-topology classification 
 
 ## Numeric solve and motion relationships remain derived
 
-Local numeric solving currently derives equation-enabled geometric relationship ids and optional transient local Revolute drives. Block-38 Coincident/Parallel/Perpendicular records remain persisted but excluded from solve/motion graph participation until Block 39.
+Local numeric solving derives equation-enabled geometric relationship ids and optional transient local Revolute drives. Block 39 enables persisted Coincident/Parallel/Perpendicular records in the same solve/motion graph participation path as the historical five relationship families.
 
 Cross-hierarchy geometric solving derives:
 

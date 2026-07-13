@@ -161,7 +161,8 @@ Current suites cover:
 - local Mate/Distance/Angle/Concentric/Insert intent and solving;
 - persistent local and Project-level Coincident/Parallel/Perpendicular intent and lowercase JSON roundtrips;
 - generic relationship target order/state/id-scope preservation and scalar rejection;
-- Block-38 generic relationships excluded from current solve/motion graph participation until Block 39;
+- Block-39 Coincident/Parallel/Perpendicular compatibility, residuals, graph participation, local/cross solving, freshness/application, and Jacobian-rank diagnostics;
+- non-planar Line/Axis Angle execution through shared directional equations;
 - exact local and occurrence-qualified endpoint identity;
 - typed target source classification and capability projection;
 - Plane/Axis/Line/Point/Circle/Cylinder/Frame descriptor validation;
@@ -264,27 +265,27 @@ The typed target/capability and generated-topology identity layers are public li
 - `docs/assembly-reference-geometry-intent-mvp5.md`: Blocks 32–34 reference-geometry contract
 - `docs/assembly-generated-topology-reference-mvp5.md`: Block-35 generated-topology identity/recovery contract
 - `docs/assembly-generic-relationship-intent-mvp5.md`: Block-38 generic relationship intent/JSON contract
-- `docs/assembly-general-geometric-target-roadmap.md`: implemented Blocks 31–38 and planned Blocks 39–47
+- `docs/assembly-generic-relationship-equations-mvp5.md`: Block-39 generic relationship equation/solve contract
+- `docs/assembly-general-geometric-target-roadmap.md`: implemented Blocks 31–39 and planned Blocks 40–47
 - `docs/project-goal.md`: long-term direction
 
 ## Formatting
 
 Formatting is configured by `.editorconfig` and `.clang-format`.
 
-For Block 38 production/test files:
+For Block 39 production/test files:
 
 ```bash
 clang-format -i \
-  include/blcad/core/assembly_constraint.hpp \
-  src/core/assembly_constraint.cpp \
-  src/core/assembly_constraint_graph.cpp \
-  src/core/assembly_cross_hierarchy_constraint_graph.cpp \
-  src/core/assembly_cross_hierarchy_motion_graph.cpp \
+  include/blcad/geometry/assembly_generic_relationship_equation_builder.hpp \
+  include/blcad/geometry/assembly_hierarchy_constraint_equation_builder.hpp \
   src/core/assembly_constraint_graph_participation.hpp \
-  src/core/assembly_document_json.cpp \
-  src/core/project_json.cpp \
+  src/geometry/assembly_generic_relationship_equation_builder.cpp \
   src/geometry/assembly_target_compatibility.cpp \
-  tests/core/assembly_generic_relationship_tests.cpp
+  src/geometry/assembly_constraint_numeric_system.hpp \
+  src/geometry/assembly_constraint_numeric_system.cpp \
+  src/geometry/assembly_hierarchy_constraint_equation_builder.cpp \
+  tests/geometry/assembly_generic_relationship_equation_tests.cpp
 ```
 
 ## Clean generated files
@@ -295,7 +296,7 @@ rm -rf build/
 
 ## Current assembly development boundary
 
-Blocks 23–38 are implemented.
+Blocks 23–39 are implemented.
 
 Block 35 freezes:
 
@@ -323,7 +324,7 @@ recovery
   -> Resolved | Lost
 ```
 
-Block 36 resolves those identities into typed Geometry descriptors. Block 37 freezes deterministic target compatibility selection for existing relationship types. Block 38 adds persistent local/Project-level Coincident, Parallel, and Perpendicular intent plus lowercase JSON spellings while keeping the three families out of current solve/motion graphs until Block 39.
+Block 36 resolves those identities into typed Geometry descriptors. Block 37 freezes deterministic target compatibility selection. Block 38 adds persistent local/Project-level Coincident, Parallel, and Perpendicular intent plus lowercase JSON spellings. Block 39 adds their capability-driven equations, enables shared graph participation and numeric execution, and closes non-planar Line/Axis Angle execution.
 
 Focused Block-35 tests:
 
@@ -332,7 +333,7 @@ Focused Block-35 tests:
 ./build/dev/blcad_core_tests "[core][semantic-generated-topology-recovery]"
 ```
 
-Focused Blocks 36–38 tests:
+Focused Blocks 36–39 tests:
 
 ```bash
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-generated-topology-target-resolution]"
@@ -340,6 +341,10 @@ Focused Blocks 36–38 tests:
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-cross-hierarchy-target-compatibility]"
 ./build/dev/blcad_core_tests "[core][assembly-generic-relationship-intent]"
 ./build/dev/blcad_core_tests "[core][assembly-generic-relationship-json]"
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-generic-relationships]"
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-generic-relationships-solver]"
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-generic-relationships-cross-hierarchy]"
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-generic-relationships-diagnostics]"
 ```
 
-The immediate next step is Block 39: generic relationship equations and shared solve integration. Block 38 persistent intent/JSON is implemented without activating the new families in current graphs or equations. Exact sequencing is maintained in `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md` and detailed target planning in `docs/assembly-general-geometric-target-roadmap.md`.
+The immediate next step is Block 40: joint target compatibility and the oriented `Frame` contract. Block 39 generic relationship equations and shared solve integration are implemented without new execution infrastructure or persistence. Exact sequencing is maintained in `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md` and detailed target planning in `docs/assembly-general-geometric-target-roadmap.md`.

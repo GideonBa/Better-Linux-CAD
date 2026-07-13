@@ -1,13 +1,14 @@
 #pragma once
 
-#include "blcad/core/assembly_hierarchy.hpp"
 #include "blcad/core/assembly_constraint.hpp"
+#include "blcad/core/assembly_hierarchy.hpp"
 #include "blcad/core/project.hpp"
 #include "blcad/core/quantity.hpp"
 #include "blcad/core/result.hpp"
 #include "blcad/geometry/assembly_concentric_constraint_equation_builder.hpp"
 #include "blcad/geometry/assembly_constraint_equation_builder.hpp"
 #include "blcad/geometry/assembly_constraint_target_resolver.hpp"
+#include "blcad/geometry/assembly_generic_relationship_equation_builder.hpp"
 #include "blcad/geometry/assembly_insert_constraint_equation_builder.hpp"
 
 #include <optional>
@@ -25,8 +26,7 @@ namespace blcad::geometry {
 class AssemblyHierarchyConstraintTarget {
 public:
   [[nodiscard]] static Result<AssemblyHierarchyConstraintTarget>
-  create(std::vector<SubassemblyInstanceId> occurrence_path,
-         ComponentInstanceId component_instance,
+  create(std::vector<SubassemblyInstanceId> occurrence_path, ComponentInstanceId component_instance,
          std::string semantic_reference);
 
   [[nodiscard]] const std::vector<SubassemblyInstanceId>& occurrence_path() const noexcept;
@@ -52,18 +52,14 @@ private:
 class AssemblyHierarchyConstraintQuery {
 public:
   [[nodiscard]] static Result<AssemblyHierarchyConstraintQuery>
-  create(AssemblyConstraintId id,
-         AssemblyConstraintType type,
-         AssemblyHierarchyConstraintTarget target_a,
-         AssemblyHierarchyConstraintTarget target_b,
+  create(AssemblyConstraintId id, AssemblyConstraintType type,
+         AssemblyHierarchyConstraintTarget target_a, AssemblyHierarchyConstraintTarget target_b,
          std::optional<Quantity> distance = std::nullopt,
          std::optional<Quantity> angle = std::nullopt);
 
   [[nodiscard]] static Result<AssemblyHierarchyConstraintQuery>
-  create(AssemblyConstraintId id,
-         AssemblyConstraintType type,
-         AssemblyHierarchyConstraintEndpoint target_a,
-         AssemblyHierarchyConstraintEndpoint target_b,
+  create(AssemblyConstraintId id, AssemblyConstraintType type,
+         AssemblyHierarchyConstraintEndpoint target_a, AssemblyHierarchyConstraintEndpoint target_b,
          std::optional<Quantity> distance = std::nullopt,
          std::optional<Quantity> angle = std::nullopt) {
     auto query_target_a = AssemblyHierarchyConstraintTarget::create(
@@ -97,12 +93,10 @@ public:
                          const AssemblyHierarchyConstraintQuery&) = default;
 
 private:
-  AssemblyHierarchyConstraintQuery(AssemblyConstraintId id,
-                                   AssemblyConstraintType type,
+  AssemblyHierarchyConstraintQuery(AssemblyConstraintId id, AssemblyConstraintType type,
                                    AssemblyHierarchyConstraintTarget target_a,
                                    AssemblyHierarchyConstraintTarget target_b,
-                                   std::optional<Quantity> distance,
-                                   std::optional<Quantity> angle);
+                                   std::optional<Quantity> distance, std::optional<Quantity> angle);
 
   AssemblyConstraintId id_;
   AssemblyConstraintType type_;
@@ -141,6 +135,19 @@ struct AssemblyHierarchyAxisConstraintTargetDescriptor {
                          const AssemblyHierarchyAxisConstraintTargetDescriptor&) = default;
 };
 
+struct AssemblyHierarchyGenericConstraintTargetDescriptor {
+  std::vector<SubassemblyInstanceId> occurrence_path;
+  DocumentId assembly_document;
+  ComponentInstanceId component_instance;
+  AssemblyGeometricTargetSourceMetadata source_metadata;
+  std::string semantic_reference;
+  AssemblyGeometricTargetCapability selected_capability = AssemblyGeometricTargetCapability::Point;
+  AssemblyGeometricTargetDescriptor descriptor;
+
+  friend bool operator==(const AssemblyHierarchyGenericConstraintTargetDescriptor&,
+                         const AssemblyHierarchyGenericConstraintTargetDescriptor&) = default;
+};
+
 struct AssemblyHierarchyInsertConstraintTargetDescriptor {
   std::vector<SubassemblyInstanceId> occurrence_path;
   DocumentId assembly_document;
@@ -161,14 +168,13 @@ struct AssemblyHierarchyInsertConstraintTargetDescriptor {
 using AssemblyHierarchyConstraintTargetDescriptor =
     std::variant<AssemblyHierarchyPlanarConstraintTargetDescriptor,
                  AssemblyHierarchyAxisConstraintTargetDescriptor,
+                 AssemblyHierarchyGenericConstraintTargetDescriptor,
                  AssemblyHierarchyInsertConstraintTargetDescriptor>;
 
 using AssemblyHierarchyConstraintResidualDescriptor =
-    std::variant<PlanarMateResidualDescriptor,
-                 PlanarDistanceResidualDescriptor,
-                 PlanarAngleResidualDescriptor,
-                 ConcentricResidualDescriptor,
-                 InsertResidualDescriptor>;
+    std::variant<PlanarMateResidualDescriptor, PlanarDistanceResidualDescriptor,
+                 PlanarAngleResidualDescriptor, ConcentricResidualDescriptor,
+                 InsertResidualDescriptor, AssemblyGenericRelationshipResidualDescriptor>;
 
 struct AssemblyHierarchyConstraintEquationDescriptor {
   AssemblyConstraintId relationship;
@@ -187,25 +193,22 @@ struct AssemblyHierarchyConstraintEquationDescriptor {
 class AssemblyHierarchyConstraintTargetResolver {
 public:
   [[nodiscard]] Result<AssemblyResolvedGeometricTarget>
-  resolve_geometric(const Project& project,
-                    const AssemblyHierarchyConstraintTarget& target) const;
+  resolve_geometric(const Project& project, const AssemblyHierarchyConstraintTarget& target) const;
 
   [[nodiscard]] Result<AssemblyHierarchyPlanarConstraintTargetDescriptor>
-  resolve_planar(const Project& project,
-                 const AssemblyHierarchyConstraintTarget& target) const;
+  resolve_planar(const Project& project, const AssemblyHierarchyConstraintTarget& target) const;
 
   [[nodiscard]] Result<AssemblyHierarchyAxisConstraintTargetDescriptor>
-  resolve_axis(const Project& project,
-               const AssemblyHierarchyConstraintTarget& target) const;
+  resolve_axis(const Project& project, const AssemblyHierarchyConstraintTarget& target) const;
 
   [[nodiscard]] Result<AssemblyHierarchyInsertConstraintTargetDescriptor>
-  resolve_insert(const Project& project,
-                 const AssemblyHierarchyConstraintTarget& target) const;
+  resolve_insert(const Project& project, const AssemblyHierarchyConstraintTarget& target) const;
 };
 
-// Builds read-only Mate/Distance/Angle/Concentric/Insert residual semantics for
-// endpoints that may live in different AssemblyDocument occurrences. The query
-// is not solved, persisted, or inserted into a local constraint graph.
+// Builds read-only Mate/Distance/Angle/Concentric/Insert and generic
+// Coincident/Parallel/Perpendicular residual semantics for endpoints that may
+// live in different AssemblyDocument occurrences. The query is not solved,
+// persisted, or inserted into a local constraint graph.
 class AssemblyHierarchyConstraintEquationBuilder {
 public:
   [[nodiscard]] Result<AssemblyHierarchyConstraintEquationDescriptor>

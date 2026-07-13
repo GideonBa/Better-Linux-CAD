@@ -145,7 +145,7 @@ Parallel
 Perpendicular
 ```
 
-Current equation-enabled relationship families remain the historical five: Mate, Distance, Angle, Concentric, and Insert. Block-38 Coincident/Parallel/Perpendicular intent remains persistent-only until Block 39.
+All eight persistent relationship families are equation-enabled: Mate, Distance, Angle, Concentric, Insert, Coincident, Parallel, and Perpendicular. Block 39 adds capability-driven generic equations and closes Line/Axis Angle execution selected by Block 37.
 
 Local endpoint identity:
 
@@ -162,7 +162,7 @@ Project-level endpoint identity:
  semantic_reference)
 ```
 
-Current local and cross-hierarchy solve/motion graphs derive deterministic relationship incidence over `ComponentTransformAuthority` values for equation-enabled relationship families. Block-38 generic relationship intent is explicitly excluded from graph participation until Block 39 adds equations and shared integration.
+Local and cross-hierarchy solve/motion graphs derive deterministic relationship incidence over `ComponentTransformAuthority` values for all equation-enabled relationship families, including Block-39 Coincident/Parallel/Perpendicular relationships.
 
 Each unique free active transform authority contributes:
 
@@ -352,7 +352,9 @@ Block 36 adds `topo:` Geometry target resolution: `resolve_geometric` parses can
 
 Block 37 adds deterministic target compatibility selection through `AssemblyTargetCompatibilityResolver`: relationship type plus target A/B capability vectors produce one ordered capability pair or an explicit incompatibility. Existing local and cross-hierarchy Mate/Distance/Angle/Concentric/Insert equation builders consume that compatibility result before projection, without adding new equations or JSON.
 
-Block 38 extends shared Core relationship intent and existing local/Project JSON type spellings with `Coincident`, `Parallel`, and `Perpendicular`. They reuse endpoint/order/state/id-scope semantics, carry no scalar quantity, resolve no Geometry during Core construction/loading, and remain outside current solve/motion graphs until Block 39.
+Block 38 extends shared Core relationship intent and existing local/Project JSON type spellings with `Coincident`, `Parallel`, and `Perpendicular`. They reuse endpoint/order/state/id-scope semantics and carry no scalar quantity.
+
+Block 39 adds capability-driven Coincident/Parallel/Perpendicular equations, enables their existing graph participation, reuses shared residual scaling/finite differences/Gauss-Newton/freshness/application/rank diagnostics, and closes Line/Axis Angle execution selected by Block 37.
 
 Canonical target contract: `docs/assembly-geometric-target-taxonomy-mvp5.md`.
 
@@ -489,7 +491,7 @@ Block 33 adds `datum_axes` PartDocument persistence. Block 35 adds canonical sem
 
 ## Current direction
 
-Blocks 23–38 of the current assembly sequence are implemented.
+Blocks 23–39 of the current assembly sequence are implemented.
 
 Canonical current target architecture:
 
@@ -497,6 +499,7 @@ Canonical current target architecture:
 - `docs/assembly-reference-geometry-intent-mvp5.md`
 - `docs/assembly-generated-topology-reference-mvp5.md`
 - `docs/assembly-generic-relationship-intent-mvp5.md`
+- `docs/assembly-generic-relationship-equations-mvp5.md`
 - `docs/assembly-general-geometric-target-roadmap.md`
 
 The complete original planning baseline for Blocks 32–47 remains in `docs/assembly-general-geometric-target-roadmap-planning-baseline.md` and is incorporated by the active roadmap for still-planned acceptance/failure details.
@@ -505,6 +508,6 @@ Canonical numbered sequence:
 
 - `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`
 
-The next technical step is Block 39 only: generic relationship equations and shared solve integration for `Coincident`, `Parallel`, and `Perpendicular`.
+The next technical step is Block 40 only: joint target compatibility and the oriented `Frame` contract.
 
-Block 38 persistent intent/JSON is implemented. Generic relationship equations and graph participation, occurrence-local child pose overrides, whole-subassembly solve variables, general physics, and richer joints remain deferred according to their roadmap blocks.
+Block 39 generic relationship equations and shared solve integration are implemented. Occurrence-local child pose overrides, whole-subassembly solve variables, general physics, and richer joints remain deferred according to their roadmap blocks.

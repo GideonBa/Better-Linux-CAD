@@ -1,6 +1,6 @@
 # Assembly Generic Geometric Relationship Intent and JSON MVP-5
 
-Status: implemented as Block 38 of `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`.
+Status: implemented as Block 38 of `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`. Block 39 equation/solve integration is implemented in `docs/assembly-generic-relationship-equations-mvp5.md`.
 
 This document is canonical for persistent local and Project-level `Coincident`, `Parallel`, and `Perpendicular` relationship intent, their JSON spellings, value-family validation, graph-participation boundary, and Block-39 handoff.
 
@@ -265,10 +265,10 @@ Loading performs Core structure/value validation only and resolves no Geometry.
 - historical five-family spellings remain unchanged;
 - generic relationships remain absent from current local solve, cross-hierarchy solve, and cross-hierarchy motion graphs.
 
-## Handoff
+## Implemented Block-39 continuation
 
-The next technical step is Block 39: generic relationship equations and shared solve integration.
+Block 39 is implemented in `docs/assembly-generic-relationship-equations-mvp5.md`.
 
-Block 39 must extend Block-37 compatibility and Geometry execution for the documented initial capability pairs, then integrate `Coincident`, `Parallel`, and `Perpendicular` through the existing local/cross-hierarchy graphs, residual/Jacobian engine, freshness, atomic application, and diagnostics boundaries.
+The three persistent families now have capability-driven equations and enter existing local/cross-hierarchy solve and motion graphs. Shared residual scaling, central finite differences, Gauss-Newton solving, freshness, atomic application, and Jacobian-rank diagnostics are reused without parallel infrastructure.
 
-Block 39 must not create a second graph, optimizer, finite-difference implementation, transform authority, or endpoint model.
+The next technical step is Block 40: joint target compatibility and the oriented `Frame` contract.

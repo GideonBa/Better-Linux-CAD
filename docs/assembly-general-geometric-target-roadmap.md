@@ -1,6 +1,6 @@
 # General Assembly Geometric Target and Relationship Roadmap
 
-Status: Blocks 31–38 are implemented. Block 39 is the current next technical step. Blocks 39–47 remain planned headless architecture.
+Status: Blocks 31–39 are implemented. Block 40 is the current next technical step. Blocks 40–47 remain planned headless architecture.
 
 This document is the active status and sequencing authority for the expansion from the current assembly target layer to semantic reference geometry, stable generated topology targets, generic geometric relationships, and richer motion-joint families.
 
@@ -10,6 +10,7 @@ Implemented contracts are canonical in:
 - `docs/assembly-reference-geometry-intent-mvp5.md`
 - `docs/assembly-generated-topology-reference-mvp5.md`
 - `docs/assembly-generic-relationship-intent-mvp5.md`
+- `docs/assembly-generic-relationship-equations-mvp5.md`
 
 The complete pre-implementation planning detail for Blocks 32–47 is preserved byte-for-byte in:
 
@@ -155,7 +156,7 @@ Focused tag:
 
 ## Mandatory continuation order
 
-Blocks 32 through 38 are implemented. The remaining order is unchanged.
+Blocks 32 through 39 are implemented. The remaining order is unchanged.
 
 ```text
 32 assembly-selectable reference geometry Core intent (implemented)
@@ -165,7 +166,7 @@ Blocks 32 through 38 are implemented. The remaining order is unchanged.
   -> 36 generated face/edge/vertex target resolution (implemented)
   -> 37 explicit target compatibility matrix (implemented)
   -> 38 generic geometric relationship Core intent + JSON (implemented)
-  -> 39 generic relationship equations + shared solve integration
+  -> 39 generic relationship equations + shared solve integration (implemented)
   -> 40 joint target compatibility + oriented Frame contract
   -> 41 general joint coordinate/limit Core model
   -> 42 general joint coordinate JSON/backward compatibility
@@ -436,11 +437,13 @@ Focused tags:
 
 Block 38 adds no residual/equation, no target compatibility entry for the new families, no JSON field/schema bump, and no Geometry resolution during Core construction or loading.
 
-## Block 39 — Generic relationship equations and shared solve integration
+## Block 39 — Generic relationship equations and shared solve integration — Implemented
+
+Canonical document: `docs/assembly-generic-relationship-equations-mvp5.md`.
 
 Primary boundary: Geometry equation semantics plus existing numeric/diagnostic execution.
 
-Initial Coincident pairs:
+Implemented Coincident pairs:
 
 ```text
 Point <-> Point
@@ -450,7 +453,7 @@ Point <-> Plane
 Plane <-> Point
 ```
 
-Initial residual seeds:
+Canonical residuals are:
 
 ```text
 Point-Point
@@ -463,9 +466,22 @@ Point-Plane
   dot(point - plane.origin, plane.normal)
 ```
 
-Parallel and Perpendicular initially support Line/Axis direction pairs and Plane normal pairs.
+Parallel and Perpendicular support Line/Axis direction pairs and Plane normal pairs. Parallel uses `cross(dA, dB)` and accepts parallel or anti-parallel directions; Perpendicular uses `dot(dA, dB)`.
 
-All new families reuse existing local/cross graphs, `ComponentTransformAuthority`, Block-31 projection, Block-37 compatibility selection, shared residual scaling, central finite differences, Gauss-Newton solving, PartDocument freshness, atomic application, and Jacobian-rank diagnostics. No generic-target-specific solver is allowed.
+The shared capability-driven equation builder also closes Line/Axis Angle execution selected by Block 37 through `dot(dA, dB) - cos(target_angle_deg)`.
+
+Coincident/Parallel/Perpendicular now participate in existing local/cross solve and motion connectivity. All new equations reuse existing `ComponentTransformAuthority`, target projection, deterministic relationship order, residual scaling, central finite differences, Gauss-Newton solving, PartDocument freshness, atomic application, and Jacobian-rank diagnostics.
+
+Focused tags:
+
+```text
+[geometry][assembly-generic-relationships]
+[geometry][assembly-generic-relationships-solver]
+[geometry][assembly-generic-relationships-cross-hierarchy]
+[geometry][assembly-generic-relationships-diagnostics]
+```
+
+No generic-target-specific solver, graph, transform authority, finite-difference implementation, endpoint model, persistence field, or JSON change was added.
 
 ## Block 40 — Joint target compatibility and oriented Frame contract
 
@@ -574,8 +590,8 @@ posed geometry/contact records/sweep analyses
 
 ## Immediate next technical step
 
-Block 39 is the current next technical step.
+Block 40 is the current next technical step.
 
-Implement Block 39 only: generic relationship equations and shared solve integration for `Coincident`, `Parallel`, and `Perpendicular` through Block-37 capability compatibility, existing local/cross-hierarchy graphs, the shared residual/Jacobian engine, freshness, atomic application, and diagnostics.
+Implement Block 40 only: migrate joint target compatibility to typed capability semantics and freeze the oriented `Frame` contract while preserving current Revolute `Frame <-> Frame` execution.
 
-Do not introduce a second graph, optimizer, finite-difference implementation, transform authority, or endpoint model in Block 39.
+Do not change joint persistence, add a joint family, or synthesize a Frame from Axis using an arbitrary world axis in Block 40.

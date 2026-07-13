@@ -14,7 +14,7 @@ Block 26 implements:
 - local relationship evaluation once in containing-document local space;
 - Project-level cross-hierarchy relationship evaluation through exact occurrence paths in root-assembly space;
 - deterministic mixed relationship residual concatenation;
-- shared Mate, Distance, Angle, Concentric, and Insert scalar flattening;
+- shared Mate, Distance, Angle, Concentric, Insert, Coincident, Parallel, and Perpendicular scalar flattening after Block 39;
 - shared central finite differences;
 - the existing damped Gauss-Newton optimizer;
 - source Project immutability;
@@ -153,7 +153,7 @@ For each Project-level cross-hierarchy relationship:
 
 ## Shared residual flattening
 
-Canonical scalar counts remain:
+Canonical historical scalar counts remain:
 
 ```text
 Mate        4
@@ -161,6 +161,17 @@ Distance    4
 Angle       1
 Concentric  6
 Insert      7
+```
+
+Block 39 adds capability-dependent generic counts:
+
+```text
+Coincident Point/Point  3
+Coincident Point/Line   3
+Coincident Point/Plane  1
+Parallel                 3
+Perpendicular            1
+Directional Angle        1
 ```
 
 Length residuals retain the established `length_residual_scale_mm` scaling.
@@ -239,7 +250,7 @@ Block-26 numeric coverage:
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-cross-hierarchy-solver]"
 ```
 
-The suite proves all five residual families, root-to-child convergence, nested exact parent chains, repeated child occurrences sharing one variable block/proposal, same-authority endpoints through different parent chains, mixed local/cross residuals, canonical relationship order, insertion-order independence, grounded context, no-grounded failure, solve-start group freshness, and source/boundary immutability.
+The historical suite proves the original five residual families, root-to-child convergence, nested exact parent chains, repeated child occurrences sharing one variable block/proposal, same-authority endpoints through different parent chains, mixed local/cross residuals, canonical relationship order, insertion-order independence, grounded context, no-grounded failure, solve-start group freshness, and source/boundary immutability. Block-39 focused coverage extends the same numeric path to Coincident, Parallel, Perpendicular, and directional Angle without changing the solver engine.
 
 Block-27 follow-up coverage:
 
@@ -256,6 +267,10 @@ No numeric solve, freshness snapshot, proposal, Jacobian, rank product, or diagn
 Persistent model intent remains direct component state/placement, rigid subassembly occurrence state/placement, local geometric constraints, and Project-level occurrence-qualified cross-hierarchy geometric constraints.
 
 Derived and unpersisted products include transform authorities, incidence, endpoint mappings, solve groups, mixed residual vectors, finite-difference Jacobians, solve state, authority/relationship/boundary/semantic-PartDocument snapshots, proposals, freshness products, and diagnostics.
+
+## Block-39 generic relationship follow-up
+
+`docs/assembly-generic-relationship-equations-mvp5.md` is canonical for the Block-39 capability pairs, residual formulas, graph participation, and focused proofs. The shared numeric engine in this document remains authoritative and unchanged in optimizer semantics.
 
 ## Implemented follow-up
 

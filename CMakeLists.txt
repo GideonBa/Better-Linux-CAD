@@ -104,6 +104,7 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/arc_closed_profile_adapter.cpp
     src/geometry/assembly_concentric_constraint_equation_builder.cpp
     src/geometry/assembly_constraint_equation_builder.cpp
+    src/geometry/assembly_generic_relationship_equation_builder.cpp
     src/geometry/assembly_constraint_numeric_system.cpp
     src/geometry/assembly_constraint_target_resolver.cpp
     src/geometry/assembly_contact_analyzer.cpp
@@ -309,6 +310,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/assembly_concentric_constraint_equation_builder_tests.cpp
       tests/geometry/assembly_concentric_numeric_solver_tests.cpp
       tests/geometry/assembly_constraint_equation_builder_tests.cpp
+      tests/geometry/assembly_generic_relationship_equation_tests.cpp
       tests/geometry/assembly_constraint_target_resolver_tests.cpp
       tests/geometry/assembly_contact_analyzer_tests.cpp
       tests/geometry/assembly_cross_hierarchy_application_tests.cpp
