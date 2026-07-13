@@ -19,23 +19,6 @@ report_failure() {
 }
 trap report_failure EXIT
 
-if [[ ! -f debug/block39-run23.log ]]; then
-  mkdir -p debug
-  curl --fail --location --silent --show-error \
-    -H "Authorization: Bearer ${GH_TOKEN}" \
-    -H "Accept: application/vnd.github+json" \
-    -H "X-GitHub-Api-Version: 2022-11-28" \
-    "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/jobs/86793699037/logs" \
-    > debug/block39-run23.log
-  git config user.name "github-actions[bot]"
-  git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-  git add debug/block39-run23.log
-  git commit -m "Capture Block 39 verification diagnostics"
-  git push origin HEAD:block39-generic-relationship-equations
-  trap - EXIT
-  exit 1
-fi
-
 python3 - <<'PY'
 from pathlib import Path
 
@@ -114,6 +97,7 @@ geometry_status=0
 cmake --workflow --preset dev-geometry-build-test || geometry_status=$?
 
 focused_status=0
+: > /tmp/block39-focused.log
 for tag in \
   "[geometry][assembly-generic-relationships]" \
   "[geometry][assembly-generic-relationships-solver]" \
@@ -122,13 +106,23 @@ for tag in \
   "[geometry][assembly-target-compatibility]" \
   "[geometry][assembly-cross-hierarchy-target-compatibility]"
 do
-  echo "===== focused tag: $tag ====="
-  ./build/dev-geometry/blcad_geometry_tests "$tag" || focused_status=1
+  echo "===== focused tag: $tag =====" | tee -a /tmp/block39-focused.log
+  ./build/dev-geometry/blcad_geometry_tests "$tag" 2>&1 | tee -a /tmp/block39-focused.log || focused_status=1
 done
 
 if [[ $geometry_status -ne 0 || $focused_status -ne 0 ]]; then
   echo "Geometry workflow status: $geometry_status"
   echo "Focused test status: $focused_status"
+  if [[ ! -f debug/block39-focused.log ]]; then
+    mkdir -p debug
+    cp /tmp/block39-focused.log debug/block39-focused.log
+    git config user.name "github-actions[bot]"
+    git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+    git add debug/block39-focused.log
+    git commit -m "Capture Block 39 focused test diagnostics"
+    git push origin HEAD:block39-generic-relationship-equations
+    trap - EXIT
+  fi
   exit 1
 fi
 
