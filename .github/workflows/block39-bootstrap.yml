@@ -1,6 +1,11 @@
 name: Block 39 Bootstrap
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/block39-bootstrap.yml
   pull_request_target:
     branches:
       - main
@@ -14,9 +19,10 @@ permissions:
 jobs:
   patch-and-test:
     if: >-
-      github.event.pull_request.number == 36 &&
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      github.event.pull_request.head.ref == 'block39-generic-relationship-equations'
+      github.event_name == 'push' ||
+      (github.event.pull_request.number == 36 &&
+       github.event.pull_request.head.repo.full_name == github.repository &&
+       github.event.pull_request.head.ref == 'block39-generic-relationship-equations')
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -100,7 +106,6 @@ jobs:
         if: failure()
         env:
           GH_TOKEN: ${{ github.token }}
-          PR_URL: ${{ github.event.pull_request.html_url }}
         run: |
           {
             echo 'Block 39 verification failed.'
@@ -118,11 +123,10 @@ jobs:
             tail -n 60 /tmp/block39-focused.log 2>/dev/null || true
             echo '```'
           } > /tmp/block39-comment.md
-          gh pr comment "$PR_URL" --body-file /tmp/block39-comment.md
+          gh pr comment 36 --repo "$GITHUB_REPOSITORY" --body-file /tmp/block39-comment.md
 
       - name: Report verified Block 39
         if: success()
         env:
           GH_TOKEN: ${{ github.token }}
-          PR_URL: ${{ github.event.pull_request.html_url }}
-        run: gh pr comment "$PR_URL" --body "Block 39 verification passed: complete Core and Geometry workflows, all four focused generic-relationship tags, and both target-compatibility regression tags succeeded; the verified implementation commit was pushed to the PR branch."
+        run: gh pr comment 36 --repo "$GITHUB_REPOSITORY" --body "Block 39 verification passed: complete Core and Geometry workflows, all four focused generic-relationship tags, and both target-compatibility regression tags succeeded; the verified implementation commit was pushed to the PR branch."
