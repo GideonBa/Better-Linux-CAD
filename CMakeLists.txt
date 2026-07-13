@@ -136,6 +136,9 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/assembly_cylindrical_joint_equation_builder.cpp
     src/geometry/assembly_cylindrical_joint_residual.cpp
     src/geometry/assembly_hierarchy_cylindrical_joint_equation_builder.cpp
+    src/geometry/assembly_planar_joint_equation_builder.cpp
+    src/geometry/assembly_planar_joint_residual.cpp
+    src/geometry/assembly_hierarchy_planar_joint_equation_builder.cpp
     src/geometry/assembly_revolute_sweep_analyzer.cpp
     src/geometry/assembly_rigid_body_solver.cpp
     src/geometry/assembly_semantic_target_freshness.cpp

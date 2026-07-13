@@ -42,7 +42,7 @@ Result<AssemblyJointTargetCompatibility> AssemblyJointTargetCompatibilityResolve
   }
 
   if ((joint_type == AssemblyJointType::Revolute || joint_type == AssemblyJointType::Prismatic ||
-       joint_type == AssemblyJointType::Cylindrical) &&
+       joint_type == AssemblyJointType::Cylindrical || joint_type == AssemblyJointType::Planar) &&
       has_capability(target_a, AssemblyGeometricTargetCapability::Frame) &&
       has_capability(target_b, AssemblyGeometricTargetCapability::Frame)) {
     return Result<AssemblyJointTargetCompatibility>::success(

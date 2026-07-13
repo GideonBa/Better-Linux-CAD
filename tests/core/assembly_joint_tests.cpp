@@ -264,6 +264,88 @@ TEST_CASE("Cross-hierarchy Cylindrical intent preserves both coordinate slots",
   CHECK(joint.value().coordinate_slots().size() == 2U);
 }
 
+TEST_CASE("Planar joint intent owns ordered U V and normal-rotation slots",
+          "[core][assembly-planar-joint]") {
+  auto u = AssemblyJointCoordinateSlot::create(
+      AssemblyJointCoordinateRole::TranslationU, AssemblyJointCoordinateKind::Linear,
+      displacement(3.0, "joint.planar"), displacement(-20.0, "joint.planar"),
+      displacement(20.0, "joint.planar"));
+  auto v = AssemblyJointCoordinateSlot::create(
+      AssemblyJointCoordinateRole::TranslationV, AssemblyJointCoordinateKind::Linear,
+      displacement(-4.0, "joint.planar"), displacement(-20.0, "joint.planar"),
+      displacement(20.0, "joint.planar"));
+  auto rotation = AssemblyJointCoordinateSlot::create(
+      AssemblyJointCoordinateRole::RotationNormal, AssemblyJointCoordinateKind::Angular,
+      angle(15.0, "joint.planar"), angle(-90.0, "joint.planar"), angle(90.0, "joint.planar"));
+  REQUIRE(u);
+  REQUIRE(v);
+  REQUIRE(rotation);
+  auto joint = AssemblyJoint::create(
+      AssemblyJointId("joint.planar"), "Planar", AssemblyJointType::Planar,
+      make_target("component.a"), make_target("component.b"), AssemblyJointState::Active,
+      std::vector<AssemblyJointCoordinateSlot>{u.value(), v.value(), rotation.value()});
+  REQUIRE(joint);
+  CHECK(to_string(joint.value().type()) == "planar");
+  REQUIRE(joint.value().coordinate_slots().size() == 3U);
+  CHECK(joint.value().coordinate_slots()[0].role() == AssemblyJointCoordinateRole::TranslationU);
+  CHECK(joint.value().coordinate_slots()[1].role() == AssemblyJointCoordinateRole::TranslationV);
+  CHECK(joint.value().coordinate_slots()[2].role() == AssemblyJointCoordinateRole::RotationNormal);
+  CHECK(AssemblyJoint::create(
+            AssemblyJointId("joint.bad-planar"), "BadPlanar", AssemblyJointType::Planar,
+            make_target("component.a"), make_target("component.b"), AssemblyJointState::Active,
+            std::vector<AssemblyJointCoordinateSlot>{v.value(), u.value(), rotation.value()})
+            .has_error());
+
+  auto assembly = make_assembly();
+  REQUIRE(assembly.add_joint(joint.value()));
+  auto serialized = serialize_assembly_document_to_json(assembly);
+  REQUIRE(serialized);
+  const auto json = nlohmann::json::parse(serialized.value());
+  const auto& record = json.at("assembly_joints").front();
+  CHECK(record.at("type") == "planar");
+  CHECK(record.at("coordinates")[0].at("role") == "translation_u");
+  CHECK(record.at("coordinates")[1].at("role") == "translation_v");
+  CHECK(record.at("coordinates")[2].at("role") == "rotation_normal");
+  CHECK_FALSE(record.contains("limits"));
+  CHECK_FALSE(record.contains("coordinate"));
+  auto restored = deserialize_assembly_document_from_json(serialized.value());
+  REQUIRE(restored);
+  CHECK(restored.value().find_joint(AssemblyJointId("joint.planar"))->coordinate_slots() ==
+        joint.value().coordinate_slots());
+}
+
+TEST_CASE("Cross-hierarchy Planar intent preserves all three coordinates",
+          "[core][assembly-cross-hierarchy-planar-joint]") {
+  auto a = AssemblyHierarchyConstraintEndpoint::create({}, ComponentInstanceId("component.a"),
+                                                       "feature.hole.seat");
+  auto b = AssemblyHierarchyConstraintEndpoint::create({SubassemblyInstanceId("subassembly.child")},
+                                                       ComponentInstanceId("component.b"),
+                                                       "feature.hole.seat");
+  auto u = AssemblyJointCoordinateSlot::create(
+      AssemblyJointCoordinateRole::TranslationU, AssemblyJointCoordinateKind::Linear,
+      displacement(0.0, "joint.cross.planar"), displacement(-20.0, "joint.cross.planar"),
+      displacement(20.0, "joint.cross.planar"));
+  auto v = AssemblyJointCoordinateSlot::create(
+      AssemblyJointCoordinateRole::TranslationV, AssemblyJointCoordinateKind::Linear,
+      displacement(0.0, "joint.cross.planar"), displacement(-20.0, "joint.cross.planar"),
+      displacement(20.0, "joint.cross.planar"));
+  auto rotation = AssemblyJointCoordinateSlot::create(
+      AssemblyJointCoordinateRole::RotationNormal, AssemblyJointCoordinateKind::Angular,
+      angle(0.0, "joint.cross.planar"), angle(-90.0, "joint.cross.planar"),
+      angle(90.0, "joint.cross.planar"));
+  REQUIRE(a);
+  REQUIRE(b);
+  REQUIRE(u);
+  REQUIRE(v);
+  REQUIRE(rotation);
+  auto joint = AssemblyHierarchyJoint::create(
+      AssemblyJointId("joint.cross.planar"), "CrossPlanar", AssemblyJointType::Planar, a.value(),
+      b.value(), AssemblyJointState::Active,
+      std::vector<AssemblyJointCoordinateSlot>{u.value(), v.value(), rotation.value()});
+  REQUIRE(joint);
+  CHECK(joint.value().coordinate_slots().size() == 3U);
+}
+
 TEST_CASE("Assembly joint coordinate slots preserve family roles and physical kinds",
           "[core][assembly-joint-coordinate-model]") {
   CHECK(to_string(AssemblyJointCoordinateKind::Angular) == "angular");

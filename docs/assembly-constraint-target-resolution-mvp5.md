@@ -383,7 +383,7 @@ Relationship equation builders consume requested capabilities through the Block-
 
 The first new persistent generic relationship types are planned only in Block 38, after compatibility semantics are stable. Their equations and numeric integration follow in Block 39.
 
-Block 40 joint target compatibility is implemented with deterministic oriented `Frame / Frame` selection and explicit Axis-only rejection. Blocks 41–43 implement family-defined typed coordinates, additive compatible JSON, and shared vector drives. Blocks 44–45 implement Prismatic and Cylindrical on that boundary; Planar and Ball/Spherical remain Blocks 46–47.
+Block 40 joint target compatibility is implemented with deterministic oriented `Frame / Frame` selection and explicit Axis-only rejection. Blocks 41–43 implement family-defined typed coordinates, additive compatible JSON, and shared vector drives. Blocks 44–46 implement Prismatic, Cylindrical, and Planar on that boundary; Ball/Spherical remains Block 47.
 
 ## Failure behavior
 
@@ -432,7 +432,7 @@ Current coverage includes all six generated faces, primary circular axis identit
 
 ## Current handoff
 
-The implemented target resolver supports generated plane/axis/seat semantics and all current Mate/Distance/Angle/Concentric/Insert/Revolute/Prismatic/Cylindrical consumers.
+The implemented target resolver supports generated plane/axis/seat semantics and all current Mate/Distance/Angle/Concentric/Insert/Revolute/Prismatic/Cylindrical/Planar consumers.
 
 Block 30 remains the immediate next technical step for richer contact/swept-motion analysis.
 

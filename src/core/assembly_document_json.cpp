@@ -260,6 +260,8 @@ assembly_constraint_from_json(const json& constraint_json) {
     return Result<AssemblyJointType>::success(AssemblyJointType::Prismatic);
   if (text == "cylindrical")
     return Result<AssemblyJointType>::success(AssemblyJointType::Cylindrical);
+  if (text == "planar")
+    return Result<AssemblyJointType>::success(AssemblyJointType::Planar);
   return Result<AssemblyJointType>::failure(json_error("unsupported assembly joint type"));
 }
 

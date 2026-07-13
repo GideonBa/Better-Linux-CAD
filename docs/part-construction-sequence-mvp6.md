@@ -2,7 +2,7 @@
 
 Status: planned post-Assembly-MVP sequence. Blocks 48-94 are not implemented yet.
 
-Current repository work remains on Block 46 of the assembly target/relationship/joint sequence. Blocks 46–47 remain mandatory before this sequence starts. Block 48 becomes the next technical step only after Block 47 is implemented and the Assembly MVP handoff is complete.
+Current repository work remains on Block 47 of the assembly target/relationship/joint sequence. Block 47 remains mandatory before this sequence starts. Block 48 becomes the next technical step only after Block 47 is implemented and the Assembly MVP handoff is complete.
 
 This document is the active status, phase-order, authority-boundary, and handoff summary for the first broad BLCAD Part Construction MVP after the Assembly MVP.
 
@@ -101,6 +101,6 @@ Do not merge these phases into one feature branch.
 
 ## Current handoff
 
-Blocks 35–37 stable generated-topology identity, Geometry target resolution, and explicit relationship compatibility are implemented. Blocks 38–39 generic relationship intent/equations, Block 40 joint target compatibility/oriented Frame, Blocks 41–42 typed coordinate state/JSON, and Block 43 shared vector joint drives are also implemented. Blocks 44–45 Prismatic and Cylindrical are implemented; Block 46 Planar is the current assembly next technical step.
+Blocks 35–37 stable generated-topology identity, Geometry target resolution, and explicit relationship compatibility are implemented. Blocks 38–39 generic relationship intent/equations, Block 40 joint target compatibility/oriented Frame, Blocks 41–42 typed coordinate state/JSON, and Block 43 shared vector joint drives are also implemented. Blocks 44–46 Prismatic, Cylindrical, and Planar are implemented; Block 47 Ball/Spherical is the current assembly next technical step.
 
-Blocks 46–47 remain mandatory before this Part Construction sequence begins. After Block 47, Block 48 — Body identity and `PartDocument` ownership — becomes the next technical step. The complete Block 48-94 implementation contracts remain in `docs/part-construction-sequence-mvp6-planning-detail.md`.
+Block 47 remains mandatory before this Part Construction sequence begins. After Block 47, Block 48 — Body identity and `PartDocument` ownership — becomes the next technical step. The complete Block 48-94 implementation contracts remain in `docs/part-construction-sequence-mvp6-planning-detail.md`.

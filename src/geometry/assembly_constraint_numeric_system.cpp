@@ -212,10 +212,20 @@ append_joint_drive_residuals(const Project& project, const AssemblyNumericJointD
       return Result<std::size_t>::failure(equation.error());
     return append_scaled_residuals(equation.value().residual, length_residual_scale_mm, residuals);
   }
-  const AssemblyCylindricalJointEquationBuilder builder;
+  if (joint->type() == AssemblyJointType::Cylindrical) {
+    const AssemblyCylindricalJointEquationBuilder builder;
+    auto equation =
+        builder.build(project, *joint, *coordinate(AssemblyJointCoordinateRole::Translation),
+                      *coordinate(AssemblyJointCoordinateRole::Rotation));
+    if (equation.has_error())
+      return Result<std::size_t>::failure(equation.error());
+    return append_scaled_residuals(equation.value().residual, length_residual_scale_mm, residuals);
+  }
+  const AssemblyPlanarJointEquationBuilder builder;
   auto equation =
-      builder.build(project, *joint, *coordinate(AssemblyJointCoordinateRole::Translation),
-                    *coordinate(AssemblyJointCoordinateRole::Rotation));
+      builder.build(project, *joint, *coordinate(AssemblyJointCoordinateRole::TranslationU),
+                    *coordinate(AssemblyJointCoordinateRole::TranslationV),
+                    *coordinate(AssemblyJointCoordinateRole::RotationNormal));
   if (equation.has_error())
     return Result<std::size_t>::failure(equation.error());
   return append_scaled_residuals(equation.value().residual, length_residual_scale_mm, residuals);
@@ -317,6 +327,20 @@ Result<std::size_t> append_scaled_residuals(const CylindricalJointResidualDescri
   residuals.push_back(residual.twist_alignment_sine);
   residuals.push_back(residual.twist_alignment_cosine);
   return Result<std::size_t>::success(9U);
+}
+
+Result<std::size_t> append_scaled_residuals(const PlanarJointResidualDescriptor& residual,
+                                            double length_residual_scale_mm,
+                                            NumericVector& residuals) {
+  residuals.push_back(residual.normal_alignment.x);
+  residuals.push_back(residual.normal_alignment.y);
+  residuals.push_back(residual.normal_alignment.z);
+  residuals.push_back(residual.normal_separation_mm / length_residual_scale_mm);
+  residuals.push_back(residual.translation_u_error_mm / length_residual_scale_mm);
+  residuals.push_back(residual.translation_v_error_mm / length_residual_scale_mm);
+  residuals.push_back(residual.rotation_normal_sine);
+  residuals.push_back(residual.rotation_normal_cosine);
+  return Result<std::size_t>::success(8U);
 }
 
 Result<NumericVector> evaluate_residuals(const Project& project,

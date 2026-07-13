@@ -55,5 +55,5 @@ coordinate-slot snapshots as the authority.
 
 ## Block 45 handoff
 
-Block 45 Cylindrical is implemented in `docs/assembly-cylindrical-joint-mvp5.md`. The next
-technical step is Block 46 Planar; Ball/Spherical remains Block 47.
+Blocks 45–46 Cylindrical and Planar are implemented in their canonical documents. The next
+technical step is Block 47 Ball/Spherical.

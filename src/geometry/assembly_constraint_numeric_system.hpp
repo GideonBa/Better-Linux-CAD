@@ -11,6 +11,7 @@
 #include "blcad/geometry/assembly_hierarchy_constraint_equation_builder.hpp"
 #include "blcad/geometry/assembly_insert_constraint_equation_builder.hpp"
 #include "blcad/geometry/assembly_joint_drive.hpp"
+#include "blcad/geometry/assembly_planar_joint_equation_builder.hpp"
 #include "blcad/geometry/assembly_prismatic_joint_equation_builder.hpp"
 #include "blcad/geometry/assembly_revolute_joint_equation_builder.hpp"
 
@@ -77,6 +78,9 @@ append_scaled_residuals(const PrismaticJointResidualDescriptor& residual,
                         double length_residual_scale_mm, NumericVector& residuals);
 [[nodiscard]] Result<std::size_t>
 append_scaled_residuals(const CylindricalJointResidualDescriptor& residual,
+                        double length_residual_scale_mm, NumericVector& residuals);
+[[nodiscard]] Result<std::size_t>
+append_scaled_residuals(const PlanarJointResidualDescriptor& residual,
                         double length_residual_scale_mm, NumericVector& residuals);
 
 [[nodiscard]] Result<NumericVector>

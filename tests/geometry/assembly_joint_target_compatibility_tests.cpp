@@ -156,6 +156,11 @@ TEST_CASE("Prismatic Frame equations preserve orientation and drive signed axial
   CHECK(compatibility
             .resolve(AssemblyJointType::Cylindrical, axis_target("axis.a"), axis_target("axis.b"))
             .has_error());
+  REQUIRE(compatibility.resolve(AssemblyJointType::Planar, frame_target("frame.a"),
+                                frame_target("frame.b")));
+  CHECK(
+      compatibility.resolve(AssemblyJointType::Planar, axis_target("axis.a"), axis_target("axis.b"))
+          .has_error());
 
   auto requested = Quantity::linear_displacement_mm(15.0, "joint.slider");
   REQUIRE(requested);

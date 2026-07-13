@@ -51,5 +51,5 @@ Revolute-only adapters.
 
 ## Block 46 handoff
 
-The next technical step is Block 46: Planar joint family with bounded Linear `translation_u`,
-Linear `translation_v`, and Angular `rotation_normal` coordinates. Ball/Spherical remains Block 47.
+Block 46 Planar is implemented in `docs/assembly-planar-joint-mvp5.md`. The next technical step is
+Block 47 Ball/Spherical.

@@ -141,6 +141,27 @@ AssemblyJoint make_cylindrical_joint(const char* id, const char* component_a,
   return value.value();
 }
 
+AssemblyJoint make_planar_joint(const char* id, const char* component_a, const char* component_b) {
+  auto u = AssemblyJointCoordinateSlot::create(
+      AssemblyJointCoordinateRole::TranslationU, AssemblyJointCoordinateKind::Linear,
+      displacement(0.0, id), displacement(-50.0, id), displacement(50.0, id));
+  auto v = AssemblyJointCoordinateSlot::create(
+      AssemblyJointCoordinateRole::TranslationV, AssemblyJointCoordinateKind::Linear,
+      displacement(0.0, id), displacement(-50.0, id), displacement(50.0, id));
+  auto rotation = AssemblyJointCoordinateSlot::create(
+      AssemblyJointCoordinateRole::RotationNormal, AssemblyJointCoordinateKind::Angular,
+      angle(0.0, id), angle(-90.0, id), angle(90.0, id));
+  REQUIRE(u);
+  REQUIRE(v);
+  REQUIRE(rotation);
+  auto value = AssemblyJoint::create(
+      AssemblyJointId(id), id, AssemblyJointType::Planar, target(component_a), target(component_b),
+      AssemblyJointState::Active,
+      std::vector<AssemblyJointCoordinateSlot>{u.value(), v.value(), rotation.value()});
+  REQUIRE(value);
+  return value.value();
+}
+
 Project make_project(std::initializer_list<ComponentSpec> components) {
   auto assembly = AssemblyDocument::create(DocumentId("assembly.revolute"), "RevoluteAssembly");
   REQUIRE(assembly);
@@ -406,6 +427,61 @@ TEST_CASE("Cylindrical vector motion coexists for translation and twist and appl
   REQUIRE(translation_only);
   const auto& held = proposal_for(translation_only.value().solve_result, "component.b");
   CHECK(held.proposed_transform.translation_mm.z == Approx(-8.0).margin(kTolerance));
+  CHECK(held.proposed_transform.rotation_deg.z == Approx(0.0).margin(kTolerance));
+}
+
+TEST_CASE("Planar vector motion drives U V and normal rotation through one optimizer",
+          "[geometry][assembly-planar-joint]") {
+  Project project =
+      make_project({{"component.a", identity_rigid_transform(), ComponentGroundingState::Grounded},
+                    {"component.b"}});
+  REQUIRE(project.assembly().add_joint(
+      make_planar_joint("joint.planar", "component.a", "component.b")));
+  const AssemblyJointDrive drive{
+      AssemblyJointId("joint.planar"),
+      {{AssemblyJointCoordinateRole::RotationNormal, angle(25.0, "joint.planar")},
+       {AssemblyJointCoordinateRole::TranslationV, displacement(-7.0, "joint.planar")},
+       {AssemblyJointCoordinateRole::TranslationU, displacement(11.0, "joint.planar")}}};
+  auto result = AssemblyJointMotionSolver{}.move(project, drive);
+  REQUIRE(result);
+  REQUIRE(result.value().converged());
+  REQUIRE(result.value().requested_coordinates.size() == 3U);
+  CHECK(result.value().requested_coordinates[0].role == AssemblyJointCoordinateRole::TranslationU);
+  CHECK(result.value().requested_coordinates[1].role == AssemblyJointCoordinateRole::TranslationV);
+  CHECK(result.value().requested_coordinates[2].role ==
+        AssemblyJointCoordinateRole::RotationNormal);
+  const auto& proposal = proposal_for(result.value().solve_result, "component.b");
+  CHECK(proposal.proposed_transform.translation_mm.x == Approx(11.0).margin(kTolerance));
+  CHECK(proposal.proposed_transform.translation_mm.y == Approx(-7.0).margin(kTolerance));
+  CHECK(proposal.proposed_transform.translation_mm.z == Approx(0.0).margin(kTolerance));
+  CHECK(proposal.proposed_transform.rotation_deg.z == Approx(25.0).margin(kTolerance));
+  auto applied = AssemblyJointMotionResultApplier{}.apply(project, result.value());
+  REQUIRE(applied);
+  const auto* joint = project.assembly().find_joint(AssemblyJointId("joint.planar"));
+  REQUIRE(joint);
+  CHECK(joint->find_coordinate_slot(AssemblyJointCoordinateRole::TranslationU)
+            ->value()
+            .millimeters() == 11.0);
+  CHECK(joint->find_coordinate_slot(AssemblyJointCoordinateRole::TranslationV)
+            ->value()
+            .millimeters() == -7.0);
+  CHECK(
+      joint->find_coordinate_slot(AssemblyJointCoordinateRole::RotationNormal)->value().degrees() ==
+      25.0);
+
+  Project partial =
+      make_project({{"component.a", identity_rigid_transform(), ComponentGroundingState::Grounded},
+                    {"component.b"}});
+  REQUIRE(partial.assembly().add_joint(
+      make_planar_joint("joint.planar", "component.a", "component.b")));
+  auto u_only = AssemblyJointMotionSolver{}.move(
+      partial, AssemblyJointDrive{AssemblyJointId("joint.planar"),
+                                  {{AssemblyJointCoordinateRole::TranslationU,
+                                    displacement(6.0, "joint.planar")}}});
+  REQUIRE(u_only);
+  const auto& held = proposal_for(u_only.value().solve_result, "component.b");
+  CHECK(held.proposed_transform.translation_mm.x == Approx(6.0).margin(kTolerance));
+  CHECK(held.proposed_transform.translation_mm.y == Approx(0.0).margin(kTolerance));
   CHECK(held.proposed_transform.rotation_deg.z == Approx(0.0).margin(kTolerance));
 }
 

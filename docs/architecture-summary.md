@@ -379,9 +379,10 @@ Persistent local `AssemblyJoint` and Project-level `AssemblyHierarchyJoint` inte
 
 Current families are `Revolute`, with principal-angle limits and one authored angular rotation,
 `Prismatic`, with bounded signed Linear displacement and one authored translation, and
-`Cylindrical`, with bounded Linear translation plus bounded Angular rotation.
+`Cylindrical`, with bounded Linear translation plus bounded Angular rotation, and `Planar`, with
+bounded U/V Linear translations plus bounded normal Angular rotation.
 
-Current `.seat` sources expose Frame, Axis, and Plane. `AssemblyJointTargetCompatibilityResolver` deterministically selects Frame/Frame before projection for local and cross-hierarchy Revolute, Prismatic, and Cylindrical equations. Axis-only targets fail closed because no deterministic reference X direction exists. The selected oriented Frames feed the family residual constructors.
+Current `.seat` sources expose Frame, Axis, and Plane. `AssemblyJointTargetCompatibilityResolver` deterministically selects Frame/Frame before projection for local and cross-hierarchy Revolute, Prismatic, Cylindrical, and Planar equations. Axis-only targets fail closed because no deterministic reference X direction exists. The selected oriented Frames feed the family residual constructors.
 
 ```text
 directed axis alignment
@@ -508,6 +509,7 @@ Canonical current target architecture:
 - `docs/assembly-vector-joint-drive-mvp5.md`
 - `docs/assembly-prismatic-joint-mvp5.md`
 - `docs/assembly-cylindrical-joint-mvp5.md`
+- `docs/assembly-planar-joint-mvp5.md`
 - `docs/assembly-general-geometric-target-roadmap.md`
 
 The complete original planning baseline for Blocks 32–47 remains in `docs/assembly-general-geometric-target-roadmap-planning-baseline.md` and is incorporated by the active roadmap for still-planned acceptance/failure details.
@@ -516,6 +518,6 @@ Canonical numbered sequence:
 
 - `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`
 
-Block 45 Cylindrical is implemented in `docs/assembly-cylindrical-joint-mvp5.md`. The next technical step is Block 46 Planar.
+Block 46 Planar is implemented in `docs/assembly-planar-joint-mvp5.md`. The next technical step is Block 47 Ball/Spherical.
 
-Block 45 adds two-coordinate Cylindrical intent and jointly drives signed axial translation plus periodic twist through the shared local/root-space path. Scalar Revolute APIs remain adapters; transform variables and the shared numeric engine are unchanged. Axis-only oriented joints still fail closed without arbitrary reference-direction synthesis. Occurrence-local child pose overrides, whole-subassembly solve variables, general physics, and the remaining richer joints stay deferred according to their roadmap blocks.
+Block 46 adds three-coordinate Planar intent and jointly drives U/V translation plus normal twist through the shared local/root-space path. Scalar Revolute APIs remain adapters; transform variables and the shared numeric engine are unchanged. Axis-only oriented joints still fail closed without arbitrary reference-direction synthesis. Occurrence-local child pose overrides, whole-subassembly solve variables, general physics, and Ball/Spherical stay deferred to their roadmap blocks.

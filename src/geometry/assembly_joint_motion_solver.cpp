@@ -134,12 +134,14 @@ AssemblyJointMotionSolver::move(const Project& project, AssemblyJointDrive drive
         validation_error(joint_id.value(), "assembly joint must exist in project assembly"));
   }
   if (joint->state() != AssemblyJointState::Active) {
-    return Result<AssemblyJointMotionResult>::failure(validation_error(
-        joint_id.value(), joint->type() == AssemblyJointType::Revolute
-                              ? "revolute joint motion requires an active joint"
-                          : joint->type() == AssemblyJointType::Prismatic
-                              ? "prismatic joint motion requires an active joint"
-                              : "cylindrical joint motion requires an active joint"));
+    return Result<AssemblyJointMotionResult>::failure(
+        validation_error(joint_id.value(), joint->type() == AssemblyJointType::Revolute
+                                               ? "revolute joint motion requires an active joint"
+                                           : joint->type() == AssemblyJointType::Prismatic
+                                               ? "prismatic joint motion requires an active joint"
+                                           : joint->type() == AssemblyJointType::Cylindrical
+                                               ? "cylindrical joint motion requires an active joint"
+                                               : "planar joint motion requires an active joint"));
   }
 
   auto selected_drive = detail::resolve_joint_drive(*joint, drive);

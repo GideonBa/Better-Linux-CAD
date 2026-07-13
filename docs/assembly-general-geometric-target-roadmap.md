@@ -1,6 +1,6 @@
 # General Assembly Geometric Target and Relationship Roadmap
 
-Status: Blocks 31–45 are implemented. Block 46 is the current next technical step. Blocks 46–47 remain planned headless architecture.
+Status: Blocks 31–46 are implemented. Block 47 is the current next technical step and remains planned headless architecture.
 
 This document is the active status and sequencing authority for the expansion from the current assembly target layer to semantic reference geometry, stable generated topology targets, generic geometric relationships, and richer motion-joint families.
 
@@ -563,17 +563,19 @@ Cylindrical composes bounded Linear `translation` and Angular `rotation` coordin
 `Frame <-> Frame` endpoints. Both roles share the local/root-space graph, numeric, holding,
 freshness, and atomic application paths.
 
-## Blocks 46–47 — Richer joint families
+## Block 46 — Planar joint family — Implemented
+
+Canonical contract: `docs/assembly-planar-joint-mvp5.md`.
+
+Planar uses bounded Linear `translation_u`, Linear `translation_v`, and Angular
+`rotation_normal` coordinates on oriented `Frame <-> Frame` endpoints and the shared local/root
+motion, holding, freshness, and atomic application paths.
+
+## Block 47 — Remaining richer joint family
 
 One family per block:
 
 ```text
-46 Planar
-  Frame <-> Frame
-  translation_u   : LinearDisplacementMm
-  translation_v   : LinearDisplacementMm
-  rotation_normal : AngleDeg
-
 47 Ball/Spherical
   Point <-> Point
   preferred first seed: passive center coincidence
@@ -636,7 +638,7 @@ exchange products
 posed geometry/contact records/sweep analyses
 ```
 
-## Current next technical step — Block 46
+## Current next technical step — Block 47
 
-Block 45 is implemented in `docs/assembly-cylindrical-joint-mvp5.md`. Implement Block 46 Planar
-only; Ball/Spherical remains Block 47.
+Block 46 is implemented in `docs/assembly-planar-joint-mvp5.md`. Implement Block 47 Ball/Spherical
+only with the passive Point/Point seed unless a singularity-aware orientation contract is frozen.

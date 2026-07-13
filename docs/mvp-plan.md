@@ -4,7 +4,7 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 45
+implemented_through: Block 46
 current_block: 44
 current_boundary: Prismatic joint family across Core, JSON, Geometry, and motion
 current_tag: "[core][assembly-prismatic-joint]"
@@ -531,7 +531,7 @@ Both local and Project-level motion solvers now accept `AssemblyJointDrive` with
 [geometry][assembly-vector-joint-drive-application]
 ```
 
-### Blocks 46–47 — Planned joint continuation
+### Block 47 — Planned joint continuation
 
 **Status:** Planned
 **Canonical:** roadmap `docs/assembly-general-geometric-target-roadmap.md`
@@ -539,7 +539,6 @@ Both local and Project-level motion solvers now accept `AssemblyJointDrive` with
 Mandatory order:
 
 ```text
-46 Planar joint
 47 Ball/Spherical joint
 ```
 
@@ -608,7 +607,13 @@ Block 45 composes bounded Linear `translation` and Angular `rotation` coordinate
 Frame/Frame, vector-drive, graph, solver, freshness, and atomic application paths. Canonical
 contract: `docs/assembly-cylindrical-joint-mvp5.md`.
 
-## Current next technical step — Block 46
+## Block 46 — Planar joint family — Implemented
 
-Implement the Planar joint family only with bounded Linear `translation_u`, Linear
-`translation_v`, and Angular `rotation_normal` coordinates. Ball/Spherical remains Block 47.
+Block 46 implements bounded Linear `translation_u`, Linear `translation_v`, and Angular
+`rotation_normal` coordinates on the shared Frame/Frame, vector-drive, graph, solver, freshness,
+and atomic application paths. Canonical contract: `docs/assembly-planar-joint-mvp5.md`.
+
+## Current next technical step — Block 47
+
+Implement the passive Ball/Spherical family with Point/Point center coincidence and explicit
+selected-drive rejection unless a singularity-aware orientation representation is first frozen.

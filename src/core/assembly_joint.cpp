@@ -133,6 +133,29 @@ validate_family_coordinates(const std::string& object_id, AssemblyJointType type
     }
     return Result<AssemblyJointLimits>::success({});
   }
+  case AssemblyJointType::Planar: {
+    if (slots.size() != 3U || slots[0].role() != AssemblyJointCoordinateRole::TranslationU ||
+        slots[0].kind() != AssemblyJointCoordinateKind::Linear ||
+        slots[1].role() != AssemblyJointCoordinateRole::TranslationV ||
+        slots[1].kind() != AssemblyJointCoordinateKind::Linear ||
+        slots[2].role() != AssemblyJointCoordinateRole::RotationNormal ||
+        slots[2].kind() != AssemblyJointCoordinateKind::Angular) {
+      return Result<AssemblyJointLimits>::failure(Error::validation(
+          object_id,
+          "planar joint requires ordered translation_u, translation_v, and rotation_normal slots"));
+    }
+    if (!slots[0].lower_limit() || !slots[0].upper_limit() || !slots[1].lower_limit() ||
+        !slots[1].upper_limit() || !slots[2].lower_limit() || !slots[2].upper_limit()) {
+      return Result<AssemblyJointLimits>::failure(
+          Error::validation(object_id, "planar joint coordinates require lower and upper limits"));
+    }
+    if (slots[2].lower_limit()->degrees() < -180.0 || slots[2].upper_limit()->degrees() > 180.0) {
+      return Result<AssemblyJointLimits>::failure(Error::validation(
+          object_id,
+          "planar rotation limits must stay within the principal -180 to 180 degree range"));
+    }
+    return Result<AssemblyJointLimits>::success({});
+  }
   }
   return Result<AssemblyJointLimits>::failure(
       Error::validation(object_id, "unsupported assembly joint family"));
@@ -157,6 +180,8 @@ std::string_view to_string(AssemblyJointType type) noexcept {
     return "prismatic";
   case AssemblyJointType::Cylindrical:
     return "cylindrical";
+  case AssemblyJointType::Planar:
+    return "planar";
   }
   return "revolute";
 }

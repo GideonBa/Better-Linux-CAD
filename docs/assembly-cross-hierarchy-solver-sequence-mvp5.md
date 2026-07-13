@@ -1,6 +1,6 @@
 # Cross-Hierarchy Assembly Relationship Sequence MVP-5
 
-Status: Blocks 23–45 are implemented. Block 46 is the current next technical step. Blocks 46–47 remain the explicit richer-joint continuation.
+Status: Blocks 23–46 are implemented. Block 47 is the current next technical step and final explicit richer-joint continuation.
 
 This document is the canonical numbered handoff sequence for cross-document assembly intent, solving, motion, exchange, posed analysis, and general geometric target architecture.
 
@@ -527,10 +527,13 @@ One family per block:
 Canonical contracts: `docs/assembly-prismatic-joint-mvp5.md` and
 `docs/assembly-cylindrical-joint-mvp5.md`.
 
-## Blocks 46–47 — Remaining richer joint families
+## Block 46 — Planar joint family — Implemented
+
+Canonical contract: `docs/assembly-planar-joint-mvp5.md`.
+
+## Block 47 — Remaining richer joint family
 
 ```text
-46 Planar
 47 Ball/Spherical
 ```
 
@@ -545,7 +548,7 @@ Current persistent assembly intent includes:
 ```text
 component placement/state
 local geometric relationships including persistent Coincident/Parallel/Perpendicular intent
-local Revolute, Prismatic, and Cylindrical joint coordinate intent
+local Revolute, Prismatic, Cylindrical, and Planar joint coordinate intent
 Project-owned child assemblies
 SubassemblyInstance placement/state
 cross_hierarchy_constraints[]
@@ -570,10 +573,10 @@ XDE labels and STEP entities
 posed shapes/contact records/sweep analyses
 ```
 
-## Block 45 — Cylindrical joint family — Implemented
+## Block 46 — Planar joint family — Implemented
 
-Block 45 is implemented in `docs/assembly-cylindrical-joint-mvp5.md`: two-coordinate local and
-Project-level Cylindrical intent, JSON, Frame/Frame equations, and shared vector-drive motion.
+Block 46 is implemented in `docs/assembly-planar-joint-mvp5.md`: three-coordinate local and
+Project-level Planar intent, JSON, Frame/Frame equations, and shared vector-drive motion.
 
-The current next technical step is Block 46 Planar. Blocks 40–45 compatibility, persistence,
+The current next technical step is Block 47 Ball/Spherical. Blocks 40–46 compatibility, persistence,
 numeric, freshness, and application contracts remain authoritative.

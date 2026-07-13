@@ -5,7 +5,9 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <cmath>
 #include <limits>
+#include <numbers>
 #include <utility>
 #include <variant>
 
@@ -77,6 +79,29 @@ AssemblyHierarchyJoint cross_cylindrical_joint(const char* id = "joint.cross.cyl
       endpoint({"subassembly.left"}, "component.child", "feature.hole.seat"),
       AssemblyJointState::Active,
       std::vector<AssemblyJointCoordinateSlot>{translation.value(), rotation.value()});
+  REQUIRE(value);
+  return value.value();
+}
+
+AssemblyHierarchyJoint cross_planar_joint(const char* id = "joint.cross.planar") {
+  auto u = AssemblyJointCoordinateSlot::create(
+      AssemblyJointCoordinateRole::TranslationU, AssemblyJointCoordinateKind::Linear,
+      displacement(0.0, id), displacement(-50.0, id), displacement(50.0, id));
+  auto v = AssemblyJointCoordinateSlot::create(
+      AssemblyJointCoordinateRole::TranslationV, AssemblyJointCoordinateKind::Linear,
+      displacement(0.0, id), displacement(-50.0, id), displacement(50.0, id));
+  auto rotation = AssemblyJointCoordinateSlot::create(
+      AssemblyJointCoordinateRole::RotationNormal, AssemblyJointCoordinateKind::Angular,
+      angle(0.0, id), angle(-90.0, id), angle(90.0, id));
+  REQUIRE(u);
+  REQUIRE(v);
+  REQUIRE(rotation);
+  auto value = AssemblyHierarchyJoint::create(
+      AssemblyJointId(id), id, AssemblyJointType::Planar,
+      endpoint({}, "component.root", "feature.hole.seat"),
+      endpoint({"subassembly.left"}, "component.child", "feature.hole.seat"),
+      AssemblyJointState::Active,
+      std::vector<AssemblyJointCoordinateSlot>{u.value(), v.value(), rotation.value()});
   REQUIRE(value);
   return value.value();
 }
@@ -264,6 +289,54 @@ TEST_CASE("Cross-hierarchy Cylindrical motion drives both root-space coordinates
             .millimeters() == 14.0);
   CHECK(joint->find_coordinate_slot(AssemblyJointCoordinateRole::Rotation)->value().degrees() ==
         -25.0);
+}
+
+TEST_CASE("Cross-hierarchy Planar motion drives all root-space plane coordinates atomically",
+          "[geometry][assembly-cross-hierarchy-planar-motion]") {
+  Project project = motion_project();
+  add_joint(project, cross_planar_joint());
+  constexpr double u = 14.0;
+  constexpr double v = -5.0;
+  constexpr double rotation_deg = -25.0;
+  const AssemblyJointDrive drive{
+      AssemblyJointId("joint.cross.planar"),
+      {{AssemblyJointCoordinateRole::RotationNormal, angle(rotation_deg, "joint.cross.planar")},
+       {AssemblyJointCoordinateRole::TranslationV, displacement(v, "joint.cross.planar")},
+       {AssemblyJointCoordinateRole::TranslationU, displacement(u, "joint.cross.planar")}}};
+  auto result = AssemblyCrossHierarchyJointMotionSolver{}.move(project, drive);
+  REQUIRE(result);
+  REQUIRE(result.value().converged());
+  REQUIRE(result.value().requested_coordinates.size() == 3U);
+  CHECK(result.value().requested_coordinates[0].role == AssemblyJointCoordinateRole::TranslationU);
+  CHECK(result.value().requested_coordinates[1].role == AssemblyJointCoordinateRole::TranslationV);
+  CHECK(result.value().requested_coordinates[2].role ==
+        AssemblyJointCoordinateRole::RotationNormal);
+  REQUIRE(result.value().proposed_transforms.size() == 1U);
+  const double radians = rotation_deg * std::numbers::pi_v<double> / 180.0;
+  const double cosine = std::cos(radians);
+  const double sine = std::sin(radians);
+  constexpr double origin_x = 4.0;
+  constexpr double origin_y = -6.0;
+  const double expected_x = origin_x + u - (cosine * origin_x - sine * origin_y);
+  const double expected_y = origin_y + v - (sine * origin_x + cosine * origin_y);
+  const auto& proposal = result.value().proposed_transforms.front().proposed_transform;
+  CHECK(proposal.translation_mm.x == Approx(expected_x).margin(1.0e-4));
+  CHECK(proposal.translation_mm.y == Approx(expected_y).margin(1.0e-4));
+  CHECK(proposal.translation_mm.z == Approx(0.0).margin(1.0e-4));
+  CHECK(proposal.rotation_deg.z == Approx(rotation_deg).margin(1.0e-4));
+  auto applied = AssemblyCrossHierarchyJointMotionResultApplier{}.apply(project, result.value());
+  REQUIRE(applied);
+  const auto* joint = project.find_cross_hierarchy_joint(AssemblyJointId("joint.cross.planar"));
+  REQUIRE(joint);
+  CHECK(joint->find_coordinate_slot(AssemblyJointCoordinateRole::TranslationU)
+            ->value()
+            .millimeters() == u);
+  CHECK(joint->find_coordinate_slot(AssemblyJointCoordinateRole::TranslationV)
+            ->value()
+            .millimeters() == v);
+  CHECK(
+      joint->find_coordinate_slot(AssemblyJointCoordinateRole::RotationNormal)->value().degrees() ==
+      rotation_deg);
 }
 
 TEST_CASE("Cross-hierarchy vector drives preserve role order freshness and atomic application",
