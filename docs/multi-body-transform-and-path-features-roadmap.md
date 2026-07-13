@@ -379,16 +379,18 @@ These records are future target architecture. They are not part of the current `
 13. Add path/guide-curve loft support.
 14. Add STEP export of multi-body parts with deterministic body naming where supported.
 
-Feature Body-operation persistence, body-scoped recompute/inspection, Body Booleans, and
-BodyTransform/SketchOwnership intent plus associative Geometry execution are implemented through
-Block 57. The current handoff is Block 58 reusable Part feature semantic input references.
+Feature Body-operation persistence, body-scoped recompute/inspection, Body Booleans,
+BodyTransform/SketchOwnership intent plus associative Geometry execution, reusable semantic inputs,
+and richer Extrude/Cut intent/JSON are implemented through Block 59. The current handoff is Block
+60 richer Extrude/Cut Geometry.
 Canonical implemented contracts include `docs/part-body-identity-mvp6.md`,
 `docs/part-body-json-mvp6.md`,
 `docs/part-feature-body-operation-mvp6.md`, `docs/part-feature-body-dependency-mvp6.md`, and
 `docs/part-multi-body-recompute-mvp6.md`, `docs/part-multi-body-inspection-mvp6.md`,
 `docs/part-body-boolean-mvp6.md`, `docs/part-body-boolean-geometry-mvp6.md`, and
 `docs/part-body-transform-ownership-mvp6.md`, and
-`docs/part-body-transform-geometry-mvp6.md`; the
+`docs/part-body-transform-geometry-mvp6.md`, `docs/part-feature-input-reference-mvp6.md`, and
+`docs/part-extrude-extent-intent-mvp6.md`; the
 numbered Part Construction sequence is authoritative where this older roadmap groups work
 differently.
 

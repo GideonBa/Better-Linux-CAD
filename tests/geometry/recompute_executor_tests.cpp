@@ -222,6 +222,36 @@ TEST_CASE("GeometryRecomputeExecutor executes an additive extrude into the shape
   CHECK(summary.solid_count == 1);
 }
 
+TEST_CASE("GeometryRecomputeExecutor fails closed on Block 59 Extrude intent before Block 60",
+          "[geometry][extrude-extent]") {
+  auto document = PartDocument::create(DocumentId("part.symmetric"), "Symmetric");
+  REQUIRE(document);
+  REQUIRE(document.value().add_parameter(make_length_parameter("part.width", "width", 120.0)));
+  REQUIRE(document.value().add_parameter(make_length_parameter("part.height", "height", 80.0)));
+  REQUIRE(
+      document.value().add_parameter(make_length_parameter("part.thickness", "thickness", 8.0)));
+  REQUIRE(document.value().add_datum_plane(DatumPlane::xy().value()));
+  REQUIRE(document.value().add_sketch(make_rectangle_sketch()));
+  auto extent = ExtrudeExtentIntent::symmetric(ParameterId("part.thickness"));
+  REQUIRE(extent);
+  auto intent = ExtrudeFeatureIntent::create(extent.value());
+  REQUIRE(intent);
+  auto feature = Feature::create_additive_extrude(FeatureId("feature.symmetric"), "Symmetric",
+                                                  SketchId("sketch.base"), intent.value());
+  REQUIRE(feature);
+  REQUIRE(document.value().add_feature(feature.value()));
+
+  ShapeCache cache = make_shape_cache();
+  const auto result = GeometryRecomputeExecutor{}.execute_additive_extrude(
+      document.value(), FeatureId("feature.symmetric"), cache);
+  REQUIRE(result.has_error());
+  CHECK(result.error().message() ==
+        "richer additive extrude extent, taper, and thin geometry starts in Block 60");
+  CHECK(cache.feature_shape_count() == 0U);
+  CHECK(cache.body_shape_count() == 0U);
+  CHECK_FALSE(cache.has_final_shape());
+}
+
 TEST_CASE("GeometryRecomputeExecutor executes additive feature nodes from a recompute plan",
           "[geometry][recompute]") {
   auto document = make_document_with_base_additive_extrude();

@@ -1,6 +1,6 @@
 # Cross-Hierarchy Assembly Relationship Sequence MVP-5
 
-Status: Blocks 23–47 and Part Construction Blocks 48–57 are implemented. The Assembly MVP sequence is complete; Block 58 is the current next technical step.
+Status: Blocks 23–47 and Part Construction Blocks 48–59 are implemented. The Assembly MVP sequence is complete; Block 60 is the current next technical step.
 
 This document is the canonical numbered handoff sequence for cross-document assembly intent, solving, motion, exchange, posed analysis, and general geometric target architecture.
 
@@ -583,8 +583,9 @@ Project-level Planar intent, JSON, Frame/Frame equations, and shared vector-driv
 
 Block 47 is implemented in `docs/assembly-spherical-joint-mvp5.md`: passive local and Project-level
 Spherical intent, JSON, Point/Point equations, shared motion closure, and selected-drive rejection.
-Blocks 48–57 Body identity, body-scoped recompute/inspection, Body Booleans, and
+Blocks 48–59 Body identity, body-scoped recompute/inspection, Body Booleans, and
 BodyTransform/SketchOwnership intent plus associative Geometry execution are implemented. The
-current next technical step is Block 58 Part feature semantic input references.
+Block-59 richer Extrude/Cut intent and JSON are also implemented. The current next technical step
+is Block 60 richer Extrude/Cut Geometry.
 Blocks 40–47 compatibility, persistence, numeric,
 freshness, and application contracts remain authoritative.

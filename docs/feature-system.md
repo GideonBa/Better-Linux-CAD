@@ -1,6 +1,6 @@
 # Feature System
 
-Status: target architecture. Additive/Subtractive Extrude, multi-body identity/results, Body Booleans, and Block-57 associative BodyTransform/SketchOwnership execution are implemented; reusable Part feature semantic inputs are the Block-58 boundary.
+Status: target architecture. Additive/Subtractive Extrude, multi-body identity/results, Body Booleans, associative BodyTransform/SketchOwnership execution, and Block-58 reusable Part feature semantic inputs are implemented; richer Extrude/Cut intent is the Block-59 boundary.
 
 Features are the parametric operations a part is built from. Each feature has inputs, parameters, references, and a computed geometry output. The central rule is that a feature stores the *rule* for computing geometry, not only the finished body. The OCCT shape is a cache.
 
@@ -48,6 +48,18 @@ The finished OCCT geometry is only a cache derived from these rules. See `docs/s
 - Shaft feature (`docs/shaft-wizard.md`).
 
 All of these are stored as first-class features in the feature tree, are managed by the dependency graph, and recompute on change. They all use semantic references (`docs/semantic-references.md`), never raw kernel IDs.
+
+Block 58 provides the shared Core input vocabulary used by those later features:
+`ProfileRegionReference`, `AxisReference`, `PlaneReference`, `FaceReference`, `EdgeReference`, and
+`BodyReference`. Source identity, expected Geometry capability, and consumer role are separate;
+generated face/edge sources reuse the stable Block-35 semantic topology types.
+
+Block 59 broadens both existing Extrude Feature records without introducing a second feature tree.
+`ExtrudeFeatureIntent` stores `Distance`, `Symmetric`, `TwoSided`, `ThroughAll`, `ToNext`,
+`ToFace`, or `Between`, plus optional signed taper and thin intent. Distance/thickness fields are
+Length-parameter references; ToFace/Between use Block-58 typed semantic face references. The
+existing `FeatureBodyResultContext` remains the NewBody/Join/Cut/Intersect authority. Block 60 owns
+the richer Geometry; historical straight Extrude/Cut remains the current executable fast path.
 
 The long-term sketcher and feature parity target is documented in `docs/inventor-like-sketcher-and-feature-roadmap.md`.
 

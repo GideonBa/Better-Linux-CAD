@@ -700,6 +700,20 @@ stack order. Rotation axes use `explicit`, `datum_axis`, `construction_line`, or
 identity. Older files missing either array restore empty collections; no Body, ownership, or
 transform is inferred.
 
+Block 58 adds reusable typed Part-feature input values but intentionally no standalone top-level
+array. Their source/capability/role data is serialized inside the consuming Feature record beginning
+with the later feature-specific Core blocks.
+
+Block 59 begins that embedding with an optional Feature-local `extrude` object. It stores one of
+`distance`, `symmetric`, `two_sided`, `through_all`, `to_next`, `to_face`, or `between`; only the
+selected mode's distance-parameter or semantic-face fields are present. Optional
+`taper_angle_deg` and `thin` fields retain taper and wall-thickness intent. Thin modes are
+`one_sided`, `two_sided`, and `mid_plane`, with one or two Length parameter IDs as required.
+ToFace/Between faces persist Block-58 `role`, `capability`, `source_kind`, and semantic source
+identity. Exact historical additive Distance records keep `length_parameter` and omit `extrude`;
+exact historical subtractive ThroughAll records keep `depth: "through_all"` and omit `extrude`.
+Missing richer fields therefore continue to restore the historical defaults.
+
 ## Planned STEP import persistence after Block 94
 
 This section is planned architecture, not part of the current schema. Blocks 95–101 in

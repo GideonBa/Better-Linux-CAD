@@ -367,4 +367,4 @@ Block 40 joint target compatibility and the oriented Frame contract are implemen
 
 Current Revolute remains `Frame <-> Frame`; Axis alone remains incompatible because it has no deterministic reference X direction.
 
-Blocks 41–43 typed coordinates, additive compatible JSON, and shared vector drives are implemented in their canonical joint documents. Blocks 44–47 Prismatic, Cylindrical, Planar, and passive Spherical are implemented in their canonical documents. Blocks 48–57 Body identity, body-scoped recompute/inspection, Body Booleans, and BodyTransform/SketchOwnership intent are implemented; Block 58 Part feature semantic input reference contract is next.
+Blocks 41–43 typed coordinates, additive compatible JSON, and shared vector drives are implemented in their canonical joint documents. Blocks 44–47 Prismatic, Cylindrical, Planar, and passive Spherical are implemented in their canonical documents. Blocks 48–59 Body identity, body-scoped recompute/inspection, Body Booleans, and BodyTransform/SketchOwnership intent are implemented; Block 60 richer Extrude/Cut Geometry is next.

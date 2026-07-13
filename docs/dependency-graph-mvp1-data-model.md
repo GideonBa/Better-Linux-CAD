@@ -200,3 +200,11 @@ Block 53 freezes public Body-result inspection. Block 54 adds BodyBooleanFeature
 dependencies, in-place producer advancement, invalidation, cycle rejection, and removal protection.
 Block 56 adds ordered BodyTransform producer advancement and SketchOwnership association nodes;
 Block 57 executes those planned transform nodes in Geometry.
+Block 58 references expose dependency-ready `source_node_id()` values: profile regions point to
+their Sketch node, datum/construction references to their typed source node, semantic topology to
+its producer Feature, and Body references to `body:<BodyId>`. Consuming features add the actual
+edges when their Core intent is introduced.
+Block 59 is the first such consumer: every Extrude extent/thin Length parameter feeds the Feature,
+and every ToFace/Between semantic face producer Feature feeds the consuming Extrude. JSON loading
+defers those consumers until referenced producer Features exist; missing or cyclic dependencies
+fail closed.

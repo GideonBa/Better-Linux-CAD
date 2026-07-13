@@ -61,6 +61,12 @@ OCCT with deterministic multi-tool and incremental-recompute behavior. Block 56 
 BodyTransform and SketchOwnership intent, compatible JSON, producer advancement, and reference
 dependencies. Block 57 executes those transforms transactionally and keeps cumulative Body,
 owned-frame, construction-reference, semantic, and projected results derived in `ShapeCache`.
+Block 58 adds the reusable Core boundary for typed Part-feature input sources, expected geometric
+capabilities, feature-specific roles, dependency node identity, and read-only document validation.
+Block 59 extends both Extrude families with persistent seven-mode extent intent, optional taper and
+thin intent, typed limit-face references, Length-parameter validation/dependencies, and compatible
+JSON. Exact historical Distance/ThroughAll records and Geometry remain unchanged; richer Geometry
+is the Block-60 boundary.
 
 `Project` owns:
 
@@ -567,12 +573,14 @@ Canonical numbered sequence:
 - `docs/part-body-boolean-geometry-mvp6.md`
 - `docs/part-body-transform-ownership-mvp6.md`
 - `docs/part-body-transform-geometry-mvp6.md`
+- `docs/part-feature-input-reference-mvp6.md`
+- `docs/part-extrude-extent-intent-mvp6.md`
 - `docs/step-import-sequence-mvp7.md`
 
-Block 47 Spherical completes the Assembly MVP sequence. Blocks 48–57 Body identity, body-scoped
-recompute/inspection, Body Booleans, and persistent plus associative BodyTransform/SketchOwnership
-execution are implemented. The next technical step is Block 58 reusable Part feature semantic
-input references.
+Block 47 Spherical completes the Assembly MVP sequence. Blocks 48–59 Body identity, body-scoped
+recompute/inspection, Body Booleans, associative BodyTransform/SketchOwnership execution, and
+reusable Part-feature semantic input references plus richer persistent Extrude/Cut intent are
+implemented. The next technical step is Block 60 richer Extrude/Cut Geometry.
 
 Block 47 adds passive Point/Point Spherical intent through the shared local/root-space path. Scalar
 Revolute APIs remain adapters; transform variables and the shared numeric engine are unchanged.

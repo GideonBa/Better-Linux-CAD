@@ -60,5 +60,6 @@ The proof covers translation, rotation through ordered stacks, uniform-scale vol
 idempotence, transformed semantic edges, owned Sketch/reference frames, unchanged local Sketch
 coordinates, and fixed unowned Sketches.
 
-Block 58 starts the reusable Part feature semantic-input contract; it does not broaden this cache
-state into persistent matrices or raw OCCT identity.
+Block 58 provides the reusable Part feature semantic-input contract without broadening this cache
+state into persistent matrices or raw OCCT identity. Block 59 richer Extrude/Cut intent is
+implemented; Block 60 Geometry is the current next boundary.

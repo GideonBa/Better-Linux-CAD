@@ -1,8 +1,8 @@
 # Part Construction Sequence MVP-6
 
-Status: active post-Assembly-MVP sequence. Blocks 48–57 are implemented; Blocks 58–94 remain planned. Blocks 95–101 form the subsequent STEP Import MVP.
+Status: active post-Assembly-MVP sequence. Blocks 48–59 are implemented; Blocks 60–94 remain planned. Blocks 95–101 form the subsequent STEP Import MVP.
 
-Block 47 completed the Assembly MVP handoff. Blocks 48–57 establish Body identity, body-scoped recompute/inspection, Body Boolean execution, persistent BodyTransform/SketchOwnership intent, and associative transform Geometry. Block 58 — Part feature semantic input reference contract — is the current next technical step.
+Block 47 completed the Assembly MVP handoff. Blocks 48–59 establish Body identity, body-scoped recompute/inspection, Body Boolean execution, associative transform Geometry, reusable semantic Part-feature input references, and richer persistent Extrude/Cut intent. Block 60 — richer Extrude/Cut Geometry — is the current next technical step.
 
 This document is the active status, phase-order, authority-boundary, and handoff summary for the first broad BLCAD Part Construction MVP after the Assembly MVP.
 
@@ -10,7 +10,7 @@ The complete original Blocks 48-94 per-block planning detail is preserved byte-f
 
 - `docs/part-construction-sequence-mvp6-planning-detail.md`
 
-The implemented Blocks 48–57 contracts are canonical in:
+The implemented Blocks 48–59 contracts are canonical in:
 
 - `docs/part-body-identity-mvp6.md`
 - `docs/part-body-json-mvp6.md`
@@ -22,6 +22,8 @@ The implemented Blocks 48–57 contracts are canonical in:
 - `docs/part-body-boolean-geometry-mvp6.md`
 - `docs/part-body-transform-ownership-mvp6.md`
 - `docs/part-body-transform-geometry-mvp6.md`
+- `docs/part-feature-input-reference-mvp6.md`
+- `docs/part-extrude-extent-intent-mvp6.md`
 
 The planned post-Block-94 STEP import handoff is canonical in:
 
@@ -129,8 +131,11 @@ adds persistent BodyBooleanFeature intent, JSON, and graph semantics. Block 55 a
 transactional OCCT Boolean Geometry and incremental recompute. Block 56 adds ordered BodyTransform
 and SketchOwnership Core intent, JSON, graph semantics, and removal protection. Block 57 executes
 the stack in OCCT and derives associative owned frames plus refreshed semantic/projected references.
-Block 58 — Part feature semantic input reference contract — is the next technical step. The remaining Block 58-94 implementation
-contracts stay in
+Block 58 freezes reusable typed ProfileRegion/Axis/Plane/Face/Edge/Body references with independent
+source identity, expected capability, feature role, dependency identity, and document validation.
+Block 59 freezes seven extent modes, optional taper/thin intent, typed limit-face and Length
+parameter validation/dependencies, and legacy-compatible JSON. Block 60 — richer Extrude/Cut
+Geometry — is the next technical step. The remaining Block 60-94 implementation contracts stay in
 `docs/part-construction-sequence-mvp6-planning-detail.md`.
 
 ## Post-Block-94 handoff

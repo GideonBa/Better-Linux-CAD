@@ -4,17 +4,17 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 57
-current_block: 58
-current_boundary: Part feature semantic input reference contract
-current_tag: "[core][part-feature-input-reference]"
+implemented_through: Block 59
+current_block: 60
+current_boundary: Richer Extrude/Cut Geometry
+current_tag: "[geometry][extrude-extent]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
   mvp_3: "Parametric bolt circle pattern — implemented"
   mvp_4: "Assembly parameters and Project container — implemented"
   mvp_5: "Assembly relationships, motion, hierarchy, analysis, exchange — Blocks 1–47 implemented"
-  mvp_6: "Part Construction — Blocks 48–57 implemented, Blocks 58–94 planned, Block 58 next"
+  mvp_6: "Part Construction — Blocks 48–59 implemented, Blocks 60–94 planned, Block 60 next"
   mvp_7: "STEP Import — Blocks 95–101 planned after Block 94"
 ---
 
@@ -552,10 +552,10 @@ motion solvers reject Spherical as the selected drive.
 
 ## MVP 6 — Part Construction MVP after Block 47
 
-**Status:** In progress — Blocks 48–57 implemented
+**Status:** In progress — Blocks 48–59 implemented
 **Canonical:** sequence `docs/part-construction-sequence-mvp6.md`
 
-Blocks 48–57 are complete. Block 58 is the current next technical step.
+Blocks 48–59 are complete. Block 60 is the current next technical step.
 
 Mandatory Part Construction phase order:
 
@@ -795,7 +795,38 @@ Canonical contract: `docs/part-body-transform-geometry-mvp6.md`.
 [geometry][body-transform]
 ```
 
-## Current next technical step — Block 58
+## Block 58 — Part feature semantic input reference contract — Implemented
 
-Freeze the reusable Part feature semantic input reference contract according to
-`docs/part-construction-sequence-mvp6-planning-detail.md`.
+Block 58 adds reusable `ProfileRegionReference`, `AxisReference`, `PlaneReference`,
+`FaceReference`, `EdgeReference`, and `BodyReference` Core values. Each independently retains
+typed source identity, requested Geometry capability, and feature-specific role. The role matrix
+fails closed, generated face/edge sources reuse Block-35 identity/validation, dependency node IDs
+are explicit, and document validation checks every supported source family without accepting raw
+OCCT identity.
+
+Canonical contract: `docs/part-feature-input-reference-mvp6.md`.
+
+```text
+[core][part-feature-input-reference]
+```
+
+## Block 59 — Richer Extrude/Cut extent and thin-feature intent plus JSON — Implemented
+
+Block 59 adds persistent `Distance`, `Symmetric`, `TwoSided`, `ThroughAll`, `ToNext`, `ToFace`, and
+`Between` extent intent to both Extrude families. Optional signed taper and one-sided, two-sided, or
+mid-plane thin intent retain exact mode-specific parameters. `PartDocument` validates Length and
+semantic face references and records their dependency edges. Rich combinations use an embedded
+`extrude` JSON object, while the exact historical additive Distance and subtractive ThroughAll
+records retain their former JSON defaults. Geometry fails explicitly on the richer modes until
+Block 60.
+
+Canonical contract: `docs/part-extrude-extent-intent-mvp6.md`.
+
+```text
+[core][extrude-extent]
+```
+
+## Current next technical step — Block 60
+
+Execute the Block-59 extent, taper, thin, and NewBody/Join/Cut/Intersect matrix in OCCT according
+to `docs/part-construction-sequence-mvp6-planning-detail.md`.

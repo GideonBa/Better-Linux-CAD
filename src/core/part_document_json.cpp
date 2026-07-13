@@ -1043,6 +1043,172 @@ driving_dimension_from_json(const json& dimension_json) {
       json_error("unsupported extrude direction in part document json"));
 }
 
+[[nodiscard]] json extrude_limit_face_to_json(const FaceReference& reference) {
+  json value{{"role", std::string(to_string(reference.role()))},
+             {"capability", std::string(to_string(reference.expected_capability()))},
+             {"source_kind", std::string(to_string(reference.source_kind()))}};
+  if (reference.source_kind() == PartFeatureInputSourceKind::SemanticPlanarFace) {
+    const auto& face = std::get<SemanticFaceReference>(reference.source());
+    value["source_feature"] = face.source_feature().value();
+    value["face"] = std::string(to_string(face.face()));
+  } else {
+    const auto& face = std::get<SemanticCylindricalFaceReference>(reference.source());
+    value["source_feature"] = face.source_feature().value();
+    value["source_profile"] = face.source_profile().value();
+    value["face"] = std::string(to_string(face.face()));
+  }
+  return value;
+}
+
+[[nodiscard]] Result<FaceReference> extrude_limit_face_from_json(const json& value) {
+  if (!value.is_object() || value.value("role", "") != "extrude_limit_face" ||
+      value.value("capability", "") != "face")
+    return Result<FaceReference>::failure(
+        json_error("extrude limit face requires role and Face capability"));
+  const std::string source_kind = value.value("source_kind", "");
+  if (source_kind == "semantic_planar_face") {
+    if (value.size() != 5U || !value.contains("source_feature") || !value.contains("face"))
+      return Result<FaceReference>::failure(
+          json_error("semantic planar extrude limit face has invalid fields"));
+    auto face = semantic_face_from_json(value.at("face"));
+    if (face.has_error())
+      return Result<FaceReference>::failure(face.error());
+    auto identity = SemanticFaceReference::create(
+        FeatureId(value.at("source_feature").get<std::string>()), face.value());
+    if (identity.has_error())
+      return Result<FaceReference>::failure(identity.error());
+    return FaceReference::create_planar(PartFeatureInputRole::ExtrudeLimitFace,
+                                        std::move(identity.value()));
+  }
+  if (source_kind == "semantic_cylindrical_face") {
+    if (value.size() != 6U || !value.contains("source_feature") ||
+        !value.contains("source_profile") || !value.contains("face"))
+      return Result<FaceReference>::failure(
+          json_error("semantic cylindrical extrude limit face has invalid fields"));
+    if (value.at("face").get<std::string>() != "wall")
+      return Result<FaceReference>::failure(
+          json_error("unsupported semantic cylindrical face in extrude extent"));
+    auto identity = SemanticCylindricalFaceReference::create(
+        FeatureId(value.at("source_feature").get<std::string>()),
+        ProfileId(value.at("source_profile").get<std::string>()));
+    if (identity.has_error())
+      return Result<FaceReference>::failure(identity.error());
+    return FaceReference::create_cylindrical(PartFeatureInputRole::ExtrudeLimitFace,
+                                             std::move(identity.value()));
+  }
+  return Result<FaceReference>::failure(json_error("unsupported extrude limit face source kind"));
+}
+
+[[nodiscard]] json extrude_feature_intent_to_json(const ExtrudeFeatureIntent& intent) {
+  const auto& extent = intent.extent();
+  json value{{"extent", std::string(to_string(extent.mode()))}};
+  if (extent.first_distance_parameter().has_value())
+    value["first_distance_parameter"] = extent.first_distance_parameter()->value();
+  if (extent.second_distance_parameter().has_value())
+    value["second_distance_parameter"] = extent.second_distance_parameter()->value();
+  if (extent.first_face().has_value())
+    value["first_face"] = extrude_limit_face_to_json(*extent.first_face());
+  if (extent.second_face().has_value())
+    value["second_face"] = extrude_limit_face_to_json(*extent.second_face());
+  if (intent.taper_angle_deg().has_value())
+    value["taper_angle_deg"] = *intent.taper_angle_deg();
+  if (intent.thin().has_value()) {
+    const auto& thin = *intent.thin();
+    value["thin"] = json{{"mode", std::string(to_string(thin.mode()))},
+                         {"first_thickness_parameter", thin.first_thickness_parameter().value()}};
+    if (thin.second_thickness_parameter().has_value())
+      value["thin"]["second_thickness_parameter"] = thin.second_thickness_parameter()->value();
+  }
+  return value;
+}
+
+[[nodiscard]] Result<ExtrudeFeatureIntent> extrude_feature_intent_from_json(const json& value) {
+  if (!value.is_object() || !value.contains("extent") || !value.at("extent").is_string())
+    return Result<ExtrudeFeatureIntent>::failure(
+        json_error("extrude intent requires string extent"));
+  const std::string mode = value.at("extent").get<std::string>();
+  std::size_t required_mode_fields = 0U;
+  if (mode == "distance" || mode == "symmetric" || mode == "to_face")
+    required_mode_fields = 1U;
+  else if (mode == "two_sided" || mode == "between")
+    required_mode_fields = 2U;
+  const std::size_t expected_fields = 1U + required_mode_fields +
+                                      (value.contains("taper_angle_deg") ? 1U : 0U) +
+                                      (value.contains("thin") ? 1U : 0U);
+  if (value.size() != expected_fields)
+    return Result<ExtrudeFeatureIntent>::failure(
+        json_error("extrude intent has fields not valid for its extent mode"));
+  Result<ExtrudeExtentIntent> extent = Result<ExtrudeExtentIntent>::failure(
+      json_error("unsupported extrude extent in part document json"));
+  if (mode == "distance")
+    extent = ExtrudeExtentIntent::distance(
+        ParameterId(value.at("first_distance_parameter").get<std::string>()));
+  else if (mode == "symmetric")
+    extent = ExtrudeExtentIntent::symmetric(
+        ParameterId(value.at("first_distance_parameter").get<std::string>()));
+  else if (mode == "two_sided")
+    extent = ExtrudeExtentIntent::two_sided(
+        ParameterId(value.at("first_distance_parameter").get<std::string>()),
+        ParameterId(value.at("second_distance_parameter").get<std::string>()));
+  else if (mode == "through_all")
+    extent = Result<ExtrudeExtentIntent>::success(ExtrudeExtentIntent::through_all());
+  else if (mode == "to_next")
+    extent = Result<ExtrudeExtentIntent>::success(ExtrudeExtentIntent::to_next());
+  else if (mode == "to_face") {
+    auto face = extrude_limit_face_from_json(value.at("first_face"));
+    if (face.has_error())
+      return Result<ExtrudeFeatureIntent>::failure(face.error());
+    extent = ExtrudeExtentIntent::to_face(std::move(face.value()));
+  } else if (mode == "between") {
+    auto first = extrude_limit_face_from_json(value.at("first_face"));
+    auto second = extrude_limit_face_from_json(value.at("second_face"));
+    if (first.has_error())
+      return Result<ExtrudeFeatureIntent>::failure(first.error());
+    if (second.has_error())
+      return Result<ExtrudeFeatureIntent>::failure(second.error());
+    extent = ExtrudeExtentIntent::between(std::move(first.value()), std::move(second.value()));
+  }
+  if (extent.has_error())
+    return Result<ExtrudeFeatureIntent>::failure(extent.error());
+
+  std::optional<ExtrudeThinIntent> thin;
+  if (value.contains("thin")) {
+    const auto& thin_json = value.at("thin");
+    if (!thin_json.is_object() || !thin_json.contains("mode") ||
+        !thin_json.contains("first_thickness_parameter"))
+      return Result<ExtrudeFeatureIntent>::failure(
+          json_error("extrude thin intent requires mode and first thickness parameter"));
+    const std::string thin_mode = thin_json.at("mode").get<std::string>();
+    ExtrudeThinMode parsed_mode;
+    if (thin_mode == "one_sided")
+      parsed_mode = ExtrudeThinMode::OneSided;
+    else if (thin_mode == "two_sided")
+      parsed_mode = ExtrudeThinMode::TwoSided;
+    else if (thin_mode == "mid_plane")
+      parsed_mode = ExtrudeThinMode::MidPlane;
+    else
+      return Result<ExtrudeFeatureIntent>::failure(
+          json_error("unsupported extrude thin mode in part document json"));
+    const std::size_t expected_thin_fields = parsed_mode == ExtrudeThinMode::TwoSided ? 3U : 2U;
+    if (thin_json.size() != expected_thin_fields)
+      return Result<ExtrudeFeatureIntent>::failure(
+          json_error("extrude thin intent has fields not valid for its mode"));
+    std::optional<ParameterId> second;
+    if (thin_json.contains("second_thickness_parameter"))
+      second = ParameterId(thin_json.at("second_thickness_parameter").get<std::string>());
+    auto parsed = ExtrudeThinIntent::create(
+        parsed_mode, ParameterId(thin_json.at("first_thickness_parameter").get<std::string>()),
+        second);
+    if (parsed.has_error())
+      return Result<ExtrudeFeatureIntent>::failure(parsed.error());
+    thin = std::move(parsed.value());
+  }
+  std::optional<double> taper;
+  if (value.contains("taper_angle_deg"))
+    taper = value.at("taper_angle_deg").get<double>();
+  return ExtrudeFeatureIntent::create(std::move(extent.value()), taper, std::move(thin));
+}
+
 [[nodiscard]] Result<std::optional<FeatureBodyResultContext>>
 feature_body_result_context_from_json(const json& feature_json) {
   const bool has_mode = feature_json.contains("operation_mode");
@@ -1092,22 +1258,45 @@ feature_body_result_context_from_json(const json& feature_json) {
     return Result<Feature>::failure(direction.error());
   Result<Feature> feature =
       Result<Feature>::failure(json_error("unsupported feature type in part document json"));
-  if (type == "additive_extrude")
-    feature = Feature::create_additive_extrude(
-        FeatureId(feature_json.at("id").get<std::string>()),
-        feature_json.at("name").get<std::string>(),
-        SketchId(feature_json.at("input_sketch").get<std::string>()),
-        ParameterId(feature_json.at("length_parameter").get<std::string>()), direction.value());
-  else if (type == "subtractive_extrude") {
-    if (feature_json.at("depth").get<std::string>() != "through_all")
-      return Result<Feature>::failure(
-          json_error("only through_all subtractive extrude depth is supported"));
-    feature = Feature::create_subtractive_extrude(
-        FeatureId(feature_json.at("id").get<std::string>()),
-        feature_json.at("name").get<std::string>(),
-        SketchId(feature_json.at("input_sketch").get<std::string>()),
-        FeatureId(feature_json.at("target_feature").get<std::string>()),
-        SubtractiveExtrudeDepth::ThroughAll, direction.value());
+  std::optional<ExtrudeFeatureIntent> intent;
+  if (feature_json.contains("extrude")) {
+    auto parsed = extrude_feature_intent_from_json(feature_json.at("extrude"));
+    if (parsed.has_error())
+      return Result<Feature>::failure(parsed.error());
+    intent = std::move(parsed.value());
+  }
+  if (type == "additive_extrude") {
+    if (intent.has_value())
+      feature = Feature::create_additive_extrude(
+          FeatureId(feature_json.at("id").get<std::string>()),
+          feature_json.at("name").get<std::string>(),
+          SketchId(feature_json.at("input_sketch").get<std::string>()), std::move(*intent),
+          direction.value());
+    else
+      feature = Feature::create_additive_extrude(
+          FeatureId(feature_json.at("id").get<std::string>()),
+          feature_json.at("name").get<std::string>(),
+          SketchId(feature_json.at("input_sketch").get<std::string>()),
+          ParameterId(feature_json.at("length_parameter").get<std::string>()), direction.value());
+  } else if (type == "subtractive_extrude") {
+    if (intent.has_value())
+      feature = Feature::create_subtractive_extrude(
+          FeatureId(feature_json.at("id").get<std::string>()),
+          feature_json.at("name").get<std::string>(),
+          SketchId(feature_json.at("input_sketch").get<std::string>()),
+          FeatureId(feature_json.at("target_feature").get<std::string>()), std::move(*intent),
+          direction.value());
+    else {
+      if (feature_json.at("depth").get<std::string>() != "through_all")
+        return Result<Feature>::failure(
+            json_error("only through_all subtractive extrude depth is supported"));
+      feature = Feature::create_subtractive_extrude(
+          FeatureId(feature_json.at("id").get<std::string>()),
+          feature_json.at("name").get<std::string>(),
+          SketchId(feature_json.at("input_sketch").get<std::string>()),
+          FeatureId(feature_json.at("target_feature").get<std::string>()),
+          SubtractiveExtrudeDepth::ThroughAll, direction.value());
+    }
   }
   if (feature.has_error())
     return feature;
@@ -1117,6 +1306,15 @@ feature_body_result_context_from_json(const json& feature_json) {
   if (!context.value().has_value())
     return feature;
   return feature.value().with_body_result_context(std::move(context.value().value()));
+}
+
+[[nodiscard]] bool extrude_reference_features_available(const PartDocument& document,
+                                                        const Feature& feature) {
+  const auto available = [&document](const std::optional<FaceReference>& face) {
+    return !face.has_value() || document.find_feature(FeatureId(face->source_node_id())) != nullptr;
+  };
+  return available(feature.extrude_intent().extent().first_face()) &&
+         available(feature.extrude_intent().extent().second_face());
 }
 
 [[nodiscard]] Result<BodyBooleanFeature> body_boolean_feature_from_json(const json& value) {
@@ -1182,8 +1380,7 @@ body_transform_coordinate_space_from_json(const json& value) {
   if (spelling == "body_local")
     return Result<BodyTransformCoordinateSpace>::success(BodyTransformCoordinateSpace::BodyLocal);
   if (spelling == "sketch_local")
-    return Result<BodyTransformCoordinateSpace>::success(
-        BodyTransformCoordinateSpace::SketchLocal);
+    return Result<BodyTransformCoordinateSpace>::success(BodyTransformCoordinateSpace::SketchLocal);
   if (spelling == "construction_reference")
     return Result<BodyTransformCoordinateSpace>::success(
         BodyTransformCoordinateSpace::ConstructionReference);
@@ -1202,7 +1399,7 @@ body_transform_rotation_axis_from_json(const json& value) {
       return Result<BodyTransformRotationAxis>::failure(
           json_error("explicit body rotation axis requires origin and direction"));
     return BodyTransformRotationAxis::create_explicit(point3_from_json(value.at("origin")),
-                                                       vector3_from_json(value.at("direction")));
+                                                      vector3_from_json(value.at("direction")));
   }
   if (kind == "datum_axis") {
     if (!value.contains("datum_axis") || !value.at("datum_axis").is_string())
@@ -1239,15 +1436,12 @@ body_transform_rotation_axis_from_json(const json& value) {
     return Result<BodyTransform>::failure(
         json_error("body transform requires all mandatory fields"));
   if (!value.at("id").is_string() || !value.at("body").is_string() ||
-      !value.at("kind").is_string() ||
-      !value.at("apply_to_owned_sketches").is_boolean() ||
+      !value.at("kind").is_string() || !value.at("apply_to_owned_sketches").is_boolean() ||
       !value.at("apply_to_owned_construction_geometry").is_boolean() ||
-      (value.contains("coordinate_reference") &&
-       !value.at("coordinate_reference").is_string()))
+      (value.contains("coordinate_reference") && !value.at("coordinate_reference").is_string()))
     return Result<BodyTransform>::failure(json_error("body transform fields have invalid types"));
 
-  auto coordinate_space =
-      body_transform_coordinate_space_from_json(value.at("coordinate_space"));
+  auto coordinate_space = body_transform_coordinate_space_from_json(value.at("coordinate_space"));
   if (coordinate_space.has_error())
     return Result<BodyTransform>::failure(coordinate_space.error());
   std::optional<std::string> coordinate_reference;
@@ -1256,13 +1450,11 @@ body_transform_rotation_axis_from_json(const json& value) {
   const BodyTransformId id(value.at("id").get<std::string>());
   const BodyId body(value.at("body").get<std::string>());
   const bool apply_sketches = value.at("apply_to_owned_sketches").get<bool>();
-  const bool apply_construction =
-      value.at("apply_to_owned_construction_geometry").get<bool>();
+  const bool apply_construction = value.at("apply_to_owned_construction_geometry").get<bool>();
   const std::string kind = value.at("kind").get<std::string>();
   if (kind == "translate") {
     if (!value.contains("translation_mm") || value.contains("rotation_axis") ||
-        value.contains("angle_deg") || value.contains("scale_factor") ||
-        value.contains("center"))
+        value.contains("angle_deg") || value.contains("scale_factor") || value.contains("center"))
       return Result<BodyTransform>::failure(
           json_error("translate body transform requires only translation_mm parameters"));
     return BodyTransform::create_translate(
@@ -1278,10 +1470,10 @@ body_transform_rotation_axis_from_json(const json& value) {
     auto axis = body_transform_rotation_axis_from_json(value.at("rotation_axis"));
     if (axis.has_error())
       return Result<BodyTransform>::failure(axis.error());
-    return BodyTransform::create_rotate(
-        id, body, coordinate_space.value(), std::move(coordinate_reference),
-        std::move(axis.value()), value.at("angle_deg").get<double>(), apply_sketches,
-        apply_construction);
+    return BodyTransform::create_rotate(id, body, coordinate_space.value(),
+                                        std::move(coordinate_reference), std::move(axis.value()),
+                                        value.at("angle_deg").get<double>(), apply_sketches,
+                                        apply_construction);
   }
   if (kind == "uniform_scale") {
     if (!value.contains("scale_factor") || !value.at("scale_factor").is_number() ||
@@ -1312,14 +1504,12 @@ body_transform_rotation_axis_from_json(const json& value) {
   else if (spelling == "reference_only")
     association = SketchAssociation::ReferenceOnly;
   else
-    return Result<SketchOwnership>::failure(
-        json_error("unsupported sketch ownership association"));
+    return Result<SketchOwnership>::failure(json_error("unsupported sketch ownership association"));
   return SketchOwnership::create(SketchId(value.at("sketch").get<std::string>()),
                                  BodyId(value.at("owning_body").get<std::string>()), association);
 }
 
-[[nodiscard]] json body_transform_rotation_axis_to_json(
-    const BodyTransformRotationAxis& axis) {
+[[nodiscard]] json body_transform_rotation_axis_to_json(const BodyTransformRotationAxis& axis) {
   json value{{"kind", std::string(to_string(axis.kind()))}};
   switch (axis.kind()) {
   case BodyTransformRotationAxisKind::Explicit:
@@ -1550,12 +1740,21 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
                       {"type", std::string(to_string(feature.type()))},
                       {"input_sketch", feature.input_sketch().value()},
                       {"direction", std::string(to_string(feature.direction()))}};
-    if (feature.type() == FeatureType::AdditiveExtrude)
+    if (feature.type() == FeatureType::AdditiveExtrude &&
+        feature.extrude_intent().is_historical_additive_default())
       feature_json["length_parameter"] = feature.length_parameter().value();
     if (feature.type() == FeatureType::SubtractiveExtrude) {
       feature_json["target_feature"] = feature.target_feature().value();
-      feature_json["depth"] = std::string(to_string(feature.subtractive_depth()));
+      if (feature.extrude_intent().is_historical_subtractive_default())
+        feature_json["depth"] = std::string(to_string(feature.subtractive_depth()));
     }
+    const bool explicit_extrude_intent =
+        (feature.type() == FeatureType::AdditiveExtrude &&
+         !feature.extrude_intent().is_historical_additive_default()) ||
+        (feature.type() == FeatureType::SubtractiveExtrude &&
+         !feature.extrude_intent().is_historical_subtractive_default());
+    if (explicit_extrude_intent)
+      feature_json["extrude"] = extrude_feature_intent_to_json(feature.extrude_intent());
     if (feature.body_result_context().has_value()) {
       const auto& context = feature.body_result_context().value();
       feature_json["operation_mode"] = std::string(to_string(context.operation_mode()));
@@ -1588,13 +1787,13 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
              {"association", std::string(to_string(ownership.association()))}});
   root["body_transforms"] = json::array();
   for (const BodyTransform& transform : document.body_transforms()) {
-    json value{{"id", transform.id().value()},
-               {"body", transform.body().value()},
-               {"kind", std::string(to_string(transform.kind()))},
-               {"coordinate_space", std::string(to_string(transform.coordinate_space()))},
-               {"apply_to_owned_sketches", transform.apply_to_owned_sketches()},
-               {"apply_to_owned_construction_geometry",
-                transform.apply_to_owned_construction_geometry()}};
+    json value{
+        {"id", transform.id().value()},
+        {"body", transform.body().value()},
+        {"kind", std::string(to_string(transform.kind()))},
+        {"coordinate_space", std::string(to_string(transform.coordinate_space()))},
+        {"apply_to_owned_sketches", transform.apply_to_owned_sketches()},
+        {"apply_to_owned_construction_geometry", transform.apply_to_owned_construction_geometry()}};
     if (transform.coordinate_reference().has_value())
       value["coordinate_reference"] = *transform.coordinate_reference();
     switch (transform.kind()) {
@@ -1602,8 +1801,7 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
       value["translation_mm"] = vector3_to_json(transform.translation_mm());
       break;
     case BodyTransformKind::Rotate:
-      value["rotation_axis"] =
-          body_transform_rotation_axis_to_json(*transform.rotation_axis());
+      value["rotation_axis"] = body_transform_rotation_axis_to_json(*transform.rotation_axis());
       value["angle_deg"] = transform.angle_deg();
       break;
     case BodyTransformKind::UniformScale:
@@ -1752,11 +1950,14 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
         if (document.value().find_sketch(feature.value().input_sketch()) == nullptr)
           continue;
         if (feature.value().type() == FeatureType::AdditiveExtrude &&
+            feature.value().extrude_intent().is_historical_additive_default() &&
             document.value().find_parameter(feature.value().length_parameter()) == nullptr)
           return Result<PartDocument>::failure(
               json_error("additive extrude length parameter must exist in part document"));
         if (feature.value().type() == FeatureType::SubtractiveExtrude &&
             document.value().find_feature(feature.value().target_feature()) == nullptr)
+          continue;
+        if (!extrude_reference_features_available(document.value(), feature.value()))
           continue;
         auto added = document.value().add_feature(feature.value());
         if (added.has_error())

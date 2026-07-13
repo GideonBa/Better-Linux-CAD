@@ -35,6 +35,10 @@ Implemented or planned families include:
 - `SemanticVertexReference`
 - `SemanticAxisReference`
 - `SemanticSeatingPlaneReference`
+- Block-58 Part feature wrappers: `ProfileRegionReference`, `AxisReference`, `PlaneReference`,
+  `FaceReference`, `EdgeReference`, and `BodyReference`
+- Block-59 `ToFace`/`Between` Extrude limits consume `FaceReference` with the
+  `ExtrudeLimitFace` role and retain the producer Feature dependency
 - future named groups and analytic surface references
 
 Geometry-producing features should expose stable constructive meaning for downstream consumers.

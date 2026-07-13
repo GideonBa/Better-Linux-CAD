@@ -56,6 +56,7 @@ add_library(
   src/core/invalidation_state.cpp
   src/core/part_document.cpp
   src/core/part_document_json.cpp
+  src/core/part_feature_input_reference.cpp
   src/core/parameter.cpp
   src/core/parameter_expression.cpp
   src/core/project.cpp
@@ -283,6 +284,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/derived_workplane_tests.cpp
     tests/core/error_result_tests.cpp
     tests/core/feature_tests.cpp
+    tests/core/extrude_extent_intent_tests.cpp
     tests/core/feature_body_operation_tests.cpp
     tests/core/feature_body_operation_json_tests.cpp
     tests/core/generated_topology_reference_tests.cpp
@@ -298,6 +300,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/projected_sketch_reference_json_tests.cpp
     tests/core/projected_sketch_reference_tests.cpp
     tests/core/quantity_tests.cpp
+    tests/core/part_feature_input_reference_tests.cpp
     tests/core/recompute_plan_tests.cpp
     tests/core/reference_driven_sketch_constraint_tests.cpp
     tests/core/reference_generated_line_json_tests.cpp

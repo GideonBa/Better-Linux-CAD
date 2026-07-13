@@ -688,6 +688,11 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_additive_extrude(
     return Result<std::size_t>::failure(
         geometry_error(feature->id().value(), "only additive extrude features are supported"));
   }
+  if (!feature->extrude_intent().is_historical_additive_default()) {
+    return Result<std::size_t>::failure(geometry_error(
+        feature->id().value(),
+        "richer additive extrude extent, taper, and thin geometry starts in Block 60"));
+  }
   if (feature->body_result_context().has_value() &&
       feature->body_result_context()->operation_mode() != FeatureBodyOperationMode::NewBody) {
     return Result<std::size_t>::failure(geometry_error(
@@ -826,6 +831,11 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_subtractive_extrude(
   if (feature->type() != FeatureType::SubtractiveExtrude) {
     return Result<std::size_t>::failure(
         geometry_error(feature->id().value(), "only subtractive extrude features are supported"));
+  }
+  if (!feature->extrude_intent().is_historical_subtractive_default()) {
+    return Result<std::size_t>::failure(geometry_error(
+        feature->id().value(),
+        "richer subtractive extrude extent, taper, and thin geometry starts in Block 60"));
   }
   if (feature->body_result_context().has_value() &&
       feature->body_result_context()->operation_mode() != FeatureBodyOperationMode::Cut) {

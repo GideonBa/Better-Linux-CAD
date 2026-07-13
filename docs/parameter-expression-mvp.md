@@ -19,6 +19,9 @@ Parameter references use the parameter name. Unit dimension is a length power: b
 - `PartDocument::set_parameter_value` rejects direct writes to expression-driven parameters; after any accepted parameter write it re-evaluates every affected expression parameter in topological order, so chained formulas read already-updated inputs, before returning the affected node list.
 - `PartDocument::set_parameter_formula` is the mutation path for expression parameters: the new formula is evaluated first, the parameter's old input edges are replaced through `DependencyGraph::remove_dependencies_of_dependent`, direct and indirect cycles are rejected before any state changes, and dependents (including chained expressions) are invalidated and re-evaluated. Invalid edits leave the document untouched.
 - JSON persists the formula string; deserialization re-derives the value and the edges through `add_expression_parameter` (file order preserves input-before-expression validity).
+- Block 59 Extrude `distance`, `symmetric`, `two_sided`, and thin-wall inputs reference normal
+  Length parameters. Formula-driven Length parameters therefore participate through the same
+  dependency chain; Extrude intent does not persist duplicate evaluated lengths.
 
 ## Covered by tests
 

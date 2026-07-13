@@ -91,6 +91,87 @@ validate_generated_vertex_reference(const PartDocument& document,
   return Result<std::size_t>::success(0);
 }
 
+[[nodiscard]] Result<std::size_t> validate_extrude_length_parameter(const PartDocument& document,
+                                                                    const ParameterId& parameter_id,
+                                                                    const std::string& object_id,
+                                                                    std::string_view role) {
+  const Parameter* parameter = document.find_parameter(parameter_id);
+  if (parameter == nullptr || parameter->type() != ParameterType::Length)
+    return Result<std::size_t>::failure(Error::validation(
+        object_id, std::string(role) + " must reference an existing length parameter"));
+  return Result<std::size_t>::success(1U);
+}
+
+[[nodiscard]] Result<std::size_t> validate_extrude_feature_intent(const PartDocument& document,
+                                                                  const Feature& feature) {
+  const auto& extent = feature.extrude_intent().extent();
+  for (const auto* parameter :
+       {&extent.first_distance_parameter(), &extent.second_distance_parameter()}) {
+    if (!parameter->has_value())
+      continue;
+    auto valid = validate_extrude_length_parameter(document, **parameter, feature.id().value(),
+                                                   "extrude distance");
+    if (valid.has_error())
+      return valid;
+  }
+  for (const auto* face : {&extent.first_face(), &extent.second_face()}) {
+    if (!face->has_value())
+      continue;
+    auto valid = validate_part_feature_input_reference(document, **face);
+    if (valid.has_error())
+      return valid;
+  }
+  if (feature.extrude_intent().thin().has_value()) {
+    const auto& thin = *feature.extrude_intent().thin();
+    auto first = validate_extrude_length_parameter(document, thin.first_thickness_parameter(),
+                                                   feature.id().value(), "thin thickness");
+    if (first.has_error())
+      return first;
+    if (thin.second_thickness_parameter().has_value()) {
+      auto second = validate_extrude_length_parameter(document, *thin.second_thickness_parameter(),
+                                                      feature.id().value(), "thin thickness");
+      if (second.has_error())
+        return second;
+    }
+  }
+  return Result<std::size_t>::success(1U);
+}
+
+[[nodiscard]] Result<std::size_t> add_extrude_feature_dependencies(DependencyGraph& graph,
+                                                                   const Feature& feature) {
+  const auto& extent = feature.extrude_intent().extent();
+  for (const auto* parameter :
+       {&extent.first_distance_parameter(), &extent.second_distance_parameter()}) {
+    if (!parameter->has_value())
+      continue;
+    auto dependency = add_dependency_if_missing(graph, (**parameter).value(), feature.id().value());
+    if (dependency.has_error())
+      return dependency;
+  }
+  for (const auto* face : {&extent.first_face(), &extent.second_face()}) {
+    if (!face->has_value())
+      continue;
+    auto dependency =
+        add_dependency_if_missing(graph, (**face).source_node_id(), feature.id().value());
+    if (dependency.has_error())
+      return dependency;
+  }
+  if (feature.extrude_intent().thin().has_value()) {
+    const auto& thin = *feature.extrude_intent().thin();
+    auto first = add_dependency_if_missing(graph, thin.first_thickness_parameter().value(),
+                                           feature.id().value());
+    if (first.has_error())
+      return first;
+    if (thin.second_thickness_parameter().has_value()) {
+      auto second = add_dependency_if_missing(graph, thin.second_thickness_parameter()->value(),
+                                              feature.id().value());
+      if (second.has_error())
+        return second;
+    }
+  }
+  return Result<std::size_t>::success(graph.dependency_count());
+}
+
 [[nodiscard]] Result<std::size_t>
 validate_semantic_reference_target(const PartDocument& document,
                                    const SemanticReferenceTarget& target,
@@ -839,9 +920,13 @@ Result<std::size_t> PartDocument::add_feature(Feature feature) {
     return Result<std::size_t>::failure(Error::validation(
         feature.id().value(), "feature input sketch must exist in part document"));
   if (feature.type() == FeatureType::AdditiveExtrude &&
+      feature.extrude_intent().is_historical_additive_default() &&
       !has_parameter_id(feature.length_parameter()))
     return Result<std::size_t>::failure(Error::validation(
         feature.id().value(), "additive extrude length parameter must exist in part document"));
+  auto valid_extrude_intent = validate_extrude_feature_intent(*this, feature);
+  if (valid_extrude_intent.has_error())
+    return Result<std::size_t>::failure(valid_extrude_intent.error());
   if (feature.type() == FeatureType::SubtractiveExtrude &&
       !has_feature_id(feature.target_feature()))
     return Result<std::size_t>::failure(Error::validation(
@@ -863,12 +948,9 @@ Result<std::size_t> PartDocument::add_feature(Feature feature) {
       add_dependency_if_missing(graph, feature.input_sketch().value(), feature.id().value());
   if (sketch_dependency.has_error())
     return Result<std::size_t>::failure(sketch_dependency.error());
-  if (feature.type() == FeatureType::AdditiveExtrude) {
-    auto length_dependency =
-        add_dependency_if_missing(graph, feature.length_parameter().value(), feature.id().value());
-    if (length_dependency.has_error())
-      return Result<std::size_t>::failure(length_dependency.error());
-  }
+  auto extrude_dependencies = add_extrude_feature_dependencies(graph, feature);
+  if (extrude_dependencies.has_error())
+    return Result<std::size_t>::failure(extrude_dependencies.error());
   if (feature.type() == FeatureType::SubtractiveExtrude) {
     auto target_dependency =
         add_dependency_if_missing(graph, feature.target_feature().value(), feature.id().value());
@@ -982,8 +1064,8 @@ Result<std::size_t> PartDocument::add_sketch_ownership(SketchOwnership ownership
     return Result<std::size_t>::failure(Error::validation(
         ownership.sketch().value(), "sketch ownership must be unique per sketch"));
   if (!has_sketch_id(ownership.sketch()))
-    return Result<std::size_t>::failure(Error::validation(
-        ownership.sketch().value(), "owned sketch must exist in part document"));
+    return Result<std::size_t>::failure(
+        Error::validation(ownership.sketch().value(), "owned sketch must exist in part document"));
   if (!has_body_id(ownership.owning_body()))
     return Result<std::size_t>::failure(Error::validation(
         ownership.sketch().value(), "sketch owning body must exist in part document"));
@@ -993,8 +1075,7 @@ Result<std::size_t> PartDocument::add_sketch_ownership(SketchOwnership ownership
   auto added_node = graph.add_node(node_id);
   if (added_node.has_error())
     return Result<std::size_t>::failure(added_node.error());
-  auto sketch_dependency =
-      add_dependency_if_missing(graph, ownership.sketch().value(), node_id);
+  auto sketch_dependency = add_dependency_if_missing(graph, ownership.sketch().value(), node_id);
   if (sketch_dependency.has_error())
     return Result<std::size_t>::failure(sketch_dependency.error());
   for (const BodyTransform& transform : body_transforms_) {
@@ -1013,19 +1094,18 @@ Result<std::size_t> PartDocument::add_sketch_ownership(SketchOwnership ownership
   if (synced.has_error())
     return Result<std::size_t>::failure(synced.error());
   invalidation_state_ = std::move(invalidation_state);
-  const auto position = std::lower_bound(
-      sketch_ownerships_.begin(), sketch_ownerships_.end(), ownership.sketch(),
-      [](const SketchOwnership& existing, const SketchId& id) {
-        return existing.sketch().value() < id.value();
-      });
+  const auto position =
+      std::lower_bound(sketch_ownerships_.begin(), sketch_ownerships_.end(), ownership.sketch(),
+                       [](const SketchOwnership& existing, const SketchId& id) {
+                         return existing.sketch().value() < id.value();
+                       });
   const auto index = static_cast<std::size_t>(std::distance(sketch_ownerships_.begin(), position));
   sketch_ownerships_.insert(position, std::move(ownership));
   return Result<std::size_t>::success(index);
 }
 
 Result<std::size_t> PartDocument::add_body_transform(BodyTransform transform) {
-  if (has_body_transform_id(transform.id()) ||
-      dependency_graph_.has_node(transform.id().value()))
+  if (has_body_transform_id(transform.id()) || dependency_graph_.has_node(transform.id().value()))
     return Result<std::size_t>::failure(Error::validation(
         transform.id().value(), "body transform id must be unique within part document"));
   if (!has_body_id(transform.body()))
@@ -1039,8 +1119,7 @@ Result<std::size_t> PartDocument::add_body_transform(BodyTransform transform) {
       return Result<std::size_t>::failure(Error::validation(
           transform.id().value(), "sketch-local coordinate reference must exist"));
     coordinate_dependency = sketch.value();
-  } else if (transform.coordinate_space() ==
-             BodyTransformCoordinateSpace::ConstructionReference) {
+  } else if (transform.coordinate_space() == BodyTransformCoordinateSpace::ConstructionReference) {
     const std::string& reference = *transform.coordinate_reference();
     const bool exists = has_datum_plane_id(DatumPlaneId(reference)) ||
                         has_datum_axis_id(DatumAxisId(reference)) ||
@@ -1066,8 +1145,8 @@ Result<std::size_t> PartDocument::add_body_transform(BodyTransform transform) {
             transform.id().value(), "rotation construction line must exist in part document"));
       axis_dependency = axis.construction_line().value();
     } else if (axis.kind() == BodyTransformRotationAxisKind::SemanticEdge) {
-      auto valid = validate_generated_edge_reference(*this, *axis.semantic_edge(),
-                                                     transform.id().value());
+      auto valid =
+          validate_generated_edge_reference(*this, *axis.semantic_edge(), transform.id().value());
       if (valid.has_error())
         return Result<std::size_t>::failure(valid.error());
       axis_dependency = axis.semantic_edge()->source_feature().value();
@@ -1089,8 +1168,7 @@ Result<std::size_t> PartDocument::add_body_transform(BodyTransform transform) {
   for (const auto& dependency_id : {coordinate_dependency, axis_dependency}) {
     if (!dependency_id.has_value())
       continue;
-    auto dependency =
-        add_dependency_if_missing(graph, *dependency_id, transform.id().value());
+    auto dependency = add_dependency_if_missing(graph, *dependency_id, transform.id().value());
     if (dependency.has_error())
       return Result<std::size_t>::failure(dependency.error());
   }
@@ -1104,8 +1182,7 @@ Result<std::size_t> PartDocument::add_body_transform(BodyTransform transform) {
         return Result<std::size_t>::failure(dependency.error());
     }
   }
-  auto result_dependency =
-      add_dependency_if_missing(graph, transform.id().value(), result_node);
+  auto result_dependency = add_dependency_if_missing(graph, transform.id().value(), result_node);
   if (result_dependency.has_error())
     return Result<std::size_t>::failure(result_dependency.error());
   if (graph.has_cycle())
@@ -1328,8 +1405,7 @@ Result<std::vector<std::string>> PartDocument::mark_body_changed(BodyId id) {
   return invalidation_state_.mark_changed(dependency_graph_, body_dependency_node_id(id));
 }
 
-Result<std::vector<std::string>>
-PartDocument::mark_body_transform_changed(BodyTransformId id) {
+Result<std::vector<std::string>> PartDocument::mark_body_transform_changed(BodyTransformId id) {
   if (id.empty())
     return Result<std::vector<std::string>>::failure(
         Error::validation("body_transform", "body transform id must not be empty"));
@@ -1643,11 +1719,11 @@ const BodyBooleanFeature* PartDocument::find_body_boolean_feature(FeatureId id) 
 }
 
 const SketchOwnership* PartDocument::find_sketch_ownership(SketchId id) const noexcept {
-  const auto position = std::lower_bound(
-      sketch_ownerships_.begin(), sketch_ownerships_.end(), id,
-      [](const SketchOwnership& ownership, const SketchId& candidate) {
-        return ownership.sketch().value() < candidate.value();
-      });
+  const auto position =
+      std::lower_bound(sketch_ownerships_.begin(), sketch_ownerships_.end(), id,
+                       [](const SketchOwnership& ownership, const SketchId& candidate) {
+                         return ownership.sketch().value() < candidate.value();
+                       });
   return position != sketch_ownerships_.end() && position->sketch() == id ? &*position : nullptr;
 }
 
