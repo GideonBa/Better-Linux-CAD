@@ -24,9 +24,9 @@ update_component_instance(std::vector<ComponentInstance>& component_instances,
         Error::validation("component_instance", "component instance id must not be empty"));
   }
 
-  const auto found = std::find_if(
-      component_instances.begin(), component_instances.end(),
-      [&id](const ComponentInstance& instance) { return instance.id() == id; });
+  const auto found =
+      std::find_if(component_instances.begin(), component_instances.end(),
+                   [&id](const ComponentInstance& instance) { return instance.id() == id; });
   if (found == component_instances.end()) {
     return Result<std::size_t>::failure(
         Error::validation(id.value(), "component instance must exist in assembly document"));
@@ -45,8 +45,8 @@ update_component_instance(std::vector<ComponentInstance>& component_instances,
 } // namespace
 
 Result<ParameterBinding> ParameterBinding::create(ParameterBindingId id, DocumentId part_document,
-                                                   ParameterId part_parameter,
-                                                   ParameterId assembly_parameter) {
+                                                  ParameterId part_parameter,
+                                                  ParameterId assembly_parameter) {
   const auto object_id = id.empty() ? std::string("parameter_binding") : id.value();
   if (id.empty()) {
     return Result<ParameterBinding>::failure(
@@ -65,8 +65,8 @@ Result<ParameterBinding> ParameterBinding::create(ParameterBindingId id, Documen
         Error::validation(object_id, "parameter binding assembly parameter must not be empty"));
   }
   return Result<ParameterBinding>::success(ParameterBinding(std::move(id), std::move(part_document),
-                                                             std::move(part_parameter),
-                                                             std::move(assembly_parameter)));
+                                                            std::move(part_parameter),
+                                                            std::move(assembly_parameter)));
 }
 
 ParameterBinding::ParameterBinding(ParameterBindingId id, DocumentId part_document,
@@ -75,14 +75,22 @@ ParameterBinding::ParameterBinding(ParameterBindingId id, DocumentId part_docume
       part_parameter_(std::move(part_parameter)),
       assembly_parameter_(std::move(assembly_parameter)) {}
 
-const ParameterBindingId& ParameterBinding::id() const noexcept { return id_; }
-const DocumentId& ParameterBinding::part_document() const noexcept { return part_document_; }
-const ParameterId& ParameterBinding::part_parameter() const noexcept { return part_parameter_; }
+const ParameterBindingId& ParameterBinding::id() const noexcept {
+  return id_;
+}
+const DocumentId& ParameterBinding::part_document() const noexcept {
+  return part_document_;
+}
+const ParameterId& ParameterBinding::part_parameter() const noexcept {
+  return part_parameter_;
+}
 const ParameterId& ParameterBinding::assembly_parameter() const noexcept {
   return assembly_parameter_;
 }
 
-RigidTransform identity_rigid_transform() noexcept { return RigidTransform{}; }
+RigidTransform identity_rigid_transform() noexcept {
+  return RigidTransform{};
+}
 
 std::string_view to_string(ComponentVisibility visibility) noexcept {
   switch (visibility) {
@@ -114,10 +122,12 @@ std::string_view to_string(ComponentGroundingState state) noexcept {
   return "free";
 }
 
-Result<ComponentInstance> ComponentInstance::create(
-    ComponentInstanceId id, std::string name, DocumentId referenced_part_document,
-    ComponentVisibility visibility, ComponentSuppressionState suppression_state,
-    ComponentGroundingState grounding_state, RigidTransform transform) {
+Result<ComponentInstance> ComponentInstance::create(ComponentInstanceId id, std::string name,
+                                                    DocumentId referenced_part_document,
+                                                    ComponentVisibility visibility,
+                                                    ComponentSuppressionState suppression_state,
+                                                    ComponentGroundingState grounding_state,
+                                                    RigidTransform transform) {
   const auto object_id = id.empty() ? std::string("component_instance") : id.value();
   if (id.empty()) {
     return Result<ComponentInstance>::failure(
@@ -135,9 +145,9 @@ Result<ComponentInstance> ComponentInstance::create(
     return Result<ComponentInstance>::failure(
         Error::validation(object_id, "component instance transform values must be finite"));
   }
-  return Result<ComponentInstance>::success(ComponentInstance(
-      std::move(id), std::move(name), std::move(referenced_part_document), visibility,
-      suppression_state, grounding_state, transform));
+  return Result<ComponentInstance>::success(
+      ComponentInstance(std::move(id), std::move(name), std::move(referenced_part_document),
+                        visibility, suppression_state, grounding_state, transform));
 }
 
 Result<ComponentInstance> ComponentInstance::with_transform(RigidTransform transform) const {
@@ -145,14 +155,13 @@ Result<ComponentInstance> ComponentInstance::with_transform(RigidTransform trans
                 grounding_state_, transform);
 }
 
-Result<ComponentInstance>
-ComponentInstance::with_visibility(ComponentVisibility visibility) const {
+Result<ComponentInstance> ComponentInstance::with_visibility(ComponentVisibility visibility) const {
   return create(id_, name_, referenced_part_document_, visibility, suppression_state_,
                 grounding_state_, transform_);
 }
 
-Result<ComponentInstance> ComponentInstance::with_suppression_state(
-    ComponentSuppressionState suppression_state) const {
+Result<ComponentInstance>
+ComponentInstance::with_suppression_state(ComponentSuppressionState suppression_state) const {
   return create(id_, name_, referenced_part_document_, visibility_, suppression_state,
                 grounding_state_, transform_);
 }
@@ -174,19 +183,27 @@ ComponentInstance::ComponentInstance(ComponentInstanceId id, std::string name,
       suppression_state_(suppression_state), grounding_state_(grounding_state),
       transform_(transform) {}
 
-const ComponentInstanceId& ComponentInstance::id() const noexcept { return id_; }
-const std::string& ComponentInstance::name() const noexcept { return name_; }
+const ComponentInstanceId& ComponentInstance::id() const noexcept {
+  return id_;
+}
+const std::string& ComponentInstance::name() const noexcept {
+  return name_;
+}
 const DocumentId& ComponentInstance::referenced_part_document() const noexcept {
   return referenced_part_document_;
 }
-ComponentVisibility ComponentInstance::visibility() const noexcept { return visibility_; }
+ComponentVisibility ComponentInstance::visibility() const noexcept {
+  return visibility_;
+}
 ComponentSuppressionState ComponentInstance::suppression_state() const noexcept {
   return suppression_state_;
 }
 ComponentGroundingState ComponentInstance::grounding_state() const noexcept {
   return grounding_state_;
 }
-const RigidTransform& ComponentInstance::transform() const noexcept { return transform_; }
+const RigidTransform& ComponentInstance::transform() const noexcept {
+  return transform_;
+}
 
 Result<AssemblyDocument> AssemblyDocument::create(DocumentId id, std::string name) {
   const auto object_id = id.empty() ? std::string("assembly_document") : id.value();
@@ -270,8 +287,9 @@ Result<std::size_t> AssemblyDocument::add_component_instance(ComponentInstance i
         instance.id().value(), "component instance id must be unique within assembly document"));
   }
   if (!has_member_part(instance.referenced_part_document())) {
-    return Result<std::size_t>::failure(Error::validation(
-        instance.id().value(), "component instance referenced part must be an assembly member part"));
+    return Result<std::size_t>::failure(
+        Error::validation(instance.id().value(),
+                          "component instance referenced part must be an assembly member part"));
   }
   component_instances_.push_back(std::move(instance));
   return Result<std::size_t>::success(component_instances_.size() - 1U);
@@ -297,63 +315,72 @@ Result<std::size_t> AssemblyDocument::add_constraint(AssemblyConstraint constrai
 
 Result<std::size_t> AssemblyDocument::add_joint(AssemblyJoint joint) {
   if (has_joint_id(joint.id())) {
-    return Result<std::size_t>::failure(
-        Error::validation(joint.id().value(), "assembly joint id must be unique within assembly document"));
+    return Result<std::size_t>::failure(Error::validation(
+        joint.id().value(), "assembly joint id must be unique within assembly document"));
   }
   if (!has_component_instance_id(joint.target_a().component_instance())) {
-    return Result<std::size_t>::failure(
-        Error::validation(joint.id().value(), "assembly joint target A component instance must exist"));
+    return Result<std::size_t>::failure(Error::validation(
+        joint.id().value(), "assembly joint target A component instance must exist"));
   }
   if (!has_component_instance_id(joint.target_b().component_instance())) {
-    return Result<std::size_t>::failure(
-        Error::validation(joint.id().value(), "assembly joint target B component instance must exist"));
+    return Result<std::size_t>::failure(Error::validation(
+        joint.id().value(), "assembly joint target B component instance must exist"));
   }
 
   joints_.push_back(std::move(joint));
   return Result<std::size_t>::success(joints_.size() - 1U);
 }
 
-Result<std::size_t>
-AssemblyDocument::set_component_instance_transform(ComponentInstanceId id, RigidTransform transform) {
-  return update_component_instance(
-      component_instances_, std::move(id),
-      [transform](const ComponentInstance& instance) { return instance.with_transform(transform); });
+Result<std::size_t> AssemblyDocument::set_component_instance_transform(ComponentInstanceId id,
+                                                                       RigidTransform transform) {
+  return update_component_instance(component_instances_, std::move(id),
+                                   [transform](const ComponentInstance& instance) {
+                                     return instance.with_transform(transform);
+                                   });
 }
 
-Result<std::size_t> AssemblyDocument::set_component_instance_visibility(
-    ComponentInstanceId id, ComponentVisibility visibility) {
-  return update_component_instance(
-      component_instances_, std::move(id), [visibility](const ComponentInstance& instance) {
-        return instance.with_visibility(visibility);
-      });
+Result<std::size_t>
+AssemblyDocument::set_component_instance_visibility(ComponentInstanceId id,
+                                                    ComponentVisibility visibility) {
+  return update_component_instance(component_instances_, std::move(id),
+                                   [visibility](const ComponentInstance& instance) {
+                                     return instance.with_visibility(visibility);
+                                   });
 }
 
 Result<std::size_t> AssemblyDocument::set_component_instance_suppression_state(
     ComponentInstanceId id, ComponentSuppressionState suppression_state) {
-  return update_component_instance(
-      component_instances_, std::move(id),
-      [suppression_state](const ComponentInstance& instance) {
-        return instance.with_suppression_state(suppression_state);
-      });
+  return update_component_instance(component_instances_, std::move(id),
+                                   [suppression_state](const ComponentInstance& instance) {
+                                     return instance.with_suppression_state(suppression_state);
+                                   });
 }
 
-Result<std::size_t> AssemblyDocument::set_component_instance_grounding_state(
-    ComponentInstanceId id, ComponentGroundingState grounding_state) {
-  return update_component_instance(
-      component_instances_, std::move(id), [grounding_state](const ComponentInstance& instance) {
-        return instance.with_grounding_state(grounding_state);
-      });
+Result<std::size_t>
+AssemblyDocument::set_component_instance_grounding_state(ComponentInstanceId id,
+                                                         ComponentGroundingState grounding_state) {
+  return update_component_instance(component_instances_, std::move(id),
+                                   [grounding_state](const ComponentInstance& instance) {
+                                     return instance.with_grounding_state(grounding_state);
+                                   });
 }
 
 Result<std::size_t> AssemblyDocument::set_joint_coordinate(AssemblyJointId id,
                                                            Quantity coordinate) {
+  return set_joint_coordinate_value(id, AssemblyJointCoordinateRole::Rotation,
+                                    std::move(coordinate));
+}
+
+Result<std::size_t> AssemblyDocument::set_joint_coordinate_value(AssemblyJointId id,
+                                                                 AssemblyJointCoordinateRole role,
+                                                                 Quantity coordinate) {
   if (id.empty()) {
     return Result<std::size_t>::failure(
         Error::validation("assembly_joint", "assembly joint id must not be empty"));
   }
   for (std::size_t index = 0U; index < joints_.size(); ++index) {
     if (joints_[index].id() == id) {
-      auto updated = joints_[index].with_coordinate(coordinate);
+      auto updated = joints_[index].with_coordinate_value(role, std::move(coordinate));
       if (updated.has_error()) {
         return Result<std::size_t>::failure(updated.error());
       }
@@ -427,9 +454,15 @@ Result<BindingApplication> AssemblyDocument::apply_bindings_to(PartDocument& par
   return Result<BindingApplication>::success(std::move(application));
 }
 
-const DocumentId& AssemblyDocument::id() const noexcept { return id_; }
-const std::string& AssemblyDocument::name() const noexcept { return name_; }
-const std::vector<Parameter>& AssemblyDocument::parameters() const noexcept { return parameters_; }
+const DocumentId& AssemblyDocument::id() const noexcept {
+  return id_;
+}
+const std::string& AssemblyDocument::name() const noexcept {
+  return name_;
+}
+const std::vector<Parameter>& AssemblyDocument::parameters() const noexcept {
+  return parameters_;
+}
 const std::vector<DocumentId>& AssemblyDocument::member_parts() const noexcept {
   return member_parts_;
 }
@@ -442,15 +475,27 @@ const std::vector<ComponentInstance>& AssemblyDocument::component_instances() co
 const std::vector<AssemblyConstraint>& AssemblyDocument::constraints() const noexcept {
   return constraints_;
 }
-const std::vector<AssemblyJoint>& AssemblyDocument::joints() const noexcept { return joints_; }
-std::size_t AssemblyDocument::parameter_count() const noexcept { return parameters_.size(); }
-std::size_t AssemblyDocument::member_part_count() const noexcept { return member_parts_.size(); }
-std::size_t AssemblyDocument::binding_count() const noexcept { return bindings_.size(); }
+const std::vector<AssemblyJoint>& AssemblyDocument::joints() const noexcept {
+  return joints_;
+}
+std::size_t AssemblyDocument::parameter_count() const noexcept {
+  return parameters_.size();
+}
+std::size_t AssemblyDocument::member_part_count() const noexcept {
+  return member_parts_.size();
+}
+std::size_t AssemblyDocument::binding_count() const noexcept {
+  return bindings_.size();
+}
 std::size_t AssemblyDocument::component_instance_count() const noexcept {
   return component_instances_.size();
 }
-std::size_t AssemblyDocument::constraint_count() const noexcept { return constraints_.size(); }
-std::size_t AssemblyDocument::joint_count() const noexcept { return joints_.size(); }
+std::size_t AssemblyDocument::constraint_count() const noexcept {
+  return constraints_.size();
+}
+std::size_t AssemblyDocument::joint_count() const noexcept {
+  return joints_.size();
+}
 
 const Parameter* AssemblyDocument::find_parameter(ParameterId id) const noexcept {
   for (const auto& parameter : parameters_) {
@@ -500,7 +545,8 @@ const AssemblyJoint* AssemblyDocument::find_joint(AssemblyJointId id) const noex
 }
 
 bool AssemblyDocument::has_member_part(const DocumentId& part_document) const noexcept {
-  return std::find(member_parts_.begin(), member_parts_.end(), part_document) != member_parts_.end();
+  return std::find(member_parts_.begin(), member_parts_.end(), part_document) !=
+         member_parts_.end();
 }
 
 bool AssemblyDocument::has_parameter_id(const ParameterId& id) const noexcept {

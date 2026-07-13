@@ -101,8 +101,8 @@ Focused tags:
 
 Coverage proves canonical writer shape, deterministic reserialization, slot-only loading, historical-only loading, exact dual agreement, malformed role/kind/unit/order failures, and identical compatibility policy across both endpoint scopes.
 
-## Block 43 handoff
+## Block 43 outcome
 
-The next technical step is Block 43: vector joint drives, holding semantics, freshness, and atomic application.
+Block 43 is implemented in `docs/assembly-vector-joint-drive-mvp5.md`.
 
-Block 43 must drive coordinates by stable role, hold all undriven authored slots deterministically, include complete slot state in freshness, and apply transforms plus selected authored coordinate updates atomically. It must not introduce a new joint family; Prismatic begins in Block 44.
+Coordinates are now driven by stable role; omitted selected and non-selected active slots hold authored values; result freshness includes complete slot and explicit drive state; and transforms plus exactly driven selected coordinates apply atomically. The next technical step is Block 44 Prismatic.

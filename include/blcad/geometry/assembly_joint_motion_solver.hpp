@@ -4,6 +4,7 @@
 #include "blcad/core/project.hpp"
 #include "blcad/core/quantity.hpp"
 #include "blcad/core/result.hpp"
+#include "blcad/geometry/assembly_joint_drive.hpp"
 #include "blcad/geometry/assembly_rigid_body_solver.hpp"
 
 #include <vector>
@@ -18,6 +19,7 @@ struct AssemblyJointMotionInputSnapshot {
   AssemblyConstraintTarget target_b;
   AssemblyJointLimits limits;
   double coordinate_deg = 0.0;
+  std::vector<AssemblyJointCoordinateSlot> coordinate_slots;
 
   friend bool operator==(const AssemblyJointMotionInputSnapshot&,
                          const AssemblyJointMotionInputSnapshot&) = default;
@@ -29,19 +31,26 @@ struct AssemblyJointMotionResult {
   double requested_coordinate_deg = 0.0;
   std::vector<AssemblyJointMotionInputSnapshot> joint_snapshots;
   AssemblySolveResult solve_result;
+  std::vector<AssemblyJointCoordinateDrive> requested_coordinates;
 
-  [[nodiscard]] bool converged() const noexcept { return solve_result.converged(); }
+  [[nodiscard]] bool converged() const noexcept {
+    return solve_result.converged();
+  }
 
   friend bool operator==(const AssemblyJointMotionResult&,
                          const AssemblyJointMotionResult&) = default;
 };
 
-// Explicit read-only motion query. It drives one active Revolute joint to a
-// requested in-range coordinate, holds every other active joint in the derived
-// combined relationship group at its persisted coordinate, and returns ordinary
-// rigid-transform proposals through the shared assembly numeric solve engine.
+// Explicit read-only motion query. It drives typed roles on one active joint,
+// holds omitted selected roles and every role of other active joints at authored
+// values, and returns ordinary rigid-transform proposals through the shared
+// assembly numeric solve engine. The scalar overload is the Revolute adapter.
 class AssemblyJointMotionSolver {
 public:
+  [[nodiscard]] Result<AssemblyJointMotionResult>
+  move(const Project& project, AssemblyJointDrive drive,
+       AssemblyRigidBodySolverOptions options = {}) const;
+
   [[nodiscard]] Result<AssemblyJointMotionResult>
   move(const Project& project, AssemblyJointId joint, Quantity requested_coordinate,
        AssemblyRigidBodySolverOptions options = {}) const;
@@ -49,7 +58,8 @@ public:
 
 // Atomic motion application boundary. It validates the embedded component solve
 // snapshots plus every driven joint-input snapshot before applying transforms
-// and replacing the selected authored joint coordinate on a Project copy.
+// and replacing exactly the explicitly driven selected-joint coordinates on a
+// Project copy.
 class AssemblyJointMotionResultApplier {
 public:
   [[nodiscard]] Result<std::size_t> apply(Project& project,

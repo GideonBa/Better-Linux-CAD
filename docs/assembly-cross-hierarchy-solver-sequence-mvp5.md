@@ -1,6 +1,6 @@
 # Cross-Hierarchy Assembly Relationship Sequence MVP-5
 
-Status: Blocks 23–42 are implemented. Block 43 is the current next technical step. Blocks 43–47 remain the explicit richer-joint continuation.
+Status: Blocks 23–43 are implemented. Block 44 is the current next technical step. Blocks 44–47 remain the explicit richer-joint continuation.
 
 This document is the canonical numbered handoff sequence for cross-document assembly intent, solving, motion, exchange, posed analysis, and general geometric target architecture.
 
@@ -22,6 +22,7 @@ Implemented contracts are canonical in:
 - `docs/assembly-joint-target-compatibility-mvp5.md`
 - `docs/assembly-joint-coordinate-model-mvp5.md`
 - `docs/assembly-joint-coordinate-json-mvp5.md`
+- `docs/assembly-vector-joint-drive-mvp5.md`
 - `docs/file-format.md`
 
 Future target/relationship/joint details are canonical in:
@@ -309,7 +310,7 @@ Mandatory order:
 40 joint target compatibility + oriented Frame contract (implemented)
 41 general joint coordinate/limit Core model (implemented)
 42 general joint coordinate JSON/backward compatibility (implemented)
-43 vector joint drives + holding/freshness/atomic application
+43 vector joint drives + holding/freshness/atomic application (implemented)
 44 Prismatic joint
 45 Cylindrical joint
 46 Planar joint
@@ -506,9 +507,11 @@ Local and Project-level writers emit deterministic typed `coordinates[]` plus th
 
 Focused tags: `[core][assembly-joint-coordinate-json]` and `[core][assembly-cross-hierarchy-joint-coordinate-json]`.
 
-## Block 43 — General joint coordinate drives
+## Block 43 — General joint coordinate drives — Implemented
 
-Block 43 generalizes selected-joint drives to deterministic coordinate drive vectors with holding semantics, freshness, and atomic application.
+Local and Project-level motion now shares typed role-addressed drive validation, family-order restoration, authored holding semantics, complete coordinate-slot/drive freshness, and atomic application of transforms plus exactly driven selected roles. Scalar Revolute APIs delegate to this boundary. Canonical contract: `docs/assembly-vector-joint-drive-mvp5.md`.
+
+Focused tags: `[geometry][assembly-vector-joint-drive]`, `[geometry][assembly-cross-hierarchy-vector-joint-drive]`, and `[geometry][assembly-vector-joint-drive-application]`.
 
 Authority variables remain six direct component-transform variables per free authority. Joint coordinates remain drive parameters.
 
@@ -561,6 +564,6 @@ posed shapes/contact records/sweep analyses
 
 ## Next technical step
 
-Implement Block 43 only: deterministic role-addressed joint drive vectors with local/Project-level parity, holding semantics, complete slot freshness, and atomic application.
+Implement Block 44 only: the Prismatic family with local/Project-level intent, JSON, oriented target compatibility, deterministic equations, graph participation, and shared vector-drive motion.
 
-Preserve the implemented Block-42 JSON contract and Revolute execution. Add no new joint family in Block 43.
+Preserve Blocks 40–43 compatibility, persistence, numeric, freshness, and application contracts. Add no Cylindrical family in Block 44.

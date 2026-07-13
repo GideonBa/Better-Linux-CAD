@@ -588,6 +588,6 @@ Canonical contracts:
 
 `AssemblyJointTargetCompatibilityResolver` selects the typed `Frame / Frame` contract before local or cross-hierarchy Revolute projection. `.seat` remains the current deterministic Frame source. Axis-only Revolute fails closed because Axis supplies no reference X direction, and Geometry never synthesizes one from an arbitrary world axis. Canonical contract: `docs/assembly-joint-target-compatibility-mvp5.md`.
 
-## Next technical step — Block 43
+## Next technical step — Block 44
 
-Blocks 41–42 typed joint coordinates and additive compatible JSON are implemented in `docs/assembly-joint-coordinate-model-mvp5.md` and `docs/assembly-joint-coordinate-json-mvp5.md`. The next technical step is Block 43: vector joint drives, holding semantics, freshness, and atomic application.
+Blocks 41–43 typed coordinates, additive compatible JSON, and shared vector drives are implemented in `docs/assembly-joint-coordinate-model-mvp5.md`, `docs/assembly-joint-coordinate-json-mvp5.md`, and `docs/assembly-vector-joint-drive-mvp5.md`. The next technical step is Block 44: the Prismatic joint family.

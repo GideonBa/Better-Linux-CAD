@@ -38,6 +38,8 @@ public:
   [[nodiscard]] bool is_valid_count() const noexcept;
   [[nodiscard]] bool is_valid_angle() const noexcept;
 
+  friend bool operator==(const Quantity&, const Quantity&) = default;
+
 private:
   Quantity(double value, QuantityKind kind);
 

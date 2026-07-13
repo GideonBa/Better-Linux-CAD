@@ -491,7 +491,7 @@ Block 33 adds `datum_axes` PartDocument persistence. Block 35 adds canonical sem
 
 ## Current direction
 
-Blocks 23–42 of the current assembly sequence are implemented.
+Blocks 23–43 of the current assembly sequence are implemented.
 
 Canonical current target architecture:
 
@@ -503,6 +503,7 @@ Canonical current target architecture:
 - `docs/assembly-joint-target-compatibility-mvp5.md`
 - `docs/assembly-joint-coordinate-model-mvp5.md`
 - `docs/assembly-joint-coordinate-json-mvp5.md`
+- `docs/assembly-vector-joint-drive-mvp5.md`
 - `docs/assembly-general-geometric-target-roadmap.md`
 
 The complete original planning baseline for Blocks 32–47 remains in `docs/assembly-general-geometric-target-roadmap-planning-baseline.md` and is incorporated by the active roadmap for still-planned acceptance/failure details.
@@ -511,6 +512,6 @@ Canonical numbered sequence:
 
 - `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`
 
-The next technical step is Block 43 only: vector joint drives, holding semantics, freshness, and atomic application.
+The next technical step is Block 44 only: the Prismatic joint family.
 
-Block 42 deterministic coordinate-slot JSON is implemented for local and Project-level joints. Writers emit canonical `coordinates[]` plus historical Revolute scalar fields; readers accept slot-only, historical-only, or exactly matching dual records. Axis-only Revolute still fails closed without arbitrary reference-direction synthesis. Occurrence-local child pose overrides, whole-subassembly solve variables, general physics, and richer joints remain deferred according to their roadmap blocks.
+Block 43 role-addressed vector drives, authored holding semantics, complete slot/drive freshness, and atomic application are implemented for local and Project-level motion. Scalar Revolute APIs remain adapters; transform variables and the shared numeric engine are unchanged. Axis-only Revolute still fails closed without arbitrary reference-direction synthesis. Occurrence-local child pose overrides, whole-subassembly solve variables, general physics, and richer joints remain deferred according to their roadmap blocks.

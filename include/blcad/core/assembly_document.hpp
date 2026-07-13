@@ -69,14 +69,12 @@ enum class ComponentGroundingState { Free, Grounded };
 
 class ComponentInstance {
 public:
-  [[nodiscard]] static Result<ComponentInstance> create(
-      ComponentInstanceId id,
-      std::string name,
-      DocumentId referenced_part_document,
-      ComponentVisibility visibility = ComponentVisibility::Visible,
-      ComponentSuppressionState suppression_state = ComponentSuppressionState::Active,
-      ComponentGroundingState grounding_state = ComponentGroundingState::Free,
-      RigidTransform transform = identity_rigid_transform());
+  [[nodiscard]] static Result<ComponentInstance>
+  create(ComponentInstanceId id, std::string name, DocumentId referenced_part_document,
+         ComponentVisibility visibility = ComponentVisibility::Visible,
+         ComponentSuppressionState suppression_state = ComponentSuppressionState::Active,
+         ComponentGroundingState grounding_state = ComponentGroundingState::Free,
+         RigidTransform transform = identity_rigid_transform());
 
   // Copy-style updates preserve component identity and referenced part model
   // intent while replacing one explicit free-placement/state field.
@@ -96,13 +94,9 @@ public:
   [[nodiscard]] const RigidTransform& transform() const noexcept;
 
 private:
-  ComponentInstance(ComponentInstanceId id,
-                    std::string name,
-                    DocumentId referenced_part_document,
-                    ComponentVisibility visibility,
-                    ComponentSuppressionState suppression_state,
-                    ComponentGroundingState grounding_state,
-                    RigidTransform transform);
+  ComponentInstance(ComponentInstanceId id, std::string name, DocumentId referenced_part_document,
+                    ComponentVisibility visibility, ComponentSuppressionState suppression_state,
+                    ComponentGroundingState grounding_state, RigidTransform transform);
 
   ComponentInstanceId id_;
   std::string name_;
@@ -118,17 +112,14 @@ private:
 // but no grounding or solver variables in the rigid-subassembly seed.
 class SubassemblyInstance {
 public:
-  [[nodiscard]] static Result<SubassemblyInstance> create(
-      SubassemblyInstanceId id,
-      std::string name,
-      DocumentId referenced_assembly_document,
-      ComponentVisibility visibility = ComponentVisibility::Visible,
-      ComponentSuppressionState suppression_state = ComponentSuppressionState::Active,
-      RigidTransform transform = identity_rigid_transform());
+  [[nodiscard]] static Result<SubassemblyInstance>
+  create(SubassemblyInstanceId id, std::string name, DocumentId referenced_assembly_document,
+         ComponentVisibility visibility = ComponentVisibility::Visible,
+         ComponentSuppressionState suppression_state = ComponentSuppressionState::Active,
+         RigidTransform transform = identity_rigid_transform());
 
   [[nodiscard]] Result<SubassemblyInstance> with_transform(RigidTransform transform) const;
-  [[nodiscard]] Result<SubassemblyInstance>
-  with_visibility(ComponentVisibility visibility) const;
+  [[nodiscard]] Result<SubassemblyInstance> with_visibility(ComponentVisibility visibility) const;
   [[nodiscard]] Result<SubassemblyInstance>
   with_suppression_state(ComponentSuppressionState suppression_state) const;
 
@@ -140,12 +131,9 @@ public:
   [[nodiscard]] const RigidTransform& transform() const noexcept;
 
 private:
-  SubassemblyInstance(SubassemblyInstanceId id,
-                      std::string name,
-                      DocumentId referenced_assembly_document,
-                      ComponentVisibility visibility,
-                      ComponentSuppressionState suppression_state,
-                      RigidTransform transform);
+  SubassemblyInstance(SubassemblyInstanceId id, std::string name,
+                      DocumentId referenced_assembly_document, ComponentVisibility visibility,
+                      ComponentSuppressionState suppression_state, RigidTransform transform);
 
   SubassemblyInstanceId id_;
   std::string name_;
@@ -181,24 +169,29 @@ public:
   [[nodiscard]] Result<std::size_t> add_joint(AssemblyJoint joint);
   // Explicit free-placement/state edits. These do not infer constraints, solve
   // transforms, enforce grounding, or trigger part recompute.
-  [[nodiscard]] Result<std::size_t>
-  set_component_instance_transform(ComponentInstanceId id, RigidTransform transform);
+  [[nodiscard]] Result<std::size_t> set_component_instance_transform(ComponentInstanceId id,
+                                                                     RigidTransform transform);
   [[nodiscard]] Result<std::size_t>
   set_component_instance_visibility(ComponentInstanceId id, ComponentVisibility visibility);
-  [[nodiscard]] Result<std::size_t> set_component_instance_suppression_state(
-      ComponentInstanceId id, ComponentSuppressionState suppression_state);
+  [[nodiscard]] Result<std::size_t>
+  set_component_instance_suppression_state(ComponentInstanceId id,
+                                           ComponentSuppressionState suppression_state);
   [[nodiscard]] Result<std::size_t>
   set_component_instance_grounding_state(ComponentInstanceId id,
                                          ComponentGroundingState grounding_state);
-  [[nodiscard]] Result<std::size_t>
-  set_subassembly_instance_transform(SubassemblyInstanceId id, RigidTransform transform);
+  [[nodiscard]] Result<std::size_t> set_subassembly_instance_transform(SubassemblyInstanceId id,
+                                                                       RigidTransform transform);
   [[nodiscard]] Result<std::size_t>
   set_subassembly_instance_visibility(SubassemblyInstanceId id, ComponentVisibility visibility);
-  [[nodiscard]] Result<std::size_t> set_subassembly_instance_suppression_state(
-      SubassemblyInstanceId id, ComponentSuppressionState suppression_state);
+  [[nodiscard]] Result<std::size_t>
+  set_subassembly_instance_suppression_state(SubassemblyInstanceId id,
+                                             ComponentSuppressionState suppression_state);
   // Explicit authored joint-coordinate update; geometry movement remains an
   // application-layer operation through the motion solve/application boundary.
   [[nodiscard]] Result<std::size_t> set_joint_coordinate(AssemblyJointId id, Quantity coordinate);
+  [[nodiscard]] Result<std::size_t> set_joint_coordinate_value(AssemblyJointId id,
+                                                               AssemblyJointCoordinateRole role,
+                                                               Quantity coordinate);
   // Sets an assembly parameter value with the same validation as creation.
   [[nodiscard]] Result<std::size_t> set_parameter_value(ParameterId id, Quantity value);
 
@@ -230,8 +223,7 @@ public:
   find_component_instance(ComponentInstanceId id) const noexcept;
   [[nodiscard]] const SubassemblyInstance*
   find_subassembly_instance(SubassemblyInstanceId id) const noexcept;
-  [[nodiscard]] const AssemblyConstraint*
-  find_constraint(AssemblyConstraintId id) const noexcept;
+  [[nodiscard]] const AssemblyConstraint* find_constraint(AssemblyConstraintId id) const noexcept;
   [[nodiscard]] const AssemblyJoint* find_joint(AssemblyJointId id) const noexcept;
   [[nodiscard]] bool has_member_part(const DocumentId& part_document) const noexcept;
 

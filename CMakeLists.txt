@@ -121,6 +121,7 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/assembly_insert_constraint_equation_builder.cpp
     src/geometry/assembly_interference_analyzer.cpp
     src/geometry/assembly_joint_target_compatibility.cpp
+    src/geometry/assembly_joint_drive_validation.cpp
     src/geometry/assembly_joint_motion_solver.cpp
     src/geometry/assembly_matrix_rank.cpp
     src/geometry/assembly_numeric_solve_engine.cpp

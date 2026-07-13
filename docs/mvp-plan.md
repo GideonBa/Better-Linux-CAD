@@ -4,16 +4,16 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 42
-current_block: 43
-current_boundary: Vector joint drives, holding semantics, freshness, and atomic application
-current_tag: "[geometry][assembly-vector-joint-drive]"
+implemented_through: Block 43
+current_block: 44
+current_boundary: Prismatic joint family across Core, JSON, Geometry, and motion
+current_tag: "[core][assembly-prismatic-joint]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
   mvp_3: "Parametric bolt circle pattern — implemented"
   mvp_4: "Assembly parameters and Project container — implemented"
-  mvp_5: "Assembly relationships, motion, hierarchy, analysis, exchange — Blocks 1–42 implemented, Blocks 43–47 planned"
+  mvp_5: "Assembly relationships, motion, hierarchy, analysis, exchange — Blocks 1–43 implemented, Blocks 44–47 planned"
   mvp_6: "Part Construction — Blocks 48–94 planned, starts after Block 47"
 ---
 
@@ -516,7 +516,22 @@ Local and Project-level writers now emit deterministic family-ordered `coordinat
 [core][assembly-cross-hierarchy-joint-coordinate-json]
 ```
 
-### Blocks 43–47 — Planned joint continuation
+### Block 43 — Vector joint drives, holding, freshness, and atomic application
+
+**Status:** Implemented
+**Canonical:** `docs/assembly-vector-joint-drive-mvp5.md`
+
+Both local and Project-level motion solvers now accept `AssemblyJointDrive` with typed values addressed by stable coordinate role. Validation restores family order, rejects empty/duplicate/unknown/wrong-unit/out-of-range requests, holds omitted selected roles and every non-selected active joint slot at authored values, snapshots complete coordinate-slot definitions plus explicit drives, and atomically applies transforms with exactly the explicitly driven selected roles. Historical scalar Revolute overloads remain adapters.
+
+**Focused tags:**
+
+```text
+[geometry][assembly-vector-joint-drive]
+[geometry][assembly-cross-hierarchy-vector-joint-drive]
+[geometry][assembly-vector-joint-drive-application]
+```
+
+### Blocks 44–47 — Planned joint continuation
 
 **Status:** Planned
 **Canonical:** roadmap `docs/assembly-general-geometric-target-roadmap.md`
@@ -524,7 +539,6 @@ Local and Project-level writers now emit deterministic family-ordered `coordinat
 Mandatory order:
 
 ```text
-43 vector joint drives + holding/freshness/atomic application
 44 Prismatic joint
 45 Cylindrical joint
 46 Planar joint
@@ -569,21 +583,23 @@ After Block 94 the first Part Construction MVP is considered complete. That mean
 
 It does not mean SolidWorks/Inventor Part product parity. Production GUI modeling, Class-A surfacing, arbitrary NURBS control cages, variable-radius fillets, advanced topology healing, direct modeling, sheet metal, weldments, and specialized manufacturing feature systems remain later work.
 
-## Current next technical step — Block 43
+## Current next technical step — Block 44
 
 **Status:** Current
-**Primary boundary:** Geometry motion execution, result freshness, and atomic application.
+**Primary boundary:** One Prismatic family across Core intent, JSON, target compatibility, equations, and shared vector-drive motion.
 
-Block 43 must generalize selected-joint scalar requests into role-addressed drive vectors with:
+Block 44 must add:
 
 ```text
-exact selected-family drive-role validation
-authored-value holding for undriven selected roles
-complete holding drives for non-selected active joints
-complete coordinate-slot freshness snapshots
-atomic transform and selected-coordinate application
+Prismatic local and Project-level persistent intent
+one Linear translation coordinate with typed limits
+canonical prismatic JSON spelling and slot persistence
+an explicit oriented target compatibility contract
+deterministic residual order and shared local/root-space equations
+motion graph and Block-43 vector-drive participation
+complete freshness and atomic application
 ```
 
-Authority variables remain six direct transform variables per unique free authority; joint coordinates remain drive parameters. Local and Project-level target identity scopes remain distinct.
+The preferred first target contract is `Frame <-> Frame`; a reduced Axis/Line contract requires an explicit remaining-orientation policy. Authority variables and the shared numeric engine remain unchanged.
 
-**Notes:** Block 43 adds no new joint family; Prismatic begins in Block 44.
+**Notes:** Implement Prismatic only. Cylindrical remains Block 45.

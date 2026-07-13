@@ -48,11 +48,10 @@ private:
 class Project {
 public:
   [[nodiscard]] static Result<Project> create(DocumentId id, std::string name,
-                                               AssemblyDocument assembly);
+                                              AssemblyDocument assembly);
 
   [[nodiscard]] Result<std::size_t> add_part_document(PartDocument part_document);
-  [[nodiscard]] Result<std::size_t>
-  add_child_assembly_document(AssemblyDocument assembly_document);
+  [[nodiscard]] Result<std::size_t> add_child_assembly_document(AssemblyDocument assembly_document);
   [[nodiscard]] Result<std::size_t>
   add_cross_hierarchy_constraint(AssemblyHierarchyConstraint constraint);
   [[nodiscard]] Result<std::size_t> add_cross_hierarchy_joint(AssemblyHierarchyJoint joint);
@@ -69,11 +68,14 @@ public:
   // Changes one root-assembly parameter, applies all root assembly bindings to
   // owned member parts, and returns per-part recompute plans for affected parts.
   [[nodiscard]] Result<ProjectUpdateResult> set_assembly_parameter_value(ParameterId id,
-                                                                          Quantity value);
+                                                                         Quantity value);
   // Explicit authored coordinate update for one Project-level cross-hierarchy
   // joint. Geometry movement remains an application-layer motion operation.
+  [[nodiscard]] Result<std::size_t> set_cross_hierarchy_joint_coordinate(AssemblyJointId id,
+                                                                         Quantity coordinate);
   [[nodiscard]] Result<std::size_t>
-  set_cross_hierarchy_joint_coordinate(AssemblyJointId id, Quantity coordinate);
+  set_cross_hierarchy_joint_coordinate_value(AssemblyJointId id, AssemblyJointCoordinateRole role,
+                                             Quantity coordinate);
 
   [[nodiscard]] const DocumentId& id() const noexcept;
   [[nodiscard]] const std::string& name() const noexcept;

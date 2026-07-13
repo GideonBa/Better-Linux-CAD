@@ -48,8 +48,7 @@ PartDocument make_hole_part() {
   REQUIRE(part.value().add_parameter(length_parameter("part.width", "width", 10.0)));
   REQUIRE(part.value().add_parameter(length_parameter("part.height", "height", 20.0)));
   REQUIRE(part.value().add_parameter(length_parameter("part.thickness", "thickness", 2.0)));
-  REQUIRE(part.value().add_parameter(
-      length_parameter("part.hole_diameter", "hole_diameter", 4.0)));
+  REQUIRE(part.value().add_parameter(length_parameter("part.hole_diameter", "hole_diameter", 4.0)));
 
   auto xy = DatumPlane::xy();
   REQUIRE(xy);
@@ -63,16 +62,16 @@ PartDocument make_hole_part() {
   REQUIRE(base.value().add_profile(rectangle.value()));
   REQUIRE(part.value().add_sketch(base.value()));
 
-  auto base_feature = Feature::create_additive_extrude(
-      FeatureId("feature.base_extrude"), "BaseExtrude", SketchId("sketch.base"),
-      ParameterId("part.thickness"));
+  auto base_feature =
+      Feature::create_additive_extrude(FeatureId("feature.base_extrude"), "BaseExtrude",
+                                       SketchId("sketch.base"), ParameterId("part.thickness"));
   REQUIRE(base_feature);
   REQUIRE(part.value().add_feature(base_feature.value()));
 
   auto hole = Sketch::create(SketchId("sketch.hole"), "Hole", DatumPlaneId("datum.xy"));
   REQUIRE(hole);
-  auto circle = CircleProfile::create(ProfileId("profile.hole"),
-                                      ParameterId("part.hole_diameter"), Point2{0.0, 0.0});
+  auto circle = CircleProfile::create(ProfileId("profile.hole"), ParameterId("part.hole_diameter"),
+                                      Point2{0.0, 0.0});
   REQUIRE(circle);
   REQUIRE(hole.value().add_profile(circle.value()));
   REQUIRE(part.value().add_sketch(hole.value()));
@@ -87,7 +86,8 @@ PartDocument make_hole_part() {
 }
 
 AssemblyConstraintTarget target(const char* component) {
-  auto value = AssemblyConstraintTarget::create(ComponentInstanceId(component), "feature.hole.seat");
+  auto value =
+      AssemblyConstraintTarget::create(ComponentInstanceId(component), "feature.hole.seat");
   REQUIRE(value);
   return value.value();
 }
@@ -95,9 +95,9 @@ AssemblyConstraintTarget target(const char* component) {
 AssemblyJoint make_joint(const char* id, const char* component_a, const char* component_b,
                          AssemblyJointState state = AssemblyJointState::Active,
                          double coordinate_deg = 0.0) {
-  auto value = AssemblyJoint::create(
-      AssemblyJointId(id), id, AssemblyJointType::Revolute, target(component_a), target(component_b),
-      state, angle(-90.0, id), angle(90.0, id), angle(coordinate_deg, id));
+  auto value = AssemblyJoint::create(AssemblyJointId(id), id, AssemblyJointType::Revolute,
+                                     target(component_a), target(component_b), state,
+                                     angle(-90.0, id), angle(90.0, id), angle(coordinate_deg, id));
   REQUIRE(value);
   return value.value();
 }
@@ -113,7 +113,8 @@ Project make_project(std::initializer_list<ComponentSpec> components) {
     REQUIRE(component);
     REQUIRE(assembly.value().add_component_instance(component.value()));
   }
-  auto project = Project::create(DocumentId("project.revolute"), "RevoluteProject", assembly.value());
+  auto project =
+      Project::create(DocumentId("project.revolute"), "RevoluteProject", assembly.value());
   REQUIRE(project);
   REQUIRE(project.value().add_part_document(make_hole_part()));
   return project.value();
@@ -176,11 +177,12 @@ std::size_t numeric_rank(detail::NumericMatrix matrix, double tolerance = 1.0e-8
 
 TEST_CASE("Revolute joint equation preserves oriented signed twist semantics",
           "[geometry][assembly-revolute-joint]") {
-  Project aligned = make_project(
-      {{"component.a", identity_rigid_transform(), ComponentGroundingState::Grounded},
-       {"component.b"}});
+  Project aligned =
+      make_project({{"component.a", identity_rigid_transform(), ComponentGroundingState::Grounded},
+                    {"component.b"}});
   REQUIRE(aligned.assembly().add_joint(make_joint("joint.revolute", "component.a", "component.b")));
-  const AssemblyJoint* aligned_joint = aligned.assembly().find_joint(AssemblyJointId("joint.revolute"));
+  const AssemblyJoint* aligned_joint =
+      aligned.assembly().find_joint(AssemblyJointId("joint.revolute"));
   REQUIRE(aligned_joint != nullptr);
 
   const AssemblyRevoluteJointEquationBuilder builder;
@@ -192,11 +194,12 @@ TEST_CASE("Revolute joint equation preserves oriented signed twist semantics",
   CHECK(zero.value().residual.twist_alignment_sine == Approx(0.0).margin(kTolerance));
   CHECK(zero.value().residual.twist_alignment_cosine == Approx(0.0).margin(kTolerance));
 
-  Project rotated = make_project(
-      {{"component.a", identity_rigid_transform(), ComponentGroundingState::Grounded},
-       {"component.b", RigidTransform{Vector3{}, Vector3{0.0, 0.0, 30.0}}}});
+  Project rotated =
+      make_project({{"component.a", identity_rigid_transform(), ComponentGroundingState::Grounded},
+                    {"component.b", RigidTransform{Vector3{}, Vector3{0.0, 0.0, 30.0}}}});
   REQUIRE(rotated.assembly().add_joint(make_joint("joint.revolute", "component.a", "component.b")));
-  const AssemblyJoint* rotated_joint = rotated.assembly().find_joint(AssemblyJointId("joint.revolute"));
+  const AssemblyJoint* rotated_joint =
+      rotated.assembly().find_joint(AssemblyJointId("joint.revolute"));
   REQUIRE(rotated_joint != nullptr);
   const auto positive = builder.build(rotated, *rotated_joint, angle(30.0, "joint.revolute"));
   const auto negative = builder.build(rotated, *rotated_joint, angle(-30.0, "joint.revolute"));
@@ -209,9 +212,9 @@ TEST_CASE("Revolute joint equation preserves oriented signed twist semantics",
 
 TEST_CASE("Shared numeric system gives a regular rank six revolute drive",
           "[geometry][assembly-revolute-joint]") {
-  Project project = make_project(
-      {{"component.a", identity_rigid_transform(), ComponentGroundingState::Grounded},
-       {"component.b"}});
+  Project project =
+      make_project({{"component.a", identity_rigid_transform(), ComponentGroundingState::Grounded},
+                    {"component.b"}});
   REQUIRE(project.assembly().add_joint(make_joint("joint.revolute", "component.a", "component.b")));
 
   const detail::AssemblyNumericRelationshipSet relationships{
@@ -238,18 +241,18 @@ TEST_CASE("Shared numeric system gives a regular rank six revolute drive",
 
 TEST_CASE("Revolute motion solver moves and atomically applies an in-range joint coordinate",
           "[geometry][assembly-revolute-joint]") {
-  Project project = make_project(
-      {{"component.a", identity_rigid_transform(), ComponentGroundingState::Grounded},
-       {"component.b"}});
+  Project project =
+      make_project({{"component.a", identity_rigid_transform(), ComponentGroundingState::Grounded},
+                    {"component.b"}});
   REQUIRE(project.assembly().add_joint(make_joint("joint.revolute", "component.a", "component.b")));
   const RigidTransform source_transform =
       project.assembly().find_component_instance(ComponentInstanceId("component.b"))->transform();
 
   const AssemblyJointMotionSolver solver;
-  const auto first = solver.move(project, AssemblyJointId("joint.revolute"),
-                                 angle(45.0, "joint.revolute"));
-  const auto repeated = solver.move(project, AssemblyJointId("joint.revolute"),
-                                    angle(45.0, "joint.revolute"));
+  const auto first =
+      solver.move(project, AssemblyJointId("joint.revolute"), angle(45.0, "joint.revolute"));
+  const auto repeated =
+      solver.move(project, AssemblyJointId("joint.revolute"), angle(45.0, "joint.revolute"));
   REQUIRE(first);
   REQUIRE(repeated);
   CHECK(first.value() == repeated.value());
@@ -267,8 +270,9 @@ TEST_CASE("Revolute motion solver moves and atomically applies an in-range joint
   CHECK(proposal.proposed_transform.rotation_deg.y == Approx(0.0).margin(kTolerance));
   CHECK(proposal.proposed_transform.rotation_deg.z == Approx(45.0).margin(kTolerance));
   CHECK(project.assembly().find_joint(AssemblyJointId("joint.revolute"))->coordinate_deg() == 0.0);
-  CHECK(project.assembly().find_component_instance(ComponentInstanceId("component.b"))->transform() ==
-        source_transform);
+  CHECK(
+      project.assembly().find_component_instance(ComponentInstanceId("component.b"))->transform() ==
+      source_transform);
 
   const AssemblyJointMotionResultApplier applier;
   const auto applied = applier.apply(project, first.value());
@@ -282,14 +286,78 @@ TEST_CASE("Revolute motion solver moves and atomically applies an in-range joint
 
   const AssemblyJoint* joint = project.assembly().find_joint(AssemblyJointId("joint.revolute"));
   REQUIRE(joint != nullptr);
-  const auto equation = AssemblyRevoluteJointEquationBuilder{}.build(
-      project, *joint, angle(45.0, "joint.revolute"));
+  const auto equation =
+      AssemblyRevoluteJointEquationBuilder{}.build(project, *joint, angle(45.0, "joint.revolute"));
   REQUIRE(equation);
   check_vector_zero(equation.value().residual.direction_alignment);
   check_vector_zero(equation.value().residual.axis_offset_mm);
   CHECK(equation.value().residual.signed_seating_separation_mm == Approx(0.0).margin(kTolerance));
   CHECK(equation.value().residual.twist_alignment_sine == Approx(0.0).margin(kTolerance));
   CHECK(equation.value().residual.twist_alignment_cosine == Approx(0.0).margin(kTolerance));
+}
+
+TEST_CASE("Local vector joint drives validate roles snapshot all slots and apply atomically",
+          "[geometry][assembly-vector-joint-drive]"
+          "[geometry][assembly-vector-joint-drive-application]") {
+  Project project =
+      make_project({{"component.a", identity_rigid_transform(), ComponentGroundingState::Grounded},
+                    {"component.b"}});
+  REQUIRE(project.assembly().add_joint(make_joint("joint.vector", "component.a", "component.b")));
+  const AssemblyJointMotionSolver solver;
+  const AssemblyJointDrive drive{
+      AssemblyJointId("joint.vector"),
+      {{AssemblyJointCoordinateRole::Rotation, angle(45.0, "joint.vector")}}};
+
+  auto vector_result = solver.move(project, drive);
+  auto scalar_result =
+      solver.move(project, AssemblyJointId("joint.vector"), angle(45.0, "joint.vector"));
+  REQUIRE(vector_result);
+  REQUIRE(scalar_result);
+  CHECK(vector_result.value() == scalar_result.value());
+  REQUIRE(vector_result.value().requested_coordinates.size() == 1U);
+  CHECK(vector_result.value().requested_coordinates.front().role ==
+        AssemblyJointCoordinateRole::Rotation);
+  CHECK(vector_result.value().requested_coordinates.front().requested_value.degrees() == 45.0);
+  REQUIRE(vector_result.value().joint_snapshots.size() == 1U);
+  CHECK(vector_result.value().joint_snapshots.front().coordinate_slots ==
+        project.assembly().find_joint(AssemblyJointId("joint.vector"))->coordinate_slots());
+
+  auto tampered = vector_result.value();
+  tampered.requested_coordinates.front().role = AssemblyJointCoordinateRole::RotationNormal;
+  CHECK(AssemblyJointMotionResultApplier{}.apply(project, tampered).has_error());
+  CHECK(project.assembly().find_joint(AssemblyJointId("joint.vector"))->coordinate_deg() == 0.0);
+  CHECK(
+      project.assembly().find_component_instance(ComponentInstanceId("component.b"))->transform() ==
+      identity_rigid_transform());
+
+  auto applied = AssemblyJointMotionResultApplier{}.apply(project, vector_result.value());
+  REQUIRE(applied);
+  CHECK(project.assembly().find_joint(AssemblyJointId("joint.vector"))->coordinate_deg() == 45.0);
+
+  Project invalid =
+      make_project({{"component.a", identity_rigid_transform(), ComponentGroundingState::Grounded},
+                    {"component.b"}});
+  REQUIRE(invalid.assembly().add_joint(make_joint("joint.vector", "component.a", "component.b")));
+  CHECK(solver.move(invalid, AssemblyJointDrive{AssemblyJointId("joint.vector"), {}}).has_error());
+  CHECK(solver
+            .move(invalid,
+                  AssemblyJointDrive{
+                      AssemblyJointId("joint.vector"),
+                      {{AssemblyJointCoordinateRole::Rotation, angle(10.0, "joint.vector")},
+                       {AssemblyJointCoordinateRole::Rotation, angle(20.0, "joint.vector")}}})
+            .has_error());
+  CHECK(solver
+            .move(invalid, AssemblyJointDrive{AssemblyJointId("joint.vector"),
+                                              {{AssemblyJointCoordinateRole::RotationNormal,
+                                                angle(10.0, "joint.vector")}}})
+            .has_error());
+  auto wrong_kind = Quantity::length_mm(1.0, "joint.vector");
+  REQUIRE(wrong_kind);
+  CHECK(solver
+            .move(invalid,
+                  AssemblyJointDrive{AssemblyJointId("joint.vector"),
+                                     {{AssemblyJointCoordinateRole::Rotation, wrong_kind.value()}}})
+            .has_error());
 }
 
 TEST_CASE("Revolute motion enforces limits grounding activity and suppression boundaries",
@@ -300,11 +368,12 @@ TEST_CASE("Revolute motion enforces limits grounding activity and suppression bo
     Project project = make_project(
         {{"component.a", identity_rigid_transform(), ComponentGroundingState::Grounded},
          {"component.b"}});
-    REQUIRE(project.assembly().add_joint(make_joint("joint.revolute", "component.a", "component.b")));
-    const auto upper = solver.move(project, AssemblyJointId("joint.revolute"),
-                                   angle(91.0, "joint.revolute"));
-    const auto lower = solver.move(project, AssemblyJointId("joint.revolute"),
-                                   angle(-91.0, "joint.revolute"));
+    REQUIRE(
+        project.assembly().add_joint(make_joint("joint.revolute", "component.a", "component.b")));
+    const auto upper =
+        solver.move(project, AssemblyJointId("joint.revolute"), angle(91.0, "joint.revolute"));
+    const auto lower =
+        solver.move(project, AssemblyJointId("joint.revolute"), angle(-91.0, "joint.revolute"));
     REQUIRE(upper.has_error());
     REQUIRE(lower.has_error());
     CHECK(upper.error().message() ==
@@ -315,9 +384,10 @@ TEST_CASE("Revolute motion enforces limits grounding activity and suppression bo
 
   SECTION("a surviving motion group requires one grounded component") {
     Project project = make_project({{"component.a"}, {"component.b"}});
-    REQUIRE(project.assembly().add_joint(make_joint("joint.revolute", "component.a", "component.b")));
-    const auto moved = solver.move(project, AssemblyJointId("joint.revolute"),
-                                   angle(20.0, "joint.revolute"));
+    REQUIRE(
+        project.assembly().add_joint(make_joint("joint.revolute", "component.a", "component.b")));
+    const auto moved =
+        solver.move(project, AssemblyJointId("joint.revolute"), angle(20.0, "joint.revolute"));
     REQUIRE(moved.has_error());
     CHECK(moved.error().message() ==
           "solver connected group requires at least one grounded component");
@@ -327,10 +397,10 @@ TEST_CASE("Revolute motion enforces limits grounding activity and suppression bo
     Project inactive = make_project(
         {{"component.a", identity_rigid_transform(), ComponentGroundingState::Grounded},
          {"component.b"}});
-    REQUIRE(inactive.assembly().add_joint(make_joint("joint.revolute", "component.a", "component.b",
-                                                     AssemblyJointState::Inactive)));
-    const auto inactive_result = solver.move(inactive, AssemblyJointId("joint.revolute"),
-                                             angle(20.0, "joint.revolute"));
+    REQUIRE(inactive.assembly().add_joint(
+        make_joint("joint.revolute", "component.a", "component.b", AssemblyJointState::Inactive)));
+    const auto inactive_result =
+        solver.move(inactive, AssemblyJointId("joint.revolute"), angle(20.0, "joint.revolute"));
     REQUIRE(inactive_result.has_error());
     CHECK(inactive_result.error().message() == "revolute joint motion requires an active joint");
 
@@ -340,8 +410,8 @@ TEST_CASE("Revolute motion enforces limits grounding activity and suppression bo
           ComponentSuppressionState::Suppressed}});
     REQUIRE(suppressed.assembly().add_joint(
         make_joint("joint.revolute", "component.a", "component.b")));
-    const auto suppressed_result = solver.move(suppressed, AssemblyJointId("joint.revolute"),
-                                               angle(20.0, "joint.revolute"));
+    const auto suppressed_result =
+        solver.move(suppressed, AssemblyJointId("joint.revolute"), angle(20.0, "joint.revolute"));
     REQUIRE(suppressed_result.has_error());
     CHECK(suppressed_result.error().message() ==
           "revolute joint motion requires active non-suppressed target components");
@@ -350,16 +420,16 @@ TEST_CASE("Revolute motion enforces limits grounding activity and suppression bo
 
 TEST_CASE("Revolute motion filters suppressed related joints and keeps full stale snapshots",
           "[geometry][assembly-revolute-joint]") {
-  Project project = make_project(
-      {{"component.a", identity_rigid_transform(), ComponentGroundingState::Grounded},
-       {"component.b"},
-       {"component.c", identity_rigid_transform(), ComponentGroundingState::Free,
-        ComponentSuppressionState::Suppressed}});
+  Project project =
+      make_project({{"component.a", identity_rigid_transform(), ComponentGroundingState::Grounded},
+                    {"component.b"},
+                    {"component.c", identity_rigid_transform(), ComponentGroundingState::Free,
+                     ComponentSuppressionState::Suppressed}});
   REQUIRE(project.assembly().add_joint(make_joint("joint.a", "component.a", "component.b")));
   REQUIRE(project.assembly().add_joint(make_joint("joint.z", "component.b", "component.c")));
 
-  const auto moved = AssemblyJointMotionSolver{}.move(project, AssemblyJointId("joint.a"),
-                                                       angle(30.0, "joint.a"));
+  const auto moved =
+      AssemblyJointMotionSolver{}.move(project, AssemblyJointId("joint.a"), angle(30.0, "joint.a"));
   REQUIRE(moved);
   REQUIRE(moved.value().converged());
   CHECK(moved.value().solve_result.residual_summary.residual_component_count == 9U);
@@ -378,53 +448,58 @@ TEST_CASE("Revolute motion result application rejects stale component and joint 
     Project project = make_project(
         {{"component.a", identity_rigid_transform(), ComponentGroundingState::Grounded},
          {"component.b"}});
-    REQUIRE(project.assembly().add_joint(make_joint("joint.revolute", "component.a", "component.b")));
-    const auto moved = solver.move(project, AssemblyJointId("joint.revolute"),
-                                   angle(30.0, "joint.revolute"));
+    REQUIRE(
+        project.assembly().add_joint(make_joint("joint.revolute", "component.a", "component.b")));
+    const auto moved =
+        solver.move(project, AssemblyJointId("joint.revolute"), angle(30.0, "joint.revolute"));
     REQUIRE(moved);
     REQUIRE(moved.value().converged());
     REQUIRE(project.assembly().set_component_instance_transform(
-        ComponentInstanceId("component.b"),
-        RigidTransform{Vector3{1.0, 0.0, 0.0}, Vector3{}}));
+        ComponentInstanceId("component.b"), RigidTransform{Vector3{1.0, 0.0, 0.0}, Vector3{}}));
     const auto applied = applier.apply(project, moved.value());
     REQUIRE(applied.has_error());
     CHECK(applied.error().message() ==
           "assembly solve result is stale because component solve input changed");
-    CHECK(project.assembly().find_joint(AssemblyJointId("joint.revolute"))->coordinate_deg() == 0.0);
+    CHECK(project.assembly().find_joint(AssemblyJointId("joint.revolute"))->coordinate_deg() ==
+          0.0);
   }
 
   SECTION("joint authored coordinate changed") {
     Project project = make_project(
         {{"component.a", identity_rigid_transform(), ComponentGroundingState::Grounded},
          {"component.b"}});
-    REQUIRE(project.assembly().add_joint(make_joint("joint.revolute", "component.a", "component.b")));
-    const auto moved = solver.move(project, AssemblyJointId("joint.revolute"),
-                                   angle(30.0, "joint.revolute"));
+    REQUIRE(
+        project.assembly().add_joint(make_joint("joint.revolute", "component.a", "component.b")));
+    const auto moved =
+        solver.move(project, AssemblyJointId("joint.revolute"), angle(30.0, "joint.revolute"));
     REQUIRE(moved);
     REQUIRE(moved.value().converged());
     REQUIRE(project.assembly().set_joint_coordinate(AssemblyJointId("joint.revolute"),
-                                                     angle(10.0, "joint.revolute")));
+                                                    angle(10.0, "joint.revolute")));
     const RigidTransform transform =
         project.assembly().find_component_instance(ComponentInstanceId("component.b"))->transform();
     const auto applied = applier.apply(project, moved.value());
     REQUIRE(applied.has_error());
     CHECK(applied.error().message() == "joint motion result is stale because joint input changed");
-    CHECK(project.assembly().find_component_instance(ComponentInstanceId("component.b"))->transform() ==
-          transform);
-    CHECK(project.assembly().find_joint(AssemblyJointId("joint.revolute"))->coordinate_deg() == 10.0);
+    CHECK(project.assembly()
+              .find_component_instance(ComponentInstanceId("component.b"))
+              ->transform() == transform);
+    CHECK(project.assembly().find_joint(AssemblyJointId("joint.revolute"))->coordinate_deg() ==
+          10.0);
   }
 }
 
 TEST_CASE("Revolute motion holds other active joints at persisted coordinates",
-          "[geometry][assembly-revolute-joint]") {
-  Project project = make_project(
-      {{"component.a", identity_rigid_transform(), ComponentGroundingState::Grounded},
-       {"component.b"}, {"component.c"}});
+          "[geometry][assembly-revolute-joint][geometry][assembly-vector-joint-drive]") {
+  Project project =
+      make_project({{"component.a", identity_rigid_transform(), ComponentGroundingState::Grounded},
+                    {"component.b"},
+                    {"component.c"}});
   REQUIRE(project.assembly().add_joint(make_joint("joint.a", "component.a", "component.b")));
   REQUIRE(project.assembly().add_joint(make_joint("joint.z", "component.b", "component.c")));
 
-  const auto moved = AssemblyJointMotionSolver{}.move(project, AssemblyJointId("joint.z"),
-                                                       angle(35.0, "joint.z"));
+  const auto moved =
+      AssemblyJointMotionSolver{}.move(project, AssemblyJointId("joint.z"), angle(35.0, "joint.z"));
   REQUIRE(moved);
   REQUIRE(moved.value().converged());
   CHECK(moved.value().solve_result.residual_summary.residual_component_count == 18U);

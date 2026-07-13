@@ -9,9 +9,10 @@
 namespace blcad {
 namespace {
 
-[[nodiscard]] Result<const AssemblyDocument*> resolve_joint_endpoint_assembly(
-    const Project& project, const AssemblyHierarchyConstraintEndpoint& endpoint,
-    const AssemblyJointId& joint_id, std::string_view target_label) {
+[[nodiscard]] Result<const AssemblyDocument*>
+resolve_joint_endpoint_assembly(const Project& project,
+                                const AssemblyHierarchyConstraintEndpoint& endpoint,
+                                const AssemblyJointId& joint_id, std::string_view target_label) {
   const AssemblyDocument* assembly = &project.assembly();
   for (const SubassemblyInstanceId& occurrence : endpoint.occurrence_path()) {
     const SubassemblyInstance* instance = assembly->find_subassembly_instance(occurrence);
@@ -30,9 +31,9 @@ namespace {
   return Result<const AssemblyDocument*>::success(assembly);
 }
 
-[[nodiscard]] Result<std::size_t> validate_joint_endpoint(
-    const Project& project, const AssemblyHierarchyConstraintEndpoint& endpoint,
-    const AssemblyJointId& joint_id, std::string_view target_label) {
+[[nodiscard]] Result<std::size_t>
+validate_joint_endpoint(const Project& project, const AssemblyHierarchyConstraintEndpoint& endpoint,
+                        const AssemblyJointId& joint_id, std::string_view target_label) {
   auto assembly = resolve_joint_endpoint_assembly(project, endpoint, joint_id, target_label);
   if (assembly.has_error()) {
     return Result<std::size_t>::failure(assembly.error());
@@ -83,13 +84,19 @@ Result<std::size_t> Project::validate_cross_hierarchy_joints() const {
 
 Result<std::size_t> Project::set_cross_hierarchy_joint_coordinate(AssemblyJointId id,
                                                                   Quantity coordinate) {
+  return set_cross_hierarchy_joint_coordinate_value(id, AssemblyJointCoordinateRole::Rotation,
+                                                    std::move(coordinate));
+}
+
+Result<std::size_t> Project::set_cross_hierarchy_joint_coordinate_value(
+    AssemblyJointId id, AssemblyJointCoordinateRole role, Quantity coordinate) {
   AssemblyHierarchyJoint* joint = find_cross_hierarchy_joint(id);
   if (joint == nullptr) {
-    return Result<std::size_t>::failure(Error::validation(
-        id.empty() ? std::string("assembly_hierarchy_joint") : id.value(),
-        "cross-hierarchy assembly joint must exist in project"));
+    return Result<std::size_t>::failure(
+        Error::validation(id.empty() ? std::string("assembly_hierarchy_joint") : id.value(),
+                          "cross-hierarchy assembly joint must exist in project"));
   }
-  auto updated = joint->with_coordinate(coordinate);
+  auto updated = joint->with_coordinate_value(role, std::move(coordinate));
   if (updated.has_error()) {
     return Result<std::size_t>::failure(updated.error());
   }
@@ -109,17 +116,18 @@ std::size_t Project::cross_hierarchy_joint_count() const noexcept {
   return cross_hierarchy_joints_.size();
 }
 
-const AssemblyHierarchyJoint* Project::find_cross_hierarchy_joint(AssemblyJointId id) const noexcept {
-  const auto found = std::find_if(
-      cross_hierarchy_joints_.begin(), cross_hierarchy_joints_.end(),
-      [&id](const AssemblyHierarchyJoint& joint) { return joint.id() == id; });
+const AssemblyHierarchyJoint*
+Project::find_cross_hierarchy_joint(AssemblyJointId id) const noexcept {
+  const auto found =
+      std::find_if(cross_hierarchy_joints_.begin(), cross_hierarchy_joints_.end(),
+                   [&id](const AssemblyHierarchyJoint& joint) { return joint.id() == id; });
   return found == cross_hierarchy_joints_.end() ? nullptr : &*found;
 }
 
 AssemblyHierarchyJoint* Project::find_cross_hierarchy_joint(AssemblyJointId id) noexcept {
-  const auto found = std::find_if(
-      cross_hierarchy_joints_.begin(), cross_hierarchy_joints_.end(),
-      [&id](const AssemblyHierarchyJoint& joint) { return joint.id() == id; });
+  const auto found =
+      std::find_if(cross_hierarchy_joints_.begin(), cross_hierarchy_joints_.end(),
+                   [&id](const AssemblyHierarchyJoint& joint) { return joint.id() == id; });
   return found == cross_hierarchy_joints_.end() ? nullptr : &*found;
 }
 

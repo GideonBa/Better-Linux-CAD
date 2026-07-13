@@ -106,4 +106,4 @@ Block 42 is implemented in `docs/assembly-joint-coordinate-json-mvp5.md`.
 
 Slots now serialize additively for local and Project-level joints with canonical role spellings, typed units, deterministic family order, historical scalar Revolute loading, a dual compatibility writer, and explicit malformed-role failures.
 
-The next technical step is Block 43 vector motion drives. New joint families remain Blocks 44–47.
+Block 43 vector motion drives are implemented in `docs/assembly-vector-joint-drive-mvp5.md`. The next technical step is Block 44 Prismatic; the remaining richer families stay Blocks 45–47.

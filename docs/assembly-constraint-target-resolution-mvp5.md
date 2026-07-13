@@ -343,7 +343,7 @@ The refined post-Block-30 sequence is:
   -> 40 joint target compatibility + oriented Frame contract (implemented)
   -> 41 general joint coordinate/limit Core model (implemented)
   -> 42 general joint coordinate JSON/backward compatibility (implemented)
-  -> 43 vector joint drives + holding/freshness/atomic application
+  -> 43 vector joint drives + holding/freshness/atomic application (implemented)
   -> 44 Prismatic joint
   -> 45 Cylindrical joint
   -> 46 Planar joint
@@ -383,7 +383,7 @@ Relationship equation builders consume requested capabilities through the Block-
 
 The first new persistent generic relationship types are planned only in Block 38, after compatibility semantics are stable. Their equations and numeric integration follow in Block 39.
 
-Block 40 joint target compatibility is implemented with the deterministic Revolute `Frame / Frame` contract and explicit Axis-only rejection. Blocks 41–42 implement the family-defined typed coordinate model and additive compatible JSON. Vector-drive semantics remain Block 43 before Prismatic, Cylindrical, Planar, and Ball/Spherical are integrated one family per block.
+Block 40 joint target compatibility is implemented with the deterministic Revolute `Frame / Frame` contract and explicit Axis-only rejection. Blocks 41–43 implement family-defined typed coordinates, additive compatible JSON, and shared vector drives. Prismatic, Cylindrical, Planar, and Ball/Spherical remain one family per Block 44–47.
 
 ## Failure behavior
 

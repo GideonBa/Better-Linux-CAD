@@ -1,6 +1,6 @@
 # General Assembly Geometric Target and Relationship Roadmap
 
-Status: Blocks 31–42 are implemented. Block 43 is the current next technical step. Blocks 43–47 remain planned headless architecture.
+Status: Blocks 31–43 are implemented. Block 44 is the current next technical step. Blocks 44–47 remain planned headless architecture.
 
 This document is the active status and sequencing authority for the expansion from the current assembly target layer to semantic reference geometry, stable generated topology targets, generic geometric relationships, and richer motion-joint families.
 
@@ -14,6 +14,7 @@ Implemented contracts are canonical in:
 - `docs/assembly-joint-target-compatibility-mvp5.md`
 - `docs/assembly-joint-coordinate-model-mvp5.md`
 - `docs/assembly-joint-coordinate-json-mvp5.md`
+- `docs/assembly-vector-joint-drive-mvp5.md`
 
 The complete pre-implementation planning detail for Blocks 32–47 is preserved byte-for-byte in:
 
@@ -159,7 +160,7 @@ Focused tag:
 
 ## Mandatory continuation order
 
-Blocks 32 through 42 are implemented. The remaining order is unchanged.
+Blocks 32 through 43 are implemented. The remaining order is unchanged.
 
 ```text
 32 assembly-selectable reference geometry Core intent (implemented)
@@ -173,7 +174,7 @@ Blocks 32 through 42 are implemented. The remaining order is unchanged.
   -> 40 joint target compatibility + oriented Frame contract (implemented)
   -> 41 general joint coordinate/limit Core model (implemented)
   -> 42 general joint coordinate JSON/backward compatibility (implemented)
-  -> 43 vector joint drives + holding/freshness/atomic application
+  -> 43 vector joint drives + holding/freshness/atomic application (implemented)
   -> 44 Prismatic joint
   -> 45 Cylindrical joint
   -> 46 Planar joint
@@ -532,9 +533,17 @@ Focused tags:
 [core][assembly-cross-hierarchy-joint-coordinate-json]
 ```
 
-## Block 43 — Multi-coordinate drives
+## Block 43 — Multi-coordinate drives — Implemented
 
-Block 43 generalizes selected-joint scalar drives to deterministic coordinate drive vectors with holding semantics, complete coordinate-slot freshness, and atomic application.
+Local and Project-level solvers now accept typed `AssemblyJointDrive` requests addressed by stable coordinate role. Family order is restored deterministically; omitted selected roles and every non-selected active joint slot hold authored values. Results protect complete coordinate-slot definitions and explicit drives, and appliers update transforms plus exactly driven selected roles on one Project copy. Scalar Revolute entry points remain adapters. Canonical contract: `docs/assembly-vector-joint-drive-mvp5.md`.
+
+Focused tags:
+
+```text
+[geometry][assembly-vector-joint-drive]
+[geometry][assembly-cross-hierarchy-vector-joint-drive]
+[geometry][assembly-vector-joint-drive-application]
+```
 
 Authority variables remain six direct component-transform variables per unique free authority. Joint coordinates remain drive parameters.
 
@@ -621,8 +630,8 @@ posed geometry/contact records/sweep analyses
 
 ## Immediate next technical step
 
-Block 43 is the current next technical step.
+Block 44 is the current next technical step.
 
-Implement Block 43 only: generalize selected-joint scalar drives into deterministic role-addressed coordinate drive vectors with holding semantics, complete slot freshness, and atomic application.
+Implement Block 44 only: add the Prismatic family across Core intent, JSON, oriented target compatibility, deterministic equations, graph participation, and shared Block-43 vector-drive execution.
 
-Preserve the Block-42 persistence contract and existing transform-authority model. Do not introduce a new joint family; Prismatic remains Block 44.
+Freeze the one-coordinate Linear `translation` contract and reuse the existing transform-authority/numeric/application paths. Do not introduce Cylindrical; it remains Block 45.
