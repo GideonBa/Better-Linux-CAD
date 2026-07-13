@@ -1,0 +1,25 @@
+name: Block 39 Patch
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  actions: read
+  contents: write
+  pull-requests: write
+
+jobs:
+  patch-and-test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: block39-generic-relationship-equations
+          fetch-depth: 0
+
+      - name: Run Block 39 implementation and verification
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/run_block39_ci.sh
