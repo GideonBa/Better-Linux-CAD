@@ -4,15 +4,15 @@
 #include "blcad/core/project.hpp"
 #include "blcad/core/quantity.hpp"
 #include "blcad/core/result.hpp"
-#include "blcad/geometry/assembly_hierarchy_constraint_equation_builder.hpp"
 #include "blcad/geometry/assembly_revolute_joint_equation_builder.hpp"
 
 namespace blcad::geometry {
 
 struct AssemblyHierarchyRevoluteJointEquationDescriptor {
   AssemblyJointId joint;
-  AssemblyHierarchyInsertConstraintTargetDescriptor target_a;
-  AssemblyHierarchyInsertConstraintTargetDescriptor target_b;
+  AssemblyJointTargetCompatibility compatibility;
+  AssemblyRevoluteJointTargetDescriptor target_a;
+  AssemblyRevoluteJointTargetDescriptor target_b;
   double requested_coordinate_deg = 0.0;
   RevoluteJointResidualDescriptor residual;
 

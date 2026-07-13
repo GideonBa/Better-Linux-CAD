@@ -1,6 +1,6 @@
 # Cross-Hierarchy Assembly Relationship Sequence MVP-5
 
-Status: Blocks 23–39 are implemented. Block 40 is the current next technical step. Blocks 40–47 remain the explicit richer-joint continuation.
+Status: Blocks 23–40 are implemented. Block 41 is the current next technical step. Blocks 41–47 remain the explicit richer-joint continuation.
 
 This document is the canonical numbered handoff sequence for cross-document assembly intent, solving, motion, exchange, posed analysis, and general geometric target architecture.
 
@@ -483,9 +483,11 @@ Focused tags:
 [geometry][assembly-generic-relationships-diagnostics]
 ```
 
-## Block 40 — Joint target compatibility and oriented Frame contract
+## Block 40 — Joint target compatibility and oriented Frame contract — Implemented
 
 Block 40 migrates joint target compatibility to capability semantics and freezes oriented `Frame` requirements. Current Revolute remains `Frame <-> Frame`; Axis alone is insufficient for signed twist.
+
+The implemented `AssemblyJointTargetCompatibilityResolver` is consumed before projection by both local and cross-hierarchy Revolute builders. Existing `.seat` targets remain supported, exact local/rooted identities remain unchanged, and Axis-only targets fail closed without arbitrary Frame synthesis. Both paths share the unchanged Revolute residual constructor. Canonical contract: `docs/assembly-joint-target-compatibility-mvp5.md`.
 
 ## Blocks 41–43 — General joint coordinate foundation
 
@@ -546,6 +548,6 @@ posed shapes/contact records/sweep analyses
 
 ## Next technical step
 
-Implement Block 40 only: joint target compatibility and the oriented `Frame` contract.
+Implement Block 41 only: general joint coordinate/limit Core model with typed, family-defined coordinate slots and local/Project-level parity.
 
-Preserve current Revolute `Frame <-> Frame` execution, migrate compatibility selection onto typed target capabilities, and do not change joint persistence or add a new joint family.
+Preserve implemented Revolute `Frame <-> Frame` compatibility/execution through an explicit adaptation boundary. Add no JSON change, vector motion drive, or new joint family in Block 41.

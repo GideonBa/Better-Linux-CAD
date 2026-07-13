@@ -1,6 +1,6 @@
 # General Assembly Geometric Target and Relationship Roadmap
 
-Status: Blocks 31–39 are implemented. Block 40 is the current next technical step. Blocks 40–47 remain planned headless architecture.
+Status: Blocks 31–40 are implemented. Block 41 is the current next technical step. Blocks 41–47 remain planned headless architecture.
 
 This document is the active status and sequencing authority for the expansion from the current assembly target layer to semantic reference geometry, stable generated topology targets, generic geometric relationships, and richer motion-joint families.
 
@@ -483,7 +483,7 @@ Focused tags:
 
 No generic-target-specific solver, graph, transform authority, finite-difference implementation, endpoint model, persistence field, or JSON change was added.
 
-## Block 40 — Joint target compatibility and oriented Frame contract
+## Block 40 — Joint target compatibility and oriented Frame contract — Implemented
 
 Primary boundary: derived joint compatibility semantics.
 
@@ -496,6 +496,10 @@ Frame <-> Frame
 Current `.seat` sources project Frame. Axis alone is insufficient for signed twist because it has no deterministic reference X direction. Geometry may not synthesize a Frame from Axis using an arbitrary world axis.
 
 No joint persistence change or new joint family belongs in Block 40.
+
+Implemented `AssemblyJointTargetCompatibilityResolver` as the derived compatibility authority for joint endpoints. The initial deterministic matrix remains exactly `Revolute -> Frame / Frame`. Both local and cross-hierarchy Revolute builders now resolve typed geometric targets, consume this compatibility before projection, preserve original target scope/identity, and route the selected oriented Frames through one shared residual constructor.
+
+Axis-only Revolute fails explicitly through the joint compatibility authority because Axis supplies no deterministic reference X direction. No arbitrary world-axis Frame synthesis is permitted. The canonical implemented contract is `docs/assembly-joint-target-compatibility-mvp5.md`.
 
 ## Blocks 41–43 — Multi-coordinate joint foundation
 
@@ -590,8 +594,8 @@ posed geometry/contact records/sweep analyses
 
 ## Immediate next technical step
 
-Block 40 is the current next technical step.
+Block 41 is the current next technical step.
 
-Implement Block 40 only: migrate joint target compatibility to typed capability semantics and freeze the oriented `Frame` contract while preserving current Revolute `Frame <-> Frame` execution.
+Implement Block 41 only: generalize persistent local and Project-level joint coordinates/limits into family-defined typed coordinate slots while preserving current Revolute APIs through an explicit adaptation boundary.
 
-Do not change joint persistence, add a joint family, or synthesize a Frame from Axis using an arbitrary world axis in Block 40.
+Do not change JSON or introduce vector motion drives in Block 41; those remain Blocks 42 and 43.

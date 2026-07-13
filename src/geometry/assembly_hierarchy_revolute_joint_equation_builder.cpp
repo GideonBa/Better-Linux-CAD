@@ -1,6 +1,6 @@
 #include "blcad/geometry/assembly_hierarchy_revolute_joint_equation_builder.hpp"
 
-#include "assembly_revolute_joint_residual.hpp"
+#include "blcad/geometry/assembly_hierarchy_constraint_equation_builder.hpp"
 
 #include <string>
 #include <utility>
@@ -12,8 +12,8 @@ namespace {
   return Error::validation(std::move(object_id), std::move(message));
 }
 
-[[nodiscard]] Result<AssemblyHierarchyConstraintTarget> make_query_target(
-    const AssemblyHierarchyConstraintEndpoint& endpoint) {
+[[nodiscard]] Result<AssemblyHierarchyConstraintTarget>
+make_query_target(const AssemblyHierarchyConstraintEndpoint& endpoint) {
   return AssemblyHierarchyConstraintTarget::create(
       endpoint.occurrence_path(), endpoint.component_instance(), endpoint.semantic_reference());
 }
@@ -21,9 +21,9 @@ namespace {
 } // namespace
 
 Result<AssemblyHierarchyRevoluteJointEquationDescriptor>
-AssemblyHierarchyRevoluteJointEquationBuilder::build(
-    const Project& project, const AssemblyHierarchyJoint& joint,
-    const Quantity& requested_coordinate) const {
+AssemblyHierarchyRevoluteJointEquationBuilder::build(const Project& project,
+                                                     const AssemblyHierarchyJoint& joint,
+                                                     const Quantity& requested_coordinate) const {
   if (joint.state() != AssemblyJointState::Active) {
     return Result<AssemblyHierarchyRevoluteJointEquationDescriptor>::failure(validation_error(
         joint.id().value(), "hierarchy Revolute equation construction requires an active joint"));
@@ -49,21 +49,26 @@ AssemblyHierarchyRevoluteJointEquationBuilder::build(
   }
 
   const AssemblyHierarchyConstraintTargetResolver resolver;
-  auto target_a = resolver.resolve_insert(project, query_target_a.value());
+  auto target_a = resolver.resolve_geometric(project, query_target_a.value());
   if (target_a.has_error()) {
     return Result<AssemblyHierarchyRevoluteJointEquationDescriptor>::failure(target_a.error());
   }
-  auto target_b = resolver.resolve_insert(project, query_target_b.value());
+  auto target_b = resolver.resolve_geometric(project, query_target_b.value());
   if (target_b.has_error()) {
     return Result<AssemblyHierarchyRevoluteJointEquationDescriptor>::failure(target_b.error());
   }
 
+  const AssemblyRevoluteJointEquationBuilder shared_builder;
+  auto equation = shared_builder.build(joint.id(), joint.type(), target_a.value(), target_b.value(),
+                                       requested_coordinate);
+  if (equation.has_error()) {
+    return Result<AssemblyHierarchyRevoluteJointEquationDescriptor>::failure(equation.error());
+  }
   return Result<AssemblyHierarchyRevoluteJointEquationDescriptor>::success(
       AssemblyHierarchyRevoluteJointEquationDescriptor{
-          joint.id(), target_a.value(), target_b.value(), requested_coordinate.degrees(),
-          detail::build_revolute_joint_residual(
-              target_a.value().axis, target_a.value().seating_plane, target_b.value().axis,
-              target_b.value().seating_plane, requested_coordinate.degrees())});
+          equation.value().joint, equation.value().compatibility, equation.value().target_a,
+          equation.value().target_b, equation.value().requested_coordinate_deg,
+          equation.value().residual});
 }
 
 } // namespace blcad::geometry

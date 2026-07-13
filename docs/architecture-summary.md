@@ -379,7 +379,7 @@ Persistent local `AssemblyJoint` and Project-level `AssemblyHierarchyJoint` inte
 
 The current family is `Revolute` with state, principal-angle limits, and one authored angular coordinate.
 
-Current `.seat` sources expose Frame, Axis, and Plane. Existing compatibility adapters retain the directed axis/seating descriptor shape consumed by the shared Revolute residual constructor:
+Current `.seat` sources expose Frame, Axis, and Plane. `AssemblyJointTargetCompatibilityResolver` deterministically selects Frame/Frame before projection for local and cross-hierarchy Revolute equations. Axis-only targets fail closed because no deterministic reference X direction exists. The selected oriented Frames feed the shared Revolute residual constructor:
 
 ```text
 directed axis alignment
@@ -491,7 +491,7 @@ Block 33 adds `datum_axes` PartDocument persistence. Block 35 adds canonical sem
 
 ## Current direction
 
-Blocks 23–39 of the current assembly sequence are implemented.
+Blocks 23–40 of the current assembly sequence are implemented.
 
 Canonical current target architecture:
 
@@ -500,6 +500,7 @@ Canonical current target architecture:
 - `docs/assembly-generated-topology-reference-mvp5.md`
 - `docs/assembly-generic-relationship-intent-mvp5.md`
 - `docs/assembly-generic-relationship-equations-mvp5.md`
+- `docs/assembly-joint-target-compatibility-mvp5.md`
 - `docs/assembly-general-geometric-target-roadmap.md`
 
 The complete original planning baseline for Blocks 32–47 remains in `docs/assembly-general-geometric-target-roadmap-planning-baseline.md` and is incorporated by the active roadmap for still-planned acceptance/failure details.
@@ -508,6 +509,6 @@ Canonical numbered sequence:
 
 - `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`
 
-The next technical step is Block 40 only: joint target compatibility and the oriented `Frame` contract.
+The next technical step is Block 41 only: general joint coordinate/limit Core model.
 
-Block 39 generic relationship equations and shared solve integration are implemented. Occurrence-local child pose overrides, whole-subassembly solve variables, general physics, and richer joints remain deferred according to their roadmap blocks.
+Block 40 derived joint compatibility and the oriented Frame/Frame Revolute contract are implemented. Axis-only Revolute fails closed without arbitrary reference-direction synthesis. Occurrence-local child pose overrides, whole-subassembly solve variables, general physics, and richer joints remain deferred according to their roadmap blocks.

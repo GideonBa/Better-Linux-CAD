@@ -383,7 +383,7 @@ Relationship equation builders consume requested capabilities through the Block-
 
 The first new persistent generic relationship types are planned only in Block 38, after compatibility semantics are stable. Their equations and numeric integration follow in Block 39.
 
-Joint target compatibility is generalized in Block 40. Multi-coordinate joint model/JSON/drive semantics are then separated into Blocks 41-43 before Prismatic, Cylindrical, Planar, and Ball/Spherical are integrated one family per block.
+Block 40 joint target compatibility is implemented with the deterministic Revolute `Frame / Frame` contract and explicit Axis-only rejection. Multi-coordinate joint model/JSON/drive semantics remain separated into Blocks 41-43 before Prismatic, Cylindrical, Planar, and Ball/Spherical are integrated one family per block.
 
 ## Failure behavior
 

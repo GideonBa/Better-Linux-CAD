@@ -119,6 +119,7 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/assembly_hierarchy_transform_evaluator.cpp
     src/geometry/assembly_insert_constraint_equation_builder.cpp
     src/geometry/assembly_interference_analyzer.cpp
+    src/geometry/assembly_joint_target_compatibility.cpp
     src/geometry/assembly_joint_motion_solver.cpp
     src/geometry/assembly_matrix_rank.cpp
     src/geometry/assembly_numeric_solve_engine.cpp
@@ -325,6 +326,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/assembly_insert_constraint_equation_builder_tests.cpp
       tests/geometry/assembly_insert_numeric_solver_tests.cpp
       tests/geometry/assembly_interference_analyzer_tests.cpp
+      tests/geometry/assembly_joint_target_compatibility_tests.cpp
       tests/geometry/assembly_joint_motion_snapshot_tests.cpp
       tests/geometry/assembly_nested_step_exporter_tests.cpp
       tests/geometry/assembly_parameter_pipeline_tests.cpp

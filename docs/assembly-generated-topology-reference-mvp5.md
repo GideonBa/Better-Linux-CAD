@@ -340,6 +340,6 @@ GeneratedVertex          -> Point
 
 Descriptors are computed analytically from validated feature/sketch/profile intent for both component-local and exact rooted transform semantics; acceptance is `[geometry][assembly-generated-topology-target-resolution]`. Block 36 added no compatibility rule, relationship family, or JSON field.
 
-Block 37 explicit target compatibility, Block 38 generic relationship intent/JSON, and Block 39 generic relationship equations/shared solve integration are implemented. Block 39 consumes generated target capabilities through the same projection contract and adds no generated-topology JSON field.
+Block 37 explicit relationship compatibility, Block 38 generic relationship intent/JSON, Block 39 generic equations/shared solve integration, and Block 40 joint target compatibility are implemented. Blocks 39–40 consume generated target capabilities through the same projection contract and add no generated-topology JSON field.
 
-The next technical step is Block 40: joint target compatibility and the oriented `Frame` contract.
+The next technical step is Block 41: general joint coordinate/limit Core model.

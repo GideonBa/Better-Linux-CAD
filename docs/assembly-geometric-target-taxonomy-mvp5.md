@@ -584,6 +584,10 @@ Canonical contracts:
 - `docs/assembly-generic-relationship-intent-mvp5.md`
 - `docs/assembly-generic-relationship-equations-mvp5.md`
 
-## Next technical step — Block 40
+## Block 40 — Joint target compatibility and oriented Frame — Implemented
 
-The next technical step is Block 40: joint target compatibility and the oriented `Frame` contract.
+`AssemblyJointTargetCompatibilityResolver` selects the typed `Frame / Frame` contract before local or cross-hierarchy Revolute projection. `.seat` remains the current deterministic Frame source. Axis-only Revolute fails closed because Axis supplies no reference X direction, and Geometry never synthesizes one from an arbitrary world axis. Canonical contract: `docs/assembly-joint-target-compatibility-mvp5.md`.
+
+## Next technical step — Block 41
+
+The next technical step is Block 41: general joint coordinate/limit Core model.

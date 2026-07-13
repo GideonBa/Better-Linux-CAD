@@ -266,14 +266,15 @@ The typed target/capability and generated-topology identity layers are public li
 - `docs/assembly-generated-topology-reference-mvp5.md`: Block-35 generated-topology identity/recovery contract
 - `docs/assembly-generic-relationship-intent-mvp5.md`: Block-38 generic relationship intent/JSON contract
 - `docs/assembly-generic-relationship-equations-mvp5.md`: Block-39 generic relationship equation/solve contract
-- `docs/assembly-general-geometric-target-roadmap.md`: implemented Blocks 31–39 and planned Blocks 40–47
+- `docs/assembly-joint-target-compatibility-mvp5.md`: Block-40 joint compatibility/oriented Frame contract
+- `docs/assembly-general-geometric-target-roadmap.md`: implemented Blocks 31–40 and planned Blocks 41–47
 - `docs/project-goal.md`: long-term direction
 
 ## Formatting
 
 Formatting is configured by `.editorconfig` and `.clang-format`.
 
-For Block 39 production/test files:
+For Blocks 39–40 production/test files:
 
 ```bash
 clang-format -i \
@@ -285,7 +286,14 @@ clang-format -i \
   src/geometry/assembly_constraint_numeric_system.hpp \
   src/geometry/assembly_constraint_numeric_system.cpp \
   src/geometry/assembly_hierarchy_constraint_equation_builder.cpp \
-  tests/geometry/assembly_generic_relationship_equation_tests.cpp
+  tests/geometry/assembly_generic_relationship_equation_tests.cpp \
+  include/blcad/geometry/assembly_joint_target_compatibility.hpp \
+  include/blcad/geometry/assembly_revolute_joint_equation_builder.hpp \
+  include/blcad/geometry/assembly_hierarchy_revolute_joint_equation_builder.hpp \
+  src/geometry/assembly_joint_target_compatibility.cpp \
+  src/geometry/assembly_revolute_joint_equation_builder.cpp \
+  src/geometry/assembly_hierarchy_revolute_joint_equation_builder.cpp \
+  tests/geometry/assembly_joint_target_compatibility_tests.cpp
 ```
 
 ## Clean generated files
@@ -296,7 +304,7 @@ rm -rf build/
 
 ## Current assembly development boundary
 
-Blocks 23–39 are implemented.
+Blocks 23–40 are implemented.
 
 Block 35 freezes:
 
@@ -333,7 +341,7 @@ Focused Block-35 tests:
 ./build/dev/blcad_core_tests "[core][semantic-generated-topology-recovery]"
 ```
 
-Focused Blocks 36–39 tests:
+Focused Blocks 36–40 tests:
 
 ```bash
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-generated-topology-target-resolution]"
@@ -345,6 +353,8 @@ Focused Blocks 36–39 tests:
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-generic-relationships-solver]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-generic-relationships-cross-hierarchy]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-generic-relationships-diagnostics]"
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-joint-target-compatibility]"
+./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-cross-hierarchy-joint-target-compatibility]"
 ```
 
-The immediate next step is Block 40: joint target compatibility and the oriented `Frame` contract. Block 39 generic relationship equations and shared solve integration are implemented without new execution infrastructure or persistence. Exact sequencing is maintained in `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md` and detailed target planning in `docs/assembly-general-geometric-target-roadmap.md`.
+The immediate next step is Block 41: general joint coordinate/limit Core model. Block 40 joint target compatibility and the oriented Frame/Frame Revolute contract are implemented without persistence or solver changes. Exact sequencing is maintained in `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md` and detailed target planning in `docs/assembly-general-geometric-target-roadmap.md`.

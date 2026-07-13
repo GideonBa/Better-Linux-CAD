@@ -4,7 +4,7 @@ BLCAD will be an independent, headless parametric CAD system for Linux, in activ
 
 All architecture, feature contracts, persistence semantics, roadmaps, and current implementation status live in [`docs/`](docs/). This README is intentionally kept small and evergreen — it is not a status page.
 
-The assembly sequence is implemented through Block 39. Block 40 — joint target compatibility and the oriented `Frame` contract — is the next technical step. The canonical Block-39 contract is [`docs/assembly-generic-relationship-equations-mvp5.md`](docs/assembly-generic-relationship-equations-mvp5.md).
+The assembly sequence is implemented through Block 40. Block 41 — the general joint coordinate/limit Core model — is the next technical step. The canonical Block-40 contract is [`docs/assembly-joint-target-compatibility-mvp5.md`](docs/assembly-joint-target-compatibility-mvp5.md).
 
 ## Repository layout
 

@@ -4,16 +4,16 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 39
-current_block: 40
-current_boundary: Joint target compatibility and oriented Frame contract
-current_tag: "(assigned when Block 40 starts)"
+implemented_through: Block 40
+current_block: 41
+current_boundary: General joint coordinate/limit Core model
+current_tag: "[core][assembly-joint-coordinate-model]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
   mvp_3: "Parametric bolt circle pattern — implemented"
   mvp_4: "Assembly parameters and Project container — implemented"
-  mvp_5: "Assembly relationships, motion, hierarchy, analysis, exchange — Blocks 1–39 implemented, Blocks 40–47 planned"
+  mvp_5: "Assembly relationships, motion, hierarchy, analysis, exchange — Blocks 1–40 implemented, Blocks 41–47 planned"
   mvp_6: "Part Construction — Blocks 48–94 planned, starts after Block 47"
 ---
 
@@ -474,7 +474,21 @@ No new graph, transform authority, optimizer, finite-difference engine, endpoint
 [geometry][assembly-generic-relationships-diagnostics]
 ```
 
-## Blocks 40–47 — Planned joint continuation
+### Block 40 — Joint target compatibility and oriented Frame contract
+
+**Status:** Implemented
+**Canonical:** `docs/assembly-joint-target-compatibility-mvp5.md`
+
+Implemented derived joint compatibility with the initial deterministic rule `Revolute -> Frame / Frame`. Local and cross-hierarchy Revolute builders consume compatibility before projection and share the unchanged Frame-based residual path. Axis-only Revolute fails explicitly because Axis has no deterministic reference X direction. No joint persistence or JSON changed.
+
+**Focused tags:**
+
+```text
+[geometry][assembly-joint-target-compatibility]
+[geometry][assembly-cross-hierarchy-joint-target-compatibility]
+```
+
+### Blocks 41–47 — Planned joint continuation
 
 **Status:** Planned
 **Canonical:** roadmap `docs/assembly-general-geometric-target-roadmap.md`
@@ -482,7 +496,6 @@ No new graph, transform authority, optimizer, finite-difference engine, endpoint
 Mandatory order:
 
 ```text
-40 joint target compatibility + oriented Frame contract
 41 general joint coordinate/limit Core model
 42 general joint coordinate JSON/backward compatibility
 43 vector joint drives + holding/freshness/atomic application
@@ -530,17 +543,20 @@ After Block 94 the first Part Construction MVP is considered complete. That mean
 
 It does not mean SolidWorks/Inventor Part product parity. Production GUI modeling, Class-A surfacing, arbitrary NURBS control cages, variable-radius fillets, advanced topology healing, direct modeling, sheet metal, weldments, and specialized manufacturing feature systems remain later work.
 
-## Current next technical step — Block 40
+## Current next technical step — Block 41
 
 **Status:** Current
-**Primary boundary:** Joint target compatibility and the oriented `Frame` contract.
+**Primary boundary:** Persistent Core joint coordinate and limit state.
 
-Block 40 must migrate joint target compatibility to typed target-capability semantics while preserving current Revolute execution as:
+Block 41 must generalize local and Project-level joint coordinate state into stable family-defined typed slots equivalent to:
 
 ```text
-Frame <-> Frame
+semantic role
+Angular or Linear kind
+authored typed value
+optional typed lower/upper limits
 ```
 
-Freeze the oriented-frame requirements needed for deterministic signed twist. An Axis alone is insufficient because it does not provide the reference X direction required by the current Revolute residual semantics.
+Current Revolute public APIs and semantics must remain available through an explicit compatibility/adaptation boundary. Local and Project-level target identity scopes remain distinct.
 
-**Notes:** Block 40 adds no joint persistence change, no new joint family, and no arbitrary world-axis synthesis of a `Frame` from an `Axis`.
+**Notes:** Block 41 adds no JSON change and no vector motion solver; those are Blocks 42 and 43.

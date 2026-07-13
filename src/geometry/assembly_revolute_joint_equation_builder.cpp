@@ -3,6 +3,7 @@
 #include "assembly_revolute_joint_residual.hpp"
 
 #include "blcad/geometry/assembly_constraint_target_resolver.hpp"
+#include "blcad/geometry/assembly_hierarchy_transform_evaluator.hpp"
 #include "blcad/geometry/assembly_transform_evaluator.hpp"
 
 #include <string>
@@ -15,32 +16,34 @@ namespace {
   return Error::validation(std::move(object_id), std::move(message));
 }
 
-[[nodiscard]] Result<AssemblySpaceInsertConstraintTargetDescriptor>
-resolve_assembly_space_joint_target(const Project& project, const AssemblyConstraintTarget& target) {
-  const AssemblyConstraintTargetResolver target_resolver;
-  auto resolved_target = target_resolver.resolve_insert(project, target);
-  if (resolved_target.has_error()) {
-    return Result<AssemblySpaceInsertConstraintTargetDescriptor>::failure(resolved_target.error());
+[[nodiscard]] AssemblyFrameTargetDescriptor
+evaluate_frame_to_equation_space(const AssemblyResolvedGeometricTarget& target,
+                                 const AssemblyFrameTargetDescriptor& frame) {
+  if (target.coordinate_space == AssemblyGeometricTargetCoordinateSpace::RootAssembly) {
+    return frame;
   }
+  const AssemblyHierarchyTransformEvaluator evaluator;
+  return AssemblyFrameTargetDescriptor{
+      evaluator.evaluate_point(target.transforms_inner_to_outer, frame.origin),
+      evaluator.evaluate_vector(target.transforms_inner_to_outer, frame.x_axis),
+      evaluator.evaluate_vector(target.transforms_inner_to_outer, frame.y_axis),
+      evaluator.evaluate_vector(target.transforms_inner_to_outer, frame.z_axis)};
+}
 
-  const AssemblyTransformEvaluator transform_evaluator;
-  const ResolvedAssemblyInsertConstraintTarget& resolved = resolved_target.value();
-  return Result<AssemblySpaceInsertConstraintTargetDescriptor>::success(
-      AssemblySpaceInsertConstraintTargetDescriptor{
-          resolved.component_instance,
-          target.semantic_reference(),
-          resolved.source_feature,
-          resolved.source_profile,
-          transform_evaluator.evaluate_axis(resolved.component_transform, resolved.local_axis),
-          transform_evaluator.evaluate_plane(resolved.component_transform,
-                                             resolved.local_seating_plane)});
+[[nodiscard]] AssemblySpaceAxisDescriptor frame_axis(const AssemblyFrameTargetDescriptor& frame) {
+  return AssemblySpaceAxisDescriptor{frame.origin, frame.z_axis};
+}
+
+[[nodiscard]] AssemblySpacePlanarDescriptor
+frame_plane(const AssemblyFrameTargetDescriptor& frame) {
+  return AssemblySpacePlanarDescriptor{frame.origin, frame.x_axis, frame.y_axis, frame.z_axis};
 }
 
 } // namespace
 
 Result<AssemblyRevoluteJointEquationDescriptor>
 AssemblyRevoluteJointEquationBuilder::build(const Project& project, const AssemblyJoint& joint,
-                                             const Quantity& requested_coordinate) const {
+                                            const Quantity& requested_coordinate) const {
   if (joint.state() != AssemblyJointState::Active) {
     return Result<AssemblyRevoluteJointEquationDescriptor>::failure(validation_error(
         joint.id().value(), "revolute joint equation construction requires an active joint"));
@@ -50,25 +53,64 @@ AssemblyRevoluteJointEquationBuilder::build(const Project& project, const Assemb
         joint.id().value(), "revolute joint equation construction requires a Revolute joint"));
   }
   if (requested_coordinate.kind() != QuantityKind::AngleDeg) {
-    return Result<AssemblyRevoluteJointEquationDescriptor>::failure(validation_error(
-        joint.id().value(), "revolute joint drive coordinate must use degrees"));
+    return Result<AssemblyRevoluteJointEquationDescriptor>::failure(
+        validation_error(joint.id().value(), "revolute joint drive coordinate must use degrees"));
   }
 
-  auto target_a = resolve_assembly_space_joint_target(project, joint.target_a());
+  const AssemblyConstraintTargetResolver resolver;
+  auto target_a = resolver.resolve_geometric(project, joint.target_a());
   if (target_a.has_error()) {
     return Result<AssemblyRevoluteJointEquationDescriptor>::failure(target_a.error());
   }
-  auto target_b = resolve_assembly_space_joint_target(project, joint.target_b());
+  auto target_b = resolver.resolve_geometric(project, joint.target_b());
   if (target_b.has_error()) {
     return Result<AssemblyRevoluteJointEquationDescriptor>::failure(target_b.error());
   }
 
+  return build(joint.id(), joint.type(), target_a.value(), target_b.value(), requested_coordinate);
+}
+
+Result<AssemblyRevoluteJointEquationDescriptor> AssemblyRevoluteJointEquationBuilder::build(
+    AssemblyJointId joint, AssemblyJointType type, const AssemblyResolvedGeometricTarget& target_a,
+    const AssemblyResolvedGeometricTarget& target_b, const Quantity& requested_coordinate) const {
+  if (type != AssemblyJointType::Revolute) {
+    return Result<AssemblyRevoluteJointEquationDescriptor>::failure(validation_error(
+        joint.value(), "revolute joint equation construction requires a Revolute joint"));
+  }
+  if (requested_coordinate.kind() != QuantityKind::AngleDeg) {
+    return Result<AssemblyRevoluteJointEquationDescriptor>::failure(
+        validation_error(joint.value(), "revolute joint drive coordinate must use degrees"));
+  }
+
+  const AssemblyJointTargetCompatibilityResolver compatibility_resolver;
+  auto compatibility = compatibility_resolver.resolve(type, target_a, target_b);
+  if (compatibility.has_error()) {
+    return Result<AssemblyRevoluteJointEquationDescriptor>::failure(compatibility.error());
+  }
+  auto projected_a = project_frame(target_a);
+  if (projected_a.has_error()) {
+    return Result<AssemblyRevoluteJointEquationDescriptor>::failure(projected_a.error());
+  }
+  auto projected_b = project_frame(target_b);
+  if (projected_b.has_error()) {
+    return Result<AssemblyRevoluteJointEquationDescriptor>::failure(projected_b.error());
+  }
+
+  const AssemblyFrameTargetDescriptor frame_a =
+      evaluate_frame_to_equation_space(target_a, projected_a.value());
+  const AssemblyFrameTargetDescriptor frame_b =
+      evaluate_frame_to_equation_space(target_b, projected_b.value());
   return Result<AssemblyRevoluteJointEquationDescriptor>::success(
       AssemblyRevoluteJointEquationDescriptor{
-          joint.id(), target_a.value(), target_b.value(), requested_coordinate.degrees(),
-          detail::build_revolute_joint_residual(
-              target_a.value().axis, target_a.value().seating_plane, target_b.value().axis,
-              target_b.value().seating_plane, requested_coordinate.degrees())});
+          joint, compatibility.value(),
+          AssemblyRevoluteJointTargetDescriptor{target_a, compatibility.value().target_a_capability,
+                                                frame_a},
+          AssemblyRevoluteJointTargetDescriptor{target_b, compatibility.value().target_b_capability,
+                                                frame_b},
+          requested_coordinate.degrees(),
+          detail::build_revolute_joint_residual(frame_axis(frame_a), frame_plane(frame_a),
+                                                frame_axis(frame_b), frame_plane(frame_b),
+                                                requested_coordinate.degrees())});
 }
 
 } // namespace blcad::geometry

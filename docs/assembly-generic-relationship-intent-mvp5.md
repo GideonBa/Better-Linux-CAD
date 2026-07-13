@@ -271,4 +271,4 @@ Block 39 is implemented in `docs/assembly-generic-relationship-equations-mvp5.md
 
 The three persistent families now have capability-driven equations and enter existing local/cross-hierarchy solve and motion graphs. Shared residual scaling, central finite differences, Gauss-Newton solving, freshness, atomic application, and Jacobian-rank diagnostics are reused without parallel infrastructure.
 
-The next technical step is Block 40: joint target compatibility and the oriented `Frame` contract.
+Block 40 joint target compatibility and the oriented `Frame` contract are implemented in `docs/assembly-joint-target-compatibility-mvp5.md`. The next technical step is Block 41: general joint coordinate/limit Core model.

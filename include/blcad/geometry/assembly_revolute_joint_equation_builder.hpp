@@ -4,7 +4,8 @@
 #include "blcad/core/project.hpp"
 #include "blcad/core/quantity.hpp"
 #include "blcad/core/result.hpp"
-#include "blcad/geometry/assembly_insert_constraint_equation_builder.hpp"
+#include "blcad/geometry/assembly_geometric_target.hpp"
+#include "blcad/geometry/assembly_joint_target_compatibility.hpp"
 
 namespace blcad::geometry {
 
@@ -31,10 +32,20 @@ struct RevoluteJointResidualDescriptor {
                          const RevoluteJointResidualDescriptor&) = default;
 };
 
+struct AssemblyRevoluteJointTargetDescriptor {
+  AssemblyResolvedGeometricTarget target;
+  AssemblyGeometricTargetCapability selected_capability = AssemblyGeometricTargetCapability::Frame;
+  AssemblyFrameTargetDescriptor equation_space_frame;
+
+  friend bool operator==(const AssemblyRevoluteJointTargetDescriptor&,
+                         const AssemblyRevoluteJointTargetDescriptor&) = default;
+};
+
 struct AssemblyRevoluteJointEquationDescriptor {
   AssemblyJointId joint;
-  AssemblySpaceInsertConstraintTargetDescriptor target_a;
-  AssemblySpaceInsertConstraintTargetDescriptor target_b;
+  AssemblyJointTargetCompatibility compatibility;
+  AssemblyRevoluteJointTargetDescriptor target_a;
+  AssemblyRevoluteJointTargetDescriptor target_b;
   double requested_coordinate_deg = 0.0;
   RevoluteJointResidualDescriptor residual;
 
@@ -46,6 +57,12 @@ class AssemblyRevoluteJointEquationBuilder {
 public:
   [[nodiscard]] Result<AssemblyRevoluteJointEquationDescriptor>
   build(const Project& project, const AssemblyJoint& joint,
+        const Quantity& requested_coordinate) const;
+
+  [[nodiscard]] Result<AssemblyRevoluteJointEquationDescriptor>
+  build(AssemblyJointId joint, AssemblyJointType type,
+        const AssemblyResolvedGeometricTarget& target_a,
+        const AssemblyResolvedGeometricTarget& target_b,
         const Quantity& requested_coordinate) const;
 };
 

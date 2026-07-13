@@ -363,8 +363,8 @@ The complete existing Geometry suite remains the regression proof for historical
 
 ## Handoff
 
-The next technical step is Block 40: joint target compatibility and the oriented Frame contract.
+Block 40 joint target compatibility and the oriented Frame contract are implemented in `docs/assembly-joint-target-compatibility-mvp5.md`.
 
-Block 40 must migrate joint target compatibility onto typed target capabilities while preserving current Revolute `Frame <-> Frame` execution. Axis alone remains insufficient for deterministic signed twist because it has no reference X direction.
+Current Revolute remains `Frame <-> Frame`; Axis alone remains incompatible because it has no deterministic reference X direction.
 
-Block 40 must not change joint persistence, introduce a new joint family, or synthesize a Frame from Axis using an arbitrary world axis.
+The next technical step is Block 41: general joint coordinate/limit Core model.
