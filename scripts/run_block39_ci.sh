@@ -21,7 +21,12 @@ trap report_failure EXIT
 
 if [[ ! -f debug/block39-run23.log ]]; then
   mkdir -p debug
-  gh api "repos/${GITHUB_REPOSITORY}/actions/jobs/86793699037/logs" > debug/block39-run23.log
+  curl --fail --location --silent --show-error \
+    -H "Authorization: Bearer ${GH_TOKEN}" \
+    -H "Accept: application/vnd.github+json" \
+    -H "X-GitHub-Api-Version: 2022-11-28" \
+    "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/jobs/86793699037/logs" \
+    > debug/block39-run23.log
   git config user.name "github-actions[bot]"
   git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
   git add debug/block39-run23.log
