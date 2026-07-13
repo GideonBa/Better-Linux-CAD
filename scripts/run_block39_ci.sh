@@ -19,6 +19,45 @@ report_failure() {
 }
 trap report_failure EXIT
 
+python3 - <<'PY'
+from pathlib import Path
+
+path = Path("scripts/apply_block39.py")
+text = path.read_text(encoding="utf-8")
+start = text.index(
+    'replace_exact(\n    "src/geometry/assembly_constraint_numeric_system.cpp",\n'
+    "    '''Result<std::size_t> append_scaled_residuals(const InsertResidualDescriptor& residual,"
+)
+end = text.index(
+    "\n# ---------------------------------------------------------------------------\n"
+    "# Cross-hierarchy equation descriptor and builder integration.",
+    start,
+)
+replacement = r'''replace_exact(
+    "src/geometry/assembly_constraint_numeric_system.cpp",
+    '''Result<std::size_t> append_scaled_residuals(const InsertResidualDescriptor& residual,
+                                             double length_residual_scale_mm,
+                                             NumericVector& residuals) {
+  return append_scaled_residual(residual, length_residual_scale_mm, residuals);
+}
+''',
+    '''Result<std::size_t> append_scaled_residuals(const InsertResidualDescriptor& residual,
+                                             double length_residual_scale_mm,
+                                             NumericVector& residuals) {
+  return append_scaled_residual(residual, length_residual_scale_mm, residuals);
+}
+
+Result<std::size_t> append_scaled_residuals(
+    const AssemblyGenericRelationshipResidualDescriptor& residual,
+    double length_residual_scale_mm, NumericVector& residuals) {
+  return append_scaled_residual(residual, length_residual_scale_mm, residuals);
+}
+''',
+)
+'''
+path.write_text(text[:start] + replacement + text[end:], encoding="utf-8")
+PY
+
 python3 scripts/apply_block39.py
 python3 scripts/normalize_block39.py
 
