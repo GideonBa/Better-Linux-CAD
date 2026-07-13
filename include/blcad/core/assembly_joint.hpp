@@ -12,7 +12,7 @@
 
 namespace blcad {
 
-enum class AssemblyJointType { Revolute, Prismatic, Cylindrical, Planar };
+enum class AssemblyJointType { Revolute, Prismatic, Cylindrical, Planar, Spherical };
 [[nodiscard]] std::string_view to_string(AssemblyJointType type) noexcept;
 
 enum class AssemblyJointState { Active, Inactive };

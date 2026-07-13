@@ -51,5 +51,5 @@ Revolute-only adapters.
 
 ## Block 46 handoff
 
-Block 46 Planar is implemented in `docs/assembly-planar-joint-mvp5.md`. The next technical step is
-Block 47 Ball/Spherical.
+Block 46 Planar and Block 47 passive Spherical are implemented in their canonical documents. The
+next technical step is Block 48.

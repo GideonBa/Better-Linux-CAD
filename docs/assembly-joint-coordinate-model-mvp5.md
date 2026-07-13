@@ -109,5 +109,6 @@ Block 42 is implemented in `docs/assembly-joint-coordinate-json-mvp5.md`.
 
 Slots now serialize additively for local and Project-level joints with canonical role spellings, typed units, deterministic family order, historical scalar Revolute loading, a dual compatibility writer, and explicit malformed-role failures.
 
-Block 43 vector motion drives and Blocks 44–46 Prismatic/Cylindrical/Planar execution are
-implemented in their canonical documents. The next technical step is Block 47 Ball/Spherical.
+Block 43 vector motion drives, Blocks 44–46 Prismatic/Cylindrical/Planar execution, and Block 47
+passive Spherical with an empty family slot signature are implemented in their canonical documents.
+The next technical step is Block 48.

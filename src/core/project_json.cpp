@@ -112,6 +112,8 @@ constexpr int k_version = 1;
     return Result<AssemblyJointType>::success(AssemblyJointType::Cylindrical);
   if (text == "planar")
     return Result<AssemblyJointType>::success(AssemblyJointType::Planar);
+  if (text == "spherical")
+    return Result<AssemblyJointType>::success(AssemblyJointType::Spherical);
   return Result<AssemblyJointType>::failure(
       json_error("unsupported cross-hierarchy assembly joint type"));
 }

@@ -367,4 +367,4 @@ Focused Blocks 36–40 tests:
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-cross-hierarchy-joint-target-compatibility]"
 ```
 
-Blocks 44–46 Prismatic, Cylindrical, and Planar are implemented. The immediate next step is Block 47 Ball/Spherical. Block 43 role-addressed drives, authored holding, complete coordinate-slot freshness, and atomic application are implemented for both local and Project-level motion. Exact sequencing is maintained in `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md` and detailed target planning in `docs/assembly-general-geometric-target-roadmap.md`.
+Blocks 44–47 Prismatic, Cylindrical, Planar, and passive Spherical are implemented. The immediate next step is Block 48 Body identity and `PartDocument` ownership. Block 43 role-addressed drives, authored holding, complete coordinate-slot freshness, and atomic application remain authoritative for local and Project-level driven motion; Spherical participates passively and rejects selection. Exact sequencing is maintained in `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md` and `docs/part-construction-sequence-mvp6.md`.

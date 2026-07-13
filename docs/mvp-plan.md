@@ -4,17 +4,17 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 46
-current_block: 44
-current_boundary: Prismatic joint family across Core, JSON, Geometry, and motion
-current_tag: "[core][assembly-prismatic-joint]"
+implemented_through: Block 47
+current_block: 48
+current_boundary: Body identity and PartDocument ownership
+current_tag: "[core][part-body]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
   mvp_3: "Parametric bolt circle pattern — implemented"
   mvp_4: "Assembly parameters and Project container — implemented"
-  mvp_5: "Assembly relationships, motion, hierarchy, analysis, exchange — Blocks 1–43 implemented, Blocks 44–47 planned"
-  mvp_6: "Part Construction — Blocks 48–94 planned, starts after Block 47"
+  mvp_5: "Assembly relationships, motion, hierarchy, analysis, exchange — Blocks 1–47 implemented"
+  mvp_6: "Part Construction — Blocks 48–94 planned, Block 48 next"
 ---
 
 # MVP Plan
@@ -531,25 +531,30 @@ Both local and Project-level motion solvers now accept `AssemblyJointDrive` with
 [geometry][assembly-vector-joint-drive-application]
 ```
 
-### Block 47 — Planned joint continuation
+### Block 47 — Ball/Spherical joint family
 
-**Status:** Planned
-**Canonical:** roadmap `docs/assembly-general-geometric-target-roadmap.md`
+**Status:** Implemented
+**Canonical:** `docs/assembly-spherical-joint-mvp5.md`
 
-Mandatory order:
+Local and Project-level `Spherical` intent persists with canonical `"spherical"` spelling and an
+empty `coordinates[]` list. Capability compatibility requires `Point <-> Point`; the shared local
+and root-space numeric closures contribute the three ordered components of `point_b - point_a`.
+The passive family participates whenever another joint drives its connected group, but both public
+motion solvers reject Spherical as the selected drive.
 
 ```text
-47 Ball/Spherical joint
+[core][assembly-spherical-joint]
+[core][assembly-cross-hierarchy-spherical-joint]
+[geometry][assembly-spherical-joint]
+[geometry][assembly-cross-hierarchy-spherical-joint]
 ```
-
-**Notes:** Do not merge these blocks.
 
 ## MVP 6 — Planned Part Construction MVP after Block 47
 
 **Status:** Planned
 **Canonical:** sequence `docs/part-construction-sequence-mvp6.md`
 
-Block 48 starts only after the Assembly MVP reaches Block 47.
+Block 47 is complete. Block 48 is the current next technical step.
 
 Mandatory Part Construction phase order:
 
@@ -613,7 +618,14 @@ Block 46 implements bounded Linear `translation_u`, Linear `translation_v`, and 
 `rotation_normal` coordinates on the shared Frame/Frame, vector-drive, graph, solver, freshness,
 and atomic application paths. Canonical contract: `docs/assembly-planar-joint-mvp5.md`.
 
-## Current next technical step — Block 47
+## Block 47 — Ball/Spherical joint family — Implemented
 
-Implement the passive Ball/Spherical family with Point/Point center coincidence and explicit
-selected-drive rejection unless a singularity-aware orientation representation is first frozen.
+Block 47 implements passive local and Project-level Spherical intent, canonical JSON with no
+coordinate slots, `Point <-> Point` compatibility, three-row center coincidence, shared motion
+closure, freshness reuse, and explicit selected-drive rejection. Canonical contract:
+`docs/assembly-spherical-joint-mvp5.md`.
+
+## Current next technical step — Block 48
+
+Begin Body identity and `PartDocument` ownership according to
+`docs/part-construction-sequence-mvp6.md`.

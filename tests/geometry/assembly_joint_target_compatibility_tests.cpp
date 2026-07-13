@@ -1,9 +1,12 @@
 #include "assembly_cross_hierarchy_test_support.hpp"
 
+#include "blcad/core/assembly_reference_target.hpp"
 #include "blcad/geometry/assembly_hierarchy_revolute_joint_equation_builder.hpp"
+#include "blcad/geometry/assembly_hierarchy_spherical_joint_equation_builder.hpp"
 #include "blcad/geometry/assembly_joint_target_compatibility.hpp"
 #include "blcad/geometry/assembly_prismatic_joint_equation_builder.hpp"
 #include "blcad/geometry/assembly_revolute_joint_equation_builder.hpp"
+#include "blcad/geometry/assembly_spherical_joint_equation_builder.hpp"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -19,6 +22,12 @@ using Catch::Approx;
 namespace {
 
 constexpr const char* kCompatibilityObjectId = "geometry.assembly_joint_target_compatibility";
+
+template <typename Id> std::string reference_spelling(Id id) {
+  auto spelling = make_assembly_reference_target_spelling(AssemblyReferenceTargetIdentity{id});
+  REQUIRE(spelling);
+  return spelling.value();
+}
 
 Quantity angle(double degrees, const char* id) {
   auto value = Quantity::angle_deg(degrees, id);
@@ -54,6 +63,19 @@ AssemblyResolvedGeometricTarget axis_target(const char* reference) {
       AssemblyCylindricalSurfaceTargetDescriptor{Point3{}, Vector3{0.0, 0.0, 1.0}, 2.0},
       assembly_geometric_target_capabilities(
           AssemblyGeometricTargetSourceKind::GeneratedCylindricalFace),
+      AssemblyGeometricTargetCoordinateSpace::RootAssembly,
+      {identity_rigid_transform()}};
+}
+
+AssemblyResolvedGeometricTarget point_target(const char* reference, Point3 point) {
+  return AssemblyResolvedGeometricTarget{
+      AssemblyHierarchyGeometricTargetEndpointIdentity{
+          {}, ComponentInstanceId("component.synthetic"), reference},
+      AssemblyGeometricTargetSourceKind::ConstructionPoint,
+      AssemblyGeometricTargetSourceMetadata{DocumentId("part.synthetic"), std::nullopt,
+                                            std::nullopt, std::nullopt, std::nullopt, std::nullopt},
+      AssemblyPointTargetDescriptor{point},
+      assembly_geometric_target_capabilities(AssemblyGeometricTargetSourceKind::ConstructionPoint),
       AssemblyGeometricTargetCoordinateSpace::RootAssembly,
       {identity_rigid_transform()}};
 }
@@ -141,6 +163,48 @@ TEST_CASE("Joint target compatibility freezes oriented Frame requirements",
   REQUIRE(axis_axis.has_error());
   CHECK(axis_axis.error().object_id() == kCompatibilityObjectId);
   CHECK(axis_axis.error().message().find("reference X direction") != std::string::npos);
+}
+
+TEST_CASE("Spherical equations require Point targets and expose center coincidence residuals",
+          "[geometry][assembly-spherical-joint]") {
+  const AssemblyJointTargetCompatibilityResolver compatibility;
+  auto compatible = compatibility.resolve(AssemblyJointType::Spherical,
+                                          point_target("point.a", Point3{1.0, 2.0, 3.0}),
+                                          point_target("point.b", Point3{4.0, 6.0, 8.0}));
+  REQUIRE(compatible);
+  CHECK(compatible.value().target_a_capability == AssemblyGeometricTargetCapability::Point);
+  CHECK(compatible.value().target_b_capability == AssemblyGeometricTargetCapability::Point);
+  auto incompatible = compatibility.resolve(AssemblyJointType::Spherical, frame_target("frame.a"),
+                                            frame_target("frame.b"));
+  REQUIRE(incompatible.has_error());
+  CHECK(incompatible.error().message().find("Point/Point") != std::string::npos);
+
+  const AssemblySphericalJointEquationBuilder builder;
+  auto equation = builder.build(AssemblyJointId("joint.spherical"), AssemblyJointType::Spherical,
+                                point_target("point.a", Point3{1.0, 2.0, 3.0}),
+                                point_target("point.b", Point3{4.0, 6.0, 8.0}));
+  REQUIRE(equation);
+  CHECK(equation.value().residual.center_offset_mm == Vector3{3.0, 4.0, 5.0});
+  CHECK(equation.value().target_a.equation_space_point == Point3{1.0, 2.0, 3.0});
+  CHECK(equation.value().target_b.equation_space_point == Point3{4.0, 6.0, 8.0});
+}
+
+TEST_CASE("Cross-hierarchy Spherical equations evaluate Point centers in root space",
+          "[geometry][assembly-cross-hierarchy-spherical-joint]") {
+  Project project = hierarchy_project();
+  const std::string point = reference_spelling(ConstructionPointId("construction_point.anchor"));
+  auto joint = AssemblyHierarchyJoint::create(
+      AssemblyJointId("joint.cross.spherical"), "CrossSpherical", AssemblyJointType::Spherical,
+      ts::endpoint({}, "component.root", point.c_str()),
+      ts::endpoint({"subassembly.left"}, "component.child", point.c_str()),
+      AssemblyJointState::Active, std::vector<AssemblyJointCoordinateSlot>{});
+  REQUIRE(joint);
+  const AssemblyHierarchySphericalJointEquationBuilder builder;
+  auto equation = builder.build(project, joint.value());
+  REQUIRE(equation);
+  CHECK(equation.value().target_a.selected_capability == AssemblyGeometricTargetCapability::Point);
+  CHECK(equation.value().target_b.selected_capability == AssemblyGeometricTargetCapability::Point);
+  CHECK(equation.value().residual.center_offset_mm == Vector3{});
 }
 
 TEST_CASE("Prismatic Frame equations preserve orientation and drive signed axial translation",

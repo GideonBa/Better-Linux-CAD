@@ -40,6 +40,11 @@ inline PartDocument solver_part(Point3 reference_anchor = Point3{1.0, 2.0, 3.0},
                                                    "Anchor", reference_anchor);
   REQUIRE(anchor);
   REQUIRE(part.value().add_construction_point(anchor.value()));
+  auto spherical_center =
+      ConstructionPoint::create_explicit(ConstructionPointId("construction_point.spherical_center"),
+                                         "SphericalCenter", Point3{4.0, -6.0, 0.0});
+  REQUIRE(spherical_center);
+  REQUIRE(part.value().add_construction_point(spherical_center.value()));
 
   auto line =
       ConstructionLine::create_explicit(ConstructionLineId("construction_line.axis_y"), "AxisY",

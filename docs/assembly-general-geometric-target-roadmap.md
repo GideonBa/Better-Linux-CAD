@@ -1,6 +1,6 @@
 # General Assembly Geometric Target and Relationship Roadmap
 
-Status: Blocks 31–46 are implemented. Block 47 is the current next technical step and remains planned headless architecture.
+Status: Blocks 31–47 are implemented. The Assembly MVP handoff is complete; Block 48 is the current next technical step.
 
 This document is the active status and sequencing authority for the expansion from the current assembly target layer to semantic reference geometry, stable generated topology targets, generic geometric relationships, and richer motion-joint families.
 
@@ -15,6 +15,7 @@ Implemented contracts are canonical in:
 - `docs/assembly-joint-coordinate-model-mvp5.md`
 - `docs/assembly-joint-coordinate-json-mvp5.md`
 - `docs/assembly-vector-joint-drive-mvp5.md`
+- `docs/assembly-spherical-joint-mvp5.md`
 
 The complete pre-implementation planning detail for Blocks 32–47 is preserved byte-for-byte in:
 
@@ -571,17 +572,22 @@ Planar uses bounded Linear `translation_u`, Linear `translation_v`, and Angular
 `rotation_normal` coordinates on oriented `Frame <-> Frame` endpoints and the shared local/root
 motion, holding, freshness, and atomic application paths.
 
-## Block 47 — Remaining richer joint family
+## Block 47 — Ball/Spherical joint family — Implemented
 
-One family per block:
+Canonical contract: `docs/assembly-spherical-joint-mvp5.md`.
 
 ```text
-47 Ball/Spherical
-  Point <-> Point
-  preferred first seed: passive center coincidence
+Spherical
+  persistent spelling: spherical
+  coordinates: []
+  compatibility: Point <-> Point
+  residual: point_b - point_a
 ```
 
-A driven spherical orientation is not represented by arbitrary Euler angles without a separately frozen singularity/order contract.
+The passive family participates in local and cross-hierarchy motion closure while a different joint
+is selected. Selecting Spherical itself as a drive fails explicitly. A driven spherical orientation
+is not represented by arbitrary Euler angles without a separately frozen singularity/order
+contract.
 
 ## Planned generic relationship compatibility target
 
@@ -602,7 +608,7 @@ This table is planned future compatibility, not a claim that those combinations 
 
 ## GUI selection boundary
 
-Blocks 31–47 remain headless semantic model/query/equation/motion work.
+Blocks 31–47 are complete headless semantic model/query/equation/motion work.
 
 A future picker consumes:
 
@@ -638,7 +644,8 @@ exchange products
 posed geometry/contact records/sweep analyses
 ```
 
-## Current next technical step — Block 47
+## Current next technical step — Block 48
 
-Block 46 is implemented in `docs/assembly-planar-joint-mvp5.md`. Implement Block 47 Ball/Spherical
-only with the passive Point/Point seed unless a singularity-aware orientation contract is frozen.
+Block 47 is implemented in `docs/assembly-spherical-joint-mvp5.md` and completes the Assembly MVP
+handoff. Begin Body identity and `PartDocument` ownership according to
+`docs/part-construction-sequence-mvp6.md`.

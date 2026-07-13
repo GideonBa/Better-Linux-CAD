@@ -221,11 +221,18 @@ append_joint_drive_residuals(const Project& project, const AssemblyNumericJointD
       return Result<std::size_t>::failure(equation.error());
     return append_scaled_residuals(equation.value().residual, length_residual_scale_mm, residuals);
   }
-  const AssemblyPlanarJointEquationBuilder builder;
-  auto equation =
-      builder.build(project, *joint, *coordinate(AssemblyJointCoordinateRole::TranslationU),
-                    *coordinate(AssemblyJointCoordinateRole::TranslationV),
-                    *coordinate(AssemblyJointCoordinateRole::RotationNormal));
+  if (joint->type() == AssemblyJointType::Planar) {
+    const AssemblyPlanarJointEquationBuilder builder;
+    auto equation =
+        builder.build(project, *joint, *coordinate(AssemblyJointCoordinateRole::TranslationU),
+                      *coordinate(AssemblyJointCoordinateRole::TranslationV),
+                      *coordinate(AssemblyJointCoordinateRole::RotationNormal));
+    if (equation.has_error())
+      return Result<std::size_t>::failure(equation.error());
+    return append_scaled_residuals(equation.value().residual, length_residual_scale_mm, residuals);
+  }
+  const AssemblySphericalJointEquationBuilder builder;
+  auto equation = builder.build(project, *joint);
   if (equation.has_error())
     return Result<std::size_t>::failure(equation.error());
   return append_scaled_residuals(equation.value().residual, length_residual_scale_mm, residuals);
@@ -341,6 +348,15 @@ Result<std::size_t> append_scaled_residuals(const PlanarJointResidualDescriptor&
   residuals.push_back(residual.rotation_normal_sine);
   residuals.push_back(residual.rotation_normal_cosine);
   return Result<std::size_t>::success(8U);
+}
+
+Result<std::size_t> append_scaled_residuals(const SphericalJointResidualDescriptor& residual,
+                                            double length_residual_scale_mm,
+                                            NumericVector& residuals) {
+  residuals.push_back(residual.center_offset_mm.x / length_residual_scale_mm);
+  residuals.push_back(residual.center_offset_mm.y / length_residual_scale_mm);
+  residuals.push_back(residual.center_offset_mm.z / length_residual_scale_mm);
+  return Result<std::size_t>::success(3U);
 }
 
 Result<NumericVector> evaluate_residuals(const Project& project,

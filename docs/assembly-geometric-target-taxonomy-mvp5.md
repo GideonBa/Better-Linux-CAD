@@ -586,8 +586,8 @@ Canonical contracts:
 
 ## Block 40 — Joint target compatibility and oriented Frame — Implemented
 
-`AssemblyJointTargetCompatibilityResolver` selects the typed `Frame / Frame` contract before local or cross-hierarchy Revolute and Prismatic projection. `.seat` remains the current deterministic Frame source. Axis-only oriented joints fail closed because Axis supplies no reference X direction, and Geometry never synthesizes one from an arbitrary world axis. Canonical contracts: `docs/assembly-joint-target-compatibility-mvp5.md` and `docs/assembly-prismatic-joint-mvp5.md`.
+`AssemblyJointTargetCompatibilityResolver` selects the typed `Frame / Frame` contract before local or cross-hierarchy Revolute, Prismatic, Cylindrical, and Planar projection. `.seat` remains the current deterministic Frame source. Axis-only oriented joints fail closed because Axis supplies no reference X direction, and Geometry never synthesizes one from an arbitrary world axis. Passive Spherical selects `Point / Point`; `.seat` is not implicitly projected to Point. Canonical contracts: `docs/assembly-joint-target-compatibility-mvp5.md` and the family documents.
 
 ## Next technical step — Block 44
 
-Blocks 41–43 typed coordinates, additive compatible JSON, and shared vector drives are implemented in `docs/assembly-joint-coordinate-model-mvp5.md`, `docs/assembly-joint-coordinate-json-mvp5.md`, and `docs/assembly-vector-joint-drive-mvp5.md`. Blocks 44–46 Prismatic, Cylindrical, and Planar are implemented in their canonical documents. The next technical step is Block 47 Ball/Spherical.
+Blocks 41–43 typed coordinates, additive compatible JSON, and shared vector drives are implemented in `docs/assembly-joint-coordinate-model-mvp5.md`, `docs/assembly-joint-coordinate-json-mvp5.md`, and `docs/assembly-vector-joint-drive-mvp5.md`. Blocks 44–47 Prismatic, Cylindrical, Planar, and passive Spherical are implemented in their canonical documents. The next technical step is Block 48.

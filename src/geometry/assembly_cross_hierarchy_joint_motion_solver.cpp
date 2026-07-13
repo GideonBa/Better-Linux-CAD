@@ -397,6 +397,10 @@ AssemblyCrossHierarchyJointMotionSolver::move(const Project& project, AssemblyJo
     return Result<AssemblyCrossHierarchyJointMotionResult>::failure(
         validation_error(joint_id.value(), "cross-hierarchy motion joint must exist in project"));
   }
+  if (selected_joint->type() == AssemblyJointType::Spherical) {
+    return Result<AssemblyCrossHierarchyJointMotionResult>::failure(validation_error(
+        joint_id.value(), "passive cross-hierarchy Spherical joint cannot be selected as a drive"));
+  }
   if (selected_joint->state() != AssemblyJointState::Active) {
     return Result<AssemblyCrossHierarchyJointMotionResult>::failure(validation_error(
         joint_id.value(), "cross-hierarchy " + std::string(to_string(selected_joint->type())) +

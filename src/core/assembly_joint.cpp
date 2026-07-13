@@ -156,6 +156,12 @@ validate_family_coordinates(const std::string& object_id, AssemblyJointType type
     }
     return Result<AssemblyJointLimits>::success({});
   }
+  case AssemblyJointType::Spherical:
+    if (!slots.empty()) {
+      return Result<AssemblyJointLimits>::failure(Error::validation(
+          object_id, "passive spherical joint requires an empty coordinate slot list"));
+    }
+    return Result<AssemblyJointLimits>::success({});
   }
   return Result<AssemblyJointLimits>::failure(
       Error::validation(object_id, "unsupported assembly joint family"));
@@ -182,6 +188,8 @@ std::string_view to_string(AssemblyJointType type) noexcept {
     return "cylindrical";
   case AssemblyJointType::Planar:
     return "planar";
+  case AssemblyJointType::Spherical:
+    return "spherical";
   }
   return "revolute";
 }

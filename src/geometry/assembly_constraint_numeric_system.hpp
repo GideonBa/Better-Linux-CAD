@@ -14,6 +14,7 @@
 #include "blcad/geometry/assembly_planar_joint_equation_builder.hpp"
 #include "blcad/geometry/assembly_prismatic_joint_equation_builder.hpp"
 #include "blcad/geometry/assembly_revolute_joint_equation_builder.hpp"
+#include "blcad/geometry/assembly_spherical_joint_equation_builder.hpp"
 
 #include <cstddef>
 #include <functional>
@@ -81,6 +82,9 @@ append_scaled_residuals(const CylindricalJointResidualDescriptor& residual,
                         double length_residual_scale_mm, NumericVector& residuals);
 [[nodiscard]] Result<std::size_t>
 append_scaled_residuals(const PlanarJointResidualDescriptor& residual,
+                        double length_residual_scale_mm, NumericVector& residuals);
+[[nodiscard]] Result<std::size_t>
+append_scaled_residuals(const SphericalJointResidualDescriptor& residual,
                         double length_residual_scale_mm, NumericVector& residuals);
 
 [[nodiscard]] Result<NumericVector>

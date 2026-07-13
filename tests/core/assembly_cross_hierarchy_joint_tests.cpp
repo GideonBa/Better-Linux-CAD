@@ -268,6 +268,37 @@ TEST_CASE("Cross-hierarchy Revolute Project JSON is additive and exact",
   CHECK(deserialize_project_from_json(legacy_json.dump()).has_error());
 }
 
+TEST_CASE("Cross-hierarchy Spherical Project JSON preserves passive intent",
+          "[core][assembly-cross-hierarchy-spherical-joint]") {
+  Project project = base_project();
+  auto joint = AssemblyHierarchyJoint::create(
+      AssemblyJointId("joint.cross.spherical"), "CrossSpherical", AssemblyJointType::Spherical,
+      endpoint({}, "component.root", "ref:construction_point:construction_point.anchor"),
+      endpoint({"subassembly.left"}, "component.child",
+               "ref:construction_point:construction_point.anchor"),
+      AssemblyJointState::Active, std::vector<AssemblyJointCoordinateSlot>{});
+  REQUIRE(joint);
+  REQUIRE(project.add_cross_hierarchy_joint(joint.value()));
+
+  auto serialized = serialize_project_to_json(project);
+  REQUIRE(serialized);
+  const auto json = nlohmann::json::parse(serialized.value());
+  const auto& record = json.at("cross_hierarchy_joints").front();
+  CHECK(record.at("type") == "spherical");
+  CHECK(record.at("coordinates").empty());
+  CHECK_FALSE(record.contains("limits"));
+  CHECK_FALSE(record.contains("coordinate"));
+
+  auto restored = deserialize_project_from_json(serialized.value());
+  REQUIRE(restored);
+  const auto* restored_joint =
+      restored.value().find_cross_hierarchy_joint(AssemblyJointId("joint.cross.spherical"));
+  REQUIRE(restored_joint);
+  CHECK(restored_joint->type() == AssemblyJointType::Spherical);
+  CHECK(restored_joint->coordinate_slots().empty());
+  CHECK(restored_joint->target_b().occurrence_path().size() == 1U);
+}
+
 TEST_CASE("Cross-hierarchy joint coordinate JSON matches the local compatibility contract",
           "[core][assembly-cross-hierarchy-joint-coordinate-json]") {
   Project project = base_project();

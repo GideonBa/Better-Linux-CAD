@@ -46,8 +46,8 @@ requested selected roles atomically.
 - `[geometry][assembly-planar-joint]`
 - `[geometry][assembly-cross-hierarchy-planar-motion]`
 
-## Block 47 handoff
+## Block 47 handoff — completed
 
-The next technical step is Block 47 Ball/Spherical. Its preferred first seed is passive
-Point/Point center coincidence with explicit rejection as a selected driven joint until a
-singularity-aware orientation-coordinate contract exists.
+Block 47 Ball/Spherical is implemented in `docs/assembly-spherical-joint-mvp5.md` as passive
+Point/Point center coincidence with explicit selected-drive rejection. Block 48 is now the next
+technical step.

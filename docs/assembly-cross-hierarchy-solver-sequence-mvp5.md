@@ -1,6 +1,6 @@
 # Cross-Hierarchy Assembly Relationship Sequence MVP-5
 
-Status: Blocks 23–46 are implemented. Block 47 is the current next technical step and final explicit richer-joint continuation.
+Status: Blocks 23–47 are implemented. The Assembly MVP sequence is complete; Block 48 is the current next technical step.
 
 This document is the canonical numbered handoff sequence for cross-document assembly intent, solving, motion, exchange, posed analysis, and general geometric target architecture.
 
@@ -22,6 +22,7 @@ Implemented contracts are canonical in:
 - `docs/assembly-joint-target-compatibility-mvp5.md`
 - `docs/assembly-joint-coordinate-model-mvp5.md`
 - `docs/assembly-joint-coordinate-json-mvp5.md`
+- `docs/assembly-spherical-joint-mvp5.md`
 - `docs/assembly-vector-joint-drive-mvp5.md`
 - `docs/file-format.md`
 
@@ -531,13 +532,15 @@ Canonical contracts: `docs/assembly-prismatic-joint-mvp5.md` and
 
 Canonical contract: `docs/assembly-planar-joint-mvp5.md`.
 
-## Block 47 — Remaining richer joint family
+## Block 47 — Ball/Spherical joint family — Implemented
 
 ```text
-47 Ball/Spherical
+Spherical -> passive Point/Point center coincidence
 ```
 
-Exact target compatibility, coordinate roles, limits, residual order, holding-drive behavior, motion integration, freshness, and application semantics remain canonical in `docs/assembly-general-geometric-target-roadmap.md` until each block is implemented.
+Canonical contract: `docs/assembly-spherical-joint-mvp5.md`. Spherical has no coordinate slots,
+contributes three center-offset rows to local and cross-hierarchy motion closures, reuses existing
+freshness/application authority, and cannot be selected as a drive.
 
 ## Persistence rule
 
@@ -548,7 +551,7 @@ Current persistent assembly intent includes:
 ```text
 component placement/state
 local geometric relationships including persistent Coincident/Parallel/Perpendicular intent
-local Revolute, Prismatic, Cylindrical, and Planar joint coordinate intent
+local Revolute, Prismatic, Cylindrical, Planar, and passive Spherical joint intent
 Project-owned child assemblies
 SubassemblyInstance placement/state
 cross_hierarchy_constraints[]
@@ -573,10 +576,12 @@ XDE labels and STEP entities
 posed shapes/contact records/sweep analyses
 ```
 
-## Block 46 — Planar joint family — Implemented
+## Blocks 46–47 — Final Assembly joint families — Implemented
 
 Block 46 is implemented in `docs/assembly-planar-joint-mvp5.md`: three-coordinate local and
 Project-level Planar intent, JSON, Frame/Frame equations, and shared vector-drive motion.
 
-The current next technical step is Block 47 Ball/Spherical. Blocks 40–46 compatibility, persistence,
-numeric, freshness, and application contracts remain authoritative.
+Block 47 is implemented in `docs/assembly-spherical-joint-mvp5.md`: passive local and Project-level
+Spherical intent, JSON, Point/Point equations, shared motion closure, and selected-drive rejection.
+The current next technical step is Block 48. Blocks 40–47 compatibility, persistence, numeric,
+freshness, and application contracts remain authoritative.

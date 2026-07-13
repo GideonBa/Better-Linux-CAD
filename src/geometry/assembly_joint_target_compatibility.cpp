@@ -50,13 +50,24 @@ Result<AssemblyJointTargetCompatibility> AssemblyJointTargetCompatibilityResolve
                                          AssemblyGeometricTargetCapability::Frame});
   }
 
+  if (joint_type == AssemblyJointType::Spherical &&
+      has_capability(target_a, AssemblyGeometricTargetCapability::Point) &&
+      has_capability(target_b, AssemblyGeometricTargetCapability::Point)) {
+    return Result<AssemblyJointTargetCompatibility>::success(
+        AssemblyJointTargetCompatibility{joint_type, AssemblyGeometricTargetCapability::Point,
+                                         AssemblyGeometricTargetCapability::Point});
+  }
+
   return Result<AssemblyJointTargetCompatibility>::failure(Error::validation(
       kCompatibilityObjectId,
       "assembly " + std::string(to_string(joint_type)) +
-          " joint target capabilities are incompatible: oriented Frame/Frame is "
-          "required; Axis alone has no deterministic reference X direction; target A exposes " +
-          describe_capabilities(target_a.capabilities) + ", target B exposes " +
-          describe_capabilities(target_b.capabilities)));
+          " joint target capabilities are incompatible: " +
+          (joint_type == AssemblyJointType::Spherical ? "Point/Point is required"
+                                                      : "oriented Frame/Frame is required; Axis "
+                                                        "alone has no deterministic reference X "
+                                                        "direction") +
+          "; target A exposes " + describe_capabilities(target_a.capabilities) +
+          ", target B exposes " + describe_capabilities(target_b.capabilities)));
 }
 
 } // namespace blcad::geometry

@@ -317,6 +317,7 @@ revolute
 prismatic
 cylindrical
 planar
+spherical
 ```
 
 Representative record:
@@ -367,11 +368,14 @@ also omitted for Cylindrical.
 Planar uses `"type": "planar"` and three bounded coordinates in canonical order: Linear
 `translation_u`, Linear `translation_v`, then Angular `rotation_normal`.
 
+Spherical uses `"type": "spherical"` and exactly `"coordinates": []`. It has no limits or
+authored coordinate, so Revolute-only scalar fields are omitted.
+
 ## Project-level cross-hierarchy joint JSON
 
 `cross_hierarchy_joints[]` is additive Project-level motion intent.
 
-`revolute`, `prismatic`, `cylindrical`, and `planar` use this endpoint envelope. Project-level
+`revolute`, `prismatic`, `cylindrical`, `planar`, and `spherical` use this endpoint envelope. Project-level
 coordinate signatures are identical to their local family signatures.
 
 Representative record:
@@ -426,9 +430,10 @@ Additional rules:
 - Cylindrical requires bounded Linear `translation` then bounded Angular `rotation` slots;
 - Planar requires bounded Linear `translation_u`, bounded Linear `translation_v`, then bounded
   Angular `rotation_normal` slots;
+- Spherical requires an empty coordinate slot list;
 - readers accept slot-only, historical-only, or exactly matching dual Revolute records;
 - partial legacy fields, conflicting dual records, and duplicate/missing/unknown roles fail closed;
-- `revolute`, `prismatic`, `cylindrical`, and `planar` are supported at local and
+- `revolute`, `prismatic`, `cylindrical`, `planar`, and `spherical` are supported at local and
   cross-hierarchy scope;
 - state is `active|inactive`;
 - ids are unique inside the Project-level cross-hierarchy joint collection;

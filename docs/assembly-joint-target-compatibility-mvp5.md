@@ -168,5 +168,6 @@ Block 41 is implemented in `docs/assembly-joint-coordinate-model-mvp5.md`.
 Both `AssemblyJoint` and `AssemblyHierarchyJoint` now own family-defined typed persistent coordinate slots with stable semantic roles, explicit Angular/Linear kinds, authored values, and optional typed limits.
 
 Current Revolute public APIs are preserved through an explicit adaptation boundary. Block 42 JSON,
-Block 43 vector motion drives and Blocks 44–46 Prismatic/Cylindrical/Planar are implemented in
-their canonical joint documents. The next joint-family step is Block 47 Ball/Spherical.
+Block 43 vector motion drives, Blocks 44–46 Prismatic/Cylindrical/Planar, and Block 47 passive
+Spherical are implemented in their canonical joint documents. Spherical extends compatibility with
+`Point / Point`; oriented families retain `Frame / Frame`.

@@ -1,5 +1,6 @@
 #include "assembly_constraint_numeric_system.hpp"
 
+#include "blcad/core/assembly_reference_target.hpp"
 #include "blcad/geometry/assembly_joint_motion_solver.hpp"
 #include "blcad/geometry/assembly_revolute_joint_equation_builder.hpp"
 
@@ -20,6 +21,12 @@ using Catch::Approx;
 namespace {
 
 constexpr double kTolerance = 1.0e-6;
+
+template <typename Id> std::string reference_spelling(Id id) {
+  auto spelling = make_assembly_reference_target_spelling(AssemblyReferenceTargetIdentity{id});
+  REQUIRE(spelling);
+  return spelling.value();
+}
 
 struct ComponentSpec {
   const char* id;
@@ -60,6 +67,15 @@ PartDocument make_hole_part() {
   REQUIRE(xy);
   REQUIRE(part.value().add_datum_plane(xy.value()));
 
+  auto anchor = ConstructionPoint::create_explicit(ConstructionPointId("construction_point.anchor"),
+                                                   "Anchor", Point3{1.0, 2.0, 3.0});
+  REQUIRE(anchor);
+  REQUIRE(part.value().add_construction_point(anchor.value()));
+  auto spherical_center = ConstructionPoint::create_explicit(
+      ConstructionPointId("construction_point.spherical_center"), "SphericalCenter", Point3{});
+  REQUIRE(spherical_center);
+  REQUIRE(part.value().add_construction_point(spherical_center.value()));
+
   auto base = Sketch::create(SketchId("sketch.base"), "Base", DatumPlaneId("datum.xy"));
   REQUIRE(base);
   auto rectangle = RectangleProfile::create(ProfileId("profile.base"), ParameterId("part.width"),
@@ -94,6 +110,14 @@ PartDocument make_hole_part() {
 AssemblyConstraintTarget target(const char* component) {
   auto value =
       AssemblyConstraintTarget::create(ComponentInstanceId(component), "feature.hole.seat");
+  REQUIRE(value);
+  return value.value();
+}
+
+AssemblyConstraintTarget point_target(const char* component) {
+  auto value = AssemblyConstraintTarget::create(
+      ComponentInstanceId(component),
+      reference_spelling(ConstructionPointId("construction_point.spherical_center")));
   REQUIRE(value);
   return value.value();
 }
@@ -158,6 +182,16 @@ AssemblyJoint make_planar_joint(const char* id, const char* component_a, const c
       AssemblyJointId(id), id, AssemblyJointType::Planar, target(component_a), target(component_b),
       AssemblyJointState::Active,
       std::vector<AssemblyJointCoordinateSlot>{u.value(), v.value(), rotation.value()});
+  REQUIRE(value);
+  return value.value();
+}
+
+AssemblyJoint make_spherical_joint(const char* id, const char* component_a,
+                                   const char* component_b) {
+  auto value =
+      AssemblyJoint::create(AssemblyJointId(id), id, AssemblyJointType::Spherical,
+                            point_target(component_a), point_target(component_b),
+                            AssemblyJointState::Active, std::vector<AssemblyJointCoordinateSlot>{});
   REQUIRE(value);
   return value.value();
 }
@@ -483,6 +517,57 @@ TEST_CASE("Planar vector motion drives U V and normal rotation through one optim
   CHECK(held.proposed_transform.translation_mm.x == Approx(6.0).margin(kTolerance));
   CHECK(held.proposed_transform.translation_mm.y == Approx(0.0).margin(kTolerance));
   CHECK(held.proposed_transform.rotation_deg.z == Approx(0.0).margin(kTolerance));
+}
+
+TEST_CASE("Passive Spherical joints participate in local motion closure but cannot be driven",
+          "[geometry][assembly-spherical-joint]") {
+  Project coincident =
+      make_project({{"component.a", identity_rigid_transform(), ComponentGroundingState::Grounded},
+                    {"component.b"}});
+  REQUIRE(coincident.assembly().add_joint(
+      make_spherical_joint("joint.spherical", "component.a", "component.b")));
+  const detail::AssemblyNumericRelationshipSet relationships{
+      {}, {{AssemblyJointId("joint.spherical"), {}}}};
+  auto zero = detail::evaluate_residuals(coincident, relationships, 1.0);
+  REQUIRE(zero);
+  REQUIRE(zero.value().size() == 3U);
+  CHECK(zero.value()[0] == Approx(0.0));
+  CHECK(zero.value()[1] == Approx(0.0));
+  CHECK(zero.value()[2] == Approx(0.0));
+
+  Project displaced =
+      make_project({{"component.a", identity_rigid_transform(), ComponentGroundingState::Grounded},
+                    {"component.b", RigidTransform{Vector3{5.0, -2.0, 7.0}, Vector3{}}}});
+  REQUIRE(displaced.assembly().add_joint(
+      make_spherical_joint("joint.spherical", "component.a", "component.b")));
+  auto offset = detail::evaluate_residuals(displaced, relationships, 1.0);
+  REQUIRE(offset);
+  REQUIRE(offset.value().size() == 3U);
+  CHECK(offset.value()[0] == Approx(5.0));
+  CHECK(offset.value()[1] == Approx(-2.0));
+  CHECK(offset.value()[2] == Approx(7.0));
+
+  auto selected = AssemblyJointMotionSolver{}.move(
+      coincident, AssemblyJointDrive{AssemblyJointId("joint.spherical"), {}});
+  REQUIRE(selected.has_error());
+  CHECK(selected.error().message().find("cannot be selected") != std::string::npos);
+
+  Project driven =
+      make_project({{"component.a", identity_rigid_transform(), ComponentGroundingState::Grounded},
+                    {"component.b"}});
+  REQUIRE(driven.assembly().add_joint(make_joint("joint.revolute", "component.a", "component.b")));
+  REQUIRE(driven.assembly().add_joint(
+      make_spherical_joint("joint.spherical", "component.a", "component.b")));
+  auto moved = AssemblyJointMotionSolver{}.move(driven, AssemblyJointId("joint.revolute"),
+                                                angle(30.0, "joint.revolute"));
+  REQUIRE(moved);
+  REQUIRE(moved.value().converged());
+  CHECK(moved.value().solve_result.residual_summary.residual_component_count == 12U);
+  REQUIRE(moved.value().joint_snapshots.size() == 2U);
+  REQUIRE(AssemblyJointMotionResultApplier{}.apply(driven, moved.value()));
+  CHECK(driven.assembly().find_joint(AssemblyJointId("joint.revolute"))->coordinate_deg() == 30.0);
+  CHECK(
+      driven.assembly().find_joint(AssemblyJointId("joint.spherical"))->coordinate_slots().empty());
 }
 
 TEST_CASE("Local vector joint drives validate roles snapshot all slots and apply atomically",

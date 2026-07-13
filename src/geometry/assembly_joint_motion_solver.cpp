@@ -133,6 +133,10 @@ AssemblyJointMotionSolver::move(const Project& project, AssemblyJointDrive drive
     return Result<AssemblyJointMotionResult>::failure(
         validation_error(joint_id.value(), "assembly joint must exist in project assembly"));
   }
+  if (joint->type() == AssemblyJointType::Spherical) {
+    return Result<AssemblyJointMotionResult>::failure(validation_error(
+        joint_id.value(), "passive Spherical joint cannot be selected as a motion drive"));
+  }
   if (joint->state() != AssemblyJointState::Active) {
     return Result<AssemblyJointMotionResult>::failure(
         validation_error(joint_id.value(), joint->type() == AssemblyJointType::Revolute

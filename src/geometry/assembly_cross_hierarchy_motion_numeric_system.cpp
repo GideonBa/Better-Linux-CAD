@@ -7,9 +7,11 @@
 #include "blcad/geometry/assembly_hierarchy_planar_joint_equation_builder.hpp"
 #include "blcad/geometry/assembly_hierarchy_prismatic_joint_equation_builder.hpp"
 #include "blcad/geometry/assembly_hierarchy_revolute_joint_equation_builder.hpp"
+#include "blcad/geometry/assembly_hierarchy_spherical_joint_equation_builder.hpp"
 #include "blcad/geometry/assembly_planar_joint_equation_builder.hpp"
 #include "blcad/geometry/assembly_prismatic_joint_equation_builder.hpp"
 #include "blcad/geometry/assembly_revolute_joint_equation_builder.hpp"
+#include "blcad/geometry/assembly_spherical_joint_equation_builder.hpp"
 
 #include <string>
 #include <type_traits>
@@ -66,12 +68,19 @@ append_local_joint_drive_residuals(const Project& project,
       return Result<std::size_t>::failure(equation.error());
     return append_scaled_residuals(equation.value().residual, length_residual_scale_mm, residuals);
   }
-  const AssemblyPlanarJointEquationBuilder builder;
-  auto equation = builder.build(
-      local_project.value(), *joint,
-      joint->find_coordinate_slot(AssemblyJointCoordinateRole::TranslationU)->value(),
-      joint->find_coordinate_slot(AssemblyJointCoordinateRole::TranslationV)->value(),
-      joint->find_coordinate_slot(AssemblyJointCoordinateRole::RotationNormal)->value());
+  if (joint->type() == AssemblyJointType::Planar) {
+    const AssemblyPlanarJointEquationBuilder builder;
+    auto equation = builder.build(
+        local_project.value(), *joint,
+        joint->find_coordinate_slot(AssemblyJointCoordinateRole::TranslationU)->value(),
+        joint->find_coordinate_slot(AssemblyJointCoordinateRole::TranslationV)->value(),
+        joint->find_coordinate_slot(AssemblyJointCoordinateRole::RotationNormal)->value());
+    if (equation.has_error())
+      return Result<std::size_t>::failure(equation.error());
+    return append_scaled_residuals(equation.value().residual, length_residual_scale_mm, residuals);
+  }
+  const AssemblySphericalJointEquationBuilder builder;
+  auto equation = builder.build(local_project.value(), *joint);
   if (equation.has_error())
     return Result<std::size_t>::failure(equation.error());
   return append_scaled_residuals(equation.value().residual, length_residual_scale_mm, residuals);
@@ -119,11 +128,18 @@ append_local_joint_drive_residuals(const Project& project,
       return Result<std::size_t>::failure(equation.error());
     return append_scaled_residuals(equation.value().residual, length_residual_scale_mm, residuals);
   }
-  const AssemblyHierarchyPlanarJointEquationBuilder builder;
-  auto equation =
-      builder.build(project, *joint, requested(AssemblyJointCoordinateRole::TranslationU),
-                    requested(AssemblyJointCoordinateRole::TranslationV),
-                    requested(AssemblyJointCoordinateRole::RotationNormal));
+  if (joint->type() == AssemblyJointType::Planar) {
+    const AssemblyHierarchyPlanarJointEquationBuilder builder;
+    auto equation =
+        builder.build(project, *joint, requested(AssemblyJointCoordinateRole::TranslationU),
+                      requested(AssemblyJointCoordinateRole::TranslationV),
+                      requested(AssemblyJointCoordinateRole::RotationNormal));
+    if (equation.has_error())
+      return Result<std::size_t>::failure(equation.error());
+    return append_scaled_residuals(equation.value().residual, length_residual_scale_mm, residuals);
+  }
+  const AssemblyHierarchySphericalJointEquationBuilder builder;
+  auto equation = builder.build(project, *joint);
   if (equation.has_error())
     return Result<std::size_t>::failure(equation.error());
   return append_scaled_residuals(equation.value().residual, length_residual_scale_mm, residuals);

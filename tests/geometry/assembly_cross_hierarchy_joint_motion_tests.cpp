@@ -1,5 +1,7 @@
+#include "assembly_cross_hierarchy_motion_numeric_system.hpp"
 #include "assembly_cross_hierarchy_test_support.hpp"
 
+#include "blcad/core/assembly_reference_target.hpp"
 #include "blcad/geometry/assembly_cross_hierarchy_joint_motion_solver.hpp"
 
 #include <catch2/catch_approx.hpp>
@@ -17,6 +19,12 @@ using namespace blcad::geometry::test_support;
 using Catch::Approx;
 
 namespace {
+
+template <typename Id> std::string reference_spelling(Id id) {
+  auto spelling = make_assembly_reference_target_spelling(AssemblyReferenceTargetIdentity{id});
+  REQUIRE(spelling);
+  return spelling.value();
+}
 
 Quantity angle(double degrees, const char* id) {
   auto value = Quantity::angle_deg(degrees, id);
@@ -102,6 +110,18 @@ AssemblyHierarchyJoint cross_planar_joint(const char* id = "joint.cross.planar")
       endpoint({"subassembly.left"}, "component.child", "feature.hole.seat"),
       AssemblyJointState::Active,
       std::vector<AssemblyJointCoordinateSlot>{u.value(), v.value(), rotation.value()});
+  REQUIRE(value);
+  return value.value();
+}
+
+AssemblyHierarchyJoint cross_spherical_joint(const char* id = "joint.cross.spherical") {
+  const std::string point =
+      reference_spelling(ConstructionPointId("construction_point.spherical_center"));
+  auto value = AssemblyHierarchyJoint::create(
+      AssemblyJointId(id), id, AssemblyJointType::Spherical,
+      endpoint({}, "component.root", point.c_str()),
+      endpoint({"subassembly.left"}, "component.child", point.c_str()), AssemblyJointState::Active,
+      std::vector<AssemblyJointCoordinateSlot>{});
   REQUIRE(value);
   return value.value();
 }
@@ -482,6 +502,44 @@ TEST_CASE("Combined motion keeps canonical four-family order and authored holdin
   const auto held = move(contradictory, "joint.cross.selected", 0.0);
   CHECK_FALSE(held.converged());
   CHECK(held.residual_summary.final_rms > 1.0e-6);
+}
+
+TEST_CASE("Passive cross-hierarchy Spherical joints join motion closure but reject selection",
+          "[geometry][assembly-cross-hierarchy-spherical-joint]") {
+  Project project = motion_project();
+  add_joint(project, cross_joint("joint.cross.selected"));
+  add_joint(project, cross_spherical_joint());
+
+  auto graph = AssemblyCrossHierarchyMotionGraph::build(project);
+  REQUIRE(graph);
+  REQUIRE(graph.value().motion_group_count() == 1U);
+  const auto& group = graph.value().motion_groups().front();
+  REQUIRE(group.relationships.size() == 2U);
+  auto residuals = detail::evaluate_cross_hierarchy_motion_group_residuals(
+      project, group, AssemblyJointId("joint.cross.selected"),
+      {{AssemblyJointCoordinateRole::Rotation, angle(0.0, "joint.cross.selected")}}, 1.0);
+  REQUIRE(residuals);
+  REQUIRE(residuals.value().size() == 12U);
+  CHECK(std::all_of(residuals.value().begin(), residuals.value().end(),
+                    [](double residual) { return std::abs(residual) <= 1.0e-12; }));
+
+  auto selected = AssemblyCrossHierarchyJointMotionSolver{}.move(
+      project, AssemblyJointDrive{AssemblyJointId("joint.cross.spherical"), {}});
+  REQUIRE(selected.has_error());
+  CHECK(selected.error().message().find("cannot be selected") != std::string::npos);
+
+  auto moved = AssemblyCrossHierarchyJointMotionSolver{}.move(
+      project, AssemblyJointId("joint.cross.selected"), angle(30.0, "joint.cross.selected"));
+  REQUIRE(moved);
+  REQUIRE(moved.value().converged());
+  CHECK(moved.value().residual_summary.residual_component_count == 12U);
+  REQUIRE(moved.value().relationship_snapshots.size() == 2U);
+  REQUIRE(AssemblyCrossHierarchyJointMotionResultApplier{}.apply(project, moved.value()));
+  CHECK(project.find_cross_hierarchy_joint(AssemblyJointId("joint.cross.selected"))
+            ->coordinate_deg() == 30.0);
+  CHECK(project.find_cross_hierarchy_joint(AssemblyJointId("joint.cross.spherical"))
+            ->coordinate_slots()
+            .empty());
 }
 
 TEST_CASE("Cross-hierarchy motion applies transforms and selected coordinate atomically",

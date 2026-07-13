@@ -55,5 +55,5 @@ coordinate-slot snapshots as the authority.
 
 ## Block 45 handoff
 
-Blocks 45–46 Cylindrical and Planar are implemented in their canonical documents. The next
-technical step is Block 47 Ball/Spherical.
+Blocks 45–47 Cylindrical, Planar, and passive Spherical are implemented in their canonical
+documents. The next technical step is Block 48.

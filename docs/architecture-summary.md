@@ -378,11 +378,12 @@ The typed target taxonomy and Block-35 identity layer add no second target revis
 Persistent local `AssemblyJoint` and Project-level `AssemblyHierarchyJoint` intent remain separate from geometric constraints.
 
 Current families are `Revolute`, with principal-angle limits and one authored angular rotation,
-`Prismatic`, with bounded signed Linear displacement and one authored translation, and
-`Cylindrical`, with bounded Linear translation plus bounded Angular rotation, and `Planar`, with
-bounded U/V Linear translations plus bounded normal Angular rotation.
+`Prismatic`, with bounded signed Linear displacement and one authored translation,
+`Cylindrical`, with bounded Linear translation plus bounded Angular rotation, `Planar`, with
+bounded U/V Linear translations plus bounded normal Angular rotation, and passive `Spherical`,
+with no coordinate slots.
 
-Current `.seat` sources expose Frame, Axis, and Plane. `AssemblyJointTargetCompatibilityResolver` deterministically selects Frame/Frame before projection for local and cross-hierarchy Revolute, Prismatic, Cylindrical, and Planar equations. Axis-only targets fail closed because no deterministic reference X direction exists. The selected oriented Frames feed the family residual constructors.
+Current `.seat` sources expose Frame, Axis, and Plane. `AssemblyJointTargetCompatibilityResolver` deterministically selects Frame/Frame before projection for local and cross-hierarchy Revolute, Prismatic, Cylindrical, and Planar equations. Axis-only targets fail closed because no deterministic reference X direction exists. Spherical instead requires Point/Point and contributes `point_b - point_a` center coincidence; `.seat` is not silently treated as a Point. The selected capabilities feed the family residual constructors.
 
 ```text
 directed axis alignment
@@ -494,7 +495,7 @@ Block 33 adds `datum_axes` PartDocument persistence. Block 35 adds canonical sem
 
 ## Current direction
 
-Blocks 23–43 of the current assembly sequence are implemented.
+Blocks 23–47 of the Assembly sequence are implemented.
 
 Canonical current target architecture:
 
@@ -510,14 +511,21 @@ Canonical current target architecture:
 - `docs/assembly-prismatic-joint-mvp5.md`
 - `docs/assembly-cylindrical-joint-mvp5.md`
 - `docs/assembly-planar-joint-mvp5.md`
+- `docs/assembly-spherical-joint-mvp5.md`
 - `docs/assembly-general-geometric-target-roadmap.md`
 
-The complete original planning baseline for Blocks 32–47 remains in `docs/assembly-general-geometric-target-roadmap-planning-baseline.md` and is incorporated by the active roadmap for still-planned acceptance/failure details.
+The complete original planning baseline for Blocks 32–47 remains in `docs/assembly-general-geometric-target-roadmap-planning-baseline.md` as historical design context; implemented canonical contracts are authoritative.
 
 Canonical numbered sequence:
 
 - `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`
 
-Block 46 Planar is implemented in `docs/assembly-planar-joint-mvp5.md`. The next technical step is Block 47 Ball/Spherical.
+Block 47 Spherical is implemented in `docs/assembly-spherical-joint-mvp5.md` and completes the
+Assembly MVP sequence. The next technical step is Block 48 Body identity and `PartDocument`
+ownership.
 
-Block 46 adds three-coordinate Planar intent and jointly drives U/V translation plus normal twist through the shared local/root-space path. Scalar Revolute APIs remain adapters; transform variables and the shared numeric engine are unchanged. Axis-only oriented joints still fail closed without arbitrary reference-direction synthesis. Occurrence-local child pose overrides, whole-subassembly solve variables, general physics, and Ball/Spherical stay deferred to their roadmap blocks.
+Block 47 adds passive Point/Point Spherical intent through the shared local/root-space path. Scalar
+Revolute APIs remain adapters; transform variables and the shared numeric engine are unchanged.
+Axis-only oriented joints still fail closed without arbitrary reference-direction synthesis. A
+driven spherical orientation, occurrence-local child pose overrides, whole-subassembly solve
+variables, and general physics remain deferred.

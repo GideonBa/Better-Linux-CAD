@@ -1,4 +1,5 @@
 #include "blcad/core/assembly_document_json.hpp"
+#include "blcad/core/assembly_reference_target.hpp"
 #include "blcad/core/project.hpp"
 #include "blcad/core/project_json.hpp"
 
@@ -65,6 +66,12 @@ PartDocument make_part() {
   auto part = PartDocument::create(DocumentId("part.shared"), "SharedPart");
   REQUIRE(part);
   return part.value();
+}
+
+template <typename Id> std::string reference_spelling(Id id) {
+  auto spelling = make_assembly_reference_target_spelling(AssemblyReferenceTargetIdentity{id});
+  REQUIRE(spelling);
+  return spelling.value();
 }
 
 } // namespace
@@ -344,6 +351,64 @@ TEST_CASE("Cross-hierarchy Planar intent preserves all three coordinates",
       std::vector<AssemblyJointCoordinateSlot>{u.value(), v.value(), rotation.value()});
   REQUIRE(joint);
   CHECK(joint.value().coordinate_slots().size() == 3U);
+}
+
+TEST_CASE("Spherical joint intent is passive and persists one canonical spelling",
+          "[core][assembly-spherical-joint]") {
+  auto joint = AssemblyJoint::create(AssemblyJointId("joint.spherical"), "Spherical",
+                                     AssemblyJointType::Spherical, make_target("component.a"),
+                                     make_target("component.b"), AssemblyJointState::Active,
+                                     std::vector<AssemblyJointCoordinateSlot>{});
+  REQUIRE(joint);
+  CHECK(to_string(joint.value().type()) == "spherical");
+  CHECK(joint.value().coordinate_slots().empty());
+
+  auto forbidden_coordinate = AssemblyJointCoordinateSlot::create(
+      AssemblyJointCoordinateRole::Rotation, AssemblyJointCoordinateKind::Angular,
+      angle(0.0, "joint.spherical"), angle(-90.0, "joint.spherical"),
+      angle(90.0, "joint.spherical"));
+  REQUIRE(forbidden_coordinate);
+  CHECK(AssemblyJoint::create(
+            AssemblyJointId("joint.bad-spherical"), "BadSpherical", AssemblyJointType::Spherical,
+            make_target("component.a"), make_target("component.b"), AssemblyJointState::Active,
+            std::vector<AssemblyJointCoordinateSlot>{forbidden_coordinate.value()})
+            .has_error());
+
+  auto assembly = make_assembly();
+  REQUIRE(assembly.add_joint(joint.value()));
+  auto serialized = serialize_assembly_document_to_json(assembly);
+  REQUIRE(serialized);
+  const auto json = nlohmann::json::parse(serialized.value());
+  const auto& record = json.at("assembly_joints").front();
+  CHECK(record.at("type") == "spherical");
+  CHECK(record.at("coordinates").empty());
+  CHECK_FALSE(record.contains("limits"));
+  CHECK_FALSE(record.contains("coordinate"));
+  auto restored = deserialize_assembly_document_from_json(serialized.value());
+  REQUIRE(restored);
+  const auto* restored_joint = restored.value().find_joint(AssemblyJointId("joint.spherical"));
+  REQUIRE(restored_joint);
+  CHECK(restored_joint->type() == AssemblyJointType::Spherical);
+  CHECK(restored_joint->coordinate_slots().empty());
+}
+
+TEST_CASE("Cross-hierarchy Spherical intent preserves passive Point endpoint identity",
+          "[core][assembly-cross-hierarchy-spherical-joint]") {
+  const std::string point = reference_spelling(ConstructionPointId("construction_point.anchor"));
+  auto a =
+      AssemblyHierarchyConstraintEndpoint::create({}, ComponentInstanceId("component.a"), point);
+  auto b = AssemblyHierarchyConstraintEndpoint::create({SubassemblyInstanceId("subassembly.child")},
+                                                       ComponentInstanceId("component.b"), point);
+  REQUIRE(a);
+  REQUIRE(b);
+  auto joint = AssemblyHierarchyJoint::create(
+      AssemblyJointId("joint.cross.spherical"), "CrossSpherical", AssemblyJointType::Spherical,
+      a.value(), b.value(), AssemblyJointState::Active, std::vector<AssemblyJointCoordinateSlot>{});
+  REQUIRE(joint);
+  CHECK(to_string(joint.value().type()) == "spherical");
+  CHECK(joint.value().coordinate_slots().empty());
+  CHECK(joint.value().target_a().semantic_reference() == point);
+  CHECK(joint.value().target_b().occurrence_path().size() == 1U);
 }
 
 TEST_CASE("Assembly joint coordinate slots preserve family roles and physical kinds",
