@@ -191,4 +191,4 @@ execution boundary:
 - inspect the deterministic Body results now produced by the Block-52 `ShapeCache`
 - use OCCT only behind this adapter boundary
 
-Block 53 is the next step and freezes public Body-result inspection.
+Block 53 freezes public Body-result inspection. Block 54 next adds BodyBooleanFeature dependencies.

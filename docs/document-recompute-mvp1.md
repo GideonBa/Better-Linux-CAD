@@ -49,6 +49,9 @@ the Geometry work. Explicit Body documents commit full and incremental execution
 and an incremental plan preserves Body entries it does not affect. Historical zero-Body documents
 retain the original partial-result-on-failure compatibility behavior.
 
+`BodyResultInspector` provides the public headless post-recompute view of Body IDs, kind,
+visibility, producing Feature, shape summary, and Solid/Surface counts.
+
 ## Recompute lifecycle
 
 The executor works on a `const PartDocument` and does not modify its invalidation state. Calling `mark_all_clean()` after a successful recompute remains the caller's responsibility. This keeps execution free of document mutation.

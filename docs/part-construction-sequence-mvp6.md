@@ -1,8 +1,8 @@
 # Part Construction Sequence MVP-6
 
-Status: active post-Assembly-MVP sequence. Blocks 48–52 are implemented; Blocks 53–94 remain planned. Blocks 95–101 form the subsequent STEP Import MVP.
+Status: active post-Assembly-MVP sequence. Blocks 48–53 are implemented; Blocks 54–94 remain planned. Blocks 95–101 form the subsequent STEP Import MVP.
 
-Block 47 completed the Assembly MVP handoff. Blocks 48–52 establish Body identity, persistent feature Body-result operations, dependencies, and body-scoped recompute. Block 53 — multi-body compatibility and body-result inspection — is the current next technical step.
+Block 47 completed the Assembly MVP handoff. Blocks 48–53 establish Body identity, persistent feature Body-result operations, body-scoped recompute, and checked result inspection. Block 54 — BodyBooleanFeature Core intent and JSON — is the current next technical step.
 
 This document is the active status, phase-order, authority-boundary, and handoff summary for the first broad BLCAD Part Construction MVP after the Assembly MVP.
 
@@ -10,13 +10,14 @@ The complete original Blocks 48-94 per-block planning detail is preserved byte-f
 
 - `docs/part-construction-sequence-mvp6-planning-detail.md`
 
-The implemented Blocks 48–52 contracts are canonical in:
+The implemented Blocks 48–53 contracts are canonical in:
 
 - `docs/part-body-identity-mvp6.md`
 - `docs/part-body-json-mvp6.md`
 - `docs/part-feature-body-operation-mvp6.md`
 - `docs/part-feature-body-dependency-mvp6.md`
 - `docs/part-multi-body-recompute-mvp6.md`
+- `docs/part-multi-body-inspection-mvp6.md`
 
 The planned post-Block-94 STEP import handoff is canonical in:
 
@@ -119,8 +120,9 @@ The prerequisite Assembly sequence is complete. Blocks 48–50 provide Body iden
 and explicit NewBody/Join/Cut/Intersect intent. Block 51 persists that Feature context and connects
 Body producer/consumer state to dependency, invalidation, recompute planning, cycle rejection, and
 removal protection. Block 52 adds deterministic body-scoped cache products and transactional
-recompute. Block 53 — multi-body compatibility and body-result inspection — is the next technical
-step. The remaining Block 53-94 implementation contracts stay in
+recompute. Block 53 adds checked headless result inspection and final-shape compatibility. Block 54
+— BodyBooleanFeature Core intent and JSON — is the next technical step. The remaining Block 54-94
+implementation contracts stay in
 `docs/part-construction-sequence-mvp6-planning-detail.md`.
 
 ## Post-Block-94 handoff

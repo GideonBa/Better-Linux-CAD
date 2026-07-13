@@ -88,7 +88,7 @@ PartDocument::mark_body_changed(body.base)
 ```
 
 Dirty `body:<BodyId>` nodes are included in topological order. They remain planning records in Core;
-Block 52 supplies their body-scoped ShapeCache execution; Block 53 adds public inspection.
+Blocks 52–53 supply body-scoped ShapeCache execution and public checked inspection.
 
 `PartDocument::mark_all_clean()` indirectly clears the plan because no `dirty` nodes remain afterward.
 

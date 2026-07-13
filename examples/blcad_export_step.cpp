@@ -1,5 +1,6 @@
 #include "blcad/core/error.hpp"
 #include "blcad/core/part_document_json.hpp"
+#include "blcad/geometry/body_result_inspector.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
 #include "blcad/geometry/shape_cache.hpp"
 #include "blcad/geometry/step_exporter.hpp"
@@ -45,15 +46,15 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  const blcad::geometry::GeometryShape* final_shape = cache.value().final_shape();
-  if (final_shape == nullptr) {
-    print_error(
-        blcad::Error::geometry("shape_cache.cli_export", "recompute produced no final shape"));
+  const auto final_shape = blcad::geometry::BodyResultInspector{}.resolve_compatible_final_shape(
+      document.value(), cache.value());
+  if (final_shape.has_error()) {
+    print_error(final_shape.error());
     return 1;
   }
 
   const blcad::geometry::StepExporter exporter;
-  const auto written = exporter.write_step(*final_shape, argv[2]);
+  const auto written = exporter.write_step(final_shape.value(), argv[2]);
   if (written.has_error()) {
     print_error(written.error());
     return 1;

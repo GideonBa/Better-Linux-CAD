@@ -99,5 +99,5 @@ removal cleanup/rejection, duplicate producers, and transactional cycle rejectio
 
 ## Handoff
 
-Block 52 is implemented in `docs/part-multi-body-recompute-mvp6.md`. Block 53 now freezes public
-Body-result inspection and ambiguous historical final-shape behavior.
+Blocks 52–53 body-scoped recompute and checked result inspection are implemented. Block 54 now
+introduces BodyBooleanFeature Core intent and JSON.

@@ -1,5 +1,6 @@
 #include "blcad/core/error.hpp"
 #include "blcad/core/project_json.hpp"
+#include "blcad/geometry/body_result_inspector.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
 #include "blcad/geometry/shape_cache.hpp"
 #include "blcad/geometry/step_exporter.hpp"
@@ -72,7 +73,8 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  auto update = project.value().set_assembly_parameter_value(assembly_parameter_id, quantity.value());
+  auto update =
+      project.value().set_assembly_parameter_value(assembly_parameter_id, quantity.value());
   if (update.has_error()) {
     print_error(update.error());
     return 1;
@@ -103,14 +105,15 @@ int main(int argc, char** argv) {
       return 1;
     }
 
-    const blcad::geometry::GeometryShape* final_shape = cache.value().final_shape();
-    if (final_shape == nullptr) {
-      print_error(blcad::Error::geometry(part.id().value(), "project part recompute produced no shape"));
+    const auto final_shape =
+        blcad::geometry::BodyResultInspector{}.resolve_compatible_final_shape(part, cache.value());
+    if (final_shape.has_error()) {
+      print_error(final_shape.error());
       return 1;
     }
 
     const auto output_path = output_path_for_part(output_dir, part);
-    const auto written = exporter.write_step(*final_shape, output_path.string());
+    const auto written = exporter.write_step(final_shape.value(), output_path.string());
     if (written.has_error()) {
       print_error(written.error());
       return 1;

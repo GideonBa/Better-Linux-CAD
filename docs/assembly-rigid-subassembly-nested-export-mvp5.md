@@ -317,7 +317,7 @@ Canonical details: `docs/assembly-structured-step-products-mvp5.md`.
 
 ## Failure policy
 
-Hierarchy/flattened/structured consumers fail closed on their documented boundaries, including invalid references/cycles, unresolved parts, recompute failures, missing final shapes, malformed derived transform context, empty visible-active output, OCCT/XDE transfer failures, and STEP write failures.
+Hierarchy/flattened/structured consumers fail closed on their documented boundaries, including invalid references/cycles, unresolved parts, recompute failures, missing or Block-53-ambiguous final shapes, malformed derived transform context, empty visible-active output, OCCT/XDE transfer failures, and STEP write failures.
 
 All hierarchy/export consumers are read-only with respect to persistent Project model intent.
 

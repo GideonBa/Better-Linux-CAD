@@ -8,7 +8,8 @@ This document describes STEP export for MVP 1. The code lives in the optional ta
 
 This step writes a computed `GeometryShape` as a STEP file:
 
-- only a `GeometryShape` is exported, in practice the final shape from the `ShapeCache`
+- only one `GeometryShape` is exported; Block-53 callers obtain it through the checked historical
+  compatibility query rather than selecting from a multi-body `ShapeCache`
 - the exporter encapsulates the OCCT STEP writer behind the core/OCCT boundary
 - `blcad_core` remains free of OCCT and knows no STEP writer
 - expected errors are reported as `ErrorCategory::Export`

@@ -378,12 +378,12 @@ These records are future target architecture. They are not part of the current `
 13. Add path/guide-curve loft support.
 14. Add STEP export of multi-body parts with deterministic body naming where supported.
 
-Feature Body-operation persistence, dependency semantics, and body-scoped recompute are implemented
-through Block 52. The current handoff is Block 53 multi-body compatibility and body-result
-inspection. Canonical implemented
-contracts include `docs/part-body-identity-mvp6.md`, `docs/part-body-json-mvp6.md`,
+Feature Body-operation persistence, body-scoped recompute, and checked inspection are implemented
+through Block 53. The current handoff is Block 54 BodyBooleanFeature Core intent and JSON.
+Canonical implemented contracts include `docs/part-body-identity-mvp6.md`,
+`docs/part-body-json-mvp6.md`,
 `docs/part-feature-body-operation-mvp6.md`, `docs/part-feature-body-dependency-mvp6.md`, and
-`docs/part-multi-body-recompute-mvp6.md`; the
+`docs/part-multi-body-recompute-mvp6.md`, and `docs/part-multi-body-inspection-mvp6.md`; the
 numbered Part Construction sequence is authoritative where this older roadmap groups work
 differently.
 

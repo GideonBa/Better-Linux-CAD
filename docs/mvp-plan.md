@@ -4,17 +4,17 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 52
-current_block: 53
-current_boundary: Multi-body compatibility and body-result inspection
-current_tag: "[geometry][multi-body-inspection]"
+implemented_through: Block 53
+current_block: 54
+current_boundary: BodyBooleanFeature Core intent and JSON
+current_tag: "[core][body-boolean]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
   mvp_3: "Parametric bolt circle pattern — implemented"
   mvp_4: "Assembly parameters and Project container — implemented"
   mvp_5: "Assembly relationships, motion, hierarchy, analysis, exchange — Blocks 1–47 implemented"
-  mvp_6: "Part Construction — Blocks 48–52 implemented, Blocks 53–94 planned, Block 53 next"
+  mvp_6: "Part Construction — Blocks 48–53 implemented, Blocks 54–94 planned, Block 54 next"
   mvp_7: "STEP Import — Blocks 95–101 planned after Block 94"
 ---
 
@@ -552,10 +552,10 @@ motion solvers reject Spherical as the selected drive.
 
 ## MVP 6 — Part Construction MVP after Block 47
 
-**Status:** In progress — Blocks 48–52 implemented
+**Status:** In progress — Blocks 48–53 implemented
 **Canonical:** sequence `docs/part-construction-sequence-mvp6.md`
 
-Blocks 48–52 are complete. Block 53 is the current next technical step.
+Blocks 48–53 are complete. Block 54 is the current next technical step.
 
 Mandatory Part Construction phase order:
 
@@ -730,7 +730,19 @@ Canonical contract: `docs/part-multi-body-recompute-mvp6.md`.
 [geometry][multi-body-recompute]
 ```
 
-## Current next technical step — Block 53
+## Block 53 — Multi-body compatibility and body-result inspection — Implemented
 
-Add multi-body compatibility and body-result inspection according to
+Block 53 adds deterministic headless Body metadata/shape inspection, Solid/Surface counts,
+independent two-Body recompute proof, and a checked historical final-shape compatibility query that
+rejects Surface-only and multi-body ambiguity.
+
+Canonical contract: `docs/part-multi-body-inspection-mvp6.md`.
+
+```text
+[geometry][multi-body-inspection]
+```
+
+## Current next technical step — Block 54
+
+Add BodyBooleanFeature Core intent and JSON according to
 `docs/part-construction-sequence-mvp6.md`.

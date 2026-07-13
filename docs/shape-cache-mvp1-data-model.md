@@ -76,6 +76,10 @@ remove_body_shape(body.base)
 
 The `body_shapes()` view is always ordered lexicographically by `BodyId`.
 
+Application-level metadata and summary queries use the Block-53 `BodyResultInspector`; checked
+historical final-shape access rejects Surface-only and multi-body Parts rather than selecting an
+arbitrary cached result.
+
 The final shape is connected to the feature that currently produced it:
 
 ```text

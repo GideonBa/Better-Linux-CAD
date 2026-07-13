@@ -357,7 +357,7 @@ sort PartDocumentId
 -> resolve project-owned PartDocument
 -> create one private ShapeCache
 -> GeometryRecomputeExecutor::execute_document
--> require final shape
+-> require a Block-53-compatible single Solid final shape
 -> copy unposed TopoDS_Shape definition
 ```
 

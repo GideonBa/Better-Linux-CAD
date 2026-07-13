@@ -39,8 +39,8 @@ partial-result behavior on failure.
 
 The historical `final_shape()` query remains available for zero-Body documents and for an explicit
 single Solid Body. A document with more than one Body, or a single Surface Body, clears this
-compatibility result instead of selecting an arbitrary Body. Block 53 freezes the public ambiguous
-query/error and body-summary inspection contracts.
+compatibility result instead of selecting an arbitrary Body. Block 53 freezes the public checked
+query/error and body-summary inspection contracts in `docs/part-multi-body-inspection-mvp6.md`.
 
 ## Proof
 
@@ -56,5 +56,5 @@ target-shape failure, and disabled final-shape compatibility for a multi-body do
 
 ## Handoff
 
-Block 53 adds stable headless body-result inspection, solid/surface counts, shape summaries, and an
-explicit public error contract for ambiguous historical final-shape access.
+Block 53 inspection is implemented. Block 54 now introduces persistent BodyBooleanFeature Core
+intent and JSON.

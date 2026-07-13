@@ -99,7 +99,7 @@ sort PartDocumentId
 -> resolve project-owned part
 -> create one private ShapeCache
 -> recompute exactly once
--> require final shape
+-> require a Block-53-compatible single Solid final shape
 -> return one unposed TopoDS_Shape definition
 ```
 

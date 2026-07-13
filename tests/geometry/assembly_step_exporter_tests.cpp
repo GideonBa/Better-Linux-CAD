@@ -74,9 +74,9 @@ PartDocument make_plate_part() {
   REQUIRE(sketch.value().add_profile(rectangle.value()));
   REQUIRE(part.value().add_sketch(sketch.value()));
 
-  auto feature = Feature::create_additive_extrude(
-      FeatureId("feature.base_extrude"), "BaseExtrude", SketchId("sketch.base"),
-      ParameterId("part.thickness"));
+  auto feature =
+      Feature::create_additive_extrude(FeatureId("feature.base_extrude"), "BaseExtrude",
+                                       SketchId("sketch.base"), ParameterId("part.thickness"));
   REQUIRE(feature);
   REQUIRE(part.value().add_feature(feature.value()));
   return part.value();
@@ -94,8 +94,8 @@ Project make_project(std::initializer_list<ComponentSpec> components) {
     REQUIRE(assembly.value().add_component_instance(component.value()));
   }
 
-  auto project = Project::create(DocumentId("project.posed_export"), "PosedExportProject",
-                                 assembly.value());
+  auto project =
+      Project::create(DocumentId("project.posed_export"), "PosedExportProject", assembly.value());
   REQUIRE(project);
   REQUIRE(project.value().add_part_document(make_plate_part()));
   return project.value();
@@ -113,8 +113,8 @@ StepShapeSummary read_step_shape_summary(const std::filesystem::path& path) {
   REQUIRE_FALSE(bounds.IsVoid());
 
   StepShapeSummary summary;
-  bounds.Get(summary.bounds.x_min, summary.bounds.y_min, summary.bounds.z_min,
-             summary.bounds.x_max, summary.bounds.y_max, summary.bounds.z_max);
+  bounds.Get(summary.bounds.x_min, summary.bounds.y_min, summary.bounds.z_min, summary.bounds.x_max,
+             summary.bounds.y_max, summary.bounds.z_max);
 
   for (TopExp_Explorer explorer(shape, TopAbs_SOLID); explorer.More(); explorer.Next()) {
     ++summary.solid_count;
@@ -142,10 +142,10 @@ void check_equivalent_step_geometry(const StepShapeSummary& actual,
 
 TEST_CASE("AssemblyStepExporter poses repeated part instances and preserves repeat-export geometry",
           "[geometry][assembly-step-export]") {
-  Project project = make_project(
-      {{"component.a"},
-       {"component.b", ComponentVisibility::Visible, ComponentSuppressionState::Active,
-        RigidTransform{Vector3{30.0, 0.0, 0.0}, Vector3{0.0, 0.0, 90.0}}}});
+  Project project =
+      make_project({{"component.a"},
+                    {"component.b", ComponentVisibility::Visible, ComponentSuppressionState::Active,
+                     RigidTransform{Vector3{30.0, 0.0, 0.0}, Vector3{0.0, 0.0, 90.0}}}});
 
   const AssemblyStepExporter exporter;
   const auto built = exporter.build_posed_shape(project);
@@ -192,8 +192,7 @@ TEST_CASE("AssemblyStepExporter excludes hidden and suppressed component occurre
       {{"component.visible"},
        {"component.hidden", ComponentVisibility::Hidden, ComponentSuppressionState::Active,
         RigidTransform{Vector3{50.0, 0.0, 0.0}, Vector3{}}},
-       {"component.suppressed", ComponentVisibility::Visible,
-        ComponentSuppressionState::Suppressed,
+       {"component.suppressed", ComponentVisibility::Visible, ComponentSuppressionState::Suppressed,
         RigidTransform{Vector3{100.0, 0.0, 0.0}, Vector3{}}}});
 
   const AssemblyStepExporter exporter;
@@ -229,8 +228,8 @@ TEST_CASE("AssemblyStepExporter fails closed on an unresolvable project member",
                                              DocumentId("part.missing"));
   REQUIRE(component);
   REQUIRE(assembly.value().add_component_instance(component.value()));
-  auto project = Project::create(DocumentId("project.missing_part"), "MissingPartProject",
-                                 assembly.value());
+  auto project =
+      Project::create(DocumentId("project.missing_part"), "MissingPartProject", assembly.value());
   REQUIRE(project);
 
   const auto built = AssemblyStepExporter{}.build_posed_shape(project.value());
@@ -250,8 +249,8 @@ TEST_CASE("AssemblyStepExporter fails when a referenced part recomputes without 
                                              DocumentId("part.empty"));
   REQUIRE(component);
   REQUIRE(assembly.value().add_component_instance(component.value()));
-  auto project = Project::create(DocumentId("project.empty_part"), "EmptyPartProject",
-                                 assembly.value());
+  auto project =
+      Project::create(DocumentId("project.empty_part"), "EmptyPartProject", assembly.value());
   REQUIRE(project);
   auto empty_part = PartDocument::create(DocumentId("part.empty"), "EmptyPart");
   REQUIRE(empty_part);
@@ -261,5 +260,5 @@ TEST_CASE("AssemblyStepExporter fails when a referenced part recomputes without 
   REQUIRE(built.has_error());
   CHECK(built.error().category() == ErrorCategory::Geometry);
   CHECK(built.error().object_id() == "part.empty");
-  CHECK(built.error().message() == "assembly export part recompute produced no final shape");
+  CHECK(built.error().message() == "historical part has no final shape result");
 }
