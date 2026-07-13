@@ -84,6 +84,10 @@ Core identity/model/connectivity:
 ./build/dev/blcad_core_tests "[core][assembly-constraint-graph]"
 ./build/dev/blcad_core_tests "[core][assembly-joint]"
 ./build/dev/blcad_core_tests "[core][assembly-joint-graph]"
+./build/dev/blcad_core_tests "[core][assembly-joint-coordinate-model]"
+./build/dev/blcad_core_tests "[core][assembly-cross-hierarchy-joint-coordinate-model]"
+./build/dev/blcad_core_tests "[core][assembly-joint-coordinate-json]"
+./build/dev/blcad_core_tests "[core][assembly-cross-hierarchy-joint-coordinate-json]"
 ./build/dev/blcad_core_tests "[core][subassembly-instance]"
 ./build/dev/blcad_core_tests "[core][assembly-hierarchy]"
 ./build/dev/blcad_core_tests "[core][assembly-leaf-occurrence]"
@@ -267,7 +271,9 @@ The typed target/capability and generated-topology identity layers are public li
 - `docs/assembly-generic-relationship-intent-mvp5.md`: Block-38 generic relationship intent/JSON contract
 - `docs/assembly-generic-relationship-equations-mvp5.md`: Block-39 generic relationship equation/solve contract
 - `docs/assembly-joint-target-compatibility-mvp5.md`: Block-40 joint compatibility/oriented Frame contract
-- `docs/assembly-general-geometric-target-roadmap.md`: implemented Blocks 31–40 and planned Blocks 41–47
+- `docs/assembly-joint-coordinate-model-mvp5.md`: Block-41 family-defined typed joint coordinates and Revolute compatibility adapter
+- `docs/assembly-joint-coordinate-json-mvp5.md`: Block-42 additive slot JSON and historical Revolute compatibility
+- `docs/assembly-general-geometric-target-roadmap.md`: implemented Blocks 31–42 and planned Blocks 43–47
 - `docs/project-goal.md`: long-term direction
 
 ## Formatting
@@ -304,7 +310,7 @@ rm -rf build/
 
 ## Current assembly development boundary
 
-Blocks 23–40 are implemented.
+Blocks 23–42 are implemented.
 
 Block 35 freezes:
 
@@ -357,4 +363,4 @@ Focused Blocks 36–40 tests:
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-cross-hierarchy-joint-target-compatibility]"
 ```
 
-The immediate next step is Block 41: general joint coordinate/limit Core model. Block 40 joint target compatibility and the oriented Frame/Frame Revolute contract are implemented without persistence or solver changes. Exact sequencing is maintained in `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md` and detailed target planning in `docs/assembly-general-geometric-target-roadmap.md`.
+The immediate next step is Block 43: vector joint drives, holding semantics, freshness, and atomic application. Block 42 additive coordinate-slot JSON and historical Revolute compatibility are implemented for both local and Project-level joints. Exact sequencing is maintained in `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md` and detailed target planning in `docs/assembly-general-geometric-target-roadmap.md`.

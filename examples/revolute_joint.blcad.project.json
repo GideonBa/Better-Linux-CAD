@@ -58,6 +58,15 @@
           "semantic_reference": "feature.hole.seat"
         },
         "state": "active",
+        "coordinates": [
+          {
+            "role": "rotation",
+            "kind": "angular",
+            "value": {"unit": "deg", "value": 0.0},
+            "lower_limit": {"unit": "deg", "value": -90.0},
+            "upper_limit": {"unit": "deg", "value": 90.0}
+          }
+        ],
         "limits": {
           "lower": {"unit": "deg", "value": -90.0},
           "upper": {"unit": "deg", "value": 90.0}

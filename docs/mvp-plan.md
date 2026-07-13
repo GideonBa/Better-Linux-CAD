@@ -4,16 +4,16 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 40
-current_block: 41
-current_boundary: General joint coordinate/limit Core model
-current_tag: "[core][assembly-joint-coordinate-model]"
+implemented_through: Block 42
+current_block: 43
+current_boundary: Vector joint drives, holding semantics, freshness, and atomic application
+current_tag: "[geometry][assembly-vector-joint-drive]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
   mvp_3: "Parametric bolt circle pattern — implemented"
   mvp_4: "Assembly parameters and Project container — implemented"
-  mvp_5: "Assembly relationships, motion, hierarchy, analysis, exchange — Blocks 1–40 implemented, Blocks 41–47 planned"
+  mvp_5: "Assembly relationships, motion, hierarchy, analysis, exchange — Blocks 1–42 implemented, Blocks 43–47 planned"
   mvp_6: "Part Construction — Blocks 48–94 planned, starts after Block 47"
 ---
 
@@ -488,7 +488,35 @@ Implemented derived joint compatibility with the initial deterministic rule `Rev
 [geometry][assembly-cross-hierarchy-joint-target-compatibility]
 ```
 
-### Blocks 41–47 — Planned joint continuation
+### Block 41 — General joint coordinate/limit Core model
+
+**Status:** Implemented
+**Canonical:** `docs/assembly-joint-coordinate-model-mvp5.md`
+
+Implemented family-owned ordered coordinate slots with stable semantic roles, Angular/Linear kinds, typed values, and optional typed lower/upper bounds for both local and Project-level joints. Revolute is exactly one bounded Angular `rotation` slot. Its scalar constructors/accessors remain compatibility adapters; Block 41 itself made no JSON change. Signed linear coordinates use `LinearDisplacementMm` rather than positive `LengthMm` or unitless doubles.
+
+**Focused tags:**
+
+```text
+[core][assembly-joint-coordinate-model]
+[core][assembly-cross-hierarchy-joint-coordinate-model]
+```
+
+### Block 42 — General joint coordinate JSON and compatibility
+
+**Status:** Implemented
+**Canonical:** `docs/assembly-joint-coordinate-json-mvp5.md`
+
+Local and Project-level writers now emit deterministic family-ordered `coordinates[]` with canonical role/kind spellings and typed units. Current Revolute writers retain historical `limits` plus scalar `coordinate` fields additively. Readers accept slot-only, historical-only, or exactly matching dual records and reject unknown/duplicate/missing roles, wrong units, incomplete Legacy state, and conflicting dual representations.
+
+**Focused tags:**
+
+```text
+[core][assembly-joint-coordinate-json]
+[core][assembly-cross-hierarchy-joint-coordinate-json]
+```
+
+### Blocks 43–47 — Planned joint continuation
 
 **Status:** Planned
 **Canonical:** roadmap `docs/assembly-general-geometric-target-roadmap.md`
@@ -496,8 +524,6 @@ Implemented derived joint compatibility with the initial deterministic rule `Rev
 Mandatory order:
 
 ```text
-41 general joint coordinate/limit Core model
-42 general joint coordinate JSON/backward compatibility
 43 vector joint drives + holding/freshness/atomic application
 44 Prismatic joint
 45 Cylindrical joint
@@ -543,20 +569,21 @@ After Block 94 the first Part Construction MVP is considered complete. That mean
 
 It does not mean SolidWorks/Inventor Part product parity. Production GUI modeling, Class-A surfacing, arbitrary NURBS control cages, variable-radius fillets, advanced topology healing, direct modeling, sheet metal, weldments, and specialized manufacturing feature systems remain later work.
 
-## Current next technical step — Block 41
+## Current next technical step — Block 43
 
 **Status:** Current
-**Primary boundary:** Persistent Core joint coordinate and limit state.
+**Primary boundary:** Geometry motion execution, result freshness, and atomic application.
 
-Block 41 must generalize local and Project-level joint coordinate state into stable family-defined typed slots equivalent to:
+Block 43 must generalize selected-joint scalar requests into role-addressed drive vectors with:
 
 ```text
-semantic role
-Angular or Linear kind
-authored typed value
-optional typed lower/upper limits
+exact selected-family drive-role validation
+authored-value holding for undriven selected roles
+complete holding drives for non-selected active joints
+complete coordinate-slot freshness snapshots
+atomic transform and selected-coordinate application
 ```
 
-Current Revolute public APIs and semantics must remain available through an explicit compatibility/adaptation boundary. Local and Project-level target identity scopes remain distinct.
+Authority variables remain six direct transform variables per unique free authority; joint coordinates remain drive parameters. Local and Project-level target identity scopes remain distinct.
 
-**Notes:** Block 41 adds no JSON change and no vector motion solver; those are Blocks 42 and 43.
+**Notes:** Block 43 adds no new joint family; Prismatic begins in Block 44.

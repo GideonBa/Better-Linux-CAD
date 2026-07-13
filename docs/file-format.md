@@ -1,6 +1,6 @@
 # Project and Save File Format
 
-Status: implemented save-format seeds exist for single-part model intent, assembly parameters, embedded Project JSON, part component occurrences, rigid child assembly occurrences, local Mate/Concentric/Distance/Insert/Angle intent, Project-level cross-hierarchy geometric intent, local Revolute joint intent, Project-level occurrence-qualified Revolute joint intent, semantic generated feature/axis/seat targets, `ref:` reference-geometry targets, canonical `topo:` generated-topology semantic targets, and authored transform/state records.
+Status: implemented save-format seeds exist for single-part model intent, assembly parameters, embedded Project JSON, part component occurrences, rigid child assembly occurrences, local Mate/Concentric/Distance/Insert/Angle intent, Project-level cross-hierarchy geometric intent, local and occurrence-qualified Revolute joint intent with typed `coordinates[]` plus historical scalar compatibility, semantic generated feature/axis/seat targets, `ref:` reference-geometry targets, canonical `topo:` generated-topology semantic targets, and authored transform/state records.
 
 The save format stores parametric and semantic model intent. OCCT shapes, hierarchy traversal state, occurrence graphs, transform authorities, generated-topology producer classification/recovery results, resolved geometry, residuals, Jacobians, solve/motion results, freshness snapshots, proposals, diagnostics, and exchange products are derived.
 
@@ -332,6 +332,15 @@ Representative record:
     "semantic_reference": "feature.hole.seat"
   },
   "state": "active",
+  "coordinates": [
+    {
+      "role": "rotation",
+      "kind": "angular",
+      "value": {"unit": "deg", "value": 0.0},
+      "lower_limit": {"unit": "deg", "value": -90.0},
+      "upper_limit": {"unit": "deg", "value": 90.0}
+    }
+  ],
   "limits": {
     "lower": {"unit": "deg", "value": -90.0},
     "upper": {"unit": "deg", "value": 90.0}
@@ -341,6 +350,8 @@ Representative record:
 ```
 
 Local joints target distinct local component ids in one containing assembly document.
+
+`coordinates[]` is the canonical Block-42 coordinate representation. Current Revolute writers retain `limits` and scalar `coordinate` additively for older readers.
 
 ## Project-level cross-hierarchy Revolute joint JSON
 
@@ -364,6 +375,15 @@ Representative record:
     "semantic_reference": "feature.bore.seat"
   },
   "state": "active",
+  "coordinates": [
+    {
+      "role": "rotation",
+      "kind": "angular",
+      "value": {"unit": "deg", "value": 0.0},
+      "lower_limit": {"unit": "deg", "value": -90.0},
+      "upper_limit": {"unit": "deg", "value": 90.0}
+    }
+  ],
   "limits": {
     "lower": {"unit": "deg", "value": -90.0},
     "upper": {"unit": "deg", "value": 90.0}
@@ -381,7 +401,12 @@ lower <= coordinate <= upper
 
 Additional rules:
 
-- all limit/coordinate values use `deg`;
+- canonical roles are `rotation`, `translation`, `translation_u`, `translation_v`, and `rotation_normal`;
+- canonical kinds are `angular` and `linear`, with exact units `deg` and `mm` respectively;
+- slot order is family-defined and persisted unchanged;
+- current Revolute requires exactly one bounded Angular `rotation` slot;
+- readers accept slot-only, historical-only, or exactly matching dual Revolute records;
+- partial legacy fields, conflicting dual records, and duplicate/missing/unknown roles fail closed;
 - only `revolute` is supported in the current cross-hierarchy joint seed;
 - state is `active|inactive`;
 - ids are unique inside the Project-level cross-hierarchy joint collection;
@@ -459,7 +484,7 @@ source FeatureId
 
 The current endpoint serializers need no new JSON field because `semantic_reference` already stores opaque identity strings. `topo:` spellings roundtrip byte-for-byte through local and occurrence-qualified endpoints.
 
-Block 35 does not persist generated-topology role matrices, producer classification, validation results, recovery results, or OCCT topology. Block 36 Geometry resolution of `topo:` identities into typed descriptors/capabilities is derived query state and likewise adds no JSON field. Block 37 relationship target compatibility and Block 40 joint target compatibility are also derived query state and add no JSON field. Block 38 extends accepted relationship `type` values with `coincident`, `parallel`, and `perpendicular` without adding a field or changing schema/version markers.
+Block 35 does not persist generated-topology role matrices, producer classification, validation results, recovery results, or OCCT topology. Block 36 Geometry resolution of `topo:` identities into typed descriptors/capabilities is derived query state and likewise adds no JSON field. Block 37 relationship target compatibility and Block 40 joint target compatibility are also derived query state and add no JSON field. Block 38 extends accepted relationship `type` values with `coincident`, `parallel`, and `perpendicular` without adding a field or changing schema/version markers. Block 41 replaces scalar in-memory joint coordinate authority with typed family-defined slots. Block 42 adds `coordinates[]` while retaining the existing Revolute `limits` plus scalar `coordinate` writer fields through compatibility adapters. This is additive; schema/version markers remain unchanged.
 
 Fields such as these are not persistent:
 

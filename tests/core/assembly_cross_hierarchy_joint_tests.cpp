@@ -19,23 +19,23 @@ PartDocument part() {
   return value.value();
 }
 
-ComponentInstance component(const char* id,
-                            ComponentGroundingState grounding = ComponentGroundingState::Free,
-                            ComponentVisibility visibility = ComponentVisibility::Visible,
-                            ComponentSuppressionState suppression = ComponentSuppressionState::Active) {
-  auto value = ComponentInstance::create(
-      ComponentInstanceId(id), id, DocumentId("part.motion"), visibility, suppression, grounding,
-      identity_rigid_transform());
+ComponentInstance
+component(const char* id, ComponentGroundingState grounding = ComponentGroundingState::Free,
+          ComponentVisibility visibility = ComponentVisibility::Visible,
+          ComponentSuppressionState suppression = ComponentSuppressionState::Active) {
+  auto value =
+      ComponentInstance::create(ComponentInstanceId(id), id, DocumentId("part.motion"), visibility,
+                                suppression, grounding, identity_rigid_transform());
   REQUIRE(value);
   return value.value();
 }
 
-SubassemblyInstance occurrence(
-    const char* id, ComponentVisibility visibility = ComponentVisibility::Visible,
-    ComponentSuppressionState suppression = ComponentSuppressionState::Active) {
-  auto value = SubassemblyInstance::create(
-      SubassemblyInstanceId(id), id, DocumentId("assembly.child"), visibility, suppression,
-      identity_rigid_transform());
+SubassemblyInstance
+occurrence(const char* id, ComponentVisibility visibility = ComponentVisibility::Visible,
+           ComponentSuppressionState suppression = ComponentSuppressionState::Active) {
+  auto value =
+      SubassemblyInstance::create(SubassemblyInstanceId(id), id, DocumentId("assembly.child"),
+                                  visibility, suppression, identity_rigid_transform());
   REQUIRE(value);
   return value.value();
 }
@@ -44,7 +44,8 @@ AssemblyHierarchyConstraintEndpoint endpoint(std::initializer_list<const char*> 
                                              const char* component_id,
                                              const char* reference = "feature.hole.seat") {
   std::vector<SubassemblyInstanceId> occurrence_path;
-  for (const char* id : path) occurrence_path.emplace_back(id);
+  for (const char* id : path)
+    occurrence_path.emplace_back(id);
   auto value = AssemblyHierarchyConstraintEndpoint::create(
       std::move(occurrence_path), ComponentInstanceId(component_id), reference);
   REQUIRE(value);
@@ -64,12 +65,12 @@ Quantity angle(double degrees, const char* id) {
   return value.value();
 }
 
-AssemblyHierarchyJoint cross_joint(
-    const char* id = "joint.cross.revolute",
-    AssemblyHierarchyConstraintEndpoint target_a = endpoint({}, "component.root"),
-    AssemblyHierarchyConstraintEndpoint target_b =
-        endpoint({"subassembly.left"}, "component.child"),
-    AssemblyJointState state = AssemblyJointState::Active, double coordinate = 0.0) {
+AssemblyHierarchyJoint
+cross_joint(const char* id = "joint.cross.revolute",
+            AssemblyHierarchyConstraintEndpoint target_a = endpoint({}, "component.root"),
+            AssemblyHierarchyConstraintEndpoint target_b = endpoint({"subassembly.left"},
+                                                                    "component.child"),
+            AssemblyJointState state = AssemblyJointState::Active, double coordinate = 0.0) {
   auto value = AssemblyHierarchyJoint::create(
       AssemblyJointId(id), id, AssemblyJointType::Revolute, std::move(target_a),
       std::move(target_b), state, angle(-90.0, id), angle(90.0, id), angle(coordinate, id));
@@ -78,19 +79,19 @@ AssemblyHierarchyJoint cross_joint(
 }
 
 AssemblyJoint local_joint(const char* id) {
-  auto value = AssemblyJoint::create(
-      AssemblyJointId(id), id, AssemblyJointType::Revolute,
-      local_target("component.child"), local_target("component.anchor"),
-      AssemblyJointState::Active, angle(-90.0, id), angle(90.0, id), angle(0.0, id));
+  auto value = AssemblyJoint::create(AssemblyJointId(id), id, AssemblyJointType::Revolute,
+                                     local_target("component.child"),
+                                     local_target("component.anchor"), AssemblyJointState::Active,
+                                     angle(-90.0, id), angle(90.0, id), angle(0.0, id));
   REQUIRE(value);
   return value.value();
 }
 
 AssemblyConstraint local_constraint(const char* id) {
-  auto value = AssemblyConstraint::create(
-      AssemblyConstraintId(id), id, AssemblyConstraintType::Concentric,
-      local_target("component.child", "feature.hole.axis"),
-      local_target("component.anchor", "feature.hole.axis"));
+  auto value =
+      AssemblyConstraint::create(AssemblyConstraintId(id), id, AssemblyConstraintType::Concentric,
+                                 local_target("component.child", "feature.hole.axis"),
+                                 local_target("component.anchor", "feature.hole.axis"));
   REQUIRE(value);
   return value.value();
 }
@@ -111,7 +112,8 @@ Project base_project(bool repeated = false) {
   REQUIRE(root.value().add_component_instance(
       component("component.root", ComponentGroundingState::Grounded)));
   REQUIRE(root.value().add_subassembly_instance(occurrence("subassembly.left")));
-  if (repeated) REQUIRE(root.value().add_subassembly_instance(occurrence("subassembly.right")));
+  if (repeated)
+    REQUIRE(root.value().add_subassembly_instance(occurrence("subassembly.right")));
 
   auto child = AssemblyDocument::create(DocumentId("assembly.child"), "Child");
   REQUIRE(child);
@@ -146,23 +148,55 @@ TEST_CASE("Project-level occurrence-qualified Revolute joint intent preserves hi
   CHECK(joint.value().limits() == expected_limits);
   CHECK(joint.value().coordinate_deg() == 12.0);
 
-  CHECK(AssemblyHierarchyJoint::create(
-            AssemblyJointId("joint.same"), "Same", AssemblyJointType::Revolute, root, root,
-            AssemblyJointState::Active, angle(-45.0, "joint.same"), angle(45.0, "joint.same"),
-            angle(0.0, "joint.same"))
+  CHECK(AssemblyHierarchyJoint::create(AssemblyJointId("joint.same"), "Same",
+                                       AssemblyJointType::Revolute, root, root,
+                                       AssemblyJointState::Active, angle(-45.0, "joint.same"),
+                                       angle(45.0, "joint.same"), angle(0.0, "joint.same"))
             .has_error());
 
   const auto left = endpoint({"subassembly.left"}, "component.child");
   const auto right = endpoint({"subassembly.right"}, "component.child");
-  CHECK(AssemblyHierarchyJoint::create(
-            AssemblyJointId("joint.shared"), "Shared", AssemblyJointType::Revolute, left, right,
-            AssemblyJointState::Active, angle(-90.0, "joint.shared"),
-            angle(90.0, "joint.shared"), angle(0.0, "joint.shared"))
+  CHECK(AssemblyHierarchyJoint::create(AssemblyJointId("joint.shared"), "Shared",
+                                       AssemblyJointType::Revolute, left, right,
+                                       AssemblyJointState::Active, angle(-90.0, "joint.shared"),
+                                       angle(90.0, "joint.shared"), angle(0.0, "joint.shared"))
             .has_value());
   CHECK(AssemblyHierarchyJoint::create(
             AssemblyJointId("joint.bad_limits"), "Bad", AssemblyJointType::Revolute, root, nested,
             AssemblyJointState::Active, angle(20.0, "joint.bad_limits"),
             angle(10.0, "joint.bad_limits"), angle(15.0, "joint.bad_limits"))
+            .has_error());
+}
+
+TEST_CASE("Cross-hierarchy joints share the family coordinate model without merging target scope",
+          "[core][assembly-cross-hierarchy-joint-coordinate-model]") {
+  auto slot = AssemblyJointCoordinateSlot::create(
+      AssemblyJointCoordinateRole::Rotation, AssemblyJointCoordinateKind::Angular,
+      angle(10.0, "joint.cross.slots"), angle(-30.0, "joint.cross.slots"),
+      angle(45.0, "joint.cross.slots"));
+  REQUIRE(slot);
+  const auto root = endpoint({}, "component.root");
+  const auto nested = endpoint({"subassembly.left"}, "component.child");
+  auto joint = AssemblyHierarchyJoint::create(
+      AssemblyJointId("joint.cross.slots"), "CrossSlots", AssemblyJointType::Revolute, root, nested,
+      AssemblyJointState::Active, std::vector<AssemblyJointCoordinateSlot>{slot.value()});
+  REQUIRE(joint);
+  CHECK(joint.value().target_a() == root);
+  CHECK(joint.value().target_b() == nested);
+  REQUIRE(joint.value().coordinate_slots().size() == 1U);
+  CHECK(joint.value().coordinate_slots().front() == slot.value());
+  CHECK((joint.value().limits() == AssemblyJointLimits{-30.0, 45.0}));
+  CHECK(joint.value().coordinate_deg() == 10.0);
+
+  auto updated = joint.value().with_coordinate_value(AssemblyJointCoordinateRole::Rotation,
+                                                     angle(25.0, "joint.cross.slots"));
+  REQUIRE(updated);
+  CHECK(updated.value().coordinate_slots().front().value().degrees() == 25.0);
+  CHECK(joint.value().coordinate_slots().front().value().degrees() == 10.0);
+
+  CHECK(AssemblyHierarchyJoint::create(
+            AssemblyJointId("joint.cross.missing"), "Missing", AssemblyJointType::Revolute, root,
+            nested, AssemblyJointState::Active, std::vector<AssemblyJointCoordinateSlot>{})
             .has_error());
 }
 
@@ -177,21 +211,27 @@ TEST_CASE("Project owns cross-hierarchy joint ids independently from local joint
   CHECK(project.add_cross_hierarchy_joint(cross_joint("joint.shared_id")).has_error());
 
   const RigidTransform root_transform =
-      project.assembly().find_component_instance(ComponentInstanceId("component.root"))->transform();
+      project.assembly()
+          .find_component_instance(ComponentInstanceId("component.root"))
+          ->transform();
   const RigidTransform child_transform =
       child->find_component_instance(ComponentInstanceId("component.child"))->transform();
   const RigidTransform boundary =
-      project.assembly().find_subassembly_instance(SubassemblyInstanceId("subassembly.left"))->transform();
+      project.assembly()
+          .find_subassembly_instance(SubassemblyInstanceId("subassembly.left"))
+          ->transform();
   REQUIRE(project.set_cross_hierarchy_joint_coordinate(AssemblyJointId("joint.shared_id"),
                                                        angle(30.0, "joint.shared_id")));
   CHECK(project.find_cross_hierarchy_joint(AssemblyJointId("joint.shared_id"))->coordinate_deg() ==
         30.0);
-  CHECK(project.assembly().find_component_instance(ComponentInstanceId("component.root"))->transform() ==
-        root_transform);
+  CHECK(project.assembly()
+            .find_component_instance(ComponentInstanceId("component.root"))
+            ->transform() == root_transform);
   CHECK(child->find_component_instance(ComponentInstanceId("component.child"))->transform() ==
         child_transform);
-  CHECK(project.assembly().find_subassembly_instance(SubassemblyInstanceId("subassembly.left"))->transform() ==
-        boundary);
+  CHECK(project.assembly()
+            .find_subassembly_instance(SubassemblyInstanceId("subassembly.left"))
+            ->transform() == boundary);
 }
 
 TEST_CASE("Cross-hierarchy Revolute Project JSON is additive and exact",
@@ -199,8 +239,8 @@ TEST_CASE("Cross-hierarchy Revolute Project JSON is additive and exact",
   Project project = base_project(true);
   const auto target_a = endpoint({}, "component.root", "feature.root.seat");
   const auto target_b = endpoint({"subassembly.right"}, "component.child", "feature.child.seat");
-  REQUIRE(project.add_cross_hierarchy_joint(cross_joint(
-      "joint.cross.json", target_a, target_b, AssemblyJointState::Inactive, 25.0)));
+  REQUIRE(project.add_cross_hierarchy_joint(
+      cross_joint("joint.cross.json", target_a, target_b, AssemblyJointState::Inactive, 25.0)));
 
   auto serialized = serialize_project_to_json(project);
   REQUIRE(serialized);
@@ -226,6 +266,59 @@ TEST_CASE("Cross-hierarchy Revolute Project JSON is additive and exact",
   legacy_json = nlohmann::json::parse(serialized.value());
   legacy_json["cross_hierarchy_joints"][0]["coordinate"]["unit"] = "mm";
   CHECK(deserialize_project_from_json(legacy_json.dump()).has_error());
+}
+
+TEST_CASE("Cross-hierarchy joint coordinate JSON matches the local compatibility contract",
+          "[core][assembly-cross-hierarchy-joint-coordinate-json]") {
+  Project project = base_project();
+  REQUIRE(project.add_cross_hierarchy_joint(cross_joint(
+      "joint.cross.coordinate.json", endpoint({}, "component.root"),
+      endpoint({"subassembly.left"}, "component.child"), AssemblyJointState::Active, 15.0)));
+  auto serialized = serialize_project_to_json(project);
+  REQUIRE(serialized);
+  nlohmann::json authored = nlohmann::json::parse(serialized.value());
+  auto& joint_json = authored["cross_hierarchy_joints"][0];
+
+  REQUIRE(joint_json["coordinates"].size() == 1U);
+  CHECK(joint_json["coordinates"][0]["role"] == "rotation");
+  CHECK(joint_json["coordinates"][0]["kind"] == "angular");
+  CHECK(joint_json["coordinates"][0]["value"]["unit"] == "deg");
+  CHECK(joint_json["coordinates"][0]["value"]["value"] == 15.0);
+  CHECK(joint_json.contains("limits"));
+  CHECK(joint_json.contains("coordinate"));
+
+  auto generalized_only = authored;
+  generalized_only["cross_hierarchy_joints"][0].erase("limits");
+  generalized_only["cross_hierarchy_joints"][0].erase("coordinate");
+  auto generalized_loaded = deserialize_project_from_json(generalized_only.dump());
+  REQUIRE(generalized_loaded);
+  CHECK(generalized_loaded.value()
+            .find_cross_hierarchy_joint(AssemblyJointId("joint.cross.coordinate.json"))
+            ->coordinate_deg() == 15.0);
+  auto canonical_again = serialize_project_to_json(generalized_loaded.value());
+  REQUIRE(canonical_again);
+  CHECK(canonical_again.value() == serialized.value());
+
+  auto legacy_only = authored;
+  legacy_only["cross_hierarchy_joints"][0].erase("coordinates");
+  auto legacy_loaded = deserialize_project_from_json(legacy_only.dump());
+  REQUIRE(legacy_loaded);
+  CHECK(legacy_loaded.value()
+            .find_cross_hierarchy_joint(AssemblyJointId("joint.cross.coordinate.json"))
+            ->coordinate_deg() == 15.0);
+
+  auto duplicate = generalized_only;
+  duplicate["cross_hierarchy_joints"][0]["coordinates"].push_back(
+      duplicate["cross_hierarchy_joints"][0]["coordinates"][0]);
+  CHECK(deserialize_project_from_json(duplicate.dump()).has_error());
+
+  auto unknown_kind = generalized_only;
+  unknown_kind["cross_hierarchy_joints"][0]["coordinates"][0]["kind"] = "scalar";
+  CHECK(deserialize_project_from_json(unknown_kind.dump()).has_error());
+
+  auto conflicting = authored;
+  conflicting["cross_hierarchy_joints"][0]["limits"]["upper"]["value"] = 80.0;
+  CHECK(deserialize_project_from_json(conflicting.dump()).has_error());
 }
 
 TEST_CASE("Cross-hierarchy joint structure validation follows exact rooted paths",
@@ -279,15 +372,16 @@ TEST_CASE("Combined motion graph closes over local and cross geometry and joints
 TEST_CASE("Repeated cross-hierarchy joint endpoints keep two paths and one authority incidence",
           "[core][assembly-cross-hierarchy-motion-graph]") {
   Project project = base_project(true);
-  REQUIRE(project.add_cross_hierarchy_joint(cross_joint(
-      "joint.same_authority", endpoint({"subassembly.left"}, "component.child"),
-      endpoint({"subassembly.right"}, "component.child"))));
+  REQUIRE(project.add_cross_hierarchy_joint(
+      cross_joint("joint.same_authority", endpoint({"subassembly.left"}, "component.child"),
+                  endpoint({"subassembly.right"}, "component.child"))));
   auto graph = AssemblyCrossHierarchyMotionGraph::build(project);
   REQUIRE(graph);
   REQUIRE(graph.value().motion_group_count() == 1U);
   REQUIRE(graph.value().joint_endpoint_mapping_count() == 2U);
   const std::vector<SubassemblyInstanceId> expected_left{SubassemblyInstanceId("subassembly.left")};
-  const std::vector<SubassemblyInstanceId> expected_right{SubassemblyInstanceId("subassembly.right")};
+  const std::vector<SubassemblyInstanceId> expected_right{
+      SubassemblyInstanceId("subassembly.right")};
   CHECK(graph.value().joint_endpoint_mappings()[0].endpoint.occurrence_path() == expected_left);
   CHECK(graph.value().joint_endpoint_mappings()[1].endpoint.occurrence_path() == expected_right);
   CHECK(graph.value().joint_endpoint_mappings()[0].authority ==

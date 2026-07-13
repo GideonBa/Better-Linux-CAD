@@ -342,4 +342,4 @@ Descriptors are computed analytically from validated feature/sketch/profile inte
 
 Block 37 explicit relationship compatibility, Block 38 generic relationship intent/JSON, Block 39 generic equations/shared solve integration, and Block 40 joint target compatibility are implemented. Blocks 39–40 consume generated target capabilities through the same projection contract and add no generated-topology JSON field.
 
-The next technical step is Block 41: general joint coordinate/limit Core model.
+Blocks 41–42 typed joint coordinates and additive compatible JSON are implemented in `docs/assembly-joint-coordinate-model-mvp5.md` and `docs/assembly-joint-coordinate-json-mvp5.md`. The next technical step is Block 43: vector joint drives, holding semantics, freshness, and atomic application.

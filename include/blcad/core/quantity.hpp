@@ -9,6 +9,7 @@ namespace blcad {
 
 enum class QuantityKind {
   LengthMm,
+  LinearDisplacementMm,
   Count,
   AngleDeg,
 };
@@ -17,6 +18,9 @@ class Quantity {
 public:
   [[nodiscard]] static Result<Quantity> length_mm(double value_mm,
                                                   std::string_view object_id = "quantity");
+  // A signed linear coordinate or displacement in millimeters.
+  [[nodiscard]] static Result<Quantity>
+  linear_displacement_mm(double value_mm, std::string_view object_id = "quantity");
   // A dimensionless positive integer amount, for example a hole count.
   [[nodiscard]] static Result<Quantity> count(double value,
                                               std::string_view object_id = "quantity");
@@ -30,6 +34,7 @@ public:
   [[nodiscard]] double degrees() const noexcept;
   [[nodiscard]] std::string_view unit() const noexcept;
   [[nodiscard]] bool is_positive_length() const noexcept;
+  [[nodiscard]] bool is_valid_linear_displacement() const noexcept;
   [[nodiscard]] bool is_valid_count() const noexcept;
   [[nodiscard]] bool is_valid_angle() const noexcept;
 

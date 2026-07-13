@@ -1,5 +1,6 @@
 #include "blcad/core/project_json.hpp"
 
+#include "assembly_joint_json.hpp"
 #include "blcad/core/assembly_document_json.hpp"
 #include "blcad/core/part_document_json.hpp"
 
@@ -228,15 +229,17 @@ cross_hierarchy_constraint_from_json(const json& constraint_json) {
 }
 
 [[nodiscard]] json cross_hierarchy_joint_to_json(const AssemblyHierarchyJoint& joint) {
-  return json{{"id", joint.id().value()},
-              {"name", joint.name()},
-              {"type", std::string(to_string(joint.type()))},
-              {"target_a", endpoint_to_json(joint.target_a())},
-              {"target_b", endpoint_to_json(joint.target_b())},
-              {"state", std::string(to_string(joint.state()))},
-              {"limits", json{{"lower", angle_quantity_to_json(joint.limits().lower_deg)},
-                              {"upper", angle_quantity_to_json(joint.limits().upper_deg)}}},
-              {"coordinate", angle_quantity_to_json(joint.coordinate_deg())}};
+  return json{
+      {"id", joint.id().value()},
+      {"name", joint.name()},
+      {"type", std::string(to_string(joint.type()))},
+      {"target_a", endpoint_to_json(joint.target_a())},
+      {"target_b", endpoint_to_json(joint.target_b())},
+      {"state", std::string(to_string(joint.state()))},
+      {"coordinates", detail::assembly_joint_coordinate_slots_to_json(joint.coordinate_slots())},
+      {"limits", json{{"lower", angle_quantity_to_json(joint.limits().lower_deg)},
+                      {"upper", angle_quantity_to_json(joint.limits().upper_deg)}}},
+      {"coordinate", angle_quantity_to_json(joint.coordinate_deg())}};
 }
 
 [[nodiscard]] Result<AssemblyHierarchyJoint>
@@ -259,27 +262,59 @@ cross_hierarchy_joint_from_json(const json& joint_json) {
   }
 
   const std::string id = joint_json.at("id").get<std::string>();
-  const json& limits = joint_json.at("limits");
-  auto lower = angle_quantity_from_json(limits.at("lower"), id,
-                                        "cross-hierarchy assembly joint lower limit");
-  if (lower.has_error()) {
-    return Result<AssemblyHierarchyJoint>::failure(lower.error());
-  }
-  auto upper = angle_quantity_from_json(limits.at("upper"), id,
-                                        "cross-hierarchy assembly joint upper limit");
-  if (upper.has_error()) {
-    return Result<AssemblyHierarchyJoint>::failure(upper.error());
-  }
-  auto coordinate = angle_quantity_from_json(joint_json.at("coordinate"), id,
-                                             "cross-hierarchy assembly joint coordinate");
-  if (coordinate.has_error()) {
-    return Result<AssemblyHierarchyJoint>::failure(coordinate.error());
+  const bool has_legacy_limits = joint_json.contains("limits");
+  const bool has_legacy_coordinate = joint_json.contains("coordinate");
+  if (has_legacy_limits != has_legacy_coordinate) {
+    return Result<AssemblyHierarchyJoint>::failure(json_error(
+        "legacy cross-hierarchy assembly joint limits and coordinate must appear together"));
   }
 
-  return AssemblyHierarchyJoint::create(
+  std::optional<AssemblyHierarchyJoint> legacy_joint;
+  if (has_legacy_limits) {
+    const json& limits = joint_json.at("limits");
+    auto lower = angle_quantity_from_json(limits.at("lower"), id,
+                                          "cross-hierarchy assembly joint lower limit");
+    if (lower.has_error())
+      return Result<AssemblyHierarchyJoint>::failure(lower.error());
+    auto upper = angle_quantity_from_json(limits.at("upper"), id,
+                                          "cross-hierarchy assembly joint upper limit");
+    if (upper.has_error())
+      return Result<AssemblyHierarchyJoint>::failure(upper.error());
+    auto coordinate = angle_quantity_from_json(joint_json.at("coordinate"), id,
+                                               "cross-hierarchy assembly joint coordinate");
+    if (coordinate.has_error())
+      return Result<AssemblyHierarchyJoint>::failure(coordinate.error());
+    auto created = AssemblyHierarchyJoint::create(
+        AssemblyJointId(id), joint_json.at("name").get<std::string>(), type.value(),
+        target_a.value(), target_b.value(), state.value(), lower.value(), upper.value(),
+        coordinate.value());
+    if (created.has_error())
+      return created;
+    legacy_joint = created.value();
+  }
+
+  if (!joint_json.contains("coordinates")) {
+    if (!legacy_joint) {
+      return Result<AssemblyHierarchyJoint>::failure(json_error(
+          "cross-hierarchy assembly joint requires coordinates or legacy Revolute fields"));
+    }
+    return Result<AssemblyHierarchyJoint>::success(std::move(*legacy_joint));
+  }
+
+  auto slots = detail::assembly_joint_coordinate_slots_from_json(joint_json.at("coordinates"), id);
+  if (slots.has_error())
+    return Result<AssemblyHierarchyJoint>::failure(slots.error());
+  auto joint = AssemblyHierarchyJoint::create(
       AssemblyJointId(id), joint_json.at("name").get<std::string>(), type.value(),
-      std::move(target_a.value()), std::move(target_b.value()), state.value(), lower.value(),
-      upper.value(), coordinate.value());
+      std::move(target_a.value()), std::move(target_b.value()), state.value(),
+      std::move(slots.value()));
+  if (joint.has_error())
+    return joint;
+  if (legacy_joint && legacy_joint->coordinate_slots() != joint.value().coordinate_slots()) {
+    return Result<AssemblyHierarchyJoint>::failure(json_error(
+        "cross-hierarchy assembly joint coordinate slots conflict with legacy Revolute fields"));
+  }
+  return joint;
 }
 
 } // namespace

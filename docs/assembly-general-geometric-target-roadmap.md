@@ -1,6 +1,6 @@
 # General Assembly Geometric Target and Relationship Roadmap
 
-Status: Blocks 31–40 are implemented. Block 41 is the current next technical step. Blocks 41–47 remain planned headless architecture.
+Status: Blocks 31–42 are implemented. Block 43 is the current next technical step. Blocks 43–47 remain planned headless architecture.
 
 This document is the active status and sequencing authority for the expansion from the current assembly target layer to semantic reference geometry, stable generated topology targets, generic geometric relationships, and richer motion-joint families.
 
@@ -11,6 +11,9 @@ Implemented contracts are canonical in:
 - `docs/assembly-generated-topology-reference-mvp5.md`
 - `docs/assembly-generic-relationship-intent-mvp5.md`
 - `docs/assembly-generic-relationship-equations-mvp5.md`
+- `docs/assembly-joint-target-compatibility-mvp5.md`
+- `docs/assembly-joint-coordinate-model-mvp5.md`
+- `docs/assembly-joint-coordinate-json-mvp5.md`
 
 The complete pre-implementation planning detail for Blocks 32–47 is preserved byte-for-byte in:
 
@@ -156,7 +159,7 @@ Focused tag:
 
 ## Mandatory continuation order
 
-Blocks 32 through 39 are implemented. The remaining order is unchanged.
+Blocks 32 through 42 are implemented. The remaining order is unchanged.
 
 ```text
 32 assembly-selectable reference geometry Core intent (implemented)
@@ -167,9 +170,9 @@ Blocks 32 through 39 are implemented. The remaining order is unchanged.
   -> 37 explicit target compatibility matrix (implemented)
   -> 38 generic geometric relationship Core intent + JSON (implemented)
   -> 39 generic relationship equations + shared solve integration (implemented)
-  -> 40 joint target compatibility + oriented Frame contract
-  -> 41 general joint coordinate/limit Core model
-  -> 42 general joint coordinate JSON/backward compatibility
+  -> 40 joint target compatibility + oriented Frame contract (implemented)
+  -> 41 general joint coordinate/limit Core model (implemented)
+  -> 42 general joint coordinate JSON/backward compatibility (implemented)
   -> 43 vector joint drives + holding/freshness/atomic application
   -> 44 Prismatic joint
   -> 45 Cylindrical joint
@@ -501,11 +504,35 @@ Implemented `AssemblyJointTargetCompatibilityResolver` as the derived compatibil
 
 Axis-only Revolute fails explicitly through the joint compatibility authority because Axis supplies no deterministic reference X direction. No arbitrary world-axis Frame synthesis is permitted. The canonical implemented contract is `docs/assembly-joint-target-compatibility-mvp5.md`.
 
-## Blocks 41–43 — Multi-coordinate joint foundation
+## Block 41 — General joint coordinate/limit Core model — Implemented
 
-Block 41 generalizes the persistent local/Project-level joint coordinate/limit model into family-defined typed coordinate slots with explicit angular/linear kinds.
+Persistent `AssemblyJoint` and `AssemblyHierarchyJoint` state now owns ordered, family-defined `AssemblyJointCoordinateSlot` values. Every slot has a stable semantic role, an explicit Angular/Linear kind, a typed authored value, and independently optional typed bounds. Angular coordinates use `AngleDeg`; signed linear coordinates use the dedicated `LinearDisplacementMm` quantity rather than positive construction length or a unitless scalar.
 
-Block 42 serializes that coordinate-slot model additively and preserves historical scalar Revolute compatibility.
+The implemented role vocabulary is `rotation`, `translation`, `translation_u`, `translation_v`, and `rotation_normal`. Current Revolute validates exactly one bounded Angular `rotation` slot. Existing scalar constructors, `with_coordinate`, `limits()`, and `coordinate_deg()` remain explicit Revolute compatibility views over that slot. Local and exact rooted target scopes remain separate.
+
+No JSON record changed and no vector motion drive or new joint family was introduced. Canonical contract: `docs/assembly-joint-coordinate-model-mvp5.md`.
+
+Focused tags:
+
+```text
+[core][assembly-joint-coordinate-model]
+[core][assembly-cross-hierarchy-joint-coordinate-model]
+```
+
+## Block 42 — General joint coordinate JSON and compatibility — Implemented
+
+Local and Project-level joint records now serialize deterministic family-ordered `coordinates[]` using canonical role/kind spellings and typed `deg`/`mm` quantities. Current Revolute writers also retain historical `limits` plus scalar `coordinate` fields, so old readers keep working without a schema/version change.
+
+Readers accept slot-only, historical-only, or exactly matching dual records. Unknown/duplicate/missing roles, unknown kinds, wrong units, invalid family order/limits, partial legacy fields, and conflicting dual state fail closed. Canonical contract: `docs/assembly-joint-coordinate-json-mvp5.md`.
+
+Focused tags:
+
+```text
+[core][assembly-joint-coordinate-json]
+[core][assembly-cross-hierarchy-joint-coordinate-json]
+```
+
+## Block 43 — Multi-coordinate drives
 
 Block 43 generalizes selected-joint scalar drives to deterministic coordinate drive vectors with holding semantics, complete coordinate-slot freshness, and atomic application.
 
@@ -518,16 +545,16 @@ One family per block:
 ```text
 44 Prismatic
   preferred first compatibility: Frame <-> Frame
-  translation : LengthMm
+  translation : LinearDisplacementMm
 
 45 Cylindrical
-  translation : LengthMm
+  translation : LinearDisplacementMm
   rotation    : AngleDeg
 
 46 Planar
   Frame <-> Frame
-  translation_u   : LengthMm
-  translation_v   : LengthMm
+  translation_u   : LinearDisplacementMm
+  translation_v   : LinearDisplacementMm
   rotation_normal : AngleDeg
 
 47 Ball/Spherical
@@ -594,8 +621,8 @@ posed geometry/contact records/sweep analyses
 
 ## Immediate next technical step
 
-Block 41 is the current next technical step.
+Block 43 is the current next technical step.
 
-Implement Block 41 only: generalize persistent local and Project-level joint coordinates/limits into family-defined typed coordinate slots while preserving current Revolute APIs through an explicit adaptation boundary.
+Implement Block 43 only: generalize selected-joint scalar drives into deterministic role-addressed coordinate drive vectors with holding semantics, complete slot freshness, and atomic application.
 
-Do not change JSON or introduce vector motion drives in Block 41; those remain Blocks 42 and 43.
+Preserve the Block-42 persistence contract and existing transform-authority model. Do not introduce a new joint family; Prismatic remains Block 44.

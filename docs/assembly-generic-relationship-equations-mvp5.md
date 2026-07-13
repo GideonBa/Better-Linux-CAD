@@ -367,4 +367,4 @@ Block 40 joint target compatibility and the oriented Frame contract are implemen
 
 Current Revolute remains `Frame <-> Frame`; Axis alone remains incompatible because it has no deterministic reference X direction.
 
-The next technical step is Block 41: general joint coordinate/limit Core model.
+Blocks 41–42 typed joint coordinates and additive compatible JSON are implemented in `docs/assembly-joint-coordinate-model-mvp5.md` and `docs/assembly-joint-coordinate-json-mvp5.md`. The next technical step is Block 43: vector joint drives, holding semantics, freshness, and atomic application.

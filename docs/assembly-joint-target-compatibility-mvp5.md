@@ -2,7 +2,7 @@
 
 Status: implemented as Block 40 of `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`.
 
-This document is canonical for derived joint target compatibility, the oriented `Frame` contract used by current Revolute equations, local/cross-hierarchy parity, and the Block-41 handoff.
+This document is canonical for derived joint target compatibility, the oriented `Frame` contract used by current Revolute equations, and local/cross-hierarchy parity. Its former Block-41 handoff is now implemented by `docs/assembly-joint-coordinate-model-mvp5.md`.
 
 ## Scope
 
@@ -161,10 +161,10 @@ Coverage proves:
 - local and cross-hierarchy compatibility/results agree;
 - existing local and cross-hierarchy Revolute numeric/motion tests remain unchanged.
 
-## Block 41 handoff
+## Block 41 outcome
 
-The next technical step is Block 41: general joint coordinate/limit Core model.
+Block 41 is implemented in `docs/assembly-joint-coordinate-model-mvp5.md`.
 
-Block 41 must introduce family-defined, typed persistent coordinate slots with stable semantic roles, explicit angular/linear kinds, authored values, and optional typed limits for both `AssemblyJoint` and `AssemblyHierarchyJoint`.
+Both `AssemblyJoint` and `AssemblyHierarchyJoint` now own family-defined typed persistent coordinate slots with stable semantic roles, explicit Angular/Linear kinds, authored values, and optional typed limits.
 
-Block 41 must preserve current Revolute public APIs through an explicit adaptation boundary. JSON changes and vector motion drives remain deferred to Blocks 42 and 43 respectively.
+Current Revolute public APIs are preserved through an explicit adaptation boundary. Block 42 JSON is implemented in `docs/assembly-joint-coordinate-json-mvp5.md`; vector motion drives remain deferred to Block 43.

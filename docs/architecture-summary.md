@@ -491,7 +491,7 @@ Block 33 adds `datum_axes` PartDocument persistence. Block 35 adds canonical sem
 
 ## Current direction
 
-Blocks 23–40 of the current assembly sequence are implemented.
+Blocks 23–42 of the current assembly sequence are implemented.
 
 Canonical current target architecture:
 
@@ -501,6 +501,8 @@ Canonical current target architecture:
 - `docs/assembly-generic-relationship-intent-mvp5.md`
 - `docs/assembly-generic-relationship-equations-mvp5.md`
 - `docs/assembly-joint-target-compatibility-mvp5.md`
+- `docs/assembly-joint-coordinate-model-mvp5.md`
+- `docs/assembly-joint-coordinate-json-mvp5.md`
 - `docs/assembly-general-geometric-target-roadmap.md`
 
 The complete original planning baseline for Blocks 32–47 remains in `docs/assembly-general-geometric-target-roadmap-planning-baseline.md` and is incorporated by the active roadmap for still-planned acceptance/failure details.
@@ -509,6 +511,6 @@ Canonical numbered sequence:
 
 - `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`
 
-The next technical step is Block 41 only: general joint coordinate/limit Core model.
+The next technical step is Block 43 only: vector joint drives, holding semantics, freshness, and atomic application.
 
-Block 40 derived joint compatibility and the oriented Frame/Frame Revolute contract are implemented. Axis-only Revolute fails closed without arbitrary reference-direction synthesis. Occurrence-local child pose overrides, whole-subassembly solve variables, general physics, and richer joints remain deferred according to their roadmap blocks.
+Block 42 deterministic coordinate-slot JSON is implemented for local and Project-level joints. Writers emit canonical `coordinates[]` plus historical Revolute scalar fields; readers accept slot-only, historical-only, or exactly matching dual records. Axis-only Revolute still fails closed without arbitrary reference-direction synthesis. Occurrence-local child pose overrides, whole-subassembly solve variables, general physics, and richer joints remain deferred according to their roadmap blocks.

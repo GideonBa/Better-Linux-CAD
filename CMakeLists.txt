@@ -37,6 +37,7 @@ add_library(
   src/core/assembly_exchange_graph.cpp
   src/core/assembly_hierarchy.cpp
   src/core/assembly_joint.cpp
+  src/core/assembly_joint_json.cpp
   src/core/assembly_joint_graph.cpp
   src/core/assembly_leaf_occurrence.cpp
   src/core/assembly_reference_target.cpp

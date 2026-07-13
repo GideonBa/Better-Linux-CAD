@@ -1,5 +1,7 @@
 #include "blcad/core/assembly_document_json.hpp"
 
+#include "assembly_joint_json.hpp"
+
 #include <nlohmann/json.hpp>
 
 #include <exception>
@@ -267,15 +269,17 @@ assembly_constraint_from_json(const json& constraint_json) {
 }
 
 [[nodiscard]] json assembly_joint_to_json(const AssemblyJoint& joint) {
-  return json{{"id", joint.id().value()},
-              {"name", joint.name()},
-              {"type", std::string(to_string(joint.type()))},
-              {"target_a", constraint_target_to_json(joint.target_a())},
-              {"target_b", constraint_target_to_json(joint.target_b())},
-              {"state", std::string(to_string(joint.state()))},
-              {"limits", json{{"lower", angle_quantity_to_json(joint.limits().lower_deg)},
-                              {"upper", angle_quantity_to_json(joint.limits().upper_deg)}}},
-              {"coordinate", angle_quantity_to_json(joint.coordinate_deg())}};
+  return json{
+      {"id", joint.id().value()},
+      {"name", joint.name()},
+      {"type", std::string(to_string(joint.type()))},
+      {"target_a", constraint_target_to_json(joint.target_a())},
+      {"target_b", constraint_target_to_json(joint.target_b())},
+      {"state", std::string(to_string(joint.state()))},
+      {"coordinates", detail::assembly_joint_coordinate_slots_to_json(joint.coordinate_slots())},
+      {"limits", json{{"lower", angle_quantity_to_json(joint.limits().lower_deg)},
+                      {"upper", angle_quantity_to_json(joint.limits().upper_deg)}}},
+      {"coordinate", angle_quantity_to_json(joint.coordinate_deg())}};
 }
 
 [[nodiscard]] Result<AssemblyJoint> assembly_joint_from_json(const json& joint_json) {
@@ -293,22 +297,57 @@ assembly_constraint_from_json(const json& constraint_json) {
     return Result<AssemblyJoint>::failure(target_b.error());
 
   const std::string id = joint_json.at("id").get<std::string>();
-  const json& limits = joint_json.at("limits");
-  auto lower = angle_quantity_from_json(limits.at("lower"), id, "assembly joint lower limit");
-  if (lower.has_error())
-    return Result<AssemblyJoint>::failure(lower.error());
-  auto upper = angle_quantity_from_json(limits.at("upper"), id, "assembly joint upper limit");
-  if (upper.has_error())
-    return Result<AssemblyJoint>::failure(upper.error());
-  auto coordinate =
-      angle_quantity_from_json(joint_json.at("coordinate"), id, "assembly joint coordinate");
-  if (coordinate.has_error())
-    return Result<AssemblyJoint>::failure(coordinate.error());
+  const bool has_legacy_limits = joint_json.contains("limits");
+  const bool has_legacy_coordinate = joint_json.contains("coordinate");
+  if (has_legacy_limits != has_legacy_coordinate) {
+    return Result<AssemblyJoint>::failure(
+        json_error("legacy assembly joint limits and coordinate must appear together"));
+  }
 
-  return AssemblyJoint::create(AssemblyJointId(id), joint_json.at("name").get<std::string>(),
-                               type.value(), std::move(target_a.value()),
-                               std::move(target_b.value()), state.value(), lower.value(),
-                               upper.value(), coordinate.value());
+  std::optional<AssemblyJoint> legacy_joint;
+  if (has_legacy_limits) {
+    const json& limits = joint_json.at("limits");
+    auto lower = angle_quantity_from_json(limits.at("lower"), id, "assembly joint lower limit");
+    if (lower.has_error())
+      return Result<AssemblyJoint>::failure(lower.error());
+    auto upper = angle_quantity_from_json(limits.at("upper"), id, "assembly joint upper limit");
+    if (upper.has_error())
+      return Result<AssemblyJoint>::failure(upper.error());
+    auto coordinate =
+        angle_quantity_from_json(joint_json.at("coordinate"), id, "assembly joint coordinate");
+    if (coordinate.has_error())
+      return Result<AssemblyJoint>::failure(coordinate.error());
+    auto created = AssemblyJoint::create(
+        AssemblyJointId(id), joint_json.at("name").get<std::string>(), type.value(),
+        target_a.value(), target_b.value(), state.value(), lower.value(), upper.value(),
+        coordinate.value());
+    if (created.has_error())
+      return created;
+    legacy_joint = created.value();
+  }
+
+  if (!joint_json.contains("coordinates")) {
+    if (!legacy_joint) {
+      return Result<AssemblyJoint>::failure(
+          json_error("assembly joint requires coordinates or legacy Revolute coordinate fields"));
+    }
+    return Result<AssemblyJoint>::success(std::move(*legacy_joint));
+  }
+
+  auto slots = detail::assembly_joint_coordinate_slots_from_json(joint_json.at("coordinates"), id);
+  if (slots.has_error())
+    return Result<AssemblyJoint>::failure(slots.error());
+  auto joint = AssemblyJoint::create(
+      AssemblyJointId(id), joint_json.at("name").get<std::string>(), type.value(),
+      std::move(target_a.value()), std::move(target_b.value()), state.value(),
+      std::move(slots.value()));
+  if (joint.has_error())
+    return joint;
+  if (legacy_joint && legacy_joint->coordinate_slots() != joint.value().coordinate_slots()) {
+    return Result<AssemblyJoint>::failure(
+        json_error("assembly joint coordinate slots conflict with legacy Revolute fields"));
+  }
+  return joint;
 }
 
 [[nodiscard]] Result<Parameter> assembly_parameter_from_json(const json& parameter_json) {

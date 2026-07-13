@@ -24,6 +24,14 @@ Result<Quantity> Quantity::length_mm(double value_mm, std::string_view object_id
   return Result<Quantity>::success(Quantity(value_mm, QuantityKind::LengthMm));
 }
 
+Result<Quantity> Quantity::linear_displacement_mm(double value_mm, std::string_view object_id) {
+  const std::string id(object_id);
+  if (!std::isfinite(value_mm)) {
+    return Result<Quantity>::failure(Error::validation(id, "linear displacement must be finite"));
+  }
+  return Result<Quantity>::success(Quantity(value_mm, QuantityKind::LinearDisplacementMm));
+}
+
 Result<Quantity> Quantity::count(double value, std::string_view object_id) {
   const std::string id(object_id);
 
@@ -80,6 +88,10 @@ std::string_view Quantity::unit() const noexcept {
 
 bool Quantity::is_positive_length() const noexcept {
   return kind_ == QuantityKind::LengthMm && value_mm_ > 0.0;
+}
+
+bool Quantity::is_valid_linear_displacement() const noexcept {
+  return kind_ == QuantityKind::LinearDisplacementMm;
 }
 
 bool Quantity::is_valid_count() const noexcept {
