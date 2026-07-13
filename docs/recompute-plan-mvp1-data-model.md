@@ -92,8 +92,8 @@ Blocks 52–53 supply body-scoped ShapeCache execution and public checked inspec
 
 Block 54 also registers Body-Boolean feature nodes in the same graph. Target and tool Bodies feed
 the Boolean node, and the node feeds either the modified target Body or a distinct result Body.
-Consequently, invalidation and recompute planning already order Boolean work deterministically;
-actual OCCT Boolean execution is the Block-55 boundary.
+Consequently, invalidation and recompute planning order Boolean work deterministically. Block 55
+now executes those steps through the body-scoped OCCT Boolean path.
 
 `PartDocument::mark_all_clean()` indirectly clears the plan because no `dirty` nodes remain afterward.
 
@@ -124,11 +124,11 @@ Current tests check:
 The first geometry adapter for rectangle extrusion, a small `ShapeCache`, and a narrow
 `AdditiveExtrude` execution exist in the optional target `blcad_geometry`. The recompute plan remains
 separate and now also describes Body-state work. Blocks 52–53 execute and inspect the existing
-Body-scoped extrude path; Block 55 will execute the Boolean steps introduced by Block 54.
+Body-scoped extrude path; Block 55 executes the Boolean steps introduced by Block 54.
 
 Next steps may use the plan but should stay small:
 
-- execute Body-Boolean Feature/Body steps
+- extend Body execution only through later explicit feature contracts
 - update deterministic Body entries in a generalized `ShapeCache`
 - continue to use OCCT only behind `blcad_geometry`
 - do not build a GUI yet

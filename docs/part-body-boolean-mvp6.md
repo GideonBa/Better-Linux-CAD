@@ -19,6 +19,7 @@ BodyBooleanFeature
 
 Canonical spellings are `add`, `subtract`, `intersect`, `modify_target`, and `new_body`.
 `keep_tool_bodies` explicitly freezes retention versus consumption intent for Block-55 Geometry.
+That Geometry contract is now implemented in `docs/part-body-boolean-geometry-mvp6.md`.
 
 ## Validation and identity
 
@@ -80,6 +81,6 @@ Focused tag:
 [core][body-boolean]
 ```
 
-Block 54 creates no OCCT Boolean, changes no ShapeCache entry, and consumes no Body Geometry.
-Block 55 implements deterministic Add/Subtract/Intersect execution, keep/consume behavior, both
+Block 54 itself creates no OCCT Boolean, changes no ShapeCache entry, and consumes no Body Geometry.
+Block 55 now implements deterministic Add/Subtract/Intersect execution, keep/consume behavior, both
 result modes, incremental recompute, and Geometry error context.

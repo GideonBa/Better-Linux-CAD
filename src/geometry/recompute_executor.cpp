@@ -35,6 +35,40 @@ struct GlobalCompositeProfileVertices {
   return Error::geometry(std::move(object_id), std::move(message));
 }
 
+[[nodiscard]] Result<GeometryShape> resolve_cached_body_input(const PartDocument& document,
+                                                              const ShapeCache& shape_cache,
+                                                              const BodyId& body_id,
+                                                              std::string_view role) {
+  if (const GeometryShape* shape = shape_cache.find_body_shape(body_id))
+    return Result<GeometryShape>::success(*shape);
+
+  const std::string body_node = "body:" + body_id.value();
+  for (const auto& [producer, dependent] : document.dependency_graph().dependencies()) {
+    if (dependent != body_node)
+      continue;
+    if (const GeometryShape* shape = shape_cache.find_feature_shape(FeatureId(producer)))
+      return Result<GeometryShape>::success(*shape);
+  }
+
+  return Result<GeometryShape>::failure(
+      geometry_error(body_id.value(),
+                     std::string(role) + " body shape must exist in the shape cache"));
+}
+
+[[nodiscard]] Result<GeometryShape>
+resolve_boolean_target_input(const PartDocument& document, const ShapeCache& shape_cache,
+                             const BodyBooleanFeature& feature) {
+  if (feature.result_mode() == BodyBooleanResultMode::ModifyTarget) {
+    for (const auto& [producer, dependent] : document.dependency_graph().dependencies()) {
+      if (dependent != feature.id().value() || producer.starts_with("body:"))
+        continue;
+      if (const GeometryShape* shape = shape_cache.find_feature_shape(FeatureId(producer)))
+        return Result<GeometryShape>::success(*shape);
+    }
+  }
+  return resolve_cached_body_input(document, shape_cache, feature.target_body(), "target");
+}
+
 [[nodiscard]] Result<std::size_t> store_feature_result(const PartDocument& document,
                                                        const Feature& feature, GeometryShape shape,
                                                        ShapeCache& shape_cache) {
@@ -805,6 +839,57 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_subtractive_extrude(
   return store_feature_result(document, *feature, std::move(shape.value()), shape_cache);
 }
 
+Result<std::size_t> GeometryRecomputeExecutor::execute_body_boolean(
+    const PartDocument& document, FeatureId feature_id, ShapeCache& shape_cache) const {
+  if (feature_id.empty()) {
+    return Result<std::size_t>::failure(
+        validation_error("body_boolean", "feature id must not be empty"));
+  }
+  const BodyBooleanFeature* feature = document.find_body_boolean_feature(feature_id);
+  if (feature == nullptr) {
+    return Result<std::size_t>::failure(
+        validation_error(feature_id.value(), "body boolean feature must exist in part document"));
+  }
+
+  ShapeCache working_cache = shape_cache;
+  auto target = resolve_boolean_target_input(document, working_cache, *feature);
+  if (target.has_error())
+    return Result<std::size_t>::failure(target.error());
+
+  std::vector<GeometryShape> tools;
+  tools.reserve(feature->tool_bodies().size());
+  for (const BodyId& tool_body : feature->tool_bodies()) {
+    auto tool = resolve_cached_body_input(document, working_cache, tool_body, "tool");
+    if (tool.has_error())
+      return Result<std::size_t>::failure(tool.error());
+    tools.push_back(std::move(tool.value()));
+  }
+
+  auto result = body_boolean_adapter_.combine(feature->id(), feature->operation(), target.value(),
+                                              tools);
+  if (result.has_error())
+    return Result<std::size_t>::failure(result.error());
+
+  if (!feature->keep_tool_bodies()) {
+    for (const BodyId& tool_body : feature->tool_bodies()) {
+      auto removed = working_cache.remove_body_shape(tool_body);
+      if (removed.has_error())
+        return Result<std::size_t>::failure(removed.error());
+    }
+  }
+  auto stored_feature = working_cache.store_feature_shape(feature->id(), result.value());
+  if (stored_feature.has_error())
+    return stored_feature;
+  auto stored_body = working_cache.store_body_shape(feature->effective_result_body(), feature->id(),
+                                                    std::move(result.value()));
+  if (stored_body.has_error())
+    return stored_body;
+
+  working_cache.clear_final_shape();
+  shape_cache = std::move(working_cache);
+  return stored_body;
+}
+
 Result<std::size_t> GeometryRecomputeExecutor::execute_feature(const PartDocument& document,
                                                                const Feature& feature,
                                                                ShapeCache& shape_cache) const {
@@ -827,15 +912,20 @@ GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const Reco
   GeometryRecomputeSummary summary;
   for (const RecomputeStep& step : plan.steps()) {
     const Feature* feature = document.find_feature(FeatureId(step.node_id));
-    if (feature == nullptr)
+    const BodyBooleanFeature* body_boolean =
+        document.find_body_boolean_feature(FeatureId(step.node_id));
+    if (feature == nullptr && body_boolean == nullptr)
       continue;
 
-    auto removed_stale_shape = execution_cache.remove_feature_shape(feature->id());
+    const FeatureId& executable_id = feature != nullptr ? feature->id() : body_boolean->id();
+    auto removed_stale_shape = execution_cache.remove_feature_shape(executable_id);
     if (removed_stale_shape.has_error()) {
       return Result<GeometryRecomputeSummary>::failure(removed_stale_shape.error());
     }
 
-    auto executed = execute_feature(document, *feature, execution_cache);
+    auto executed = feature != nullptr
+                        ? execute_feature(document, *feature, execution_cache)
+                        : execute_body_boolean(document, body_boolean->id(), execution_cache);
     if (executed.has_error())
       return Result<GeometryRecomputeSummary>::failure(executed.error());
 
@@ -853,13 +943,34 @@ GeometryRecomputeExecutor::execute_document(const PartDocument& document,
   ShapeCache working_cache = shape_cache;
   ShapeCache& execution_cache = document.bodies().empty() ? shape_cache : working_cache;
   GeometryRecomputeSummary summary;
-  for (const Feature& feature : document.features()) {
-    auto removed_stale_shape = execution_cache.remove_feature_shape(feature.id());
+  std::vector<std::string> executable_ids;
+  if (document.bodies().empty()) {
+    executable_ids.reserve(document.features().size());
+    for (const Feature& feature : document.features())
+      executable_ids.push_back(feature.id().value());
+  } else {
+    auto order = document.dependency_graph().topological_order();
+    if (order.has_error())
+      return Result<GeometryRecomputeSummary>::failure(order.error());
+    executable_ids = std::move(order.value());
+  }
+
+  for (const std::string& executable_id : executable_ids) {
+    const Feature* feature = document.find_feature(FeatureId(executable_id));
+    const BodyBooleanFeature* body_boolean =
+        document.find_body_boolean_feature(FeatureId(executable_id));
+    if (feature == nullptr && body_boolean == nullptr)
+      continue;
+
+    const FeatureId& feature_id = feature != nullptr ? feature->id() : body_boolean->id();
+    auto removed_stale_shape = execution_cache.remove_feature_shape(feature_id);
     if (removed_stale_shape.has_error()) {
       return Result<GeometryRecomputeSummary>::failure(removed_stale_shape.error());
     }
 
-    auto executed = execute_feature(document, feature, execution_cache);
+    auto executed = feature != nullptr
+                        ? execute_feature(document, *feature, execution_cache)
+                        : execute_body_boolean(document, body_boolean->id(), execution_cache);
     if (executed.has_error())
       return Result<GeometryRecomputeSummary>::failure(executed.error());
 

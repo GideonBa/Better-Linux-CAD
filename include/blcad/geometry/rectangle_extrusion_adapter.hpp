@@ -15,6 +15,7 @@ struct ShapeSummary {
 };
 
 class RectangleExtrusionAdapter;
+class BodyBooleanAdapter;
 class CircularCutAdapter;
 class ClosedProfileAdapter;
 class StepExporter;
@@ -41,6 +42,7 @@ private:
   struct Impl;
 
   friend class RectangleExtrusionAdapter;
+  friend class BodyBooleanAdapter;
   friend class CircularCutAdapter;
   friend class ClosedProfileAdapter;
   friend class StepExporter;

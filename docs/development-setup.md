@@ -392,7 +392,7 @@ Block 51 feature Body-operation persistence and graph semantics are implemented.
 ./build/dev/blcad_core_tests "[core][part-body-dependency]"
 ```
 
-The immediate next step is Block 55 Body boolean Geometry and recompute. Block 54 persistent intent is canonical in `docs/part-body-boolean-mvp6.md`. Block 43 role-addressed drives, authored holding, complete coordinate-slot freshness, and atomic application remain authoritative for local and Project-level driven motion; Spherical participates passively and rejects selection. Exact sequencing is maintained in `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md` and `docs/part-construction-sequence-mvp6.md`.
+Block 55 Body Boolean Geometry can be verified with `./build/blcad_geometry_tests "[geometry][body-boolean]"`; its contract is canonical in `docs/part-body-boolean-geometry-mvp6.md`. The immediate next step is Block 56 BodyTransform and SketchOwnership Core intent plus JSON. Block 43 role-addressed drives, authored holding, complete coordinate-slot freshness, and atomic application remain authoritative for local and Project-level driven motion; Spherical participates passively and rejects selection. Exact sequencing is maintained in `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md` and `docs/part-construction-sequence-mvp6.md`.
 
 After the Blocks 48–94 Part Construction sequence, Blocks 95–101 plan STEP import as either an
 immutable Assembly-ready Reference Part or an EditableBody `ImportedBodyFeature` with downstream

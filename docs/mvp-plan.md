@@ -4,17 +4,17 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 54
-current_block: 55
-current_boundary: Body boolean Geometry and recompute
-current_tag: "[geometry][body-boolean]"
+implemented_through: Block 55
+current_block: 56
+current_boundary: BodyTransform and SketchOwnership Core intent plus JSON
+current_tag: "[core][body-transform] [core][sketch-ownership]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
   mvp_3: "Parametric bolt circle pattern — implemented"
   mvp_4: "Assembly parameters and Project container — implemented"
   mvp_5: "Assembly relationships, motion, hierarchy, analysis, exchange — Blocks 1–47 implemented"
-  mvp_6: "Part Construction — Blocks 48–54 implemented, Blocks 55–94 planned, Block 55 next"
+  mvp_6: "Part Construction — Blocks 48–55 implemented, Blocks 56–94 planned, Block 56 next"
   mvp_7: "STEP Import — Blocks 95–101 planned after Block 94"
 ---
 
@@ -552,10 +552,10 @@ motion solvers reject Spherical as the selected drive.
 
 ## MVP 6 — Part Construction MVP after Block 47
 
-**Status:** In progress — Blocks 48–54 implemented
+**Status:** In progress — Blocks 48–55 implemented
 **Canonical:** sequence `docs/part-construction-sequence-mvp6.md`
 
-Blocks 48–54 are complete. Block 55 is the current next technical step.
+Blocks 48–55 are complete. Block 56 is the current next technical step.
 
 Mandatory Part Construction phase order:
 
@@ -754,7 +754,20 @@ Canonical contract: `docs/part-body-boolean-mvp6.md`.
 [core][body-boolean]
 ```
 
-## Current next technical step — Block 55
+## Block 55 — Body boolean Geometry and recompute — Implemented
 
-Add Body boolean Geometry and recompute according to
+Block 55 executes Add/Fuse, Subtract/Cut, and Intersect/Common against body-scoped cached shapes in
+canonical tool order. It supports ModifyTarget/NewBody, keep/consume semantics, mixed graph-ordered
+Feature/Boolean execution, incremental recompute, contextual Geometry failures, and transactional
+cache commits.
+
+Canonical contract: `docs/part-body-boolean-geometry-mvp6.md`.
+
+```text
+[geometry][body-boolean]
+```
+
+## Current next technical step — Block 56
+
+Add BodyTransform and SketchOwnership Core intent plus JSON according to
 `docs/part-construction-sequence-mvp6.md`.

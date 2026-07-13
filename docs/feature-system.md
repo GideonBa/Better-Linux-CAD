@@ -1,6 +1,6 @@
 # Feature System
 
-Status: target architecture. Additive/Subtractive Extrude, multi-body identity/results, and Block-54 BodyBooleanFeature Core intent are implemented; Body Boolean Geometry is the Block-55 boundary.
+Status: target architecture. Additive/Subtractive Extrude, multi-body identity/results, Block-54 BodyBooleanFeature Core intent, and Block-55 Body Boolean Geometry are implemented; BodyTransform and SketchOwnership intent is the Block-56 boundary.
 
 Features are the parametric operations a part is built from. Each feature has inputs, parameters, references, and a computed geometry output. The central rule is that a feature stores the *rule* for computing geometry, not only the finished body. The OCCT shape is a cache.
 
@@ -158,7 +158,7 @@ A feature depends on its input sketch, selected profile region, parameters, targ
 5. Use the implemented Block-52 `ShapeCache` support for multiple body shapes.
 6. Add body transform records for translate, rotate, and uniform scale.
 7. Add sketch ownership records so body transforms can move owned sketch workplanes when requested.
-8. Execute the implemented Block-54 body boolean features in Geometry (Block 55).
+8. Extend the implemented Block-55 body boolean Geometry only through explicit later feature contracts.
 9. Add `RevolveFeature` and `RevolveCutFeature`.
 10. Extend the implemented circular-hole-pattern seed (`docs/bolt-circle-pattern-mvp3.md`) with assembly-scoped parameters, skip instances, and hole semantics.
 11. Add richer extrude/cut extents: symmetric, two-sided, to-object, to-next, taper/draft, and thin features.
