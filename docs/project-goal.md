@@ -32,8 +32,10 @@ The project grows through controlled headless vertical slices. Historical phase 
 4. broader sketch/profile/feature support;
 5. sketch constraints and diagnostics;
 6. assembly relationships, motion, hierarchy, posed geometry, analysis, structured exchange, and general target architecture;
-7. GUI/application workflows;
-8. engineering modules.
+7. broad multi-body Part Construction;
+8. STEP Part/Assembly import as Reference or EditableBody;
+9. GUI/application workflows;
+10. engineering modules.
 
 Phases 1–6 have implemented seeds. Current work remains centered on CAD-core and headless application contracts rather than GUI breadth.
 
@@ -54,7 +56,7 @@ A feature should be narrow enough to prove through focused headless tests before
 
 ## Current technical phase
 
-The active assembly phase has implemented:
+The completed Assembly phase has implemented:
 
 ```text
 local five-family geometric solving + diagnostics
@@ -74,6 +76,11 @@ stable producer-driven generated topology identity and read-only recovery
 generated topology target resolution and deterministic target compatibility
 persistent local/Project-level Coincident, Parallel, and Perpendicular intent + JSON
 ```
+
+Blocks 48–52 establish Body identity, persistent feature Body-result operations, dependencies, and
+body-scoped recompute. The current next technical step is Block 53 multi-body compatibility and
+body-result inspection. STEP Part and
+structured Assembly import follows that sequence in Blocks 95–101.
 
 Several identity/authority questions are deliberately separated.
 
@@ -195,7 +202,7 @@ Blocks 32–34 established assembly-selectable reference geometry Core intent, s
 
 Block 35 establishes stable generated topology identity and recovery before Geometry topology lookup. Canonical `topo:` spellings encode exact semantic producer identities for cylindrical wall, rectangular linear-edge/vertex roles, and circular source/opposite rim roles. Producer role matrices publish expected cardinality and unsupported/ambiguous/patterned sources fail closed. Recovery is read-only and never writes raw kernel topology ids.
 
-Block 36 resolves the supported Block-35 semantic producers into Cylinder/Axis, Line, Circle/Axis/center Point, and Point capabilities, computed analytically from validated model intent for both component-local and exact rooted transform semantics. Block 37 adds deterministic relationship/target compatibility selection. Block 38 adds persistent local and Project-level Coincident/Parallel/Perpendicular intent plus lowercase JSON spellings. Block 39 adds capability-driven generic equations, shared local/cross-hierarchy graph and solver integration, freshness/application reuse, measured Jacobian-rank diagnostics, and non-planar Line/Axis Angle execution. Block 40 adds deterministic joint target compatibility, freezes Revolute as `Frame / Frame`, and rejects Axis-only motion targets without hidden reference-direction synthesis. Blocks 41–43 add family-defined typed coordinate slots, deterministic compatible JSON, role-addressed drives, holding semantics, complete slot freshness, and atomic application. Blocks 44–46 Prismatic, Cylindrical, and Planar are implemented. Block 47 completes the Assembly MVP with passive Point/Point Spherical intent, center-coincidence motion closure, and explicit selected-drive rejection. The next authority step is Block 48 Body identity and `PartDocument` ownership.
+Block 36 resolves the supported Block-35 semantic producers into Cylinder/Axis, Line, Circle/Axis/center Point, and Point capabilities, computed analytically from validated model intent for both component-local and exact rooted transform semantics. Block 37 adds deterministic relationship/target compatibility selection. Block 38 adds persistent local/Project-level relationship intent. Blocks 39–47 complete generic equations and the Assembly joint families through Spherical. Blocks 48–52 add stable Body identity, persistent feature Body-result operations, dependencies, and body-scoped recompute. The next authority step is Block 53 multi-body compatibility and body-result inspection.
 
 Canonical sequence: `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`.
 
@@ -218,7 +225,8 @@ The system should eventually cover:
 - top-down design with assembly/cross-part parameter relationships;
 - engineering assistants for bolts, holes, shafts, bearings, and gears;
 - standard-parts libraries and a material database;
-- structured assembly exchange, STEP import/export, and STL export;
+- structured assembly exchange, STEP import/export, and STL export; STEP import is concretely
+  sequenced in Blocks 95–101 as immutable Reference Parts or EditableBody base features;
 - richer contact/interference/motion analysis;
 - technical drawings and bills of materials;
 - later CAM or FEM coupling.
@@ -245,6 +253,9 @@ These are sequencing boundaries, not permanent product exclusions.
 ## Documentation authority
 
 `docs/mvp-plan.md` is the implementation-sequence source of truth.
+
+`docs/step-import-sequence-mvp7.md` is the canonical post-Block-94 plan for STEP Part and
+structured Assembly import.
 
 `docs/architecture-summary.md` summarizes implemented architecture.
 

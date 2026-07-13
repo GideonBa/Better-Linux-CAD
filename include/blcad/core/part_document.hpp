@@ -1,5 +1,6 @@
 #pragma once
 
+#include "blcad/core/body.hpp"
 #include "blcad/core/construction_geometry.hpp"
 #include "blcad/core/datum_axis.hpp"
 #include "blcad/core/datum_plane.hpp"
@@ -40,11 +41,16 @@ public:
   [[nodiscard]] Result<std::size_t> add_derived_workplane(DerivedWorkplane workplane);
   [[nodiscard]] Result<std::size_t> add_sketch(Sketch sketch);
   [[nodiscard]] Result<std::size_t> add_feature(Feature feature);
+  [[nodiscard]] Result<std::size_t> add_body(Body body);
+  [[nodiscard]] Result<std::size_t> remove_body(BodyId id);
+  [[nodiscard]] Result<std::size_t> set_body_visibility(BodyId id, BodyVisibility visibility);
   [[nodiscard]] Result<std::size_t> add_reference_status(ReferenceStatusRecord status);
   [[nodiscard]] Result<std::size_t> add_reference_remap(ReferenceRemapRecord remap);
   [[nodiscard]] Result<std::size_t>
   add_sketch_origin_override(SketchOriginOverrideRecord origin_override);
   [[nodiscard]] Result<std::vector<std::string>> mark_parameter_changed(ParameterId id);
+  [[nodiscard]] Result<std::vector<std::string>> mark_feature_changed(FeatureId id);
+  [[nodiscard]] Result<std::vector<std::string>> mark_body_changed(BodyId id);
   // Sets a parameter value, validates it, and marks the parameter and its
   // dependents as changed. Affected expression parameters are re-evaluated in
   // topological order before the affected graph nodes are returned. Direct
@@ -71,6 +77,8 @@ public:
   [[nodiscard]] const std::vector<DerivedWorkplane>& derived_workplanes() const noexcept;
   [[nodiscard]] const std::vector<Sketch>& sketches() const noexcept;
   [[nodiscard]] const std::vector<Feature>& features() const noexcept;
+  // Body order is canonical lexicographic BodyId order, independent of insertion order.
+  [[nodiscard]] const std::vector<Body>& bodies() const noexcept;
   [[nodiscard]] const std::vector<ReferenceStatusRecord>& reference_statuses() const noexcept;
   [[nodiscard]] const std::vector<ReferenceRemapRecord>& reference_remaps() const noexcept;
   [[nodiscard]] const std::vector<SketchOriginOverrideRecord>&
@@ -86,6 +94,7 @@ public:
   [[nodiscard]] std::size_t derived_workplane_count() const noexcept;
   [[nodiscard]] std::size_t sketch_count() const noexcept;
   [[nodiscard]] std::size_t feature_count() const noexcept;
+  [[nodiscard]] std::size_t body_count() const noexcept;
   [[nodiscard]] std::size_t reference_status_count() const noexcept;
   [[nodiscard]] std::size_t reference_remap_count() const noexcept;
   [[nodiscard]] std::size_t sketch_origin_override_count() const noexcept;
@@ -103,6 +112,7 @@ public:
   [[nodiscard]] const DerivedWorkplane* find_derived_workplane(DatumPlaneId id) const noexcept;
   [[nodiscard]] const Sketch* find_sketch(SketchId id) const noexcept;
   [[nodiscard]] const Feature* find_feature(FeatureId id) const noexcept;
+  [[nodiscard]] const Body* find_body(BodyId id) const noexcept;
   [[nodiscard]] const ReferenceStatusRecord*
   find_reference_status(ReferenceStatusId id) const noexcept;
   [[nodiscard]] const ReferenceRemapRecord*
@@ -126,6 +136,7 @@ private:
   [[nodiscard]] bool has_derived_workplane_id(const DatumPlaneId& id) const noexcept;
   [[nodiscard]] bool has_sketch_id(const SketchId& id) const noexcept;
   [[nodiscard]] bool has_feature_id(const FeatureId& id) const noexcept;
+  [[nodiscard]] bool has_body_id(const BodyId& id) const noexcept;
   [[nodiscard]] bool has_reference_status_id(const ReferenceStatusId& id) const noexcept;
   [[nodiscard]] bool has_reference_remap_id(const ReferenceRemapId& id) const noexcept;
   [[nodiscard]] bool has_sketch_origin_override_id(const SketchId& id) const noexcept;
@@ -141,6 +152,7 @@ private:
   std::vector<DerivedWorkplane> derived_workplanes_;
   std::vector<Sketch> sketches_;
   std::vector<Feature> features_;
+  std::vector<Body> bodies_;
   std::vector<ReferenceStatusRecord> reference_statuses_;
   std::vector<ReferenceRemapRecord> reference_remaps_;
   std::vector<SketchOriginOverrideRecord> sketch_origin_overrides_;

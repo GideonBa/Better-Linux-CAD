@@ -17,6 +17,8 @@ Fundamental decisions:
 - separate authored hierarchy boundaries from derived traversal/composition;
 - separate geometric relationships from motion-joint intent;
 - separate exchange/product identity from OCCT/XDE/STEP identity;
+- treat a verified external STEP asset reference and its digest as model intent while keeping STEP
+  bytes and imported BRep derived;
 - keep contact/sweep products derived and unpersisted;
 - require complete freshness validation before solve/motion results mutate model intent.
 
@@ -46,9 +48,13 @@ A lower authority layer must not depend on a higher execution layer for persiste
 
 ## Part and Project ownership
 
-`PartDocument` is persistent parametric definition authority. Implemented part intent includes typed quantities/parameters, unit-aware formulas, datum/derived workplanes, construction geometry, sketches/profiles, projected/reference-driven geometry, semantic generated references/recovery, sketch constraints/diagnostics/repair helpers, additive/subtractive extrudes, `CircularHolePattern`, and dependency/invalidation/recompute planning.
+`PartDocument` is persistent parametric definition authority. Implemented part intent includes typed quantities/parameters, unit-aware formulas, datum/derived workplanes, construction geometry, sketches/profiles, projected/reference-driven geometry, semantic generated references/recovery, sketch constraints/diagnostics/repair helpers, additive/subtractive extrudes, `CircularHolePattern`, dependency/invalidation/recompute planning, and a deterministic collection of immutable Solid/Surface `Body` records with stable `BodyId` and visibility intent.
 
-OCCT shapes and `ShapeCache` values are computed products.
+OCCT shapes and `ShapeCache` values are computed products. Block 49 persists Body records; Block 50
+adds explicit NewBody/Join/Cut/Intersect result intent; Block 51 persists that context and connects
+`body:<BodyId>` producer/consumer chains to invalidation and recompute planning. Block 52 executes
+NewBody/Cut results into deterministic Body-scoped cache entries without moving shape identity into
+Core.
 
 `Project` owns:
 
@@ -493,6 +499,31 @@ posed shapes/contact records/sweep analyses
 
 Block 33 adds `datum_axes` PartDocument persistence. Block 35 adds canonical semantic endpoint strings but no JSON field or generated-topology cache. Block 38 adds accepted relationship type spellings without changing local or Project-level relationship record shapes. `docs/file-format.md` remains save-format authority.
 
+## Planned STEP import authority after Block 94
+
+Blocks 95–101 in `docs/step-import-sequence-mvp7.md` add two explicit modes without weakening the
+authority model:
+
+```text
+Reference
+  verified external STEP asset -> immutable imported Part definition
+
+EditableBody
+  verified external STEP asset -> ImportedBodyFeature -> persistent BodyId outputs
+  -> ordinary downstream BLCAD feature intent
+```
+
+Persistent import intent is limited to a project-relative asset reference, content digest, explicit
+mode, imported product/body selection, BLCAD body ids, and semantic imported-topology catalog.
+STEP bytes, BRep shapes, XDE labels, STEP entity numbers, transfer maps, resolved topology, and
+capability projections remain derived. Source refresh is explicit and transactional; lost or
+ambiguous imported topology fails closed before Assembly or downstream Part intent is changed.
+
+Reference Parts participate as shared `PartDocument` definitions in existing component and nested
+Assembly hierarchies. EditableBody does not reconstruct foreign history: it begins BLCAD history at
+an immutable `ImportedBodyFeature`. Structured STEP assembly import maps unique product definitions
+to shared BLCAD Part/Assembly definitions and direct occurrences to existing instance transforms.
+
 ## Current direction
 
 Blocks 23–47 of the Assembly sequence are implemented.
@@ -519,10 +550,17 @@ The complete original planning baseline for Blocks 32–47 remains in `docs/asse
 Canonical numbered sequence:
 
 - `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`
+- `docs/part-construction-sequence-mvp6.md`
+- `docs/part-body-identity-mvp6.md`
+- `docs/part-body-json-mvp6.md`
+- `docs/part-feature-body-operation-mvp6.md`
+- `docs/part-feature-body-dependency-mvp6.md`
+- `docs/part-multi-body-recompute-mvp6.md`
+- `docs/step-import-sequence-mvp7.md`
 
-Block 47 Spherical is implemented in `docs/assembly-spherical-joint-mvp5.md` and completes the
-Assembly MVP sequence. The next technical step is Block 48 Body identity and `PartDocument`
-ownership.
+Block 47 Spherical completes the Assembly MVP sequence. Blocks 48–52 Body identity, persistent
+feature Body-result operations, dependencies, and body-scoped recompute are implemented. The next
+technical step is Block 53 multi-body compatibility and body-result inspection.
 
 Block 47 adds passive Point/Point Spherical intent through the shared local/root-space path. Scalar
 Revolute APIs remain adapters; transform variables and the shared numeric engine are unchanged.

@@ -176,3 +176,44 @@ TEST_CASE("ShapeCache rejects empty feature ids and empty shapes", "[geometry][s
   CHECK(empty_shape.error().object_id() == "feature.base_extrude");
   CHECK(empty_shape.error().message() == "shape cache cannot store an empty shape");
 }
+
+TEST_CASE("ShapeCache stores deterministic body-scoped results",
+          "[geometry][shape_cache][multi-body-recompute]") {
+  auto cache = ShapeCache::create(ShapeCacheId("shape_cache.part"));
+  REQUIRE(cache);
+
+  REQUIRE(
+      cache.value().store_body_shape(BodyId("body.z"), FeatureId("feature.z"), make_plate_shape()));
+  REQUIRE(
+      cache.value().store_body_shape(BodyId("body.a"), FeatureId("feature.a"), make_plate_shape()));
+
+  REQUIRE(cache.value().body_shape_count() == 2);
+  CHECK(cache.value().body_shapes()[0].body_id.value() == "body.a");
+  CHECK(cache.value().body_shapes()[1].body_id.value() == "body.z");
+  REQUIRE(cache.value().find_body_shape(BodyId("body.a")) != nullptr);
+  CHECK(cache.value().find_body_result(BodyId("body.a"))->source_feature_id.value() == "feature.a");
+  CHECK_FALSE(cache.value().has_final_shape());
+}
+
+TEST_CASE("ShapeCache updates and removes one body without disturbing another",
+          "[geometry][shape_cache][multi-body-recompute]") {
+  auto cache = ShapeCache::create(ShapeCacheId("shape_cache.part"));
+  REQUIRE(cache);
+  REQUIRE(
+      cache.value().store_body_shape(BodyId("body.a"), FeatureId("feature.a"), make_plate_shape()));
+  REQUIRE(
+      cache.value().store_body_shape(BodyId("body.b"), FeatureId("feature.b"), make_plate_shape()));
+
+  REQUIRE(cache.value().store_body_shape(BodyId("body.a"), FeatureId("feature.a.next"),
+                                         make_plate_shape()));
+  CHECK(cache.value().body_shape_count() == 2);
+  CHECK(cache.value().find_body_result(BodyId("body.a"))->source_feature_id.value() ==
+        "feature.a.next");
+  CHECK(cache.value().find_body_result(BodyId("body.b"))->source_feature_id.value() == "feature.b");
+
+  const auto removed = cache.value().remove_body_shape(BodyId("body.a"));
+  REQUIRE(removed);
+  CHECK(removed.value());
+  CHECK(cache.value().find_body_shape(BodyId("body.a")) == nullptr);
+  REQUIRE(cache.value().find_body_shape(BodyId("body.b")) != nullptr);
+}

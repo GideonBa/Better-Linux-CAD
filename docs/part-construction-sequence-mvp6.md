@@ -1,14 +1,26 @@
 # Part Construction Sequence MVP-6
 
-Status: planned post-Assembly-MVP sequence. Blocks 48-94 are not implemented yet.
+Status: active post-Assembly-MVP sequence. Blocks 48–52 are implemented; Blocks 53–94 remain planned. Blocks 95–101 form the subsequent STEP Import MVP.
 
-Block 47 of the assembly target/relationship/joint sequence is implemented and the Assembly MVP handoff is complete. Block 48 — Body identity and `PartDocument` ownership — is the current next technical step.
+Block 47 completed the Assembly MVP handoff. Blocks 48–52 establish Body identity, persistent feature Body-result operations, dependencies, and body-scoped recompute. Block 53 — multi-body compatibility and body-result inspection — is the current next technical step.
 
 This document is the active status, phase-order, authority-boundary, and handoff summary for the first broad BLCAD Part Construction MVP after the Assembly MVP.
 
 The complete original Blocks 48-94 per-block planning detail is preserved byte-for-byte in:
 
 - `docs/part-construction-sequence-mvp6-planning-detail.md`
+
+The implemented Blocks 48–52 contracts are canonical in:
+
+- `docs/part-body-identity-mvp6.md`
+- `docs/part-body-json-mvp6.md`
+- `docs/part-feature-body-operation-mvp6.md`
+- `docs/part-feature-body-dependency-mvp6.md`
+- `docs/part-multi-body-recompute-mvp6.md`
+
+The planned post-Block-94 STEP import handoff is canonical in:
+
+- `docs/step-import-sequence-mvp7.md`
 
 That companion document's block goals, required work, failure policies, acceptance tags, proofs, and explicit deferrals are incorporated by reference here. Its historical top-level statement that repository work was on Block 35 is preserved planning context, not current status authority.
 
@@ -103,4 +115,18 @@ Do not merge these phases into one feature branch.
 
 Blocks 35–37 stable generated-topology identity, Geometry target resolution, and explicit relationship compatibility are implemented. Blocks 38–39 generic relationship intent/equations, Block 40 joint target compatibility/oriented Frame, Blocks 41–42 typed coordinate state/JSON, and Block 43 shared vector joint drives are also implemented. Blocks 44–47 Prismatic, Cylindrical, Planar, and passive Ball/Spherical are implemented.
 
-The prerequisite Assembly sequence is complete. Block 48 — Body identity and `PartDocument` ownership — is now the next technical step. The complete Block 48-94 implementation contracts remain in `docs/part-construction-sequence-mvp6-planning-detail.md`.
+The prerequisite Assembly sequence is complete. Blocks 48–50 provide Body identity, persistence,
+and explicit NewBody/Join/Cut/Intersect intent. Block 51 persists that Feature context and connects
+Body producer/consumer state to dependency, invalidation, recompute planning, cycle rejection, and
+removal protection. Block 52 adds deterministic body-scoped cache products and transactional
+recompute. Block 53 — multi-body compatibility and body-result inspection — is the next technical
+step. The remaining Block 53-94 implementation contracts stay in
+`docs/part-construction-sequence-mvp6-planning-detail.md`.
+
+## Post-Block-94 handoff
+
+Block 94 completes the first Part Construction MVP. Blocks 95–101 then add STEP import with two
+explicit modes: immutable Reference Parts for Assembly use and EditableBody Parts whose
+`ImportedBodyFeature` is followed by normal BLCAD feature history. Stable imported topology,
+source freshness, structured STEP assembly import, and integrated refresh/re-export behavior are
+separate blocks rather than implicit additions to Block 93 or 94.

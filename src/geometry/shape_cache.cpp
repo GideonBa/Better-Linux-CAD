@@ -80,11 +80,58 @@ Result<bool> ShapeCache::remove_feature_shape(FeatureId feature_id) {
   return Result<bool>::success(true);
 }
 
-void ShapeCache::clear() noexcept {
-  feature_shapes_.clear();
+Result<std::size_t> ShapeCache::store_body_shape(BodyId body_id, FeatureId source_feature_id,
+                                                 GeometryShape shape) {
+  if (body_id.empty()) {
+    return Result<std::size_t>::failure(
+        Error::validation(kShapeCacheObjectId, "body id must not be empty"));
+  }
+  const auto validation = validate_cache_input(source_feature_id, shape);
+  if (validation.has_error())
+    return validation;
+
+  const auto position = std::lower_bound(body_shapes_.begin(), body_shapes_.end(), body_id,
+                                         [](const CachedBodyShape& cached, const BodyId& id) {
+                                           return cached.body_id.value() < id.value();
+                                         });
+  if (position != body_shapes_.end() && position->body_id == body_id) {
+    const auto index = static_cast<std::size_t>(std::distance(body_shapes_.begin(), position));
+    position->source_feature_id = std::move(source_feature_id);
+    position->shape = std::move(shape);
+    return Result<std::size_t>::success(index);
+  }
+
+  const auto index = static_cast<std::size_t>(std::distance(body_shapes_.begin(), position));
+  body_shapes_.insert(position, CachedBodyShape{std::move(body_id), std::move(source_feature_id),
+                                                std::move(shape)});
+  return Result<std::size_t>::success(index);
+}
+
+Result<bool> ShapeCache::remove_body_shape(BodyId body_id) {
+  if (body_id.empty()) {
+    return Result<bool>::failure(
+        Error::validation(kShapeCacheObjectId, "body id must not be empty"));
+  }
+  const auto position = std::lower_bound(body_shapes_.begin(), body_shapes_.end(), body_id,
+                                         [](const CachedBodyShape& cached, const BodyId& id) {
+                                           return cached.body_id.value() < id.value();
+                                         });
+  if (position == body_shapes_.end() || position->body_id != body_id)
+    return Result<bool>::success(false);
+  body_shapes_.erase(position);
+  return Result<bool>::success(true);
+}
+
+void ShapeCache::clear_final_shape() noexcept {
   has_final_shape_ = false;
   final_feature_id_ = FeatureId();
   final_shape_ = GeometryShape();
+}
+
+void ShapeCache::clear() noexcept {
+  feature_shapes_.clear();
+  body_shapes_.clear();
+  clear_final_shape();
 }
 
 const ShapeCacheId& ShapeCache::id() const noexcept {
@@ -110,6 +157,27 @@ const GeometryShape* ShapeCache::find_feature_shape(const FeatureId& feature_id)
   }
 
   return &existing->shape;
+}
+
+const std::vector<CachedBodyShape>& ShapeCache::body_shapes() const noexcept {
+  return body_shapes_;
+}
+
+std::size_t ShapeCache::body_shape_count() const noexcept {
+  return body_shapes_.size();
+}
+
+const CachedBodyShape* ShapeCache::find_body_result(const BodyId& body_id) const noexcept {
+  const auto position = std::lower_bound(body_shapes_.begin(), body_shapes_.end(), body_id,
+                                         [](const CachedBodyShape& cached, const BodyId& id) {
+                                           return cached.body_id.value() < id.value();
+                                         });
+  return position != body_shapes_.end() && position->body_id == body_id ? &*position : nullptr;
+}
+
+const GeometryShape* ShapeCache::find_body_shape(const BodyId& body_id) const noexcept {
+  const CachedBodyShape* result = find_body_result(body_id);
+  return result == nullptr ? nullptr : &result->shape;
 }
 
 bool ShapeCache::has_final_shape() const noexcept {

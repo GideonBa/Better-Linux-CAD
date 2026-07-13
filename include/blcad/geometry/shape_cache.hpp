@@ -14,6 +14,12 @@ struct CachedFeatureShape {
   GeometryShape shape;
 };
 
+struct CachedBodyShape {
+  BodyId body_id;
+  FeatureId source_feature_id;
+  GeometryShape shape;
+};
+
 class ShapeCache {
 public:
   [[nodiscard]] static Result<ShapeCache> create(ShapeCacheId id);
@@ -22,6 +28,10 @@ public:
   [[nodiscard]] Result<std::size_t> set_final_shape(FeatureId source_feature_id,
                                                     GeometryShape shape);
   [[nodiscard]] Result<bool> remove_feature_shape(FeatureId feature_id);
+  [[nodiscard]] Result<std::size_t> store_body_shape(BodyId body_id, FeatureId source_feature_id,
+                                                     GeometryShape shape);
+  [[nodiscard]] Result<bool> remove_body_shape(BodyId body_id);
+  void clear_final_shape() noexcept;
 
   void clear() noexcept;
 
@@ -29,6 +39,10 @@ public:
   [[nodiscard]] const std::vector<CachedFeatureShape>& feature_shapes() const noexcept;
   [[nodiscard]] std::size_t feature_shape_count() const noexcept;
   [[nodiscard]] const GeometryShape* find_feature_shape(const FeatureId& feature_id) const noexcept;
+  [[nodiscard]] const std::vector<CachedBodyShape>& body_shapes() const noexcept;
+  [[nodiscard]] std::size_t body_shape_count() const noexcept;
+  [[nodiscard]] const CachedBodyShape* find_body_result(const BodyId& body_id) const noexcept;
+  [[nodiscard]] const GeometryShape* find_body_shape(const BodyId& body_id) const noexcept;
   [[nodiscard]] bool has_final_shape() const noexcept;
   [[nodiscard]] const FeatureId& final_feature_id() const noexcept;
   [[nodiscard]] const GeometryShape* final_shape() const noexcept;
@@ -41,6 +55,7 @@ private:
 
   ShapeCacheId id_;
   std::vector<CachedFeatureShape> feature_shapes_;
+  std::vector<CachedBodyShape> body_shapes_;
   bool has_final_shape_ = false;
   FeatureId final_feature_id_;
   GeometryShape final_shape_;

@@ -375,6 +375,10 @@ Structured exchange tests:
 
 prove rooted assembly/component exchange identity, shared part definitions, repeated/nested occurrence products, exact transform-chain reuse, collision-free names, XDE/STEP assembly usage relationships, and geometric equivalence with the flattened compatibility export.
 
+The reader used for geometric equivalence is test-only export verification. It is not a BLCAD STEP
+Part/Assembly import path. Reference and EditableBody import plus structured hierarchy conversion
+are planned in Blocks 95–101 of `docs/step-import-sequence-mvp7.md`.
+
 ## Current handoff
 
 Block 29 structured STEP assembly/product relationships are implemented.

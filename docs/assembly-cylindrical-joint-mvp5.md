@@ -52,4 +52,5 @@ Revolute-only adapters.
 ## Block 46 handoff
 
 Block 46 Planar and Block 47 passive Spherical are implemented in their canonical documents. The
-next technical step is Block 48.
+Blocks 48–52 Body identity, persistent feature Body-result operations, dependencies, and body-scoped
+recompute are implemented; Block 53 multi-body compatibility and body-result inspection is next.

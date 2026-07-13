@@ -12,6 +12,19 @@ namespace {
 
 constexpr double k_tolerance = 1.0e-9;
 
+[[nodiscard]] std::string body_dependency_node_id(const BodyId& id) {
+  return "body:" + id.value();
+}
+
+[[nodiscard]] std::vector<std::string> dependency_sources_of(const DependencyGraph& graph,
+                                                             std::string_view dependent) {
+  std::vector<std::string> sources;
+  for (const auto& edge : graph.dependencies())
+    if (edge.second == dependent)
+      sources.push_back(edge.first);
+  return sources;
+}
+
 Result<std::size_t> add_dependency_if_missing(DependencyGraph& graph, std::string dependency,
                                               std::string dependent) {
   if (graph.has_dependency(dependency, dependent)) {
@@ -829,6 +842,15 @@ Result<std::size_t> PartDocument::add_feature(Feature feature) {
       !has_feature_id(feature.target_feature()))
     return Result<std::size_t>::failure(Error::validation(
         feature.id().value(), "subtractive extrude target feature must exist in part document"));
+  if (feature.body_result_context().has_value()) {
+    const auto& context = feature.body_result_context().value();
+    if (context.target_body().has_value() && !has_body_id(context.target_body().value()))
+      return Result<std::size_t>::failure(Error::validation(
+          feature.id().value(), "feature target body must exist in part document"));
+    if (!has_body_id(context.effective_produced_body()))
+      return Result<std::size_t>::failure(Error::validation(
+          feature.id().value(), "feature produced body must exist in part document"));
+  }
   auto graph = dependency_graph_;
   auto added_node = graph.add_node(feature.id().value());
   if (added_node.has_error())
@@ -849,6 +871,38 @@ Result<std::size_t> PartDocument::add_feature(Feature feature) {
     if (target_dependency.has_error())
       return Result<std::size_t>::failure(target_dependency.error());
   }
+  if (feature.body_result_context().has_value()) {
+    const auto& context = feature.body_result_context().value();
+    const std::string result_node = body_dependency_node_id(context.effective_produced_body());
+    const bool modifies_in_place =
+        context.target_body().has_value() &&
+        context.target_body().value() == context.effective_produced_body();
+    if (modifies_in_place) {
+      const auto previous_producers = dependency_sources_of(graph, result_node);
+      graph.remove_dependencies_of_dependent(result_node);
+      for (const auto& producer : previous_producers) {
+        auto producer_dependency = add_dependency_if_missing(graph, producer, feature.id().value());
+        if (producer_dependency.has_error())
+          return Result<std::size_t>::failure(producer_dependency.error());
+      }
+    } else {
+      if (!dependency_sources_of(graph, result_node).empty())
+        return Result<std::size_t>::failure(Error::dependency(
+            feature.id().value(), "feature produced body already has a producing feature"));
+      if (context.target_body().has_value()) {
+        auto body_dependency = add_dependency_if_missing(
+            graph, body_dependency_node_id(context.target_body().value()), feature.id().value());
+        if (body_dependency.has_error())
+          return Result<std::size_t>::failure(body_dependency.error());
+      }
+    }
+    auto result_dependency = add_dependency_if_missing(graph, feature.id().value(), result_node);
+    if (result_dependency.has_error())
+      return Result<std::size_t>::failure(result_dependency.error());
+    if (graph.has_cycle())
+      return Result<std::size_t>::failure(Error::dependency(
+          feature.id().value(), "feature body operation must not create a dependency cycle"));
+  }
   auto invalidation_state = invalidation_state_;
   auto synced = sync_graph(std::move(graph), invalidation_state, dependency_graph_);
   if (synced.has_error())
@@ -856,6 +910,84 @@ Result<std::size_t> PartDocument::add_feature(Feature feature) {
   invalidation_state_ = std::move(invalidation_state);
   features_.push_back(std::move(feature));
   return Result<std::size_t>::success(features_.size() - 1U);
+}
+
+Result<std::size_t> PartDocument::add_body(Body body) {
+  if (has_body_id(body.id())) {
+    return Result<std::size_t>::failure(
+        Error::validation(body.id().value(), "body id must be unique within part document"));
+  }
+  auto graph = dependency_graph_;
+  const std::string node_id = body_dependency_node_id(body.id());
+  auto added_node = graph.add_node(node_id);
+  if (added_node.has_error())
+    return Result<std::size_t>::failure(added_node.error());
+  auto invalidation_state = invalidation_state_;
+  auto synced = sync_graph(std::move(graph), invalidation_state, dependency_graph_);
+  if (synced.has_error())
+    return Result<std::size_t>::failure(synced.error());
+  invalidation_state_ = std::move(invalidation_state);
+  const auto position = std::lower_bound(
+      bodies_.begin(), bodies_.end(), body.id().value(),
+      [](const Body& existing, const std::string& id) { return existing.id().value() < id; });
+  const auto index = static_cast<std::size_t>(std::distance(bodies_.begin(), position));
+  bodies_.insert(position, std::move(body));
+  return Result<std::size_t>::success(index);
+}
+
+Result<std::size_t> PartDocument::remove_body(BodyId id) {
+  if (id.empty()) {
+    return Result<std::size_t>::failure(Error::validation("body", "body id must not be empty"));
+  }
+  const auto found = std::find_if(bodies_.begin(), bodies_.end(),
+                                  [&id](const Body& body) { return body.id() == id; });
+  if (found == bodies_.end()) {
+    return Result<std::size_t>::failure(
+        Error::validation(id.value(), "body must exist in part document"));
+  }
+  for (const auto& feature : features_) {
+    if (!feature.body_result_context().has_value())
+      continue;
+    const auto& context = feature.body_result_context().value();
+    if ((context.target_body().has_value() && context.target_body().value() == id) ||
+        context.effective_produced_body() == id)
+      return Result<std::size_t>::failure(
+          Error::dependency(id.value(), "body with dependent model intent cannot be removed"));
+  }
+  const auto dependents = dependency_graph_.direct_dependents(body_dependency_node_id(id));
+  if (!dependents.empty()) {
+    return Result<std::size_t>::failure(
+        Error::dependency(id.value(), "body with dependent model intent cannot be removed"));
+  }
+  auto graph = dependency_graph_;
+  auto removed_node = graph.remove_node(body_dependency_node_id(id));
+  if (removed_node.has_error())
+    return Result<std::size_t>::failure(removed_node.error());
+  auto invalidation_state = invalidation_state_;
+  invalidation_state.untrack_node(body_dependency_node_id(id));
+  dependency_graph_ = std::move(graph);
+  invalidation_state_ = std::move(invalidation_state);
+  bodies_.erase(found);
+  return Result<std::size_t>::success(1U);
+}
+
+Result<std::size_t> PartDocument::set_body_visibility(BodyId id, BodyVisibility visibility) {
+  if (id.empty()) {
+    return Result<std::size_t>::failure(Error::validation("body", "body id must not be empty"));
+  }
+  const auto found = std::find_if(bodies_.begin(), bodies_.end(),
+                                  [&id](const Body& body) { return body.id() == id; });
+  if (found == bodies_.end()) {
+    return Result<std::size_t>::failure(
+        Error::validation(id.value(), "body must exist in part document"));
+  }
+  auto updated = found->with_visibility(visibility);
+  if (updated.has_error()) {
+    return Result<std::size_t>::failure(updated.error());
+  }
+  *found = std::move(updated.value());
+  return Result<std::size_t>::success(
+      static_cast<std::size_t>(std::distance(bodies_.begin(), found)));
 }
 
 Result<std::size_t> PartDocument::add_reference_status(ReferenceStatusRecord status) {
@@ -952,6 +1084,24 @@ Result<std::vector<std::string>> PartDocument::mark_parameter_changed(ParameterI
     return Result<std::vector<std::string>>::failure(
         Error::validation(id.value(), "parameter must exist in part document"));
   return invalidation_state_.mark_changed(dependency_graph_, id.value());
+}
+Result<std::vector<std::string>> PartDocument::mark_feature_changed(FeatureId id) {
+  if (id.empty())
+    return Result<std::vector<std::string>>::failure(
+        Error::validation("feature", "feature id must not be empty"));
+  if (!has_feature_id(id))
+    return Result<std::vector<std::string>>::failure(
+        Error::validation(id.value(), "feature must exist in part document"));
+  return invalidation_state_.mark_changed(dependency_graph_, id.value());
+}
+Result<std::vector<std::string>> PartDocument::mark_body_changed(BodyId id) {
+  if (id.empty())
+    return Result<std::vector<std::string>>::failure(
+        Error::validation("body", "body id must not be empty"));
+  if (!has_body_id(id))
+    return Result<std::vector<std::string>>::failure(
+        Error::validation(id.value(), "body must exist in part document"));
+  return invalidation_state_.mark_changed(dependency_graph_, body_dependency_node_id(id));
 }
 Result<std::vector<std::string>> PartDocument::set_parameter_value(ParameterId id, Quantity value) {
   if (id.empty())
@@ -1108,6 +1258,9 @@ const std::vector<Sketch>& PartDocument::sketches() const noexcept {
 const std::vector<Feature>& PartDocument::features() const noexcept {
   return features_;
 }
+const std::vector<Body>& PartDocument::bodies() const noexcept {
+  return bodies_;
+}
 const std::vector<ReferenceStatusRecord>& PartDocument::reference_statuses() const noexcept {
   return reference_statuses_;
 }
@@ -1150,6 +1303,9 @@ std::size_t PartDocument::sketch_count() const noexcept {
 }
 std::size_t PartDocument::feature_count() const noexcept {
   return features_.size();
+}
+std::size_t PartDocument::body_count() const noexcept {
+  return bodies_.size();
 }
 std::size_t PartDocument::reference_status_count() const noexcept {
   return reference_statuses_.size();
@@ -1222,6 +1378,12 @@ const Feature* PartDocument::find_feature(FeatureId id) const noexcept {
       return &feature;
   return nullptr;
 }
+const Body* PartDocument::find_body(BodyId id) const noexcept {
+  const auto found = std::lower_bound(
+      bodies_.begin(), bodies_.end(), id.value(),
+      [](const Body& body, const std::string& value) { return body.id().value() < value; });
+  return found != bodies_.end() && found->id() == id ? &*found : nullptr;
+}
 const ReferenceStatusRecord*
 PartDocument::find_reference_status(ReferenceStatusId id) const noexcept {
   for (const auto& status : reference_statuses_)
@@ -1277,6 +1439,9 @@ bool PartDocument::has_sketch_id(const SketchId& id) const noexcept {
 }
 bool PartDocument::has_feature_id(const FeatureId& id) const noexcept {
   return find_feature(id) != nullptr;
+}
+bool PartDocument::has_body_id(const BodyId& id) const noexcept {
+  return find_body(id) != nullptr;
 }
 bool PartDocument::has_reference_status_id(const ReferenceStatusId& id) const noexcept {
   return find_reference_status(id) != nullptr;

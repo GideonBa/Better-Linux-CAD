@@ -62,6 +62,22 @@ TEST_CASE("DependencyGraph reuses existing nodes", "[core][dependency_graph]") {
   CHECK(graph.node_count() == 1);
 }
 
+TEST_CASE("DependencyGraph removes nodes and their incident edges", "[core][dependency_graph]") {
+  DependencyGraph graph;
+  REQUIRE(graph.add_dependency("part.width", "sketch.base"));
+  REQUIRE(graph.add_dependency("sketch.base", "feature.base"));
+
+  const auto removed = graph.remove_node("sketch.base");
+  REQUIRE(removed);
+  CHECK(removed.value() == 1U);
+  CHECK_FALSE(graph.has_node("sketch.base"));
+  CHECK(graph.has_node("part.width"));
+  CHECK(graph.has_node("feature.base"));
+  CHECK(graph.dependency_count() == 0U);
+  REQUIRE(graph.remove_node("sketch.base"));
+  CHECK(graph.remove_node("").has_error());
+}
+
 TEST_CASE("DependencyGraph rejects empty node ids", "[core][dependency_graph]") {
   DependencyGraph graph;
 

@@ -50,22 +50,28 @@ ProfileSection
   one selected sketch profile used by loft/sweep/path-extrude features
 ```
 
-## Multi-body PartDocument target model
+## Multi-body PartDocument model
 
-A future `PartDocument` should have a body collection:
+Block 48 implements the first body collection boundary. The fields after `visibility` remain target
+architecture for later blocks:
 
 ```text
 PartDocument
   bodies[]
     BodyId
     name
-    body_kind = solid | surface | construction_only
+    body_kind = solid | surface
+    visibility
+
+    # planned extensions
     source_features[]
     transform_stack[]
-    visibility
     material_override
     cached_shape_key
 ```
+
+`construction_only` is not a Body kind in the numbered Part Construction contract; construction
+geometry remains separate semantic model intent.
 
 Feature outputs should explicitly target bodies:
 
@@ -355,8 +361,10 @@ These records are future target architecture. They are not part of the current `
 
 ## Proposed implementation sequence
 
-1. Add `BodyId` and `Body` records to `PartDocument` without changing geometry behavior.
-2. Add feature output body metadata: `new_body`, `target_body`, and `operation_mode`.
+1. **Implemented in Block 48:** add `BodyId` and the first immutable `Body` records to `PartDocument` without changing geometry behavior. The seed covers id, name, Solid/Surface kind, visibility, canonical ordering, and ownership; feature outputs, transforms, material/cache metadata, and JSON remain later steps.
+2. **Implemented through Block 51:** add feature operation mode plus target/effective-result Body
+   intent, compatible persistence, producer/consumer graph edges, invalidation, and cycle/removal
+   behavior.
 3. Add `ShapeCache` support for multiple body shapes instead of only a single final shape.
 4. Add JSON roundtrip tests for body identity and feature output body intent.
 5. Add `BodyTransform` records and transform-stack ordering.
@@ -369,6 +377,19 @@ These records are future target architecture. They are not part of the current `
 12. Add multi-section loft through three or more sketches.
 13. Add path/guide-curve loft support.
 14. Add STEP export of multi-body parts with deterministic body naming where supported.
+
+Feature Body-operation persistence, dependency semantics, and body-scoped recompute are implemented
+through Block 52. The current handoff is Block 53 multi-body compatibility and body-result
+inspection. Canonical implemented
+contracts include `docs/part-body-identity-mvp6.md`, `docs/part-body-json-mvp6.md`,
+`docs/part-feature-body-operation-mvp6.md`, `docs/part-feature-body-dependency-mvp6.md`, and
+`docs/part-multi-body-recompute-mvp6.md`; the
+numbered Part Construction sequence is authoritative where this older roadmap groups work
+differently.
+
+STEP import is deliberately sequenced afterward in `docs/step-import-sequence-mvp7.md`: Blocks
+95–101 reuse this roadmap's body and feature-result authority for Reference and EditableBody import
+modes instead of adding foreign BRep authority prematurely.
 
 ## First acceptance tests
 

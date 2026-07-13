@@ -528,6 +528,11 @@ The suites prove:
 - structured and flattened exporters produce equivalent posed solid count, volume, and bounds for repeated root and nested assembly fixtures;
 - empty output path and empty exported assembly fail closed.
 
+The `STEPControl_Reader` use above is export verification only; it is not a user-facing STEP
+importer and creates no BLCAD Part/Assembly intent. Production Reference, EditableBody, and
+structured Assembly import is planned separately in Blocks 95–101 of
+`docs/step-import-sequence-mvp7.md`.
+
 ## Next technical step
 
 Implement Block 30 only: richer posed contact classification and swept-motion analysis over the now-frozen rooted exchange/occurrence identities.

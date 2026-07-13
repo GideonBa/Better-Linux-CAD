@@ -367,4 +367,33 @@ Focused Blocks 36–40 tests:
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-cross-hierarchy-joint-target-compatibility]"
 ```
 
-Blocks 44–47 Prismatic, Cylindrical, Planar, and passive Spherical are implemented. The immediate next step is Block 48 Body identity and `PartDocument` ownership. Block 43 role-addressed drives, authored holding, complete coordinate-slot freshness, and atomic application remain authoritative for local and Project-level driven motion; Spherical participates passively and rejects selection. Exact sequencing is maintained in `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md` and `docs/part-construction-sequence-mvp6.md`.
+Blocks 44–47 Prismatic, Cylindrical, Planar, and passive Spherical are implemented. Block 48 Body identity and deterministic `PartDocument` ownership is also implemented; its focused Core proof is:
+
+```bash
+./build/dev/blcad_core_tests "[core][part-body]"
+```
+
+Block 49 Body JSON and structural validation is implemented. Its focused Core proof is:
+
+```bash
+./build/dev/blcad_core_tests "[core][part-body-json]"
+```
+
+Block 50 feature output-body and operation-mode Core intent is implemented. Its focused Core proof is:
+
+```bash
+./build/dev/blcad_core_tests "[core][feature-body-operation]"
+```
+
+Block 51 feature Body-operation persistence and graph semantics are implemented. Focused proofs are:
+
+```bash
+./build/dev/blcad_core_tests "[core][feature-body-operation-json]"
+./build/dev/blcad_core_tests "[core][part-body-dependency]"
+```
+
+The immediate next step is Block 53 multi-body compatibility and body-result inspection. Block 52 body-scoped ShapeCache/recompute execution is canonical in `docs/part-multi-body-recompute-mvp6.md`. Block 43 role-addressed drives, authored holding, complete coordinate-slot freshness, and atomic application remain authoritative for local and Project-level driven motion; Spherical participates passively and rejects selection. Exact sequencing is maintained in `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md` and `docs/part-construction-sequence-mvp6.md`.
+
+After the Blocks 48–94 Part Construction sequence, Blocks 95–101 plan STEP import as either an
+immutable Assembly-ready Reference Part or an EditableBody `ImportedBodyFeature` with downstream
+BLCAD features. Canonical sequencing: `docs/step-import-sequence-mvp7.md`.

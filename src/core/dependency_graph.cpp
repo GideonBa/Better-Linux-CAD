@@ -31,6 +31,22 @@ Result<std::size_t> DependencyGraph::add_node(NodeId node_id) {
   return Result<std::size_t>::success(nodes_.size() - 1);
 }
 
+Result<std::size_t> DependencyGraph::remove_node(NodeId node_id) {
+  if (node_id.empty())
+    return Result<std::size_t>::failure(
+        Error::validation("dependency_graph", "dependency node id must not be empty"));
+  const auto found = std::find(nodes_.begin(), nodes_.end(), node_id);
+  if (found == nodes_.end())
+    return Result<std::size_t>::success(0U);
+  dependencies_.erase(std::remove_if(dependencies_.begin(), dependencies_.end(),
+                                     [&node_id](const DependencyEdge& edge) {
+                                       return edge.first == node_id || edge.second == node_id;
+                                     }),
+                      dependencies_.end());
+  nodes_.erase(found);
+  return Result<std::size_t>::success(1U);
+}
+
 Result<std::size_t> DependencyGraph::add_dependency(NodeId dependency, NodeId dependent) {
   if (dependency.empty()) {
     return Result<std::size_t>::failure(

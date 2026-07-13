@@ -16,6 +16,7 @@ public:
   using DependencyEdge = std::pair<NodeId, NodeId>;
 
   [[nodiscard]] Result<std::size_t> add_node(NodeId node_id);
+  [[nodiscard]] Result<std::size_t> remove_node(NodeId node_id);
   [[nodiscard]] Result<std::size_t> add_dependency(NodeId dependency, NodeId dependent);
   // Removes every edge whose dependent is the given node and returns how many
   // were removed. Nodes stay in the graph; only incoming edges are dropped.

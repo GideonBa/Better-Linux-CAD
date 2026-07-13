@@ -105,6 +105,8 @@ Coverage proves scalar/vector adapter equivalence, typed role validation, duplic
 
 Blocks 44–46 Prismatic, Cylindrical, and Planar plus Block 47 passive Spherical are implemented in
 their canonical documents. Spherical joins holding/motion closure as a zero-slot relationship but
-is explicitly rejected as the selected drive. The next technical step is Block 48.
+is explicitly rejected as the selected drive. Blocks 48–52 Body identity, persistent feature
+Body-result operations, dependencies, and body-scoped recompute are implemented; Block 53
+multi-body compatibility and body-result inspection is the next technical step.
 
 Block 44 must add one `translation` Linear coordinate, persistent local/Project intent and JSON spelling, an explicit oriented target compatibility contract, deterministic residual order, shared local/root-space equations, graph participation, vector-drive execution, complete freshness, and atomic application. It must reuse the Block-43 drive boundary rather than adding a family-specific motion API.

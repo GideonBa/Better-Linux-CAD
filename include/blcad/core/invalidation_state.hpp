@@ -31,6 +31,7 @@ public:
   [[nodiscard]] static InvalidationState from_graph(const DependencyGraph& graph);
 
   [[nodiscard]] Result<std::size_t> track_node(NodeId node_id);
+  std::size_t untrack_node(std::string_view node_id) noexcept;
   [[nodiscard]] Result<std::size_t> sync_from_graph(const DependencyGraph& graph);
   [[nodiscard]] Result<std::vector<NodeId>> mark_changed(const DependencyGraph& graph,
                                                          std::string_view node_id);

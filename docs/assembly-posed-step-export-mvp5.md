@@ -241,6 +241,10 @@ Block-29 structured coverage:
 
 also compares structured STEP re-imported geometry against this flattened compatibility export for repeated root and repeated nested fixtures.
 
+These re-import checks validate exported geometry only. They do not create persistent BLCAD Parts,
+features, component instances, or subassemblies. That production import boundary is planned in
+Blocks 95–101 of `docs/step-import-sequence-mvp7.md`.
+
 ## Persistence boundary
 
 Persisted input authority remains:

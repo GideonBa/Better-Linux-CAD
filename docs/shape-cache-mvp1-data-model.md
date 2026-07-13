@@ -1,6 +1,6 @@
 # ShapeCache Data Model
 
-Status: optional geometry data model for computed feature shapes, final shape tracking, and stale-shape removal during incremental recompute.
+Status: geometry data model for computed feature/body shapes and compatibility final-shape tracking; generalized for multi-body recompute in Block 52.
 
 This document describes the small `ShapeCache` used by the optional `blcad_geometry` target. The cache contains computed `GeometryShape` values. It remains outside `PartDocument`, which stores model intent only.
 
@@ -11,6 +11,7 @@ The `ShapeCache` stores computed geometry as the result of the parametric model.
 The current cache supports:
 
 - storing computed feature shapes by `FeatureId`
+- storing deterministic body results by `BodyId` with their source `FeatureId`
 - replacing an existing feature shape when the same `FeatureId` is stored again
 - removing a cached feature shape before dirty-feature recompute
 - marking one final shape and its source feature
@@ -40,12 +41,14 @@ include/blcad/geometry/shape_cache.hpp
 Current types:
 
 - `CachedFeatureShape`
+- `CachedBodyShape`
 - `ShapeCache`
 
 `ShapeCache` uses:
 
 - `ShapeCacheId`
 - `FeatureId`
+- `BodyId`
 - `GeometryShape`
 - `Result<T>` and `Error`
 
@@ -63,6 +66,16 @@ Feature shapes are stored by feature ID:
 store_feature_shape(feature.base_extrude, geometry_shape)
 ```
 
+Body results are stored, replaced, queried, and removed independently:
+
+```text
+store_body_shape(body.base, feature.top_hole_cut, geometry_shape)
+find_body_result(body.base)
+remove_body_shape(body.base)
+```
+
+The `body_shapes()` view is always ordered lexicographically by `BodyId`.
+
 The final shape is connected to the feature that currently produced it:
 
 ```text
@@ -77,11 +90,14 @@ remove_feature_shape(feature.top_hole_cut)
 
 If the removed feature is also the current final-shape source, the final-shape marker is cleared. This prevents stale final geometry from surviving a failed incremental recompute.
 
-`clear()` removes all feature shapes and the final shape.
+`clear()` removes all feature shapes, body shapes, and the final shape.
 
 ## Incremental recompute rule
 
-`GeometryRecomputeExecutor::execute_plan` removes any cached shape for a dirty feature immediately before executing that feature.
+For explicit Body documents, `GeometryRecomputeExecutor::execute_plan` works on a cache copy,
+removes cached shapes for executed dirty Features there, and commits only after the complete plan
+succeeds. Body entries outside the plan are preserved. Historical zero-Body documents keep the
+original stale-feature removal and partial-result behavior.
 
 This matters for validation failures:
 
@@ -125,7 +141,7 @@ Current tests check:
 
 Not included yet:
 
-- integration into `PartDocument`
+- integration into `PartDocument` (deliberately remains outside Core)
 - persistent cache metadata
 - partial cache invalidation records
 - cache serialization

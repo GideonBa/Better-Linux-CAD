@@ -1,5 +1,6 @@
 #include "blcad/geometry/recompute_executor.hpp"
 
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 using namespace blcad;
@@ -141,6 +142,54 @@ ShapeCache make_shape_cache() {
   REQUIRE(cache);
 
   return cache.value();
+}
+
+Body make_solid_body(const char* id) {
+  auto body = Body::create(BodyId(id), id, BodyKind::Solid);
+  REQUIRE(body);
+  return body.value();
+}
+
+Feature with_body_context(Feature feature, FeatureBodyOperationMode mode,
+                          std::optional<BodyId> target, std::optional<BodyId> produced) {
+  auto context = FeatureBodyResultContext::create(mode, std::move(target), std::move(produced));
+  REQUIRE(context);
+  auto attached = feature.with_body_result_context(context.value());
+  REQUIRE(attached);
+  return attached.value();
+}
+
+PartDocument make_two_body_document() {
+  auto document = PartDocument::create(DocumentId("part.two_body"), "TwoBody");
+  REQUIRE(document);
+  REQUIRE(document.value().add_parameter(make_length_parameter("a.width", "a_width", 40.0)));
+  REQUIRE(document.value().add_parameter(make_length_parameter("a.height", "a_height", 30.0)));
+  REQUIRE(document.value().add_parameter(make_length_parameter("a.depth", "a_depth", 5.0)));
+  REQUIRE(document.value().add_parameter(make_length_parameter("b.width", "b_width", 20.0)));
+  REQUIRE(document.value().add_parameter(make_length_parameter("b.height", "b_height", 10.0)));
+  REQUIRE(document.value().add_parameter(make_length_parameter("b.depth", "b_depth", 7.0)));
+  auto xy = DatumPlane::xy();
+  REQUIRE(xy);
+  REQUIRE(document.value().add_datum_plane(xy.value()));
+
+  for (const char prefix : {'a', 'b'}) {
+    const std::string p(1, prefix);
+    auto sketch = Sketch::create(SketchId("sketch." + p), "Sketch" + p, DatumPlaneId("datum.xy"));
+    REQUIRE(sketch);
+    auto rectangle = RectangleProfile::create(ProfileId("profile." + p), ParameterId(p + ".width"),
+                                              ParameterId(p + ".height"));
+    REQUIRE(rectangle);
+    REQUIRE(sketch.value().add_profile(rectangle.value()));
+    REQUIRE(document.value().add_sketch(sketch.value()));
+    REQUIRE(document.value().add_body(make_solid_body(("body." + p).c_str())));
+    auto feature =
+        Feature::create_additive_extrude(FeatureId("feature." + p), "Extrude" + p,
+                                         SketchId("sketch." + p), ParameterId(p + ".depth"));
+    REQUIRE(feature);
+    REQUIRE(document.value().add_feature(with_body_context(
+        feature.value(), FeatureBodyOperationMode::NewBody, std::nullopt, BodyId("body." + p))));
+  }
+  return document.value();
 }
 
 } // namespace
@@ -334,4 +383,102 @@ TEST_CASE("GeometryRecomputeExecutor rejects unsupported subtractive sketches",
         "subtractive extrude requires exactly one circle, closed profile, arc closed profile, "
         "composite closed profile, circular hole pattern, or detected simple region");
   CHECK_FALSE(cache.has_final_shape());
+}
+
+TEST_CASE("GeometryRecomputeExecutor produces two independent body results",
+          "[geometry][multi-body-recompute]") {
+  const PartDocument document = make_two_body_document();
+  ShapeCache cache = make_shape_cache();
+  const GeometryRecomputeExecutor executor;
+
+  const auto summary = executor.execute_document(document, cache);
+
+  REQUIRE(summary);
+  CHECK(summary.value().executed_feature_count == 2);
+  CHECK(cache.body_shape_count() == 2);
+  REQUIRE(cache.find_body_shape(BodyId("body.a")) != nullptr);
+  REQUIRE(cache.find_body_shape(BodyId("body.b")) != nullptr);
+  CHECK(cache.body_shapes()[0].body_id.value() == "body.a");
+  CHECK(cache.body_shapes()[1].body_id.value() == "body.b");
+  CHECK_FALSE(cache.has_final_shape());
+
+  const RectangleExtrusionAdapter inspector;
+  CHECK(inspector.summarize(*cache.find_body_shape(BodyId("body.a"))).volume_mm3 ==
+        Catch::Approx(6000.0));
+  CHECK(inspector.summarize(*cache.find_body_shape(BodyId("body.b"))).volume_mm3 ==
+        Catch::Approx(1400.0));
+}
+
+TEST_CASE("GeometryRecomputeExecutor preserves unaffected body cache entries",
+          "[geometry][multi-body-recompute]") {
+  auto document = make_two_body_document();
+  ShapeCache cache = make_shape_cache();
+  const GeometryRecomputeExecutor executor;
+  REQUIRE(executor.execute_document(document, cache));
+  const CachedBodyShape before_b = *cache.find_body_result(BodyId("body.b"));
+
+  REQUIRE(document.mark_parameter_changed(ParameterId("a.width")));
+  const auto plan = document.create_recompute_plan();
+  REQUIRE(plan);
+  REQUIRE(plan.value().contains("feature.a"));
+  CHECK_FALSE(plan.value().contains("feature.b"));
+  REQUIRE(executor.execute_plan(document, plan.value(), cache));
+
+  const CachedBodyShape* after_b = cache.find_body_result(BodyId("body.b"));
+  REQUIRE(after_b != nullptr);
+  CHECK(after_b->source_feature_id == before_b.source_feature_id);
+  const RectangleExtrusionAdapter inspector;
+  CHECK(inspector.summarize(after_b->shape).volume_mm3 ==
+        inspector.summarize(before_b.shape).volume_mm3);
+}
+
+TEST_CASE("GeometryRecomputeExecutor cuts a target body and fails closed when it is missing",
+          "[geometry][multi-body-recompute]") {
+  auto document = make_document_with_base_plate_and_hole_cut();
+  REQUIRE(document.add_body(make_solid_body("body.base")));
+
+  const Feature base = with_body_context(document.features()[0], FeatureBodyOperationMode::NewBody,
+                                         std::nullopt, BodyId("body.base"));
+  const Feature cut = with_body_context(document.features()[1], FeatureBodyOperationMode::Cut,
+                                        BodyId("body.base"), std::nullopt);
+
+  auto rebuilt = PartDocument::create(DocumentId("part.body_cut"), "BodyCut");
+  REQUIRE(rebuilt);
+  for (const auto& parameter : document.parameters())
+    REQUIRE(rebuilt.value().add_parameter(parameter));
+  for (const auto& datum : document.datum_planes())
+    REQUIRE(rebuilt.value().add_datum_plane(datum));
+  for (const auto& sketch : document.sketches())
+    REQUIRE(rebuilt.value().add_sketch(sketch));
+  REQUIRE(rebuilt.value().add_body(make_solid_body("body.base")));
+  REQUIRE(rebuilt.value().add_feature(base));
+  REQUIRE(rebuilt.value().add_feature(cut));
+
+  ShapeCache cache = make_shape_cache();
+  const GeometryRecomputeExecutor executor;
+  REQUIRE(
+      executor.execute_additive_extrude(rebuilt.value(), FeatureId("feature.base_extrude"), cache));
+  const RectangleExtrusionAdapter inspector;
+  const double base_volume =
+      inspector.summarize(*cache.find_body_shape(BodyId("body.base"))).volume_mm3;
+  REQUIRE(executor.execute_subtractive_extrude(rebuilt.value(),
+                                               FeatureId("feature.center_hole_cut"), cache));
+  REQUIRE(cache.find_body_result(BodyId("body.base")) != nullptr);
+  CHECK(cache.find_body_result(BodyId("body.base"))->source_feature_id.value() ==
+        "feature.center_hole_cut");
+  CHECK(inspector.summarize(*cache.find_body_shape(BodyId("body.base"))).volume_mm3 < base_volume);
+  CHECK(cache.has_final_shape());
+  REQUIRE(cache.remove_body_shape(BodyId("body.base")));
+  const auto failed = executor.execute_subtractive_extrude(
+      rebuilt.value(), FeatureId("feature.center_hole_cut"), cache);
+  REQUIRE(failed.has_error());
+  CHECK(failed.error().object_id() == "body.base");
+  CHECK(failed.error().message() == "target body shape must exist in the shape cache");
+
+  REQUIRE(rebuilt.value().mark_parameter_changed(ParameterId("part.hole_diameter")));
+  const auto plan = rebuilt.value().create_recompute_plan();
+  REQUIRE(plan);
+  const auto failed_plan = executor.execute_plan(rebuilt.value(), plan.value(), cache);
+  REQUIRE(failed_plan.has_error());
+  CHECK(cache.find_feature_shape(FeatureId("feature.center_hole_cut")) != nullptr);
 }

@@ -35,6 +35,36 @@ struct GlobalCompositeProfileVertices {
   return Error::geometry(std::move(object_id), std::move(message));
 }
 
+[[nodiscard]] Result<std::size_t> store_feature_result(const PartDocument& document,
+                                                       const Feature& feature, GeometryShape shape,
+                                                       ShapeCache& shape_cache) {
+  if (!feature.body_result_context().has_value())
+    return shape_cache.set_final_shape(feature.id(), std::move(shape));
+
+  const FeatureBodyResultContext& context = *feature.body_result_context();
+  const BodyId& result_body_id = context.effective_produced_body();
+  const Body* result_body = document.find_body(result_body_id);
+  if (result_body == nullptr) {
+    return Result<std::size_t>::failure(
+        validation_error(result_body_id.value(), "produced body must exist in part document"));
+  }
+
+  auto feature_result = shape_cache.store_feature_shape(feature.id(), shape);
+  if (feature_result.has_error())
+    return feature_result;
+  auto body_result = shape_cache.store_body_shape(result_body_id, feature.id(), std::move(shape));
+  if (body_result.has_error())
+    return body_result;
+
+  if (document.bodies().size() == 1U && result_body->kind() == BodyKind::Solid) {
+    const GeometryShape* cached = shape_cache.find_body_shape(result_body_id);
+    return shape_cache.set_final_shape(feature.id(), *cached);
+  }
+
+  shape_cache.clear_final_shape();
+  return body_result;
+}
+
 [[nodiscard]] const Parameter* find_required_parameter(const PartDocument& document,
                                                        const ParameterId& parameter_id) noexcept {
   return document.find_parameter(parameter_id);
@@ -469,6 +499,12 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_additive_extrude(
     return Result<std::size_t>::failure(
         geometry_error(feature->id().value(), "only additive extrude features are supported"));
   }
+  if (feature->body_result_context().has_value() &&
+      feature->body_result_context()->operation_mode() != FeatureBodyOperationMode::NewBody) {
+    return Result<std::size_t>::failure(geometry_error(
+        feature->id().value(),
+        "additive extrude body execution currently requires new_body operation mode"));
+  }
 
   const Sketch* sketch = document.find_sketch(feature->input_sketch());
   if (sketch == nullptr) {
@@ -517,7 +553,7 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_additive_extrude(
     if (shape.has_error())
       return Result<std::size_t>::failure(shape.error());
 
-    return shape_cache.set_final_shape(feature->id(), std::move(shape.value()));
+    return store_feature_result(document, *feature, std::move(shape.value()), shape_cache);
   }
 
   if (has_exactly_one_closed_profile(*sketch) || has_no_profiles(*sketch) ||
@@ -542,7 +578,7 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_additive_extrude(
       if (shape.has_error())
         return Result<std::size_t>::failure(shape.error());
 
-      return shape_cache.set_final_shape(feature->id(), std::move(shape.value()));
+      return store_feature_result(document, *feature, std::move(shape.value()), shape_cache);
     }
 
     if (has_exactly_one_composite_closed_profile(*sketch)) {
@@ -557,7 +593,7 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_additive_extrude(
       if (shape.has_error())
         return Result<std::size_t>::failure(shape.error());
 
-      return shape_cache.set_final_shape(feature->id(), std::move(shape.value()));
+      return store_feature_result(document, *feature, std::move(shape.value()), shape_cache);
     }
 
     Result<std::vector<Point3>> vertices =
@@ -575,7 +611,7 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_additive_extrude(
     if (shape.has_error())
       return Result<std::size_t>::failure(shape.error());
 
-    return shape_cache.set_final_shape(feature->id(), std::move(shape.value()));
+    return store_feature_result(document, *feature, std::move(shape.value()), shape_cache);
   }
 
   return Result<std::size_t>::failure(validation_error(
@@ -600,6 +636,12 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_subtractive_extrude(
     return Result<std::size_t>::failure(
         geometry_error(feature->id().value(), "only subtractive extrude features are supported"));
   }
+  if (feature->body_result_context().has_value() &&
+      feature->body_result_context()->operation_mode() != FeatureBodyOperationMode::Cut) {
+    return Result<std::size_t>::failure(
+        geometry_error(feature->id().value(),
+                       "subtractive extrude body execution currently requires cut operation mode"));
+  }
 
   const Sketch* sketch = document.find_sketch(feature->input_sketch());
   if (sketch == nullptr) {
@@ -617,10 +659,24 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_subtractive_extrude(
         "composite closed profile, circular hole pattern, or detected simple region"));
   }
 
-  const GeometryShape* target = shape_cache.find_feature_shape(feature->target_feature());
+  const GeometryShape* target = nullptr;
+  std::string target_object_id = feature->target_feature().value();
+  if (feature->body_result_context().has_value()) {
+    const BodyId& target_body = *feature->body_result_context()->target_body();
+    if (document.find_body(target_body) == nullptr) {
+      return Result<std::size_t>::failure(
+          validation_error(target_body.value(), "target body must exist in part document"));
+    }
+    target = shape_cache.find_body_shape(target_body);
+    target_object_id = target_body.value();
+  } else {
+    target = shape_cache.find_feature_shape(feature->target_feature());
+  }
   if (target == nullptr) {
     return Result<std::size_t>::failure(geometry_error(
-        feature->target_feature().value(), "target feature shape must exist in the shape cache"));
+        target_object_id, feature->body_result_context().has_value()
+                              ? "target body shape must exist in the shape cache"
+                              : "target feature shape must exist in the shape cache"));
   }
 
   auto resolved_workplane = workplane_resolver_.resolve_for_sketch(document, *sketch);
@@ -649,7 +705,7 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_subtractive_extrude(
     if (shape.has_error())
       return Result<std::size_t>::failure(shape.error());
 
-    return shape_cache.set_final_shape(feature->id(), std::move(shape.value()));
+    return store_feature_result(document, *feature, std::move(shape.value()), shape_cache);
   }
 
   if (has_exactly_one_circular_hole_pattern(*sketch)) {
@@ -698,7 +754,7 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_subtractive_extrude(
       current = std::move(shape.value());
     }
 
-    return shape_cache.set_final_shape(feature->id(), std::move(current));
+    return store_feature_result(document, *feature, std::move(current), shape_cache);
   }
 
   if (has_exactly_one_arc_closed_profile(*sketch)) {
@@ -713,7 +769,7 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_subtractive_extrude(
     if (shape.has_error())
       return Result<std::size_t>::failure(shape.error());
 
-    return shape_cache.set_final_shape(feature->id(), std::move(shape.value()));
+    return store_feature_result(document, *feature, std::move(shape.value()), shape_cache);
   }
 
   if (has_exactly_one_composite_closed_profile(*sketch)) {
@@ -728,7 +784,7 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_subtractive_extrude(
     if (shape.has_error())
       return Result<std::size_t>::failure(shape.error());
 
-    return shape_cache.set_final_shape(feature->id(), std::move(shape.value()));
+    return store_feature_result(document, *feature, std::move(shape.value()), shape_cache);
   }
 
   Result<std::vector<Point3>> vertices =
@@ -746,7 +802,7 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_subtractive_extrude(
   if (shape.has_error())
     return Result<std::size_t>::failure(shape.error());
 
-  return shape_cache.set_final_shape(feature->id(), std::move(shape.value()));
+  return store_feature_result(document, *feature, std::move(shape.value()), shape_cache);
 }
 
 Result<std::size_t> GeometryRecomputeExecutor::execute_feature(const PartDocument& document,
@@ -766,44 +822,52 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_feature(const PartDocumen
 Result<GeometryRecomputeSummary>
 GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const RecomputePlan& plan,
                                         ShapeCache& shape_cache) const {
+  ShapeCache working_cache = shape_cache;
+  ShapeCache& execution_cache = document.bodies().empty() ? shape_cache : working_cache;
   GeometryRecomputeSummary summary;
   for (const RecomputeStep& step : plan.steps()) {
     const Feature* feature = document.find_feature(FeatureId(step.node_id));
     if (feature == nullptr)
       continue;
 
-    auto removed_stale_shape = shape_cache.remove_feature_shape(feature->id());
+    auto removed_stale_shape = execution_cache.remove_feature_shape(feature->id());
     if (removed_stale_shape.has_error()) {
       return Result<GeometryRecomputeSummary>::failure(removed_stale_shape.error());
     }
 
-    auto executed = execute_feature(document, *feature, shape_cache);
+    auto executed = execute_feature(document, *feature, execution_cache);
     if (executed.has_error())
       return Result<GeometryRecomputeSummary>::failure(executed.error());
 
     ++summary.executed_feature_count;
   }
 
+  if (!document.bodies().empty())
+    shape_cache = std::move(working_cache);
   return Result<GeometryRecomputeSummary>::success(summary);
 }
 
 Result<GeometryRecomputeSummary>
 GeometryRecomputeExecutor::execute_document(const PartDocument& document,
                                             ShapeCache& shape_cache) const {
+  ShapeCache working_cache = shape_cache;
+  ShapeCache& execution_cache = document.bodies().empty() ? shape_cache : working_cache;
   GeometryRecomputeSummary summary;
   for (const Feature& feature : document.features()) {
-    auto removed_stale_shape = shape_cache.remove_feature_shape(feature.id());
+    auto removed_stale_shape = execution_cache.remove_feature_shape(feature.id());
     if (removed_stale_shape.has_error()) {
       return Result<GeometryRecomputeSummary>::failure(removed_stale_shape.error());
     }
 
-    auto executed = execute_feature(document, feature, shape_cache);
+    auto executed = execute_feature(document, feature, execution_cache);
     if (executed.has_error())
       return Result<GeometryRecomputeSummary>::failure(executed.error());
 
     ++summary.executed_feature_count;
   }
 
+  if (!document.bodies().empty())
+    shape_cache = std::move(working_cache);
   return Result<GeometryRecomputeSummary>::success(summary);
 }
 

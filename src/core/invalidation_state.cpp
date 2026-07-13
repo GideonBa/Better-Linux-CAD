@@ -1,5 +1,6 @@
 #include "blcad/core/invalidation_state.hpp"
 
+#include <algorithm>
 #include <limits>
 #include <utility>
 
@@ -48,6 +49,16 @@ Result<std::size_t> InvalidationState::track_node(NodeId node_id) {
 
   entries_.push_back(InvalidationEntry{std::move(node_id), InvalidationStatus::Clean});
   return Result<std::size_t>::success(entries_.size() - 1);
+}
+
+std::size_t InvalidationState::untrack_node(std::string_view node_id) noexcept {
+  const auto found =
+      std::find_if(entries_.begin(), entries_.end(),
+                   [node_id](const InvalidationEntry& entry) { return entry.node_id == node_id; });
+  if (found == entries_.end())
+    return 0U;
+  entries_.erase(found);
+  return 1U;
 }
 
 Result<std::size_t> InvalidationState::sync_from_graph(const DependencyGraph& graph) {

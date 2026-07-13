@@ -1,6 +1,7 @@
 # MVP 1 Dependency Graph Data Model
 
-Status: pure data model with `PartDocument` integration, no recompute.
+Status: data model with `PartDocument` Feature/Body producer-consumer integration; recompute
+execution remains separate.
 
 This document describes the current state of `DependencyGraph`.
 
@@ -28,7 +29,8 @@ means:
 B depends on A.
 ```
 
-If `A` is changed later, `B` is a candidate for invalidation and recompute. This invalidation is not executed in this step yet.
+If `A` is marked changed, `InvalidationState` marks `B` and its transitive dependents dirty;
+`RecomputePlan` orders that work. Geometry execution remains outside this graph model.
 
 ## Nodes
 
@@ -45,6 +47,8 @@ sketch.base
 sketch.hole
 feature.base_extrude
 feature.center_hole_cut
+body:body.base
+body:body.result
 ```
 
 The graph deliberately uses no OCCT or GUI types. Internally, it also knows no concrete `ParameterId`, `SketchId`, or `FeatureId` classes. `PartDocument` translates the typed IDs into these stable node IDs.
@@ -118,6 +122,14 @@ When objects are added, nodes and edges are created automatically:
 - every feature creates an edge from the input sketch to the feature.
 - `AdditiveExtrude` additionally creates an edge from the length parameter to the feature.
 - `SubtractiveExtrude` additionally creates an edge from the target feature to the feature.
+- adding a Body creates a canonical `body:<BodyId>` node;
+- explicit Feature Body context connects target Body to Feature and Feature to result Body;
+- later Body consumers depend on the current Body node;
+- an in-place modifier advances the producer chain as `previous producer -> modifier -> body` to
+  avoid a false body/modifier self-cycle;
+- a duplicate producer or real graph cycle rejects the Feature transactionally;
+- removing an unused Body removes its node and incident edges, while produced/referenced Bodies
+  cannot be removed.
 
 The graph is readable through `PartDocument::dependency_graph()`. The accessor is intentionally `const` so external callers cannot bypass document invariants.
 
@@ -165,11 +177,18 @@ Current tests check:
 - the MVP-1 reference plate is topologically ordered through the document graph
 - `InvalidationState` uses the graph to mark dependent nodes as `dirty`
 - `RecomputePlan` uses the graph's topological order to sort `dirty` nodes
+- Feature/Body producer chains propagate invalidation into later consumers and Body results
+- in-place Body updates remain acyclic and topologically ordered
+- duplicate producers and real cycles fail before graph mutation
+- dependent Body removal is rejected and unused Body-node removal is complete
 
 ## Next useful step
 
-The first optional geometry adapter and additive execution already exist. The graph remains separate and describes only dependencies. The next step should stay small:
+The graph remains separate and describes dependencies. Block 52 now supplies the Body-specific
+execution boundary:
 
-- execute `SubtractiveExtrude` from a recompute-plan node
-- treat the existing geometry `ShapeCache` as input and output
+- execute Body-scoped Feature and Body nodes from a recompute plan
+- inspect the deterministic Body results now produced by the Block-52 `ShapeCache`
 - use OCCT only behind this adapter boundary
+
+Block 53 is the next step and freezes public Body-result inspection.

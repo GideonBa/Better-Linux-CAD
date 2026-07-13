@@ -72,12 +72,18 @@ Revolve is needed for shafts, pulleys, cones, turned bodies, grooves, undercuts,
 
 ## Multi-body operations, transforms, and body booleans
 
-A future `PartDocument` should not be limited to one final body. It should be able to contain multiple semantic bodies, each with stable identity and recomputable shape cache output.
+Block 48 begins the transition away from one implicit final body: `PartDocument` can now own
+multiple semantic Body records with stable identity. Recomputable per-body shape-cache output is a
+later boundary.
 
 Target behavior:
 
-- `BodyId` identifies a body inside one part file.
-- `Body` stores name, kind, source features, transform stack, visibility, material override, and cache key.
+- `BodyId` now identifies a body inside one part file.
+- The implemented Block-48 `Body` seed stores id, name, Solid/Surface kind, and visibility.
+- Block 49 persists that seed in deterministic, backward-compatible `bodies[]` JSON.
+- Blocks 50–51 add explicit NewBody/Join/Cut/Intersect Feature result context, compatible JSON,
+  target/effective-result Body validation, producer/consumer graph edges, and invalidation.
+- Source features, transform stack, material override, cache key, and recomputable body shapes remain planned.
 - Features support `operation_mode = new_body | join | cut | intersect`.
 - Body transform records support translate, rotate, uniform scale, optional non-uniform scale, and later matrix transforms.
 - Transform order is stored explicitly in a `BodyTransformStack`.
@@ -145,8 +151,8 @@ A feature depends on its input sketch, selected profile region, parameters, targ
 1. Introduce a common feature base so new feature types share id, name, references, parameters, and generated-shape handling.
 2. Add `FeatureReference` as an exposed-output mechanism on features.
 3. Add selected `ProfileRegion` inputs after automatic region detection exists.
-4. Add `BodyId`, `Body`, and feature output-body metadata so a part can own multiple bodies.
-5. Add `ShapeCache` support for multiple body shapes.
+4. Add `BodyId`, `Body`, and feature output-body metadata so a part can own multiple bodies. Body identity/ownership, output-body intent, persistence, and dependency semantics are implemented through Block 51.
+5. Use the implemented Block-52 `ShapeCache` support for multiple body shapes.
 6. Add body transform records for translate, rotate, and uniform scale.
 7. Add sketch ownership records so body transforms can move owned sketch workplanes when requested.
 8. Add body boolean features for add/subtract/intersect.

@@ -4,17 +4,18 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 47
-current_block: 48
-current_boundary: Body identity and PartDocument ownership
-current_tag: "[core][part-body]"
+implemented_through: Block 52
+current_block: 53
+current_boundary: Multi-body compatibility and body-result inspection
+current_tag: "[geometry][multi-body-inspection]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
   mvp_3: "Parametric bolt circle pattern — implemented"
   mvp_4: "Assembly parameters and Project container — implemented"
   mvp_5: "Assembly relationships, motion, hierarchy, analysis, exchange — Blocks 1–47 implemented"
-  mvp_6: "Part Construction — Blocks 48–94 planned, Block 48 next"
+  mvp_6: "Part Construction — Blocks 48–52 implemented, Blocks 53–94 planned, Block 53 next"
+  mvp_7: "STEP Import — Blocks 95–101 planned after Block 94"
 ---
 
 # MVP Plan
@@ -549,12 +550,12 @@ motion solvers reject Spherical as the selected drive.
 [geometry][assembly-cross-hierarchy-spherical-joint]
 ```
 
-## MVP 6 — Planned Part Construction MVP after Block 47
+## MVP 6 — Part Construction MVP after Block 47
 
-**Status:** Planned
+**Status:** In progress — Blocks 48–52 implemented
 **Canonical:** sequence `docs/part-construction-sequence-mvp6.md`
 
-Block 47 is complete. Block 48 is the current next technical step.
+Blocks 48–52 are complete. Block 53 is the current next technical step.
 
 Mandatory Part Construction phase order:
 
@@ -584,6 +585,38 @@ The sequence consolidates existing planning from:
 After Block 94 the first Part Construction MVP is considered complete. That means a serious headless parametric Part kernel with multiple solid/surface bodies, explicit body operations, Revolve, general patterns, Mirror, Fillet, Chamfer, Shell, Draft, 3D Sketches, Sweep, Loft, first Surface Features, surface-to-solid conversion, and multi-body STEP exchange.
 
 It does not mean SolidWorks/Inventor Part product parity. Production GUI modeling, Class-A surfacing, arbitrary NURBS control cages, variable-radius fillets, advanced topology healing, direct modeling, sheet metal, weldments, and specialized manufacturing feature systems remain later work.
+
+## MVP 7 — Planned STEP Import after Block 94
+
+**Status:** Planned
+**Canonical:** `docs/step-import-sequence-mvp7.md`
+
+The STEP Import sequence provides two explicit user modes:
+
+```text
+Reference
+  immutable imported Part definition for Assembly use
+
+EditableBody
+  ImportedBodyFeature as immutable base geometry
+  followed by normal parametric BLCAD features
+```
+
+Mandatory order:
+
+```text
+95  STEP source identity, import modes, JSON, and freshness
+96  OCCT STEP/XDE reader and deterministic imported body definitions
+97  stable imported topology identity, recovery, and target resolution
+98  Reference Part integration with assemblies
+99  EditableBody ImportedBodyFeature and downstream modeling
+100 structured STEP assembly import
+101 integrated import, refresh, edit, assembly, and re-export acceptance
+```
+
+Blocks 95–101 do not reconstruct foreign feature history and do not implement direct face
+push/pull. EditableBody means that new BLCAD features are built after a persistent imported base
+feature.
 
 ## Block 44 — Prismatic joint family — Implemented
 
@@ -625,7 +658,79 @@ coordinate slots, `Point <-> Point` compatibility, three-row center coincidence,
 closure, freshness reuse, and explicit selected-drive rejection. Canonical contract:
 `docs/assembly-spherical-joint-mvp5.md`.
 
-## Current next technical step — Block 48
+## Block 48 — Body identity and PartDocument ownership — Implemented
 
-Begin Body identity and `PartDocument` ownership according to
+Block 48 adds typed `BodyId`, immutable Solid/Surface `Body` intent with explicit visibility, and a
+deterministically BodyId-ordered collection owned by `PartDocument`. IDs are unique per part,
+duplicate names remain valid, lookup/update/removal fail explicitly, and dependent removal has a
+fail-closed boundary for the body dependency edges introduced in Block 51. Historical documents
+retain zero implicit bodies, and Geometry, `ShapeCache`, STEP export, and JSON are unchanged.
+
+Canonical contract: `docs/part-body-identity-mvp6.md`.
+
+```text
+[core][part-body]
+```
+
+## Block 49 — Body JSON and structural validation — Implemented
+
+Block 49 adds the optional-on-read, always-emitted `bodies[]` field with required `id`, `name`,
+`kind`, and `visibility` strings. Loading accepts historical files without the field as zero-body
+Parts, canonicalizes authored order through Block-48 ownership, and rejects malformed arrays,
+entries, fields, enum spellings, empty identity fields, and duplicate Body IDs. No implicit Body is
+created and Geometry remains unchanged.
+
+Canonical contract: `docs/part-body-json-mvp6.md`.
+
+```text
+[core][part-body-json]
+```
+
+## Block 50 — Feature output-body and operation-mode Core intent — Implemented
+
+Block 50 adds validated `NewBody`, `Join`, `Cut`, and `Intersect` Core intent with optional target
+and produced Body IDs. NewBody requires a produced Body and forbids a target. Modifying modes
+require a target; an omitted produced Body preserves target identity, while an explicit result may
+name another existing Body. `PartDocument` validates all explicit/effective references. Historical
+features retain a null context, and JSON, dependency/invalidation graphs, and Geometry are
+unchanged.
+
+Canonical contract: `docs/part-feature-body-operation-mvp6.md`.
+
+```text
+[core][feature-body-operation]
+```
+
+## Block 51 — Feature Body-operation JSON, dependencies, and invalidation — Implemented
+
+Block 51 serializes explicit operation mode plus optional target/produced Body IDs and restores
+historical Feature JSON through an exact null-context default. `body:<BodyId>` nodes connect
+producer Features, target Bodies, later consumers, invalidation, and recompute plans. In-place
+operations advance the Body producer chain without a self-cycle; duplicate producers and real
+cycles fail transactionally. Referenced/produced Bodies cannot be removed, while unused removal
+cleans graph and invalidation state.
+
+Canonical contract: `docs/part-feature-body-dependency-mvp6.md`.
+
+```text
+[core][feature-body-operation-json]
+[core][part-body-dependency]
+```
+
+## Block 52 — Multi-body ShapeCache and recompute execution — Implemented
+
+Block 52 adds deterministic `BodyId -> GeometryShape` cache results with producing Feature identity,
+body-aware NewBody/Cut execution, preservation of unaffected Body entries, transactional plan/full
+execution, fail-closed missing Body/result handling, and an unambiguous single-solid historical
+final-shape compatibility path.
+
+Canonical contract: `docs/part-multi-body-recompute-mvp6.md`.
+
+```text
+[geometry][multi-body-recompute]
+```
+
+## Current next technical step — Block 53
+
+Add multi-body compatibility and body-result inspection according to
 `docs/part-construction-sequence-mvp6.md`.

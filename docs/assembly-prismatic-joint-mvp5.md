@@ -56,4 +56,6 @@ coordinate-slot snapshots as the authority.
 ## Block 45 handoff
 
 Blocks 45–47 Cylindrical, Planar, and passive Spherical are implemented in their canonical
-documents. The next technical step is Block 48.
+documents. Blocks 48–52 Body identity, persistent feature Body-result operations, dependencies, and
+body-scoped recompute are implemented; Block 53 multi-body compatibility and body-result inspection
+is the next technical step.

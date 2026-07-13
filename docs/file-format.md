@@ -1,6 +1,6 @@
 # Project and Save File Format
 
-Status: implemented save-format seeds exist for single-part model intent, assembly parameters, embedded Project JSON, part component occurrences, rigid child assembly occurrences, local Mate/Concentric/Distance/Insert/Angle intent, Project-level cross-hierarchy geometric intent, local and occurrence-qualified Revolute joint intent with typed `coordinates[]` plus historical scalar compatibility, semantic generated feature/axis/seat targets, `ref:` reference-geometry targets, canonical `topo:` generated-topology semantic targets, and authored transform/state records.
+Status: implemented save-format seeds exist for single-part model intent including persistent Solid/Surface Body records and Feature Body-result operations, assembly parameters, embedded Project JSON, part component occurrences, rigid child assembly occurrences, local Mate/Concentric/Distance/Insert/Angle intent, Project-level cross-hierarchy geometric intent, local and occurrence-qualified Revolute joint intent with typed `coordinates[]` plus historical scalar compatibility, semantic generated feature/axis/seat targets, `ref:` reference-geometry targets, canonical `topo:` generated-topology semantic targets, and authored transform/state records.
 
 The save format stores parametric and semantic model intent. OCCT shapes, hierarchy traversal state, occurrence graphs, transform authorities, generated-topology producer classification/recovery results, resolved geometry, residuals, Jacobians, solve/motion results, freshness snapshots, proposals, diagnostics, and exchange products are derived.
 
@@ -615,3 +615,92 @@ transform proposals
 ```
 
 Semantic target-producing model freshness stores the exact canonical `serialize_part_document_to_json(part)` payload only inside derived solve/motion results. It is not an additional persistent revision field.
+
+## Body persistence
+
+Block 49 adds the top-level `bodies` array to `.blcad.json` while retaining the existing schema and
+version:
+
+```json
+{
+  "bodies": [
+    {
+      "id": "body.base",
+      "name": "Base",
+      "kind": "solid",
+      "visibility": "visible"
+    },
+    {
+      "id": "body.skin",
+      "name": "Skin",
+      "kind": "surface",
+      "visibility": "hidden"
+    }
+  ]
+}
+```
+
+The four fields are required strings. `kind` accepts only `solid` or `surface`; `visibility`
+accepts only `visible` or `hidden`. Body IDs must be non-empty and unique within the Part, names
+must be non-empty, and serialization orders entries lexicographically by Body ID. The serializer
+always emits the array, including when empty.
+
+Historical files without `bodies` load explicitly as zero-body Parts. An absent or empty array
+does not synthesize a Body from features or the final shape. Malformed arrays/entries, missing or
+non-string fields, unsupported values, and duplicate IDs fail closed.
+
+Block 51 adds optional Body-result fields to existing Feature records:
+
+```json
+{
+  "operation_mode": "join",
+  "target_body": "body.base"
+}
+```
+
+`operation_mode` accepts `new_body`, `join`, `cut`, or `intersect`. `target_body` and
+`produced_body`, when present, are Body ID strings. NewBody requires `produced_body` and forbids
+`target_body`. Modifying modes require `target_body`; an absent `produced_body` preserves target
+identity. Optional fields are omitted, never written as `null`.
+
+A Body reference without `operation_mode`, malformed/unsupported values, invalid combinations,
+missing Body IDs, duplicate producers, and dependency cycles fail closed. Historical Features with
+all three fields absent restore the exact null Body context and synthesize nothing. Geometry,
+`ShapeCache`, and raw OCCT shapes remain outside the save format.
+
+## Planned STEP import persistence after Block 94
+
+This section is planned architecture, not part of the current schema. Blocks 95–101 in
+`docs/step-import-sequence-mvp7.md` will freeze the exact additive JSON shape.
+
+Planned persistent import intent includes:
+
+```text
+StepImportSourceId
+canonical project-relative asset path
+SHA-256 source-content digest
+mode = reference | editable_body
+selected imported product/body definitions
+persistent BLCAD BodyId outputs for EditableBody
+semantic imported-topology catalog and recovery descriptors
+```
+
+Planned persistence must not include:
+
+```text
+STEP file bytes
+absolute machine-local path as model identity
+TopoDS shapes
+XDE/TDF labels
+STEP entity numbers
+reader transfer maps
+OCCT traversal indices
+resolved imported topology handles
+derived Plane/Axis/Line/Point/Circle/Cylinder descriptors
+```
+
+Reference mode stores immutable imported Part/source intent suitable for ComponentInstance use.
+EditableBody mode stores an `ImportedBodyFeature` at the beginning of normal Part feature history;
+later BLCAD features remain ordinary persistent model intent. Missing or digest-mismatched assets
+fail closed, and an explicit source refresh is required before persisted digest/topology recovery
+state may change.

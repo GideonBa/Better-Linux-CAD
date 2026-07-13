@@ -42,6 +42,7 @@ add_library(
   src/core/assembly_leaf_occurrence.cpp
   src/core/assembly_reference_target.cpp
   src/core/assembly_subassembly_instances.cpp
+  src/core/body.cpp
   src/core/composite_closed_profile.cpp
   src/core/construction_geometry.cpp
   src/core/datum_axis.cpp
@@ -257,6 +258,8 @@ if(BLCAD_BUILD_TESTS)
     tests/core/assembly_leaf_occurrence_tests.cpp
     tests/core/assembly_reference_target_json_tests.cpp
     tests/core/assembly_reference_target_tests.cpp
+    tests/core/body_tests.cpp
+    tests/core/body_json_tests.cpp
     tests/core/chained_construction_relation_tests.cpp
     tests/core/circular_hole_pattern_tests.cpp
     tests/core/closed_profile_json_tests.cpp
@@ -272,11 +275,14 @@ if(BLCAD_BUILD_TESTS)
     tests/core/derived_workplane_tests.cpp
     tests/core/error_result_tests.cpp
     tests/core/feature_tests.cpp
+    tests/core/feature_body_operation_tests.cpp
+    tests/core/feature_body_operation_json_tests.cpp
     tests/core/generated_topology_reference_tests.cpp
     tests/core/invalidation_state_tests.cpp
     tests/core/part_document_json_tests.cpp
     tests/core/part_document_json_workplane_tests.cpp
     tests/core/part_document_tests.cpp
+    tests/core/part_body_dependency_tests.cpp
     tests/core/parameter_expression_tests.cpp
     tests/core/parameter_tests.cpp
     tests/core/project_tests.cpp

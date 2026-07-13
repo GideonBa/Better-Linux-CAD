@@ -75,6 +75,21 @@ PartDocument::create_recompute_plan()
   -> dirty nodes in topological order
 ```
 
+Block 51 adds analogous Body-aware sources:
+
+```text
+PartDocument::mark_feature_changed(feature.producer)
+  -> produced body dirty
+  -> later Body consumers dirty
+  -> their result Bodies dirty
+
+PartDocument::mark_body_changed(body.base)
+  -> later Body consumers and result Bodies dirty
+```
+
+Dirty `body:<BodyId>` nodes are included in topological order. They remain planning records in Core;
+Block 52 supplies their body-scoped ShapeCache execution; Block 53 adds public inspection.
+
 `PartDocument::mark_all_clean()` indirectly clears the plan because no `dirty` nodes remain afterward.
 
 ## Error behavior
@@ -96,14 +111,17 @@ Current tests check:
 - graph cycles are reported as dependency errors
 - `PartDocument` creates a plan from its internal state
 - `PartDocument::mark_all_clean()` leads to an empty plan
+- Body producer/consumer chains yield deterministic Feature/Body step order
 
 ## Connection to geometry
 
-The first geometry adapter for rectangle extrusion, a small `ShapeCache`, and a narrow `AdditiveExtrude` execution now exist in the optional target `blcad_geometry`. The recompute plan remains separate from that: it still describes only the order of nodes that need recalculation.
+The first geometry adapter for rectangle extrusion, a small `ShapeCache`, and a narrow
+`AdditiveExtrude` execution exist in the optional target `blcad_geometry`. The recompute plan remains
+separate and now also describes Body-state work. Block 52 executes that work.
 
 Next steps may use the plan but should stay small:
 
-- execute `SubtractiveExtrude` from a plan node
-- update the result in the existing `ShapeCache`
+- execute Body-scoped Feature/Body steps
+- update deterministic Body entries in a generalized `ShapeCache`
 - continue to use OCCT only behind `blcad_geometry`
 - do not build a GUI yet

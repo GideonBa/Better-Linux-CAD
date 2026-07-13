@@ -43,6 +43,12 @@ execute_document(document, shape_cache)
 
 By contrast, `execute_plan` executes only the `dirty` nodes of a `RecomputePlan`. `execute_document` ignores the invalidation state and rebuilds the entire cache.
 
+Since Block 52, explicit Body-result Features additionally write deterministic `BodyId`-scoped
+results. Body nodes in a plan are derived boundaries; their producer/consumer Feature nodes perform
+the Geometry work. Explicit Body documents commit full and incremental execution transactionally,
+and an incremental plan preserves Body entries it does not affect. Historical zero-Body documents
+retain the original partial-result-on-failure compatibility behavior.
+
 ## Recompute lifecycle
 
 The executor works on a `const PartDocument` and does not modify its invalidation state. Calling `mark_all_clean()` after a successful recompute remains the caller's responsibility. This keeps execution free of document mutation.

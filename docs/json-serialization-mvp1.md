@@ -1,6 +1,6 @@
 # JSON Serialization
 
-Status: core serialization for `PartDocument` model intent, including file-level helpers, derived workplanes, line-based closed sketch profiles, arc closed profiles, spline curve segments, tangent-continuity metadata, composite closed profiles with inner contours, explicit construction geometry, relation-driven construction geometry, chained construction relations, semantic generated edge/vertex references, projected sketch reference entities, reference-driven sketch constraints, reference-generated sketch helper lines, sketch geometric constraints, sketch driving dimensions, generated-region profile selections, reference recovery metadata, reference remap records, and sketch-origin override records.
+Status: core serialization for `PartDocument` model intent, including file-level helpers, persistent Solid/Surface Body records, Feature Body-result operations, derived workplanes, line-based closed sketch profiles, arc closed profiles, spline curve segments, tangent-continuity metadata, composite closed profiles with inner contours, explicit construction geometry, relation-driven construction geometry, chained construction relations, semantic generated edge/vertex references, projected sketch reference entities, reference-driven sketch constraints, reference-generated sketch helper lines, sketch geometric constraints, sketch driving dimensions, generated-region profile selections, reference recovery metadata, reference remap records, and sketch-origin override records.
 
 The JSON serialization layer persists model intent only. It does not serialize OCCT shapes, `GeometryShape`, `ShapeCache` contents, raw face IDs, raw edge IDs, raw vertex IDs, BRep handles, resolved projected coordinates, solver state, automatic region-search caches, trim-solver caches, tessellated arc caches, tessellated spline caches, tangent-solver caches, or exported STEP data.
 
@@ -8,7 +8,7 @@ The JSON serialization layer persists model intent only. It does not serialize O
 
 The goal is to make a `PartDocument` reproducible from a textual representation:
 
-1. Build a `PartDocument` with parameters, datum planes, construction geometry, construction relations, derived workplanes, sketches, sketch entities, projected sketch reference entities, reference-generated sketch helper lines, reference-driven sketch constraints, sketch geometric constraints, sketch driving dimensions, selected generated-region profiles, arc/spline closed profiles, composite closed profiles, reference recovery records, profiles, and features.
+1. Build a `PartDocument` with Bodies, parameters, datum planes, construction geometry, construction relations, derived workplanes, sketches, sketch entities, projected sketch reference entities, reference-generated sketch helper lines, reference-driven sketch constraints, sketch geometric constraints, sketch driving dimensions, selected generated-region profiles, arc/spline closed profiles, composite closed profiles, reference recovery records, profiles, and features.
 2. Serialize that model intent to JSON.
 3. Optionally write the JSON as a `.blcad.json` model file.
 4. Rebuild the `PartDocument` from JSON through the normal validated construction APIs.
@@ -21,6 +21,7 @@ The current JSON format stores:
 
 - schema identifier and version
 - document ID and name
+- deterministic Solid/Surface Body records with stable ID, name, and visibility
 - length parameters
 - datum planes
 - explicit construction points, lines, and planes
@@ -53,6 +54,18 @@ The current JSON format stores:
 - additive and subtractive extrude features
 
 The current JSON format does not store final BRep geometry, ShapeCache contents, exported STEP data, GUI state, full sketch solver state, resolved projection caches, automatic region-search caches, automatic topology matching state, general relation collections independent from construction objects, or assembly data.
+
+Block 51 now stores explicit Feature Body-result context through optional `operation_mode`,
+`target_body`, and `produced_body` fields. Existing Feature records with all three absent restore a
+null Body context and retain their historical single-final-shape compatibility behavior. Exact
+combinations and failure policy are canonical in `docs/part-feature-body-dependency-mvp6.md`.
+
+## Bodies
+
+`bodies[]` stores required `id`, `name`, `kind`, and `visibility` strings. Canonical kinds are
+`solid` and `surface`; canonical visibility values are `visible` and `hidden`. Output is ordered
+lexicographically by Body ID. Files without the additive field remain compatible and load with no
+implicit Body records. See `docs/part-body-json-mvp6.md` and `docs/file-format.md`.
 
 ## Construction geometry
 

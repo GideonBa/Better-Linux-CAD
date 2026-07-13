@@ -327,6 +327,46 @@ sketch_origin_override_from_json(const json& value) {
                         datum_plane_json.at("name").get<std::string>());
 }
 
+[[nodiscard]] Result<BodyKind> body_kind_from_json(const json& value) {
+  const auto kind = value.get<std::string>();
+  if (kind == "solid")
+    return Result<BodyKind>::success(BodyKind::Solid);
+  if (kind == "surface")
+    return Result<BodyKind>::success(BodyKind::Surface);
+  return Result<BodyKind>::failure(json_error("unsupported body kind in part document json"));
+}
+
+[[nodiscard]] Result<BodyVisibility> body_visibility_from_json(const json& value) {
+  const auto visibility = value.get<std::string>();
+  if (visibility == "visible")
+    return Result<BodyVisibility>::success(BodyVisibility::Visible);
+  if (visibility == "hidden")
+    return Result<BodyVisibility>::success(BodyVisibility::Hidden);
+  return Result<BodyVisibility>::failure(
+      json_error("unsupported body visibility in part document json"));
+}
+
+[[nodiscard]] Result<Body> body_from_json(const json& value) {
+  if (!value.is_object())
+    return Result<Body>::failure(json_error("body entry must be an object in part document json"));
+  for (const auto* field : {"id", "name", "kind", "visibility"}) {
+    if (!value.contains(field))
+      return Result<Body>::failure(
+          json_error("body entry must contain id, name, kind, and visibility"));
+    if (!value.at(field).is_string())
+      return Result<Body>::failure(
+          json_error("body id, name, kind, and visibility must be strings"));
+  }
+  auto kind = body_kind_from_json(value.at("kind"));
+  if (kind.has_error())
+    return Result<Body>::failure(kind.error());
+  auto visibility = body_visibility_from_json(value.at("visibility"));
+  if (visibility.has_error())
+    return Result<Body>::failure(visibility.error());
+  return Body::create(BodyId(value.at("id").get<std::string>()),
+                      value.at("name").get<std::string>(), kind.value(), visibility.value());
+}
+
 [[nodiscard]] std::vector<ParameterId> parameter_dependencies_from_object(const json& value) {
   if (!value.contains("parameter_dependencies"))
     return {};
@@ -1003,29 +1043,80 @@ driving_dimension_from_json(const json& dimension_json) {
       json_error("unsupported extrude direction in part document json"));
 }
 
+[[nodiscard]] Result<std::optional<FeatureBodyResultContext>>
+feature_body_result_context_from_json(const json& feature_json) {
+  const bool has_mode = feature_json.contains("operation_mode");
+  const bool has_target = feature_json.contains("target_body");
+  const bool has_produced = feature_json.contains("produced_body");
+  if (!has_mode) {
+    if (has_target || has_produced)
+      return Result<std::optional<FeatureBodyResultContext>>::failure(
+          json_error("feature body references require operation_mode in part document json"));
+    return Result<std::optional<FeatureBodyResultContext>>::success(std::nullopt);
+  }
+  if (!feature_json.at("operation_mode").is_string() ||
+      (has_target && !feature_json.at("target_body").is_string()) ||
+      (has_produced && !feature_json.at("produced_body").is_string()))
+    return Result<std::optional<FeatureBodyResultContext>>::failure(
+        json_error("feature body operation fields must be strings"));
+  const auto spelling = feature_json.at("operation_mode").get<std::string>();
+  FeatureBodyOperationMode mode;
+  if (spelling == "new_body")
+    mode = FeatureBodyOperationMode::NewBody;
+  else if (spelling == "join")
+    mode = FeatureBodyOperationMode::Join;
+  else if (spelling == "cut")
+    mode = FeatureBodyOperationMode::Cut;
+  else if (spelling == "intersect")
+    mode = FeatureBodyOperationMode::Intersect;
+  else
+    return Result<std::optional<FeatureBodyResultContext>>::failure(
+        json_error("unsupported feature body operation mode in part document json"));
+  std::optional<BodyId> target_body;
+  if (has_target)
+    target_body = BodyId(feature_json.at("target_body").get<std::string>());
+  std::optional<BodyId> produced_body;
+  if (has_produced)
+    produced_body = BodyId(feature_json.at("produced_body").get<std::string>());
+  auto context =
+      FeatureBodyResultContext::create(mode, std::move(target_body), std::move(produced_body));
+  if (context.has_error())
+    return Result<std::optional<FeatureBodyResultContext>>::failure(context.error());
+  return Result<std::optional<FeatureBodyResultContext>>::success(std::move(context.value()));
+}
+
 [[nodiscard]] Result<Feature> feature_from_json(const json& feature_json) {
   const auto type = feature_json.at("type").get<std::string>();
   auto direction = extrude_direction_from_json(feature_json.at("direction"));
   if (direction.has_error())
     return Result<Feature>::failure(direction.error());
+  Result<Feature> feature =
+      Result<Feature>::failure(json_error("unsupported feature type in part document json"));
   if (type == "additive_extrude")
-    return Feature::create_additive_extrude(
+    feature = Feature::create_additive_extrude(
         FeatureId(feature_json.at("id").get<std::string>()),
         feature_json.at("name").get<std::string>(),
         SketchId(feature_json.at("input_sketch").get<std::string>()),
         ParameterId(feature_json.at("length_parameter").get<std::string>()), direction.value());
-  if (type == "subtractive_extrude") {
+  else if (type == "subtractive_extrude") {
     if (feature_json.at("depth").get<std::string>() != "through_all")
       return Result<Feature>::failure(
           json_error("only through_all subtractive extrude depth is supported"));
-    return Feature::create_subtractive_extrude(
+    feature = Feature::create_subtractive_extrude(
         FeatureId(feature_json.at("id").get<std::string>()),
         feature_json.at("name").get<std::string>(),
         SketchId(feature_json.at("input_sketch").get<std::string>()),
         FeatureId(feature_json.at("target_feature").get<std::string>()),
         SubtractiveExtrudeDepth::ThroughAll, direction.value());
   }
-  return Result<Feature>::failure(json_error("unsupported feature type in part document json"));
+  if (feature.has_error())
+    return feature;
+  auto context = feature_body_result_context_from_json(feature_json);
+  if (context.has_error())
+    return Result<Feature>::failure(context.error());
+  if (!context.value().has_value())
+    return feature;
+  return feature.value().with_body_result_context(std::move(context.value().value()));
 }
 
 [[nodiscard]] bool sketch_dependencies_available(const PartDocument& document,
@@ -1062,6 +1153,12 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
   root["schema"] = k_schema;
   root["version"] = k_version;
   root["document"] = json{{"id", document.id().value()}, {"name", document.name()}};
+  root["bodies"] = json::array();
+  for (const auto& body : document.bodies())
+    root["bodies"].push_back(json{{"id", body.id().value()},
+                                  {"name", body.name()},
+                                  {"kind", std::string(to_string(body.kind()))},
+                                  {"visibility", std::string(to_string(body.visibility()))}});
   root["parameters"] = json::array();
   for (const auto& parameter : document.parameters()) {
     json parameter_json{{"id", parameter.id().value()},
@@ -1239,6 +1336,14 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
       feature_json["target_feature"] = feature.target_feature().value();
       feature_json["depth"] = std::string(to_string(feature.subtractive_depth()));
     }
+    if (feature.body_result_context().has_value()) {
+      const auto& context = feature.body_result_context().value();
+      feature_json["operation_mode"] = std::string(to_string(context.operation_mode()));
+      if (context.target_body().has_value())
+        feature_json["target_body"] = context.target_body()->value();
+      if (context.produced_body().has_value())
+        feature_json["produced_body"] = context.produced_body()->value();
+    }
     root["features"].push_back(std::move(feature_json));
   }
   root["reference_statuses"] = json::array();
@@ -1267,6 +1372,18 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
                                          document_json.at("name").get<std::string>());
     if (document.has_error())
       return document;
+    const json body_array = root.value("bodies", json::array());
+    if (!body_array.is_array())
+      return Result<PartDocument>::failure(
+          json_error("bodies must be an array in part document json"));
+    for (const auto& body_json : body_array) {
+      auto body = body_from_json(body_json);
+      if (body.has_error())
+        return Result<PartDocument>::failure(body.error());
+      auto added = document.value().add_body(std::move(body.value()));
+      if (added.has_error())
+        return Result<PartDocument>::failure(added.error());
+    }
     for (const auto& parameter_json : root.at("parameters")) {
       if (parameter_json.contains("formula")) {
         // Expression parameters re-derive value and dependency edges from the
