@@ -33,32 +33,11 @@ end = text.index(
     "# Cross-hierarchy equation descriptor and builder integration.",
     start,
 )
-replacement = r'''replace_exact(
-    "src/geometry/assembly_constraint_numeric_system.cpp",
-    '''Result<std::size_t> append_scaled_residuals(const InsertResidualDescriptor& residual,
-                                             double length_residual_scale_mm,
-                                             NumericVector& residuals) {
-  return append_scaled_residual(residual, length_residual_scale_mm, residuals);
-}
-''',
-    '''Result<std::size_t> append_scaled_residuals(const InsertResidualDescriptor& residual,
-                                             double length_residual_scale_mm,
-                                             NumericVector& residuals) {
-  return append_scaled_residual(residual, length_residual_scale_mm, residuals);
-}
-
-Result<std::size_t> append_scaled_residuals(
-    const AssemblyGenericRelationshipResidualDescriptor& residual,
-    double length_residual_scale_mm, NumericVector& residuals) {
-  return append_scaled_residual(residual, length_residual_scale_mm, residuals);
-}
-''',
-)
-'''
-path.write_text(text[:start] + replacement + text[end:], encoding="utf-8")
+path.write_text(text[:start] + text[end:], encoding="utf-8")
 PY
 
 python3 scripts/apply_block39.py
+python3 scripts/normalize_block39_numeric.py
 python3 scripts/normalize_block39.py
 
 sudo apt-get update
@@ -88,11 +67,12 @@ cmake --workflow --preset dev-geometry-build-test
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-target-compatibility]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-cross-hierarchy-target-compatibility]"
 
-rm scripts/normalize_block39.py scripts/run_block39_ci.sh
+rm scripts/normalize_block39.py scripts/normalize_block39_numeric.py scripts/run_block39_ci.sh
 
 git diff --check
 test ! -e scripts/apply_block39.py
 test ! -e scripts/normalize_block39.py
+test ! -e scripts/normalize_block39_numeric.py
 test ! -e scripts/run_block39_ci.sh
 test ! -e .github/workflows/block39-patch.yml
 grep -R "AssemblyGenericRelationshipEquationBuilder" -n include src tests
