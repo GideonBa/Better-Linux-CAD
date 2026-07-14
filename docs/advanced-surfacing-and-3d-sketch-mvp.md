@@ -329,6 +329,8 @@ PathExtrudeFeature
 PathCutFeature
 BoundarySurfaceFeature
 FillSurfaceFeature
+TrimSurfaceFeature
+ExtendSurfaceFeature
 SurfaceStitchFeature
 ClosedShellToSolidFeature
 ContinuityMode
@@ -350,7 +352,12 @@ GuideCurveReference
 PathCurveReference
 BoundaryCurveReference
 SurfaceReference
+TrimmingReference
 ```
+
+Block 88 implements these six Surface feature intents and their Boundary/Surface/trimming
+reference types, document graph semantics, result-Body authority, removal protection, and strict
+compatible JSON. Blocks 89–92 retain Geometry execution ownership.
 
 ## Proposed implementation sequence
 

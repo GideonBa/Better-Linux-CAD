@@ -4,17 +4,17 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 87
-current_block: 88
-current_boundary: Surface feature Core intent and JSON
-current_tag: "[core][surface-feature]"
+implemented_through: Block 88
+current_block: 89
+current_boundary: Boundary and Fill Surface Geometry
+current_tag: "[geometry][surface-boundary-fill]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
   mvp_3: "Parametric bolt circle pattern — implemented"
   mvp_4: "Assembly parameters and Project container — implemented"
   mvp_5: "Assembly relationships, motion, hierarchy, analysis, exchange — Blocks 1–47 implemented"
-  mvp_6: "Part Construction — Blocks 48–87 implemented, Blocks 88–94 planned, Block 88 next"
+  mvp_6: "Part Construction — Blocks 48–88 implemented, Blocks 89–94 planned, Block 89 next"
   mvp_7: "STEP Import — Blocks 95–101 planned after Block 94"
 ---
 
@@ -552,10 +552,10 @@ motion solvers reject Spherical as the selected drive.
 
 ## MVP 6 — Part Construction MVP after Block 47
 
-**Status:** In progress — Blocks 48–87 implemented
+**Status:** In progress — Blocks 48–88 implemented
 **Canonical:** sequence `docs/part-construction-sequence-mvp6.md`
 
-Blocks 48–87 are complete. Block 88 is the current next technical step.
+Blocks 48–88 are complete. Block 88 is implemented; Block 89 is the current next technical step.
 
 Mandatory Part Construction phase order:
 
@@ -1203,11 +1203,23 @@ Canonical contract: `docs/part-guided-loft-geometry-mvp6.md`.
 [geometry][guided-loft]
 ```
 
-## Current next technical step — Block 88
+## Block 88 — Surface feature Core intent and JSON — Implemented
 
-Implement persistent Surface-feature intent, semantic inputs, Body-result authority, dependencies,
-removal behavior, and strict compatible JSON according to the planning detail.
+Block 88 activates Surface Bodies as persistent construction results and introduces Boundary,
+Fill, Trim, Extend, Stitch, and Closed-shell-to-Solid intent. Semantic curve/surface/trimming
+references, result identity, dependency/invalidation, protected removal, and strict compatible JSON
+are document-integrated.
+
+Canonical contract: `docs/part-surface-feature-intent-mvp6.md`.
 
 ```text
 [core][surface-feature]
+```
+
+## Current next technical step — Block 89
+
+Execute BoundarySurfaceFeature and FillSurfaceFeature from their frozen semantic curve inputs.
+
+```text
+[geometry][surface-boundary-fill]
 ```

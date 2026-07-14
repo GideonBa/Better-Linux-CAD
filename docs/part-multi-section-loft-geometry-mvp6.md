@@ -47,5 +47,5 @@ Coverage proves three-section execution, deterministic four-section solid and op
 parameter-driven intermediate-section recompute, and rejection of mismatched authored section
 correspondence.
 
-Blocks 48–87 are implemented. Block 87 Guided and continuity-controlled Loft is implemented;
-Block 88 Surface feature Core intent and JSON is next.
+Blocks 48–88 are implemented. Block 87 Guided and continuity-controlled Loft is implemented;
+Block 88 Surface feature Core intent and JSON is implemented; Block 89 Boundary and Fill Surface Geometry is next.

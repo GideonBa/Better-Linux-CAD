@@ -27,6 +27,7 @@
 #include "blcad/core/sketch_3d.hpp"
 #include "blcad/core/sketch_ownership.hpp"
 #include "blcad/core/sweep_feature.hpp"
+#include "blcad/core/surface_feature.hpp"
 
 #include <cstddef>
 #include <string>
@@ -61,6 +62,8 @@ public:
   [[nodiscard]] Result<std::size_t> add_revolve_feature(RevolveFeature feature);
   [[nodiscard]] Result<std::size_t> add_sweep_feature(SweepFeature feature);
   [[nodiscard]] Result<std::size_t> add_loft_feature(LoftFeature feature);
+  [[nodiscard]] Result<std::size_t> add_surface_feature(SurfaceFeature feature);
+  [[nodiscard]] Result<std::size_t> remove_surface_feature(FeatureId id);
   [[nodiscard]] Result<std::size_t> add_linear_pattern_feature(LinearPatternFeature feature);
   [[nodiscard]] Result<std::size_t> add_circular_pattern_feature(CircularPatternFeature feature);
   [[nodiscard]] Result<std::size_t> add_mirror_feature(MirrorFeature feature);
@@ -113,6 +116,7 @@ public:
   [[nodiscard]] const std::vector<RevolveFeature>& revolve_features() const noexcept;
   [[nodiscard]] const std::vector<SweepFeature>& sweep_features() const noexcept;
   [[nodiscard]] const std::vector<LoftFeature>& loft_features() const noexcept;
+  [[nodiscard]] const std::vector<SurfaceFeature>& surface_features() const noexcept;
   [[nodiscard]] const std::vector<LinearPatternFeature>& linear_pattern_features() const noexcept;
   [[nodiscard]] const std::vector<CircularPatternFeature>&
   circular_pattern_features() const noexcept;
@@ -146,6 +150,7 @@ public:
   [[nodiscard]] std::size_t revolve_feature_count() const noexcept;
   [[nodiscard]] std::size_t sweep_feature_count() const noexcept;
   [[nodiscard]] std::size_t loft_feature_count() const noexcept;
+  [[nodiscard]] std::size_t surface_feature_count() const noexcept;
   [[nodiscard]] std::size_t linear_pattern_feature_count() const noexcept;
   [[nodiscard]] std::size_t circular_pattern_feature_count() const noexcept;
   [[nodiscard]] std::size_t mirror_feature_count() const noexcept;
@@ -179,6 +184,7 @@ public:
   [[nodiscard]] const RevolveFeature* find_revolve_feature(FeatureId id) const noexcept;
   [[nodiscard]] const SweepFeature* find_sweep_feature(FeatureId id) const noexcept;
   [[nodiscard]] const LoftFeature* find_loft_feature(FeatureId id) const noexcept;
+  [[nodiscard]] const SurfaceFeature* find_surface_feature(FeatureId id) const noexcept;
   [[nodiscard]] const LinearPatternFeature*
   find_linear_pattern_feature(FeatureId id) const noexcept;
   [[nodiscard]] const CircularPatternFeature*
@@ -220,6 +226,7 @@ private:
   [[nodiscard]] bool has_revolve_feature_id(const FeatureId& id) const noexcept;
   [[nodiscard]] bool has_sweep_feature_id(const FeatureId& id) const noexcept;
   [[nodiscard]] bool has_loft_feature_id(const FeatureId& id) const noexcept;
+  [[nodiscard]] bool has_surface_feature_id(const FeatureId& id) const noexcept;
   [[nodiscard]] bool has_linear_pattern_feature_id(const FeatureId& id) const noexcept;
   [[nodiscard]] bool has_circular_pattern_feature_id(const FeatureId& id) const noexcept;
   [[nodiscard]] bool has_mirror_feature_id(const FeatureId& id) const noexcept;
@@ -258,6 +265,7 @@ private:
   std::vector<RevolveFeature> revolve_features_;
   std::vector<SweepFeature> sweep_features_;
   std::vector<LoftFeature> loft_features_;
+  std::vector<SurfaceFeature> surface_features_;
   std::vector<LinearPatternFeature> linear_pattern_features_;
   std::vector<CircularPatternFeature> circular_pattern_features_;
   std::vector<MirrorFeature> mirror_features_;

@@ -849,6 +849,15 @@ Block 87 adds no JSON fields. It executes the existing nullable `path_curve`, or
 execution without a verified curvature guarantee. Sampled control sections are never serialized.
 Canonical details are in `docs/part-guided-loft-geometry-mvp6.md`.
 
+Block 88 adds the always-emitted, optional-on-read top-level `surface_features` array. Strict
+records persist one of `boundary_surface`, `fill_surface`, `trim_surface`, `extend_surface`,
+`surface_stitch`, or `closed_shell_to_solid`, an explicit result Body, and the complete nullable or
+empty inactive-slot set. Boundary references select PathCurves or semantic edges; Surface
+references select Surface Bodies or semantic faces; trimming references select a boundary curve or
+sketch/profile region. Historical files missing the array restore zero Surface features. OCCT
+faces, shells, sewing results, and topology maps are not stored. Canonical details are in
+`docs/part-surface-feature-intent-mvp6.md`.
+
 ## Planned STEP import persistence after Block 94
 
 This section is planned architecture, not part of the current schema. Blocks 95–101 in

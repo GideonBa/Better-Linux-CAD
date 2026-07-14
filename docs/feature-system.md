@@ -99,8 +99,10 @@ Geometry without writing topology identity back into Core. Block 79 adds PathCur
 and guide control, Block 83 adds path-following AdditiveExtrude/SubtractiveExtrude, Block 84 adds
 persistent ordered Loft/LoftCut/LoftSurface intent, Block 85 executes two-section C0 Loft Geometry
 on arbitrary planes, Block 86 executes deterministic ordered multi-section Loft Geometry, and
-Block 87 adds center-path/ordered-guide control plus verified G1/C1 continuity. Block 88 Surface
-feature Core intent and JSON is next.
+Block 87 adds center-path/ordered-guide control plus verified G1/C1 continuity. Block 88 adds the
+first persistent Boundary/Fill/Trim/Extend/Stitch/Closed-shell-to-Solid Surface intent, semantic
+references, Body-result authority, dependency/removal rules, and strict JSON. Block 89 Boundary and
+Fill Surface Geometry is next.
 
 The long-term sketcher and feature parity target is documented in `docs/inventor-like-sketcher-and-feature-roadmap.md`.
 
@@ -174,12 +176,17 @@ Target behavior:
   reference a primary path, ordered guide curves, and C0/G1/G2 continuity intent.
 - Implemented `LoftCutFeature` persists removal intent for a target body.
 - Implemented `LoftSurfaceFeature` accepts homogeneous closed or open PathCurve sections.
+- Implemented Surface Core intent includes `BoundarySurfaceFeature`, `FillSurfaceFeature`,
+  `TrimSurfaceFeature`, `ExtendSurfaceFeature`, `SurfaceStitchFeature`, and
+  `ClosedShellToSolidFeature`, with semantic Boundary/Surface/trimming references and explicit
+  Surface/Solid result Bodies.
 - Profile-section sketches in a loft may be on arbitrarily oriented planes.
 - Section ordering, seam/alignment references, and optional normal flips must be explicit to avoid random twist.
 - `GuidedLoft` uses guide curves or rails to control shape flow.
-- `BoundarySurface` and `FillSurface` create surfaces from spatial curve boundaries.
-- `StitchSurfaces` / `KnitSurfaces` creates a shell from surfaces.
-- `ConvertClosedShellToSolid` validates and converts a closed shell into a solid body.
+- `BoundarySurface` and `FillSurface` Geometry will create surfaces from the implemented spatial
+  curve-boundary intent in Block 89.
+- `StitchSurfaces` / `KnitSurfaces` Geometry will create a shell from persistent Surface inputs.
+- `ConvertClosedShellToSolid` Geometry will validate and convert persistent closed-shell intent.
 
 The detailed 3D sketch and surfacing block is in `docs/advanced-surfacing-and-3d-sketch-mvp.md`.
 

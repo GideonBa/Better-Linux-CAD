@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <string>
+#include <type_traits>
 #include <utility>
 
 namespace blcad {
@@ -1788,6 +1789,162 @@ Result<std::size_t> PartDocument::add_loft_feature(LoftFeature feature) {
   return Result<std::size_t>::success(loft_features_.size() - 1U);
 }
 
+Result<std::size_t> PartDocument::add_surface_feature(SurfaceFeature feature) {
+  const FeatureId id = surface_feature_id(feature);
+  if (has_any_feature_id(id))
+    return Result<std::size_t>::failure(
+        Error::validation(id.value(), "feature id must be unique within part document"));
+
+  const auto validate_boundary = [this, &id](const BoundaryCurveReference& boundary) {
+    if (boundary.source_kind() == BoundaryCurveSourceKind::PathCurve) {
+      if (find_path_curve(std::get<PathCurveId>(boundary.source())) == nullptr)
+        return Result<std::size_t>::failure(
+            Error::validation(id.value(), "surface boundary PathCurve must exist"));
+    } else {
+      auto semantic = validate_generated_topology_reference(
+          *this, std::get<SemanticEdgeReference>(boundary.source()));
+      if (semantic.has_error()) return semantic;
+    }
+    return Result<std::size_t>::success(1U);
+  };
+  const auto validate_surface = [this, &id](const SurfaceReference& surface) {
+    if (surface.source_kind() == SurfaceReferenceSourceKind::Body) {
+      const Body* body = find_body(std::get<BodyId>(surface.source()));
+      if (body == nullptr || body->kind() != BodyKind::Surface)
+        return Result<std::size_t>::failure(
+            Error::validation(id.value(), "surface reference must identify a Surface Body"));
+    } else {
+      auto face = FaceReference::create_planar(
+          PartFeatureInputRole::DraftFace,
+          std::get<SemanticFaceReference>(surface.source()));
+      if (face.has_error()) return Result<std::size_t>::failure(face.error());
+      auto semantic = validate_part_feature_input_reference(*this, face.value());
+      if (semantic.has_error()) return semantic;
+    }
+    return Result<std::size_t>::success(1U);
+  };
+
+  Result<std::size_t> valid = Result<std::size_t>::success(1U);
+  std::visit([&](const auto& value) {
+    using T = std::decay_t<decltype(value)>;
+    if constexpr (std::is_same_v<T, BoundarySurfaceFeature> ||
+                  std::is_same_v<T, FillSurfaceFeature>) {
+      for (const auto& boundary : value.boundaries()) {
+        valid = validate_boundary(boundary);
+        if (valid.has_error()) return;
+      }
+      if constexpr (std::is_same_v<T, FillSurfaceFeature>) {
+        if (value.boundaries().size() == 1U &&
+            value.boundaries().front().source_kind() == BoundaryCurveSourceKind::PathCurve) {
+          const PathCurve* path = find_path_curve(
+              std::get<PathCurveId>(value.boundaries().front().source()));
+          if (path->closure() != PathClosure::Closed)
+            valid = Result<std::size_t>::failure(Error::validation(
+                id.value(), "single-curve fill boundary must be a closed PathCurve"));
+        }
+      }
+    } else if constexpr (std::is_same_v<T, TrimSurfaceFeature>) {
+      valid = validate_surface(value.target());
+      if (valid.has_error()) return;
+      if (value.trimming().source_kind() == TrimmingReferenceSourceKind::BoundaryCurve)
+        valid = validate_boundary(std::get<BoundaryCurveReference>(value.trimming().source()));
+      else
+        valid = validate_part_feature_input_reference(
+            *this, std::get<ProfileRegionReference>(value.trimming().source()));
+    } else if constexpr (std::is_same_v<T, ExtendSurfaceFeature>) {
+      valid = validate_surface(value.target());
+      if (valid.has_error()) return;
+      valid = validate_boundary(value.boundary());
+      if (valid.has_error()) return;
+      const Parameter* distance = find_parameter(value.distance_parameter());
+      if (distance == nullptr || distance->type() != ParameterType::Length ||
+          !distance->value().is_positive_length())
+        valid = Result<std::size_t>::failure(Error::validation(
+            id.value(), "surface extension distance must be a positive Length parameter"));
+    } else if constexpr (std::is_same_v<T, SurfaceStitchFeature>) {
+      for (const auto& surface : value.surfaces()) {
+        valid = validate_surface(surface);
+        if (valid.has_error()) return;
+      }
+      const Parameter* tolerance = find_parameter(value.tolerance_parameter());
+      if (tolerance == nullptr || tolerance->type() != ParameterType::Length ||
+          !tolerance->value().is_positive_length())
+        valid = Result<std::size_t>::failure(Error::validation(
+            id.value(), "surface stitch tolerance must be a positive Length parameter"));
+    } else {
+      valid = validate_surface(value.shell());
+    }
+  }, feature);
+  if (valid.has_error()) return valid;
+
+  const BodyId result_id = surface_feature_result_body(feature);
+  const Body* result_body = find_body(result_id);
+  const BodyKind expected_kind = surface_feature_kind(feature) ==
+                                         SurfaceFeatureKind::ClosedShellToSolid
+                                     ? BodyKind::Solid
+                                     : BodyKind::Surface;
+  if (result_body == nullptr || result_body->kind() != expected_kind)
+    return Result<std::size_t>::failure(Error::validation(
+        id.value(), "surface feature result Body kind must match its feature kind"));
+  const std::string result_node = body_dependency_node_id(result_id);
+  if (!dependency_sources_of(dependency_graph_, result_node).empty())
+    return Result<std::size_t>::failure(
+        Error::dependency(id.value(), "surface feature result Body already has a producer"));
+
+  auto graph = dependency_graph_;
+  auto node = graph.add_node(id.value());
+  if (node.has_error()) return Result<std::size_t>::failure(node.error());
+  for (const auto& input : surface_feature_input_nodes(feature)) {
+    if (input == result_node)
+      return Result<std::size_t>::failure(
+          Error::dependency(id.value(), "surface feature result Body cannot be an input"));
+    auto edge = add_dependency_if_missing(graph, input, id.value());
+    if (edge.has_error()) return Result<std::size_t>::failure(edge.error());
+  }
+  auto result_edge = add_dependency_if_missing(graph, id.value(), result_node);
+  if (result_edge.has_error()) return Result<std::size_t>::failure(result_edge.error());
+  if (graph.has_cycle())
+    return Result<std::size_t>::failure(
+        Error::dependency(id.value(), "surface feature must not create a dependency cycle"));
+  auto invalidation = invalidation_state_;
+  auto synced = sync_graph(std::move(graph), invalidation, dependency_graph_);
+  if (synced.has_error()) return Result<std::size_t>::failure(synced.error());
+  invalidation_state_ = std::move(invalidation);
+  surface_features_.push_back(std::move(feature));
+  return Result<std::size_t>::success(surface_features_.size() - 1U);
+}
+
+Result<std::size_t> PartDocument::remove_surface_feature(FeatureId id) {
+  const auto found = std::find_if(surface_features_.begin(), surface_features_.end(),
+                                  [&id](const auto& feature) {
+                                    return surface_feature_id(feature) == id;
+                                  });
+  if (found == surface_features_.end())
+    return Result<std::size_t>::failure(
+        Error::validation(id.empty() ? "surface_feature" : id.value(),
+                          "surface feature must exist in part document"));
+  const std::string result_node = body_dependency_node_id(surface_feature_result_body(*found));
+  if (!dependency_graph_.direct_dependents(result_node).empty())
+    return Result<std::size_t>::failure(
+        Error::dependency(id.value(), "surface feature with dependent result cannot be removed"));
+  const auto feature_dependents = dependency_graph_.direct_dependents(id.value());
+  if (std::any_of(feature_dependents.begin(), feature_dependents.end(),
+                  [&result_node](const std::string& dependent) {
+                    return dependent != result_node;
+                  }))
+    return Result<std::size_t>::failure(
+        Error::dependency(id.value(), "surface feature with dependent intent cannot be removed"));
+  auto graph = dependency_graph_;
+  auto removed = graph.remove_node(id.value());
+  if (removed.has_error()) return Result<std::size_t>::failure(removed.error());
+  auto invalidation = invalidation_state_;
+  invalidation.untrack_node(id.value());
+  dependency_graph_ = std::move(graph);
+  invalidation_state_ = std::move(invalidation);
+  surface_features_.erase(found);
+  return Result<std::size_t>::success(1U);
+}
+
 Result<std::size_t> PartDocument::add_linear_pattern_feature(LinearPatternFeature feature) {
   if (has_any_feature_id(feature.id()))
     return Result<std::size_t>::failure(
@@ -2545,6 +2702,10 @@ Result<std::size_t> PartDocument::remove_body(BodyId id) {
       return Result<std::size_t>::failure(
           Error::dependency(id.value(), "body with dependent model intent cannot be removed"));
   }
+  for (const auto& feature : surface_features_)
+    if (surface_feature_result_body(feature) == id)
+      return Result<std::size_t>::failure(
+          Error::dependency(id.value(), "body with dependent model intent cannot be removed"));
   for (const auto& feature : linear_pattern_features_) {
     const auto& context = feature.body_result_context();
     const bool references_body =
@@ -2940,6 +3101,9 @@ const std::vector<SweepFeature>& PartDocument::sweep_features() const noexcept {
 const std::vector<LoftFeature>& PartDocument::loft_features() const noexcept {
   return loft_features_;
 }
+const std::vector<SurfaceFeature>& PartDocument::surface_features() const noexcept {
+  return surface_features_;
+}
 const std::vector<LinearPatternFeature>& PartDocument::linear_pattern_features() const noexcept {
   return linear_pattern_features_;
 }
@@ -3033,6 +3197,9 @@ std::size_t PartDocument::sweep_feature_count() const noexcept {
 }
 std::size_t PartDocument::loft_feature_count() const noexcept {
   return loft_features_.size();
+}
+std::size_t PartDocument::surface_feature_count() const noexcept {
+  return surface_features_.size();
 }
 std::size_t PartDocument::linear_pattern_feature_count() const noexcept {
   return linear_pattern_features_.size();
@@ -3167,6 +3334,12 @@ const SweepFeature* PartDocument::find_sweep_feature(FeatureId id) const noexcep
 const LoftFeature* PartDocument::find_loft_feature(FeatureId id) const noexcept {
   for (const auto& feature : loft_features_)
     if (feature.id() == id)
+      return &feature;
+  return nullptr;
+}
+const SurfaceFeature* PartDocument::find_surface_feature(FeatureId id) const noexcept {
+  for (const auto& feature : surface_features_)
+    if (surface_feature_id(feature) == id)
       return &feature;
   return nullptr;
 }
@@ -3312,6 +3485,9 @@ bool PartDocument::has_sweep_feature_id(const FeatureId& id) const noexcept {
 bool PartDocument::has_loft_feature_id(const FeatureId& id) const noexcept {
   return find_loft_feature(id) != nullptr;
 }
+bool PartDocument::has_surface_feature_id(const FeatureId& id) const noexcept {
+  return find_surface_feature(id) != nullptr;
+}
 bool PartDocument::has_linear_pattern_feature_id(const FeatureId& id) const noexcept {
   return find_linear_pattern_feature(id) != nullptr;
 }
@@ -3346,7 +3522,8 @@ bool PartDocument::has_body_transform_id(const BodyTransformId& id) const noexce
 }
 bool PartDocument::has_any_feature_id(const FeatureId& id) const noexcept {
   return has_feature_id(id) || has_revolve_feature_id(id) || has_sweep_feature_id(id) ||
-         has_loft_feature_id(id) || has_linear_pattern_feature_id(id) ||
+         has_loft_feature_id(id) || has_surface_feature_id(id) ||
+         has_linear_pattern_feature_id(id) ||
          has_circular_pattern_feature_id(id) || has_mirror_feature_id(id) ||
          has_fillet_feature_id(id) || has_chamfer_feature_id(id) || has_shell_feature_id(id) ||
          has_draft_feature_id(id) || has_body_boolean_feature_id(id);

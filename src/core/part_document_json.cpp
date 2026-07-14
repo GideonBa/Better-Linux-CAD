@@ -22,6 +22,9 @@ using json = nlohmann::json;
 constexpr std::string_view k_schema = "blcad.part_document.mvp1";
 constexpr int k_version = 1;
 
+[[nodiscard]] bool has_exact_fields(const json& value,
+                                    std::initializer_list<std::string_view> fields);
+
 [[nodiscard]] Error json_error(std::string message) {
   return Error::validation("part_document_json", std::move(message));
 }
@@ -2524,6 +2527,254 @@ using ParsedPartPattern = std::variant<LinearPatternFeature, CircularPatternFeat
   return Result<LoftFeature>::failure(json_error("unsupported loft feature type"));
 }
 
+[[nodiscard]] json boundary_curve_reference_to_json(const BoundaryCurveReference& reference) {
+  json value{{"source_kind", std::string(to_string(reference.source_kind()))},
+             {"path_curve", nullptr}, {"semantic_edge", nullptr}};
+  if (reference.source_kind() == BoundaryCurveSourceKind::PathCurve)
+    value["path_curve"] = std::get<PathCurveId>(reference.source()).value();
+  else
+    value["semantic_edge"] = semantic_edge_reference_to_json(
+        std::get<SemanticEdgeReference>(reference.source()));
+  return value;
+}
+
+[[nodiscard]] Result<BoundaryCurveReference>
+boundary_curve_reference_from_json(const json& value) {
+  if (!has_exact_fields(value, {"source_kind", "path_curve", "semantic_edge"}) ||
+      !value.at("source_kind").is_string() ||
+      (!value.at("path_curve").is_null() && !value.at("path_curve").is_string()) ||
+      (!value.at("semantic_edge").is_null() && !value.at("semantic_edge").is_object()))
+    return Result<BoundaryCurveReference>::failure(
+        json_error("surface boundary reference is malformed"));
+  const std::string kind = value.at("source_kind").get<std::string>();
+  if (kind == "path_curve" && value.at("path_curve").is_string() &&
+      value.at("semantic_edge").is_null())
+    return BoundaryCurveReference::create_path_curve(
+        PathCurveId(value.at("path_curve").get<std::string>()));
+  if (kind == "semantic_edge" && value.at("path_curve").is_null() &&
+      value.at("semantic_edge").is_object()) {
+    const auto& edge_json = value.at("semantic_edge");
+    if (!has_exact_fields(edge_json, {"source_feature", "edge"}) ||
+        !edge_json.at("source_feature").is_string() || !edge_json.at("edge").is_string())
+      return Result<BoundaryCurveReference>::failure(
+          json_error("surface semantic edge is malformed"));
+    auto edge = semantic_edge_reference_from_json(edge_json);
+    if (edge.has_error()) return Result<BoundaryCurveReference>::failure(edge.error());
+    return BoundaryCurveReference::create_semantic_edge(std::move(edge.value()));
+  }
+  return Result<BoundaryCurveReference>::failure(
+      json_error("surface boundary reference has inconsistent source fields"));
+}
+
+[[nodiscard]] json surface_reference_to_json(const SurfaceReference& reference) {
+  json value{{"source_kind", std::string(to_string(reference.source_kind()))},
+             {"body", nullptr}, {"semantic_face", nullptr}};
+  if (reference.source_kind() == SurfaceReferenceSourceKind::Body)
+    value["body"] = std::get<BodyId>(reference.source()).value();
+  else {
+    const auto& face = std::get<SemanticFaceReference>(reference.source());
+    value["semantic_face"] = json{{"source_feature", face.source_feature().value()},
+                                  {"face", std::string(to_string(face.face()))}};
+  }
+  return value;
+}
+
+[[nodiscard]] Result<SurfaceReference> surface_reference_from_json(const json& value) {
+  if (!has_exact_fields(value, {"source_kind", "body", "semantic_face"}) ||
+      !value.at("source_kind").is_string() ||
+      (!value.at("body").is_null() && !value.at("body").is_string()) ||
+      (!value.at("semantic_face").is_null() && !value.at("semantic_face").is_object()))
+    return Result<SurfaceReference>::failure(json_error("surface reference is malformed"));
+  const std::string kind = value.at("source_kind").get<std::string>();
+  if (kind == "body" && value.at("body").is_string() && value.at("semantic_face").is_null())
+    return SurfaceReference::create_body(BodyId(value.at("body").get<std::string>()));
+  if (kind == "semantic_face" && value.at("body").is_null() &&
+      value.at("semantic_face").is_object()) {
+    const auto& face_json = value.at("semantic_face");
+    if (!has_exact_fields(face_json, {"source_feature", "face"}) ||
+        !face_json.at("source_feature").is_string() || !face_json.at("face").is_string())
+      return Result<SurfaceReference>::failure(json_error("surface semantic face is malformed"));
+    auto face = semantic_face_from_json(face_json.at("face"));
+    if (face.has_error()) return Result<SurfaceReference>::failure(face.error());
+    auto reference = SemanticFaceReference::create(
+        FeatureId(face_json.at("source_feature").get<std::string>()), face.value());
+    if (reference.has_error()) return Result<SurfaceReference>::failure(reference.error());
+    return SurfaceReference::create_semantic_face(std::move(reference.value()));
+  }
+  return Result<SurfaceReference>::failure(
+      json_error("surface reference has inconsistent source fields"));
+}
+
+[[nodiscard]] json trimming_reference_to_json(const TrimmingReference& reference) {
+  json value{{"source_kind", std::string(to_string(reference.source_kind()))},
+             {"boundary_curve", nullptr}, {"sketch", nullptr}, {"profile", nullptr}};
+  if (reference.source_kind() == TrimmingReferenceSourceKind::BoundaryCurve)
+    value["boundary_curve"] = boundary_curve_reference_to_json(
+        std::get<BoundaryCurveReference>(reference.source()));
+  else {
+    const auto& profile = std::get<ProfileRegionReference>(reference.source());
+    value["sketch"] = profile.sketch().value();
+    value["profile"] = profile.profile().value();
+  }
+  return value;
+}
+
+[[nodiscard]] Result<TrimmingReference> trimming_reference_from_json(const json& value) {
+  if (!has_exact_fields(value, {"source_kind", "boundary_curve", "sketch", "profile"}) ||
+      !value.at("source_kind").is_string())
+    return Result<TrimmingReference>::failure(json_error("surface trimming reference is malformed"));
+  const std::string kind = value.at("source_kind").get<std::string>();
+  if (kind == "boundary_curve" && value.at("boundary_curve").is_object() &&
+      value.at("sketch").is_null() && value.at("profile").is_null()) {
+    auto boundary = boundary_curve_reference_from_json(value.at("boundary_curve"));
+    if (boundary.has_error()) return Result<TrimmingReference>::failure(boundary.error());
+    return TrimmingReference::create_boundary_curve(std::move(boundary.value()));
+  }
+  if (kind == "profile_region" && value.at("boundary_curve").is_null() &&
+      value.at("sketch").is_string() && value.at("profile").is_string()) {
+    auto profile = ProfileRegionReference::create(
+        SketchId(value.at("sketch").get<std::string>()),
+        ProfileId(value.at("profile").get<std::string>()));
+    if (profile.has_error()) return Result<TrimmingReference>::failure(profile.error());
+    return TrimmingReference::create_profile_region(std::move(profile.value()));
+  }
+  return Result<TrimmingReference>::failure(
+      json_error("surface trimming reference has inconsistent source fields"));
+}
+
+[[nodiscard]] json surface_feature_to_json(const SurfaceFeature& feature) {
+  json value{{"id", surface_feature_id(feature).value()},
+             {"name", surface_feature_name(feature)},
+             {"type", std::string(to_string(surface_feature_kind(feature)))},
+             {"boundaries", json::array()}, {"target", nullptr}, {"trimming", nullptr},
+             {"boundary", nullptr}, {"distance_parameter", nullptr},
+             {"surfaces", json::array()}, {"tolerance_parameter", nullptr},
+             {"shell", nullptr}, {"result_body", surface_feature_result_body(feature).value()}};
+  std::visit([&](const auto& typed) {
+    using T = std::decay_t<decltype(typed)>;
+    if constexpr (std::is_same_v<T, BoundarySurfaceFeature> ||
+                  std::is_same_v<T, FillSurfaceFeature>) {
+      for (const auto& boundary : typed.boundaries())
+        value["boundaries"].push_back(boundary_curve_reference_to_json(boundary));
+    } else if constexpr (std::is_same_v<T, TrimSurfaceFeature>) {
+      value["target"] = surface_reference_to_json(typed.target());
+      value["trimming"] = trimming_reference_to_json(typed.trimming());
+    } else if constexpr (std::is_same_v<T, ExtendSurfaceFeature>) {
+      value["target"] = surface_reference_to_json(typed.target());
+      value["boundary"] = boundary_curve_reference_to_json(typed.boundary());
+      value["distance_parameter"] = typed.distance_parameter().value();
+    } else if constexpr (std::is_same_v<T, SurfaceStitchFeature>) {
+      for (const auto& surface : typed.surfaces())
+        value["surfaces"].push_back(surface_reference_to_json(surface));
+      value["tolerance_parameter"] = typed.tolerance_parameter().value();
+    } else value["shell"] = surface_reference_to_json(typed.shell());
+  }, feature);
+  return value;
+}
+
+[[nodiscard]] Result<SurfaceFeature> surface_feature_from_json(const json& value) {
+  if (!has_exact_fields(value, {"id", "name", "type", "boundaries", "target", "trimming",
+                                "boundary", "distance_parameter", "surfaces",
+                                "tolerance_parameter", "shell", "result_body"}) ||
+      !value.at("id").is_string() || !value.at("name").is_string() ||
+      !value.at("type").is_string() || !value.at("boundaries").is_array() ||
+      !value.at("surfaces").is_array() || !value.at("result_body").is_string())
+    return Result<SurfaceFeature>::failure(json_error("surface feature intent is malformed"));
+  std::vector<BoundaryCurveReference> boundaries;
+  for (const auto& entry : value.at("boundaries")) {
+    auto parsed = boundary_curve_reference_from_json(entry);
+    if (parsed.has_error()) return Result<SurfaceFeature>::failure(parsed.error());
+    boundaries.push_back(std::move(parsed.value()));
+  }
+  std::vector<SurfaceReference> surfaces;
+  for (const auto& entry : value.at("surfaces")) {
+    auto parsed = surface_reference_from_json(entry);
+    if (parsed.has_error()) return Result<SurfaceFeature>::failure(parsed.error());
+    surfaces.push_back(std::move(parsed.value()));
+  }
+  const FeatureId id(value.at("id").get<std::string>());
+  const std::string name = value.at("name").get<std::string>();
+  const BodyId result(value.at("result_body").get<std::string>());
+  const std::string type = value.at("type").get<std::string>();
+  const auto null = [&value](const char* field) { return value.at(field).is_null(); };
+  bool active_slots_match = false;
+  if (type == "boundary_surface" || type == "fill_surface")
+    active_slots_match = value.at("surfaces").empty() && null("target") && null("trimming") &&
+                         null("boundary") && null("distance_parameter") &&
+                         null("tolerance_parameter") && null("shell");
+  else if (type == "trim_surface")
+    active_slots_match = value.at("boundaries").empty() && value.at("surfaces").empty() &&
+                         value.at("target").is_object() && value.at("trimming").is_object() &&
+                         null("boundary") && null("distance_parameter") &&
+                         null("tolerance_parameter") && null("shell");
+  else if (type == "extend_surface")
+    active_slots_match = value.at("boundaries").empty() && value.at("surfaces").empty() &&
+                         value.at("target").is_object() && null("trimming") &&
+                         value.at("boundary").is_object() &&
+                         value.at("distance_parameter").is_string() &&
+                         null("tolerance_parameter") && null("shell");
+  else if (type == "surface_stitch")
+    active_slots_match = value.at("boundaries").empty() && null("target") && null("trimming") &&
+                         null("boundary") && null("distance_parameter") &&
+                         value.at("tolerance_parameter").is_string() && null("shell");
+  else if (type == "closed_shell_to_solid")
+    active_slots_match = value.at("boundaries").empty() && value.at("surfaces").empty() &&
+                         null("target") && null("trimming") && null("boundary") &&
+                         null("distance_parameter") && null("tolerance_parameter") &&
+                         value.at("shell").is_object();
+  if (!active_slots_match)
+    return Result<SurfaceFeature>::failure(
+        json_error("surface feature active and inactive fields are inconsistent"));
+  if (type == "boundary_surface") {
+    auto parsed = BoundarySurfaceFeature::create(id, name, std::move(boundaries), result);
+    if (parsed.has_error()) return Result<SurfaceFeature>::failure(parsed.error());
+    return Result<SurfaceFeature>::success(std::move(parsed.value()));
+  }
+  if (type == "fill_surface") {
+    auto parsed = FillSurfaceFeature::create(id, name, std::move(boundaries), result);
+    if (parsed.has_error()) return Result<SurfaceFeature>::failure(parsed.error());
+    return Result<SurfaceFeature>::success(std::move(parsed.value()));
+  }
+  if (type == "trim_surface" && value.at("target").is_object() &&
+      value.at("trimming").is_object()) {
+    auto target = surface_reference_from_json(value.at("target"));
+    auto trimming = trimming_reference_from_json(value.at("trimming"));
+    if (target.has_error()) return Result<SurfaceFeature>::failure(target.error());
+    if (trimming.has_error()) return Result<SurfaceFeature>::failure(trimming.error());
+    auto parsed = TrimSurfaceFeature::create(id, name, std::move(target.value()),
+                                             std::move(trimming.value()), result);
+    if (parsed.has_error()) return Result<SurfaceFeature>::failure(parsed.error());
+    return Result<SurfaceFeature>::success(std::move(parsed.value()));
+  }
+  if (type == "extend_surface" && value.at("target").is_object() &&
+      value.at("boundary").is_object() && value.at("distance_parameter").is_string()) {
+    auto target = surface_reference_from_json(value.at("target"));
+    auto boundary = boundary_curve_reference_from_json(value.at("boundary"));
+    if (target.has_error()) return Result<SurfaceFeature>::failure(target.error());
+    if (boundary.has_error()) return Result<SurfaceFeature>::failure(boundary.error());
+    auto parsed = ExtendSurfaceFeature::create(
+        id, name, std::move(target.value()), std::move(boundary.value()),
+        ParameterId(value.at("distance_parameter").get<std::string>()), result);
+    if (parsed.has_error()) return Result<SurfaceFeature>::failure(parsed.error());
+    return Result<SurfaceFeature>::success(std::move(parsed.value()));
+  }
+  if (type == "surface_stitch" && value.at("tolerance_parameter").is_string()) {
+    auto parsed = SurfaceStitchFeature::create(
+        id, name, std::move(surfaces),
+        ParameterId(value.at("tolerance_parameter").get<std::string>()), result);
+    if (parsed.has_error()) return Result<SurfaceFeature>::failure(parsed.error());
+    return Result<SurfaceFeature>::success(std::move(parsed.value()));
+  }
+  if (type == "closed_shell_to_solid" && value.at("shell").is_object()) {
+    auto shell = surface_reference_from_json(value.at("shell"));
+    if (shell.has_error()) return Result<SurfaceFeature>::failure(shell.error());
+    auto parsed = ClosedShellToSolidFeature::create(id, name, std::move(shell.value()), result);
+    if (parsed.has_error()) return Result<SurfaceFeature>::failure(parsed.error());
+    return Result<SurfaceFeature>::success(std::move(parsed.value()));
+  }
+  return Result<SurfaceFeature>::failure(json_error("unsupported surface feature intent"));
+}
+
 [[nodiscard]] bool extrude_reference_features_available(const PartDocument& document,
                                                         const Feature& feature) {
   const auto available = [&document](const std::optional<FaceReference>& face) {
@@ -3552,6 +3803,9 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
   root["loft_features"] = json::array();
   for (const auto& feature : document.loft_features())
     root["loft_features"].push_back(loft_feature_to_json(feature));
+  root["surface_features"] = json::array();
+  for (const auto& feature : document.surface_features())
+    root["surface_features"].push_back(surface_feature_to_json(feature));
   root["part_patterns"] = json::array();
   auto pattern_order = document.dependency_graph().topological_order();
   if (pattern_order.has_error())
@@ -3908,6 +4162,18 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
       if (feature.has_error())
         return Result<PartDocument>::failure(feature.error());
       auto added = document.value().add_loft_feature(std::move(feature.value()));
+      if (added.has_error())
+        return Result<PartDocument>::failure(added.error());
+    }
+    const json surface_array = root.value("surface_features", json::array());
+    if (!surface_array.is_array())
+      return Result<PartDocument>::failure(
+          json_error("surface_features must be an array in part document json"));
+    for (const auto& surface_json : surface_array) {
+      auto feature = surface_feature_from_json(surface_json);
+      if (feature.has_error())
+        return Result<PartDocument>::failure(feature.error());
+      auto added = document.value().add_surface_feature(std::move(feature.value()));
       if (added.has_error())
         return Result<PartDocument>::failure(added.error());
     }

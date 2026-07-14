@@ -608,9 +608,10 @@ Canonical numbered sequence:
 - `docs/part-loft-geometry-mvp6.md`
 - `docs/part-multi-section-loft-geometry-mvp6.md`
 - `docs/part-guided-loft-geometry-mvp6.md`
+- `docs/part-surface-feature-intent-mvp6.md`
 - `docs/step-import-sequence-mvp7.md`
 
-Block 47 Spherical completes the Assembly MVP sequence. Blocks 48–87 Body identity, body-scoped
+Block 47 Spherical completes the Assembly MVP sequence. Blocks 48–88 Body identity, body-scoped
 recompute/inspection, Body Booleans, associative BodyTransform/SketchOwnership execution, and
 reusable Part-feature semantic input references plus richer Extrude/Cut intent/Geometry and
 persistent plus executed Revolve/RevolveCut, general Pattern intent plus Geometry, and persistent
@@ -620,8 +621,8 @@ Arc, Spline, Helix, Guide Curve, their deterministic JSON/source-reference gramm
 deterministic OCCT Geometry conversion, reusable connected PathCurve Core/JSON intent, and
 persistent plus spatial/twist/guide-controlled Sweep/SweepCut/SweepSurface and path-following
 Extrude/Extruded Cut and persistent plus executed path/guide-controlled multi-section
-Loft/LoftCut/LoftSurface Geometry through verified G1/C1 are implemented. The next technical step
-is Block 88 Surface feature Core intent and JSON.
+Loft/LoftCut/LoftSurface Geometry through verified G1/C1 and persistent Surface-feature Core/JSON
+intent are implemented. The next technical step is Block 89 Boundary and Fill Surface Geometry.
 
 Block 47 adds passive Point/Point Spherical intent through the shared local/root-space path. Scalar
 Revolute APIs remain adapters; transform variables and the shared numeric engine are unchanged.
