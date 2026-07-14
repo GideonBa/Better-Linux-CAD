@@ -1,8 +1,7 @@
 # GUI Feature Validation Sequence MVP-7
 
-Status: active. Blocks 95–99 are implemented; Blocks 100–105 are planned. Block 100 parameters,
-bodies, and foundational Part workflows are the current next technical step. STEP Import follows in
-Blocks 106–112.
+Status: complete. Blocks 95–105 are implemented and accepted. Block 106 begins Interactive
+Sketcher MVP-8; STEP Import follows in Blocks 122–128.
 
 This document is the canonical numbered implementation sequence for a simple desktop UI that makes
 every feature implemented through Block 94 reachable and testable. The interaction model follows
@@ -37,7 +36,8 @@ Included:
 
 Explicitly deferred:
 
-- STEP import, which starts only after GUI acceptance in Block 106;
+- productive direct-manipulation Sketch editing, which starts in Block 106;
+- STEP import, which starts after Interactive Sketcher acceptance in Block 122;
 - production styling, custom themes, workspace customization, macros, add-ins, and command search;
 - manufacturing, drawings, simulation, rendering, collaboration, and cloud workflows;
 - exact parity with any commercial CAD product;
@@ -102,7 +102,8 @@ inactive -> collecting semantic selections -> editing parameters -> preview -> a
 103 Assembly authoring, relationships, joints, motion, and hierarchy workflows
 104 analysis and STEP-export workflows
 105 integrated GUI feature-coverage acceptance
-106–112 STEP Import MVP-8
+106–121 Interactive Sketcher MVP-8
+122–128 STEP Import MVP-9
 ```
 
 Do not collapse Blocks 95–105 into one large GUI change. The shell, viewport, editing surfaces, and
@@ -318,6 +319,9 @@ Focused tags:
 
 ## Block 100 — Parameters, bodies, and foundational Part workflows
 
+Status: implemented for all currently persistent Core authorities. Detailed contract and the
+explicit unsupported suppression boundary: `docs/gui-part-foundation-workbench-mvp7.md`.
+
 Primary boundary: the first complete solid-feature authoring loop.
 
 Expose parameter/expression editing, Body creation/activation, profile selection, Extrude and
@@ -338,6 +342,8 @@ Focused tags:
 ```
 
 ## Block 101 — Patterns, finishing, shell, draft, and body operations
+
+Status: implemented. Detailed contract: `docs/gui-part-operations-workbench-mvp7.md`.
 
 Primary boundary: UI coverage of the remaining conventional mechanical Part features.
 
@@ -360,6 +366,8 @@ Focused tags:
 
 ## Block 102 — 3D paths, Sweep, Loft, and Surface workflows
 
+Status: implemented. Detailed contract: `docs/gui-spatial-surface-workbench-mvp7.md`.
+
 Primary boundary: UI coverage of spatial and surface modeling.
 
 Expose model-space 3D Sketch point/line/polyline/arc/spline/helix/guide entities, connected
@@ -381,6 +389,8 @@ Focused tags:
 ```
 
 ## Block 103 — Assembly authoring, relationships, joints, motion, and hierarchy
+
+Status: implemented. Detailed contract: `docs/gui-assembly-workbench-mvp7.md`.
 
 Primary boundary: interactive use of the complete Assembly MVP.
 
@@ -405,6 +415,8 @@ Focused tags:
 
 ## Block 104 — Analysis and STEP-export workflows
 
+Status: implemented. Detailed contract: `docs/gui-analysis-step-export-workbench-mvp7.md`.
+
 Primary boundary: GUI access to existing inspection and exchange consumers.
 
 Expose solve/DOF inspection, interference, clearance, contact-related queries, sampled revolute
@@ -423,6 +435,10 @@ Focused tags:
 ```
 
 ## Block 105 — Integrated GUI feature-coverage acceptance
+
+Status: implemented and accepted. Acceptance authority:
+`docs/gui-feature-validation-mvp7-acceptance.md`; machine-readable coverage:
+`docs/gui-feature-coverage-manifest-mvp7.json`.
 
 Primary boundary: proof that the desktop can exercise every implemented feature family through
 Block 94 without bypassing public authorities.
@@ -462,7 +478,8 @@ Focused tags:
 [integration][gui-headless-equivalence]
 ```
 
-After Block 105, the GUI Validation MVP is complete and Block 106 begins STEP Import MVP-8.
+After Block 105, the GUI Validation MVP is complete and Block 106 begins Interactive Sketcher
+MVP-8. STEP Import MVP-9 begins after its Block-121 acceptance.
 
 ## Coverage ownership summary
 

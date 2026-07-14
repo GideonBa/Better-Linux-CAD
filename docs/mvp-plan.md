@@ -4,10 +4,10 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 99
-current_block: 100
-current_boundary: Parameters, bodies, and foundational Part workflows
-current_tag: "[gui][parameters]"
+implemented_through: Block 105
+current_block: 106
+current_boundary: Interactive Sketch workspace and command lifecycle
+current_tag: "[gui][sketch-workspace]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -15,8 +15,9 @@ phase_status:
   mvp_4: "Assembly parameters and Project container — implemented"
   mvp_5: "Assembly relationships, motion, hierarchy, analysis, exchange — Blocks 1–47 implemented"
   mvp_6: "Part Construction — Blocks 48–94 implemented; MVP complete"
-  mvp_7: "GUI Feature Validation — Blocks 95–99 implemented; Blocks 100–105 planned; Block 100 next"
-  mvp_8: "STEP Import — Blocks 106–112 planned after GUI acceptance"
+  mvp_7: "GUI Feature Validation — Blocks 95–105 implemented; MVP complete"
+  mvp_8: "Interactive Sketcher — Blocks 106–121 planned; Block 106 next"
+  mvp_9: "STEP Import — Blocks 122–128 planned after Interactive Sketcher acceptance"
 ---
 
 # MVP Plan
@@ -586,14 +587,14 @@ The sequence consolidates existing planning from:
 
 The first Part Construction MVP is complete. It provides a serious headless parametric Part kernel with multiple solid/surface bodies, explicit body operations, Revolve, general patterns, Mirror, Fillet, Chamfer, Shell, Draft, 3D Sketches, Sweep, Loft, first Surface Features, surface-to-solid conversion, and multi-body STEP exchange.
 
-It does not mean SolidWorks/Inventor Part product parity. Blocks 95–105 add a simple validation UI,
-not commercial-product parity. Class-A surfacing, arbitrary NURBS control cages, variable-radius
+It does not mean SolidWorks/Inventor Part product parity. Blocks 95–105 add a validation UI and
+Blocks 106–121 plan the productive Interactive Sketcher. Class-A surfacing, arbitrary NURBS control cages, variable-radius
 fillets, advanced topology healing, direct modeling, sheet metal, weldments, and specialized
 manufacturing feature systems remain later work.
 
 ## MVP 7 — GUI Feature Validation after Block 94
 
-**Status:** Active — Blocks 95–99 implemented; Block 100 next
+**Status:** Complete — Blocks 95–105 implemented and accepted
 **Canonical:** `docs/gui-feature-validation-sequence-mvp7.md`
 
 The optional Qt 6 desktop uses familiar parametric-CAD interaction patterns: a tabbed command area,
@@ -620,10 +621,31 @@ Block 105 owns a manifest proving that every public feature family implemented t
 a GUI create/edit or explicit read-only disposition, browser/property inspection, viewport behavior,
 and focused or headless-equivalence coverage.
 
-## MVP 8 — STEP Import after GUI Validation
+## MVP 8 — Interactive Sketcher
 
-**Status:** Planned — Blocks 106–112 follow Block 105
-**Canonical:** `docs/step-import-sequence-mvp8.md`
+**Status:** Planned — Blocks 106–121 follow Block 105
+**Canonical:** `docs/interactive-sketcher-sequence-mvp8.md`
+
+This phase turns the validation surface into an Inventor-familiar productive Sketch environment.
+It adds shared point topology, a deterministic headless planar constraint solver, mouse-draggable
+points and curve handles, creation/constraint/dimension/modify tools, profile recognition, and an
+interactive Sketch3D surface without moving model authority into Qt.
+
+Mandatory order:
+
+```text
+106–110 interaction foundation, shared topology, solver, and live dragging
+111–113 basic/mechanical/conic/spline creation and editing
+114–115 geometric constraints, automatic inference, dimensions, and expressions
+116–119 modify/reference/transform tools, regions, diagnostics, and Finish Sketch
+120     interactive Sketch3D
+121     integrated usability, persistence, performance, and GUI/headless acceptance
+```
+
+## MVP 9 — STEP Import after Interactive Sketcher
+
+**Status:** Planned — Blocks 122–128 follow Block 121
+**Canonical:** `docs/step-import-sequence-mvp9.md`
 
 The STEP Import sequence provides two explicit user modes:
 
@@ -639,16 +661,16 @@ EditableBody
 Mandatory order:
 
 ```text
-106 STEP source identity, import modes, JSON, and freshness
-107 OCCT STEP/XDE reader and deterministic imported body definitions
-108 stable imported topology identity, recovery, and target resolution
-109 Reference Part integration with assemblies
-110 EditableBody ImportedBodyFeature and downstream modeling
-111 structured STEP assembly import
-112 integrated import, refresh, edit, assembly, and re-export acceptance
+122 STEP source identity, import modes, JSON, and freshness
+123 OCCT STEP/XDE reader and deterministic imported body definitions
+124 stable imported topology identity, recovery, and target resolution
+125 Reference Part integration with assemblies
+126 EditableBody ImportedBodyFeature and downstream modeling
+127 structured STEP assembly import
+128 integrated import, refresh, edit, assembly, and re-export acceptance
 ```
 
-Blocks 106–112 do not reconstruct foreign feature history and do not implement direct face
+Blocks 122–128 do not reconstruct foreign feature history and do not implement direct face
 push/pull. EditableBody means that new BLCAD features are built after a persistent imported base
 feature.
 
@@ -1402,7 +1424,50 @@ model/plane coordinate mapping. Repairs require Preview and commit as one undoab
 [gui][sketch-repair]
 ```
 
-## Current next technical step — Block 100
+## Block 100 — Parameters, Bodies, and foundational Part workflows — Implemented
 
-Expose parameter, Body, Extrude/Cut, Revolve, and bolt-circle/hole authoring through the established
-GUI transaction and task boundaries.
+The GUI application workbench now provides typed parameters/expressions, Body creation/activation,
+copy-based Extrude/Cut and Revolve/RevolveCut preview, atomic Apply, bolt-circle hole intent, and
+body-cache inspection. A GUI-driven tutorial Part passes save/load/recompute. Persistent Part-feature
+suppression is explicitly unavailable because no Core/JSON/recompute authority exists; the GUI fails
+closed instead of persisting ineffective state. See `docs/gui-part-foundation-workbench-mvp7.md`.
+
+## Block 101 — Patterns, finishing, shell, draft, and Body operations — Implemented
+
+The GUI application workbench exposes every current Pattern, Mirror, Fillet, Chamfer, Shell, Draft,
+Body Boolean, and associative Body Transform authority through copy-based preview and atomic Apply.
+The acceptance path covers multi-Body recompute, save/load, transform, Boolean composition, and
+fresh-result STEP export. See `docs/gui-part-operations-workbench-mvp7.md`.
+
+## Block 102 — 3D paths, Sweep, Loft, and Surface workflows — Implemented
+
+The GUI spatial workbench exposes complete authored Sketch3D data, connected planar/3D PathCurves,
+Sweep and path-following Extrude families, ordered/ guided Loft families, and all current Surface
+features through copy-based preview and atomic Apply. The acceptance path proves distinct path,
+Surface-Body, and Solid-Body viewport products. See `docs/gui-spatial-surface-workbench-mvp7.md`.
+
+## Block 103 — Assembly authoring, relationships, joints, motion, and hierarchy — Implemented
+
+The GUI Assembly workbench exposes Project/Assembly ownership, repeated Parts, nested subassemblies,
+occurrence state, parameters/bindings, every current relationship/joint family, cross-hierarchy
+intent, DOF/residual diagnostics, numeric solve, joint drives, and atomic result application. See
+`docs/gui-assembly-workbench-mvp7.md`.
+
+## Block 104 — Analysis and STEP-export workflows — Implemented
+
+The GUI analysis/export workbench exposes authoritative DOF, interference, clearance, contact, and
+sampled motion results plus Part multi-body and flattened/structured Assembly STEP modes. Freshness,
+document mode, structure, output, progress, and cancellation-before-commit are explicit. See
+`docs/gui-analysis-step-export-workbench-mvp7.md`.
+
+## Block 105 — Integrated GUI feature-coverage acceptance — Implemented
+
+The checked-in coverage manifest maps every implemented family to GUI command, inspection,
+presentation, persistence, and proof. Integrated tests establish GUI/headless canonical intent and
+recompute equivalence, Undo/Redo freshness, deterministic samples, and fail-closed boundaries. See
+`docs/gui-feature-validation-mvp7-acceptance.md`.
+
+## Current next technical step — Block 106
+
+Begin Interactive Sketcher MVP-8 with the contextual Sketch workspace and command lifecycle in
+`docs/interactive-sketcher-sequence-mvp8.md`.

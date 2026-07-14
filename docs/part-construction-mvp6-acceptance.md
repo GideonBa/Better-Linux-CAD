@@ -74,6 +74,6 @@ kernel entity order.
 
 ## Handoff
 
-Part Construction MVP-6 is complete through Block 94. Block 95 begins GUI Feature Validation MVP-7
-with the optional Qt application shell, GUI document session, command architecture, and transient
-selection/task state. STEP Import MVP-8 begins after GUI acceptance in Block 106.
+Part Construction MVP-6 is complete through Block 94 and GUI Feature Validation MVP-7 is accepted
+through Block 105. Interactive Sketcher MVP-8 begins in Block 106; STEP Import MVP-9 follows after
+its acceptance in Block 122.

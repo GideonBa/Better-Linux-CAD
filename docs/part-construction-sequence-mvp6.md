@@ -1,7 +1,8 @@
 # Part Construction Sequence MVP-6
 
 Status: complete. Blocks 48–94 and GUI Blocks 95–97 are implemented; Blocks 98–105 form the active
-GUI Feature Validation continuation, followed by STEP Import Blocks 106–112.
+GUI Feature Validation and Interactive Sketcher continuation, followed by STEP Import Blocks
+122–128.
 
 Block 47 completed the Assembly MVP handoff. Blocks 48–94 establish Body identity, body-scoped recompute/inspection, Body Boolean execution, associative transform Geometry, reusable semantic Part-feature inputs, richer Extrude/Cut intent plus Geometry, persistent plus executed Revolve/RevolveCut, general Pattern and Mirror Geometry, persistent plus executed Fillet/Chamfer/Shell/Draft Geometry, persistent model-space 3D Sketch Geometry, connected PathCurve Core intent, executed Sweep/SweepCut/SweepSurface through spatial paths, twist, and guide control, path-following Extrude/Extruded Cut, persistent plus executed guided multi-section Loft intent through verified G1/C1, persistent Surface-feature intent, executed Boundary/Fill, Trim/Extend, Stitch/Knit/Sew shell and Closed-shell-to-solid Surface Geometry, plus deterministic multi-body STEP export. Block 94 proves those contracts together through reproducible headless acceptance workflows. Block 95 Qt application shell, GUI document session, and command architecture is implemented; Block 96 document lifecycle, transactions, recompute, and diagnostics is implemented; Block 97 OCCT viewport, navigation, display, and semantic picking is implemented; Block 98 browser, property editor, and selection synchronization is the current next technical step.
 
@@ -64,7 +65,8 @@ The implemented Blocks 48–94 contracts are canonical in:
 The planned post-Block-94 GUI handoff and subsequent STEP import handoff are canonical in:
 
 - `docs/gui-feature-validation-sequence-mvp7.md`
-- `docs/step-import-sequence-mvp8.md`
+- `docs/interactive-sketcher-sequence-mvp8.md`
+- `docs/step-import-sequence-mvp9.md`
 
 That companion document's block goals, required work, failure policies, acceptance tags, proofs, and explicit deferrals are incorporated by reference here. Its historical top-level statement that repository work was on Block 35 is preserved planning context, not current status authority.
 
@@ -221,8 +223,11 @@ Block 94 integrates these authorities under one acceptance tag; its canonical re
 
 Block 94 completes the first Part Construction MVP. Blocks 95–105 add a simple Qt desktop that makes
 all feature families implemented through Block 94 testable through familiar CAD workbenches and
-closes with a GUI/headless feature-coverage acceptance. Blocks 106–112 then add STEP import with two
-explicit modes: immutable Reference Parts for Assembly use and EditableBody Parts whose
+closes with a GUI/headless feature-coverage acceptance. Blocks 106–121 then add the productive
+Interactive Sketcher. Blocks 122–128 add STEP import with two explicit modes: immutable Reference
+Parts for Assembly use and EditableBody Parts whose
 `ImportedBodyFeature` is followed by normal BLCAD feature history. Stable imported topology, source
 freshness, structured STEP assembly import, and integrated refresh/re-export behavior remain
 separate blocks rather than implicit additions to Part Construction or GUI infrastructure.
+Canonical plans are `docs/interactive-sketcher-sequence-mvp8.md` and
+`docs/step-import-sequence-mvp9.md`.

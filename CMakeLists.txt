@@ -276,10 +276,15 @@ if(BLCAD_BUILD_GUI)
   add_library(
     blcad_gui STATIC
     src/gui/gui_command_registry.cpp
+    src/gui/gui_assembly_workbench.cpp
+    src/gui/gui_analysis_export_workbench.cpp
     src/gui/gui_document_browser.cpp
     src/gui/gui_document_session.cpp
+    src/gui/gui_part_foundation_workbench.cpp
+    src/gui/gui_part_operations_workbench.cpp
     src/gui/gui_selection_model.cpp
     src/gui/gui_sketch_workbench.cpp
+    src/gui/gui_spatial_surface_workbench.cpp
     src/gui/gui_task_state.cpp
     src/gui/main_window.cpp
     src/gui/occt_viewport.cpp
@@ -535,14 +540,21 @@ if(BLCAD_BUILD_TESTS)
       blcad_gui_tests
       tests/gui/gui_test_main.cpp
       tests/gui/gui_application_shell_tests.cpp
+      tests/gui/gui_assembly_workbench_tests.cpp
+      tests/gui/gui_analysis_export_workbench_tests.cpp
       tests/gui/gui_command_state_tests.cpp
       tests/gui/gui_document_session_tests.cpp
       tests/gui/gui_document_browser_tests.cpp
       tests/gui/gui_occt_viewport_tests.cpp
+      tests/gui/gui_part_foundation_workbench_tests.cpp
+      tests/gui/gui_part_operations_workbench_tests.cpp
       tests/gui/gui_sketch_workbench_tests.cpp
+      tests/gui/gui_spatial_surface_workbench_tests.cpp
+      tests/gui/gui_feature_coverage_acceptance_tests.cpp
       tests/gui/gui_startup_splash_tests.cpp
     )
     target_link_libraries(blcad_gui_tests PRIVATE BLCAD::gui Catch2::Catch2)
+    target_compile_definitions(blcad_gui_tests PRIVATE BLCAD_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
 
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
       target_compile_options(blcad_gui_tests PRIVATE -Wall -Wextra -Wpedantic)

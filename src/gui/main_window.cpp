@@ -118,6 +118,24 @@ const GuiCommandRegistry& MainWindow::command_registry() const noexcept {
 
 GuiSketchWorkbench& MainWindow::sketch_workbench() noexcept { return sketch_workbench_; }
 
+GuiPartFoundationWorkbench& MainWindow::part_foundation_workbench() noexcept {
+  return part_foundation_workbench_;
+}
+
+GuiPartOperationsWorkbench& MainWindow::part_operations_workbench() noexcept {
+  return part_operations_workbench_;
+}
+
+GuiSpatialSurfaceWorkbench& MainWindow::spatial_surface_workbench() noexcept {
+  return spatial_surface_workbench_;
+}
+
+GuiAssemblyWorkbench& MainWindow::assembly_workbench() noexcept { return assembly_workbench_; }
+
+GuiAnalysisExportWorkbench& MainWindow::analysis_export_workbench() noexcept {
+  return analysis_export_workbench_;
+}
+
 const std::optional<SketchId>& MainWindow::active_sketch() const noexcept { return active_sketch_; }
 
 bool MainWindow::request_workspace(GuiWorkspace workspace) noexcept {

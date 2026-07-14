@@ -34,12 +34,13 @@ The project grows through controlled headless vertical slices. Historical phase 
 6. assembly relationships, motion, hierarchy, posed geometry, analysis, structured exchange, and general target architecture;
 7. broad multi-body Part Construction;
 8. GUI/application workflows and complete implemented-feature validation;
-9. STEP Part/Assembly import as Reference or EditableBody;
-10. engineering modules.
+9. productive solver-backed Interactive Sketcher with direct manipulation;
+10. STEP Part/Assembly import as Reference or EditableBody;
+11. engineering modules.
 
-Phases 1–7 have implemented seeds through the completed Part Construction MVP. The current GUI
-Validation phase has implemented its Block-95 Qt shell and continues toward a simple test UI before
-STEP Import without changing Core/Geometry authority.
+Phases 1–8 are implemented through GUI Feature Validation Block 105. Interactive Sketcher MVP-8
+now plans the productive direct-manipulation workbench before STEP Import, without moving solver or
+model authority into Qt.
 
 Development rule:
 
@@ -90,10 +91,10 @@ spatial paths, twist, and guide control, path-following Extrude/Extruded Cut, an
 executed path/guide-controlled multi-section Loft Geometry through verified G1/C1, and the first
 persistent Surface-feature family plus executed Boundary/Fill, Trim/Extend, Stitch/Knit/Sew shell,
 Closed-shell-to-solid Surface Geometry, and deterministic visible Solid/Surface Body STEP export.
-Block 94 integrated Part Construction MVP acceptance and GUI Blocks 95–97 are implemented. The
-current next technical step is Block 98 browser, property editor, and selection synchronization.
-GUI Feature Validation continues through Block 105; STEP Part and structured Assembly import then
-follows in Blocks 106–112.
+Block 94 integrated Part Construction MVP acceptance and GUI Blocks 95–105 are implemented. The
+current next technical step is Block 106 Interactive Sketch workspace and command lifecycle.
+Interactive Sketcher continues through Block 121; STEP Part and structured Assembly import follows
+in Blocks 122–128.
 
 Several identity/authority questions are deliberately separated.
 
@@ -239,7 +240,7 @@ The system should eventually cover:
 - engineering assistants for bolts, holes, shafts, bearings, and gears;
 - standard-parts libraries and a material database;
 - structured assembly exchange, STEP import/export, and STL export; STEP import is concretely
-  sequenced in Blocks 106–112 as immutable Reference Parts or EditableBody base features;
+  sequenced in Blocks 122–128 as immutable Reference Parts or EditableBody base features;
 - richer contact/interference/motion analysis;
 - technical drawings and bills of materials;
 - later CAM or FEM coupling.
@@ -267,8 +268,8 @@ These are sequencing boundaries, not permanent product exclusions.
 
 `docs/mvp-plan.md` is the implementation-sequence source of truth.
 
-`docs/step-import-sequence-mvp8.md` is the canonical post-Block-94 plan for STEP Part and
-structured Assembly import.
+`docs/interactive-sketcher-sequence-mvp8.md` is canonical for productive Sketch interaction.
+`docs/step-import-sequence-mvp9.md` is canonical for STEP Part and structured Assembly import.
 
 `docs/architecture-summary.md` summarizes implemented architecture.
 

@@ -1,37 +1,24 @@
 # Future Roadmap: Inventor-like Sketcher and Feature Parity
 
-Status: planned long-term roadmap. This document is not an implementation claim.
+Status: capability catalog. The numbered implementation authority is now
+`docs/interactive-sketcher-sequence-mvp8.md` for Blocks 106–121.
 
 This document records the target that BLCAD should eventually grow from its current minimal CAD-kernel MVP into a serious parametric sketch and feature system. The reference quality bar is an Inventor-like workflow: rich 2D sketches, 3D sketches, constraints, dimensions, automatic profile detection, feature creation from profiles, and advanced curve/surface workflows.
 
 The goal is not to clone Autodesk Inventor's UI, names, or proprietary behavior. The goal is to document the broad CAD capabilities that users expect from an Inventor-class sketch environment and to map them into BLCAD's own architecture.
 
-## Current implemented baseline
+## Current baseline and remaining interaction gap
 
-The current implementation is intentionally much smaller than this roadmap.
+The headless baseline is implemented through Part Construction Block 94 and the validation GUI is
+accepted through Block 105. It already includes planar lines/arcs/splines, projected references,
+the current constraint/dimension subset, trim/extend intent, 3D Sketch curves, profiles, Revolve,
+Sweep, Loft, Surface features, and GUI inspection/transaction paths.
 
-Implemented today:
-
-- `RectangleProfile` fast-path primitive
-- `CircleProfile` fast-path primitive
-- `LineSegment` sketch entity
-- `ClosedProfile` from ordered line-segment IDs
-- validation for connected, closed, non-self-intersecting line loops
-- JSON persistence for line segments and closed profiles
-- additive extrude from one rectangle or one closed line profile
-- subtractive through-all cut from one circle or one closed line profile
-
-Not implemented yet:
-
-- automatic region detection from unordered sketch curves
-- arcs as sketch entities
-- splines as sketch entities
-- ellipses, slots, polygons, text, projected geometry
-- sketch constraints and dimensions
-- trim, extend, offset, mirror, pattern, fillet, or chamfer inside the sketcher
-- revolve or revolve cut
-- sweep, loft, guide-curve features, boundary surfaces, or surface-to-solid conversion
-- GUI sketch editing
+The remaining gap is product-quality authoring: stable shared 2D points, a general planar solver,
+direct mouse dragging, automatic inference, in-canvas dimensions, complete primitive and modify
+tools, automatic region selection, and a coherent Finish Sketch workflow. Blocks 106–121 implement
+that gap in dependency order. The detailed lists below remain the capability catalog; where they
+conflict with the numbered sequence, the numbered sequence is authoritative.
 
 ## Design principles
 

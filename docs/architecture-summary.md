@@ -523,13 +523,20 @@ exercising every Core/Geometry feature implemented through Block 94. The familia
 tabbed command area, model/assembly browser, central OCCT viewport, property/task editor, and
 diagnostic status area.
 
-Blocks 95–99 implement the optional `blcad_gui` layer, executable shell, transient
+Blocks 95–105 implement and accept the optional `blcad_gui` layer, executable shell, transient
 session/selection/task state, command enablement, document lifecycle, atomic document
 transactions, undo/redo, recompute, structured diagnostics, OCCT display/navigation, semantic
 picking, deterministic browser/property projection, bidirectional selection synchronization, and
 offscreen tests. Block 99 adds datum/construction/derived-workplane authoring, planar Sketch editing,
 normal-plane coordinate/camera handling, Core-backed profile/diagnostic inspection, and previewed
-single-transaction repair. Blocks 100–105 extend that boundary without moving persistent authority
+single-transaction repair. Block 100 adds typed parameter/expression, Body, foundational Extrude/Cut,
+Revolve, hole, preview/apply, and body-inspection workflows. Block 101 adds Pattern, Mirror,
+finishing, Shell, Draft, Body Boolean/Transform, and fresh-result STEP-export workflows. Block 102
+adds Sketch3D/PathCurve, Sweep/path-Extrude, Loft, Surface-feature, and distinct
+path/Surface/Solid presentation workflows. Block 103 adds Project/Assembly authoring, hierarchy,
+relationships, joints, solve/DOF diagnostics, motion preview, and atomic result application. Block
+104 adds read-only analysis and freshness-gated Part/Assembly STEP-export consumers. Block 105
+completes machine-checked coverage and GUI/headless equivalence without moving persistent authority
 into widgets.
 
 The GUI is a client of existing authorities:
@@ -548,13 +555,22 @@ recompute authority. Viewer owners map back to stable BLCAD semantic references 
 persisting OCCT subshape identity. Preview/Apply/Cancel and undo/redo operate on candidate document
 transactions, and failures retain the last valid displayed result.
 
-Block 105 closes the phase with a machine-checked feature-coverage manifest and GUI/headless
-equivalence workflows. The UI borrows general interaction conventions from established parametric
-CAD systems, but does not copy their branded assets or exact product layouts.
+Block 105 closes the phase with the machine-checked feature-coverage manifest and GUI/headless
+equivalence workflows in `docs/gui-feature-validation-mvp7-acceptance.md`. The UI borrows general
+interaction conventions from established parametric CAD systems, but does not copy their branded
+assets or exact product layouts.
 
-## Planned STEP import authority after Block 105
+## Planned interactive Sketch authority after Block 105
 
-Blocks 106–112 in `docs/step-import-sequence-mvp8.md` add two explicit modes without weakening the
+Blocks 106–121 in `docs/interactive-sketcher-sequence-mvp8.md` add shared planar point topology, a
+headless deterministic constraint solver, transactional mouse dragging, direct creation and modify
+tools, in-canvas dimensions, region recognition, and Interactive Sketch3D. Qt owns hover, screen
+mapping, glyph placement, and candidate presentation; Core owns persistent points, entities,
+constraints, and dimensions.
+
+## Planned STEP import authority after Block 121
+
+Blocks 122–128 in `docs/step-import-sequence-mvp9.md` add two explicit modes without weakening the
 authority model:
 
 ```text
@@ -652,7 +668,8 @@ Canonical numbered sequence:
 - `docs/part-multi-body-step-export-mvp6.md`
 - `docs/part-construction-mvp6-acceptance.md`
 - `docs/gui-feature-validation-sequence-mvp7.md`
-- `docs/step-import-sequence-mvp8.md`
+- `docs/interactive-sketcher-sequence-mvp8.md`
+- `docs/step-import-sequence-mvp9.md`
 
 Block 47 Spherical completes the Assembly MVP sequence. Blocks 48–94 Body identity, body-scoped
 recompute/inspection, Body Booleans, associative BodyTransform/SketchOwnership execution, and
@@ -670,14 +687,20 @@ Geometry, and deterministic visible Solid/Surface Body STEP exchange are impleme
 uses `BodyId`-ordered cached results and collision-free `blcad:body-definition:<encoded BodyId>` XDE
 names without mutating Core intent or persisting exchange ids. Block 94 proves the complete Part
 Construction authority set through one Core/Geometry acceptance tag without adding persistence.
-Blocks 95–99 implement the optional Qt application shell, GUI session/command/task state, semantic
+Blocks 95–105 implement and accept the optional Qt application shell, GUI session/command/task state, semantic
 selection, document lifecycle, atomic transactions, undo/redo, recompute, diagnostics, and the
 `blcad_gui` boundary without moving document authority into widgets. Block 97 additionally provides
 transient OCCT presentation/navigation and stable semantic picking; Block 98 adds deterministic
 browser/property projection, Core-authorized edits, and bidirectional selection sync. Block 99 adds
-datum/workplane and complete implemented planar Sketch/reference/repair workflows. The next
-technical step is Block 100 parameters, bodies, and foundational Part workflows. STEP Import begins
-after GUI acceptance in Block 106.
+datum/workplane and complete implemented planar Sketch/reference/repair workflows. Block 100 adds
+the current persistent parameter, Body, Extrude/Cut, Revolve, hole, and inspection authorities.
+Block 101 adds conventional Pattern, finishing, Body composition/transform, and STEP-export
+workflows. Block 102 adds spatial paths, Sweep/Loft, and Surface workflows. Block 103 adds complete
+Assembly authoring, relationships, joints, hierarchy, solve, and motion workflows. Block 104 adds
+DOF/interference/clearance/contact/motion analysis and Part plus
+flattened/structured Assembly STEP export. Block 105 completes integrated GUI feature coverage and
+headless equivalence. The next technical step is Block 106 Interactive Sketch workspace and command
+lifecycle. STEP Import begins after Interactive Sketcher acceptance in Block 122.
 
 Block 47 adds passive Point/Point Spherical intent through the shared local/root-space path. Scalar
 Revolute APIs remain adapters; transform variables and the shared numeric engine are unchanged.

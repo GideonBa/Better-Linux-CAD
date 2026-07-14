@@ -1,9 +1,14 @@
 #pragma once
 
 #include "blcad/gui/gui_command_registry.hpp"
+#include "blcad/gui/gui_assembly_workbench.hpp"
+#include "blcad/gui/gui_analysis_export_workbench.hpp"
 #include "blcad/gui/gui_document_browser.hpp"
 #include "blcad/gui/gui_document_session.hpp"
+#include "blcad/gui/gui_part_foundation_workbench.hpp"
+#include "blcad/gui/gui_part_operations_workbench.hpp"
 #include "blcad/gui/gui_sketch_workbench.hpp"
+#include "blcad/gui/gui_spatial_surface_workbench.hpp"
 
 #include <QMainWindow>
 
@@ -30,6 +35,11 @@ public:
   [[nodiscard]] GuiCommandRegistry& command_registry() noexcept;
   [[nodiscard]] const GuiCommandRegistry& command_registry() const noexcept;
   [[nodiscard]] GuiSketchWorkbench& sketch_workbench() noexcept;
+  [[nodiscard]] GuiPartFoundationWorkbench& part_foundation_workbench() noexcept;
+  [[nodiscard]] GuiPartOperationsWorkbench& part_operations_workbench() noexcept;
+  [[nodiscard]] GuiSpatialSurfaceWorkbench& spatial_surface_workbench() noexcept;
+  [[nodiscard]] GuiAssemblyWorkbench& assembly_workbench() noexcept;
+  [[nodiscard]] GuiAnalysisExportWorkbench& analysis_export_workbench() noexcept;
   [[nodiscard]] const std::optional<SketchId>& active_sketch() const noexcept;
 
   [[nodiscard]] bool request_workspace(GuiWorkspace workspace) noexcept;
@@ -69,6 +79,11 @@ private:
   GuiDocumentSession session_;
   GuiCommandRegistry command_registry_;
   GuiSketchWorkbench sketch_workbench_;
+  GuiPartFoundationWorkbench part_foundation_workbench_;
+  GuiPartOperationsWorkbench part_operations_workbench_;
+  GuiSpatialSurfaceWorkbench spatial_surface_workbench_;
+  GuiAssemblyWorkbench assembly_workbench_;
+  GuiAnalysisExportWorkbench analysis_export_workbench_;
   std::optional<SketchId> active_sketch_;
   QTabBar* workspace_tabs_{nullptr};
   QTreeWidget* model_browser_{nullptr};
