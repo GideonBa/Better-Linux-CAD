@@ -71,4 +71,4 @@ Block 65 General Circular Pattern Geometry is implemented in
 `docs/part-circular-pattern-geometry-mvp6.md`; Block 66 MirrorFeature Core intent and JSON is
 implemented in `docs/part-mirror-intent-mvp6.md`; Block 67 Geometry is implemented in
 `docs/part-mirror-geometry-mvp6.md`. Blocks 72 ShellFeature Geometry and 73 DraftFeature Core
-intent/JSON are implemented; Block 74 DraftFeature Geometry is implemented; Block 75 Basic 3D Sketch Core intent and Block 76 richer 3D curve intent are implemented; Block 77 3D Sketch JSON and semantic references is next.
+intent/JSON are implemented; Block 74 DraftFeature Geometry is implemented; Block 75 Basic 3D Sketch Core intent and Block 76 richer 3D curve intent are implemented; Block 77 3D Sketch JSON and semantic references is implemented; Block 78 3D Sketch Geometry conversion is implemented; Block 79 connected PathCurve Core intent, JSON, and validation is next.

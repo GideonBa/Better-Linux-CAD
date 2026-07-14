@@ -4,17 +4,17 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 66
-current_block: 67
-current_boundary: MirrorFeature Geometry
-current_tag: "[geometry][mirror-feature]"
+implemented_through: Block 78
+current_block: 79
+current_boundary: Connected PathCurve Core intent, JSON, and validation
+current_tag: "[core][path-curve]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
   mvp_3: "Parametric bolt circle pattern — implemented"
   mvp_4: "Assembly parameters and Project container — implemented"
   mvp_5: "Assembly relationships, motion, hierarchy, analysis, exchange — Blocks 1–47 implemented"
-  mvp_6: "Part Construction — Blocks 48–76 implemented, Blocks 77–94 planned, Block 77 next"
+  mvp_6: "Part Construction — Blocks 48–78 implemented, Blocks 79–94 planned, Block 79 next"
   mvp_7: "STEP Import — Blocks 95–101 planned after Block 94"
 ---
 
@@ -552,10 +552,10 @@ motion solvers reject Spherical as the selected drive.
 
 ## MVP 6 — Part Construction MVP after Block 47
 
-**Status:** In progress — Blocks 48–76 implemented
+**Status:** In progress — Blocks 48–78 implemented
 **Canonical:** sequence `docs/part-construction-sequence-mvp6.md`
 
-Blocks 48–76 are complete. Block 77 is the current next technical step.
+Blocks 48–78 are complete. Block 79 is the current next technical step.
 
 Mandatory Part Construction phase order:
 
@@ -1055,7 +1055,34 @@ Canonical contract: `docs/part-sketch-3d-curves-core-mvp6.md`.
 [core][sketch-3d-curves]
 ```
 
-## Current next technical step — Block 77
+## Block 77 — 3D Sketch JSON and semantic references — Implemented
 
-Implement 3D Sketch JSON and semantic references according to
+Block 77 adds the always-emitted, optional-on-read `sketches_3d` array. It roundtrips all
+Block-75/76 entities in deterministic type and insertion order, freezes strict local,
+ConstructionPoint, and planar-Sketch point-reference grammar, and never persists resolved
+coordinates. Missing, extra, ambiguous, mistyped, and invalid-source records fail closed.
+
+Canonical contract: `docs/part-sketch-3d-json-mvp6.md`.
+
+```text
+[core][sketch-3d-json]
+```
+
+## Block 78 — 3D Sketch Geometry conversion — Implemented
+
+Block 78 resolves explicit, parameter-driven, local, ConstructionPoint, and supported planar
+Sketch point sources in model space. It deterministically converts points, lines, polylines, arcs,
+fit/control splines, and exact cylindrical helices into transient OCCT vertex/edge/wire products.
+Guide roles do not duplicate source Geometry, and no resolved coordinate or OCCT topology identity
+is written back into Core.
+
+Canonical contract: `docs/part-sketch-3d-geometry-mvp6.md`.
+
+```text
+[geometry][sketch-3d]
+```
+
+## Current next technical step — Block 79
+
+Implement connected PathCurve Core intent, JSON, and validation according to
 `docs/part-construction-sequence-mvp6-planning-detail.md`.

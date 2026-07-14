@@ -65,4 +65,4 @@ state into persistent matrices or raw OCCT identity. Block 59 richer Extrude/Cut
 implemented together with Block 60 Geometry; Blocks 61–62 Revolve/RevolveCut intent and Geometry
 are implemented. Blocks 67 MirrorFeature Geometry and 72 ShellFeature Geometry are implemented;
 Blocks 73–74 DraftFeature intent/JSON and Geometry, Block 75 Basic 3D Sketch Core, and Block 76
-richer 3D curve intent are implemented; Block 77 3D Sketch JSON and semantic references is next.
+richer 3D curve intent are implemented; Block 77 3D Sketch JSON and semantic references is implemented; Block 78 3D Sketch Geometry conversion is implemented; Block 79 connected PathCurve Core intent, JSON, and validation is next.

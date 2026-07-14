@@ -17,7 +17,8 @@ parameter dependencies, ownership, and failure behavior without executing geomet
 The planar target is a line-segment start/end or projected point. The reference stores source
 identity, never a resolved or copied model-space coordinate. `PartDocument` validates the external
 source and creates ConstructionPoint/planar-Sketch dependency edges transactionally. Block 77
-freezes its JSON grammar; generated vertex/edge-point persistence remains on that boundary.
+freezes its JSON grammar in `docs/part-sketch-3d-json-mvp6.md`; recovered generated
+vertex/edge-point sources remain deferred until their stable cross-feature grammar is introduced.
 
 ## Arc and spline contract
 
@@ -50,9 +51,9 @@ All Block-75/76 entities share one sketch-local `SketchEntityId` scope.
 
 ## Deliberate boundary
 
-There is still no general 3D constraint solver and no OCCT curve. The current Part serializer
-continues to reject documents containing `Sketch3D`. Block 77 defines additive JSON, deterministic
-entity order, and cross-source semantic-reference grammar. Block 78 performs Geometry conversion.
+There is still no general 3D constraint solver and no OCCT curve. Block 77 now provides additive
+JSON, deterministic entity order, and cross-source semantic-reference grammar. Block 78 performs
+Geometry conversion.
 
 ## Verified behavior
 
@@ -68,4 +69,4 @@ entity order, and cross-source semantic-reference grammar. Block 78 performs Geo
 ./build/dev-geometry/blcad_core_tests "[core][sketch-3d-curves]"
 ```
 
-Blocks 48–76 are implemented. Block 77 3D Sketch JSON and semantic references is next.
+Blocks 48–78 are implemented. Block 78 3D Sketch Geometry conversion is implemented; Block 79 connected PathCurve Core intent, JSON, and validation is next.

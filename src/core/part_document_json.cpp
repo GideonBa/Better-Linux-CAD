@@ -2468,12 +2468,387 @@ body_transform_rotation_axis_from_json(const json& value) {
   return true;
 }
 
+[[nodiscard]] bool has_exact_fields(const json& value,
+                                    std::initializer_list<std::string_view> fields) {
+  if (!value.is_object() || value.size() != fields.size())
+    return false;
+  return std::all_of(fields.begin(), fields.end(), [&value](std::string_view field) {
+    return value.contains(std::string(field));
+  });
+}
+
+[[nodiscard]] json sketch_coordinate_3d_to_json(const SketchCoordinate3D& coordinate) {
+  if (coordinate.source() == SketchCoordinate3DSource::Explicit)
+    return json{{"source", "explicit"},
+                {"value_mm", coordinate.explicit_coordinate()->millimeters()}};
+  return json{{"source", "parameter"}, {"parameter", coordinate.parameter()->value()}};
+}
+
+[[nodiscard]] Result<SketchCoordinate3D> sketch_coordinate_3d_from_json(const json& value) {
+  if (!value.is_object() || !value.contains("source") || !value.at("source").is_string())
+    return Result<SketchCoordinate3D>::failure(
+        json_error("3D sketch coordinate requires a string source"));
+  const std::string source = value.at("source").get<std::string>();
+  if (source == "explicit") {
+    if (!has_exact_fields(value, {"source", "value_mm"}) || !value.at("value_mm").is_number())
+      return Result<SketchCoordinate3D>::failure(
+          json_error("explicit 3D sketch coordinate requires only numeric value_mm"));
+    auto quantity = Quantity::linear_displacement_mm(value.at("value_mm").get<double>(),
+                                                     "sketch_3d_coordinate");
+    if (quantity.has_error())
+      return Result<SketchCoordinate3D>::failure(quantity.error());
+    return SketchCoordinate3D::create_explicit(quantity.value());
+  }
+  if (source == "parameter") {
+    if (!has_exact_fields(value, {"source", "parameter"}) || !value.at("parameter").is_string())
+      return Result<SketchCoordinate3D>::failure(
+          json_error("parameter 3D sketch coordinate requires only a string parameter"));
+    return SketchCoordinate3D::create_parameter(
+        ParameterId(value.at("parameter").get<std::string>()));
+  }
+  return Result<SketchCoordinate3D>::failure(json_error("unsupported 3D sketch coordinate source"));
+}
+
+[[nodiscard]] json sketch_point_reference_3d_to_json(const SketchPointReference3D& reference) {
+  if (reference.source() == SketchPointReference3DSource::LocalPoint)
+    return json{{"source", "local_point"}, {"point", reference.local_point()->value()}};
+  if (reference.source() == SketchPointReference3DSource::ConstructionPoint)
+    return json{{"source", "construction_point"},
+                {"point", reference.construction_point()->value()}};
+  return json{{"source", "planar_sketch_point"},
+              {"sketch", reference.planar_sketch()->value()},
+              {"target", reference_target_to_json(*reference.planar_point())}};
+}
+
+[[nodiscard]] Result<SketchPointReference3D>
+sketch_point_reference_3d_from_json(const json& value) {
+  if (!value.is_object() || !value.contains("source") || !value.at("source").is_string())
+    return Result<SketchPointReference3D>::failure(
+        json_error("3D sketch point reference requires a string source"));
+  const std::string source = value.at("source").get<std::string>();
+  if (source == "local_point") {
+    if (!has_exact_fields(value, {"source", "point"}) || !value.at("point").is_string())
+      return Result<SketchPointReference3D>::failure(
+          json_error("local 3D point reference requires only a string point"));
+    return SketchPointReference3D::create_local_point(
+        SketchEntityId(value.at("point").get<std::string>()));
+  }
+  if (source == "construction_point") {
+    if (!has_exact_fields(value, {"source", "point"}) || !value.at("point").is_string())
+      return Result<SketchPointReference3D>::failure(
+          json_error("construction 3D point reference requires only a string point"));
+    return SketchPointReference3D::create_construction_point(
+        ConstructionPointId(value.at("point").get<std::string>()));
+  }
+  if (source == "planar_sketch_point") {
+    if (!has_exact_fields(value, {"source", "sketch", "target"}) ||
+        !value.at("sketch").is_string() ||
+        !has_exact_fields(value.at("target"), {"kind", "entity"}) ||
+        !value.at("target").at("kind").is_string() || !value.at("target").at("entity").is_string())
+      return Result<SketchPointReference3D>::failure(
+          json_error("planar 3D point reference requires sketch and target"));
+    auto target = reference_target_from_json(value.at("target"));
+    if (target.has_error())
+      return Result<SketchPointReference3D>::failure(target.error());
+    return SketchPointReference3D::create_planar_sketch_point(
+        SketchId(value.at("sketch").get<std::string>()), std::move(target.value()));
+  }
+  return Result<SketchPointReference3D>::failure(
+      json_error("unsupported 3D sketch point reference source"));
+}
+
+[[nodiscard]] json
+sketch_point_references_3d_to_json(const std::vector<SketchPointReference3D>& references) {
+  json result = json::array();
+  for (const auto& reference : references)
+    result.push_back(sketch_point_reference_3d_to_json(reference));
+  return result;
+}
+
+[[nodiscard]] Result<std::vector<SketchPointReference3D>>
+sketch_point_references_3d_from_json(const json& value) {
+  if (!value.is_array())
+    return Result<std::vector<SketchPointReference3D>>::failure(
+        json_error("3D sketch point references must be an array"));
+  std::vector<SketchPointReference3D> result;
+  result.reserve(value.size());
+  for (const auto& entry : value) {
+    auto reference = sketch_point_reference_3d_from_json(entry);
+    if (reference.has_error())
+      return Result<std::vector<SketchPointReference3D>>::failure(reference.error());
+    result.push_back(std::move(reference.value()));
+  }
+  return Result<std::vector<SketchPointReference3D>>::success(std::move(result));
+}
+
+[[nodiscard]] std::string_view
+spline_representation_spelling(SketchSpline3DRepresentation representation) noexcept {
+  return representation == SketchSpline3DRepresentation::FitPoints ? "fit_points"
+                                                                   : "control_points";
+}
+
+[[nodiscard]] std::string_view
+spline_continuity_spelling(SketchSpline3DContinuity continuity) noexcept {
+  switch (continuity) {
+  case SketchSpline3DContinuity::Positional:
+    return "positional";
+  case SketchSpline3DContinuity::Tangent:
+    return "tangent";
+  case SketchSpline3DContinuity::Curvature:
+    return "curvature";
+  }
+  return "positional";
+}
+
+[[nodiscard]] std::string_view guide_role_spelling(SketchGuideCurve3DRole role) noexcept {
+  switch (role) {
+  case SketchGuideCurve3DRole::General:
+    return "general";
+  case SketchGuideCurve3DRole::SweepPath:
+    return "sweep_path";
+  case SketchGuideCurve3DRole::LoftGuide:
+    return "loft_guide";
+  case SketchGuideCurve3DRole::Centerline:
+    return "centerline";
+  }
+  return "general";
+}
+
+[[nodiscard]] json sketch_3d_to_json(const Sketch3D& sketch) {
+  json value{
+      {"id", sketch.id().value()}, {"name", sketch.name()},      {"points", json::array()},
+      {"lines", json::array()},    {"polylines", json::array()}, {"arcs", json::array()},
+      {"splines", json::array()},  {"helices", json::array()},   {"guide_curves", json::array()}};
+  for (const auto& point : sketch.points())
+    value["points"].push_back(json{{"id", point.id().value()},
+                                   {"x", sketch_coordinate_3d_to_json(point.x())},
+                                   {"y", sketch_coordinate_3d_to_json(point.y())},
+                                   {"z", sketch_coordinate_3d_to_json(point.z())}});
+  for (const auto& line : sketch.lines())
+    value["lines"].push_back(json{{"id", line.id().value()},
+                                  {"start_point", line.start_point().value()},
+                                  {"end_point", line.end_point().value()}});
+  for (const auto& polyline : sketch.polylines())
+    value["polylines"].push_back(
+        json{{"id", polyline.id().value()},
+             {"ordered_vertices", sketch_entity_ids_to_json(polyline.ordered_vertices())}});
+  for (const auto& arc : sketch.arcs())
+    value["arcs"].push_back(
+        json{{"id", arc.id().value()},
+             {"start", sketch_point_reference_3d_to_json(arc.start())},
+             {"intermediate", sketch_point_reference_3d_to_json(arc.intermediate())},
+             {"end", sketch_point_reference_3d_to_json(arc.end())}});
+  for (const auto& spline : sketch.splines())
+    value["splines"].push_back(json{
+        {"id", spline.id().value()},
+        {"representation", std::string(spline_representation_spelling(spline.representation()))},
+        {"degree", spline.degree()},
+        {"continuity", std::string(spline_continuity_spelling(spline.continuity()))},
+        {"points", sketch_point_references_3d_to_json(spline.ordered_points())}});
+  for (const auto& helix : sketch.helices()) {
+    json axis{{"source", helix.axis().source() == SketchHelixAxis3DSource::DatumAxis
+                             ? "datum_axis"
+                             : "construction_line"},
+              {"id", helix.axis().referenced_node_id()}};
+    value["helices"].push_back(
+        json{{"id", helix.id().value()},
+             {"axis", std::move(axis)},
+             {"radius_parameter", helix.radius_parameter().value()},
+             {"pitch_parameter", helix.pitch_parameter().value()},
+             {"turns_parameter", helix.turns_parameter().value()},
+             {"handedness", helix.handedness() == SketchHelix3DHandedness::RightHanded
+                                ? "right_handed"
+                                : "left_handed"}});
+  }
+  for (const auto& guide : sketch.guide_curves())
+    value["guide_curves"].push_back(json{{"id", guide.id().value()},
+                                         {"source_curve", guide.source_curve().value()},
+                                         {"role", std::string(guide_role_spelling(guide.role()))},
+                                         {"label", guide.label()}});
+  return value;
+}
+
+[[nodiscard]] Result<Sketch3D> sketch_3d_from_json(const json& value) {
+  if (!has_exact_fields(value, {"id", "name", "points", "lines", "polylines", "arcs", "splines",
+                                "helices", "guide_curves"}) ||
+      !value.at("id").is_string() || !value.at("name").is_string())
+    return Result<Sketch3D>::failure(
+        json_error("3D sketch requires its exact identity and entity arrays"));
+  for (const char* field :
+       {"points", "lines", "polylines", "arcs", "splines", "helices", "guide_curves"})
+    if (!value.at(field).is_array())
+      return Result<Sketch3D>::failure(json_error("3D sketch entity fields must be arrays"));
+  auto sketch = Sketch3D::create(Sketch3DId(value.at("id").get<std::string>()),
+                                 value.at("name").get<std::string>());
+  if (sketch.has_error())
+    return sketch;
+  for (const auto& entry : value.at("points")) {
+    if (!has_exact_fields(entry, {"id", "x", "y", "z"}) || !entry.at("id").is_string())
+      return Result<Sketch3D>::failure(json_error("3D sketch point has invalid fields"));
+    auto x = sketch_coordinate_3d_from_json(entry.at("x"));
+    auto y = sketch_coordinate_3d_from_json(entry.at("y"));
+    auto z = sketch_coordinate_3d_from_json(entry.at("z"));
+    if (x.has_error() || y.has_error() || z.has_error())
+      return Result<Sketch3D>::failure(x.has_error()   ? x.error()
+                                       : y.has_error() ? y.error()
+                                                       : z.error());
+    auto point =
+        SketchPoint3D::create(SketchEntityId(entry.at("id").get<std::string>()),
+                              std::move(x.value()), std::move(y.value()), std::move(z.value()));
+    if (point.has_error())
+      return Result<Sketch3D>::failure(point.error());
+    auto added = sketch.value().add_point(std::move(point.value()));
+    if (added.has_error())
+      return Result<Sketch3D>::failure(added.error());
+  }
+  for (const auto& entry : value.at("lines")) {
+    if (!has_exact_fields(entry, {"id", "start_point", "end_point"}) ||
+        !entry.at("id").is_string() || !entry.at("start_point").is_string() ||
+        !entry.at("end_point").is_string())
+      return Result<Sketch3D>::failure(json_error("3D sketch line has invalid fields"));
+    auto line = SketchLine3D::create(SketchEntityId(entry.at("id").get<std::string>()),
+                                     SketchEntityId(entry.at("start_point").get<std::string>()),
+                                     SketchEntityId(entry.at("end_point").get<std::string>()));
+    if (line.has_error())
+      return Result<Sketch3D>::failure(line.error());
+    auto added = sketch.value().add_line(std::move(line.value()));
+    if (added.has_error())
+      return Result<Sketch3D>::failure(added.error());
+  }
+  for (const auto& entry : value.at("polylines")) {
+    if (!has_exact_fields(entry, {"id", "ordered_vertices"}) || !entry.at("id").is_string() ||
+        !entry.at("ordered_vertices").is_array())
+      return Result<Sketch3D>::failure(json_error("3D sketch polyline has invalid fields"));
+    auto polyline =
+        SketchPolyline3D::create(SketchEntityId(entry.at("id").get<std::string>()),
+                                 sketch_entity_ids_from_json(entry.at("ordered_vertices")));
+    if (polyline.has_error())
+      return Result<Sketch3D>::failure(polyline.error());
+    auto added = sketch.value().add_polyline(std::move(polyline.value()));
+    if (added.has_error())
+      return Result<Sketch3D>::failure(added.error());
+  }
+  for (const auto& entry : value.at("arcs")) {
+    if (!has_exact_fields(entry, {"id", "start", "intermediate", "end"}) ||
+        !entry.at("id").is_string())
+      return Result<Sketch3D>::failure(json_error("3D sketch arc has invalid fields"));
+    auto start = sketch_point_reference_3d_from_json(entry.at("start"));
+    auto intermediate = sketch_point_reference_3d_from_json(entry.at("intermediate"));
+    auto end = sketch_point_reference_3d_from_json(entry.at("end"));
+    if (start.has_error() || intermediate.has_error() || end.has_error())
+      return Result<Sketch3D>::failure(start.has_error()          ? start.error()
+                                       : intermediate.has_error() ? intermediate.error()
+                                                                  : end.error());
+    auto arc = SketchArc3D::create_three_point(
+        SketchEntityId(entry.at("id").get<std::string>()), std::move(start.value()),
+        std::move(intermediate.value()), std::move(end.value()));
+    if (arc.has_error())
+      return Result<Sketch3D>::failure(arc.error());
+    auto added = sketch.value().add_arc(std::move(arc.value()));
+    if (added.has_error())
+      return Result<Sketch3D>::failure(added.error());
+  }
+  for (const auto& entry : value.at("splines")) {
+    if (!has_exact_fields(entry, {"id", "representation", "degree", "continuity", "points"}) ||
+        !entry.at("id").is_string() || !entry.at("representation").is_string() ||
+        !entry.at("degree").is_number_unsigned() || !entry.at("continuity").is_string())
+      return Result<Sketch3D>::failure(json_error("3D sketch spline has invalid fields"));
+    const std::string representation = entry.at("representation").get<std::string>();
+    const std::string continuity = entry.at("continuity").get<std::string>();
+    if (representation != "fit_points" && representation != "control_points")
+      return Result<Sketch3D>::failure(json_error("unsupported 3D spline representation"));
+    SketchSpline3DContinuity parsed_continuity;
+    if (continuity == "positional")
+      parsed_continuity = SketchSpline3DContinuity::Positional;
+    else if (continuity == "tangent")
+      parsed_continuity = SketchSpline3DContinuity::Tangent;
+    else if (continuity == "curvature")
+      parsed_continuity = SketchSpline3DContinuity::Curvature;
+    else
+      return Result<Sketch3D>::failure(json_error("unsupported 3D spline continuity"));
+    auto points = sketch_point_references_3d_from_json(entry.at("points"));
+    if (points.has_error())
+      return Result<Sketch3D>::failure(points.error());
+    auto spline = SketchSpline3D::create(
+        SketchEntityId(entry.at("id").get<std::string>()),
+        representation == "fit_points" ? SketchSpline3DRepresentation::FitPoints
+                                       : SketchSpline3DRepresentation::ControlPoints,
+        std::move(points.value()), entry.at("degree").get<std::size_t>(), parsed_continuity);
+    if (spline.has_error())
+      return Result<Sketch3D>::failure(spline.error());
+    auto added = sketch.value().add_spline(std::move(spline.value()));
+    if (added.has_error())
+      return Result<Sketch3D>::failure(added.error());
+  }
+  for (const auto& entry : value.at("helices")) {
+    if (!has_exact_fields(entry, {"id", "axis", "radius_parameter", "pitch_parameter",
+                                  "turns_parameter", "handedness"}) ||
+        !entry.at("id").is_string() || !entry.at("radius_parameter").is_string() ||
+        !entry.at("pitch_parameter").is_string() || !entry.at("turns_parameter").is_string() ||
+        !entry.at("handedness").is_string() ||
+        !has_exact_fields(entry.at("axis"), {"source", "id"}) ||
+        !entry.at("axis").at("source").is_string() || !entry.at("axis").at("id").is_string())
+      return Result<Sketch3D>::failure(json_error("3D sketch helix has invalid fields"));
+    const std::string axis_source = entry.at("axis").at("source").get<std::string>();
+    Result<SketchHelixAxis3D> axis =
+        axis_source == "datum_axis"
+            ? SketchHelixAxis3D::create_datum_axis(
+                  DatumAxisId(entry.at("axis").at("id").get<std::string>()))
+            : SketchHelixAxis3D::create_construction_line(
+                  ConstructionLineId(entry.at("axis").at("id").get<std::string>()));
+    if (axis_source != "datum_axis" && axis_source != "construction_line")
+      return Result<Sketch3D>::failure(json_error("unsupported 3D helix axis source"));
+    if (axis.has_error())
+      return Result<Sketch3D>::failure(axis.error());
+    const std::string handedness = entry.at("handedness").get<std::string>();
+    if (handedness != "right_handed" && handedness != "left_handed")
+      return Result<Sketch3D>::failure(json_error("unsupported 3D helix handedness"));
+    auto helix = SketchHelix3D::create(
+        SketchEntityId(entry.at("id").get<std::string>()), std::move(axis.value()),
+        ParameterId(entry.at("radius_parameter").get<std::string>()),
+        ParameterId(entry.at("pitch_parameter").get<std::string>()),
+        ParameterId(entry.at("turns_parameter").get<std::string>()),
+        handedness == "right_handed" ? SketchHelix3DHandedness::RightHanded
+                                     : SketchHelix3DHandedness::LeftHanded);
+    if (helix.has_error())
+      return Result<Sketch3D>::failure(helix.error());
+    auto added = sketch.value().add_helix(std::move(helix.value()));
+    if (added.has_error())
+      return Result<Sketch3D>::failure(added.error());
+  }
+  for (const auto& entry : value.at("guide_curves")) {
+    if (!has_exact_fields(entry, {"id", "source_curve", "role", "label"}) ||
+        !entry.at("id").is_string() || !entry.at("source_curve").is_string() ||
+        !entry.at("role").is_string() || !entry.at("label").is_string())
+      return Result<Sketch3D>::failure(json_error("3D guide curve has invalid fields"));
+    const std::string role = entry.at("role").get<std::string>();
+    SketchGuideCurve3DRole parsed_role;
+    if (role == "general")
+      parsed_role = SketchGuideCurve3DRole::General;
+    else if (role == "sweep_path")
+      parsed_role = SketchGuideCurve3DRole::SweepPath;
+    else if (role == "loft_guide")
+      parsed_role = SketchGuideCurve3DRole::LoftGuide;
+    else if (role == "centerline")
+      parsed_role = SketchGuideCurve3DRole::Centerline;
+    else
+      return Result<Sketch3D>::failure(json_error("unsupported 3D guide curve role"));
+    auto guide =
+        SketchGuideCurve3D::create(SketchEntityId(entry.at("id").get<std::string>()),
+                                   SketchEntityId(entry.at("source_curve").get<std::string>()),
+                                   parsed_role, entry.at("label").get<std::string>());
+    if (guide.has_error())
+      return Result<Sketch3D>::failure(guide.error());
+    auto added = sketch.value().add_guide_curve(std::move(guide.value()));
+    if (added.has_error())
+      return Result<Sketch3D>::failure(added.error());
+  }
+  return sketch;
+}
+
 } // namespace
 
 Result<std::string> serialize_part_document_to_json(const PartDocument& document) {
-  if (document.sketch_3d_count() != 0U)
-    return Result<std::string>::failure(
-        json_error("3D sketch serialization is unavailable until the Block 77 schema boundary"));
   json root;
   root["schema"] = k_schema;
   root["version"] = k_version;
@@ -2648,6 +3023,9 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
                {"hole_diameter_parameter", pattern.hole_diameter_parameter().value()}});
     root["sketches"].push_back(std::move(sketch_json));
   }
+  root["sketches_3d"] = json::array();
+  for (const auto& sketch : document.sketches_3d())
+    root["sketches_3d"].push_back(sketch_3d_to_json(sketch));
   root["features"] = json::array();
   for (const auto& feature : document.features()) {
     json feature_json{{"id", feature.id().value()},
@@ -2960,6 +3338,18 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
       if (axis.has_error())
         return Result<PartDocument>::failure(axis.error());
       auto added = document.value().add_datum_axis(axis.value());
+      if (added.has_error())
+        return Result<PartDocument>::failure(added.error());
+    }
+    const json sketch_3d_array = root.value("sketches_3d", json::array());
+    if (!sketch_3d_array.is_array())
+      return Result<PartDocument>::failure(
+          json_error("sketches_3d must be an array in part document json"));
+    for (const auto& sketch_json : sketch_3d_array) {
+      auto sketch = sketch_3d_from_json(sketch_json);
+      if (sketch.has_error())
+        return Result<PartDocument>::failure(sketch.error());
+      auto added = document.value().add_sketch_3d(std::move(sketch.value()));
       if (added.has_error())
         return Result<PartDocument>::failure(added.error());
     }

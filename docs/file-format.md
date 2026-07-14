@@ -782,10 +782,19 @@ identity. Missing arrays restore zero Draft features; unknown fields, malformed 
 role/capability mismatches, duplicate faces, wrong parameter units, and zero/out-of-range angles
 fail closed. Canonical details are in `docs/part-draft-intent-mvp6.md`.
 
-Blocks 75–76 add `Sketch3D`, Arc, Spline, Helix, Guide-Curve, and cross-source point-reference
-intent only to the in-memory Part Core. They intentionally do not change the current JSON schema:
-Block 77 owns the additive `sketches_3d` representation. To prevent silent data loss, the current
-serializer fails explicitly when a Part owns any 3D sketch.
+Block 77 adds the always-emitted, optional-on-read `sketches_3d` array. Each strict record owns
+`id`, `name`, and deterministic `points`, `lines`, `polylines`, `arcs`, `splines`, `helices`, and
+`guide_curves` arrays. Coordinates are either signed explicit `value_mm` values or Length
+parameter ids. Curve points use exact `local_point`, `construction_point`, or
+`planar_sketch_point` source records; planar sources retain Sketch id plus line-endpoint or
+projected-point target identity and never persist resolved coordinates. Spline representation,
+degree and continuity, Helix axis/parameters/handedness, and Guide roles roundtrip exactly. Missing
+the top-level array restores zero 3D sketches; malformed, ambiguous, extra, or wrong-source fields
+fail closed. Canonical details are in `docs/part-sketch-3d-json-mvp6.md`.
+
+Block 78 does not add persistent fields. Resolved model-space coordinates and OCCT vertex, edge,
+wire, and curve identities remain transient Geometry products and are regenerated from the Block-77
+semantic source records. Canonical details are in `docs/part-sketch-3d-geometry-mvp6.md`.
 
 ## Planned STEP import persistence after Block 94
 

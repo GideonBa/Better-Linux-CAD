@@ -129,7 +129,11 @@ TEST_CASE("Block 75 connects coordinate parameters to 3D sketch invalidation and
   CHECK(document.value().find_sketch_3d(Sketch3DId("sketch3d.path")) != nullptr);
   CHECK(document.value().dependency_graph().has_dependency("path.x", "sketch3d.path"));
   CHECK(document.value().dependency_graph().has_dependency("path.z", "sketch3d.path"));
-  CHECK(serialize_part_document_to_json(document.value()).has_error());
+  auto serialized = serialize_part_document_to_json(document.value());
+  REQUIRE(serialized);
+  auto restored = deserialize_part_document_from_json(serialized.value());
+  REQUIRE(restored);
+  CHECK(restored.value().find_sketch_3d(Sketch3DId("sketch3d.path")) != nullptr);
 
   document.value().mark_all_clean();
   auto changed = Quantity::length_mm(14.0, "path.x");

@@ -41,10 +41,8 @@ invalidation state unchanged.
 
 Block 75 provides no general 3D constraint solver, curve geometry, OCCT conversion, or planar
 workplane. Block 76 adds spline, arc, helix, and guide-curve intent in
-`docs/part-sketch-3d-curves-core-mvp6.md`. Block 77 owns additive JSON and cross-source semantic
-references; therefore Block-75/76 3D sketches are not yet serialized and the current Part
-serializer rejects them explicitly instead of dropping intent. Block 78 converts the stable intent
-to geometry.
+`docs/part-sketch-3d-curves-core-mvp6.md`. Block 77 provides additive JSON and cross-source semantic
+references in `docs/part-sketch-3d-json-mvp6.md`. Block 78 converts the stable intent to geometry.
 
 ## Verified behavior
 
@@ -60,4 +58,4 @@ to geometry.
 ./build/dev-geometry/blcad_core_tests "[core][sketch-3d]"
 ```
 
-Blocks 48–76 are implemented. Block 77 3D Sketch JSON and semantic references is next.
+Blocks 48–78 are implemented. Block 78 3D Sketch Geometry conversion is implemented; Block 79 connected PathCurve Core intent, JSON, and validation is next.

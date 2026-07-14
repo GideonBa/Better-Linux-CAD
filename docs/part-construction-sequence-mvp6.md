@@ -1,8 +1,8 @@
 # Part Construction Sequence MVP-6
 
-Status: active post-Assembly-MVP sequence. Blocks 48–76 are implemented; Blocks 77–94 remain planned. Blocks 95–101 form the subsequent STEP Import MVP.
+Status: active post-Assembly-MVP sequence. Blocks 48–78 are implemented; Blocks 79–94 remain planned. Blocks 95–101 form the subsequent STEP Import MVP.
 
-Block 47 completed the Assembly MVP handoff. Blocks 48–76 establish Body identity, body-scoped recompute/inspection, Body Boolean execution, associative transform Geometry, reusable semantic Part-feature inputs, richer Extrude/Cut intent plus Geometry, persistent plus executed Revolve/RevolveCut, general Pattern and Mirror Geometry, persistent plus executed Fillet/Chamfer/Shell/Draft Geometry, and model-space 3D Sketch Core intent through Arc/Spline/Helix/Guide curves. Block 77 — 3D Sketch JSON and semantic references — is the current next technical step.
+Block 47 completed the Assembly MVP handoff. Blocks 48–78 establish Body identity, body-scoped recompute/inspection, Body Boolean execution, associative transform Geometry, reusable semantic Part-feature inputs, richer Extrude/Cut intent plus Geometry, persistent plus executed Revolve/RevolveCut, general Pattern and Mirror Geometry, persistent plus executed Fillet/Chamfer/Shell/Draft Geometry, and persistent model-space 3D Sketch Core intent through Arc/Spline/Helix/Guide curves. Block 78 adds deterministic 3D Sketch Geometry conversion. Block 79 — connected PathCurve Core intent, JSON, and validation — is the current next technical step.
 
 This document is the active status, phase-order, authority-boundary, and handoff summary for the first broad BLCAD Part Construction MVP after the Assembly MVP.
 
@@ -10,7 +10,7 @@ The complete original Blocks 48-94 per-block planning detail is preserved byte-f
 
 - `docs/part-construction-sequence-mvp6-planning-detail.md`
 
-The implemented Blocks 48–76 contracts are canonical in:
+The implemented Blocks 48–78 contracts are canonical in:
 
 - `docs/part-body-identity-mvp6.md`
 - `docs/part-body-json-mvp6.md`
@@ -41,6 +41,8 @@ The implemented Blocks 48–76 contracts are canonical in:
 - `docs/part-draft-geometry-mvp6.md`
 - `docs/part-sketch-3d-core-mvp6.md`
 - `docs/part-sketch-3d-curves-core-mvp6.md`
+- `docs/part-sketch-3d-json-mvp6.md`
+- `docs/part-sketch-3d-geometry-mvp6.md`
 
 The planned post-Block-94 STEP import handoff is canonical in:
 
@@ -180,8 +182,11 @@ protection, and strict compatible JSON. Block 74 resolves semantic faces, pull d
 neutral planes into checked signed OCCT DraftAngle execution with associative and transactional
 recompute. Block 75 adds separate model-space 3D sketch identity, points, lines, ordered polylines,
 typed coordinates, graph invalidation, and removal behavior. Block 76 adds referenced three-point
-Arcs, Fit/Control Splines, typed Helices, Guide roles, and their dependencies. The remaining Block
-77–94 implementation contracts stay in
+Arcs, Fit/Control Splines, typed Helices, Guide roles, and their dependencies. Block 77 adds strict,
+deterministic JSON plus source-identity-only semantic point references. Block 78 resolves those
+references and executes Points, Lines, Polylines, Arcs, Splines, and Helices as deterministic,
+transient OCCT products without persisting topology identity. The remaining Blocks 79–94
+implementation contracts stay in
 `docs/part-construction-sequence-mvp6-planning-detail.md`.
 
 ## Post-Block-94 handoff

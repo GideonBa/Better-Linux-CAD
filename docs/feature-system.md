@@ -92,8 +92,9 @@ Block 74 executes those references through signed OCCT draft geometry, validates
 and publishes parameter/upstream recompute transactionally. Block 75 adds separate model-space
 `Sketch3D` ownership with explicit/parameter-driven points, point-referenced lines, ordered
 polylines, and graph invalidation. Block 76 adds mixed-source point references, three-point Arcs,
-Fit/Control Splines, typed Helices, and Guide-Curve roles. Block 77 JSON and semantic references
-is next.
+Fit/Control Splines, typed Helices, and Guide-Curve roles. Block 77 adds strict deterministic JSON
+and source-identity-only semantic references. Block 78 executes deterministic transient OCCT
+Geometry without writing topology identity back into Core. Block 79 PathCurve intent is next.
 
 The long-term sketcher and feature parity target is documented in `docs/inventor-like-sketcher-and-feature-roadmap.md`.
 

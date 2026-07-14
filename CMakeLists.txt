@@ -183,6 +183,7 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/revolve_adapter.cpp
     src/geometry/semantic_reference_evaluator.cpp
     src/geometry/shape_cache.cpp
+    src/geometry/sketch_3d_geometry_adapter.cpp
     src/geometry/sketch_reference_projector.cpp
     src/geometry/sketch_region_finder.cpp
     src/geometry/step_exporter.cpp
@@ -346,6 +347,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/sketch_tests.cpp
     tests/core/sketch_3d_tests.cpp
     tests/core/sketch_3d_curve_tests.cpp
+    tests/core/sketch_3d_json_tests.cpp
     tests/core/subassembly_instance_tests.cpp
   )
 
@@ -425,6 +427,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/right_workplane_pipeline_tests.cpp
       tests/geometry/semantic_reference_evaluator_tests.cpp
       tests/geometry/shape_cache_tests.cpp
+      tests/geometry/sketch_3d_geometry_adapter_tests.cpp
       tests/geometry/sketch_reference_projector_tests.cpp
       tests/geometry/sketch_region_finder_tests.cpp
       tests/geometry/spline_profile_pipeline_tests.cpp

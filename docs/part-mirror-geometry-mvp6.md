@@ -35,4 +35,4 @@ a semantic generated top face, all four Body-result modes, parameter-driven reco
 transactional missing-reference failure.
 
 Blocks 72–74 ShellFeature Geometry and DraftFeature intent/JSON plus Geometry are implemented.
-Block 75 Basic 3D Sketch Core intent and Block 76 richer 3D curve intent are implemented; Block 77 3D Sketch JSON and semantic references is next.
+Block 75 Basic 3D Sketch Core intent and Block 76 richer 3D curve intent are implemented; Block 77 3D Sketch JSON and semantic references is implemented; Block 78 3D Sketch Geometry conversion is implemented; Block 79 connected PathCurve Core intent, JSON, and validation is next.

@@ -22,6 +22,7 @@ class BodyTransformAdapter;
 class RevolveAdapter;
 class StepExporter;
 class AssemblyStepExporter;
+class Sketch3DGeometryAdapter;
 
 namespace detail {
 class AssemblyPartShapeDefinitionBuilder;
@@ -55,6 +56,7 @@ private:
   friend class DraftAdapter;
   friend class StepExporter;
   friend class AssemblyStepExporter;
+  friend class Sketch3DGeometryAdapter;
   friend class detail::AssemblyPartShapeDefinitionBuilder;
   friend class detail::AssemblyPosedLeafShapeBuilder;
 
