@@ -98,8 +98,9 @@ Geometry without writing topology identity back into Core. Block 79 adds PathCur
 80 adds Sweep/SweepCut/SweepSurface intent, Blocks 81–82 execute planar then spatial paths, twist,
 and guide control, Block 83 adds path-following AdditiveExtrude/SubtractiveExtrude, Block 84 adds
 persistent ordered Loft/LoftCut/LoftSurface intent, Block 85 executes two-section C0 Loft Geometry
-on arbitrary planes, and Block 86 executes deterministic ordered multi-section Loft Geometry.
-Block 87 Guided and continuity-controlled Loft is next.
+on arbitrary planes, Block 86 executes deterministic ordered multi-section Loft Geometry, and
+Block 87 adds center-path/ordered-guide control plus verified G1/C1 continuity. Block 88 Surface
+feature Core intent and JSON is next.
 
 The long-term sketcher and feature parity target is documented in `docs/inventor-like-sketcher-and-feature-roadmap.md`.
 
@@ -156,9 +157,9 @@ The detailed roadmap is in `docs/multi-body-transform-and-path-features-roadmap.
 
 ## Sweep, loft, path-following extrude, and surfacing
 
-Sweep Geometry through spatial/twisted/guided paths, path-following Extrude/Extruded Cut, and Loft
-Core intent are implemented. Loft Geometry and broader surfacing remain first-class feature
-families in the active Part Construction sequence.
+Sweep Geometry through spatial/twisted/guided paths, path-following Extrude/Extruded Cut, and
+path/guide-controlled multi-section Loft Geometry through verified G1/C1 are implemented. Broader
+surfacing remains a first-class feature family in the active Part Construction sequence.
 
 Target behavior:
 

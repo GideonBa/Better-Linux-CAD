@@ -4,17 +4,17 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 86
-current_block: 87
-current_boundary: Guided and continuity-controlled Loft
-current_tag: "[geometry][guided-loft]"
+implemented_through: Block 87
+current_block: 88
+current_boundary: Surface feature Core intent and JSON
+current_tag: "[core][surface-feature]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
   mvp_3: "Parametric bolt circle pattern — implemented"
   mvp_4: "Assembly parameters and Project container — implemented"
   mvp_5: "Assembly relationships, motion, hierarchy, analysis, exchange — Blocks 1–47 implemented"
-  mvp_6: "Part Construction — Blocks 48–86 implemented, Blocks 87–94 planned, Block 87 next"
+  mvp_6: "Part Construction — Blocks 48–87 implemented, Blocks 88–94 planned, Block 88 next"
   mvp_7: "STEP Import — Blocks 95–101 planned after Block 94"
 ---
 
@@ -552,10 +552,10 @@ motion solvers reject Spherical as the selected drive.
 
 ## MVP 6 — Part Construction MVP after Block 47
 
-**Status:** In progress — Blocks 48–86 implemented
+**Status:** In progress — Blocks 48–87 implemented
 **Canonical:** sequence `docs/part-construction-sequence-mvp6.md`
 
-Blocks 48–86 are complete. Block 87 is the current next technical step.
+Blocks 48–87 are complete. Block 88 is the current next technical step.
 
 Mandatory Part Construction phase order:
 
@@ -1192,11 +1192,22 @@ Canonical contract: `docs/part-multi-section-loft-geometry-mvp6.md`.
 [geometry][multi-section-loft]
 ```
 
-## Current next technical step — Block 87
+## Block 87 — Guided and continuity-controlled Loft — Implemented
 
-Implement semantic path/guide-controlled Loft behavior and the frozen C0/G1/G2 continuity policy
-according to `docs/part-construction-sequence-mvp6-planning-detail.md`.
+Block 87 resolves semantic center paths and ordered guides into deterministic intermediate control
+sections. C0 and verified G1/C1 execution are supported; G2 fails explicitly without degradation.
+
+Canonical contract: `docs/part-guided-loft-geometry-mvp6.md`.
 
 ```text
 [geometry][guided-loft]
+```
+
+## Current next technical step — Block 88
+
+Implement persistent Surface-feature intent, semantic inputs, Body-result authority, dependencies,
+removal behavior, and strict compatible JSON according to the planning detail.
+
+```text
+[core][surface-feature]
 ```

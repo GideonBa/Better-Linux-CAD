@@ -420,6 +420,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/extrude_extent_pipeline_tests.cpp
       tests/geometry/dimension_driven_profile_resolver_tests.cpp
       tests/geometry/front_workplane_pipeline_tests.cpp
+      tests/geometry/guided_loft_pipeline_tests.cpp
       tests/geometry/fillet_feature_pipeline_tests.cpp
       tests/geometry/left_workplane_pipeline_tests.cpp
       tests/geometry/linear_pattern_pipeline_tests.cpp

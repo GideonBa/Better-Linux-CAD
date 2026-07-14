@@ -73,8 +73,9 @@ Sweep/SweepCut/SweepSurface intent, Block 81 executes its basic planar subset, a
 spatial paths, explicit twist, and guide-controlled Sweep. Block 83 adds path-following
 AdditiveExtrude/SubtractiveExtrude while keeping them distinct from Sweep intent. Block 84 adds
 ordered Loft section, alignment, path/guide, continuity, and Body-result Core intent. Block 85
-executes two-section C0 Loft/LoftCut/LoftSurface Geometry on arbitrary workplanes, and Block 86
-extends it to ordered intermediate sections. Guided and G1/G2 execution remain in Block 87.
+executes two-section C0 Loft/LoftCut/LoftSurface Geometry on arbitrary workplanes, Block 86 extends
+it to ordered intermediate sections, and Block 87 adds center-path/ordered-guide control with
+verified G1/C1 execution. G2 remains explicit unsupported intent without silent degradation.
 
 A 3D spline should be able to reference:
 

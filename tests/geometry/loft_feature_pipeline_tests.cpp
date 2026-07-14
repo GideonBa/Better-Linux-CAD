@@ -316,14 +316,14 @@ TEST_CASE("Block 85 executes stable seam flip and rotation intent", "[geometry][
         Catch::Approx(volume(second_cache, "body.loft")).epsilon(1.0e-10));
 }
 
-TEST_CASE("Block 85 rejects staged continuity execution transactionally",
+TEST_CASE("Block 87 rejects unsupported G2 continuity execution transactionally",
           "[geometry][loft-feature]") {
   auto document =
-      new_body_loft_document({1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}, LoftContinuity::G1);
+      new_body_loft_document({1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}, LoftContinuity::G2);
   ShapeCache shape_cache = cache("cache.failure");
   auto result = GeometryRecomputeExecutor{}.execute_document(document, shape_cache);
   REQUIRE(result.has_error());
-  CHECK(result.error().message().find("Block 87") != std::string::npos);
+  CHECK(result.error().message().find("G2 loft continuity is unsupported") != std::string::npos);
   CHECK(shape_cache.feature_shape_count() == 0U);
   CHECK(shape_cache.body_shape_count() == 0U);
 }

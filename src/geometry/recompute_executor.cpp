@@ -2291,14 +2291,39 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_loft(const PartDocument& 
   if (feature->sections().size() < 2U)
     return Result<std::size_t>::failure(
         geometry_error(feature_id.value(), "loft requires at least two ordered sections"));
-  if (feature->path_curve().has_value() || !feature->guide_curves().empty())
-    return Result<std::size_t>::failure(geometry_error(
-        feature_id.value(), "guided and path-controlled loft execution starts in Block 87"));
-  if (feature->continuity() != LoftContinuity::C0)
+  if (feature->continuity() == LoftContinuity::G2)
     return Result<std::size_t>::failure(
-        geometry_error(feature_id.value(), "G1/G2 loft continuity execution starts in Block 87"));
+        geometry_error(feature_id.value(),
+                       "G2 loft continuity is unsupported without a verified curvature guarantee"));
 
   ShapeCache working_cache = shape_cache;
+  std::vector<SweepPathSegment> center_path_segments;
+  const std::vector<SweepPathSegment>* center_path = nullptr;
+  if (feature->path_curve().has_value()) {
+    const PathCurve* path = document.find_path_curve(*feature->path_curve());
+    if (path == nullptr)
+      return Result<std::size_t>::failure(
+          geometry_error(feature->path_curve()->value(), "loft center path must exist"));
+    auto resolved = resolve_basic_sweep_path(document, *path, working_cache, workplane_resolver_,
+                                             "loft center path");
+    if (resolved.has_error())
+      return Result<std::size_t>::failure(resolved.error());
+    center_path_segments = std::move(resolved.value());
+    center_path = &center_path_segments;
+  }
+  std::vector<std::vector<SweepPathSegment>> guide_segments;
+  guide_segments.reserve(feature->guide_curves().size());
+  for (const PathCurveId& guide_id : feature->guide_curves()) {
+    const PathCurve* guide = document.find_path_curve(guide_id);
+    if (guide == nullptr)
+      return Result<std::size_t>::failure(
+          geometry_error(guide_id.value(), "loft guide curve must exist"));
+    auto resolved = resolve_basic_sweep_path(document, *guide, working_cache, workplane_resolver_,
+                                             "loft guide curve");
+    if (resolved.has_error())
+      return Result<std::size_t>::failure(resolved.error());
+    guide_segments.push_back(std::move(resolved.value()));
+  }
   Result<GeometryShape> tool = Result<GeometryShape>::failure(
       geometry_error(feature_id.value(), "unsupported two-section loft"));
   const bool open = feature->sections().front().kind() == LoftSectionKind::OpenPath;
@@ -2332,7 +2357,8 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_loft(const PartDocument& 
       }
       sections.push_back(std::move(resolved.value()));
     }
-    tool = loft_adapter_.loft_open_sections(feature->id(), sections);
+    tool = loft_adapter_.loft_open_sections(feature->id(), sections, center_path, guide_segments,
+                                            feature->continuity());
   } else {
     std::vector<std::vector<ClosedProfileCurveSegment>> sections;
     sections.reserve(feature->sections().size());
@@ -2344,7 +2370,8 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_loft(const PartDocument& 
       sections.push_back(std::move(resolved.value()));
     }
     tool = loft_adapter_.loft_closed_sections(feature->id(), sections,
-                                              feature->kind() != LoftFeatureKind::LoftSurface);
+                                              feature->kind() != LoftFeatureKind::LoftSurface,
+                                              center_path, guide_segments, feature->continuity());
   }
   if (tool.has_error())
     return Result<std::size_t>::failure(tool.error());

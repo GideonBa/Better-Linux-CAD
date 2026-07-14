@@ -1,8 +1,8 @@
 # Part Construction Sequence MVP-6
 
-Status: active post-Assembly-MVP sequence. Blocks 48–86 are implemented; Blocks 87–94 remain planned. Blocks 95–101 form the subsequent STEP Import MVP.
+Status: active post-Assembly-MVP sequence. Blocks 48–87 are implemented; Blocks 88–94 remain planned. Blocks 95–101 form the subsequent STEP Import MVP.
 
-Block 47 completed the Assembly MVP handoff. Blocks 48–86 establish Body identity, body-scoped recompute/inspection, Body Boolean execution, associative transform Geometry, reusable semantic Part-feature inputs, richer Extrude/Cut intent plus Geometry, persistent plus executed Revolve/RevolveCut, general Pattern and Mirror Geometry, persistent plus executed Fillet/Chamfer/Shell/Draft Geometry, persistent model-space 3D Sketch Geometry, connected PathCurve Core intent, executed Sweep/SweepCut/SweepSurface through spatial paths, twist, and guide control, path-following Extrude/Extruded Cut, and persistent plus executed multi-section Loft intent. Block 87 — Guided and continuity-controlled Loft — is the current next technical step.
+Block 47 completed the Assembly MVP handoff. Blocks 48–87 establish Body identity, body-scoped recompute/inspection, Body Boolean execution, associative transform Geometry, reusable semantic Part-feature inputs, richer Extrude/Cut intent plus Geometry, persistent plus executed Revolve/RevolveCut, general Pattern and Mirror Geometry, persistent plus executed Fillet/Chamfer/Shell/Draft Geometry, persistent model-space 3D Sketch Geometry, connected PathCurve Core intent, executed Sweep/SweepCut/SweepSurface through spatial paths, twist, and guide control, path-following Extrude/Extruded Cut, and persistent plus executed guided multi-section Loft intent through verified G1/C1. Block 88 — Surface feature Core intent and JSON — is the current next technical step.
 
 This document is the active status, phase-order, authority-boundary, and handoff summary for the first broad BLCAD Part Construction MVP after the Assembly MVP.
 
@@ -10,7 +10,7 @@ The complete original Blocks 48-94 per-block planning detail is preserved byte-f
 
 - `docs/part-construction-sequence-mvp6-planning-detail.md`
 
-The implemented Blocks 48–86 contracts are canonical in:
+The implemented Blocks 48–87 contracts are canonical in:
 
 - `docs/part-body-identity-mvp6.md`
 - `docs/part-body-json-mvp6.md`
@@ -51,6 +51,7 @@ The implemented Blocks 48–86 contracts are canonical in:
 - `docs/part-loft-intent-mvp6.md`
 - `docs/part-loft-geometry-mvp6.md`
 - `docs/part-multi-section-loft-geometry-mvp6.md`
+- `docs/part-guided-loft-geometry-mvp6.md`
 
 The planned post-Block-94 STEP import handoff is canonical in:
 

@@ -844,6 +844,11 @@ Block 86 also adds no JSON fields. The existing ordered `sections` array already
 or more profiles; intermediate-section resolution and the resulting OCCT product remain derived.
 Canonical Geometry details are in `docs/part-multi-section-loft-geometry-mvp6.md`.
 
+Block 87 adds no JSON fields. It executes the existing nullable `path_curve`, ordered
+`guide_curves`, and `c0|g1|g2` values. G2 remains readable persistent intent but fails Geometry
+execution without a verified curvature guarantee. Sampled control sections are never serialized.
+Canonical details are in `docs/part-guided-loft-geometry-mvp6.md`.
+
 ## Planned STEP import persistence after Block 94
 
 This section is planned architecture, not part of the current schema. Blocks 95–101 in
