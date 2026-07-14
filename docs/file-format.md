@@ -836,6 +836,10 @@ alignment and Angle rotation IDs, plus `flip_normal`; inactive source slots are 
 files missing the array restore zero Loft features. Derived correspondence, workplane frames, and
 OCCT topology are not stored. Canonical details are in `docs/part-loft-intent-mvp6.md`.
 
+Block 85 adds no JSON fields. Two-section workplane resolution, seam correspondence, and OCCT
+Loft/LoftCut/LoftSurface products are transient Geometry/cache state. Its execution contract is
+canonical in `docs/part-loft-geometry-mvp6.md`.
+
 ## Planned STEP import persistence after Block 94
 
 This section is planned architecture, not part of the current schema. Blocks 95–101 in

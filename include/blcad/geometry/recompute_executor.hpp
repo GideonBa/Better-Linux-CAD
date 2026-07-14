@@ -12,6 +12,7 @@
 #include "blcad/geometry/draft_adapter.hpp"
 #include "blcad/geometry/fillet_adapter.hpp"
 #include "blcad/geometry/linear_pattern_adapter.hpp"
+#include "blcad/geometry/loft_adapter.hpp"
 #include "blcad/geometry/mirror_adapter.hpp"
 #include "blcad/geometry/rectangle_extrusion_adapter.hpp"
 #include "blcad/geometry/revolve_adapter.hpp"
@@ -79,6 +80,9 @@ public:
   [[nodiscard]] Result<std::size_t>
   execute_sweep(const PartDocument& document, FeatureId feature_id, ShapeCache& shape_cache) const;
 
+  [[nodiscard]] Result<std::size_t> execute_loft(const PartDocument& document, FeatureId feature_id,
+                                                 ShapeCache& shape_cache) const;
+
   [[nodiscard]] Result<GeometryRecomputeSummary> execute_plan(const PartDocument& document,
                                                               const RecomputePlan& plan,
                                                               ShapeCache& shape_cache) const;
@@ -110,6 +114,7 @@ private:
   BodyTransformAdapter body_transform_adapter_;
   RevolveAdapter revolve_adapter_;
   SweepAdapter sweep_adapter_;
+  LoftAdapter loft_adapter_;
   CircularPatternAdapter circular_pattern_adapter_;
   LinearPatternAdapter linear_pattern_adapter_;
   MirrorAdapter mirror_adapter_;

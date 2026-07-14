@@ -72,7 +72,9 @@ The first five entities and `Sketch3D` ownership are implemented; Block 76 addit
 Sweep/SweepCut/SweepSurface intent, Block 81 executes its basic planar subset, and Block 82 adds
 spatial paths, explicit twist, and guide-controlled Sweep. Block 83 adds path-following
 AdditiveExtrude/SubtractiveExtrude while keeping them distinct from Sweep intent. Block 84 adds
-ordered Loft section, alignment, path/guide, continuity, and Body-result Core intent.
+ordered Loft section, alignment, path/guide, continuity, and Body-result Core intent. Block 85
+executes two-section C0 Loft/LoftCut/LoftSurface Geometry on arbitrary workplanes; multi-section,
+guided, and G1/G2 execution remain in Blocks 86–87.
 
 A 3D spline should be able to reference:
 

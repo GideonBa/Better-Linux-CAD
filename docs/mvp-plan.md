@@ -4,17 +4,17 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 84
-current_block: 85
-current_boundary: Two-section Loft Geometry on arbitrary planes
-current_tag: "[geometry][loft-feature]"
+implemented_through: Block 85
+current_block: 86
+current_boundary: Multi-section Loft
+current_tag: "[geometry][multi-section-loft]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
   mvp_3: "Parametric bolt circle pattern — implemented"
   mvp_4: "Assembly parameters and Project container — implemented"
   mvp_5: "Assembly relationships, motion, hierarchy, analysis, exchange — Blocks 1–47 implemented"
-  mvp_6: "Part Construction — Blocks 48–84 implemented, Blocks 85–94 planned, Block 85 next"
+  mvp_6: "Part Construction — Blocks 48–85 implemented, Blocks 86–94 planned, Block 86 next"
   mvp_7: "STEP Import — Blocks 95–101 planned after Block 94"
 ---
 
@@ -552,10 +552,10 @@ motion solvers reject Spherical as the selected drive.
 
 ## MVP 6 — Part Construction MVP after Block 47
 
-**Status:** In progress — Blocks 48–84 implemented
+**Status:** In progress — Blocks 48–85 implemented
 **Canonical:** sequence `docs/part-construction-sequence-mvp6.md`
 
-Blocks 48–84 are complete. Block 85 is the current next technical step.
+Blocks 48–85 are complete. Block 86 is the current next technical step.
 
 Mandatory Part Construction phase order:
 
@@ -1167,7 +1167,25 @@ Canonical contract: `docs/part-loft-intent-mvp6.md`.
 [core][loft-feature]
 ```
 
-## Current next technical step — Block 85
+## Block 85 — Two-section Loft Geometry on arbitrary planes — Implemented
 
-Implement Two-section Loft Geometry on arbitrary planes according to
-`docs/part-construction-sequence-mvp6-planning-detail.md`.
+Block 85 resolves exactly two ordered sections through their own workplane frames and executes
+checked C0 Loft/LoftCut/LoftSurface products for parallel, tilted, and arbitrarily oriented planes.
+Closed profiles create solids, open profiles create surfaces, and all four Body-result modes use
+the established transactional Boolean/cache boundary.
+
+Canonical contract: `docs/part-loft-geometry-mvp6.md`.
+
+```text
+[geometry][loft-feature]
+```
+
+## Current next technical step — Block 86
+
+Implement deterministic three-or-more-section Loft Geometry according to
+`docs/part-construction-sequence-mvp6-planning-detail.md`. A middle section must shape the
+transition without incidental OCCT wire-order authority.
+
+```text
+[geometry][multi-section-loft]
+```

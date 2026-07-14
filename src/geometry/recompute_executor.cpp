@@ -301,6 +301,28 @@ resolve_boolean_target_input(const PartDocument& document, const ShapeCache& sha
   return body_result;
 }
 
+[[nodiscard]] Result<std::size_t> store_loft_result(const PartDocument& document,
+                                                    const LoftFeature& feature, GeometryShape shape,
+                                                    ShapeCache& shape_cache) {
+  const BodyId& result_body_id = feature.body_result_context().effective_produced_body();
+  const Body* result_body = document.find_body(result_body_id);
+  if (result_body == nullptr)
+    return Result<std::size_t>::failure(
+        validation_error(result_body_id.value(), "produced body must exist in part document"));
+  auto feature_result = shape_cache.store_feature_shape(feature.id(), shape);
+  if (feature_result.has_error())
+    return feature_result;
+  auto body_result = shape_cache.store_body_shape(result_body_id, feature.id(), std::move(shape));
+  if (body_result.has_error())
+    return body_result;
+  if (document.bodies().size() == 1U && result_body->kind() == BodyKind::Solid) {
+    const GeometryShape* cached = shape_cache.find_body_shape(result_body_id);
+    return shape_cache.set_final_shape(feature.id(), *cached);
+  }
+  shape_cache.clear_final_shape();
+  return body_result;
+}
+
 [[nodiscard]] bool feature_produces_body(const PartDocument& document, std::string_view producer,
                                          const BodyId& body) {
   if (const Feature* feature = document.find_feature(FeatureId(std::string(producer)));
@@ -310,6 +332,8 @@ resolve_boolean_target_input(const PartDocument& document, const ShapeCache& sha
           document.find_revolve_feature(FeatureId(std::string(producer))))
     return feature->body_result_context().effective_produced_body() == body;
   if (const SweepFeature* feature = document.find_sweep_feature(FeatureId(std::string(producer))))
+    return feature->body_result_context().effective_produced_body() == body;
+  if (const LoftFeature* feature = document.find_loft_feature(FeatureId(std::string(producer))))
     return feature->body_result_context().effective_produced_body() == body;
   if (const LinearPatternFeature* feature =
           document.find_linear_pattern_feature(FeatureId(std::string(producer))))
@@ -1585,6 +1609,144 @@ line_profile_curves(const std::vector<Point3>& vertices) {
   return curves;
 }
 
+[[nodiscard]] ClosedProfileCurveSegment
+reversed_loft_curve(const ClosedProfileCurveSegment& segment) {
+  if (segment.kind == ClosedProfileCurveKind::Line)
+    return {segment.kind, segment.end, {}, segment.start};
+  if (segment.kind == ClosedProfileCurveKind::CircularArc)
+    return {segment.kind, segment.end, segment.mid, segment.start};
+  return {segment.kind, segment.end, segment.control2, segment.start, segment.mid};
+}
+
+[[nodiscard]] Point3 rotate_about_axis(Point3 point, Point3 center, Vector3 axis,
+                                       double angle_rad) {
+  axis = normalized(axis);
+  const Vector3 value{point.x - center.x, point.y - center.y, point.z - center.z};
+  const double cosine = std::cos(angle_rad), sine = std::sin(angle_rad);
+  const Vector3 crossed{axis.y * value.z - axis.z * value.y, axis.z * value.x - axis.x * value.z,
+                        axis.x * value.y - axis.y * value.x};
+  const double axial = axis.x * value.x + axis.y * value.y + axis.z * value.z;
+  const Vector3 rotated{value.x * cosine + crossed.x * sine + axis.x * axial * (1.0 - cosine),
+                        value.y * cosine + crossed.y * sine + axis.y * axial * (1.0 - cosine),
+                        value.z * cosine + crossed.z * sine + axis.z * axial * (1.0 - cosine)};
+  return {center.x + rotated.x, center.y + rotated.y, center.z + rotated.z};
+}
+
+void apply_loft_section_controls(std::vector<ClosedProfileCurveSegment>& curves,
+                                 const ProfileSectionReference& section,
+                                 const ResolvedWorkplane& workplane, double rotation_deg) {
+  if (section.flip_normal()) {
+    std::reverse(curves.begin(), curves.end());
+    for (auto& curve : curves)
+      curve = reversed_loft_curve(curve);
+  }
+  if (std::abs(rotation_deg) <= k_tolerance)
+    return;
+  Point3 center{};
+  for (const auto& curve : curves) {
+    center.x += curve.start.x;
+    center.y += curve.start.y;
+    center.z += curve.start.z;
+  }
+  const double count = static_cast<double>(curves.size());
+  center = {center.x / count, center.y / count, center.z / count};
+  const double angle = rotation_deg * k_pi / 180.0;
+  for (auto& curve : curves) {
+    curve.start = rotate_about_axis(curve.start, center, workplane.normal, angle);
+    curve.end = rotate_about_axis(curve.end, center, workplane.normal, angle);
+    if (curve.kind != ClosedProfileCurveKind::Line)
+      curve.mid = rotate_about_axis(curve.mid, center, workplane.normal, angle);
+    if (curve.kind == ClosedProfileCurveKind::CubicBezierSpline)
+      curve.control2 = rotate_about_axis(curve.control2, center, workplane.normal, angle);
+  }
+}
+
+template <typename IdRange>
+void align_loft_section(std::vector<ClosedProfileCurveSegment>& curves, const IdRange& ids,
+                        const std::optional<SketchEntityId>& alignment) {
+  if (!alignment.has_value())
+    return;
+  const auto found = std::find(ids.begin(), ids.end(), *alignment);
+  if (found == ids.end())
+    return;
+  const auto offset = static_cast<std::size_t>(std::distance(ids.begin(), found));
+  std::rotate(curves.begin(), curves.begin() + static_cast<std::ptrdiff_t>(offset), curves.end());
+}
+
+[[nodiscard]] Result<std::vector<ClosedProfileCurveSegment>>
+resolve_loft_closed_section(const PartDocument& document, const ProfileSectionReference& section,
+                            const ShapeCache& cache, const WorkplaneResolver& resolver) {
+  const auto& reference = std::get<ProfileRegionReference>(section.source());
+  const Sketch* sketch = document.find_sketch(reference.sketch());
+  if (sketch == nullptr)
+    return Result<std::vector<ClosedProfileCurveSegment>>::failure(
+        geometry_error(reference.sketch().value(), "loft section sketch must exist"));
+  auto workplane = resolver.resolve_for_sketch(document, *sketch, cache);
+  if (workplane.has_error())
+    return Result<std::vector<ClosedProfileCurveSegment>>::failure(workplane.error());
+  std::vector<ClosedProfileCurveSegment> curves;
+  const ProfileId& profile_id = reference.profile();
+  if (const RectangleProfile* rectangle = sketch->find_rectangle_profile(profile_id)) {
+    const Parameter* width = document.find_parameter(rectangle->width_parameter());
+    const Parameter* height = document.find_parameter(rectangle->height_parameter());
+    if (width == nullptr || height == nullptr || width->type() != ParameterType::Length ||
+        height->type() != ParameterType::Length)
+      return Result<std::vector<ClosedProfileCurveSegment>>::failure(
+          geometry_error(profile_id.value(), "loft rectangle dimensions must be Length values"));
+    auto vertices = map_bounded_local_vertices(
+        resolver, workplane.value(), profile_id.value(),
+        rectangle_local_vertices(*rectangle, width->value(), height->value()));
+    if (vertices.has_error())
+      return Result<std::vector<ClosedProfileCurveSegment>>::failure(vertices.error());
+    curves = line_profile_curves(vertices.value());
+  } else if (const ClosedProfile* closed = sketch->find_closed_profile(profile_id)) {
+    auto vertices = evaluate_bounded_closed_profile_vertices(document, resolver, workplane.value(),
+                                                             *sketch, *closed);
+    if (vertices.has_error())
+      return Result<std::vector<ClosedProfileCurveSegment>>::failure(vertices.error());
+    curves = line_profile_curves(vertices.value());
+    align_loft_section(curves, closed->line_segments(), section.alignment_reference());
+  } else if (const ArcClosedProfile* arc = sketch->find_arc_closed_profile(profile_id)) {
+    auto resolved = evaluate_bounded_arc_profile_curves(resolver, workplane.value(), *sketch, *arc);
+    if (resolved.has_error())
+      return Result<std::vector<ClosedProfileCurveSegment>>::failure(resolved.error());
+    curves = std::move(resolved.value());
+    align_loft_section(curves, arc->curve_segments(), section.alignment_reference());
+  } else if (const CircleProfile* circle = sketch->find_circle_profile(profile_id)) {
+    const Parameter* diameter = document.find_parameter(circle->diameter_parameter());
+    if (diameter == nullptr || diameter->type() != ParameterType::Length)
+      return Result<std::vector<ClosedProfileCurveSegment>>::failure(
+          geometry_error(profile_id.value(), "loft circle diameter must be a Length"));
+    const double radius = diameter->value().millimeters() / 2.0;
+    for (std::size_t index = 0U; index < 4U; ++index) {
+      const double start = static_cast<double>(index) * k_pi / 2.0;
+      const double middle = start + k_pi / 4.0;
+      const double end = start + k_pi / 2.0;
+      const auto mapped = [&](double angle) {
+        return resolver.evaluate_point(workplane.value(),
+                                       {circle->center().x + radius * std::cos(angle),
+                                        circle->center().y + radius * std::sin(angle)});
+      };
+      curves.push_back(
+          {ClosedProfileCurveKind::CircularArc, mapped(start), mapped(middle), mapped(end)});
+    }
+  } else {
+    return Result<std::vector<ClosedProfileCurveSegment>>::failure(geometry_error(
+        profile_id.value(),
+        "Block 85 supports rectangle, circle, line, and arc/spline closed loft sections"));
+  }
+  double rotation_deg = 0.0;
+  if (section.rotation_offset().has_value()) {
+    const Parameter* rotation = document.find_parameter(*section.rotation_offset());
+    if (rotation == nullptr || rotation->type() != ParameterType::Angle)
+      return Result<std::vector<ClosedProfileCurveSegment>>::failure(geometry_error(
+          section.rotation_offset()->value(), "loft rotation must reference an Angle parameter"));
+    rotation_deg = rotation->value().degrees();
+  }
+  apply_loft_section_controls(curves, section, workplane.value(), rotation_deg);
+  return Result<std::vector<ClosedProfileCurveSegment>>::success(std::move(curves));
+}
+
 // True when the sketch contains exactly one profile and it is of the kind
 // selected by `kind_size`.
 template <typename KindSize>
@@ -2111,6 +2273,104 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_sweep(const PartDocument&
     result = std::move(combined.value());
   }
   auto stored = store_sweep_result(document, *feature, std::move(result), working_cache);
+  if (stored.has_error())
+    return stored;
+  shape_cache = std::move(working_cache);
+  return stored;
+}
+
+Result<std::size_t> GeometryRecomputeExecutor::execute_loft(const PartDocument& document,
+                                                            FeatureId feature_id,
+                                                            ShapeCache& shape_cache) const {
+  if (feature_id.empty())
+    return Result<std::size_t>::failure(validation_error("loft", "feature id must not be empty"));
+  const LoftFeature* feature = document.find_loft_feature(feature_id);
+  if (feature == nullptr)
+    return Result<std::size_t>::failure(
+        validation_error(feature_id.value(), "loft feature must exist in part document"));
+  if (feature->sections().size() != 2U)
+    return Result<std::size_t>::failure(
+        geometry_error(feature_id.value(), "Block 85 requires exactly two loft sections"));
+  if (feature->path_curve().has_value() || !feature->guide_curves().empty())
+    return Result<std::size_t>::failure(geometry_error(
+        feature_id.value(), "guided and path-controlled loft execution starts in Block 87"));
+  if (feature->continuity() != LoftContinuity::C0)
+    return Result<std::size_t>::failure(
+        geometry_error(feature_id.value(), "G1/G2 loft continuity execution starts in Block 87"));
+
+  ShapeCache working_cache = shape_cache;
+  Result<GeometryShape> tool = Result<GeometryShape>::failure(
+      geometry_error(feature_id.value(), "unsupported two-section loft"));
+  const bool open = feature->sections().front().kind() == LoftSectionKind::OpenPath;
+  if (open) {
+    if (feature->kind() != LoftFeatureKind::LoftSurface)
+      return Result<std::size_t>::failure(
+          geometry_error(feature_id.value(), "open loft sections require LoftSurface"));
+    std::vector<std::vector<SweepPathSegment>> sections;
+    sections.reserve(2U);
+    for (const auto& section : feature->sections()) {
+      if (section.rotation_offset().has_value()) {
+        const Parameter* rotation = document.find_parameter(*section.rotation_offset());
+        if (rotation == nullptr || rotation->type() != ParameterType::Angle ||
+            std::abs(rotation->value().degrees()) > k_tolerance)
+          return Result<std::size_t>::failure(geometry_error(
+              feature_id.value(), "non-zero rotation of open loft sections is unsupported"));
+      }
+      const PathCurveId& path_id = std::get<PathCurveId>(section.source());
+      const PathCurve* path = document.find_path_curve(path_id);
+      if (path == nullptr)
+        return Result<std::size_t>::failure(
+            geometry_error(path_id.value(), "open loft section PathCurve must exist"));
+      auto resolved = resolve_basic_sweep_path(document, *path, working_cache, workplane_resolver_,
+                                               "open loft section");
+      if (resolved.has_error())
+        return Result<std::size_t>::failure(resolved.error());
+      if (section.flip_normal()) {
+        std::reverse(resolved.value().begin(), resolved.value().end());
+        for (auto& segment : resolved.value())
+          segment = reversed_sweep_segment(segment);
+      }
+      sections.push_back(std::move(resolved.value()));
+    }
+    tool = loft_adapter_.loft_open_sections(feature->id(), sections);
+  } else {
+    std::vector<std::vector<ClosedProfileCurveSegment>> sections;
+    sections.reserve(2U);
+    for (const auto& section : feature->sections()) {
+      auto resolved =
+          resolve_loft_closed_section(document, section, working_cache, workplane_resolver_);
+      if (resolved.has_error())
+        return Result<std::size_t>::failure(resolved.error());
+      sections.push_back(std::move(resolved.value()));
+    }
+    tool = loft_adapter_.loft_closed_sections(feature->id(), sections,
+                                              feature->kind() != LoftFeatureKind::LoftSurface);
+  }
+  if (tool.has_error())
+    return Result<std::size_t>::failure(tool.error());
+
+  GeometryShape result = tool.value();
+  const auto& context = feature->body_result_context();
+  if (context.operation_mode() != FeatureBodyOperationMode::NewBody) {
+    if (!context.target_body().has_value())
+      return Result<std::size_t>::failure(
+          geometry_error(feature_id.value(), "modifying loft requires a target Body"));
+    auto target = resolve_in_place_body_target(document, feature->id(), *context.target_body(),
+                                               working_cache);
+    if (target.has_error())
+      return Result<std::size_t>::failure(target.error());
+    BodyBooleanOperation operation = BodyBooleanOperation::Add;
+    if (context.operation_mode() == FeatureBodyOperationMode::Cut)
+      operation = BodyBooleanOperation::Subtract;
+    else if (context.operation_mode() == FeatureBodyOperationMode::Intersect)
+      operation = BodyBooleanOperation::Intersect;
+    auto combined = body_boolean_adapter_.combine(feature->id(), operation, *target.value(),
+                                                  std::vector<GeometryShape>{tool.value()});
+    if (combined.has_error())
+      return Result<std::size_t>::failure(combined.error());
+    result = std::move(combined.value());
+  }
+  auto stored = store_loft_result(document, *feature, std::move(result), working_cache);
   if (stored.has_error())
     return stored;
   shape_cache = std::move(working_cache);
@@ -3018,6 +3278,7 @@ GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const Reco
     const Feature* feature = document.find_feature(FeatureId(step.node_id));
     const RevolveFeature* revolve = document.find_revolve_feature(FeatureId(step.node_id));
     const SweepFeature* sweep = document.find_sweep_feature(FeatureId(step.node_id));
+    const LoftFeature* loft = document.find_loft_feature(FeatureId(step.node_id));
     const LinearPatternFeature* linear_pattern =
         document.find_linear_pattern_feature(FeatureId(step.node_id));
     const CircularPatternFeature* circular_pattern =
@@ -3031,15 +3292,16 @@ GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const Reco
         document.find_body_boolean_feature(FeatureId(step.node_id));
     const BodyTransform* body_transform =
         document.find_body_transform(BodyTransformId(step.node_id));
-    if (feature == nullptr && revolve == nullptr && sweep == nullptr && linear_pattern == nullptr &&
-        circular_pattern == nullptr && mirror == nullptr && fillet == nullptr &&
-        chamfer == nullptr && shell == nullptr && draft == nullptr && body_boolean == nullptr &&
-        body_transform == nullptr)
+    if (feature == nullptr && revolve == nullptr && sweep == nullptr && loft == nullptr &&
+        linear_pattern == nullptr && circular_pattern == nullptr && mirror == nullptr &&
+        fillet == nullptr && chamfer == nullptr && shell == nullptr && draft == nullptr &&
+        body_boolean == nullptr && body_transform == nullptr)
       continue;
 
     const FeatureId executable_id = feature != nullptr            ? feature->id()
                                     : revolve != nullptr          ? revolve->id()
                                     : sweep != nullptr            ? sweep->id()
+                                    : loft != nullptr             ? loft->id()
                                     : linear_pattern != nullptr   ? linear_pattern->id()
                                     : circular_pattern != nullptr ? circular_pattern->id()
                                     : mirror != nullptr           ? mirror->id()
@@ -3059,6 +3321,7 @@ GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const Reco
         feature != nullptr   ? execute_feature(document, *feature, execution_cache)
         : revolve != nullptr ? execute_revolve(document, revolve->id(), execution_cache)
         : sweep != nullptr   ? execute_sweep(document, sweep->id(), execution_cache)
+        : loft != nullptr    ? execute_loft(document, loft->id(), execution_cache)
         : linear_pattern != nullptr
             ? execute_linear_pattern(document, linear_pattern->id(), execution_cache)
         : circular_pattern != nullptr
@@ -3104,6 +3367,7 @@ GeometryRecomputeExecutor::execute_document(const PartDocument& document,
     const Feature* feature = document.find_feature(FeatureId(executable_id));
     const RevolveFeature* revolve = document.find_revolve_feature(FeatureId(executable_id));
     const SweepFeature* sweep = document.find_sweep_feature(FeatureId(executable_id));
+    const LoftFeature* loft = document.find_loft_feature(FeatureId(executable_id));
     const LinearPatternFeature* linear_pattern =
         document.find_linear_pattern_feature(FeatureId(executable_id));
     const CircularPatternFeature* circular_pattern =
@@ -3117,15 +3381,16 @@ GeometryRecomputeExecutor::execute_document(const PartDocument& document,
         document.find_body_boolean_feature(FeatureId(executable_id));
     const BodyTransform* body_transform =
         document.find_body_transform(BodyTransformId(executable_id));
-    if (feature == nullptr && revolve == nullptr && sweep == nullptr && linear_pattern == nullptr &&
-        circular_pattern == nullptr && mirror == nullptr && fillet == nullptr &&
-        chamfer == nullptr && shell == nullptr && draft == nullptr && body_boolean == nullptr &&
-        body_transform == nullptr)
+    if (feature == nullptr && revolve == nullptr && sweep == nullptr && loft == nullptr &&
+        linear_pattern == nullptr && circular_pattern == nullptr && mirror == nullptr &&
+        fillet == nullptr && chamfer == nullptr && shell == nullptr && draft == nullptr &&
+        body_boolean == nullptr && body_transform == nullptr)
       continue;
 
     const FeatureId feature_id = feature != nullptr            ? feature->id()
                                  : revolve != nullptr          ? revolve->id()
                                  : sweep != nullptr            ? sweep->id()
+                                 : loft != nullptr             ? loft->id()
                                  : linear_pattern != nullptr   ? linear_pattern->id()
                                  : circular_pattern != nullptr ? circular_pattern->id()
                                  : mirror != nullptr           ? mirror->id()
@@ -3145,6 +3410,7 @@ GeometryRecomputeExecutor::execute_document(const PartDocument& document,
         feature != nullptr   ? execute_feature(document, *feature, execution_cache)
         : revolve != nullptr ? execute_revolve(document, revolve->id(), execution_cache)
         : sweep != nullptr   ? execute_sweep(document, sweep->id(), execution_cache)
+        : loft != nullptr    ? execute_loft(document, loft->id(), execution_cache)
         : linear_pattern != nullptr
             ? execute_linear_pattern(document, linear_pattern->id(), execution_cache)
         : circular_pattern != nullptr

@@ -96,9 +96,9 @@ Fit/Control Splines, typed Helices, and Guide-Curve roles. Block 77 adds strict 
 and source-identity-only semantic references. Block 78 executes deterministic transient OCCT
 Geometry without writing topology identity back into Core. Block 79 adds PathCurve intent, Block
 80 adds Sweep/SweepCut/SweepSurface intent, Blocks 81–82 execute planar then spatial paths, twist,
-and guide control, Block 83 adds path-following AdditiveExtrude/SubtractiveExtrude, and Block 84
-adds persistent ordered Loft/LoftCut/LoftSurface intent. Block 85 Two-section Loft Geometry on
-arbitrary planes is next.
+and guide control, Block 83 adds path-following AdditiveExtrude/SubtractiveExtrude, Block 84 adds
+persistent ordered Loft/LoftCut/LoftSurface intent, and Block 85 executes two-section C0 Loft
+Geometry on arbitrary planes. Block 86 Multi-section Loft is next.
 
 The long-term sketcher and feature parity target is documented in `docs/inventor-like-sketcher-and-feature-roadmap.md`.
 

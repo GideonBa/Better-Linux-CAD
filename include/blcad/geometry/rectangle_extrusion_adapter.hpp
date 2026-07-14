@@ -52,6 +52,7 @@ private:
   friend class BodyTransformAdapter;
   friend class RevolveAdapter;
   friend class SweepAdapter;
+  friend class LoftAdapter;
   friend class FilletAdapter;
   friend class ChamferAdapter;
   friend class ShellAdapter;

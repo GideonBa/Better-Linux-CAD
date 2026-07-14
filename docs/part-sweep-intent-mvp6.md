@@ -65,4 +65,4 @@ The focused suite covers factory invariants for all three feature types, depende
 and removal protection, Body-kind enforcement, strict roundtrip JSON, older-file compatibility,
 and malformed-record rejection.
 
-Blocks 48–84 are implemented. Block 83 Path-following Extrude and Extruded Cut is implemented; Block 84 ProfileSectionReference and Loft Core intent plus JSON is implemented; Block 85 Two-section Loft Geometry on arbitrary planes is next.
+Blocks 48–85 are implemented. Block 83 Path-following Extrude and Extruded Cut is implemented; Block 84 ProfileSectionReference and Loft Core intent plus JSON is implemented; Block 85 Two-section Loft Geometry on arbitrary planes is implemented; Block 86 Multi-section Loft is next.

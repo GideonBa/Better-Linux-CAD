@@ -49,4 +49,4 @@ Coverage proves three feature kinds, minimum and deterministic section order, cl
 compatibility, dependencies, Body-kind validation, strict JSON round-trip, malformed-record
 rejection, and historical compatibility.
 
-Blocks 48–84 are implemented. Block 85 Two-section Loft Geometry on arbitrary planes is next.
+Blocks 48–85 are implemented. Block 85 Two-section Loft Geometry on arbitrary planes is implemented; Block 86 Multi-section Loft is next.

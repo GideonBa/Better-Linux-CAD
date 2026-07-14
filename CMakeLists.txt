@@ -179,6 +179,7 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/recompute_executor.cpp
     src/geometry/circular_pattern_adapter.cpp
     src/geometry/linear_pattern_adapter.cpp
+    src/geometry/loft_adapter.cpp
     src/geometry/mirror_adapter.cpp
     src/geometry/rectangle_extrusion_adapter.cpp
     src/geometry/reference_driven_sketch_helper.cpp
@@ -422,6 +423,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/fillet_feature_pipeline_tests.cpp
       tests/geometry/left_workplane_pipeline_tests.cpp
       tests/geometry/linear_pattern_pipeline_tests.cpp
+      tests/geometry/loft_feature_pipeline_tests.cpp
       tests/geometry/mirror_feature_pipeline_tests.cpp
       tests/geometry/parameter_expression_pipeline_tests.cpp
       tests/geometry/path_extrude_pipeline_tests.cpp
