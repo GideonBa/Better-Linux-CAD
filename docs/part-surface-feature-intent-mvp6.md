@@ -74,9 +74,10 @@ malformed records, and compatibility with historical files lacking `surface_feat
 
 ## Handoff
 
-Blocks 48–91 are implemented. Boundary/Fill, Trim/Extend, and Stitch execution are canonical in
-`docs/part-boundary-fill-surface-geometry-mvp6.md`,
-`docs/part-trim-extend-surface-geometry-mvp6.md`, and
-`docs/part-surface-stitch-geometry-mvp6.md`. Block 92 Closed shell to solid conversion is the
-current next technical step. Network surfaces and arbitrary patch-network intent remain deferred
-beyond the first Part Construction MVP.
+Blocks 48–92 are implemented. Boundary/Fill, Trim/Extend, Stitch, and Closed-shell-to-solid
+execution are canonical in `docs/part-boundary-fill-surface-geometry-mvp6.md`,
+`docs/part-trim-extend-surface-geometry-mvp6.md`,
+`docs/part-surface-stitch-geometry-mvp6.md`, and
+`docs/part-closed-shell-to-solid-geometry-mvp6.md`. Block 93 multi-body STEP export and
+deterministic body naming is the current next technical step. Network surfaces and arbitrary
+patch-network intent remain deferred beyond the first Part Construction MVP.

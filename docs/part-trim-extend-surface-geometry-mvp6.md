@@ -53,6 +53,7 @@ ambiguous multi-face target.
 
 ## Handoff
 
-Blocks 48–91 are implemented. Stitch/Knit/Sew shell execution is canonical in
-`docs/part-surface-stitch-geometry-mvp6.md`. Block 92 Closed shell to solid conversion is the
-current next technical step.
+Blocks 48–92 are implemented. Stitch/Knit/Sew shell and Closed-shell-to-solid execution are
+canonical in `docs/part-surface-stitch-geometry-mvp6.md` and
+`docs/part-closed-shell-to-solid-geometry-mvp6.md`. Block 93 multi-body STEP export and
+deterministic body naming is the current next technical step.

@@ -36,6 +36,9 @@ public:
   [[nodiscard]] Result<GeometryShape>
   stitch_surfaces(FeatureId feature_id, const std::vector<GeometryShape>& surfaces,
                   double tolerance_mm) const;
+
+  [[nodiscard]] Result<GeometryShape> close_shell_to_solid(FeatureId feature_id,
+                                                           const GeometryShape& shell) const;
 };
 
 } // namespace blcad::geometry

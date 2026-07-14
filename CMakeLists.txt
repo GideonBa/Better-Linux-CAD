@@ -442,6 +442,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/surface_boundary_fill_pipeline_tests.cpp
       tests/geometry/surface_trim_extend_pipeline_tests.cpp
       tests/geometry/surface_stitch_pipeline_tests.cpp
+      tests/geometry/surface_close_shell_pipeline_tests.cpp
       tests/geometry/shell_feature_pipeline_tests.cpp
       tests/geometry/draft_feature_pipeline_tests.cpp
       tests/geometry/right_workplane_pipeline_tests.cpp

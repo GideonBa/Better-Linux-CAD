@@ -872,6 +872,11 @@ semantic Surface references, positive Length tolerance parameter, and result Bod
 shell, its faces, and the sewing tolerance remain transient. Canonical Geometry details are in
 `docs/part-surface-stitch-geometry-mvp6.md`.
 
+Block 92 adds no JSON fields. Closed-shell-to-solid conversion consumes the existing semantic
+Surface shell reference and the Solid result Body id. The produced solid, its shell, and orientation
+state remain transient cache products. Canonical Geometry details are in
+`docs/part-closed-shell-to-solid-geometry-mvp6.md`.
+
 ## Planned STEP import persistence after Block 94
 
 This section is planned architecture, not part of the current schema. Blocks 95–101 in

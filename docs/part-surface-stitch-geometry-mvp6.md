@@ -58,6 +58,7 @@ a non-positive tolerance.
 
 ## Handoff
 
-Blocks 48–91 are implemented. Block 92 Closed shell to solid conversion is the current next
-technical step. Closed-shell-to-solid conversion Geometry remains deferred until Block 92, and
-`SurfaceStitchFeature` supplies its consistently oriented, sufficiently manifold shell input.
+Blocks 48–92 are implemented. Closed-shell-to-solid conversion is canonical in
+`docs/part-closed-shell-to-solid-geometry-mvp6.md`; `SurfaceStitchFeature` supplies its
+consistently oriented, sufficiently manifold shell input. Block 93 multi-body STEP export and
+deterministic body naming is the current next technical step.

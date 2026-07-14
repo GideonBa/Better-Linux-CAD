@@ -10,11 +10,13 @@
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepBuilderAPI_MakePolygon.hxx>
+#include <BRepBuilderAPI_MakeSolid.hxx>
 #include <BRepBuilderAPI_MakeWire.hxx>
 #include <BRepBuilderAPI_Sewing.hxx>
 #include <BRepCheck_Analyzer.hxx>
 #include <BRepFill_Filling.hxx>
 #include <BRepGProp.hxx>
+#include <BRepLib.hxx>
 #include <BRepOffsetAPI_ThruSections.hxx>
 #include <BRepTools.hxx>
 #include <BRepTools_WireExplorer.hxx>
@@ -33,6 +35,7 @@
 #include <TopoDS_Face.hxx>
 #include <TopoDS_Shape.hxx>
 #include <TopoDS_Shell.hxx>
+#include <TopoDS_Solid.hxx>
 #include <TopoDS_Vertex.hxx>
 #include <TopoDS_Wire.hxx>
 #include <gp_Dir.hxx>
@@ -655,6 +658,79 @@ SurfaceAdapter::stitch_surfaces(FeatureId feature_id,
     return Result<GeometryShape>::failure(surface_error(feature_id, exception.what()));
   } catch (...) {
     return Result<GeometryShape>::failure(surface_error(feature_id, "unknown surface stitch error"));
+  }
+}
+
+Result<GeometryShape> SurfaceAdapter::close_shell_to_solid(FeatureId feature_id,
+                                                           const GeometryShape& shell) const {
+  if (feature_id.empty())
+    return Result<GeometryShape>::failure(
+        Error::validation("closed_shell_to_solid", "feature id must not be empty"));
+  if (shell.empty())
+    return Result<GeometryShape>::failure(
+        surface_error(feature_id, "closed-shell-to-solid input must not be empty"));
+  const TopoDS_Shape& input = shell.impl_->shape;
+  if (TopExp_Explorer(input, TopAbs_SOLID).More())
+    return Result<GeometryShape>::failure(
+        surface_error(feature_id, "closed-shell-to-solid input must be a surface shell, not a solid"));
+
+  std::vector<TopoDS_Shell> shells;
+  for (TopExp_Explorer explorer(input, TopAbs_SHELL); explorer.More(); explorer.Next())
+    shells.push_back(TopoDS::Shell(explorer.Current()));
+  if (shells.size() != 1U)
+    return Result<GeometryShape>::failure(
+        surface_error(feature_id, "closed-shell-to-solid requires exactly one connected shell"));
+  TopoDS_Shell shell_topology = shells.front();
+
+  // A closed manifold shell shares every edge between exactly two faces: a free
+  // edge means the shell is open, more than two faces means it is non-manifold.
+  TopTools_IndexedDataMapOfShapeListOfShape edge_faces;
+  TopExp::MapShapesAndAncestors(shell_topology, TopAbs_EDGE, TopAbs_FACE, edge_faces);
+  for (Standard_Integer index = 1; index <= edge_faces.Extent(); ++index) {
+    const Standard_Integer count = edge_faces.FindFromIndex(index).Extent();
+    if (count < 2)
+      return Result<GeometryShape>::failure(surface_error(
+          feature_id, "closed-shell-to-solid requires a closed shell with no free edges"));
+    if (count > 2)
+      return Result<GeometryShape>::failure(
+          surface_error(feature_id, "closed-shell-to-solid rejects a non-manifold shell"));
+  }
+  if (!BRepCheck_Analyzer(shell_topology, true).IsValid())
+    return Result<GeometryShape>::failure(surface_error(
+        feature_id, "closed-shell-to-solid requires a consistently oriented valid shell"));
+
+  try {
+    shell_topology.Closed(Standard_True);
+    BRepBuilderAPI_MakeSolid maker(shell_topology);
+    if (!maker.IsDone())
+      return Result<GeometryShape>::failure(
+          surface_error(feature_id, "OCCT could not build a solid from the closed shell"));
+    TopoDS_Solid solid = maker.Solid();
+    BRepLib::OrientClosedSolid(solid);
+    if (solid.IsNull() || !BRepCheck_Analyzer(solid, true).IsValid())
+      return Result<GeometryShape>::failure(
+          surface_error(feature_id, "closed-shell-to-solid produced a topologically invalid solid"));
+    std::size_t solid_count = 0U;
+    for (TopExp_Explorer explorer(solid, TopAbs_SOLID); explorer.More(); explorer.Next())
+      ++solid_count;
+    if (solid_count != 1U)
+      return Result<GeometryShape>::failure(
+          surface_error(feature_id, "closed-shell-to-solid must produce exactly one solid"));
+    GProp_GProps volume;
+    BRepGProp::VolumeProperties(solid, volume);
+    if (!(volume.Mass() > kTolerance))
+      return Result<GeometryShape>::failure(surface_error(
+          feature_id, "closed-shell-to-solid produced a degenerate zero-volume solid"));
+    TopoDS_Shape result = solid;
+    return Result<GeometryShape>::success(
+        GeometryShape(std::make_shared<GeometryShape::Impl>(std::move(result))));
+  } catch (const Standard_Failure& failure) {
+    return Result<GeometryShape>::failure(surface_error(feature_id, failure_message(failure)));
+  } catch (const std::exception& exception) {
+    return Result<GeometryShape>::failure(surface_error(feature_id, exception.what()));
+  } catch (...) {
+    return Result<GeometryShape>::failure(
+        surface_error(feature_id, "unknown closed-shell-to-solid error"));
   }
 }
 

@@ -330,15 +330,24 @@ resolve_boolean_target_input(const PartDocument& document, const ShapeCache& sha
   const FeatureId& feature_id = surface_feature_id(feature);
   const BodyId& result_body_id = surface_feature_result_body(feature);
   const Body* result_body = document.find_body(result_body_id);
-  if (result_body == nullptr || result_body->kind() != BodyKind::Surface)
-    return Result<std::size_t>::failure(
-        validation_error(result_body_id.value(), "surface result must identify a Surface Body"));
+  const BodyKind expected_kind =
+      surface_feature_kind(feature) == SurfaceFeatureKind::ClosedShellToSolid ? BodyKind::Solid
+                                                                              : BodyKind::Surface;
+  if (result_body == nullptr || result_body->kind() != expected_kind)
+    return Result<std::size_t>::failure(validation_error(
+        result_body_id.value(), expected_kind == BodyKind::Solid
+                                    ? "closed-shell-to-solid result must identify a Solid Body"
+                                    : "surface result must identify a Surface Body"));
   auto feature_result = shape_cache.store_feature_shape(feature_id, shape);
   if (feature_result.has_error())
     return feature_result;
   auto body_result = shape_cache.store_body_shape(result_body_id, feature_id, std::move(shape));
   if (body_result.has_error())
     return body_result;
+  if (document.bodies().size() == 1U && result_body->kind() == BodyKind::Solid) {
+    const GeometryShape* cached = shape_cache.find_body_shape(result_body_id);
+    return shape_cache.set_final_shape(feature_id, *cached);
+  }
   shape_cache.clear_final_shape();
   return body_result;
 }
@@ -2556,9 +2565,6 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_surface_feature(
     return Result<std::size_t>::failure(
         validation_error(feature_id.value(), "surface feature must exist in part document"));
   const SurfaceFeatureKind kind = surface_feature_kind(*feature);
-  if (kind == SurfaceFeatureKind::ClosedShellToSolid)
-    return Result<std::size_t>::failure(geometry_error(
-        feature_id.value(), "closed-shell-to-solid Geometry is deferred to Block 92"));
 
   ShapeCache working_cache = shape_cache;
   Result<GeometryShape> result = Result<GeometryShape>::failure(
@@ -2611,7 +2617,7 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_surface_feature(
                          "surface extension distance must resolve to a positive Length parameter"));
     result = surface_adapter_.extend_surface(feature_id, target.value(), boundary.value(),
                                              distance->value().millimeters());
-  } else {
+  } else if (kind == SurfaceFeatureKind::SurfaceStitch) {
     const auto& stitch = std::get<SurfaceStitchFeature>(*feature);
     std::vector<GeometryShape> resolved_surfaces;
     resolved_surfaces.reserve(stitch.surfaces().size());
@@ -2630,6 +2636,13 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_surface_feature(
                          "surface stitch tolerance must resolve to a positive Length parameter"));
     result = surface_adapter_.stitch_surfaces(feature_id, resolved_surfaces,
                                               tolerance->value().millimeters());
+  } else {
+    const auto& closed = std::get<ClosedShellToSolidFeature>(*feature);
+    auto shell = resolve_surface_target(document, closed.shell(), working_cache, surface_adapter_,
+                                        feature_id);
+    if (shell.has_error())
+      return Result<std::size_t>::failure(shell.error());
+    result = surface_adapter_.close_shell_to_solid(feature_id, shell.value());
   }
   if (result.has_error())
     return Result<std::size_t>::failure(result.error());
