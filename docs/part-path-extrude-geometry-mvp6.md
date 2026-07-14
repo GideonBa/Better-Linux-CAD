@@ -47,5 +47,5 @@ The proof covers stable feature identity, validation, dependency/removal protect
 round-trip and malformed input, plus additive, curved-route, and subtractive transactional
 geometry execution.
 
-Blocks 48–88 are implemented. Block 84 ProfileSectionReference and Loft Core intent plus JSON is
+Blocks 48–89 are implemented. Block 84 ProfileSectionReference and Loft Core intent plus JSON is
 next.

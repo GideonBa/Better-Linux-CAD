@@ -21,6 +21,7 @@ class ClosedProfileAdapter;
 class BodyTransformAdapter;
 class RevolveAdapter;
 class SweepAdapter;
+class SurfaceAdapter;
 class StepExporter;
 class AssemblyStepExporter;
 class Sketch3DGeometryAdapter;
@@ -52,6 +53,7 @@ private:
   friend class BodyTransformAdapter;
   friend class RevolveAdapter;
   friend class SweepAdapter;
+  friend class SurfaceAdapter;
   friend class LoftAdapter;
   friend class FilletAdapter;
   friend class ChamferAdapter;

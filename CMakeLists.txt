@@ -187,6 +187,7 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/reference_generated_profile_resolver.cpp
     src/geometry/revolve_adapter.cpp
     src/geometry/sweep_adapter.cpp
+    src/geometry/surface_adapter.cpp
     src/geometry/semantic_reference_evaluator.cpp
     src/geometry/shape_cache.cpp
     src/geometry/sketch_3d_geometry_adapter.cpp
@@ -438,6 +439,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/reference_part_pipeline_tests.cpp
       tests/geometry/revolve_feature_pipeline_tests.cpp
       tests/geometry/sweep_feature_pipeline_tests.cpp
+      tests/geometry/surface_boundary_fill_pipeline_tests.cpp
       tests/geometry/shell_feature_pipeline_tests.cpp
       tests/geometry/draft_feature_pipeline_tests.cpp
       tests/geometry/right_workplane_pipeline_tests.cpp

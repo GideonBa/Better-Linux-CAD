@@ -858,6 +858,10 @@ sketch/profile region. Historical files missing the array restore zero Surface f
 faces, shells, sewing results, and topology maps are not stored. Canonical details are in
 `docs/part-surface-feature-intent-mvp6.md`.
 
+Block 89 adds no JSON fields. Boundary and Fill Surface execution consumes the existing semantic
+boundary references and result Body ids; resolved OCCT edges, wires, and faces remain transient.
+Canonical Geometry details are in `docs/part-boundary-fill-surface-geometry-mvp6.md`.
+
 ## Planned STEP import persistence after Block 94
 
 This section is planned architecture, not part of the current schema. Blocks 95–101 in

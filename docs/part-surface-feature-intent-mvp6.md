@@ -74,6 +74,7 @@ malformed records, and compatibility with historical files lacking `surface_feat
 
 ## Handoff
 
-Blocks 48–88 are implemented. Block 89 Boundary and Fill Surface Geometry is the current next
-technical step. Network surfaces and arbitrary patch-network intent remain deferred beyond the
-first Part Construction MVP.
+Blocks 48–89 are implemented. Boundary and Fill Surface execution is canonical in
+`docs/part-boundary-fill-surface-geometry-mvp6.md`. Block 90 Trim and Extend Surface Geometry is the
+current next technical step. Network surfaces and arbitrary patch-network intent remain deferred
+beyond the first Part Construction MVP.

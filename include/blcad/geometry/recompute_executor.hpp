@@ -18,6 +18,7 @@
 #include "blcad/geometry/revolve_adapter.hpp"
 #include "blcad/geometry/shape_cache.hpp"
 #include "blcad/geometry/shell_adapter.hpp"
+#include "blcad/geometry/surface_adapter.hpp"
 #include "blcad/geometry/sweep_adapter.hpp"
 #include "blcad/geometry/workplane_resolver.hpp"
 
@@ -80,6 +81,10 @@ public:
   [[nodiscard]] Result<std::size_t>
   execute_sweep(const PartDocument& document, FeatureId feature_id, ShapeCache& shape_cache) const;
 
+  [[nodiscard]] Result<std::size_t> execute_surface_feature(const PartDocument& document,
+                                                            FeatureId feature_id,
+                                                            ShapeCache& shape_cache) const;
+
   [[nodiscard]] Result<std::size_t> execute_loft(const PartDocument& document, FeatureId feature_id,
                                                  ShapeCache& shape_cache) const;
 
@@ -114,6 +119,7 @@ private:
   BodyTransformAdapter body_transform_adapter_;
   RevolveAdapter revolve_adapter_;
   SweepAdapter sweep_adapter_;
+  SurfaceAdapter surface_adapter_;
   LoftAdapter loft_adapter_;
   CircularPatternAdapter circular_pattern_adapter_;
   LinearPatternAdapter linear_pattern_adapter_;

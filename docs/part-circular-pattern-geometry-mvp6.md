@@ -72,5 +72,5 @@ failure.
 Block 66 MirrorFeature Core intent and JSON is implemented in
 `docs/part-mirror-intent-mvp6.md`. Blocks 67 MirrorFeature Geometry and 72 ShellFeature Geometry are
 implemented; Blocks 73–74 DraftFeature intent/JSON and Geometry, Block 75 Basic 3D Sketch Core,
-Blocks 48–88 through persistent ordered Loft intent are implemented. Block 85 Two-section Loft
+Blocks 48–89 through persistent ordered Loft intent are implemented. Block 85 Two-section Loft
 Geometry on arbitrary planes is next.

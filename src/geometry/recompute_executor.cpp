@@ -323,6 +323,26 @@ resolve_boolean_target_input(const PartDocument& document, const ShapeCache& sha
   return body_result;
 }
 
+[[nodiscard]] Result<std::size_t> store_surface_result(const PartDocument& document,
+                                                       const SurfaceFeature& feature,
+                                                       GeometryShape shape,
+                                                       ShapeCache& shape_cache) {
+  const FeatureId& feature_id = surface_feature_id(feature);
+  const BodyId& result_body_id = surface_feature_result_body(feature);
+  const Body* result_body = document.find_body(result_body_id);
+  if (result_body == nullptr || result_body->kind() != BodyKind::Surface)
+    return Result<std::size_t>::failure(
+        validation_error(result_body_id.value(), "surface result must identify a Surface Body"));
+  auto feature_result = shape_cache.store_feature_shape(feature_id, shape);
+  if (feature_result.has_error())
+    return feature_result;
+  auto body_result = shape_cache.store_body_shape(result_body_id, feature_id, std::move(shape));
+  if (body_result.has_error())
+    return body_result;
+  shape_cache.clear_final_shape();
+  return body_result;
+}
+
 [[nodiscard]] bool feature_produces_body(const PartDocument& document, std::string_view producer,
                                          const BodyId& body) {
   if (const Feature* feature = document.find_feature(FeatureId(std::string(producer)));
@@ -335,6 +355,9 @@ resolve_boolean_target_input(const PartDocument& document, const ShapeCache& sha
     return feature->body_result_context().effective_produced_body() == body;
   if (const LoftFeature* feature = document.find_loft_feature(FeatureId(std::string(producer))))
     return feature->body_result_context().effective_produced_body() == body;
+  if (const SurfaceFeature* feature =
+          document.find_surface_feature(FeatureId(std::string(producer))))
+    return surface_feature_result_body(*feature) == body;
   if (const LinearPatternFeature* feature =
           document.find_linear_pattern_feature(FeatureId(std::string(producer))))
     return feature->body_result_context().effective_produced_body() == body;
@@ -1399,10 +1422,13 @@ evaluate_composite_local_vertices(const PartDocument& document, const Sketch& sk
 [[nodiscard]] Result<std::vector<SweepPathSegment>>
 resolve_basic_sweep_path(const PartDocument& document, const PathCurve& path,
                          const ShapeCache& shape_cache, const WorkplaneResolver& resolver,
-                         std::string_view role) {
-  if (path.closure() != PathClosure::Open)
+                         std::string_view role, PathClosure required_closure = PathClosure::Open,
+                         bool allow_surface_boundary_sources = false) {
+  if (path.closure() != required_closure)
     return Result<std::vector<SweepPathSegment>>::failure(
-        geometry_error(path.id().value(), std::string(role) + " must be open"));
+        geometry_error(path.id().value(), std::string(role) + (required_closure == PathClosure::Open
+                                                                   ? " must be open"
+                                                                   : " must be closed")));
   std::vector<SweepPathSegment> resolved;
   resolved.reserve(path.segments().size());
   for (const auto& reference : path.segments()) {
@@ -1448,10 +1474,50 @@ resolve_basic_sweep_path(const PartDocument& document, const PathCurve& path,
                    resolver.evaluate_point(workplane.value(), arc->start()),
                    resolver.evaluate_point(workplane.value(), arc->mid()),
                    resolver.evaluate_point(workplane.value(), arc->end())};
+      } else if (*reference.planar_curve_kind() == PlanarPathCurveKind::Spline) {
+        if (!allow_surface_boundary_sources)
+          return Result<std::vector<SweepPathSegment>>::failure(
+              geometry_error(reference.entity()->value(),
+                             "Block 81 supports only direct planar line and arc path segments"));
+        const SplineSegment* spline = sketch->find_spline_segment(*reference.entity());
+        if (spline == nullptr)
+          return Result<std::vector<SweepPathSegment>>::failure(
+              geometry_error(reference.entity()->value(), "planar surface spline must exist"));
+        std::vector<Point3> controls{resolver.evaluate_point(workplane.value(), spline->start()),
+                                     resolver.evaluate_point(workplane.value(), spline->control1()),
+                                     resolver.evaluate_point(workplane.value(), spline->control2()),
+                                     resolver.evaluate_point(workplane.value(), spline->end())};
+        auto sampled = sampled_path(controls);
+        if (reference.reversed()) {
+          std::reverse(sampled.begin(), sampled.end());
+          for (auto& item : sampled)
+            item = reversed_sweep_segment(item);
+        }
+        resolved.insert(resolved.end(), sampled.begin(), sampled.end());
+        continue;
+      } else if (*reference.planar_curve_kind() == PlanarPathCurveKind::ReferenceGeneratedLine) {
+        if (!allow_surface_boundary_sources)
+          return Result<std::vector<SweepPathSegment>>::failure(
+              geometry_error(reference.entity()->value(),
+                             "Block 81 supports only direct planar line and arc path segments"));
+        const ReferenceGeneratedLine* generated =
+            sketch->find_reference_generated_line(*reference.entity());
+        if (generated == nullptr)
+          return Result<std::vector<SweepPathSegment>>::failure(geometry_error(
+              reference.entity()->value(), "reference-generated surface line must exist"));
+        auto line = ReferenceGeneratedProfileResolver{}.resolve_line(document, *sketch, *generated);
+        if (line.has_error())
+          return Result<std::vector<SweepPathSegment>>::failure(line.error());
+        segment = {SweepPathSegmentKind::Line,
+                   resolver.evaluate_point(workplane.value(), line.value().start()),
+                   {},
+                   resolver.evaluate_point(workplane.value(), line.value().end())};
       } else {
-        return Result<std::vector<SweepPathSegment>>::failure(
-            geometry_error(reference.entity()->value(),
-                           "Block 81 supports only direct planar line and arc path segments"));
+        return Result<std::vector<SweepPathSegment>>::failure(geometry_error(
+            reference.entity()->value(),
+            allow_surface_boundary_sources
+                ? "projected infinite lines cannot bound a surface PathCurve"
+                : "Block 81 supports only direct planar line and arc path segments"));
       }
     } else if (reference.source_kind() == PathSegmentSourceKind::Sketch3DCurve) {
       const Sketch3D* sketch = document.find_sketch_3d(*reference.sketch_3d());
@@ -1588,13 +1654,39 @@ resolve_basic_sweep_path(const PartDocument& document, const PathCurve& path,
       resolved.insert(resolved.end(), spatial.begin(), spatial.end());
       continue;
     } else {
-      return Result<std::vector<SweepPathSegment>>::failure(
-          geometry_error(reference.source_node_id(),
-                         "semantic generated-edge sweep paths are unsupported in Block 82"));
+      if (!allow_surface_boundary_sources)
+        return Result<std::vector<SweepPathSegment>>::failure(
+            geometry_error(reference.source_node_id(),
+                           "semantic generated-edge sweep paths are unsupported in Block 82"));
+      auto edge = SemanticReferenceEvaluator{}.resolve_edge(document, *reference.semantic_edge(),
+                                                            shape_cache);
+      if (edge.has_error())
+        return Result<std::vector<SweepPathSegment>>::failure(edge.error());
+      segment = {SweepPathSegmentKind::Line, edge.value().start, {}, edge.value().end};
     }
     resolved.push_back(reference.reversed() ? reversed_sweep_segment(segment) : segment);
   }
   return Result<std::vector<SweepPathSegment>>::success(std::move(resolved));
+}
+
+[[nodiscard]] Result<std::vector<SweepPathSegment>>
+resolve_surface_boundary(const PartDocument& document, const BoundaryCurveReference& boundary,
+                         const ShapeCache& shape_cache, const WorkplaneResolver& resolver) {
+  if (boundary.source_kind() == BoundaryCurveSourceKind::PathCurve) {
+    const PathCurveId& path_id = std::get<PathCurveId>(boundary.source());
+    const PathCurve* path = document.find_path_curve(path_id);
+    if (path == nullptr)
+      return Result<std::vector<SweepPathSegment>>::failure(
+          geometry_error(path_id.value(), "surface boundary PathCurve must exist"));
+    return resolve_basic_sweep_path(document, *path, shape_cache, resolver, "surface boundary",
+                                    path->closure(), true);
+  }
+  const auto& reference = std::get<SemanticEdgeReference>(boundary.source());
+  auto edge = SemanticReferenceEvaluator{}.resolve_edge(document, reference, shape_cache);
+  if (edge.has_error())
+    return Result<std::vector<SweepPathSegment>>::failure(edge.error());
+  return Result<std::vector<SweepPathSegment>>::success(
+      {{SweepPathSegmentKind::Line, edge.value().start, {}, edge.value().end}});
 }
 
 [[nodiscard]] std::vector<ClosedProfileCurveSegment>
@@ -2398,6 +2490,50 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_loft(const PartDocument& 
     result = std::move(combined.value());
   }
   auto stored = store_loft_result(document, *feature, std::move(result), working_cache);
+  if (stored.has_error())
+    return stored;
+  shape_cache = std::move(working_cache);
+  return stored;
+}
+
+Result<std::size_t> GeometryRecomputeExecutor::execute_surface_feature(
+    const PartDocument& document, FeatureId feature_id, ShapeCache& shape_cache) const {
+  if (feature_id.empty())
+    return Result<std::size_t>::failure(
+        validation_error("surface_feature", "feature id must not be empty"));
+  const SurfaceFeature* feature = document.find_surface_feature(feature_id);
+  if (feature == nullptr)
+    return Result<std::size_t>::failure(
+        validation_error(feature_id.value(), "surface feature must exist in part document"));
+  const SurfaceFeatureKind kind = surface_feature_kind(*feature);
+  if (kind != SurfaceFeatureKind::BoundarySurface && kind != SurfaceFeatureKind::FillSurface)
+    return Result<std::size_t>::failure(
+        geometry_error(feature_id.value(), "surface feature Geometry is deferred beyond Block 89"));
+
+  ShapeCache working_cache = shape_cache;
+  std::vector<BoundaryCurveReference> authored_boundaries;
+  if (const auto* boundary = std::get_if<BoundarySurfaceFeature>(feature))
+    authored_boundaries = boundary->boundaries();
+  else
+    authored_boundaries = std::get<FillSurfaceFeature>(*feature).boundaries();
+
+  std::vector<std::vector<SweepPathSegment>> boundaries;
+  boundaries.reserve(authored_boundaries.size());
+  for (const auto& authored : authored_boundaries) {
+    auto resolved =
+        resolve_surface_boundary(document, authored, working_cache, workplane_resolver_);
+    if (resolved.has_error())
+      return Result<std::size_t>::failure(resolved.error());
+    boundaries.push_back(std::move(resolved.value()));
+  }
+
+  Result<GeometryShape> result =
+      kind == SurfaceFeatureKind::BoundarySurface
+          ? surface_adapter_.make_boundary_surface(feature_id, boundaries)
+          : surface_adapter_.make_fill_surface(feature_id, boundaries);
+  if (result.has_error())
+    return Result<std::size_t>::failure(result.error());
+  auto stored = store_surface_result(document, *feature, std::move(result.value()), working_cache);
   if (stored.has_error())
     return stored;
   shape_cache = std::move(working_cache);
@@ -3306,6 +3442,7 @@ GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const Reco
     const RevolveFeature* revolve = document.find_revolve_feature(FeatureId(step.node_id));
     const SweepFeature* sweep = document.find_sweep_feature(FeatureId(step.node_id));
     const LoftFeature* loft = document.find_loft_feature(FeatureId(step.node_id));
+    const SurfaceFeature* surface = document.find_surface_feature(FeatureId(step.node_id));
     const LinearPatternFeature* linear_pattern =
         document.find_linear_pattern_feature(FeatureId(step.node_id));
     const CircularPatternFeature* circular_pattern =
@@ -3320,15 +3457,16 @@ GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const Reco
     const BodyTransform* body_transform =
         document.find_body_transform(BodyTransformId(step.node_id));
     if (feature == nullptr && revolve == nullptr && sweep == nullptr && loft == nullptr &&
-        linear_pattern == nullptr && circular_pattern == nullptr && mirror == nullptr &&
-        fillet == nullptr && chamfer == nullptr && shell == nullptr && draft == nullptr &&
-        body_boolean == nullptr && body_transform == nullptr)
+        surface == nullptr && linear_pattern == nullptr && circular_pattern == nullptr &&
+        mirror == nullptr && fillet == nullptr && chamfer == nullptr && shell == nullptr &&
+        draft == nullptr && body_boolean == nullptr && body_transform == nullptr)
       continue;
 
     const FeatureId executable_id = feature != nullptr            ? feature->id()
                                     : revolve != nullptr          ? revolve->id()
                                     : sweep != nullptr            ? sweep->id()
                                     : loft != nullptr             ? loft->id()
+                                    : surface != nullptr          ? surface_feature_id(*surface)
                                     : linear_pattern != nullptr   ? linear_pattern->id()
                                     : circular_pattern != nullptr ? circular_pattern->id()
                                     : mirror != nullptr           ? mirror->id()
@@ -3349,6 +3487,8 @@ GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const Reco
         : revolve != nullptr ? execute_revolve(document, revolve->id(), execution_cache)
         : sweep != nullptr   ? execute_sweep(document, sweep->id(), execution_cache)
         : loft != nullptr    ? execute_loft(document, loft->id(), execution_cache)
+        : surface != nullptr
+            ? execute_surface_feature(document, surface_feature_id(*surface), execution_cache)
         : linear_pattern != nullptr
             ? execute_linear_pattern(document, linear_pattern->id(), execution_cache)
         : circular_pattern != nullptr
@@ -3395,6 +3535,7 @@ GeometryRecomputeExecutor::execute_document(const PartDocument& document,
     const RevolveFeature* revolve = document.find_revolve_feature(FeatureId(executable_id));
     const SweepFeature* sweep = document.find_sweep_feature(FeatureId(executable_id));
     const LoftFeature* loft = document.find_loft_feature(FeatureId(executable_id));
+    const SurfaceFeature* surface = document.find_surface_feature(FeatureId(executable_id));
     const LinearPatternFeature* linear_pattern =
         document.find_linear_pattern_feature(FeatureId(executable_id));
     const CircularPatternFeature* circular_pattern =
@@ -3409,15 +3550,16 @@ GeometryRecomputeExecutor::execute_document(const PartDocument& document,
     const BodyTransform* body_transform =
         document.find_body_transform(BodyTransformId(executable_id));
     if (feature == nullptr && revolve == nullptr && sweep == nullptr && loft == nullptr &&
-        linear_pattern == nullptr && circular_pattern == nullptr && mirror == nullptr &&
-        fillet == nullptr && chamfer == nullptr && shell == nullptr && draft == nullptr &&
-        body_boolean == nullptr && body_transform == nullptr)
+        surface == nullptr && linear_pattern == nullptr && circular_pattern == nullptr &&
+        mirror == nullptr && fillet == nullptr && chamfer == nullptr && shell == nullptr &&
+        draft == nullptr && body_boolean == nullptr && body_transform == nullptr)
       continue;
 
     const FeatureId feature_id = feature != nullptr            ? feature->id()
                                  : revolve != nullptr          ? revolve->id()
                                  : sweep != nullptr            ? sweep->id()
                                  : loft != nullptr             ? loft->id()
+                                 : surface != nullptr          ? surface_feature_id(*surface)
                                  : linear_pattern != nullptr   ? linear_pattern->id()
                                  : circular_pattern != nullptr ? circular_pattern->id()
                                  : mirror != nullptr           ? mirror->id()
@@ -3438,6 +3580,8 @@ GeometryRecomputeExecutor::execute_document(const PartDocument& document,
         : revolve != nullptr ? execute_revolve(document, revolve->id(), execution_cache)
         : sweep != nullptr   ? execute_sweep(document, sweep->id(), execution_cache)
         : loft != nullptr    ? execute_loft(document, loft->id(), execution_cache)
+        : surface != nullptr
+            ? execute_surface_feature(document, surface_feature_id(*surface), execution_cache)
         : linear_pattern != nullptr
             ? execute_linear_pattern(document, linear_pattern->id(), execution_cache)
         : circular_pattern != nullptr
