@@ -1,6 +1,8 @@
 #pragma once
 
+#include "blcad/core/part_document.hpp"
 #include "blcad/core/result.hpp"
+#include "blcad/geometry/shape_cache.hpp"
 #include "blcad/geometry/sweep_adapter.hpp"
 
 #include <vector>
@@ -16,6 +18,20 @@ public:
   [[nodiscard]] Result<GeometryShape>
   make_fill_surface(FeatureId feature_id,
                     const std::vector<std::vector<SweepPathSegment>>& boundaries) const;
+
+  [[nodiscard]] Result<GeometryShape>
+  extract_semantic_face(FeatureId feature_id, const PartDocument& document,
+                        const ShapeCache& shape_cache,
+                        const SemanticFaceReference& reference) const;
+
+  [[nodiscard]] Result<GeometryShape>
+  trim_surface(FeatureId feature_id, const GeometryShape& target,
+               const std::vector<SweepPathSegment>& closed_boundary) const;
+
+  [[nodiscard]] Result<GeometryShape> extend_surface(FeatureId feature_id,
+                                                     const GeometryShape& target,
+                                                     const std::vector<SweepPathSegment>& boundary,
+                                                     double distance_mm) const;
 };
 
 } // namespace blcad::geometry

@@ -102,7 +102,7 @@ on arbitrary planes, Block 86 executes deterministic ordered multi-section Loft 
 Block 87 adds center-path/ordered-guide control plus verified G1/C1 continuity. Block 88 adds the
 first persistent Boundary/Fill/Trim/Extend/Stitch/Closed-shell-to-Solid Surface intent, semantic
 references, Body-result authority, dependency/removal rules, and strict JSON. Block 89 executes
-Boundary and Fill Surface Geometry; Block 90 Trim and Extend Surface Geometry is next.
+Boundary and Fill Surface Geometry; Block 90 Trim and Extend Surface Geometry is implemented; Block 91 Stitch/Knit/Sew shell Geometry is next.
 
 The long-term sketcher and feature parity target is documented in `docs/inventor-like-sketcher-and-feature-roadmap.md`.
 
@@ -185,6 +185,8 @@ Target behavior:
 - `GuidedLoft` uses guide curves or rails to control shape flow.
 - Implemented `BoundarySurface` and `FillSurface` Geometry creates face-only Surface Bodies from
   planar, spatial, construction/reference, and supported semantic generated-edge boundaries.
+- Implemented `TrimSurface` resolves one closed planar contour against one unambiguous target face;
+  implemented `ExtendSurface` extends one recovered linear edge of a planar polygon Surface.
 - `StitchSurfaces` / `KnitSurfaces` Geometry will create a shell from persistent Surface inputs.
 - `ConvertClosedShellToSolid` Geometry will validate and convert persistent closed-shell intent.
 

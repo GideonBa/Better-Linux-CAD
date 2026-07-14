@@ -52,5 +52,6 @@ rejection of an open contour.
 
 ## Handoff
 
-Blocks 48–89 are implemented. Block 90 Trim and Extend Surface Geometry is the current next
-technical step.
+Blocks 48–90 are implemented. Trim and Extend execution is canonical in
+`docs/part-trim-extend-surface-geometry-mvp6.md`. Block 91 Stitch/Knit/Sew shell Geometry is the
+current next technical step.

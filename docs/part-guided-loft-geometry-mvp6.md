@@ -56,4 +56,4 @@ leaves prior feature and Body products unchanged.
 Coverage proves a center-path-controlled duct transition, a root/mid/tip blade-like Loft with
 leading and trailing guides plus verified G1/C1 surfaces, and transactional G2 rejection.
 
-Blocks 48–89 are implemented. Block 88 Surface feature Core intent and JSON is implemented; Block 89 Boundary and Fill Surface Geometry is implemented; Block 90 Trim and Extend Surface Geometry is next.
+Blocks 48–90 are implemented. Block 88 Surface feature Core intent and JSON is implemented; Block 89 Boundary and Fill Surface Geometry is implemented; Block 90 Trim and Extend Surface Geometry is implemented; Block 91 Stitch/Knit/Sew shell Geometry is next.

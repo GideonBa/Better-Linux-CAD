@@ -1,22 +1,43 @@
 #include "blcad/geometry/surface_adapter.hpp"
 
+#include "blcad/geometry/semantic_reference_evaluator.hpp"
+
 #include "geometry_shape_internal.hpp"
 
+#include <BRepAdaptor_Curve.hxx>
+#include <BRepAdaptor_Surface.hxx>
+#include <BRepAlgoAPI_Common.hxx>
 #include <BRepBuilderAPI_MakeEdge.hxx>
+#include <BRepBuilderAPI_MakeFace.hxx>
+#include <BRepBuilderAPI_MakePolygon.hxx>
 #include <BRepBuilderAPI_MakeWire.hxx>
 #include <BRepCheck_Analyzer.hxx>
 #include <BRepFill_Filling.hxx>
+#include <BRepGProp.hxx>
 #include <BRepOffsetAPI_ThruSections.hxx>
+#include <BRepTools.hxx>
+#include <BRepTools_WireExplorer.hxx>
+#include <BRep_Tool.hxx>
 #include <GC_MakeArcOfCircle.hxx>
+#include <GProp_GProps.hxx>
 #include <GeomAbs_Shape.hxx>
+#include <GeomAbs_SurfaceType.hxx>
 #include <Standard_Failure.hxx>
 #include <TopAbs_ShapeEnum.hxx>
+#include <TopExp.hxx>
 #include <TopExp_Explorer.hxx>
+#include <TopoDS.hxx>
 #include <TopoDS_Edge.hxx>
+#include <TopoDS_Face.hxx>
 #include <TopoDS_Shape.hxx>
+#include <TopoDS_Vertex.hxx>
 #include <TopoDS_Wire.hxx>
+#include <gp_Dir.hxx>
+#include <gp_Pln.hxx>
 #include <gp_Pnt.hxx>
 
+#include <algorithm>
+#include <array>
 #include <cmath>
 #include <exception>
 #include <memory>
@@ -43,6 +64,24 @@ constexpr double kTolerance = 1.0e-7;
 
 [[nodiscard]] bool same_point(Point3 left, Point3 right) {
   return distance(left, right) <= kTolerance;
+}
+
+[[nodiscard]] double dot(Vector3 left, Vector3 right) {
+  return left.x * right.x + left.y * right.y + left.z * right.z;
+}
+
+[[nodiscard]] Vector3 normalized(Vector3 value) {
+  const double magnitude = std::sqrt(dot(value, value));
+  return {value.x / magnitude, value.y / magnitude, value.z / magnitude};
+}
+
+[[nodiscard]] Vector3 cross(Vector3 left, Vector3 right) {
+  return {left.y * right.z - left.z * right.y, left.z * right.x - left.x * right.z,
+          left.x * right.y - left.y * right.x};
+}
+
+[[nodiscard]] Point3 point3(const gp_Pnt& value) {
+  return {value.X(), value.Y(), value.Z()};
 }
 
 [[nodiscard]] std::string failure_message(const Standard_Failure& failure) {
@@ -122,6 +161,94 @@ ordered_edges(const FeatureId& id, const std::vector<std::vector<SweepPathSegmen
   if (!wire.IsDone())
     return Result<TopoDS_Wire>::failure(surface_error(id, "could not build surface section wire"));
   return Result<TopoDS_Wire>::success(wire.Wire());
+}
+
+[[nodiscard]] std::size_t face_count(const TopoDS_Shape& shape) {
+  std::size_t count = 0U;
+  for (TopExp_Explorer explorer(shape, TopAbs_FACE); explorer.More(); explorer.Next())
+    ++count;
+  return count;
+}
+
+[[nodiscard]] Result<TopoDS_Face>
+single_surface_face(const FeatureId& id, const TopoDS_Shape& shape, std::string_view role) {
+  if (shape.IsNull())
+    return Result<TopoDS_Face>::failure(surface_error(id, std::string(role) + " is empty"));
+  std::vector<TopoDS_Face> faces;
+  for (TopExp_Explorer explorer(shape, TopAbs_FACE); explorer.More(); explorer.Next())
+    faces.push_back(TopoDS::Face(explorer.Current()));
+  if (faces.size() != 1U)
+    return Result<TopoDS_Face>::failure(
+        surface_error(id, std::string(role) + " must resolve to exactly one unambiguous face"));
+  return Result<TopoDS_Face>::success(faces.front());
+}
+
+[[nodiscard]] std::array<SemanticVertex, 3> face_vertices(SemanticFace face) {
+  switch (face) {
+  case SemanticFace::Top:
+    return {SemanticVertex::TopFrontRight, SemanticVertex::TopFrontLeft,
+            SemanticVertex::TopBackRight};
+  case SemanticFace::Bottom:
+    return {SemanticVertex::BottomFrontRight, SemanticVertex::BottomBackRight,
+            SemanticVertex::BottomFrontLeft};
+  case SemanticFace::Right:
+    return {SemanticVertex::BottomFrontRight, SemanticVertex::TopFrontRight,
+            SemanticVertex::BottomBackRight};
+  case SemanticFace::Left:
+    return {SemanticVertex::BottomFrontLeft, SemanticVertex::BottomBackLeft,
+            SemanticVertex::TopFrontLeft};
+  case SemanticFace::Front:
+    return {SemanticVertex::BottomFrontRight, SemanticVertex::BottomFrontLeft,
+            SemanticVertex::TopFrontRight};
+  case SemanticFace::Back:
+    return {SemanticVertex::BottomBackRight, SemanticVertex::TopBackRight,
+            SemanticVertex::BottomBackLeft};
+  }
+  return {SemanticVertex::TopFrontRight, SemanticVertex::TopFrontLeft,
+          SemanticVertex::TopBackRight};
+}
+
+[[nodiscard]] Result<std::pair<Point3, Vector3>>
+expected_plane(const FeatureId& id, const PartDocument& document, const ShapeCache& cache,
+               const SemanticFaceReference& reference) {
+  const auto vertices = face_vertices(reference.face());
+  std::array<Point3, 3> points;
+  for (std::size_t index = 0U; index < vertices.size(); ++index) {
+    auto semantic = SemanticVertexReference::create(reference.source_feature(), vertices[index]);
+    if (semantic.has_error())
+      return Result<std::pair<Point3, Vector3>>::failure(semantic.error());
+    auto resolved = SemanticReferenceEvaluator{}.resolve_vertex(document, semantic.value(), cache);
+    if (resolved.has_error())
+      return Result<std::pair<Point3, Vector3>>::failure(resolved.error());
+    points[index] = resolved.value().position;
+  }
+  const Vector3 first{points[1].x - points[0].x, points[1].y - points[0].y,
+                      points[1].z - points[0].z};
+  const Vector3 second{points[2].x - points[0].x, points[2].y - points[0].y,
+                       points[2].z - points[0].z};
+  const Vector3 normal = cross(first, second);
+  if (dot(normal, normal) <= kTolerance * kTolerance)
+    return Result<std::pair<Point3, Vector3>>::failure(
+        surface_error(id, "semantic surface face has degenerate source geometry"));
+  return Result<std::pair<Point3, Vector3>>::success({points[0], normalized(normal)});
+}
+
+[[nodiscard]] Result<TopoDS_Face> planar_trim_face(const FeatureId& id,
+                                                   const std::vector<SweepPathSegment>& boundary) {
+  auto edges = ordered_edges(id, {boundary}, true);
+  if (edges.has_error())
+    return Result<TopoDS_Face>::failure(edges.error());
+  BRepBuilderAPI_MakeWire wire;
+  for (const auto& edge : edges.value())
+    wire.Add(edge);
+  if (!wire.IsDone())
+    return Result<TopoDS_Face>::failure(
+        surface_error(id, "could not build the closed trimming wire"));
+  BRepBuilderAPI_MakeFace face(wire.Wire());
+  if (!face.IsDone())
+    return Result<TopoDS_Face>::failure(
+        surface_error(id, "trimming boundary must form one planar closed face"));
+  return Result<TopoDS_Face>::success(face.Face());
 }
 
 [[nodiscard]] Result<TopoDS_Shape> checked_shape(const FeatureId& id, TopoDS_Shape shape) {
@@ -215,6 +342,215 @@ Result<GeometryShape> SurfaceAdapter::make_fill_surface(
     return Result<GeometryShape>::failure(shape.error());
   return Result<GeometryShape>::success(
       GeometryShape(std::make_shared<GeometryShape::Impl>(std::move(shape.value()))));
+}
+
+Result<GeometryShape>
+SurfaceAdapter::extract_semantic_face(FeatureId feature_id, const PartDocument& document,
+                                      const ShapeCache& shape_cache,
+                                      const SemanticFaceReference& reference) const {
+  if (feature_id.empty())
+    return Result<GeometryShape>::failure(
+        Error::validation("surface_face", "feature id must not be empty"));
+  const GeometryShape* source = shape_cache.find_feature_shape(reference.source_feature());
+  if (source == nullptr || source->empty())
+    return Result<GeometryShape>::failure(surface_error(
+        feature_id, "semantic surface source feature shape must exist in the shape cache"));
+  auto expected = expected_plane(feature_id, document, shape_cache, reference);
+  if (expected.has_error())
+    return Result<GeometryShape>::failure(expected.error());
+
+  std::vector<TopoDS_Face> matches;
+  for (TopExp_Explorer explorer(source->impl_->shape, TopAbs_FACE); explorer.More();
+       explorer.Next()) {
+    const TopoDS_Face face = TopoDS::Face(explorer.Current());
+    BRepAdaptor_Surface surface(face);
+    if (surface.GetType() != GeomAbs_Plane)
+      continue;
+    const gp_Pln plane = surface.Plane();
+    const gp_Dir direction = plane.Axis().Direction();
+    const Vector3 normal{direction.X(), direction.Y(), direction.Z()};
+    if (std::abs(std::abs(dot(normal, expected.value().second)) - 1.0) > kTolerance)
+      continue;
+    const gp_Pnt location = plane.Location();
+    const Vector3 delta{expected.value().first.x - location.X(),
+                        expected.value().first.y - location.Y(),
+                        expected.value().first.z - location.Z()};
+    if (std::abs(dot(delta, normal)) <= kTolerance)
+      matches.push_back(face);
+  }
+  if (matches.size() != 1U)
+    return Result<GeometryShape>::failure(surface_error(
+        feature_id, matches.empty() ? "semantic surface face no longer exists on source feature"
+                                    : "semantic surface face is ambiguous on source feature"));
+  TopoDS_Shape face = matches.front();
+  return Result<GeometryShape>::success(
+      GeometryShape(std::make_shared<GeometryShape::Impl>(std::move(face))));
+}
+
+Result<GeometryShape>
+SurfaceAdapter::trim_surface(FeatureId feature_id, const GeometryShape& target,
+                             const std::vector<SweepPathSegment>& closed_boundary) const {
+  if (feature_id.empty())
+    return Result<GeometryShape>::failure(
+        Error::validation("trim_surface", "feature id must not be empty"));
+  auto target_face = single_surface_face(feature_id, target.impl_->shape, "trim target");
+  if (target_face.has_error())
+    return Result<GeometryShape>::failure(target_face.error());
+  auto trimming_face = planar_trim_face(feature_id, closed_boundary);
+  if (trimming_face.has_error())
+    return Result<GeometryShape>::failure(trimming_face.error());
+  try {
+    BRepAlgoAPI_Common common(target_face.value(), trimming_face.value());
+    common.Build();
+    if (!common.IsDone())
+      return Result<GeometryShape>::failure(
+          surface_error(feature_id, "OCCT could not trim the target surface"));
+    TopoDS_Shape result = common.Shape();
+    if (face_count(result) != 1U)
+      return Result<GeometryShape>::failure(
+          surface_error(feature_id, "trimming result is empty, disconnected, or ambiguous"));
+    auto checked = checked_shape(feature_id, std::move(result));
+    if (checked.has_error())
+      return Result<GeometryShape>::failure(checked.error());
+    return Result<GeometryShape>::success(
+        GeometryShape(std::make_shared<GeometryShape::Impl>(std::move(checked.value()))));
+  } catch (const Standard_Failure& failure) {
+    return Result<GeometryShape>::failure(surface_error(feature_id, failure_message(failure)));
+  } catch (const std::exception& exception) {
+    return Result<GeometryShape>::failure(surface_error(feature_id, exception.what()));
+  }
+}
+
+Result<GeometryShape> SurfaceAdapter::extend_surface(FeatureId feature_id,
+                                                     const GeometryShape& target,
+                                                     const std::vector<SweepPathSegment>& boundary,
+                                                     double distance_mm) const {
+  if (feature_id.empty())
+    return Result<GeometryShape>::failure(
+        Error::validation("extend_surface", "feature id must not be empty"));
+  if (!std::isfinite(distance_mm) || distance_mm <= 0.0)
+    return Result<GeometryShape>::failure(
+        surface_error(feature_id, "surface extension distance must be positive and finite"));
+  if (boundary.size() != 1U || boundary.front().kind != SweepPathSegmentKind::Line)
+    return Result<GeometryShape>::failure(surface_error(
+        feature_id, "surface extension currently requires one linear boundary segment"));
+  auto target_face = single_surface_face(feature_id, target.impl_->shape, "extend target");
+  if (target_face.has_error())
+    return Result<GeometryShape>::failure(target_face.error());
+
+  try {
+    std::vector<TopoDS_Edge> matches;
+    for (TopExp_Explorer explorer(target_face.value(), TopAbs_EDGE); explorer.More();
+         explorer.Next()) {
+      const TopoDS_Edge edge = TopoDS::Edge(explorer.Current());
+      TopoDS_Vertex first_vertex;
+      TopoDS_Vertex second_vertex;
+      TopExp::Vertices(edge, first_vertex, second_vertex);
+      if (first_vertex.IsNull() || second_vertex.IsNull())
+        continue;
+      const Point3 first = point3(BRep_Tool::Pnt(first_vertex));
+      const Point3 second = point3(BRep_Tool::Pnt(second_vertex));
+      if ((same_point(first, boundary.front().start) && same_point(second, boundary.front().end)) ||
+          (same_point(first, boundary.front().end) && same_point(second, boundary.front().start)))
+        matches.push_back(edge);
+    }
+    if (matches.size() != 1U)
+      return Result<GeometryShape>::failure(surface_error(
+          feature_id, matches.empty() ? "extension boundary no longer matches the target surface"
+                                      : "extension boundary is ambiguous on the target surface"));
+
+    const Point3 start = boundary.front().start;
+    const Point3 end = boundary.front().end;
+    const Vector3 edge_direction = normalized({end.x - start.x, end.y - start.y, end.z - start.z});
+    GProp_GProps properties;
+    BRepGProp::SurfaceProperties(target_face.value(), properties);
+    const Point3 center = point3(properties.CentreOfMass());
+    const Point3 middle{(start.x + end.x) / 2.0, (start.y + end.y) / 2.0, (start.z + end.z) / 2.0};
+    const Vector3 toward_center{center.x - middle.x, center.y - middle.y, center.z - middle.z};
+    const double along_edge = dot(toward_center, edge_direction);
+    const Vector3 inward{toward_center.x - edge_direction.x * along_edge,
+                         toward_center.y - edge_direction.y * along_edge,
+                         toward_center.z - edge_direction.z * along_edge};
+    if (dot(inward, inward) <= kTolerance * kTolerance)
+      return Result<GeometryShape>::failure(
+          surface_error(feature_id, "extension boundary has no unique outward direction"));
+    const Vector3 inward_direction = normalized(inward);
+    const Vector3 outward{-inward_direction.x, -inward_direction.y, -inward_direction.z};
+    const Vector3 plane_normal = normalized(cross(edge_direction, outward));
+    for (TopExp_Explorer explorer(target_face.value(), TopAbs_VERTEX); explorer.More();
+         explorer.Next()) {
+      const Point3 vertex = point3(BRep_Tool::Pnt(TopoDS::Vertex(explorer.Current())));
+      const Vector3 delta{vertex.x - start.x, vertex.y - start.y, vertex.z - start.z};
+      if (std::abs(dot(delta, plane_normal)) > kTolerance)
+        return Result<GeometryShape>::failure(
+            surface_error(feature_id, "extend target must be geometrically planar"));
+    }
+    const Point3 extended_start{start.x + outward.x * distance_mm,
+                                start.y + outward.y * distance_mm,
+                                start.z + outward.z * distance_mm};
+    const Point3 extended_end{end.x + outward.x * distance_mm, end.y + outward.y * distance_mm,
+                              end.z + outward.z * distance_mm};
+
+    std::size_t wire_count = 0U;
+    for (TopExp_Explorer explorer(target_face.value(), TopAbs_WIRE); explorer.More();
+         explorer.Next())
+      ++wire_count;
+    if (wire_count != 1U)
+      return Result<GeometryShape>::failure(
+          surface_error(feature_id, "surface extension requires one outer boundary wire"));
+    const TopoDS_Wire outer = BRepTools::OuterWire(target_face.value());
+    std::vector<Point3> vertices;
+    std::vector<TopoDS_Edge> ordered_boundary_edges;
+    for (BRepTools_WireExplorer explorer(outer, target_face.value()); explorer.More();
+         explorer.Next()) {
+      const TopoDS_Edge edge = TopoDS::Edge(explorer.Current());
+      if (BRepAdaptor_Curve(edge).GetType() != GeomAbs_Line)
+        return Result<GeometryShape>::failure(surface_error(
+            feature_id, "surface extension currently requires a linear polygon boundary"));
+      vertices.push_back(point3(BRep_Tool::Pnt(explorer.CurrentVertex())));
+      ordered_boundary_edges.push_back(edge);
+    }
+    if (vertices.size() < 3U)
+      return Result<GeometryShape>::failure(
+          surface_error(feature_id, "surface extension target boundary is incomplete"));
+    const auto selected =
+        std::find_if(ordered_boundary_edges.begin(), ordered_boundary_edges.end(),
+                     [&matches](const TopoDS_Edge& edge) { return edge.IsSame(matches.front()); });
+    if (selected == ordered_boundary_edges.end())
+      return Result<GeometryShape>::failure(
+          surface_error(feature_id, "extension edge is missing from the outer boundary"));
+    const std::size_t selected_index =
+        static_cast<std::size_t>(std::distance(ordered_boundary_edges.begin(), selected));
+    const Point3 ordered_start = vertices[selected_index];
+    const bool authored_order = same_point(ordered_start, start);
+
+    BRepBuilderAPI_MakePolygon polygon;
+    for (std::size_t index = 0U; index < vertices.size(); ++index) {
+      polygon.Add(point(vertices[index]));
+      if (index == selected_index) {
+        polygon.Add(point(authored_order ? extended_start : extended_end));
+        polygon.Add(point(authored_order ? extended_end : extended_start));
+      }
+    }
+    polygon.Close();
+    if (!polygon.IsDone())
+      return Result<GeometryShape>::failure(
+          surface_error(feature_id, "could not build the extended surface boundary"));
+    BRepBuilderAPI_MakeFace extended_face(polygon.Wire());
+    if (!extended_face.IsDone())
+      return Result<GeometryShape>::failure(
+          surface_error(feature_id, "could not build the extended surface face"));
+    TopoDS_Shape result = extended_face.Face();
+    auto checked = checked_shape(feature_id, std::move(result));
+    if (checked.has_error())
+      return Result<GeometryShape>::failure(checked.error());
+    return Result<GeometryShape>::success(
+        GeometryShape(std::make_shared<GeometryShape::Impl>(std::move(checked.value()))));
+  } catch (const Standard_Failure& failure) {
+    return Result<GeometryShape>::failure(surface_error(feature_id, failure_message(failure)));
+  } catch (const std::exception& exception) {
+    return Result<GeometryShape>::failure(surface_error(feature_id, exception.what()));
+  }
 }
 
 } // namespace blcad::geometry

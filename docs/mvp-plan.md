@@ -4,17 +4,17 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 89
-current_block: 90
-current_boundary: Trim and Extend Surface Geometry
-current_tag: "[geometry][surface-trim-extend]"
+implemented_through: Block 90
+current_block: 91
+current_boundary: Stitch/Knit/Sew shell Geometry
+current_tag: "[geometry][surface-stitch]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
   mvp_3: "Parametric bolt circle pattern — implemented"
   mvp_4: "Assembly parameters and Project container — implemented"
   mvp_5: "Assembly relationships, motion, hierarchy, analysis, exchange — Blocks 1–47 implemented"
-  mvp_6: "Part Construction — Blocks 48–89 implemented, Blocks 90–94 planned, Block 90 next"
+  mvp_6: "Part Construction — Blocks 48–90 implemented, Blocks 91–94 planned, Block 91 next"
   mvp_7: "STEP Import — Blocks 95–101 planned after Block 94"
 ---
 
@@ -552,10 +552,10 @@ motion solvers reject Spherical as the selected drive.
 
 ## MVP 6 — Part Construction MVP after Block 47
 
-**Status:** In progress — Blocks 48–89 implemented
+**Status:** In progress — Blocks 48–90 implemented
 **Canonical:** sequence `docs/part-construction-sequence-mvp6.md`
 
-Blocks 48–89 are complete. Block 89 is implemented; Block 90 is the current next technical step.
+Blocks 48–90 are complete. Block 90 is implemented; Block 91 is the current next technical step.
 
 Mandatory Part Construction phase order:
 
@@ -1228,11 +1228,23 @@ Canonical contract: `docs/part-boundary-fill-surface-geometry-mvp6.md`.
 [geometry][surface-boundary-fill]
 ```
 
-## Current next technical step — Block 90
+## Block 90 — Trim and Extend Surface Geometry — Implemented
 
-Execute TrimSurfaceFeature and ExtendSurfaceFeature from their frozen semantic Surface and trimming
-references, including reference recovery after upstream boundary changes.
+Block 90 resolves Surface Bodies and supported semantic planar faces on every recompute. It executes
+single-contour Trim and linear-boundary planar Extend operations, validates unambiguous face-only
+results, and publishes feature plus Surface-Body cache entries transactionally.
+
+Canonical contract: `docs/part-trim-extend-surface-geometry-mvp6.md`.
 
 ```text
 [geometry][surface-trim-extend]
+```
+
+## Current next technical step — Block 91
+
+Execute `SurfaceStitchFeature` over its ordered semantic Surface set with explicit tolerance,
+connectivity, free-edge, orientation, and manifold diagnostics.
+
+```text
+[geometry][surface-stitch]
 ```

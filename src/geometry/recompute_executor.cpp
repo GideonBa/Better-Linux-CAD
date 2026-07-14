@@ -1839,6 +1839,56 @@ resolve_loft_closed_section(const PartDocument& document, const ProfileSectionRe
   return Result<std::vector<ClosedProfileCurveSegment>>::success(std::move(curves));
 }
 
+[[nodiscard]] std::vector<SweepPathSegment>
+surface_path_from_closed_curves(const std::vector<ClosedProfileCurveSegment>& curves) {
+  std::vector<SweepPathSegment> result;
+  for (const auto& curve : curves) {
+    if (curve.kind == ClosedProfileCurveKind::Line) {
+      result.push_back({SweepPathSegmentKind::Line, curve.start, {}, curve.end});
+    } else if (curve.kind == ClosedProfileCurveKind::CircularArc) {
+      result.push_back({SweepPathSegmentKind::CircularArc, curve.start, curve.mid, curve.end});
+    } else {
+      auto sampled = sampled_path({curve.start, curve.mid, curve.control2, curve.end});
+      result.insert(result.end(), sampled.begin(), sampled.end());
+    }
+  }
+  return result;
+}
+
+[[nodiscard]] Result<std::vector<SweepPathSegment>>
+resolve_surface_trimming(const PartDocument& document, const TrimmingReference& trimming,
+                         const ShapeCache& cache, const WorkplaneResolver& resolver) {
+  if (trimming.source_kind() == TrimmingReferenceSourceKind::BoundaryCurve)
+    return resolve_surface_boundary(document, std::get<BoundaryCurveReference>(trimming.source()),
+                                    cache, resolver);
+  auto section = ProfileSectionReference::create_closed_region(
+      std::get<ProfileRegionReference>(trimming.source()));
+  if (section.has_error())
+    return Result<std::vector<SweepPathSegment>>::failure(section.error());
+  auto curves = resolve_loft_closed_section(document, section.value(), cache, resolver);
+  if (curves.has_error())
+    return Result<std::vector<SweepPathSegment>>::failure(curves.error());
+  return Result<std::vector<SweepPathSegment>>::success(
+      surface_path_from_closed_curves(curves.value()));
+}
+
+[[nodiscard]] Result<GeometryShape> resolve_surface_target(const PartDocument& document,
+                                                           const SurfaceReference& reference,
+                                                           const ShapeCache& cache,
+                                                           const SurfaceAdapter& adapter,
+                                                           const FeatureId& consumer) {
+  if (reference.source_kind() == SurfaceReferenceSourceKind::Body) {
+    const BodyId& body = std::get<BodyId>(reference.source());
+    const GeometryShape* shape = cache.find_body_shape(body);
+    if (shape == nullptr)
+      return Result<GeometryShape>::failure(
+          geometry_error(body.value(), "surface target Body shape must exist in the shape cache"));
+    return Result<GeometryShape>::success(*shape);
+  }
+  return adapter.extract_semantic_face(consumer, document, cache,
+                                       std::get<SemanticFaceReference>(reference.source()));
+}
+
 // True when the sketch contains exactly one profile and it is of the kind
 // selected by `kind_size`.
 template <typename KindSize>
@@ -2506,31 +2556,62 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_surface_feature(
     return Result<std::size_t>::failure(
         validation_error(feature_id.value(), "surface feature must exist in part document"));
   const SurfaceFeatureKind kind = surface_feature_kind(*feature);
-  if (kind != SurfaceFeatureKind::BoundarySurface && kind != SurfaceFeatureKind::FillSurface)
+  if (kind == SurfaceFeatureKind::SurfaceStitch || kind == SurfaceFeatureKind::ClosedShellToSolid)
     return Result<std::size_t>::failure(
-        geometry_error(feature_id.value(), "surface feature Geometry is deferred beyond Block 89"));
+        geometry_error(feature_id.value(), "surface feature Geometry is deferred beyond Block 90"));
 
   ShapeCache working_cache = shape_cache;
-  std::vector<BoundaryCurveReference> authored_boundaries;
-  if (const auto* boundary = std::get_if<BoundarySurfaceFeature>(feature))
-    authored_boundaries = boundary->boundaries();
-  else
-    authored_boundaries = std::get<FillSurfaceFeature>(*feature).boundaries();
+  Result<GeometryShape> result = Result<GeometryShape>::failure(
+      geometry_error(feature_id.value(), "unsupported surface feature"));
+  if (kind == SurfaceFeatureKind::BoundarySurface || kind == SurfaceFeatureKind::FillSurface) {
+    std::vector<BoundaryCurveReference> authored_boundaries;
+    if (const auto* boundary = std::get_if<BoundarySurfaceFeature>(feature))
+      authored_boundaries = boundary->boundaries();
+    else
+      authored_boundaries = std::get<FillSurfaceFeature>(*feature).boundaries();
 
-  std::vector<std::vector<SweepPathSegment>> boundaries;
-  boundaries.reserve(authored_boundaries.size());
-  for (const auto& authored : authored_boundaries) {
-    auto resolved =
-        resolve_surface_boundary(document, authored, working_cache, workplane_resolver_);
-    if (resolved.has_error())
-      return Result<std::size_t>::failure(resolved.error());
-    boundaries.push_back(std::move(resolved.value()));
+    std::vector<std::vector<SweepPathSegment>> boundaries;
+    boundaries.reserve(authored_boundaries.size());
+    for (const auto& authored : authored_boundaries) {
+      auto resolved =
+          resolve_surface_boundary(document, authored, working_cache, workplane_resolver_);
+      if (resolved.has_error())
+        return Result<std::size_t>::failure(resolved.error());
+      boundaries.push_back(std::move(resolved.value()));
+    }
+    result = kind == SurfaceFeatureKind::BoundarySurface
+                 ? surface_adapter_.make_boundary_surface(feature_id, boundaries)
+                 : surface_adapter_.make_fill_surface(feature_id, boundaries);
+  } else if (kind == SurfaceFeatureKind::TrimSurface) {
+    const auto& trim = std::get<TrimSurfaceFeature>(*feature);
+    auto target = resolve_surface_target(document, trim.target(), working_cache, surface_adapter_,
+                                         feature_id);
+    if (target.has_error())
+      return Result<std::size_t>::failure(target.error());
+    auto trimming =
+        resolve_surface_trimming(document, trim.trimming(), working_cache, workplane_resolver_);
+    if (trimming.has_error())
+      return Result<std::size_t>::failure(trimming.error());
+    result = surface_adapter_.trim_surface(feature_id, target.value(), trimming.value());
+  } else {
+    const auto& extend = std::get<ExtendSurfaceFeature>(*feature);
+    auto target = resolve_surface_target(document, extend.target(), working_cache, surface_adapter_,
+                                         feature_id);
+    if (target.has_error())
+      return Result<std::size_t>::failure(target.error());
+    auto boundary =
+        resolve_surface_boundary(document, extend.boundary(), working_cache, workplane_resolver_);
+    if (boundary.has_error())
+      return Result<std::size_t>::failure(boundary.error());
+    const Parameter* distance = document.find_parameter(extend.distance_parameter());
+    if (distance == nullptr || distance->type() != ParameterType::Length ||
+        !distance->value().is_positive_length())
+      return Result<std::size_t>::failure(
+          geometry_error(extend.distance_parameter().value(),
+                         "surface extension distance must resolve to a positive Length parameter"));
+    result = surface_adapter_.extend_surface(feature_id, target.value(), boundary.value(),
+                                             distance->value().millimeters());
   }
-
-  Result<GeometryShape> result =
-      kind == SurfaceFeatureKind::BoundarySurface
-          ? surface_adapter_.make_boundary_surface(feature_id, boundaries)
-          : surface_adapter_.make_fill_surface(feature_id, boundaries);
   if (result.has_error())
     return Result<std::size_t>::failure(result.error());
   auto stored = store_surface_result(document, *feature, std::move(result.value()), working_cache);

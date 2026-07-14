@@ -862,6 +862,11 @@ Block 89 adds no JSON fields. Boundary and Fill Surface execution consumes the e
 boundary references and result Body ids; resolved OCCT edges, wires, and faces remain transient.
 Canonical Geometry details are in `docs/part-boundary-fill-surface-geometry-mvp6.md`.
 
+Block 90 adds no JSON fields. Trim and Extend Surface execution consumes the existing semantic
+Surface/trimming/boundary references, positive distance parameter, and result Body ids. Resolved
+target faces, intersections, and extended faces remain transient. Canonical Geometry details are
+in `docs/part-trim-extend-surface-geometry-mvp6.md`.
+
 ## Planned STEP import persistence after Block 94
 
 This section is planned architecture, not part of the current schema. Blocks 95–101 in
