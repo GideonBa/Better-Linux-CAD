@@ -1,0 +1,55 @@
+# Part Shell Intent MVP-6
+
+Status: implemented in Block 71.
+
+Block 71 adds persistent thin-wall solid intent without executing OCCT offset geometry. Shell
+Geometry remains owned by Block 72.
+
+## Core model
+
+```text
+ShellFeature
+  id, name
+  target_body
+  ordered removed_faces[]: FaceReference
+  thickness_parameter: Length
+  direction: Inward | Outward
+```
+
+At least one removed face is mandatory. Each entry has the `ShellRemovalFace` role and may be a
+supported semantic planar or cylindrical face. Authored order is stable and duplicate semantic
+identities fail before publication.
+
+Thickness is always a positive millimeter Length. `Inward` and `Outward` are the only sign
+authority; a signed thickness is deliberately not persisted. This keeps parameter units and
+offset direction independent and unambiguous.
+
+## Body history and invalidation
+
+Shell modifies its target Body in place. Its removed-face producers, thickness parameter, and the
+previous producer of the target Body are dependencies. After insertion, Shell becomes the new
+Body producer. Thickness or upstream face changes therefore invalidate Shell and downstream Body
+consumers; referenced Bodies cannot be removed.
+
+Missing Bodies, missing/unsupported face producers, incorrect roles, duplicate faces, missing or
+wrong-unit thickness parameters, duplicate feature IDs, and dependency cycles fail
+transactionally.
+
+## JSON
+
+Part JSON always emits an ordered `shell_features[]` array. Each record contains exactly `id`,
+`name`, `target_body`, ordered `removed_faces`, `thickness_parameter`, and `direction`. Face
+records use strict `semantic_planar_face` or `semantic_cylindrical_face` spellings with the
+`shell_removal_face` role and `face` capability.
+
+Missing arrays deserialize as zero Shell features for older files. Unknown fields, directions,
+roles, capabilities, source kinds, and malformed identities fail closed. Round trips preserve
+feature/face order and Body-history dependencies deterministically.
+
+## Verification
+
+```text
+./build/blcad_core_tests "[core][shell-feature]"
+```
+
+Block 72 ShellFeature Geometry is the next boundary.

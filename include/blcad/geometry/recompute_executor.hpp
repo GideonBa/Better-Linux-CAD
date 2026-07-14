@@ -5,8 +5,13 @@
 #include "blcad/core/result.hpp"
 #include "blcad/geometry/body_boolean_adapter.hpp"
 #include "blcad/geometry/body_transform_adapter.hpp"
+#include "blcad/geometry/chamfer_adapter.hpp"
 #include "blcad/geometry/circular_cut_adapter.hpp"
+#include "blcad/geometry/circular_pattern_adapter.hpp"
 #include "blcad/geometry/closed_profile_adapter.hpp"
+#include "blcad/geometry/fillet_adapter.hpp"
+#include "blcad/geometry/linear_pattern_adapter.hpp"
+#include "blcad/geometry/mirror_adapter.hpp"
 #include "blcad/geometry/rectangle_extrusion_adapter.hpp"
 #include "blcad/geometry/revolve_adapter.hpp"
 #include "blcad/geometry/shape_cache.hpp"
@@ -44,6 +49,24 @@ public:
                                                     FeatureId feature_id,
                                                     ShapeCache& shape_cache) const;
 
+  [[nodiscard]] Result<std::size_t> execute_linear_pattern(const PartDocument& document,
+                                                           FeatureId feature_id,
+                                                           ShapeCache& shape_cache) const;
+
+  [[nodiscard]] Result<std::size_t> execute_circular_pattern(const PartDocument& document,
+                                                             FeatureId feature_id,
+                                                             ShapeCache& shape_cache) const;
+
+  [[nodiscard]] Result<std::size_t>
+  execute_mirror(const PartDocument& document, FeatureId feature_id, ShapeCache& shape_cache) const;
+
+  [[nodiscard]] Result<std::size_t>
+  execute_fillet(const PartDocument& document, FeatureId feature_id, ShapeCache& shape_cache) const;
+
+  [[nodiscard]] Result<std::size_t> execute_chamfer(const PartDocument& document,
+                                                    FeatureId feature_id,
+                                                    ShapeCache& shape_cache) const;
+
   [[nodiscard]] Result<GeometryRecomputeSummary> execute_plan(const PartDocument& document,
                                                               const RecomputePlan& plan,
                                                               ShapeCache& shape_cache) const;
@@ -63,9 +86,14 @@ private:
   RectangleExtrusionAdapter rectangle_extrusion_adapter_;
   CircularCutAdapter circular_cut_adapter_;
   ClosedProfileAdapter closed_profile_adapter_;
+  FilletAdapter fillet_adapter_;
+  ChamferAdapter chamfer_adapter_;
   BodyBooleanAdapter body_boolean_adapter_;
   BodyTransformAdapter body_transform_adapter_;
   RevolveAdapter revolve_adapter_;
+  CircularPatternAdapter circular_pattern_adapter_;
+  LinearPatternAdapter linear_pattern_adapter_;
+  MirrorAdapter mirror_adapter_;
   WorkplaneResolver workplane_resolver_;
 };
 

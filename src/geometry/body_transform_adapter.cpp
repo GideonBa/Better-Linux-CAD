@@ -6,6 +6,7 @@
 #include <BRepBuilderAPI_Transform.hxx>
 #include <Bnd_Box.hxx>
 #include <gp_Ax1.hxx>
+#include <gp_Ax2.hxx>
 #include <gp_Dir.hxx>
 #include <gp_Pnt.hxx>
 #include <gp_Trsf.hxx>
@@ -141,6 +142,26 @@ Result<GeometryShape> BodyTransformAdapter::rotate(const GeometryShape& shape, P
   if (result.IsNull())
     return Result<GeometryShape>::failure(
         transform_error("OCCT transform did not produce a shape"));
+  return Result<GeometryShape>::success(
+      GeometryShape(std::make_shared<GeometryShape::Impl>(result)));
+}
+
+Result<GeometryShape> BodyTransformAdapter::mirror(const GeometryShape& shape, Point3 plane_origin,
+                                                   Vector3 plane_normal) const {
+  if (shape.empty())
+    return Result<GeometryShape>::failure(transform_error("input shape must not be empty"));
+  const double length =
+      std::sqrt(plane_normal.x * plane_normal.x + plane_normal.y * plane_normal.y +
+                plane_normal.z * plane_normal.z);
+  if (!std::isfinite(length) || length <= 1.0e-12)
+    return Result<GeometryShape>::failure(
+        transform_error("mirror plane normal must not be zero length"));
+  gp_Trsf transform;
+  transform.SetMirror(gp_Ax2(gp_Pnt(plane_origin.x, plane_origin.y, plane_origin.z),
+                             gp_Dir(plane_normal.x, plane_normal.y, plane_normal.z)));
+  TopoDS_Shape result = apply_occt(shape.impl_->shape, transform);
+  if (result.IsNull())
+    return Result<GeometryShape>::failure(transform_error("OCCT mirror did not produce a shape"));
   return Result<GeometryShape>::success(
       GeometryShape(std::make_shared<GeometryShape::Impl>(result)));
 }

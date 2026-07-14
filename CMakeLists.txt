@@ -49,11 +49,13 @@ add_library(
   src/core/construction_geometry.cpp
   src/core/datum_axis.cpp
   src/core/datum_plane.cpp
+  src/core/edge_treatment_feature.cpp
   src/core/dependency_graph.cpp
   src/core/error.cpp
   src/core/feature.cpp
   src/core/generated_topology_reference.cpp
   src/core/invalidation_state.cpp
+  src/core/mirror_feature.cpp
   src/core/part_pattern_feature.cpp
   src/core/part_document.cpp
   src/core/part_document_json.cpp
@@ -83,6 +85,7 @@ add_library(
   src/core/sketch_repair_transactions.cpp
   src/core/sketch_repair_undo_stack.cpp
   src/core/sketch_repair_undo_stack_summary.cpp
+  src/core/shell_feature.cpp
 )
 add_library(BLCAD::core ALIAS blcad_core)
 
@@ -164,7 +167,12 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/construction_line_resolver.cpp
     src/geometry/construction_point_resolver.cpp
     src/geometry/dimension_driven_profile_resolver.cpp
+    src/geometry/fillet_adapter.cpp
+    src/geometry/chamfer_adapter.cpp
     src/geometry/recompute_executor.cpp
+    src/geometry/circular_pattern_adapter.cpp
+    src/geometry/linear_pattern_adapter.cpp
+    src/geometry/mirror_adapter.cpp
     src/geometry/rectangle_extrusion_adapter.cpp
     src/geometry/reference_driven_sketch_helper.cpp
     src/geometry/reference_generated_profile_resolver.cpp
@@ -286,6 +294,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/datum_plane_tests.cpp
     tests/core/dependency_graph_tests.cpp
     tests/core/derived_workplane_tests.cpp
+    tests/core/edge_treatment_feature_tests.cpp
     tests/core/error_result_tests.cpp
     tests/core/feature_tests.cpp
     tests/core/extrude_extent_intent_tests.cpp
@@ -293,6 +302,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/feature_body_operation_json_tests.cpp
     tests/core/generated_topology_reference_tests.cpp
     tests/core/invalidation_state_tests.cpp
+    tests/core/mirror_feature_tests.cpp
     tests/core/part_document_json_tests.cpp
     tests/core/part_document_json_workplane_tests.cpp
     tests/core/part_document_tests.cpp
@@ -304,6 +314,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/projected_sketch_reference_json_tests.cpp
     tests/core/projected_sketch_reference_tests.cpp
     tests/core/quantity_tests.cpp
+    tests/core/shell_feature_tests.cpp
     tests/core/part_feature_input_reference_tests.cpp
     tests/core/part_pattern_feature_tests.cpp
     tests/core/recompute_plan_tests.cpp
@@ -382,14 +393,19 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/bolt_circle_pattern_pipeline_tests.cpp
       tests/geometry/chained_construction_plane_resolver_tests.cpp
       tests/geometry/circular_cut_adapter_tests.cpp
+      tests/geometry/chamfer_feature_pipeline_tests.cpp
       tests/geometry/closed_profile_pipeline_tests.cpp
       tests/geometry/composite_closed_profile_pipeline_tests.cpp
       tests/geometry/construction_plane_pipeline_tests.cpp
+      tests/geometry/circular_pattern_pipeline_tests.cpp
       tests/geometry/derived_workplane_pipeline_tests.cpp
       tests/geometry/extrude_extent_pipeline_tests.cpp
       tests/geometry/dimension_driven_profile_resolver_tests.cpp
       tests/geometry/front_workplane_pipeline_tests.cpp
+      tests/geometry/fillet_feature_pipeline_tests.cpp
       tests/geometry/left_workplane_pipeline_tests.cpp
+      tests/geometry/linear_pattern_pipeline_tests.cpp
+      tests/geometry/mirror_feature_pipeline_tests.cpp
       tests/geometry/parameter_expression_pipeline_tests.cpp
       tests/geometry/recompute_executor_tests.cpp
       tests/geometry/rectangle_extrusion_adapter_tests.cpp

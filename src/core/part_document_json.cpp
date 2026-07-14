@@ -2,13 +2,16 @@
 
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <exception>
 #include <filesystem>
 #include <fstream>
+#include <optional>
 #include <sstream>
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -179,6 +182,63 @@ composite_inner_contours_from_json(const json& values) {
                                        edge.value());
 }
 
+[[nodiscard]] Result<SemanticCircularEdge> semantic_circular_edge_from_json(const json& value) {
+  const std::string edge = value.get<std::string>();
+  if (edge == "source_rim")
+    return Result<SemanticCircularEdge>::success(SemanticCircularEdge::SourceRim);
+  if (edge == "opposite_rim")
+    return Result<SemanticCircularEdge>::success(SemanticCircularEdge::OppositeRim);
+  return Result<SemanticCircularEdge>::failure(json_error("unsupported semantic circular edge"));
+}
+
+[[nodiscard]] json edge_treatment_edge_to_json(const EdgeReference& edge) {
+  if (edge.source_kind() == PartFeatureInputSourceKind::SemanticLinearEdge) {
+    const auto& source = std::get<SemanticEdgeReference>(edge.source());
+    return json{{"source_kind", "semantic_linear_edge"},
+                {"source_feature", source.source_feature().value()},
+                {"edge", std::string(to_string(source.edge()))}};
+  }
+  const auto& source = std::get<SemanticCircularEdgeReference>(edge.source());
+  return json{{"source_kind", "semantic_circular_edge"},
+              {"source_feature", source.source_feature().value()},
+              {"source_profile", source.source_profile().value()},
+              {"edge", std::string(to_string(source.edge()))}};
+}
+
+[[nodiscard]] Result<EdgeReference> edge_treatment_edge_from_json(const json& value,
+                                                                  PartFeatureInputRole role) {
+  if (!value.is_object() || !value.contains("source_kind") || !value.at("source_kind").is_string())
+    return Result<EdgeReference>::failure(json_error("edge treatment edge requires source_kind"));
+  const std::string kind = value.at("source_kind").get<std::string>();
+  if (kind == "semantic_linear_edge" && value.size() == 3U && value.contains("source_feature") &&
+      value.at("source_feature").is_string() && value.contains("edge") &&
+      value.at("edge").is_string()) {
+    auto edge = semantic_edge_from_json(value.at("edge"));
+    if (edge.has_error())
+      return Result<EdgeReference>::failure(edge.error());
+    auto reference = SemanticEdgeReference::create(
+        FeatureId(value.at("source_feature").get<std::string>()), edge.value());
+    if (reference.has_error())
+      return Result<EdgeReference>::failure(reference.error());
+    return EdgeReference::create_linear(role, std::move(reference.value()));
+  }
+  if (kind == "semantic_circular_edge" && value.size() == 4U && value.contains("source_feature") &&
+      value.at("source_feature").is_string() && value.contains("source_profile") &&
+      value.at("source_profile").is_string() && value.contains("edge") &&
+      value.at("edge").is_string()) {
+    auto edge = semantic_circular_edge_from_json(value.at("edge"));
+    if (edge.has_error())
+      return Result<EdgeReference>::failure(edge.error());
+    auto reference = SemanticCircularEdgeReference::create(
+        FeatureId(value.at("source_feature").get<std::string>()),
+        ProfileId(value.at("source_profile").get<std::string>()), edge.value());
+    if (reference.has_error())
+      return Result<EdgeReference>::failure(reference.error());
+    return EdgeReference::create_circular(role, std::move(reference.value()));
+  }
+  return Result<EdgeReference>::failure(json_error("unsupported or malformed edge treatment edge"));
+}
+
 [[nodiscard]] json semantic_vertex_reference_to_json(const SemanticVertexReference& reference) {
   return json{{"source_feature", reference.source_feature().value()},
               {"vertex", std::string(to_string(reference.vertex()))}};
@@ -299,11 +359,19 @@ sketch_origin_override_from_json(const json& value) {
   return Quantity::count(parameter_json.at("value").get<double>(), object_id);
 }
 
+[[nodiscard]] Result<Quantity> angle_quantity_from_json(const json& parameter_json,
+                                                        const std::string& object_id) {
+  if (parameter_json.at("unit").get<std::string>() != "deg")
+    return Result<Quantity>::failure(json_error("angle parameters must use unit \"deg\""));
+  return Quantity::angle_deg(parameter_json.at("value").get<double>(), object_id);
+}
+
 [[nodiscard]] Result<Parameter> parameter_from_json(const json& parameter_json) {
   const auto id = parameter_json.at("id").get<std::string>();
   const auto type = parameter_json.at("type").get<std::string>();
-  if (type != "length" && type != "count")
-    return Result<Parameter>::failure(json_error("only length and count parameters are supported"));
+  if (type != "length" && type != "count" && type != "angle")
+    return Result<Parameter>::failure(
+        json_error("only length, count, and angle parameters are supported"));
   if (parameter_json.at("scope").get<std::string>() != "part")
     return Result<Parameter>::failure(json_error("only part-scope parameters are supported"));
   if (type == "count") {
@@ -311,6 +379,13 @@ sketch_origin_override_from_json(const json& value) {
     if (quantity.has_error())
       return Result<Parameter>::failure(quantity.error());
     return Parameter::create_count(ParameterId(id), parameter_json.at("name").get<std::string>(),
+                                   quantity.value());
+  }
+  if (type == "angle") {
+    auto quantity = angle_quantity_from_json(parameter_json, id);
+    if (quantity.has_error())
+      return Result<Parameter>::failure(quantity.error());
+    return Parameter::create_angle(ParameterId(id), parameter_json.at("name").get<std::string>(),
                                    quantity.value());
   }
   auto quantity = length_quantity_from_json(parameter_json, id);
@@ -1397,6 +1472,70 @@ feature_body_result_context_from_json(const json& feature_json) {
   return Result<AxisReference>::failure(json_error("unsupported pattern axis source kind"));
 }
 
+[[nodiscard]] json mirror_source_to_json(const MirrorSourceReference& source) {
+  if (source.kind() == MirrorSourceKind::Feature)
+    return json{{"kind", "feature"}, {"feature", std::get<FeatureId>(source.source()).value()}};
+  return json{{"kind", "body"}, {"body", std::get<BodyId>(source.source()).value()}};
+}
+
+[[nodiscard]] Result<MirrorSourceReference> mirror_source_from_json(const json& value) {
+  if (!value.is_object() || !value.contains("kind") || !value.at("kind").is_string())
+    return Result<MirrorSourceReference>::failure(json_error("mirror source requires string kind"));
+  const std::string kind = value.at("kind").get<std::string>();
+  if (kind == "feature" && value.size() == 2U && value.contains("feature") &&
+      value.at("feature").is_string())
+    return MirrorSourceReference::feature(FeatureId(value.at("feature").get<std::string>()));
+  if (kind == "body" && value.size() == 2U && value.contains("body") &&
+      value.at("body").is_string())
+    return MirrorSourceReference::body(BodyId(value.at("body").get<std::string>()));
+  return Result<MirrorSourceReference>::failure(
+      json_error("unsupported or malformed mirror source"));
+}
+
+[[nodiscard]] json mirror_plane_to_json(const PlaneReference& plane) {
+  json value{{"source_kind", std::string(to_string(plane.source_kind()))}};
+  if (plane.source_kind() == PartFeatureInputSourceKind::DatumPlane)
+    value["datum_plane"] = std::get<DatumPlaneId>(plane.source()).value();
+  else if (plane.source_kind() == PartFeatureInputSourceKind::ConstructionPlane)
+    value["construction_plane"] = std::get<ConstructionPlaneId>(plane.source()).value();
+  else {
+    const auto& face = std::get<SemanticFaceReference>(plane.source());
+    value["source_feature"] = face.source_feature().value();
+    value["face"] = std::string(to_string(face.face()));
+  }
+  return value;
+}
+
+[[nodiscard]] Result<PlaneReference> mirror_plane_from_json(const json& value) {
+  if (!value.is_object() || !value.contains("source_kind") || !value.at("source_kind").is_string())
+    return Result<PlaneReference>::failure(json_error("mirror plane requires source_kind"));
+  const std::string kind = value.at("source_kind").get<std::string>();
+  if (kind == "datum_plane" && value.size() == 2U && value.contains("datum_plane") &&
+      value.at("datum_plane").is_string())
+    return PlaneReference::create_datum_plane(
+        PartFeatureInputRole::MirrorPlane,
+        DatumPlaneId(value.at("datum_plane").get<std::string>()));
+  if (kind == "construction_plane" && value.size() == 2U && value.contains("construction_plane") &&
+      value.at("construction_plane").is_string())
+    return PlaneReference::create_construction_plane(
+        PartFeatureInputRole::MirrorPlane,
+        ConstructionPlaneId(value.at("construction_plane").get<std::string>()));
+  if (kind == "semantic_planar_face" && value.size() == 3U && value.contains("source_feature") &&
+      value.at("source_feature").is_string() && value.contains("face") &&
+      value.at("face").is_string()) {
+    auto face = semantic_face_from_json(value.at("face"));
+    if (face.has_error())
+      return Result<PlaneReference>::failure(face.error());
+    auto semantic = SemanticFaceReference::create(
+        FeatureId(value.at("source_feature").get<std::string>()), face.value());
+    if (semantic.has_error())
+      return Result<PlaneReference>::failure(semantic.error());
+    return PlaneReference::create_semantic_face(PartFeatureInputRole::MirrorPlane,
+                                                std::move(semantic.value()));
+  }
+  return Result<PlaneReference>::failure(json_error("unsupported or malformed mirror plane"));
+}
+
 [[nodiscard]] json pattern_body_context_to_json(const FeatureBodyResultContext& context) {
   json value{{"operation_mode", std::string(to_string(context.operation_mode()))}};
   if (context.target_body().has_value())
@@ -1435,6 +1574,232 @@ feature_body_result_context_from_json(const json& feature_json) {
     value["sources"].push_back(pattern_source_to_json(source));
   value.update(pattern_body_context_to_json(feature.body_result_context()));
   return value;
+}
+
+[[nodiscard]] json mirror_feature_to_json(const MirrorFeature& feature) {
+  json value{{"id", feature.id().value()},
+             {"name", feature.name()},
+             {"type", "mirror"},
+             {"sources", json::array()},
+             {"mirror_plane", mirror_plane_to_json(feature.mirror_plane())}};
+  for (const auto& source : feature.sources())
+    value["sources"].push_back(mirror_source_to_json(source));
+  value.update(pattern_body_context_to_json(feature.body_result_context()));
+  return value;
+}
+
+[[nodiscard]] Result<MirrorFeature> mirror_feature_from_json(const json& value) {
+  if (!value.is_object() || !value.contains("id") || !value.at("id").is_string() ||
+      !value.contains("name") || !value.at("name").is_string() ||
+      value.value("type", "") != "mirror" || !value.contains("sources") ||
+      !value.at("sources").is_array() || !value.contains("mirror_plane") ||
+      !value.at("mirror_plane").is_object() || !value.contains("operation_mode"))
+    return Result<MirrorFeature>::failure(
+        json_error("mirror feature requires valid mandatory intent fields"));
+  auto context = feature_body_result_context_from_json(value);
+  if (context.has_error())
+    return Result<MirrorFeature>::failure(context.error());
+  if (!context.value().has_value())
+    return Result<MirrorFeature>::failure(
+        json_error("mirror feature requires body result context"));
+  const std::size_t expected_fields =
+      6U + (value.contains("target_body") ? 1U : 0U) + (value.contains("produced_body") ? 1U : 0U);
+  if (value.size() != expected_fields)
+    return Result<MirrorFeature>::failure(json_error("mirror feature has unsupported fields"));
+  std::vector<MirrorSourceReference> sources;
+  sources.reserve(value.at("sources").size());
+  for (const auto& source_json : value.at("sources")) {
+    auto source = mirror_source_from_json(source_json);
+    if (source.has_error())
+      return Result<MirrorFeature>::failure(source.error());
+    sources.push_back(std::move(source.value()));
+  }
+  auto plane = mirror_plane_from_json(value.at("mirror_plane"));
+  if (plane.has_error())
+    return Result<MirrorFeature>::failure(plane.error());
+  return MirrorFeature::create(FeatureId(value.at("id").get<std::string>()),
+                               value.at("name").get<std::string>(), std::move(sources),
+                               std::move(plane.value()), std::move(*context.value()));
+}
+
+[[nodiscard]] json fillet_feature_to_json(const FilletFeature& feature) {
+  json value{
+      {"id", feature.id().value()}, {"name", feature.name()},
+      {"type", "fillet"},           {"target_body", feature.target_body().value()},
+      {"edges", json::array()},     {"radius_parameter", feature.radius_parameter().value()}};
+  for (const auto& edge : feature.edges())
+    value["edges"].push_back(edge_treatment_edge_to_json(edge));
+  return value;
+}
+
+[[nodiscard]] json chamfer_feature_to_json(const ChamferFeature& feature) {
+  json value{{"id", feature.id().value()},
+             {"name", feature.name()},
+             {"type", "chamfer"},
+             {"target_body", feature.target_body().value()},
+             {"edges", json::array()},
+             {"mode", std::string(to_string(feature.mode()))},
+             {"first_parameter", feature.first_parameter().value()}};
+  for (const auto& edge : feature.edges())
+    value["edges"].push_back(edge_treatment_edge_to_json(edge));
+  if (feature.second_parameter().has_value())
+    value["second_parameter"] = feature.second_parameter()->value();
+  return value;
+}
+
+using ParsedEdgeTreatment = std::variant<FilletFeature, ChamferFeature>;
+
+[[nodiscard]] Result<ParsedEdgeTreatment> edge_treatment_from_json(const json& value) {
+  if (!value.is_object() || !value.contains("id") || !value.at("id").is_string() ||
+      !value.contains("name") || !value.at("name").is_string() || !value.contains("type") ||
+      !value.at("type").is_string() || !value.contains("target_body") ||
+      !value.at("target_body").is_string() || !value.contains("edges") ||
+      !value.at("edges").is_array())
+    return Result<ParsedEdgeTreatment>::failure(
+        json_error("edge treatment requires valid mandatory intent fields"));
+  const std::string type = value.at("type").get<std::string>();
+  const PartFeatureInputRole role =
+      type == "fillet" ? PartFeatureInputRole::FilletEdge : PartFeatureInputRole::ChamferEdge;
+  std::vector<EdgeReference> edges;
+  edges.reserve(value.at("edges").size());
+  for (const auto& edge_json : value.at("edges")) {
+    auto edge = edge_treatment_edge_from_json(edge_json, role);
+    if (edge.has_error())
+      return Result<ParsedEdgeTreatment>::failure(edge.error());
+    edges.push_back(std::move(edge.value()));
+  }
+  const FeatureId id(value.at("id").get<std::string>());
+  const std::string name = value.at("name").get<std::string>();
+  const BodyId target(value.at("target_body").get<std::string>());
+  if (type == "fillet" && value.size() == 6U && value.contains("radius_parameter") &&
+      value.at("radius_parameter").is_string()) {
+    auto feature =
+        FilletFeature::create(id, name, target, std::move(edges),
+                              ParameterId(value.at("radius_parameter").get<std::string>()));
+    if (feature.has_error())
+      return Result<ParsedEdgeTreatment>::failure(feature.error());
+    return Result<ParsedEdgeTreatment>::success(std::move(feature.value()));
+  }
+  if (type != "chamfer" || !value.contains("mode") || !value.at("mode").is_string() ||
+      !value.contains("first_parameter") || !value.at("first_parameter").is_string())
+    return Result<ParsedEdgeTreatment>::failure(
+        json_error("unsupported or malformed edge treatment"));
+  const std::string mode = value.at("mode").get<std::string>();
+  const ParameterId first(value.at("first_parameter").get<std::string>());
+  Result<ChamferFeature> feature =
+      Result<ChamferFeature>::failure(json_error("unsupported or malformed chamfer mode"));
+  if (mode == "equal_distance" && value.size() == 7U)
+    feature = ChamferFeature::create_equal_distance(id, name, target, std::move(edges), first);
+  else if ((mode == "two_distance" || mode == "distance_angle") && value.size() == 8U &&
+           value.contains("second_parameter") && value.at("second_parameter").is_string()) {
+    const ParameterId second(value.at("second_parameter").get<std::string>());
+    feature =
+        mode == "two_distance"
+            ? ChamferFeature::create_two_distance(id, name, target, std::move(edges), first, second)
+            : ChamferFeature::create_distance_angle(id, name, target, std::move(edges), first,
+                                                    second);
+  }
+  if (feature.has_error())
+    return Result<ParsedEdgeTreatment>::failure(feature.error());
+  return Result<ParsedEdgeTreatment>::success(std::move(feature.value()));
+}
+
+[[nodiscard]] json shell_removal_face_to_json(const FaceReference& reference) {
+  json value{{"role", std::string(to_string(reference.role()))},
+             {"capability", std::string(to_string(reference.expected_capability()))},
+             {"source_kind", std::string(to_string(reference.source_kind()))}};
+  if (reference.source_kind() == PartFeatureInputSourceKind::SemanticPlanarFace) {
+    const auto& face = std::get<SemanticFaceReference>(reference.source());
+    value["source_feature"] = face.source_feature().value();
+    value["face"] = std::string(to_string(face.face()));
+  } else {
+    const auto& face = std::get<SemanticCylindricalFaceReference>(reference.source());
+    value["source_feature"] = face.source_feature().value();
+    value["source_profile"] = face.source_profile().value();
+    value["face"] = std::string(to_string(face.face()));
+  }
+  return value;
+}
+
+[[nodiscard]] Result<FaceReference> shell_removal_face_from_json(const json& value) {
+  if (!value.is_object() || value.value("role", "") != "shell_removal_face" ||
+      value.value("capability", "") != "face")
+    return Result<FaceReference>::failure(
+        json_error("shell removal face requires role and Face capability"));
+  const std::string source_kind = value.value("source_kind", "");
+  if (source_kind == "semantic_planar_face") {
+    if (value.size() != 5U || !value.contains("source_feature") ||
+        !value.at("source_feature").is_string() || !value.contains("face") ||
+        !value.at("face").is_string())
+      return Result<FaceReference>::failure(
+          json_error("semantic planar shell removal face has invalid fields"));
+    auto face = semantic_face_from_json(value.at("face"));
+    if (face.has_error())
+      return Result<FaceReference>::failure(face.error());
+    auto identity = SemanticFaceReference::create(
+        FeatureId(value.at("source_feature").get<std::string>()), face.value());
+    if (identity.has_error())
+      return Result<FaceReference>::failure(identity.error());
+    return FaceReference::create_planar(PartFeatureInputRole::ShellRemovalFace,
+                                        std::move(identity.value()));
+  }
+  if (source_kind == "semantic_cylindrical_face") {
+    if (value.size() != 6U || !value.contains("source_feature") ||
+        !value.at("source_feature").is_string() || !value.contains("source_profile") ||
+        !value.at("source_profile").is_string() || value.value("face", "") != "wall")
+      return Result<FaceReference>::failure(
+          json_error("semantic cylindrical shell removal face has invalid fields"));
+    auto identity = SemanticCylindricalFaceReference::create(
+        FeatureId(value.at("source_feature").get<std::string>()),
+        ProfileId(value.at("source_profile").get<std::string>()));
+    if (identity.has_error())
+      return Result<FaceReference>::failure(identity.error());
+    return FaceReference::create_cylindrical(PartFeatureInputRole::ShellRemovalFace,
+                                             std::move(identity.value()));
+  }
+  return Result<FaceReference>::failure(
+      json_error("unsupported shell removal face source kind"));
+}
+
+[[nodiscard]] json shell_feature_to_json(const ShellFeature& feature) {
+  json value{{"id", feature.id().value()},
+             {"name", feature.name()},
+             {"target_body", feature.target_body().value()},
+             {"removed_faces", json::array()},
+             {"thickness_parameter", feature.thickness_parameter().value()},
+             {"direction", std::string(to_string(feature.direction()))}};
+  for (const FaceReference& face : feature.removed_faces())
+    value["removed_faces"].push_back(shell_removal_face_to_json(face));
+  return value;
+}
+
+[[nodiscard]] Result<ShellFeature> shell_feature_from_json(const json& value) {
+  if (!value.is_object() || value.size() != 6U || !value.contains("id") ||
+      !value.at("id").is_string() || !value.contains("name") ||
+      !value.at("name").is_string() || !value.contains("target_body") ||
+      !value.at("target_body").is_string() || !value.contains("removed_faces") ||
+      !value.at("removed_faces").is_array() || !value.contains("thickness_parameter") ||
+      !value.at("thickness_parameter").is_string() || !value.contains("direction") ||
+      !value.at("direction").is_string())
+    return Result<ShellFeature>::failure(
+        json_error("shell feature requires exactly its mandatory intent fields"));
+  std::vector<FaceReference> removed_faces;
+  removed_faces.reserve(value.at("removed_faces").size());
+  for (const auto& face_json : value.at("removed_faces")) {
+    auto face = shell_removal_face_from_json(face_json);
+    if (face.has_error())
+      return Result<ShellFeature>::failure(face.error());
+    removed_faces.push_back(std::move(face.value()));
+  }
+  const std::string direction = value.at("direction").get<std::string>();
+  if (direction != "inward" && direction != "outward")
+    return Result<ShellFeature>::failure(
+        json_error("unsupported shell direction in part document json"));
+  return ShellFeature::create(
+      FeatureId(value.at("id").get<std::string>()), value.at("name").get<std::string>(),
+      BodyId(value.at("target_body").get<std::string>()), std::move(removed_faces),
+      ParameterId(value.at("thickness_parameter").get<std::string>()),
+      direction == "inward" ? ShellDirection::Inward : ShellDirection::Outward);
 }
 
 using ParsedPartPattern = std::variant<LinearPatternFeature, CircularPatternFeature>;
@@ -2111,6 +2476,21 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
     if (const auto* circular = document.find_circular_pattern_feature(FeatureId(node)))
       root["part_patterns"].push_back(circular_pattern_to_json(*circular));
   }
+  root["mirror_features"] = json::array();
+  for (const std::string& node : pattern_order.value())
+    if (const auto* mirror = document.find_mirror_feature(FeatureId(node)))
+      root["mirror_features"].push_back(mirror_feature_to_json(*mirror));
+  root["edge_treatments"] = json::array();
+  for (const std::string& node : pattern_order.value()) {
+    if (const auto* fillet = document.find_fillet_feature(FeatureId(node)))
+      root["edge_treatments"].push_back(fillet_feature_to_json(*fillet));
+    if (const auto* chamfer = document.find_chamfer_feature(FeatureId(node)))
+      root["edge_treatments"].push_back(chamfer_feature_to_json(*chamfer));
+  }
+  root["shell_features"] = json::array();
+  for (const std::string& node : pattern_order.value())
+    if (const auto* shell = document.find_shell_feature(FeatureId(node)))
+      root["shell_features"].push_back(shell_feature_to_json(*shell));
   root["body_booleans"] = json::array();
   for (const auto& feature : document.body_boolean_features()) {
     json feature_json{{"id", feature.id().value()},
@@ -2199,8 +2579,10 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
       if (parameter_json.contains("formula")) {
         // Expression parameters re-derive value and dependency edges from the
         // persisted formula; earlier file order guarantees inputs exist.
-        auto type = parameter_json.at("type").get<std::string>() == "count" ? ParameterType::Count
-                                                                            : ParameterType::Length;
+        const std::string type_name = parameter_json.at("type").get<std::string>();
+        auto type = type_name == "count"   ? ParameterType::Count
+                    : type_name == "angle" ? ParameterType::Angle
+                                           : ParameterType::Length;
         auto added = document.value().add_expression_parameter(
             ParameterId(parameter_json.at("id").get<std::string>()),
             parameter_json.at("name").get<std::string>(), type,
@@ -2388,16 +2770,107 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
     if (!pattern_array.is_array())
       return Result<PartDocument>::failure(
           json_error("part_patterns must be an array in part document json"));
+    std::vector<std::optional<ParsedPartPattern>> pending_patterns;
+    pending_patterns.reserve(pattern_array.size());
     for (const auto& pattern_json : pattern_array) {
       auto pattern = part_pattern_from_json(pattern_json);
       if (pattern.has_error())
         return Result<PartDocument>::failure(pattern.error());
-      Result<std::size_t> added =
-          std::holds_alternative<LinearPatternFeature>(pattern.value())
-              ? document.value().add_linear_pattern_feature(
-                    std::move(std::get<LinearPatternFeature>(pattern.value())))
-              : document.value().add_circular_pattern_feature(
-                    std::move(std::get<CircularPatternFeature>(pattern.value())));
+      pending_patterns.emplace_back(std::move(pattern.value()));
+    }
+    const json mirror_array = root.value("mirror_features", json::array());
+    if (!mirror_array.is_array())
+      return Result<PartDocument>::failure(
+          json_error("mirror_features must be an array in part document json"));
+    std::vector<std::optional<MirrorFeature>> pending_mirrors;
+    pending_mirrors.reserve(mirror_array.size());
+    for (const auto& mirror_json : mirror_array) {
+      auto feature = mirror_feature_from_json(mirror_json);
+      if (feature.has_error())
+        return Result<PartDocument>::failure(feature.error());
+      pending_mirrors.emplace_back(std::move(feature.value()));
+    }
+    const auto feature_exists = [&document](const FeatureId& id) {
+      return document.value().find_feature(id) != nullptr ||
+             document.value().find_revolve_feature(id) != nullptr ||
+             document.value().find_linear_pattern_feature(id) != nullptr ||
+             document.value().find_circular_pattern_feature(id) != nullptr ||
+             document.value().find_mirror_feature(id) != nullptr ||
+             document.value().find_body_boolean_feature(id) != nullptr;
+    };
+    const auto sources_exist = [&feature_exists](const auto& sources) {
+      return std::all_of(sources.begin(), sources.end(), [&feature_exists](const auto& source) {
+        using SourceKind = decltype(source.kind());
+        if constexpr (std::is_same_v<SourceKind, PatternSourceKind>) {
+          return source.kind() == PatternSourceKind::Body ||
+                 feature_exists(std::get<FeatureId>(source.source()));
+        } else {
+          return source.kind() == MirrorSourceKind::Body ||
+                 feature_exists(std::get<FeatureId>(source.source()));
+        }
+      });
+    };
+    std::size_t remaining_part_features = pending_patterns.size() + pending_mirrors.size();
+    while (remaining_part_features > 0U) {
+      bool progress = false;
+      for (auto& pending : pending_patterns) {
+        if (!pending.has_value())
+          continue;
+        const bool ready = std::visit(
+            [&sources_exist](const auto& feature) { return sources_exist(feature.sources()); },
+            *pending);
+        if (!ready)
+          continue;
+        Result<std::size_t> added = std::holds_alternative<LinearPatternFeature>(*pending)
+                                        ? document.value().add_linear_pattern_feature(
+                                              std::move(std::get<LinearPatternFeature>(*pending)))
+                                        : document.value().add_circular_pattern_feature(std::move(
+                                              std::get<CircularPatternFeature>(*pending)));
+        if (added.has_error())
+          return Result<PartDocument>::failure(added.error());
+        pending.reset();
+        --remaining_part_features;
+        progress = true;
+      }
+      for (auto& pending : pending_mirrors) {
+        if (!pending.has_value() || !sources_exist(pending->sources()))
+          continue;
+        auto added = document.value().add_mirror_feature(std::move(*pending));
+        if (added.has_error())
+          return Result<PartDocument>::failure(added.error());
+        pending.reset();
+        --remaining_part_features;
+        progress = true;
+      }
+      if (!progress)
+        return Result<PartDocument>::failure(
+            json_error("could not resolve Pattern/Mirror feature dependencies"));
+    }
+    const json edge_treatment_array = root.value("edge_treatments", json::array());
+    if (!edge_treatment_array.is_array())
+      return Result<PartDocument>::failure(
+          json_error("edge_treatments must be an array in part document json"));
+    for (const auto& treatment_json : edge_treatment_array) {
+      auto treatment = edge_treatment_from_json(treatment_json);
+      if (treatment.has_error())
+        return Result<PartDocument>::failure(treatment.error());
+      Result<std::size_t> added = std::holds_alternative<FilletFeature>(treatment.value())
+                                      ? document.value().add_fillet_feature(
+                                            std::move(std::get<FilletFeature>(treatment.value())))
+                                      : document.value().add_chamfer_feature(
+                                            std::move(std::get<ChamferFeature>(treatment.value())));
+      if (added.has_error())
+        return Result<PartDocument>::failure(added.error());
+    }
+    const json shell_array = root.value("shell_features", json::array());
+    if (!shell_array.is_array())
+      return Result<PartDocument>::failure(
+          json_error("shell_features must be an array in part document json"));
+    for (const auto& shell_json : shell_array) {
+      auto shell = shell_feature_from_json(shell_json);
+      if (shell.has_error())
+        return Result<PartDocument>::failure(shell.error());
+      auto added = document.value().add_shell_feature(std::move(shell.value()));
       if (added.has_error())
         return Result<PartDocument>::failure(added.error());
     }

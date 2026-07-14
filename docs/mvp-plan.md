@@ -4,17 +4,17 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 63
-current_block: 64
-current_boundary: General Linear Pattern Geometry
-current_tag: "[geometry][linear-pattern]"
+implemented_through: Block 66
+current_block: 67
+current_boundary: MirrorFeature Geometry
+current_tag: "[geometry][mirror-feature]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
   mvp_3: "Parametric bolt circle pattern — implemented"
   mvp_4: "Assembly parameters and Project container — implemented"
   mvp_5: "Assembly relationships, motion, hierarchy, analysis, exchange — Blocks 1–47 implemented"
-  mvp_6: "Part Construction — Blocks 48–63 implemented, Blocks 64–94 planned, Block 64 next"
+  mvp_6: "Part Construction — Blocks 48–71 implemented, Blocks 72–94 planned, Block 72 next"
   mvp_7: "STEP Import — Blocks 95–101 planned after Block 94"
 ---
 
@@ -552,10 +552,10 @@ motion solvers reject Spherical as the selected drive.
 
 ## MVP 6 — Part Construction MVP after Block 47
 
-**Status:** In progress — Blocks 48–63 implemented
+**Status:** In progress — Blocks 48–71 implemented
 **Canonical:** sequence `docs/part-construction-sequence-mvp6.md`
 
-Blocks 48–63 are complete. Block 64 is the current next technical step.
+Blocks 48–71 are complete. Block 72 is the current next technical step.
 
 Mandatory Part Construction phase order:
 
@@ -886,8 +886,111 @@ Canonical contract: `docs/part-pattern-core-mvp6.md`.
 [core][part-pattern]
 ```
 
-## Current next technical step — Block 64
+## Block 64 — General Linear Pattern Geometry — Implemented
 
-Execute deterministic translational Feature- and Body-source instances for spacing/total-extent,
-positive/negative direction, all Body-result modes, stable generated order, and incremental
-recompute according to `docs/part-construction-sequence-mvp6-planning-detail.md`.
+Block 64 resolves Feature/Body source shapes and typed directions, generates deterministic
+instance-major translations for spacing or total extent with positive/negative direction, and
+executes NewBody, Join, Cut, and Intersect through an atomic Pattern-tool union. In-place sources
+recover the preceding Body producer. Parameter-driven incremental recompute is idempotent and
+invalid Count or Geometry leaves previous cache state intact.
+
+Canonical contract: `docs/part-linear-pattern-geometry-mvp6.md`.
+
+```text
+[geometry][linear-pattern]
+```
+
+## Block 65 — General Circular Pattern Geometry — Implemented
+
+Block 65 resolves typed axis origin and direction, generates deterministic instance-major
+rotations for full circles or partial total angles, and executes Feature/Body sources through
+NewBody, Join, Cut, and Intersect. Full circles omit the duplicate endpoint; partial patterns
+include both angle boundaries. Semantic axes, parameter-driven Count recompute, and failure remain
+associative and transactional. The specialized `CircularHolePattern` path stays unchanged.
+
+Canonical contract: `docs/part-circular-pattern-geometry-mvp6.md`.
+
+```text
+[geometry][circular-pattern]
+```
+
+## Block 66 — MirrorFeature Core intent and JSON — Implemented
+
+Block 66 adds ordered typed Feature/Body Mirror sources, Datum/Construction/semantic planar
+`MirrorPlane` identity, mandatory Body-result semantics, dependency/invalidation and removal
+protection, and additive strict `mirror_features[]` JSON. In-place Body sources advance the prior
+producer without a self-cycle. Pattern/Mirror source chains restore by dependency availability;
+older files omit the array safely.
+
+Canonical contract: `docs/part-mirror-intent-mvp6.md`.
+
+```text
+[core][mirror-feature]
+```
+
+## Block 67 — MirrorFeature Geometry — Implemented
+
+Block 67 executes ordered Feature/Body sources through typed Datum, Construction, and supported
+semantic generated planes. It supports NewBody/Join/Cut/Intersect, associative plane transforms,
+incremental recompute, and transactional reference failure.
+
+Canonical contract: `docs/part-mirror-geometry-mvp6.md`.
+
+```text
+[geometry][mirror-feature]
+```
+
+## Block 68 — Edge treatment Core intent and JSON — Implemented
+
+Block 68 adds persistent Fillet/Chamfer intent with ordered semantic linear or circular edges,
+duplicate rejection, Body-history ownership, parameter dependencies, invalidation, three Chamfer
+modes, strict compatible `edge_treatments[]` JSON, and degree-valued Angle parameters.
+
+Canonical contract: `docs/part-edge-treatment-intent-mvp6.md`.
+
+```text
+[core][edge-treatment]
+```
+
+## Block 69 — Fillet Geometry — Implemented
+
+Block 69 resolves ordered semantic linear/circular edge references against the current target
+solid and executes one constant-radius OCCT fillet transaction. Radius-only edits recompute the
+fillet alone; upstream edits recover the edge on refreshed topology. Missing/ambiguous edges,
+excessive radii, and invalid solids fail without replacing the previous cache.
+
+Canonical contract: `docs/part-fillet-geometry-mvp6.md`.
+
+```text
+[geometry][fillet-feature]
+```
+
+## Block 70 — Chamfer Geometry — Implemented
+
+Block 70 executes EqualDistance, TwoDistance, and DistanceAngle on ordered semantic linear or
+circular edges. Asymmetric modes derive a deterministic semantic reference face, parameter and
+upstream edits recompute associatively, and topology/size failures preserve the prior cache.
+
+Canonical contract: `docs/part-chamfer-geometry-mvp6.md`.
+
+```text
+[geometry][chamfer-feature]
+```
+
+## Block 71 — ShellFeature Core intent and JSON — Implemented
+
+Block 71 freezes target-Body ownership, ordered semantic planar/cylindrical removal faces, positive
+Length thickness plus explicit Inward/Outward direction, dependencies, invalidation, removal
+protection, and additive strict `shell_features[]` JSON.
+
+Canonical contract: `docs/part-shell-intent-mvp6.md`.
+
+```text
+[core][shell-feature]
+```
+
+## Current next technical step — Block 72
+
+Execute semantic removed-face shelling with inward/outward OCCT thickness, associative recovery,
+parameter recompute, and transactional invalid-result failure according to
+`docs/part-construction-sequence-mvp6-planning-detail.md`.

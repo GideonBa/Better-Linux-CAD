@@ -63,4 +63,4 @@ coordinates, and fixed unowned Sketches.
 Block 58 provides the reusable Part feature semantic-input contract without broadening this cache
 state into persistent matrices or raw OCCT identity. Block 59 richer Extrude/Cut intent is
 implemented together with Block 60 Geometry; Blocks 61–62 Revolve/RevolveCut intent and Geometry
-are implemented. Block 64 General Linear Pattern Geometry is the current next boundary.
+are implemented. Block 67 MirrorFeature Geometry is implemented; Block 72 ShellFeature Geometry is the current next boundary.

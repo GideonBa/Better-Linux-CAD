@@ -1,0 +1,37 @@
+# Part Mirror Geometry MVP-6
+
+Status: implemented in Block 67.
+
+Block 67 executes persistent `MirrorFeature` intent as deterministic OCCT geometry. The result
+contains reflected source geometry; it does not implicitly retain an original source instance.
+
+## Geometry contract
+
+- Feature and Body sources resolve from `ShapeCache` in persistent source order.
+- Datum planes, construction planes, and supported semantic generated planar faces resolve to a
+  model-space origin and normal.
+- Cached associative Body transforms are applied to referenced plane origins and normals.
+- `MirrorAdapter` creates one reflected copy per source with OCCT plane reflection.
+- Multiple reflected sources are fused deterministically before Body-result semantics are applied.
+- `NewBody` publishes the reflected union; `Join`, `Cut`, and `Intersect` combine that union with
+  the preceding target-Body result.
+- Cache products are published only after all work succeeds.
+
+The plane normal must be finite and non-zero, every source shape must exist, and Boolean results
+must remain valid. Failure preserves the caller's prior cache state and reports the stable failing
+source or feature identity.
+
+## Recompute and proof boundary
+
+Dependency order executes plane, source, and prior target-Body producers before the mirror.
+Parameter edits rebuild semantic planes and reflected geometry instead of reusing stale shapes.
+
+```text
+./build/blcad_geometry_tests "[geometry][mirror-feature]"
+```
+
+The suite covers ordered output, Feature and Body sources, a non-axis-aligned construction plane,
+a semantic generated top face, all four Body-result modes, parameter-driven recompute, and
+transactional missing-reference failure.
+
+Block 72 ShellFeature Geometry is the next boundary.

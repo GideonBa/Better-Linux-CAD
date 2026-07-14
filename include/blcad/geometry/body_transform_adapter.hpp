@@ -33,6 +33,8 @@ public:
   [[nodiscard]] Result<GeometryShape> translate(const GeometryShape& shape, Vector3 offset) const;
   [[nodiscard]] Result<GeometryShape> rotate(const GeometryShape& shape, Point3 origin,
                                              Vector3 axis, double angle_deg) const;
+  [[nodiscard]] Result<GeometryShape> mirror(const GeometryShape& shape, Point3 plane_origin,
+                                             Vector3 plane_normal) const;
   [[nodiscard]] Result<GeometryShape> uniform_scale(const GeometryShape& shape, Point3 center,
                                                     double factor) const;
   [[nodiscard]] Result<GeometryShapeBounds> bounds(const GeometryShape& shape) const;

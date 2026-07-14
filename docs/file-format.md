@@ -736,6 +736,44 @@ intent preserves a finite total degree angle and mandatory equal spacing. Missin
 zero general Patterns; generated instances and OCCT copies remain derived. Canonical details are in
 `docs/part-pattern-core-mvp6.md`.
 
+Block 64 adds no persistent field. Signed placement distances, translated OCCT instances, the
+Pattern tool union, Body Boolean result, derived instance order, and cache diagnostics remain
+recompute products. Canonical execution details are in
+`docs/part-linear-pattern-geometry-mvp6.md`.
+
+Block 65 also adds no persistent field. Resolved axis frames, angular steps, rotated instances,
+Pattern tool unions, Body Boolean results, and cache diagnostics remain derived recompute products.
+Canonical execution details are in `docs/part-circular-pattern-geometry-mvp6.md`.
+
+Block 66 adds the always-emitted, optional-on-read `mirror_features` array under the unchanged
+schema version. Each item stores `id`, `name`, `type = mirror`, ordered Feature/Body `sources`, a
+strict typed `mirror_plane`, and mandatory Body-operation/result fields. Plane source kinds are
+`datum_plane`, `construction_plane`, or `semantic_planar_face`, each with only its matching source
+identity fields. Missing arrays restore zero Mirrors; unknown top-level, source, or plane fields
+fail closed. Canonical details are in `docs/part-mirror-intent-mvp6.md`.
+
+Block 68 adds the always-emitted, optional-on-read `edge_treatments` array. Fillet records persist
+ordered semantic edges and one Length radius parameter. Chamfer records persist
+`equal_distance`, `two_distance`, or `distance_angle` plus their exact one- or two-parameter
+signature. Edge sources are strict `semantic_linear_edge` or `semantic_circular_edge` objects.
+The parameter table also accepts `type: "angle"` with unit `deg`; angle expressions remain
+unsupported. Unknown fields, duplicate edges, invalid source roles, and mismatched parameter types
+fail closed. Canonical details are in `docs/part-edge-treatment-intent-mvp6.md`.
+
+Block 69 adds no persistent field. Constant-radius Fillet results, resolved OCCT edges, and
+topology-match diagnostics are derived recompute products. Canonical execution details are in
+`docs/part-fillet-geometry-mvp6.md`.
+
+Block 70 also adds no persistent field. Chamfer results, derived asymmetric reference faces, and
+OCCT diagnostics remain recompute products of the Block-68 records. Canonical execution details
+are in `docs/part-chamfer-geometry-mvp6.md`.
+
+Block 71 adds the always-emitted, optional-on-read `shell_features` array. Each strict record owns
+`id`, `name`, `target_body`, ordered semantic planar/cylindrical `removed_faces`, one positive
+Length `thickness_parameter`, and `direction` (`inward` or `outward`). Unknown record/face fields,
+roles, capabilities, source kinds, and directions fail closed. Canonical details are in
+`docs/part-shell-intent-mvp6.md`.
+
 ## Planned STEP import persistence after Block 94
 
 This section is planned architecture, not part of the current schema. Blocks 95–101 in

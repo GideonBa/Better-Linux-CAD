@@ -382,8 +382,9 @@ These records are future target architecture. They are not part of the current `
 Feature Body-operation persistence, body-scoped recompute/inspection, Body Booleans,
 BodyTransform/SketchOwnership intent plus associative Geometry execution, reusable semantic inputs,
 and richer Extrude/Cut intent/JSON plus Geometry, persistent plus executed Revolve/RevolveCut, and
-general Linear/Circular Pattern Core intent are implemented through Block 63. The current handoff
-is Block 64 General Linear Pattern Geometry.
+general Pattern Core intent plus Linear and Circular Pattern Geometry, and persistent MirrorFeature
+intent and Edge Treatment Core/JSON are implemented through Block 68. The current handoff is Block
+69 Fillet Geometry.
 Canonical implemented contracts include `docs/part-body-identity-mvp6.md`,
 `docs/part-body-json-mvp6.md`,
 `docs/part-feature-body-operation-mvp6.md`, `docs/part-feature-body-dependency-mvp6.md`, and
@@ -395,7 +396,10 @@ Canonical implemented contracts include `docs/part-body-identity-mvp6.md`,
 `docs/part-extrude-extent-geometry-mvp6.md`, and
 `docs/part-revolve-intent-mvp6.md`, and
 `docs/part-revolve-geometry-mvp6.md`, and
-`docs/part-pattern-core-mvp6.md`; the
+`docs/part-pattern-core-mvp6.md`, and
+`docs/part-linear-pattern-geometry-mvp6.md`, and
+`docs/part-circular-pattern-geometry-mvp6.md`, and
+`docs/part-mirror-intent-mvp6.md`; the
 numbered Part Construction sequence is authoritative where this older roadmap groups work
 differently.
 

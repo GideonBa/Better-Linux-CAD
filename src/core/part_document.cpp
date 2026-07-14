@@ -1243,6 +1243,253 @@ Result<std::size_t> PartDocument::add_circular_pattern_feature(CircularPatternFe
   return Result<std::size_t>::success(circular_pattern_features_.size() - 1U);
 }
 
+Result<std::size_t> PartDocument::add_mirror_feature(MirrorFeature feature) {
+  if (has_any_feature_id(feature.id()))
+    return Result<std::size_t>::failure(
+        Error::validation(feature.id().value(), "feature id must be unique within part document"));
+  auto plane_valid = validate_part_feature_input_reference(*this, feature.mirror_plane());
+  if (plane_valid.has_error())
+    return Result<std::size_t>::failure(plane_valid.error());
+  for (const auto& source : feature.sources()) {
+    if (source.kind() == MirrorSourceKind::Feature &&
+        !has_any_feature_id(std::get<FeatureId>(source.source())))
+      return Result<std::size_t>::failure(Error::validation(
+          feature.id().value(), "mirror source feature must exist in part document"));
+    if (source.kind() == MirrorSourceKind::Body && !has_body_id(std::get<BodyId>(source.source())))
+      return Result<std::size_t>::failure(Error::validation(
+          feature.id().value(), "mirror source body must exist in part document"));
+  }
+  const auto& context = feature.body_result_context();
+  if (context.target_body().has_value() && !has_body_id(*context.target_body()))
+    return Result<std::size_t>::failure(
+        Error::validation(feature.id().value(), "mirror target body must exist in part document"));
+  if (!has_body_id(context.effective_produced_body()))
+    return Result<std::size_t>::failure(Error::validation(
+        feature.id().value(), "mirror produced body must exist in part document"));
+
+  const bool modifies_in_place = context.target_body().has_value() &&
+                                 *context.target_body() == context.effective_produced_body();
+  auto graph = dependency_graph_;
+  auto added_node = graph.add_node(feature.id().value());
+  if (added_node.has_error())
+    return Result<std::size_t>::failure(added_node.error());
+  for (const auto& source : feature.sources()) {
+    if (modifies_in_place && source.kind() == MirrorSourceKind::Body &&
+        std::get<BodyId>(source.source()) == context.effective_produced_body())
+      continue;
+    auto dependency =
+        add_dependency_if_missing(graph, source.source_node_id(), feature.id().value());
+    if (dependency.has_error())
+      return Result<std::size_t>::failure(dependency.error());
+  }
+  auto plane_dependency = add_dependency_if_missing(graph, feature.mirror_plane().source_node_id(),
+                                                    feature.id().value());
+  if (plane_dependency.has_error())
+    return Result<std::size_t>::failure(plane_dependency.error());
+
+  const std::string result_node = body_dependency_node_id(context.effective_produced_body());
+  if (modifies_in_place) {
+    const auto previous_producers = dependency_sources_of(graph, result_node);
+    graph.remove_dependencies_of_dependent(result_node);
+    for (const auto& producer : previous_producers) {
+      auto dependency = add_dependency_if_missing(graph, producer, feature.id().value());
+      if (dependency.has_error())
+        return Result<std::size_t>::failure(dependency.error());
+    }
+  } else {
+    if (!dependency_sources_of(graph, result_node).empty())
+      return Result<std::size_t>::failure(Error::dependency(
+          feature.id().value(), "mirror produced body already has a producing feature"));
+    if (context.target_body().has_value()) {
+      auto dependency = add_dependency_if_missing(
+          graph, body_dependency_node_id(*context.target_body()), feature.id().value());
+      if (dependency.has_error())
+        return Result<std::size_t>::failure(dependency.error());
+    }
+  }
+  auto result_dependency = add_dependency_if_missing(graph, feature.id().value(), result_node);
+  if (result_dependency.has_error())
+    return Result<std::size_t>::failure(result_dependency.error());
+  if (graph.has_cycle())
+    return Result<std::size_t>::failure(
+        Error::dependency(feature.id().value(), "mirror must not create a dependency cycle"));
+  auto invalidation_state = invalidation_state_;
+  auto synced = sync_graph(std::move(graph), invalidation_state, dependency_graph_);
+  if (synced.has_error())
+    return Result<std::size_t>::failure(synced.error());
+  invalidation_state_ = std::move(invalidation_state);
+  mirror_features_.push_back(std::move(feature));
+  return Result<std::size_t>::success(mirror_features_.size() - 1U);
+}
+
+Result<std::size_t>
+PartDocument::add_edge_treatment_dependencies(const FeatureId& id, const BodyId& target_body,
+                                              const std::vector<EdgeReference>& edges,
+                                              const std::vector<ParameterId>& parameters) {
+  auto graph = dependency_graph_;
+  auto added_node = graph.add_node(id.value());
+  if (added_node.has_error())
+    return Result<std::size_t>::failure(added_node.error());
+  for (const auto& edge : edges) {
+    auto dependency = add_dependency_if_missing(graph, edge.source_node_id(), id.value());
+    if (dependency.has_error())
+      return Result<std::size_t>::failure(dependency.error());
+  }
+  for (const auto& parameter : parameters) {
+    auto dependency = add_dependency_if_missing(graph, parameter.value(), id.value());
+    if (dependency.has_error())
+      return Result<std::size_t>::failure(dependency.error());
+  }
+  const std::string body_node = body_dependency_node_id(target_body);
+  const auto previous_producers = dependency_sources_of(graph, body_node);
+  graph.remove_dependencies_of_dependent(body_node);
+  for (const auto& producer : previous_producers) {
+    auto dependency = add_dependency_if_missing(graph, producer, id.value());
+    if (dependency.has_error())
+      return Result<std::size_t>::failure(dependency.error());
+  }
+  auto result_dependency = add_dependency_if_missing(graph, id.value(), body_node);
+  if (result_dependency.has_error())
+    return Result<std::size_t>::failure(result_dependency.error());
+  if (graph.has_cycle())
+    return Result<std::size_t>::failure(
+        Error::dependency(id.value(), "edge treatment must not create a dependency cycle"));
+  auto invalidation_state = invalidation_state_;
+  auto synced = sync_graph(std::move(graph), invalidation_state, dependency_graph_);
+  if (synced.has_error())
+    return Result<std::size_t>::failure(synced.error());
+  invalidation_state_ = std::move(invalidation_state);
+  return Result<std::size_t>::success(1U);
+}
+
+Result<std::size_t> PartDocument::add_fillet_feature(FilletFeature feature) {
+  if (has_any_feature_id(feature.id()))
+    return Result<std::size_t>::failure(
+        Error::validation(feature.id().value(), "feature id must be unique within part document"));
+  if (!has_body_id(feature.target_body()))
+    return Result<std::size_t>::failure(
+        Error::validation(feature.id().value(), "fillet target body must exist in part document"));
+  for (const auto& edge : feature.edges()) {
+    auto valid = validate_part_feature_input_reference(*this, edge);
+    if (valid.has_error())
+      return Result<std::size_t>::failure(valid.error());
+  }
+  const Parameter* radius = find_parameter(feature.radius_parameter());
+  if (radius == nullptr || radius->type() != ParameterType::Length)
+    return Result<std::size_t>::failure(Error::validation(
+        feature.id().value(), "fillet radius must reference an existing length parameter"));
+  auto dependencies = add_edge_treatment_dependencies(
+      feature.id(), feature.target_body(), feature.edges(), {feature.radius_parameter()});
+  if (dependencies.has_error())
+    return dependencies;
+  fillet_features_.push_back(std::move(feature));
+  return Result<std::size_t>::success(fillet_features_.size() - 1U);
+}
+
+Result<std::size_t> PartDocument::add_chamfer_feature(ChamferFeature feature) {
+  if (has_any_feature_id(feature.id()))
+    return Result<std::size_t>::failure(
+        Error::validation(feature.id().value(), "feature id must be unique within part document"));
+  if (!has_body_id(feature.target_body()))
+    return Result<std::size_t>::failure(
+        Error::validation(feature.id().value(), "chamfer target body must exist in part document"));
+  for (const auto& edge : feature.edges()) {
+    auto valid = validate_part_feature_input_reference(*this, edge);
+    if (valid.has_error())
+      return Result<std::size_t>::failure(valid.error());
+  }
+  const Parameter* first = find_parameter(feature.first_parameter());
+  if (first == nullptr || first->type() != ParameterType::Length)
+    return Result<std::size_t>::failure(Error::validation(
+        feature.id().value(), "chamfer distance must reference an existing length parameter"));
+  std::vector<ParameterId> parameters{feature.first_parameter()};
+  if (feature.second_parameter().has_value()) {
+    const Parameter* second = find_parameter(*feature.second_parameter());
+    const ParameterType required =
+        feature.mode() == ChamferMode::DistanceAngle ? ParameterType::Angle : ParameterType::Length;
+    if (second == nullptr || second->type() != required)
+      return Result<std::size_t>::failure(
+          Error::validation(feature.id().value(),
+                            feature.mode() == ChamferMode::DistanceAngle
+                                ? "chamfer angle must reference an existing angle parameter"
+                                : "chamfer distance must reference an existing length parameter"));
+    if (required == ParameterType::Angle &&
+        (second->value().degrees() <= 0.0 || second->value().degrees() >= 90.0))
+      return Result<std::size_t>::failure(Error::validation(
+          feature.id().value(), "chamfer angle must be greater than 0 and less than 90 degrees"));
+    parameters.push_back(*feature.second_parameter());
+  }
+  auto dependencies = add_edge_treatment_dependencies(feature.id(), feature.target_body(),
+                                                      feature.edges(), parameters);
+  if (dependencies.has_error())
+    return dependencies;
+  chamfer_features_.push_back(std::move(feature));
+  return Result<std::size_t>::success(chamfer_features_.size() - 1U);
+}
+
+Result<std::size_t> PartDocument::add_shell_dependencies(const ShellFeature& feature) {
+  auto graph = dependency_graph_;
+  auto added_node = graph.add_node(feature.id().value());
+  if (added_node.has_error())
+    return Result<std::size_t>::failure(added_node.error());
+  for (const FaceReference& face : feature.removed_faces()) {
+    auto dependency =
+        add_dependency_if_missing(graph, face.source_node_id(), feature.id().value());
+    if (dependency.has_error())
+      return Result<std::size_t>::failure(dependency.error());
+  }
+  auto thickness_dependency = add_dependency_if_missing(
+      graph, feature.thickness_parameter().value(), feature.id().value());
+  if (thickness_dependency.has_error())
+    return Result<std::size_t>::failure(thickness_dependency.error());
+
+  const std::string body_node = body_dependency_node_id(feature.target_body());
+  const auto previous_producers = dependency_sources_of(graph, body_node);
+  graph.remove_dependencies_of_dependent(body_node);
+  for (const std::string& producer : previous_producers) {
+    auto dependency = add_dependency_if_missing(graph, producer, feature.id().value());
+    if (dependency.has_error())
+      return Result<std::size_t>::failure(dependency.error());
+  }
+  auto result_dependency =
+      add_dependency_if_missing(graph, feature.id().value(), body_node);
+  if (result_dependency.has_error())
+    return Result<std::size_t>::failure(result_dependency.error());
+  if (graph.has_cycle())
+    return Result<std::size_t>::failure(
+        Error::dependency(feature.id().value(), "shell must not create a dependency cycle"));
+  auto invalidation_state = invalidation_state_;
+  auto synced = sync_graph(std::move(graph), invalidation_state, dependency_graph_);
+  if (synced.has_error())
+    return Result<std::size_t>::failure(synced.error());
+  invalidation_state_ = std::move(invalidation_state);
+  return Result<std::size_t>::success(1U);
+}
+
+Result<std::size_t> PartDocument::add_shell_feature(ShellFeature feature) {
+  if (has_any_feature_id(feature.id()))
+    return Result<std::size_t>::failure(
+        Error::validation(feature.id().value(), "feature id must be unique within part document"));
+  if (!has_body_id(feature.target_body()))
+    return Result<std::size_t>::failure(
+        Error::validation(feature.id().value(), "shell target body must exist in part document"));
+  for (const FaceReference& face : feature.removed_faces()) {
+    auto valid = validate_part_feature_input_reference(*this, face);
+    if (valid.has_error())
+      return Result<std::size_t>::failure(valid.error());
+  }
+  const Parameter* thickness = find_parameter(feature.thickness_parameter());
+  if (thickness == nullptr || thickness->type() != ParameterType::Length ||
+      thickness->value().millimeters() <= 0.0)
+    return Result<std::size_t>::failure(Error::validation(
+        feature.id().value(), "shell thickness must reference a positive length parameter"));
+  auto dependencies = add_shell_dependencies(feature);
+  if (dependencies.has_error())
+    return dependencies;
+  shell_features_.push_back(std::move(feature));
+  return Result<std::size_t>::success(shell_features_.size() - 1U);
+}
+
 Result<std::size_t> PartDocument::add_body_boolean_feature(BodyBooleanFeature feature) {
   if (has_any_feature_id(feature.id()))
     return Result<std::size_t>::failure(
@@ -1516,6 +1763,29 @@ Result<std::size_t> PartDocument::remove_body(BodyId id) {
       return Result<std::size_t>::failure(
           Error::dependency(id.value(), "body with dependent model intent cannot be removed"));
   }
+  for (const auto& feature : mirror_features_) {
+    const auto& context = feature.body_result_context();
+    const bool references_body =
+        std::any_of(feature.sources().begin(), feature.sources().end(), [&id](const auto& source) {
+          return source.kind() == MirrorSourceKind::Body && std::get<BodyId>(source.source()) == id;
+        });
+    if (references_body || (context.target_body().has_value() && *context.target_body() == id) ||
+        context.effective_produced_body() == id)
+      return Result<std::size_t>::failure(
+          Error::dependency(id.value(), "body with dependent model intent cannot be removed"));
+  }
+  for (const auto& feature : fillet_features_)
+    if (feature.target_body() == id)
+      return Result<std::size_t>::failure(
+          Error::dependency(id.value(), "body with dependent model intent cannot be removed"));
+  for (const auto& feature : chamfer_features_)
+    if (feature.target_body() == id)
+      return Result<std::size_t>::failure(
+          Error::dependency(id.value(), "body with dependent model intent cannot be removed"));
+  for (const auto& feature : shell_features_)
+    if (feature.target_body() == id)
+      return Result<std::size_t>::failure(
+          Error::dependency(id.value(), "body with dependent model intent cannot be removed"));
   for (const auto& feature : body_boolean_features_) {
     if (feature.target_body() == id || feature.effective_result_body() == id ||
         std::find(feature.tool_bodies().begin(), feature.tool_bodies().end(), id) !=
@@ -1855,6 +2125,18 @@ const std::vector<CircularPatternFeature>&
 PartDocument::circular_pattern_features() const noexcept {
   return circular_pattern_features_;
 }
+const std::vector<MirrorFeature>& PartDocument::mirror_features() const noexcept {
+  return mirror_features_;
+}
+const std::vector<FilletFeature>& PartDocument::fillet_features() const noexcept {
+  return fillet_features_;
+}
+const std::vector<ChamferFeature>& PartDocument::chamfer_features() const noexcept {
+  return chamfer_features_;
+}
+const std::vector<ShellFeature>& PartDocument::shell_features() const noexcept {
+  return shell_features_;
+}
 const std::vector<BodyBooleanFeature>& PartDocument::body_boolean_features() const noexcept {
   return body_boolean_features_;
 }
@@ -1920,6 +2202,18 @@ std::size_t PartDocument::linear_pattern_feature_count() const noexcept {
 }
 std::size_t PartDocument::circular_pattern_feature_count() const noexcept {
   return circular_pattern_features_.size();
+}
+std::size_t PartDocument::mirror_feature_count() const noexcept {
+  return mirror_features_.size();
+}
+std::size_t PartDocument::fillet_feature_count() const noexcept {
+  return fillet_features_.size();
+}
+std::size_t PartDocument::chamfer_feature_count() const noexcept {
+  return chamfer_features_.size();
+}
+std::size_t PartDocument::shell_feature_count() const noexcept {
+  return shell_features_.size();
 }
 std::size_t PartDocument::body_boolean_feature_count() const noexcept {
   return body_boolean_features_.size();
@@ -2025,6 +2319,30 @@ PartDocument::find_circular_pattern_feature(FeatureId id) const noexcept {
       return &feature;
   return nullptr;
 }
+const MirrorFeature* PartDocument::find_mirror_feature(FeatureId id) const noexcept {
+  for (const auto& feature : mirror_features_)
+    if (feature.id() == id)
+      return &feature;
+  return nullptr;
+}
+const FilletFeature* PartDocument::find_fillet_feature(FeatureId id) const noexcept {
+  for (const auto& feature : fillet_features_)
+    if (feature.id() == id)
+      return &feature;
+  return nullptr;
+}
+const ChamferFeature* PartDocument::find_chamfer_feature(FeatureId id) const noexcept {
+  for (const auto& feature : chamfer_features_)
+    if (feature.id() == id)
+      return &feature;
+  return nullptr;
+}
+const ShellFeature* PartDocument::find_shell_feature(FeatureId id) const noexcept {
+  for (const auto& feature : shell_features_)
+    if (feature.id() == id)
+      return &feature;
+  return nullptr;
+}
 const BodyBooleanFeature* PartDocument::find_body_boolean_feature(FeatureId id) const noexcept {
   for (const auto& feature : body_boolean_features_)
     if (feature.id() == id)
@@ -2118,6 +2436,18 @@ bool PartDocument::has_linear_pattern_feature_id(const FeatureId& id) const noex
 bool PartDocument::has_circular_pattern_feature_id(const FeatureId& id) const noexcept {
   return find_circular_pattern_feature(id) != nullptr;
 }
+bool PartDocument::has_mirror_feature_id(const FeatureId& id) const noexcept {
+  return find_mirror_feature(id) != nullptr;
+}
+bool PartDocument::has_fillet_feature_id(const FeatureId& id) const noexcept {
+  return find_fillet_feature(id) != nullptr;
+}
+bool PartDocument::has_chamfer_feature_id(const FeatureId& id) const noexcept {
+  return find_chamfer_feature(id) != nullptr;
+}
+bool PartDocument::has_shell_feature_id(const FeatureId& id) const noexcept {
+  return find_shell_feature(id) != nullptr;
+}
 bool PartDocument::has_body_boolean_feature_id(const FeatureId& id) const noexcept {
   return find_body_boolean_feature(id) != nullptr;
 }
@@ -2131,7 +2461,9 @@ bool PartDocument::has_body_transform_id(const BodyTransformId& id) const noexce
 }
 bool PartDocument::has_any_feature_id(const FeatureId& id) const noexcept {
   return has_feature_id(id) || has_revolve_feature_id(id) || has_linear_pattern_feature_id(id) ||
-         has_circular_pattern_feature_id(id) || has_body_boolean_feature_id(id);
+         has_circular_pattern_feature_id(id) || has_mirror_feature_id(id) ||
+         has_fillet_feature_id(id) || has_chamfer_feature_id(id) || has_shell_feature_id(id) ||
+         has_body_boolean_feature_id(id);
 }
 bool PartDocument::has_body_id(const BodyId& id) const noexcept {
   return find_body(id) != nullptr;

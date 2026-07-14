@@ -64,8 +64,8 @@ schema/version changes.
 
 ## Geometry boundary and proof
 
-Geometry recompute reports the Pattern Feature ID and the owning future block instead of silently
-marking unimplemented Pattern intent clean.
+Blocks 64 and 65 execute Linear and Circular Pattern intent respectively. Both consume the ordered
+Core sources and typed references without adding per-instance persistent Feature records.
 
 Focused verification:
 
@@ -77,4 +77,8 @@ The suite covers source identity/order, validation, Linear/Circular fields, in-p
 dependency/invalidation, removal protection, compatible strict JSON, missing sources, and invalid
 parameter types.
 
-Block 64 General Linear Pattern Geometry is the next boundary.
+Block 64 Linear Pattern Geometry is implemented in
+`docs/part-linear-pattern-geometry-mvp6.md`; Block 65 Circular Pattern Geometry is implemented in
+`docs/part-circular-pattern-geometry-mvp6.md`; Block 66 MirrorFeature Core intent and JSON is
+implemented in `docs/part-mirror-intent-mvp6.md`; Block 67 Geometry is implemented in
+`docs/part-mirror-geometry-mvp6.md`. Block 72 ShellFeature Geometry is next.

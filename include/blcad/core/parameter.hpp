@@ -13,6 +13,7 @@ namespace blcad {
 enum class ParameterType {
   Length,
   Count,
+  Angle,
 };
 
 enum class ParameterScope {
@@ -30,6 +31,9 @@ public:
                                                        ParameterScope scope = ParameterScope::Part);
   // A dimensionless positive integer parameter, for example a hole count.
   [[nodiscard]] static Result<Parameter> create_count(ParameterId id, std::string name,
+                                                      Quantity value,
+                                                      ParameterScope scope = ParameterScope::Part);
+  [[nodiscard]] static Result<Parameter> create_angle(ParameterId id, std::string name,
                                                       Quantity value,
                                                       ParameterScope scope = ParameterScope::Part);
 

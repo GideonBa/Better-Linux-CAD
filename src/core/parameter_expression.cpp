@@ -214,6 +214,9 @@ Result<ParameterExpressionEvaluation>
 ParameterExpressionEvaluator::evaluate(const PartDocument& document, std::string_view formula,
                                        ParameterType target_type,
                                        std::string_view object_id) const {
+  if (target_type == ParameterType::Angle)
+    return Result<ParameterExpressionEvaluation>::failure(
+        Error::validation(std::string(object_id), "angle expression parameters are not supported"));
   ExpressionParser parser{document, formula, std::string(object_id), 0U, {}};
 
   auto value = parser.parse_expression();

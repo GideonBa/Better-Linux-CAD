@@ -10,6 +10,8 @@ std::string_view to_string(ParameterType type) noexcept {
     return "length";
   case ParameterType::Count:
     return "count";
+  case ParameterType::Angle:
+    return "angle";
   }
 
   return "length";
@@ -72,6 +74,22 @@ Result<Parameter> Parameter::create_count(ParameterId id, std::string name, Quan
       Parameter(std::move(id), std::move(name), ParameterType::Count, value, scope));
 }
 
+Result<Parameter> Parameter::create_angle(ParameterId id, std::string name, Quantity value,
+                                          ParameterScope scope) {
+  const auto object_id = id.empty() ? std::string("parameter") : id.value();
+  if (id.empty())
+    return Result<Parameter>::failure(
+        Error::validation(object_id, "parameter id must not be empty"));
+  if (name.empty())
+    return Result<Parameter>::failure(
+        Error::validation(object_id, "parameter name must not be empty"));
+  if (!value.is_valid_angle())
+    return Result<Parameter>::failure(
+        Error::validation(object_id, "angle parameter must use degrees"));
+  return Result<Parameter>::success(
+      Parameter(std::move(id), std::move(name), ParameterType::Angle, value, scope));
+}
+
 Result<Parameter> Parameter::create_expression(ParameterId id, std::string name, ParameterType type,
                                                std::string formula, Quantity evaluated_value,
                                                ParameterScope scope) {
@@ -82,6 +100,9 @@ Result<Parameter> Parameter::create_expression(ParameterId id, std::string name,
         Error::validation(object_id, "expression parameter formula must not be empty"));
   }
 
+  if (type == ParameterType::Angle)
+    return Result<Parameter>::failure(Error::validation(
+        object_id, "angle expression parameters are not supported by the current evaluator"));
   auto plain = type == ParameterType::Count
                    ? create_count(std::move(id), std::move(name), evaluated_value, scope)
                    : create_length(std::move(id), std::move(name), evaluated_value, scope);
@@ -95,8 +116,9 @@ Result<Parameter> Parameter::create_expression(ParameterId id, std::string name,
 }
 
 Result<Parameter> Parameter::with_value(Quantity value) const {
-  auto updated = type_ == ParameterType::Count ? create_count(id_, name_, value, scope_)
-                                               : create_length(id_, name_, value, scope_);
+  auto updated = type_ == ParameterType::Count   ? create_count(id_, name_, value, scope_)
+                 : type_ == ParameterType::Angle ? create_angle(id_, name_, value, scope_)
+                                                 : create_length(id_, name_, value, scope_);
   if (updated.has_error()) {
     return updated;
   }

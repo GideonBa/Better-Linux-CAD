@@ -368,8 +368,9 @@ assembly_constraint_from_json(const json& constraint_json) {
 [[nodiscard]] Result<Parameter> assembly_parameter_from_json(const json& parameter_json) {
   const auto id = parameter_json.at("id").get<std::string>();
   const auto type = parameter_json.at("type").get<std::string>();
-  if (type != "length" && type != "count") {
-    return Result<Parameter>::failure(json_error("only length and count parameters are supported"));
+  if (type != "length" && type != "count" && type != "angle") {
+    return Result<Parameter>::failure(
+        json_error("only length, count, and angle parameters are supported"));
   }
   if (parameter_json.at("scope").get<std::string>() != "assembly") {
     return Result<Parameter>::failure(
@@ -383,6 +384,15 @@ assembly_constraint_from_json(const json& constraint_json) {
     if (quantity.has_error())
       return Result<Parameter>::failure(quantity.error());
     return Parameter::create_count(ParameterId(id), parameter_json.at("name").get<std::string>(),
+                                   quantity.value(), ParameterScope::Assembly);
+  }
+  if (type == "angle") {
+    if (parameter_json.at("unit").get<std::string>() != "deg")
+      return Result<Parameter>::failure(json_error("angle parameters must use unit \"deg\""));
+    auto quantity = Quantity::angle_deg(parameter_json.at("value").get<double>(), id);
+    if (quantity.has_error())
+      return Result<Parameter>::failure(quantity.error());
+    return Parameter::create_angle(ParameterId(id), parameter_json.at("name").get<std::string>(),
                                    quantity.value(), ParameterScope::Assembly);
   }
   if (parameter_json.at("unit").get<std::string>() != "mm") {

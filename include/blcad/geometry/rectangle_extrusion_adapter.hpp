@@ -49,6 +49,8 @@ private:
   friend class ClosedProfileAdapter;
   friend class BodyTransformAdapter;
   friend class RevolveAdapter;
+  friend class FilletAdapter;
+  friend class ChamferAdapter;
   friend class StepExporter;
   friend class AssemblyStepExporter;
   friend class detail::AssemblyPartShapeDefinitionBuilder;

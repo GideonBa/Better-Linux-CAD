@@ -584,13 +584,22 @@ Canonical numbered sequence:
 - `docs/part-revolve-intent-mvp6.md`
 - `docs/part-revolve-geometry-mvp6.md`
 - `docs/part-pattern-core-mvp6.md`
+- `docs/part-linear-pattern-geometry-mvp6.md`
+- `docs/part-circular-pattern-geometry-mvp6.md`
+- `docs/part-mirror-intent-mvp6.md`
+- `docs/part-mirror-geometry-mvp6.md`
+- `docs/part-edge-treatment-intent-mvp6.md`
+- `docs/part-fillet-geometry-mvp6.md`
+- `docs/part-chamfer-geometry-mvp6.md`
+- `docs/part-shell-intent-mvp6.md`
 - `docs/step-import-sequence-mvp7.md`
 
-Block 47 Spherical completes the Assembly MVP sequence. Blocks 48–63 Body identity, body-scoped
+Block 47 Spherical completes the Assembly MVP sequence. Blocks 48–71 Body identity, body-scoped
 recompute/inspection, Body Booleans, associative BodyTransform/SketchOwnership execution, and
 reusable Part-feature semantic input references plus richer Extrude/Cut intent/Geometry and
-persistent plus executed Revolve/RevolveCut and persistent general Linear/Circular Pattern intent
-are implemented. The next technical step is Block 64 General Linear Pattern Geometry.
+persistent plus executed Revolve/RevolveCut, general Pattern intent plus Geometry, and persistent
+plus executed MirrorFeature Geometry, persistent plus executed Fillet/Chamfer, and persistent
+ShellFeature intent are implemented. The next technical step is Block 72 ShellFeature Geometry.
 
 Block 47 adds passive Point/Point Spherical intent through the shared local/root-space path. Scalar
 Revolute APIs remain adapters; transform variables and the shared numeric engine are unchanged.

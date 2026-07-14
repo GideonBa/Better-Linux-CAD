@@ -71,8 +71,20 @@ failure. It maps the supported profile regions and typed axes into model space, 
 partial, and symmetric revolutions, applies all four Body operations, and publishes cache results
 only after valid solid construction. Block 63 adds ordered Feature/Body Pattern sources, persistent
 Linear/Circular parameters and direction/axis intent, shared Body-result semantics, graph
-invalidation, and compatible JSON without copying Feature records. Block 64 General Linear Pattern
-Geometry is next.
+invalidation, and compatible JSON without copying Feature records. Block 64 executes deterministic
+Feature/Body Linear Patterns for spacing/total extent, reversed direction, and all Body operations.
+Block 65 executes full/partial Feature/Body Circular Patterns around typed axes with deterministic
+angular order, all Body operations, and incremental recompute. Block 66 MirrorFeature Core intent
+and JSON adds ordered Feature/Body sources, typed Datum/Construction/semantic planar mirror-plane
+identity, Body-result and graph semantics, and compatible strict JSON. Block 67 MirrorFeature
+Geometry executes typed-plane reflection, all Body-result modes, and transactional recompute.
+Block 68 adds ordered semantic Fillet/Chamfer edges, Body-history ownership, dimensional
+parameters, three Chamfer modes, invalidation, and strict compatible JSON. Block 69 Fillet Geometry
+executes constant-radius OCCT results with semantic edge recovery and transactional recompute.
+Block 70 executes all three Chamfer modes with deterministic semantic reference sides and the same
+transactional recompute boundary. Block 71 adds ordered semantic Shell removal faces, positive
+Length thickness, explicit Inward/Outward direction, Body history, invalidation, and strict
+compatible JSON. Block 72 ShellFeature Geometry is next.
 
 The long-term sketcher and feature parity target is documented in `docs/inventor-like-sketcher-and-feature-roadmap.md`.
 

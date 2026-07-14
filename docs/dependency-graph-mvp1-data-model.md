@@ -221,3 +221,19 @@ Block 63 adds each ordered Pattern Feature/Body source, direction/axis source, C
 parameter, and target/prior Body producer as an input to the Pattern node. The Pattern produces its
 effective Body node. An in-place Body source is replaced by the preceding Body producer edge so
 the authored dependency remains acyclic and incremental execution cannot consume its own result.
+Block 64 consumes that ordering in Geometry. Feature/Body sources resolve before deterministic
+instance generation; in-place operations read the preceding producer shape, and only the completed
+Linear Pattern result replaces the Feature- and Body-scoped cache entries.
+Block 65 consumes the same graph ordering for Circular Pattern execution. Typed axis origin and
+direction resolve after their semantic producers; deterministic rotations and the atomic Body
+operation complete before the Circular Pattern replaces Feature- and Body-scoped cache entries.
+Block 66 adds every ordered Mirror Feature/Body source and typed plane source as dependencies of
+the Mirror node, which produces its effective Body. Modifying Mirrors advance the prior producer;
+an in-place Body source is replaced by that producer edge to prevent a Body self-cycle.
+Block 68 adds every ordered semantic edge producer and dimensional parameter as a dependency of
+its Fillet/Chamfer node. The preceding target-Body producer feeds the treatment, and the treatment
+becomes the next producer of that same Body, preserving acyclic in-place feature history.
+Block 71 applies the same in-place history contract to ShellFeature. Every ordered semantic
+removed-face producer and the positive Length thickness parameter feed the Shell node; the prior
+target-Body producer precedes it, and Shell becomes the new producer of that Body. Thickness and
+upstream topology changes therefore invalidate Shell and all later Body consumers.

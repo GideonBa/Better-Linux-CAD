@@ -277,6 +277,248 @@ resolve_boolean_target_input(const PartDocument& document, const ShapeCache& sha
   return body_result;
 }
 
+[[nodiscard]] bool feature_produces_body(const PartDocument& document, std::string_view producer,
+                                         const BodyId& body) {
+  if (const Feature* feature = document.find_feature(FeatureId(std::string(producer)));
+      feature != nullptr && feature->body_result_context().has_value())
+    return feature->body_result_context()->effective_produced_body() == body;
+  if (const RevolveFeature* feature =
+          document.find_revolve_feature(FeatureId(std::string(producer))))
+    return feature->body_result_context().effective_produced_body() == body;
+  if (const LinearPatternFeature* feature =
+          document.find_linear_pattern_feature(FeatureId(std::string(producer))))
+    return feature->body_result_context().effective_produced_body() == body;
+  if (const CircularPatternFeature* feature =
+          document.find_circular_pattern_feature(FeatureId(std::string(producer))))
+    return feature->body_result_context().effective_produced_body() == body;
+  if (const MirrorFeature* feature = document.find_mirror_feature(FeatureId(std::string(producer))))
+    return feature->body_result_context().effective_produced_body() == body;
+  if (const FilletFeature* feature = document.find_fillet_feature(FeatureId(std::string(producer))))
+    return feature->target_body() == body;
+  if (const ChamferFeature* feature =
+          document.find_chamfer_feature(FeatureId(std::string(producer))))
+    return feature->target_body() == body;
+  if (const ShellFeature* feature = document.find_shell_feature(FeatureId(std::string(producer))))
+    return feature->target_body() == body;
+  if (const BodyBooleanFeature* feature =
+          document.find_body_boolean_feature(FeatureId(std::string(producer))))
+    return feature->effective_result_body() == body;
+  if (const BodyTransform* transform =
+          document.find_body_transform(BodyTransformId(std::string(producer))))
+    return transform->body() == body;
+  return false;
+}
+
+[[nodiscard]] Result<const GeometryShape*>
+resolve_edge_treatment_target(const PartDocument& document, const FeatureId& feature_id,
+                              const BodyId& target_body, const ShapeCache& shape_cache) {
+  auto order = document.dependency_graph().topological_order();
+  if (order.has_error())
+    return Result<const GeometryShape*>::failure(order.error());
+
+  const GeometryShape* target = nullptr;
+  for (const std::string& producer : order.value()) {
+    if (!feature_produces_body(document, producer, target_body))
+      continue;
+    const bool is_dependency = std::ranges::any_of(
+        document.dependency_graph().dependencies(), [&](const auto& dependency) {
+          return dependency.first == producer && dependency.second == feature_id.value();
+        });
+    if (!is_dependency)
+      continue;
+    if (const GeometryShape* candidate = shape_cache.find_feature_shape(FeatureId(producer));
+        candidate != nullptr)
+      target = candidate;
+  }
+
+  if (target == nullptr)
+    target = shape_cache.find_body_shape(target_body);
+  if (target == nullptr)
+    return Result<const GeometryShape*>::failure(geometry_error(
+        target_body.value(), "edge-treatment target body shape must exist in shape cache"));
+  return Result<const GeometryShape*>::success(target);
+}
+
+[[nodiscard]] Result<std::size_t> store_fillet_result(const PartDocument& document,
+                                                      const FilletFeature& feature,
+                                                      GeometryShape shape,
+                                                      ShapeCache& shape_cache) {
+  const Body* body = document.find_body(feature.target_body());
+  if (body == nullptr)
+    return Result<std::size_t>::failure(
+        validation_error(feature.target_body().value(), "target body must exist"));
+  auto feature_result = shape_cache.store_feature_shape(feature.id(), shape);
+  if (feature_result.has_error())
+    return feature_result;
+  auto body_result =
+      shape_cache.store_body_shape(feature.target_body(), feature.id(), std::move(shape));
+  if (body_result.has_error())
+    return body_result;
+  if (document.bodies().size() == 1U && body->kind() == BodyKind::Solid) {
+    const GeometryShape* cached = shape_cache.find_body_shape(feature.target_body());
+    return shape_cache.set_final_shape(feature.id(), *cached);
+  }
+  shape_cache.clear_final_shape();
+  return body_result;
+}
+
+[[nodiscard]] Result<std::size_t> store_chamfer_result(const PartDocument& document,
+                                                        const ChamferFeature& feature,
+                                                        GeometryShape shape,
+                                                        ShapeCache& shape_cache) {
+  const Body* body = document.find_body(feature.target_body());
+  if (body == nullptr)
+    return Result<std::size_t>::failure(
+        validation_error(feature.target_body().value(), "target body must exist"));
+  auto feature_result = shape_cache.store_feature_shape(feature.id(), shape);
+  if (feature_result.has_error())
+    return feature_result;
+  auto body_result =
+      shape_cache.store_body_shape(feature.target_body(), feature.id(), std::move(shape));
+  if (body_result.has_error())
+    return body_result;
+  if (document.bodies().size() == 1U && body->kind() == BodyKind::Solid) {
+    const GeometryShape* cached = shape_cache.find_body_shape(feature.target_body());
+    return shape_cache.set_final_shape(feature.id(), *cached);
+  }
+  shape_cache.clear_final_shape();
+  return body_result;
+}
+
+template <typename PatternFeature>
+[[nodiscard]] Result<const GeometryShape*> resolve_pattern_target(const PartDocument& document,
+                                                                  const PatternFeature& feature,
+                                                                  const ShapeCache& shape_cache) {
+  const auto& context = feature.body_result_context();
+  if (!context.target_body().has_value())
+    return Result<const GeometryShape*>::success(nullptr);
+  const BodyId& body = *context.target_body();
+  for (const auto& [producer, dependent] : document.dependency_graph().dependencies()) {
+    if (dependent != feature.id().value() || producer.starts_with("body:") ||
+        !feature_produces_body(document, producer, body))
+      continue;
+    if (const GeometryShape* shape = shape_cache.find_feature_shape(FeatureId(producer)))
+      return Result<const GeometryShape*>::success(shape);
+  }
+  const GeometryShape* shape = shape_cache.find_body_shape(body);
+  if (shape == nullptr)
+    return Result<const GeometryShape*>::failure(
+        geometry_error(body.value(), "pattern target body shape must exist in shape cache"));
+  return Result<const GeometryShape*>::success(shape);
+}
+
+template <typename PatternFeature>
+[[nodiscard]] Result<std::vector<GeometryShape>>
+resolve_pattern_sources(const PatternFeature& feature, const ShapeCache& shape_cache,
+                        const GeometryShape* target) {
+  std::vector<GeometryShape> sources;
+  sources.reserve(feature.sources().size());
+  const auto& context = feature.body_result_context();
+  for (const auto& source : feature.sources()) {
+    const GeometryShape* shape = nullptr;
+    if (source.kind() == PatternSourceKind::Feature) {
+      const FeatureId& id = std::get<FeatureId>(source.source());
+      shape = shape_cache.find_feature_shape(id);
+    } else {
+      const BodyId& id = std::get<BodyId>(source.source());
+      const bool is_in_place_target = context.target_body().has_value() &&
+                                      *context.target_body() == id &&
+                                      context.effective_produced_body() == id;
+      shape = is_in_place_target ? target : shape_cache.find_body_shape(id);
+    }
+    if (shape == nullptr)
+      return Result<std::vector<GeometryShape>>::failure(geometry_error(
+          source.source_node_id(), "pattern source shape must exist in shape cache"));
+    sources.push_back(*shape);
+  }
+  return Result<std::vector<GeometryShape>>::success(std::move(sources));
+}
+
+[[nodiscard]] Result<std::vector<GeometryShape>>
+resolve_mirror_sources(const MirrorFeature& feature, const ShapeCache& shape_cache,
+                       const GeometryShape* target) {
+  std::vector<GeometryShape> sources;
+  sources.reserve(feature.sources().size());
+  const auto& context = feature.body_result_context();
+  for (const auto& source : feature.sources()) {
+    const GeometryShape* shape = nullptr;
+    if (source.kind() == MirrorSourceKind::Feature) {
+      shape = shape_cache.find_feature_shape(std::get<FeatureId>(source.source()));
+    } else {
+      const BodyId& id = std::get<BodyId>(source.source());
+      const bool is_in_place_target = context.target_body().has_value() &&
+                                      *context.target_body() == id &&
+                                      context.effective_produced_body() == id;
+      shape = is_in_place_target ? target : shape_cache.find_body_shape(id);
+    }
+    if (shape == nullptr)
+      return Result<std::vector<GeometryShape>>::failure(
+          geometry_error(source.source_node_id(), "mirror source shape must exist in shape cache"));
+    sources.push_back(*shape);
+  }
+  return Result<std::vector<GeometryShape>>::success(std::move(sources));
+}
+
+[[nodiscard]] Result<std::pair<Point3, Vector3>>
+resolve_mirror_plane(const PartDocument& document, const PlaneReference& reference,
+                     const ShapeCache& shape_cache, const WorkplaneResolver& resolver) {
+  Result<ResolvedWorkplane> plane = Result<ResolvedWorkplane>::failure(
+      geometry_error(reference.source_node_id(), "unsupported mirror plane source"));
+  if (const auto* datum = std::get_if<DatumPlaneId>(&reference.source())) {
+    plane = resolver.resolve(document, *datum);
+  } else if (const auto* construction = std::get_if<ConstructionPlaneId>(&reference.source())) {
+    plane = resolver.resolve(document, DatumPlaneId(construction->value()));
+  } else {
+    plane = resolver.resolve_generated_face(document,
+                                            std::get<SemanticFaceReference>(reference.source()));
+  }
+  if (plane.has_error())
+    return Result<std::pair<Point3, Vector3>>::failure(plane.error());
+
+  Point3 origin = plane.value().origin;
+  Vector3 normal = plane.value().normal;
+  if (const auto* transform = shape_cache.find_reference_transform(reference.source_node_id())) {
+    origin = transform->cumulative_transform.transform_point(origin);
+    normal = transform->cumulative_transform.transform_vector(normal);
+  }
+  return Result<std::pair<Point3, Vector3>>::success({origin, normalized(normal)});
+}
+
+template <typename PatternFeature>
+[[nodiscard]] Result<GeometryShape> fuse_pattern_shapes(const PatternFeature& feature,
+                                                        const std::vector<GeometryShape>& shapes,
+                                                        const BodyBooleanAdapter& boolean_adapter) {
+  if (shapes.empty())
+    return Result<GeometryShape>::failure(
+        geometry_error(feature.id().value(), "pattern produced no tool shapes"));
+  if (shapes.size() == 1U)
+    return Result<GeometryShape>::success(shapes.front());
+  std::vector<GeometryShape> tools(shapes.begin() + 1, shapes.end());
+  return boolean_adapter.combine(feature.id(), BodyBooleanOperation::Add, shapes.front(), tools);
+}
+
+template <typename PatternFeature>
+[[nodiscard]] Result<std::size_t>
+store_pattern_result(const PartDocument& document, const PatternFeature& feature,
+                     GeometryShape shape, ShapeCache& shape_cache) {
+  const BodyId& result_body = feature.body_result_context().effective_produced_body();
+  if (document.find_body(result_body) == nullptr)
+    return Result<std::size_t>::failure(
+        validation_error(result_body.value(), "pattern produced body must exist"));
+  auto feature_result = shape_cache.store_feature_shape(feature.id(), shape);
+  if (feature_result.has_error())
+    return feature_result;
+  auto body_result = shape_cache.store_body_shape(result_body, feature.id(), std::move(shape));
+  if (body_result.has_error())
+    return body_result;
+  if (document.bodies().size() == 1U && document.bodies().front().kind() == BodyKind::Solid) {
+    const GeometryShape* cached = shape_cache.find_body_shape(result_body);
+    return shape_cache.set_final_shape(feature.id(), *cached);
+  }
+  shape_cache.clear_final_shape();
+  return body_result;
+}
+
 [[nodiscard]] Result<const GeometryShape*> resolve_revolve_target(const PartDocument& document,
                                                                   const RevolveFeature& feature,
                                                                   const ShapeCache& shape_cache) {
@@ -313,15 +555,15 @@ resolve_boolean_target_input(const PartDocument& document, const ShapeCache& sha
 }
 
 [[nodiscard]] Result<std::pair<Point3, Vector3>>
-resolve_revolve_axis(const PartDocument& document, const AxisReference& reference,
-                     const ShapeCache& shape_cache, const WorkplaneResolver& workplane_resolver) {
+resolve_axis_reference(const PartDocument& document, const AxisReference& reference,
+                       const ShapeCache& shape_cache, const WorkplaneResolver& workplane_resolver) {
   Result<std::pair<Point3, Vector3>> resolved = Result<std::pair<Point3, Vector3>>::failure(
-      geometry_error(reference.source_node_id(), "unsupported revolve axis source"));
+      geometry_error(reference.source_node_id(), "unsupported axis source"));
   if (const auto* datum = std::get_if<DatumAxisId>(&reference.source())) {
     const DatumAxis* axis = document.find_datum_axis(*datum);
     if (axis == nullptr)
       return Result<std::pair<Point3, Vector3>>::failure(
-          geometry_error(datum->value(), "revolve DatumAxis must exist in part document"));
+          geometry_error(datum->value(), "DatumAxis must exist in part document"));
     if (axis->kind() == DatumAxisKind::Explicit)
       resolved = Result<std::pair<Point3, Vector3>>::success({axis->origin(), axis->direction()});
     else {
@@ -342,13 +584,13 @@ resolve_revolve_axis(const PartDocument& document, const AxisReference& referenc
     if (source == nullptr || source->type() != FeatureType::SubtractiveExtrude)
       return Result<std::pair<Point3, Vector3>>::failure(
           geometry_error(semantic->source_feature().value(),
-                         "semantic revolve axis requires a circular subtractive-extrude producer"));
+                         "semantic axis requires a circular subtractive-extrude producer"));
     const Sketch* sketch = document.find_sketch(source->input_sketch());
     if (sketch == nullptr || sketch->circle_profiles().size() != 1U ||
         sketch->profile_count() != 1U)
       return Result<std::pair<Point3, Vector3>>::failure(
           geometry_error(semantic->source_feature().value(),
-                         "semantic revolve axis producer requires exactly one circle profile"));
+                         "semantic axis producer requires exactly one circle profile"));
     auto workplane = workplane_resolver.resolve_for_sketch(document, *sketch, shape_cache);
     if (workplane.has_error())
       return Result<std::pair<Point3, Vector3>>::failure(workplane.error());
@@ -1130,7 +1372,7 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_revolve(const PartDocumen
   auto workplane = workplane_resolver_.resolve_for_sketch(document, *sketch, working_cache);
   if (workplane.has_error())
     return Result<std::size_t>::failure(workplane.error());
-  auto axis = resolve_revolve_axis(document, feature->axis(), working_cache, workplane_resolver_);
+  auto axis = resolve_axis_reference(document, feature->axis(), working_cache, workplane_resolver_);
   if (axis.has_error())
     return Result<std::size_t>::failure(axis.error());
   const ResolvedRevolveAngles angles = resolve_revolve_angles(feature->extent());
@@ -1230,6 +1472,234 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_revolve(const PartDocumen
     result = std::move(combined.value());
   }
   auto stored = store_revolve_result(document, *feature, std::move(result), working_cache);
+  if (stored.has_error())
+    return stored;
+  shape_cache = std::move(working_cache);
+  return stored;
+}
+
+Result<std::size_t> GeometryRecomputeExecutor::execute_linear_pattern(
+    const PartDocument& document, FeatureId feature_id, ShapeCache& shape_cache) const {
+  if (feature_id.empty())
+    return Result<std::size_t>::failure(
+        validation_error("linear_pattern", "feature id must not be empty"));
+  const LinearPatternFeature* feature = document.find_linear_pattern_feature(feature_id);
+  if (feature == nullptr)
+    return Result<std::size_t>::failure(
+        validation_error(feature_id.value(), "linear pattern feature must exist in part document"));
+  const Parameter* count = document.find_parameter(feature->count_parameter());
+  const Parameter* extent = document.find_parameter(feature->extent_parameter());
+  if (count == nullptr || count->type() != ParameterType::Count ||
+      count->value().count_value() < 2U)
+    return Result<std::size_t>::failure(
+        geometry_error(feature->id().value(), "linear pattern count must resolve to at least 2"));
+  if (extent == nullptr || extent->type() != ParameterType::Length)
+    return Result<std::size_t>::failure(geometry_error(
+        feature->id().value(), "linear pattern extent must resolve to a Length parameter"));
+
+  ShapeCache working_cache = shape_cache;
+  auto target = resolve_pattern_target(document, *feature, working_cache);
+  if (target.has_error())
+    return Result<std::size_t>::failure(target.error());
+  auto sources = resolve_pattern_sources(*feature, working_cache, target.value());
+  if (sources.has_error())
+    return Result<std::size_t>::failure(sources.error());
+  auto direction =
+      resolve_axis_reference(document, feature->direction(), working_cache, workplane_resolver_);
+  if (direction.has_error())
+    return Result<std::size_t>::failure(direction.error());
+  Vector3 signed_direction = normalized(direction.value().second);
+  if (feature->direction_sign() == PatternDirectionSign::Negative)
+    signed_direction = {-signed_direction.x, -signed_direction.y, -signed_direction.z};
+  const std::size_t instance_count = count->value().count_value();
+  double spacing_mm = extent->value().millimeters();
+  if (feature->extent_mode() == LinearPatternExtentMode::TotalExtent)
+    spacing_mm /= static_cast<double>(instance_count - 1U);
+  auto instances = linear_pattern_adapter_.generate_instances(
+      feature->id(), sources.value(), signed_direction, instance_count, spacing_mm);
+  if (instances.has_error())
+    return Result<std::size_t>::failure(instances.error());
+
+  std::vector<GeometryShape> tools;
+  const auto& context = feature->body_result_context();
+  if (context.operation_mode() == FeatureBodyOperationMode::NewBody) {
+    tools = std::move(instances.value());
+  } else {
+    if (target.value() == nullptr)
+      return Result<std::size_t>::failure(geometry_error(
+          feature->id().value(), "modifying linear pattern requires a target shape"));
+    const std::size_t source_count = feature->sources().size();
+    tools.reserve(instances.value().size());
+    for (std::size_t index = 0U; index < instances.value().size(); ++index) {
+      const std::size_t instance_index = index / source_count;
+      const auto& source = feature->sources().at(index % source_count);
+      bool original_in_target = false;
+      if (instance_index == 0U && context.target_body().has_value()) {
+        if (source.kind() == PatternSourceKind::Body)
+          original_in_target = std::get<BodyId>(source.source()) == *context.target_body();
+        else
+          original_in_target = feature_produces_body(
+              document, std::get<FeatureId>(source.source()).value(), *context.target_body());
+      }
+      if (!original_in_target)
+        tools.push_back(instances.value().at(index));
+    }
+  }
+
+  auto tool_union = fuse_pattern_shapes(*feature, tools, body_boolean_adapter_);
+  if (tool_union.has_error())
+    return Result<std::size_t>::failure(tool_union.error());
+  GeometryShape result = tool_union.value();
+  if (context.operation_mode() != FeatureBodyOperationMode::NewBody) {
+    BodyBooleanOperation operation = BodyBooleanOperation::Add;
+    if (context.operation_mode() == FeatureBodyOperationMode::Cut)
+      operation = BodyBooleanOperation::Subtract;
+    else if (context.operation_mode() == FeatureBodyOperationMode::Intersect)
+      operation = BodyBooleanOperation::Intersect;
+    auto combined = body_boolean_adapter_.combine(feature->id(), operation, *target.value(),
+                                                  {tool_union.value()});
+    if (combined.has_error())
+      return Result<std::size_t>::failure(combined.error());
+    result = std::move(combined.value());
+  }
+  auto stored = store_pattern_result(document, *feature, std::move(result), working_cache);
+  if (stored.has_error())
+    return stored;
+  shape_cache = std::move(working_cache);
+  return stored;
+}
+
+Result<std::size_t> GeometryRecomputeExecutor::execute_circular_pattern(
+    const PartDocument& document, FeatureId feature_id, ShapeCache& shape_cache) const {
+  if (feature_id.empty())
+    return Result<std::size_t>::failure(
+        validation_error("circular_pattern", "feature id must not be empty"));
+  const CircularPatternFeature* feature = document.find_circular_pattern_feature(feature_id);
+  if (feature == nullptr)
+    return Result<std::size_t>::failure(validation_error(
+        feature_id.value(), "circular pattern feature must exist in part document"));
+  const Parameter* count = document.find_parameter(feature->count_parameter());
+  if (count == nullptr || count->type() != ParameterType::Count ||
+      count->value().count_value() < 2U)
+    return Result<std::size_t>::failure(
+        geometry_error(feature->id().value(), "circular pattern count must resolve to at least 2"));
+  if (!feature->equal_spacing())
+    return Result<std::size_t>::failure(
+        geometry_error(feature->id().value(), "circular pattern requires equal spacing"));
+
+  ShapeCache working_cache = shape_cache;
+  auto target = resolve_pattern_target(document, *feature, working_cache);
+  if (target.has_error())
+    return Result<std::size_t>::failure(target.error());
+  auto sources = resolve_pattern_sources(*feature, working_cache, target.value());
+  if (sources.has_error())
+    return Result<std::size_t>::failure(sources.error());
+  auto axis = resolve_axis_reference(document, feature->axis(), working_cache, workplane_resolver_);
+  if (axis.has_error())
+    return Result<std::size_t>::failure(axis.error());
+  auto instances = circular_pattern_adapter_.generate_instances(
+      feature->id(), sources.value(), axis.value().first, axis.value().second,
+      count->value().count_value(), feature->total_angle_deg());
+  if (instances.has_error())
+    return Result<std::size_t>::failure(instances.error());
+
+  std::vector<GeometryShape> tools;
+  const auto& context = feature->body_result_context();
+  if (context.operation_mode() == FeatureBodyOperationMode::NewBody) {
+    tools = std::move(instances.value());
+  } else {
+    if (target.value() == nullptr)
+      return Result<std::size_t>::failure(geometry_error(
+          feature->id().value(), "modifying circular pattern requires a target shape"));
+    const std::size_t source_count = feature->sources().size();
+    tools.reserve(instances.value().size());
+    for (std::size_t index = 0U; index < instances.value().size(); ++index) {
+      const std::size_t instance_index = index / source_count;
+      const auto& source = feature->sources().at(index % source_count);
+      bool original_in_target = false;
+      if (instance_index == 0U && context.target_body().has_value()) {
+        if (source.kind() == PatternSourceKind::Body)
+          original_in_target = std::get<BodyId>(source.source()) == *context.target_body();
+        else
+          original_in_target = feature_produces_body(
+              document, std::get<FeatureId>(source.source()).value(), *context.target_body());
+      }
+      if (!original_in_target)
+        tools.push_back(instances.value().at(index));
+    }
+  }
+
+  auto tool_union = fuse_pattern_shapes(*feature, tools, body_boolean_adapter_);
+  if (tool_union.has_error())
+    return Result<std::size_t>::failure(tool_union.error());
+  GeometryShape result = tool_union.value();
+  if (context.operation_mode() != FeatureBodyOperationMode::NewBody) {
+    BodyBooleanOperation operation = BodyBooleanOperation::Add;
+    if (context.operation_mode() == FeatureBodyOperationMode::Cut)
+      operation = BodyBooleanOperation::Subtract;
+    else if (context.operation_mode() == FeatureBodyOperationMode::Intersect)
+      operation = BodyBooleanOperation::Intersect;
+    auto combined = body_boolean_adapter_.combine(feature->id(), operation, *target.value(),
+                                                  {tool_union.value()});
+    if (combined.has_error())
+      return Result<std::size_t>::failure(combined.error());
+    result = std::move(combined.value());
+  }
+  auto stored = store_pattern_result(document, *feature, std::move(result), working_cache);
+  if (stored.has_error())
+    return stored;
+  shape_cache = std::move(working_cache);
+  return stored;
+}
+
+Result<std::size_t> GeometryRecomputeExecutor::execute_mirror(const PartDocument& document,
+                                                              FeatureId feature_id,
+                                                              ShapeCache& shape_cache) const {
+  if (feature_id.empty())
+    return Result<std::size_t>::failure(validation_error("mirror", "feature id must not be empty"));
+  const MirrorFeature* feature = document.find_mirror_feature(feature_id);
+  if (feature == nullptr)
+    return Result<std::size_t>::failure(
+        validation_error(feature_id.value(), "mirror feature must exist in part document"));
+
+  ShapeCache working_cache = shape_cache;
+  auto target = resolve_pattern_target(document, *feature, working_cache);
+  if (target.has_error())
+    return Result<std::size_t>::failure(target.error());
+  auto sources = resolve_mirror_sources(*feature, working_cache, target.value());
+  if (sources.has_error())
+    return Result<std::size_t>::failure(sources.error());
+  auto plane =
+      resolve_mirror_plane(document, feature->mirror_plane(), working_cache, workplane_resolver_);
+  if (plane.has_error())
+    return Result<std::size_t>::failure(plane.error());
+  auto reflected = mirror_adapter_.reflect_sources(feature->id(), sources.value(),
+                                                   plane.value().first, plane.value().second);
+  if (reflected.has_error())
+    return Result<std::size_t>::failure(reflected.error());
+  auto tool_union = fuse_pattern_shapes(*feature, reflected.value(), body_boolean_adapter_);
+  if (tool_union.has_error())
+    return Result<std::size_t>::failure(tool_union.error());
+
+  GeometryShape result = tool_union.value();
+  const auto& context = feature->body_result_context();
+  if (context.operation_mode() != FeatureBodyOperationMode::NewBody) {
+    if (target.value() == nullptr)
+      return Result<std::size_t>::failure(
+          geometry_error(feature->id().value(), "modifying mirror requires a target shape"));
+    BodyBooleanOperation operation = BodyBooleanOperation::Add;
+    if (context.operation_mode() == FeatureBodyOperationMode::Cut)
+      operation = BodyBooleanOperation::Subtract;
+    else if (context.operation_mode() == FeatureBodyOperationMode::Intersect)
+      operation = BodyBooleanOperation::Intersect;
+    auto combined = body_boolean_adapter_.combine(feature->id(), operation, *target.value(),
+                                                  std::vector<GeometryShape>{tool_union.value()});
+    if (combined.has_error())
+      return Result<std::size_t>::failure(combined.error());
+    result = std::move(combined.value());
+  }
+
+  auto stored = store_pattern_result(document, *feature, std::move(result), working_cache);
   if (stored.has_error())
     return stored;
   shape_cache = std::move(working_cache);
@@ -1556,6 +2026,88 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_subtractive_extrude(
   return store_feature_result(document, *feature, std::move(shape.value()), shape_cache);
 }
 
+Result<std::size_t> GeometryRecomputeExecutor::execute_fillet(const PartDocument& document,
+                                                              FeatureId feature_id,
+                                                              ShapeCache& shape_cache) const {
+  if (feature_id.empty())
+    return Result<std::size_t>::failure(validation_error("fillet", "feature id must not be empty"));
+  const FilletFeature* feature = document.find_fillet_feature(feature_id);
+  if (feature == nullptr)
+    return Result<std::size_t>::failure(
+        validation_error(feature_id.value(), "fillet feature must exist in part document"));
+
+  const Parameter* radius = document.find_parameter(feature->radius_parameter());
+  if (radius == nullptr || radius->type() != ParameterType::Length ||
+      radius->value().millimeters() <= k_tolerance)
+    return Result<std::size_t>::failure(validation_error(
+        feature->radius_parameter().value(), "fillet radius must be a positive length"));
+
+  ShapeCache working_cache = shape_cache;
+  auto target =
+      resolve_edge_treatment_target(document, feature->id(), feature->target_body(), working_cache);
+  if (target.has_error())
+    return Result<std::size_t>::failure(target.error());
+  auto result = fillet_adapter_.apply(document, *feature, *target.value(), working_cache,
+                                      radius->value().millimeters());
+  if (result.has_error())
+    return Result<std::size_t>::failure(result.error());
+  auto stored = store_fillet_result(document, *feature, std::move(result.value()), working_cache);
+  if (stored.has_error())
+    return stored;
+  shape_cache = std::move(working_cache);
+  return stored;
+}
+
+Result<std::size_t> GeometryRecomputeExecutor::execute_chamfer(const PartDocument& document,
+                                                               FeatureId feature_id,
+                                                               ShapeCache& shape_cache) const {
+  if (feature_id.empty())
+    return Result<std::size_t>::failure(
+        validation_error("chamfer", "feature id must not be empty"));
+  const ChamferFeature* feature = document.find_chamfer_feature(feature_id);
+  if (feature == nullptr)
+    return Result<std::size_t>::failure(
+        validation_error(feature_id.value(), "chamfer feature must exist in part document"));
+
+  const Parameter* first = document.find_parameter(feature->first_parameter());
+  if (first == nullptr || first->type() != ParameterType::Length ||
+      first->value().millimeters() <= k_tolerance)
+    return Result<std::size_t>::failure(validation_error(
+        feature->first_parameter().value(), "first chamfer parameter must be a positive length"));
+
+  std::optional<double> second_value;
+  if (feature->second_parameter().has_value()) {
+    const Parameter* second = document.find_parameter(*feature->second_parameter());
+    const ParameterType expected = feature->mode() == ChamferMode::DistanceAngle
+                                       ? ParameterType::Angle
+                                       : ParameterType::Length;
+    if (second == nullptr || second->type() != expected)
+      return Result<std::size_t>::failure(validation_error(
+          feature->second_parameter()->value(), "second chamfer parameter has the wrong type"));
+    second_value = expected == ParameterType::Angle ? second->value().degrees()
+                                                    : second->value().millimeters();
+    if (*second_value <= k_tolerance ||
+        (expected == ParameterType::Angle && *second_value >= 90.0))
+      return Result<std::size_t>::failure(validation_error(
+          feature->second_parameter()->value(), "second chamfer parameter is outside its range"));
+  }
+
+  ShapeCache working_cache = shape_cache;
+  auto target =
+      resolve_edge_treatment_target(document, feature->id(), feature->target_body(), working_cache);
+  if (target.has_error())
+    return Result<std::size_t>::failure(target.error());
+  auto result = chamfer_adapter_.apply(document, *feature, *target.value(), working_cache,
+                                       first->value().millimeters(), second_value);
+  if (result.has_error())
+    return Result<std::size_t>::failure(result.error());
+  auto stored = store_chamfer_result(document, *feature, std::move(result.value()), working_cache);
+  if (stored.has_error())
+    return stored;
+  shape_cache = std::move(working_cache);
+  return stored;
+}
+
 Result<std::size_t> GeometryRecomputeExecutor::execute_body_boolean(const PartDocument& document,
                                                                     FeatureId feature_id,
                                                                     ShapeCache& shape_cache) const {
@@ -1753,23 +2305,29 @@ GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const Reco
         document.find_linear_pattern_feature(FeatureId(step.node_id));
     const CircularPatternFeature* circular_pattern =
         document.find_circular_pattern_feature(FeatureId(step.node_id));
-    if (linear_pattern != nullptr)
+    const MirrorFeature* mirror = document.find_mirror_feature(FeatureId(step.node_id));
+    const FilletFeature* fillet = document.find_fillet_feature(FeatureId(step.node_id));
+    const ChamferFeature* chamfer = document.find_chamfer_feature(FeatureId(step.node_id));
+    const ShellFeature* shell = document.find_shell_feature(FeatureId(step.node_id));
+    if (shell != nullptr)
       return Result<GeometryRecomputeSummary>::failure(geometry_error(
-          linear_pattern->id().value(), "Linear Pattern geometry is not available until Block 64"));
-    if (circular_pattern != nullptr)
-      return Result<GeometryRecomputeSummary>::failure(
-          geometry_error(circular_pattern->id().value(),
-                         "Circular Pattern geometry is not available until Block 65"));
+          shell->id().value(), "ShellFeature geometry is not available until Block 72"));
     const BodyBooleanFeature* body_boolean =
         document.find_body_boolean_feature(FeatureId(step.node_id));
     const BodyTransform* body_transform =
         document.find_body_transform(BodyTransformId(step.node_id));
-    if (feature == nullptr && revolve == nullptr && body_boolean == nullptr &&
-        body_transform == nullptr)
+    if (feature == nullptr && revolve == nullptr && linear_pattern == nullptr &&
+        circular_pattern == nullptr && mirror == nullptr && fillet == nullptr &&
+        chamfer == nullptr && body_boolean == nullptr && body_transform == nullptr)
       continue;
 
-    const FeatureId executable_id = feature != nullptr   ? feature->id()
-                                    : revolve != nullptr ? revolve->id()
+    const FeatureId executable_id = feature != nullptr            ? feature->id()
+                                    : revolve != nullptr          ? revolve->id()
+                                    : linear_pattern != nullptr   ? linear_pattern->id()
+                                    : circular_pattern != nullptr ? circular_pattern->id()
+                                    : mirror != nullptr           ? mirror->id()
+                                    : fillet != nullptr           ? fillet->id()
+                                    : chamfer != nullptr          ? chamfer->id()
                                     : body_boolean != nullptr
                                         ? body_boolean->id()
                                         : FeatureId(body_transform->id().value());
@@ -1778,11 +2336,19 @@ GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const Reco
       return Result<GeometryRecomputeSummary>::failure(removed_stale_shape.error());
     }
 
-    auto executed = feature != nullptr   ? execute_feature(document, *feature, execution_cache)
-                    : revolve != nullptr ? execute_revolve(document, revolve->id(), execution_cache)
-                    : body_boolean != nullptr
-                        ? execute_body_boolean(document, body_boolean->id(), execution_cache)
-                        : execute_body_transform(document, body_transform->id(), execution_cache);
+    auto executed =
+        feature != nullptr   ? execute_feature(document, *feature, execution_cache)
+        : revolve != nullptr ? execute_revolve(document, revolve->id(), execution_cache)
+        : linear_pattern != nullptr
+            ? execute_linear_pattern(document, linear_pattern->id(), execution_cache)
+        : circular_pattern != nullptr
+            ? execute_circular_pattern(document, circular_pattern->id(), execution_cache)
+        : mirror != nullptr ? execute_mirror(document, mirror->id(), execution_cache)
+        : fillet != nullptr ? execute_fillet(document, fillet->id(), execution_cache)
+        : chamfer != nullptr ? execute_chamfer(document, chamfer->id(), execution_cache)
+        : body_boolean != nullptr
+            ? execute_body_boolean(document, body_boolean->id(), execution_cache)
+            : execute_body_transform(document, body_transform->id(), execution_cache);
     if (executed.has_error())
       return Result<GeometryRecomputeSummary>::failure(executed.error());
 
@@ -1819,23 +2385,29 @@ GeometryRecomputeExecutor::execute_document(const PartDocument& document,
         document.find_linear_pattern_feature(FeatureId(executable_id));
     const CircularPatternFeature* circular_pattern =
         document.find_circular_pattern_feature(FeatureId(executable_id));
-    if (linear_pattern != nullptr)
+    const MirrorFeature* mirror = document.find_mirror_feature(FeatureId(executable_id));
+    const FilletFeature* fillet = document.find_fillet_feature(FeatureId(executable_id));
+    const ChamferFeature* chamfer = document.find_chamfer_feature(FeatureId(executable_id));
+    const ShellFeature* shell = document.find_shell_feature(FeatureId(executable_id));
+    if (shell != nullptr)
       return Result<GeometryRecomputeSummary>::failure(geometry_error(
-          linear_pattern->id().value(), "Linear Pattern geometry is not available until Block 64"));
-    if (circular_pattern != nullptr)
-      return Result<GeometryRecomputeSummary>::failure(
-          geometry_error(circular_pattern->id().value(),
-                         "Circular Pattern geometry is not available until Block 65"));
+          shell->id().value(), "ShellFeature geometry is not available until Block 72"));
     const BodyBooleanFeature* body_boolean =
         document.find_body_boolean_feature(FeatureId(executable_id));
     const BodyTransform* body_transform =
         document.find_body_transform(BodyTransformId(executable_id));
-    if (feature == nullptr && revolve == nullptr && body_boolean == nullptr &&
-        body_transform == nullptr)
+    if (feature == nullptr && revolve == nullptr && linear_pattern == nullptr &&
+        circular_pattern == nullptr && mirror == nullptr && fillet == nullptr &&
+        chamfer == nullptr && body_boolean == nullptr && body_transform == nullptr)
       continue;
 
-    const FeatureId feature_id = feature != nullptr   ? feature->id()
-                                 : revolve != nullptr ? revolve->id()
+    const FeatureId feature_id = feature != nullptr            ? feature->id()
+                                 : revolve != nullptr          ? revolve->id()
+                                 : linear_pattern != nullptr   ? linear_pattern->id()
+                                 : circular_pattern != nullptr ? circular_pattern->id()
+                                 : mirror != nullptr           ? mirror->id()
+                                 : fillet != nullptr           ? fillet->id()
+                                 : chamfer != nullptr          ? chamfer->id()
                                  : body_boolean != nullptr
                                      ? body_boolean->id()
                                      : FeatureId(body_transform->id().value());
@@ -1844,11 +2416,19 @@ GeometryRecomputeExecutor::execute_document(const PartDocument& document,
       return Result<GeometryRecomputeSummary>::failure(removed_stale_shape.error());
     }
 
-    auto executed = feature != nullptr   ? execute_feature(document, *feature, execution_cache)
-                    : revolve != nullptr ? execute_revolve(document, revolve->id(), execution_cache)
-                    : body_boolean != nullptr
-                        ? execute_body_boolean(document, body_boolean->id(), execution_cache)
-                        : execute_body_transform(document, body_transform->id(), execution_cache);
+    auto executed =
+        feature != nullptr   ? execute_feature(document, *feature, execution_cache)
+        : revolve != nullptr ? execute_revolve(document, revolve->id(), execution_cache)
+        : linear_pattern != nullptr
+            ? execute_linear_pattern(document, linear_pattern->id(), execution_cache)
+        : circular_pattern != nullptr
+            ? execute_circular_pattern(document, circular_pattern->id(), execution_cache)
+        : mirror != nullptr ? execute_mirror(document, mirror->id(), execution_cache)
+        : fillet != nullptr ? execute_fillet(document, fillet->id(), execution_cache)
+        : chamfer != nullptr ? execute_chamfer(document, chamfer->id(), execution_cache)
+        : body_boolean != nullptr
+            ? execute_body_boolean(document, body_boolean->id(), execution_cache)
+            : execute_body_transform(document, body_transform->id(), execution_cache);
     if (executed.has_error())
       return Result<GeometryRecomputeSummary>::failure(executed.error());
 

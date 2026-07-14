@@ -80,4 +80,4 @@ The suite covers 360-degree, negative partial, and symmetric revolves; NewBody, 
 Intersect; a revolved groove/undercut fixture; semantic-axis invalidation and incremental recompute;
 and transactional rejection of a self-intersecting axis-crossing profile.
 
-Block 64 is the next boundary: General Linear Pattern Geometry.
+Block 67 MirrorFeature Geometry is implemented; Block 72 ShellFeature Geometry is the next boundary.
