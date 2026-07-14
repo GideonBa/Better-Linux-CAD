@@ -2,8 +2,8 @@
 
 Status: implemented in Block 73.
 
-Block 73 adds persistent tapered-face intent without executing OCCT draft geometry. Geometry is
-owned by Block 74.
+Block 73 adds persistent tapered-face intent. Its OCCT execution is implemented by Block 74 and
+specified in `docs/part-draft-geometry-mvp6.md`.
 
 ## Core model
 
@@ -30,8 +30,8 @@ the draft-angle sign.
 
 The angle parameter is a non-zero Angle strictly between -90 and +90 degrees. Positive draft
 expands the selected faces away from the neutral plane while advancing along the positive pull
-direction; negative draft contracts them. Block 74 must preserve this convention when mapping to
-OCCT.
+direction; negative draft contracts them. Block 74 preserves this convention while mapping it to
+OCCT's opposite signed removal convention.
 
 ## Body history and invalidation
 
@@ -61,4 +61,4 @@ dependencies.
 ./build/blcad_core_tests "[core][draft-feature]"
 ```
 
-Block 74 DraftFeature Geometry is the next boundary.
+Block 74 DraftFeature Geometry is implemented. Block 75 Basic 3D Sketch Core intent is implemented; Block 76 richer 3D curve intent is next.

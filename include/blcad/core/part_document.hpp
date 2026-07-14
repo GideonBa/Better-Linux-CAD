@@ -22,6 +22,7 @@
 #include "blcad/core/revolve_feature.hpp"
 #include "blcad/core/shell_feature.hpp"
 #include "blcad/core/sketch.hpp"
+#include "blcad/core/sketch_3d.hpp"
 #include "blcad/core/sketch_ownership.hpp"
 
 #include <cstddef>
@@ -49,6 +50,8 @@ public:
   [[nodiscard]] Result<std::size_t> add_construction_plane(ConstructionPlane plane);
   [[nodiscard]] Result<std::size_t> add_derived_workplane(DerivedWorkplane workplane);
   [[nodiscard]] Result<std::size_t> add_sketch(Sketch sketch);
+  [[nodiscard]] Result<std::size_t> add_sketch_3d(Sketch3D sketch);
+  [[nodiscard]] Result<std::size_t> remove_sketch_3d(Sketch3DId id);
   [[nodiscard]] Result<std::size_t> add_feature(Feature feature);
   [[nodiscard]] Result<std::size_t> add_revolve_feature(RevolveFeature feature);
   [[nodiscard]] Result<std::size_t> add_linear_pattern_feature(LinearPatternFeature feature);
@@ -97,6 +100,7 @@ public:
   [[nodiscard]] const std::vector<ConstructionPlane>& construction_planes() const noexcept;
   [[nodiscard]] const std::vector<DerivedWorkplane>& derived_workplanes() const noexcept;
   [[nodiscard]] const std::vector<Sketch>& sketches() const noexcept;
+  [[nodiscard]] const std::vector<Sketch3D>& sketches_3d() const noexcept;
   [[nodiscard]] const std::vector<Feature>& features() const noexcept;
   [[nodiscard]] const std::vector<RevolveFeature>& revolve_features() const noexcept;
   [[nodiscard]] const std::vector<LinearPatternFeature>& linear_pattern_features() const noexcept;
@@ -126,6 +130,7 @@ public:
   [[nodiscard]] std::size_t construction_plane_count() const noexcept;
   [[nodiscard]] std::size_t derived_workplane_count() const noexcept;
   [[nodiscard]] std::size_t sketch_count() const noexcept;
+  [[nodiscard]] std::size_t sketch_3d_count() const noexcept;
   [[nodiscard]] std::size_t feature_count() const noexcept;
   [[nodiscard]] std::size_t revolve_feature_count() const noexcept;
   [[nodiscard]] std::size_t linear_pattern_feature_count() const noexcept;
@@ -155,6 +160,7 @@ public:
   find_construction_plane(ConstructionPlaneId id) const noexcept;
   [[nodiscard]] const DerivedWorkplane* find_derived_workplane(DatumPlaneId id) const noexcept;
   [[nodiscard]] const Sketch* find_sketch(SketchId id) const noexcept;
+  [[nodiscard]] const Sketch3D* find_sketch_3d(Sketch3DId id) const noexcept;
   [[nodiscard]] const Feature* find_feature(FeatureId id) const noexcept;
   [[nodiscard]] const RevolveFeature* find_revolve_feature(FeatureId id) const noexcept;
   [[nodiscard]] const LinearPatternFeature*
@@ -192,6 +198,7 @@ private:
   [[nodiscard]] bool has_construction_plane_id(const ConstructionPlaneId& id) const noexcept;
   [[nodiscard]] bool has_derived_workplane_id(const DatumPlaneId& id) const noexcept;
   [[nodiscard]] bool has_sketch_id(const SketchId& id) const noexcept;
+  [[nodiscard]] bool has_sketch_3d_id(const Sketch3DId& id) const noexcept;
   [[nodiscard]] bool has_feature_id(const FeatureId& id) const noexcept;
   [[nodiscard]] bool has_revolve_feature_id(const FeatureId& id) const noexcept;
   [[nodiscard]] bool has_linear_pattern_feature_id(const FeatureId& id) const noexcept;
@@ -226,6 +233,7 @@ private:
   std::vector<ConstructionPlane> construction_planes_;
   std::vector<DerivedWorkplane> derived_workplanes_;
   std::vector<Sketch> sketches_;
+  std::vector<Sketch3D> sketches_3d_;
   std::vector<Feature> features_;
   std::vector<RevolveFeature> revolve_features_;
   std::vector<LinearPatternFeature> linear_pattern_features_;

@@ -111,5 +111,5 @@ Slots now serialize additively for local and Project-level joints with canonical
 
 Block 43 vector motion drives, Blocks 44–46 Prismatic/Cylindrical/Planar execution, and Block 47
 passive Spherical with an empty family slot signature are implemented in their canonical documents.
-Blocks 48–73 Part Construction through DraftFeature Core intent/JSON are implemented. Block 74
-DraftFeature Geometry is next.
+Blocks 48–75 Part Construction through DraftFeature Geometry are implemented. Block 75 Basic 3D
+Sketch Core intent is next.

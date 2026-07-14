@@ -45,5 +45,5 @@ modes, deterministic reference-side behavior, a circular hole rim, parameter and
 recompute, broken-reference failure, excessive-distance failure, and transactional cache
 preservation.
 
-Blocks 72 ShellFeature Geometry and 73 DraftFeature Core intent/JSON are implemented; Block 74
-DraftFeature Geometry is next.
+Blocks 72–74 ShellFeature Geometry and DraftFeature intent/JSON plus Geometry are implemented.
+Block 75 Basic 3D Sketch Core intent is implemented; Block 76 richer 3D curve intent is next.

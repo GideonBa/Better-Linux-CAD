@@ -817,7 +817,7 @@ Result<std::size_t> PartDocument::add_derived_workplane(DerivedWorkplane workpla
 }
 
 Result<std::size_t> PartDocument::add_sketch(Sketch sketch) {
-  if (has_sketch_id(sketch.id()))
+  if (has_sketch_id(sketch.id()) || has_sketch_3d_id(Sketch3DId(sketch.id().value())))
     return Result<std::size_t>::failure(
         Error::validation(sketch.id().value(), "sketch id must be unique within part document"));
   if (!has_workplane_id(sketch.workplane()))
@@ -910,6 +910,62 @@ Result<std::size_t> PartDocument::add_sketch(Sketch sketch) {
   invalidation_state_ = std::move(invalidation_state);
   sketches_.push_back(std::move(sketch));
   return Result<std::size_t>::success(sketches_.size() - 1U);
+}
+
+Result<std::size_t> PartDocument::add_sketch_3d(Sketch3D sketch) {
+  if (has_sketch_3d_id(sketch.id()) || has_sketch_id(SketchId(sketch.id().value())))
+    return Result<std::size_t>::failure(Error::validation(
+        sketch.id().value(), "sketch id must be unique across planar and 3D sketches"));
+
+  for (const ParameterId& parameter_id : sketch.parameter_dependencies()) {
+    const Parameter* parameter = find_parameter(parameter_id);
+    if (parameter == nullptr || parameter->type() != ParameterType::Length)
+      return Result<std::size_t>::failure(
+          Error::validation(sketch.id().value(),
+                            "3D sketch coordinate parameters must be existing Length parameters"));
+  }
+
+  auto graph = dependency_graph_;
+  auto added_node = graph.add_node(sketch.id().value());
+  if (added_node.has_error())
+    return Result<std::size_t>::failure(added_node.error());
+  for (const ParameterId& parameter_id : sketch.parameter_dependencies()) {
+    auto dependency = add_dependency_if_missing(graph, parameter_id.value(), sketch.id().value());
+    if (dependency.has_error())
+      return Result<std::size_t>::failure(dependency.error());
+  }
+  auto invalidation_state = invalidation_state_;
+  auto synced = sync_graph(std::move(graph), invalidation_state, dependency_graph_);
+  if (synced.has_error())
+    return Result<std::size_t>::failure(synced.error());
+  invalidation_state_ = std::move(invalidation_state);
+  sketches_3d_.push_back(std::move(sketch));
+  return Result<std::size_t>::success(sketches_3d_.size() - 1U);
+}
+
+Result<std::size_t> PartDocument::remove_sketch_3d(Sketch3DId id) {
+  if (id.empty())
+    return Result<std::size_t>::failure(
+        Error::validation("sketch_3d", "3D sketch id must not be empty"));
+  const auto found = std::find_if(sketches_3d_.begin(), sketches_3d_.end(),
+                                  [&id](const Sketch3D& sketch) { return sketch.id() == id; });
+  if (found == sketches_3d_.end())
+    return Result<std::size_t>::failure(
+        Error::validation(id.value(), "3D sketch must exist in part document"));
+  if (!dependency_graph_.direct_dependents(id.value()).empty())
+    return Result<std::size_t>::failure(
+        Error::dependency(id.value(), "3D sketch with dependent model intent cannot be removed"));
+  auto graph = dependency_graph_;
+  auto removed = graph.remove_node(id.value());
+  if (removed.has_error())
+    return Result<std::size_t>::failure(removed.error());
+  auto invalidation_state = invalidation_state_;
+  auto synced = sync_graph(std::move(graph), invalidation_state, dependency_graph_);
+  if (synced.has_error())
+    return Result<std::size_t>::failure(synced.error());
+  invalidation_state_ = std::move(invalidation_state);
+  sketches_3d_.erase(found);
+  return Result<std::size_t>::success(1U);
 }
 
 Result<std::size_t> PartDocument::add_feature(Feature feature) {
@@ -2186,6 +2242,9 @@ const std::vector<DerivedWorkplane>& PartDocument::derived_workplanes() const no
 const std::vector<Sketch>& PartDocument::sketches() const noexcept {
   return sketches_;
 }
+const std::vector<Sketch3D>& PartDocument::sketches_3d() const noexcept {
+  return sketches_3d_;
+}
 const std::vector<Feature>& PartDocument::features() const noexcept {
   return features_;
 }
@@ -2267,6 +2326,9 @@ std::size_t PartDocument::derived_workplane_count() const noexcept {
 }
 std::size_t PartDocument::sketch_count() const noexcept {
   return sketches_.size();
+}
+std::size_t PartDocument::sketch_3d_count() const noexcept {
+  return sketches_3d_.size();
 }
 std::size_t PartDocument::feature_count() const noexcept {
   return features_.size();
@@ -2370,6 +2432,12 @@ const DerivedWorkplane* PartDocument::find_derived_workplane(DatumPlaneId id) co
 }
 const Sketch* PartDocument::find_sketch(SketchId id) const noexcept {
   for (const auto& sketch : sketches_)
+    if (sketch.id() == id)
+      return &sketch;
+  return nullptr;
+}
+const Sketch3D* PartDocument::find_sketch_3d(Sketch3DId id) const noexcept {
+  for (const auto& sketch : sketches_3d_)
     if (sketch.id() == id)
       return &sketch;
   return nullptr;
@@ -2509,6 +2577,9 @@ bool PartDocument::has_derived_workplane_id(const DatumPlaneId& id) const noexce
 }
 bool PartDocument::has_sketch_id(const SketchId& id) const noexcept {
   return find_sketch(id) != nullptr;
+}
+bool PartDocument::has_sketch_3d_id(const Sketch3DId& id) const noexcept {
+  return find_sketch_3d(id) != nullptr;
 }
 bool PartDocument::has_feature_id(const FeatureId& id) const noexcept {
   return find_feature(id) != nullptr;

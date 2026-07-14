@@ -9,6 +9,7 @@
 #include "blcad/geometry/circular_cut_adapter.hpp"
 #include "blcad/geometry/circular_pattern_adapter.hpp"
 #include "blcad/geometry/closed_profile_adapter.hpp"
+#include "blcad/geometry/draft_adapter.hpp"
 #include "blcad/geometry/fillet_adapter.hpp"
 #include "blcad/geometry/linear_pattern_adapter.hpp"
 #include "blcad/geometry/mirror_adapter.hpp"
@@ -71,6 +72,9 @@ public:
   [[nodiscard]] Result<std::size_t>
   execute_shell(const PartDocument& document, FeatureId feature_id, ShapeCache& shape_cache) const;
 
+  [[nodiscard]] Result<std::size_t>
+  execute_draft(const PartDocument& document, FeatureId feature_id, ShapeCache& shape_cache) const;
+
   [[nodiscard]] Result<GeometryRecomputeSummary> execute_plan(const PartDocument& document,
                                                               const RecomputePlan& plan,
                                                               ShapeCache& shape_cache) const;
@@ -93,6 +97,7 @@ private:
   FilletAdapter fillet_adapter_;
   ChamferAdapter chamfer_adapter_;
   ShellAdapter shell_adapter_;
+  DraftAdapter draft_adapter_;
   BodyBooleanAdapter body_boolean_adapter_;
   BodyTransformAdapter body_transform_adapter_;
   RevolveAdapter revolve_adapter_;

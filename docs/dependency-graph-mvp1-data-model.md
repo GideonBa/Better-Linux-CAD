@@ -241,3 +241,6 @@ Block 73 applies it to DraftFeature. Every ordered semantic face producer, pull-
 neutral-plane source, and signed Angle parameter feeds the Draft node; the preceding target-Body
 producer feeds Draft, and Draft becomes the next producer of that Body. Reference or angle changes
 therefore invalidate Draft and every later Body consumer without introducing a Body self-cycle.
+Block 75 adds one node per `Sketch3D`. Every distinct Length parameter used by a point coordinate
+feeds that node, so coordinate changes invalidate the spatial sketch and future curve/feature
+consumers. Removing an unconsumed 3D sketch removes its node and incoming parameter edges.

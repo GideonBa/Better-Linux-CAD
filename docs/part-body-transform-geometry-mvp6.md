@@ -64,5 +64,5 @@ Block 58 provides the reusable Part feature semantic-input contract without broa
 state into persistent matrices or raw OCCT identity. Block 59 richer Extrude/Cut intent is
 implemented together with Block 60 Geometry; Blocks 61–62 Revolve/RevolveCut intent and Geometry
 are implemented. Blocks 67 MirrorFeature Geometry and 72 ShellFeature Geometry are implemented;
-Block 73 DraftFeature Core intent/JSON is implemented; Block 74 DraftFeature Geometry is the current
-next boundary.
+Blocks 73–74 DraftFeature intent/JSON and Geometry are implemented; Block 75 Basic 3D Sketch Core
+intent is the current next boundary.

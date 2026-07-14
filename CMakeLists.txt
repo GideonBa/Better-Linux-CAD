@@ -73,6 +73,7 @@ add_library(
   src/core/reference_recovery.cpp
   src/core/revolve_feature.cpp
   src/core/sketch.cpp
+  src/core/sketch_3d.cpp
   src/core/sketch_ownership.cpp
   src/core/sketch_arc_profile.cpp
   src/core/sketch_constraints.cpp
@@ -171,6 +172,7 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/fillet_adapter.cpp
     src/geometry/chamfer_adapter.cpp
     src/geometry/shell_adapter.cpp
+    src/geometry/draft_adapter.cpp
     src/geometry/recompute_executor.cpp
     src/geometry/circular_pattern_adapter.cpp
     src/geometry/linear_pattern_adapter.cpp
@@ -342,6 +344,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/sketch_repair_undo_stack_tests.cpp
     tests/core/sketch_spline_profile_json_tests.cpp
     tests/core/sketch_tests.cpp
+    tests/core/sketch_3d_tests.cpp
     tests/core/subassembly_instance_tests.cpp
   )
 
@@ -417,6 +420,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/reference_part_pipeline_tests.cpp
       tests/geometry/revolve_feature_pipeline_tests.cpp
       tests/geometry/shell_feature_pipeline_tests.cpp
+      tests/geometry/draft_feature_pipeline_tests.cpp
       tests/geometry/right_workplane_pipeline_tests.cpp
       tests/geometry/semantic_reference_evaluator_tests.cpp
       tests/geometry/shape_cache_tests.cpp

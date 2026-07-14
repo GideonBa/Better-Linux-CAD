@@ -409,6 +409,28 @@ resolve_in_place_body_target(const PartDocument& document, const FeatureId& feat
   return body_result;
 }
 
+[[nodiscard]] Result<std::size_t> store_draft_result(const PartDocument& document,
+                                                     const DraftFeature& feature,
+                                                     GeometryShape shape, ShapeCache& shape_cache) {
+  const Body* body = document.find_body(feature.target_body());
+  if (body == nullptr)
+    return Result<std::size_t>::failure(
+        validation_error(feature.target_body().value(), "target body must exist"));
+  auto feature_result = shape_cache.store_feature_shape(feature.id(), shape);
+  if (feature_result.has_error())
+    return feature_result;
+  auto body_result =
+      shape_cache.store_body_shape(feature.target_body(), feature.id(), std::move(shape));
+  if (body_result.has_error())
+    return body_result;
+  if (document.bodies().size() == 1U && body->kind() == BodyKind::Solid) {
+    const GeometryShape* cached = shape_cache.find_body_shape(feature.target_body());
+    return shape_cache.set_final_shape(feature.id(), *cached);
+  }
+  shape_cache.clear_final_shape();
+  return body_result;
+}
+
 template <typename PatternFeature>
 [[nodiscard]] Result<const GeometryShape*> resolve_pattern_target(const PartDocument& document,
                                                                   const PatternFeature& feature,
@@ -2164,6 +2186,49 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_shell(const PartDocument&
   return stored;
 }
 
+Result<std::size_t> GeometryRecomputeExecutor::execute_draft(const PartDocument& document,
+                                                             FeatureId feature_id,
+                                                             ShapeCache& shape_cache) const {
+  if (feature_id.empty())
+    return Result<std::size_t>::failure(validation_error("draft", "feature id must not be empty"));
+  const DraftFeature* feature = document.find_draft_feature(feature_id);
+  if (feature == nullptr)
+    return Result<std::size_t>::failure(
+        validation_error(feature_id.value(), "draft feature must exist in part document"));
+  const Parameter* angle = document.find_parameter(feature->angle_parameter());
+  if (angle == nullptr || angle->type() != ParameterType::Angle ||
+      !std::isfinite(angle->value().degrees()) ||
+      std::abs(angle->value().degrees()) <= k_tolerance ||
+      std::abs(angle->value().degrees()) >= 90.0)
+    return Result<std::size_t>::failure(
+        validation_error(feature->angle_parameter().value(),
+                         "draft angle must be finite, non-zero and |angle| < 90 degrees"));
+
+  ShapeCache working_cache = shape_cache;
+  auto target =
+      resolve_in_place_body_target(document, feature->id(), feature->target_body(), working_cache);
+  if (target.has_error())
+    return Result<std::size_t>::failure(target.error());
+  auto direction = resolve_axis_reference(document, feature->pull_direction(), working_cache,
+                                          workplane_resolver_);
+  if (direction.has_error())
+    return Result<std::size_t>::failure(direction.error());
+  auto plane =
+      resolve_mirror_plane(document, feature->neutral_plane(), working_cache, workplane_resolver_);
+  if (plane.has_error())
+    return Result<std::size_t>::failure(plane.error());
+  auto result = draft_adapter_.apply(document, *feature, *target.value(), working_cache,
+                                     direction.value().second, plane.value().first,
+                                     plane.value().second, angle->value().degrees());
+  if (result.has_error())
+    return Result<std::size_t>::failure(result.error());
+  auto stored = store_draft_result(document, *feature, std::move(result.value()), working_cache);
+  if (stored.has_error())
+    return stored;
+  shape_cache = std::move(working_cache);
+  return stored;
+}
+
 Result<std::size_t> GeometryRecomputeExecutor::execute_body_boolean(const PartDocument& document,
                                                                     FeatureId feature_id,
                                                                     ShapeCache& shape_cache) const {
@@ -2366,9 +2431,6 @@ GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const Reco
     const ChamferFeature* chamfer = document.find_chamfer_feature(FeatureId(step.node_id));
     const ShellFeature* shell = document.find_shell_feature(FeatureId(step.node_id));
     const DraftFeature* draft = document.find_draft_feature(FeatureId(step.node_id));
-    if (draft != nullptr)
-      return Result<GeometryRecomputeSummary>::failure(geometry_error(
-          draft->id().value(), "DraftFeature geometry is not available until Block 74"));
     const BodyBooleanFeature* body_boolean =
         document.find_body_boolean_feature(FeatureId(step.node_id));
     const BodyTransform* body_transform =
@@ -2387,6 +2449,7 @@ GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const Reco
                                     : fillet != nullptr           ? fillet->id()
                                     : chamfer != nullptr          ? chamfer->id()
                                     : shell != nullptr            ? shell->id()
+                                    : draft != nullptr            ? draft->id()
                                     : body_boolean != nullptr
                                         ? body_boolean->id()
                                         : FeatureId(body_transform->id().value());
@@ -2406,6 +2469,7 @@ GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const Reco
         : fillet != nullptr  ? execute_fillet(document, fillet->id(), execution_cache)
         : chamfer != nullptr ? execute_chamfer(document, chamfer->id(), execution_cache)
         : shell != nullptr   ? execute_shell(document, shell->id(), execution_cache)
+        : draft != nullptr   ? execute_draft(document, draft->id(), execution_cache)
         : body_boolean != nullptr
             ? execute_body_boolean(document, body_boolean->id(), execution_cache)
             : execute_body_transform(document, body_transform->id(), execution_cache);
@@ -2450,9 +2514,6 @@ GeometryRecomputeExecutor::execute_document(const PartDocument& document,
     const ChamferFeature* chamfer = document.find_chamfer_feature(FeatureId(executable_id));
     const ShellFeature* shell = document.find_shell_feature(FeatureId(executable_id));
     const DraftFeature* draft = document.find_draft_feature(FeatureId(executable_id));
-    if (draft != nullptr)
-      return Result<GeometryRecomputeSummary>::failure(geometry_error(
-          draft->id().value(), "DraftFeature geometry is not available until Block 74"));
     const BodyBooleanFeature* body_boolean =
         document.find_body_boolean_feature(FeatureId(executable_id));
     const BodyTransform* body_transform =
@@ -2471,6 +2532,7 @@ GeometryRecomputeExecutor::execute_document(const PartDocument& document,
                                  : fillet != nullptr           ? fillet->id()
                                  : chamfer != nullptr          ? chamfer->id()
                                  : shell != nullptr            ? shell->id()
+                                 : draft != nullptr            ? draft->id()
                                  : body_boolean != nullptr
                                      ? body_boolean->id()
                                      : FeatureId(body_transform->id().value());
@@ -2490,6 +2552,7 @@ GeometryRecomputeExecutor::execute_document(const PartDocument& document,
         : fillet != nullptr  ? execute_fillet(document, fillet->id(), execution_cache)
         : chamfer != nullptr ? execute_chamfer(document, chamfer->id(), execution_cache)
         : shell != nullptr   ? execute_shell(document, shell->id(), execution_cache)
+        : draft != nullptr   ? execute_draft(document, draft->id(), execution_cache)
         : body_boolean != nullptr
             ? execute_body_boolean(document, body_boolean->id(), execution_cache)
             : execute_body_transform(document, body_transform->id(), execution_cache);

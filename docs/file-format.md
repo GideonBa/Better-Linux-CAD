@@ -782,6 +782,11 @@ identity. Missing arrays restore zero Draft features; unknown fields, malformed 
 role/capability mismatches, duplicate faces, wrong parameter units, and zero/out-of-range angles
 fail closed. Canonical details are in `docs/part-draft-intent-mvp6.md`.
 
+Block 75 adds `Sketch3D` only to the in-memory Part Core. It intentionally does not change the
+current JSON schema: Block 77 owns the additive `sketches_3d` representation after the Block-76
+curve entities and cross-source references are frozen. To prevent silent data loss, the current
+serializer fails explicitly when a Part owns any Block-75 3D sketch.
+
 ## Planned STEP import persistence after Block 94
 
 This section is planned architecture, not part of the current schema. Blocks 95–101 in

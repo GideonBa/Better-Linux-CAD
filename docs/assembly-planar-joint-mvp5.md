@@ -49,6 +49,6 @@ requested selected roles atomically.
 ## Block 47 handoff — completed
 
 Block 47 Ball/Spherical is implemented in `docs/assembly-spherical-joint-mvp5.md` as passive
-Point/Point center coincidence with explicit selected-drive rejection. Blocks 48–73 Part
-Construction through DraftFeature Core intent/JSON are implemented; Block 74 DraftFeature Geometry
+Point/Point center coincidence with explicit selected-drive rejection. Blocks 48–75 Part
+Construction through DraftFeature Geometry are implemented; Block 75 Basic 3D Sketch Core intent
 is next.

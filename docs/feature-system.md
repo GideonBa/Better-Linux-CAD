@@ -88,7 +88,10 @@ compatible JSON. Block 72 resolves those faces on the current target solid, exec
 inward/outward OCCT thick-solid offsets, and publishes only valid single-solid results
 transactionally. Block 73 adds ordered semantic Draft faces, Axis/Line pull direction, typed
 neutral planes, signed Angle parameters, Body history, invalidation, and strict compatible JSON.
-Block 74 DraftFeature Geometry is next.
+Block 74 executes those references through signed OCCT draft geometry, validates a single solid,
+and publishes parameter/upstream recompute transactionally. Block 75 adds separate model-space
+`Sketch3D` ownership with explicit/parameter-driven points, point-referenced lines, ordered
+polylines, and graph invalidation. Block 76 richer 3D curve intent is next.
 
 The long-term sketcher and feature parity target is documented in `docs/inventor-like-sketcher-and-feature-roadmap.md`.
 

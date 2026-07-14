@@ -52,5 +52,5 @@ feature/face order and Body-history dependencies deterministically.
 ./build/blcad_core_tests "[core][shell-feature]"
 ```
 
-Block 72 ShellFeature Geometry and Block 73 DraftFeature Core intent/JSON are implemented. Block 74
-DraftFeature Geometry is the next boundary.
+Blocks 72–74 ShellFeature Geometry and DraftFeature intent/JSON plus Geometry are implemented.
+Block 75 Basic 3D Sketch Core intent is implemented; Block 76 richer 3D curve intent is the next boundary.

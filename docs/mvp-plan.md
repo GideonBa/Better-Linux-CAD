@@ -14,7 +14,7 @@ phase_status:
   mvp_3: "Parametric bolt circle pattern — implemented"
   mvp_4: "Assembly parameters and Project container — implemented"
   mvp_5: "Assembly relationships, motion, hierarchy, analysis, exchange — Blocks 1–47 implemented"
-  mvp_6: "Part Construction — Blocks 48–73 implemented, Blocks 74–94 planned, Block 74 next"
+  mvp_6: "Part Construction — Blocks 48–75 implemented, Blocks 76–94 planned, Block 76 next"
   mvp_7: "STEP Import — Blocks 95–101 planned after Block 94"
 ---
 
@@ -552,10 +552,10 @@ motion solvers reject Spherical as the selected drive.
 
 ## MVP 6 — Part Construction MVP after Block 47
 
-**Status:** In progress — Blocks 48–73 implemented
+**Status:** In progress — Blocks 48–75 implemented
 **Canonical:** sequence `docs/part-construction-sequence-mvp6.md`
 
-Blocks 48–73 are complete. Block 74 is the current next technical step.
+Blocks 48–75 are complete. Block 76 is the current next technical step.
 
 Mandatory Part Construction phase order:
 
@@ -1015,8 +1015,34 @@ Canonical contract: `docs/part-draft-intent-mvp6.md`.
 [core][draft-feature]
 ```
 
-## Current next technical step — Block 74
+## Block 74 — DraftFeature Geometry — Implemented
 
-Execute positive/negative drafted faces with arbitrary pull direction and non-root neutral planes,
-associative reference recovery, and transactional invalid/tangent/self-intersection failure
-according to `docs/part-construction-sequence-mvp6-planning-detail.md`.
+Block 74 resolves current semantic planar/cylindrical faces, arbitrary typed pull directions, and
+datum/construction/semantic neutral planes; maps the documented positive/negative convention to
+checked OCCT DraftAngle execution; supports associative parameter/upstream recompute; and rejects
+missing, ambiguous, tangent, self-intersecting, or invalid results without replacing prior cache
+products.
+
+Canonical contract: `docs/part-draft-geometry-mvp6.md`.
+
+```text
+[geometry][draft-feature]
+```
+
+## Block 75 — Basic 3D Sketch Core intent — Implemented
+
+Block 75 adds a separate model-space `Sketch3D` domain with explicit or Length-parameter-driven
+`SketchPoint3D` coordinates, point-referenced `SketchLine3D`, ordered `SketchPolyline3D`, one local
+entity-id scope, document ownership/removal, and transactional dependency/invalidation behavior.
+It deliberately does not add a 3D solver, JSON, richer curves, or OCCT conversion.
+
+Canonical contract: `docs/part-sketch-3d-core-mvp6.md`.
+
+```text
+[core][sketch-3d]
+```
+
+## Current next technical step — Block 76
+
+Implement 3D spline, arc, helix, and guide-curve intent according to
+`docs/part-construction-sequence-mvp6-planning-detail.md`.

@@ -594,15 +594,17 @@ Canonical numbered sequence:
 - `docs/part-shell-intent-mvp6.md`
 - `docs/part-shell-geometry-mvp6.md`
 - `docs/part-draft-intent-mvp6.md`
+- `docs/part-draft-geometry-mvp6.md`
+- `docs/part-sketch-3d-core-mvp6.md`
 - `docs/step-import-sequence-mvp7.md`
 
-Block 47 Spherical completes the Assembly MVP sequence. Blocks 48–73 Body identity, body-scoped
+Block 47 Spherical completes the Assembly MVP sequence. Blocks 48–75 Body identity, body-scoped
 recompute/inspection, Body Booleans, associative BodyTransform/SketchOwnership execution, and
 reusable Part-feature semantic input references plus richer Extrude/Cut intent/Geometry and
 persistent plus executed Revolve/RevolveCut, general Pattern intent plus Geometry, and persistent
 plus executed MirrorFeature Geometry, persistent plus executed Fillet/Chamfer/Shell Geometry, and
-persistent DraftFeature intent are implemented. The next technical step is Block 74 DraftFeature
-Geometry.
+persistent plus executed DraftFeature Geometry and the basic model-space 3D Sketch Core are
+implemented. The next technical step is Block 76 richer 3D curve intent.
 
 Block 47 adds passive Point/Point Spherical intent through the shared local/root-space path. Scalar
 Revolute APIs remain adapters; transform variables and the shared numeric engine are unchanged.

@@ -52,5 +52,5 @@ Revolute-only adapters.
 ## Block 46 handoff
 
 Block 46 Planar and Block 47 passive Spherical are implemented in their canonical documents.
-Blocks 48–73 Part Construction through DraftFeature Core intent/JSON are implemented; Block 74
-DraftFeature Geometry is next.
+Blocks 48–75 Part Construction through DraftFeature Geometry are implemented; Block 75 Basic 3D
+Sketch Core intent is next.

@@ -52,6 +52,7 @@ private:
   friend class FilletAdapter;
   friend class ChamferAdapter;
   friend class ShellAdapter;
+  friend class DraftAdapter;
   friend class StepExporter;
   friend class AssemblyStepExporter;
   friend class detail::AssemblyPartShapeDefinitionBuilder;

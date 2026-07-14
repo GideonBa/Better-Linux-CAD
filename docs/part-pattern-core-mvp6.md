@@ -82,4 +82,4 @@ Block 64 Linear Pattern Geometry is implemented in
 `docs/part-circular-pattern-geometry-mvp6.md`; Block 66 MirrorFeature Core intent and JSON is
 implemented in `docs/part-mirror-intent-mvp6.md`; Block 67 Geometry is implemented in
 `docs/part-mirror-geometry-mvp6.md`. Blocks 72 ShellFeature Geometry and 73 DraftFeature Core
-intent/JSON are implemented; Block 74 DraftFeature Geometry is next.
+intent/JSON are implemented; Block 74 DraftFeature Geometry is implemented; Block 75 Basic 3D Sketch Core intent is implemented; Block 76 richer 3D curve intent is next.

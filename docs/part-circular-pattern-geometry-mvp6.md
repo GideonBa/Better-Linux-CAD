@@ -71,5 +71,5 @@ failure.
 
 Block 66 MirrorFeature Core intent and JSON is implemented in
 `docs/part-mirror-intent-mvp6.md`. Blocks 67 MirrorFeature Geometry and 72 ShellFeature Geometry are
-implemented; Block 73 DraftFeature Core intent/JSON is implemented and Block 74 DraftFeature
-Geometry is the next boundary.
+implemented; Blocks 73–74 DraftFeature intent/JSON and Geometry are implemented. Block 75 Basic 3D
+Sketch Core intent is the next boundary.

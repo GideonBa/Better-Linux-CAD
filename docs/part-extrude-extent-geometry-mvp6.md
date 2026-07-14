@@ -92,4 +92,4 @@ incremental idempotence, and the historical executor integration.
 
 Blocks 61–62 persistent Revolve/RevolveCut intent, JSON, and rotational Geometry are implemented.
 Blocks 67 MirrorFeature Geometry, 72 ShellFeature Geometry, and 73 DraftFeature Core intent/JSON are
-implemented; Block 74 DraftFeature Geometry is the next boundary.
+implemented; Block 74 DraftFeature Geometry is implemented; Block 75 Basic 3D Sketch Core intent is implemented; Block 76 richer 3D curve intent is the next boundary.

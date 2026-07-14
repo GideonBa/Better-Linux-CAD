@@ -2471,6 +2471,9 @@ body_transform_rotation_axis_from_json(const json& value) {
 } // namespace
 
 Result<std::string> serialize_part_document_to_json(const PartDocument& document) {
+  if (document.sketch_3d_count() != 0U)
+    return Result<std::string>::failure(
+        json_error("3D sketch serialization is unavailable until the Block 77 schema boundary"));
   json root;
   root["schema"] = k_schema;
   root["version"] = k_version;
