@@ -91,7 +91,9 @@ neutral planes, signed Angle parameters, Body history, invalidation, and strict 
 Block 74 executes those references through signed OCCT draft geometry, validates a single solid,
 and publishes parameter/upstream recompute transactionally. Block 75 adds separate model-space
 `Sketch3D` ownership with explicit/parameter-driven points, point-referenced lines, ordered
-polylines, and graph invalidation. Block 76 richer 3D curve intent is next.
+polylines, and graph invalidation. Block 76 adds mixed-source point references, three-point Arcs,
+Fit/Control Splines, typed Helices, and Guide-Curve roles. Block 77 JSON and semantic references
+is next.
 
 The long-term sketcher and feature parity target is documented in `docs/inventor-like-sketcher-and-feature-roadmap.md`.
 

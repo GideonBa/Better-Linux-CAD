@@ -61,4 +61,4 @@ dependencies.
 ./build/blcad_core_tests "[core][draft-feature]"
 ```
 
-Block 74 DraftFeature Geometry is implemented. Block 75 Basic 3D Sketch Core intent is implemented; Block 76 richer 3D curve intent is next.
+Block 74 DraftFeature Geometry is implemented. Block 75 Basic 3D Sketch Core intent and Block 76 richer 3D curve intent are implemented; Block 77 3D Sketch JSON and semantic references is next.

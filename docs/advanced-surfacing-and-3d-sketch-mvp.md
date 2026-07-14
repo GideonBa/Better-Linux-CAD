@@ -1,7 +1,7 @@
 # Future MVP: Advanced Surfacing, 3D Sketches, Sweep, Loft, and Surface-to-Solid
 
-Status: partially implemented. Block 75 provides basic 3D Sketch Core intent; richer curves,
-references, Geometry conversion, Sweep, Loft, and surfacing remain planned.
+Status: partially implemented. Blocks 75–76 provide 3D Sketch Core and richer curve intent;
+JSON references, Geometry conversion, Sweep, Loft, and surfacing remain planned.
 
 This document records the long-term requirement that BLCAD should support advanced 3D curve and surface modeling. This is intentionally separate from the first closed-profile sketch MVP and from construction geometry.
 
@@ -50,8 +50,8 @@ BLCAD should eventually support:
 ## 3D sketching
 
 Block 75 allows basic point-, line-, and polyline-based sketches to exist directly in model space
-instead of only inside one planar sketch. Blocks 76–78 extend this seed with richer curves,
-references/JSON, and Geometry conversion.
+instead of only inside one planar sketch. Block 76 adds Arc, Spline, Helix, Guide-Curve, and
+mixed-source point-reference intent. Blocks 77–78 add references/JSON and Geometry conversion.
 
 The target entities include:
 
@@ -64,8 +64,8 @@ SketchGuideCurve3D
 PathCurve
 ```
 
-The first three entities and `Sketch3D` ownership are implemented. `SketchSpline3D`,
-`SketchGuideCurve3D`, and reusable `PathCurve` remain planned.
+The first five entities and `Sketch3D` ownership are implemented; Block 76 additionally implements
+`SketchArc3D` and `SketchHelix3D`. Reusable `PathCurve` remains planned.
 
 A 3D spline should be able to reference:
 

@@ -45,5 +45,5 @@ caller's previous cache unchanged.
 ./build/blcad_geometry_tests "[geometry][shell-feature]"
 ```
 
-Blocks 73–74 DraftFeature intent/JSON and Geometry are implemented. Block 75 Basic 3D Sketch Core
-intent is the next boundary.
+Blocks 73–74 DraftFeature intent/JSON and Geometry, Block 75 Basic 3D Sketch Core, and Block 76
+richer 3D curve intent are implemented. Block 77 3D Sketch JSON and semantic references is next.

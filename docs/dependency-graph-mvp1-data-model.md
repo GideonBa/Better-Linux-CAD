@@ -244,3 +244,6 @@ therefore invalidate Draft and every later Body consumer without introducing a B
 Block 75 adds one node per `Sketch3D`. Every distinct Length parameter used by a point coordinate
 feeds that node, so coordinate changes invalidate the spatial sketch and future curve/feature
 consumers. Removing an unconsumed 3D sketch removes its node and incoming parameter edges.
+Block 76 additionally feeds that node from referenced ConstructionPoints and planar Sketches, from
+typed Helix axes, and from the Helix radius, pitch, and turn parameters. Missing or wrong-unit
+sources fail before ownership or graph state changes.

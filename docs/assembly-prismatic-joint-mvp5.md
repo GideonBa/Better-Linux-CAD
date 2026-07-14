@@ -56,5 +56,5 @@ coordinate-slot snapshots as the authority.
 ## Block 45 handoff
 
 Blocks 45–47 Cylindrical, Planar, and passive Spherical are implemented in their canonical
-documents. Blocks 48–75 Part Construction through DraftFeature Geometry are implemented;
-Block 74 DraftFeature Geometry is implemented; Block 75 Basic 3D Sketch Core intent is implemented; Block 76 richer 3D curve intent is the next technical step.
+documents. Blocks 48–76 Part Construction through richer 3D curve intent are implemented; Block
+77 3D Sketch JSON and semantic references is next.

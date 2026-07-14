@@ -14,7 +14,7 @@ phase_status:
   mvp_3: "Parametric bolt circle pattern — implemented"
   mvp_4: "Assembly parameters and Project container — implemented"
   mvp_5: "Assembly relationships, motion, hierarchy, analysis, exchange — Blocks 1–47 implemented"
-  mvp_6: "Part Construction — Blocks 48–75 implemented, Blocks 76–94 planned, Block 76 next"
+  mvp_6: "Part Construction — Blocks 48–76 implemented, Blocks 77–94 planned, Block 77 next"
   mvp_7: "STEP Import — Blocks 95–101 planned after Block 94"
 ---
 
@@ -552,10 +552,10 @@ motion solvers reject Spherical as the selected drive.
 
 ## MVP 6 — Part Construction MVP after Block 47
 
-**Status:** In progress — Blocks 48–75 implemented
+**Status:** In progress — Blocks 48–76 implemented
 **Canonical:** sequence `docs/part-construction-sequence-mvp6.md`
 
-Blocks 48–75 are complete. Block 76 is the current next technical step.
+Blocks 48–76 are complete. Block 77 is the current next technical step.
 
 Mandatory Part Construction phase order:
 
@@ -1042,7 +1042,20 @@ Canonical contract: `docs/part-sketch-3d-core-mvp6.md`.
 [core][sketch-3d]
 ```
 
-## Current next technical step — Block 76
+## Block 76 — 3D spline, arc, helix, and guide-curve intent — Implemented
 
-Implement 3D spline, arc, helix, and guide-curve intent according to
+Block 76 adds mixed local/construction/planar point references, three-point Arcs, ordered
+Fit-/Control-Point Splines with degree/continuity validation, typed axis/radius/pitch/turn Helices,
+and role-bearing Guide-Curve metadata. External sources and Helix parameters feed the owning
+`Sketch3D` dependency node; missing, duplicate, wrong-unit, and unsafe-removal cases fail closed.
+
+Canonical contract: `docs/part-sketch-3d-curves-core-mvp6.md`.
+
+```text
+[core][sketch-3d-curves]
+```
+
+## Current next technical step — Block 77
+
+Implement 3D Sketch JSON and semantic references according to
 `docs/part-construction-sequence-mvp6-planning-detail.md`.

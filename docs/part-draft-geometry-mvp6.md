@@ -52,4 +52,4 @@ previous cache atomically.
 ./build/dev-geometry/blcad_geometry_tests "[geometry][draft-feature]"
 ```
 
-Blocks 48–75 are implemented. Block 75 Basic 3D Sketch Core intent is implemented; Block 76 richer 3D curve intent is the next boundary.
+Blocks 48–76 are implemented. Block 75 Basic 3D Sketch Core intent and Block 76 richer 3D curve intent are implemented; Block 77 3D Sketch JSON and semantic references is next.

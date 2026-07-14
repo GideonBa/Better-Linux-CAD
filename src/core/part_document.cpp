@@ -917,13 +917,70 @@ Result<std::size_t> PartDocument::add_sketch_3d(Sketch3D sketch) {
     return Result<std::size_t>::failure(Error::validation(
         sketch.id().value(), "sketch id must be unique across planar and 3D sketches"));
 
-  for (const ParameterId& parameter_id : sketch.parameter_dependencies()) {
-    const Parameter* parameter = find_parameter(parameter_id);
-    if (parameter == nullptr || parameter->type() != ParameterType::Length)
+  for (const SketchPoint3D& point : sketch.points())
+    for (const ParameterId& parameter_id : point.parameter_dependencies()) {
+      const Parameter* parameter = find_parameter(parameter_id);
+      if (parameter == nullptr || parameter->type() != ParameterType::Length)
+        return Result<std::size_t>::failure(Error::validation(
+            sketch.id().value(),
+            "3D sketch coordinate parameters must be existing Length parameters"));
+    }
+  for (const SketchHelix3D& helix : sketch.helices()) {
+    for (const ParameterId* parameter_id : {&helix.radius_parameter(), &helix.pitch_parameter()}) {
+      const Parameter* parameter = find_parameter(*parameter_id);
+      if (parameter == nullptr || parameter->type() != ParameterType::Length)
+        return Result<std::size_t>::failure(Error::validation(
+            helix.id().value(), "3D helix radius and pitch must be existing Length parameters"));
+    }
+    const Parameter* turns = find_parameter(helix.turns_parameter());
+    if (turns == nullptr || turns->type() != ParameterType::Count ||
+        turns->value().count_value() < 1U)
+      return Result<std::size_t>::failure(Error::validation(
+          helix.id().value(), "3D helix turns must be an existing positive Count parameter"));
+    const bool axis_exists =
+        helix.axis().source() == SketchHelixAxis3DSource::DatumAxis
+            ? find_datum_axis(*helix.axis().datum_axis()) != nullptr
+            : find_construction_line(*helix.axis().construction_line()) != nullptr;
+    if (!axis_exists)
       return Result<std::size_t>::failure(
-          Error::validation(sketch.id().value(),
-                            "3D sketch coordinate parameters must be existing Length parameters"));
+          Error::validation(helix.id().value(), "3D helix axis must exist in part document"));
   }
+
+  const auto validate_point_reference =
+      [this, &sketch](const SketchPointReference3D& reference) -> Result<std::size_t> {
+    if (reference.source() == SketchPointReference3DSource::ConstructionPoint) {
+      if (find_construction_point(*reference.construction_point()) == nullptr)
+        return Result<std::size_t>::failure(Error::validation(
+            sketch.id().value(), "3D curve construction point must exist in part document"));
+      return Result<std::size_t>::success(1U);
+    }
+    if (reference.source() != SketchPointReference3DSource::PlanarSketchPoint)
+      return Result<std::size_t>::success(1U);
+    const Sketch* planar = find_sketch(*reference.planar_sketch());
+    if (planar == nullptr)
+      return Result<std::size_t>::failure(Error::validation(
+          sketch.id().value(), "3D curve planar source sketch must exist in part document"));
+    const SketchReferenceTarget& target = *reference.planar_point();
+    const bool exists = target.kind() == SketchReferenceTargetKind::ProjectedPoint
+                            ? planar->find_projected_point(target.entity()) != nullptr
+                            : planar->find_line_segment(target.entity()) != nullptr;
+    if (!exists)
+      return Result<std::size_t>::failure(Error::validation(
+          sketch.id().value(), "3D curve planar point target must exist in its source sketch"));
+    return Result<std::size_t>::success(1U);
+  };
+  for (const SketchArc3D& arc : sketch.arcs())
+    for (const SketchPointReference3D& reference : arc.point_references()) {
+      auto valid = validate_point_reference(reference);
+      if (valid.has_error())
+        return valid;
+    }
+  for (const SketchSpline3D& spline : sketch.splines())
+    for (const SketchPointReference3D& reference : spline.ordered_points()) {
+      auto valid = validate_point_reference(reference);
+      if (valid.has_error())
+        return valid;
+    }
 
   auto graph = dependency_graph_;
   auto added_node = graph.add_node(sketch.id().value());
@@ -931,6 +988,11 @@ Result<std::size_t> PartDocument::add_sketch_3d(Sketch3D sketch) {
     return Result<std::size_t>::failure(added_node.error());
   for (const ParameterId& parameter_id : sketch.parameter_dependencies()) {
     auto dependency = add_dependency_if_missing(graph, parameter_id.value(), sketch.id().value());
+    if (dependency.has_error())
+      return Result<std::size_t>::failure(dependency.error());
+  }
+  for (const std::string& source : sketch.referenced_node_ids()) {
+    auto dependency = add_dependency_if_missing(graph, source, sketch.id().value());
     if (dependency.has_error())
       return Result<std::size_t>::failure(dependency.error());
   }

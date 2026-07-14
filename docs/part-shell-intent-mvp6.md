@@ -53,4 +53,4 @@ feature/face order and Body-history dependencies deterministically.
 ```
 
 Blocks 72–74 ShellFeature Geometry and DraftFeature intent/JSON plus Geometry are implemented.
-Block 75 Basic 3D Sketch Core intent is implemented; Block 76 richer 3D curve intent is the next boundary.
+Block 75 Basic 3D Sketch Core intent and Block 76 richer 3D curve intent are implemented; Block 77 3D Sketch JSON and semantic references is next.

@@ -345,6 +345,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/sketch_spline_profile_json_tests.cpp
     tests/core/sketch_tests.cpp
     tests/core/sketch_3d_tests.cpp
+    tests/core/sketch_3d_curve_tests.cpp
     tests/core/subassembly_instance_tests.cpp
   )
 
