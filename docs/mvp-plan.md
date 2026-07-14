@@ -4,17 +4,17 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 90
-current_block: 91
-current_boundary: Stitch/Knit/Sew shell Geometry
-current_tag: "[geometry][surface-stitch]"
+implemented_through: Block 91
+current_block: 92
+current_boundary: Closed shell to solid conversion
+current_tag: "[geometry][surface-to-solid]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
   mvp_3: "Parametric bolt circle pattern — implemented"
   mvp_4: "Assembly parameters and Project container — implemented"
   mvp_5: "Assembly relationships, motion, hierarchy, analysis, exchange — Blocks 1–47 implemented"
-  mvp_6: "Part Construction — Blocks 48–90 implemented, Blocks 91–94 planned, Block 91 next"
+  mvp_6: "Part Construction — Blocks 48–91 implemented, Blocks 92–94 planned, Block 92 next"
   mvp_7: "STEP Import — Blocks 95–101 planned after Block 94"
 ---
 
@@ -552,10 +552,10 @@ motion solvers reject Spherical as the selected drive.
 
 ## MVP 6 — Part Construction MVP after Block 47
 
-**Status:** In progress — Blocks 48–90 implemented
+**Status:** In progress — Blocks 48–91 implemented
 **Canonical:** sequence `docs/part-construction-sequence-mvp6.md`
 
-Blocks 48–90 are complete. Block 90 is implemented; Block 91 is the current next technical step.
+Blocks 48–91 are complete. Block 91 is implemented; Block 92 is the current next technical step.
 
 Mandatory Part Construction phase order:
 
@@ -1240,11 +1240,29 @@ Canonical contract: `docs/part-trim-extend-surface-geometry-mvp6.md`.
 [geometry][surface-trim-extend]
 ```
 
-## Current next technical step — Block 91
+## Block 91 — Stitch/Knit/Sew shell Surface Geometry — Implemented
 
-Execute `SurfaceStitchFeature` over its ordered semantic Surface set with explicit tolerance,
-connectivity, free-edge, orientation, and manifold diagnostics.
+Block 91 sews an ordered set of at least two semantic Surface inputs into one connected shell within
+an explicit positive Length tolerance. It gathers input faces (rejecting empty inputs, solids, and
+faceless surfaces), sews them with the resolved boundary-match tolerance, and validates one shell
+containing every input face (free-edge/gap connectivity), consistent face orientation, and basic
+manifold suitability. The result stays a face-only Surface Body with no automatic topology healing
+or arbitrary gap closing; a stitched shell keeps its open outer free edges. Semantic and
+Surface-Body inputs are re-resolved on every recompute, tolerance-parameter changes re-sew the
+shell, and feature/Surface-Body cache publication is transactional.
+
+Canonical contract: `docs/part-surface-stitch-geometry-mvp6.md`.
 
 ```text
 [geometry][surface-stitch]
+```
+
+## Current next technical step — Block 92
+
+Execute `ClosedShellToSolidFeature` over a closed, consistently oriented, sufficiently manifold
+stitched shell, producing an explicit `BodyKind::Solid` identity and rejecting open/non-manifold
+inputs with explicit diagnostics.
+
+```text
+[geometry][surface-to-solid]
 ```

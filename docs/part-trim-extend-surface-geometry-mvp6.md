@@ -53,5 +53,6 @@ ambiguous multi-face target.
 
 ## Handoff
 
-Blocks 48–90 are implemented. Block 91 Stitch/Knit/Sew shell Geometry is the current next
-technical step.
+Blocks 48–91 are implemented. Stitch/Knit/Sew shell execution is canonical in
+`docs/part-surface-stitch-geometry-mvp6.md`. Block 92 Closed shell to solid conversion is the
+current next technical step.

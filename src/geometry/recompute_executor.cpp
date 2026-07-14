@@ -2556,9 +2556,9 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_surface_feature(
     return Result<std::size_t>::failure(
         validation_error(feature_id.value(), "surface feature must exist in part document"));
   const SurfaceFeatureKind kind = surface_feature_kind(*feature);
-  if (kind == SurfaceFeatureKind::SurfaceStitch || kind == SurfaceFeatureKind::ClosedShellToSolid)
-    return Result<std::size_t>::failure(
-        geometry_error(feature_id.value(), "surface feature Geometry is deferred beyond Block 90"));
+  if (kind == SurfaceFeatureKind::ClosedShellToSolid)
+    return Result<std::size_t>::failure(geometry_error(
+        feature_id.value(), "closed-shell-to-solid Geometry is deferred to Block 92"));
 
   ShapeCache working_cache = shape_cache;
   Result<GeometryShape> result = Result<GeometryShape>::failure(
@@ -2593,7 +2593,7 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_surface_feature(
     if (trimming.has_error())
       return Result<std::size_t>::failure(trimming.error());
     result = surface_adapter_.trim_surface(feature_id, target.value(), trimming.value());
-  } else {
+  } else if (kind == SurfaceFeatureKind::ExtendSurface) {
     const auto& extend = std::get<ExtendSurfaceFeature>(*feature);
     auto target = resolve_surface_target(document, extend.target(), working_cache, surface_adapter_,
                                          feature_id);
@@ -2611,6 +2611,25 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_surface_feature(
                          "surface extension distance must resolve to a positive Length parameter"));
     result = surface_adapter_.extend_surface(feature_id, target.value(), boundary.value(),
                                              distance->value().millimeters());
+  } else {
+    const auto& stitch = std::get<SurfaceStitchFeature>(*feature);
+    std::vector<GeometryShape> resolved_surfaces;
+    resolved_surfaces.reserve(stitch.surfaces().size());
+    for (const auto& reference : stitch.surfaces()) {
+      auto resolved = resolve_surface_target(document, reference, working_cache, surface_adapter_,
+                                             feature_id);
+      if (resolved.has_error())
+        return Result<std::size_t>::failure(resolved.error());
+      resolved_surfaces.push_back(std::move(resolved.value()));
+    }
+    const Parameter* tolerance = document.find_parameter(stitch.tolerance_parameter());
+    if (tolerance == nullptr || tolerance->type() != ParameterType::Length ||
+        !tolerance->value().is_positive_length())
+      return Result<std::size_t>::failure(
+          geometry_error(stitch.tolerance_parameter().value(),
+                         "surface stitch tolerance must resolve to a positive Length parameter"));
+    result = surface_adapter_.stitch_surfaces(feature_id, resolved_surfaces,
+                                              tolerance->value().millimeters());
   }
   if (result.has_error())
     return Result<std::size_t>::failure(result.error());

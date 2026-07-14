@@ -1,6 +1,6 @@
 # General Assembly Geometric Target and Relationship Roadmap
 
-Status: Blocks 31–47 and Part Construction Blocks 48–90 are implemented. The Assembly MVP handoff is complete; Block 83 is implemented; Block 84 is implemented; Block 85 is implemented; Block 86 is implemented; Block 87 is implemented; Block 88 is implemented; Block 89 is implemented; Block 90 is implemented; Block 91 is the current next technical step.
+Status: Blocks 31–47 and Part Construction Blocks 48–91 are implemented. The Assembly MVP handoff is complete; Block 83 is implemented; Block 84 is implemented; Block 85 is implemented; Block 86 is implemented; Block 87 is implemented; Block 88 is implemented; Block 89 is implemented; Block 90 is implemented; Block 91 is implemented; Block 92 is the current next technical step.
 
 This document is the active status and sequencing authority for the expansion from the current assembly target layer to semantic reference geometry, stable generated topology targets, generic geometric relationships, and richer motion-joint families.
 
@@ -647,7 +647,7 @@ posed geometry/contact records/sweep analyses
 ## Current next technical step — Block 91
 
 Block 47 is implemented in `docs/assembly-spherical-joint-mvp5.md` and completes the Assembly MVP
-handoff. Blocks 48–90 Body identity, body-scoped recompute/inspection, Body Booleans, and
+handoff. Blocks 48–91 Body identity, body-scoped recompute/inspection, Body Booleans, and
 BodyTransform/SketchOwnership intent plus associative Geometry execution, reusable Part-feature
 input references, richer Extrude/Cut intent/JSON plus Geometry, persistent plus executed
 Revolve/RevolveCut, General Part Pattern Core intent/JSON, Linear/Circular Pattern Geometry, and

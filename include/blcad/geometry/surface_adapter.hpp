@@ -32,6 +32,10 @@ public:
                                                      const GeometryShape& target,
                                                      const std::vector<SweepPathSegment>& boundary,
                                                      double distance_mm) const;
+
+  [[nodiscard]] Result<GeometryShape>
+  stitch_surfaces(FeatureId feature_id, const std::vector<GeometryShape>& surfaces,
+                  double tolerance_mm) const;
 };
 
 } // namespace blcad::geometry

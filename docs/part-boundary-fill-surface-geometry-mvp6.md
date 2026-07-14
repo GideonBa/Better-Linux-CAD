@@ -52,6 +52,7 @@ rejection of an open contour.
 
 ## Handoff
 
-Blocks 48–90 are implemented. Trim and Extend execution is canonical in
-`docs/part-trim-extend-surface-geometry-mvp6.md`. Block 91 Stitch/Knit/Sew shell Geometry is the
+Blocks 48–91 are implemented. Trim/Extend and Stitch execution are canonical in
+`docs/part-trim-extend-surface-geometry-mvp6.md` and
+`docs/part-surface-stitch-geometry-mvp6.md`. Block 92 Closed shell to solid conversion is the
 current next technical step.

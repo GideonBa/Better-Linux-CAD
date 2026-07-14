@@ -74,8 +74,9 @@ malformed records, and compatibility with historical files lacking `surface_feat
 
 ## Handoff
 
-Blocks 48–90 are implemented. Boundary/Fill and Trim/Extend execution are canonical in
-`docs/part-boundary-fill-surface-geometry-mvp6.md` and
-`docs/part-trim-extend-surface-geometry-mvp6.md`. Block 91 Stitch/Knit/Sew shell Geometry is the
+Blocks 48–91 are implemented. Boundary/Fill, Trim/Extend, and Stitch execution are canonical in
+`docs/part-boundary-fill-surface-geometry-mvp6.md`,
+`docs/part-trim-extend-surface-geometry-mvp6.md`, and
+`docs/part-surface-stitch-geometry-mvp6.md`. Block 92 Closed shell to solid conversion is the
 current next technical step. Network surfaces and arbitrary patch-network intent remain deferred
 beyond the first Part Construction MVP.

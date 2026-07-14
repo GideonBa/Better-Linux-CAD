@@ -867,6 +867,11 @@ Surface/trimming/boundary references, positive distance parameter, and result Bo
 target faces, intersections, and extended faces remain transient. Canonical Geometry details are
 in `docs/part-trim-extend-surface-geometry-mvp6.md`.
 
+Block 91 adds no JSON fields. Stitch/Knit/Sew shell Surface execution consumes the existing ordered
+semantic Surface references, positive Length tolerance parameter, and result Body id. The sewn
+shell, its faces, and the sewing tolerance remain transient. Canonical Geometry details are in
+`docs/part-surface-stitch-geometry-mvp6.md`.
+
 ## Planned STEP import persistence after Block 94
 
 This section is planned architecture, not part of the current schema. Blocks 95–101 in

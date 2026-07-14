@@ -1,8 +1,8 @@
 # Part Construction Sequence MVP-6
 
-Status: active post-Assembly-MVP sequence. Blocks 48–90 are implemented; Blocks 91–94 remain planned. Blocks 95–101 form the subsequent STEP Import MVP.
+Status: active post-Assembly-MVP sequence. Blocks 48–91 are implemented; Blocks 92–94 remain planned. Blocks 95–101 form the subsequent STEP Import MVP.
 
-Block 47 completed the Assembly MVP handoff. Blocks 48–90 establish Body identity, body-scoped recompute/inspection, Body Boolean execution, associative transform Geometry, reusable semantic Part-feature inputs, richer Extrude/Cut intent plus Geometry, persistent plus executed Revolve/RevolveCut, general Pattern and Mirror Geometry, persistent plus executed Fillet/Chamfer/Shell/Draft Geometry, persistent model-space 3D Sketch Geometry, connected PathCurve Core intent, executed Sweep/SweepCut/SweepSurface through spatial paths, twist, and guide control, path-following Extrude/Extruded Cut, persistent plus executed guided multi-section Loft intent through verified G1/C1, persistent Surface-feature intent, and executed Boundary/Fill plus Trim/Extend Surface Geometry. Block 91 — Stitch/Knit/Sew shell Geometry — is the current next technical step.
+Block 47 completed the Assembly MVP handoff. Blocks 48–91 establish Body identity, body-scoped recompute/inspection, Body Boolean execution, associative transform Geometry, reusable semantic Part-feature inputs, richer Extrude/Cut intent plus Geometry, persistent plus executed Revolve/RevolveCut, general Pattern and Mirror Geometry, persistent plus executed Fillet/Chamfer/Shell/Draft Geometry, persistent model-space 3D Sketch Geometry, connected PathCurve Core intent, executed Sweep/SweepCut/SweepSurface through spatial paths, twist, and guide control, path-following Extrude/Extruded Cut, persistent plus executed guided multi-section Loft intent through verified G1/C1, persistent Surface-feature intent, and executed Boundary/Fill, Trim/Extend, plus Stitch/Knit/Sew shell Surface Geometry. Block 92 — Closed shell to solid conversion — is the current next technical step.
 
 This document is the active status, phase-order, authority-boundary, and handoff summary for the first broad BLCAD Part Construction MVP after the Assembly MVP.
 
@@ -10,7 +10,7 @@ The complete original Blocks 48-94 per-block planning detail is preserved byte-f
 
 - `docs/part-construction-sequence-mvp6-planning-detail.md`
 
-The implemented Blocks 48–90 contracts are canonical in:
+The implemented Blocks 48–91 contracts are canonical in:
 
 - `docs/part-body-identity-mvp6.md`
 - `docs/part-body-json-mvp6.md`
@@ -55,6 +55,7 @@ The implemented Blocks 48–90 contracts are canonical in:
 - `docs/part-surface-feature-intent-mvp6.md`
 - `docs/part-boundary-fill-surface-geometry-mvp6.md`
 - `docs/part-trim-extend-surface-geometry-mvp6.md`
+- `docs/part-surface-stitch-geometry-mvp6.md`
 
 The planned post-Block-94 STEP import handoff is canonical in:
 
@@ -204,8 +205,8 @@ SweepCut, and SweepSurface intent with closed-region or open-PathCurve profiles,
 identity, orientation override, optional twist, Body-result semantics, dependency tracking, and
 strict additive JSON. Block 81 executes bounded ConstructionLine and planar line/arc/polyline
 paths for solid Sweep, SweepCut, and SweepSurface with explicit orientation and transactional
-Body-cache publication. Blocks 82–89 add spatial/twist/guide Sweep, path-following Extrude/Cut,
-ordered and guided Loft Geometry, Surface-feature intent, and Boundary/Fill plus Trim/Extend execution. The remaining Blocks 91–94
+Body-cache publication. Blocks 82–91 add spatial/twist/guide Sweep, path-following Extrude/Cut,
+ordered and guided Loft Geometry, Surface-feature intent, and Boundary/Fill, Trim/Extend, plus Stitch/Knit/Sew shell execution. The remaining Blocks 92–94
 implementation contracts stay in
 `docs/part-construction-sequence-mvp6-planning-detail.md`.
 

@@ -11,6 +11,7 @@
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepBuilderAPI_MakePolygon.hxx>
 #include <BRepBuilderAPI_MakeWire.hxx>
+#include <BRepBuilderAPI_Sewing.hxx>
 #include <BRepCheck_Analyzer.hxx>
 #include <BRepFill_Filling.hxx>
 #include <BRepGProp.hxx>
@@ -26,10 +27,12 @@
 #include <TopAbs_ShapeEnum.hxx>
 #include <TopExp.hxx>
 #include <TopExp_Explorer.hxx>
+#include <TopTools_IndexedDataMapOfShapeListOfShape.hxx>
 #include <TopoDS.hxx>
 #include <TopoDS_Edge.hxx>
 #include <TopoDS_Face.hxx>
 #include <TopoDS_Shape.hxx>
+#include <TopoDS_Shell.hxx>
 #include <TopoDS_Vertex.hxx>
 #include <TopoDS_Wire.hxx>
 #include <gp_Dir.hxx>
@@ -282,6 +285,38 @@ fill(const FeatureId& id, const std::vector<std::vector<SweepPathSegment>>& boun
   } catch (...) {
     return Result<TopoDS_Shape>::failure(surface_error(id, "unknown surface filling error"));
   }
+}
+
+// Gathers every face across the ordered stitch input shapes, rejecting empty
+// inputs, solids, and faceless surfaces so that stitching only ever sees faces.
+[[nodiscard]] Result<std::vector<TopoDS_Face>>
+stitch_input_faces(const FeatureId& id, const std::vector<TopoDS_Shape>& shapes) {
+  std::vector<TopoDS_Face> faces;
+  for (const auto& shape : shapes) {
+    if (shape.IsNull())
+      return Result<std::vector<TopoDS_Face>>::failure(
+          surface_error(id, "surface stitch input must not be empty"));
+    if (TopExp_Explorer(shape, TopAbs_SOLID).More())
+      return Result<std::vector<TopoDS_Face>>::failure(
+          surface_error(id, "surface stitch inputs must be surfaces, not solids"));
+    const std::size_t before = faces.size();
+    for (TopExp_Explorer explorer(shape, TopAbs_FACE); explorer.More(); explorer.Next())
+      faces.push_back(TopoDS::Face(explorer.Current()));
+    if (faces.size() == before)
+      return Result<std::vector<TopoDS_Face>>::failure(
+          surface_error(id, "surface stitch input contains no face"));
+  }
+  return Result<std::vector<TopoDS_Face>>::success(std::move(faces));
+}
+
+// True when any edge of the shell is shared by more than two faces.
+[[nodiscard]] bool is_non_manifold_shell(const TopoDS_Shell& shell) {
+  TopTools_IndexedDataMapOfShapeListOfShape edge_faces;
+  TopExp::MapShapesAndAncestors(shell, TopAbs_EDGE, TopAbs_FACE, edge_faces);
+  for (Standard_Integer index = 1; index <= edge_faces.Extent(); ++index)
+    if (edge_faces.FindFromIndex(index).Extent() > 2)
+      return true;
+  return false;
 }
 
 } // namespace
@@ -550,6 +585,76 @@ Result<GeometryShape> SurfaceAdapter::extend_surface(FeatureId feature_id,
     return Result<GeometryShape>::failure(surface_error(feature_id, failure_message(failure)));
   } catch (const std::exception& exception) {
     return Result<GeometryShape>::failure(surface_error(feature_id, exception.what()));
+  }
+}
+
+Result<GeometryShape>
+SurfaceAdapter::stitch_surfaces(FeatureId feature_id,
+                                const std::vector<GeometryShape>& surfaces,
+                                double tolerance_mm) const {
+  if (feature_id.empty())
+    return Result<GeometryShape>::failure(
+        Error::validation("surface_stitch", "feature id must not be empty"));
+  if (!std::isfinite(tolerance_mm) || tolerance_mm <= 0.0)
+    return Result<GeometryShape>::failure(
+        surface_error(feature_id, "surface stitch tolerance must be positive and finite"));
+  if (surfaces.size() < 2U)
+    return Result<GeometryShape>::failure(
+        surface_error(feature_id, "surface stitch requires at least two surfaces"));
+  std::vector<TopoDS_Shape> shapes;
+  shapes.reserve(surfaces.size());
+  for (const auto& surface : surfaces) {
+    if (surface.empty())
+      return Result<GeometryShape>::failure(
+          surface_error(feature_id, "surface stitch input must not be empty"));
+    shapes.push_back(surface.impl_->shape);
+  }
+  auto faces = stitch_input_faces(feature_id, shapes);
+  if (faces.has_error())
+    return Result<GeometryShape>::failure(faces.error());
+  const std::size_t input_face_count = faces.value().size();
+  if (input_face_count < 2U)
+    return Result<GeometryShape>::failure(
+        surface_error(feature_id, "surface stitch requires at least two faces"));
+
+  try {
+    BRepBuilderAPI_Sewing sewing(tolerance_mm);
+    for (const auto& face : faces.value())
+      sewing.Add(face);
+    sewing.Perform();
+    const TopoDS_Shape sewn = sewing.SewedShape();
+    if (sewn.IsNull())
+      return Result<GeometryShape>::failure(
+          surface_error(feature_id, "OCCT could not stitch the surface set"));
+    if (sewing.NbMultipleEdges() > 0)
+      return Result<GeometryShape>::failure(
+          surface_error(feature_id, "stitched shell is non-manifold"));
+
+    std::vector<TopoDS_Shell> shells;
+    for (TopExp_Explorer explorer(sewn, TopAbs_SHELL); explorer.More(); explorer.Next())
+      shells.push_back(TopoDS::Shell(explorer.Current()));
+    if (shells.size() != 1U)
+      return Result<GeometryShape>::failure(surface_error(
+          feature_id, "stitched surfaces do not form one connected shell within tolerance"));
+    const TopoDS_Shell& shell = shells.front();
+    if (face_count(shell) != input_face_count || face_count(sewn) != input_face_count)
+      return Result<GeometryShape>::failure(surface_error(
+          feature_id, "stitched shell left free faces or gaps outside tolerance"));
+    if (is_non_manifold_shell(shell))
+      return Result<GeometryShape>::failure(
+          surface_error(feature_id, "stitched shell is non-manifold"));
+
+    auto checked = checked_shape(feature_id, shell);
+    if (checked.has_error())
+      return Result<GeometryShape>::failure(checked.error());
+    return Result<GeometryShape>::success(
+        GeometryShape(std::make_shared<GeometryShape::Impl>(std::move(checked.value()))));
+  } catch (const Standard_Failure& failure) {
+    return Result<GeometryShape>::failure(surface_error(feature_id, failure_message(failure)));
+  } catch (const std::exception& exception) {
+    return Result<GeometryShape>::failure(surface_error(feature_id, exception.what()));
+  } catch (...) {
+    return Result<GeometryShape>::failure(surface_error(feature_id, "unknown surface stitch error"));
   }
 }
 
