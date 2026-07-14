@@ -4,17 +4,17 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 61
-current_block: 62
-current_boundary: Revolve/RevolveCut Geometry
-current_tag: "[geometry][revolve-feature]"
+implemented_through: Block 63
+current_block: 64
+current_boundary: General Linear Pattern Geometry
+current_tag: "[geometry][linear-pattern]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
   mvp_3: "Parametric bolt circle pattern — implemented"
   mvp_4: "Assembly parameters and Project container — implemented"
   mvp_5: "Assembly relationships, motion, hierarchy, analysis, exchange — Blocks 1–47 implemented"
-  mvp_6: "Part Construction — Blocks 48–61 implemented, Blocks 62–94 planned, Block 62 next"
+  mvp_6: "Part Construction — Blocks 48–63 implemented, Blocks 64–94 planned, Block 64 next"
   mvp_7: "STEP Import — Blocks 95–101 planned after Block 94"
 ---
 
@@ -552,10 +552,10 @@ motion solvers reject Spherical as the selected drive.
 
 ## MVP 6 — Part Construction MVP after Block 47
 
-**Status:** In progress — Blocks 48–61 implemented
+**Status:** In progress — Blocks 48–63 implemented
 **Canonical:** sequence `docs/part-construction-sequence-mvp6.md`
 
-Blocks 48–61 are complete. Block 62 is the current next technical step.
+Blocks 48–63 are complete. Block 64 is the current next technical step.
 
 Mandatory Part Construction phase order:
 
@@ -857,7 +857,37 @@ Canonical contract: `docs/part-revolve-intent-mvp6.md`.
 [core][revolve-feature]
 ```
 
-## Current next technical step — Block 62
+## Block 62 — Revolve/RevolveCut Geometry — Implemented
 
-Implement profile-to-model-space mapping and transactional OCCT Revolve/RevolveCut Geometry
-according to `docs/part-construction-sequence-mvp6-planning-detail.md`.
+Block 62 maps the selected rectangle, circle, closed curve, or composite profile into model space,
+resolves DatumAxis, ConstructionLine, semantic primary-axis, and semantic generated-edge sources,
+and builds deterministic full, signed partial, or symmetric OCCT revolutions. NewBody publishes the
+tool; Join/Cut/Intersect reuse the shared Body Boolean authority and recover the preceding producer
+for incremental idempotence. Semantic-axis producer changes recompute in graph order. Axis/profile
+crossing and invalid OCCT results fail transactionally without replacing valid cache state.
+
+Canonical contract: `docs/part-revolve-geometry-mvp6.md`.
+
+```text
+[geometry][revolve-feature]
+```
+
+## Block 63 — General Part Pattern Core model and JSON — Implemented
+
+Block 63 adds ordered typed Feature/Body Pattern sources, Linear spacing/total-extent and direction
+intent, Circular total-angle/equal-spacing intent, typed Count/Length parameters, all Body-result
+modes, dependency/invalidation/removal semantics, and additive compatible `part_patterns[]` JSON.
+Generated ordering is instance-major with authored source order and no copied persistent Feature
+records. Geometry fails explicitly at the Block-64/65 boundary.
+
+Canonical contract: `docs/part-pattern-core-mvp6.md`.
+
+```text
+[core][part-pattern]
+```
+
+## Current next technical step — Block 64
+
+Execute deterministic translational Feature- and Body-source instances for spacing/total-extent,
+positive/negative direction, all Body-result modes, stable generated order, and incremental
+recompute according to `docs/part-construction-sequence-mvp6-planning-detail.md`.

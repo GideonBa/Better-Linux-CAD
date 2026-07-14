@@ -19,6 +19,7 @@ class BodyBooleanAdapter;
 class CircularCutAdapter;
 class ClosedProfileAdapter;
 class BodyTransformAdapter;
+class RevolveAdapter;
 class StepExporter;
 class AssemblyStepExporter;
 
@@ -47,6 +48,7 @@ private:
   friend class CircularCutAdapter;
   friend class ClosedProfileAdapter;
   friend class BodyTransformAdapter;
+  friend class RevolveAdapter;
   friend class StepExporter;
   friend class AssemblyStepExporter;
   friend class detail::AssemblyPartShapeDefinitionBuilder;

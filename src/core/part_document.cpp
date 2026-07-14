@@ -1014,24 +1014,23 @@ Result<std::size_t> PartDocument::add_revolve_feature(RevolveFeature feature) {
     return Result<std::size_t>::failure(
         Error::validation(feature.id().value(), "revolve target body must exist in part document"));
   if (!has_body_id(context.effective_produced_body()))
-    return Result<std::size_t>::failure(
-        Error::validation(feature.id().value(), "revolve produced body must exist in part document"));
+    return Result<std::size_t>::failure(Error::validation(
+        feature.id().value(), "revolve produced body must exist in part document"));
 
   auto graph = dependency_graph_;
   auto added_node = graph.add_node(feature.id().value());
   if (added_node.has_error())
     return Result<std::size_t>::failure(added_node.error());
-  for (const std::string& source : {feature.profile().source_node_id(),
-                                    feature.axis().source_node_id()}) {
+  for (const std::string& source :
+       {feature.profile().source_node_id(), feature.axis().source_node_id()}) {
     auto dependency = add_dependency_if_missing(graph, source, feature.id().value());
     if (dependency.has_error())
       return Result<std::size_t>::failure(dependency.error());
   }
 
   const std::string result_node = body_dependency_node_id(context.effective_produced_body());
-  const bool modifies_in_place =
-      context.target_body().has_value() &&
-      context.target_body().value() == context.effective_produced_body();
+  const bool modifies_in_place = context.target_body().has_value() &&
+                                 context.target_body().value() == context.effective_produced_body();
   if (modifies_in_place) {
     const auto previous_producers = dependency_sources_of(graph, result_node);
     graph.remove_dependencies_of_dependent(result_node);
@@ -1065,6 +1064,183 @@ Result<std::size_t> PartDocument::add_revolve_feature(RevolveFeature feature) {
   invalidation_state_ = std::move(invalidation_state);
   revolve_features_.push_back(std::move(feature));
   return Result<std::size_t>::success(revolve_features_.size() - 1U);
+}
+
+Result<std::size_t> PartDocument::add_linear_pattern_feature(LinearPatternFeature feature) {
+  if (has_any_feature_id(feature.id()))
+    return Result<std::size_t>::failure(
+        Error::validation(feature.id().value(), "feature id must be unique within part document"));
+  const Parameter* count = find_parameter(feature.count_parameter());
+  if (count == nullptr || count->type() != ParameterType::Count ||
+      count->value().count_value() < 2U)
+    return Result<std::size_t>::failure(Error::validation(
+        feature.id().value(),
+        "linear pattern count must reference an existing count parameter of at least 2"));
+  const Parameter* extent = find_parameter(feature.extent_parameter());
+  if (extent == nullptr || extent->type() != ParameterType::Length)
+    return Result<std::size_t>::failure(Error::validation(
+        feature.id().value(), "linear pattern extent must reference an existing length parameter"));
+  auto direction_valid = validate_part_feature_input_reference(*this, feature.direction());
+  if (direction_valid.has_error())
+    return Result<std::size_t>::failure(direction_valid.error());
+  for (const auto& source : feature.sources()) {
+    if (source.kind() == PatternSourceKind::Feature &&
+        !has_any_feature_id(std::get<FeatureId>(source.source())))
+      return Result<std::size_t>::failure(Error::validation(
+          feature.id().value(), "linear pattern source feature must exist in part document"));
+    if (source.kind() == PatternSourceKind::Body && !has_body_id(std::get<BodyId>(source.source())))
+      return Result<std::size_t>::failure(Error::validation(
+          feature.id().value(), "linear pattern source body must exist in part document"));
+  }
+  const auto& context = feature.body_result_context();
+  if (context.target_body().has_value() && !has_body_id(*context.target_body()))
+    return Result<std::size_t>::failure(Error::validation(
+        feature.id().value(), "linear pattern target body must exist in part document"));
+  if (!has_body_id(context.effective_produced_body()))
+    return Result<std::size_t>::failure(Error::validation(
+        feature.id().value(), "linear pattern produced body must exist in part document"));
+
+  const bool modifies_in_place = context.target_body().has_value() &&
+                                 *context.target_body() == context.effective_produced_body();
+  auto graph = dependency_graph_;
+  auto added_node = graph.add_node(feature.id().value());
+  if (added_node.has_error())
+    return Result<std::size_t>::failure(added_node.error());
+  for (const auto& source : feature.sources()) {
+    if (modifies_in_place && source.kind() == PatternSourceKind::Body &&
+        std::get<BodyId>(source.source()) == context.effective_produced_body())
+      continue;
+    auto dependency =
+        add_dependency_if_missing(graph, source.source_node_id(), feature.id().value());
+    if (dependency.has_error())
+      return Result<std::size_t>::failure(dependency.error());
+  }
+  for (const std::string& source :
+       {feature.direction().source_node_id(), feature.count_parameter().value(),
+        feature.extent_parameter().value()}) {
+    auto dependency = add_dependency_if_missing(graph, source, feature.id().value());
+    if (dependency.has_error())
+      return Result<std::size_t>::failure(dependency.error());
+  }
+  const std::string result_node = body_dependency_node_id(context.effective_produced_body());
+  if (modifies_in_place) {
+    const auto previous_producers = dependency_sources_of(graph, result_node);
+    graph.remove_dependencies_of_dependent(result_node);
+    for (const auto& producer : previous_producers) {
+      auto dependency = add_dependency_if_missing(graph, producer, feature.id().value());
+      if (dependency.has_error())
+        return Result<std::size_t>::failure(dependency.error());
+    }
+  } else {
+    if (!dependency_sources_of(graph, result_node).empty())
+      return Result<std::size_t>::failure(Error::dependency(
+          feature.id().value(), "linear pattern produced body already has a producing feature"));
+    if (context.target_body().has_value()) {
+      auto dependency = add_dependency_if_missing(
+          graph, body_dependency_node_id(*context.target_body()), feature.id().value());
+      if (dependency.has_error())
+        return Result<std::size_t>::failure(dependency.error());
+    }
+  }
+  auto result_dependency = add_dependency_if_missing(graph, feature.id().value(), result_node);
+  if (result_dependency.has_error())
+    return Result<std::size_t>::failure(result_dependency.error());
+  if (graph.has_cycle())
+    return Result<std::size_t>::failure(Error::dependency(
+        feature.id().value(), "linear pattern must not create a dependency cycle"));
+  auto invalidation_state = invalidation_state_;
+  auto synced = sync_graph(std::move(graph), invalidation_state, dependency_graph_);
+  if (synced.has_error())
+    return Result<std::size_t>::failure(synced.error());
+  invalidation_state_ = std::move(invalidation_state);
+  linear_pattern_features_.push_back(std::move(feature));
+  return Result<std::size_t>::success(linear_pattern_features_.size() - 1U);
+}
+
+Result<std::size_t> PartDocument::add_circular_pattern_feature(CircularPatternFeature feature) {
+  if (has_any_feature_id(feature.id()))
+    return Result<std::size_t>::failure(
+        Error::validation(feature.id().value(), "feature id must be unique within part document"));
+  const Parameter* count = find_parameter(feature.count_parameter());
+  if (count == nullptr || count->type() != ParameterType::Count ||
+      count->value().count_value() < 2U)
+    return Result<std::size_t>::failure(Error::validation(
+        feature.id().value(),
+        "circular pattern count must reference an existing count parameter of at least 2"));
+  auto axis_valid = validate_part_feature_input_reference(*this, feature.axis());
+  if (axis_valid.has_error())
+    return Result<std::size_t>::failure(axis_valid.error());
+  for (const auto& source : feature.sources()) {
+    if (source.kind() == PatternSourceKind::Feature &&
+        !has_any_feature_id(std::get<FeatureId>(source.source())))
+      return Result<std::size_t>::failure(Error::validation(
+          feature.id().value(), "circular pattern source feature must exist in part document"));
+    if (source.kind() == PatternSourceKind::Body && !has_body_id(std::get<BodyId>(source.source())))
+      return Result<std::size_t>::failure(Error::validation(
+          feature.id().value(), "circular pattern source body must exist in part document"));
+  }
+  const auto& context = feature.body_result_context();
+  if (context.target_body().has_value() && !has_body_id(*context.target_body()))
+    return Result<std::size_t>::failure(Error::validation(
+        feature.id().value(), "circular pattern target body must exist in part document"));
+  if (!has_body_id(context.effective_produced_body()))
+    return Result<std::size_t>::failure(Error::validation(
+        feature.id().value(), "circular pattern produced body must exist in part document"));
+
+  const bool modifies_in_place = context.target_body().has_value() &&
+                                 *context.target_body() == context.effective_produced_body();
+  auto graph = dependency_graph_;
+  auto added_node = graph.add_node(feature.id().value());
+  if (added_node.has_error())
+    return Result<std::size_t>::failure(added_node.error());
+  for (const auto& source : feature.sources()) {
+    if (modifies_in_place && source.kind() == PatternSourceKind::Body &&
+        std::get<BodyId>(source.source()) == context.effective_produced_body())
+      continue;
+    auto dependency =
+        add_dependency_if_missing(graph, source.source_node_id(), feature.id().value());
+    if (dependency.has_error())
+      return Result<std::size_t>::failure(dependency.error());
+  }
+  for (const std::string& source :
+       {feature.axis().source_node_id(), feature.count_parameter().value()}) {
+    auto dependency = add_dependency_if_missing(graph, source, feature.id().value());
+    if (dependency.has_error())
+      return Result<std::size_t>::failure(dependency.error());
+  }
+  const std::string result_node = body_dependency_node_id(context.effective_produced_body());
+  if (modifies_in_place) {
+    const auto previous_producers = dependency_sources_of(graph, result_node);
+    graph.remove_dependencies_of_dependent(result_node);
+    for (const auto& producer : previous_producers) {
+      auto dependency = add_dependency_if_missing(graph, producer, feature.id().value());
+      if (dependency.has_error())
+        return Result<std::size_t>::failure(dependency.error());
+    }
+  } else {
+    if (!dependency_sources_of(graph, result_node).empty())
+      return Result<std::size_t>::failure(Error::dependency(
+          feature.id().value(), "circular pattern produced body already has a producing feature"));
+    if (context.target_body().has_value()) {
+      auto dependency = add_dependency_if_missing(
+          graph, body_dependency_node_id(*context.target_body()), feature.id().value());
+      if (dependency.has_error())
+        return Result<std::size_t>::failure(dependency.error());
+    }
+  }
+  auto result_dependency = add_dependency_if_missing(graph, feature.id().value(), result_node);
+  if (result_dependency.has_error())
+    return Result<std::size_t>::failure(result_dependency.error());
+  if (graph.has_cycle())
+    return Result<std::size_t>::failure(Error::dependency(
+        feature.id().value(), "circular pattern must not create a dependency cycle"));
+  auto invalidation_state = invalidation_state_;
+  auto synced = sync_graph(std::move(graph), invalidation_state, dependency_graph_);
+  if (synced.has_error())
+    return Result<std::size_t>::failure(synced.error());
+  invalidation_state_ = std::move(invalidation_state);
+  circular_pattern_features_.push_back(std::move(feature));
+  return Result<std::size_t>::success(circular_pattern_features_.size() - 1U);
 }
 
 Result<std::size_t> PartDocument::add_body_boolean_feature(BodyBooleanFeature feature) {
@@ -1312,6 +1488,30 @@ Result<std::size_t> PartDocument::remove_body(BodyId id) {
   for (const auto& feature : revolve_features_) {
     const auto& context = feature.body_result_context();
     if ((context.target_body().has_value() && context.target_body().value() == id) ||
+        context.effective_produced_body() == id)
+      return Result<std::size_t>::failure(
+          Error::dependency(id.value(), "body with dependent model intent cannot be removed"));
+  }
+  for (const auto& feature : linear_pattern_features_) {
+    const auto& context = feature.body_result_context();
+    const bool references_body =
+        std::any_of(feature.sources().begin(), feature.sources().end(), [&id](const auto& source) {
+          return source.kind() == PatternSourceKind::Body &&
+                 std::get<BodyId>(source.source()) == id;
+        });
+    if (references_body || (context.target_body().has_value() && *context.target_body() == id) ||
+        context.effective_produced_body() == id)
+      return Result<std::size_t>::failure(
+          Error::dependency(id.value(), "body with dependent model intent cannot be removed"));
+  }
+  for (const auto& feature : circular_pattern_features_) {
+    const auto& context = feature.body_result_context();
+    const bool references_body =
+        std::any_of(feature.sources().begin(), feature.sources().end(), [&id](const auto& source) {
+          return source.kind() == PatternSourceKind::Body &&
+                 std::get<BodyId>(source.source()) == id;
+        });
+    if (references_body || (context.target_body().has_value() && *context.target_body() == id) ||
         context.effective_produced_body() == id)
       return Result<std::size_t>::failure(
           Error::dependency(id.value(), "body with dependent model intent cannot be removed"));
@@ -1648,6 +1848,13 @@ const std::vector<Feature>& PartDocument::features() const noexcept {
 const std::vector<RevolveFeature>& PartDocument::revolve_features() const noexcept {
   return revolve_features_;
 }
+const std::vector<LinearPatternFeature>& PartDocument::linear_pattern_features() const noexcept {
+  return linear_pattern_features_;
+}
+const std::vector<CircularPatternFeature>&
+PartDocument::circular_pattern_features() const noexcept {
+  return circular_pattern_features_;
+}
 const std::vector<BodyBooleanFeature>& PartDocument::body_boolean_features() const noexcept {
   return body_boolean_features_;
 }
@@ -1707,6 +1914,12 @@ std::size_t PartDocument::feature_count() const noexcept {
 }
 std::size_t PartDocument::revolve_feature_count() const noexcept {
   return revolve_features_.size();
+}
+std::size_t PartDocument::linear_pattern_feature_count() const noexcept {
+  return linear_pattern_features_.size();
+}
+std::size_t PartDocument::circular_pattern_feature_count() const noexcept {
+  return circular_pattern_features_.size();
 }
 std::size_t PartDocument::body_boolean_feature_count() const noexcept {
   return body_boolean_features_.size();
@@ -1799,6 +2012,19 @@ const RevolveFeature* PartDocument::find_revolve_feature(FeatureId id) const noe
       return &feature;
   return nullptr;
 }
+const LinearPatternFeature* PartDocument::find_linear_pattern_feature(FeatureId id) const noexcept {
+  for (const auto& feature : linear_pattern_features_)
+    if (feature.id() == id)
+      return &feature;
+  return nullptr;
+}
+const CircularPatternFeature*
+PartDocument::find_circular_pattern_feature(FeatureId id) const noexcept {
+  for (const auto& feature : circular_pattern_features_)
+    if (feature.id() == id)
+      return &feature;
+  return nullptr;
+}
 const BodyBooleanFeature* PartDocument::find_body_boolean_feature(FeatureId id) const noexcept {
   for (const auto& feature : body_boolean_features_)
     if (feature.id() == id)
@@ -1886,6 +2112,12 @@ bool PartDocument::has_feature_id(const FeatureId& id) const noexcept {
 bool PartDocument::has_revolve_feature_id(const FeatureId& id) const noexcept {
   return find_revolve_feature(id) != nullptr;
 }
+bool PartDocument::has_linear_pattern_feature_id(const FeatureId& id) const noexcept {
+  return find_linear_pattern_feature(id) != nullptr;
+}
+bool PartDocument::has_circular_pattern_feature_id(const FeatureId& id) const noexcept {
+  return find_circular_pattern_feature(id) != nullptr;
+}
 bool PartDocument::has_body_boolean_feature_id(const FeatureId& id) const noexcept {
   return find_body_boolean_feature(id) != nullptr;
 }
@@ -1898,7 +2130,8 @@ bool PartDocument::has_body_transform_id(const BodyTransformId& id) const noexce
   return find_body_transform(id) != nullptr;
 }
 bool PartDocument::has_any_feature_id(const FeatureId& id) const noexcept {
-  return has_feature_id(id) || has_revolve_feature_id(id) || has_body_boolean_feature_id(id);
+  return has_feature_id(id) || has_revolve_feature_id(id) || has_linear_pattern_feature_id(id) ||
+         has_circular_pattern_feature_id(id) || has_body_boolean_feature_id(id);
 }
 bool PartDocument::has_body_id(const BodyId& id) const noexcept {
   return find_body(id) != nullptr;

@@ -254,6 +254,144 @@ resolve_boolean_target_input(const PartDocument& document, const ShapeCache& sha
   return body_result;
 }
 
+[[nodiscard]] Result<std::size_t> store_revolve_result(const PartDocument& document,
+                                                       const RevolveFeature& feature,
+                                                       GeometryShape shape,
+                                                       ShapeCache& shape_cache) {
+  const BodyId& result_body_id = feature.body_result_context().effective_produced_body();
+  const Body* result_body = document.find_body(result_body_id);
+  if (result_body == nullptr)
+    return Result<std::size_t>::failure(
+        validation_error(result_body_id.value(), "produced body must exist in part document"));
+  auto feature_result = shape_cache.store_feature_shape(feature.id(), shape);
+  if (feature_result.has_error())
+    return feature_result;
+  auto body_result = shape_cache.store_body_shape(result_body_id, feature.id(), std::move(shape));
+  if (body_result.has_error())
+    return body_result;
+  if (document.bodies().size() == 1U && result_body->kind() == BodyKind::Solid) {
+    const GeometryShape* cached = shape_cache.find_body_shape(result_body_id);
+    return shape_cache.set_final_shape(feature.id(), *cached);
+  }
+  shape_cache.clear_final_shape();
+  return body_result;
+}
+
+[[nodiscard]] Result<const GeometryShape*> resolve_revolve_target(const PartDocument& document,
+                                                                  const RevolveFeature& feature,
+                                                                  const ShapeCache& shape_cache) {
+  const auto& context = feature.body_result_context();
+  if (!context.target_body().has_value())
+    return Result<const GeometryShape*>::success(nullptr);
+  const BodyId& body = *context.target_body();
+  for (const auto& [producer, dependent] : document.dependency_graph().dependencies()) {
+    if (dependent != feature.id().value() || producer.starts_with("body:"))
+      continue;
+    bool produces_target = false;
+    if (const Feature* previous = document.find_feature(FeatureId(producer));
+        previous != nullptr && previous->body_result_context().has_value())
+      produces_target = previous->body_result_context()->effective_produced_body() == body;
+    if (const RevolveFeature* previous = document.find_revolve_feature(FeatureId(producer));
+        previous != nullptr)
+      produces_target = previous->body_result_context().effective_produced_body() == body;
+    if (const BodyBooleanFeature* previous =
+            document.find_body_boolean_feature(FeatureId(producer));
+        previous != nullptr)
+      produces_target = previous->effective_result_body() == body;
+    if (const BodyTransform* previous = document.find_body_transform(BodyTransformId(producer));
+        previous != nullptr)
+      produces_target = previous->body() == body;
+    if (produces_target)
+      if (const GeometryShape* shape = shape_cache.find_feature_shape(FeatureId(producer)))
+        return Result<const GeometryShape*>::success(shape);
+  }
+  const GeometryShape* shape = shape_cache.find_body_shape(body);
+  if (shape == nullptr)
+    return Result<const GeometryShape*>::failure(
+        geometry_error(body.value(), "revolve target body shape must exist in shape cache"));
+  return Result<const GeometryShape*>::success(shape);
+}
+
+[[nodiscard]] Result<std::pair<Point3, Vector3>>
+resolve_revolve_axis(const PartDocument& document, const AxisReference& reference,
+                     const ShapeCache& shape_cache, const WorkplaneResolver& workplane_resolver) {
+  Result<std::pair<Point3, Vector3>> resolved = Result<std::pair<Point3, Vector3>>::failure(
+      geometry_error(reference.source_node_id(), "unsupported revolve axis source"));
+  if (const auto* datum = std::get_if<DatumAxisId>(&reference.source())) {
+    const DatumAxis* axis = document.find_datum_axis(*datum);
+    if (axis == nullptr)
+      return Result<std::pair<Point3, Vector3>>::failure(
+          geometry_error(datum->value(), "revolve DatumAxis must exist in part document"));
+    if (axis->kind() == DatumAxisKind::Explicit)
+      resolved = Result<std::pair<Point3, Vector3>>::success({axis->origin(), axis->direction()});
+    else {
+      auto line = ConstructionLineResolver{}.resolve(document, axis->source_construction_line());
+      if (line.has_error())
+        return Result<std::pair<Point3, Vector3>>::failure(line.error());
+      resolved =
+          Result<std::pair<Point3, Vector3>>::success({line.value().point, line.value().direction});
+    }
+  } else if (const auto* line_id = std::get_if<ConstructionLineId>(&reference.source())) {
+    auto line = ConstructionLineResolver{}.resolve(document, *line_id);
+    if (line.has_error())
+      return Result<std::pair<Point3, Vector3>>::failure(line.error());
+    resolved =
+        Result<std::pair<Point3, Vector3>>::success({line.value().point, line.value().direction});
+  } else if (const auto* semantic = std::get_if<SemanticAxisReference>(&reference.source())) {
+    const Feature* source = document.find_feature(semantic->source_feature());
+    if (source == nullptr || source->type() != FeatureType::SubtractiveExtrude)
+      return Result<std::pair<Point3, Vector3>>::failure(
+          geometry_error(semantic->source_feature().value(),
+                         "semantic revolve axis requires a circular subtractive-extrude producer"));
+    const Sketch* sketch = document.find_sketch(source->input_sketch());
+    if (sketch == nullptr || sketch->circle_profiles().size() != 1U ||
+        sketch->profile_count() != 1U)
+      return Result<std::pair<Point3, Vector3>>::failure(
+          geometry_error(semantic->source_feature().value(),
+                         "semantic revolve axis producer requires exactly one circle profile"));
+    auto workplane = workplane_resolver.resolve_for_sketch(document, *sketch, shape_cache);
+    if (workplane.has_error())
+      return Result<std::pair<Point3, Vector3>>::failure(workplane.error());
+    const CircleProfile& circle = sketch->circle_profiles().front();
+    const Point3 origin = workplane_resolver.evaluate_point(workplane.value(), circle.center());
+    Vector3 direction = workplane.value().normal;
+    if (source->direction() == ExtrudeDirection::OppositeSketchNormal)
+      direction = {-direction.x, -direction.y, -direction.z};
+    resolved = Result<std::pair<Point3, Vector3>>::success({origin, direction});
+  } else {
+    const auto& edge = std::get<SemanticEdgeReference>(reference.source());
+    auto line = SemanticReferenceEvaluator{}.resolve_edge(document, edge, shape_cache);
+    if (line.has_error())
+      return Result<std::pair<Point3, Vector3>>::failure(line.error());
+    resolved = Result<std::pair<Point3, Vector3>>::success(
+        {line.value().start, normalized({line.value().end.x - line.value().start.x,
+                                         line.value().end.y - line.value().start.y,
+                                         line.value().end.z - line.value().start.z})});
+  }
+
+  if (resolved.has_error())
+    return resolved;
+  if (const auto* transform = shape_cache.find_reference_transform(reference.source_node_id()))
+    return Result<std::pair<Point3, Vector3>>::success(
+        {transform->cumulative_transform.transform_point(resolved.value().first),
+         normalized(transform->cumulative_transform.transform_vector(resolved.value().second))});
+  return resolved;
+}
+
+struct ResolvedRevolveAngles {
+  double start_deg = 0.0;
+  double sweep_deg = 360.0;
+};
+
+[[nodiscard]] ResolvedRevolveAngles resolve_revolve_angles(const RevolveAngleExtent& extent) {
+  if (extent.mode() == RevolveExtentMode::Full)
+    return {};
+  if (extent.mode() == RevolveExtentMode::Symmetric)
+    return {-*extent.angle_deg() / 2.0, *extent.angle_deg()};
+  const double sign = *extent.side() == RevolveSide::Positive ? 1.0 : -1.0;
+  return {0.0, sign * *extent.angle_deg()};
+}
+
 [[nodiscard]] const Parameter* find_required_parameter(const PartDocument& document,
                                                        const ParameterId& parameter_id) noexcept {
   return document.find_parameter(parameter_id);
@@ -973,6 +1111,131 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_richer_extrude(
   return store_feature_result(document, feature, std::move(result), shape_cache);
 }
 
+Result<std::size_t> GeometryRecomputeExecutor::execute_revolve(const PartDocument& document,
+                                                               FeatureId feature_id,
+                                                               ShapeCache& shape_cache) const {
+  if (feature_id.empty())
+    return Result<std::size_t>::failure(
+        validation_error("revolve", "feature id must not be empty"));
+  const RevolveFeature* feature = document.find_revolve_feature(feature_id);
+  if (feature == nullptr)
+    return Result<std::size_t>::failure(
+        validation_error(feature_id.value(), "revolve feature must exist in part document"));
+
+  ShapeCache working_cache = shape_cache;
+  const Sketch* sketch = document.find_sketch(feature->profile().sketch());
+  if (sketch == nullptr)
+    return Result<std::size_t>::failure(
+        validation_error(feature->profile().sketch().value(), "revolve profile sketch must exist"));
+  auto workplane = workplane_resolver_.resolve_for_sketch(document, *sketch, working_cache);
+  if (workplane.has_error())
+    return Result<std::size_t>::failure(workplane.error());
+  auto axis = resolve_revolve_axis(document, feature->axis(), working_cache, workplane_resolver_);
+  if (axis.has_error())
+    return Result<std::size_t>::failure(axis.error());
+  const ResolvedRevolveAngles angles = resolve_revolve_angles(feature->extent());
+
+  Result<GeometryShape> tool = Result<GeometryShape>::failure(
+      geometry_error(feature->id().value(), "unsupported revolve profile region"));
+  const ProfileId& profile_id = feature->profile().profile();
+  if (const RectangleProfile* rectangle = sketch->find_rectangle_profile(profile_id)) {
+    const Parameter* width = document.find_parameter(rectangle->width_parameter());
+    const Parameter* height = document.find_parameter(rectangle->height_parameter());
+    if (width == nullptr || height == nullptr)
+      return Result<std::size_t>::failure(
+          geometry_error(profile_id.value(), "revolve rectangle dimensions must exist"));
+    auto vertices = map_bounded_local_vertices(
+        workplane_resolver_, workplane.value(), profile_id.value(),
+        rectangle_local_vertices(*rectangle, width->value(), height->value()));
+    if (vertices.has_error())
+      return Result<std::size_t>::failure(vertices.error());
+    tool =
+        revolve_adapter_.revolve_profile(feature->id(), vertices.value(), axis.value().first,
+                                         axis.value().second, angles.start_deg, angles.sweep_deg);
+  } else if (const ClosedProfile* closed = sketch->find_closed_profile(profile_id)) {
+    auto vertices = evaluate_bounded_closed_profile_vertices(document, workplane_resolver_,
+                                                             workplane.value(), *sketch, *closed);
+    if (vertices.has_error())
+      return Result<std::size_t>::failure(vertices.error());
+    tool =
+        revolve_adapter_.revolve_profile(feature->id(), vertices.value(), axis.value().first,
+                                         axis.value().second, angles.start_deg, angles.sweep_deg);
+  } else if (const ArcClosedProfile* arc = sketch->find_arc_closed_profile(profile_id)) {
+    auto curves =
+        evaluate_bounded_arc_profile_curves(workplane_resolver_, workplane.value(), *sketch, *arc);
+    if (curves.has_error())
+      return Result<std::size_t>::failure(curves.error());
+    tool = revolve_adapter_.revolve_profile_curves(feature->id(), curves.value(),
+                                                   axis.value().first, axis.value().second,
+                                                   angles.start_deg, angles.sweep_deg);
+  } else if (const CompositeClosedProfile* composite =
+                 sketch->find_composite_closed_profile(profile_id)) {
+    auto vertices = evaluate_bounded_composite_profile_vertices(
+        document, workplane_resolver_, workplane.value(), *sketch, *composite);
+    if (vertices.has_error())
+      return Result<std::size_t>::failure(vertices.error());
+    tool = revolve_adapter_.revolve_profile_with_holes(
+        feature->id(), vertices.value().outer, vertices.value().inner, axis.value().first,
+        axis.value().second, angles.start_deg, angles.sweep_deg);
+  } else if (const CircleProfile* circle = sketch->find_circle_profile(profile_id)) {
+    const Parameter* diameter = document.find_parameter(circle->diameter_parameter());
+    if (diameter == nullptr || diameter->type() != ParameterType::Length)
+      return Result<std::size_t>::failure(
+          geometry_error(profile_id.value(), "revolve circle diameter must be a Length parameter"));
+    auto bounded_center = evaluate_bounded_circle_center(workplane_resolver_, workplane.value(),
+                                                         *circle, diameter->value());
+    if (bounded_center.has_error())
+      return Result<std::size_t>::failure(bounded_center.error());
+    const double radius = diameter->value().millimeters() / 2.0;
+    const Point2 center = circle->center();
+    std::vector<ClosedProfileCurveSegment> curves;
+    curves.reserve(4U);
+    for (std::size_t index = 0U; index < 4U; ++index) {
+      const double start = static_cast<double>(index) * k_pi / 2.0;
+      const double middle = start + k_pi / 4.0;
+      const double end = start + k_pi / 2.0;
+      const auto mapped = [&](double angle) {
+        return workplane_resolver_.evaluate_point(
+            workplane.value(),
+            {center.x + radius * std::cos(angle), center.y + radius * std::sin(angle)});
+      };
+      curves.push_back(
+          {ClosedProfileCurveKind::CircularArc, mapped(start), mapped(middle), mapped(end)});
+    }
+    tool = revolve_adapter_.revolve_profile_curves(feature->id(), curves, axis.value().first,
+                                                   axis.value().second, angles.start_deg,
+                                                   angles.sweep_deg);
+  }
+  if (tool.has_error())
+    return Result<std::size_t>::failure(tool.error());
+
+  auto target = resolve_revolve_target(document, *feature, working_cache);
+  if (target.has_error())
+    return Result<std::size_t>::failure(target.error());
+  GeometryShape result = tool.value();
+  const FeatureBodyOperationMode mode = feature->body_result_context().operation_mode();
+  if (mode != FeatureBodyOperationMode::NewBody) {
+    if (target.value() == nullptr)
+      return Result<std::size_t>::failure(
+          geometry_error(feature->id().value(), "modifying revolve requires a target shape"));
+    BodyBooleanOperation operation = BodyBooleanOperation::Add;
+    if (mode == FeatureBodyOperationMode::Cut)
+      operation = BodyBooleanOperation::Subtract;
+    else if (mode == FeatureBodyOperationMode::Intersect)
+      operation = BodyBooleanOperation::Intersect;
+    auto combined = body_boolean_adapter_.combine(feature->id(), operation, *target.value(),
+                                                  std::vector<GeometryShape>{tool.value()});
+    if (combined.has_error())
+      return Result<std::size_t>::failure(combined.error());
+    result = std::move(combined.value());
+  }
+  auto stored = store_revolve_result(document, *feature, std::move(result), working_cache);
+  if (stored.has_error())
+    return stored;
+  shape_cache = std::move(working_cache);
+  return stored;
+}
+
 Result<std::size_t> GeometryRecomputeExecutor::execute_additive_extrude(
     const PartDocument& document, FeatureId feature_id, ShapeCache& shape_cache) const {
   if (feature_id.empty()) {
@@ -1486,17 +1749,27 @@ GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const Reco
   for (const RecomputeStep& step : plan.steps()) {
     const Feature* feature = document.find_feature(FeatureId(step.node_id));
     const RevolveFeature* revolve = document.find_revolve_feature(FeatureId(step.node_id));
-    if (revolve != nullptr)
+    const LinearPatternFeature* linear_pattern =
+        document.find_linear_pattern_feature(FeatureId(step.node_id));
+    const CircularPatternFeature* circular_pattern =
+        document.find_circular_pattern_feature(FeatureId(step.node_id));
+    if (linear_pattern != nullptr)
       return Result<GeometryRecomputeSummary>::failure(geometry_error(
-          revolve->id().value(), "Revolve/RevolveCut geometry is not available until Block 62"));
+          linear_pattern->id().value(), "Linear Pattern geometry is not available until Block 64"));
+    if (circular_pattern != nullptr)
+      return Result<GeometryRecomputeSummary>::failure(
+          geometry_error(circular_pattern->id().value(),
+                         "Circular Pattern geometry is not available until Block 65"));
     const BodyBooleanFeature* body_boolean =
         document.find_body_boolean_feature(FeatureId(step.node_id));
     const BodyTransform* body_transform =
         document.find_body_transform(BodyTransformId(step.node_id));
-    if (feature == nullptr && body_boolean == nullptr && body_transform == nullptr)
+    if (feature == nullptr && revolve == nullptr && body_boolean == nullptr &&
+        body_transform == nullptr)
       continue;
 
-    const FeatureId executable_id = feature != nullptr ? feature->id()
+    const FeatureId executable_id = feature != nullptr   ? feature->id()
+                                    : revolve != nullptr ? revolve->id()
                                     : body_boolean != nullptr
                                         ? body_boolean->id()
                                         : FeatureId(body_transform->id().value());
@@ -1505,7 +1778,8 @@ GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const Reco
       return Result<GeometryRecomputeSummary>::failure(removed_stale_shape.error());
     }
 
-    auto executed = feature != nullptr ? execute_feature(document, *feature, execution_cache)
+    auto executed = feature != nullptr   ? execute_feature(document, *feature, execution_cache)
+                    : revolve != nullptr ? execute_revolve(document, revolve->id(), execution_cache)
                     : body_boolean != nullptr
                         ? execute_body_boolean(document, body_boolean->id(), execution_cache)
                         : execute_body_transform(document, body_transform->id(), execution_cache);
@@ -1541,17 +1815,27 @@ GeometryRecomputeExecutor::execute_document(const PartDocument& document,
   for (const std::string& executable_id : executable_ids) {
     const Feature* feature = document.find_feature(FeatureId(executable_id));
     const RevolveFeature* revolve = document.find_revolve_feature(FeatureId(executable_id));
-    if (revolve != nullptr)
+    const LinearPatternFeature* linear_pattern =
+        document.find_linear_pattern_feature(FeatureId(executable_id));
+    const CircularPatternFeature* circular_pattern =
+        document.find_circular_pattern_feature(FeatureId(executable_id));
+    if (linear_pattern != nullptr)
       return Result<GeometryRecomputeSummary>::failure(geometry_error(
-          revolve->id().value(), "Revolve/RevolveCut geometry is not available until Block 62"));
+          linear_pattern->id().value(), "Linear Pattern geometry is not available until Block 64"));
+    if (circular_pattern != nullptr)
+      return Result<GeometryRecomputeSummary>::failure(
+          geometry_error(circular_pattern->id().value(),
+                         "Circular Pattern geometry is not available until Block 65"));
     const BodyBooleanFeature* body_boolean =
         document.find_body_boolean_feature(FeatureId(executable_id));
     const BodyTransform* body_transform =
         document.find_body_transform(BodyTransformId(executable_id));
-    if (feature == nullptr && body_boolean == nullptr && body_transform == nullptr)
+    if (feature == nullptr && revolve == nullptr && body_boolean == nullptr &&
+        body_transform == nullptr)
       continue;
 
-    const FeatureId feature_id = feature != nullptr ? feature->id()
+    const FeatureId feature_id = feature != nullptr   ? feature->id()
+                                 : revolve != nullptr ? revolve->id()
                                  : body_boolean != nullptr
                                      ? body_boolean->id()
                                      : FeatureId(body_transform->id().value());
@@ -1560,7 +1844,8 @@ GeometryRecomputeExecutor::execute_document(const PartDocument& document,
       return Result<GeometryRecomputeSummary>::failure(removed_stale_shape.error());
     }
 
-    auto executed = feature != nullptr ? execute_feature(document, *feature, execution_cache)
+    auto executed = feature != nullptr   ? execute_feature(document, *feature, execution_cache)
+                    : revolve != nullptr ? execute_revolve(document, revolve->id(), execution_cache)
                     : body_boolean != nullptr
                         ? execute_body_boolean(document, body_boolean->id(), execution_cache)
                         : execute_body_transform(document, body_transform->id(), execution_cache);

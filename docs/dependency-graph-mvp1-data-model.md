@@ -214,4 +214,10 @@ from the same predecessor rather than applying the operation repeatedly to its o
 Block 61 applies the same graph contract to Revolve/RevolveCut: profile Sketch and typed axis source
 feed the Revolve Feature, target/prior Body producers precede modifying operations, and the Feature
 produces `body:<effective-result-body>`. Source changes therefore invalidate rotational intent and
-its Body result before Block-62 Geometry consumes the plan.
+its Body result before Block-62 Geometry consumes the plan. The executor resolves the ordered
+profile, typed axis, semantic producer, and prior target-Body dependencies and publishes the
+revolved Body result only after successful OCCT construction.
+Block 63 adds each ordered Pattern Feature/Body source, direction/axis source, Count/Length
+parameter, and target/prior Body producer as an input to the Pattern node. The Pattern produces its
+effective Body node. An in-place Body source is replaced by the preceding Body producer edge so
+the authored dependency remains acyclic and incremental execution cannot consume its own result.

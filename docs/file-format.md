@@ -724,6 +724,18 @@ identity payload. Missing arrays restore zero Revolve records. Malformed mode-sp
 unsupported sources, invalid body-operation pairings, and unresolved references fail closed.
 Canonical details are in `docs/part-revolve-intent-mvp6.md`.
 
+Block 62 adds no persistent field: mapped profile/axis geometry, OCCT revolution shapes, Boolean
+tools/results, validation diagnostics, and `ShapeCache` entries remain derived recompute products.
+Canonical execution details are in `docs/part-revolve-geometry-mvp6.md`.
+
+Block 63 adds the always-emitted, optional-on-read `part_patterns` array. Linear and Circular items
+store ordered typed Feature/Body sources, concrete direction/axis references, a Count parameter,
+mode-specific extent/angle intent, and mandatory Body-result fields. Linear extent references a
+Length parameter and preserves spacing/total-extent plus positive/negative direction. Circular
+intent preserves a finite total degree angle and mandatory equal spacing. Missing arrays restore
+zero general Patterns; generated instances and OCCT copies remain derived. Canonical details are in
+`docs/part-pattern-core-mvp6.md`.
+
 ## Planned STEP import persistence after Block 94
 
 This section is planned architecture, not part of the current schema. Blocks 95–101 in

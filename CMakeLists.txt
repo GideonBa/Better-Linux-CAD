@@ -54,6 +54,7 @@ add_library(
   src/core/feature.cpp
   src/core/generated_topology_reference.cpp
   src/core/invalidation_state.cpp
+  src/core/part_pattern_feature.cpp
   src/core/part_document.cpp
   src/core/part_document_json.cpp
   src/core/part_feature_input_reference.cpp
@@ -167,6 +168,7 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/rectangle_extrusion_adapter.cpp
     src/geometry/reference_driven_sketch_helper.cpp
     src/geometry/reference_generated_profile_resolver.cpp
+    src/geometry/revolve_adapter.cpp
     src/geometry/semantic_reference_evaluator.cpp
     src/geometry/shape_cache.cpp
     src/geometry/sketch_reference_projector.cpp
@@ -303,6 +305,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/projected_sketch_reference_tests.cpp
     tests/core/quantity_tests.cpp
     tests/core/part_feature_input_reference_tests.cpp
+    tests/core/part_pattern_feature_tests.cpp
     tests/core/recompute_plan_tests.cpp
     tests/core/reference_driven_sketch_constraint_tests.cpp
     tests/core/reference_generated_line_json_tests.cpp
@@ -393,6 +396,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/reference_driven_sketch_helper_tests.cpp
       tests/geometry/reference_generated_profile_resolver_tests.cpp
       tests/geometry/reference_part_pipeline_tests.cpp
+      tests/geometry/revolve_feature_pipeline_tests.cpp
       tests/geometry/right_workplane_pipeline_tests.cpp
       tests/geometry/semantic_reference_evaluator_tests.cpp
       tests/geometry/shape_cache_tests.cpp

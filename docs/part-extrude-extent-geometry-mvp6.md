@@ -90,5 +90,5 @@ The proof covers symmetric/two-sided spans, ToFace, Between, exact ToNext, Throu
 taper, a mid-plane open-line thin feature, richer SubtractiveExtrude, all four Body operations,
 incremental idempotence, and the historical executor integration.
 
-Block 61 persistent Revolve/RevolveCut intent and JSON is implemented. Block 62 rotational Geometry
-is the next boundary.
+Blocks 61–62 persistent Revolve/RevolveCut intent, JSON, and rotational Geometry are implemented.
+Block 64 General Linear Pattern Geometry is the next boundary.

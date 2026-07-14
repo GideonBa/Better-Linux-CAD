@@ -1337,6 +1337,181 @@ feature_body_result_context_from_json(const json& feature_json) {
   return value;
 }
 
+[[nodiscard]] json pattern_source_to_json(const PatternSourceReference& source) {
+  if (source.kind() == PatternSourceKind::Feature)
+    return json{{"kind", "feature"}, {"feature", std::get<FeatureId>(source.source()).value()}};
+  return json{{"kind", "body"}, {"body", std::get<BodyId>(source.source()).value()}};
+}
+
+[[nodiscard]] Result<PatternSourceReference> pattern_source_from_json(const json& value) {
+  if (!value.is_object() || !value.contains("kind") || !value.at("kind").is_string())
+    return Result<PatternSourceReference>::failure(
+        json_error("pattern source requires string kind"));
+  const std::string kind = value.at("kind").get<std::string>();
+  if (kind == "feature" && value.size() == 2U && value.contains("feature") &&
+      value.at("feature").is_string())
+    return PatternSourceReference::feature(FeatureId(value.at("feature").get<std::string>()));
+  if (kind == "body" && value.size() == 2U && value.contains("body") &&
+      value.at("body").is_string())
+    return PatternSourceReference::body(BodyId(value.at("body").get<std::string>()));
+  return Result<PatternSourceReference>::failure(
+      json_error("unsupported or malformed pattern source"));
+}
+
+[[nodiscard]] Result<AxisReference> pattern_axis_from_json(const json& axis_json) {
+  if (!axis_json.is_object() || !axis_json.contains("source_kind") ||
+      !axis_json.at("source_kind").is_string())
+    return Result<AxisReference>::failure(json_error("pattern axis requires source_kind"));
+  const std::string source_kind = axis_json.at("source_kind").get<std::string>();
+  if (source_kind == "datum_axis" && axis_json.size() == 2U && axis_json.contains("datum_axis") &&
+      axis_json.at("datum_axis").is_string())
+    return AxisReference::create_datum_axis(
+        PartFeatureInputRole::PatternAxis,
+        DatumAxisId(axis_json.at("datum_axis").get<std::string>()));
+  if (source_kind == "construction_line" && axis_json.size() == 2U &&
+      axis_json.contains("construction_line") && axis_json.at("construction_line").is_string())
+    return AxisReference::create_construction_line(
+        PartFeatureInputRole::PatternAxis,
+        ConstructionLineId(axis_json.at("construction_line").get<std::string>()),
+        PartFeatureInputCapability::Axis);
+  if (source_kind == "semantic_axis" && axis_json.size() == 3U &&
+      axis_json.contains("source_feature") && axis_json.contains("axis") &&
+      axis_json.at("source_feature").is_string() && axis_json.at("axis").is_string() &&
+      axis_json.at("axis").get<std::string>() == "axis") {
+    auto semantic =
+        SemanticAxisReference::create(FeatureId(axis_json.at("source_feature").get<std::string>()));
+    if (semantic.has_error())
+      return Result<AxisReference>::failure(semantic.error());
+    return AxisReference::create_semantic_axis(PartFeatureInputRole::PatternAxis,
+                                               std::move(semantic.value()));
+  }
+  if (source_kind == "semantic_linear_edge" && axis_json.size() == 2U &&
+      axis_json.contains("semantic_edge") && axis_json.at("semantic_edge").is_object()) {
+    auto edge = semantic_edge_reference_from_json(axis_json.at("semantic_edge"));
+    if (edge.has_error())
+      return Result<AxisReference>::failure(edge.error());
+    return AxisReference::create_semantic_edge(PartFeatureInputRole::PatternAxis,
+                                               std::move(edge.value()),
+                                               PartFeatureInputCapability::Axis);
+  }
+  return Result<AxisReference>::failure(json_error("unsupported pattern axis source kind"));
+}
+
+[[nodiscard]] json pattern_body_context_to_json(const FeatureBodyResultContext& context) {
+  json value{{"operation_mode", std::string(to_string(context.operation_mode()))}};
+  if (context.target_body().has_value())
+    value["target_body"] = context.target_body()->value();
+  if (context.produced_body().has_value())
+    value["produced_body"] = context.produced_body()->value();
+  return value;
+}
+
+[[nodiscard]] json linear_pattern_to_json(const LinearPatternFeature& feature) {
+  json value{{"id", feature.id().value()},
+             {"name", feature.name()},
+             {"type", "linear_pattern"},
+             {"sources", json::array()},
+             {"direction", revolve_axis_to_json(feature.direction())},
+             {"count_parameter", feature.count_parameter().value()},
+             {"extent", json{{"mode", std::string(to_string(feature.extent_mode()))},
+                             {"parameter", feature.extent_parameter().value()},
+                             {"direction", std::string(to_string(feature.direction_sign()))}}}};
+  for (const auto& source : feature.sources())
+    value["sources"].push_back(pattern_source_to_json(source));
+  value.update(pattern_body_context_to_json(feature.body_result_context()));
+  return value;
+}
+
+[[nodiscard]] json circular_pattern_to_json(const CircularPatternFeature& feature) {
+  json value{{"id", feature.id().value()},
+             {"name", feature.name()},
+             {"type", "circular_pattern"},
+             {"sources", json::array()},
+             {"axis", revolve_axis_to_json(feature.axis())},
+             {"count_parameter", feature.count_parameter().value()},
+             {"total_angle_deg", feature.total_angle_deg()},
+             {"equal_spacing", feature.equal_spacing()}};
+  for (const auto& source : feature.sources())
+    value["sources"].push_back(pattern_source_to_json(source));
+  value.update(pattern_body_context_to_json(feature.body_result_context()));
+  return value;
+}
+
+using ParsedPartPattern = std::variant<LinearPatternFeature, CircularPatternFeature>;
+
+[[nodiscard]] Result<ParsedPartPattern> part_pattern_from_json(const json& value) {
+  if (!value.is_object() || !value.contains("id") || !value.contains("name") ||
+      !value.contains("type") || !value.contains("sources") || !value.contains("count_parameter") ||
+      !value.contains("operation_mode") || !value.at("id").is_string() ||
+      !value.at("name").is_string() || !value.at("type").is_string() ||
+      !value.at("sources").is_array() || !value.at("count_parameter").is_string())
+    return Result<ParsedPartPattern>::failure(
+        json_error("part pattern requires valid mandatory intent fields"));
+  std::vector<PatternSourceReference> sources;
+  for (const auto& source_json : value.at("sources")) {
+    auto source = pattern_source_from_json(source_json);
+    if (source.has_error())
+      return Result<ParsedPartPattern>::failure(source.error());
+    sources.push_back(std::move(source.value()));
+  }
+  auto context = feature_body_result_context_from_json(value);
+  if (context.has_error())
+    return Result<ParsedPartPattern>::failure(context.error());
+  if (!context.value().has_value())
+    return Result<ParsedPartPattern>::failure(
+        json_error("part pattern requires body result context"));
+  const FeatureId id(value.at("id").get<std::string>());
+  const std::string name = value.at("name").get<std::string>();
+  const ParameterId count(value.at("count_parameter").get<std::string>());
+  const std::string type = value.at("type").get<std::string>();
+  if (type == "linear_pattern") {
+    if (!value.contains("direction") || !value.at("direction").is_object() ||
+        !value.contains("extent") || !value.at("extent").is_object())
+      return Result<ParsedPartPattern>::failure(
+          json_error("linear pattern requires direction and extent"));
+    auto direction = pattern_axis_from_json(value.at("direction"));
+    if (direction.has_error())
+      return Result<ParsedPartPattern>::failure(direction.error());
+    const auto& extent = value.at("extent");
+    if (extent.size() != 3U || !extent.contains("mode") || !extent.contains("parameter") ||
+        !extent.contains("direction") || !extent.at("mode").is_string() ||
+        !extent.at("parameter").is_string() || !extent.at("direction").is_string())
+      return Result<ParsedPartPattern>::failure(json_error("linear pattern extent is malformed"));
+    const std::string mode = extent.at("mode").get<std::string>();
+    const std::string sign = extent.at("direction").get<std::string>();
+    if ((mode != "spacing" && mode != "total_extent") || (sign != "positive" && sign != "negative"))
+      return Result<ParsedPartPattern>::failure(
+          json_error("linear pattern extent has unsupported mode or direction"));
+    auto feature = LinearPatternFeature::create(
+        id, name, std::move(sources), std::move(direction.value()), count,
+        mode == "spacing" ? LinearPatternExtentMode::Spacing : LinearPatternExtentMode::TotalExtent,
+        ParameterId(extent.at("parameter").get<std::string>()),
+        sign == "positive" ? PatternDirectionSign::Positive : PatternDirectionSign::Negative,
+        std::move(*context.value()));
+    if (feature.has_error())
+      return Result<ParsedPartPattern>::failure(feature.error());
+    return Result<ParsedPartPattern>::success(std::move(feature.value()));
+  }
+  if (type == "circular_pattern") {
+    if (!value.contains("axis") || !value.at("axis").is_object() ||
+        !value.contains("total_angle_deg") || !value.at("total_angle_deg").is_number() ||
+        !value.contains("equal_spacing") || !value.at("equal_spacing").is_boolean())
+      return Result<ParsedPartPattern>::failure(
+          json_error("circular pattern requires axis, total angle, and equal spacing"));
+    auto axis = pattern_axis_from_json(value.at("axis"));
+    if (axis.has_error())
+      return Result<ParsedPartPattern>::failure(axis.error());
+    auto feature = CircularPatternFeature::create(
+        id, name, std::move(sources), std::move(axis.value()), count,
+        value.at("total_angle_deg").get<double>(), value.at("equal_spacing").get<bool>(),
+        std::move(*context.value()));
+    if (feature.has_error())
+      return Result<ParsedPartPattern>::failure(feature.error());
+    return Result<ParsedPartPattern>::success(std::move(feature.value()));
+  }
+  return Result<ParsedPartPattern>::failure(json_error("unsupported part pattern type"));
+}
+
 [[nodiscard]] json revolve_feature_to_json(const RevolveFeature& feature) {
   json value{{"id", feature.id().value()},
              {"name", feature.name()},
@@ -1376,10 +1551,10 @@ feature_body_result_context_from_json(const json& feature_json) {
       !profile_json.at("profile").is_string())
     return Result<RevolveFeature>::failure(
         json_error("revolve profile requires only string sketch and profile fields"));
-  auto profile = ProfileRegionReference::create(
-      SketchId(profile_json.at("sketch").get<std::string>()),
-      ProfileId(profile_json.at("profile").get<std::string>()),
-      PartFeatureInputRole::RevolveProfile);
+  auto profile =
+      ProfileRegionReference::create(SketchId(profile_json.at("sketch").get<std::string>()),
+                                     ProfileId(profile_json.at("profile").get<std::string>()),
+                                     PartFeatureInputRole::RevolveProfile);
   if (profile.has_error())
     return Result<RevolveFeature>::failure(profile.error());
 
@@ -1387,16 +1562,15 @@ feature_body_result_context_from_json(const json& feature_json) {
   if (!axis_json.contains("source_kind") || !axis_json.at("source_kind").is_string())
     return Result<RevolveFeature>::failure(json_error("revolve axis requires source_kind"));
   const std::string source_kind = axis_json.at("source_kind").get<std::string>();
-  Result<AxisReference> axis = Result<AxisReference>::failure(
-      json_error("unsupported revolve axis source kind"));
-  if (source_kind == "datum_axis" && axis_json.size() == 2U &&
-      axis_json.contains("datum_axis") && axis_json.at("datum_axis").is_string())
+  Result<AxisReference> axis =
+      Result<AxisReference>::failure(json_error("unsupported revolve axis source kind"));
+  if (source_kind == "datum_axis" && axis_json.size() == 2U && axis_json.contains("datum_axis") &&
+      axis_json.at("datum_axis").is_string())
     axis = AxisReference::create_datum_axis(
         PartFeatureInputRole::RevolveAxis,
         DatumAxisId(axis_json.at("datum_axis").get<std::string>()));
   else if (source_kind == "construction_line" && axis_json.size() == 2U &&
-           axis_json.contains("construction_line") &&
-           axis_json.at("construction_line").is_string())
+           axis_json.contains("construction_line") && axis_json.at("construction_line").is_string())
     axis = AxisReference::create_construction_line(
         PartFeatureInputRole::RevolveAxis,
         ConstructionLineId(axis_json.at("construction_line").get<std::string>()),
@@ -1406,8 +1580,8 @@ feature_body_result_context_from_json(const json& feature_json) {
            axis_json.at("source_feature").is_string() && axis_json.at("axis").is_string()) {
     if (axis_json.at("axis").get<std::string>() != "axis")
       return Result<RevolveFeature>::failure(json_error("unsupported semantic revolve axis"));
-    auto semantic = SemanticAxisReference::create(
-        FeatureId(axis_json.at("source_feature").get<std::string>()));
+    auto semantic =
+        SemanticAxisReference::create(FeatureId(axis_json.at("source_feature").get<std::string>()));
     if (semantic.has_error())
       return Result<RevolveFeature>::failure(semantic.error());
     axis = AxisReference::create_semantic_axis(PartFeatureInputRole::RevolveAxis,
@@ -1417,9 +1591,9 @@ feature_body_result_context_from_json(const json& feature_json) {
     auto edge = semantic_edge_reference_from_json(axis_json.at("semantic_edge"));
     if (edge.has_error())
       return Result<RevolveFeature>::failure(edge.error());
-    axis = AxisReference::create_semantic_edge(
-        PartFeatureInputRole::RevolveAxis, std::move(edge.value()),
-        PartFeatureInputCapability::Axis);
+    axis = AxisReference::create_semantic_edge(PartFeatureInputRole::RevolveAxis,
+                                               std::move(edge.value()),
+                                               PartFeatureInputCapability::Axis);
   }
   if (axis.has_error())
     return Result<RevolveFeature>::failure(axis.error());
@@ -1428,21 +1602,21 @@ feature_body_result_context_from_json(const json& feature_json) {
   if (!extent_json.contains("mode") || !extent_json.at("mode").is_string())
     return Result<RevolveFeature>::failure(json_error("revolve extent requires mode"));
   const std::string mode = extent_json.at("mode").get<std::string>();
-  Result<RevolveAngleExtent> extent = Result<RevolveAngleExtent>::failure(
-      json_error("unsupported revolve extent mode"));
+  Result<RevolveAngleExtent> extent =
+      Result<RevolveAngleExtent>::failure(json_error("unsupported revolve extent mode"));
   if (mode == "full" && extent_json.size() == 1U)
     extent = Result<RevolveAngleExtent>::success(RevolveAngleExtent::full());
-  else if (mode == "angle" && extent_json.size() == 3U &&
-           extent_json.contains("angle_deg") && extent_json.at("angle_deg").is_number() &&
-           extent_json.contains("side") && extent_json.at("side").is_string()) {
+  else if (mode == "angle" && extent_json.size() == 3U && extent_json.contains("angle_deg") &&
+           extent_json.at("angle_deg").is_number() && extent_json.contains("side") &&
+           extent_json.at("side").is_string()) {
     const std::string side = extent_json.at("side").get<std::string>();
     if (side != "positive" && side != "negative")
       return Result<RevolveFeature>::failure(json_error("unsupported revolve side"));
-    extent = RevolveAngleExtent::angle(
-        extent_json.at("angle_deg").get<double>(),
-        side == "positive" ? RevolveSide::Positive : RevolveSide::Negative);
-  } else if (mode == "symmetric" && extent_json.size() == 2U &&
-             extent_json.contains("angle_deg") && extent_json.at("angle_deg").is_number())
+    extent = RevolveAngleExtent::angle(extent_json.at("angle_deg").get<double>(),
+                                       side == "positive" ? RevolveSide::Positive
+                                                          : RevolveSide::Negative);
+  } else if (mode == "symmetric" && extent_json.size() == 2U && extent_json.contains("angle_deg") &&
+             extent_json.at("angle_deg").is_number())
     extent = RevolveAngleExtent::symmetric(extent_json.at("angle_deg").get<double>());
   if (extent.has_error())
     return Result<RevolveFeature>::failure(extent.error());
@@ -1927,6 +2101,16 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
   root["revolve_features"] = json::array();
   for (const auto& feature : document.revolve_features())
     root["revolve_features"].push_back(revolve_feature_to_json(feature));
+  root["part_patterns"] = json::array();
+  auto pattern_order = document.dependency_graph().topological_order();
+  if (pattern_order.has_error())
+    return Result<std::string>::failure(pattern_order.error());
+  for (const std::string& node : pattern_order.value()) {
+    if (const auto* linear = document.find_linear_pattern_feature(FeatureId(node)))
+      root["part_patterns"].push_back(linear_pattern_to_json(*linear));
+    if (const auto* circular = document.find_circular_pattern_feature(FeatureId(node)))
+      root["part_patterns"].push_back(circular_pattern_to_json(*circular));
+  }
   root["body_booleans"] = json::array();
   for (const auto& feature : document.body_boolean_features()) {
     json feature_json{{"id", feature.id().value()},
@@ -2197,6 +2381,23 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
       if (feature.has_error())
         return Result<PartDocument>::failure(feature.error());
       auto added = document.value().add_body_boolean_feature(std::move(feature.value()));
+      if (added.has_error())
+        return Result<PartDocument>::failure(added.error());
+    }
+    const json pattern_array = root.value("part_patterns", json::array());
+    if (!pattern_array.is_array())
+      return Result<PartDocument>::failure(
+          json_error("part_patterns must be an array in part document json"));
+    for (const auto& pattern_json : pattern_array) {
+      auto pattern = part_pattern_from_json(pattern_json);
+      if (pattern.has_error())
+        return Result<PartDocument>::failure(pattern.error());
+      Result<std::size_t> added =
+          std::holds_alternative<LinearPatternFeature>(pattern.value())
+              ? document.value().add_linear_pattern_feature(
+                    std::move(std::get<LinearPatternFeature>(pattern.value())))
+              : document.value().add_circular_pattern_feature(
+                    std::move(std::get<CircularPatternFeature>(pattern.value())));
       if (added.has_error())
         return Result<PartDocument>::failure(added.error());
     }

@@ -49,6 +49,6 @@ requested selected roles atomically.
 ## Block 47 handoff — completed
 
 Block 47 Ball/Spherical is implemented in `docs/assembly-spherical-joint-mvp5.md` as passive
-Point/Point center coincidence with explicit selected-drive rejection. Blocks 48–61 Body identity,
+Point/Point center coincidence with explicit selected-drive rejection. Blocks 48–63 Body identity,
 body-scoped recompute/inspection, Body Booleans, and BodyTransform/SketchOwnership intent are
-implemented; Block 62 Revolve/RevolveCut Geometry is next.
+implemented; Block 64 General Linear Pattern Geometry is next.

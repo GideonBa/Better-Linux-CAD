@@ -97,4 +97,5 @@ Focused proof:
 ./build/blcad_core_tests "[core][revolve-feature]"
 ```
 
-Block 62 is the next boundary: Revolve/RevolveCut Geometry.
+Block 62 Geometry is implemented in `docs/part-revolve-geometry-mvp6.md`. Block 63 General Part
+Pattern Core model and JSON is the next boundary.

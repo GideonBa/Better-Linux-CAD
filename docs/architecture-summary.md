@@ -582,13 +582,15 @@ Canonical numbered sequence:
 - `docs/part-extrude-extent-intent-mvp6.md`
 - `docs/part-extrude-extent-geometry-mvp6.md`
 - `docs/part-revolve-intent-mvp6.md`
+- `docs/part-revolve-geometry-mvp6.md`
+- `docs/part-pattern-core-mvp6.md`
 - `docs/step-import-sequence-mvp7.md`
 
-Block 47 Spherical completes the Assembly MVP sequence. Blocks 48–61 Body identity, body-scoped
+Block 47 Spherical completes the Assembly MVP sequence. Blocks 48–63 Body identity, body-scoped
 recompute/inspection, Body Booleans, associative BodyTransform/SketchOwnership execution, and
 reusable Part-feature semantic input references plus richer Extrude/Cut intent/Geometry and
-persistent Revolve/RevolveCut intent are implemented. The next technical step is Block 62
-Revolve/RevolveCut Geometry.
+persistent plus executed Revolve/RevolveCut and persistent general Linear/Circular Pattern intent
+are implemented. The next technical step is Block 64 General Linear Pattern Geometry.
 
 Block 47 adds passive Point/Point Spherical intent through the shared local/root-space path. Scalar
 Revolute APIs remain adapters; transform variables and the shared numeric engine are unchanged.

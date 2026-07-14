@@ -67,7 +67,12 @@ Block 61 adds persistent `RevolveFeature` intent with an explicit `Revolve`/`Rev
 typed `RevolveProfile` and `RevolveAxis` inputs, canonical Full/partial/symmetric angle semantics,
 and mandatory Body result context. The document owns validation, graph/invalidation semantics, and
 strict compatible JSON. Block 62 owns OCCT revolution, rotational cuts, and self-intersection
-failure.
+failure. It maps the supported profile regions and typed axes into model space, executes full,
+partial, and symmetric revolutions, applies all four Body operations, and publishes cache results
+only after valid solid construction. Block 63 adds ordered Feature/Body Pattern sources, persistent
+Linear/Circular parameters and direction/axis intent, shared Body-result semantics, graph
+invalidation, and compatible JSON without copying Feature records. Block 64 General Linear Pattern
+Geometry is next.
 
 The long-term sketcher and feature parity target is documented in `docs/inventor-like-sketcher-and-feature-roadmap.md`.
 
