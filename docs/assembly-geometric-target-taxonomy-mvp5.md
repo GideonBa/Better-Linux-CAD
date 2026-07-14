@@ -590,4 +590,4 @@ Canonical contracts:
 
 ## Next technical step — Block 44
 
-Blocks 41–43 typed coordinates, additive compatible JSON, and shared vector drives are implemented in `docs/assembly-joint-coordinate-model-mvp5.md`, `docs/assembly-joint-coordinate-json-mvp5.md`, and `docs/assembly-vector-joint-drive-mvp5.md`. Blocks 44–47 Prismatic, Cylindrical, Planar, and passive Spherical are implemented in their canonical documents. Blocks 48–71 Body identity, body-scoped recompute/inspection, Body Booleans, and BodyTransform/SketchOwnership intent are implemented; Block 72 ShellFeature Geometry is next.
+Blocks 41–43 typed coordinates, additive compatible JSON, and shared vector drives are implemented in `docs/assembly-joint-coordinate-model-mvp5.md`, `docs/assembly-joint-coordinate-json-mvp5.md`, and `docs/assembly-vector-joint-drive-mvp5.md`. Blocks 44–47 Prismatic, Cylindrical, Planar, and passive Spherical are implemented in their canonical documents. Blocks 48–73 Part Construction through DraftFeature Core intent/JSON are implemented; Block 74 DraftFeature Geometry is next.

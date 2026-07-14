@@ -4,7 +4,7 @@ BLCAD will be an independent, headless parametric CAD system for Linux, in activ
 
 All architecture, feature contracts, persistence semantics, roadmaps, and current implementation status live in [`docs/`](docs/). This README is intentionally kept small and evergreen — it is not a status page.
 
-The assembly sequence is implemented through Block 47. Part Construction Blocks 48–71 add Body identity, body-scoped recompute/inspection, Body Booleans, associative Body transforms, reusable semantic Part-feature inputs, richer Extrude/Cut intent plus Geometry, persistent plus executed Revolve/RevolveCut, general Pattern and Mirror Geometry, persistent plus executed Fillet/Chamfer, and persistent ShellFeature intent; the current contract is [`docs/part-shell-intent-mvp6.md`](docs/part-shell-intent-mvp6.md). Block 72 — ShellFeature Geometry — is the next technical step.
+The assembly sequence is implemented through Block 47. Part Construction Blocks 48–73 add Body identity, body-scoped recompute/inspection, Body Booleans, associative Body transforms, reusable semantic Part-feature inputs, richer Extrude/Cut intent plus Geometry, persistent plus executed Revolve/RevolveCut, general Pattern and Mirror Geometry, persistent plus executed Fillet/Chamfer/Shell Geometry, and persistent DraftFeature intent; the current contract is [`docs/part-draft-intent-mvp6.md`](docs/part-draft-intent-mvp6.md). Block 74 — DraftFeature Geometry — is the next technical step.
 
 ## Repository layout
 

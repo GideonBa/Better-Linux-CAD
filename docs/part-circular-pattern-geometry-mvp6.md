@@ -70,4 +70,6 @@ exact volume and bounds, parameter-driven Count recompute, and transactional inv
 failure.
 
 Block 66 MirrorFeature Core intent and JSON is implemented in
-`docs/part-mirror-intent-mvp6.md`. Block 67 MirrorFeature Geometry is implemented; Block 72 ShellFeature Geometry is the next boundary.
+`docs/part-mirror-intent-mvp6.md`. Blocks 67 MirrorFeature Geometry and 72 ShellFeature Geometry are
+implemented; Block 73 DraftFeature Core intent/JSON is implemented and Block 74 DraftFeature
+Geometry is the next boundary.

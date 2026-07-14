@@ -84,7 +84,11 @@ executes constant-radius OCCT results with semantic edge recovery and transactio
 Block 70 executes all three Chamfer modes with deterministic semantic reference sides and the same
 transactional recompute boundary. Block 71 adds ordered semantic Shell removal faces, positive
 Length thickness, explicit Inward/Outward direction, Body history, invalidation, and strict
-compatible JSON. Block 72 ShellFeature Geometry is next.
+compatible JSON. Block 72 resolves those faces on the current target solid, executes checked
+inward/outward OCCT thick-solid offsets, and publishes only valid single-solid results
+transactionally. Block 73 adds ordered semantic Draft faces, Axis/Line pull direction, typed
+neutral planes, signed Angle parameters, Body history, invalidation, and strict compatible JSON.
+Block 74 DraftFeature Geometry is next.
 
 The long-term sketcher and feature parity target is documented in `docs/inventor-like-sketcher-and-feature-roadmap.md`.
 

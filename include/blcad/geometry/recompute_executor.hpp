@@ -15,6 +15,7 @@
 #include "blcad/geometry/rectangle_extrusion_adapter.hpp"
 #include "blcad/geometry/revolve_adapter.hpp"
 #include "blcad/geometry/shape_cache.hpp"
+#include "blcad/geometry/shell_adapter.hpp"
 #include "blcad/geometry/workplane_resolver.hpp"
 
 #include <algorithm>
@@ -67,6 +68,9 @@ public:
                                                     FeatureId feature_id,
                                                     ShapeCache& shape_cache) const;
 
+  [[nodiscard]] Result<std::size_t>
+  execute_shell(const PartDocument& document, FeatureId feature_id, ShapeCache& shape_cache) const;
+
   [[nodiscard]] Result<GeometryRecomputeSummary> execute_plan(const PartDocument& document,
                                                               const RecomputePlan& plan,
                                                               ShapeCache& shape_cache) const;
@@ -88,6 +92,7 @@ private:
   ClosedProfileAdapter closed_profile_adapter_;
   FilletAdapter fillet_adapter_;
   ChamferAdapter chamfer_adapter_;
+  ShellAdapter shell_adapter_;
   BodyBooleanAdapter body_boolean_adapter_;
   BodyTransformAdapter body_transform_adapter_;
   RevolveAdapter revolve_adapter_;

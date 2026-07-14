@@ -70,4 +70,5 @@ and spacing recompute, exact volume/bounds, and transactional invalid-Count fail
 Block 65 General Circular Pattern Geometry is implemented in
 `docs/part-circular-pattern-geometry-mvp6.md`; Block 66 MirrorFeature Core intent and JSON is
 implemented in `docs/part-mirror-intent-mvp6.md`; Block 67 Geometry is implemented in
-`docs/part-mirror-geometry-mvp6.md`. Block 72 ShellFeature Geometry is next.
+`docs/part-mirror-geometry-mvp6.md`. Blocks 72 ShellFeature Geometry and 73 DraftFeature Core
+intent/JSON are implemented; Block 74 DraftFeature Geometry is next.

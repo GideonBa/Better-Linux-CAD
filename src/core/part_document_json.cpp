@@ -1757,8 +1757,7 @@ using ParsedEdgeTreatment = std::variant<FilletFeature, ChamferFeature>;
     return FaceReference::create_cylindrical(PartFeatureInputRole::ShellRemovalFace,
                                              std::move(identity.value()));
   }
-  return Result<FaceReference>::failure(
-      json_error("unsupported shell removal face source kind"));
+  return Result<FaceReference>::failure(json_error("unsupported shell removal face source kind"));
 }
 
 [[nodiscard]] json shell_feature_to_json(const ShellFeature& feature) {
@@ -1775,12 +1774,11 @@ using ParsedEdgeTreatment = std::variant<FilletFeature, ChamferFeature>;
 
 [[nodiscard]] Result<ShellFeature> shell_feature_from_json(const json& value) {
   if (!value.is_object() || value.size() != 6U || !value.contains("id") ||
-      !value.at("id").is_string() || !value.contains("name") ||
-      !value.at("name").is_string() || !value.contains("target_body") ||
-      !value.at("target_body").is_string() || !value.contains("removed_faces") ||
-      !value.at("removed_faces").is_array() || !value.contains("thickness_parameter") ||
-      !value.at("thickness_parameter").is_string() || !value.contains("direction") ||
-      !value.at("direction").is_string())
+      !value.at("id").is_string() || !value.contains("name") || !value.at("name").is_string() ||
+      !value.contains("target_body") || !value.at("target_body").is_string() ||
+      !value.contains("removed_faces") || !value.at("removed_faces").is_array() ||
+      !value.contains("thickness_parameter") || !value.at("thickness_parameter").is_string() ||
+      !value.contains("direction") || !value.at("direction").is_string())
     return Result<ShellFeature>::failure(
         json_error("shell feature requires exactly its mandatory intent fields"));
   std::vector<FaceReference> removed_faces;
@@ -1800,6 +1798,222 @@ using ParsedEdgeTreatment = std::variant<FilletFeature, ChamferFeature>;
       BodyId(value.at("target_body").get<std::string>()), std::move(removed_faces),
       ParameterId(value.at("thickness_parameter").get<std::string>()),
       direction == "inward" ? ShellDirection::Inward : ShellDirection::Outward);
+}
+
+[[nodiscard]] json draft_face_to_json(const FaceReference& reference) {
+  json value{{"role", std::string(to_string(reference.role()))},
+             {"capability", std::string(to_string(reference.expected_capability()))},
+             {"source_kind", std::string(to_string(reference.source_kind()))}};
+  if (reference.source_kind() == PartFeatureInputSourceKind::SemanticPlanarFace) {
+    const auto& face = std::get<SemanticFaceReference>(reference.source());
+    value["source_feature"] = face.source_feature().value();
+    value["face"] = std::string(to_string(face.face()));
+  } else {
+    const auto& face = std::get<SemanticCylindricalFaceReference>(reference.source());
+    value["source_feature"] = face.source_feature().value();
+    value["source_profile"] = face.source_profile().value();
+    value["face"] = std::string(to_string(face.face()));
+  }
+  return value;
+}
+
+[[nodiscard]] Result<FaceReference> draft_face_from_json(const json& value) {
+  if (!value.is_object() || value.value("role", "") != "draft_face" ||
+      value.value("capability", "") != "face")
+    return Result<FaceReference>::failure(
+        json_error("draft face requires draft_face role and Face capability"));
+  const std::string kind = value.value("source_kind", "");
+  if (kind == "semantic_planar_face" && value.size() == 5U && value.contains("source_feature") &&
+      value.at("source_feature").is_string() && value.contains("face") &&
+      value.at("face").is_string()) {
+    auto face = semantic_face_from_json(value.at("face"));
+    if (face.has_error())
+      return Result<FaceReference>::failure(face.error());
+    auto semantic = SemanticFaceReference::create(
+        FeatureId(value.at("source_feature").get<std::string>()), face.value());
+    if (semantic.has_error())
+      return Result<FaceReference>::failure(semantic.error());
+    return FaceReference::create_planar(PartFeatureInputRole::DraftFace,
+                                        std::move(semantic.value()));
+  }
+  if (kind == "semantic_cylindrical_face" && value.size() == 6U &&
+      value.contains("source_feature") && value.at("source_feature").is_string() &&
+      value.contains("source_profile") && value.at("source_profile").is_string() &&
+      value.value("face", "") == "wall") {
+    auto semantic = SemanticCylindricalFaceReference::create(
+        FeatureId(value.at("source_feature").get<std::string>()),
+        ProfileId(value.at("source_profile").get<std::string>()));
+    if (semantic.has_error())
+      return Result<FaceReference>::failure(semantic.error());
+    return FaceReference::create_cylindrical(PartFeatureInputRole::DraftFace,
+                                             std::move(semantic.value()));
+  }
+  return Result<FaceReference>::failure(json_error("unsupported or malformed draft face"));
+}
+
+[[nodiscard]] json draft_pull_direction_to_json(const AxisReference& direction) {
+  json value{{"role", std::string(to_string(direction.role()))},
+             {"capability", std::string(to_string(direction.expected_capability()))},
+             {"source_kind", std::string(to_string(direction.source_kind()))}};
+  switch (direction.source_kind()) {
+  case PartFeatureInputSourceKind::DatumAxis:
+    value["datum_axis"] = std::get<DatumAxisId>(direction.source()).value();
+    break;
+  case PartFeatureInputSourceKind::ConstructionLine:
+    value["construction_line"] = std::get<ConstructionLineId>(direction.source()).value();
+    break;
+  case PartFeatureInputSourceKind::SemanticAxis: {
+    const auto& semantic = std::get<SemanticAxisReference>(direction.source());
+    value["source_feature"] = semantic.source_feature().value();
+    value["axis"] = std::string(to_string(semantic.axis()));
+    break;
+  }
+  case PartFeatureInputSourceKind::SemanticLinearEdge:
+    value["semantic_edge"] =
+        semantic_edge_reference_to_json(std::get<SemanticEdgeReference>(direction.source()));
+    break;
+  default:
+    break;
+  }
+  return value;
+}
+
+[[nodiscard]] Result<AxisReference> draft_pull_direction_from_json(const json& value) {
+  if (!value.is_object() || value.value("role", "") != "draft_pull_direction" ||
+      !value.contains("capability") || !value.at("capability").is_string() ||
+      !value.contains("source_kind") || !value.at("source_kind").is_string())
+    return Result<AxisReference>::failure(
+        json_error("draft pull direction requires role capability and source_kind"));
+  const std::string capability_name = value.at("capability").get<std::string>();
+  if (capability_name != "axis" && capability_name != "line")
+    return Result<AxisReference>::failure(
+        json_error("draft pull direction capability must be axis or line"));
+  const PartFeatureInputCapability capability = capability_name == "axis"
+                                                    ? PartFeatureInputCapability::Axis
+                                                    : PartFeatureInputCapability::Line;
+  const std::string kind = value.at("source_kind").get<std::string>();
+  if (kind == "datum_axis" && capability == PartFeatureInputCapability::Axis &&
+      value.size() == 4U && value.contains("datum_axis") && value.at("datum_axis").is_string())
+    return AxisReference::create_datum_axis(PartFeatureInputRole::DraftPullDirection,
+                                            DatumAxisId(value.at("datum_axis").get<std::string>()));
+  if (kind == "construction_line" && value.size() == 4U && value.contains("construction_line") &&
+      value.at("construction_line").is_string())
+    return AxisReference::create_construction_line(
+        PartFeatureInputRole::DraftPullDirection,
+        ConstructionLineId(value.at("construction_line").get<std::string>()), capability);
+  if (kind == "semantic_axis" && capability == PartFeatureInputCapability::Axis &&
+      value.size() == 5U && value.contains("source_feature") &&
+      value.at("source_feature").is_string() && value.value("axis", "") == "axis") {
+    auto semantic =
+        SemanticAxisReference::create(FeatureId(value.at("source_feature").get<std::string>()));
+    if (semantic.has_error())
+      return Result<AxisReference>::failure(semantic.error());
+    return AxisReference::create_semantic_axis(PartFeatureInputRole::DraftPullDirection,
+                                               std::move(semantic.value()));
+  }
+  if (kind == "semantic_linear_edge" && value.size() == 4U && value.contains("semantic_edge") &&
+      value.at("semantic_edge").is_object()) {
+    auto edge = semantic_edge_reference_from_json(value.at("semantic_edge"));
+    if (edge.has_error())
+      return Result<AxisReference>::failure(edge.error());
+    return AxisReference::create_semantic_edge(PartFeatureInputRole::DraftPullDirection,
+                                               std::move(edge.value()), capability);
+  }
+  return Result<AxisReference>::failure(
+      json_error("unsupported or malformed draft pull direction"));
+}
+
+[[nodiscard]] json draft_neutral_plane_to_json(const PlaneReference& plane) {
+  json value{{"role", std::string(to_string(plane.role()))},
+             {"capability", std::string(to_string(plane.expected_capability()))},
+             {"source_kind", std::string(to_string(plane.source_kind()))}};
+  if (plane.source_kind() == PartFeatureInputSourceKind::DatumPlane)
+    value["datum_plane"] = std::get<DatumPlaneId>(plane.source()).value();
+  else if (plane.source_kind() == PartFeatureInputSourceKind::ConstructionPlane)
+    value["construction_plane"] = std::get<ConstructionPlaneId>(plane.source()).value();
+  else {
+    const auto& face = std::get<SemanticFaceReference>(plane.source());
+    value["source_feature"] = face.source_feature().value();
+    value["face"] = std::string(to_string(face.face()));
+  }
+  return value;
+}
+
+[[nodiscard]] Result<PlaneReference> draft_neutral_plane_from_json(const json& value) {
+  if (!value.is_object() || value.value("role", "") != "draft_neutral_plane" ||
+      value.value("capability", "") != "plane" || !value.contains("source_kind") ||
+      !value.at("source_kind").is_string())
+    return Result<PlaneReference>::failure(
+        json_error("draft neutral plane requires role Plane capability and source_kind"));
+  const std::string kind = value.at("source_kind").get<std::string>();
+  if (kind == "datum_plane" && value.size() == 4U && value.contains("datum_plane") &&
+      value.at("datum_plane").is_string())
+    return PlaneReference::create_datum_plane(
+        PartFeatureInputRole::DraftNeutralPlane,
+        DatumPlaneId(value.at("datum_plane").get<std::string>()));
+  if (kind == "construction_plane" && value.size() == 4U && value.contains("construction_plane") &&
+      value.at("construction_plane").is_string())
+    return PlaneReference::create_construction_plane(
+        PartFeatureInputRole::DraftNeutralPlane,
+        ConstructionPlaneId(value.at("construction_plane").get<std::string>()));
+  if (kind == "semantic_planar_face" && value.size() == 5U && value.contains("source_feature") &&
+      value.at("source_feature").is_string() && value.contains("face") &&
+      value.at("face").is_string()) {
+    auto face = semantic_face_from_json(value.at("face"));
+    if (face.has_error())
+      return Result<PlaneReference>::failure(face.error());
+    auto semantic = SemanticFaceReference::create(
+        FeatureId(value.at("source_feature").get<std::string>()), face.value());
+    if (semantic.has_error())
+      return Result<PlaneReference>::failure(semantic.error());
+    return PlaneReference::create_semantic_face(PartFeatureInputRole::DraftNeutralPlane,
+                                                std::move(semantic.value()));
+  }
+  return Result<PlaneReference>::failure(
+      json_error("unsupported or malformed draft neutral plane"));
+}
+
+[[nodiscard]] json draft_feature_to_json(const DraftFeature& feature) {
+  json value{{"id", feature.id().value()},
+             {"name", feature.name()},
+             {"target_body", feature.target_body().value()},
+             {"faces", json::array()},
+             {"pull_direction", draft_pull_direction_to_json(feature.pull_direction())},
+             {"neutral_plane", draft_neutral_plane_to_json(feature.neutral_plane())},
+             {"angle_parameter", feature.angle_parameter().value()}};
+  for (const FaceReference& face : feature.faces())
+    value["faces"].push_back(draft_face_to_json(face));
+  return value;
+}
+
+[[nodiscard]] Result<DraftFeature> draft_feature_from_json(const json& value) {
+  if (!value.is_object() || value.size() != 7U || !value.contains("id") ||
+      !value.at("id").is_string() || !value.contains("name") || !value.at("name").is_string() ||
+      !value.contains("target_body") || !value.at("target_body").is_string() ||
+      !value.contains("faces") || !value.at("faces").is_array() ||
+      !value.contains("pull_direction") || !value.contains("neutral_plane") ||
+      !value.contains("angle_parameter") || !value.at("angle_parameter").is_string())
+    return Result<DraftFeature>::failure(
+        json_error("draft feature requires exactly its mandatory intent fields"));
+  std::vector<FaceReference> faces;
+  faces.reserve(value.at("faces").size());
+  for (const auto& face_json : value.at("faces")) {
+    auto face = draft_face_from_json(face_json);
+    if (face.has_error())
+      return Result<DraftFeature>::failure(face.error());
+    faces.push_back(std::move(face.value()));
+  }
+  auto direction = draft_pull_direction_from_json(value.at("pull_direction"));
+  if (direction.has_error())
+    return Result<DraftFeature>::failure(direction.error());
+  auto plane = draft_neutral_plane_from_json(value.at("neutral_plane"));
+  if (plane.has_error())
+    return Result<DraftFeature>::failure(plane.error());
+  return DraftFeature::create(FeatureId(value.at("id").get<std::string>()),
+                              value.at("name").get<std::string>(),
+                              BodyId(value.at("target_body").get<std::string>()), std::move(faces),
+                              std::move(direction.value()), std::move(plane.value()),
+                              ParameterId(value.at("angle_parameter").get<std::string>()));
 }
 
 using ParsedPartPattern = std::variant<LinearPatternFeature, CircularPatternFeature>;
@@ -2491,6 +2705,10 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
   for (const std::string& node : pattern_order.value())
     if (const auto* shell = document.find_shell_feature(FeatureId(node)))
       root["shell_features"].push_back(shell_feature_to_json(*shell));
+  root["draft_features"] = json::array();
+  for (const std::string& node : pattern_order.value())
+    if (const auto* draft = document.find_draft_feature(FeatureId(node)))
+      root["draft_features"].push_back(draft_feature_to_json(*draft));
   root["body_booleans"] = json::array();
   for (const auto& feature : document.body_boolean_features()) {
     json feature_json{{"id", feature.id().value()},
@@ -2871,6 +3089,18 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
       if (shell.has_error())
         return Result<PartDocument>::failure(shell.error());
       auto added = document.value().add_shell_feature(std::move(shell.value()));
+      if (added.has_error())
+        return Result<PartDocument>::failure(added.error());
+    }
+    const json draft_array = root.value("draft_features", json::array());
+    if (!draft_array.is_array())
+      return Result<PartDocument>::failure(
+          json_error("draft_features must be an array in part document json"));
+    for (const auto& draft_json : draft_array) {
+      auto draft = draft_feature_from_json(draft_json);
+      if (draft.has_error())
+        return Result<PartDocument>::failure(draft.error());
+      auto added = document.value().add_draft_feature(std::move(draft.value()));
       if (added.has_error())
         return Result<PartDocument>::failure(added.error());
     }

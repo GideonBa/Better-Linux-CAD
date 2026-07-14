@@ -91,4 +91,5 @@ taper, a mid-plane open-line thin feature, richer SubtractiveExtrude, all four B
 incremental idempotence, and the historical executor integration.
 
 Blocks 61–62 persistent Revolve/RevolveCut intent, JSON, and rotational Geometry are implemented.
-Block 67 MirrorFeature Geometry is implemented; Block 72 ShellFeature Geometry is the next boundary.
+Blocks 67 MirrorFeature Geometry, 72 ShellFeature Geometry, and 73 DraftFeature Core intent/JSON are
+implemented; Block 74 DraftFeature Geometry is the next boundary.

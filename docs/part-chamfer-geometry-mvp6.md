@@ -45,4 +45,5 @@ modes, deterministic reference-side behavior, a circular hole rim, parameter and
 recompute, broken-reference failure, excessive-distance failure, and transactional cache
 preservation.
 
-Block 72 ShellFeature Geometry is the next boundary.
+Blocks 72 ShellFeature Geometry and 73 DraftFeature Core intent/JSON are implemented; Block 74
+DraftFeature Geometry is next.

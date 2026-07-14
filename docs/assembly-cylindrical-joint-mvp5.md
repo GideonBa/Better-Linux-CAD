@@ -51,7 +51,6 @@ Revolute-only adapters.
 
 ## Block 46 handoff
 
-Block 46 Planar and Block 47 passive Spherical are implemented in their canonical documents. The
-Blocks 48–71 Body identity, body-scoped recompute/inspection, Body Booleans, and
-BodyTransform/SketchOwnership intent are implemented; Block 57 Body transform Geometry and
-associative ownership behavior is next.
+Block 46 Planar and Block 47 passive Spherical are implemented in their canonical documents.
+Blocks 48–73 Part Construction through DraftFeature Core intent/JSON are implemented; Block 74
+DraftFeature Geometry is next.

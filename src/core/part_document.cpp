@@ -1433,13 +1433,12 @@ Result<std::size_t> PartDocument::add_shell_dependencies(const ShellFeature& fea
   if (added_node.has_error())
     return Result<std::size_t>::failure(added_node.error());
   for (const FaceReference& face : feature.removed_faces()) {
-    auto dependency =
-        add_dependency_if_missing(graph, face.source_node_id(), feature.id().value());
+    auto dependency = add_dependency_if_missing(graph, face.source_node_id(), feature.id().value());
     if (dependency.has_error())
       return Result<std::size_t>::failure(dependency.error());
   }
-  auto thickness_dependency = add_dependency_if_missing(
-      graph, feature.thickness_parameter().value(), feature.id().value());
+  auto thickness_dependency =
+      add_dependency_if_missing(graph, feature.thickness_parameter().value(), feature.id().value());
   if (thickness_dependency.has_error())
     return Result<std::size_t>::failure(thickness_dependency.error());
 
@@ -1451,8 +1450,7 @@ Result<std::size_t> PartDocument::add_shell_dependencies(const ShellFeature& fea
     if (dependency.has_error())
       return Result<std::size_t>::failure(dependency.error());
   }
-  auto result_dependency =
-      add_dependency_if_missing(graph, feature.id().value(), body_node);
+  auto result_dependency = add_dependency_if_missing(graph, feature.id().value(), body_node);
   if (result_dependency.has_error())
     return Result<std::size_t>::failure(result_dependency.error());
   if (graph.has_cycle())
@@ -1488,6 +1486,78 @@ Result<std::size_t> PartDocument::add_shell_feature(ShellFeature feature) {
     return dependencies;
   shell_features_.push_back(std::move(feature));
   return Result<std::size_t>::success(shell_features_.size() - 1U);
+}
+
+Result<std::size_t> PartDocument::add_draft_dependencies(const DraftFeature& feature) {
+  auto graph = dependency_graph_;
+  auto added_node = graph.add_node(feature.id().value());
+  if (added_node.has_error())
+    return Result<std::size_t>::failure(added_node.error());
+  for (const FaceReference& face : feature.faces()) {
+    auto dependency = add_dependency_if_missing(graph, face.source_node_id(), feature.id().value());
+    if (dependency.has_error())
+      return Result<std::size_t>::failure(dependency.error());
+  }
+  for (const std::string& source :
+       {feature.pull_direction().source_node_id(), feature.neutral_plane().source_node_id(),
+        feature.angle_parameter().value()}) {
+    auto dependency = add_dependency_if_missing(graph, source, feature.id().value());
+    if (dependency.has_error())
+      return Result<std::size_t>::failure(dependency.error());
+  }
+
+  const std::string body_node = body_dependency_node_id(feature.target_body());
+  const auto previous_producers = dependency_sources_of(graph, body_node);
+  graph.remove_dependencies_of_dependent(body_node);
+  for (const std::string& producer : previous_producers) {
+    auto dependency = add_dependency_if_missing(graph, producer, feature.id().value());
+    if (dependency.has_error())
+      return Result<std::size_t>::failure(dependency.error());
+  }
+  auto result_dependency = add_dependency_if_missing(graph, feature.id().value(), body_node);
+  if (result_dependency.has_error())
+    return Result<std::size_t>::failure(result_dependency.error());
+  if (graph.has_cycle())
+    return Result<std::size_t>::failure(
+        Error::dependency(feature.id().value(), "draft must not create a dependency cycle"));
+  auto invalidation_state = invalidation_state_;
+  auto synced = sync_graph(std::move(graph), invalidation_state, dependency_graph_);
+  if (synced.has_error())
+    return Result<std::size_t>::failure(synced.error());
+  invalidation_state_ = std::move(invalidation_state);
+  return Result<std::size_t>::success(1U);
+}
+
+Result<std::size_t> PartDocument::add_draft_feature(DraftFeature feature) {
+  if (has_any_feature_id(feature.id()))
+    return Result<std::size_t>::failure(
+        Error::validation(feature.id().value(), "feature id must be unique within part document"));
+  if (!has_body_id(feature.target_body()))
+    return Result<std::size_t>::failure(
+        Error::validation(feature.id().value(), "draft target body must exist in part document"));
+  for (const FaceReference& face : feature.faces()) {
+    auto valid = validate_part_feature_input_reference(*this, face);
+    if (valid.has_error())
+      return Result<std::size_t>::failure(valid.error());
+  }
+  auto pull_valid = validate_part_feature_input_reference(*this, feature.pull_direction());
+  if (pull_valid.has_error())
+    return Result<std::size_t>::failure(pull_valid.error());
+  auto plane_valid = validate_part_feature_input_reference(*this, feature.neutral_plane());
+  if (plane_valid.has_error())
+    return Result<std::size_t>::failure(plane_valid.error());
+  const Parameter* angle = find_parameter(feature.angle_parameter());
+  if (angle == nullptr || angle->type() != ParameterType::Angle ||
+      std::abs(angle->value().degrees()) <= k_tolerance ||
+      std::abs(angle->value().degrees()) >= 90.0)
+    return Result<std::size_t>::failure(Error::validation(
+        feature.id().value(),
+        "draft angle must reference a non-zero Angle between -90 and 90 degrees"));
+  auto dependencies = add_draft_dependencies(feature);
+  if (dependencies.has_error())
+    return dependencies;
+  draft_features_.push_back(std::move(feature));
+  return Result<std::size_t>::success(draft_features_.size() - 1U);
 }
 
 Result<std::size_t> PartDocument::add_body_boolean_feature(BodyBooleanFeature feature) {
@@ -1783,6 +1853,10 @@ Result<std::size_t> PartDocument::remove_body(BodyId id) {
       return Result<std::size_t>::failure(
           Error::dependency(id.value(), "body with dependent model intent cannot be removed"));
   for (const auto& feature : shell_features_)
+    if (feature.target_body() == id)
+      return Result<std::size_t>::failure(
+          Error::dependency(id.value(), "body with dependent model intent cannot be removed"));
+  for (const auto& feature : draft_features_)
     if (feature.target_body() == id)
       return Result<std::size_t>::failure(
           Error::dependency(id.value(), "body with dependent model intent cannot be removed"));
@@ -2137,6 +2211,9 @@ const std::vector<ChamferFeature>& PartDocument::chamfer_features() const noexce
 const std::vector<ShellFeature>& PartDocument::shell_features() const noexcept {
   return shell_features_;
 }
+const std::vector<DraftFeature>& PartDocument::draft_features() const noexcept {
+  return draft_features_;
+}
 const std::vector<BodyBooleanFeature>& PartDocument::body_boolean_features() const noexcept {
   return body_boolean_features_;
 }
@@ -2214,6 +2291,9 @@ std::size_t PartDocument::chamfer_feature_count() const noexcept {
 }
 std::size_t PartDocument::shell_feature_count() const noexcept {
   return shell_features_.size();
+}
+std::size_t PartDocument::draft_feature_count() const noexcept {
+  return draft_features_.size();
 }
 std::size_t PartDocument::body_boolean_feature_count() const noexcept {
   return body_boolean_features_.size();
@@ -2343,6 +2423,12 @@ const ShellFeature* PartDocument::find_shell_feature(FeatureId id) const noexcep
       return &feature;
   return nullptr;
 }
+const DraftFeature* PartDocument::find_draft_feature(FeatureId id) const noexcept {
+  for (const auto& feature : draft_features_)
+    if (feature.id() == id)
+      return &feature;
+  return nullptr;
+}
 const BodyBooleanFeature* PartDocument::find_body_boolean_feature(FeatureId id) const noexcept {
   for (const auto& feature : body_boolean_features_)
     if (feature.id() == id)
@@ -2448,6 +2534,9 @@ bool PartDocument::has_chamfer_feature_id(const FeatureId& id) const noexcept {
 bool PartDocument::has_shell_feature_id(const FeatureId& id) const noexcept {
   return find_shell_feature(id) != nullptr;
 }
+bool PartDocument::has_draft_feature_id(const FeatureId& id) const noexcept {
+  return find_draft_feature(id) != nullptr;
+}
 bool PartDocument::has_body_boolean_feature_id(const FeatureId& id) const noexcept {
   return find_body_boolean_feature(id) != nullptr;
 }
@@ -2463,7 +2552,7 @@ bool PartDocument::has_any_feature_id(const FeatureId& id) const noexcept {
   return has_feature_id(id) || has_revolve_feature_id(id) || has_linear_pattern_feature_id(id) ||
          has_circular_pattern_feature_id(id) || has_mirror_feature_id(id) ||
          has_fillet_feature_id(id) || has_chamfer_feature_id(id) || has_shell_feature_id(id) ||
-         has_body_boolean_feature_id(id);
+         has_draft_feature_id(id) || has_body_boolean_feature_id(id);
 }
 bool PartDocument::has_body_id(const BodyId& id) const noexcept {
   return find_body(id) != nullptr;

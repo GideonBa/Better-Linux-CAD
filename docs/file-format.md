@@ -774,6 +774,14 @@ Length `thickness_parameter`, and `direction` (`inward` or `outward`). Unknown r
 roles, capabilities, source kinds, and directions fail closed. Canonical details are in
 `docs/part-shell-intent-mvp6.md`.
 
+Block 73 adds the always-emitted, optional-on-read `draft_features` array. Each strict record owns
+`id`, `name`, `target_body`, ordered semantic planar/cylindrical `faces`, a typed
+`pull_direction`, typed `neutral_plane`, and signed Angle `angle_parameter`. Nested references
+persist their Draft-specific role, Axis/Line/Plane/Face capability, source kind, and exact source
+identity. Missing arrays restore zero Draft features; unknown fields, malformed references,
+role/capability mismatches, duplicate faces, wrong parameter units, and zero/out-of-range angles
+fail closed. Canonical details are in `docs/part-draft-intent-mvp6.md`.
+
 ## Planned STEP import persistence after Block 94
 
 This section is planned architecture, not part of the current schema. Blocks 95–101 in

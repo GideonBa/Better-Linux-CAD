@@ -2,8 +2,8 @@
 
 Status: implemented in Block 71.
 
-Block 71 adds persistent thin-wall solid intent without executing OCCT offset geometry. Shell
-Geometry remains owned by Block 72.
+Block 71 adds persistent thin-wall solid intent. Its OCCT execution is implemented by Block 72 in
+`docs/part-shell-geometry-mvp6.md`.
 
 ## Core model
 
@@ -52,4 +52,5 @@ feature/face order and Body-history dependencies deterministically.
 ./build/blcad_core_tests "[core][shell-feature]"
 ```
 
-Block 72 ShellFeature Geometry is the next boundary.
+Block 72 ShellFeature Geometry and Block 73 DraftFeature Core intent/JSON are implemented. Block 74
+DraftFeature Geometry is the next boundary.

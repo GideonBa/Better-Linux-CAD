@@ -237,3 +237,7 @@ Block 71 applies the same in-place history contract to ShellFeature. Every order
 removed-face producer and the positive Length thickness parameter feed the Shell node; the prior
 target-Body producer precedes it, and Shell becomes the new producer of that Body. Thickness and
 upstream topology changes therefore invalidate Shell and all later Body consumers.
+Block 73 applies it to DraftFeature. Every ordered semantic face producer, pull-direction source,
+neutral-plane source, and signed Angle parameter feeds the Draft node; the preceding target-Body
+producer feeds Draft, and Draft becomes the next producer of that Body. Reference or angle changes
+therefore invalidate Draft and every later Body consumer without introducing a Body self-cycle.

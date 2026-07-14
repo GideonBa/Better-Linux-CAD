@@ -49,6 +49,7 @@ add_library(
   src/core/construction_geometry.cpp
   src/core/datum_axis.cpp
   src/core/datum_plane.cpp
+  src/core/draft_feature.cpp
   src/core/edge_treatment_feature.cpp
   src/core/dependency_graph.cpp
   src/core/error.cpp
@@ -169,6 +170,7 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/dimension_driven_profile_resolver.cpp
     src/geometry/fillet_adapter.cpp
     src/geometry/chamfer_adapter.cpp
+    src/geometry/shell_adapter.cpp
     src/geometry/recompute_executor.cpp
     src/geometry/circular_pattern_adapter.cpp
     src/geometry/linear_pattern_adapter.cpp
@@ -294,6 +296,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/datum_plane_tests.cpp
     tests/core/dependency_graph_tests.cpp
     tests/core/derived_workplane_tests.cpp
+    tests/core/draft_feature_tests.cpp
     tests/core/edge_treatment_feature_tests.cpp
     tests/core/error_result_tests.cpp
     tests/core/feature_tests.cpp
@@ -413,6 +416,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/reference_generated_profile_resolver_tests.cpp
       tests/geometry/reference_part_pipeline_tests.cpp
       tests/geometry/revolve_feature_pipeline_tests.cpp
+      tests/geometry/shell_feature_pipeline_tests.cpp
       tests/geometry/right_workplane_pipeline_tests.cpp
       tests/geometry/semantic_reference_evaluator_tests.cpp
       tests/geometry/shape_cache_tests.cpp

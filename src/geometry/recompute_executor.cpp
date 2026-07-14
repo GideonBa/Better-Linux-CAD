@@ -300,6 +300,8 @@ resolve_boolean_target_input(const PartDocument& document, const ShapeCache& sha
     return feature->target_body() == body;
   if (const ShellFeature* feature = document.find_shell_feature(FeatureId(std::string(producer))))
     return feature->target_body() == body;
+  if (const DraftFeature* feature = document.find_draft_feature(FeatureId(std::string(producer))))
+    return feature->target_body() == body;
   if (const BodyBooleanFeature* feature =
           document.find_body_boolean_feature(FeatureId(std::string(producer))))
     return feature->effective_result_body() == body;
@@ -310,8 +312,8 @@ resolve_boolean_target_input(const PartDocument& document, const ShapeCache& sha
 }
 
 [[nodiscard]] Result<const GeometryShape*>
-resolve_edge_treatment_target(const PartDocument& document, const FeatureId& feature_id,
-                              const BodyId& target_body, const ShapeCache& shape_cache) {
+resolve_in_place_body_target(const PartDocument& document, const FeatureId& feature_id,
+                             const BodyId& target_body, const ShapeCache& shape_cache) {
   auto order = document.dependency_graph().topological_order();
   if (order.has_error())
     return Result<const GeometryShape*>::failure(order.error());
@@ -335,7 +337,7 @@ resolve_edge_treatment_target(const PartDocument& document, const FeatureId& fea
     target = shape_cache.find_body_shape(target_body);
   if (target == nullptr)
     return Result<const GeometryShape*>::failure(geometry_error(
-        target_body.value(), "edge-treatment target body shape must exist in shape cache"));
+        target_body.value(), "in-place feature target body shape must exist in shape cache"));
   return Result<const GeometryShape*>::success(target);
 }
 
@@ -363,9 +365,31 @@ resolve_edge_treatment_target(const PartDocument& document, const FeatureId& fea
 }
 
 [[nodiscard]] Result<std::size_t> store_chamfer_result(const PartDocument& document,
-                                                        const ChamferFeature& feature,
-                                                        GeometryShape shape,
-                                                        ShapeCache& shape_cache) {
+                                                       const ChamferFeature& feature,
+                                                       GeometryShape shape,
+                                                       ShapeCache& shape_cache) {
+  const Body* body = document.find_body(feature.target_body());
+  if (body == nullptr)
+    return Result<std::size_t>::failure(
+        validation_error(feature.target_body().value(), "target body must exist"));
+  auto feature_result = shape_cache.store_feature_shape(feature.id(), shape);
+  if (feature_result.has_error())
+    return feature_result;
+  auto body_result =
+      shape_cache.store_body_shape(feature.target_body(), feature.id(), std::move(shape));
+  if (body_result.has_error())
+    return body_result;
+  if (document.bodies().size() == 1U && body->kind() == BodyKind::Solid) {
+    const GeometryShape* cached = shape_cache.find_body_shape(feature.target_body());
+    return shape_cache.set_final_shape(feature.id(), *cached);
+  }
+  shape_cache.clear_final_shape();
+  return body_result;
+}
+
+[[nodiscard]] Result<std::size_t> store_shell_result(const PartDocument& document,
+                                                     const ShellFeature& feature,
+                                                     GeometryShape shape, ShapeCache& shape_cache) {
   const Body* body = document.find_body(feature.target_body());
   if (body == nullptr)
     return Result<std::size_t>::failure(
@@ -2044,7 +2068,7 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_fillet(const PartDocument
 
   ShapeCache working_cache = shape_cache;
   auto target =
-      resolve_edge_treatment_target(document, feature->id(), feature->target_body(), working_cache);
+      resolve_in_place_body_target(document, feature->id(), feature->target_body(), working_cache);
   if (target.has_error())
     return Result<std::size_t>::failure(target.error());
   auto result = fillet_adapter_.apply(document, *feature, *target.value(), working_cache,
@@ -2086,15 +2110,14 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_chamfer(const PartDocumen
           feature->second_parameter()->value(), "second chamfer parameter has the wrong type"));
     second_value = expected == ParameterType::Angle ? second->value().degrees()
                                                     : second->value().millimeters();
-    if (*second_value <= k_tolerance ||
-        (expected == ParameterType::Angle && *second_value >= 90.0))
+    if (*second_value <= k_tolerance || (expected == ParameterType::Angle && *second_value >= 90.0))
       return Result<std::size_t>::failure(validation_error(
           feature->second_parameter()->value(), "second chamfer parameter is outside its range"));
   }
 
   ShapeCache working_cache = shape_cache;
   auto target =
-      resolve_edge_treatment_target(document, feature->id(), feature->target_body(), working_cache);
+      resolve_in_place_body_target(document, feature->id(), feature->target_body(), working_cache);
   if (target.has_error())
     return Result<std::size_t>::failure(target.error());
   auto result = chamfer_adapter_.apply(document, *feature, *target.value(), working_cache,
@@ -2102,6 +2125,39 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_chamfer(const PartDocumen
   if (result.has_error())
     return Result<std::size_t>::failure(result.error());
   auto stored = store_chamfer_result(document, *feature, std::move(result.value()), working_cache);
+  if (stored.has_error())
+    return stored;
+  shape_cache = std::move(working_cache);
+  return stored;
+}
+
+Result<std::size_t> GeometryRecomputeExecutor::execute_shell(const PartDocument& document,
+                                                             FeatureId feature_id,
+                                                             ShapeCache& shape_cache) const {
+  if (feature_id.empty())
+    return Result<std::size_t>::failure(validation_error("shell", "feature id must not be empty"));
+  const ShellFeature* feature = document.find_shell_feature(feature_id);
+  if (feature == nullptr)
+    return Result<std::size_t>::failure(
+        validation_error(feature_id.value(), "shell feature must exist in part document"));
+  const Parameter* thickness = document.find_parameter(feature->thickness_parameter());
+  if (thickness == nullptr || thickness->type() != ParameterType::Length ||
+      !std::isfinite(thickness->value().millimeters()) ||
+      thickness->value().millimeters() <= k_tolerance)
+    return Result<std::size_t>::failure(
+        validation_error(feature->thickness_parameter().value(),
+                         "shell thickness must be a positive finite length"));
+
+  ShapeCache working_cache = shape_cache;
+  auto target =
+      resolve_in_place_body_target(document, feature->id(), feature->target_body(), working_cache);
+  if (target.has_error())
+    return Result<std::size_t>::failure(target.error());
+  auto result = shell_adapter_.apply(document, *feature, *target.value(), working_cache,
+                                     thickness->value().millimeters());
+  if (result.has_error())
+    return Result<std::size_t>::failure(result.error());
+  auto stored = store_shell_result(document, *feature, std::move(result.value()), working_cache);
   if (stored.has_error())
     return stored;
   shape_cache = std::move(working_cache);
@@ -2309,16 +2365,18 @@ GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const Reco
     const FilletFeature* fillet = document.find_fillet_feature(FeatureId(step.node_id));
     const ChamferFeature* chamfer = document.find_chamfer_feature(FeatureId(step.node_id));
     const ShellFeature* shell = document.find_shell_feature(FeatureId(step.node_id));
-    if (shell != nullptr)
+    const DraftFeature* draft = document.find_draft_feature(FeatureId(step.node_id));
+    if (draft != nullptr)
       return Result<GeometryRecomputeSummary>::failure(geometry_error(
-          shell->id().value(), "ShellFeature geometry is not available until Block 72"));
+          draft->id().value(), "DraftFeature geometry is not available until Block 74"));
     const BodyBooleanFeature* body_boolean =
         document.find_body_boolean_feature(FeatureId(step.node_id));
     const BodyTransform* body_transform =
         document.find_body_transform(BodyTransformId(step.node_id));
     if (feature == nullptr && revolve == nullptr && linear_pattern == nullptr &&
         circular_pattern == nullptr && mirror == nullptr && fillet == nullptr &&
-        chamfer == nullptr && body_boolean == nullptr && body_transform == nullptr)
+        chamfer == nullptr && shell == nullptr && draft == nullptr && body_boolean == nullptr &&
+        body_transform == nullptr)
       continue;
 
     const FeatureId executable_id = feature != nullptr            ? feature->id()
@@ -2328,6 +2386,7 @@ GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const Reco
                                     : mirror != nullptr           ? mirror->id()
                                     : fillet != nullptr           ? fillet->id()
                                     : chamfer != nullptr          ? chamfer->id()
+                                    : shell != nullptr            ? shell->id()
                                     : body_boolean != nullptr
                                         ? body_boolean->id()
                                         : FeatureId(body_transform->id().value());
@@ -2343,9 +2402,10 @@ GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const Reco
             ? execute_linear_pattern(document, linear_pattern->id(), execution_cache)
         : circular_pattern != nullptr
             ? execute_circular_pattern(document, circular_pattern->id(), execution_cache)
-        : mirror != nullptr ? execute_mirror(document, mirror->id(), execution_cache)
-        : fillet != nullptr ? execute_fillet(document, fillet->id(), execution_cache)
+        : mirror != nullptr  ? execute_mirror(document, mirror->id(), execution_cache)
+        : fillet != nullptr  ? execute_fillet(document, fillet->id(), execution_cache)
         : chamfer != nullptr ? execute_chamfer(document, chamfer->id(), execution_cache)
+        : shell != nullptr   ? execute_shell(document, shell->id(), execution_cache)
         : body_boolean != nullptr
             ? execute_body_boolean(document, body_boolean->id(), execution_cache)
             : execute_body_transform(document, body_transform->id(), execution_cache);
@@ -2389,16 +2449,18 @@ GeometryRecomputeExecutor::execute_document(const PartDocument& document,
     const FilletFeature* fillet = document.find_fillet_feature(FeatureId(executable_id));
     const ChamferFeature* chamfer = document.find_chamfer_feature(FeatureId(executable_id));
     const ShellFeature* shell = document.find_shell_feature(FeatureId(executable_id));
-    if (shell != nullptr)
+    const DraftFeature* draft = document.find_draft_feature(FeatureId(executable_id));
+    if (draft != nullptr)
       return Result<GeometryRecomputeSummary>::failure(geometry_error(
-          shell->id().value(), "ShellFeature geometry is not available until Block 72"));
+          draft->id().value(), "DraftFeature geometry is not available until Block 74"));
     const BodyBooleanFeature* body_boolean =
         document.find_body_boolean_feature(FeatureId(executable_id));
     const BodyTransform* body_transform =
         document.find_body_transform(BodyTransformId(executable_id));
     if (feature == nullptr && revolve == nullptr && linear_pattern == nullptr &&
         circular_pattern == nullptr && mirror == nullptr && fillet == nullptr &&
-        chamfer == nullptr && body_boolean == nullptr && body_transform == nullptr)
+        chamfer == nullptr && shell == nullptr && draft == nullptr && body_boolean == nullptr &&
+        body_transform == nullptr)
       continue;
 
     const FeatureId feature_id = feature != nullptr            ? feature->id()
@@ -2408,6 +2470,7 @@ GeometryRecomputeExecutor::execute_document(const PartDocument& document,
                                  : mirror != nullptr           ? mirror->id()
                                  : fillet != nullptr           ? fillet->id()
                                  : chamfer != nullptr          ? chamfer->id()
+                                 : shell != nullptr            ? shell->id()
                                  : body_boolean != nullptr
                                      ? body_boolean->id()
                                      : FeatureId(body_transform->id().value());
@@ -2423,9 +2486,10 @@ GeometryRecomputeExecutor::execute_document(const PartDocument& document,
             ? execute_linear_pattern(document, linear_pattern->id(), execution_cache)
         : circular_pattern != nullptr
             ? execute_circular_pattern(document, circular_pattern->id(), execution_cache)
-        : mirror != nullptr ? execute_mirror(document, mirror->id(), execution_cache)
-        : fillet != nullptr ? execute_fillet(document, fillet->id(), execution_cache)
+        : mirror != nullptr  ? execute_mirror(document, mirror->id(), execution_cache)
+        : fillet != nullptr  ? execute_fillet(document, fillet->id(), execution_cache)
         : chamfer != nullptr ? execute_chamfer(document, chamfer->id(), execution_cache)
+        : shell != nullptr   ? execute_shell(document, shell->id(), execution_cache)
         : body_boolean != nullptr
             ? execute_body_boolean(document, body_boolean->id(), execution_cache)
             : execute_body_transform(document, body_transform->id(), execution_cache);

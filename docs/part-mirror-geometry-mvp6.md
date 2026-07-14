@@ -34,4 +34,5 @@ The suite covers ordered output, Feature and Body sources, a non-axis-aligned co
 a semantic generated top face, all four Body-result modes, parameter-driven recompute, and
 transactional missing-reference failure.
 
-Block 72 ShellFeature Geometry is the next boundary.
+Blocks 72 ShellFeature Geometry and 73 DraftFeature Core intent/JSON are implemented; Block 74
+DraftFeature Geometry is next.

@@ -1,8 +1,8 @@
 # Part Construction Sequence MVP-6
 
-Status: active post-Assembly-MVP sequence. Blocks 48–71 are implemented; Blocks 72–94 remain planned. Blocks 95–101 form the subsequent STEP Import MVP.
+Status: active post-Assembly-MVP sequence. Blocks 48–73 are implemented; Blocks 74–94 remain planned. Blocks 95–101 form the subsequent STEP Import MVP.
 
-Block 47 completed the Assembly MVP handoff. Blocks 48–71 establish Body identity, body-scoped recompute/inspection, Body Boolean execution, associative transform Geometry, reusable semantic Part-feature inputs, richer Extrude/Cut intent plus Geometry, persistent plus executed Revolve/RevolveCut, general Pattern and Mirror Geometry, persistent plus executed Fillet/Chamfer, and persistent ShellFeature intent. Block 72 — ShellFeature Geometry — is the current next technical step.
+Block 47 completed the Assembly MVP handoff. Blocks 48–73 establish Body identity, body-scoped recompute/inspection, Body Boolean execution, associative transform Geometry, reusable semantic Part-feature inputs, richer Extrude/Cut intent plus Geometry, persistent plus executed Revolve/RevolveCut, general Pattern and Mirror Geometry, persistent plus executed Fillet/Chamfer/Shell Geometry, and persistent DraftFeature intent. Block 74 — DraftFeature Geometry — is the current next technical step.
 
 This document is the active status, phase-order, authority-boundary, and handoff summary for the first broad BLCAD Part Construction MVP after the Assembly MVP.
 
@@ -10,7 +10,7 @@ The complete original Blocks 48-94 per-block planning detail is preserved byte-f
 
 - `docs/part-construction-sequence-mvp6-planning-detail.md`
 
-The implemented Blocks 48–71 contracts are canonical in:
+The implemented Blocks 48–73 contracts are canonical in:
 
 - `docs/part-body-identity-mvp6.md`
 - `docs/part-body-json-mvp6.md`
@@ -36,6 +36,8 @@ The implemented Blocks 48–71 contracts are canonical in:
 - `docs/part-fillet-geometry-mvp6.md`
 - `docs/part-chamfer-geometry-mvp6.md`
 - `docs/part-shell-intent-mvp6.md`
+- `docs/part-shell-geometry-mvp6.md`
+- `docs/part-draft-intent-mvp6.md`
 
 The planned post-Block-94 STEP import handoff is canonical in:
 
@@ -166,7 +168,12 @@ and upstream recompute, and preserves prior cache products on topology or radius
 executes all three Chamfer modes with deterministic semantic reference sides, incremental
 recompute, and transactional topology/size failure. Block 71 adds ordered semantic removed-face,
 positive thickness, explicit direction, Body-history, invalidation, and strict compatible Shell
-intent/JSON. The remaining Block 72–94 implementation
+intent/JSON. Block 72 resolves the current target Body's semantic planar/cylindrical removal faces,
+executes inward/outward OCCT thick-solid offsets, validates a single manifold solid, supports
+incremental parameter/upstream recompute, and preserves prior cache products on failure. Block 73
+adds ordered semantic Draft faces, Axis/Line pull-direction authority, typed neutral-plane
+identity, a signed non-zero Angle convention, Body-history dependencies, invalidation, removal
+protection, and strict compatible JSON. The remaining Block 74–94 implementation
 contracts stay in
 `docs/part-construction-sequence-mvp6-planning-detail.md`.
 

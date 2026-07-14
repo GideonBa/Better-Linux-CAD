@@ -56,6 +56,5 @@ coordinate-slot snapshots as the authority.
 ## Block 45 handoff
 
 Blocks 45–47 Cylindrical, Planar, and passive Spherical are implemented in their canonical
-documents. Blocks 48–71 Body identity, body-scoped recompute/inspection, Body Booleans, and
-BodyTransform/SketchOwnership intent are implemented; Block 57 Body transform Geometry and
-associative ownership behavior is the next technical step.
+documents. Blocks 48–73 Part Construction through DraftFeature Core intent/JSON are implemented;
+Block 74 DraftFeature Geometry is the next technical step.

@@ -14,7 +14,7 @@ phase_status:
   mvp_3: "Parametric bolt circle pattern — implemented"
   mvp_4: "Assembly parameters and Project container — implemented"
   mvp_5: "Assembly relationships, motion, hierarchy, analysis, exchange — Blocks 1–47 implemented"
-  mvp_6: "Part Construction — Blocks 48–71 implemented, Blocks 72–94 planned, Block 72 next"
+  mvp_6: "Part Construction — Blocks 48–73 implemented, Blocks 74–94 planned, Block 74 next"
   mvp_7: "STEP Import — Blocks 95–101 planned after Block 94"
 ---
 
@@ -552,10 +552,10 @@ motion solvers reject Spherical as the selected drive.
 
 ## MVP 6 — Part Construction MVP after Block 47
 
-**Status:** In progress — Blocks 48–71 implemented
+**Status:** In progress — Blocks 48–73 implemented
 **Canonical:** sequence `docs/part-construction-sequence-mvp6.md`
 
-Blocks 48–71 are complete. Block 72 is the current next technical step.
+Blocks 48–73 are complete. Block 74 is the current next technical step.
 
 Mandatory Part Construction phase order:
 
@@ -989,8 +989,34 @@ Canonical contract: `docs/part-shell-intent-mvp6.md`.
 [core][shell-feature]
 ```
 
-## Current next technical step — Block 72
+## Block 72 — ShellFeature Geometry — Implemented
 
-Execute semantic removed-face shelling with inward/outward OCCT thickness, associative recovery,
-parameter recompute, and transactional invalid-result failure according to
-`docs/part-construction-sequence-mvp6-planning-detail.md`.
+Block 72 resolves ordered semantic planar/cylindrical removal faces on the current target solid,
+maps explicit Inward/Outward direction to checked OCCT thick-solid offsets, supports associative
+parameter and upstream recompute, and rejects missing/ambiguous topology, excessive thickness, and
+invalid or non-manifold results without replacing the previous cache.
+
+Canonical contract: `docs/part-shell-geometry-mvp6.md`.
+
+```text
+[geometry][shell-feature]
+```
+
+## Block 73 — DraftFeature Core intent and JSON — Implemented
+
+Block 73 freezes target-Body ownership, ordered semantic planar/cylindrical Draft faces, explicit
+Axis/Line pull-direction capability, typed datum/construction/semantic neutral planes, a signed
+non-zero Angle in (-90°, +90°), dependencies, invalidation, removal protection, duplicate
+rejection, and additive strict `draft_features[]` JSON.
+
+Canonical contract: `docs/part-draft-intent-mvp6.md`.
+
+```text
+[core][draft-feature]
+```
+
+## Current next technical step — Block 74
+
+Execute positive/negative drafted faces with arbitrary pull direction and non-root neutral planes,
+associative reference recovery, and transactional invalid/tangent/self-intersection failure
+according to `docs/part-construction-sequence-mvp6-planning-detail.md`.

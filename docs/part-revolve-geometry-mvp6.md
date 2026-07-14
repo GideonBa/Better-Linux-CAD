@@ -80,4 +80,5 @@ The suite covers 360-degree, negative partial, and symmetric revolves; NewBody, 
 Intersect; a revolved groove/undercut fixture; semantic-axis invalidation and incremental recompute;
 and transactional rejection of a self-intersecting axis-crossing profile.
 
-Block 67 MirrorFeature Geometry is implemented; Block 72 ShellFeature Geometry is the next boundary.
+Blocks 67 MirrorFeature Geometry, 72 ShellFeature Geometry, and 73 DraftFeature Core intent/JSON are
+implemented; Block 74 DraftFeature Geometry is the next boundary.
