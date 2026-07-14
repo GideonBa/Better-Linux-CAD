@@ -58,4 +58,4 @@ references in `docs/part-sketch-3d-json-mvp6.md`. Block 78 converts the stable i
 ./build/dev-geometry/blcad_core_tests "[core][sketch-3d]"
 ```
 
-Blocks 48–78 are implemented. Block 78 3D Sketch Geometry conversion is implemented; Block 79 connected PathCurve Core intent, JSON, and validation is next.
+Blocks 48–80 are implemented. Block 78 3D Sketch Geometry conversion is implemented; Block 79 connected PathCurve Core intent, JSON, and validation is implemented; Block 80 Sweep feature Core intent and JSON is implemented; Block 81 Basic Sweep Geometry is next.

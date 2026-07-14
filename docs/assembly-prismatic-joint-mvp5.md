@@ -56,5 +56,5 @@ coordinate-slot snapshots as the authority.
 ## Block 45 handoff
 
 Blocks 45–47 Cylindrical, Planar, and passive Spherical are implemented in their canonical
-documents. Blocks 48–78 Part Construction through richer 3D curve intent are implemented; Block
+documents. Blocks 48–80 Part Construction through richer 3D curve intent are implemented; Block
 77 3D Sketch JSON and semantic references is next.

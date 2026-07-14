@@ -111,5 +111,5 @@ Slots now serialize additively for local and Project-level joints with canonical
 
 Block 43 vector motion drives, Blocks 44–46 Prismatic/Cylindrical/Planar execution, and Block 47
 passive Spherical with an empty family slot signature are implemented in their canonical documents.
-Blocks 48–78 Part Construction through 3D Sketch JSON and semantic references are implemented;
-Block 78 3D Sketch Geometry conversion is implemented; Block 79 connected PathCurve Core intent, JSON, and validation is next.
+Blocks 48–80 Part Construction through 3D Sketch JSON and semantic references are implemented;
+Block 78 3D Sketch Geometry conversion is implemented; Block 79 connected PathCurve Core intent, JSON, and validation is implemented; Block 80 Sweep feature Core intent and JSON is implemented; Block 81 Basic Sweep Geometry is next.

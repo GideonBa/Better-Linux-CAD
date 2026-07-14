@@ -796,6 +796,21 @@ Block 78 does not add persistent fields. Resolved model-space coordinates and OC
 wire, and curve identities remain transient Geometry products and are regenerated from the Block-77
 semantic source records. Canonical details are in `docs/part-sketch-3d-geometry-mvp6.md`.
 
+Block 79 adds the always-emitted, optional-on-read `path_curves` array. Each strict record stores
+`id`, `name`, ordered source-dependent `segments`, `closure`, `orientation_rule`, nullable
+`fixed_up_vector`, nullable `continuity_hint`, and positive `connection_tolerance_mm`. Segments
+persist authored direction and exact planar-Sketch, ConstructionLine, 3D-Sketch, or semantic-edge
+identity. Resolved endpoints and OCCT identities are never stored. Canonical details are in
+`docs/part-path-curve-core-mvp6.md`.
+
+Block 80 adds the always-emitted, optional-on-read `sweep_features` array. Its strict records store
+`id`, `name`, `type`, a closed-region or open-PathCurve `profile`, trajectory `path`, nullable
+orientation/fixed-up-vector overrides, nullable Angle `twist_parameter`, `operation_mode`, and the
+target/produced Body fields required by that operation. Missing dependencies, incompatible
+profile/type or operation combinations, wrong Body kinds, and extra fields fail closed. Derived
+path frames and OCCT topology are never stored. Canonical details are in
+`docs/part-sweep-intent-mvp6.md`.
+
 ## Planned STEP import persistence after Block 94
 
 This section is planned architecture, not part of the current schema. Blocks 95–101 in

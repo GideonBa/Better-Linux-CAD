@@ -94,7 +94,8 @@ and publishes parameter/upstream recompute transactionally. Block 75 adds separa
 polylines, and graph invalidation. Block 76 adds mixed-source point references, three-point Arcs,
 Fit/Control Splines, typed Helices, and Guide-Curve roles. Block 77 adds strict deterministic JSON
 and source-identity-only semantic references. Block 78 executes deterministic transient OCCT
-Geometry without writing topology identity back into Core. Block 79 PathCurve intent is next.
+Geometry without writing topology identity back into Core. Block 79 PathCurve intent and Block 80
+Sweep/SweepCut/SweepSurface intent are implemented; Block 81 Basic Sweep Geometry is next.
 
 The long-term sketcher and feature parity target is documented in `docs/inventor-like-sketcher-and-feature-roadmap.md`.
 
@@ -151,11 +152,12 @@ The detailed roadmap is in `docs/multi-body-transform-and-path-features-roadmap.
 
 ## Sweep, loft, path-following extrude, and surfacing
 
-Sweep, loft, path-following extrude, and surfacing are not first MVP features, but they are first-class future feature families.
+Sweep Core intent is implemented; its Geometry, loft, path-following extrude, and broader
+surfacing remain first-class feature families in the active Part Construction sequence.
 
 Target behavior:
 
-- `PathCurve` stores an ordered connected path made from line, arc, spline, projected, construction, semantic, or 3D-sketch segment references.
+- Implemented `PathCurve` stores an ordered connected path made from line, arc, spline, projected, construction, semantic, or 3D-sketch segment references, with explicit direction, closure, orientation, continuity hint, and tolerance.
 - `AdditiveExtrude` and `SubtractiveExtrude` may later use `direction_mode = path` with a `PathCurveId`.
 - `SweepFeature` consumes a profile and a path curve.
 - `SweepCutFeature` removes a swept volume from a target body.

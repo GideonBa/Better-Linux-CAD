@@ -2220,6 +2220,127 @@ using ParsedPartPattern = std::variant<LinearPatternFeature, CircularPatternFeat
   return Result<RevolveFeature>::failure(json_error("unsupported revolve feature type"));
 }
 
+[[nodiscard]] json sweep_feature_to_json(const SweepFeature& feature) {
+  json profile{{"kind", std::string(to_string(feature.profile().kind()))}};
+  if (feature.profile().kind() == SweepProfileKind::ClosedRegion) {
+    const auto& source = std::get<ProfileRegionReference>(feature.profile().source());
+    profile["sketch"] = source.sketch().value();
+    profile["profile"] = source.profile().value();
+  } else {
+    profile["path_curve"] = std::get<PathCurveId>(feature.profile().source()).value();
+  }
+  json value{
+      {"id", feature.id().value()},
+      {"name", feature.name()},
+      {"type", std::string(to_string(feature.kind()))},
+      {"profile", std::move(profile)},
+      {"path", feature.path().value()},
+      {"orientation_override", nullptr},
+      {"fixed_up_vector_override", nullptr},
+      {"twist_parameter", nullptr},
+      {"operation_mode", std::string(to_string(feature.body_result_context().operation_mode()))}};
+  if (feature.orientation_override().has_value())
+    value["orientation_override"] = std::string(to_string(*feature.orientation_override()));
+  if (feature.fixed_up_vector_override().has_value())
+    value["fixed_up_vector_override"] = vector3_to_json(*feature.fixed_up_vector_override());
+  if (feature.twist_parameter().has_value())
+    value["twist_parameter"] = feature.twist_parameter()->value();
+  const auto& context = feature.body_result_context();
+  if (context.target_body().has_value())
+    value["target_body"] = context.target_body()->value();
+  if (context.produced_body().has_value())
+    value["produced_body"] = context.produced_body()->value();
+  return value;
+}
+
+[[nodiscard]] Result<SweepFeature> sweep_feature_from_json(const json& value) {
+  const std::size_t expected_size =
+      9U + (value.contains("target_body") ? 1U : 0U) + (value.contains("produced_body") ? 1U : 0U);
+  if (!value.is_object() || value.size() != expected_size || !value.contains("id") ||
+      !value.contains("name") || !value.contains("type") || !value.contains("profile") ||
+      !value.contains("path") || !value.contains("orientation_override") ||
+      !value.contains("fixed_up_vector_override") || !value.contains("twist_parameter") ||
+      !value.contains("operation_mode") || !value.at("id").is_string() ||
+      !value.at("name").is_string() || !value.at("type").is_string() ||
+      !value.at("profile").is_object() || !value.at("path").is_string() ||
+      (!value.at("orientation_override").is_null() &&
+       !value.at("orientation_override").is_string()) ||
+      (!value.at("fixed_up_vector_override").is_null() &&
+       !value.at("fixed_up_vector_override").is_object()) ||
+      (!value.at("twist_parameter").is_null() && !value.at("twist_parameter").is_string()))
+    return Result<SweepFeature>::failure(
+        json_error("sweep feature requires exactly its mandatory intent fields"));
+
+  const auto& profile_json = value.at("profile");
+  if (!profile_json.contains("kind") || !profile_json.at("kind").is_string())
+    return Result<SweepFeature>::failure(json_error("sweep profile requires kind"));
+  Result<SweepProfileReference> profile =
+      Result<SweepProfileReference>::failure(json_error("unsupported sweep profile kind"));
+  const std::string profile_kind = profile_json.at("kind").get<std::string>();
+  if (profile_kind == "closed_region" && profile_json.size() == 3U &&
+      profile_json.contains("sketch") && profile_json.at("sketch").is_string() &&
+      profile_json.contains("profile") && profile_json.at("profile").is_string()) {
+    auto region =
+        ProfileRegionReference::create(SketchId(profile_json.at("sketch").get<std::string>()),
+                                       ProfileId(profile_json.at("profile").get<std::string>()),
+                                       PartFeatureInputRole::SweepProfile);
+    if (region.has_error())
+      return Result<SweepFeature>::failure(region.error());
+    profile = SweepProfileReference::create_closed_region(std::move(region.value()));
+  } else if (profile_kind == "open_path" && profile_json.size() == 2U &&
+             profile_json.contains("path_curve") && profile_json.at("path_curve").is_string()) {
+    profile = SweepProfileReference::create_open_path(
+        PathCurveId(profile_json.at("path_curve").get<std::string>()));
+  }
+  if (profile.has_error())
+    return Result<SweepFeature>::failure(profile.error());
+
+  std::optional<PathOrientationRule> orientation;
+  if (!value.at("orientation_override").is_null()) {
+    const std::string spelling = value.at("orientation_override").get<std::string>();
+    if (spelling == "profile_normal")
+      orientation = PathOrientationRule::ProfileNormal;
+    else if (spelling == "minimum_twist")
+      orientation = PathOrientationRule::MinimumTwist;
+    else if (spelling == "fixed_up_vector")
+      orientation = PathOrientationRule::FixedUpVector;
+    else
+      return Result<SweepFeature>::failure(json_error("unsupported sweep orientation override"));
+  }
+  std::optional<Vector3> fixed_up;
+  if (!value.at("fixed_up_vector_override").is_null()) {
+    if (value.at("fixed_up_vector_override").size() != 3U ||
+        !value.at("fixed_up_vector_override").contains("x") ||
+        !value.at("fixed_up_vector_override").contains("y") ||
+        !value.at("fixed_up_vector_override").contains("z"))
+      return Result<SweepFeature>::failure(json_error("sweep fixed up vector is malformed"));
+    fixed_up = vector3_from_json(value.at("fixed_up_vector_override"));
+  }
+  std::optional<ParameterId> twist;
+  if (!value.at("twist_parameter").is_null())
+    twist = ParameterId(value.at("twist_parameter").get<std::string>());
+  auto context = feature_body_result_context_from_json(value);
+  if (context.has_error() || !context.value().has_value())
+    return Result<SweepFeature>::failure(
+        context.has_error() ? context.error() : json_error("sweep feature requires body context"));
+  const FeatureId id(value.at("id").get<std::string>());
+  const std::string name = value.at("name").get<std::string>();
+  const PathCurveId path(value.at("path").get<std::string>());
+  const std::string type = value.at("type").get<std::string>();
+  if (type == "sweep")
+    return SweepFeature::create_sweep(id, name, std::move(profile.value()), path,
+                                      std::move(*context.value()), orientation, fixed_up, twist);
+  if (type == "sweep_cut")
+    return SweepFeature::create_sweep_cut(id, name, std::move(profile.value()), path,
+                                          std::move(*context.value()), orientation, fixed_up,
+                                          twist);
+  if (type == "sweep_surface")
+    return SweepFeature::create_sweep_surface(id, name, std::move(profile.value()), path,
+                                              std::move(*context.value()), orientation, fixed_up,
+                                              twist);
+  return Result<SweepFeature>::failure(json_error("unsupported sweep feature type"));
+}
+
 [[nodiscard]] bool extrude_reference_features_available(const PartDocument& document,
                                                         const Feature& feature) {
   const auto available = [&document](const std::optional<FaceReference>& face) {
@@ -2846,6 +2967,179 @@ spline_continuity_spelling(SketchSpline3DContinuity continuity) noexcept {
   return sketch;
 }
 
+[[nodiscard]] json path_segment_to_json(const PathSegmentReference& segment) {
+  json value{{"source", std::string(to_string(segment.source_kind()))},
+             {"reversed", segment.reversed()}};
+  switch (segment.source_kind()) {
+  case PathSegmentSourceKind::PlanarSketchCurve:
+    value["sketch"] = segment.planar_sketch()->value();
+    value["entity"] = segment.entity()->value();
+    value["curve_kind"] = std::string(to_string(*segment.planar_curve_kind()));
+    break;
+  case PathSegmentSourceKind::ConstructionLine:
+    value["construction_line"] = segment.construction_line()->value();
+    break;
+  case PathSegmentSourceKind::Sketch3DCurve:
+    value["sketch_3d"] = segment.sketch_3d()->value();
+    value["entity"] = segment.entity()->value();
+    value["curve_kind"] = std::string(to_string(*segment.sketch_3d_curve_kind()));
+    break;
+  case PathSegmentSourceKind::SemanticGeneratedEdge:
+    value["semantic_edge"] = semantic_edge_reference_to_json(*segment.semantic_edge());
+    break;
+  }
+  return value;
+}
+
+[[nodiscard]] Result<PathSegmentReference> path_segment_from_json(const json& value) {
+  if (!value.is_object() || !value.contains("source") || !value.at("source").is_string() ||
+      !value.contains("reversed") || !value.at("reversed").is_boolean())
+    return Result<PathSegmentReference>::failure(json_error("path segment has invalid fields"));
+  const std::string source = value.at("source").get<std::string>();
+  const bool reversed = value.at("reversed").get<bool>();
+  if (source == "planar_sketch_curve") {
+    if (!has_exact_fields(value, {"source", "reversed", "sketch", "entity", "curve_kind"}) ||
+        !value.at("sketch").is_string() || !value.at("entity").is_string() ||
+        !value.at("curve_kind").is_string())
+      return Result<PathSegmentReference>::failure(
+          json_error("planar path segment has invalid fields"));
+    const std::string kind = value.at("curve_kind").get<std::string>();
+    std::optional<PlanarPathCurveKind> parsed;
+    if (kind == "line")
+      parsed = PlanarPathCurveKind::Line;
+    else if (kind == "arc")
+      parsed = PlanarPathCurveKind::Arc;
+    else if (kind == "spline")
+      parsed = PlanarPathCurveKind::Spline;
+    else if (kind == "projected_line")
+      parsed = PlanarPathCurveKind::ProjectedLine;
+    else if (kind == "reference_generated_line")
+      parsed = PlanarPathCurveKind::ReferenceGeneratedLine;
+    if (!parsed.has_value())
+      return Result<PathSegmentReference>::failure(
+          json_error("unsupported planar path curve kind"));
+    return PathSegmentReference::create_planar(
+        SketchId(value.at("sketch").get<std::string>()),
+        SketchEntityId(value.at("entity").get<std::string>()), *parsed, reversed);
+  }
+  if (source == "construction_line") {
+    if (!has_exact_fields(value, {"source", "reversed", "construction_line"}) ||
+        !value.at("construction_line").is_string())
+      return Result<PathSegmentReference>::failure(
+          json_error("construction-line path segment has invalid fields"));
+    return PathSegmentReference::create_construction_line(
+        ConstructionLineId(value.at("construction_line").get<std::string>()), reversed);
+  }
+  if (source == "sketch_3d_curve") {
+    if (!has_exact_fields(value, {"source", "reversed", "sketch_3d", "entity", "curve_kind"}) ||
+        !value.at("sketch_3d").is_string() || !value.at("entity").is_string() ||
+        !value.at("curve_kind").is_string())
+      return Result<PathSegmentReference>::failure(
+          json_error("3D-sketch path segment has invalid fields"));
+    const std::string kind = value.at("curve_kind").get<std::string>();
+    std::optional<Sketch3DPathCurveKind> parsed;
+    if (kind == "line")
+      parsed = Sketch3DPathCurveKind::Line;
+    else if (kind == "polyline")
+      parsed = Sketch3DPathCurveKind::Polyline;
+    else if (kind == "arc")
+      parsed = Sketch3DPathCurveKind::Arc;
+    else if (kind == "spline")
+      parsed = Sketch3DPathCurveKind::Spline;
+    else if (kind == "helix")
+      parsed = Sketch3DPathCurveKind::Helix;
+    if (!parsed.has_value())
+      return Result<PathSegmentReference>::failure(
+          json_error("unsupported 3D-sketch path curve kind"));
+    return PathSegmentReference::create_sketch_3d(
+        Sketch3DId(value.at("sketch_3d").get<std::string>()),
+        SketchEntityId(value.at("entity").get<std::string>()), *parsed, reversed);
+  }
+  if (source == "semantic_generated_edge") {
+    if (!has_exact_fields(value, {"source", "reversed", "semantic_edge"}))
+      return Result<PathSegmentReference>::failure(
+          json_error("semantic-edge path segment has invalid fields"));
+    auto edge = semantic_edge_reference_from_json(value.at("semantic_edge"));
+    if (edge.has_error())
+      return Result<PathSegmentReference>::failure(edge.error());
+    return PathSegmentReference::create_semantic_edge(std::move(edge.value()), reversed);
+  }
+  return Result<PathSegmentReference>::failure(json_error("unsupported path segment source"));
+}
+
+[[nodiscard]] json path_curve_to_json(const PathCurve& path) {
+  json segments = json::array();
+  for (const auto& segment : path.segments())
+    segments.push_back(path_segment_to_json(segment));
+  json value{{"id", path.id().value()},
+             {"name", path.name()},
+             {"segments", std::move(segments)},
+             {"closure", std::string(to_string(path.closure()))},
+             {"orientation_rule", std::string(to_string(path.orientation_rule()))},
+             {"fixed_up_vector", nullptr},
+             {"continuity_hint", nullptr},
+             {"connection_tolerance_mm", path.connection_tolerance_mm()}};
+  if (path.fixed_up_vector().has_value())
+    value["fixed_up_vector"] = vector3_to_json(*path.fixed_up_vector());
+  if (path.continuity_hint().has_value())
+    value["continuity_hint"] = std::string(to_string(*path.continuity_hint()));
+  return value;
+}
+
+[[nodiscard]] Result<PathCurve> path_curve_from_json(const json& value) {
+  if (!has_exact_fields(value, {"id", "name", "segments", "closure", "orientation_rule",
+                                "fixed_up_vector", "continuity_hint", "connection_tolerance_mm"}) ||
+      !value.at("id").is_string() || !value.at("name").is_string() ||
+      !value.at("segments").is_array() || !value.at("closure").is_string() ||
+      !value.at("orientation_rule").is_string() ||
+      (!value.at("fixed_up_vector").is_null() && !value.at("fixed_up_vector").is_object()) ||
+      (!value.at("continuity_hint").is_null() && !value.at("continuity_hint").is_string()) ||
+      !value.at("connection_tolerance_mm").is_number())
+    return Result<PathCurve>::failure(json_error("path curve has invalid fields"));
+  if (value.at("fixed_up_vector").is_object() &&
+      !has_exact_fields(value.at("fixed_up_vector"), {"x", "y", "z"}))
+    return Result<PathCurve>::failure(json_error("path fixed up vector has invalid fields"));
+  std::vector<PathSegmentReference> segments;
+  for (const auto& entry : value.at("segments")) {
+    auto segment = path_segment_from_json(entry);
+    if (segment.has_error())
+      return Result<PathCurve>::failure(segment.error());
+    segments.push_back(std::move(segment.value()));
+  }
+  const std::string closure_name = value.at("closure").get<std::string>();
+  if (closure_name != "open" && closure_name != "closed")
+    return Result<PathCurve>::failure(json_error("unsupported path closure"));
+  const std::string orientation_name = value.at("orientation_rule").get<std::string>();
+  std::optional<PathOrientationRule> orientation;
+  if (orientation_name == "profile_normal")
+    orientation = PathOrientationRule::ProfileNormal;
+  else if (orientation_name == "minimum_twist")
+    orientation = PathOrientationRule::MinimumTwist;
+  else if (orientation_name == "fixed_up_vector")
+    orientation = PathOrientationRule::FixedUpVector;
+  if (!orientation.has_value())
+    return Result<PathCurve>::failure(json_error("unsupported path orientation rule"));
+  std::optional<Vector3> fixed_up;
+  if (!value.at("fixed_up_vector").is_null())
+    fixed_up = vector3_from_json(value.at("fixed_up_vector"));
+  std::optional<PathContinuityHint> continuity;
+  if (!value.at("continuity_hint").is_null()) {
+    const std::string hint = value.at("continuity_hint").get<std::string>();
+    if (hint == "c0")
+      continuity = PathContinuityHint::C0;
+    else if (hint == "g1")
+      continuity = PathContinuityHint::G1;
+    else if (hint == "g2")
+      continuity = PathContinuityHint::G2;
+    else
+      return Result<PathCurve>::failure(json_error("unsupported path continuity hint"));
+  }
+  return PathCurve::create(
+      PathCurveId(value.at("id").get<std::string>()), value.at("name").get<std::string>(),
+      std::move(segments), closure_name == "open" ? PathClosure::Open : PathClosure::Closed,
+      *orientation, fixed_up, continuity, value.at("connection_tolerance_mm").get<double>());
+}
+
 } // namespace
 
 Result<std::string> serialize_part_document_to_json(const PartDocument& document) {
@@ -3026,6 +3320,9 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
   root["sketches_3d"] = json::array();
   for (const auto& sketch : document.sketches_3d())
     root["sketches_3d"].push_back(sketch_3d_to_json(sketch));
+  root["path_curves"] = json::array();
+  for (const auto& path : document.path_curves())
+    root["path_curves"].push_back(path_curve_to_json(path));
   root["features"] = json::array();
   for (const auto& feature : document.features()) {
     json feature_json{{"id", feature.id().value()},
@@ -3061,6 +3358,9 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
   root["revolve_features"] = json::array();
   for (const auto& feature : document.revolve_features())
     root["revolve_features"].push_back(revolve_feature_to_json(feature));
+  root["sweep_features"] = json::array();
+  for (const auto& feature : document.sweep_features())
+    root["sweep_features"].push_back(sweep_feature_to_json(feature));
   root["part_patterns"] = json::array();
   auto pattern_order = document.dependency_graph().topological_order();
   if (pattern_order.has_error())
@@ -3353,6 +3653,18 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
       if (added.has_error())
         return Result<PartDocument>::failure(added.error());
     }
+    const json path_curve_array = root.value("path_curves", json::array());
+    if (!path_curve_array.is_array())
+      return Result<PartDocument>::failure(
+          json_error("path_curves must be an array in part document json"));
+    for (const auto& path_json : path_curve_array) {
+      auto path = path_curve_from_json(path_json);
+      if (path.has_error())
+        return Result<PartDocument>::failure(path.error());
+      auto added = document.value().add_path_curve(std::move(path.value()));
+      if (added.has_error())
+        return Result<PartDocument>::failure(added.error());
+    }
     const json revolve_array = root.value("revolve_features", json::array());
     if (!revolve_array.is_array())
       return Result<PartDocument>::failure(
@@ -3362,6 +3674,18 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
       if (feature.has_error())
         return Result<PartDocument>::failure(feature.error());
       auto added = document.value().add_revolve_feature(std::move(feature.value()));
+      if (added.has_error())
+        return Result<PartDocument>::failure(added.error());
+    }
+    const json sweep_array = root.value("sweep_features", json::array());
+    if (!sweep_array.is_array())
+      return Result<PartDocument>::failure(
+          json_error("sweep_features must be an array in part document json"));
+    for (const auto& sweep_json : sweep_array) {
+      auto feature = sweep_feature_from_json(sweep_json);
+      if (feature.has_error())
+        return Result<PartDocument>::failure(feature.error());
+      auto added = document.value().add_sweep_feature(std::move(feature.value()));
       if (added.has_error())
         return Result<PartDocument>::failure(added.error());
     }

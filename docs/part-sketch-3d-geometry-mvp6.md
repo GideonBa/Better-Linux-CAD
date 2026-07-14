@@ -51,5 +51,5 @@ The focused suite covers all supported product kinds, parameter recomputation, f
 non-mutation of serialized Core intent, and a fit spline whose three points come from planar
 sketches on three differently oriented workplanes.
 
-Blocks 48–78 are implemented. Block 79 connected PathCurve Core intent, JSON, and validation is
+Blocks 48–80 are implemented. Block 79 connected PathCurve Core intent, JSON, and validation is
 next.

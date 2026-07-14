@@ -4,17 +4,17 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 78
-current_block: 79
-current_boundary: Connected PathCurve Core intent, JSON, and validation
-current_tag: "[core][path-curve]"
+implemented_through: Block 80
+current_block: 81
+current_boundary: Basic Sweep Geometry
+current_tag: "[geometry][sweep-feature]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
   mvp_3: "Parametric bolt circle pattern — implemented"
   mvp_4: "Assembly parameters and Project container — implemented"
   mvp_5: "Assembly relationships, motion, hierarchy, analysis, exchange — Blocks 1–47 implemented"
-  mvp_6: "Part Construction — Blocks 48–78 implemented, Blocks 79–94 planned, Block 79 next"
+  mvp_6: "Part Construction — Blocks 48–80 implemented, Blocks 81–94 planned, Block 81 next"
   mvp_7: "STEP Import — Blocks 95–101 planned after Block 94"
 ---
 
@@ -552,10 +552,10 @@ motion solvers reject Spherical as the selected drive.
 
 ## MVP 6 — Part Construction MVP after Block 47
 
-**Status:** In progress — Blocks 48–78 implemented
+**Status:** In progress — Blocks 48–80 implemented
 **Canonical:** sequence `docs/part-construction-sequence-mvp6.md`
 
-Blocks 48–78 are complete. Block 79 is the current next technical step.
+Blocks 48–80 are complete. Block 81 is the current next technical step.
 
 Mandatory Part Construction phase order:
 
@@ -1082,7 +1082,36 @@ Canonical contract: `docs/part-sketch-3d-geometry-mvp6.md`.
 [geometry][sketch-3d]
 ```
 
-## Current next technical step — Block 79
+## Block 79 — Connected PathCurve Core intent, JSON, and validation — Implemented
 
-Implement connected PathCurve Core intent, JSON, and validation according to
+Block 79 adds reusable `PathCurveId` ownership, ordered and reversible semantic segments, open or
+closed intent, ProfileNormal/MinimumTwist/FixedUpVector orientation, optional C0/G1/G2 hints, and
+an explicit positive connection tolerance. Planar, ConstructionLine, 3D-Sketch, and semantic-edge
+sources are strict, dependency-tracked, additive in JSON, and contain no OCCT identity. Provable
+finite endpoints must connect in order; duplicate segments, branches, repeated junctions, and
+invalid closed seams fail closed.
+
+Canonical contract: `docs/part-path-curve-core-mvp6.md`.
+
+```text
+[core][path-curve]
+```
+
+## Block 80 — Sweep feature Core intent and JSON — Implemented
+
+Block 80 adds persistent `SweepFeature`, `SweepCutFeature`, and `SweepSurfaceFeature` intent with
+closed-region or open-PathCurve profiles, a reusable trajectory `PathCurveId`, inherited or
+overridden orientation, optional Angle-parameter twist, and body-result context. PartDocument
+tracks all profile, path, parameter, target, and produced-Body dependencies. Strict additive JSON
+roundtrips the complete intent without persisting derived frames or OCCT topology.
+
+Canonical contract: `docs/part-sweep-intent-mvp6.md`.
+
+```text
+[core][sweep-feature]
+```
+
+## Current next technical step — Block 81
+
+Implement Basic Sweep Geometry according to
 `docs/part-construction-sequence-mvp6-planning-detail.md`.

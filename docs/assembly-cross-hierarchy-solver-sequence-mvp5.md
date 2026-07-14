@@ -1,6 +1,6 @@
 # Cross-Hierarchy Assembly Relationship Sequence MVP-5
 
-Status: Blocks 23–47 and Part Construction Blocks 48–78 are implemented. The Assembly MVP sequence is complete; Block 79 is the current next technical step.
+Status: Blocks 23–47 and Part Construction Blocks 48–80 are implemented. The Assembly MVP sequence is complete; Block 81 is the current next technical step.
 
 This document is the canonical numbered handoff sequence for cross-document assembly intent, solving, motion, exchange, posed analysis, and general geometric target architecture.
 
@@ -583,7 +583,7 @@ Project-level Planar intent, JSON, Frame/Frame equations, and shared vector-driv
 
 Block 47 is implemented in `docs/assembly-spherical-joint-mvp5.md`: passive local and Project-level
 Spherical intent, JSON, Point/Point equations, shared motion closure, and selected-drive rejection.
-Blocks 48–78 Body identity, body-scoped recompute/inspection, Body Booleans, and
+Blocks 48–80 Body identity, body-scoped recompute/inspection, Body Booleans, and
 BodyTransform/SketchOwnership intent plus associative Geometry execution are implemented. The
 Block-59 richer Extrude/Cut intent/JSON, Block-60 Geometry, and Block-61 Revolve/RevolveCut intent
 Block 62 Revolve/RevolveCut Geometry, Block 63 General Part Pattern Core intent/JSON, and Blocks
@@ -591,8 +591,8 @@ Block 62 Revolve/RevolveCut Geometry, Block 63 General Part Pattern Core intent/
 implemented. Fillet/Chamfer Core intent and JSON are implemented in Block 68, with Geometry in
 Blocks 69–70; ShellFeature Core intent/JSON and Geometry are implemented in Blocks 71–72, and
 DraftFeature Core intent/JSON in Block 73, Geometry in Block 74, the Basic 3D Sketch Core in Block
-75, richer 3D curve intent in Block 76, strict 3D Sketch JSON in Block 77, and deterministic
-transient OCCT Geometry conversion in Block 78. The current next technical step is Block 79
-connected PathCurve Core intent, JSON, and validation.
+75, richer 3D curve intent in Block 76, strict 3D Sketch JSON in Block 77, deterministic transient
+OCCT Geometry conversion in Block 78, and connected PathCurve Core/JSON intent in Block 79, and persistent Sweep/SweepCut/SweepSurface intent in Block 80. The
+current next technical step is Block 81 Basic Sweep Geometry.
 Blocks 40–47 compatibility, persistence, numeric,
 freshness, and application contracts remain authoritative.

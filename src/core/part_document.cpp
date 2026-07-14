@@ -69,6 +69,241 @@ Result<std::size_t> add_dependency_if_missing(DependencyGraph& graph, std::strin
   return feature != nullptr && feature->type() == FeatureType::AdditiveExtrude;
 }
 
+struct PathEndpoint {
+  std::string identity;
+  std::string coordinate_space;
+  Point3 position{};
+  bool has_position = false;
+};
+
+[[nodiscard]] double path_distance(Point3 left, Point3 right) noexcept {
+  return std::hypot(std::hypot(left.x - right.x, left.y - right.y), left.z - right.z);
+}
+
+[[nodiscard]] bool path_endpoints_connect(const PathEndpoint& left, const PathEndpoint& right,
+                                          double tolerance) noexcept {
+  if (!left.identity.empty() && left.identity == right.identity)
+    return true;
+  return left.has_position && right.has_position &&
+         left.coordinate_space == right.coordinate_space &&
+         path_distance(left.position, right.position) <= tolerance;
+}
+
+[[nodiscard]] Result<Point3> path_owned_point(const PartDocument& document,
+                                              const SketchPoint3D& point) {
+  const auto coordinate = [&document, &point](const SketchCoordinate3D& value) -> Result<double> {
+    if (value.source() == SketchCoordinate3DSource::Explicit)
+      return Result<double>::success(value.explicit_coordinate()->millimeters());
+    const Parameter* parameter = document.find_parameter(*value.parameter());
+    if (parameter == nullptr || parameter->type() != ParameterType::Length)
+      return Result<double>::failure(Error::validation(
+          point.id().value(), "path endpoint coordinate requires an existing Length parameter"));
+    return Result<double>::success(parameter->value().millimeters());
+  };
+  auto x = coordinate(point.x());
+  auto y = coordinate(point.y());
+  auto z = coordinate(point.z());
+  if (x.has_error() || y.has_error() || z.has_error())
+    return Result<Point3>::failure(x.has_error()   ? x.error()
+                                   : y.has_error() ? y.error()
+                                                   : z.error());
+  return Result<Point3>::success({x.value(), y.value(), z.value()});
+}
+
+[[nodiscard]] Result<PathEndpoint>
+path_point_reference_endpoint(const PartDocument& document, const Sketch3D& owner,
+                              const SketchPointReference3D& reference) {
+  if (reference.source() == SketchPointReference3DSource::LocalPoint) {
+    const SketchPoint3D* point = owner.find_point(*reference.local_point());
+    if (point == nullptr)
+      return Result<PathEndpoint>::failure(
+          Error::validation(owner.id().value(), "path local 3D point must exist"));
+    auto position = path_owned_point(document, *point);
+    if (position.has_error())
+      return Result<PathEndpoint>::failure(position.error());
+    return Result<PathEndpoint>::success(
+        {"sketch_3d:" + owner.id().value() + ":point:" + point->id().value(), "model",
+         position.value(), true});
+  }
+  if (reference.source() == SketchPointReference3DSource::ConstructionPoint) {
+    const ConstructionPoint* point =
+        document.find_construction_point(*reference.construction_point());
+    if (point == nullptr)
+      return Result<PathEndpoint>::failure(
+          Error::validation(owner.id().value(), "path ConstructionPoint must exist"));
+    PathEndpoint result{"construction_point:" + point->id().value(), {}, {}, false};
+    if (point->kind() == ConstructionPointKind::Explicit) {
+      result.coordinate_space = "model";
+      result.position = point->position();
+      result.has_position = true;
+    }
+    return Result<PathEndpoint>::success(std::move(result));
+  }
+  const auto& target = *reference.planar_point();
+  PathEndpoint result{"planar:" + reference.planar_sketch()->value() + ":" +
+                          std::string(to_string(target.kind())) + ":" + target.entity().value(),
+                      {},
+                      {},
+                      false};
+  const Sketch* sketch = document.find_sketch(*reference.planar_sketch());
+  if (sketch != nullptr && target.kind() != SketchReferenceTargetKind::ProjectedPoint) {
+    const LineSegment* line = sketch->find_line_segment(target.entity());
+    if (line != nullptr) {
+      const Point2 local = target.kind() == SketchReferenceTargetKind::LineSegmentStart
+                               ? line->start()
+                               : line->end();
+      result.coordinate_space = "workplane:" + sketch->workplane().value();
+      result.position = {local.x, local.y, 0.0};
+      result.has_position = true;
+    }
+  }
+  return Result<PathEndpoint>::success(std::move(result));
+}
+
+[[nodiscard]] Result<std::pair<PathEndpoint, PathEndpoint>>
+path_segment_endpoints(const PartDocument& document, const PathSegmentReference& segment) {
+  PathEndpoint start, end;
+  if (segment.source_kind() == PathSegmentSourceKind::PlanarSketchCurve) {
+    const Sketch* sketch = document.find_sketch(*segment.planar_sketch());
+    if (sketch == nullptr)
+      return Result<std::pair<PathEndpoint, PathEndpoint>>::failure(
+          Error::validation(segment.planar_sketch()->value(), "path source sketch must exist"));
+    Point2 first{}, last{};
+    bool resolved = true;
+    switch (*segment.planar_curve_kind()) {
+    case PlanarPathCurveKind::Line: {
+      const LineSegment* curve = sketch->find_line_segment(*segment.entity());
+      if (curve == nullptr)
+        return Result<std::pair<PathEndpoint, PathEndpoint>>::failure(
+            Error::validation(segment.entity()->value(), "path planar line must exist"));
+      first = curve->start();
+      last = curve->end();
+      break;
+    }
+    case PlanarPathCurveKind::Arc: {
+      const ArcSegment* curve = sketch->find_arc_segment(*segment.entity());
+      if (curve == nullptr)
+        return Result<std::pair<PathEndpoint, PathEndpoint>>::failure(
+            Error::validation(segment.entity()->value(), "path planar arc must exist"));
+      first = curve->start();
+      last = curve->end();
+      break;
+    }
+    case PlanarPathCurveKind::Spline: {
+      const SplineSegment* curve = sketch->find_spline_segment(*segment.entity());
+      if (curve == nullptr)
+        return Result<std::pair<PathEndpoint, PathEndpoint>>::failure(
+            Error::validation(segment.entity()->value(), "path planar spline must exist"));
+      first = curve->start();
+      last = curve->end();
+      break;
+    }
+    case PlanarPathCurveKind::ProjectedLine:
+      resolved = false;
+      if (sketch->find_projected_line(*segment.entity()) == nullptr)
+        return Result<std::pair<PathEndpoint, PathEndpoint>>::failure(
+            Error::validation(segment.entity()->value(), "path projected line must exist"));
+      break;
+    case PlanarPathCurveKind::ReferenceGeneratedLine:
+      resolved = false;
+      if (sketch->find_reference_generated_line(*segment.entity()) == nullptr)
+        return Result<std::pair<PathEndpoint, PathEndpoint>>::failure(Error::validation(
+            segment.entity()->value(), "path reference-generated line must exist"));
+      break;
+    }
+    const std::string base = "planar:" + sketch->id().value() + ":" + segment.entity()->value();
+    start.identity = base + ":start";
+    end.identity = base + ":end";
+    if (resolved) {
+      start.coordinate_space = end.coordinate_space = "workplane:" + sketch->workplane().value();
+      start.position = {first.x, first.y, 0.0};
+      end.position = {last.x, last.y, 0.0};
+      start.has_position = end.has_position = true;
+    }
+  } else if (segment.source_kind() == PathSegmentSourceKind::Sketch3DCurve) {
+    const Sketch3D* sketch = document.find_sketch_3d(*segment.sketch_3d());
+    if (sketch == nullptr)
+      return Result<std::pair<PathEndpoint, PathEndpoint>>::failure(
+          Error::validation(segment.sketch_3d()->value(), "path source 3D sketch must exist"));
+    switch (*segment.sketch_3d_curve_kind()) {
+    case Sketch3DPathCurveKind::Line: {
+      const SketchLine3D* curve = sketch->find_line(*segment.entity());
+      if (curve == nullptr)
+        return Result<std::pair<PathEndpoint, PathEndpoint>>::failure(
+            Error::validation(segment.entity()->value(), "path 3D line must exist"));
+      auto first = SketchPointReference3D::create_local_point(curve->start_point());
+      auto last = SketchPointReference3D::create_local_point(curve->end_point());
+      start = path_point_reference_endpoint(document, *sketch, first.value()).value();
+      end = path_point_reference_endpoint(document, *sketch, last.value()).value();
+      break;
+    }
+    case Sketch3DPathCurveKind::Polyline: {
+      const SketchPolyline3D* curve = sketch->find_polyline(*segment.entity());
+      if (curve == nullptr)
+        return Result<std::pair<PathEndpoint, PathEndpoint>>::failure(
+            Error::validation(segment.entity()->value(), "path 3D polyline must exist"));
+      auto first = SketchPointReference3D::create_local_point(curve->ordered_vertices().front());
+      auto last = SketchPointReference3D::create_local_point(curve->ordered_vertices().back());
+      start = path_point_reference_endpoint(document, *sketch, first.value()).value();
+      end = path_point_reference_endpoint(document, *sketch, last.value()).value();
+      break;
+    }
+    case Sketch3DPathCurveKind::Arc: {
+      const SketchArc3D* curve = sketch->find_arc(*segment.entity());
+      if (curve == nullptr)
+        return Result<std::pair<PathEndpoint, PathEndpoint>>::failure(
+            Error::validation(segment.entity()->value(), "path 3D arc must exist"));
+      auto first = path_point_reference_endpoint(document, *sketch, curve->start());
+      auto last = path_point_reference_endpoint(document, *sketch, curve->end());
+      if (first.has_error() || last.has_error())
+        return Result<std::pair<PathEndpoint, PathEndpoint>>::failure(
+            first.has_error() ? first.error() : last.error());
+      start = first.value();
+      end = last.value();
+      break;
+    }
+    case Sketch3DPathCurveKind::Spline: {
+      const SketchSpline3D* curve = sketch->find_spline(*segment.entity());
+      if (curve == nullptr)
+        return Result<std::pair<PathEndpoint, PathEndpoint>>::failure(
+            Error::validation(segment.entity()->value(), "path 3D spline must exist"));
+      auto first =
+          path_point_reference_endpoint(document, *sketch, curve->ordered_points().front());
+      auto last = path_point_reference_endpoint(document, *sketch, curve->ordered_points().back());
+      if (first.has_error() || last.has_error())
+        return Result<std::pair<PathEndpoint, PathEndpoint>>::failure(
+            first.has_error() ? first.error() : last.error());
+      start = first.value();
+      end = last.value();
+      break;
+    }
+    case Sketch3DPathCurveKind::Helix:
+      if (sketch->find_helix(*segment.entity()) == nullptr)
+        return Result<std::pair<PathEndpoint, PathEndpoint>>::failure(
+            Error::validation(segment.entity()->value(), "path 3D helix must exist"));
+      start.identity = "helix:" + sketch->id().value() + ":" + segment.entity()->value() + ":start";
+      end.identity = "helix:" + sketch->id().value() + ":" + segment.entity()->value() + ":end";
+      break;
+    }
+  } else if (segment.source_kind() == PathSegmentSourceKind::ConstructionLine) {
+    if (document.find_construction_line(*segment.construction_line()) == nullptr)
+      return Result<std::pair<PathEndpoint, PathEndpoint>>::failure(Error::validation(
+          segment.construction_line()->value(), "path ConstructionLine must exist"));
+    start.identity = "construction_line:" + segment.construction_line()->value() + ":start";
+    end.identity = "construction_line:" + segment.construction_line()->value() + ":end";
+  } else {
+    if (!has_additive_source_feature(document, segment.semantic_edge()->source_feature()))
+      return Result<std::pair<PathEndpoint, PathEndpoint>>::failure(
+          Error::validation(segment.semantic_edge()->source_feature().value(),
+                            "path semantic edge source must exist"));
+    start.identity = segment.semantic_edge()->node_id() + ":start";
+    end.identity = segment.semantic_edge()->node_id() + ":end";
+  }
+  if (segment.reversed())
+    std::swap(start, end);
+  return Result<std::pair<PathEndpoint, PathEndpoint>>::success({std::move(start), std::move(end)});
+}
+
 [[nodiscard]] Result<std::size_t>
 validate_generated_edge_reference(const PartDocument& document,
                                   const SemanticEdgeReference& reference,
@@ -1030,6 +1265,85 @@ Result<std::size_t> PartDocument::remove_sketch_3d(Sketch3DId id) {
   return Result<std::size_t>::success(1U);
 }
 
+Result<std::size_t> PartDocument::add_path_curve(PathCurve path_curve) {
+  if (has_path_curve_id(path_curve.id()))
+    return Result<std::size_t>::failure(
+        Error::validation(path_curve.id().value(), "path curve id must be unique"));
+  std::vector<std::pair<PathEndpoint, PathEndpoint>> endpoints;
+  endpoints.reserve(path_curve.segments().size());
+  for (const auto& segment : path_curve.segments()) {
+    auto resolved = path_segment_endpoints(*this, segment);
+    if (resolved.has_error())
+      return Result<std::size_t>::failure(resolved.error());
+    endpoints.push_back(std::move(resolved.value()));
+  }
+  for (std::size_t index = 1; index < endpoints.size(); ++index)
+    if (!path_endpoints_connect(endpoints[index - 1U].second, endpoints[index].first,
+                                path_curve.connection_tolerance_mm()))
+      return Result<std::size_t>::failure(Error::validation(
+          path_curve.id().value(), "path segments must be ordered and connected within tolerance"));
+  if (path_curve.closure() == PathClosure::Closed &&
+      !path_endpoints_connect(endpoints.back().second, endpoints.front().first,
+                              path_curve.connection_tolerance_mm()))
+    return Result<std::size_t>::failure(Error::validation(
+        path_curve.id().value(), "closed path endpoints must connect within tolerance"));
+  std::vector<PathEndpoint> junctions;
+  junctions.reserve(endpoints.size() + 1U);
+  junctions.push_back(endpoints.front().first);
+  for (const auto& endpoint : endpoints)
+    junctions.push_back(endpoint.second);
+  for (std::size_t right = 1U; right < junctions.size(); ++right)
+    for (std::size_t left = 0U; left < right; ++left) {
+      const bool permitted_closed_seam = path_curve.closure() == PathClosure::Closed &&
+                                         left == 0U && right + 1U == junctions.size();
+      if (!permitted_closed_seam && path_endpoints_connect(junctions[left], junctions[right],
+                                                           path_curve.connection_tolerance_mm()))
+        return Result<std::size_t>::failure(Error::validation(
+            path_curve.id().value(),
+            "path curve must not contain branch points or repeated internal junctions"));
+    }
+
+  auto graph = dependency_graph_;
+  auto node = graph.add_node(path_curve.id().value());
+  if (node.has_error())
+    return Result<std::size_t>::failure(node.error());
+  for (const auto& segment : path_curve.segments()) {
+    auto dependency =
+        add_dependency_if_missing(graph, segment.source_node_id(), path_curve.id().value());
+    if (dependency.has_error())
+      return Result<std::size_t>::failure(dependency.error());
+  }
+  auto invalidation_state = invalidation_state_;
+  auto synced = sync_graph(std::move(graph), invalidation_state, dependency_graph_);
+  if (synced.has_error())
+    return Result<std::size_t>::failure(synced.error());
+  invalidation_state_ = std::move(invalidation_state);
+  path_curves_.push_back(std::move(path_curve));
+  return Result<std::size_t>::success(path_curves_.size() - 1U);
+}
+
+Result<std::size_t> PartDocument::remove_path_curve(PathCurveId id) {
+  const auto found = std::find_if(path_curves_.begin(), path_curves_.end(),
+                                  [&id](const PathCurve& path) { return path.id() == id; });
+  if (found == path_curves_.end())
+    return Result<std::size_t>::failure(
+        Error::validation(id.value(), "path curve must exist in part document"));
+  if (!dependency_graph_.direct_dependents(id.value()).empty())
+    return Result<std::size_t>::failure(
+        Error::dependency(id.value(), "path curve with dependent model intent cannot be removed"));
+  auto graph = dependency_graph_;
+  auto removed = graph.remove_node(id.value());
+  if (removed.has_error())
+    return Result<std::size_t>::failure(removed.error());
+  auto invalidation_state = invalidation_state_;
+  auto synced = sync_graph(std::move(graph), invalidation_state, dependency_graph_);
+  if (synced.has_error())
+    return Result<std::size_t>::failure(synced.error());
+  invalidation_state_ = std::move(invalidation_state);
+  path_curves_.erase(found);
+  return Result<std::size_t>::success(1U);
+}
+
 Result<std::size_t> PartDocument::add_feature(Feature feature) {
   if (has_any_feature_id(feature.id()))
     return Result<std::size_t>::failure(
@@ -1182,6 +1496,108 @@ Result<std::size_t> PartDocument::add_revolve_feature(RevolveFeature feature) {
   invalidation_state_ = std::move(invalidation_state);
   revolve_features_.push_back(std::move(feature));
   return Result<std::size_t>::success(revolve_features_.size() - 1U);
+}
+
+Result<std::size_t> PartDocument::add_sweep_feature(SweepFeature feature) {
+  if (has_any_feature_id(feature.id()))
+    return Result<std::size_t>::failure(
+        Error::validation(feature.id().value(), "feature id must be unique within part document"));
+  if (feature.profile().kind() == SweepProfileKind::ClosedRegion) {
+    const auto& profile = std::get<ProfileRegionReference>(feature.profile().source());
+    auto valid = validate_part_feature_input_reference(*this, profile);
+    if (valid.has_error())
+      return Result<std::size_t>::failure(valid.error());
+  } else {
+    const PathCurveId profile_id = std::get<PathCurveId>(feature.profile().source());
+    const PathCurve* profile = find_path_curve(profile_id);
+    if (profile == nullptr || profile->closure() != PathClosure::Open)
+      return Result<std::size_t>::failure(Error::validation(
+          feature.id().value(), "surface sweep profile must reference an existing open PathCurve"));
+    if (profile_id == feature.path())
+      return Result<std::size_t>::failure(
+          Error::validation(feature.id().value(),
+                            "surface sweep profile and trajectory must be different PathCurves"));
+  }
+  if (find_path_curve(feature.path()) == nullptr)
+    return Result<std::size_t>::failure(
+        Error::validation(feature.id().value(), "sweep trajectory PathCurve must exist"));
+  if (feature.twist_parameter().has_value()) {
+    const Parameter* twist = find_parameter(*feature.twist_parameter());
+    if (twist == nullptr || twist->type() != ParameterType::Angle)
+      return Result<std::size_t>::failure(Error::validation(
+          feature.id().value(), "sweep twist must reference an existing Angle parameter"));
+  }
+
+  const auto& context = feature.body_result_context();
+  if (context.target_body().has_value() && !has_body_id(*context.target_body()))
+    return Result<std::size_t>::failure(
+        Error::validation(feature.id().value(), "sweep target body must exist"));
+  const Body* produced = find_body(context.effective_produced_body());
+  if (produced == nullptr)
+    return Result<std::size_t>::failure(
+        Error::validation(feature.id().value(), "sweep produced body must exist"));
+  const bool surface = feature.kind() == SweepFeatureKind::SweepSurface;
+  if ((surface && produced->kind() != BodyKind::Surface) ||
+      (!surface && produced->kind() != BodyKind::Solid))
+    return Result<std::size_t>::failure(Error::validation(
+        feature.id().value(), "sweep produced body kind must match solid or surface feature kind"));
+  if (context.target_body().has_value()) {
+    const Body* target = find_body(*context.target_body());
+    if (target == nullptr || target->kind() != BodyKind::Solid)
+      return Result<std::size_t>::failure(
+          Error::validation(feature.id().value(), "solid sweep target must be a solid Body"));
+  }
+
+  auto graph = dependency_graph_;
+  auto node = graph.add_node(feature.id().value());
+  if (node.has_error())
+    return Result<std::size_t>::failure(node.error());
+  for (const std::string& source : {feature.profile().source_node_id(), feature.path().value()}) {
+    auto dependency = add_dependency_if_missing(graph, source, feature.id().value());
+    if (dependency.has_error())
+      return Result<std::size_t>::failure(dependency.error());
+  }
+  if (feature.twist_parameter().has_value()) {
+    auto dependency =
+        add_dependency_if_missing(graph, feature.twist_parameter()->value(), feature.id().value());
+    if (dependency.has_error())
+      return Result<std::size_t>::failure(dependency.error());
+  }
+  const std::string result_node = body_dependency_node_id(context.effective_produced_body());
+  const bool modifies_in_place = context.target_body().has_value() &&
+                                 *context.target_body() == context.effective_produced_body();
+  if (modifies_in_place) {
+    const auto previous_producers = dependency_sources_of(graph, result_node);
+    graph.remove_dependencies_of_dependent(result_node);
+    for (const auto& producer : previous_producers) {
+      auto dependency = add_dependency_if_missing(graph, producer, feature.id().value());
+      if (dependency.has_error())
+        return Result<std::size_t>::failure(dependency.error());
+    }
+  } else {
+    if (!dependency_sources_of(graph, result_node).empty())
+      return Result<std::size_t>::failure(Error::dependency(
+          feature.id().value(), "sweep produced body already has a producing feature"));
+    if (context.target_body().has_value()) {
+      auto dependency = add_dependency_if_missing(
+          graph, body_dependency_node_id(*context.target_body()), feature.id().value());
+      if (dependency.has_error())
+        return Result<std::size_t>::failure(dependency.error());
+    }
+  }
+  auto result_dependency = add_dependency_if_missing(graph, feature.id().value(), result_node);
+  if (result_dependency.has_error())
+    return Result<std::size_t>::failure(result_dependency.error());
+  if (graph.has_cycle())
+    return Result<std::size_t>::failure(
+        Error::dependency(feature.id().value(), "sweep must not create a dependency cycle"));
+  auto invalidation_state = invalidation_state_;
+  auto synced = sync_graph(std::move(graph), invalidation_state, dependency_graph_);
+  if (synced.has_error())
+    return Result<std::size_t>::failure(synced.error());
+  invalidation_state_ = std::move(invalidation_state);
+  sweep_features_.push_back(std::move(feature));
+  return Result<std::size_t>::success(sweep_features_.size() - 1U);
 }
 
 Result<std::size_t> PartDocument::add_linear_pattern_feature(LinearPatternFeature feature) {
@@ -1927,6 +2343,13 @@ Result<std::size_t> PartDocument::remove_body(BodyId id) {
       return Result<std::size_t>::failure(
           Error::dependency(id.value(), "body with dependent model intent cannot be removed"));
   }
+  for (const auto& feature : sweep_features_) {
+    const auto& context = feature.body_result_context();
+    if ((context.target_body().has_value() && *context.target_body() == id) ||
+        context.effective_produced_body() == id)
+      return Result<std::size_t>::failure(
+          Error::dependency(id.value(), "body with dependent model intent cannot be removed"));
+  }
   for (const auto& feature : linear_pattern_features_) {
     const auto& context = feature.body_result_context();
     const bool references_body =
@@ -2307,11 +2730,17 @@ const std::vector<Sketch>& PartDocument::sketches() const noexcept {
 const std::vector<Sketch3D>& PartDocument::sketches_3d() const noexcept {
   return sketches_3d_;
 }
+const std::vector<PathCurve>& PartDocument::path_curves() const noexcept {
+  return path_curves_;
+}
 const std::vector<Feature>& PartDocument::features() const noexcept {
   return features_;
 }
 const std::vector<RevolveFeature>& PartDocument::revolve_features() const noexcept {
   return revolve_features_;
+}
+const std::vector<SweepFeature>& PartDocument::sweep_features() const noexcept {
+  return sweep_features_;
 }
 const std::vector<LinearPatternFeature>& PartDocument::linear_pattern_features() const noexcept {
   return linear_pattern_features_;
@@ -2392,11 +2821,17 @@ std::size_t PartDocument::sketch_count() const noexcept {
 std::size_t PartDocument::sketch_3d_count() const noexcept {
   return sketches_3d_.size();
 }
+std::size_t PartDocument::path_curve_count() const noexcept {
+  return path_curves_.size();
+}
 std::size_t PartDocument::feature_count() const noexcept {
   return features_.size();
 }
 std::size_t PartDocument::revolve_feature_count() const noexcept {
   return revolve_features_.size();
+}
+std::size_t PartDocument::sweep_feature_count() const noexcept {
+  return sweep_features_.size();
 }
 std::size_t PartDocument::linear_pattern_feature_count() const noexcept {
   return linear_pattern_features_.size();
@@ -2504,6 +2939,12 @@ const Sketch3D* PartDocument::find_sketch_3d(Sketch3DId id) const noexcept {
       return &sketch;
   return nullptr;
 }
+const PathCurve* PartDocument::find_path_curve(PathCurveId id) const noexcept {
+  for (const auto& path : path_curves_)
+    if (path.id() == id)
+      return &path;
+  return nullptr;
+}
 const Feature* PartDocument::find_feature(FeatureId id) const noexcept {
   for (const auto& feature : features_)
     if (feature.id() == id)
@@ -2512,6 +2953,12 @@ const Feature* PartDocument::find_feature(FeatureId id) const noexcept {
 }
 const RevolveFeature* PartDocument::find_revolve_feature(FeatureId id) const noexcept {
   for (const auto& feature : revolve_features_)
+    if (feature.id() == id)
+      return &feature;
+  return nullptr;
+}
+const SweepFeature* PartDocument::find_sweep_feature(FeatureId id) const noexcept {
+  for (const auto& feature : sweep_features_)
     if (feature.id() == id)
       return &feature;
   return nullptr;
@@ -2643,11 +3090,17 @@ bool PartDocument::has_sketch_id(const SketchId& id) const noexcept {
 bool PartDocument::has_sketch_3d_id(const Sketch3DId& id) const noexcept {
   return find_sketch_3d(id) != nullptr;
 }
+bool PartDocument::has_path_curve_id(const PathCurveId& id) const noexcept {
+  return find_path_curve(id) != nullptr;
+}
 bool PartDocument::has_feature_id(const FeatureId& id) const noexcept {
   return find_feature(id) != nullptr;
 }
 bool PartDocument::has_revolve_feature_id(const FeatureId& id) const noexcept {
   return find_revolve_feature(id) != nullptr;
+}
+bool PartDocument::has_sweep_feature_id(const FeatureId& id) const noexcept {
+  return find_sweep_feature(id) != nullptr;
 }
 bool PartDocument::has_linear_pattern_feature_id(const FeatureId& id) const noexcept {
   return find_linear_pattern_feature(id) != nullptr;
@@ -2682,10 +3135,10 @@ bool PartDocument::has_body_transform_id(const BodyTransformId& id) const noexce
   return find_body_transform(id) != nullptr;
 }
 bool PartDocument::has_any_feature_id(const FeatureId& id) const noexcept {
-  return has_feature_id(id) || has_revolve_feature_id(id) || has_linear_pattern_feature_id(id) ||
-         has_circular_pattern_feature_id(id) || has_mirror_feature_id(id) ||
-         has_fillet_feature_id(id) || has_chamfer_feature_id(id) || has_shell_feature_id(id) ||
-         has_draft_feature_id(id) || has_body_boolean_feature_id(id);
+  return has_feature_id(id) || has_revolve_feature_id(id) || has_sweep_feature_id(id) ||
+         has_linear_pattern_feature_id(id) || has_circular_pattern_feature_id(id) ||
+         has_mirror_feature_id(id) || has_fillet_feature_id(id) || has_chamfer_feature_id(id) ||
+         has_shell_feature_id(id) || has_draft_feature_id(id) || has_body_boolean_feature_id(id);
 }
 bool PartDocument::has_body_id(const BodyId& id) const noexcept {
   return find_body(id) != nullptr;

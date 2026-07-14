@@ -15,6 +15,7 @@
 #include "blcad/core/mirror_feature.hpp"
 #include "blcad/core/parameter.hpp"
 #include "blcad/core/part_pattern_feature.hpp"
+#include "blcad/core/path_curve.hpp"
 #include "blcad/core/quantity.hpp"
 #include "blcad/core/recompute_plan.hpp"
 #include "blcad/core/reference_recovery.hpp"
@@ -24,6 +25,7 @@
 #include "blcad/core/sketch.hpp"
 #include "blcad/core/sketch_3d.hpp"
 #include "blcad/core/sketch_ownership.hpp"
+#include "blcad/core/sweep_feature.hpp"
 
 #include <cstddef>
 #include <string>
@@ -52,8 +54,11 @@ public:
   [[nodiscard]] Result<std::size_t> add_sketch(Sketch sketch);
   [[nodiscard]] Result<std::size_t> add_sketch_3d(Sketch3D sketch);
   [[nodiscard]] Result<std::size_t> remove_sketch_3d(Sketch3DId id);
+  [[nodiscard]] Result<std::size_t> add_path_curve(PathCurve path_curve);
+  [[nodiscard]] Result<std::size_t> remove_path_curve(PathCurveId id);
   [[nodiscard]] Result<std::size_t> add_feature(Feature feature);
   [[nodiscard]] Result<std::size_t> add_revolve_feature(RevolveFeature feature);
+  [[nodiscard]] Result<std::size_t> add_sweep_feature(SweepFeature feature);
   [[nodiscard]] Result<std::size_t> add_linear_pattern_feature(LinearPatternFeature feature);
   [[nodiscard]] Result<std::size_t> add_circular_pattern_feature(CircularPatternFeature feature);
   [[nodiscard]] Result<std::size_t> add_mirror_feature(MirrorFeature feature);
@@ -101,8 +106,10 @@ public:
   [[nodiscard]] const std::vector<DerivedWorkplane>& derived_workplanes() const noexcept;
   [[nodiscard]] const std::vector<Sketch>& sketches() const noexcept;
   [[nodiscard]] const std::vector<Sketch3D>& sketches_3d() const noexcept;
+  [[nodiscard]] const std::vector<PathCurve>& path_curves() const noexcept;
   [[nodiscard]] const std::vector<Feature>& features() const noexcept;
   [[nodiscard]] const std::vector<RevolveFeature>& revolve_features() const noexcept;
+  [[nodiscard]] const std::vector<SweepFeature>& sweep_features() const noexcept;
   [[nodiscard]] const std::vector<LinearPatternFeature>& linear_pattern_features() const noexcept;
   [[nodiscard]] const std::vector<CircularPatternFeature>&
   circular_pattern_features() const noexcept;
@@ -131,8 +138,10 @@ public:
   [[nodiscard]] std::size_t derived_workplane_count() const noexcept;
   [[nodiscard]] std::size_t sketch_count() const noexcept;
   [[nodiscard]] std::size_t sketch_3d_count() const noexcept;
+  [[nodiscard]] std::size_t path_curve_count() const noexcept;
   [[nodiscard]] std::size_t feature_count() const noexcept;
   [[nodiscard]] std::size_t revolve_feature_count() const noexcept;
+  [[nodiscard]] std::size_t sweep_feature_count() const noexcept;
   [[nodiscard]] std::size_t linear_pattern_feature_count() const noexcept;
   [[nodiscard]] std::size_t circular_pattern_feature_count() const noexcept;
   [[nodiscard]] std::size_t mirror_feature_count() const noexcept;
@@ -161,8 +170,10 @@ public:
   [[nodiscard]] const DerivedWorkplane* find_derived_workplane(DatumPlaneId id) const noexcept;
   [[nodiscard]] const Sketch* find_sketch(SketchId id) const noexcept;
   [[nodiscard]] const Sketch3D* find_sketch_3d(Sketch3DId id) const noexcept;
+  [[nodiscard]] const PathCurve* find_path_curve(PathCurveId id) const noexcept;
   [[nodiscard]] const Feature* find_feature(FeatureId id) const noexcept;
   [[nodiscard]] const RevolveFeature* find_revolve_feature(FeatureId id) const noexcept;
+  [[nodiscard]] const SweepFeature* find_sweep_feature(FeatureId id) const noexcept;
   [[nodiscard]] const LinearPatternFeature*
   find_linear_pattern_feature(FeatureId id) const noexcept;
   [[nodiscard]] const CircularPatternFeature*
@@ -199,8 +210,10 @@ private:
   [[nodiscard]] bool has_derived_workplane_id(const DatumPlaneId& id) const noexcept;
   [[nodiscard]] bool has_sketch_id(const SketchId& id) const noexcept;
   [[nodiscard]] bool has_sketch_3d_id(const Sketch3DId& id) const noexcept;
+  [[nodiscard]] bool has_path_curve_id(const PathCurveId& id) const noexcept;
   [[nodiscard]] bool has_feature_id(const FeatureId& id) const noexcept;
   [[nodiscard]] bool has_revolve_feature_id(const FeatureId& id) const noexcept;
+  [[nodiscard]] bool has_sweep_feature_id(const FeatureId& id) const noexcept;
   [[nodiscard]] bool has_linear_pattern_feature_id(const FeatureId& id) const noexcept;
   [[nodiscard]] bool has_circular_pattern_feature_id(const FeatureId& id) const noexcept;
   [[nodiscard]] bool has_mirror_feature_id(const FeatureId& id) const noexcept;
@@ -234,8 +247,10 @@ private:
   std::vector<DerivedWorkplane> derived_workplanes_;
   std::vector<Sketch> sketches_;
   std::vector<Sketch3D> sketches_3d_;
+  std::vector<PathCurve> path_curves_;
   std::vector<Feature> features_;
   std::vector<RevolveFeature> revolve_features_;
+  std::vector<SweepFeature> sweep_features_;
   std::vector<LinearPatternFeature> linear_pattern_features_;
   std::vector<CircularPatternFeature> circular_pattern_features_;
   std::vector<MirrorFeature> mirror_features_;

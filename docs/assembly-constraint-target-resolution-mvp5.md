@@ -383,7 +383,7 @@ Relationship equation builders consume requested capabilities through the Block-
 
 The first new persistent generic relationship types are planned only in Block 38, after compatibility semantics are stable. Their equations and numeric integration follow in Block 39.
 
-Block 40 joint target compatibility is implemented with deterministic oriented `Frame / Frame` selection and explicit Axis-only rejection. Blocks 41–43 implement family-defined typed coordinates, additive compatible JSON, and shared vector drives. Blocks 44–46 implement Prismatic, Cylindrical, and Planar on that boundary; Block 47 implements passive `Point / Point` Spherical center coincidence. Blocks 48–78 Part Construction through deterministic 3D Sketch Geometry conversion are implemented; Block 79 connected PathCurve Core intent, JSON, and validation is next.
+Block 40 joint target compatibility is implemented with deterministic oriented `Frame / Frame` selection and explicit Axis-only rejection. Blocks 41–43 implement family-defined typed coordinates, additive compatible JSON, and shared vector drives. Blocks 44–46 implement Prismatic, Cylindrical, and Planar on that boundary; Block 47 implements passive `Point / Point` Spherical center coincidence. Blocks 48–80 Part Construction through deterministic 3D Sketch Geometry conversion are implemented; Block 79 connected PathCurve Core intent, JSON, and validation is implemented; Block 80 Sweep feature Core intent and JSON is implemented; Block 81 Basic Sweep Geometry is next.
 
 ## Failure behavior
 

@@ -63,6 +63,7 @@ add_library(
   src/core/part_feature_input_reference.cpp
   src/core/parameter.cpp
   src/core/parameter_expression.cpp
+  src/core/path_curve.cpp
   src/core/project.cpp
   src/core/project_cross_hierarchy_constraints.cpp
   src/core/project_cross_hierarchy_joints.cpp
@@ -88,6 +89,7 @@ add_library(
   src/core/sketch_repair_undo_stack.cpp
   src/core/sketch_repair_undo_stack_summary.cpp
   src/core/shell_feature.cpp
+  src/core/sweep_feature.cpp
 )
 add_library(BLCAD::core ALIAS blcad_core)
 
@@ -315,6 +317,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/part_body_dependency_tests.cpp
     tests/core/parameter_expression_tests.cpp
     tests/core/parameter_tests.cpp
+    tests/core/path_curve_tests.cpp
     tests/core/project_tests.cpp
     tests/core/projected_reference_invalidation_tests.cpp
     tests/core/projected_sketch_reference_json_tests.cpp
@@ -349,6 +352,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/sketch_3d_curve_tests.cpp
     tests/core/sketch_3d_json_tests.cpp
     tests/core/subassembly_instance_tests.cpp
+    tests/core/sweep_feature_tests.cpp
   )
 
   target_link_libraries(blcad_core_tests PRIVATE BLCAD::core Catch2::Catch2WithMain)

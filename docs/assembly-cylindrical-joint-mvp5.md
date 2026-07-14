@@ -52,5 +52,5 @@ Revolute-only adapters.
 ## Block 46 handoff
 
 Block 46 Planar and Block 47 passive Spherical are implemented in their canonical documents.
-Blocks 48–78 Part Construction through 3D Sketch JSON and semantic references are implemented;
-Block 78 3D Sketch Geometry conversion is implemented; Block 79 connected PathCurve Core intent, JSON, and validation is next.
+Blocks 48–80 Part Construction through 3D Sketch JSON and semantic references are implemented;
+Block 78 3D Sketch Geometry conversion is implemented; Block 79 connected PathCurve Core intent, JSON, and validation is implemented; Block 80 Sweep feature Core intent and JSON is implemented; Block 81 Basic Sweep Geometry is next.
