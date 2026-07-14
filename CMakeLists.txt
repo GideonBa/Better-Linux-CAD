@@ -183,6 +183,7 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/reference_driven_sketch_helper.cpp
     src/geometry/reference_generated_profile_resolver.cpp
     src/geometry/revolve_adapter.cpp
+    src/geometry/sweep_adapter.cpp
     src/geometry/semantic_reference_evaluator.cpp
     src/geometry/shape_cache.cpp
     src/geometry/sketch_3d_geometry_adapter.cpp
@@ -317,6 +318,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/part_body_dependency_tests.cpp
     tests/core/parameter_expression_tests.cpp
     tests/core/parameter_tests.cpp
+    tests/core/path_extrude_feature_tests.cpp
     tests/core/path_curve_tests.cpp
     tests/core/project_tests.cpp
     tests/core/projected_reference_invalidation_tests.cpp
@@ -420,12 +422,14 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/linear_pattern_pipeline_tests.cpp
       tests/geometry/mirror_feature_pipeline_tests.cpp
       tests/geometry/parameter_expression_pipeline_tests.cpp
+      tests/geometry/path_extrude_pipeline_tests.cpp
       tests/geometry/recompute_executor_tests.cpp
       tests/geometry/rectangle_extrusion_adapter_tests.cpp
       tests/geometry/reference_driven_sketch_helper_tests.cpp
       tests/geometry/reference_generated_profile_resolver_tests.cpp
       tests/geometry/reference_part_pipeline_tests.cpp
       tests/geometry/revolve_feature_pipeline_tests.cpp
+      tests/geometry/sweep_feature_pipeline_tests.cpp
       tests/geometry/shell_feature_pipeline_tests.cpp
       tests/geometry/draft_feature_pipeline_tests.cpp
       tests/geometry/right_workplane_pipeline_tests.cpp

@@ -1,9 +1,11 @@
 #include "blcad/geometry/recompute_executor.hpp"
 
 #include "blcad/geometry/construction_line_resolver.hpp"
+#include "blcad/geometry/construction_point_resolver.hpp"
 #include "blcad/geometry/dimension_driven_profile_resolver.hpp"
 #include "blcad/geometry/reference_generated_profile_resolver.hpp"
 #include "blcad/geometry/semantic_reference_evaluator.hpp"
+#include "blcad/geometry/sketch_reference_projector.hpp"
 #include "blcad/geometry/sketch_region_finder.hpp"
 
 #include <algorithm>
@@ -277,6 +279,28 @@ resolve_boolean_target_input(const PartDocument& document, const ShapeCache& sha
   return body_result;
 }
 
+[[nodiscard]] Result<std::size_t> store_sweep_result(const PartDocument& document,
+                                                     const SweepFeature& feature,
+                                                     GeometryShape shape, ShapeCache& shape_cache) {
+  const BodyId& result_body_id = feature.body_result_context().effective_produced_body();
+  const Body* result_body = document.find_body(result_body_id);
+  if (result_body == nullptr)
+    return Result<std::size_t>::failure(
+        validation_error(result_body_id.value(), "produced body must exist in part document"));
+  auto feature_result = shape_cache.store_feature_shape(feature.id(), shape);
+  if (feature_result.has_error())
+    return feature_result;
+  auto body_result = shape_cache.store_body_shape(result_body_id, feature.id(), std::move(shape));
+  if (body_result.has_error())
+    return body_result;
+  if (document.bodies().size() == 1U && result_body->kind() == BodyKind::Solid) {
+    const GeometryShape* cached = shape_cache.find_body_shape(result_body_id);
+    return shape_cache.set_final_shape(feature.id(), *cached);
+  }
+  shape_cache.clear_final_shape();
+  return body_result;
+}
+
 [[nodiscard]] bool feature_produces_body(const PartDocument& document, std::string_view producer,
                                          const BodyId& body) {
   if (const Feature* feature = document.find_feature(FeatureId(std::string(producer)));
@@ -284,6 +308,8 @@ resolve_boolean_target_input(const PartDocument& document, const ShapeCache& sha
     return feature->body_result_context()->effective_produced_body() == body;
   if (const RevolveFeature* feature =
           document.find_revolve_feature(FeatureId(std::string(producer))))
+    return feature->body_result_context().effective_produced_body() == body;
+  if (const SweepFeature* feature = document.find_sweep_feature(FeatureId(std::string(producer))))
     return feature->body_result_context().effective_produced_body() == body;
   if (const LinearPatternFeature* feature =
           document.find_linear_pattern_feature(FeatureId(std::string(producer))))
@@ -575,21 +601,7 @@ store_pattern_result(const PartDocument& document, const PatternFeature& feature
   for (const auto& [producer, dependent] : document.dependency_graph().dependencies()) {
     if (dependent != feature.id().value() || producer.starts_with("body:"))
       continue;
-    bool produces_target = false;
-    if (const Feature* previous = document.find_feature(FeatureId(producer));
-        previous != nullptr && previous->body_result_context().has_value())
-      produces_target = previous->body_result_context()->effective_produced_body() == body;
-    if (const RevolveFeature* previous = document.find_revolve_feature(FeatureId(producer));
-        previous != nullptr)
-      produces_target = previous->body_result_context().effective_produced_body() == body;
-    if (const BodyBooleanFeature* previous =
-            document.find_body_boolean_feature(FeatureId(producer));
-        previous != nullptr)
-      produces_target = previous->effective_result_body() == body;
-    if (const BodyTransform* previous = document.find_body_transform(BodyTransformId(producer));
-        previous != nullptr)
-      produces_target = previous->body() == body;
-    if (produces_target)
+    if (feature_produces_body(document, producer, body))
       if (const GeometryShape* shape = shape_cache.find_feature_shape(FeatureId(producer)))
         return Result<const GeometryShape*>::success(shape);
   }
@@ -1266,6 +1278,313 @@ evaluate_composite_local_vertices(const PartDocument& document, const Sketch& sk
                                     region.value().vertices);
 }
 
+[[nodiscard]] SweepPathSegment reversed_sweep_segment(SweepPathSegment segment) {
+  std::swap(segment.start, segment.end);
+  return segment;
+}
+
+[[nodiscard]] Result<double> sweep_coordinate(const PartDocument& document,
+                                              const SketchCoordinate3D& coordinate,
+                                              const SketchEntityId& id) {
+  if (coordinate.source() == SketchCoordinate3DSource::Explicit)
+    return Result<double>::success(coordinate.explicit_coordinate()->millimeters());
+  const Parameter* parameter = document.find_parameter(*coordinate.parameter());
+  if (parameter == nullptr || parameter->type() != ParameterType::Length)
+    return Result<double>::failure(
+        geometry_error(id.value(), "3D path coordinate requires a Length parameter"));
+  return Result<double>::success(parameter->value().millimeters());
+}
+
+[[nodiscard]] Result<Point3> sweep_point(const PartDocument& document, const Sketch3D& sketch,
+                                         const SketchPointReference3D& reference) {
+  if (reference.source() == SketchPointReference3DSource::ConstructionPoint) {
+    auto point = ConstructionPointResolver{}.resolve(document, *reference.construction_point());
+    return point.has_error() ? Result<Point3>::failure(point.error())
+                             : Result<Point3>::success(point.value().position);
+  }
+  if (reference.source() == SketchPointReference3DSource::LocalPoint) {
+    const SketchPoint3D* point = sketch.find_point(*reference.local_point());
+    if (point == nullptr)
+      return Result<Point3>::failure(
+          geometry_error(reference.local_point()->value(), "3D path point must exist"));
+    auto x = sweep_coordinate(document, point->x(), point->id());
+    auto y = sweep_coordinate(document, point->y(), point->id());
+    auto z = sweep_coordinate(document, point->z(), point->id());
+    if (x.has_error() || y.has_error() || z.has_error())
+      return Result<Point3>::failure(x.has_error()   ? x.error()
+                                     : y.has_error() ? y.error()
+                                                     : z.error());
+    return Result<Point3>::success({x.value(), y.value(), z.value()});
+  }
+  const Sketch* planar = document.find_sketch(*reference.planar_sketch());
+  if (planar == nullptr)
+    return Result<Point3>::failure(
+        geometry_error(reference.planar_sketch()->value(), "3D path planar sketch must exist"));
+  auto workplane = WorkplaneResolver{}.resolve_for_sketch(document, *planar);
+  if (workplane.has_error())
+    return Result<Point3>::failure(workplane.error());
+  const SketchReferenceTarget& target = *reference.planar_point();
+  Point2 local{};
+  if (target.kind() == SketchReferenceTargetKind::ProjectedPoint) {
+    const ProjectedSketchPoint* projected = planar->find_projected_point(target.entity());
+    if (projected == nullptr)
+      return Result<Point3>::failure(
+          geometry_error(target.entity().value(), "3D path projected point must exist"));
+    auto point = SketchReferenceProjector{}.resolve_point(document, *planar, *projected);
+    if (point.has_error())
+      return Result<Point3>::failure(point.error());
+    local = point.value().position;
+  } else {
+    const LineSegment* line = planar->find_line_segment(target.entity());
+    if (line == nullptr)
+      return Result<Point3>::failure(
+          geometry_error(target.entity().value(), "3D path planar line endpoint must exist"));
+    local =
+        target.kind() == SketchReferenceTargetKind::LineSegmentStart ? line->start() : line->end();
+  }
+  return Result<Point3>::success(WorkplaneResolver{}.evaluate_point(workplane.value(), local));
+}
+
+[[nodiscard]] Result<Point3> sweep_local_point(const PartDocument& document, const Sketch3D& sketch,
+                                               SketchEntityId id) {
+  auto reference = SketchPointReference3D::create_local_point(std::move(id));
+  return sweep_point(document, sketch, reference.value());
+}
+
+[[nodiscard]] std::vector<SweepPathSegment> sampled_path(const std::vector<Point3>& controls,
+                                                         std::size_t samples = 32U) {
+  std::vector<Point3> points;
+  points.reserve(samples + 1U);
+  for (std::size_t sample = 0U; sample <= samples; ++sample) {
+    std::vector<Point3> work = controls;
+    const double t = static_cast<double>(sample) / static_cast<double>(samples);
+    for (std::size_t level = work.size() - 1U; level > 0U; --level)
+      for (std::size_t index = 0U; index < level; ++index)
+        work[index] = {(1.0 - t) * work[index].x + t * work[index + 1U].x,
+                       (1.0 - t) * work[index].y + t * work[index + 1U].y,
+                       (1.0 - t) * work[index].z + t * work[index + 1U].z};
+    points.push_back(work.front());
+  }
+  std::vector<SweepPathSegment> segments;
+  segments.reserve(samples);
+  for (std::size_t index = 1U; index < points.size(); ++index)
+    segments.push_back({SweepPathSegmentKind::Line, points[index - 1U], {}, points[index]});
+  return segments;
+}
+
+[[nodiscard]] Result<std::vector<SweepPathSegment>>
+resolve_basic_sweep_path(const PartDocument& document, const PathCurve& path,
+                         const ShapeCache& shape_cache, const WorkplaneResolver& resolver,
+                         std::string_view role) {
+  if (path.closure() != PathClosure::Open)
+    return Result<std::vector<SweepPathSegment>>::failure(
+        geometry_error(path.id().value(), std::string(role) + " must be open"));
+  std::vector<SweepPathSegment> resolved;
+  resolved.reserve(path.segments().size());
+  for (const auto& reference : path.segments()) {
+    SweepPathSegment segment;
+    if (reference.source_kind() == PathSegmentSourceKind::ConstructionLine) {
+      const ConstructionLine* line =
+          document.find_construction_line(*reference.construction_line());
+      if (line == nullptr || line->kind() != ConstructionLineKind::ThroughTwoPoints ||
+          !line->relation().has_value())
+        return Result<std::vector<SweepPathSegment>>::failure(
+            geometry_error(reference.source_node_id(),
+                           "Block 81 requires a construction-line path bounded by two points"));
+      const ConstructionPointResolver point_resolver;
+      auto start = point_resolver.resolve(document, line->relation()->first_point());
+      auto end = point_resolver.resolve(document, line->relation()->second_point());
+      if (start.has_error() || end.has_error())
+        return Result<std::vector<SweepPathSegment>>::failure(start.has_error() ? start.error()
+                                                                                : end.error());
+      segment = {SweepPathSegmentKind::Line, start.value().position, {}, end.value().position};
+    } else if (reference.source_kind() == PathSegmentSourceKind::PlanarSketchCurve) {
+      const Sketch* sketch = document.find_sketch(*reference.planar_sketch());
+      if (sketch == nullptr)
+        return Result<std::vector<SweepPathSegment>>::failure(
+            geometry_error(reference.source_node_id(), "sweep path sketch must exist"));
+      auto workplane = resolver.resolve_for_sketch(document, *sketch, shape_cache);
+      if (workplane.has_error())
+        return Result<std::vector<SweepPathSegment>>::failure(workplane.error());
+      if (*reference.planar_curve_kind() == PlanarPathCurveKind::Line) {
+        const LineSegment* line = sketch->find_line_segment(*reference.entity());
+        if (line == nullptr)
+          return Result<std::vector<SweepPathSegment>>::failure(
+              geometry_error(reference.entity()->value(), "planar sweep line must exist"));
+        segment = {SweepPathSegmentKind::Line,
+                   resolver.evaluate_point(workplane.value(), line->start()),
+                   {},
+                   resolver.evaluate_point(workplane.value(), line->end())};
+      } else if (*reference.planar_curve_kind() == PlanarPathCurveKind::Arc) {
+        const ArcSegment* arc = sketch->find_arc_segment(*reference.entity());
+        if (arc == nullptr)
+          return Result<std::vector<SweepPathSegment>>::failure(
+              geometry_error(reference.entity()->value(), "planar sweep arc must exist"));
+        segment = {SweepPathSegmentKind::CircularArc,
+                   resolver.evaluate_point(workplane.value(), arc->start()),
+                   resolver.evaluate_point(workplane.value(), arc->mid()),
+                   resolver.evaluate_point(workplane.value(), arc->end())};
+      } else {
+        return Result<std::vector<SweepPathSegment>>::failure(
+            geometry_error(reference.entity()->value(),
+                           "Block 81 supports only direct planar line and arc path segments"));
+      }
+    } else if (reference.source_kind() == PathSegmentSourceKind::Sketch3DCurve) {
+      const Sketch3D* sketch = document.find_sketch_3d(*reference.sketch_3d());
+      if (sketch == nullptr)
+        return Result<std::vector<SweepPathSegment>>::failure(
+            geometry_error(reference.source_node_id(), "3D path sketch must exist"));
+      std::vector<SweepPathSegment> spatial;
+      if (*reference.sketch_3d_curve_kind() == Sketch3DPathCurveKind::Line) {
+        const SketchLine3D* line = sketch->find_line(*reference.entity());
+        if (line == nullptr)
+          return Result<std::vector<SweepPathSegment>>::failure(
+              geometry_error(reference.entity()->value(), "3D sweep line must exist"));
+        auto start = sweep_local_point(document, *sketch, line->start_point());
+        auto end = sweep_local_point(document, *sketch, line->end_point());
+        if (start.has_error() || end.has_error())
+          return Result<std::vector<SweepPathSegment>>::failure(start.has_error() ? start.error()
+                                                                                  : end.error());
+        spatial.push_back({SweepPathSegmentKind::Line, start.value(), {}, end.value()});
+      } else if (*reference.sketch_3d_curve_kind() == Sketch3DPathCurveKind::Polyline) {
+        const SketchPolyline3D* polyline = sketch->find_polyline(*reference.entity());
+        if (polyline == nullptr)
+          return Result<std::vector<SweepPathSegment>>::failure(
+              geometry_error(reference.entity()->value(), "3D sweep polyline must exist"));
+        for (std::size_t index = 1U; index < polyline->ordered_vertices().size(); ++index) {
+          auto start =
+              sweep_local_point(document, *sketch, polyline->ordered_vertices()[index - 1U]);
+          auto end = sweep_local_point(document, *sketch, polyline->ordered_vertices()[index]);
+          if (start.has_error() || end.has_error())
+            return Result<std::vector<SweepPathSegment>>::failure(start.has_error() ? start.error()
+                                                                                    : end.error());
+          spatial.push_back({SweepPathSegmentKind::Line, start.value(), {}, end.value()});
+        }
+      } else if (*reference.sketch_3d_curve_kind() == Sketch3DPathCurveKind::Arc) {
+        const SketchArc3D* arc = sketch->find_arc(*reference.entity());
+        if (arc == nullptr)
+          return Result<std::vector<SweepPathSegment>>::failure(
+              geometry_error(reference.entity()->value(), "3D sweep arc must exist"));
+        auto start = sweep_point(document, *sketch, arc->start());
+        auto mid = sweep_point(document, *sketch, arc->intermediate());
+        auto end = sweep_point(document, *sketch, arc->end());
+        if (start.has_error() || mid.has_error() || end.has_error())
+          return Result<std::vector<SweepPathSegment>>::failure(start.has_error() ? start.error()
+                                                                : mid.has_error() ? mid.error()
+                                                                                  : end.error());
+        spatial.push_back(
+            {SweepPathSegmentKind::CircularArc, start.value(), mid.value(), end.value()});
+      } else if (*reference.sketch_3d_curve_kind() == Sketch3DPathCurveKind::Spline) {
+        const SketchSpline3D* spline = sketch->find_spline(*reference.entity());
+        if (spline == nullptr)
+          return Result<std::vector<SweepPathSegment>>::failure(
+              geometry_error(reference.entity()->value(), "3D sweep spline must exist"));
+        std::vector<Point3> controls;
+        for (const auto& point : spline->ordered_points()) {
+          auto resolved_point = sweep_point(document, *sketch, point);
+          if (resolved_point.has_error())
+            return Result<std::vector<SweepPathSegment>>::failure(resolved_point.error());
+          controls.push_back(resolved_point.value());
+        }
+        spatial = sampled_path(controls);
+      } else {
+        const SketchHelix3D* helix = sketch->find_helix(*reference.entity());
+        if (helix == nullptr)
+          return Result<std::vector<SweepPathSegment>>::failure(
+              geometry_error(reference.entity()->value(), "3D sweep helix must exist"));
+        const Parameter* radius = document.find_parameter(helix->radius_parameter());
+        const Parameter* pitch = document.find_parameter(helix->pitch_parameter());
+        const Parameter* turns = document.find_parameter(helix->turns_parameter());
+        if (radius == nullptr || radius->type() != ParameterType::Length || pitch == nullptr ||
+            pitch->type() != ParameterType::Length || turns == nullptr ||
+            turns->type() != ParameterType::Count || turns->value().count_value() == 0U)
+          return Result<std::vector<SweepPathSegment>>::failure(
+              geometry_error(helix->id().value(), "3D sweep helix parameters are invalid"));
+        Point3 origin{};
+        Vector3 axis{0.0, 0.0, 1.0};
+        if (helix->axis().source() == SketchHelixAxis3DSource::ConstructionLine) {
+          auto resolved_axis =
+              ConstructionLineResolver{}.resolve(document, *helix->axis().construction_line());
+          if (resolved_axis.has_error())
+            return Result<std::vector<SweepPathSegment>>::failure(resolved_axis.error());
+          origin = resolved_axis.value().point;
+          axis = normalized(resolved_axis.value().direction);
+        } else {
+          const DatumAxis* datum = document.find_datum_axis(*helix->axis().datum_axis());
+          if (datum == nullptr)
+            return Result<std::vector<SweepPathSegment>>::failure(geometry_error(
+                helix->axis().referenced_node_id(), "3D sweep helix DatumAxis must exist"));
+          if (datum->kind() == DatumAxisKind::Explicit) {
+            origin = datum->origin();
+            axis = normalized(datum->direction());
+          } else {
+            auto resolved_axis =
+                ConstructionLineResolver{}.resolve(document, datum->source_construction_line());
+            if (resolved_axis.has_error())
+              return Result<std::vector<SweepPathSegment>>::failure(resolved_axis.error());
+            origin = resolved_axis.value().point;
+            axis = normalized(resolved_axis.value().direction);
+          }
+        }
+        const Vector3 helper =
+            std::abs(axis.z) < 0.9 ? Vector3{0.0, 0.0, 1.0} : Vector3{0.0, 1.0, 0.0};
+        const Vector3 x = normalized({axis.y * helper.z - axis.z * helper.y,
+                                      axis.z * helper.x - axis.x * helper.z,
+                                      axis.x * helper.y - axis.y * helper.x});
+        const Vector3 y = {axis.y * x.z - axis.z * x.y, axis.z * x.x - axis.x * x.z,
+                           axis.x * x.y - axis.y * x.x};
+        const std::size_t count = turns->value().count_value() * 48U;
+        std::vector<Point3> points;
+        for (std::size_t index = 0U; index <= count; ++index) {
+          const double fraction = static_cast<double>(index) / static_cast<double>(count);
+          const double angle =
+              2.0 * k_pi * static_cast<double>(turns->value().count_value()) * fraction *
+              (helix->handedness() == SketchHelix3DHandedness::RightHanded ? 1.0 : -1.0);
+          const double axial = pitch->value().millimeters() *
+                               static_cast<double>(turns->value().count_value()) * fraction;
+          points.push_back(
+              {origin.x +
+                   radius->value().millimeters() * (x.x * std::cos(angle) + y.x * std::sin(angle)) +
+                   axis.x * axial,
+               origin.y +
+                   radius->value().millimeters() * (x.y * std::cos(angle) + y.y * std::sin(angle)) +
+                   axis.y * axial,
+               origin.z +
+                   radius->value().millimeters() * (x.z * std::cos(angle) + y.z * std::sin(angle)) +
+                   axis.z * axial});
+        }
+        for (std::size_t index = 1U; index < points.size(); ++index)
+          spatial.push_back({SweepPathSegmentKind::Line, points[index - 1U], {}, points[index]});
+      }
+      if (reference.reversed()) {
+        std::reverse(spatial.begin(), spatial.end());
+        for (auto& item : spatial)
+          item = reversed_sweep_segment(item);
+      }
+      resolved.insert(resolved.end(), spatial.begin(), spatial.end());
+      continue;
+    } else {
+      return Result<std::vector<SweepPathSegment>>::failure(
+          geometry_error(reference.source_node_id(),
+                         "semantic generated-edge sweep paths are unsupported in Block 82"));
+    }
+    resolved.push_back(reference.reversed() ? reversed_sweep_segment(segment) : segment);
+  }
+  return Result<std::vector<SweepPathSegment>>::success(std::move(resolved));
+}
+
+[[nodiscard]] std::vector<ClosedProfileCurveSegment>
+line_profile_curves(const std::vector<Point3>& vertices) {
+  std::vector<ClosedProfileCurveSegment> curves;
+  curves.reserve(vertices.size());
+  for (std::size_t index = 0U; index < vertices.size(); ++index)
+    curves.push_back({ClosedProfileCurveKind::Line,
+                      vertices[index],
+                      {},
+                      vertices[(index + 1U) % vertices.size()]});
+  return curves;
+}
+
 // True when the sketch contains exactly one profile and it is of the kind
 // selected by `kind_size`.
 template <typename KindSize>
@@ -1306,8 +1625,127 @@ template <typename KindSize>
 
 } // namespace
 
+Result<std::size_t> GeometryRecomputeExecutor::execute_path_extrude(const PartDocument& document,
+                                                                    const Feature& feature,
+                                                                    ShapeCache& shape_cache) const {
+  if (!feature.path_curve().has_value())
+    return Result<std::size_t>::failure(
+        geometry_error(feature.id().value(), "path extrude requires a PathCurveId"));
+  ShapeCache working_cache = shape_cache;
+  const PathCurve* path = document.find_path_curve(*feature.path_curve());
+  if (path == nullptr)
+    return Result<std::size_t>::failure(
+        geometry_error(feature.path_curve()->value(), "path extrude PathCurve must exist"));
+  auto trajectory = resolve_basic_sweep_path(document, *path, working_cache, workplane_resolver_,
+                                             "path extrude trajectory");
+  if (trajectory.has_error())
+    return Result<std::size_t>::failure(trajectory.error());
+
+  const Sketch* sketch = document.find_sketch(feature.input_sketch());
+  if (sketch == nullptr)
+    return Result<std::size_t>::failure(
+        geometry_error(feature.input_sketch().value(), "path extrude profile sketch must exist"));
+  auto workplane = workplane_resolver_.resolve_for_sketch(document, *sketch, working_cache);
+  if (workplane.has_error())
+    return Result<std::size_t>::failure(workplane.error());
+
+  std::vector<ClosedProfileCurveSegment> curves;
+  if (has_exactly_one_rectangle_profile(*sketch)) {
+    const RectangleProfile& rectangle = sketch->rectangle_profiles().front();
+    const Parameter* width = document.find_parameter(rectangle.width_parameter());
+    const Parameter* height = document.find_parameter(rectangle.height_parameter());
+    if (width == nullptr || height == nullptr)
+      return Result<std::size_t>::failure(
+          geometry_error(rectangle.id().value(), "path extrude dimensions must exist"));
+    auto vertices = map_bounded_local_vertices(
+        workplane_resolver_, workplane.value(), rectangle.id().value(),
+        rectangle_local_vertices(rectangle, width->value(), height->value()));
+    if (vertices.has_error())
+      return Result<std::size_t>::failure(vertices.error());
+    curves = line_profile_curves(vertices.value());
+  } else if (has_exactly_one_circle_profile(*sketch)) {
+    const CircleProfile& circle = sketch->circle_profiles().front();
+    const Parameter* diameter = document.find_parameter(circle.diameter_parameter());
+    if (diameter == nullptr || diameter->type() != ParameterType::Length)
+      return Result<std::size_t>::failure(
+          geometry_error(circle.id().value(), "path extrude circle diameter must be a Length"));
+    const double radius = diameter->value().millimeters() / 2.0;
+    for (std::size_t index = 0U; index < 4U; ++index) {
+      const double start = static_cast<double>(index) * k_pi / 2.0;
+      const double middle = start + k_pi / 4.0;
+      const double end = start + k_pi / 2.0;
+      const auto mapped = [&](double angle) {
+        return workplane_resolver_.evaluate_point(workplane.value(),
+                                                  {circle.center().x + radius * std::cos(angle),
+                                                   circle.center().y + radius * std::sin(angle)});
+      };
+      curves.push_back(
+          {ClosedProfileCurveKind::CircularArc, mapped(start), mapped(middle), mapped(end)});
+    }
+  } else if (has_exactly_one_closed_profile(*sketch)) {
+    auto vertices =
+        evaluate_bounded_closed_profile_vertices(document, workplane_resolver_, workplane.value(),
+                                                 *sketch, sketch->closed_profiles().front());
+    if (vertices.has_error())
+      return Result<std::size_t>::failure(vertices.error());
+    curves = line_profile_curves(vertices.value());
+  } else if (has_exactly_one_arc_closed_profile(*sketch)) {
+    auto resolved = evaluate_bounded_arc_profile_curves(
+        workplane_resolver_, workplane.value(), *sketch, sketch->arc_closed_profiles().front());
+    if (resolved.has_error())
+      return Result<std::size_t>::failure(resolved.error());
+    curves = std::move(resolved.value());
+  } else if (has_no_profiles(*sketch)) {
+    auto vertices = evaluate_bounded_detected_region_vertices(document, workplane_resolver_,
+                                                              workplane.value(), *sketch);
+    if (vertices.has_error())
+      return Result<std::size_t>::failure(vertices.error());
+    curves = line_profile_curves(vertices.value());
+  } else {
+    return Result<std::size_t>::failure(geometry_error(
+        sketch->id().value(),
+        "path extrude supports one rectangle, circle, line/arc closed, or detected profile"));
+  }
+
+  auto tool = sweep_adapter_.sweep_closed_profile(
+      feature.id(), curves, trajectory.value(), path->orientation_rule(), path->fixed_up_vector());
+  if (tool.has_error())
+    return Result<std::size_t>::failure(tool.error());
+  auto target = resolve_extrude_target(document, feature, working_cache);
+  if (target.has_error())
+    return Result<std::size_t>::failure(target.error());
+  const FeatureBodyOperationMode mode =
+      feature.body_result_context().has_value()
+          ? feature.body_result_context()->operation_mode()
+          : (feature.type() == FeatureType::AdditiveExtrude ? FeatureBodyOperationMode::NewBody
+                                                            : FeatureBodyOperationMode::Cut);
+  GeometryShape result = tool.value();
+  if (mode != FeatureBodyOperationMode::NewBody) {
+    if (target.value() == nullptr)
+      return Result<std::size_t>::failure(
+          geometry_error(feature.id().value(), "path extrude operation requires a target shape"));
+    BodyBooleanOperation operation = BodyBooleanOperation::Add;
+    if (mode == FeatureBodyOperationMode::Cut)
+      operation = BodyBooleanOperation::Subtract;
+    else if (mode == FeatureBodyOperationMode::Intersect)
+      operation = BodyBooleanOperation::Intersect;
+    auto combined = body_boolean_adapter_.combine(feature.id(), operation, *target.value(),
+                                                  std::vector<GeometryShape>{tool.value()});
+    if (combined.has_error())
+      return Result<std::size_t>::failure(combined.error());
+    result = std::move(combined.value());
+  }
+  auto stored = store_feature_result(document, feature, std::move(result), working_cache);
+  if (stored.has_error())
+    return stored;
+  shape_cache = std::move(working_cache);
+  return stored;
+}
+
 Result<std::size_t> GeometryRecomputeExecutor::execute_richer_extrude(
     const PartDocument& document, const Feature& feature, ShapeCache& shape_cache) const {
+  if (feature.direction() == ExtrudeDirection::Path)
+    return execute_path_extrude(document, feature, shape_cache);
   const Sketch* sketch = document.find_sketch(feature.input_sketch());
   if (sketch == nullptr)
     return Result<std::size_t>::failure(
@@ -1518,6 +1956,161 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_revolve(const PartDocumen
     result = std::move(combined.value());
   }
   auto stored = store_revolve_result(document, *feature, std::move(result), working_cache);
+  if (stored.has_error())
+    return stored;
+  shape_cache = std::move(working_cache);
+  return stored;
+}
+
+Result<std::size_t> GeometryRecomputeExecutor::execute_sweep(const PartDocument& document,
+                                                             FeatureId feature_id,
+                                                             ShapeCache& shape_cache) const {
+  if (feature_id.empty())
+    return Result<std::size_t>::failure(validation_error("sweep", "feature id must not be empty"));
+  const SweepFeature* feature = document.find_sweep_feature(feature_id);
+  if (feature == nullptr)
+    return Result<std::size_t>::failure(
+        validation_error(feature_id.value(), "sweep feature must exist in part document"));
+
+  ShapeCache working_cache = shape_cache;
+  const PathCurve* trajectory = document.find_path_curve(feature->path());
+  if (trajectory == nullptr)
+    return Result<std::size_t>::failure(
+        geometry_error(feature->path().value(), "sweep trajectory must exist"));
+  auto path = resolve_basic_sweep_path(document, *trajectory, working_cache, workplane_resolver_,
+                                       "sweep trajectory");
+  if (path.has_error())
+    return Result<std::size_t>::failure(path.error());
+
+  double twist_angle_deg = 0.0;
+  if (feature->twist_parameter().has_value()) {
+    const Parameter* twist = document.find_parameter(*feature->twist_parameter());
+    if (twist == nullptr || twist->type() != ParameterType::Angle)
+      return Result<std::size_t>::failure(geometry_error(
+          feature->twist_parameter()->value(), "sweep twist must reference an Angle parameter"));
+    twist_angle_deg = twist->value().degrees();
+  }
+  std::vector<SweepPathSegment> guide_segments;
+  const std::vector<SweepPathSegment>* guide = nullptr;
+  if (feature->guide_path().has_value()) {
+    const PathCurve* guide_path = document.find_path_curve(*feature->guide_path());
+    if (guide_path == nullptr)
+      return Result<std::size_t>::failure(
+          geometry_error(feature->guide_path()->value(), "sweep guide must exist"));
+    auto resolved_guide = resolve_basic_sweep_path(document, *guide_path, working_cache,
+                                                   workplane_resolver_, "sweep guide");
+    if (resolved_guide.has_error())
+      return Result<std::size_t>::failure(resolved_guide.error());
+    guide_segments = std::move(resolved_guide.value());
+    guide = &guide_segments;
+  }
+
+  const PathOrientationRule orientation =
+      feature->orientation_override().value_or(trajectory->orientation_rule());
+  const std::optional<Vector3> fixed_up = feature->orientation_override().has_value()
+                                              ? feature->fixed_up_vector_override()
+                                              : trajectory->fixed_up_vector();
+  Result<GeometryShape> tool = Result<GeometryShape>::failure(
+      geometry_error(feature_id.value(), "unsupported sweep profile"));
+
+  if (feature->profile().kind() == SweepProfileKind::OpenPath) {
+    const PathCurveId& profile_id = std::get<PathCurveId>(feature->profile().source());
+    const PathCurve* profile = document.find_path_curve(profile_id);
+    if (profile == nullptr)
+      return Result<std::size_t>::failure(
+          geometry_error(profile_id.value(), "surface sweep profile PathCurve must exist"));
+    auto profile_segments = resolve_basic_sweep_path(document, *profile, working_cache,
+                                                     workplane_resolver_, "surface profile");
+    if (profile_segments.has_error())
+      return Result<std::size_t>::failure(profile_segments.error());
+    tool = sweep_adapter_.sweep_open_profile(feature->id(), profile_segments.value(), path.value(),
+                                             orientation, fixed_up, twist_angle_deg, guide);
+  } else {
+    const auto& profile_reference = std::get<ProfileRegionReference>(feature->profile().source());
+    const Sketch* sketch = document.find_sketch(profile_reference.sketch());
+    if (sketch == nullptr)
+      return Result<std::size_t>::failure(
+          geometry_error(profile_reference.sketch().value(), "sweep profile sketch must exist"));
+    auto workplane = workplane_resolver_.resolve_for_sketch(document, *sketch, working_cache);
+    if (workplane.has_error())
+      return Result<std::size_t>::failure(workplane.error());
+    const ProfileId& profile_id = profile_reference.profile();
+    std::vector<ClosedProfileCurveSegment> curves;
+    if (const RectangleProfile* rectangle = sketch->find_rectangle_profile(profile_id)) {
+      const Parameter* width = document.find_parameter(rectangle->width_parameter());
+      const Parameter* height = document.find_parameter(rectangle->height_parameter());
+      if (width == nullptr || height == nullptr)
+        return Result<std::size_t>::failure(
+            geometry_error(profile_id.value(), "sweep rectangle dimensions must exist"));
+      auto vertices = map_bounded_local_vertices(
+          workplane_resolver_, workplane.value(), profile_id.value(),
+          rectangle_local_vertices(*rectangle, width->value(), height->value()));
+      if (vertices.has_error())
+        return Result<std::size_t>::failure(vertices.error());
+      curves = line_profile_curves(vertices.value());
+    } else if (const ClosedProfile* closed = sketch->find_closed_profile(profile_id)) {
+      auto vertices = evaluate_bounded_closed_profile_vertices(document, workplane_resolver_,
+                                                               workplane.value(), *sketch, *closed);
+      if (vertices.has_error())
+        return Result<std::size_t>::failure(vertices.error());
+      curves = line_profile_curves(vertices.value());
+    } else if (const ArcClosedProfile* arc = sketch->find_arc_closed_profile(profile_id)) {
+      auto resolved = evaluate_bounded_arc_profile_curves(workplane_resolver_, workplane.value(),
+                                                          *sketch, *arc);
+      if (resolved.has_error())
+        return Result<std::size_t>::failure(resolved.error());
+      curves = std::move(resolved.value());
+    } else if (const CircleProfile* circle = sketch->find_circle_profile(profile_id)) {
+      const Parameter* diameter = document.find_parameter(circle->diameter_parameter());
+      if (diameter == nullptr || diameter->type() != ParameterType::Length)
+        return Result<std::size_t>::failure(
+            geometry_error(profile_id.value(), "sweep circle diameter must be a Length parameter"));
+      const double radius = diameter->value().millimeters() / 2.0;
+      for (std::size_t index = 0U; index < 4U; ++index) {
+        const double start = static_cast<double>(index) * k_pi / 2.0;
+        const double middle = start + k_pi / 4.0;
+        const double end = start + k_pi / 2.0;
+        const auto mapped = [&](double angle) {
+          return workplane_resolver_.evaluate_point(
+              workplane.value(), {circle->center().x + radius * std::cos(angle),
+                                  circle->center().y + radius * std::sin(angle)});
+        };
+        curves.push_back(
+            {ClosedProfileCurveKind::CircularArc, mapped(start), mapped(middle), mapped(end)});
+      }
+    } else {
+      return Result<std::size_t>::failure(geometry_error(
+          profile_id.value(),
+          "Block 81 supports rectangle, line/arc closed, and circle sweep profiles"));
+    }
+    tool = sweep_adapter_.sweep_closed_profile(feature->id(), curves, path.value(), orientation,
+                                               fixed_up, twist_angle_deg, guide);
+  }
+  if (tool.has_error())
+    return Result<std::size_t>::failure(tool.error());
+
+  GeometryShape result = tool.value();
+  const auto& context = feature->body_result_context();
+  if (context.operation_mode() != FeatureBodyOperationMode::NewBody) {
+    if (!context.target_body().has_value())
+      return Result<std::size_t>::failure(
+          geometry_error(feature_id.value(), "modifying sweep requires a target Body"));
+    auto target = resolve_in_place_body_target(document, feature->id(), *context.target_body(),
+                                               working_cache);
+    if (target.has_error())
+      return Result<std::size_t>::failure(target.error());
+    BodyBooleanOperation operation = BodyBooleanOperation::Add;
+    if (context.operation_mode() == FeatureBodyOperationMode::Cut)
+      operation = BodyBooleanOperation::Subtract;
+    else if (context.operation_mode() == FeatureBodyOperationMode::Intersect)
+      operation = BodyBooleanOperation::Intersect;
+    auto combined = body_boolean_adapter_.combine(feature->id(), operation, *target.value(),
+                                                  std::vector<GeometryShape>{tool.value()});
+    if (combined.has_error())
+      return Result<std::size_t>::failure(combined.error());
+    result = std::move(combined.value());
+  }
+  auto stored = store_sweep_result(document, *feature, std::move(result), working_cache);
   if (stored.has_error())
     return stored;
   shape_cache = std::move(working_cache);
@@ -1768,7 +2361,8 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_additive_extrude(
     return Result<std::size_t>::failure(
         geometry_error(feature->id().value(), "only additive extrude features are supported"));
   }
-  if (!feature->extrude_intent().is_historical_additive_default() ||
+  if (feature->direction() == ExtrudeDirection::Path ||
+      !feature->extrude_intent().is_historical_additive_default() ||
       (feature->body_result_context().has_value() &&
        feature->body_result_context()->operation_mode() != FeatureBodyOperationMode::NewBody))
     return execute_richer_extrude(document, *feature, shape_cache);
@@ -1905,7 +2499,8 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_subtractive_extrude(
     return Result<std::size_t>::failure(
         geometry_error(feature->id().value(), "only subtractive extrude features are supported"));
   }
-  if (!feature->extrude_intent().is_historical_subtractive_default() ||
+  if (feature->direction() == ExtrudeDirection::Path ||
+      !feature->extrude_intent().is_historical_subtractive_default() ||
       (feature->body_result_context().has_value() &&
        feature->body_result_context()->operation_mode() != FeatureBodyOperationMode::Cut))
     return execute_richer_extrude(document, *feature, shape_cache);
@@ -2422,6 +3017,7 @@ GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const Reco
   for (const RecomputeStep& step : plan.steps()) {
     const Feature* feature = document.find_feature(FeatureId(step.node_id));
     const RevolveFeature* revolve = document.find_revolve_feature(FeatureId(step.node_id));
+    const SweepFeature* sweep = document.find_sweep_feature(FeatureId(step.node_id));
     const LinearPatternFeature* linear_pattern =
         document.find_linear_pattern_feature(FeatureId(step.node_id));
     const CircularPatternFeature* circular_pattern =
@@ -2435,7 +3031,7 @@ GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const Reco
         document.find_body_boolean_feature(FeatureId(step.node_id));
     const BodyTransform* body_transform =
         document.find_body_transform(BodyTransformId(step.node_id));
-    if (feature == nullptr && revolve == nullptr && linear_pattern == nullptr &&
+    if (feature == nullptr && revolve == nullptr && sweep == nullptr && linear_pattern == nullptr &&
         circular_pattern == nullptr && mirror == nullptr && fillet == nullptr &&
         chamfer == nullptr && shell == nullptr && draft == nullptr && body_boolean == nullptr &&
         body_transform == nullptr)
@@ -2443,6 +3039,7 @@ GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const Reco
 
     const FeatureId executable_id = feature != nullptr            ? feature->id()
                                     : revolve != nullptr          ? revolve->id()
+                                    : sweep != nullptr            ? sweep->id()
                                     : linear_pattern != nullptr   ? linear_pattern->id()
                                     : circular_pattern != nullptr ? circular_pattern->id()
                                     : mirror != nullptr           ? mirror->id()
@@ -2461,6 +3058,7 @@ GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const Reco
     auto executed =
         feature != nullptr   ? execute_feature(document, *feature, execution_cache)
         : revolve != nullptr ? execute_revolve(document, revolve->id(), execution_cache)
+        : sweep != nullptr   ? execute_sweep(document, sweep->id(), execution_cache)
         : linear_pattern != nullptr
             ? execute_linear_pattern(document, linear_pattern->id(), execution_cache)
         : circular_pattern != nullptr
@@ -2505,6 +3103,7 @@ GeometryRecomputeExecutor::execute_document(const PartDocument& document,
   for (const std::string& executable_id : executable_ids) {
     const Feature* feature = document.find_feature(FeatureId(executable_id));
     const RevolveFeature* revolve = document.find_revolve_feature(FeatureId(executable_id));
+    const SweepFeature* sweep = document.find_sweep_feature(FeatureId(executable_id));
     const LinearPatternFeature* linear_pattern =
         document.find_linear_pattern_feature(FeatureId(executable_id));
     const CircularPatternFeature* circular_pattern =
@@ -2518,7 +3117,7 @@ GeometryRecomputeExecutor::execute_document(const PartDocument& document,
         document.find_body_boolean_feature(FeatureId(executable_id));
     const BodyTransform* body_transform =
         document.find_body_transform(BodyTransformId(executable_id));
-    if (feature == nullptr && revolve == nullptr && linear_pattern == nullptr &&
+    if (feature == nullptr && revolve == nullptr && sweep == nullptr && linear_pattern == nullptr &&
         circular_pattern == nullptr && mirror == nullptr && fillet == nullptr &&
         chamfer == nullptr && shell == nullptr && draft == nullptr && body_boolean == nullptr &&
         body_transform == nullptr)
@@ -2526,6 +3125,7 @@ GeometryRecomputeExecutor::execute_document(const PartDocument& document,
 
     const FeatureId feature_id = feature != nullptr            ? feature->id()
                                  : revolve != nullptr          ? revolve->id()
+                                 : sweep != nullptr            ? sweep->id()
                                  : linear_pattern != nullptr   ? linear_pattern->id()
                                  : circular_pattern != nullptr ? circular_pattern->id()
                                  : mirror != nullptr           ? mirror->id()
@@ -2544,6 +3144,7 @@ GeometryRecomputeExecutor::execute_document(const PartDocument& document,
     auto executed =
         feature != nullptr   ? execute_feature(document, *feature, execution_cache)
         : revolve != nullptr ? execute_revolve(document, revolve->id(), execution_cache)
+        : sweep != nullptr   ? execute_sweep(document, sweep->id(), execution_cache)
         : linear_pattern != nullptr
             ? execute_linear_pattern(document, linear_pattern->id(), execution_cache)
         : circular_pattern != nullptr

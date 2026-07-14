@@ -1114,6 +1114,8 @@ driving_dimension_from_json(const json& dimension_json) {
     return Result<ExtrudeDirection>::success(ExtrudeDirection::SketchNormal);
   if (direction == "opposite_sketch_normal")
     return Result<ExtrudeDirection>::success(ExtrudeDirection::OppositeSketchNormal);
+  if (direction == "path")
+    return Result<ExtrudeDirection>::success(ExtrudeDirection::Path);
   return Result<ExtrudeDirection>::failure(
       json_error("unsupported extrude direction in part document json"));
 }
@@ -1340,6 +1342,35 @@ feature_body_result_context_from_json(const json& feature_json) {
       return Result<Feature>::failure(parsed.error());
     intent = std::move(parsed.value());
   }
+  if (direction.value() == ExtrudeDirection::Path) {
+    if (intent.has_value() || !feature_json.contains("path_curve") ||
+        !feature_json.at("path_curve").is_string())
+      return Result<Feature>::failure(
+          json_error("path extrude requires string path_curve and forbids straight extent intent"));
+    if (type == "additive_extrude")
+      feature = Feature::create_additive_path_extrude(
+          FeatureId(feature_json.at("id").get<std::string>()),
+          feature_json.at("name").get<std::string>(),
+          SketchId(feature_json.at("input_sketch").get<std::string>()),
+          PathCurveId(feature_json.at("path_curve").get<std::string>()));
+    else if (type == "subtractive_extrude")
+      feature = Feature::create_subtractive_path_extrude(
+          FeatureId(feature_json.at("id").get<std::string>()),
+          feature_json.at("name").get<std::string>(),
+          SketchId(feature_json.at("input_sketch").get<std::string>()),
+          FeatureId(feature_json.at("target_feature").get<std::string>()),
+          PathCurveId(feature_json.at("path_curve").get<std::string>()));
+    if (feature.has_error())
+      return feature;
+    auto context = feature_body_result_context_from_json(feature_json);
+    if (context.has_error())
+      return Result<Feature>::failure(context.error());
+    return context.value().has_value()
+               ? feature.value().with_body_result_context(std::move(*context.value()))
+               : feature;
+  }
+  if (feature_json.contains("path_curve"))
+    return Result<Feature>::failure(json_error("straight extrude must not contain path_curve"));
   if (type == "additive_extrude") {
     if (intent.has_value())
       feature = Feature::create_additive_extrude(
@@ -2238,6 +2269,7 @@ using ParsedPartPattern = std::variant<LinearPatternFeature, CircularPatternFeat
       {"orientation_override", nullptr},
       {"fixed_up_vector_override", nullptr},
       {"twist_parameter", nullptr},
+      {"guide_path", nullptr},
       {"operation_mode", std::string(to_string(feature.body_result_context().operation_mode()))}};
   if (feature.orientation_override().has_value())
     value["orientation_override"] = std::string(to_string(*feature.orientation_override()));
@@ -2245,6 +2277,8 @@ using ParsedPartPattern = std::variant<LinearPatternFeature, CircularPatternFeat
     value["fixed_up_vector_override"] = vector3_to_json(*feature.fixed_up_vector_override());
   if (feature.twist_parameter().has_value())
     value["twist_parameter"] = feature.twist_parameter()->value();
+  if (feature.guide_path().has_value())
+    value["guide_path"] = feature.guide_path()->value();
   const auto& context = feature.body_result_context();
   if (context.target_body().has_value())
     value["target_body"] = context.target_body()->value();
@@ -2254,8 +2288,10 @@ using ParsedPartPattern = std::variant<LinearPatternFeature, CircularPatternFeat
 }
 
 [[nodiscard]] Result<SweepFeature> sweep_feature_from_json(const json& value) {
-  const std::size_t expected_size =
-      9U + (value.contains("target_body") ? 1U : 0U) + (value.contains("produced_body") ? 1U : 0U);
+  const bool legacy_without_guide = value.is_object() && !value.contains("guide_path");
+  const std::size_t expected_size = (legacy_without_guide ? 9U : 10U) +
+                                    (value.contains("target_body") ? 1U : 0U) +
+                                    (value.contains("produced_body") ? 1U : 0U);
   if (!value.is_object() || value.size() != expected_size || !value.contains("id") ||
       !value.contains("name") || !value.contains("type") || !value.contains("profile") ||
       !value.contains("path") || !value.contains("orientation_override") ||
@@ -2267,7 +2303,9 @@ using ParsedPartPattern = std::variant<LinearPatternFeature, CircularPatternFeat
        !value.at("orientation_override").is_string()) ||
       (!value.at("fixed_up_vector_override").is_null() &&
        !value.at("fixed_up_vector_override").is_object()) ||
-      (!value.at("twist_parameter").is_null() && !value.at("twist_parameter").is_string()))
+      (!value.at("twist_parameter").is_null() && !value.at("twist_parameter").is_string()) ||
+      (!legacy_without_guide && !value.at("guide_path").is_null() &&
+       !value.at("guide_path").is_string()))
     return Result<SweepFeature>::failure(
         json_error("sweep feature requires exactly its mandatory intent fields"));
 
@@ -2319,6 +2357,9 @@ using ParsedPartPattern = std::variant<LinearPatternFeature, CircularPatternFeat
   std::optional<ParameterId> twist;
   if (!value.at("twist_parameter").is_null())
     twist = ParameterId(value.at("twist_parameter").get<std::string>());
+  std::optional<PathCurveId> guide;
+  if (!legacy_without_guide && !value.at("guide_path").is_null())
+    guide = PathCurveId(value.at("guide_path").get<std::string>());
   auto context = feature_body_result_context_from_json(value);
   if (context.has_error() || !context.value().has_value())
     return Result<SweepFeature>::failure(
@@ -2329,15 +2370,16 @@ using ParsedPartPattern = std::variant<LinearPatternFeature, CircularPatternFeat
   const std::string type = value.at("type").get<std::string>();
   if (type == "sweep")
     return SweepFeature::create_sweep(id, name, std::move(profile.value()), path,
-                                      std::move(*context.value()), orientation, fixed_up, twist);
+                                      std::move(*context.value()), orientation, fixed_up, twist,
+                                      guide);
   if (type == "sweep_cut")
     return SweepFeature::create_sweep_cut(id, name, std::move(profile.value()), path,
-                                          std::move(*context.value()), orientation, fixed_up,
-                                          twist);
+                                          std::move(*context.value()), orientation, fixed_up, twist,
+                                          guide);
   if (type == "sweep_surface")
     return SweepFeature::create_sweep_surface(id, name, std::move(profile.value()), path,
                                               std::move(*context.value()), orientation, fixed_up,
-                                              twist);
+                                              twist, guide);
   return Result<SweepFeature>::failure(json_error("unsupported sweep feature type"));
 }
 
@@ -3330,19 +3372,24 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
                       {"type", std::string(to_string(feature.type()))},
                       {"input_sketch", feature.input_sketch().value()},
                       {"direction", std::string(to_string(feature.direction()))}};
-    if (feature.type() == FeatureType::AdditiveExtrude &&
+    if (feature.direction() == ExtrudeDirection::Path)
+      feature_json["path_curve"] = feature.path_curve()->value();
+    if (feature.direction() != ExtrudeDirection::Path &&
+        feature.type() == FeatureType::AdditiveExtrude &&
         feature.extrude_intent().is_historical_additive_default())
       feature_json["length_parameter"] = feature.length_parameter().value();
     if (feature.type() == FeatureType::SubtractiveExtrude) {
       feature_json["target_feature"] = feature.target_feature().value();
-      if (feature.extrude_intent().is_historical_subtractive_default())
+      if (feature.direction() != ExtrudeDirection::Path &&
+          feature.extrude_intent().is_historical_subtractive_default())
         feature_json["depth"] = std::string(to_string(feature.subtractive_depth()));
     }
     const bool explicit_extrude_intent =
-        (feature.type() == FeatureType::AdditiveExtrude &&
-         !feature.extrude_intent().is_historical_additive_default()) ||
-        (feature.type() == FeatureType::SubtractiveExtrude &&
-         !feature.extrude_intent().is_historical_subtractive_default());
+        feature.direction() != ExtrudeDirection::Path &&
+        ((feature.type() == FeatureType::AdditiveExtrude &&
+          !feature.extrude_intent().is_historical_additive_default()) ||
+         (feature.type() == FeatureType::SubtractiveExtrude &&
+          !feature.extrude_intent().is_historical_subtractive_default()));
     if (explicit_extrude_intent)
       feature_json["extrude"] = extrude_feature_intent_to_json(feature.extrude_intent());
     if (feature.body_result_context().has_value()) {
@@ -3545,6 +3592,35 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
     const auto& feature_array = root.at("features");
     const json derived_workplane_array = root.value("derived_workplanes", json::array());
     const json construction_line_array = root.value("construction_lines", json::array());
+    const json sketch_3d_array = root.value("sketches_3d", json::array());
+    const json path_curve_array = root.value("path_curves", json::array());
+    if (!sketch_3d_array.is_array())
+      return Result<PartDocument>::failure(
+          json_error("sketches_3d must be an array in part document json"));
+    if (!path_curve_array.is_array())
+      return Result<PartDocument>::failure(
+          json_error("path_curves must be an array in part document json"));
+    bool path_sources_loaded = false;
+    const auto load_path_sources = [&]() -> Result<std::size_t> {
+      for (const auto& sketch_json : sketch_3d_array) {
+        auto sketch = sketch_3d_from_json(sketch_json);
+        if (sketch.has_error())
+          return Result<std::size_t>::failure(sketch.error());
+        auto added = document.value().add_sketch_3d(std::move(sketch.value()));
+        if (added.has_error())
+          return Result<std::size_t>::failure(added.error());
+      }
+      for (const auto& path_json : path_curve_array) {
+        auto path = path_curve_from_json(path_json);
+        if (path.has_error())
+          return Result<std::size_t>::failure(path.error());
+        auto added = document.value().add_path_curve(std::move(path.value()));
+        if (added.has_error())
+          return Result<std::size_t>::failure(added.error());
+      }
+      path_sources_loaded = true;
+      return Result<std::size_t>::success(sketch_3d_array.size() + path_curve_array.size());
+    };
     std::vector<bool> added_sketch(sketch_array.size(), false),
         added_feature(feature_array.size(), false),
         added_workplane(derived_workplane_array.size(), false),
@@ -3583,6 +3659,9 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
               json_error("additive extrude length parameter must exist in part document"));
         if (feature.value().type() == FeatureType::SubtractiveExtrude &&
             document.value().find_feature(feature.value().target_feature()) == nullptr)
+          continue;
+        if (feature.value().direction() == ExtrudeDirection::Path &&
+            document.value().find_path_curve(*feature.value().path_curve()) == nullptr)
           continue;
         if (!extrude_reference_features_available(document.value(), feature.value()))
           continue;
@@ -3629,6 +3708,12 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
         --remaining;
         progress = true;
       }
+      if (!progress && !path_sources_loaded) {
+        auto loaded = load_path_sources();
+        if (loaded.has_error())
+          return Result<PartDocument>::failure(loaded.error());
+        progress = true;
+      }
       if (!progress)
         return Result<PartDocument>::failure(
             json_error("could not resolve part document json dependencies"));
@@ -3641,29 +3726,10 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
       if (added.has_error())
         return Result<PartDocument>::failure(added.error());
     }
-    const json sketch_3d_array = root.value("sketches_3d", json::array());
-    if (!sketch_3d_array.is_array())
-      return Result<PartDocument>::failure(
-          json_error("sketches_3d must be an array in part document json"));
-    for (const auto& sketch_json : sketch_3d_array) {
-      auto sketch = sketch_3d_from_json(sketch_json);
-      if (sketch.has_error())
-        return Result<PartDocument>::failure(sketch.error());
-      auto added = document.value().add_sketch_3d(std::move(sketch.value()));
-      if (added.has_error())
-        return Result<PartDocument>::failure(added.error());
-    }
-    const json path_curve_array = root.value("path_curves", json::array());
-    if (!path_curve_array.is_array())
-      return Result<PartDocument>::failure(
-          json_error("path_curves must be an array in part document json"));
-    for (const auto& path_json : path_curve_array) {
-      auto path = path_curve_from_json(path_json);
-      if (path.has_error())
-        return Result<PartDocument>::failure(path.error());
-      auto added = document.value().add_path_curve(std::move(path.value()));
-      if (added.has_error())
-        return Result<PartDocument>::failure(added.error());
+    if (!path_sources_loaded) {
+      auto loaded = load_path_sources();
+      if (loaded.has_error())
+        return Result<PartDocument>::failure(loaded.error());
     }
     const json revolve_array = root.value("revolve_features", json::array());
     if (!revolve_array.is_array())

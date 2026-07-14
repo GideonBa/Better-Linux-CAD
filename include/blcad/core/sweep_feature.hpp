@@ -41,19 +41,22 @@ public:
                FeatureBodyResultContext body_result_context,
                std::optional<PathOrientationRule> orientation_override = std::nullopt,
                std::optional<Vector3> fixed_up_vector_override = std::nullopt,
-               std::optional<ParameterId> twist_parameter = std::nullopt);
+               std::optional<ParameterId> twist_parameter = std::nullopt,
+               std::optional<PathCurveId> guide_path = std::nullopt);
   [[nodiscard]] static Result<SweepFeature>
   create_sweep_cut(FeatureId id, std::string name, SweepProfileReference profile, PathCurveId path,
                    FeatureBodyResultContext body_result_context,
                    std::optional<PathOrientationRule> orientation_override = std::nullopt,
                    std::optional<Vector3> fixed_up_vector_override = std::nullopt,
-                   std::optional<ParameterId> twist_parameter = std::nullopt);
+                   std::optional<ParameterId> twist_parameter = std::nullopt,
+                   std::optional<PathCurveId> guide_path = std::nullopt);
   [[nodiscard]] static Result<SweepFeature>
   create_sweep_surface(FeatureId id, std::string name, SweepProfileReference profile,
                        PathCurveId path, FeatureBodyResultContext body_result_context,
                        std::optional<PathOrientationRule> orientation_override = std::nullopt,
                        std::optional<Vector3> fixed_up_vector_override = std::nullopt,
-                       std::optional<ParameterId> twist_parameter = std::nullopt);
+                       std::optional<ParameterId> twist_parameter = std::nullopt,
+                       std::optional<PathCurveId> guide_path = std::nullopt);
 
   [[nodiscard]] const FeatureId& id() const noexcept;
   [[nodiscard]] const std::string& name() const noexcept;
@@ -63,6 +66,7 @@ public:
   [[nodiscard]] const std::optional<PathOrientationRule>& orientation_override() const noexcept;
   [[nodiscard]] const std::optional<Vector3>& fixed_up_vector_override() const noexcept;
   [[nodiscard]] const std::optional<ParameterId>& twist_parameter() const noexcept;
+  [[nodiscard]] const std::optional<PathCurveId>& guide_path() const noexcept;
   [[nodiscard]] const FeatureBodyResultContext& body_result_context() const noexcept;
 
 private:
@@ -71,12 +75,12 @@ private:
          PathCurveId path, FeatureBodyResultContext body_result_context,
          std::optional<PathOrientationRule> orientation_override,
          std::optional<Vector3> fixed_up_vector_override,
-         std::optional<ParameterId> twist_parameter);
+         std::optional<ParameterId> twist_parameter, std::optional<PathCurveId> guide_path);
   SweepFeature(FeatureId id, std::string name, SweepFeatureKind kind, SweepProfileReference profile,
                PathCurveId path, FeatureBodyResultContext body_result_context,
                std::optional<PathOrientationRule> orientation_override,
                std::optional<Vector3> fixed_up_vector_override,
-               std::optional<ParameterId> twist_parameter);
+               std::optional<ParameterId> twist_parameter, std::optional<PathCurveId> guide_path);
 
   FeatureId id_;
   std::string name_;
@@ -87,6 +91,7 @@ private:
   std::optional<PathOrientationRule> orientation_override_;
   std::optional<Vector3> fixed_up_vector_override_;
   std::optional<ParameterId> twist_parameter_;
+  std::optional<PathCurveId> guide_path_;
 };
 
 } // namespace blcad

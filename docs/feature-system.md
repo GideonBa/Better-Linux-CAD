@@ -94,8 +94,11 @@ and publishes parameter/upstream recompute transactionally. Block 75 adds separa
 polylines, and graph invalidation. Block 76 adds mixed-source point references, three-point Arcs,
 Fit/Control Splines, typed Helices, and Guide-Curve roles. Block 77 adds strict deterministic JSON
 and source-identity-only semantic references. Block 78 executes deterministic transient OCCT
-Geometry without writing topology identity back into Core. Block 79 PathCurve intent and Block 80
-Sweep/SweepCut/SweepSurface intent are implemented; Block 81 Basic Sweep Geometry is next.
+Geometry without writing topology identity back into Core. Block 79 adds PathCurve intent, Block
+80 adds Sweep/SweepCut/SweepSurface intent, Blocks 81–82 execute planar then spatial paths, twist,
+and guide control, and Block 83 adds path-following AdditiveExtrude/SubtractiveExtrude while
+preserving their feature identity. Block 84 ProfileSectionReference and Loft Core intent plus JSON
+is next.
 
 The long-term sketcher and feature parity target is documented in `docs/inventor-like-sketcher-and-feature-roadmap.md`.
 
@@ -152,15 +155,19 @@ The detailed roadmap is in `docs/multi-body-transform-and-path-features-roadmap.
 
 ## Sweep, loft, path-following extrude, and surfacing
 
-Sweep Core intent is implemented; its Geometry, loft, path-following extrude, and broader
-surfacing remain first-class feature families in the active Part Construction sequence.
+Sweep Geometry through spatial/twisted/guided paths and path-following Extrude/Extruded Cut are
+implemented. Loft and broader surfacing remain first-class feature families in the active Part
+Construction sequence.
 
 Target behavior:
 
 - Implemented `PathCurve` stores an ordered connected path made from line, arc, spline, projected, construction, semantic, or 3D-sketch segment references, with explicit direction, closure, orientation, continuity hint, and tolerance.
-- `AdditiveExtrude` and `SubtractiveExtrude` may later use `direction_mode = path` with a `PathCurveId`.
-- `SweepFeature` consumes a profile and a path curve.
-- `SweepCutFeature` removes a swept volume from a target body.
+- Implemented `AdditiveExtrude` and `SubtractiveExtrude` use `direction = path` with a
+  dependency-tracked `PathCurveId` while remaining distinct from `SweepFeature`.
+- Implemented `SweepFeature` consumes a profile and a path curve and executes bounded
+  ConstructionLine or planar line/arc/polyline trajectories.
+- Implemented `SweepCutFeature` removes that swept volume from a target body; `SweepSurface`
+  executes an open planar PathCurve profile.
 - `LoftFeature` consumes two or more profile sections.
 - `LoftCutFeature` removes a lofted volume from a target body.
 - `LoftFeature` can later accept a path curve or guide curves.

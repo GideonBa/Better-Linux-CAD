@@ -60,10 +60,11 @@ SweepFeature::create_sweep(FeatureId id, std::string name, SweepProfileReference
                            PathCurveId path, FeatureBodyResultContext body_result_context,
                            std::optional<PathOrientationRule> orientation_override,
                            std::optional<Vector3> fixed_up_vector_override,
-                           std::optional<ParameterId> twist_parameter) {
+                           std::optional<ParameterId> twist_parameter,
+                           std::optional<PathCurveId> guide_path) {
   return create(std::move(id), std::move(name), SweepFeatureKind::Sweep, std::move(profile),
                 std::move(path), std::move(body_result_context), orientation_override,
-                fixed_up_vector_override, std::move(twist_parameter));
+                fixed_up_vector_override, std::move(twist_parameter), std::move(guide_path));
 }
 
 Result<SweepFeature>
@@ -71,10 +72,11 @@ SweepFeature::create_sweep_cut(FeatureId id, std::string name, SweepProfileRefer
                                PathCurveId path, FeatureBodyResultContext body_result_context,
                                std::optional<PathOrientationRule> orientation_override,
                                std::optional<Vector3> fixed_up_vector_override,
-                               std::optional<ParameterId> twist_parameter) {
+                               std::optional<ParameterId> twist_parameter,
+                               std::optional<PathCurveId> guide_path) {
   return create(std::move(id), std::move(name), SweepFeatureKind::SweepCut, std::move(profile),
                 std::move(path), std::move(body_result_context), orientation_override,
-                fixed_up_vector_override, std::move(twist_parameter));
+                fixed_up_vector_override, std::move(twist_parameter), std::move(guide_path));
 }
 
 Result<SweepFeature>
@@ -82,10 +84,11 @@ SweepFeature::create_sweep_surface(FeatureId id, std::string name, SweepProfileR
                                    PathCurveId path, FeatureBodyResultContext body_result_context,
                                    std::optional<PathOrientationRule> orientation_override,
                                    std::optional<Vector3> fixed_up_vector_override,
-                                   std::optional<ParameterId> twist_parameter) {
+                                   std::optional<ParameterId> twist_parameter,
+                                   std::optional<PathCurveId> guide_path) {
   return create(std::move(id), std::move(name), SweepFeatureKind::SweepSurface, std::move(profile),
                 std::move(path), std::move(body_result_context), orientation_override,
-                fixed_up_vector_override, std::move(twist_parameter));
+                fixed_up_vector_override, std::move(twist_parameter), std::move(guide_path));
 }
 
 Result<SweepFeature> SweepFeature::create(FeatureId id, std::string name, SweepFeatureKind kind,
@@ -93,7 +96,8 @@ Result<SweepFeature> SweepFeature::create(FeatureId id, std::string name, SweepF
                                           FeatureBodyResultContext body_result_context,
                                           std::optional<PathOrientationRule> orientation_override,
                                           std::optional<Vector3> fixed_up_vector_override,
-                                          std::optional<ParameterId> twist_parameter) {
+                                          std::optional<ParameterId> twist_parameter,
+                                          std::optional<PathCurveId> guide_path) {
   const std::string object_id = id.empty() ? "sweep_feature" : id.value();
   if (id.empty() || name.empty() || path.empty())
     return Result<SweepFeature>::failure(
@@ -126,10 +130,13 @@ Result<SweepFeature> SweepFeature::create(FeatureId id, std::string name, SweepF
       return Result<SweepFeature>::failure(
           Error::validation(object_id, "sweep fixed up vector must be finite and non-zero"));
   }
+  if (guide_path.has_value() && guide_path->empty())
+    return Result<SweepFeature>::failure(
+        Error::validation(object_id, "sweep guide path id must not be empty"));
   return Result<SweepFeature>::success(
       SweepFeature(std::move(id), std::move(name), kind, std::move(profile), std::move(path),
                    std::move(body_result_context), orientation_override, fixed_up_vector_override,
-                   std::move(twist_parameter)));
+                   std::move(twist_parameter), std::move(guide_path)));
 }
 
 SweepFeature::SweepFeature(FeatureId id, std::string name, SweepFeatureKind kind,
@@ -137,12 +144,13 @@ SweepFeature::SweepFeature(FeatureId id, std::string name, SweepFeatureKind kind
                            FeatureBodyResultContext body_result_context,
                            std::optional<PathOrientationRule> orientation_override,
                            std::optional<Vector3> fixed_up_vector_override,
-                           std::optional<ParameterId> twist_parameter)
+                           std::optional<ParameterId> twist_parameter,
+                           std::optional<PathCurveId> guide_path)
     : id_(std::move(id)), name_(std::move(name)), kind_(kind), profile_(std::move(profile)),
       path_(std::move(path)), body_result_context_(std::move(body_result_context)),
       orientation_override_(orientation_override),
       fixed_up_vector_override_(fixed_up_vector_override),
-      twist_parameter_(std::move(twist_parameter)) {}
+      twist_parameter_(std::move(twist_parameter)), guide_path_(std::move(guide_path)) {}
 
 const FeatureId& SweepFeature::id() const noexcept {
   return id_;
@@ -167,6 +175,9 @@ const std::optional<Vector3>& SweepFeature::fixed_up_vector_override() const noe
 }
 const std::optional<ParameterId>& SweepFeature::twist_parameter() const noexcept {
   return twist_parameter_;
+}
+const std::optional<PathCurveId>& SweepFeature::guide_path() const noexcept {
+  return guide_path_;
 }
 const FeatureBodyResultContext& SweepFeature::body_result_context() const noexcept {
   return body_result_context_;

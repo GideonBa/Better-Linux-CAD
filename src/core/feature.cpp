@@ -22,6 +22,8 @@ std::string_view to_string(ExtrudeDirection direction) noexcept {
     return "+Z";
   case ExtrudeDirection::OppositeSketchNormal:
     return "opposite_sketch_normal";
+  case ExtrudeDirection::Path:
+    return "path";
   }
 
   return "+Z";
@@ -343,6 +345,9 @@ Result<Feature> Feature::create_additive_extrude(FeatureId id, std::string name,
     return Result<Feature>::failure(
         Error::validation(object_id, "feature input sketch id must not be empty"));
   }
+  if (direction == ExtrudeDirection::Path)
+    return Result<Feature>::failure(Error::validation(
+        object_id, "path direction requires create_additive_path_extrude and a PathCurveId"));
 
   ParameterId length_parameter;
   if (extrude_intent.extent().first_distance_parameter().has_value())
@@ -351,6 +356,22 @@ Result<Feature> Feature::create_additive_extrude(FeatureId id, std::string name,
       Feature(std::move(id), std::move(name), FeatureType::AdditiveExtrude, std::move(input_sketch),
               std::move(length_parameter), FeatureId(), direction,
               SubtractiveExtrudeDepth::ThroughAll, std::move(extrude_intent)));
+}
+
+Result<Feature> Feature::create_additive_path_extrude(FeatureId id, std::string name,
+                                                      SketchId input_sketch,
+                                                      PathCurveId path_curve) {
+  const auto object_id = id.empty() ? std::string("feature") : id.value();
+  if (id.empty() || name.empty() || input_sketch.empty() || path_curve.empty())
+    return Result<Feature>::failure(Error::validation(
+        object_id, "path extrude requires non-empty id, name, input sketch, and PathCurveId"));
+  auto intent = ExtrudeFeatureIntent::create(ExtrudeExtentIntent::through_all());
+  if (intent.has_error())
+    return Result<Feature>::failure(intent.error());
+  return Result<Feature>::success(Feature(
+      std::move(id), std::move(name), FeatureType::AdditiveExtrude, std::move(input_sketch),
+      ParameterId(), FeatureId(), ExtrudeDirection::Path, SubtractiveExtrudeDepth::ThroughAll,
+      std::move(intent.value()), std::move(path_curve)));
 }
 
 Result<Feature> Feature::create_subtractive_extrude(FeatureId id, std::string name,
@@ -391,6 +412,9 @@ Result<Feature> Feature::create_subtractive_extrude(FeatureId id, std::string na
     return Result<Feature>::failure(
         Error::validation(object_id, "subtractive extrude target feature id must not be empty"));
   }
+  if (direction == ExtrudeDirection::Path)
+    return Result<Feature>::failure(Error::validation(
+        object_id, "path direction requires create_subtractive_path_extrude and a PathCurveId"));
 
   return Result<Feature>::success(Feature(
       std::move(id), std::move(name), FeatureType::SubtractiveExtrude, std::move(input_sketch),
@@ -399,11 +423,30 @@ Result<Feature> Feature::create_subtractive_extrude(FeatureId id, std::string na
       std::move(extrude_intent)));
 }
 
+Result<Feature> Feature::create_subtractive_path_extrude(FeatureId id, std::string name,
+                                                         SketchId input_sketch,
+                                                         FeatureId target_feature,
+                                                         PathCurveId path_curve) {
+  const auto object_id = id.empty() ? std::string("feature") : id.value();
+  if (id.empty() || name.empty() || input_sketch.empty() || target_feature.empty() ||
+      path_curve.empty())
+    return Result<Feature>::failure(Error::validation(
+        object_id,
+        "path cut requires non-empty id, name, input sketch, target feature, and PathCurveId"));
+  auto intent = ExtrudeFeatureIntent::create(ExtrudeExtentIntent::through_all());
+  if (intent.has_error())
+    return Result<Feature>::failure(intent.error());
+  return Result<Feature>::success(Feature(
+      std::move(id), std::move(name), FeatureType::SubtractiveExtrude, std::move(input_sketch),
+      ParameterId(), std::move(target_feature), ExtrudeDirection::Path,
+      SubtractiveExtrudeDepth::ThroughAll, std::move(intent.value()), std::move(path_curve)));
+}
+
 Result<Feature>
 Feature::with_body_result_context(FeatureBodyResultContext body_result_context) const {
-  return Result<Feature>::success(Feature(id_, name_, type_, input_sketch_, length_parameter_,
-                                          target_feature_, direction_, subtractive_depth_,
-                                          extrude_intent_, std::move(body_result_context)));
+  return Result<Feature>::success(
+      Feature(id_, name_, type_, input_sketch_, length_parameter_, target_feature_, direction_,
+              subtractive_depth_, extrude_intent_, path_curve_, std::move(body_result_context)));
 }
 
 const FeatureId& Feature::id() const noexcept {
@@ -439,14 +482,19 @@ const ExtrudeFeatureIntent& Feature::extrude_intent() const noexcept {
   return extrude_intent_;
 }
 
+const std::optional<PathCurveId>& Feature::path_curve() const noexcept {
+  return path_curve_;
+}
+
 Feature::Feature(FeatureId id, std::string name, FeatureType type, SketchId input_sketch,
                  ParameterId length_parameter, FeatureId target_feature, ExtrudeDirection direction,
                  SubtractiveExtrudeDepth subtractive_depth, ExtrudeFeatureIntent extrude_intent,
+                 std::optional<PathCurveId> path_curve,
                  std::optional<FeatureBodyResultContext> body_result_context)
     : id_(std::move(id)), name_(std::move(name)), type_(type),
       input_sketch_(std::move(input_sketch)), length_parameter_(std::move(length_parameter)),
       target_feature_(std::move(target_feature)), direction_(direction),
       subtractive_depth_(subtractive_depth), extrude_intent_(std::move(extrude_intent)),
-      body_result_context_(std::move(body_result_context)) {}
+      path_curve_(std::move(path_curve)), body_result_context_(std::move(body_result_context)) {}
 
 } // namespace blcad

@@ -3,8 +3,8 @@
 Status: implemented in Block 80.
 
 Block 80 introduces persistent, dependency-tracked intent for `SweepFeature`,
-`SweepCutFeature`, and `SweepSurfaceFeature`. It deliberately stops at the Core and JSON
-authority boundary; transient OCCT execution belongs to Block 81.
+`SweepCutFeature`, and `SweepSurfaceFeature`. Blocks 81–82 execute planar and spatial subsets; the
+Core and JSON authority described here remains independent of transient OCCT products.
 
 ## Profile and path authority
 
@@ -22,8 +22,8 @@ By default the Sweep inherits the trajectory's orientation rule. A feature can o
 rule with `profile_normal`, `minimum_twist`, or `fixed_up_vector`. A fixed-up override requires a
 finite, non-zero vector and other overrides must not carry one.
 
-An optional twist reference must resolve to an existing Angle parameter. Block 80 persists and
-tracks this intent; applying the rotation along the path is part of later Sweep Geometry.
+An optional twist reference must resolve to an existing Angle parameter. Block 82 applies that
+rotation along the path and adds an optional distinct open `guide_path` dependency.
 
 ## Body result context
 
@@ -46,6 +46,7 @@ path
 orientation_override = null | profile_normal | minimum_twist | fixed_up_vector
 fixed_up_vector_override = null | {x, y, z}
 twist_parameter = null | ParameterId
+guide_path = null | PathCurveId
 operation_mode
 target_body / produced_body where required by the operation mode
 ```
@@ -64,4 +65,4 @@ The focused suite covers factory invariants for all three feature types, depende
 and removal protection, Body-kind enforcement, strict roundtrip JSON, older-file compatibility,
 and malformed-record rejection.
 
-Blocks 48–80 are implemented. Block 81 Basic Sweep Geometry is next.
+Blocks 48–83 are implemented. Block 83 Path-following Extrude and Extruded Cut is implemented; Block 84 ProfileSectionReference and Loft Core intent plus JSON is next.

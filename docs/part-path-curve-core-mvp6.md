@@ -56,4 +56,4 @@ The focused suite covers tolerance-sensitive planar connectivity, mixed authored
 3D-Sketch dependency/removal protection, all four source families, all orientation metadata,
 strict JSON, and backward compatibility.
 
-Blocks 48–80 are implemented. Block 80 Sweep feature Core intent and JSON is implemented; Block 81 Basic Sweep Geometry is next.
+Blocks 48–83 are implemented. Block 80 Sweep feature Core intent and JSON is implemented; Block 81 Basic Sweep Geometry is implemented; Block 82 3D path, twist, and guide-controlled Sweep is implemented; Block 83 Path-following Extrude and Extruded Cut is implemented; Block 84 ProfileSectionReference and Loft Core intent plus JSON is next.

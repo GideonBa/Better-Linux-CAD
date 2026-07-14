@@ -17,6 +17,7 @@
 #include "blcad/geometry/revolve_adapter.hpp"
 #include "blcad/geometry/shape_cache.hpp"
 #include "blcad/geometry/shell_adapter.hpp"
+#include "blcad/geometry/sweep_adapter.hpp"
 #include "blcad/geometry/workplane_resolver.hpp"
 
 #include <algorithm>
@@ -75,6 +76,9 @@ public:
   [[nodiscard]] Result<std::size_t>
   execute_draft(const PartDocument& document, FeatureId feature_id, ShapeCache& shape_cache) const;
 
+  [[nodiscard]] Result<std::size_t>
+  execute_sweep(const PartDocument& document, FeatureId feature_id, ShapeCache& shape_cache) const;
+
   [[nodiscard]] Result<GeometryRecomputeSummary> execute_plan(const PartDocument& document,
                                                               const RecomputePlan& plan,
                                                               ShapeCache& shape_cache) const;
@@ -83,6 +87,10 @@ public:
                                                                   ShapeCache& shape_cache) const;
 
 private:
+  [[nodiscard]] Result<std::size_t> execute_path_extrude(const PartDocument& document,
+                                                         const Feature& feature,
+                                                         ShapeCache& shape_cache) const;
+
   [[nodiscard]] Result<std::size_t> execute_richer_extrude(const PartDocument& document,
                                                            const Feature& feature,
                                                            ShapeCache& shape_cache) const;
@@ -101,6 +109,7 @@ private:
   BodyBooleanAdapter body_boolean_adapter_;
   BodyTransformAdapter body_transform_adapter_;
   RevolveAdapter revolve_adapter_;
+  SweepAdapter sweep_adapter_;
   CircularPatternAdapter circular_pattern_adapter_;
   LinearPatternAdapter linear_pattern_adapter_;
   MirrorAdapter mirror_adapter_;

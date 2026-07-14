@@ -1,6 +1,6 @@
 # General Assembly Geometric Target and Relationship Roadmap
 
-Status: Blocks 31–47 and Part Construction Blocks 48–80 are implemented. The Assembly MVP handoff is complete; Block 81 is the current next technical step.
+Status: Blocks 31–47 and Part Construction Blocks 48–83 are implemented. The Assembly MVP handoff is complete; Block 83 is implemented; Block 84 is the current next technical step.
 
 This document is the active status and sequencing authority for the expansion from the current assembly target layer to semantic reference geometry, stable generated topology targets, generic geometric relationships, and richer motion-joint families.
 
@@ -644,10 +644,10 @@ exchange products
 posed geometry/contact records/sweep analyses
 ```
 
-## Current next technical step — Block 81
+## Current next technical step — Block 84
 
 Block 47 is implemented in `docs/assembly-spherical-joint-mvp5.md` and completes the Assembly MVP
-handoff. Blocks 48–80 Body identity, body-scoped recompute/inspection, Body Booleans, and
+handoff. Blocks 48–83 Body identity, body-scoped recompute/inspection, Body Booleans, and
 BodyTransform/SketchOwnership intent plus associative Geometry execution, reusable Part-feature
 input references, richer Extrude/Cut intent/JSON plus Geometry, persistent plus executed
 Revolve/RevolveCut, General Part Pattern Core intent/JSON, Linear/Circular Pattern Geometry, and
@@ -655,5 +655,7 @@ MirrorFeature Core intent/JSON plus Geometry, Fillet/Chamfer Core intent/JSON pl
 ShellFeature Core intent/JSON plus Geometry, DraftFeature Core intent/JSON plus Geometry, the
 Basic 3D Sketch Core, richer Arc/Spline/Helix/Guide intent, strict 3D Sketch JSON, deterministic
 transient OCCT Geometry conversion, connected PathCurve Core/JSON intent, and persistent
-Sweep/SweepCut/SweepSurface intent are implemented. Add Basic Sweep Geometry according to
+Sweep/SweepCut/SweepSurface execution through spatial paths, twist, and guide control, plus
+Path-following Extrude and Extruded Cut are implemented. Add ProfileSectionReference and Loft Core
+intent plus JSON according to
 `docs/part-construction-sequence-mvp6.md`.

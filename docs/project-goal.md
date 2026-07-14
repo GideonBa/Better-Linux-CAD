@@ -77,14 +77,15 @@ generated topology target resolution and deterministic target compatibility
 persistent local/Project-level Coincident, Parallel, and Perpendicular intent + JSON
 ```
 
-Blocks 48–80 establish Body identity, body-scoped recompute/inspection, Body Booleans, associative
+Blocks 48–83 establish Body identity, body-scoped recompute/inspection, Body Booleans, associative
 BodyTransform/SketchOwnership behavior, reusable Part-feature semantic input references, and
 persistent richer Extrude/Cut intent plus Geometry, Revolve/RevolveCut intent plus Geometry, and
 general Linear/Circular Pattern intent plus Geometry, persistent plus executed MirrorFeature
 Geometry, persistent plus executed Fillet/Chamfer/Shell/Draft Geometry, and model-space 3D Sketch
 Core through persistent Arc/Spline/Helix/Guide intent, strict JSON, deterministic transient OCCT
-conversion, reusable connected PathCurve intent, and persistent Sweep/SweepCut/SweepSurface
-intent. The current next technical step is Block 81 Basic Sweep Geometry. STEP Part and
+conversion, reusable connected PathCurve intent, executed Sweep/SweepCut/SweepSurface through
+spatial paths, twist, and guide control, and path-following Extrude/Extruded Cut. The current next
+technical step is Block 84 ProfileSectionReference and Loft Core intent plus JSON. STEP Part and
 structured Assembly import follows that sequence in Blocks 95–101.
 
 Several identity/authority questions are deliberately separated.
@@ -207,7 +208,7 @@ Blocks 32–34 established assembly-selectable reference geometry Core intent, s
 
 Block 35 establishes stable generated topology identity and recovery before Geometry topology lookup. Canonical `topo:` spellings encode exact semantic producer identities for cylindrical wall, rectangular linear-edge/vertex roles, and circular source/opposite rim roles. Producer role matrices publish expected cardinality and unsupported/ambiguous/patterned sources fail closed. Recovery is read-only and never writes raw kernel topology ids.
 
-Block 36 resolves the supported Block-35 semantic producers into Cylinder/Axis, Line, Circle/Axis/center Point, and Point capabilities, computed analytically from validated model intent for both component-local and exact rooted transform semantics. Block 37 adds deterministic relationship/target compatibility selection. Block 38 adds persistent local/Project-level relationship intent. Blocks 39–47 complete generic equations and the Assembly joint families through Spherical. Blocks 48–80 add stable Body identity, body-scoped recompute/inspection, Body Booleans, associative Body transforms, reusable Part-feature semantic input references, richer Extrude/Cut extent/taper/thin intent plus Geometry, persistent plus executed Revolve/RevolveCut, general Pattern Core intent plus Geometry, persistent plus executed MirrorFeature Geometry, persistent plus executed Fillet/Chamfer/Shell/Draft Geometry, persistent model-space 3D Sketch Geometry, reusable connected PathCurve Core/JSON intent, and persistent Sweep/SweepCut/SweepSurface Core/JSON intent. The next authority step is Block 81 Basic Sweep Geometry.
+Block 36 resolves the supported Block-35 semantic producers into Cylinder/Axis, Line, Circle/Axis/center Point, and Point capabilities, computed analytically from validated model intent for both component-local and exact rooted transform semantics. Block 37 adds deterministic relationship/target compatibility selection. Block 38 adds persistent local/Project-level relationship intent. Blocks 39–47 complete generic equations and the Assembly joint families through Spherical. Blocks 48–83 add stable Body identity, body-scoped recompute/inspection, Body Booleans, associative Body transforms, reusable Part-feature semantic input references, richer Extrude/Cut extent/taper/thin intent plus Geometry, persistent plus executed Revolve/RevolveCut, general Pattern Core intent plus Geometry, persistent plus executed MirrorFeature Geometry, persistent plus executed Fillet/Chamfer/Shell/Draft Geometry, persistent model-space 3D Sketch Geometry, reusable connected PathCurve Core/JSON intent, executed Sweep/SweepCut/SweepSurface through spatial paths, twist, and guide control, and path-following Extrude/Extruded Cut. The next authority step is Block 84 ProfileSectionReference and Loft Core intent plus JSON.
 
 Canonical sequence: `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`.
 

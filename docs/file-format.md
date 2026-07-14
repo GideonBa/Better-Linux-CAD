@@ -805,11 +805,28 @@ identity. Resolved endpoints and OCCT identities are never stored. Canonical det
 
 Block 80 adds the always-emitted, optional-on-read `sweep_features` array. Its strict records store
 `id`, `name`, `type`, a closed-region or open-PathCurve `profile`, trajectory `path`, nullable
-orientation/fixed-up-vector overrides, nullable Angle `twist_parameter`, `operation_mode`, and the
-target/produced Body fields required by that operation. Missing dependencies, incompatible
+orientation/fixed-up-vector overrides, nullable Angle `twist_parameter`, nullable `guide_path`,
+`operation_mode`, and the target/produced Body fields required by that operation. Missing dependencies, incompatible
 profile/type or operation combinations, wrong Body kinds, and extra fields fail closed. Derived
 path frames and OCCT topology are never stored. Canonical details are in
 `docs/part-sweep-intent-mvp6.md`.
+
+Block 81 adds no persistent fields. Its resolved profile/spine wires, orientation frames, Boolean
+products, and OCCT shapes are transient Geometry cache products. Canonical execution details are
+in `docs/part-sweep-geometry-mvp6.md`.
+
+Block 82 adds the nullable `guide_path` field to each strict Sweep record. New writers always emit
+it; readers also accept the older record shape without it. The guide must resolve to a distinct
+open PathCurve and participates in dependency invalidation. Spatial curve samples, twist frames,
+guide wires, and OCCT topology remain transient. Canonical details are in
+`docs/part-sweep-3d-geometry-mvp6.md`.
+
+Block 83 extends existing Feature records without a new top-level array. Path-following
+`additive_extrude` and `subtractive_extrude` records store `direction: "path"` and a required
+`path_curve` string, and omit the straight-mode `extrude` object. Straight records reject
+`path_curve` and remain byte-shape compatible with their historical representation. Resolved path
+frames and OCCT topology remain transient. Canonical details are in
+`docs/part-path-extrude-geometry-mvp6.md`.
 
 ## Planned STEP import persistence after Block 94
 

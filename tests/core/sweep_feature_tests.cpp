@@ -74,13 +74,17 @@ PartDocument sweep_document() {
   auto trajectory = LineSegment::create(SketchEntityId("line.trajectory"), {0.0, 0.0}, {8.0, 0.0});
   auto open_profile =
       LineSegment::create(SketchEntityId("line.open-profile"), {0.0, 0.0}, {0.0, 2.0});
+  auto guide = LineSegment::create(SketchEntityId("line.guide"), {0.0, 3.0}, {8.0, 3.0});
   REQUIRE(trajectory);
   REQUIRE(open_profile);
+  REQUIRE(guide);
   REQUIRE(paths.value().add_entity(trajectory.value()));
   REQUIRE(paths.value().add_entity(open_profile.value()));
+  REQUIRE(paths.value().add_entity(guide.value()));
   REQUIRE(document.value().add_sketch(paths.value()));
   REQUIRE(document.value().add_path_curve(path("path.trajectory", "line.trajectory")));
   REQUIRE(document.value().add_path_curve(path("path.open-profile", "line.open-profile")));
+  REQUIRE(document.value().add_path_curve(path("path.guide", "line.guide")));
 
   REQUIRE(document.value().add_body(body("body.sweep", BodyKind::Solid)));
   REQUIRE(document.value().add_body(body("body.cut", BodyKind::Solid)));
@@ -150,10 +154,12 @@ TEST_CASE("Block 80 integrates sweep sources bodies and twist into the dependenc
         affected.value().end());
 }
 
-TEST_CASE("Block 80 roundtrips all sweep families and remains additive", "[core][sweep-feature]") {
+TEST_CASE("Blocks 80 and 82 roundtrip sweep families and optional guides",
+          "[core][sweep-feature]") {
   auto document = sweep_document();
-  auto solid = SweepFeature::create_sweep(FeatureId("sweep.solid"), "Solid", closed_profile(),
-                                          PathCurveId("path.trajectory"), new_body("body.sweep"));
+  auto solid = SweepFeature::create_sweep(
+      FeatureId("sweep.solid"), "Solid", closed_profile(), PathCurveId("path.trajectory"),
+      new_body("body.sweep"), std::nullopt, std::nullopt, std::nullopt, PathCurveId("path.guide"));
   auto cut = SweepFeature::create_sweep_cut(FeatureId("sweep.cut"), "Cut", closed_profile(),
                                             PathCurveId("path.trajectory"), cut_body("body.cut"),
                                             PathOrientationRule::ProfileNormal, std::nullopt,
@@ -176,6 +182,18 @@ TEST_CASE("Block 80 roundtrips all sweep families and remains additive", "[core]
         SweepProfileKind::OpenPath);
   CHECK(restored.value().find_sweep_feature(FeatureId("sweep.cut"))->twist_parameter() ==
         ParameterId("sweep.twist"));
+  CHECK(restored.value().find_sweep_feature(FeatureId("sweep.solid"))->guide_path() ==
+        PathCurveId("path.guide"));
+  CHECK(restored.value().dependency_graph().has_dependency("path.guide", "sweep.solid"));
+
+  json legacy_feature = json::parse(serialized.value());
+  legacy_feature["sweep_features"][0].erase("guide_path");
+  auto legacy_restored = deserialize_part_document_from_json(legacy_feature.dump());
+  REQUIRE(legacy_restored);
+  CHECK_FALSE(legacy_restored.value()
+                  .find_sweep_feature(FeatureId("sweep.solid"))
+                  ->guide_path()
+                  .has_value());
 
   json historical = json::parse(serialized.value());
   historical.erase("sweep_features");

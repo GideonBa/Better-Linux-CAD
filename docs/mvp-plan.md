@@ -4,17 +4,17 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 80
-current_block: 81
-current_boundary: Basic Sweep Geometry
-current_tag: "[geometry][sweep-feature]"
+implemented_through: Block 83
+current_block: 84
+current_boundary: ProfileSectionReference and Loft Core intent plus JSON
+current_tag: "[core][loft-feature]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
   mvp_3: "Parametric bolt circle pattern — implemented"
   mvp_4: "Assembly parameters and Project container — implemented"
   mvp_5: "Assembly relationships, motion, hierarchy, analysis, exchange — Blocks 1–47 implemented"
-  mvp_6: "Part Construction — Blocks 48–80 implemented, Blocks 81–94 planned, Block 81 next"
+  mvp_6: "Part Construction — Blocks 48–83 implemented, Blocks 84–94 planned, Block 84 next"
   mvp_7: "STEP Import — Blocks 95–101 planned after Block 94"
 ---
 
@@ -552,10 +552,10 @@ motion solvers reject Spherical as the selected drive.
 
 ## MVP 6 — Part Construction MVP after Block 47
 
-**Status:** In progress — Blocks 48–80 implemented
+**Status:** In progress — Blocks 48–83 implemented
 **Canonical:** sequence `docs/part-construction-sequence-mvp6.md`
 
-Blocks 48–80 are complete. Block 81 is the current next technical step.
+Blocks 48–83 are complete. Block 84 is the current next technical step.
 
 Mandatory Part Construction phase order:
 
@@ -1111,7 +1111,50 @@ Canonical contract: `docs/part-sweep-intent-mvp6.md`.
 [core][sweep-feature]
 ```
 
-## Current next technical step — Block 81
+## Block 81 — Basic Sweep Geometry — Implemented
 
-Implement Basic Sweep Geometry according to
+Block 81 adds shared transactional OCCT pipe execution for bounded ConstructionLine and planar
+line/arc/polyline paths. Closed rectangle, circle, line, and arc/spline profiles produce solids;
+open planar PathCurve profiles produce surfaces. SweepCut and the other Body operation modes reuse
+the established Boolean/history path. Frenet, corrected-Frenet, and fixed-up orientation are
+explicit. Twist and spatial paths formed the fail-closed handoff subsequently implemented by
+Block 82.
+
+Canonical contract: `docs/part-sweep-geometry-mvp6.md`.
+
+```text
+[geometry][sweep-feature]
+```
+
+## Block 82 — 3D path, twist, and guide-controlled Sweep — Implemented
+
+Block 82 extends the shared Sweep pipeline to model-space Sketch3D line, polyline, arc, spline,
+and helix sources and to mixed connected PathCurves. Explicit Angle-driven twist and an optional
+dependency-tracked guide PathCurve are executed through the OCCT pipe-shell adapter. Minimum-twist
+and fixed-up rules retain the Block-81 contract; guide plus twist is rejected as ambiguous. The
+guide reference is additive, strict JSON intent and older Block-80 records remain readable.
+
+Canonical contract: `docs/part-sweep-3d-geometry-mvp6.md`.
+
+```text
+[geometry][sweep-3d]
+```
+
+## Block 83 — Path-following Extrude and Extruded Cut — Implemented
+
+Block 83 extends the existing AdditiveExtrude and SubtractiveExtrude model with a Path direction
+and dependency-tracked PathCurveId. Core validation and compatible JSON preserve the Extrude
+feature identity, while transactional Geometry reuses the connected path/frame pipeline for
+NewBody, Join, Cut, and Intersect results.
+
+Canonical contract: `docs/part-path-extrude-geometry-mvp6.md`.
+
+```text
+[core][path-extrude]
+[geometry][path-extrude]
+```
+
+## Current next technical step — Block 84
+
+Implement ProfileSectionReference and Loft Core intent plus JSON according to
 `docs/part-construction-sequence-mvp6-planning-detail.md`.

@@ -339,6 +339,23 @@ validate_generated_vertex_reference(const PartDocument& document,
 
 [[nodiscard]] Result<std::size_t> validate_extrude_feature_intent(const PartDocument& document,
                                                                   const Feature& feature) {
+  if (feature.direction() == ExtrudeDirection::Path) {
+    if (!feature.path_curve().has_value())
+      return Result<std::size_t>::failure(
+          Error::validation(feature.id().value(), "path extrude requires a PathCurveId"));
+    const PathCurve* path = document.find_path_curve(*feature.path_curve());
+    if (path == nullptr || path->closure() != PathClosure::Open)
+      return Result<std::size_t>::failure(Error::validation(
+          feature.id().value(), "path extrude requires an existing open PathCurve"));
+    if (feature.extrude_intent().taper_angle_deg().has_value() ||
+        feature.extrude_intent().thin().has_value())
+      return Result<std::size_t>::failure(Error::validation(
+          feature.id().value(), "path extrude does not accept taper or thin intent"));
+    return Result<std::size_t>::success(1U);
+  }
+  if (feature.path_curve().has_value())
+    return Result<std::size_t>::failure(
+        Error::validation(feature.id().value(), "straight extrude must not reference a PathCurve"));
   const auto& extent = feature.extrude_intent().extent();
   for (const auto* parameter :
        {&extent.first_distance_parameter(), &extent.second_distance_parameter()}) {
@@ -374,6 +391,12 @@ validate_generated_vertex_reference(const PartDocument& document,
 
 [[nodiscard]] Result<std::size_t> add_extrude_feature_dependencies(DependencyGraph& graph,
                                                                    const Feature& feature) {
+  if (feature.direction() == ExtrudeDirection::Path) {
+    auto dependency =
+        add_dependency_if_missing(graph, feature.path_curve()->value(), feature.id().value());
+    return dependency.has_error() ? dependency
+                                  : Result<std::size_t>::success(graph.dependency_count());
+  }
   const auto& extent = feature.extrude_intent().extent();
   for (const auto* parameter :
        {&extent.first_distance_parameter(), &extent.second_distance_parameter()}) {
@@ -1521,13 +1544,23 @@ Result<std::size_t> PartDocument::add_sweep_feature(SweepFeature feature) {
   if (find_path_curve(feature.path()) == nullptr)
     return Result<std::size_t>::failure(
         Error::validation(feature.id().value(), "sweep trajectory PathCurve must exist"));
+  if (feature.guide_path().has_value()) {
+    const PathCurve* guide = find_path_curve(*feature.guide_path());
+    if (guide == nullptr || guide->closure() != PathClosure::Open)
+      return Result<std::size_t>::failure(Error::validation(
+          feature.id().value(), "sweep guide must reference an existing open PathCurve"));
+    if (*feature.guide_path() == feature.path() ||
+        (feature.profile().kind() == SweepProfileKind::OpenPath &&
+         *feature.guide_path() == std::get<PathCurveId>(feature.profile().source())))
+      return Result<std::size_t>::failure(Error::validation(
+          feature.id().value(), "sweep guide must differ from profile and trajectory paths"));
+  }
   if (feature.twist_parameter().has_value()) {
     const Parameter* twist = find_parameter(*feature.twist_parameter());
     if (twist == nullptr || twist->type() != ParameterType::Angle)
       return Result<std::size_t>::failure(Error::validation(
           feature.id().value(), "sweep twist must reference an existing Angle parameter"));
   }
-
   const auto& context = feature.body_result_context();
   if (context.target_body().has_value() && !has_body_id(*context.target_body()))
     return Result<std::size_t>::failure(
@@ -1560,6 +1593,12 @@ Result<std::size_t> PartDocument::add_sweep_feature(SweepFeature feature) {
   if (feature.twist_parameter().has_value()) {
     auto dependency =
         add_dependency_if_missing(graph, feature.twist_parameter()->value(), feature.id().value());
+    if (dependency.has_error())
+      return Result<std::size_t>::failure(dependency.error());
+  }
+  if (feature.guide_path().has_value()) {
+    auto dependency =
+        add_dependency_if_missing(graph, feature.guide_path()->value(), feature.id().value());
     if (dependency.has_error())
       return Result<std::size_t>::failure(dependency.error());
   }

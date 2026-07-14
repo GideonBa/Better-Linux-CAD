@@ -18,6 +18,7 @@ enum class FeatureType {
 enum class ExtrudeDirection {
   SketchNormal,
   OppositeSketchNormal,
+  Path,
 };
 
 enum class SubtractiveExtrudeDepth {
@@ -147,6 +148,10 @@ public:
                           ExtrudeFeatureIntent extrude_intent,
                           ExtrudeDirection direction = ExtrudeDirection::SketchNormal);
 
+  [[nodiscard]] static Result<Feature> create_additive_path_extrude(FeatureId id, std::string name,
+                                                                    SketchId input_sketch,
+                                                                    PathCurveId path_curve);
+
   [[nodiscard]] static Result<Feature>
   create_subtractive_extrude(FeatureId id, std::string name, SketchId input_sketch,
                              FeatureId target_feature,
@@ -157,6 +162,10 @@ public:
   create_subtractive_extrude(FeatureId id, std::string name, SketchId input_sketch,
                              FeatureId target_feature, ExtrudeFeatureIntent extrude_intent,
                              ExtrudeDirection direction = ExtrudeDirection::SketchNormal);
+
+  [[nodiscard]] static Result<Feature>
+  create_subtractive_path_extrude(FeatureId id, std::string name, SketchId input_sketch,
+                                  FeatureId target_feature, PathCurveId path_curve);
 
   [[nodiscard]] Result<Feature>
   with_body_result_context(FeatureBodyResultContext body_result_context) const;
@@ -171,11 +180,13 @@ public:
   [[nodiscard]] SubtractiveExtrudeDepth subtractive_depth() const noexcept;
   [[nodiscard]] const std::optional<FeatureBodyResultContext>& body_result_context() const noexcept;
   [[nodiscard]] const ExtrudeFeatureIntent& extrude_intent() const noexcept;
+  [[nodiscard]] const std::optional<PathCurveId>& path_curve() const noexcept;
 
 private:
   Feature(FeatureId id, std::string name, FeatureType type, SketchId input_sketch,
           ParameterId length_parameter, FeatureId target_feature, ExtrudeDirection direction,
           SubtractiveExtrudeDepth subtractive_depth, ExtrudeFeatureIntent extrude_intent,
+          std::optional<PathCurveId> path_curve = std::nullopt,
           std::optional<FeatureBodyResultContext> body_result_context = std::nullopt);
 
   FeatureId id_;
@@ -187,6 +198,7 @@ private:
   ExtrudeDirection direction_;
   SubtractiveExtrudeDepth subtractive_depth_;
   ExtrudeFeatureIntent extrude_intent_;
+  std::optional<PathCurveId> path_curve_;
   std::optional<FeatureBodyResultContext> body_result_context_;
 };
 
