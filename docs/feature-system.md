@@ -96,9 +96,9 @@ Fit/Control Splines, typed Helices, and Guide-Curve roles. Block 77 adds strict 
 and source-identity-only semantic references. Block 78 executes deterministic transient OCCT
 Geometry without writing topology identity back into Core. Block 79 adds PathCurve intent, Block
 80 adds Sweep/SweepCut/SweepSurface intent, Blocks 81–82 execute planar then spatial paths, twist,
-and guide control, and Block 83 adds path-following AdditiveExtrude/SubtractiveExtrude while
-preserving their feature identity. Block 84 ProfileSectionReference and Loft Core intent plus JSON
-is next.
+and guide control, Block 83 adds path-following AdditiveExtrude/SubtractiveExtrude, and Block 84
+adds persistent ordered Loft/LoftCut/LoftSurface intent. Block 85 Two-section Loft Geometry on
+arbitrary planes is next.
 
 The long-term sketcher and feature parity target is documented in `docs/inventor-like-sketcher-and-feature-roadmap.md`.
 
@@ -155,9 +155,9 @@ The detailed roadmap is in `docs/multi-body-transform-and-path-features-roadmap.
 
 ## Sweep, loft, path-following extrude, and surfacing
 
-Sweep Geometry through spatial/twisted/guided paths and path-following Extrude/Extruded Cut are
-implemented. Loft and broader surfacing remain first-class feature families in the active Part
-Construction sequence.
+Sweep Geometry through spatial/twisted/guided paths, path-following Extrude/Extruded Cut, and Loft
+Core intent are implemented. Loft Geometry and broader surfacing remain first-class feature
+families in the active Part Construction sequence.
 
 Target behavior:
 
@@ -168,9 +168,10 @@ Target behavior:
   ConstructionLine or planar line/arc/polyline trajectories.
 - Implemented `SweepCutFeature` removes that swept volume from a target body; `SweepSurface`
   executes an open planar PathCurve profile.
-- `LoftFeature` consumes two or more profile sections.
-- `LoftCutFeature` removes a lofted volume from a target body.
-- `LoftFeature` can later accept a path curve or guide curves.
+- Implemented `LoftFeature` consumes two or more explicitly ordered profile sections and may
+  reference a primary path, ordered guide curves, and C0/G1/G2 continuity intent.
+- Implemented `LoftCutFeature` persists removal intent for a target body.
+- Implemented `LoftSurfaceFeature` accepts homogeneous closed or open PathCurve sections.
 - Profile-section sketches in a loft may be on arbitrarily oriented planes.
 - Section ordering, seam/alignment references, and optional normal flips must be explicit to avoid random twist.
 - `GuidedLoft` uses guide curves or rails to control shape flow.

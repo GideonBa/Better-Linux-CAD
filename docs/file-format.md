@@ -828,6 +828,14 @@ Block 83 extends existing Feature records without a new top-level array. Path-fo
 frames and OCCT topology remain transient. Canonical details are in
 `docs/part-path-extrude-geometry-mvp6.md`.
 
+Block 84 adds the always-emitted, optional-on-read top-level `loft_features` array. Strict records
+store `loft`, `loft_cut`, or `loft_surface`, at least two ordered section records, nullable primary
+`path_curve`, ordered `guide_curves`, `c0|g1|g2` continuity, and mandatory Body-result intent.
+Every section emits closed sketch/profile or open PathCurve source slots, optional boundary
+alignment and Angle rotation IDs, plus `flip_normal`; inactive source slots are null. Historical
+files missing the array restore zero Loft features. Derived correspondence, workplane frames, and
+OCCT topology are not stored. Canonical details are in `docs/part-loft-intent-mvp6.md`.
+
 ## Planned STEP import persistence after Block 94
 
 This section is planned architecture, not part of the current schema. Blocks 95–101 in

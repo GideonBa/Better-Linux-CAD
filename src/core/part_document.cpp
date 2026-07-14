@@ -1639,6 +1639,155 @@ Result<std::size_t> PartDocument::add_sweep_feature(SweepFeature feature) {
   return Result<std::size_t>::success(sweep_features_.size() - 1U);
 }
 
+Result<std::size_t> PartDocument::add_loft_feature(LoftFeature feature) {
+  if (has_any_feature_id(feature.id()))
+    return Result<std::size_t>::failure(
+        Error::validation(feature.id().value(), "feature id must be unique within part document"));
+  for (const auto& section : feature.sections()) {
+    if (section.kind() == LoftSectionKind::OpenPath) {
+      const PathCurveId path_id = std::get<PathCurveId>(section.source());
+      const PathCurve* path = find_path_curve(path_id);
+      if (path == nullptr || path->closure() != PathClosure::Open)
+        return Result<std::size_t>::failure(Error::validation(
+            feature.id().value(), "open loft section must reference an existing open PathCurve"));
+    } else {
+      const auto& profile = std::get<ProfileRegionReference>(section.source());
+      auto valid = validate_part_feature_input_reference(*this, profile);
+      if (valid.has_error())
+        return Result<std::size_t>::failure(valid.error());
+      if (section.alignment_reference().has_value()) {
+        const Sketch* sketch = find_sketch(profile.sketch());
+        const SketchEntityId alignment = *section.alignment_reference();
+        bool belongs = false;
+        if (const ClosedProfile* closed = sketch->find_closed_profile(profile.profile()))
+          belongs = std::find(closed->line_segments().begin(), closed->line_segments().end(),
+                              alignment) != closed->line_segments().end();
+        if (const ArcClosedProfile* closed = sketch->find_arc_closed_profile(profile.profile()))
+          belongs = std::find(closed->curve_segments().begin(), closed->curve_segments().end(),
+                              alignment) != closed->curve_segments().end();
+        if (const CompositeClosedProfile* closed =
+                sketch->find_composite_closed_profile(profile.profile())) {
+          belongs = std::find(closed->outer_contour().begin(), closed->outer_contour().end(),
+                              alignment) != closed->outer_contour().end();
+          for (const auto& inner : closed->inner_contours())
+            belongs = belongs || std::find(inner.begin(), inner.end(), alignment) != inner.end();
+        }
+        if (!belongs)
+          return Result<std::size_t>::failure(Error::validation(
+              feature.id().value(),
+              "loft section alignment must identify an entity on that profile boundary"));
+      }
+    }
+    if (section.rotation_offset().has_value()) {
+      const Parameter* rotation = find_parameter(*section.rotation_offset());
+      if (rotation == nullptr || rotation->type() != ParameterType::Angle)
+        return Result<std::size_t>::failure(Error::validation(
+            feature.id().value(), "loft section rotation must reference an Angle parameter"));
+    }
+  }
+  const auto validate_open_path = [this, &feature](const PathCurveId& id,
+                                                   std::string_view role) -> Result<std::size_t> {
+    const PathCurve* path = find_path_curve(id);
+    if (path == nullptr || path->closure() != PathClosure::Open)
+      return Result<std::size_t>::failure(Error::validation(
+          feature.id().value(),
+          std::string("loft ") + std::string(role) + " must reference an existing open PathCurve"));
+    return Result<std::size_t>::success(1U);
+  };
+  if (feature.path_curve().has_value()) {
+    auto valid = validate_open_path(*feature.path_curve(), "path");
+    if (valid.has_error())
+      return valid;
+  }
+  for (const auto& guide : feature.guide_curves()) {
+    auto valid = validate_open_path(guide, "guide");
+    if (valid.has_error())
+      return valid;
+  }
+  const auto& context = feature.body_result_context();
+  if (context.target_body().has_value() && !has_body_id(*context.target_body()))
+    return Result<std::size_t>::failure(
+        Error::validation(feature.id().value(), "loft target body must exist"));
+  const Body* produced = find_body(context.effective_produced_body());
+  if (produced == nullptr)
+    return Result<std::size_t>::failure(
+        Error::validation(feature.id().value(), "loft produced body must exist"));
+  const bool surface = feature.kind() == LoftFeatureKind::LoftSurface;
+  if ((surface && produced->kind() != BodyKind::Surface) ||
+      (!surface && produced->kind() != BodyKind::Solid))
+    return Result<std::size_t>::failure(
+        Error::validation(feature.id().value(), "loft produced body kind must match feature kind"));
+  if (context.target_body().has_value()) {
+    const Body* target = find_body(*context.target_body());
+    if (target == nullptr || target->kind() != BodyKind::Solid)
+      return Result<std::size_t>::failure(
+          Error::validation(feature.id().value(), "solid loft target must be a solid Body"));
+  }
+
+  auto graph = dependency_graph_;
+  auto node = graph.add_node(feature.id().value());
+  if (node.has_error())
+    return Result<std::size_t>::failure(node.error());
+  for (const auto& section : feature.sections()) {
+    auto dependency =
+        add_dependency_if_missing(graph, section.source_node_id(), feature.id().value());
+    if (dependency.has_error())
+      return Result<std::size_t>::failure(dependency.error());
+    if (section.rotation_offset().has_value()) {
+      dependency = add_dependency_if_missing(graph, section.rotation_offset()->value(),
+                                             feature.id().value());
+      if (dependency.has_error())
+        return Result<std::size_t>::failure(dependency.error());
+    }
+  }
+  if (feature.path_curve().has_value()) {
+    auto dependency =
+        add_dependency_if_missing(graph, feature.path_curve()->value(), feature.id().value());
+    if (dependency.has_error())
+      return Result<std::size_t>::failure(dependency.error());
+  }
+  for (const auto& guide : feature.guide_curves()) {
+    auto dependency = add_dependency_if_missing(graph, guide.value(), feature.id().value());
+    if (dependency.has_error())
+      return Result<std::size_t>::failure(dependency.error());
+  }
+  const std::string result_node = body_dependency_node_id(context.effective_produced_body());
+  const bool modifies_in_place = context.target_body().has_value() &&
+                                 *context.target_body() == context.effective_produced_body();
+  if (modifies_in_place) {
+    const auto previous_producers = dependency_sources_of(graph, result_node);
+    graph.remove_dependencies_of_dependent(result_node);
+    for (const auto& producer : previous_producers) {
+      auto dependency = add_dependency_if_missing(graph, producer, feature.id().value());
+      if (dependency.has_error())
+        return Result<std::size_t>::failure(dependency.error());
+    }
+  } else {
+    if (!dependency_sources_of(graph, result_node).empty())
+      return Result<std::size_t>::failure(Error::dependency(
+          feature.id().value(), "loft produced body already has a producing feature"));
+    if (context.target_body().has_value()) {
+      auto dependency = add_dependency_if_missing(
+          graph, body_dependency_node_id(*context.target_body()), feature.id().value());
+      if (dependency.has_error())
+        return Result<std::size_t>::failure(dependency.error());
+    }
+  }
+  auto result_dependency = add_dependency_if_missing(graph, feature.id().value(), result_node);
+  if (result_dependency.has_error())
+    return Result<std::size_t>::failure(result_dependency.error());
+  if (graph.has_cycle())
+    return Result<std::size_t>::failure(
+        Error::dependency(feature.id().value(), "loft must not create a dependency cycle"));
+  auto invalidation_state = invalidation_state_;
+  auto synced = sync_graph(std::move(graph), invalidation_state, dependency_graph_);
+  if (synced.has_error())
+    return Result<std::size_t>::failure(synced.error());
+  invalidation_state_ = std::move(invalidation_state);
+  loft_features_.push_back(std::move(feature));
+  return Result<std::size_t>::success(loft_features_.size() - 1U);
+}
+
 Result<std::size_t> PartDocument::add_linear_pattern_feature(LinearPatternFeature feature) {
   if (has_any_feature_id(feature.id()))
     return Result<std::size_t>::failure(
@@ -2389,6 +2538,13 @@ Result<std::size_t> PartDocument::remove_body(BodyId id) {
       return Result<std::size_t>::failure(
           Error::dependency(id.value(), "body with dependent model intent cannot be removed"));
   }
+  for (const auto& feature : loft_features_) {
+    const auto& context = feature.body_result_context();
+    if ((context.target_body().has_value() && *context.target_body() == id) ||
+        context.effective_produced_body() == id)
+      return Result<std::size_t>::failure(
+          Error::dependency(id.value(), "body with dependent model intent cannot be removed"));
+  }
   for (const auto& feature : linear_pattern_features_) {
     const auto& context = feature.body_result_context();
     const bool references_body =
@@ -2781,6 +2937,9 @@ const std::vector<RevolveFeature>& PartDocument::revolve_features() const noexce
 const std::vector<SweepFeature>& PartDocument::sweep_features() const noexcept {
   return sweep_features_;
 }
+const std::vector<LoftFeature>& PartDocument::loft_features() const noexcept {
+  return loft_features_;
+}
 const std::vector<LinearPatternFeature>& PartDocument::linear_pattern_features() const noexcept {
   return linear_pattern_features_;
 }
@@ -2871,6 +3030,9 @@ std::size_t PartDocument::revolve_feature_count() const noexcept {
 }
 std::size_t PartDocument::sweep_feature_count() const noexcept {
   return sweep_features_.size();
+}
+std::size_t PartDocument::loft_feature_count() const noexcept {
+  return loft_features_.size();
 }
 std::size_t PartDocument::linear_pattern_feature_count() const noexcept {
   return linear_pattern_features_.size();
@@ -2998,6 +3160,12 @@ const RevolveFeature* PartDocument::find_revolve_feature(FeatureId id) const noe
 }
 const SweepFeature* PartDocument::find_sweep_feature(FeatureId id) const noexcept {
   for (const auto& feature : sweep_features_)
+    if (feature.id() == id)
+      return &feature;
+  return nullptr;
+}
+const LoftFeature* PartDocument::find_loft_feature(FeatureId id) const noexcept {
+  for (const auto& feature : loft_features_)
     if (feature.id() == id)
       return &feature;
   return nullptr;
@@ -3141,6 +3309,9 @@ bool PartDocument::has_revolve_feature_id(const FeatureId& id) const noexcept {
 bool PartDocument::has_sweep_feature_id(const FeatureId& id) const noexcept {
   return find_sweep_feature(id) != nullptr;
 }
+bool PartDocument::has_loft_feature_id(const FeatureId& id) const noexcept {
+  return find_loft_feature(id) != nullptr;
+}
 bool PartDocument::has_linear_pattern_feature_id(const FeatureId& id) const noexcept {
   return find_linear_pattern_feature(id) != nullptr;
 }
@@ -3175,9 +3346,10 @@ bool PartDocument::has_body_transform_id(const BodyTransformId& id) const noexce
 }
 bool PartDocument::has_any_feature_id(const FeatureId& id) const noexcept {
   return has_feature_id(id) || has_revolve_feature_id(id) || has_sweep_feature_id(id) ||
-         has_linear_pattern_feature_id(id) || has_circular_pattern_feature_id(id) ||
-         has_mirror_feature_id(id) || has_fillet_feature_id(id) || has_chamfer_feature_id(id) ||
-         has_shell_feature_id(id) || has_draft_feature_id(id) || has_body_boolean_feature_id(id);
+         has_loft_feature_id(id) || has_linear_pattern_feature_id(id) ||
+         has_circular_pattern_feature_id(id) || has_mirror_feature_id(id) ||
+         has_fillet_feature_id(id) || has_chamfer_feature_id(id) || has_shell_feature_id(id) ||
+         has_draft_feature_id(id) || has_body_boolean_feature_id(id);
 }
 bool PartDocument::has_body_id(const BodyId& id) const noexcept {
   return find_body(id) != nullptr;

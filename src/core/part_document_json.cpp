@@ -2383,6 +2383,147 @@ using ParsedPartPattern = std::variant<LinearPatternFeature, CircularPatternFeat
   return Result<SweepFeature>::failure(json_error("unsupported sweep feature type"));
 }
 
+[[nodiscard]] json loft_feature_to_json(const LoftFeature& feature) {
+  json sections = json::array();
+  for (const auto& section : feature.sections()) {
+    json value{{"kind", std::string(to_string(section.kind()))},
+               {"sketch", nullptr},
+               {"profile", nullptr},
+               {"path_curve", nullptr},
+               {"alignment_reference", nullptr},
+               {"flip_normal", section.flip_normal()},
+               {"rotation_offset", nullptr}};
+    if (section.kind() == LoftSectionKind::ClosedRegion) {
+      const auto& profile = std::get<ProfileRegionReference>(section.source());
+      value["sketch"] = profile.sketch().value();
+      value["profile"] = profile.profile().value();
+      if (section.alignment_reference().has_value())
+        value["alignment_reference"] = section.alignment_reference()->value();
+    } else {
+      value["path_curve"] = std::get<PathCurveId>(section.source()).value();
+    }
+    if (section.rotation_offset().has_value())
+      value["rotation_offset"] = section.rotation_offset()->value();
+    sections.push_back(std::move(value));
+  }
+  json guides = json::array();
+  for (const auto& guide : feature.guide_curves())
+    guides.push_back(guide.value());
+  json value{
+      {"id", feature.id().value()},
+      {"name", feature.name()},
+      {"type", std::string(to_string(feature.kind()))},
+      {"sections", std::move(sections)},
+      {"path_curve", nullptr},
+      {"guide_curves", std::move(guides)},
+      {"continuity", std::string(to_string(feature.continuity()))},
+      {"operation_mode", std::string(to_string(feature.body_result_context().operation_mode()))}};
+  if (feature.path_curve().has_value())
+    value["path_curve"] = feature.path_curve()->value();
+  const auto& context = feature.body_result_context();
+  if (context.target_body().has_value())
+    value["target_body"] = context.target_body()->value();
+  if (context.produced_body().has_value())
+    value["produced_body"] = context.produced_body()->value();
+  return value;
+}
+
+[[nodiscard]] Result<LoftFeature> loft_feature_from_json(const json& value) {
+  const std::size_t expected_size =
+      8U + (value.contains("target_body") ? 1U : 0U) + (value.contains("produced_body") ? 1U : 0U);
+  if (!value.is_object() || value.size() != expected_size || !value.contains("id") ||
+      !value.contains("name") || !value.contains("type") || !value.contains("sections") ||
+      !value.contains("path_curve") || !value.contains("guide_curves") ||
+      !value.contains("continuity") || !value.contains("operation_mode") ||
+      !value.at("id").is_string() || !value.at("name").is_string() ||
+      !value.at("type").is_string() || !value.at("sections").is_array() ||
+      (!value.at("path_curve").is_null() && !value.at("path_curve").is_string()) ||
+      !value.at("guide_curves").is_array() || !value.at("continuity").is_string())
+    return Result<LoftFeature>::failure(
+        json_error("loft feature requires exactly its mandatory intent fields"));
+  std::vector<ProfileSectionReference> sections;
+  sections.reserve(value.at("sections").size());
+  for (const auto& section : value.at("sections")) {
+    if (!section.is_object() || section.size() != 7U || !section.contains("kind") ||
+        !section.contains("sketch") || !section.contains("profile") ||
+        !section.contains("path_curve") || !section.contains("alignment_reference") ||
+        !section.contains("flip_normal") || !section.contains("rotation_offset") ||
+        !section.at("kind").is_string() || !section.at("flip_normal").is_boolean() ||
+        (!section.at("alignment_reference").is_null() &&
+         !section.at("alignment_reference").is_string()) ||
+        (!section.at("rotation_offset").is_null() && !section.at("rotation_offset").is_string()))
+      return Result<LoftFeature>::failure(json_error("loft section intent is malformed"));
+    std::optional<ParameterId> rotation;
+    if (!section.at("rotation_offset").is_null())
+      rotation = ParameterId(section.at("rotation_offset").get<std::string>());
+    const bool flip = section.at("flip_normal").get<bool>();
+    Result<ProfileSectionReference> parsed =
+        Result<ProfileSectionReference>::failure(json_error("unsupported loft section kind"));
+    const std::string kind = section.at("kind").get<std::string>();
+    if (kind == "closed_region" && section.at("sketch").is_string() &&
+        section.at("profile").is_string() && section.at("path_curve").is_null()) {
+      if (!section.at("alignment_reference").is_null() &&
+          !section.at("alignment_reference").is_string())
+        return Result<LoftFeature>::failure(json_error("loft alignment reference is malformed"));
+      std::optional<SketchEntityId> alignment;
+      if (!section.at("alignment_reference").is_null())
+        alignment = SketchEntityId(section.at("alignment_reference").get<std::string>());
+      auto profile = ProfileRegionReference::create(
+          SketchId(section.at("sketch").get<std::string>()),
+          ProfileId(section.at("profile").get<std::string>()), PartFeatureInputRole::LoftSection);
+      if (profile.has_error())
+        return Result<LoftFeature>::failure(profile.error());
+      parsed = ProfileSectionReference::create_closed_region(
+          std::move(profile.value()), std::move(alignment), flip, std::move(rotation));
+    } else if (kind == "open_path" && section.at("sketch").is_null() &&
+               section.at("profile").is_null() && section.at("path_curve").is_string() &&
+               section.at("alignment_reference").is_null()) {
+      parsed = ProfileSectionReference::create_open_path(
+          PathCurveId(section.at("path_curve").get<std::string>()), flip, std::move(rotation));
+    }
+    if (parsed.has_error())
+      return Result<LoftFeature>::failure(parsed.error());
+    sections.push_back(std::move(parsed.value()));
+  }
+  std::optional<PathCurveId> path;
+  if (!value.at("path_curve").is_null())
+    path = PathCurveId(value.at("path_curve").get<std::string>());
+  std::vector<PathCurveId> guides;
+  for (const auto& guide : value.at("guide_curves")) {
+    if (!guide.is_string())
+      return Result<LoftFeature>::failure(json_error("loft guide curve id must be a string"));
+    guides.emplace_back(guide.get<std::string>());
+  }
+  LoftContinuity continuity;
+  const std::string continuity_name = value.at("continuity").get<std::string>();
+  if (continuity_name == "c0")
+    continuity = LoftContinuity::C0;
+  else if (continuity_name == "g1")
+    continuity = LoftContinuity::G1;
+  else if (continuity_name == "g2")
+    continuity = LoftContinuity::G2;
+  else
+    return Result<LoftFeature>::failure(json_error("unsupported loft continuity"));
+  auto context = feature_body_result_context_from_json(value);
+  if (context.has_error() || !context.value().has_value())
+    return Result<LoftFeature>::failure(
+        context.has_error() ? context.error() : json_error("loft feature requires body context"));
+  const FeatureId id(value.at("id").get<std::string>());
+  const std::string name = value.at("name").get<std::string>();
+  const std::string type = value.at("type").get<std::string>();
+  if (type == "loft")
+    return LoftFeature::create_loft(id, name, std::move(sections), std::move(*context.value()),
+                                    std::move(path), std::move(guides), continuity);
+  if (type == "loft_cut")
+    return LoftFeature::create_loft_cut(id, name, std::move(sections), std::move(*context.value()),
+                                        std::move(path), std::move(guides), continuity);
+  if (type == "loft_surface")
+    return LoftFeature::create_loft_surface(id, name, std::move(sections),
+                                            std::move(*context.value()), std::move(path),
+                                            std::move(guides), continuity);
+  return Result<LoftFeature>::failure(json_error("unsupported loft feature type"));
+}
+
 [[nodiscard]] bool extrude_reference_features_available(const PartDocument& document,
                                                         const Feature& feature) {
   const auto available = [&document](const std::optional<FaceReference>& face) {
@@ -3408,6 +3549,9 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
   root["sweep_features"] = json::array();
   for (const auto& feature : document.sweep_features())
     root["sweep_features"].push_back(sweep_feature_to_json(feature));
+  root["loft_features"] = json::array();
+  for (const auto& feature : document.loft_features())
+    root["loft_features"].push_back(loft_feature_to_json(feature));
   root["part_patterns"] = json::array();
   auto pattern_order = document.dependency_graph().topological_order();
   if (pattern_order.has_error())
@@ -3755,6 +3899,18 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
       if (added.has_error())
         return Result<PartDocument>::failure(added.error());
     }
+    const json loft_array = root.value("loft_features", json::array());
+    if (!loft_array.is_array())
+      return Result<PartDocument>::failure(
+          json_error("loft_features must be an array in part document json"));
+    for (const auto& loft_json : loft_array) {
+      auto feature = loft_feature_from_json(loft_json);
+      if (feature.has_error())
+        return Result<PartDocument>::failure(feature.error());
+      auto added = document.value().add_loft_feature(std::move(feature.value()));
+      if (added.has_error())
+        return Result<PartDocument>::failure(added.error());
+    }
     const json body_boolean_array = root.value("body_booleans", json::array());
     if (!body_boolean_array.is_array())
       return Result<PartDocument>::failure(
@@ -3794,6 +3950,8 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
     const auto feature_exists = [&document](const FeatureId& id) {
       return document.value().find_feature(id) != nullptr ||
              document.value().find_revolve_feature(id) != nullptr ||
+             document.value().find_sweep_feature(id) != nullptr ||
+             document.value().find_loft_feature(id) != nullptr ||
              document.value().find_linear_pattern_feature(id) != nullptr ||
              document.value().find_circular_pattern_feature(id) != nullptr ||
              document.value().find_mirror_feature(id) != nullptr ||

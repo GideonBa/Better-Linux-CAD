@@ -49,6 +49,6 @@ requested selected roles atomically.
 ## Block 47 handoff — completed
 
 Block 47 Ball/Spherical is implemented in `docs/assembly-spherical-joint-mvp5.md` as passive
-Point/Point center coincidence with explicit selected-drive rejection. Blocks 48–83 Part
-Construction through Path-following Extrude and Extruded Cut are implemented; Block 84
-ProfileSectionReference and Loft Core intent plus JSON is next.
+Point/Point center coincidence with explicit selected-drive rejection. Blocks 48–84 Part
+Construction through persistent ordered Loft intent are implemented; Block 85 Two-section Loft
+Geometry on arbitrary planes is next.

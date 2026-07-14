@@ -4,17 +4,17 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 83
-current_block: 84
-current_boundary: ProfileSectionReference and Loft Core intent plus JSON
-current_tag: "[core][loft-feature]"
+implemented_through: Block 84
+current_block: 85
+current_boundary: Two-section Loft Geometry on arbitrary planes
+current_tag: "[geometry][loft-feature]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
   mvp_3: "Parametric bolt circle pattern — implemented"
   mvp_4: "Assembly parameters and Project container — implemented"
   mvp_5: "Assembly relationships, motion, hierarchy, analysis, exchange — Blocks 1–47 implemented"
-  mvp_6: "Part Construction — Blocks 48–83 implemented, Blocks 84–94 planned, Block 84 next"
+  mvp_6: "Part Construction — Blocks 48–84 implemented, Blocks 85–94 planned, Block 85 next"
   mvp_7: "STEP Import — Blocks 95–101 planned after Block 94"
 ---
 
@@ -552,10 +552,10 @@ motion solvers reject Spherical as the selected drive.
 
 ## MVP 6 — Part Construction MVP after Block 47
 
-**Status:** In progress — Blocks 48–83 implemented
+**Status:** In progress — Blocks 48–84 implemented
 **Canonical:** sequence `docs/part-construction-sequence-mvp6.md`
 
-Blocks 48–83 are complete. Block 84 is the current next technical step.
+Blocks 48–84 are complete. Block 85 is the current next technical step.
 
 Mandatory Part Construction phase order:
 
@@ -1154,7 +1154,20 @@ Canonical contract: `docs/part-path-extrude-geometry-mvp6.md`.
 [geometry][path-extrude]
 ```
 
-## Current next technical step — Block 84
+## Block 84 — ProfileSectionReference and Loft Core intent + JSON — Implemented
 
-Implement ProfileSectionReference and Loft Core intent plus JSON according to
+Block 84 adds explicitly ordered closed/open profile sections, stable seam/alignment and normal
+intent, optional rotation Angle parameters, optional path plus ordered guides, C0/G1/G2
+continuity intent, three Loft feature kinds, Body-result semantics, dependency integration, and
+strict compatible JSON.
+
+Canonical contract: `docs/part-loft-intent-mvp6.md`.
+
+```text
+[core][loft-feature]
+```
+
+## Current next technical step — Block 85
+
+Implement Two-section Loft Geometry on arbitrary planes according to
 `docs/part-construction-sequence-mvp6-planning-detail.md`.

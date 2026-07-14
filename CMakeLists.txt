@@ -56,6 +56,7 @@ add_library(
   src/core/feature.cpp
   src/core/generated_topology_reference.cpp
   src/core/invalidation_state.cpp
+  src/core/loft_feature.cpp
   src/core/mirror_feature.cpp
   src/core/part_pattern_feature.cpp
   src/core/part_document.cpp
@@ -311,6 +312,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/feature_body_operation_json_tests.cpp
     tests/core/generated_topology_reference_tests.cpp
     tests/core/invalidation_state_tests.cpp
+    tests/core/loft_feature_tests.cpp
     tests/core/mirror_feature_tests.cpp
     tests/core/part_document_json_tests.cpp
     tests/core/part_document_json_workplane_tests.cpp
