@@ -51,5 +51,5 @@ The focused suite covers all supported product kinds, parameter recomputation, f
 non-mutation of serialized Core intent, and a fit spline whose three points come from planar
 sketches on three differently oriented workplanes.
 
-Blocks 48–85 are implemented. Block 83 Path-following Extrude and Extruded Cut is implemented;
-Block 84 ProfileSectionReference and Loft Core intent plus JSON is implemented; Block 85 Two-section Loft Geometry on arbitrary planes is implemented; Block 86 Multi-section Loft is next.
+Blocks 48–86 are implemented. Block 83 Path-following Extrude and Extruded Cut is implemented;
+Block 84 ProfileSectionReference and Loft Core intent plus JSON is implemented; Block 85 Two-section Loft Geometry on arbitrary planes is implemented; Block 86 Multi-section Loft is implemented; Block 87 Guided and continuity-controlled Loft is next.

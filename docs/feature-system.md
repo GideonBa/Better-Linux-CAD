@@ -97,8 +97,9 @@ and source-identity-only semantic references. Block 78 executes deterministic tr
 Geometry without writing topology identity back into Core. Block 79 adds PathCurve intent, Block
 80 adds Sweep/SweepCut/SweepSurface intent, Blocks 81–82 execute planar then spatial paths, twist,
 and guide control, Block 83 adds path-following AdditiveExtrude/SubtractiveExtrude, Block 84 adds
-persistent ordered Loft/LoftCut/LoftSurface intent, and Block 85 executes two-section C0 Loft
-Geometry on arbitrary planes. Block 86 Multi-section Loft is next.
+persistent ordered Loft/LoftCut/LoftSurface intent, Block 85 executes two-section C0 Loft Geometry
+on arbitrary planes, and Block 86 executes deterministic ordered multi-section Loft Geometry.
+Block 87 Guided and continuity-controlled Loft is next.
 
 The long-term sketcher and feature parity target is documented in `docs/inventor-like-sketcher-and-feature-roadmap.md`.
 

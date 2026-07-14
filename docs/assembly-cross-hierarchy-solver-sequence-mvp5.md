@@ -1,6 +1,6 @@
 # Cross-Hierarchy Assembly Relationship Sequence MVP-5
 
-Status: Blocks 23–47 and Part Construction Blocks 48–85 are implemented. The Assembly MVP sequence is complete; Block 83 is implemented; Block 84 is implemented; Block 85 is implemented; Block 86 is the current next technical step.
+Status: Blocks 23–47 and Part Construction Blocks 48–86 are implemented. The Assembly MVP sequence is complete; Block 83 is implemented; Block 84 is implemented; Block 85 is implemented; Block 86 is implemented; Block 87 is the current next technical step.
 
 This document is the canonical numbered handoff sequence for cross-document assembly intent, solving, motion, exchange, posed analysis, and general geometric target architecture.
 
@@ -583,7 +583,7 @@ Project-level Planar intent, JSON, Frame/Frame equations, and shared vector-driv
 
 Block 47 is implemented in `docs/assembly-spherical-joint-mvp5.md`: passive local and Project-level
 Spherical intent, JSON, Point/Point equations, shared motion closure, and selected-drive rejection.
-Blocks 48–85 Body identity, body-scoped recompute/inspection, Body Booleans, and
+Blocks 48–86 Body identity, body-scoped recompute/inspection, Body Booleans, and
 BodyTransform/SketchOwnership intent plus associative Geometry execution are implemented. The
 Block-59 richer Extrude/Cut intent/JSON, Block-60 Geometry, and Block-61 Revolve/RevolveCut intent
 Block 62 Revolve/RevolveCut Geometry, Block 63 General Part Pattern Core intent/JSON, and Blocks
@@ -595,7 +595,8 @@ DraftFeature Core intent/JSON in Block 73, Geometry in Block 74, the Basic 3D Sk
 OCCT Geometry conversion in Block 78, connected PathCurve Core/JSON intent in Block 79,
 persistent Sweep/SweepCut/SweepSurface intent in Block 80, basic planar Sweep execution in
 Block 81, spatial path, twist, and guide execution in Block 82, path-following Extrude and
-Extruded Cut in Block 83, persistent Loft intent in Block 84, and two-section Loft Geometry in
-Block 85. The current next technical step is Block 86 Multi-section Loft.
+Extruded Cut in Block 83, persistent Loft intent in Block 84, two-section Loft Geometry in Block
+85, and Multi-section Loft in Block 86. The current next technical step is Block 87 Guided and
+continuity-controlled Loft.
 Blocks 40–47 compatibility, persistence, numeric,
 freshness, and application contracts remain authoritative.

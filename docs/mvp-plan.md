@@ -4,17 +4,17 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 85
-current_block: 86
-current_boundary: Multi-section Loft
-current_tag: "[geometry][multi-section-loft]"
+implemented_through: Block 86
+current_block: 87
+current_boundary: Guided and continuity-controlled Loft
+current_tag: "[geometry][guided-loft]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
   mvp_3: "Parametric bolt circle pattern — implemented"
   mvp_4: "Assembly parameters and Project container — implemented"
   mvp_5: "Assembly relationships, motion, hierarchy, analysis, exchange — Blocks 1–47 implemented"
-  mvp_6: "Part Construction — Blocks 48–85 implemented, Blocks 86–94 planned, Block 86 next"
+  mvp_6: "Part Construction — Blocks 48–86 implemented, Blocks 87–94 planned, Block 87 next"
   mvp_7: "STEP Import — Blocks 95–101 planned after Block 94"
 ---
 
@@ -552,10 +552,10 @@ motion solvers reject Spherical as the selected drive.
 
 ## MVP 6 — Part Construction MVP after Block 47
 
-**Status:** In progress — Blocks 48–85 implemented
+**Status:** In progress — Blocks 48–86 implemented
 **Canonical:** sequence `docs/part-construction-sequence-mvp6.md`
 
-Blocks 48–85 are complete. Block 86 is the current next technical step.
+Blocks 48–86 are complete. Block 87 is the current next technical step.
 
 Mandatory Part Construction phase order:
 
@@ -1180,12 +1180,23 @@ Canonical contract: `docs/part-loft-geometry-mvp6.md`.
 [geometry][loft-feature]
 ```
 
-## Current next technical step — Block 86
+## Block 86 — Multi-section Loft — Implemented
 
-Implement deterministic three-or-more-section Loft Geometry according to
-`docs/part-construction-sequence-mvp6-planning-detail.md`. A middle section must shape the
-transition without incidental OCCT wire-order authority.
+Block 86 executes three or more explicitly ordered solid/surface Loft sections, retains semantic
+seam correspondence without OCCT compatibility rewriting, and recomputes the product when an
+intermediate-section parameter changes.
+
+Canonical contract: `docs/part-multi-section-loft-geometry-mvp6.md`.
 
 ```text
 [geometry][multi-section-loft]
+```
+
+## Current next technical step — Block 87
+
+Implement semantic path/guide-controlled Loft behavior and the frozen C0/G1/G2 continuity policy
+according to `docs/part-construction-sequence-mvp6-planning-detail.md`.
+
+```text
+[geometry][guided-loft]
 ```

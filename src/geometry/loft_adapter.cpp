@@ -127,12 +127,14 @@ template <typename Segment, typename Factory>
 [[nodiscard]] Result<TopoDS_Shape> execute_loft(const FeatureId& id,
                                                 const std::vector<std::vector<Segment>>& sections,
                                                 bool closed, bool solid, Factory&& factory) {
-  if (sections.size() != 2U)
+  if (sections.size() < 2U)
     return Result<TopoDS_Shape>::failure(
-        loft_error(id, "Block 85 requires exactly two ordered loft sections"));
-  if (sections[0].size() != sections[1].size())
-    return Result<TopoDS_Shape>::failure(
-        loft_error(id, "two-section loft requires matching authored edge counts"));
+        loft_error(id, "loft requires at least two ordered sections"));
+  const std::size_t authored_edge_count = sections.front().size();
+  for (const auto& section : sections)
+    if (section.size() != authored_edge_count)
+      return Result<TopoDS_Shape>::failure(
+          loft_error(id, "all loft sections require matching authored edge counts"));
   try {
     BRepOffsetAPI_ThruSections builder(solid, Standard_False, kTolerance);
     builder.CheckCompatibility(Standard_False);

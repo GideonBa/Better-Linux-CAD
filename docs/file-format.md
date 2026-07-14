@@ -840,6 +840,10 @@ Block 85 adds no JSON fields. Two-section workplane resolution, seam corresponde
 Loft/LoftCut/LoftSurface products are transient Geometry/cache state. Its execution contract is
 canonical in `docs/part-loft-geometry-mvp6.md`.
 
+Block 86 also adds no JSON fields. The existing ordered `sections` array already represents three
+or more profiles; intermediate-section resolution and the resulting OCCT product remain derived.
+Canonical Geometry details are in `docs/part-multi-section-loft-geometry-mvp6.md`.
+
 ## Planned STEP import persistence after Block 94
 
 This section is planned architecture, not part of the current schema. Blocks 95–101 in

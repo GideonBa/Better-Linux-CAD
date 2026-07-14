@@ -2288,9 +2288,9 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_loft(const PartDocument& 
   if (feature == nullptr)
     return Result<std::size_t>::failure(
         validation_error(feature_id.value(), "loft feature must exist in part document"));
-  if (feature->sections().size() != 2U)
+  if (feature->sections().size() < 2U)
     return Result<std::size_t>::failure(
-        geometry_error(feature_id.value(), "Block 85 requires exactly two loft sections"));
+        geometry_error(feature_id.value(), "loft requires at least two ordered sections"));
   if (feature->path_curve().has_value() || !feature->guide_curves().empty())
     return Result<std::size_t>::failure(geometry_error(
         feature_id.value(), "guided and path-controlled loft execution starts in Block 87"));
@@ -2307,7 +2307,7 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_loft(const PartDocument& 
       return Result<std::size_t>::failure(
           geometry_error(feature_id.value(), "open loft sections require LoftSurface"));
     std::vector<std::vector<SweepPathSegment>> sections;
-    sections.reserve(2U);
+    sections.reserve(feature->sections().size());
     for (const auto& section : feature->sections()) {
       if (section.rotation_offset().has_value()) {
         const Parameter* rotation = document.find_parameter(*section.rotation_offset());
@@ -2335,7 +2335,7 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_loft(const PartDocument& 
     tool = loft_adapter_.loft_open_sections(feature->id(), sections);
   } else {
     std::vector<std::vector<ClosedProfileCurveSegment>> sections;
-    sections.reserve(2U);
+    sections.reserve(feature->sections().size());
     for (const auto& section : feature->sections()) {
       auto resolved =
           resolve_loft_closed_section(document, section, working_cache, workplane_resolver_);
