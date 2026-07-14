@@ -214,7 +214,7 @@ TEST_CASE("Block 66 rejects missing Mirror sources and planes transactionally",
 }
 
 TEST_CASE("Block 66 Mirror JSON roundtrips all plane kinds in dependency order",
-          "[core][mirror-feature]") {
+          "[core][mirror-feature][integration][part-construction-mvp]") {
   auto document = base_document();
   REQUIRE(document.add_body(body("body.datum")));
   REQUIRE(document.add_body(body("body.construction")));

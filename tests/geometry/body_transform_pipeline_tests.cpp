@@ -94,7 +94,7 @@ GeometryShapeBounds bounds(const ShapeCache& shape_cache) {
 } // namespace
 
 TEST_CASE("Body transform Geometry executes translation and remains incremental-idempotent",
-          "[geometry][body-transform]") {
+          "[geometry][body-transform][integration][part-construction-mvp]") {
   PartDocument document = box_document();
   auto top_face = SemanticFaceReference::create(FeatureId("feature.base"), SemanticFace::Top);
   REQUIRE(top_face);

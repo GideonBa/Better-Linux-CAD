@@ -174,7 +174,7 @@ GeometryShape box(double size) {
 } // namespace
 
 TEST_CASE("Block 64 adapter preserves deterministic instance-major source order",
-          "[geometry][linear-pattern]") {
+          "[geometry][linear-pattern][integration][part-construction-mvp]") {
   GeometryShape first = box(2.0);
   auto second = BodyTransformAdapter{}.translate(first, {0.0, 10.0, 0.0});
   REQUIRE(second);

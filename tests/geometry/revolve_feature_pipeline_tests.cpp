@@ -220,7 +220,7 @@ PartDocument semantic_axis_document() {
 } // namespace
 
 TEST_CASE("Block 62 executes full partial and symmetric solid revolutions",
-          "[geometry][revolve-feature]") {
+          "[geometry][revolve-feature][integration][part-construction-mvp]") {
   auto full_document = new_body_revolve(RevolveAngleExtent::full());
   auto partial_extent = RevolveAngleExtent::angle(180.0, RevolveSide::Negative);
   auto symmetric_extent = RevolveAngleExtent::symmetric(120.0);

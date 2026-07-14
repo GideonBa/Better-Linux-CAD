@@ -142,7 +142,8 @@ GeometryShapeBounds bounds(const ShapeCache& shape_cache) {
 }
 } // namespace
 
-TEST_CASE("Block 74 executes signed positive and negative draft", "[geometry][draft-feature]") {
+TEST_CASE("Block 74 executes signed positive and negative draft",
+          "[geometry][draft-feature][integration][part-construction-mvp]") {
   auto positive = box_document(5.0);
   add_draft(positive, {face(SemanticFace::Right)});
   ShapeCache positive_cache = cache();

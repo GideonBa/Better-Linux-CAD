@@ -74,7 +74,8 @@ TEST_CASE("Block 83 freezes path direction on existing Extrude feature families"
             .has_error());
 }
 
-TEST_CASE("Block 83 tracks and roundtrips path Extrude dependencies", "[core][path-extrude]") {
+TEST_CASE("Block 83 tracks and roundtrips path Extrude dependencies",
+          "[core][path-extrude][integration][part-construction-mvp]") {
   auto document = document_with_path();
   auto additive =
       Feature::create_additive_path_extrude(FeatureId("feature.path-add"), "Path add",

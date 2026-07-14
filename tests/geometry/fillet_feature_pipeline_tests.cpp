@@ -117,7 +117,7 @@ GeometryShapeBounds bounds(const ShapeCache& cache) {
 } // namespace
 
 TEST_CASE("Block 69 executes single and ordered multi-edge constant-radius fillets",
-          "[geometry][fillet-feature]") {
+          "[geometry][fillet-feature][integration][part-construction-mvp]") {
   auto single = box_document();
   add_fillet(single, {edge(FeatureId("feature.base"), SemanticEdge::TopFront)});
   ShapeCache single_cache = shape_cache();
@@ -187,7 +187,7 @@ TEST_CASE("Block 69 resolves a semantic circular hole rim", "[geometry][fillet-f
 }
 
 TEST_CASE("Block 69 rejects broken semantic edges without changing cached geometry",
-          "[geometry][fillet-feature]") {
+          "[geometry][fillet-feature][integration][part-construction-mvp]") {
   auto document = box_document();
   ShapeCache cache = shape_cache();
   REQUIRE(GeometryRecomputeExecutor{}.execute_document(document, cache));

@@ -25,6 +25,8 @@ class SurfaceAdapter;
 class StepExporter;
 class AssemblyStepExporter;
 class Sketch3DGeometryAdapter;
+class OcctShapeView;
+class ViewportSceneBuilder;
 
 namespace detail {
 class AssemblyPartShapeDefinitionBuilder;
@@ -62,6 +64,8 @@ private:
   friend class StepExporter;
   friend class AssemblyStepExporter;
   friend class Sketch3DGeometryAdapter;
+  friend class OcctShapeView;
+  friend class ViewportSceneBuilder;
   friend class detail::AssemblyPartShapeDefinitionBuilder;
   friend class detail::AssemblyPosedLeafShapeBuilder;
 

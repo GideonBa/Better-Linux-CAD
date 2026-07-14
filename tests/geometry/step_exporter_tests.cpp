@@ -116,7 +116,7 @@ TEST_CASE("StepExporter rejects an empty path", "[geometry][step_export]") {
 }
 
 TEST_CASE("StepExporter writes visible solid and surface Bodies in deterministic order",
-          "[geometry][multi-body-step-export]") {
+          "[geometry][multi-body-step-export][integration][part-construction-mvp]") {
   auto document = PartDocument::create(DocumentId("part.multi-body"), "Multi Body");
   REQUIRE(document);
   REQUIRE(document.value().add_body(make_export_body("body/z solid", BodyKind::Solid)));

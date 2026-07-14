@@ -223,7 +223,7 @@ TEST_CASE("Block 68 validates semantic circular edges and parameter kinds transa
 }
 
 TEST_CASE("Block 68 JSON roundtrips deterministic edge-treatment order and all modes",
-          "[core][edge-treatment]") {
+          "[core][edge-treatment][integration][part-construction-mvp]") {
   auto document = base_document();
   auto fillet =
       FilletFeature::create(FeatureId("fillet.main"), "Fillet", BodyId("body.base"),

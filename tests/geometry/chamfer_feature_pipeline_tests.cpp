@@ -146,7 +146,7 @@ GeometryShapeBounds bounds(const ShapeCache& cache) {
 } // namespace
 
 TEST_CASE("Block 70 executes single and ordered multi-edge equal-distance chamfers",
-          "[geometry][chamfer-feature]") {
+          "[geometry][chamfer-feature][integration][part-construction-mvp]") {
   auto single = box_document();
   add_equal(single, {edge(FeatureId("feature.base"), SemanticEdge::TopFront)});
   ShapeCache single_cache = shape_cache();

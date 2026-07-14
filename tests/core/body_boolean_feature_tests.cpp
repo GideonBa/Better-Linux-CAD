@@ -182,7 +182,7 @@ TEST_CASE("PartDocument validates Boolean body references producers ids and remo
 }
 
 TEST_CASE("BodyBooleanFeature JSON is canonical additive and backward compatible",
-          "[core][body-boolean]") {
+          "[core][body-boolean][integration][part-construction-mvp]") {
   PartDocument document = document_with_bodies();
   REQUIRE(document.add_body_boolean_feature(
       boolean_feature("boolean.subtract", BodyBooleanOperation::Subtract, "body.a",

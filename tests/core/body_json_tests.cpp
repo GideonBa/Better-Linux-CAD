@@ -34,7 +34,7 @@ nlohmann::json serialized_body_document() {
 } // namespace
 
 TEST_CASE("Body intent survives deterministic PartDocument JSON roundtrip",
-          "[core][part-body-json]") {
+          "[core][part-body-json][integration][part-construction-mvp]") {
   const auto serialized = serialize_part_document_to_json(make_body_document());
   REQUIRE(serialized);
   const auto root = nlohmann::json::parse(serialized.value());

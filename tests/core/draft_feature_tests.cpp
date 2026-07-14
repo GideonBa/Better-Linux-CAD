@@ -192,7 +192,7 @@ TEST_CASE("Block 73 validates DraftFeature references and angle range transactio
 }
 
 TEST_CASE("Block 73 DraftFeature JSON preserves order pull capability and neutral plane",
-          "[core][draft-feature]") {
+          "[core][draft-feature][integration][part-construction-mvp]") {
   auto document = base_document(-5.0);
   REQUIRE(document.add_draft_feature(draft("draft.main",
                                            {face(SemanticFace::Front), face(SemanticFace::Right)},

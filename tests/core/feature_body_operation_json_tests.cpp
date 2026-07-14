@@ -58,7 +58,7 @@ nlohmann::json serialized_explicit_part() {
 } // namespace
 
 TEST_CASE("Feature Body operation JSON roundtrips explicit and implicit result identity",
-          "[core][feature-body-operation-json]") {
+          "[core][feature-body-operation-json][integration][part-construction-mvp]") {
   const auto root = serialized_explicit_part();
   REQUIRE(root.at("features").size() == 2U);
   const auto& new_body = root.at("features").at(0);

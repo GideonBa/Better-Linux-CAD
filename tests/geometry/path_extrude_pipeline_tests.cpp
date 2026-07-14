@@ -129,7 +129,7 @@ TEST_CASE("Block 83 executes AdditiveExtrude in path direction", "[geometry][pat
 }
 
 TEST_CASE("Block 83 executes SubtractiveExtrude along a path transactionally",
-          "[geometry][path-extrude]") {
+          "[geometry][path-extrude][integration][part-construction-mvp]") {
   auto created = PartDocument::create(DocumentId("part.path-cut"), "Path cut");
   REQUIRE(created);
   PartDocument document = created.value();

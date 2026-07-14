@@ -12,10 +12,14 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(BLCAD_BUILD_GEOMETRY "Build future OCCT geometry targets" OFF)
-option(BLCAD_BUILD_GUI "Build future Qt GUI targets" OFF)
+option(BLCAD_BUILD_GUI "Build optional Qt GUI targets" OFF)
 option(BLCAD_BUILD_TESTS "Build unit tests" ON)
 
 include(CTest)
+
+if(BLCAD_BUILD_GUI AND NOT BLCAD_BUILD_GEOMETRY)
+  message(FATAL_ERROR "BLCAD_BUILD_GUI requires BLCAD_BUILD_GEOMETRY=ON")
+endif()
 
 if(BLCAD_BUILD_GEOMETRY)
   find_package(OpenCASCADE CONFIG REQUIRED)
@@ -183,6 +187,8 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/loft_adapter.cpp
     src/geometry/mirror_adapter.cpp
     src/geometry/rectangle_extrusion_adapter.cpp
+    src/geometry/occt_shape_view.cpp
+    src/geometry/viewport_scene.cpp
     src/geometry/reference_driven_sketch_helper.cpp
     src/geometry/reference_generated_profile_resolver.cpp
     src/geometry/revolve_adapter.cpp
@@ -263,6 +269,60 @@ if(BLCAD_BUILD_GEOMETRY)
     target_compile_options(blcad_export_structured_assembly PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(blcad_move_joint PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(blcad_analyze_assembly PRIVATE -Wall -Wextra -Wpedantic)
+  endif()
+endif()
+
+if(BLCAD_BUILD_GUI)
+  add_library(
+    blcad_gui STATIC
+    src/gui/gui_command_registry.cpp
+    src/gui/gui_document_browser.cpp
+    src/gui/gui_document_session.cpp
+    src/gui/gui_selection_model.cpp
+    src/gui/gui_sketch_workbench.cpp
+    src/gui/gui_task_state.cpp
+    src/gui/main_window.cpp
+    src/gui/occt_viewport.cpp
+    src/gui/startup_splash.cpp
+  )
+  add_library(BLCAD::gui ALIAS blcad_gui)
+
+  target_include_directories(
+    blcad_gui
+    PUBLIC
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+      $<INSTALL_INTERFACE:include>
+  )
+  target_compile_features(blcad_gui PUBLIC cxx_std_20)
+  qt_add_resources(
+    blcad_gui blcad_gui_assets
+    PREFIX "/blcad/gui"
+    BASE "${CMAKE_CURRENT_SOURCE_DIR}/assets/gui"
+    FILES assets/gui/archimedes-lever.gif
+  )
+  target_link_libraries(
+    blcad_gui
+    PUBLIC
+      Qt6::Widgets
+    PRIVATE
+      BLCAD::geometry
+      Qt6::OpenGLWidgets
+      TKOpenGl
+      TKV3d
+      TKService
+  )
+  target_include_directories(blcad_gui SYSTEM PRIVATE ${OpenCASCADE_INCLUDE_DIR})
+
+  if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(blcad_gui PRIVATE -Wall -Wextra -Wpedantic)
+  endif()
+
+  add_executable(blcad_app src/gui/main.cpp)
+  set_target_properties(blcad_app PROPERTIES OUTPUT_NAME blcad)
+  target_link_libraries(blcad_app PRIVATE BLCAD::gui)
+
+  if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(blcad_app PRIVATE -Wall -Wextra -Wpedantic)
   endif()
 endif()
 
@@ -356,6 +416,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/sketch_repair_undo_stack_tests.cpp
     tests/core/sketch_spline_profile_json_tests.cpp
     tests/core/sketch_tests.cpp
+    tests/core/sketch_update_tests.cpp
     tests/core/sketch_3d_tests.cpp
     tests/core/sketch_3d_curve_tests.cpp
     tests/core/sketch_3d_json_tests.cpp
@@ -432,6 +493,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/mirror_feature_pipeline_tests.cpp
       tests/geometry/parameter_expression_pipeline_tests.cpp
       tests/geometry/path_extrude_pipeline_tests.cpp
+      tests/geometry/part_construction_mvp_acceptance_tests.cpp
       tests/geometry/recompute_executor_tests.cpp
       tests/geometry/rectangle_extrusion_adapter_tests.cpp
       tests/geometry/reference_driven_sketch_helper_tests.cpp
@@ -466,6 +528,31 @@ if(BLCAD_BUILD_TESTS)
     endif()
 
     catch_discover_tests(blcad_geometry_tests)
+  endif()
+
+  if(BLCAD_BUILD_GUI)
+    add_executable(
+      blcad_gui_tests
+      tests/gui/gui_test_main.cpp
+      tests/gui/gui_application_shell_tests.cpp
+      tests/gui/gui_command_state_tests.cpp
+      tests/gui/gui_document_session_tests.cpp
+      tests/gui/gui_document_browser_tests.cpp
+      tests/gui/gui_occt_viewport_tests.cpp
+      tests/gui/gui_sketch_workbench_tests.cpp
+      tests/gui/gui_startup_splash_tests.cpp
+    )
+    target_link_libraries(blcad_gui_tests PRIVATE BLCAD::gui Catch2::Catch2)
+
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+      target_compile_options(blcad_gui_tests PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+
+    catch_discover_tests(
+      blcad_gui_tests
+      TEST_PREFIX "gui."
+      PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    )
   endif()
 endif()
 

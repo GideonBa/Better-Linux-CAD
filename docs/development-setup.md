@@ -9,7 +9,7 @@ This document covers local BLCAD development, build/test workflows, formatting, 
 - CMake 3.28 or newer
 - Ninja
 - OCCT/Open CASCADE from Ubuntu packages for optional Geometry targets
-- Qt 6 packages for later GUI work
+- Qt 6 packages for the planned Blocks 95–105 GUI Validation phase
 - nlohmann-json
 - Catch2
 
@@ -63,8 +63,55 @@ Build directories:
 ```text
 build/dev
 build/dev-geometry
+build/dev-gui
 build/release
 ```
+
+## GUI build and Blocks 95–99 tests
+
+The GUI is optional and requires the Geometry layer. Configure, build, and run the current shell:
+
+```bash
+cmake -S . -B build/dev-gui -G Ninja \
+  -DBLCAD_BUILD_GEOMETRY=ON \
+  -DBLCAD_BUILD_GUI=ON \
+  -DBLCAD_BUILD_TESTS=ON \
+  -DCMAKE_BUILD_TYPE=Debug
+cmake --build build/dev-gui --target blcad_app blcad_gui_tests
+./build/dev-gui/blcad
+```
+
+The startup splash remains visible for 700 ms by default. Override its animation duration for
+visual inspection, for example with
+`BLCAD_SPLASH_DURATION_MS=15000 ./build/dev-gui/blcad`; accepted values are clamped to 250–60000 ms.
+The executable output is `blcad`; the CMake target is `blcad_app`. Focused offscreen tests:
+
+```bash
+./build/dev-gui/blcad_gui_tests "[gui][application-shell]"
+./build/dev-gui/blcad_gui_tests "[gui][command-state]"
+./build/dev-gui/blcad_gui_tests "[gui][startup-splash]"
+./build/dev-gui/blcad_gui_tests "[gui][document-session]"
+./build/dev-gui/blcad_gui_tests "[gui][document-transaction]"
+./build/dev-gui/blcad_gui_tests "[gui][diagnostics]"
+./build/dev-gui/blcad_gui_tests "[gui][viewport]"
+./build/dev-gui/blcad_gui_tests "[gui][navigation]"
+./build/dev-gui/blcad_gui_tests "[gui][semantic-picking]"
+./build/dev-gui/blcad_gui_tests "[gui][model-browser]"
+./build/dev-gui/blcad_gui_tests "[gui][property-editor]"
+./build/dev-gui/blcad_gui_tests "[gui][selection-sync]"
+./build/dev-gui/blcad_core_tests "[core][sketch-update]"
+./build/dev-gui/blcad_gui_tests "[gui][datum-workplane]"
+./build/dev-gui/blcad_gui_tests "[gui][sketch-workbench]"
+./build/dev-gui/blcad_gui_tests "[gui][sketch-repair]"
+ctest --test-dir build/dev-gui -R '^gui\.' --output-on-failure
+```
+
+On Linux the native OCCT viewport uses Qt's xcb platform. `blcad` selects xcb automatically when
+`DISPLAY` is available and `QT_QPA_PLATFORM` is unset. Offscreen GUI tests keep a logical viewport
+without creating an X11/GLX window.
+
+`BLCAD_BUILD_GUI=ON` with `BLCAD_BUILD_GEOMETRY=OFF` is an unsupported combination and fails during
+configuration. Core-only and Geometry-without-GUI configurations remain available.
 
 ## Focused current assembly tests
 
@@ -392,8 +439,16 @@ Block 51 feature Body-operation persistence and graph semantics are implemented.
 ./build/dev/blcad_core_tests "[core][part-body-dependency]"
 ```
 
-Block 56 BodyTransform/SketchOwnership intent can be verified with `./build/blcad_core_tests "[core][body-transform],[core][sketch-ownership]"`; Block 57 Geometry execution with `./build/blcad_geometry_tests "[geometry][body-transform]"`; Block 58 reusable Part feature inputs with `./build/blcad_core_tests "[core][part-feature-input-reference]"`; Block 59 richer Extrude/Cut intent/JSON with `./build/blcad_core_tests "[core][extrude-extent]"`; Block 60 Geometry with `./build/blcad_geometry_tests "[geometry][extrude-extent]"`; Block 61 Revolve/RevolveCut intent/JSON with `./build/blcad_core_tests "[core][revolve-feature]"`; Block 62 Geometry with `./build/blcad_geometry_tests "[geometry][revolve-feature]"`; Block 63 Pattern Core/JSON with `./build/blcad_core_tests "[core][part-pattern]"`; Block 64 Linear Pattern Geometry with `./build/blcad_geometry_tests "[geometry][linear-pattern]"`; Block 65 Circular Pattern Geometry with `./build/blcad_geometry_tests "[geometry][circular-pattern]"`; Block 66 MirrorFeature Core/JSON with `./build/blcad_core_tests "[core][mirror-feature]"`; Block 67 Geometry with `./build/blcad_geometry_tests "[geometry][mirror-feature]"`; Block 68 Edge Treatment Core/JSON with `./build/blcad_core_tests "[core][edge-treatment]"`; Block 69 Fillet Geometry with `./build/blcad_geometry_tests "[geometry][fillet-feature]"`; Block 70 Chamfer Geometry with `./build/blcad_geometry_tests "[geometry][chamfer-feature]"`; Block 71 ShellFeature Core/JSON with `./build/blcad_core_tests "[core][shell-feature]"`; Block 72 ShellFeature Geometry with `./build/blcad_geometry_tests "[geometry][shell-feature]"`; Block 73 DraftFeature Core/JSON with `./build/blcad_core_tests "[core][draft-feature]"`; Block 74 DraftFeature Geometry with `./build/blcad_geometry_tests "[geometry][draft-feature]"`; Block 75 Basic 3D Sketch Core with `./build/blcad_core_tests "[core][sketch-3d]"`; Block 76 richer 3D curve intent with `./build/dev-geometry/blcad_core_tests "[core][sketch-3d-curves]"`; Block 77 JSON with `./build/dev-geometry/blcad_core_tests "[core][sketch-3d-json]"`; and Block 78 Geometry conversion with `./build/dev-geometry/blcad_geometry_tests "[geometry][sketch-3d]"`. The current contracts additionally include `docs/part-pattern-core-mvp6.md`, `docs/part-linear-pattern-geometry-mvp6.md`, `docs/part-circular-pattern-geometry-mvp6.md`, `docs/part-mirror-intent-mvp6.md`, `docs/part-mirror-geometry-mvp6.md`, `docs/part-edge-treatment-intent-mvp6.md`, `docs/part-fillet-geometry-mvp6.md`, `docs/part-chamfer-geometry-mvp6.md`, `docs/part-shell-intent-mvp6.md`, `docs/part-shell-geometry-mvp6.md`, `docs/part-draft-intent-mvp6.md`, `docs/part-draft-geometry-mvp6.md`, `docs/part-sketch-3d-core-mvp6.md`, `docs/part-sketch-3d-curves-core-mvp6.md`, `docs/part-sketch-3d-json-mvp6.md`, `docs/part-sketch-3d-geometry-mvp6.md`, `docs/part-path-curve-core-mvp6.md`, `docs/part-sweep-intent-mvp6.md`, `docs/part-sweep-geometry-mvp6.md`, `docs/part-sweep-3d-geometry-mvp6.md`, `docs/part-path-extrude-geometry-mvp6.md`, `docs/part-loft-intent-mvp6.md`, `docs/part-loft-geometry-mvp6.md`, `docs/part-multi-section-loft-geometry-mvp6.md`, `docs/part-guided-loft-geometry-mvp6.md`, `docs/part-surface-feature-intent-mvp6.md`, `docs/part-boundary-fill-surface-geometry-mvp6.md`, `docs/part-trim-extend-surface-geometry-mvp6.md`, `docs/part-surface-stitch-geometry-mvp6.md`, `docs/part-closed-shell-to-solid-geometry-mvp6.md`, and `docs/part-multi-body-step-export-mvp6.md`. Block 79 PathCurve Core/JSON can be verified with `./build/dev-geometry/blcad_core_tests "[core][path-curve]"`; Block 80 Sweep Core/JSON with `./build/dev-geometry/blcad_core_tests "[core][sweep-feature]"`; Block 81 Sweep Geometry with `./build/dev-geometry/blcad_geometry_tests "[geometry][sweep-feature]"`; Block 82 spatial/twist/guide Sweep with `./build/dev-geometry/blcad_geometry_tests "[geometry][sweep-3d]"`; and Block 83 Path-following Extrude/Extruded Cut with `./build/blcad_core_tests "[core][path-extrude]"` plus `./build/blcad_geometry_tests "[geometry][path-extrude]"`; Block 84 Loft Core/JSON with `./build/blcad_core_tests "[core][loft-feature]"`; Block 85 Two-section Loft Geometry with `./build/blcad_geometry_tests "[geometry][loft-feature]"`; Block 86 Multi-section Loft with `./build/blcad_geometry_tests "[geometry][multi-section-loft]"`; Block 87 Guided Loft with `./build/blcad_geometry_tests "[geometry][guided-loft]"`; Block 88 Surface Core/JSON with `./build/blcad_core_tests "[core][surface-feature]"`; Block 89 Boundary/Fill Geometry with `./build/blcad_geometry_tests "[geometry][surface-boundary-fill]"`; Block 90 Trim/Extend Geometry with `./build/blcad_geometry_tests "[geometry][surface-trim-extend]"`; Block 91 Stitch/Knit/Sew shell Geometry with `./build/blcad_geometry_tests "[geometry][surface-stitch]"`; Block 92 Closed shell to solid conversion with `./build/blcad_geometry_tests "[geometry][surface-to-solid]"`; and Block 93 multi-body STEP export with `./build/blcad_geometry_tests "[geometry][multi-body-step-export]"`. The immediate next step is Block 94 integrated Part Construction MVP acceptance. Block 43 role-addressed drives, authored holding, complete coordinate-slot freshness, and atomic application remain authoritative for local and Project-level driven motion; Spherical participates passively and rejects selection. Exact sequencing is maintained in `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md` and `docs/part-construction-sequence-mvp6.md`.
+Block 56 BodyTransform/SketchOwnership intent can be verified with `./build/blcad_core_tests "[core][body-transform],[core][sketch-ownership]"`; Block 57 Geometry execution with `./build/blcad_geometry_tests "[geometry][body-transform]"`; Block 58 reusable Part feature inputs with `./build/blcad_core_tests "[core][part-feature-input-reference]"`; Block 59 richer Extrude/Cut intent/JSON with `./build/blcad_core_tests "[core][extrude-extent]"`; Block 60 Geometry with `./build/blcad_geometry_tests "[geometry][extrude-extent]"`; Block 61 Revolve/RevolveCut intent/JSON with `./build/blcad_core_tests "[core][revolve-feature]"`; Block 62 Geometry with `./build/blcad_geometry_tests "[geometry][revolve-feature]"`; Block 63 Pattern Core/JSON with `./build/blcad_core_tests "[core][part-pattern]"`; Block 64 Linear Pattern Geometry with `./build/blcad_geometry_tests "[geometry][linear-pattern]"`; Block 65 Circular Pattern Geometry with `./build/blcad_geometry_tests "[geometry][circular-pattern]"`; Block 66 MirrorFeature Core/JSON with `./build/blcad_core_tests "[core][mirror-feature]"`; Block 67 Geometry with `./build/blcad_geometry_tests "[geometry][mirror-feature]"`; Block 68 Edge Treatment Core/JSON with `./build/blcad_core_tests "[core][edge-treatment]"`; Block 69 Fillet Geometry with `./build/blcad_geometry_tests "[geometry][fillet-feature]"`; Block 70 Chamfer Geometry with `./build/blcad_geometry_tests "[geometry][chamfer-feature]"`; Block 71 ShellFeature Core/JSON with `./build/blcad_core_tests "[core][shell-feature]"`; Block 72 ShellFeature Geometry with `./build/blcad_geometry_tests "[geometry][shell-feature]"`; Block 73 DraftFeature Core/JSON with `./build/blcad_core_tests "[core][draft-feature]"`; Block 74 DraftFeature Geometry with `./build/blcad_geometry_tests "[geometry][draft-feature]"`; Block 75 Basic 3D Sketch Core with `./build/blcad_core_tests "[core][sketch-3d]"`; Block 76 richer 3D curve intent with `./build/dev-geometry/blcad_core_tests "[core][sketch-3d-curves]"`; Block 77 JSON with `./build/dev-geometry/blcad_core_tests "[core][sketch-3d-json]"`; and Block 78 Geometry conversion with `./build/dev-geometry/blcad_geometry_tests "[geometry][sketch-3d]"`. The current contracts additionally include `docs/part-pattern-core-mvp6.md`, `docs/part-linear-pattern-geometry-mvp6.md`, `docs/part-circular-pattern-geometry-mvp6.md`, `docs/part-mirror-intent-mvp6.md`, `docs/part-mirror-geometry-mvp6.md`, `docs/part-edge-treatment-intent-mvp6.md`, `docs/part-fillet-geometry-mvp6.md`, `docs/part-chamfer-geometry-mvp6.md`, `docs/part-shell-intent-mvp6.md`, `docs/part-shell-geometry-mvp6.md`, `docs/part-draft-intent-mvp6.md`, `docs/part-draft-geometry-mvp6.md`, `docs/part-sketch-3d-core-mvp6.md`, `docs/part-sketch-3d-curves-core-mvp6.md`, `docs/part-sketch-3d-json-mvp6.md`, `docs/part-sketch-3d-geometry-mvp6.md`, `docs/part-path-curve-core-mvp6.md`, `docs/part-sweep-intent-mvp6.md`, `docs/part-sweep-geometry-mvp6.md`, `docs/part-sweep-3d-geometry-mvp6.md`, `docs/part-path-extrude-geometry-mvp6.md`, `docs/part-loft-intent-mvp6.md`, `docs/part-loft-geometry-mvp6.md`, `docs/part-multi-section-loft-geometry-mvp6.md`, `docs/part-guided-loft-geometry-mvp6.md`, `docs/part-surface-feature-intent-mvp6.md`, `docs/part-boundary-fill-surface-geometry-mvp6.md`, `docs/part-trim-extend-surface-geometry-mvp6.md`, `docs/part-surface-stitch-geometry-mvp6.md`, `docs/part-closed-shell-to-solid-geometry-mvp6.md`, `docs/part-multi-body-step-export-mvp6.md`, and `docs/part-construction-mvp6-acceptance.md`. Block 79 PathCurve Core/JSON can be verified with `./build/dev-geometry/blcad_core_tests "[core][path-curve]"`; Block 80 Sweep Core/JSON with `./build/dev-geometry/blcad_core_tests "[core][sweep-feature]"`; Block 81 Sweep Geometry with `./build/dev-geometry/blcad_geometry_tests "[geometry][sweep-feature]"`; Block 82 spatial/twist/guide Sweep with `./build/dev-geometry/blcad_geometry_tests "[geometry][sweep-3d]"`; and Block 83 Path-following Extrude/Extruded Cut with `./build/blcad_core_tests "[core][path-extrude]"` plus `./build/blcad_geometry_tests "[geometry][path-extrude]"`; Block 84 Loft Core/JSON with `./build/blcad_core_tests "[core][loft-feature]"`; Block 85 Two-section Loft Geometry with `./build/blcad_geometry_tests "[geometry][loft-feature]"`; Block 86 Multi-section Loft with `./build/blcad_geometry_tests "[geometry][multi-section-loft]"`; Block 87 Guided Loft with `./build/blcad_geometry_tests "[geometry][guided-loft]"`; Block 88 Surface Core/JSON with `./build/blcad_core_tests "[core][surface-feature]"`; Block 89 Boundary/Fill Geometry with `./build/blcad_geometry_tests "[geometry][surface-boundary-fill]"`; Block 90 Trim/Extend Geometry with `./build/blcad_geometry_tests "[geometry][surface-trim-extend]"`; Block 91 Stitch/Knit/Sew shell Geometry with `./build/blcad_geometry_tests "[geometry][surface-stitch]"`; Block 92 Closed shell to solid conversion with `./build/blcad_geometry_tests "[geometry][surface-to-solid]"`; Block 93 multi-body STEP export with `./build/blcad_geometry_tests "[geometry][multi-body-step-export]"`. Block 94 acceptance is verified with `./build/blcad_core_tests "[integration][part-construction-mvp]"` and `./build/blcad_geometry_tests "[integration][part-construction-mvp]"`. Block 95 Qt application shell, GUI document session, and command architecture is implemented. Block 96 document lifecycle, transactions, recompute, and diagnostics is implemented. Block 97 OCCT viewport, navigation, display, and semantic picking is implemented. Block 98 deterministic browser, typed property editor, and selection synchronization is implemented. Block 99 datum/workplane and planar Sketch/reference/repair workflows are implemented. The immediate next step is Block 100 parameters, Bodies, and foundational Part workflows. Block 43 role-addressed drives, authored holding, complete coordinate-slot freshness, and atomic application remain authoritative for local and Project-level driven motion; Spherical participates passively and rejects selection. Exact sequencing is maintained in `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md` and `docs/part-construction-sequence-mvp6.md`.
 
-After the Blocks 48–94 Part Construction sequence, Blocks 95–101 plan STEP import as either an
-immutable Assembly-ready Reference Part or an EditableBody `ImportedBodyFeature` with downstream
-BLCAD features. Canonical sequencing: `docs/step-import-sequence-mvp7.md`.
+After the Blocks 48–94 Part Construction sequence, Blocks 95–99 implement the optional Qt 6 GUI
+shell, application-state boundary, document lifecycle, atomic transactions, undo/redo, recompute,
+and diagnostics plus the OCCT viewport, navigation, display, semantic picking, browser/property
+projection, and the planar Sketch workbench. Blocks 100–105
+plan browser/properties, all implemented Sketch/Part/Surface/Assembly workflows, analysis,
+exchange, and integrated GUI/headless feature coverage. Canonical sequencing:
+`docs/gui-feature-validation-sequence-mvp7.md`.
+
+Blocks 106–112 then plan STEP import as either an immutable Assembly-ready Reference Part or an
+EditableBody `ImportedBodyFeature` with downstream BLCAD features. Canonical sequencing:
+`docs/step-import-sequence-mvp8.md`.

@@ -124,7 +124,7 @@ TEST_CASE("Block 89 builds an open surface between two boundaries",
 }
 
 TEST_CASE("Block 89 builds a surface from four spatial boundaries",
-          "[geometry][surface-boundary-fill]") {
+          "[geometry][surface-boundary-fill][integration][part-construction-mvp]") {
   PartDocument document = empty_surface_document("part.surface.boundary");
   add_spatial_boundary_network(document);
   add_surface_body(document, "body.surface");

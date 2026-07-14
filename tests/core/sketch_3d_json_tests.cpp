@@ -144,7 +144,7 @@ PartDocument document_with_3d_sketch() {
 } // namespace
 
 TEST_CASE("Block 77 roundtrips all 3D sketch entities and typed references",
-          "[core][sketch-3d-json]") {
+          "[core][sketch-3d-json][integration][part-construction-mvp]") {
   auto document = document_with_3d_sketch();
   auto serialized = serialize_part_document_to_json(document);
   REQUIRE(serialized);

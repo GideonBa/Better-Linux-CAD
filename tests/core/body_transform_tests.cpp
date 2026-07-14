@@ -262,7 +262,7 @@ TEST_CASE("PartDocument connects construction and semantic transform references"
 }
 
 TEST_CASE("BodyTransform and SketchOwnership JSON are additive exact and ordered",
-          "[core][body-transform][core][sketch-ownership]") {
+          "[core][body-transform][core][sketch-ownership][integration][part-construction-mvp]") {
   PartDocument document = transform_document();
   REQUIRE(document.add_sketch_ownership(ownership(SketchAssociation::ReferenceOnly)));
   REQUIRE(document.add_body_transform(translate("transform.translate", true)));

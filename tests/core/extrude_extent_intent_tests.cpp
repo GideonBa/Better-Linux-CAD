@@ -192,7 +192,7 @@ TEST_CASE("PartDocument validates richer Extrude parameters faces and dependenci
 }
 
 TEST_CASE("Richer Extrude JSON roundtrips every extent plus taper and thin intent",
-          "[core][extrude-extent]") {
+          "[core][extrude-extent][integration][part-construction-mvp]") {
   auto document = extent_document();
   auto symmetric = ExtrudeExtentIntent::symmetric(ParameterId("distance"));
   auto two_sided = ExtrudeExtentIntent::two_sided(ParameterId("first"), ParameterId("second"));

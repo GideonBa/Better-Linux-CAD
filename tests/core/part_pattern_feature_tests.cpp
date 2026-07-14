@@ -199,7 +199,7 @@ TEST_CASE("Block 63 supports in-place Pattern body-result chaining", "[core][par
 }
 
 TEST_CASE("Block 63 Pattern JSON is additive strict and roundtrips exact intent",
-          "[core][part-pattern]") {
+          "[core][part-pattern][integration][part-construction-mvp]") {
   auto document = pattern_document();
   REQUIRE(document.add_linear_pattern_feature(linear_pattern()));
   REQUIRE(document.add_circular_pattern_feature(circular_pattern()));

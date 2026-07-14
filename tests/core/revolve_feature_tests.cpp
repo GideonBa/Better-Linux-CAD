@@ -193,7 +193,7 @@ TEST_CASE("PartDocument owns Revolve intent dependencies and invalidation",
 }
 
 TEST_CASE("Revolve JSON roundtrips supported extent and concrete axis intent",
-          "[core][revolve-feature]") {
+          "[core][revolve-feature][integration][part-construction-mvp]") {
   auto document = revolve_document();
   REQUIRE(document.add_revolve_feature(make_revolve(
       "revolve.full", datum_axis(), RevolveAngleExtent::full(), "body.full")));

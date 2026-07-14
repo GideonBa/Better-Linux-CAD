@@ -516,9 +516,45 @@ posed shapes/contact records/sweep analyses
 
 Block 33 adds `datum_axes` PartDocument persistence. Block 35 adds canonical semantic endpoint strings but no JSON field or generated-topology cache. Block 38 adds accepted relationship type spellings without changing local or Project-level relationship record shapes. `docs/file-format.md` remains save-format authority.
 
-## Planned STEP import authority after Block 94
+## GUI validation authority after Block 94
 
-Blocks 95–101 in `docs/step-import-sequence-mvp7.md` add two explicit modes without weakening the
+Blocks 95–105 in `docs/gui-feature-validation-sequence-mvp7.md` add an optional Qt 6 desktop for
+exercising every Core/Geometry feature implemented through Block 94. The familiar CAD layout uses a
+tabbed command area, model/assembly browser, central OCCT viewport, property/task editor, and
+diagnostic status area.
+
+Blocks 95–99 implement the optional `blcad_gui` layer, executable shell, transient
+session/selection/task state, command enablement, document lifecycle, atomic document
+transactions, undo/redo, recompute, structured diagnostics, OCCT display/navigation, semantic
+picking, deterministic browser/property projection, bidirectional selection synchronization, and
+offscreen tests. Block 99 adds datum/construction/derived-workplane authoring, planar Sketch editing,
+normal-plane coordinate/camera handling, Core-backed profile/diagnostic inspection, and previewed
+single-transaction repair. Blocks 100–105 extend that boundary without moving persistent authority
+into widgets.
+
+The GUI is a client of existing authorities:
+
+```text
+Qt widgets and command/task state
+  -> GUI document transaction
+  -> public Core intent and persistence
+  -> existing recompute / solve / analysis / exchange APIs
+  -> Geometry results
+  -> transient OCCT presentations and semantic picking
+```
+
+Qt types stay out of `blcad_core`; widgets never own BRep, solver, transform, expression, or
+recompute authority. Viewer owners map back to stable BLCAD semantic references rather than
+persisting OCCT subshape identity. Preview/Apply/Cancel and undo/redo operate on candidate document
+transactions, and failures retain the last valid displayed result.
+
+Block 105 closes the phase with a machine-checked feature-coverage manifest and GUI/headless
+equivalence workflows. The UI borrows general interaction conventions from established parametric
+CAD systems, but does not copy their branded assets or exact product layouts.
+
+## Planned STEP import authority after Block 105
+
+Blocks 106–112 in `docs/step-import-sequence-mvp8.md` add two explicit modes without weakening the
 authority model:
 
 ```text
@@ -614,9 +650,11 @@ Canonical numbered sequence:
 - `docs/part-surface-stitch-geometry-mvp6.md`
 - `docs/part-closed-shell-to-solid-geometry-mvp6.md`
 - `docs/part-multi-body-step-export-mvp6.md`
-- `docs/step-import-sequence-mvp7.md`
+- `docs/part-construction-mvp6-acceptance.md`
+- `docs/gui-feature-validation-sequence-mvp7.md`
+- `docs/step-import-sequence-mvp8.md`
 
-Block 47 Spherical completes the Assembly MVP sequence. Blocks 48–93 Body identity, body-scoped
+Block 47 Spherical completes the Assembly MVP sequence. Blocks 48–94 Body identity, body-scoped
 recompute/inspection, Body Booleans, associative BodyTransform/SketchOwnership execution, and
 reusable Part-feature semantic input references plus richer Extrude/Cut intent/Geometry and
 persistent plus executed Revolve/RevolveCut, general Pattern intent plus Geometry, and persistent
@@ -630,8 +668,16 @@ Loft/LoftCut/LoftSurface Geometry through verified G1/C1 and persistent Surface-
 intent plus Boundary/Fill, Trim/Extend, Stitch/Knit/Sew shell, Closed-shell-to-solid Surface
 Geometry, and deterministic visible Solid/Surface Body STEP exchange are implemented. Part exchange
 uses `BodyId`-ordered cached results and collision-free `blcad:body-definition:<encoded BodyId>` XDE
-names without mutating Core intent or persisting exchange ids. The next technical step is Block 94
-integrated Part Construction MVP acceptance.
+names without mutating Core intent or persisting exchange ids. Block 94 proves the complete Part
+Construction authority set through one Core/Geometry acceptance tag without adding persistence.
+Blocks 95–99 implement the optional Qt application shell, GUI session/command/task state, semantic
+selection, document lifecycle, atomic transactions, undo/redo, recompute, diagnostics, and the
+`blcad_gui` boundary without moving document authority into widgets. Block 97 additionally provides
+transient OCCT presentation/navigation and stable semantic picking; Block 98 adds deterministic
+browser/property projection, Core-authorized edits, and bidirectional selection sync. Block 99 adds
+datum/workplane and complete implemented planar Sketch/reference/repair workflows. The next
+technical step is Block 100 parameters, bodies, and foundational Part workflows. STEP Import begins
+after GUI acceptance in Block 106.
 
 Block 47 adds passive Point/Point Spherical intent through the shared local/root-space path. Scalar
 Revolute APIs remain adapters; transform variables and the shared numeric engine are unchanged.

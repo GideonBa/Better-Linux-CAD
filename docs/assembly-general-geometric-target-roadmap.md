@@ -1,6 +1,6 @@
 # General Assembly Geometric Target and Relationship Roadmap
 
-Status: Blocks 31–47 and Part Construction Blocks 48–93 are implemented. The Assembly MVP handoff is complete; Block 83 is implemented; Block 84 is implemented; Block 85 is implemented; Block 86 is implemented; Block 87 is implemented; Block 88 is implemented; Block 89 is implemented; Block 90 is implemented; Block 91 is implemented; Block 92 is implemented; Block 93 is implemented; Block 94 is the current next technical step.
+Status: Blocks 31–47 and Part Construction Blocks 48–94 are implemented. The Assembly MVP handoff is complete; Block 83 is implemented; Block 84 is implemented; Block 85 is implemented; Block 86 is implemented; Block 87 is implemented; Block 88 is implemented; Block 89 is implemented; Block 90 is implemented; Block 91 is implemented; Block 92 is implemented; Block 93 is implemented; Block 94 is implemented; Block 95 Qt application shell, GUI document session, and command architecture is implemented; Block 96 document lifecycle, transactions, recompute, and diagnostics is implemented; Block 97 OCCT viewport, navigation, display, and semantic picking is implemented; Block 98 browser, property editor, and selection synchronization is the current next technical step.
 
 This document is the active status and sequencing authority for the expansion from the current assembly target layer to semantic reference geometry, stable generated topology targets, generic geometric relationships, and richer motion-joint families.
 
@@ -66,7 +66,8 @@ The Geometry target taxonomy remains derived. Persistent endpoint strings remain
 12. Joint target compatibility precedes multi-coordinate joint state.
 13. Multi-coordinate Core state is serialized before vector-drive motion execution.
 14. Each richer joint family is implemented in its own block after the shared vector-drive boundary.
-15. GUI picking is a later presentation consumer.
+15. GUI picking remains a presentation consumer and is implemented in Block 97; it maps viewport owners
+    back to these semantic targets without adding persistent kernel identity.
 
 ## Block 31 — Typed geometric target taxonomy and capability projection — Implemented
 
@@ -644,10 +645,10 @@ exchange products
 posed geometry/contact records/sweep analyses
 ```
 
-## Current next technical step — Block 91
+## Current next technical step — Block 98
 
 Block 47 is implemented in `docs/assembly-spherical-joint-mvp5.md` and completes the Assembly MVP
-handoff. Blocks 48–93 Body identity, body-scoped recompute/inspection, Body Booleans, and
+handoff. Blocks 48–94 Body identity, body-scoped recompute/inspection, Body Booleans, and
 BodyTransform/SketchOwnership intent plus associative Geometry execution, reusable Part-feature
 input references, richer Extrude/Cut intent/JSON plus Geometry, persistent plus executed
 Revolve/RevolveCut, General Part Pattern Core intent/JSON, Linear/Circular Pattern Geometry, and
@@ -658,5 +659,9 @@ transient OCCT Geometry conversion, connected PathCurve Core/JSON intent, and pe
 Sweep/SweepCut/SweepSurface execution through spatial paths, twist, and guide control, plus
 Path-following Extrude and Extruded Cut, ProfileSectionReference and Loft Core intent/JSON, and
 two-section, Multi-section, and guided/continuity-controlled Loft Geometry plus Surface-feature
-Core intent/JSON and Boundary/Fill plus Trim/Extend Surface Geometry are implemented. Add
-Stitch/Knit/Sew shell Geometry according to `docs/part-construction-sequence-mvp6.md`.
+Core intent/JSON, Boundary/Fill, Trim/Extend, Stitch/Knit/Sew shell, closed-shell-to-solid Geometry,
+multi-body STEP export, and integrated Part Construction acceptance are implemented. Block 95 has
+implemented the GUI application shell and transient command/session state. Block 96 has implemented
+document lifecycle, atomic transactions, undo/redo, recompute, and diagnostics. Block 97 has
+implemented the OCCT viewport and stable semantic picking; Block 98 browser/property synchronization
+is next, and semantic Assembly targets become authorable through Assembly tasks in Block 103.

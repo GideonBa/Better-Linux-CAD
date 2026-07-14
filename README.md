@@ -1,10 +1,11 @@
 # BLCAD
 
-BLCAD will be an independent, headless parametric CAD system for Linux, in active development.
+BLCAD will be an independent, headless-first parametric CAD system for Linux with an optional
+desktop UI, in active development.
 
 All architecture, feature contracts, persistence semantics, roadmaps, and current implementation status live in [`docs/`](docs/). This README is intentionally kept small and evergreen — it is not a status page.
 
-The assembly sequence is implemented through Block 47. Part Construction Blocks 48–93 add Body identity, body-scoped recompute/inspection, Body Booleans, associative Body transforms, reusable semantic Part-feature inputs, richer Extrude/Cut intent plus Geometry, persistent plus executed Revolve/RevolveCut, general Pattern and Mirror Geometry, persistent plus executed Fillet/Chamfer/Shell/Draft Geometry, persistent model-space 3D Sketch Geometry, reusable connected semantic PathCurves, Sweep/SweepCut/SweepSurface through spatial paths, twist, and guide control, path-following Extrude/Extruded Cut, persistent plus executed path/guide-controlled multi-section Loft Geometry, persistent Surface-feature intent, Boundary/Fill, Trim/Extend, Stitch/Knit/Sew shell, Closed-shell-to-solid conversion, and deterministic multi-body STEP export. The current contract is [`docs/part-multi-body-step-export-mvp6.md`](docs/part-multi-body-step-export-mvp6.md). Block 94 integrated Part Construction MVP acceptance is the next technical step.
+The assembly sequence is implemented through Block 47, and Part Construction MVP-6 is complete through Block 94. It provides Body identity, body-scoped recompute/inspection, Body Booleans and transforms, reusable semantic Part-feature inputs, richer Extrude/Cut, Revolve, Pattern, Mirror, Fillet, Chamfer, Shell, Draft, model-space 3D Sketches, connected PathCurves, Sweep/SweepCut/SweepSurface, path-following Extrude/Cut, guided multi-section Loft, first Surface features, closed-shell-to-solid conversion, and deterministic multi-body STEP export. The integrated contract is [`docs/part-construction-mvp6-acceptance.md`](docs/part-construction-mvp6-acceptance.md). Blocks 95–99 implement the optional Qt shell, branded Archimedes startup splash, document lifecycle, OCCT viewport, synchronized browser/property editing, and the datum/workplane/planar-Sketch workbench with explicit repair; Blocks 100–105 extend it into a validation GUI for all implemented capabilities. [`docs/gui-feature-validation-sequence-mvp7.md`](docs/gui-feature-validation-sequence-mvp7.md) is canonical. Block 100 is next, and STEP Import follows in Blocks 106–112.
 
 ## Repository layout
 

@@ -144,7 +144,7 @@ GeometryShape fill_face(const std::string& id, double x0, double x1) {
 } // namespace
 
 TEST_CASE("Block 91 stitches two adjacent Surface bodies into one shell and recomputes",
-          "[geometry][surface-stitch]") {
+          "[geometry][surface-stitch][integration][part-construction-mvp]") {
   PartDocument document = stitch_document();
   ShapeCache shapes = cache();
   auto first = GeometryRecomputeExecutor{}.execute_document(document, shapes);

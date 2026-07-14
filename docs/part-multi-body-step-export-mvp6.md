@@ -68,5 +68,6 @@ results, kind-incompatible topology, no-visible-Body rejection, and empty-path r
 
 ## Handoff
 
-Blocks 48–93 are implemented. Block 94 integrated Part Construction MVP acceptance and its
-representative headless workflows are the current next technical step.
+Blocks 48–94 are implemented. Block 94 acceptance is canonical in
+`docs/part-construction-mvp6-acceptance.md`; Block 95 Qt application shell, GUI document session, and
+command architecture is the current next technical step.

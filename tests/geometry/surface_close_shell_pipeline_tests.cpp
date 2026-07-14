@@ -155,7 +155,7 @@ PartDocument close_document() {
 } // namespace
 
 TEST_CASE("Block 92 converts a stitched closed box shell into one solid body",
-          "[geometry][surface-to-solid]") {
+          "[geometry][surface-to-solid][integration][part-construction-mvp]") {
   PartDocument document = close_document();
   ShapeCache shapes = cache();
   auto executed = GeometryRecomputeExecutor{}.execute_document(document, shapes);

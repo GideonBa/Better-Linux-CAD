@@ -1,6 +1,7 @@
-# STEP Import Sequence MVP-7
+# STEP Import Sequence MVP-8
 
-Status: planned after the Block-94 Part Construction MVP. Blocks 95–101 are not implemented yet.
+Status: queued after the planned Block-105 GUI Validation acceptance. Blocks 106–112 are planned;
+Block 106 follows only after Blocks 95–105 are complete.
 
 This document is the canonical numbered implementation sequence for importing STEP parts and
 structured STEP assemblies in one of two explicit modes:
@@ -10,7 +11,7 @@ Reference
 EditableBody
 ```
 
-The sequence begins only after Block 94 because editable imports depend on the multi-body,
+The sequence begins after Block 105 because editable imports depend on the multi-body,
 feature-result, semantic-topology, downstream-feature, and STEP exchange authorities established by
 Blocks 48–94.
 
@@ -73,23 +74,38 @@ dimensions, constraints, patterns, or design tables remain separate future work.
 11. Import, refresh, and conversion between modes are transactional: validation and Geometry work
     complete on a copy before Project/Part intent is committed.
 12. Imported source files are never overwritten by modeling, assembly motion, recompute, or export.
+13. Because the GUI infrastructure exists before this phase, each import block adds the matching
+    task/browser/viewport access where user interaction is meaningful. Widgets remain clients of the
+    same headless Core/Geometry command and transaction paths.
 
 ## Frozen phase order
 
 ```text
-95  STEP source identity, import modes, JSON, and freshness
-96  OCCT STEP/XDE reader and deterministic imported body definitions
-97  stable imported topology identity, recovery, and target resolution
-98  Reference Part integration with assemblies
-99  EditableBody ImportedBodyFeature and downstream modeling
-100 structured STEP assembly import
-101 integrated import, refresh, edit, assembly, and re-export acceptance
+106 STEP source identity, import modes, JSON, and freshness
+107 OCCT STEP/XDE reader and deterministic imported body definitions
+108 stable imported topology identity, recovery, and target resolution
+109 Reference Part integration with assemblies
+110 EditableBody ImportedBodyFeature and downstream modeling
+111 structured STEP assembly import
+112 integrated import, refresh, edit, assembly, and re-export acceptance
 ```
 
-Do not merge Blocks 95–101 into one importer. Each block crosses a different persistent or Geometry
+Do not merge Blocks 106–112 into one importer. Each block crosses a different persistent or Geometry
 authority boundary.
 
-## Block 95 — STEP source identity, modes, JSON, and freshness
+The existing GUI grows with the same sequence:
+
+| Import block | GUI extension |
+|---|---|
+| 106 | import-mode/source task, portable-path and freshness diagnostics |
+| 107 | STEP inspection preview with product/body/unit diagnostics |
+| 108 | imported semantic topology display, filtering, and picking |
+| 109 | insert/refresh/convert commands for immutable Reference Parts |
+| 110 | EditableBody creation and downstream Part-workbench integration |
+| 111 | structured product-tree preview and Project import |
+| 112 | end-to-end GUI/headless equivalence and failure-atomicity acceptance |
+
+## Block 106 — STEP source identity, modes, JSON, and freshness
 
 Primary boundary: Core external-source intent.
 
@@ -130,7 +146,7 @@ Focused tags:
 [core][step-import-freshness]
 ```
 
-## Block 96 — OCCT STEP/XDE reader and imported body definitions
+## Block 107 — OCCT STEP/XDE reader and imported body definitions
 
 Primary boundary: deterministic STEP-to-Geometry translation.
 
@@ -153,7 +169,7 @@ Focused tag:
 [geometry][step-import-reader]
 ```
 
-## Block 97 — Stable imported topology identity and recovery
+## Block 108 — Stable imported topology identity and recovery
 
 Primary boundary: persistent selection identity over foreign geometry.
 
@@ -190,7 +206,7 @@ Focused tags:
 [geometry][step-import-assembly-target]
 ```
 
-## Block 98 — Reference Part integration with assemblies
+## Block 109 — Reference Part integration with assemblies
 
 Primary boundary: immutable imported Part definitions as Assembly members.
 
@@ -215,7 +231,7 @@ Focused tags:
 [geometry][assembly-step-reference-part]
 ```
 
-## Block 99 — EditableBody ImportedBodyFeature and downstream modeling
+## Block 110 — EditableBody ImportedBodyFeature and downstream modeling
 
 Primary boundary: imported geometry as a Part feature-result authority.
 
@@ -248,7 +264,7 @@ Focused tags:
 [geometry][imported-body-downstream-feature]
 ```
 
-## Block 100 — Structured STEP assembly import
+## Block 111 — Structured STEP assembly import
 
 Primary boundary: foreign product structure to BLCAD Project hierarchy.
 
@@ -278,11 +294,11 @@ Focused tags:
 [geometry][structured-step-import]
 ```
 
-## Block 101 — Integrated STEP import acceptance and headless workflows
+## Block 112 — Integrated STEP import acceptance and application workflows
 
 Primary boundary: end-to-end import proof and application commands.
 
-Add headless commands/APIs for:
+Add shared commands/APIs and matching GUI tasks for:
 
 ```text
 inspect STEP source
@@ -307,16 +323,18 @@ Representative acceptance must prove:
   results fail atomically;
 - source STEP files remain byte-for-byte unchanged;
 - no raw STEP/XDE/OCCT identity appears in persistent JSON.
+- GUI-created import intent and results are equivalent to the matching headless workflows.
 
 Focused tag:
 
 ```text
 [integration][step-import-mvp]
+[integration][gui-step-import]
 ```
 
-After Block 101, the first STEP Import MVP is complete.
+After Block 112, the first STEP Import MVP is complete.
 
-## Explicit deferrals after Block 101
+## Explicit deferrals after Block 112
 
 ```text
 automatic foreign feature-history recognition
@@ -329,4 +347,4 @@ lossless vendor-specific metadata and appearance parity
 arbitrary topology healing or silent geometric repair
 ```
 
-The next phase after Block 101 must be planned from measured import and topology-recovery gaps.
+The next phase after Block 112 must be planned from measured import and topology-recovery gaps.

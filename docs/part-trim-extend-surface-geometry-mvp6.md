@@ -53,7 +53,6 @@ ambiguous multi-face target.
 
 ## Handoff
 
-Blocks 48–93 are implemented. Stitch/Knit/Sew shell and Closed-shell-to-solid execution are
+Blocks 48–94 are implemented. Stitch/Knit/Sew shell and Closed-shell-to-solid execution are
 canonical in `docs/part-surface-stitch-geometry-mvp6.md` and
-`docs/part-closed-shell-to-solid-geometry-mvp6.md`. Block 93 multi-body STEP export and deterministic body naming is implemented; Block 94
-integrated Part Construction MVP acceptance is the current next technical step.
+`docs/part-closed-shell-to-solid-geometry-mvp6.md`. Block 93 multi-body STEP export and deterministic body naming is implemented; Block 94 integrated Part Construction MVP acceptance is implemented; Block 95 Qt application shell, GUI document session, and command architecture is implemented; Block 96 document lifecycle, transactions, recompute, and diagnostics is implemented; Block 97 OCCT viewport, navigation, display, and semantic picking is implemented; Block 98 browser, property editor, and selection synchronization is the current next technical step.

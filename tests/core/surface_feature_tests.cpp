@@ -157,7 +157,7 @@ TEST_CASE("Block 88 integrates Surface dependencies, invalidation, and removal",
 }
 
 TEST_CASE("Block 88 roundtrips strict and backward-compatible Surface JSON",
-          "[core][surface-feature]") {
+          "[core][surface-feature][integration][part-construction-mvp]") {
   auto document = surface_document();
   add_surface_chain(document);
   auto serialized = serialize_part_document_to_json(document);

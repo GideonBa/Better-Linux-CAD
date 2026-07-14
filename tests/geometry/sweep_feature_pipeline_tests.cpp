@@ -311,7 +311,8 @@ TEST_CASE("Block 81 executes planar polyline and arc paths with explicit orienta
   CHECK(body_volume(fixed_cache, "body.sweep") > 400.0);
 }
 
-TEST_CASE("Block 81 applies SweepCut and creates SweepSurface", "[geometry][sweep-feature]") {
+TEST_CASE("Block 81 applies SweepCut and creates SweepSurface",
+          "[geometry][sweep-feature][integration][part-construction-mvp]") {
   auto created = PartDocument::create(DocumentId("part.sweep.operations"), "SweepOperations");
   REQUIRE(created);
   PartDocument document = created.value();
@@ -399,7 +400,8 @@ TEST_CASE("Block 82 applies explicit twist and still rejects unbounded paths tra
   CHECK(body_volume(shape_cache, "body.sweep") == Catch::Approx(before));
 }
 
-TEST_CASE("Block 82 sweeps solids along a spatial spline and a helix", "[geometry][sweep-3d]") {
+TEST_CASE("Block 82 sweeps solids along a spatial spline and a helix",
+          "[geometry][sweep-3d][integration][part-construction-mvp]") {
   auto spline = spatial_sweep_document(false);
   auto helix = spatial_sweep_document(true);
   ShapeCache spline_cache = cache();

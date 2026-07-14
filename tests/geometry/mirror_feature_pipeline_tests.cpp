@@ -135,7 +135,7 @@ void add_mirror(PartDocument& document, std::vector<MirrorSourceReference> sourc
 } // namespace
 
 TEST_CASE("Block 67 mirrors feature and body sources deterministically",
-          "[geometry][mirror-feature]") {
+          "[geometry][mirror-feature][integration][part-construction-mvp]") {
   auto feature_document = base_document("part.mirror.feature");
   add_yz_mirror_plane(feature_document);
   add_box(feature_document, "source", "body.source", 4.0, 6.0, 10.0, {15.0, 2.0});
@@ -220,7 +220,7 @@ TEST_CASE("Block 67 supports Join Cut and Intersect body result modes",
 }
 
 TEST_CASE("Block 67 recomputes semantic planes and fails transactionally on missing sources",
-          "[geometry][mirror-feature]") {
+          "[geometry][mirror-feature][integration][part-construction-mvp]") {
   auto document = base_document("part.mirror.recompute");
   add_box(document, "base", "body.base", 20.0, 20.0, 10.0);
   add_box(document, "source", "body.source", 4.0, 4.0, 4.0, {15.0, 0.0});

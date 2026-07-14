@@ -53,7 +53,8 @@ and closed failure for an open (free-edge) shell and for a lone face that is not
 
 ## Handoff
 
-Blocks 48–93 are implemented. Multi-body STEP export is canonical in
-`docs/part-multi-body-step-export-mvp6.md`; Block 94 integrated Part Construction MVP acceptance is
-the current next technical step. Block 92 completes the surface-to-solid transition; the converted
-Solid Body reuses the Block-48 Body authority for all downstream modeling and Block 93 exchange.
+Blocks 48–94 are implemented. Multi-body STEP export is canonical in
+`docs/part-multi-body-step-export-mvp6.md`; Block 94 acceptance is canonical in
+`docs/part-construction-mvp6-acceptance.md`. Block 92 completes the surface-to-solid transition; the
+converted Solid Body reuses the Block-48 Body authority for downstream modeling and Block 93
+exchange. Block 95 Qt application shell, GUI document session, and command architecture is implemented; Block 96 document lifecycle, transactions, recompute, and diagnostics is implemented; Block 97 OCCT viewport, navigation, display, and semantic picking is implemented; Block 98 browser, property editor, and selection synchronization is next.

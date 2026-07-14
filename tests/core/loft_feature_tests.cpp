@@ -166,7 +166,7 @@ TEST_CASE("Block 84 freezes closed-profile seam alignment identity", "[core][lof
 }
 
 TEST_CASE("Block 84 validates dependencies and roundtrips strict Loft JSON",
-          "[core][loft-feature]") {
+          "[core][loft-feature][integration][part-construction-mvp]") {
   auto document = loft_document();
   std::vector sections{section("sketch.first", "profile.first", ParameterId("rotation")),
                        section("sketch.second", "profile.second")};

@@ -160,7 +160,7 @@ TEST_CASE("Block 79 preserves authored segment direction and source dependencies
 }
 
 TEST_CASE("Block 79 roundtrips every path source family and orientation metadata",
-          "[core][path-curve]") {
+          "[core][path-curve][integration][part-construction-mvp]") {
   auto document = path_document();
   REQUIRE(document.add_path_curve(path("path.planar", {planar_segment("line.a")})));
   REQUIRE(

@@ -197,7 +197,7 @@ TEST_CASE("Block 71 validates planar cylindrical body and parameter references t
 }
 
 TEST_CASE("Block 71 ShellFeature JSON preserves order direction and body history",
-          "[core][shell-feature]") {
+          "[core][shell-feature][integration][part-construction-mvp]") {
   auto document = base_document();
   REQUIRE(document.add_shell_feature(
       shell("shell.first", {planar_face(SemanticFace::Top), planar_face(SemanticFace::Front)},

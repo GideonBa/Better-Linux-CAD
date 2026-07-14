@@ -1,0 +1,108 @@
+#pragma once
+
+#include "blcad/gui/gui_command_registry.hpp"
+#include "blcad/gui/gui_document_browser.hpp"
+#include "blcad/gui/gui_document_session.hpp"
+#include "blcad/gui/gui_sketch_workbench.hpp"
+
+#include <QMainWindow>
+
+class QAction;
+class QCloseEvent;
+class QTabBar;
+class QTextEdit;
+class QLabel;
+class QPushButton;
+class QTableWidget;
+class QTreeWidget;
+class QTreeWidgetItem;
+
+namespace blcad::gui {
+
+class OcctViewport;
+
+class MainWindow final : public QMainWindow {
+public:
+  explicit MainWindow(QWidget* parent = nullptr);
+
+  [[nodiscard]] GuiDocumentSession& session() noexcept;
+  [[nodiscard]] const GuiDocumentSession& session() const noexcept;
+  [[nodiscard]] GuiCommandRegistry& command_registry() noexcept;
+  [[nodiscard]] const GuiCommandRegistry& command_registry() const noexcept;
+  [[nodiscard]] GuiSketchWorkbench& sketch_workbench() noexcept;
+  [[nodiscard]] const std::optional<SketchId>& active_sketch() const noexcept;
+
+  [[nodiscard]] bool request_workspace(GuiWorkspace workspace) noexcept;
+  void refresh_command_state();
+
+protected:
+  void closeEvent(QCloseEvent* event) override;
+
+private:
+  void create_shell();
+  void create_menus();
+  void create_command_bar();
+  void create_docks();
+  void create_default_commands();
+  void synchronize_workspace_tab();
+  void refresh_document_presentation();
+  void refresh_model_browser();
+  void show_node_properties(const GuiBrowserNode* node);
+  void synchronize_tree_selection(std::string_view semantic_id);
+  void preview_property_edit();
+  void apply_property_edit();
+  void cancel_property_edit();
+  void create_xy_datum();
+  void create_default_datum_axis();
+  void create_sketch_on_selection();
+  void edit_selected_sketch();
+  void add_numeric_sketch_line();
+  void inspect_selected_sketch();
+  void repair_selected_sketch();
+  void refresh_viewport_scene();
+  [[nodiscard]] bool confirm_discard_dirty();
+  void create_new_document(GuiDocumentKind kind);
+  void open_document();
+  void save_document(bool force_path);
+  void show_error(const Error& error);
+
+  GuiDocumentSession session_;
+  GuiCommandRegistry command_registry_;
+  GuiSketchWorkbench sketch_workbench_;
+  std::optional<SketchId> active_sketch_;
+  QTabBar* workspace_tabs_{nullptr};
+  QTreeWidget* model_browser_{nullptr};
+  QTableWidget* property_table_{nullptr};
+  QLabel* property_validation_{nullptr};
+  QPushButton* preview_button_{nullptr};
+  QPushButton* apply_button_{nullptr};
+  QPushButton* cancel_button_{nullptr};
+  QTextEdit* diagnostics_{nullptr};
+  OcctViewport* viewport_{nullptr};
+  QAction* new_part_action_{nullptr};
+  QAction* new_project_action_{nullptr};
+  QAction* open_action_{nullptr};
+  QAction* save_action_{nullptr};
+  QAction* save_as_action_{nullptr};
+  QAction* undo_action_{nullptr};
+  QAction* redo_action_{nullptr};
+  QAction* recompute_action_{nullptr};
+  QAction* shaded_action_{nullptr};
+  QAction* shaded_edges_action_{nullptr};
+  QAction* wireframe_action_{nullptr};
+  QAction* perspective_action_{nullptr};
+  QAction* create_datum_action_{nullptr};
+  QAction* create_axis_action_{nullptr};
+  QAction* create_sketch_action_{nullptr};
+  QAction* edit_sketch_action_{nullptr};
+  QAction* add_line_action_{nullptr};
+  QAction* inspect_sketch_action_{nullptr};
+  QAction* repair_sketch_action_{nullptr};
+  std::size_t viewport_revision_{static_cast<std::size_t>(-1)};
+  std::size_t browser_revision_{static_cast<std::size_t>(-1)};
+  GuiDocumentBrowser browser_model_;
+  std::string selected_browser_id_;
+  bool synchronizing_selection_{false};
+};
+
+} // namespace blcad::gui

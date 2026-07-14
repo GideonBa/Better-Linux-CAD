@@ -2,7 +2,7 @@
 
 Status: first line-based closed-profile MVP implemented.
 
-This document records the implemented first step from primitive-only sketches toward general CAD sketch profiles. The implementation is intentionally narrow: it supports ordered line-segment loops and uses them as one closed planar profile for additive or subtractive extrudes. Arcs, splines, profile-region detection, multiple contours, inner holes, and GUI editing remain later work.
+This document records the implemented first step from primitive-only sketches toward general CAD sketch profiles. The implementation is intentionally narrow: it supports ordered line-segment loops and uses them as one closed planar profile for additive or subtractive extrudes. Newer canonical sketch/feature contracts govern later profile capabilities; GUI editing of the complete implemented sketch authority is planned in Block 99.
 
 The larger Inventor-like sketcher and sketch-driven feature roadmap is documented in `docs/inventor-like-sketcher-and-feature-roadmap.md`.
 

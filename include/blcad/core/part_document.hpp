@@ -54,6 +54,10 @@ public:
   [[nodiscard]] Result<std::size_t> add_construction_plane(ConstructionPlane plane);
   [[nodiscard]] Result<std::size_t> add_derived_workplane(DerivedWorkplane workplane);
   [[nodiscard]] Result<std::size_t> add_sketch(Sketch sketch);
+  // Replaces one existing planar sketch atomically while preserving its position in the authored
+  // collection and every downstream dependency edge. The replacement must keep the same SketchId;
+  // all normal add_sketch validation is applied before this document changes.
+  [[nodiscard]] Result<std::size_t> update_sketch(Sketch sketch);
   [[nodiscard]] Result<std::size_t> add_sketch_3d(Sketch3D sketch);
   [[nodiscard]] Result<std::size_t> remove_sketch_3d(Sketch3DId id);
   [[nodiscard]] Result<std::size_t> add_path_curve(PathCurve path_curve);

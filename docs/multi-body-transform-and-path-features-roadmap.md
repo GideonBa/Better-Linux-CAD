@@ -403,9 +403,11 @@ Canonical implemented contracts include `docs/part-body-identity-mvp6.md`,
 numbered Part Construction sequence is authoritative where this older roadmap groups work
 differently.
 
-STEP import is deliberately sequenced afterward in `docs/step-import-sequence-mvp7.md`: Blocks
-95–101 reuse this roadmap's body and feature-result authority for Reference and EditableBody import
-modes instead of adding foreign BRep authority prematurely.
+GUI Feature Validation is deliberately sequenced first in
+`docs/gui-feature-validation-sequence-mvp7.md`. STEP import then follows in
+`docs/step-import-sequence-mvp8.md`: Blocks 106–112 reuse this roadmap's body and feature-result
+authority for Reference and EditableBody import modes instead of adding foreign BRep authority
+prematurely.
 
 ## First acceptance tests
 

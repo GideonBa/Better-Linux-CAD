@@ -6,7 +6,7 @@ This document describes the first stack layer above `SketchRepairTransactionExec
 
 ## Goal
 
-The goal is to let application, CLI, or later GUI code store applied repair transactions and undo them in strict reverse order without introducing redo, persistent journals, full sketch snapshots, or automatic repair execution.
+The goal is to let application, CLI, or GUI code store applied repair transactions and undo them in strict reverse order without introducing redo in this stack, persistent journals, full sketch snapshots, or automatic repair execution. Block 99 plans the interactive repair consumer; the broader document-level GUI undo/redo transaction history is planned in Block 96.
 
 The flow remains explicit:
 

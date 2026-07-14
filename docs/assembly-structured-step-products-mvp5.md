@@ -530,8 +530,8 @@ The suites prove:
 
 The `STEPControl_Reader` use above is export verification only; it is not a user-facing STEP
 importer and creates no BLCAD Part/Assembly intent. Production Reference, EditableBody, and
-structured Assembly import is planned separately in Blocks 95–101 of
-`docs/step-import-sequence-mvp7.md`.
+structured Assembly import is planned separately in Blocks 106–112 of
+`docs/step-import-sequence-mvp8.md`.
 
 ## Next technical step
 

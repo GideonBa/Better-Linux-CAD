@@ -1171,6 +1171,54 @@ Result<std::size_t> PartDocument::add_sketch(Sketch sketch) {
   return Result<std::size_t>::success(sketches_.size() - 1U);
 }
 
+Result<std::size_t> PartDocument::update_sketch(Sketch sketch) {
+  const auto found = std::find_if(sketches_.begin(), sketches_.end(), [&sketch](const Sketch& item) {
+    return item.id() == sketch.id();
+  });
+  if (found == sketches_.end())
+    return Result<std::size_t>::failure(
+        Error::validation(sketch.id().value(), "sketch to update must exist in part document"));
+
+  const std::size_t index = static_cast<std::size_t>(std::distance(sketches_.begin(), found));
+  std::vector<std::string> downstream;
+  for (const auto& [dependency, dependent] : dependency_graph_.dependencies())
+    if (dependency == sketch.id().value())
+      downstream.push_back(dependent);
+
+  PartDocument candidate = *this;
+  candidate.sketches_.erase(candidate.sketches_.begin() + static_cast<std::ptrdiff_t>(index));
+  auto removed = candidate.dependency_graph_.remove_node(sketch.id().value());
+  if (removed.has_error())
+    return Result<std::size_t>::failure(removed.error());
+  candidate.invalidation_state_.untrack_node(sketch.id().value());
+
+  auto added = candidate.add_sketch(std::move(sketch));
+  if (added.has_error())
+    return Result<std::size_t>::failure(added.error());
+  Sketch replacement = std::move(candidate.sketches_.back());
+  candidate.sketches_.pop_back();
+  candidate.sketches_.insert(candidate.sketches_.begin() + static_cast<std::ptrdiff_t>(index),
+                             std::move(replacement));
+
+  for (const auto& dependent : downstream) {
+    if (!candidate.dependency_graph_.has_node(dependent))
+      continue;
+    auto restored = candidate.dependency_graph_.add_dependency(candidate.sketches_[index].id().value(),
+                                                                dependent);
+    if (restored.has_error())
+      return Result<std::size_t>::failure(restored.error());
+  }
+  auto synced = candidate.invalidation_state_.sync_from_graph(candidate.dependency_graph_);
+  if (synced.has_error())
+    return Result<std::size_t>::failure(synced.error());
+  auto changed = candidate.invalidation_state_.mark_changed(candidate.dependency_graph_,
+                                                             candidate.sketches_[index].id().value());
+  if (changed.has_error())
+    return Result<std::size_t>::failure(changed.error());
+  *this = std::move(candidate);
+  return Result<std::size_t>::success(index);
+}
+
 Result<std::size_t> PartDocument::add_sketch_3d(Sketch3D sketch) {
   if (has_sketch_3d_id(sketch.id()) || has_sketch_id(SketchId(sketch.id().value())))
     return Result<std::size_t>::failure(Error::validation(

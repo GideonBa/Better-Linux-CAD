@@ -96,7 +96,7 @@ double body_volume(const ShapeCache& cache, const char* body_id) {
 } // namespace
 
 TEST_CASE("Body boolean Geometry executes Add Subtract and Intersect",
-          "[geometry][body-boolean]") {
+          "[geometry][body-boolean][integration][part-construction-mvp]") {
   struct Case {
     BodyBooleanOperation operation;
     double expected_volume;

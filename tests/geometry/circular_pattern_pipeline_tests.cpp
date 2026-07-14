@@ -209,7 +209,7 @@ GeometryShape box(double size) {
 } // namespace
 
 TEST_CASE("Block 65 adapter preserves full and partial instance-major angular order",
-          "[geometry][circular-pattern]") {
+          "[geometry][circular-pattern][integration][part-construction-mvp]") {
   auto first = BodyTransformAdapter{}.translate(box(2.0), {10.0, 0.0, 0.0});
   auto second = BodyTransformAdapter{}.translate(box(2.0), {20.0, 0.0, 0.0});
   REQUIRE(first);

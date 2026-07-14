@@ -1,6 +1,9 @@
 # User Interface Architecture
 
-Status: target architecture. Not implemented yet. There is no GUI; the current pipeline is headless. The UI comes after the internal models work.
+Status: active implementation. Blocks 95–99 provide the optional Qt shell, document transactions,
+OCCT viewport, deterministic model/assembly browser, typed property editor, and semantic selection
+synchronization. Block 99 adds datum, derived-workplane, planar Sketch, inspection, and explicit
+repair workflows. Block 100 continues with parameters, Bodies, and foundational solid features.
 
 The UI is deliberately not built like FreeCAD. The goal is a modern, consistent, reduced interface with a clear separation between model, parameters, features, and assembly. Crucially, the UI only operates the core; it must not contain CAD logic (last of the core principles in `docs/architecture-summary.md`).
 
@@ -51,9 +54,12 @@ After a change the UI updates the viewport, feature tree, and parameter window f
 
 1. Keep everything headless until the core, features, and serialization are stable.
 2. Add a read-only viewport that renders the recomputed final shape.
-3. Add a feature tree bound to the part's feature list.
-4. Add a parameter table bound to the parameter model, then make it editable and drive recompute.
-5. Add a property panel for the selected feature.
+3. Add a feature/assembly tree bound to transient projections of persistent Core models. Implemented
+   in Block 98.
+4. Add typed parameter/property editing that drives validated transactions and recompute. The
+   generic Block-98 layer and Block-99 planar Sketch workbench are implemented; remaining
+   feature-specific editors follow in Blocks 100–104.
+5. Keep selection synchronized through stable semantic ids across tree, session, and viewport.
 6. Add feature-creation dialogs one module at a time.
 7. Add the assembly tree and constraint dialog once the assembly system exists.
 

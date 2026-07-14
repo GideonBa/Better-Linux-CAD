@@ -116,7 +116,8 @@ GeometryShapeBounds bounds(const ShapeCache& shape_cache) {
 }
 } // namespace
 
-TEST_CASE("Block 72 shells a closed box into an open-top solid", "[geometry][shell-feature]") {
+TEST_CASE("Block 72 shells a closed box into an open-top solid",
+          "[geometry][shell-feature][integration][part-construction-mvp]") {
   auto document = box_document();
   add_shell(document, {face(SemanticFace::Top)});
   ShapeCache shape_cache = cache();

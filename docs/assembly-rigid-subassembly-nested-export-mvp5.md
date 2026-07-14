@@ -377,7 +377,7 @@ prove rooted assembly/component exchange identity, shared part definitions, repe
 
 The reader used for geometric equivalence is test-only export verification. It is not a BLCAD STEP
 Part/Assembly import path. Reference and EditableBody import plus structured hierarchy conversion
-are planned in Blocks 95–101 of `docs/step-import-sequence-mvp7.md`.
+are planned in Blocks 106–112 of `docs/step-import-sequence-mvp8.md`.
 
 ## Current handoff
 

@@ -225,7 +225,7 @@ TEST_CASE("Block 87 center path controls a duct transition", "[geometry][guided-
 }
 
 TEST_CASE("Block 87 leading and trailing guides control a G1 blade loft",
-          "[geometry][guided-loft]") {
+          "[geometry][guided-loft][integration][part-construction-mvp]") {
   PartDocument plain = blade_document(false, LoftContinuity::C0);
   PartDocument guided = blade_document(true, LoftContinuity::G1);
   ShapeCache plain_cache = cache("cache.blade.plain");
@@ -236,7 +236,8 @@ TEST_CASE("Block 87 leading and trailing guides control a G1 blade loft",
   CHECK(bounds(guided_cache).minimum.x < bounds(plain_cache).minimum.x - 2.0);
 }
 
-TEST_CASE("Block 87 fails unsupported G2 closed transactionally", "[geometry][guided-loft]") {
+TEST_CASE("Block 87 fails unsupported G2 closed transactionally",
+          "[geometry][guided-loft][integration][part-construction-mvp]") {
   PartDocument document = blade_document(false, LoftContinuity::G2);
   ShapeCache shape_cache = cache("cache.blade.g2");
   auto result = GeometryRecomputeExecutor{}.execute_document(document, shape_cache);

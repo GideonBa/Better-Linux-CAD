@@ -653,6 +653,10 @@ Block 93 adds no persistence fields. Multi-body STEP export reads the existing `
 `visibility` values, derives `blcad:body-definition:<percent-encoded BodyId>` names transiently,
 and never writes STEP/XDE labels or entity ids into `.blcad.json`.
 
+Block 94 also adds no persistence fields. Its integration suite roundtrips the persistent
+Blocks-48–93 families and verifies that derived OCCT, XDE, and STEP identity remains absent from
+Core JSON.
+
 Block 51 adds optional Body-result fields to existing Feature records:
 
 ```json
@@ -881,10 +885,10 @@ Surface shell reference and the Solid result Body id. The produced solid, its sh
 state remain transient cache products. Canonical Geometry details are in
 `docs/part-closed-shell-to-solid-geometry-mvp6.md`.
 
-## Planned STEP import persistence after Block 94
+## Planned STEP import persistence after GUI Validation Block 105
 
-This section is planned architecture, not part of the current schema. Blocks 95–101 in
-`docs/step-import-sequence-mvp7.md` will freeze the exact additive JSON shape.
+This section is planned architecture, not part of the current schema. Blocks 106–112 in
+`docs/step-import-sequence-mvp8.md` will freeze the exact additive JSON shape.
 
 Planned persistent import intent includes:
 

@@ -155,7 +155,7 @@ TEST_CASE("Block 80 integrates sweep sources bodies and twist into the dependenc
 }
 
 TEST_CASE("Blocks 80 and 82 roundtrip sweep families and optional guides",
-          "[core][sweep-feature]") {
+          "[core][sweep-feature][integration][part-construction-mvp]") {
   auto document = sweep_document();
   auto solid = SweepFeature::create_sweep(
       FeatureId("sweep.solid"), "Solid", closed_profile(), PathCurveId("path.trajectory"),

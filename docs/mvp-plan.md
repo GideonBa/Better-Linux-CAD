@@ -4,18 +4,19 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 93
-current_block: 94
-current_boundary: Integrated Part Construction MVP acceptance and headless workflows
-current_tag: "[integration][part-construction-mvp]"
+implemented_through: Block 99
+current_block: 100
+current_boundary: Parameters, bodies, and foundational Part workflows
+current_tag: "[gui][parameters]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
   mvp_3: "Parametric bolt circle pattern — implemented"
   mvp_4: "Assembly parameters and Project container — implemented"
   mvp_5: "Assembly relationships, motion, hierarchy, analysis, exchange — Blocks 1–47 implemented"
-  mvp_6: "Part Construction — Blocks 48–93 implemented, Block 94 planned and next"
-  mvp_7: "STEP Import — Blocks 95–101 planned after Block 94"
+  mvp_6: "Part Construction — Blocks 48–94 implemented; MVP complete"
+  mvp_7: "GUI Feature Validation — Blocks 95–99 implemented; Blocks 100–105 planned; Block 100 next"
+  mvp_8: "STEP Import — Blocks 106–112 planned after GUI acceptance"
 ---
 
 # MVP Plan
@@ -552,10 +553,11 @@ motion solvers reject Spherical as the selected drive.
 
 ## MVP 6 — Part Construction MVP after Block 47
 
-**Status:** In progress — Blocks 48–93 implemented
+**Status:** Complete — Blocks 48–94 implemented
 **Canonical:** sequence `docs/part-construction-sequence-mvp6.md`
 
-Blocks 48–93 are complete. Block 93 is implemented; Block 94 is the current next technical step.
+Blocks 48–94 are complete. Block 94 closes the first Part Construction MVP; Block 95 begins the GUI
+Feature Validation MVP.
 
 Mandatory Part Construction phase order:
 
@@ -582,14 +584,46 @@ The sequence consolidates existing planning from:
 - `docs/inventor-like-sketcher-and-feature-roadmap.md`
 - `docs/advanced-surfacing-and-3d-sketch-mvp.md`
 
-After Block 94 the first Part Construction MVP is considered complete. That means a serious headless parametric Part kernel with multiple solid/surface bodies, explicit body operations, Revolve, general patterns, Mirror, Fillet, Chamfer, Shell, Draft, 3D Sketches, Sweep, Loft, first Surface Features, surface-to-solid conversion, and multi-body STEP exchange.
+The first Part Construction MVP is complete. It provides a serious headless parametric Part kernel with multiple solid/surface bodies, explicit body operations, Revolve, general patterns, Mirror, Fillet, Chamfer, Shell, Draft, 3D Sketches, Sweep, Loft, first Surface Features, surface-to-solid conversion, and multi-body STEP exchange.
 
-It does not mean SolidWorks/Inventor Part product parity. Production GUI modeling, Class-A surfacing, arbitrary NURBS control cages, variable-radius fillets, advanced topology healing, direct modeling, sheet metal, weldments, and specialized manufacturing feature systems remain later work.
+It does not mean SolidWorks/Inventor Part product parity. Blocks 95–105 add a simple validation UI,
+not commercial-product parity. Class-A surfacing, arbitrary NURBS control cages, variable-radius
+fillets, advanced topology healing, direct modeling, sheet metal, weldments, and specialized
+manufacturing feature systems remain later work.
 
-## MVP 7 — Planned STEP Import after Block 94
+## MVP 7 — GUI Feature Validation after Block 94
 
-**Status:** Planned
-**Canonical:** `docs/step-import-sequence-mvp7.md`
+**Status:** Active — Blocks 95–99 implemented; Block 100 next
+**Canonical:** `docs/gui-feature-validation-sequence-mvp7.md`
+
+The optional Qt 6 desktop uses familiar parametric-CAD interaction patterns: a tabbed command area,
+model/assembly browser, central OCCT viewport, property/task panel, and status/diagnostic area. It
+does not copy commercial CAD branding or become a second modeling authority.
+
+Mandatory order:
+
+```text
+95  Qt application shell, GUI document session, and command architecture
+96  document lifecycle, transactions, recompute, and diagnostics
+97  OCCT viewport, navigation, display, and semantic picking
+98  model/assembly browser, property editor, and selection synchronization
+99  datum, workplane, 2D Sketch, reference, and repair workflows
+100 parameters, bodies, and foundational Part workflows
+101 patterns, finishing, shell, draft, and body operations
+102 3D paths, Sweep, Loft, and Surface workflows
+103 Assembly authoring, relationships, joints, motion, and hierarchy
+104 analysis and STEP-export workflows
+105 integrated GUI feature-coverage acceptance
+```
+
+Block 105 owns a manifest proving that every public feature family implemented through Block 94 has
+a GUI create/edit or explicit read-only disposition, browser/property inspection, viewport behavior,
+and focused or headless-equivalence coverage.
+
+## MVP 8 — STEP Import after GUI Validation
+
+**Status:** Planned — Blocks 106–112 follow Block 105
+**Canonical:** `docs/step-import-sequence-mvp8.md`
 
 The STEP Import sequence provides two explicit user modes:
 
@@ -605,16 +639,16 @@ EditableBody
 Mandatory order:
 
 ```text
-95  STEP source identity, import modes, JSON, and freshness
-96  OCCT STEP/XDE reader and deterministic imported body definitions
-97  stable imported topology identity, recovery, and target resolution
-98  Reference Part integration with assemblies
-99  EditableBody ImportedBodyFeature and downstream modeling
-100 structured STEP assembly import
-101 integrated import, refresh, edit, assembly, and re-export acceptance
+106 STEP source identity, import modes, JSON, and freshness
+107 OCCT STEP/XDE reader and deterministic imported body definitions
+108 stable imported topology identity, recovery, and target resolution
+109 Reference Part integration with assemblies
+110 EditableBody ImportedBodyFeature and downstream modeling
+111 structured STEP assembly import
+112 integrated import, refresh, edit, assembly, and re-export acceptance
 ```
 
-Blocks 95–101 do not reconstruct foreign feature history and do not implement direct face
+Blocks 106–112 do not reconstruct foreign feature history and do not implement direct face
 push/pull. EditableBody means that new BLCAD features are built after a persistent imported base
 feature.
 
@@ -1288,13 +1322,87 @@ Canonical contract: `docs/part-multi-body-step-export-mvp6.md`.
 [geometry][multi-body-step-export]
 ```
 
-## Current next technical step — Block 94
+## Block 94 — Integrated Part Construction MVP acceptance — Implemented
 
-Prove the complete Part Construction MVP with representative headless mechanical, routed/swept,
-lofted freeform, surfaced-then-solid, multi-body inspection, JSON round-trip, incremental recompute,
-and multi-body STEP export workflows. Block 94 adds no new feature family unless a narrowly scoped
-integration correction is required.
+Block 94 assembles representative mechanical, routed/swept, lofted, surfaced-then-solid, JSON,
+incremental recompute, semantic fail-closed, and multi-body STEP proofs under one integration tag.
+A dedicated two-Body workflow proves canonical roundtrip, deterministic Body ordering, affected-body
+incremental recompute, unaffected-body stability, STEP exchange, and source-model immutability.
+
+Canonical contract: `docs/part-construction-mvp6-acceptance.md`.
 
 ```text
 [integration][part-construction-mvp]
 ```
+
+## Block 95 — Qt application shell, session, and command architecture — Implemented
+
+The optional `blcad_gui`/`BLCAD::gui` library and `blcad_app` (`blcad`) executable implement the
+thin GUI application layer: document session, command registry/context, transient semantic
+selection, strict task lifecycle, desktop shell, and explicit workspace switching. The shell has
+the frozen command bar, browser/task docks, viewport placeholder, diagnostics, and status area.
+Core-only builds remain unchanged; GUI builds require Geometry explicitly. Block 95 adds no
+feature-specific editor and no new model semantics.
+
+```text
+[gui][application-shell]
+[gui][command-state]
+```
+
+## Block 96 — Document lifecycle, transactions, recompute, and diagnostics — Implemented
+
+The GUI session now owns an active Part/Project model, canonical JSON snapshot history, file/dirty
+state, fresh Part or per-Project-Part ShapeCaches, recompute status, and structured diagnostics.
+New/Open/Save/Save-as, transaction validation, atomic recompute publication, undo/redo regeneration,
+dirty-close prompts, and linked Qt actions reuse existing Core persistence and Geometry execution.
+
+```text
+[gui][document-session]
+[gui][document-transaction]
+[gui][diagnostics]
+```
+
+## Block 97 — OCCT viewport, navigation, display, and semantic picking — Implemented
+
+The central placeholder is replaced by an OCCT/Qt viewport with atomic semantic presentation
+publication, Part and posed-Assembly scene builders, shaded/edge/wireframe display, orbit/pan/zoom,
+fit and standard views, projection switching, hover highlighting, selection filters, and stable
+BLCAD semantic picking without persisted AIS or TopoDS identity.
+
+```text
+[gui][viewport]
+[gui][navigation]
+[gui][semantic-picking]
+```
+
+## Block 98 — Browser, property editor, and selection synchronization — Implemented
+
+The deterministic Part/Project browser and typed property/task editor now synchronize stable
+semantic selection with the Block-97 viewport. Supported parameter, Body, component, and
+subassembly edits use validated, undoable document transactions; generated or unsupported fields
+remain visibly read-only. See `docs/gui-browser-property-selection-mvp7.md`.
+
+```text
+[gui][model-browser]
+[gui][property-editor]
+[gui][selection-sync]
+```
+
+## Block 99 — Datum, workplane, 2D Sketch, reference, and repair workflows — Implemented
+
+The GUI workbench now exposes datum, construction, derived-workplane, planar sketch, reference,
+constraint, dimension, profile/region, diagnostic, and repair contracts through validated document
+transactions. Sketch editing uses a normal-to-plane orthographic camera and deterministic
+model/plane coordinate mapping. Repairs require Preview and commit as one undoable transaction. See
+`docs/gui-sketch-workbench-mvp7.md`.
+
+```text
+[gui][datum-workplane]
+[gui][sketch-workbench]
+[gui][sketch-repair]
+```
+
+## Current next technical step — Block 100
+
+Expose parameter, Body, Extrude/Cut, Revolve, and bolt-circle/hole authoring through the established
+GUI transaction and task boundaries.
