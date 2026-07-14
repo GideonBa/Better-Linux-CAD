@@ -1,8 +1,8 @@
 # Part Construction Sequence MVP-6
 
-Status: active post-Assembly-MVP sequence. Blocks 48–92 are implemented; Blocks 93–94 remain planned. Blocks 95–101 form the subsequent STEP Import MVP.
+Status: active post-Assembly-MVP sequence. Blocks 48–93 are implemented; Block 94 remains planned. Blocks 95–101 form the subsequent STEP Import MVP.
 
-Block 47 completed the Assembly MVP handoff. Blocks 48–92 establish Body identity, body-scoped recompute/inspection, Body Boolean execution, associative transform Geometry, reusable semantic Part-feature inputs, richer Extrude/Cut intent plus Geometry, persistent plus executed Revolve/RevolveCut, general Pattern and Mirror Geometry, persistent plus executed Fillet/Chamfer/Shell/Draft Geometry, persistent model-space 3D Sketch Geometry, connected PathCurve Core intent, executed Sweep/SweepCut/SweepSurface through spatial paths, twist, and guide control, path-following Extrude/Extruded Cut, persistent plus executed guided multi-section Loft intent through verified G1/C1, persistent Surface-feature intent, and executed Boundary/Fill, Trim/Extend, Stitch/Knit/Sew shell, plus Closed-shell-to-solid Surface Geometry. Block 93 — Multi-body STEP export and deterministic body naming — is the current next technical step.
+Block 47 completed the Assembly MVP handoff. Blocks 48–93 establish Body identity, body-scoped recompute/inspection, Body Boolean execution, associative transform Geometry, reusable semantic Part-feature inputs, richer Extrude/Cut intent plus Geometry, persistent plus executed Revolve/RevolveCut, general Pattern and Mirror Geometry, persistent plus executed Fillet/Chamfer/Shell/Draft Geometry, persistent model-space 3D Sketch Geometry, connected PathCurve Core intent, executed Sweep/SweepCut/SweepSurface through spatial paths, twist, and guide control, path-following Extrude/Extruded Cut, persistent plus executed guided multi-section Loft intent through verified G1/C1, persistent Surface-feature intent, executed Boundary/Fill, Trim/Extend, Stitch/Knit/Sew shell and Closed-shell-to-solid Surface Geometry, plus deterministic multi-body STEP export. Block 94 — Integrated Part Construction MVP acceptance and headless workflows — is the current next technical step.
 
 This document is the active status, phase-order, authority-boundary, and handoff summary for the first broad BLCAD Part Construction MVP after the Assembly MVP.
 
@@ -10,7 +10,7 @@ The complete original Blocks 48-94 per-block planning detail is preserved byte-f
 
 - `docs/part-construction-sequence-mvp6-planning-detail.md`
 
-The implemented Blocks 48–92 contracts are canonical in:
+The implemented Blocks 48–93 contracts are canonical in:
 
 - `docs/part-body-identity-mvp6.md`
 - `docs/part-body-json-mvp6.md`
@@ -57,6 +57,7 @@ The implemented Blocks 48–92 contracts are canonical in:
 - `docs/part-trim-extend-surface-geometry-mvp6.md`
 - `docs/part-surface-stitch-geometry-mvp6.md`
 - `docs/part-closed-shell-to-solid-geometry-mvp6.md`
+- `docs/part-multi-body-step-export-mvp6.md`
 
 The planned post-Block-94 STEP import handoff is canonical in:
 
@@ -206,9 +207,10 @@ SweepCut, and SweepSurface intent with closed-region or open-PathCurve profiles,
 identity, orientation override, optional twist, Body-result semantics, dependency tracking, and
 strict additive JSON. Block 81 executes bounded ConstructionLine and planar line/arc/polyline
 paths for solid Sweep, SweepCut, and SweepSurface with explicit orientation and transactional
-Body-cache publication. Blocks 82–92 add spatial/twist/guide Sweep, path-following Extrude/Cut,
-ordered and guided Loft Geometry, Surface-feature intent, and Boundary/Fill, Trim/Extend, Stitch/Knit/Sew shell, plus Closed-shell-to-solid execution. The remaining Blocks 93–94
-implementation contracts stay in
+Body-cache publication. Blocks 82–93 add spatial/twist/guide Sweep, path-following Extrude/Cut,
+ordered and guided Loft Geometry, Surface-feature intent, Boundary/Fill, Trim/Extend,
+Stitch/Knit/Sew shell, Closed-shell-to-solid execution, and deterministic multi-body STEP export.
+The remaining Block 94 implementation contract stays in
 `docs/part-construction-sequence-mvp6-planning-detail.md`.
 
 ## Post-Block-94 handoff

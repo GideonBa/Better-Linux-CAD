@@ -45,5 +45,5 @@ Coverage proves parallel, tilted, and arbitrarily oriented sections; closed soli
 products; `NewBody`, `Join`, `Cut`/`LoftCut`, and `Intersect`; deterministic seam/flip/rotation
 execution; and transactional rejection of staged continuity intent.
 
-Blocks 48–92 are implemented. Block 86 Multi-section Loft is implemented; Block 87 Guided and
+Blocks 48–93 are implemented. Block 86 Multi-section Loft is implemented; Block 87 Guided and
 continuity-controlled Loft is next.

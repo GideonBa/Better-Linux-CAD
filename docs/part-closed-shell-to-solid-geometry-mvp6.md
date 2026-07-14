@@ -53,6 +53,7 @@ and closed failure for an open (free-edge) shell and for a lone face that is not
 
 ## Handoff
 
-Blocks 48–92 are implemented. Block 93 multi-body STEP export and deterministic body naming is the
-current next technical step. Block 92 completes the surface-to-solid transition; the converted Solid
-Body reuses the Block-48 Body authority for all downstream modeling.
+Blocks 48–93 are implemented. Multi-body STEP export is canonical in
+`docs/part-multi-body-step-export-mvp6.md`; Block 94 integrated Part Construction MVP acceptance is
+the current next technical step. Block 92 completes the surface-to-solid transition; the converted
+Solid Body reuses the Block-48 Body authority for all downstream modeling and Block 93 exchange.

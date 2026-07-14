@@ -611,9 +611,12 @@ Canonical numbered sequence:
 - `docs/part-surface-feature-intent-mvp6.md`
 - `docs/part-boundary-fill-surface-geometry-mvp6.md`
 - `docs/part-trim-extend-surface-geometry-mvp6.md`
+- `docs/part-surface-stitch-geometry-mvp6.md`
+- `docs/part-closed-shell-to-solid-geometry-mvp6.md`
+- `docs/part-multi-body-step-export-mvp6.md`
 - `docs/step-import-sequence-mvp7.md`
 
-Block 47 Spherical completes the Assembly MVP sequence. Blocks 48–92 Body identity, body-scoped
+Block 47 Spherical completes the Assembly MVP sequence. Blocks 48–93 Body identity, body-scoped
 recompute/inspection, Body Booleans, associative BodyTransform/SketchOwnership execution, and
 reusable Part-feature semantic input references plus richer Extrude/Cut intent/Geometry and
 persistent plus executed Revolve/RevolveCut, general Pattern intent plus Geometry, and persistent
@@ -624,9 +627,11 @@ deterministic OCCT Geometry conversion, reusable connected PathCurve Core/JSON i
 persistent plus spatial/twist/guide-controlled Sweep/SweepCut/SweepSurface and path-following
 Extrude/Extruded Cut and persistent plus executed path/guide-controlled multi-section
 Loft/LoftCut/LoftSurface Geometry through verified G1/C1 and persistent Surface-feature Core/JSON
-intent plus Boundary/Fill, Trim/Extend, Stitch/Knit/Sew shell, and Closed-shell-to-solid Surface
-Geometry are implemented. The next technical step is Block 93 multi-body STEP export and
-deterministic body naming.
+intent plus Boundary/Fill, Trim/Extend, Stitch/Knit/Sew shell, Closed-shell-to-solid Surface
+Geometry, and deterministic visible Solid/Surface Body STEP exchange are implemented. Part exchange
+uses `BodyId`-ordered cached results and collision-free `blcad:body-definition:<encoded BodyId>` XDE
+names without mutating Core intent or persisting exchange ids. The next technical step is Block 94
+integrated Part Construction MVP acceptance.
 
 Block 47 adds passive Point/Point Spherical intent through the shared local/root-space path. Scalar
 Revolute APIs remain adapters; transform variables and the shared numeric engine are unchanged.

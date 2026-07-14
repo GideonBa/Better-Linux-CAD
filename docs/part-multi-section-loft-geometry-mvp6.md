@@ -47,5 +47,5 @@ Coverage proves three-section execution, deterministic four-section solid and op
 parameter-driven intermediate-section recompute, and rejection of mismatched authored section
 correspondence.
 
-Blocks 48–92 are implemented. Block 87 Guided and continuity-controlled Loft is implemented;
-Block 88 Surface feature Core intent and JSON is implemented; Block 89 Boundary and Fill Surface Geometry is implemented; Block 90 Trim and Extend Surface Geometry is implemented; Block 91 Stitch/Knit/Sew shell Geometry is implemented; Block 92 Closed shell to solid conversion is implemented; Block 93 multi-body STEP export is next.
+Blocks 48–93 are implemented. Block 87 Guided and continuity-controlled Loft is implemented;
+Block 88 Surface feature Core intent and JSON is implemented; Block 89 Boundary and Fill Surface Geometry is implemented; Block 90 Trim and Extend Surface Geometry is implemented; Block 91 Stitch/Knit/Sew shell Geometry is implemented; Block 92 Closed shell to solid conversion is implemented; Block 93 multi-body STEP export is implemented; Block 94 integrated Part Construction MVP acceptance is next.

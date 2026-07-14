@@ -102,7 +102,7 @@ on arbitrary planes, Block 86 executes deterministic ordered multi-section Loft 
 Block 87 adds center-path/ordered-guide control plus verified G1/C1 continuity. Block 88 adds the
 first persistent Boundary/Fill/Trim/Extend/Stitch/Closed-shell-to-Solid Surface intent, semantic
 references, Body-result authority, dependency/removal rules, and strict JSON. Block 89 executes
-Boundary and Fill Surface Geometry; Block 90 Trim and Extend Surface Geometry is implemented; Block 91 Stitch/Knit/Sew shell Geometry is implemented; Block 92 Closed shell to solid conversion is implemented; Block 93 multi-body STEP export is next.
+Boundary and Fill Surface Geometry; Block 90 Trim and Extend Surface Geometry is implemented; Block 91 Stitch/Knit/Sew shell Geometry is implemented; Block 92 Closed shell to solid conversion is implemented; Block 93 multi-body STEP export is implemented; Block 94 integrated Part Construction MVP acceptance is next.
 
 The long-term sketcher and feature parity target is documented in `docs/inventor-like-sketcher-and-feature-roadmap.md`.
 

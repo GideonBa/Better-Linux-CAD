@@ -4,17 +4,17 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 92
-current_block: 93
-current_boundary: Multi-body STEP export and deterministic body naming
-current_tag: "[geometry][multi-body-step-export]"
+implemented_through: Block 93
+current_block: 94
+current_boundary: Integrated Part Construction MVP acceptance and headless workflows
+current_tag: "[integration][part-construction-mvp]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
   mvp_3: "Parametric bolt circle pattern — implemented"
   mvp_4: "Assembly parameters and Project container — implemented"
   mvp_5: "Assembly relationships, motion, hierarchy, analysis, exchange — Blocks 1–47 implemented"
-  mvp_6: "Part Construction — Blocks 48–92 implemented, Blocks 93–94 planned, Block 93 next"
+  mvp_6: "Part Construction — Blocks 48–93 implemented, Block 94 planned and next"
   mvp_7: "STEP Import — Blocks 95–101 planned after Block 94"
 ---
 
@@ -552,10 +552,10 @@ motion solvers reject Spherical as the selected drive.
 
 ## MVP 6 — Part Construction MVP after Block 47
 
-**Status:** In progress — Blocks 48–92 implemented
+**Status:** In progress — Blocks 48–93 implemented
 **Canonical:** sequence `docs/part-construction-sequence-mvp6.md`
 
-Blocks 48–92 are complete. Block 92 is implemented; Block 93 is the current next technical step.
+Blocks 48–93 are complete. Block 93 is implemented; Block 94 is the current next technical step.
 
 Mandatory Part Construction phase order:
 
@@ -1273,12 +1273,28 @@ Canonical contract: `docs/part-closed-shell-to-solid-geometry-mvp6.md`.
 [geometry][surface-to-solid]
 ```
 
-## Current next technical step — Block 93
+## Block 93 — Multi-body STEP export and deterministic body naming — Implemented
 
-Extend Part STEP export to multiple visible solid/surface bodies, reusing `BodyId` as exchange
-definition identity, generating collision-free deterministic body names, and preserving source
-`PartDocument` immutability without persisting STEP/XDE entity ids.
+`StepExporter::write_part_step` exports all visible Solid and Surface Body results from an existing
+`ShapeCache` in deterministic `BodyId` order. Each free XDE definition is named
+`blcad:body-definition:<percent-encoded BodyId>` using the established collision-free exchange
+encoding. Hidden Bodies are excluded; missing, empty, and kind-incompatible visible results fail
+before writing. Export reuses cached shapes, keeps `PartDocument` and cache immutable, and persists
+no STEP/XDE ids.
+
+Canonical contract: `docs/part-multi-body-step-export-mvp6.md`.
 
 ```text
 [geometry][multi-body-step-export]
+```
+
+## Current next technical step — Block 94
+
+Prove the complete Part Construction MVP with representative headless mechanical, routed/swept,
+lofted freeform, surfaced-then-solid, multi-body inspection, JSON round-trip, incremental recompute,
+and multi-body STEP export workflows. Block 94 adds no new feature family unless a narrowly scoped
+integration correction is required.
+
+```text
+[integration][part-construction-mvp]
 ```

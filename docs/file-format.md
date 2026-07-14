@@ -649,6 +649,10 @@ Historical files without `bodies` load explicitly as zero-body Parts. An absent 
 does not synthesize a Body from features or the final shape. Malformed arrays/entries, missing or
 non-string fields, unsupported values, and duplicate IDs fail closed.
 
+Block 93 adds no persistence fields. Multi-body STEP export reads the existing `id`, `kind`, and
+`visibility` values, derives `blcad:body-definition:<percent-encoded BodyId>` names transiently,
+and never writes STEP/XDE labels or entity ids into `.blcad.json`.
+
 Block 51 adds optional Body-result fields to existing Feature records:
 
 ```json

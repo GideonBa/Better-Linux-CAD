@@ -77,7 +77,7 @@ generated topology target resolution and deterministic target compatibility
 persistent local/Project-level Coincident, Parallel, and Perpendicular intent + JSON
 ```
 
-Blocks 48–92 establish Body identity, body-scoped recompute/inspection, Body Booleans, associative
+Blocks 48–93 establish Body identity, body-scoped recompute/inspection, Body Booleans, associative
 BodyTransform/SketchOwnership behavior, reusable Part-feature semantic input references, and
 persistent richer Extrude/Cut intent plus Geometry, Revolve/RevolveCut intent plus Geometry, and
 general Linear/Circular Pattern intent plus Geometry, persistent plus executed MirrorFeature
@@ -87,10 +87,9 @@ conversion, reusable connected PathCurve intent, executed Sweep/SweepCut/SweepSu
 spatial paths, twist, and guide control, path-following Extrude/Extruded Cut, and persistent plus
 executed path/guide-controlled multi-section Loft Geometry through verified G1/C1, and the first
 persistent Surface-feature family plus executed Boundary/Fill, Trim/Extend, Stitch/Knit/Sew shell,
-and Closed-shell-to-solid Surface Geometry. The current next technical step is Block 93 multi-body
-STEP export and deterministic body naming.
-STEP Part and
-structured Assembly import follows that sequence in Blocks 95–101.
+Closed-shell-to-solid Surface Geometry, and deterministic visible Solid/Surface Body STEP export.
+The current next technical step is Block 94 integrated Part Construction MVP acceptance. STEP Part
+and structured Assembly import follows that sequence in Blocks 95–101.
 
 Several identity/authority questions are deliberately separated.
 
@@ -212,7 +211,7 @@ Blocks 32–34 established assembly-selectable reference geometry Core intent, s
 
 Block 35 establishes stable generated topology identity and recovery before Geometry topology lookup. Canonical `topo:` spellings encode exact semantic producer identities for cylindrical wall, rectangular linear-edge/vertex roles, and circular source/opposite rim roles. Producer role matrices publish expected cardinality and unsupported/ambiguous/patterned sources fail closed. Recovery is read-only and never writes raw kernel topology ids.
 
-Block 36 resolves the supported Block-35 semantic producers into Cylinder/Axis, Line, Circle/Axis/center Point, and Point capabilities, computed analytically from validated model intent for both component-local and exact rooted transform semantics. Block 37 adds deterministic relationship/target compatibility selection. Block 38 adds persistent local/Project-level relationship intent. Blocks 39–47 complete generic equations and the Assembly joint families through Spherical. Blocks 48–92 add stable Body identity, body-scoped recompute/inspection, Body Booleans, associative Body transforms, reusable Part-feature semantic input references, richer Extrude/Cut extent/taper/thin intent plus Geometry, persistent plus executed Revolve/RevolveCut, general Pattern Core intent plus Geometry, persistent plus executed MirrorFeature Geometry, persistent plus executed Fillet/Chamfer/Shell/Draft Geometry, persistent model-space 3D Sketch Geometry, reusable connected PathCurve Core/JSON intent, executed Sweep/SweepCut/SweepSurface through spatial paths, twist, and guide control, path-following Extrude/Extruded Cut, and persistent ordered Loft/LoftCut/LoftSurface intent. Block 85 Two-section Loft Geometry on arbitrary planes is implemented. Block 86 Multi-section Loft is implemented. Block 87 Guided and continuity-controlled Loft is implemented. Block 88 Surface feature Core intent and JSON is implemented. Block 89 Boundary and Fill Surface Geometry is implemented. Block 90 Trim and Extend Surface Geometry is implemented. Block 91 Stitch/Knit/Sew shell Geometry is implemented. Block 92 Closed shell to solid conversion is implemented. The next authority step is Block 93 multi-body STEP export and deterministic body naming.
+Block 36 resolves the supported Block-35 semantic producers into Cylinder/Axis, Line, Circle/Axis/center Point, and Point capabilities, computed analytically from validated model intent for both component-local and exact rooted transform semantics. Block 37 adds deterministic relationship/target compatibility selection. Block 38 adds persistent local/Project-level relationship intent. Blocks 39–47 complete generic equations and the Assembly joint families through Spherical. Blocks 48–93 add stable Body identity, body-scoped recompute/inspection, Body Booleans, associative Body transforms, reusable Part-feature semantic input references, richer Extrude/Cut extent/taper/thin intent plus Geometry, persistent plus executed Revolve/RevolveCut, general Pattern Core intent plus Geometry, persistent plus executed MirrorFeature Geometry, persistent plus executed Fillet/Chamfer/Shell/Draft Geometry, persistent model-space 3D Sketch Geometry, reusable connected PathCurve Core/JSON intent, executed Sweep/SweepCut/SweepSurface through spatial paths, twist, and guide control, path-following Extrude/Extruded Cut, and persistent ordered Loft/LoftCut/LoftSurface intent. Block 85 Two-section Loft Geometry on arbitrary planes is implemented. Block 86 Multi-section Loft is implemented. Block 87 Guided and continuity-controlled Loft is implemented. Block 88 Surface feature Core intent and JSON is implemented. Block 89 Boundary and Fill Surface Geometry is implemented. Block 90 Trim and Extend Surface Geometry is implemented. Block 91 Stitch/Knit/Sew shell Geometry is implemented. Block 92 Closed shell to solid conversion is implemented. Block 93 multi-body STEP export and deterministic body naming is implemented. The next authority step is Block 94 integrated Part Construction MVP acceptance.
 
 Canonical sequence: `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`.
 
