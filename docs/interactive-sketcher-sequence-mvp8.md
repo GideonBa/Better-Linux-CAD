@@ -11,7 +11,7 @@ commands, and immediate feedback without copying branded assets or product-speci
 ## Product outcome
 
 A user can enter a planar Sketch, create common mechanical profiles without authoring JSON, drag
-unconstrained points, watch constrained geometry solve continuously, add and edit dimensions in the
+unconstrained points, watch constrained geometry solve continuously, add/edit dimensions in the
 canvas, repair conflicts, and leave the Sketch with one undoable document result. Persistent intent
 remains available to headless Core/Geometry consumers.
 
@@ -54,7 +54,7 @@ The viewport is a client of those authorities.
 +--------------------------------------------------------------------------------+
 ```
 
-Mouse conventions remain:
+Mouse conventions:
 
 - left click selects or places; drag moves a handle or box-selects from empty canvas;
 - `Esc` backs out one command stage and never silently commits;
@@ -72,16 +72,17 @@ Mouse conventions remain:
    glyph placement are transient GUI state.
 2. Shared Sketch points, entities, constraints, dimensions, and construction/reference state are
    Core intent with stable ids and canonical persistence.
-3. The solver is a deterministic headless Core service; widgets do not own constraint mathematics.
-4. Dragging solves a disposable candidate. Release commits one document transaction; `Esc`, lost
+3. Numeric coordinate equality is not topology connectivity. Distinct point ids may be coincident.
+4. The solver is a deterministic headless Core service; widgets do not own constraint mathematics.
+5. Dragging solves a disposable candidate. Release commits one document transaction; `Esc`, lost
    capture, or failed solve restores the pre-drag snapshot.
-5. Fixed or fully constrained geometry refuses incompatible drag instead of deleting constraints.
-6. Automatic constraints are transient inference candidates until accepted.
-7. Projected geometry remains associative and read-only until an explicit conversion command.
-8. Every creation/edit workflow has keyboard-accessible Apply/Cancel and a headless command path.
-9. Solver failure, non-convergence, ambiguity, or over-constraint publishes diagnostics and no
-   partial persistent mutation.
-10. Historical PartDocument Sketch JSON migrates deterministically through an explicit Core boundary;
+6. Fixed or fully constrained geometry refuses incompatible drag instead of deleting constraints.
+7. Automatic constraints are transient inference candidates until accepted.
+8. Projected geometry remains associative/read-only until explicit conversion.
+9. Every creation/edit workflow has keyboard-accessible Apply/Cancel and a headless command path.
+10. Solver failure, non-convergence, ambiguity, or over-constraint publishes diagnostics and no
+    partial persistent mutation.
+11. Historical PartDocument Sketch JSON migrates deterministically through an explicit Core boundary;
     save/load never depends on GUI session state.
 
 ## Canonical authority rule
@@ -160,6 +161,9 @@ Repeated click cycles deterministic overlapping hits. Empty-space drag uses left
 right-to-left Crossing semantics. Grid, grid snap, origin/axis/endpoint/midpoint/center/quadrant/
 intersection/nearest snaps, and horizontal/vertical/X/Y alignment inference are implemented.
 
+The current scene builder projects historical `Sketch` compatibility intent. It never promotes a
+screen hit, sampled endpoint, or equal coordinate to persistent `SketchPointId` identity.
+
 Canonical contract: `docs/gui-sketch-plane-interaction-mvp8.md`.
 
 Focused tags: `[gui][sketch-hit-test]`, `[gui][sketch-snap]`,
@@ -167,18 +171,39 @@ Focused tags: `[gui][sketch-hit-test]`, `[gui][sketch-snap]`,
 
 ## Block 108 — Shared point topology and editable Core commands — Implemented
 
-Block 108 adds `SketchPointId`, `SketchTopologyPoint`, `SketchTopologyEntity`, and one canonical
-`SketchTopology` snapshot. Lines, arcs, splines, rectangle/circle/pattern centers, profile
-relationships, and reference entities are projected into stable topology identities.
+Block 108 adds `SketchPointId`, `SketchTopologyPoint`, `SketchTopologyEntity`, and canonical
+`SketchTopology`. Existing Line/Arc/Spline and profile intent is projected into stable topology
+identities for future solver/direct-manipulation consumers.
 
-Historical embedded `Point2` usages migrate deterministically. Candidate entities are processed by
-canonical topology id; same-flag coincident point usages within `1e-9` share one point id. Every
-collapsed legacy identity is recorded in `SketchTopologyMigrationReport`. For example, a triangle
-with six historical endpoint usages migrates to three shared points and three explicit identity-change
-records, independent of entity insertion order.
+Global point/entity collections are lexicographic id order. Ordered entity point roles and ordered
+profile curve dependencies remain semantic order and are never sorted.
 
-Global points and entities are lexicographic id order. Ordered entity point roles and ordered profile
-curve dependencies remain semantic order and are never sorted.
+### Explicit connectivity-derived legacy migration
+
+Historical embedded `Point2` usages do not contain point identity. Migration therefore does not
+pretend that coordinate equality proves connectivity.
+
+`SketchTopology::migrate_legacy(...)` derives point sharing only from explicit ordered connectivity
+already present in:
+
+```text
+ClosedProfile
+ArcClosedProfile
+CompositeClosedProfile outer contour
+each CompositeClosedProfile inner contour
+```
+
+For a supported editable curve in one ordered contour, the current curve's end usage and next curve's
+start usage are paired, including last-to-first closure. Their historical coordinates must agree
+within `1e-9` and flags must be compatible. Connected usage groups choose the lexicographically
+smallest proposed usage id as canonical `SketchPointId`.
+
+`SketchTopologyMigrationReport` records each endpoint usage collapsed into the canonical shared id.
+A connected triangle therefore migrates from six historical endpoint usages to three shared points
+and three explicit identity-change records independent of line insertion order.
+
+Two unrelated point usages at the same coordinate remain distinct point ids. This is required for
+Block 109 to represent explicit `Coincident` constraints between logically separate solver variables.
 
 Explicit topology flags are:
 
@@ -190,6 +215,8 @@ reference
 Reference and construction cannot both be true. Projected point/line and reference-generated line
 intent migrates as read-only reference entities.
 
+### Editable topology commands
+
 `SketchEditCommandExecutor` implements:
 
 ```text
@@ -199,13 +226,18 @@ ReplaceEntity
 RemovePoint / RemoveEntity
 ```
 
-Commands execute on disposable candidate collections and republish only through complete topology
-validation. Deletion is dependency-safe; reference intent is read-only. A move addresses exactly one
-shared point id, so every connected entity continues to reference the same moved point.
+Commands execute on disposable collections and republish only through complete topology validation.
+Deletion is dependency-safe and reference intent is read-only. Add and Move allow distinct point ids
+to occupy the same numeric coordinate; no implicit id merge occurs.
+
+Moving one shared point changes one point record and every connected entity continues to reference the
+same id.
 
 Every successful command produces a `SketchEditTransaction` containing exact canonical `before` and
 `after` snapshots. `SketchTopologyUndoStack` uses those full snapshots for exact undo/redo and clears
 redo after a new command.
+
+### Topology persistence and compatibility migration
 
 Canonical topology persistence is:
 
@@ -215,17 +247,18 @@ version = 1
 ```
 
 It persists point ids/coordinates/flags, entity ids/kinds/ordered point references/ordered entity
-dependencies/flags, and canonical dependency records. The loader applies the same duplicate,
-coincidence, flag, arity, and reference validation as direct Core creation.
+dependencies/flags, and canonical dependency records. Equal-coordinate distinct point ids round-trip
+exactly.
 
-The historical `blcad.part_document.mvp1` schema remains load-compatible. The explicit
-`migrate_legacy_part_document_sketch_json(...)` boundary loads the old PartDocument, selects one
-Sketch, migrates it, and returns topology plus the identity-change report. No GUI state participates.
+Historical `blcad.part_document.mvp1` remains load-compatible.
+`migrate_legacy_part_document_sketch_json(...)` loads the old PartDocument, selects one Sketch,
+migrates it, and returns topology plus migration report. No GUI state participates.
 
-`SketchTopologyPartDocumentEditor` additionally supports lossless compatibility application for a
-topology edit representable by the historical Sketch records. It migrates, edits, materializes,
-re-migrates, requires exact topology equality, and only then calls the existing atomic
-`PartDocument::update_sketch(...)`. Lossy identity or flag projection fails closed.
+`SketchTopologyPartDocumentEditor` supports lossless compatibility application for representable
+edits. It migrates, applies one topology command, materializes a historical Sketch candidate,
+re-migrates, requires exact topology equality, and only then invokes atomic
+`PartDocument::update_sketch(...)`. Lossy point identity, flags, explicit orphan records, or ordered
+connectivity cause fail-closed rejection.
 
 Canonical contract: `docs/sketch-shared-topology-mvp8.md`.
 
@@ -241,11 +274,11 @@ Focused tags: `[core][sketch-topology]`, `[core][sketch-edit-command]`,
 
 ## Block 109 — General planar constraint solver — Current next technical step
 
-Add a deterministic headless nonlinear solver over Block-108 planar point and curve parameters.
-Freeze variable ordering, scale normalization, tolerances, iteration limits, convergence reporting,
-and stable conflict attribution.
+Add a deterministic headless nonlinear solver over Block-108 planar point/entity topology. Freeze
+variable ordering, scale normalization, tolerances, iteration limits, convergence reporting, and
+stable conflict attribution.
 
-Initial solve families are:
+Initial solve families:
 
 ```text
 coincident
@@ -290,10 +323,10 @@ Focused tags: `[core][sketch-solver]`, `[core][sketch-dof]`,
 
 ## Block 110 — Solver-backed mouse dragging
 
-Expose endpoint, midpoint, center, radius, arc, spline, and dimension handles. Pointer movement maps to
-a target and asks the Block-109 solver for a disposable candidate. Preview never mutates the
-document. Release commits one transaction; `Esc`, lost capture, or failed solve restores the
-pre-drag state. The final pointer position is never dropped by throttling.
+Expose endpoint, midpoint, center, radius, arc, spline, and dimension handles. Pointer movement maps
+to a target and asks Block 109 for a disposable candidate. Preview never mutates the document.
+Release commits one transaction; `Esc`, lost capture, or failed solve restores pre-drag state. The
+final pointer position is never dropped by throttling.
 
 Existing authority: Blocks 108–109, `docs/gui-sketch-workbench-mvp7.md`, and the Block-96 GUI
 transaction/undo contract.
@@ -311,9 +344,9 @@ Focused tags: `[gui][sketch-create-basic]`, `[integration][sketch-basic-profile]
 
 ## Block 112 — Circles, arcs, ellipses, and slots
 
-Add the persistent Core/Geometry intent required for supported circle, arc, ellipse/elliptical-arc,
-and slot construction families. Full circles become real curve entities where required. Degenerate
-radii and ambiguous collinear picks fail closed.
+Add persistent Core/Geometry intent for supported circle, arc, ellipse/elliptical-arc, and slot
+construction families. Full circles become real curve entities where required. Degenerate radii and
+ambiguous collinear picks fail closed.
 
 Focused tags: `[core][sketch-conics]`, `[geometry][sketch-conics]`,
 `[gui][sketch-create-conics]`.
@@ -353,9 +386,8 @@ Focused tags: `[core][sketch-modify]`, `[geometry][sketch-modify]`,
 
 ## Block 117 — Offset, projection, and construction references
 
-Add chain/loop offset, supported associative projection, explicit break-link conversion, and the
-matching lost/ambiguous reference workflow. Projected geometry remains read-only until explicitly
-converted.
+Add chain/loop offset, supported associative projection, explicit break-link conversion, and matching
+lost/ambiguous reference workflow. Projected geometry remains read-only until explicitly converted.
 
 Focused tags: `[core][sketch-offset-project]`, `[geometry][sketch-offset-project]`,
 `[gui][sketch-project]`.
@@ -370,8 +402,8 @@ Focused tags: `[core][sketch-transform-pattern]`, `[gui][sketch-transform-patter
 ## Block 119 — Regions, profiles, diagnostics, and Finish Sketch
 
 Continuously recognize bounded regions from solved visible non-construction geometry, expose profile
-selection and open/self-crossing diagnostics, and complete the solver-aware Finish Sketch workflow.
-The resulting profile handoff is consumed by Interactive Modeling Block 122/124.
+selection and open/self-crossing diagnostics, and complete solver-aware Finish Sketch workflow. The
+profile handoff is consumed by Interactive Modeling Blocks 122/124.
 
 Focused tags: `[geometry][sketch-regions]`, `[gui][sketch-profile-selection]`,
 `[integration][sketch-finish]`.
