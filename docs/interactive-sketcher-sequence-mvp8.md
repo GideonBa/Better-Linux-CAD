@@ -1,7 +1,7 @@
 # Interactive Sketcher Sequence MVP-8
 
-Status: in progress. Block 106 is implemented; Block 107 is the current next technical step. Blocks
-106–121 precede Interactive Modeling MVP-9 (Blocks 122–131,
+Status: in progress. Blocks 106–107 are implemented; Block 108 is the current next technical step.
+Blocks 106–121 precede Interactive Modeling MVP-9 (Blocks 122–131,
 `docs/interactive-modeling-sequence-mvp9.md`) and STEP Import MVP-10 (Blocks 132–138).
 
 This phase turns the Block-99 validation surface into a productive, Inventor-familiar Sketch
@@ -94,8 +94,8 @@ authoritative feature-to-block mapping.
 
 ```text
 106 Sketch workspace, interaction state, command HUD, and usability contract — implemented
-107 plane mapping, hit testing, box selection, grid, snapping, and inference preview — next
-108 shared planar point/entity topology, mutation commands, JSON migration, and undo semantics
+107 plane mapping, hit testing, box selection, grid, snapping, and inference preview — implemented
+108 shared planar point/entity topology, mutation commands, JSON migration, and undo semantics — next
 109 deterministic planar constraint solver, DOF accounting, conflicts, and diagnostics
 110 solver-backed mouse dragging, handles, live preview, and atomic commit
 111 point, line, polyline, rectangle, polygon, and construction-geometry creation
@@ -129,8 +129,8 @@ command cancel. Repeatable commands publish transient repeat state. The Sketch s
 frozen `Create`, `Constrain`, `Dimension`, `Modify`, and `Project` groups plus
 `Entities`, `Constraints`, `Dimensions`, and `Diagnostics` browser-section contracts. The command
 bar renders the groups and a numeric HUD; the status bar exposes cursor, snap/inference, remaining
-DOF, and solve state. Block-107/109 producers intentionally leave explicit unavailable states until
-their own authorities exist.
+DOF, and solve state. Block 107 now produces cursor/hit/snap interaction state; Block 109 remains the
+owner of DOF and general solve status.
 
 `Enter Sketch` resolves the existing workplane, captures previous workspace/selection plus a
 transient viewport camera bookmark and selection-filter mask, activates normal orthographic view,
@@ -149,13 +149,30 @@ Block-96 transactions), `docs/gui-sketch-workbench-mvp7.md`, `docs/workplane-res
 
 Focused tags: `[gui][sketch-workspace]`, `[gui][sketch-command-lifecycle]`.
 
-## Block 107 — Plane interaction, hit testing, snapping, and inference
+## Block 107 — Plane interaction, hit testing, snapping, and inference — Implemented
 
-Create one device-independent mapping between pixels, view rays, workplane coordinates, and model
-space. Add zoom-stable hit tolerances, point/curve/dimension/glyph priority, cycling through stacked
-hits, window/crossing selection, hover highlighting, grid display, grid snap, origin/axis snap,
-endpoint/midpoint/center/quadrant/intersection/nearest snaps, and horizontal/vertical/alignment
-inference previews. Snap selection is deterministic in model space with screen-space tie breaking.
+`GuiSketchPlaneMapping` now provides one device-independent Screen-DIP -> view-ray -> active-plane
+-> model-space mapping and the reverse model -> Screen-DIP projection. The native OCCT bridge uses
+`V3d_View` pixel/ray conversion with explicit Qt device-pixel-ratio conversion; the deterministic
+offscreen provider uses an explicit plane center and model-units-per-DIP scale.
+
+`GuiSketchInteractionSceneBuilder` derives transient line/arc/spline/profile/reference curves, snap
+landmarks, annotation anchors, and intersections from the current persistent Sketch. The controller
+uses zoom-stable DIP tolerances, the frozen `Point -> Curve -> Dimension -> Glyph` hit priority,
+stable repeated-click cycling, left-to-right Window selection, right-to-left Crossing selection,
+bounded grid display, grid snap, origin/axis/endpoint/midpoint/center/quadrant/intersection/nearest
+snaps, and horizontal/vertical/X/Y-alignment inference candidates. Eligible snap candidates are
+ordered by model-space distance, screen-space distance, stable snap-family priority, and candidate
+id.
+
+`OcctViewport` renders the grid, highest-priority hover product, snap marker, and box-selection
+rubber band in one transparent transient overlay. `install_sketch_interaction_binder(...)` projects
+the active Core Sketch into that authority, publishes raw plane cursor coordinates and snap/inference
+text into the Block-106 status surface, synchronizes semantic selection with the existing session,
+and disables direct selection while a Sketch command task is active. `Show grid` and `Snap to grid`
+are contextual Sketch actions. No interaction sample, pixel, hover, grid, or snap result is persisted.
+
+Canonical contract: `docs/gui-sketch-plane-interaction-mvp8.md`.
 
 Existing authority: `docs/gui-sketch-workbench-mvp7.md` (plane-coordinate mapper),
 `docs/workplane-resolver-mvp2.md`, `docs/bounded-workplane-validation-mvp2.md`,
@@ -177,7 +194,8 @@ where possible and report every unavoidable identity change.
 Existing authority: `docs/sketch-mvp1-data-model.md`, `docs/general-closed-sketch-profile-mvp.md`,
 `docs/arc-and-trim-extend-sketch-profile-mvp.md`, `docs/spline-and-tangent-continuity-mvp.md`,
 `docs/construction-geometry-mvp.md`, `docs/semantic-references.md`, `docs/file-format.md`
-(current Sketch JSON being migrated).
+(current Sketch JSON being migrated), and `docs/gui-sketch-plane-interaction-mvp8.md` (stable
+transient selection/snap consumers that must survive the topology migration).
 
 Focused tags: `[core][sketch-topology]`, `[core][sketch-edit-command]`,
 `[core][sketch-json-migration]`.
@@ -240,9 +258,9 @@ Focused tags: `[gui][sketch-create-basic]`, `[integration][sketch-basic-profile]
 
 Extend Core/Geometry intent where required for center-radius/diameter, two-point, three-point, and
 tangent circles; center/start/end, three-point, and tangent arcs; ellipses/elliptical arcs; and
-center-to-center, overall-length, and three-point slots. Add
-center, radius, endpoint, quadrant, major/minor-axis, and slot handles. Full circles are real curve
-entities rather than nearly closed arcs. Degenerate radii and ambiguous collinear picks fail closed.
+center-to-center, overall-length, and three-point slots. Add center, radius, endpoint, quadrant,
+major/minor-axis, and slot handles. Full circles are real curve entities rather than nearly closed
+arcs. Degenerate radii and ambiguous collinear picks fail closed.
 
 Existing authority: `docs/sketch-mvp1-data-model.md` (circle profiles),
 `docs/arc-and-trim-extend-sketch-profile-mvp.md` (arc entities/profiles),
@@ -354,7 +372,7 @@ remaining DOF, conflicts, unused geometry, lost references, and downstream profi
 may be accepted explicitly, errors cannot. Repair suggestions preview before one atomic commit.
 
 Existing authority: `docs/automatic-profile-region-detection-mvp.md`,
-`docs/composite-closed-profile-holes-mvp.md`, `docs/general-closed-sketch-profile-mvp.md`,
+`docs/composite-closed-sketch-profile-holes-mvp.md`, `docs/general-closed-sketch-profile-mvp.md`,
 `docs/sketch-plane-extrude-direction-mvp.md` (downstream profile consumers),
 `docs/sketch-repair-commands-mvp.md`, `docs/sketch-repair-suggestions-mvp.md`,
 `docs/sketch-repair-transactions-mvp.md`, `docs/sketch-repair-undo-stack-mvp.md`,
