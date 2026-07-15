@@ -3,6 +3,8 @@
 #include <QAction>
 #include <QApplication>
 #include <QDockWidget>
+#include <QLabel>
+#include <QLineEdit>
 #include <QStatusBar>
 #include <QTabBar>
 #include <QToolBar>
@@ -32,6 +34,12 @@ TEST_CASE("Qt application shell exposes the frozen CAD regions", "[gui][applicat
   CHECK(window.findChild<QWidget*>(QStringLiteral("blcad.occt_viewport")) != nullptr);
   CHECK(window.findChild<QWidget*>(QStringLiteral("blcad.diagnostics")) != nullptr);
   CHECK(window.findChild<QStatusBar*>(QStringLiteral("blcad.status_bar")) != nullptr);
+  CHECK(window.findChild<QWidget*>(QStringLiteral("blcad.sketch.command_groups")) != nullptr);
+  CHECK(window.findChild<QLineEdit*>(QStringLiteral("blcad.sketch.numeric_hud")) != nullptr);
+  CHECK(window.findChild<QLabel*>(QStringLiteral("blcad.sketch.cursor_status")) != nullptr);
+  CHECK(window.findChild<QLabel*>(QStringLiteral("blcad.sketch.snap_status")) != nullptr);
+  CHECK(window.findChild<QLabel*>(QStringLiteral("blcad.sketch.dof_status")) != nullptr);
+  CHECK(window.findChild<QLabel*>(QStringLiteral("blcad.sketch.solve_status")) != nullptr);
   CHECK(window.findChildren<QDockWidget*>().size() == 3);
 
   const auto* new_part = window.findChild<QAction*>(QStringLiteral("blcad.action.new_part"));
@@ -44,8 +52,12 @@ TEST_CASE("Qt application shell exposes the frozen CAD regions", "[gui][applicat
   const auto* fit_all = window.findChild<QAction*>(QStringLiteral("blcad.action.fit_all"));
   const auto* create_sketch =
       window.findChild<QAction*>(QStringLiteral("blcad.action.create_sketch"));
+  const auto* finish_sketch =
+      window.findChild<QAction*>(QStringLiteral("blcad.action.finish_sketch"));
   const auto* sketch_line =
       window.findChild<QAction*>(QStringLiteral("blcad.action.sketch_line"));
+  const auto* sketch_repeat =
+      window.findChild<QAction*>(QStringLiteral("blcad.action.sketch_repeat"));
   const auto* repair_sketch =
       window.findChild<QAction*>(QStringLiteral("blcad.action.repair_sketch"));
   REQUIRE(new_part != nullptr);
@@ -56,7 +68,9 @@ TEST_CASE("Qt application shell exposes the frozen CAD regions", "[gui][applicat
   REQUIRE(wireframe != nullptr);
   REQUIRE(fit_all != nullptr);
   REQUIRE(create_sketch != nullptr);
+  REQUIRE(finish_sketch != nullptr);
   REQUIRE(sketch_line != nullptr);
+  REQUIRE(sketch_repeat != nullptr);
   REQUIRE(repair_sketch != nullptr);
   CHECK(new_part->isEnabled());
   CHECK(open->isEnabled());
@@ -64,6 +78,9 @@ TEST_CASE("Qt application shell exposes the frozen CAD regions", "[gui][applicat
   CHECK_FALSE(save_as->isEnabled());
   CHECK_FALSE(recompute->isEnabled());
   CHECK_FALSE(create_sketch->isEnabled());
+  CHECK_FALSE(finish_sketch->isEnabled());
+  CHECK_FALSE(sketch_line->isEnabled());
+  CHECK_FALSE(sketch_repeat->isEnabled());
 
   REQUIRE(window.session().create_part(blcad::DocumentId("part.shell"), "Shell Part"));
   window.refresh_command_state();
