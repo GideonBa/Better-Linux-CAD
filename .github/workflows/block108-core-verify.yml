@@ -1,0 +1,22 @@
+name: Block 108 Core Verify
+
+on:
+  push:
+    branches:
+      - block-108-sketch-topology
+
+jobs:
+  core:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Core dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build nlohmann-json3-dev catch2
+      - name: Configure
+        run: cmake --preset dev
+      - name: Build Core tests
+        run: cmake --build --preset dev
+      - name: Run Core tests
+        run: ctest --preset dev --output-on-failure

@@ -1,6 +1,6 @@
 # Architecture Summary
 
-This document summarizes the implemented BLCAD architecture and current technical direction.
+This document summarizes implemented BLCAD architecture and the current technical direction.
 Feature-specific documents remain canonical for exact formulas, save-format spellings,
 validation/failure policy, ordering, and focused proof.
 
@@ -13,6 +13,8 @@ Fundamental decisions are:
 
 - persist parametric and semantic intent rather than final BRep authority;
 - persist stable semantic references rather than raw OCCT topology ids;
+- use stable shared planar point identity rather than equal coordinates for Sketch connectivity;
+- allow distinct point identities to occupy the same coordinate when topology does not connect them;
 - keep Core model intent below Geometry query/execution types;
 - separate stable semantic source identity from Geometry topology lookup;
 - separate semantic source classification from geometric capability projection;
@@ -20,9 +22,8 @@ Fundamental decisions are:
 - separate authored hierarchy boundaries from derived traversal/composition;
 - separate geometric relationships from motion-joint intent;
 - separate exchange/product identity from OCCT/XDE/STEP identity;
-- treat a verified external STEP asset reference and digest as future import intent while keeping
-  imported bytes/BRep derived;
 - keep viewport pixels, hover, grid, hit stacks, snap candidates, and interaction samples transient;
+- use explicit migration when a persistent identity model supersedes a historical representation;
 - require complete freshness validation before solve/motion results mutate model intent.
 
 A lower authority layer must not depend on a higher execution or presentation layer for persistent
@@ -33,6 +34,7 @@ identity.
 ```text
 Qt user interface / commands / transient interaction
 Core parametric model intent
+Core planar Sketch topology identity
 Part feature/reference semantic identity
 Assembly relationship / joint / hierarchy intent
 Core stable source identity
@@ -51,56 +53,223 @@ file and exchange formats
 ```
 
 The optional GUI is a client of Core and Geometry. Qt types stay out of `blcad_core`; widgets never
-own BRep, solver, transform, expression, recompute, or persistent Sketch-topology authority.
+own BRep, constraint mathematics, transform authority, expressions, recompute, or persistent Sketch
+topology.
 
-## PartDocument authority
+## PartDocument and Part construction authority
 
-`PartDocument` is persistent parametric definition authority. Implemented Part intent includes:
-
-```text
-typed quantities and parameters
-unit-aware expressions
-datum and derived workplanes
-construction geometry
-planar Sketches and profiles
-projected/reference-driven Sketch geometry
-semantic generated references and recovery
-Sketch constraints, diagnostics, and repair intent
-Body identity and visibility
-feature history and Body operation/result intent
-Extrude / ExtrudedCut
-Revolve / RevolveCut
-Linear / Circular Pattern
-MirrorFeature
-Fillet / Chamfer
-Shell / Draft
-Body Boolean / BodyTransform / SketchOwnership
-Sketch3D and model-space curves
-a reusable connected PathCurve
-Sweep / SweepCut / SweepSurface
-path-following Extrude / ExtrudedCut
-Loft / LoftCut / LoftSurface
-Boundary / Fill Surface
-Surface Trim / Extend
-Stitch / Knit / Sew shell
-closed-shell-to-solid conversion
-```
+`PartDocument` is persistent parametric definition authority. Implemented Part intent includes typed
+quantities/parameters, formulas, datum and derived workplanes, construction geometry, historical
+planar Sketch/profile records, projected/reference-driven Sketch geometry, Sketch constraints and
+dimensions, Body identity, feature history, multi-body result operations, broad solid features,
+Sketch3D/PathCurve, Sweep, path Extrude, Loft, Surface features, closed-shell-to-solid conversion,
+and multi-body STEP export intent.
 
 Stable `BodyId` and persistent Body result intent let recompute publish deterministic Body-scoped
-products. Feature producers and consumers participate in dependency/invalidation planning. The Core
-model does not persist `TopoDS_Shape` values.
+products. Feature producers and consumers participate in dependency/invalidation planning. Core does
+not persist `TopoDS_Shape` values.
 
-`ShapeCache` and OCCT shapes are derived. Recompute validates the current model, executes feature
-intent through Geometry adapters, and publishes checked Body/feature products. Consumers that need a
-fresh result use the current recompute/freshness boundaries rather than historical final-shape
-assumptions.
+`ShapeCache` and OCCT shapes are derived. Recompute validates current model intent, executes Geometry
+adapters, and publishes checked Body/feature products. Consumers requiring fresh results use current
+recompute/freshness boundaries rather than historical final-shape assumptions.
+
+## Shared planar Sketch topology through Block 108
+
+The historical planar `Sketch` representation embeds `Point2` coordinates directly in line, arc,
+spline, and profile-center records. That representation remains load-compatible and remains the
+compatibility carrier used by current Geometry consumers.
+
+Block 108 adds the canonical topology identity model used by future solver and direct-manipulation
+consumers:
+
+```text
+SketchTopology
+  SketchId
+  points[]
+  entities[]
+  dependencies[]
+```
+
+`SketchPointId` is stable planar point identity. `SketchTopologyPoint` stores:
+
+```text
+id
+position : Point2
+construction
+reference
+```
+
+`SketchTopologyEntity` stores:
+
+```text
+id
+kind
+ordered point references
+ordered entity dependencies
+construction
+reference
+```
+
+Implemented topology kinds cover current Line, Arc, Spline, RectangleProfile, CircleProfile,
+ClosedProfile, ArcClosedProfile, CompositeClosedProfile, CircularHolePattern, ProjectedPoint,
+ProjectedLine, and ReferenceGeneratedLine intent.
+
+Line uses two point references, Arc three, Spline four, and current rectangle/circle/hole-pattern
+profile intent one center point. Closed-profile families retain ordered curve dependencies instead of
+duplicating endpoint coordinates. Reference entities do not gain invented resolved coordinates.
+
+Global point and entity collections are canonical lexicographic id order. Defining point roles and
+ordered profile dependencies remain semantic order and are never sorted.
+
+### Point identity is not coordinate equality
+
+Two `SketchTopologyPoint` records may have equal coordinates and different `SketchPointId` values.
+This is deliberate. Block 109 must be able to model two logically distinct points constrained by
+`Coincident`; merging every equal coordinate would erase one solver variable and the constraint
+semantics before solving.
+
+Shared identity is established by explicit topology. Multiple entities may reference the same
+`SketchPointId` when they own one topological junction.
+
+### Deterministic legacy migration
+
+`SketchTopology::migrate_legacy(...)` projects historical Sketch records into canonical topology.
+Stable topology ids use:
+
+```text
+entity/<SketchEntityId>
+profile/<ProfileId>
+```
+
+Point usages propose owner/role ids such as:
+
+```text
+entity/line.web/start
+entity/line.web/end
+entity/arc.outer/mid
+profile/profile.hole/center
+```
+
+Candidates are processed by canonical topology id. Migration derives shared point equivalence only
+from explicit ordered historical profile connectivity:
+
+```text
+ClosedProfile
+ArcClosedProfile
+CompositeClosedProfile outer contour
+each CompositeClosedProfile inner contour
+```
+
+For each supported editable curve in a contour, current-end and next-start usages are connected,
+including last-to-first closure. Their legacy coordinates must agree within `1e-9` and flags must be
+compatible. The canonical id of a connected usage group is the lexicographically smallest proposed
+point id in that group.
+
+`SketchTopologyMigrationReport` records every non-canonical endpoint usage collapsed into one shared
+point. For example, a connected triangle contains six historical endpoint usages but its ordered
+closed profile defines three topological junctions, so migration produces three points and three
+identity-change records independent of line insertion order.
+
+Two unrelated line endpoints both at `(20, 0)` and without an explicit profile-connectivity relation
+remain two different point ids.
+
+Reference and construction are explicit topology flags. `reference && construction` is invalid.
+Historical projected points, projected lines, and reference-generated lines migrate as reference
+entities and are read-only for Block-108 edit commands.
+
+### Topology dependency records
+
+`SketchTopologyDependency` contains:
+
+```text
+consumer_id
+source_entity_id
+role
+```
+
+Legacy migration derives these records from reference constraints, geometric constraints, driving
+dimensions, trim/extend operations, tangent continuity, and profile topology references. The table is
+canonical consumer/source/role order and provides Block-108 entity-deletion authority. It is not a
+replacement for the PartDocument-wide dependency graph.
+
+### Editable Core commands and exact undo
+
+`SketchEditCommandExecutor` implements:
+
+```text
+AddPoint
+AddEntity
+MovePoint
+ReplaceEntity
+RemovePoint
+RemoveEntity
+```
+
+Every command executes on disposable point/entity/dependency collections. A candidate is published
+only after full `SketchTopology::create(...)` validation.
+
+Add rejects duplicate ids but allows a distinct point id at an already used coordinate. Move addresses
+one `SketchPointId`, rejects missing/reference points and non-finite coordinates, and may move one
+point into numeric coincidence with another without merging identities. If the point is shared by
+connected entities, every connected entity still references the same moved id.
+
+Replace preserves the entity id and validates all point/entity references. Remove rejects points still
+referenced by an entity and entities with active dependency consumers.
+
+Every successful command produces one `SketchEditTransaction` containing exact complete `before` and
+`after` canonical topology snapshots. `SketchTopologyUndoStack` returns those snapshots directly for
+undo and redo; it does not synthesize inverse commands heuristically.
+
+### Canonical topology JSON and historical PartDocument compatibility
+
+Block 108 adds a separate topology schema:
+
+```text
+schema  = blcad.sketch_topology.mvp8
+version = 1
+```
+
+It persists stable point ids and coordinates, point flags, entity id/kind, ordered point references,
+ordered entity dependencies, entity flags, and canonical dependency records. Distinct equal-coordinate
+point ids are valid and round-trip exactly.
+
+The historical PartDocument marker remains `blcad.part_document.mvp1`. Block 108 does not reinterpret
+that schema as if shared point ids had always existed. Instead:
+
+```text
+migrate_legacy_part_document_sketch_json(...)
+  -> historical PartDocument loader
+  -> selected Sketch
+  -> SketchTopology::migrate_legacy(...)
+  -> canonical topology + migration report
+```
+
+`SketchTopologyLegacyMaterializer` and `SketchTopologyPartDocumentEditor` provide a lossless bridge
+for topology edits that current PartDocument Sketch records can represent:
+
+```text
+current PartDocument Sketch
+  -> migrate
+  -> edit candidate topology
+  -> materialize historical Sketch candidate
+  -> re-migrate
+  -> require exact topology equality
+  -> PartDocument::update_sketch(...)
+```
+
+Only exact equality reaches the existing atomic `PartDocument::update_sketch(...)` authority. An edit
+whose point identity, flags, explicit orphan records, or ordered topology would be lost by historical
+materialization fails closed. Such topology remains fully representable in
+`blcad.sketch_topology.mvp8` rather than being silently flattened.
+
+Canonical contract: `docs/sketch-shared-topology-mvp8.md`.
 
 ## Semantic Part-feature input and generated topology identity
 
 Part features use typed semantic input references and expected geometric capabilities instead of raw
 kernel subshape ids.
 
-Current reference-source spellings include:
+Current reference-source spellings are:
 
 ```text
 ref:datum_plane:<encoded-id>
@@ -109,18 +278,9 @@ ref:construction_line:<encoded-id>
 ref:construction_point:<encoded-id>
 ```
 
-Canonical generated-topology spellings include:
-
-```text
-topo:cylindrical_face:<encoded-feature-id>:<encoded-profile-id>:wall
-topo:linear_edge:<encoded-feature-id>:<role>
-topo:circular_edge:<encoded-feature-id>:<encoded-profile-id>:source_rim
-topo:circular_edge:<encoded-feature-id>:<encoded-profile-id>:opposite_rim
-topo:vertex:<encoded-feature-id>:<role>
-```
-
-Uppercase `%HH` escaping outside `[A-Za-z0-9_-]` keeps the semantic grammar canonical and disjoint
-from historical `<feature-id>.<role>` spellings.
+Canonical generated-topology spellings include cylindrical-face, linear-edge, circular-edge, and
+vertex `topo:` producer-role identities. Uppercase `%HH` escaping outside `[A-Za-z0-9_-]` keeps the
+semantic grammar canonical and disjoint from historical `<feature-id>.<role>` spellings.
 
 The first generated-topology producer matrices are producer-owned and finite:
 
@@ -135,34 +295,15 @@ SingleCircleSubtractiveExtrude
   -> opposite_rim, expected cardinality 1
 ```
 
-Pattern result-vector position is not persistent semantic identity. Pattern-generated subelements
-remain unavailable until stable persistent per-instance identity exists.
-
-`ReferenceRecoveryEvaluator` evaluates current producer/profile/role intent read-only and returns
-`Resolved` or `Lost` plus diagnostics. Recovery never writes OCCT traversal/hash/map, XDE, STEP,
-memory, or viewport identity into the model.
+Pattern result-vector position is not persistent semantic identity. `ReferenceRecoveryEvaluator`
+evaluates producer/profile/role intent read-only and never writes OCCT/XDE/STEP/memory identity into
+the model.
 
 ## Project, AssemblyDocument, and hierarchy ownership
 
-`Project` owns:
-
-```text
-one explicit root AssemblyDocument
-Project-owned child AssemblyDocument records
-Project-owned PartDocument records
-Project-owned AssemblyHierarchyConstraint records
-Project-owned AssemblyHierarchyJoint records
-```
-
-Persistent Project-level cross-hierarchy fields remain:
-
-```text
-cross_hierarchy_constraints[]
-cross_hierarchy_joints[]
-```
-
-A child `AssemblyDocument` is a shared model definition. It enters the rooted hierarchy only through
-an authored `SubassemblyInstance`.
+`Project` owns one explicit root `AssemblyDocument`, child AssemblyDocument records, PartDocument
+records, cross-hierarchy constraints, and cross-hierarchy joints. A child AssemblyDocument is a shared
+model definition and enters rooted hierarchy only through a `SubassemblyInstance`.
 
 A persistent `ComponentInstance` stores direct local placement/state. Derived mutation identity is:
 
@@ -172,83 +313,21 @@ ComponentTransformAuthority =
    local ComponentInstanceId)
 ```
 
-Repeated rooted occurrences of one child document may expose different root-space geometry while
-sharing the same child-document component transform authority.
+Repeated rooted occurrences of one child may expose different root-space geometry while sharing the
+same child-document component transform authority.
 
-A `SubassemblyInstance` stores a referenced child assembly and one authored rigid boundary
-transform. It is not currently a six-variable solve authority and has no grounding field.
+`AssemblyHierarchyTraversal` derives deterministic root-first occurrence descriptors and exact
+transform chains. `AssemblyLeafOccurrenceResolver` is the canonical hierarchy-to-Part leaf boundary
+for posed geometry consumers. Hidden/suppressed branches and local components are absent.
 
-Project validation rejects invalid child references, root-as-child references, hierarchy cycles,
-invalid component/member structure, invalid local relationship/joint endpoints, and invalid
-occurrence-qualified endpoint path/component structure.
+## Typed Assembly geometric targets
 
-## Hierarchy traversal and visible-active leaves
-
-`AssemblyHierarchyTraversal` derives deterministic root-first occurrence descriptors.
-
-For:
-
-```text
-root --outer--> child --inner--> grandchild
-```
-
-Grandchild context is:
-
-```text
-occurrence_path = [outer, inner]
-parent_transforms_inner_to_outer = [T_inner, T_outer]
-```
-
-Every authored `RigidTransform` uses millimeters, degrees, right-hand positive rotation, active
-fixed-axis X-then-Y-then-Z rotation, and `Rz * Ry * Rx` column-vector composition.
-
-For:
-
-```text
-[T_component, T_inner, T_outer]
-```
-
-point evaluation is:
-
-```text
-T_outer(T_inner(T_component(p)))
-```
-
-Directions, normals, axes, and frame vectors rotate but do not translate.
-
-`AssemblyLeafOccurrenceResolver` is the canonical hierarchy-to-Part leaf boundary for posed
-geometry consumers. A leaf retains:
-
-```text
-containing AssemblyDocumentId
-exact rooted SubassemblyInstance path
-local ComponentInstanceId
-referenced PartDocumentId
-exact transforms_inner_to_outer
-```
-
-Hidden/suppressed hierarchy branches remove descendants. Hidden/suppressed local components are
-absent. The leaf boundary is deterministic and unpersisted.
-
-## Typed assembly geometric targets
-
-The derived Geometry boundary between semantic target resolution and equation geometry uses source
+The Geometry boundary between semantic target resolution and equation geometry uses source
 classification plus canonical capability projection.
 
-Current source kinds are:
-
-```text
-GeneratedPlanarFace
-GeneratedCylindricalFace
-GeneratedLinearEdge
-GeneratedCircularEdge
-GeneratedVertex
-DatumPlane
-DatumAxis
-ConstructionLine
-ConstructionPoint
-CircularFeatureSeat
-```
+Current source kinds include generated planar/cylindrical faces, generated linear/circular edges,
+generated vertices, DatumPlane, DatumAxis, ConstructionLine, ConstructionPoint, and
+CircularFeatureSeat.
 
 Capabilities in canonical order are:
 
@@ -262,48 +341,10 @@ Cylinder
 Frame
 ```
 
-One `AssemblyResolvedGeometricTarget` retains:
-
-```text
-exact local or occurrence-qualified endpoint identity
-source kind
-derived source model metadata
-typed descriptor variant
-canonical capability vector
-ComponentLocal or RootAssembly coordinate space
-exact current transforms_inner_to_outer context
-```
-
-Projection functions are:
-
-```text
-project_plane
-project_axis
-project_line
-project_point
-project_circle
-project_cylinder
-project_frame
-```
-
-Canonical source capability mapping is:
-
-```text
-GeneratedPlanarFace      -> Plane
-GeneratedCylindricalFace -> Axis + Cylinder
-GeneratedLinearEdge      -> Line
-GeneratedCircularEdge    -> Axis + Point(center) + Circle
-GeneratedVertex          -> Point
-DatumPlane               -> Plane
-DatumAxis                -> Axis + Line
-ConstructionLine         -> Line
-ConstructionPoint        -> Point
-CircularFeatureSeat      -> Plane + Axis + Frame
-```
-
-Every projection validates endpoint and coordinate-space consistency, source metadata,
-source-kind/descriptor agreement, descriptor geometry, canonical capability order, and transform
-context before returning geometry.
+Projection uses `project_plane`, `project_axis`, `project_line`, `project_point`, `project_circle`,
+`project_cylinder`, and `project_frame`. Every projection validates endpoint/coordinate-space
+consistency, source metadata, source-kind/descriptor agreement, descriptor geometry, canonical
+capability order, and transform context.
 
 Legacy `.top/.bottom/.right/.left/.front/.back`, `.axis`, and `.seat` target strings remain accepted
 through compatibility adapters whose geometry originates at the typed projection boundary.
@@ -323,300 +364,62 @@ Parallel
 Perpendicular
 ```
 
-All eight relationship families are equation-enabled.
-
-Local endpoint identity is:
-
-```text
-(local ComponentInstanceId,
- semantic_reference)
-```
-
-Project-level endpoint identity is:
-
-```text
-(occurrence_path,
- local ComponentInstanceId,
- semantic_reference)
-```
+All eight are equation-enabled. Local endpoint identity is `(ComponentInstanceId,
+semantic_reference)`; Project-level endpoint identity adds the exact occurrence path.
 
 Local and cross-hierarchy solve/motion graphs derive deterministic relationship incidence over
-`ComponentTransformAuthority` values. Each unique free active transform authority contributes:
+`ComponentTransformAuthority` values. The shared Assembly numeric engine owns scaled residual
+flattening, central finite differences, damped Gauss-Newton normal equations, dense elimination,
+damping escalation, backtracking, and solve-state classification.
 
-```text
-tx_mm
-ty_mm
-tz_mm
-rx_deg
-ry_deg
-rz_deg
-```
+Assembly semantic-target freshness stores exact canonical Part JSON used during solve/motion and
+compares it byte-for-byte at application. Local/cross-hierarchy solve and joint-motion application
+reuse this conservative freshness authority.
 
-Local relationships evaluate in the containing assembly-document space. Project-level relationships
-evaluate through exact rooted chains in root-assembly space.
+The Block-109 planar Sketch solver is a separate upcoming Core solver over `SketchTopology`. It must
+not reuse Assembly six-DOF transform variables or move Assembly authority into Sketches.
 
-The shared numeric engine owns scaled residual flattening, central finite differences, damped
-Gauss-Newton normal equations, dense elimination, damping escalation, backtracking, and solve-state
-classification. There is no second cross-hierarchy optimizer.
+## Assembly joints, exchange, and analysis
 
-`AssemblySemanticTargetPartSnapshot` stores the exact canonical Part JSON used during solve/motion.
-At application, current Part intent is serialized again and compared byte-for-byte. Local solve
-application, flexible-child application, local joint motion, cross-hierarchy geometric application,
-and cross-hierarchy joint motion reuse this conservative freshness authority.
+Implemented joint families are Revolute, Prismatic, Cylindrical, Planar, and passive Spherical.
+Oriented joint families use deterministic Frame/Frame compatibility; Spherical uses Point/Point
+center coincidence.
 
-## Assembly joints and motion
+Derived exchange identity distinguishes rooted assembly occurrence, rooted component occurrence, and
+shared Part product definition. Structured STEP export creates shared XDE Part definitions, rooted
+assembly labels, component references, and exact parent-child assembly references. The flattened STEP
+path remains a compatibility consumer.
 
-Persistent local `AssemblyJoint` and Project-level `AssemblyHierarchyJoint` intent remain separate
-from geometric relationships.
+Current analysis consumers include interference, clearance, rooted pair contact classification, and
+bounded sampled Revolute sweep. The sweep is deterministic discrete sampling, not continuous
+collision detection.
 
-Implemented joint families are:
+## Optional GUI and Interactive Sketch foundations
 
-```text
-Revolute    bounded Angular coordinate
-Prismatic   bounded Linear coordinate
-Cylindrical bounded Linear + Angular coordinates
-Planar      bounded U/V Linear + normal Angular coordinates
-Spherical   passive Point/Point center coincidence
-```
+Blocks 95–105 implement and accept the optional Qt 6 desktop for exercising Core/Geometry features
+through Block 94. The GUI owns transient session, selection, task, command-enable, and presentation
+state. Document lifecycle, candidate transactions, undo/redo, recompute, and diagnostics are mediated
+by `GuiDocumentSession`.
 
-Current `.seat` sources expose Frame, Axis, and Plane. Oriented joint families use deterministic
-Frame/Frame compatibility and projection. Axis-only targets fail closed because no deterministic
-reference X direction exists. Spherical instead requires Point/Point and contributes center
-coincidence.
+Block 106 introduces contextual `GuiWorkspace::Sketch` and the staged command lifecycle. Block 107
+adds a read-only plane interaction path from historical Sketch intent through
+`GuiSketchInteractionSceneBuilder`, `GuiSketchPlaneMapping`, and
+`GuiSketchInteractionController` to viewport overlay/status/semantic selection.
 
-Selected joints receive requested coordinates. Other active driven joints in the same combined
-motion closure hold authored coordinates. Cross-hierarchy motion connectivity spans local geometry,
-local joints, Project cross geometry, and Project cross joints. Fresh application protects
-relationship records, transform-authority inputs, current participation, hierarchy boundaries,
-exact Part intent, and selected coordinate semantics before atomic mutation.
+Block 108 does not move interaction mathematics into Core. It adds stable persistent point/entity
+identity for Block 109 and later direct manipulation. The current Block-107 scene builder still
+projects the historical `Sketch` compatibility representation; it does not infer `SketchPointId` from
+screen-space candidates or coordinate equality.
 
-`AssemblyFlexibleSubassemblySolver` selects one exact active non-root occurrence path and creates a
-temporary child-as-root Project view. Ordinary local solve/application is reused. Successful
-application writes direct child component transforms back to the shared child `AssemblyDocument`;
-selected and ancestor `SubassemblyInstance` transforms remain unchanged.
-
-## Exchange, posed geometry, and analysis
-
-Derived exchange identities are:
-
-```text
-assembly occurrence
-  = exact rooted SubassemblyInstance path
-
-component occurrence
-  = (containing rooted path,
-     local ComponentInstanceId)
-
-part product definition
-  = referenced PartDocumentId
-```
-
-Exchange component occurrence is not transform authority.
-
-`AssemblyExchangeGraph` derives the explicit root plus every path prefix required by a visible-active
-leaf. `AssemblyPartShapeDefinitionBuilder` performs one recompute plus one private `ShapeCache` per
-unique exported Part.
-
-`AssemblyStructuredStepExporter` creates shared XDE Part definitions, rooted assembly labels,
-component references, and exact parent-child assembly references. The flattened STEP path remains a
-compatibility consumer.
-
-`AssemblyPosedLeafShapeBuilder` reuses canonical visible-active leaves, shared Part definitions, and
-exact transform chains.
-
-Current analysis consumers include:
-
-```text
-interference
-clearance
-rooted pair contact classification
-bounded sampled Revolute sweep
-```
-
-`AssemblyContactAnalyzer` evaluates every visible-active unordered rooted component occurrence pair
-once. Pair identity is the canonical ordered pair of exact rooted component exchange identities.
-Classification is:
-
-```text
-overlap_volume_mm3 > minimum_overlap_volume_mm3
-  -> Interfering
-
-otherwise minimum_distance_mm <= touching_tolerance_mm
-  -> Touching
-
-otherwise
-  -> Separated
-```
-
-`AssemblyRevoluteSweepAnalyzer` supports root-local and Project cross-hierarchy Revolute motion. It
-accepts 2..1001 inclusive samples and starts every sample from a fresh source Project copy before
-existing motion solve/application and contact analysis. This is deterministic discrete sampling,
-not continuous collision detection.
-
-## Optional GUI architecture through Block 105
-
-Blocks 95–105 implement and accept the optional Qt 6 desktop for exercising all Core/Geometry
-features implemented through Block 94.
-
-The CAD shell contains:
-
-```text
-tabbed command/workspace area
-model / assembly browser
-central OCCT viewport
-properties / task editor
-diagnostics and status surfaces
-```
-
-The GUI owns transient session, selection, task, and command-enable state. Document lifecycle,
-atomic candidate transactions, undo/redo, recompute, and structured diagnostics remain mediated by
-`GuiDocumentSession`.
-
-The interaction path is:
-
-```text
-Qt widgets and command/task state
-  -> GUI document transaction
-  -> public Core intent and persistence
-  -> existing recompute / solve / analysis / exchange APIs
-  -> Geometry results
-  -> transient OCCT presentations and semantic picking
-```
-
-Block 97 adds OCCT display/navigation and the stable semantic picking bridge. Block 98 adds the
-deterministic browser/property projection and bidirectional semantic selection synchronization.
-Blocks 99–104 expose the existing planar Sketch, Part, Surface, Assembly, motion, analysis, and STEP
-export authorities. Block 105 closes the phase with machine-checked feature coverage and
-GUI/headless equivalence.
-
-Preview/Apply/Cancel and undo/redo operate on candidate document transactions. Failures retain the
-last valid displayed result. Viewer owners map back to stable BLCAD semantic references rather than
-persisting OCCT subshape identity.
-
-## Interactive Sketch authority through Block 107
-
-Interactive Sketcher MVP-8 is sequenced in `docs/interactive-sketcher-sequence-mvp8.md`.
-
-Block 106 introduces the contextual transient `GuiWorkspace::Sketch`. `GuiSketchWorkspace` projects
-Sketch-specific interaction stages onto the existing generic `GuiTaskState` authority:
-
-```text
-Idle
-Hover
-CollectingPicks
-NumericInput
-Preview
-SelectedHandle
-DragCandidate
-```
-
-`Enter Sketch` captures prior workspace/selection plus a transient camera bookmark and viewport
-selection filter, resolves the current workplane, enters normal orthographic view, restricts picking
-to SketchEntity/Edge/Vertex, and activates transient Dim/Isolate Sketch focus. `Finish Sketch`
-rejects active command stages or current diagnostic errors and restores workspace, semantic
-selection, Eye/Target/Up/Scale/projection, selection filter, and cursor state.
-
-Block 107 adds one read-only transient plane-interaction authority:
-
-```text
-persistent Part + Sketch intent
-  -> GuiSketchInteractionSceneBuilder
-  -> transient plane-space interaction scene
-  -> GuiSketchPlaneMapping
-  -> GuiSketchInteractionController
-  -> OcctViewport overlay / semantic selection
-  -> GuiSketchWorkspaceStatus + GuiSelectionModel
-```
-
-`GuiSketchPlaneMapping` is the single conversion boundary between Qt device-independent pixels,
-model-space view rays, active workplane coordinates, and model-space points. The native OCCT provider
-uses `V3d_View::ConvertWithProj(...)` and `V3d_View::Convert(...)` with explicit
-`devicePixelRatioF()` conversion. The offscreen provider uses an explicit plane center and
-model-units-per-DIP scale.
-
-`GuiSketchInteractionSceneBuilder` derives transient curves, point/snap landmarks, annotation
-anchors, and intersections from the current persistent Sketch. Current projection covers lines,
-three-point arcs, cubic Bezier splines, projected point/line references, reference-generated helper
-lines, parameter-driven rectangle/circle profiles, circular hole patterns, driving dimensions, and
-existing constraint/tangent anchors. Projected references resolve through the existing Geometry
-projector. Lost references are counted and omitted; no replacement geometry is authored.
-
-Interaction curve sampling is presentation/query data only:
-
-```text
-three-point arc  48 segments
-cubic Bezier     64 segments
-circle           72 segments
-```
-
-The frozen hit priority is:
-
-```text
-Point
-Curve
-Dimension
-Glyph
-```
-
-Within a priority class, hit order is screen-distance, model-distance, then stable candidate id.
-Repeated clicks at the same position cycle the deterministic hit stack and reset when the pointer or
-hit signature changes.
-
-Empty-space drag uses conventional CAD semantics:
-
-```text
-left -> right   Window: complete interaction curve contained
-right -> left   Crossing: contained or intersecting interaction curve
-```
-
-Ordinary click replaces semantic Sketch selection, `Shift` adds, and `Ctrl` toggles. The result is
-published into the existing `GuiSelectionModel`; screen coordinates, transient candidate ids, and
-sampled polylines do not become persistent identity.
-
-Implemented snap/inference families are:
-
-```text
-Origin
-Axis
-Endpoint
-Midpoint
-Center
-Quadrant
-Intersection
-Nearest
-Grid
-HorizontalInference
-VerticalInference
-AlignmentX
-AlignmentY
-```
-
-Candidates must lie inside the configured DIP tolerance. Eligible snap candidates are ordered by:
-
-```text
-model-space distance
-screen-space distance in DIP
-stable snap-family priority
-stable candidate id
-```
-
-The `OcctViewport` owns one transparent interaction overlay for grid, highest-priority hover,
-snap marker, and Window/Crossing rubber-band preview. A small binder installs the Block-107
-projection on an existing `MainWindow`, rebuilds it after supported Sketch changes, feeds raw plane
-cursor and snap/inference text into Block-106 status, and clears the projection on Finish Sketch.
-The binder owns no CAD mathematics or mutation authority.
-
-Blocks 106–107 introduce no new JSON field. Screen mappings, hit stacks, grid lines, interaction
-samples, hover, rubber-band rectangles, and snap results are regenerated transiently.
-
-Canonical contracts:
+Canonical Interactive Sketch contracts are:
 
 - `docs/gui-interactive-sketch-workspace-mvp8.md`
 - `docs/gui-sketch-plane-interaction-mvp8.md`
+- `docs/sketch-shared-topology-mvp8.md`
 
-The current next technical step is Block 108: shared persistent planar point/entity topology,
-dependency-safe editable Core commands, construction/reference flags, canonical ordering, JSON
-migration from the current planar Sketch representation, and exact undo/redo semantics.
+The current next technical step is Block 109: deterministic general planar constraint solving over
+Block-108 topology, including variable ordering, scaling, convergence policy, DOF accounting, and
+stable redundant/conflicting/non-convergent/invalid-reference diagnostics.
 
 ## Persistence summary
 
@@ -624,77 +427,50 @@ Persist:
 
 ```text
 PartDocument parametric and feature intent
+historical PartDocument planar Sketch compatibility records
+blcad.sketch_topology.mvp8 canonical point/entity topology
+SketchPointId and point coordinates
+Sketch point/entity construction and reference flags
+ordered topology point references and profile dependencies
+canonical topology dependency records
 Body records and result-operation intent
 AssemblyDocument local model intent
-ComponentInstance placement/state
-SubassemblyInstance child reference/placement/state
-local geometric relationships
-local joint intent and coordinates
-cross_hierarchy_constraints[]
-cross_hierarchy_joints[]
+component/subassembly placement and state
+local and cross-hierarchy relationships/joints
 semantic reference spellings including legacy, ref:, and topo: families
 ```
 
-Regenerate:
+Regenerate or adapt:
 
 ```text
 dependency/recompute execution products
 OCCT shapes and ShapeCache values
 hierarchy traversal and transform chains
-visible-active leaves
-relationship/joint connectivity
-ComponentTransformAuthority mappings
-generated-topology producer role matrices and recovery query results
-resolved target source kinds and typed descriptors
-capability vectors and projection results
-transformed target geometry
+relationship/joint connectivity and transform-authority mappings
+generated-topology role/recovery query results
+typed target descriptors/capability projections
 residuals/Jacobians/solve results
 freshness snapshots/proposals/diagnostics
 exchange identities/graphs/names
-Part shape definitions
-XDE labels/component references
-STEP products/entities
+XDE/STEP products and entities
 posed shapes/contact records/sweep analyses
 Sketch interaction scenes and sampled curves
 screen/view-ray/workplane mappings
-hover and stacked-hit state
-Window/Crossing rectangles and interaction selection products
-grid display products
-snap and inference candidates/results
+hover, hit cycles, box selection, grid, snap, inference
+legacy profile-connectivity migration groups and identity-change reports
+PartDocument compatibility materialization candidates
+future planar Sketch solver variables/residuals/results
 ```
 
-`docs/file-format.md` remains save-format authority.
-
-## Planned STEP import authority after Block 131
-
-Blocks 132–138 in `docs/step-import-sequence-mvp10.md` add two explicit modes without weakening the
-authority model:
-
-```text
-Reference
-  verified external STEP asset -> immutable imported Part definition
-
-EditableBody
-  verified external STEP asset -> ImportedBodyFeature -> persistent BodyId outputs
-  -> ordinary downstream BLCAD feature intent
-```
-
-Persistent import intent is limited to a project-relative asset reference, content digest, explicit
-mode, imported product/body selection, BLCAD body ids, and semantic imported-topology catalog.
-STEP bytes, BRep shapes, XDE labels, STEP entity numbers, transfer maps, resolved topology, and
-capability projections remain derived. Source refresh is explicit and transactional; lost or
-ambiguous imported topology fails closed before Assembly or downstream Part intent is changed.
-
-Reference Parts participate as shared `PartDocument` definitions in existing component and nested
-Assembly hierarchies. EditableBody does not reconstruct foreign history: it begins BLCAD history at
-an immutable `ImportedBodyFeature`. Structured STEP assembly import maps unique product definitions
-to shared BLCAD Part/Assembly definitions and direct occurrences to existing instance transforms.
+`docs/file-format.md` remains authority for historical PartDocument/Project schemas.
+`docs/sketch-shared-topology-mvp8.md` is the exact persistence/migration authority for
+`blcad.sketch_topology.mvp8`.
 
 ## Current direction and canonical documents
 
-Implemented numbered phases currently extend through Block 107.
+Implemented numbered phases currently extend through Block 108.
 
-Canonical numbered sequences and current architecture contracts include:
+Canonical sequence and architecture documents include:
 
 - `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`
 - `docs/part-construction-sequence-mvp6.md`
@@ -702,21 +478,9 @@ Canonical numbered sequences and current architecture contracts include:
 - `docs/interactive-sketcher-sequence-mvp8.md`
 - `docs/gui-interactive-sketch-workspace-mvp8.md`
 - `docs/gui-sketch-plane-interaction-mvp8.md`
+- `docs/sketch-shared-topology-mvp8.md`
 - `docs/interactive-modeling-sequence-mvp9.md`
 - `docs/step-import-sequence-mvp10.md`
-- `docs/assembly-geometric-target-taxonomy-mvp5.md`
-- `docs/assembly-reference-geometry-intent-mvp5.md`
-- `docs/assembly-generated-topology-reference-mvp5.md`
-- `docs/assembly-generic-relationship-intent-mvp5.md`
-- `docs/assembly-generic-relationship-equations-mvp5.md`
-- `docs/assembly-joint-target-compatibility-mvp5.md`
-- `docs/assembly-joint-coordinate-model-mvp5.md`
-- `docs/assembly-joint-coordinate-json-mvp5.md`
-- `docs/assembly-vector-joint-drive-mvp5.md`
 
-The complete original Assembly target-planning baseline remains in
-`docs/assembly-general-geometric-target-roadmap-planning-baseline.md` as historical design context;
-implemented canonical contracts are authoritative.
-
-Block 108 is the current implementation boundary. Interactive Part/Surface/Assembly modeling begins
+Block 109 is the current implementation boundary. Interactive Part/Surface/Assembly modeling begins
 after Interactive Sketcher acceptance in Block 122. STEP Import begins in Block 132.

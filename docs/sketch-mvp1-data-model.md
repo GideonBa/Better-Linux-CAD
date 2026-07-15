@@ -1,34 +1,36 @@
 # Sketch Data Model
 
-Status: pure core data model with `PartDocument` integration, primitive profiles, and the first line-based closed-profile sketch path.
+Status: implemented historical planar Sketch/PartDocument representation; superseded as the
+Interactive Sketcher connectivity identity model by Block-108 shared topology.
 
-This document describes the current state of `DatumPlane`, `Sketch`, `LineSegment`, `RectangleProfile`, `CircleProfile`, and `ClosedProfile`.
+This document describes the original Core records for `DatumPlane`, `Sketch`, `LineSegment`,
+`RectangleProfile`, `CircleProfile`, and `ClosedProfile`. These records remain supported, remain
+serialized by the historical `blcad.part_document.mvp1` format, and remain current Geometry
+compatibility inputs.
 
-The current scope is still deliberately limited:
+They are no longer the canonical identity model for future planar constraint solving and direct
+manipulation. Block 108 introduces stable shared `SketchPointId` and `SketchTopology`; its canonical
+contract is `docs/sketch-shared-topology-mvp8.md`.
 
-- no full sketch constraint solver
-- no arcs
-- no splines
-- no automatic profile-region detection
-- no multiple contours or inner holes in one profile
-- no GUI sketch editor
+## Historical design goal
 
-## Goal
+The MVP-1 Sketch model captured planar design intent through:
 
-The sketch data model captures design intent for planar sketches:
+- one workplane reference;
+- primitive rectangle and circle profiles;
+- explicit line segments;
+- ordered closed profiles referencing line-segment IDs;
+- parameter references for parameterized primitive sizes;
+- PartDocument validation of workplane and parameter references.
 
-- a workplane reference
-- primitive profiles for fast-path rectangle and circle cases
-- explicit line segments for the first general closed-profile path
-- ordered closed profiles that reference line-segment IDs
-- references to parameters where size is parameterized
-- document validation for workplane and parameter references
+Later blocks extended `Sketch` with arcs, splines, projected/reference-driven geometry, constraints,
+dimensions, trim/extend, tangent continuity, additional profile families, and repair workflows. Those
+extensions remain persistent historical Sketch intent and are consumed by current Part/Geometry
+pipelines.
 
-## Types
+## Historical coordinate representation
 
-### `Point2`
-
-A simple 2D point for sketch coordinates.
+`Point2` is a simple planar value:
 
 ```text
 Point2
@@ -36,31 +38,66 @@ Point2
   y
 ```
 
-### `Point3`
-
-A simple 3D point for datum-plane origins and resolved geometry points.
+The original curve records embed those values directly. For example:
 
 ```text
-Point3
-  x
-  y
-  z
+LineSegment
+  id = "line.a"
+  start = (0, 0)
+  end = (20, 0)
 ```
 
-### `Vector3`
+Validation requires non-empty line id, distinct endpoints within the historical tolerance, and
+unique line ids in one Sketch.
 
-A simple 3D vector for axes and normals.
+Line segments are Core model intent; they are not OCCT edges. However, an embedded endpoint value is
+not a shared point identity. Historically:
 
 ```text
-Vector3
-  x
-  y
-  z
+line.a.end   = (20, 0)
+line.b.start = (20, 0)
 ```
 
-## `DatumPlane`
+stores two coordinate usages whose numeric equality is interpreted by profile/geometry validation.
+That is the limitation Block 108 addresses.
 
-MVP 1 implements only the standard `XY` plane as a fixed datum plane.
+## Block-108 shared topology supersession
+
+For Interactive Sketcher solver and edit consumers, the canonical identity path is now:
+
+```text
+historical Sketch records
+  -> SketchTopology::migrate_legacy(...)
+  -> stable SketchPointId records
+  -> topology entities reference shared point ids
+```
+
+The previous example may migrate to:
+
+```text
+entity/line.a.points[1] = entity/line.a/end
+entity/line.b.points[0] = entity/line.a/end
+```
+
+The two lines then reference one point identity. Future constraint solving and drag logic must consume
+that topology identity instead of searching for numerically equal `Point2` values.
+
+`SketchTopologyMigrationReport` records every historical endpoint usage collapsed into an existing
+canonical shared point id. Migration is deterministic and does not mutate the source `Sketch`.
+
+The canonical topology persistence schema is:
+
+```text
+blcad.sketch_topology.mvp8
+version 1
+```
+
+The historical `blcad.part_document.mvp1` schema remains load-compatible. It is not silently
+reinterpreted as if shared point ids had always been serialized.
+
+## DatumPlane
+
+The original fixed XY datum is:
 
 ```text
 DatumPlane XY
@@ -72,73 +109,39 @@ DatumPlane XY
   normal = (0, 0, 1)
 ```
 
-Validation:
+Datum-plane id and name must not be empty. User-defined construction planes and broader workplane
+resolution are documented in the later workplane/construction contracts.
 
-- datum-plane ID must not be empty
-- name must not be empty
+## RectangleProfile and CircleProfile
 
-User-defined construction planes are tracked separately in `docs/construction-geometry-mvp.md`.
-
-## `LineSegment`
-
-A line segment is the first explicit sketch entity.
-
-```text
-LineSegment
-  id = "line.a"
-  start = (0, 0)
-  end = (20, 0)
-```
-
-Validation:
-
-- line segment ID must not be empty
-- start and end must not be identical within tolerance
-- line segment IDs must be unique inside one sketch
-
-Line segments are model intent. They are not OCCT edges in the core.
-
-## `RectangleProfile`
-
-The rectangle profile is still supported as a fast-path primitive.
+The rectangle fast path stores:
 
 ```text
 RectangleProfile
-  id = "profile.base_rectangle"
-  center = (0, 0)
-  width_parameter = "part.width"
-  height_parameter = "part.height"
+  id
+  center : Point2
+  width_parameter
+  height_parameter
 ```
 
-Validation:
-
-- profile ID must not be empty
-- width parameter ID must not be empty
-- height parameter ID must not be empty
-
-The profile itself does not check whether the referenced parameters exist in the `PartDocument`. This check happens when a sketch is added to `PartDocument`.
-
-## `CircleProfile`
-
-The circle profile is still supported as a fast-path primitive.
+The circle fast path stores:
 
 ```text
 CircleProfile
-  id = "profile.center_hole"
-  center = (0, 0)
-  diameter_parameter = "part.hole_diameter"
+  id
+  center : Point2
+  diameter_parameter
 ```
 
-Validation:
+Profile-local constructors validate required ids. The owning `PartDocument` validates referenced
+parameters and their required types.
 
-- profile ID must not be empty
-- diameter parameter ID must not be empty
+Block-108 legacy migration represents each primitive center through one shared topology point. The
+parameter references remain authored profile intent and are not copied into point identity.
 
-The profile itself does not check whether the diameter parameter exists in `PartDocument`. This check happens when a sketch is added to `PartDocument`.
+## ClosedProfile
 
-## `ClosedProfile`
-
-A closed profile references ordered line-segment IDs.
+The historical line-loop profile stores an ordered curve list:
 
 ```text
 ClosedProfile
@@ -146,84 +149,75 @@ ClosedProfile
   line_segments = ["line.a", "line.b", "line.c"]
 ```
 
-Validation:
+Validation requires at least three unique non-empty line ids, existing referenced lines, an ordered
+connected loop, closure from last to first, and no non-adjacent self-intersection.
 
-- profile ID must not be empty
-- at least three line segments are required
-- line segment IDs must not be empty
-- line segment IDs must be unique inside the closed profile
-- referenced line segments must exist in the owning sketch
-- line segments must be ordered and connected
-- the last segment must close back to the first segment
-- non-adjacent line segments must not self-intersect
+The curve order is semantic. Block-108 migration converts the references to ordered topology entity
+dependencies and deliberately does not lexicographically sort this contour order.
 
-`ClosedProfile` does not yet support arcs, splines, multiple contours, inner holes, or automatic region detection.
+Later ArcClosedProfile and CompositeClosedProfile families follow the same principle of ordered
+semantic curve dependencies.
 
-## `Sketch`
+## Sketch
 
-A sketch stores ID, name, workplane reference, sketch entities, and profiles.
+The historical `Sketch` stores:
 
 ```text
-Sketch
-  id = "sketch.triangle"
-  name = "Sketch_Triangle"
-  workplane = "datum.xy"
-  line_segments
-  rectangle_profiles
-  circle_profiles
-  closed_profiles
+id
+name
+workplane
+line / arc / spline records
+projected and reference-generated records
+constraint and dimension records
+trim / extend and tangent-continuity records
+primitive and general profile records
 ```
 
-Validation:
+Sketch ids, names, and workplane ids must be non-empty. Entity/profile ids obey their family and
+cross-family uniqueness rules. Profile references and constraint/dimension targets are validated by
+the existing Sketch and PartDocument authorities.
 
-- sketch ID must not be empty
-- name must not be empty
-- workplane ID must not be empty
-- line segment IDs must be unique within a sketch
-- profile IDs must be unique within a sketch across rectangle, circle, and closed profile types
-- closed profiles must reference existing line segments in ordered connected loops
+## PartDocument integration
 
-## Integration into `PartDocument`
+`PartDocument` owns planar Sketch compatibility records and validates their document-level references.
+`PartDocument::update_sketch(...)` performs candidate-based atomic Sketch replacement: it validates
+the new Sketch through `add_sketch(...)`, restores the authored Sketch position and downstream graph
+edges, synchronizes invalidation state, marks the Sketch changed, and commits only the complete
+candidate.
 
-`PartDocument` stores:
+Block 108 reuses that authority through `SketchTopologyPartDocumentEditor` only for topology edits
+that are exactly representable by the historical records. The bridge performs:
 
-- parameters
-- datum planes
-- derived workplanes
-- sketches
-- features
+```text
+migrate
+-> edit topology candidate
+-> materialize historical Sketch candidate
+-> re-migrate
+-> require exact topology equality
+-> PartDocument::update_sketch(...)
+```
 
-When a sketch is added, the document validates that:
+If shared point identity, explicit topology flags, or ordered dependencies would be lost, the bridge
+fails closed. The canonical topology state remains persistable in `blcad.sketch_topology.mvp8`.
 
-- the sketch `workplane` exists as a datum plane or derived workplane in the document
-- every `RectangleProfile.width_parameter` exists in the document
-- every `RectangleProfile.height_parameter` exists in the document
-- every `CircleProfile.diameter_parameter` exists in the document
-- sketch IDs are unique in the document
+## Current proof
 
-Line-based closed profiles do not introduce parameter dependencies yet because their current coordinates are explicit sketch-local values.
+Historical Sketch behavior remains covered by `[core][sketch]`, PartDocument JSON, profile, and
+Geometry tests.
 
-## Test coverage
+Block-108 topology/migration proof is:
 
-Current tests check:
+```text
+[core][sketch-topology]
+[core][sketch-edit-command]
+[core][sketch-json-migration]
+```
 
-- XY plane with origin, X axis, Y axis, and normal direction
-- datum-plane validation for ID and name
-- line segment endpoint storage
-- line segment validation for missing IDs and zero length
-- rectangle profile with width and height parameters
-- circle profile with diameter parameter
-- closed profile ordered line references
-- closed profile validation for too few segments and duplicate references
-- sketch validation for ID, name, and workplane
-- adding rectangle, circle, and closed profiles
-- unique profile IDs within a sketch
-- ordered closed-loop validation
-- disconnected closed-loop rejection
-- self-intersecting closed-loop rejection
-- JSON roundtrip for line segments and closed profiles
-- geometry recompute for triangle prism and triangle through-all cut
+For example, the topology proof migrates a connected triangle created in different line insertion
+orders and obtains the same three shared point records and migration report in both cases.
 
-## Next integration step
+## Current next boundary
 
-The next useful sketch-adjacent step is not more line-loop scope. The first line-based closed-profile path is implemented. The next foundational block is construction geometry: user-created construction points, construction lines, and construction planes, so sketches can be placed on explicit user-defined planes instead of only fixed datum planes or semantic generated faces.
+Block 109 adds the deterministic general planar constraint solver over Block-108 shared point/entity
+topology. The historical embedded-coordinate records remain compatibility inputs; solver connectivity
+must not regress to equal-coordinate inference.

@@ -2,106 +2,143 @@
 
 BLCAD is intended to become an independent parametric CAD system for Linux.
 
-The long-term goal is not a thin STEP exporter and not a wrapper around final BRep geometry. BLCAD owns model intent and uses OCCT/Open CASCADE as the computed geometry and exchange implementation layer.
+The long-term goal is not a thin STEP exporter and not a wrapper around final BRep geometry. BLCAD
+owns model intent and uses OCCT/Open CASCADE as the computed geometry and exchange implementation
+layer.
 
-Persistent or explicitly authored model intent already includes substantial parts of:
+Persistent or explicitly authored model intent now includes substantial parts of:
 
 - typed parameters and unit-aware expressions;
-- sketches, construction geometry, and constraints;
-- parametric features and feature history;
-- semantic generated geometry references;
-- canonical generated-topology producer-role identities;
+- planar Sketch/profile intent and canonical shared planar point/entity topology;
+- explicit Sketch construction/reference state in the Block-108 topology schema;
+- construction geometry, constraints, dimensions, and repair intent;
+- parametric Part features, Body identity, and feature history;
+- semantic generated geometry references and canonical generated-topology producer-role identities;
 - dependency, invalidation, and recompute intent;
 - assembly parameters and bindings;
-- part component occurrences and direct rigid placement;
-- local geometric assembly constraints, including persistent Coincident/Parallel/Perpendicular intent;
-- local Revolute joint limits and coordinates;
+- Part component occurrences and direct rigid placement;
+- local geometric Assembly constraints and typed joint coordinates;
 - Project-owned child assemblies and rigid subassembly occurrences;
-- Project-level occurrence-qualified geometric constraints, including persistent Coincident/Parallel/Perpendicular intent;
-- Project-level occurrence-qualified Revolute joints.
+- Project-level occurrence-qualified geometric constraints and joints.
 
-Derived data such as OCCT shapes, generated-topology producer classification/recovery query results, hierarchy traversal, transform-authority mappings, typed target source classifications/descriptors/capabilities, residuals/Jacobians, solve/motion results, freshness snapshots, rooted exchange records, posed shapes, contact classifications, sampled motion products, XDE labels, STEP products/entities, Sketch interaction samples, screen mappings, hit stacks, grid lines, and snap/inference candidates remains regenerable query/execution output rather than primary model authority.
+Derived data includes OCCT shapes, generated-topology producer classification/recovery query results,
+hierarchy traversal, transform-authority mappings, target source classifications/descriptors/
+capabilities, residuals/Jacobians, solve/motion results, freshness snapshots, exchange records, posed
+shapes, contact classifications, motion samples, XDE labels, STEP entities, Sketch interaction
+samples, screen mappings, hit stacks, grid lines, snap/inference candidates, legacy Sketch-topology
+migration reports, and PartDocument compatibility materialization candidates. These are regenerable
+query/execution products rather than primary model authority.
 
 ## Direction
 
-The project grows through controlled headless vertical slices. Historical phase order:
+The project grows through controlled headless vertical slices:
 
-1. single-part parametric model;
+1. single-Part parametric model;
 2. stable recompute graph;
 3. generated-face workplanes and semantic references;
-4. broader sketch/profile/feature support;
-5. sketch constraints and diagnostics;
-6. assembly relationships, motion, hierarchy, posed geometry, analysis, structured exchange, and general target architecture;
+4. broader Sketch/profile/feature support;
+5. Sketch constraints and diagnostics;
+6. Assembly relationships, motion, hierarchy, posed geometry, analysis, structured exchange, and
+   generic target architecture;
 7. broad multi-body Part Construction;
 8. GUI/application workflows and complete implemented-feature validation;
 9. productive solver-backed Interactive Sketcher with direct manipulation;
 10. STEP Part/Assembly import as Reference or EditableBody;
 11. engineering modules.
 
-Phases 1–8 are implemented through GUI Feature Validation Block 105. Interactive Sketcher MVP-8 is in progress with Blocks 106–107 implemented: Block 106 establishes the contextual planar Sketch workspace and command lifecycle; Block 107 adds device-independent plane mapping, zoom-stable hit testing, stacked-hit cycling, Window/Crossing selection, grid, snapping, and inference preview without moving model or solver authority into Qt. Block 108 is the current next technical step.
+Phases 1–8 are implemented through GUI Feature Validation Block 105. Interactive Sketcher MVP-8 is
+in progress with Blocks 106–108 implemented. Block 106 establishes the contextual planar Sketch
+workspace and command lifecycle. Block 107 adds device-independent plane interaction, zoom-stable
+hit testing, stacked-hit cycling, Window/Crossing selection, grid, snapping, and inference. Block 108
+adds stable shared planar point/entity topology, deterministic migration from embedded `Point2`
+Sketch intent using explicit historical profile connectivity, dependency-safe Core edit commands,
+exact topology undo/redo, and canonical topology JSON. Block 109 is the current next technical step
+and owns the deterministic general planar constraint solver.
 
 Development rule:
 
 ```text
 model intent
-  -> serialization compatibility
-  -> stable semantic source identity
+  -> serialization compatibility / explicit migration
+  -> stable semantic source and topology identity
   -> deterministic derived connectivity/query semantics
   -> typed geometry and capability projection
-  -> geometry/numeric execution
+  -> geometry / numeric execution
   -> complete freshness / explicit application when mutation is required
   -> diagnostics, analysis, or exchange consumers
 ```
 
-A feature should be narrow enough to prove through focused headless tests before UI or broad topology support is added. When one feature crosses several authority boundaries, it is split into sequenced implementation blocks instead of becoming one large solver, hierarchy, format, target, or motion rewrite.
+A feature should be narrow enough to prove through focused headless tests before UI or broad topology
+support is added. When one feature crosses several authority boundaries, it is split into sequenced
+implementation blocks instead of becoming one large solver, hierarchy, format, target, motion, or
+interaction rewrite.
 
 ## Current technical phase
 
-The completed Assembly phase has implemented:
+The completed Assembly sequence implements local and cross-hierarchy solving, five motion-joint
+families through passive Spherical, rigid nested assembly hierarchy, posed geometry, static contact
+classification, bounded Revolute sampling, flattened/structured STEP exchange, generic typed
+geometric target capability projection, assembly-selectable reference geometry, stable generated
+Part-topology identity, and persistent Coincident/Parallel/Perpendicular relationship intent.
+
+Blocks 48–94 implement broad multi-body Part Construction: stable Body identity and Body-scoped
+recompute, Body Booleans and transforms, reusable typed Part-feature inputs, richer Extrude/Cut,
+Revolve/RevolveCut, general Linear/Circular Pattern, Mirror, Fillet, Chamfer, Shell, Draft, persistent
+Sketch3D curves, reusable PathCurve, spatial/twist/guide-controlled Sweep, path Extrude, multi-section
+and guided Loft, Boundary/Fill Surface, Trim/Extend Surface, Stitch/Knit/Sew shell,
+closed-shell-to-solid conversion, and deterministic visible Solid/Surface Body STEP export.
+
+Blocks 95–105 implement and accept the optional Qt application layer over those authorities. The GUI
+owns session/command/task/selection and transient presentation state; Core and Geometry remain the
+model, solver, geometry, recompute, analysis, and exchange authorities.
+
+Blocks 106–108 establish the first Interactive Sketcher foundation:
 
 ```text
-local five-family geometric solving + diagnostics
-local Revolute motion
-rigid nested assembly hierarchy
-flattened posed STEP export
-interference + clearance compatibility analysis
-document-scoped flexible child solving
-cross-hierarchy five-family solving + fresh application + diagnostics
-Project-level occurrence-qualified Revolute motion
-structured assembly/product STEP export
-complete rooted Separated / Touching / Interfering classification
-bounded sampled local/cross-hierarchy Revolute sweep
-typed assembly geometric target taxonomy and capability projection
-assembly-selectable reference geometry intent + JSON + Geometry resolution
-stable producer-driven generated topology identity and read-only recovery
-generated topology target resolution and deterministic target compatibility
-persistent local/Project-level Coincident, Parallel, and Perpendicular intent + JSON
+contextual Sketch workspace and command lifecycle
+  -> device-independent plane interaction / hit / box selection / grid / snap / inference
+  -> stable shared SketchPointId and canonical SketchTopology
+  -> deterministic legacy migration from explicit ordered profile connectivity
+  -> distinct equal-coordinate point ids remain distinct without a topology relation
+  -> dependency-safe Add / Move / Replace / Remove Core commands
+  -> exact full-topology snapshot undo / redo
+  -> blcad.sketch_topology.mvp8 persistence
+  -> lossless compatibility application through PartDocument::update_sketch where representable
 ```
 
-Blocks 48–94 establish Body identity, body-scoped recompute/inspection, Body Booleans, associative
-BodyTransform/SketchOwnership behavior, reusable Part-feature semantic input references, and
-persistent richer Extrude/Cut intent plus Geometry, Revolve/RevolveCut intent plus Geometry, and
-general Linear/Circular Pattern intent plus Geometry, persistent plus executed MirrorFeature
-Geometry, persistent plus executed Fillet/Chamfer/Shell/Draft Geometry, and model-space 3D Sketch
-Core through persistent Arc/Spline/Helix/Guide intent, strict JSON, deterministic transient OCCT
-conversion, reusable connected PathCurve intent, executed Sweep/SweepCut/SweepSurface through
-spatial paths, twist, and guide control, path-following Extrude/Extruded Cut, and persistent plus
-executed path/guide-controlled multi-section Loft Geometry through verified G1/C1, and the first
-persistent Surface-feature family plus executed Boundary/Fill, Trim/Extend, Stitch/Knit/Sew shell,
-Closed-shell-to-solid Surface Geometry, and deterministic visible Solid/Surface Body STEP export.
-Block 94 integrated Part Construction MVP acceptance and GUI Blocks 95–105 are implemented. Block
-106 establishes the real contextual Sketch workspace and its command lifecycle. Block 107 adds the
-read-only plane-interaction authority: DIP-aware screen/ray/plane/model mapping, deterministic
-Point/Curve/Dimension/Glyph hit priority and cycling, Window/Crossing selection, bounded grid
-presentation, and deterministic snap/inference selection. The current next technical step is Block
-108 shared planar point/entity topology, editable Core mutation commands, JSON migration, and exact
-undo semantics. Interactive Sketcher continues through Block 121; Interactive Part & Assembly
-Modeling follows in Blocks 122–131 (`docs/interactive-modeling-sequence-mvp9.md`), and STEP Part and
-structured Assembly import follows in Blocks 132–138.
+The canonical Block-108 topology is future solver/direct-manipulation identity authority. The
+historical `blcad.part_document.mvp1` Sketch records remain a compatibility carrier for current
+Geometry consumers; they are not silently reinterpreted as if shared point ids had always existed.
 
-Several identity/authority questions are deliberately separated.
+The current next boundary is Block 109: deterministic planar constraint solving, solver-variable
+ordering, scale normalization, convergence policy, remaining-DOF accounting, and stable conflict/
+redundancy/invalid-reference diagnostics. Interactive Sketcher continues through Block 121.
+Interactive Part/Surface/Assembly Modeling follows in Blocks 122–131, and STEP Part plus structured
+Assembly import follows in Blocks 132–138.
 
-### Semantic endpoint identity
+## Identity and authority distinctions
+
+### Sketch point identity
+
+```text
+SketchPointId
+  -> one canonical planar point record
+  -> referenced by one or more topology entities
+```
+
+Equal floating-point coordinates are not connectivity identity. Legacy migration shares point ids
+only where the historical Sketch already contains explicit ordered profile connectivity between
+supported curve endpoints. It reports every endpoint-usage identity collapsed into the canonical
+shared point.
+
+Two unrelated point ids may have identical coordinates. This is required so Block 109 can model an
+explicit `Coincident` relationship between logically distinct points instead of erasing one variable
+before solving.
+
+Block-107 screen coordinates, hover candidates, sampled polylines, hit-cycle positions, and snap
+markers are never promoted to `SketchPointId`.
+
+### Assembly semantic endpoint identity
 
 ```text
 local
@@ -114,7 +151,8 @@ cross-hierarchy
    semantic_reference)
 ```
 
-The semantic-reference string may represent a legacy feature role, a `ref:` reference-geometry source, or a canonical `topo:` generated-topology producer-role identity.
+A semantic-reference string may represent a legacy feature role, a `ref:` reference-geometry source,
+or a canonical `topo:` generated-topology producer-role identity.
 
 ### Persisted transform authority
 
@@ -123,7 +161,7 @@ The semantic-reference string may represent a legacy feature role, a `ref:` refe
  local ComponentInstanceId)
 ```
 
-### Generated topology semantic source identity
+### Generated Part-topology semantic source identity
 
 ```text
 source feature producer
@@ -132,152 +170,68 @@ source feature producer
 + exact source profile identity where profile-derived
 ```
 
-The first Block-35 producer matrices are:
+Pattern result-vector position is not persistent semantic identity. Raw OCCT hash/traversal/map
+identity, XDE label tags, STEP entity ids, memory addresses, screen coordinates, and sampled Sketch
+polylines are never promoted to semantic target identity.
+
+### Structured exchange and static contact identity
 
 ```text
-RectangularAdditiveExtrude
-  -> 12 named linear edges, expected cardinality 1 each
-  -> 8 named vertices, expected cardinality 1 each
+exchange component occurrence
+  = (containing rooted assembly path,
+     local ComponentInstanceId)
 
-SingleCircleSubtractiveExtrude
-  -> cylindrical wall, expected cardinality 1
-  -> source_rim, expected cardinality 1
-  -> opposite_rim, expected cardinality 1
+static contact pair
+  = canonical ordered pair of exact rooted component exchange identities
 ```
 
-Pattern result-vector position is not persistent semantic identity. Pattern-generated subelements remain unavailable until stable per-instance model identity exists.
-
-Raw OCCT hash/traversal/map identity, XDE label tags, STEP entity ids, memory addresses, screen coordinates, hit-cycle positions, and sampled Sketch polylines are never promoted to semantic target identity.
-
-### Resolved source classification and capability
-
-```text
-semantic endpoint
-  -> derived AssemblyGeometricTargetSourceKind
-  -> typed descriptor
-  -> canonical capability set
-```
-
-Source kind is not persistent endpoint identity and capability is not source identity.
-
-### Structured exchange component occurrence
-
-```text
-(containing rooted assembly path,
- local ComponentInstanceId)
-```
-
-### Static contact pair identity
-
-```text
-canonical ordered pair of exact rooted
-component exchange occurrence identities
-```
-
-Two rooted occurrences of the same child assembly can be geometrically, exchange-, and contact-distinct because their parent boundaries differ while still reading and mutating one shared child-document `ComponentInstance::transform()` authority.
-
-This prevents numeric variable duplication and occurrence collapse.
-
-## General target architecture progress
-
-Block 31 establishes the generic assembly target Geometry boundary.
-
-Source kinds:
-
-```text
-GeneratedPlanarFace
-GeneratedCylindricalFace
-GeneratedLinearEdge
-GeneratedCircularEdge
-GeneratedVertex
-DatumPlane
-DatumAxis
-ConstructionLine
-ConstructionPoint
-CircularFeatureSeat
-```
-
-Capabilities:
-
-```text
-Plane
-Axis
-Line
-Point
-Circle
-Cylinder
-Frame
-```
-
-One resolved target retains exact endpoint identity, source classification, derived source metadata, one typed descriptor variant, canonical capabilities, coordinate space, and exact current transform context.
-
-Consumers project geometry explicitly through `project_plane`, `project_axis`, `project_line`, `project_point`, `project_circle`, `project_cylinder`, or `project_frame`.
-
-Current `.top/.bottom/.right/.left/.front/.back`, `.axis`, and `.seat` strings remain unchanged. Existing Mate/Distance/Angle/Concentric/Insert/Revolute consumers receive legacy descriptor shapes adapted from the typed projection boundary.
-
-Blocks 32–34 established assembly-selectable reference geometry Core intent, serialization, and Geometry resolution: first-class DatumAxis intent, the unambiguous `ref:` semantic source grammar, additive `datum_axes` JSON, byte-for-byte endpoint spelling roundtrips, and derived resolution of DatumPlane/DatumAxis/ConstructionLine/ConstructionPoint into Plane/Axis/Line/Point capabilities.
-
-Block 35 establishes stable generated topology identity and recovery before Geometry topology lookup. Canonical `topo:` spellings encode exact semantic producer identities for cylindrical wall, rectangular linear-edge/vertex roles, and circular source/opposite rim roles. Producer role matrices publish expected cardinality and unsupported/ambiguous/patterned sources fail closed. Recovery is read-only and never writes raw kernel topology ids.
-
-Block 36 resolves the supported Block-35 semantic producers into Cylinder/Axis, Line, Circle/Axis/center Point, and Point capabilities, computed analytically from validated model intent for both component-local and exact rooted transform semantics. Block 37 adds deterministic relationship/target compatibility selection. Block 38 adds persistent local/Project-level relationship intent. Blocks 39–47 complete generic equations and the Assembly joint families through Spherical. Blocks 48–94 add stable Body identity, body-scoped recompute/inspection, Body Booleans, associative Body transforms, reusable Part-feature semantic input references, richer Extrude/Cut extent/taper/thin intent plus Geometry, persistent plus executed Revolve/RevolveCut, general Pattern Core intent plus Geometry, persistent plus executed MirrorFeature Geometry, persistent plus executed Fillet/Chamfer/Shell/Draft Geometry, persistent model-space 3D Sketch Geometry, reusable connected PathCurve Core/JSON intent, executed Sweep/SweepCut/SweepSurface through spatial paths, twist, and guide control, path-following Extrude/Extruded Cut, and persistent ordered Loft/LoftCut/LoftSurface intent. Block 85 Two-section Loft Geometry on arbitrary planes is implemented. Block 86 Multi-section Loft is implemented. Block 87 Guided and continuity-controlled Loft is implemented. Block 88 Surface feature Core intent and JSON is implemented. Block 89 Boundary and Fill Surface Geometry is implemented. Block 90 Trim and Extend Surface Geometry is implemented. Block 91 Stitch/Knit/Sew shell Geometry is implemented. Block 92 Closed shell to solid conversion is implemented. Block 93 multi-body STEP export and deterministic body naming is implemented. Block 94 integrated Part Construction MVP acceptance is implemented. Blocks 95–105 implement and accept the optional Qt GUI validation phase. Block 106 implements the contextual Sketch workspace, staged command lifecycle, camera/selection restoration, transient Dim/Isolate Sketch focus, command repeat, numeric HUD, and explicit cursor/snap/DOF/solve status surfaces. Block 107 implements the transient Sketch interaction layer with one DIP-aware plane mapping, scene projection, deterministic hit/cycle/box-selection behavior, grid, snap/inference candidate selection, viewport overlay, and shell binding. The next authority step is Block 108 shared planar point/entity topology, editable Core mutation commands, JSON migration, and exact undo semantics.
-
-Canonical sequence: `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`.
-
-Canonical target/joint roadmap: `docs/assembly-general-geometric-target-roadmap.md`.
-
-Canonical generated-topology identity contract: `docs/assembly-generated-topology-reference-mvp5.md`.
+Repeated rooted occurrences of one shared child assembly can be exchange/contact distinct while
+still sharing one child-document component transform authority.
 
 ## Long-term scope
 
-The system should eventually cover:
+The system should eventually cover parametric Part modeling, robust constrained Sketches, datum and
+generated-geometry Sketch support, stable semantic references and recovery, broad feature history,
+Assembly constraints and joints, typed geometric target selection, nested motion, top-down design,
+engineering assistants for standard mechanical domains, standard-parts/material libraries, STEP
+import/export and STL export, richer analysis, technical drawings/BOMs, and later CAM/FEM coupling.
 
-- parametric part modeling;
-- robust sketches with constraints;
-- sketches on datum planes and generated geometry;
-- stable semantic references and reference recovery;
-- feature history and richer feature families;
-- assembly modeling with geometric constraints and joints;
-- surface/edge/vertex/plane/axis/line/point assembly target selection through semantic identity;
-- cross-hierarchy assembly solving and nested motion;
-- top-down design with assembly/cross-part parameter relationships;
-- engineering assistants for bolts, holes, shafts, bearings, and gears;
-- standard-parts libraries and a material database;
-- structured assembly exchange, STEP import/export, and STL export; STEP import is concretely
-  sequenced in Blocks 132–138 as immutable Reference Parts or EditableBody base features;
-- richer contact/interference/motion analysis;
-- technical drawings and bills of materials;
-- later CAM or FEM coupling.
-
-The aim is a modern engineering-oriented CAD system for Linux that combines classic parametric CAD concepts with explicit semantic model intent, deterministic headless behavior, and strong technical assistants.
+The aim is a modern engineering-oriented CAD system for Linux combining classic parametric CAD
+concepts with explicit semantic model intent, deterministic headless behavior, and strong technical
+assistants.
 
 ## Non-goals for the current phase
 
-The current phase should not attempt to deliver:
+The current phase does not yet claim production-grade GUI parity. Blocks 106–108 establish the
+workspace, interaction, and persistent shared Sketch-topology foundations; Blocks 109–121 deliberately
+add solver, direct manipulation, creation, constraints, dimensions, modify/project workflows,
+regions, Sketch3D interaction, and acceptance in sequence.
 
-- production-grade GUI parity; Blocks 106–107 establish the contextual Sketch workspace and its interaction mapping/hit/snap layer, while Blocks 108–121 deliberately add shared topology, solver, direct manipulation, authoring tools, dimensions, modify/project workflows, regions, and acceptance in sequence;
-- arbitrary raw OCCT face/edge/vertex selection as persistent identity;
-- a second transform or occurrence-local pose authority without explicit persistence/application design;
-- whole-subassembly rigid solve variables before grounding and application semantics exist;
-- generic relationship or joint equations before persistent intent and target capability compatibility exist;
-- richer joint families before typed coordinate slots and vector-drive semantics exist;
-- a general-purpose physics constraint engine;
-- full contact dynamics, collision response, friction, or rigid-body simulation;
-- continuous collision detection unless a continuous algorithm is implemented and proved;
-- production engineering assistants before underlying model intent is reliable.
-
-These are sequencing boundaries, not permanent product exclusions.
+The current phase also does not introduce arbitrary raw OCCT topology as persistent identity, a
+second Assembly transform authority, whole-subassembly solve variables, a general physics engine,
+full contact dynamics, or continuous collision detection without a proved continuous algorithm.
+These are sequencing boundaries rather than permanent product exclusions.
 
 ## Documentation authority
 
 `docs/mvp-plan.md` is the implementation-sequence source of truth.
 
 `docs/interactive-sketcher-sequence-mvp8.md` is canonical for productive Sketch interaction.
-`docs/gui-interactive-sketch-workspace-mvp8.md` is canonical for the implemented Block-106 contextual Sketch workspace and command lifecycle.
-`docs/gui-sketch-plane-interaction-mvp8.md` is canonical for the implemented Block-107 plane mapping, hit testing, box selection, grid, snapping, and inference authority.
-`docs/interactive-modeling-sequence-mvp9.md` is canonical for interactive Part, Surface, and
-Assembly modeling over the Block-94 feature families.
+
+`docs/gui-interactive-sketch-workspace-mvp8.md` is canonical for Block 106.
+
+`docs/gui-sketch-plane-interaction-mvp8.md` is canonical for Block 107.
+
+`docs/sketch-shared-topology-mvp8.md` is canonical for Block-108 shared point/entity topology,
+migration, edit commands, topology persistence, and the lossless PartDocument compatibility bridge.
+
+`docs/file-format.md` remains authority for the historical PartDocument/Project save schemas;
+Block-108 topology persistence is defined in its feature-specific canonical document rather than by
+silently changing the historical PartDocument schema.
+
+`docs/interactive-modeling-sequence-mvp9.md` is canonical for interactive Part, Surface, and Assembly
+modeling over the Block-94 feature families.
+
 `docs/step-import-sequence-mvp10.md` is canonical for STEP Part and structured Assembly import.
 
 `docs/architecture-summary.md` summarizes implemented architecture.
-
-Feature-specific MVP documents are canonical for exact contracts, persistence boundaries, mathematical semantics, failure policies, and focused proofs.
