@@ -8,6 +8,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -246,15 +247,6 @@ public:
       if (points[index - 1].id() == points[index].id())
         return Result<SketchTopology>::failure(Error::validation(
             points[index].id().value(), "sketch point ids must be unique"));
-    constexpr double point_tolerance = 1.0e-9;
-    for (std::size_t first = 0; first < points.size(); ++first)
-      for (std::size_t second = first + 1U; second < points.size(); ++second)
-        if (points[first].flags() == points[second].flags() &&
-            std::abs(points[first].position().x - points[second].position().x) <= point_tolerance &&
-            std::abs(points[first].position().y - points[second].position().y) <= point_tolerance)
-          return Result<SketchTopology>::failure(Error::validation(
-              points[second].id().value(),
-              "coincident coordinates must share one canonical Sketch point identity"));
 
     std::sort(entities.begin(), entities.end(), [](const auto& left, const auto& right) {
       return left.id() < right.id();
@@ -314,10 +306,19 @@ public:
       std::vector<std::string> dependencies;
       SketchTopologyFlags flags;
     };
+    struct PointUsage {
+      std::string proposed_id;
+      Point2 position;
+      SketchTopologyFlags flags;
+    };
 
     std::vector<Candidate> candidates;
+    std::vector<std::pair<std::string, std::string>> shared_usage_pairs;
     const auto entity_id = [](const SketchEntityId& id) { return "entity/" + id.value(); };
     const auto profile_id = [](const ProfileId& id) { return "profile/" + id.value(); };
+    const auto usage_id = [](std::string_view owner, std::string_view role) {
+      return std::string(owner) + "/" + std::string(role);
+    };
 
     for (const auto& line : sketch.line_segments())
       candidates.push_back({entity_id(line.id()), SketchTopologyEntityKind::Line,
@@ -368,39 +369,120 @@ public:
       candidates.push_back({entity_id(line.id()), SketchTopologyEntityKind::ReferenceGeneratedLine,
                             {}, {}, {.construction = false, .reference = true}});
 
+    const auto endpoint_usages = [&](const SketchEntityId& id)
+        -> std::optional<std::pair<std::string, std::string>> {
+      const std::string owner = entity_id(id);
+      if (sketch.find_line_segment(id) != nullptr || sketch.find_arc_segment(id) != nullptr ||
+          sketch.find_spline_segment(id) != nullptr)
+        return std::pair{usage_id(owner, "start"), usage_id(owner, "end")};
+      return std::nullopt;
+    };
+    const auto connect_contour = [&](const std::vector<SketchEntityId>& contour) {
+      if (contour.empty()) return;
+      for (std::size_t index = 0; index < contour.size(); ++index) {
+        const auto current = endpoint_usages(contour[index]);
+        const auto next = endpoint_usages(contour[(index + 1U) % contour.size()]);
+        if (current && next) shared_usage_pairs.emplace_back(current->second, next->first);
+      }
+    };
+    for (const auto& profile : sketch.closed_profiles()) connect_contour(profile.line_segments());
+    for (const auto& profile : sketch.arc_closed_profiles()) connect_contour(profile.curve_segments());
+    for (const auto& profile : sketch.composite_closed_profiles()) {
+      connect_contour(profile.outer_contour());
+      for (const auto& contour : profile.inner_contours()) connect_contour(contour);
+    }
+
     std::sort(candidates.begin(), candidates.end(), [](const auto& left, const auto& right) {
       return left.id < right.id;
     });
+    std::sort(shared_usage_pairs.begin(), shared_usage_pairs.end());
+    shared_usage_pairs.erase(std::unique(shared_usage_pairs.begin(), shared_usage_pairs.end()),
+                             shared_usage_pairs.end());
+
+    std::vector<PointUsage> usages;
+    std::unordered_map<std::string, std::size_t> usage_indices;
+    for (const auto& candidate : candidates)
+      for (const auto& [role, position] : candidate.point_usages) {
+        const std::string proposed = usage_id(candidate.id, role);
+        usage_indices.emplace(proposed, usages.size());
+        usages.push_back({proposed, position, candidate.flags});
+      }
+
+    std::vector<std::size_t> parent(usages.size());
+    for (std::size_t index = 0; index < parent.size(); ++index) parent[index] = index;
+    const auto root = [&parent](std::size_t index) {
+      while (parent[index] != index) {
+        parent[index] = parent[parent[index]];
+        index = parent[index];
+      }
+      return index;
+    };
+    const auto unite = [&parent, &root](std::size_t first, std::size_t second) {
+      first = root(first);
+      second = root(second);
+      if (first == second) return;
+      if (first < second)
+        parent[second] = first;
+      else
+        parent[first] = second;
+    };
+
+    constexpr double connectivity_tolerance = 1.0e-9;
+    const auto same_position = [](Point2 left, Point2 right) {
+      return std::abs(left.x - right.x) <= connectivity_tolerance &&
+             std::abs(left.y - right.y) <= connectivity_tolerance;
+    };
+    for (const auto& [first_id, second_id] : shared_usage_pairs) {
+      const auto first = usage_indices.find(first_id);
+      const auto second = usage_indices.find(second_id);
+      if (first == usage_indices.end() || second == usage_indices.end()) continue;
+      if (usages[first->second].flags != usages[second->second].flags ||
+          !same_position(usages[first->second].position, usages[second->second].position))
+        return Result<SketchTopology>::failure(Error::validation(
+            sketch.id().value(),
+            "legacy profile connectivity does not resolve to coincident compatible endpoint usages"));
+      unite(first->second, second->second);
+    }
+
+    std::vector<std::string> canonical_ids(usages.size());
+    for (std::size_t index = 0; index < usages.size(); ++index) {
+      const std::size_t representative = root(index);
+      if (canonical_ids[representative].empty() ||
+          usages[index].proposed_id < canonical_ids[representative])
+        canonical_ids[representative] = usages[index].proposed_id;
+    }
 
     SketchTopologyMigrationReport migration;
     migration.migrated_ = true;
     std::vector<SketchTopologyPoint> points;
-    std::vector<SketchTopologyEntity> entities;
-    constexpr double tolerance = 1.0e-9;
-    const auto same_position = [tolerance](Point2 left, Point2 right) {
-      return std::abs(left.x - right.x) <= tolerance &&
-             std::abs(left.y - right.y) <= tolerance;
-    };
+    std::unordered_map<std::string, SketchPointId> point_by_usage;
+    std::unordered_map<std::string, bool> point_created;
+    for (std::size_t index = 0; index < usages.size(); ++index) {
+      const std::string& canonical = canonical_ids[root(index)];
+      point_by_usage.emplace(usages[index].proposed_id, SketchPointId(canonical));
+      if (!point_created[canonical]) {
+        auto point = SketchTopologyPoint::create(SketchPointId(canonical), usages[index].position,
+                                                 usages[index].flags);
+        if (point.has_error()) return Result<SketchTopology>::failure(point.error());
+        points.push_back(std::move(point.value()));
+        point_created[canonical] = true;
+      }
+      if (usages[index].proposed_id != canonical)
+        migration.identity_changes_.push_back(
+            {usages[index].proposed_id, canonical,
+             "legacy profile connectivity now shares one canonical Sketch point"});
+    }
 
+    std::vector<SketchTopologyEntity> entities;
     for (const auto& candidate : candidates) {
       std::vector<SketchPointId> point_ids;
       for (const auto& [role, position] : candidate.point_usages) {
-        const SketchPointId proposed(candidate.id + "/" + role);
-        const auto existing = std::find_if(points.begin(), points.end(), [&](const auto& point) {
-          return point.flags() == candidate.flags && same_position(point.position(), position);
-        });
-        if (existing != points.end()) {
-          point_ids.push_back(existing->id());
-          if (existing->id() != proposed)
-            migration.identity_changes_.push_back(
-                {proposed.value(), existing->id().value(),
-                 "coincident legacy coordinates now share one canonical Sketch point"});
-        } else {
-          auto point = SketchTopologyPoint::create(proposed, position, candidate.flags);
-          if (point.has_error()) return Result<SketchTopology>::failure(point.error());
-          points.push_back(std::move(point.value()));
-          point_ids.push_back(proposed);
-        }
+        (void)position;
+        const auto found = point_by_usage.find(usage_id(candidate.id, role));
+        if (found == point_by_usage.end())
+          return Result<SketchTopology>::failure(Error::internal(
+              candidate.id, "legacy Sketch migration lost a point-usage mapping"));
+        point_ids.push_back(found->second);
       }
       auto entity = SketchTopologyEntity::create(candidate.id, candidate.kind, std::move(point_ids),
                                                  candidate.dependencies, candidate.flags);
