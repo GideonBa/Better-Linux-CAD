@@ -1,19 +1,16 @@
 # Shared Planar Sketch Topology MVP-8
 
-Status: implemented in Block 108.
+Status: implemented in Block 108. Block 109 is the first general solver consumer.
 
-This document is the canonical Core contract for shared planar point/entity topology introduced by
-Block 108. It replaces equal-floating-point-coordinate inference as the connectivity identity model
-used by future Interactive Sketcher solver and edit consumers.
+This document is the canonical Core contract for shared planar point/entity topology. It replaces
+floating-point-coordinate inference as the connectivity identity model used by Interactive Sketcher
+solver and edit consumers.
 
 The historical planar `Sketch` records remain a compatibility/materialization representation for
-current Geometry and PartDocument workflows. Block 108 adds a canonical topology snapshot and an
-explicit migration boundary over those records; it does not move solver authority into Qt and does
-not implement the Block-109 nonlinear constraint solver.
+current Geometry and PartDocument workflows. `SketchTopology` is the stable point/entity identity
+boundary consumed directly by the Block-109 constraint solver and later direct-manipulation blocks.
 
 ## Authority boundary
-
-The Core path is:
 
 ```text
 legacy/current planar Sketch intent
@@ -25,10 +22,13 @@ legacy/current planar Sketch intent
      or
   -> lossless legacy materialization check
   -> PartDocument::update_sketch(...)
+
+canonical SketchTopology
+  -> SketchConstraintSolver
+  -> derived solve result / DOF / diagnostics
 ```
 
-Block 109 consumes `SketchTopology` point and entity identity. It must not infer connectivity by
-comparing two `Point2` values.
+The solver must not infer connectivity by comparing two `Point2` values.
 
 For example, a validated ordered closed profile may historically contain:
 
@@ -38,47 +38,43 @@ line.b.start = (20, 0)
 profile.triangle = [line.a, line.b, line.c]
 ```
 
-The explicit ordered profile connectivity migrates to:
+Explicit ordered profile connectivity migrates to:
 
 ```text
 entity/line.a.points[1] = entity/line.a/end
 entity/line.b.points[0] = entity/line.a/end
 ```
 
-Both entities reference one `SketchPointId`. Moving that point changes one point record rather than
-fan-out updates over two endpoint coordinate values.
+Both entities reference one `SketchPointId`. Moving or solving that point changes one point record.
 
-Two unrelated point usages that merely have the same coordinates are **not** merged. They remain two
-point identities and can later participate in a `Coincident` constraint as distinct solver variables.
+Two unrelated point usages at the same coordinates are not merged. They remain two point identities
+and Block 109 may relate them with an explicit `Coincident` residual as distinct solver variables.
 
 ## Stable planar point identity
-
-Block 108 adds typed `SketchPointId`.
 
 `SketchTopologyPoint` contains:
 
 ```text
-id
+id : SketchPointId
 position : Point2
 construction
 reference
 ```
 
-Point ids are stable semantic Sketch-topology identity. Screen coordinates, hit candidates, sampled
-Block-107 polylines, OCCT vertices, and memory addresses are not point identity.
+Point ids are stable semantic topology identity. Screen coordinates, hit candidates, sampled Block-107
+polylines, OCCT vertices, and memory addresses are not point identity.
 
-Point validation requires:
+Validation requires:
 
-- non-empty `SketchPointId`;
+- non-empty point id;
 - finite X/Y coordinates;
 - `reference && construction` is false;
-- point id uniqueness within one topology.
+- point-id uniqueness within one topology.
 
 Distinct point ids may occupy the same coordinate. Numeric coincidence does not create connectivity.
-This is required for future explicit coincidence constraints and for geometry that intentionally
-contains overlapping but topologically separate points.
 
-Points with different semantic flags are likewise never merged merely because coordinates match.
+Block 109 consumes every non-reference point as two canonical solver variables, X then Y. Reference
+points remain constant and do not contribute solver variables.
 
 ## Entity topology
 
@@ -93,7 +89,7 @@ construction
 reference
 ```
 
-Implemented topology kinds are:
+Implemented kinds are:
 
 ```text
 Line
@@ -125,10 +121,13 @@ Closed-profile families reference ordered curve dependencies instead of duplicat
 coordinates. Projected/reference-generated entities remain explicit reference entities and do not
 invent Core-local resolved coordinates.
 
-Global point and entity collections are canonical lexicographic id order. Ordered point references
-and ordered profile dependencies are semantic order and are never sorted. A profile authored as
-`line.c -> line.a -> line.b` retains that traversal order even though the global entity collection is
-lexicographically ordered.
+Global point and entity collections are canonical lexicographic id order. Ordered point references and
+ordered profile dependencies are semantic order and are never sorted.
+
+Block 109 addresses entity targets by this canonical entity id. Solver family/type compatibility is
+explicit: for example Tangent consumes supported curve entities, Concentric consumes center-bearing
+entities, and Radial/Diameter consume Arc. A wrong kind reports `InvalidReference` rather than
+reinterpreting the entity.
 
 ## Deterministic legacy Sketch migration
 
@@ -137,17 +136,11 @@ lexicographically ordered.
 Candidate topology ids use:
 
 ```text
-SketchEntityId  -> entity/<id>
-ProfileId       -> profile/<id>
+SketchEntityId -> entity/<id>
+ProfileId      -> profile/<id>
 ```
 
-A point usage proposes:
-
-```text
-<entity-or-profile-topology-id>/<role>
-```
-
-Examples:
+A point usage proposes `<owner>/<role>`, for example:
 
 ```text
 entity/line.web/start
@@ -169,42 +162,30 @@ CompositeClosedProfile outer contour
 CompositeClosedProfile each inner contour
 ```
 
-For each supported editable curve in an ordered contour, the current curve end usage is paired with
-the next curve start usage, including last-to-first closure. A pair is shareable only when its legacy
-coordinates agree within `1e-9` Sketch units and its flags are compatible. The already validated
-historical profile path normally guarantees this condition; an inconsistent migration candidate
-fails closed.
+For each supported editable curve in an ordered contour, current curve end is paired with next curve
+start, including last-to-first closure. Coordinates must agree within `1e-9` Sketch units and flags
+must be compatible. Inconsistent explicit connectivity fails closed.
 
-The canonical id of a connected point-equivalence group is the lexicographically smallest proposed
-point-usage id in that group. This removes source entity insertion-order dependence.
-
-For every non-canonical usage in a shared group, `SketchTopologyMigrationReport` records:
+The canonical id of a connected usage group is the lexicographically smallest proposed usage id in
+that group. For every non-canonical usage, `SketchTopologyMigrationReport` records:
 
 ```text
 previous_identity
 canonical_identity
-reason
-```
-
-The reason is:
-
-```text
-legacy profile connectivity now shares one canonical Sketch point
+reason = "legacy profile connectivity now shares one canonical Sketch point"
 ```
 
 Migration never rewrites the source `Sketch`.
 
-For example, a connected triangle historically stores six endpoint usages. Its ordered
-`ClosedProfile` explicitly links three adjacent endpoint pairs, so Block-108 migration produces three
-shared points and three identity-change records. Reordering the source line insertion sequence does
-not change the result.
+A connected triangle historically stores six endpoint usages. Its ordered ClosedProfile links three
+adjacent pairs, so migration produces three shared points and three identity-change records independent
+of line insertion order.
 
-By contrast, two independent lines ending at `(20, 0)` without an ordered profile relation retain
-two distinct point ids. This is deliberate and is the central distinction between **coincident
-coordinates** and **shared topology identity**.
+Two independent line endpoints at `(20, 0)` without an ordered profile relation remain distinct ids.
+This distinction is required by Block-109 Coincident semantics and exact DOF accounting.
 
-Reference-generated curves without persistent editable endpoint coordinates remain reference
-entities and do not receive invented point usages during migration.
+Reference-generated curves without persistent editable endpoint coordinates remain reference entities
+and receive no invented point usages.
 
 ## Derived dependency records
 
@@ -216,52 +197,38 @@ source_entity_id
 role
 ```
 
-Migration derives dependencies for:
+Migration derives dependencies for reference constraints, geometric constraints, driving dimensions,
+trim/extend operations, tangent continuity, and profile topology references.
 
-- reference constraints;
-- geometric constraints;
-- driving dimensions;
-- trim/extend operations;
-- tangent continuity;
-- closed/profile topology references.
+Records are sorted by consumer/source/role and deduplicated. The table is Block-108 entity-deletion
+authority; it does not replace the PartDocument dependency graph.
 
-Dependency records are sorted by consumer, source entity, then role and deduplicated. They are
-queryable through `dependents_of(...)`.
-
-The table is Block-108 entity-deletion authority. It is not a replacement for the PartDocument-wide
-dependency graph.
+Block 109 consumes constraint targets through `SketchConstraintSystem`, not by parsing topology
+dependency prose. The dependency table remains edit/delete authority.
 
 ## Construction and reference flags
 
-`SketchTopologyFlags` makes construction/reference state explicit on points and entities:
+`SketchTopologyFlags` makes construction/reference state explicit:
 
 ```text
 construction = false | true
 reference    = false | true
 ```
 
-`reference && construction` is rejected. Reference points/entities are read-only for Block-108
-move/remove/replace commands.
+`reference && construction` is rejected. Reference points/entities are read-only for Block-108 edit
+commands. Historical projected points, projected lines, and reference-generated lines migrate as
+reference entities.
 
-Historical projected points, projected lines, and reference-generated lines migrate as reference
-entities. Current legacy Line/Arc/Spline records have no construction bit and migrate as authored
-non-construction entities.
+Canonical topology JSON persists both flags. A state not representable by historical PartDocument
+Sketch JSON is not silently flattened through the compatibility bridge.
 
-Canonical topology JSON persists both flags. A topology state using a flag not representable by the
-historical PartDocument Sketch JSON is not silently flattened through the compatibility bridge.
+For Block 109, reference points are constants. Current projected point/line topology has no invented
+resolved point coordinates, so historical projected-reference constraints adapted to the solver report
+`InvalidReference` until the later associative-reference owner supplies a coordinate-capable target.
 
 ## Editable Core commands
 
-`SketchEditCommand` freezes four command families:
-
-```text
-Add
-Move
-Replace
-Remove
-```
-
-Concrete payloads are:
+`SketchEditCommand` has Add, Move, Replace, and Remove families with payloads:
 
 ```text
 AddPoint
@@ -272,257 +239,121 @@ RemovePoint
 RemoveEntity
 ```
 
-`SketchEditCommandExecutor::apply(...)` operates on disposable point/entity/dependency collections.
-A candidate is published only after complete `SketchTopology::create(...)` validation succeeds.
+`SketchEditCommandExecutor::apply(...)` operates on disposable point/entity/dependency collections and
+publishes a candidate only after complete `SketchTopology::create(...)` validation.
 
-### Add
+Add rejects duplicate ids and invalid references. Move addresses exactly one point id, rejects missing
+or reference points and non-finite coordinates, and may move one distinct id onto another id's
+coordinate without merging identity. Replace preserves entity id and validates complete candidate
+references/dependencies. Remove rejects a point still referenced by an entity and rejects an entity
+with active dependency consumers or reference state.
 
-Adding a point rejects duplicate point id. It does **not** reject another point at the same numeric
-coordinate because coincident coordinates may represent distinct topology identities.
-
-Adding an entity rejects duplicate entity id, unknown point references, unknown entity dependencies,
-and self-dependency.
-
-### Move
-
-Move addresses exactly one `SketchPointId` and changes only that point record.
-
-Move rejects:
-
-- missing point;
-- reference point;
-- non-finite coordinates.
-
-Move may place one point at another point's coordinate without merging their ids. A future Block-109
-constraint may require or diagnose that coincidence. If the moved point is shared by connected
-entities, every connected entity still references the same moved id.
-
-### Replace
-
-Replace keeps entity id and replaces its topology record. Complete candidate topology is validated.
-
-Replace rejects missing entity, reference entity, conversion of authored geometry into reference
-geometry, unknown point/entity references, and self-dependency. Topology dependency records owned by
-the replaced entity are regenerated from ordered entity dependencies.
-
-### Remove
-
-Point removal rejects a point still referenced by any topology entity.
-
-Entity removal rejects a reference entity and any entity with an active dependency-table consumer.
-For example, `entity/line.a` cannot be removed while `profile/profile.triangle` depends on it.
-
-A failed command returns `Validation` or `Dependency` and leaves source topology unchanged.
+A failed command leaves source topology unchanged.
 
 ## Exact undo and redo
 
-Every successful command produces one `SketchEditTransaction` containing:
+Every successful command produces `SketchEditTransaction` with complete canonical `before` and `after`
+`SketchTopology` snapshots plus kind/object id.
 
-```text
-before : complete canonical SketchTopology
-after  : complete canonical SketchTopology
-kind
-object_id
-```
-
-`undo()` returns exact `before`; `redo()` returns exact `after`.
-
-`SketchTopologyUndoStack` stores transaction snapshots, clears redo after a new command, and never
+`SketchTopologyUndoStack` stores those snapshots, clears redo after a new command, and never
 reconstructs inverse commands heuristically.
 
-For example:
-
-```text
-initial
-  -> MovePoint(shared.corner, 30, 0)
-  -> moved
-  -> undo == initial
-  -> redo == moved
-```
-
-Equality is structural equality of canonical point/entity/dependency records.
+This exact snapshot model is the topology-side rollback authority Block 110 reuses for drag preview and
+cancellation.
 
 ## Canonical topology JSON
 
-Block 108 adds a separate Core topology schema:
+Block 108 adds:
 
 ```text
 schema  = blcad.sketch_topology.mvp8
 version = 1
 ```
 
-Root fields:
+Root fields are `schema`, `version`, `sketch`, `points[]`, `entities[]`, and `dependencies[]`.
 
-```text
-schema
-version
-sketch
-points[]
-entities[]
-dependencies[]
-```
-
-Point record:
-
-```json
-{
-  "id": "entity/line.a/end",
-  "position": {"x": 20.0, "y": 0.0},
-  "construction": false,
-  "reference": false
-}
-```
-
-Entity record:
-
-```json
-{
-  "id": "entity/line.b",
-  "kind": "line",
-  "points": ["entity/line.a/end", "entity/line.b/end"],
-  "entity_dependencies": [],
-  "construction": false,
-  "reference": false
-}
-```
-
-Dependency record:
-
-```json
-{
-  "consumer": "profile/profile.triangle",
-  "source_entity": "entity/line.a",
-  "role": "topology"
-}
-```
-
-The loader applies the same Core invariants as direct construction. Duplicate point ids, duplicate
-entity ids, unknown references, invalid flags, wrong point arity, duplicate ordered dependencies,
-self-dependencies, malformed records, and unsupported kinds fail closed.
-
-Distinct point ids with equal coordinates are valid and round-trip exactly.
+The loader applies the same Core invariants as direct construction. Distinct point ids with equal
+coordinates are valid and round-trip exactly.
 
 `serialize_sketch_topology_to_json(...)` and `deserialize_sketch_topology_from_json(...)` round-trip
 one canonical topology structurally exactly.
 
+Block 109 adds no topology-schema fields for solver variables, residuals, Jacobians, rank, DOF,
+convergence, or conflict diagnostics. Those values are derived on demand.
+
 ## Existing PartDocument JSON migration
 
-The historical save schema remains:
+The historical save schema remains `blcad.part_document.mvp1`.
 
-```text
-blcad.part_document.mvp1
-```
-
-Block 108 does not reinterpret it as if shared point ids had always existed. Instead:
-
-```text
-migrate_legacy_part_document_sketch_json(...)
-  -> existing PartDocument JSON loader
-  -> exact requested legacy Sketch
-  -> SketchTopology::migrate_legacy(...)
-  -> topology + migration report
-```
-
-No GUI session state participates. Existing PartDocument files continue to load through the
-historical loader.
+`migrate_legacy_part_document_sketch_json(...)` loads the historical document, selects the requested
+Sketch, and runs `SketchTopology::migrate_legacy(...)`. No GUI or solver session state participates.
 
 The topology schema is persistence authority for shared point identity and explicit topology flags.
-The historical PartDocument schema remains a compatibility carrier for current Geometry consumers
-until later Interactive Sketcher blocks adopt topology natively.
+The historical PartDocument schema remains a compatibility carrier for current Geometry consumers.
 
 ## Lossless PartDocument compatibility bridge
 
-`SketchTopologyLegacyMaterializer` projects a topology candidate back into current `LineSegment`,
-`ArcSegment`, `SplineSegment`, and profile-center records while preserving existing semantic ids and
-parameter references.
+`SketchTopologyLegacyMaterializer` projects a topology candidate back into current Line/Arc/Spline and
+profile-center records while preserving existing semantic ids and parameter references.
 
 `SketchTopologyPartDocumentEditor` performs:
 
 ```text
 current PartDocument Sketch
-  -> migrate to topology
+  -> migrate topology
   -> apply one topology command
-  -> materialize legacy Sketch candidate
+  -> materialize historical Sketch candidate
   -> migrate candidate back to topology
   -> exact topology equality check
   -> PartDocument::update_sketch(...)
 ```
 
-Only an exactly representable candidate reaches `PartDocument::update_sketch(...)`. The existing
-update authority validates the complete candidate, rebuilds Sketch dependencies, preserves authored
-Sketch position, restores downstream graph edges, marks affected nodes changed, and atomically
-publishes the candidate.
+Only an exactly representable candidate reaches `update_sketch(...)`. Identity, flags, ordered
+relationships, or orphan point records that historical Sketch JSON would lose cause fail-closed
+rejection.
 
-If round-trip materialization changes point identity, flags, ordered dependencies, or another
-canonical topology record, the bridge fails with:
+Block 109 solving does not automatically call this bridge. Solve results are disposable derived
+candidates. A later command/interaction owner must explicitly choose the validated persistent commit
+boundary.
 
-```text
-topology edit cannot be represented by legacy PartDocument Sketch JSON without identity loss
-```
-
-For example, moving a profile-connected shared line junction is representable: both historical
-endpoint coordinates materialize to the new location and profile-based migration reconstructs the
-same shared id. Setting a construction flag on a historical line is not representable because the
-old curve record has no construction field; that state remains in topology JSON rather than being
-silently lost.
-
-A topology-only command such as removing an entity may also leave explicit orphan point records. If
-historical materialization would omit those records and therefore change canonical topology, the
-PartDocument bridge rejects the single edit. The topology command itself remains valid and exactly
-persistable. A later command can remove the orphan point before a lossless materialization attempt.
-
-## Persistence and compatibility
+## Persistence and regeneration
 
 Persist in `blcad.sketch_topology.mvp8`:
 
 ```text
 SketchPointId
-point coordinates
-point construction/reference flags
-entity id and kind
-ordered point references
-ordered entity dependencies
-entity construction/reference flags
+point coordinates and flags
+entity id/kind/ordered point references/ordered entity dependencies/flags
 canonical dependency records
 ```
 
-Regenerate or adapt:
+Regenerate:
 
 ```text
-historical embedded Point2 endpoint representation
-legacy profile-connectivity migration equivalence groups
-migration identity-change report
+historical embedded Point2 compatibility representation
+legacy profile-connectivity equivalence groups and migration report
 PartDocument compatibility materialization candidate
 Block-107 interaction samples and screen mappings
-future Block-109 solver variables/residuals/results
+Block-109 solver variables/residuals/Jacobians/rank/DOF/results/diagnostics
+Block-110 drag equations and live preview candidates
 ```
 
 No OCCT shape, sampled polyline, screen coordinate, hover state, hit stack, snap candidate, or solver
-result is part of topology persistence.
+cache is topology persistence.
 
 ## Failure policy
 
-Block 108 fails closed for:
+Block 108 fails closed for invalid ids/coordinates/flags, wrong entity point arity, unknown point/entity
+references, duplicate ordered dependencies, self-dependency, inconsistent explicit profile connectivity,
+read-only reference mutation, active deletion consumers, malformed topology JSON, missing requested
+historical Sketch, or lossy PartDocument materialization.
 
-- empty or duplicate point/entity ids;
-- non-finite point coordinates;
-- reference + construction flag combination;
-- wrong point arity for entity kind;
-- unknown point or entity references;
-- duplicate ordered entity dependencies;
-- self-dependency;
-- inconsistent explicit legacy profile connectivity during migration;
-- read-only reference mutation;
-- removal with active point/entity consumers;
-- malformed or unsupported topology JSON;
-- requested legacy Sketch missing during migration;
-- lossy PartDocument compatibility materialization.
-
-A failure does not mutate source topology or PartDocument.
+Block 109 separately fails or reports `InvalidReference` when a solver request cannot consume a valid
+topology target. Solver failure does not weaken topology invariants.
 
 ## Focused proof
 
-Focused tags:
+Block-108 tags:
 
 ```text
 [core][sketch-topology]
@@ -530,28 +361,16 @@ Focused tags:
 [core][sketch-json-migration]
 ```
 
-The focused proof covers:
+They cover insertion-order-independent migration, profile-connected point sharing, identity-change
+reporting, unrelated coincident ids remaining distinct, ordered dependencies, shared-point movement,
+dependency-safe removal, Add/Replace/Remove validation, exact snapshot undo/redo, historical JSON
+migration, topology JSON, and exact round-trip.
 
-- insertion-order-independent migration;
-- six connected-triangle endpoint usages collapse to three shared points through profile
-  connectivity;
-- explicit migration identity-change reporting;
-- unrelated equal-coordinate point usages remain distinct identities;
-- ordered profile dependencies remain ordered;
-- connected entities reference the same `SketchPointId`;
-- one shared-point move is visible through every connected entity reference;
-- distinct points may be moved into numeric coincidence without identity merge;
-- dependent point/entity removal fails with `Dependency`;
-- Add/Replace/Remove candidate validation;
-- exact topology snapshot undo/redo;
-- legacy PartDocument Sketch JSON migration;
-- topology JSON schema/flag publication;
-- exact topology JSON round-trip;
-- malformed and duplicate point-id rejection.
+Block-109 consumer proof is documented in `docs/sketch-planar-constraint-solver-mvp8.md`.
 
 ## Next boundary
 
-Block 109 owns the deterministic general planar constraint solver over Block-108 point/entity
-topology. It freezes solver-variable ordering, scale normalization, nonlinear residual families,
-remaining-DOF accounting, conflict/redundancy attribution, convergence diagnostics, and stable
-headless solve results.
+Block 110 consumes Block-108 topology snapshots and Block-109 solving for semantic-handle mouse drag.
+It adds transient drag targets to disposable candidates, publishes live preview without document
+mutation, restores the pre-drag snapshot on cancellation/failure, and commits exactly one validated
+transaction on release.
