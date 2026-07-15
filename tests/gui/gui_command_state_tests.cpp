@@ -56,6 +56,9 @@ TEST_CASE("GUI task lifecycle requires preview before apply", "[gui][command-sta
 
   REQUIRE(task.begin_parameter_editing());
   CHECK(task.stage() == GuiTaskStage::EditingParameters);
+  REQUIRE(task.return_to_selection());
+  CHECK(task.stage() == GuiTaskStage::CollectingSelection);
+  REQUIRE(task.begin_parameter_editing());
   REQUIRE(task.show_preview());
   CHECK(task.stage() == GuiTaskStage::Preview);
   REQUIRE(task.return_to_editing());
