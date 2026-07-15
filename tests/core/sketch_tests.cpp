@@ -1,6 +1,14 @@
+#include "blcad/core/part_document.hpp"
+#include "blcad/core/part_document_json.hpp"
 #include "blcad/core/sketch.hpp"
+#include "blcad/core/sketch_edit_commands.hpp"
+#include "blcad/core/sketch_topology.hpp"
+#include "blcad/core/sketch_topology_json.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+
+#include <string>
+#include <vector>
 
 using namespace blcad;
 
@@ -48,13 +56,13 @@ TEST_CASE("RectangleProfile rejects missing ids and parameter references", "[cor
   CHECK(missing_id.error().message() == "rectangle profile id must not be empty");
 
   const auto missing_width = RectangleProfile::create(ProfileId("profile.base_rectangle"),
-                                                      ParameterId(), ParameterId("part.height"));
+                                                       ParameterId(), ParameterId("part.height"));
   REQUIRE(missing_width.has_error());
   CHECK(missing_width.error().object_id() == "profile.base_rectangle");
   CHECK(missing_width.error().message() == "rectangle width parameter id must not be empty");
 
   const auto missing_height = RectangleProfile::create(ProfileId("profile.base_rectangle"),
-                                                       ParameterId("part.width"), ParameterId());
+                                                        ParameterId("part.width"), ParameterId());
   REQUIRE(missing_height.has_error());
   CHECK(missing_height.error().object_id() == "profile.base_rectangle");
   CHECK(missing_height.error().message() == "rectangle height parameter id must not be empty");
@@ -275,4 +283,201 @@ TEST_CASE("Sketch rejects disconnected and self-intersecting closed profiles", "
   const auto bowtie_added = bowtie.value().add_profile(bowtie_profile.value());
   REQUIRE(bowtie_added.has_error());
   CHECK(bowtie_added.error().message() == "closed profile line segments must not self-intersect");
+}
+
+TEST_CASE("Sketch topology migration shares coincident points deterministically",
+          "[core][sketch-topology]") {
+  const auto make_triangle = [](const std::vector<std::string>& insertion_order) {
+    auto sketch =
+        Sketch::create(SketchId("sketch.topology"), "Sketch_Topology", DatumPlaneId("datum.xy"));
+    REQUIRE(sketch);
+    for (const auto& id : insertion_order) {
+      if (id == "line.a")
+        REQUIRE(sketch.value().add_entity(LineSegment::create(
+            SketchEntityId(id), Point2{0.0, 0.0}, Point2{2.0, 0.0}).value()));
+      else if (id == "line.b")
+        REQUIRE(sketch.value().add_entity(LineSegment::create(
+            SketchEntityId(id), Point2{2.0, 0.0}, Point2{0.0, 2.0}).value()));
+      else
+        REQUIRE(sketch.value().add_entity(LineSegment::create(
+            SketchEntityId(id), Point2{0.0, 2.0}, Point2{0.0, 0.0}).value()));
+    }
+    auto profile = ClosedProfile::create(
+        ProfileId("profile.triangle"),
+        {SketchEntityId("line.a"), SketchEntityId("line.b"), SketchEntityId("line.c")});
+    REQUIRE(profile);
+    REQUIRE(sketch.value().add_profile(profile.value()));
+    return sketch.value();
+  };
+
+  SketchTopologyMigrationReport first_report;
+  auto first = SketchTopology::migrate_legacy(
+      make_triangle({"line.c", "line.a", "line.b"}), &first_report);
+  REQUIRE(first);
+  CHECK(first_report.migrated());
+  CHECK(first.value().points().size() == 3U);
+  CHECK(first_report.identity_changes().size() == 3U);
+
+  const auto* line_a = first.value().find_entity("entity/line.a");
+  const auto* line_b = first.value().find_entity("entity/line.b");
+  const auto* profile = first.value().find_entity("profile/profile.triangle");
+  REQUIRE(line_a != nullptr);
+  REQUIRE(line_b != nullptr);
+  REQUIRE(profile != nullptr);
+  CHECK(line_a->points()[1] == line_b->points()[0]);
+  CHECK(profile->entity_dependencies() ==
+        std::vector<std::string>{"entity/line.a", "entity/line.b", "entity/line.c"});
+
+  SketchTopologyMigrationReport second_report;
+  auto second = SketchTopology::migrate_legacy(
+      make_triangle({"line.b", "line.c", "line.a"}), &second_report);
+  REQUIRE(second);
+  CHECK(second.value() == first.value());
+  CHECK(second_report == first_report);
+}
+
+TEST_CASE("Sketch topology edit commands are dependency-safe and exactly undoable",
+          "[core][sketch-edit-command]") {
+  auto sketch =
+      Sketch::create(SketchId("sketch.edit"), "Sketch_Edit", DatumPlaneId("datum.xy"));
+  REQUIRE(sketch);
+  REQUIRE(sketch.value().add_entity(
+      LineSegment::create(SketchEntityId("line.a"), Point2{0.0, 0.0}, Point2{2.0, 0.0}).value()));
+  REQUIRE(sketch.value().add_entity(
+      LineSegment::create(SketchEntityId("line.b"), Point2{2.0, 0.0}, Point2{0.0, 2.0}).value()));
+  REQUIRE(sketch.value().add_entity(
+      LineSegment::create(SketchEntityId("line.c"), Point2{0.0, 2.0}, Point2{0.0, 0.0}).value()));
+  auto profile = ClosedProfile::create(
+      ProfileId("profile.triangle"),
+      {SketchEntityId("line.a"), SketchEntityId("line.b"), SketchEntityId("line.c")});
+  REQUIRE(profile);
+  REQUIRE(sketch.value().add_profile(profile.value()));
+
+  auto topology = SketchTopology::migrate_legacy(sketch.value());
+  REQUIRE(topology);
+  const SketchTopology initial = topology.value();
+  const auto* line_a = initial.find_entity("entity/line.a");
+  REQUIRE(line_a != nullptr);
+  const SketchPointId shared = line_a->points()[1];
+
+  auto move = SketchEditCommand::move_point(shared, Point2{3.0, 0.0});
+  REQUIRE(move);
+  SketchTopologyUndoStack stack(initial);
+  REQUIRE(stack.apply(move.value()));
+  const SketchTopology moved = stack.current();
+  const auto* moved_point = moved.find_point(shared);
+  const auto* moved_line_b = moved.find_entity("entity/line.b");
+  REQUIRE(moved_point != nullptr);
+  REQUIRE(moved_line_b != nullptr);
+  CHECK(moved_point->position() == Point2{3.0, 0.0});
+  CHECK(moved_line_b->points()[0] == shared);
+
+  auto remove_shared = SketchEditCommand::remove_point(shared);
+  REQUIRE(remove_shared);
+  const auto blocked_point = SketchEditCommandExecutor{}.apply(moved, remove_shared.value());
+  REQUIRE(blocked_point.has_error());
+  CHECK(blocked_point.error().category() == ErrorCategory::Dependency);
+
+  auto remove_line = SketchEditCommand::remove_entity("entity/line.a");
+  REQUIRE(remove_line);
+  const auto blocked_line = SketchEditCommandExecutor{}.apply(moved, remove_line.value());
+  REQUIRE(blocked_line.has_error());
+  CHECK(blocked_line.error().category() == ErrorCategory::Dependency);
+  CHECK(blocked_line.error().message().find("profile/profile.triangle") != std::string::npos);
+
+  REQUIRE(stack.undo());
+  CHECK(stack.current() == initial);
+  REQUIRE(stack.redo());
+  CHECK(stack.current() == moved);
+
+  auto new_point = SketchTopologyPoint::create(SketchPointId("point.extra"), Point2{5.0, 5.0});
+  REQUIRE(new_point);
+  auto added_point = SketchEditCommandExecutor{}.apply(
+      initial, SketchEditCommand::add_point(new_point.value()));
+  REQUIRE(added_point);
+  auto extra_line = SketchTopologyEntity::create(
+      "entity/line.extra", SketchTopologyEntityKind::Line,
+      {SketchPointId("point.extra"), line_a->points()[0]});
+  REQUIRE(extra_line);
+  auto added_line = SketchEditCommandExecutor{}.apply(
+      added_point.value().after(), SketchEditCommand::add_entity(extra_line.value()));
+  REQUIRE(added_line);
+
+  auto replacement = SketchTopologyEntity::create(
+      "entity/line.extra", SketchTopologyEntityKind::Line,
+      {SketchPointId("point.extra"), shared}, {}, {.construction = true, .reference = false});
+  REQUIRE(replacement);
+  auto replaced = SketchEditCommandExecutor{}.apply(
+      added_line.value().after(), SketchEditCommand::replace_entity(replacement.value()));
+  REQUIRE(replaced);
+  REQUIRE(replaced.value().after().find_entity("entity/line.extra") != nullptr);
+  CHECK(replaced.value().after().find_entity("entity/line.extra")->construction());
+
+  auto remove_extra_line = SketchEditCommand::remove_entity("entity/line.extra");
+  REQUIRE(remove_extra_line);
+  auto removed_line = SketchEditCommandExecutor{}.apply(
+      replaced.value().after(), remove_extra_line.value());
+  REQUIRE(removed_line);
+  auto remove_extra_point = SketchEditCommand::remove_point(SketchPointId("point.extra"));
+  REQUIRE(remove_extra_point);
+  auto removed_point = SketchEditCommandExecutor{}.apply(
+      removed_line.value().after(), remove_extra_point.value());
+  REQUIRE(removed_point);
+  CHECK(removed_point.value().after().find_point(SketchPointId("point.extra")) == nullptr);
+}
+
+TEST_CASE("Legacy Part Sketch JSON migrates to canonical topology JSON",
+          "[core][sketch-json-migration]") {
+  auto document = PartDocument::create(DocumentId("part.topology"), "TopologyPart");
+  REQUIRE(document);
+  auto xy = DatumPlane::xy();
+  REQUIRE(xy);
+  REQUIRE(document.value().add_datum_plane(xy.value()));
+
+  auto sketch =
+      Sketch::create(SketchId("sketch.legacy"), "Sketch_Legacy", DatumPlaneId("datum.xy"));
+  REQUIRE(sketch);
+  REQUIRE(sketch.value().add_entity(
+      LineSegment::create(SketchEntityId("line.a"), Point2{0.0, 0.0}, Point2{2.0, 0.0}).value()));
+  REQUIRE(sketch.value().add_entity(
+      LineSegment::create(SketchEntityId("line.b"), Point2{2.0, 0.0}, Point2{0.0, 2.0}).value()));
+  REQUIRE(sketch.value().add_entity(
+      LineSegment::create(SketchEntityId("line.c"), Point2{0.0, 2.0}, Point2{0.0, 0.0}).value()));
+  auto profile = ClosedProfile::create(
+      ProfileId("profile.triangle"),
+      {SketchEntityId("line.a"), SketchEntityId("line.b"), SketchEntityId("line.c")});
+  REQUIRE(profile);
+  REQUIRE(sketch.value().add_profile(profile.value()));
+  REQUIRE(document.value().add_sketch(sketch.value()));
+
+  auto legacy_json = serialize_part_document_to_json(document.value());
+  REQUIRE(legacy_json);
+  REQUIRE(legacy_json.value().find("\"start\"") != std::string::npos);
+
+  auto migrated = migrate_legacy_part_document_sketch_json(
+      legacy_json.value(), SketchId("sketch.legacy"));
+  REQUIRE(migrated);
+  CHECK(migrated.value().report.migrated());
+  CHECK(migrated.value().topology.points().size() == 3U);
+  CHECK(migrated.value().topology.find_entity("entity/line.a") != nullptr);
+  CHECK(migrated.value().topology.find_entity("profile/profile.triangle") != nullptr);
+
+  auto topology_json = serialize_sketch_topology_to_json(migrated.value().topology);
+  REQUIRE(topology_json);
+  CHECK(topology_json.value().find("blcad.sketch_topology.mvp8") != std::string::npos);
+  CHECK(topology_json.value().find("\"construction\"") != std::string::npos);
+  CHECK(topology_json.value().find("\"reference\"") != std::string::npos);
+
+  auto restored = deserialize_sketch_topology_from_json(topology_json.value());
+  REQUIRE(restored);
+  CHECK(restored.value() == migrated.value().topology);
+
+  auto duplicate_point = topology_json.value();
+  const std::string needle = "\"id\": \"entity/line.a/start\"";
+  const auto position = duplicate_point.find(needle);
+  REQUIRE(position != std::string::npos);
+  duplicate_point.replace(position, needle.size(), "\"id\": \"entity/line.a/end\"");
+  const auto rejected = deserialize_sketch_topology_from_json(duplicate_point);
+  REQUIRE(rejected.has_error());
+  CHECK(rejected.error().category() == ErrorCategory::Validation);
 }
