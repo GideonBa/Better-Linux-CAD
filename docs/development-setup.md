@@ -15,9 +15,9 @@ feature-specific documents under `docs/`.
 - nlohmann-json
 - Catch2 3
 
-The current Assembly numeric engine uses project-owned dynamic containers plus deterministic dense
-elimination routines. Eigen is installed by the reference dependency set but is not currently a
-BLCAD target dependency.
+The Assembly numeric engine and Block-109 planar Sketch solver use project-owned dynamic containers plus
+deterministic dense elimination routines. Eigen is installed by the reference dependency set but is not
+currently a BLCAD target dependency.
 
 ## Install dependencies
 
@@ -45,7 +45,7 @@ Equivalent:
 ```bash
 cmake --preset dev
 cmake --build --preset dev
-ctest --preset dev
+ctest --preset dev --output-on-failure
 ```
 
 Complete Geometry workflow:
@@ -59,7 +59,7 @@ Equivalent:
 ```bash
 cmake --preset dev-geometry
 cmake --build --preset dev-geometry
-ctest --preset dev-geometry
+ctest --preset dev-geometry --output-on-failure
 ```
 
 Build directories:
@@ -87,20 +87,19 @@ cmake --build build/dev-gui --target blcad_app blcad_gui_tests
 
 The executable output is `blcad`; the CMake target is `blcad_app`.
 
-The startup splash defaults to 700 ms. For visual inspection:
+For splash inspection:
 
 ```bash
 BLCAD_SPLASH_DURATION_MS=15000 ./build/dev-gui/blcad
 ```
 
-Accepted values are clamped to 250–60000 ms.
+Accepted splash values are clamped to 250–60000 ms.
 
-On Linux the native OCCT viewport uses Qt's xcb platform. `blcad` selects xcb automatically when
-`DISPLAY` is available and `QT_QPA_PLATFORM` is unset. Offscreen GUI tests use a logical viewport
-without an X11/GLX window.
+On Linux the native OCCT viewport uses Qt xcb when `DISPLAY` is available and
+`QT_QPA_PLATFORM` is unset. Offscreen GUI tests use a logical viewport without X11/GLX.
 
-`BLCAD_BUILD_GUI=ON` with `BLCAD_BUILD_GEOMETRY=OFF` is unsupported and fails during configuration.
-Core-only and Geometry-without-GUI configurations remain supported.
+`BLCAD_BUILD_GUI=ON` with `BLCAD_BUILD_GEOMETRY=OFF` is unsupported. Core-only and
+Geometry-without-GUI configurations remain supported.
 
 Complete GUI tests:
 
@@ -116,7 +115,7 @@ QT_QPA_PLATFORM=offscreen ctest --test-dir build/dev-gui -R '^gui\.' --output-on
 
 ## Interactive Sketcher focused proof
 
-Blocks 106–108 are implemented.
+Blocks 106–109 are implemented.
 
 Block 106 workspace and command lifecycle:
 
@@ -134,10 +133,6 @@ Block 107 plane interaction, hit testing, grid, snapping, inference, and box sel
 ./build/dev-gui/blcad_gui_tests "[gui][sketch-box-selection]"
 ```
 
-The Block-107 proof covers the frozen `Point -> Curve -> Dimension -> Glyph` hit priority,
-deterministic repeated-click cycling, device-independent mapping, model-space-first snap selection
-with screen-space tie breaking, grid snap/inference, and Window/Crossing selection.
-
 Block 108 shared planar topology, edit commands, and JSON migration:
 
 ```bash
@@ -146,28 +141,41 @@ Block 108 shared planar topology, edit commands, and JSON migration:
 ./build/dev/blcad_core_tests "[core][sketch-json-migration]"
 ```
 
-These tests prove deterministic legacy migration independent of line insertion order, collapse of six
-triangle endpoint usages into three shared `SketchPointId` records, explicit migration identity-change
-reporting, ordered profile dependencies, shared-junction movement, dependency-safe removal, Add/
-Replace/Remove candidate validation, exact full-topology snapshot undo/redo, migration from existing
-PartDocument Sketch JSON, and exact `blcad.sketch_topology.mvp8` round-trip.
+Block 109 deterministic planar solver, exact local DOF, and conflict diagnostics:
 
-The current implementation handoff is Block 109. Its focused tags are:
+```bash
+./build/dev/blcad_core_tests "[core][sketch-solver]"
+./build/dev/blcad_core_tests "[core][sketch-dof]"
+./build/dev/blcad_core_tests "[core][sketch-conflict-diagnostics]"
+```
+
+The Block-109 proof covers:
+
+- canonical lexicographic constraint ordering;
+- canonical non-reference `SketchPointId` variable ordering with X then Y;
+- under-constrained remaining DOF from final Jacobian rank;
+- fully constrained convergence and solved topology publication;
+- every initial Block-109 residual family;
+- deterministic canonical incremental redundancy attribution;
+- stable remove-one conflict attribution;
+- invalid-reference classification;
+- deterministic non-convergence classification;
+- adaptation of current persisted geometric constraints and parameter-backed dimensions.
+
+The current implementation handoff is Block 110. Its focused tags are:
 
 ```text
-[core][sketch-solver]
-[core][sketch-dof]
-[core][sketch-conflict-diagnostics]
+[gui][sketch-drag]
+[integration][sketch-live-solve]
 ```
 
 ## Existing GUI validation tags
 
-Useful focused tags include:
+Representative tags:
 
 ```bash
 ./build/dev-gui/blcad_gui_tests "[gui][application-shell]"
 ./build/dev-gui/blcad_gui_tests "[gui][command-state]"
-./build/dev-gui/blcad_gui_tests "[gui][startup-splash]"
 ./build/dev-gui/blcad_gui_tests "[gui][document-session]"
 ./build/dev-gui/blcad_gui_tests "[gui][document-transaction]"
 ./build/dev-gui/blcad_gui_tests "[gui][diagnostics]"
@@ -197,21 +205,24 @@ Useful focused tags include:
 ./build/dev-gui/blcad_gui_tests "[integration][gui-headless-equivalence]"
 ```
 
-The exact source and test registration in `CMakeLists.txt` is authoritative. Block 108 adds public
-header-only Core authorities and extends the already-registered `tests/core/sketch_tests.cpp`; no new
-translation unit or CMake source registration is required.
+The exact source/test registration in `CMakeLists.txt` is authoritative.
+
+Block 109 registers:
+
+```text
+src/core/sketch_constraint_solver.cpp
+src/core/sketch_solver_legacy_adapter.cpp
+tests/core/sketch_constraint_solver_tests.cpp
+```
 
 ## Core and Geometry focused examples
 
-Core model and persistence:
+Core model/persistence:
 
 ```bash
 ./build/dev/blcad_core_tests "[core][part-body]"
 ./build/dev/blcad_core_tests "[core][feature-body-operation-json]"
 ./build/dev/blcad_core_tests "[core][part-feature-input-reference]"
-./build/dev/blcad_core_tests "[core][extrude-extent]"
-./build/dev/blcad_core_tests "[core][revolve-feature]"
-./build/dev/blcad_core_tests "[core][part-pattern]"
 ./build/dev/blcad_core_tests "[core][sketch-update]"
 ./build/dev/blcad_core_tests "[core][path-curve]"
 ./build/dev/blcad_core_tests "[core][loft-feature]"
@@ -235,14 +246,13 @@ Geometry execution:
 ./build/dev-geometry/blcad_geometry_tests "[integration][part-construction-mvp]"
 ```
 
-Assembly target, solve, motion, and exchange:
+Assembly target/solve/motion/exchange:
 
 ```bash
 ./build/dev/blcad_core_tests "[core][semantic-generated-topology-reference]"
 ./build/dev/blcad_core_tests "[core][semantic-generated-topology-recovery]"
 ./build/dev/blcad_core_tests "[core][assembly-cross-hierarchy-graph]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-geometric-target-taxonomy]"
-./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-generated-topology-target-resolution]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-target-compatibility]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-cross-hierarchy-solver]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-cross-hierarchy-application]"
@@ -279,13 +289,12 @@ blcad_move_joint <input.blcad.project.json> <joint-id> <angle-deg> <output.blcad
 blcad_analyze_assembly <input.blcad.project.json> [clearance-threshold-mm]
 ```
 
-Block-108 topology and migration are public library APIs and intentionally add no CLI.
+Block-108 topology and Block-109 solver are public library APIs and intentionally add no CLI.
 
 ## Public versus private boundaries
 
 Private Geometry headers remain private to `src/geometry`. Geometry tests have a private include path
-to that directory so focused integration tests may verify residual/Jacobian ordering and shared helper
-boundaries without promoting execution internals to the public API.
+for focused residual/Jacobian/helper verification without promoting execution internals.
 
 Block-107 public GUI interaction boundaries:
 
@@ -303,15 +312,24 @@ include/blcad/core/sketch_topology_json.hpp
 include/blcad/core/sketch_topology_part_document.hpp
 ```
 
-`SketchTopology` and `SketchPointId` are Core identity. `SketchTopologyMigrationReport` and legacy
-materialization candidates are derived/adaptation products. `GuiSketchInteractionScene`, sampled
-curves, screen positions, hit stacks, grid lines, and snap results remain transient.
+Block-109 public Core boundary:
+
+```text
+include/blcad/core/sketch_constraint_solver.hpp
+```
+
+`SketchTopology`/`SketchPointId` are persistent Core topology identity. `SketchConstraintSystem` is a
+canonical solve request. `SketchSolveResult`, variable order, residual summary, Jacobian rank, remaining
+DOF, and solver diagnostics are derived.
+
+`GuiSketchInteractionScene`, sampled curves, screen positions, hit stacks, grid lines, and snap results
+remain transient.
 
 ## Formatting
 
 Formatting is configured by `.editorconfig` and `.clang-format`.
 
-Format Block-108 headers and focused proof with:
+Format Blocks 108–109 Core changes with:
 
 ```bash
 clang-format -i \
@@ -320,11 +338,15 @@ clang-format -i \
   include/blcad/core/sketch_edit_commands.hpp \
   include/blcad/core/sketch_topology_json.hpp \
   include/blcad/core/sketch_topology_part_document.hpp \
-  tests/core/sketch_tests.cpp
+  include/blcad/core/sketch_constraint_solver.hpp \
+  src/core/sketch_constraint_solver.cpp \
+  src/core/sketch_solver_legacy_adapter.cpp \
+  tests/core/sketch_tests.cpp \
+  tests/core/sketch_constraint_solver_tests.cpp
 ```
 
-When adding a block, register new translation units/tests in `CMakeLists.txt` where required and
-document exact scope in the feature-specific canonical document plus `docs/mvp-plan.md`.
+When adding a block, register new translation units/tests in `CMakeLists.txt` and document exact scope
+in the feature-specific canonical document plus `docs/mvp-plan.md`.
 
 ## Clean generated files
 
@@ -335,24 +357,17 @@ rm -rf build/
 ## Documentation entry points
 
 - `README.md`: short repository entry point
-- `docs/mvp-plan.md`: implementation sequence and current numbered block
-- `docs/architecture-summary.md`: condensed implemented architecture
+- `docs/mvp-plan.md`: implementation sequence/current block
+- `docs/architecture-summary.md`: condensed architecture
 - `docs/file-format.md`: historical PartDocument/Project save-format authority
-- `docs/interactive-sketcher-sequence-mvp8.md`: Blocks 106–121 Interactive Sketcher sequence
-- `docs/gui-interactive-sketch-workspace-mvp8.md`: Block-106 contextual workspace contract
-- `docs/gui-sketch-plane-interaction-mvp8.md`: Block-107 plane interaction contract
-- `docs/sketch-shared-topology-mvp8.md`: Block-108 shared topology, migration, edit, and topology JSON contract
-- `docs/interactive-modeling-sequence-mvp9.md`: Blocks 122–131 interactive modeling plan
-- `docs/step-import-sequence-mvp10.md`: Blocks 132–138 STEP import plan
-- `docs/project-goal.md`: long-term direction
+- `docs/interactive-sketcher-sequence-mvp8.md`: Blocks 106–121 phase authority
+- `docs/sketch-shared-topology-mvp8.md`: Block-108 topology/migration/edit/persistence contract
+- `docs/sketch-planar-constraint-solver-mvp8.md`: Block-109 solver/DOF/diagnostics contract
 
 ## Current development boundary
 
-Blocks 1–108 are implemented according to the numbered sequence. Interactive Sketcher MVP-8 is in
-progress. Block 109 is the immediate next technical step and owns the deterministic general planar
-constraint solver over Block-108 topology: solver-variable ordering, scale normalization, tolerances,
-iteration/damping limits, convergence classification, remaining-DOF accounting, and stable
-redundant/conflicting/non-convergent/invalid-reference diagnostics.
+Blocks 106–109 are implemented. Block 110 is next.
 
-Interactive Modeling remains sequenced for Blocks 122–131. STEP Import remains sequenced for Blocks
-132–138.
+Block 110 exposes semantic Sketch handles and uses Block-107 mapping, Block-108 topology snapshots, and
+Block-109 solving for live drag preview. Release commits one validated transaction; cancellation, lost
+capture, fixed geometry, or failed solve restores the exact pre-drag snapshot.
