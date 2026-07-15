@@ -51,7 +51,7 @@ Producer boundaries are explicit:
 Block 107  cursor / hover / hit / box selection / grid / snap / inference
 Block 108  persistent shared SketchPointId / SketchTopology identity
 Block 109  deterministic solve result / exact local remaining DOF / solver diagnostics
-Block 110  semantic handles / live drag solve invocation / status publication / release commit — implemented — implemented — implemented
+Block 110  semantic handles / live drag solve invocation / status publication / release commit — implemented — implemented — implemented — implemented
 ```
 
 Block 109 provides the headless producer and Block 110 continuously publishes baseline/live drag
