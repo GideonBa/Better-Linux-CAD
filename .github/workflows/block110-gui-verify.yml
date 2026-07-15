@@ -21,20 +21,39 @@ jobs:
             qt6-base-dev nlohmann-json3-dev catch2
       - name: Configure GUI
         run: |
+          set -o pipefail
           cmake -S . -B build/dev-gui -G Ninja \
             -DBLCAD_BUILD_GEOMETRY=ON \
             -DBLCAD_BUILD_GUI=ON \
             -DBLCAD_BUILD_TESTS=ON \
-            -DCMAKE_BUILD_TYPE=Debug
+            -DCMAKE_BUILD_TYPE=Debug 2>&1 | tee configure.log
       - name: Build application and GUI tests
-        run: cmake --build build/dev-gui --target blcad_app blcad_gui_tests
+        run: |
+          set -o pipefail
+          cmake --build build/dev-gui --target blcad_app blcad_gui_tests 2>&1 | tee build.log
       - name: Run Block 110 focused tests
         env:
           QT_QPA_PLATFORM: offscreen
         run: |
-          ./build/dev-gui/blcad_gui_tests "[gui][sketch-drag]"
-          ./build/dev-gui/blcad_gui_tests "[integration][sketch-live-solve]"
+          set -o pipefail
+          {
+            ./build/dev-gui/blcad_gui_tests "[gui][sketch-drag]"
+            ./build/dev-gui/blcad_gui_tests "[integration][sketch-live-solve]"
+          } 2>&1 | tee focused.log
       - name: Run complete dev-gui CTest
         env:
           QT_QPA_PLATFORM: offscreen
-        run: ctest --test-dir build/dev-gui --output-on-failure
+        run: |
+          set -o pipefail
+          ctest --test-dir build/dev-gui --output-on-failure 2>&1 | tee ctest.log
+      - name: Upload verification logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: block110-verification-logs
+          path: |
+            configure.log
+            build.log
+            focused.log
+            ctest.log
+          if-no-files-found: ignore
