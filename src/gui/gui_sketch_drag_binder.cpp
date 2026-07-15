@@ -70,6 +70,10 @@ protected:
           drag_stage(window_.sketch_workspace().stage())) {
         restore_source_preview();
         controller_->cancel();
+        if (viewport_ != nullptr) {
+          viewport_->set_sketch_inference_anchor(std::nullopt);
+          viewport_->set_sketch_selection_enabled(true);
+        }
         publish_baseline_feedback();
       }
     } else if (watched == viewport_ &&
@@ -199,6 +203,7 @@ private:
       controller_->cancel();
       (void)window_.sketch_workspace().escape(window_.session());
       viewport_->set_sketch_inference_anchor(std::nullopt);
+      viewport_->set_sketch_selection_enabled(true);
       publish_baseline_feedback();
       window_.refresh_command_state();
       return;
@@ -227,6 +232,7 @@ private:
       return;
     }
     viewport_->set_sketch_inference_anchor(std::nullopt);
+    viewport_->set_sketch_selection_enabled(true);
     window_.refresh_command_state();
     sync_controller();
     publish_current_document_scene();
