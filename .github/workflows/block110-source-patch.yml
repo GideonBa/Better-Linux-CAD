@@ -1,0 +1,113 @@
+name: Block 110 Source Patch
+
+on:
+  push:
+    branches:
+      - block-110-sketch-live-drag
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: block-110-sketch-live-drag
+      - name: Apply integration patches
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def patch(path, old, new):
+              p = Path(path)
+              text = p.read_text()
+              if new in text:
+                  return
+              if old not in text:
+                  raise SystemExit(f'patch anchor not found in {path}: {old[:80]!r}')
+              p.write_text(text.replace(old, new, 1))
+
+          path = 'src/gui/occt_viewport.cpp'
+          patch(path,
+          '''  void set_grid(std::vector<GuiSketchScreenSegment> lines) {\n    grid_ = std::move(lines);\n    update();\n  }\n''',
+          '''  void set_grid(std::vector<GuiSketchScreenSegment> lines) {\n    grid_ = std::move(lines);\n    update();\n  }\n\n  void set_handles(std::vector<GuiSketchScreenPoint> handles) {\n    handles_ = std::move(handles);\n    update();\n  }\n''')
+          patch(path,
+          '''    if (hover_polyline_.size() >= 2U) {\n''',
+          '''    for (const auto& handle : handles_) {\n      painter.setPen(QPen(QColor(84, 190, 255), 1.8));\n      painter.setBrush(QColor(48, 52, 59));\n      painter.drawEllipse(QPointF(handle.x, handle.y), 4.2, 4.2);\n    }\n\n    if (hover_polyline_.size() >= 2U) {\n''')
+          patch(path,
+          '''  [[nodiscard]] std::size_t grid_line_count() const noexcept { return grid_.size(); }\n''',
+          '''  [[nodiscard]] std::size_t grid_line_count() const noexcept { return grid_.size(); }\n  [[nodiscard]] std::size_t handle_count() const noexcept { return handles_.size(); }\n''')
+          patch(path,
+          '''  std::vector<GuiSketchScreenSegment> grid_;\n  std::vector<GuiSketchScreenPoint> hover_polyline_;\n''',
+          '''  std::vector<GuiSketchScreenSegment> grid_;\n  std::vector<GuiSketchScreenPoint> handles_;\n  std::vector<GuiSketchScreenPoint> hover_polyline_;\n''')
+          patch(path,
+          '''  sketch_overlay_->show();\n  sketch_overlay_->raise();\n  rebuild_sketch_grid();\n''',
+          '''  sketch_overlay_->show();\n  sketch_overlay_->raise();\n  rebuild_sketch_grid();\n  rebuild_sketch_drag_handles();\n''')
+          patch(path,
+          '''  sketch_box_selection_.reset();\n  sketch_box_active_ = false;\n  if (auto* overlay = static_cast<SketchInteractionOverlay*>(sketch_overlay_)) {\n    overlay->set_grid({});\n    overlay->clear_transient();\n''',
+          '''  sketch_box_selection_.reset();\n  sketch_box_active_ = false;\n  sketch_drag_handles_.clear();\n  if (auto* overlay = static_cast<SketchInteractionOverlay*>(sketch_overlay_)) {\n    overlay->set_grid({});\n    overlay->set_handles({});\n    overlay->clear_transient();\n''')
+          patch(path,
+          '''void OcctViewport::set_sketch_pointer_callback(SketchPointerCallback callback) {\n  sketch_pointer_callback_ = std::move(callback);\n}\n''',
+          '''void OcctViewport::set_sketch_drag_handles(std::vector<Point2> handles) {\n  sketch_drag_handles_ = std::move(handles);\n  rebuild_sketch_drag_handles();\n}\n\nvoid OcctViewport::set_sketch_pointer_callback(SketchPointerCallback callback) {\n  sketch_pointer_callback_ = std::move(callback);\n}\n\nvoid OcctViewport::set_sketch_drag_pointer_callback(SketchDragPointerCallback callback) {\n  sketch_drag_pointer_callback_ = std::move(callback);\n}\n\nvoid OcctViewport::set_sketch_pointer_phase_callback(SketchPointerPhaseCallback callback) {\n  sketch_pointer_phase_callback_ = std::move(callback);\n}\n''')
+          patch(path,
+          '''std::size_t OcctViewport::sketch_grid_line_count() const noexcept {\n  const auto* overlay = static_cast<const SketchInteractionOverlay*>(sketch_overlay_);\n  return overlay == nullptr ? 0U : overlay->grid_line_count();\n}\n''',
+          '''std::size_t OcctViewport::sketch_grid_line_count() const noexcept {\n  const auto* overlay = static_cast<const SketchInteractionOverlay*>(sketch_overlay_);\n  return overlay == nullptr ? 0U : overlay->grid_line_count();\n}\n\nstd::size_t OcctViewport::sketch_drag_handle_count() const noexcept {\n  const auto* overlay = static_cast<const SketchInteractionOverlay*>(sketch_overlay_);\n  return overlay == nullptr ? 0U : overlay->handle_count();\n}\n''')
+          patch(path,
+          '''  } else {\n    rebuild_sketch_grid();\n  }\n}\n\nvoid OcctViewport::mousePressEvent(QMouseEvent* event) {\n''',
+          '''  } else {\n    rebuild_sketch_grid();\n  }\n  rebuild_sketch_drag_handles();\n}\n\nvoid OcctViewport::mousePressEvent(QMouseEvent* event) {\n''')
+          patch(path,
+          '''  if (event->button() == Qt::LeftButton && sketch_interaction_ && sketch_selection_enabled_) {\n    sketch_press_position_ = last_mouse_position_;\n    auto hits = sketch_interaction_->hits_at(\n        {event->position().x(), event->position().y()});\n    if (hits && hits.value().empty()) {\n      sketch_box_active_ = true;\n      sketch_box_selection_ = GuiSketchScreenRect{\n          {event->position().x(), event->position().y()},\n          {event->position().x(), event->position().y()}};\n      static_cast<SketchInteractionOverlay*>(sketch_overlay_)->set_box(sketch_box_selection_);\n    }\n  }\n''',
+          '''  if (event->button() == Qt::LeftButton && sketch_interaction_) {\n    const GuiSketchScreenPoint current{event->position().x(), event->position().y()};\n    update_sketch_pointer(current);\n    publish_sketch_pointer_phase(GuiSketchPointerPhase::Press, current);\n    if (sketch_selection_enabled_) {\n      sketch_press_position_ = last_mouse_position_;\n      auto hits = sketch_interaction_->hits_at(current);\n      if (hits && hits.value().empty()) {\n        sketch_box_active_ = true;\n        sketch_box_selection_ = GuiSketchScreenRect{current, current};\n        static_cast<SketchInteractionOverlay*>(sketch_overlay_)->set_box(sketch_box_selection_);\n      }\n    }\n  }\n''')
+          patch(path,
+          '''  if (event->button() == Qt::LeftButton && sketch_interaction_) {\n    const GuiSketchScreenPoint current{event->position().x(), event->position().y()};\n    if (sketch_selection_enabled_) {\n''',
+          '''  if (event->button() == Qt::LeftButton && sketch_interaction_) {\n    const GuiSketchScreenPoint current{event->position().x(), event->position().y()};\n    update_sketch_pointer(current);\n    publish_sketch_pointer_phase(GuiSketchPointerPhase::Release, current);\n    if (sketch_selection_enabled_) {\n''')
+          patch(path,
+          '''void OcctViewport::update_sketch_pointer(GuiSketchScreenPoint screen_point) {\n''',
+          '''void OcctViewport::rebuild_sketch_drag_handles() {\n  auto* overlay = static_cast<SketchInteractionOverlay*>(sketch_overlay_);\n  if (!sketch_interaction_ || overlay == nullptr)\n    return;\n  std::vector<GuiSketchScreenPoint> handles;\n  handles.reserve(sketch_drag_handles_.size());\n  for (const auto point : sketch_drag_handles_) {\n    auto screen = sketch_interaction_->mapping().plane_to_screen(point);\n    if (screen)\n      handles.push_back(screen.value());\n  }\n  overlay->set_handles(std::move(handles));\n}\n\nvoid OcctViewport::update_sketch_pointer(GuiSketchScreenPoint screen_point) {\n''')
+          patch(path,
+          '''  if (sketch_pointer_callback_)\n    sketch_pointer_callback_(sketch_snap_result_->raw_point, *sketch_snap_result_,\n                             hovered_sketch_hit_);\n}\n\nvoid OcctViewport::publish_sketch_selection() {\n''',
+          '''  if (sketch_pointer_callback_)\n    sketch_pointer_callback_(sketch_snap_result_->raw_point, *sketch_snap_result_,\n                             hovered_sketch_hit_);\n  if (sketch_drag_pointer_callback_)\n    sketch_drag_pointer_callback_(screen_point, sketch_snap_result_->raw_point,\n                                  *sketch_snap_result_, hovered_sketch_hit_);\n}\n\nvoid OcctViewport::publish_sketch_pointer_phase(GuiSketchPointerPhase phase,\n                                                GuiSketchScreenPoint screen_point) {\n  if (sketch_pointer_phase_callback_ && sketch_snap_result_)\n    sketch_pointer_phase_callback_(phase, screen_point, sketch_snap_result_->raw_point,\n                                   *sketch_snap_result_, hovered_sketch_hit_);\n}\n\nvoid OcctViewport::publish_sketch_selection() {\n''')
+
+          path = 'src/gui/gui_sketch_interaction_binder.cpp'
+          patch(path,
+          '''#include "blcad/gui/gui_sketch_interaction_binder.hpp"\n''',
+          '''#include "blcad/gui/gui_sketch_interaction_binder.hpp"\n#include "blcad/gui/gui_sketch_drag_binder.hpp"\n''')
+          patch(path,
+          '''  (void)new SketchInteractionBinder(window);\n}\n''',
+          '''  (void)new SketchInteractionBinder(window);\n  install_sketch_drag_binder(window);\n}\n''')
+
+          path = 'src/gui/gui_sketch_drag.cpp'
+          patch(path,
+          '''  return Result<GuiSketchDragController>::success(GuiSketchDragController(\n      std::move(source_sketch), std::move(topology.value()), std::move(system.value()),\n      std::move(baseline.value()), build_handles(*sketch, topology.value())));\n''',
+          '''  auto handles = build_handles(source_sketch, topology.value());\n  return Result<GuiSketchDragController>::success(GuiSketchDragController(\n      std::move(source_sketch), std::move(topology.value()), std::move(system.value()),\n      std::move(baseline.value()), std::move(handles)));\n''')
+          patch(path,
+          '''const SketchId& GuiSketchDragController::sketch_id() const noexcept {\n  return source_topology_.sketch();\n}\n''',
+          '''const SketchId& GuiSketchDragController::sketch_id() const noexcept {\n  return source_topology_.sketch();\n}\n\nconst Sketch& GuiSketchDragController::source_sketch() const noexcept { return source_sketch_; }\n''')
+
+          path = 'include/blcad/gui/gui_sketch_drag.hpp'
+          patch(path,
+          '''  [[nodiscard]] const SketchId& sketch_id() const noexcept;\n  [[nodiscard]] const SketchTopology& source_topology() const noexcept;\n''',
+          '''  [[nodiscard]] const SketchId& sketch_id() const noexcept;\n  [[nodiscard]] const Sketch& source_sketch() const noexcept;\n  [[nodiscard]] const SketchTopology& source_topology() const noexcept;\n''')
+
+          path = 'src/gui/gui_sketch_drag_binder.cpp'
+          patch(path,
+          '''  void restore_source_preview() {\n    if (!controller_)\n      return;\n    publish_scene(controller_->source_topology().sketch() == controller_->sketch_id()\n                      ? source_sketch()\n                      : source_sketch());\n    publish_handles(controller_->handles());\n  }\n\n  [[nodiscard]] const Sketch& source_sketch() const {\n    const PartDocument* part = window_.session().part_document();\n    const Sketch* current = part != nullptr ? part->find_sketch(controller_->sketch_id()) : nullptr;\n    return current != nullptr ? *current : controller_->latest_preview()->preview_sketch();\n  }\n''',
+          '''  void restore_source_preview() {\n    if (!controller_)\n      return;\n    publish_scene(controller_->source_sketch());\n    publish_handles(controller_->handles());\n  }\n''')
+
+          path = 'CMakeLists.txt'
+          patch(path,
+          '''    src/gui/gui_sketch_interaction.cpp\n    src/gui/gui_sketch_interaction_binder.cpp\n    src/gui/gui_sketch_workbench.cpp\n''',
+          '''    src/gui/gui_sketch_interaction.cpp\n    src/gui/gui_sketch_interaction_binder.cpp\n    src/gui/gui_sketch_drag.cpp\n    src/gui/gui_sketch_drag_binder.cpp\n    src/gui/gui_sketch_workbench.cpp\n''')
+          PY
+      - name: Commit integration patches
+        run: |
+          if git diff --quiet; then
+            exit 0
+          fi
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add CMakeLists.txt include/blcad/gui src/gui
+          git commit -m "Integrate Block 110 live Sketch dragging"
+          git push origin HEAD:block-110-sketch-live-drag
