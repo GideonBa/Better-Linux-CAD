@@ -1,6 +1,6 @@
 # Shared Planar Sketch Topology MVP-8
 
-Status: implemented in Block 108. Block 109 is the first general solver consumer.
+Status: implemented in Block 108. Block 109 is the general solver consumer and Block 110 is the first direct-manipulation consumer.
 
 This document is the canonical Core contract for shared planar point/entity topology. It replaces
 floating-point-coordinate inference as the connectivity identity model used by Interactive Sketcher
@@ -278,8 +278,11 @@ coordinates are valid and round-trip exactly.
 `serialize_sketch_topology_to_json(...)` and `deserialize_sketch_topology_from_json(...)` round-trip
 one canonical topology structurally exactly.
 
-Block 109 adds no topology-schema fields for solver variables, residuals, Jacobians, rank, DOF,
-convergence, or conflict diagnostics. Those values are derived on demand.
+Blocks 109–110 add no topology-schema fields for solver variables, residuals, Jacobians, rank, DOF,
+convergence, drag handles, pointer samples, temporary drag point/entity ids, or live previews. Those
+values are derived/transient. Block 110 strips `__gui.drag.pointer` / `__gui.drag.center` from solver
+output and rebuilds a topology containing exactly the source point/entity/dependency identities before
+preview or commit.
 
 ## Existing PartDocument JSON migration
 
@@ -312,9 +315,9 @@ Only an exactly representable candidate reaches `update_sketch(...)`. Identity, 
 relationships, or orphan point records that historical Sketch JSON would lose cause fail-closed
 rejection.
 
-Block 109 solving does not automatically call this bridge. Solve results are disposable derived
-candidates. A later command/interaction owner must explicitly choose the validated persistent commit
-boundary.
+Block 109 solving does not automatically call this bridge. Block 110 is one explicit interaction owner:
+it requires source-only solved topology to materialize and re-migrate exactly for preview, and repeats
+the equality check inside one freshness-checked document transaction on release.
 
 ## Persistence and regeneration
 
@@ -370,7 +373,6 @@ Block-109 consumer proof is documented in `docs/sketch-planar-constraint-solver-
 
 ## Next boundary
 
-Block 110 consumes Block-108 topology snapshots and Block-109 solving for semantic-handle mouse drag.
-It adds transient drag targets to disposable candidates, publishes live preview without document
-mutation, restores the pre-drag snapshot on cancellation/failure, and commits exactly one validated
-transaction on release.
+Block 111 uses the same stable point/entity topology for basic Sketch creation. Snap positions may seed
+new point coordinates, but only explicit topology/edit commands create persistent point identity or
+shared connectivity.

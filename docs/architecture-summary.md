@@ -347,7 +347,7 @@ that derived posed state.
 Flattened and structured assembly exchange derive stable product/occurrence identity; raw XDE/STEP
 entity identity is never model authority.
 
-## Qt GUI architecture through Block 109
+## Qt GUI architecture through Block 110
 
 `GuiDocumentSession` owns the current Project candidate/committed document view, recompute state,
 semantic selection bridge, and exact GUI undo/redo snapshots. Generic command/task state remains
@@ -363,10 +363,19 @@ Block 108 adds Core shared point/entity identity and editable topology. The curr
 builder still projects historical Sketch compatibility intent; a sampled interaction point is not
 silently promoted to `SketchPointId`.
 
-Block 109 adds a real Core producer for remaining DOF and solve state. The current Sketch status row
-already has DOF/Solve presentation slots, but direct publication into continuous GUI drag belongs to
-Block 110. Widgets must call the Core solver and render its derived result rather than duplicate
-constraint mathematics.
+Block 109 adds the Core producer for remaining DOF and solve state.
+
+Block 110 adds the first continuous GUI solver consumer. `GuiSketchDragController` derives stable
+semantic handles from Block-108 point/entity identity and translates drag intent to transient Block-109
+Coincident, Midpoint, Concentric, or Radial equations. The temporary pointer/center ids are removed from
+the solved topology before publication. Preview topology must losslessly materialize and re-migrate.
+
+`GuiSketchDragBinder` coalesces pointer moves to the latest pending sample and synchronously flushes the
+exact release sample. Live preview rebuilds transient interaction presentation and publishes exact DOF/
+solve state without document mutation. Successful release rechecks topology and constraint-system
+freshness and commits one `GuiDocumentSession` transaction. Cancellation, lost capture, solve refusal,
+or stale commit restores the pre-drag document/presentation state. Widgets still do not own constraint
+mathematics.
 
 ## Persistence and regeneration split
 
@@ -391,7 +400,7 @@ Sketch legacy migration equivalence groups and reports
 solver variables / residual vectors / Jacobians / rank / DOF
 SketchSolveResult and solver diagnostics
 Block-107 interaction samples / screen mapping / hit stacks / grid / snap candidates
-future Block-110 drag equations and live preview candidates
+Block-110 semantic drag handles / pointer samples / augmented drag equations / live preview candidates
 Assembly solve/motion proposals and freshness snapshots
 posed occurrence shapes
 contact / interference / sweep analysis
@@ -401,9 +410,9 @@ GUI hover / preview / rubber-band / HUD staging
 
 ## Current boundary
 
-Blocks 106–109 are implemented. Block 110 is the current next technical step.
+Blocks 106–110 are implemented. Block 111 is the current next technical step.
 
-Block 110 connects semantic Sketch handles and Block-107 pointer mapping to disposable Block-108
-topology candidates and Block-109 solving. Drag preview remains transient; release commits one
-validated document transaction, while `Esc`, lost capture, fixed geometry, or failed solve restores the
-pre-drag snapshot.
+Block 111 adds basic point/line/polyline/rectangle/parallelogram/polygon/centerline/construction
+creation over the existing workspace, plane mapping, shared topology, solver, and document transaction
+authorities. Creation commands must not turn Block-107 snap candidates or Block-110 handle positions
+into implicit persistent identity.

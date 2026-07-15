@@ -1,6 +1,6 @@
 # Interactive Sketcher Sequence MVP-8
 
-Status: in progress. Blocks 106–109 are implemented; Block 110 is the current next technical step.
+Status: in progress. Blocks 106–110 are implemented; Block 111 is the current next technical step.
 Blocks 106–121 precede Interactive Modeling MVP-9 (Blocks 122–131) and STEP Import MVP-10
 (Blocks 132–138).
 
@@ -100,8 +100,8 @@ must be declared at the numbered boundary and proven headlessly before a GUI con
 107 plane mapping, hit testing, box selection, grid, snapping, inference preview — implemented
 108 shared planar point/entity topology, mutation commands, JSON migration, undo — implemented
 109 deterministic planar constraint solver, DOF accounting, conflicts, diagnostics — implemented
-110 solver-backed mouse dragging, handles, live preview, atomic commit — next
-111 point, line, polyline, rectangle, polygon, construction-geometry creation
+110 solver-backed mouse dragging, handles, live preview, atomic commit — implemented
+111 point, line, polyline, rectangle, polygon, construction-geometry creation — next
 112 circle, arc, ellipse, slot creation/editing
 113 spline editing, continuity handles, Sketch text
 114 manual and automatic geometric constraints with glyph interaction
@@ -319,22 +319,33 @@ Canonical contract: `docs/sketch-planar-constraint-solver-mvp8.md`.
 Focused tags: `[core][sketch-solver]`, `[core][sketch-dof]`,
 `[core][sketch-conflict-diagnostics]`.
 
-## Block 110 — Solver-backed mouse dragging — Current next technical step
+## Block 110 — Solver-backed mouse dragging — Implemented
 
-Expose endpoint, midpoint, center, radius, arc, spline, and dimension handles. Pointer movement maps to
-a semantic drag target and asks Block 109 for a disposable candidate. Preview never mutates the
-document.
+`GuiSketchDragController` builds lexicographically ordered semantic Endpoint, Midpoint, Center, Radius,
+Arc, Spline-control, and current Dimension-target handles from Block-108 topology. Shared junctions are
+deduplicated by `SketchPointId`; handle screen positions are transient overlay state.
 
-Release commits one validated topology/document transaction. `Esc`, lost capture, failed solve, or an
-incompatible fixed/fully-constrained target restores the pre-drag snapshot. The final pointer position
-is never dropped by throttling.
+Point, line-midpoint, Arc-center, and Arc-radius drag targets translate to transient Block-109
+Coincident, Midpoint, Concentric, and Radial constraints. Temporary pointer/center ids and
+`zz.gui.drag.target` are stripped from solve output before preview. The source-only solved topology must
+materialize and re-migrate exactly before it can be shown or committed.
 
-Existing authority: Blocks 106–109, `docs/gui-sketch-workbench-mvp7.md`, and the Block-96 GUI
-transaction/undo contract.
+Move samples coalesce into one latest pending pointer and one zero-delay solve callback. Release calls
+`flush(...)` synchronously with the exact final snapped pointer before commit. Preview updates the
+interaction scene, handles, remaining DOF, and solve status without `PartDocument` mutation.
+
+Conflicting/non-convergent/invalid-reference candidates, reference handles, or incompatible fully
+constrained geometry are refused without weakening constraints. `Esc`, lost mouse capture, and window
+deactivation restore the pre-drag scene and create no history entry.
+
+Successful release revalidates source topology and constraint-system freshness, then commits one
+`Drag sketch handle` document transaction through the existing session recompute/undo authority.
+
+Canonical contract: `docs/gui-sketch-solver-drag-mvp8.md`.
 
 Focused tags: `[gui][sketch-drag]`, `[integration][sketch-live-solve]`.
 
-## Block 111 — Basic creation tools
+## Block 111 — Basic creation tools — Current next technical step
 
 Implement point, two-point line, continuous polyline, center/corner rectangle, three-point rectangle,
 parallelogram, regular polygon, centerline, and construction geometry. Multi-click commands reuse
