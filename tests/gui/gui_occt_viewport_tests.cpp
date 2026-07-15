@@ -40,6 +40,7 @@ TEST_CASE("OCCT viewport owns transient display and navigation state",
     CHECK(viewport.native_viewer_available());
   CHECK(viewport.display_mode() == GuiViewportDisplayMode::ShadedWithEdges);
   CHECK(viewport.projection() == GuiViewportProjection::Perspective);
+  CHECK_FALSE(viewport.sketch_focus_active());
 
   std::vector<ViewportSceneItem> scene;
   scene.push_back({ViewportSceneKind::SolidBody, "body/main", box_shape()});
@@ -66,6 +67,16 @@ TEST_CASE("OCCT viewport owns transient display and navigation state",
       GuiViewportCameraBookmark{{1.0, 1.0, 1.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 1.0}, 0.0}));
   CHECK_FALSE(viewport.set_plane_camera({0.0, 0.0, 0.0}, {0.0, 0.0, 1.0},
                                         {0.0, 0.0, 1.0}));
+
+  viewport.set_sketch_focus("sketch.path");
+  CHECK(viewport.sketch_focus_active());
+  CHECK(viewport.sketch_focus_id() == "sketch.path");
+  CHECK(viewport.sketch_surroundings_mode() == GuiSketchSurroundingsMode::Dim);
+  viewport.set_sketch_focus("sketch.path", GuiSketchSurroundingsMode::Isolate);
+  CHECK(viewport.sketch_surroundings_mode() == GuiSketchSurroundingsMode::Isolate);
+  viewport.clear_sketch_focus();
+  CHECK_FALSE(viewport.sketch_focus_active());
+  CHECK(viewport.sketch_focus_id().empty());
   viewport.fit_all();
 }
 
