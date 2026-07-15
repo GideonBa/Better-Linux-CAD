@@ -556,6 +556,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_part_foundation_workbench_tests.cpp
       tests/gui/gui_part_operations_workbench_tests.cpp
       tests/gui/gui_sketch_interaction_tests.cpp
+      tests/gui/gui_sketch_drag_tests.cpp
       tests/gui/gui_sketch_workbench_tests.cpp
       tests/gui/gui_spatial_surface_workbench_tests.cpp
       tests/gui/gui_feature_coverage_acceptance_tests.cpp
