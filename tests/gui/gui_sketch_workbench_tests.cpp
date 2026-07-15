@@ -178,3 +178,124 @@ TEST_CASE("Block 99 main window enters orthographic normal-to-plane sketch editi
   CHECK(viewport->plane_camera()->view_direction == Vector3{0.0, 0.0, 1.0});
   CHECK(viewport->projection() == GuiViewportProjection::Orthographic);
 }
+
+TEST_CASE("Block 106 Sketch workspace preserves context and publishes the frozen surface",
+          "[gui][sketch-workspace]") {
+  GuiDocumentSession session;
+  GuiSketchWorkbench workbench;
+  GuiSketchWorkspace workspace;
+  REQUIRE(session.create_part(DocumentId("part.workspace"), "Workspace"));
+  REQUIRE(workbench.create_xy_datum(session, DatumPlaneId("datum.xy"), "XY"));
+  REQUIRE(workbench.create_sketch(session,
+      Sketch::create(SketchId("sketch.workspace"), "Workspace", DatumPlaneId("datum.xy")).value()));
+  REQUIRE(session.set_workspace(GuiWorkspace::Inspect));
+  REQUIRE(session.selection().add({GuiSelectionKind::Datum, "datum.xy"}));
+
+  const auto plane = workspace.enter(session, workbench, SketchId("sketch.workspace"));
+  REQUIRE(plane);
+  CHECK(session.workspace() == GuiWorkspace::Sketch);
+  CHECK(session.selection().empty());
+  CHECK(workspace.active());
+  CHECK(workspace.active_sketch()->value() == "sketch.workspace");
+  CHECK(workspace.stage() == GuiSketchInteractionStage::Idle);
+  CHECK(GuiSketchWorkspace::selection_filter_mask() ==
+        (selection_kind_bit(GuiSelectionKind::SketchEntity) |
+         selection_kind_bit(GuiSelectionKind::Edge) |
+         selection_kind_bit(GuiSelectionKind::Vertex)));
+  CHECK(GuiSketchWorkspace::command_groups().size() == 5);
+  CHECK(GuiSketchWorkspace::command_groups().front() == "Create");
+  CHECK(GuiSketchWorkspace::browser_sections().size() == 4);
+  CHECK(GuiSketchWorkspace::browser_sections().back() == "Diagnostics");
+  CHECK_FALSE(workspace.status().remaining_dof.has_value());
+  CHECK(workspace.status().solve_status == "Not evaluated");
+
+  workspace.set_cursor_coordinates(Point2{12.0, -3.0});
+  workspace.set_snap_inference("Horizontal");
+  workspace.set_solve_feedback(3U, "Under constrained");
+  REQUIRE(workspace.status().cursor_coordinates.has_value());
+  CHECK(workspace.status().cursor_coordinates.value() == Point2{12.0, -3.0});
+  CHECK(workspace.status().snap_inference == "Horizontal");
+  CHECK(workspace.status().remaining_dof == 3U);
+  CHECK(workspace.status().solve_status == "Under constrained");
+
+  const auto restored = workspace.finish(session, workbench);
+  REQUIRE(restored);
+  CHECK(restored.value() == GuiWorkspace::Inspect);
+  CHECK(session.workspace() == GuiWorkspace::Inspect);
+  CHECK(session.selection().contains(GuiSelectionKind::Datum, "datum.xy"));
+  CHECK_FALSE(workspace.active());
+}
+
+TEST_CASE("Block 106 Sketch command lifecycle backtracks one stage with Esc and supports repeat",
+          "[gui][sketch-workspace][gui][sketch-command-lifecycle]") {
+  GuiDocumentSession session;
+  GuiSketchWorkbench workbench;
+  GuiSketchWorkspace workspace;
+  REQUIRE(session.create_part(DocumentId("part.command"), "Command"));
+  REQUIRE(workbench.create_xy_datum(session, DatumPlaneId("datum.xy"), "XY"));
+  REQUIRE(workbench.create_sketch(session,
+      Sketch::create(SketchId("sketch.command"), "Command", DatumPlaneId("datum.xy")).value()));
+  REQUIRE(workspace.enter(session, workbench, SketchId("sketch.command")));
+
+  REQUIRE(workspace.set_hover(true));
+  CHECK(workspace.stage() == GuiSketchInteractionStage::Hover);
+  REQUIRE(workspace.begin_command(session, "sketch.line", "Pick line start"));
+  CHECK(workspace.stage() == GuiSketchInteractionStage::CollectingPicks);
+  CHECK(session.task().stage() == GuiTaskStage::CollectingSelection);
+  REQUIRE(workspace.begin_numeric_input(session));
+  CHECK(workspace.stage() == GuiSketchInteractionStage::NumericInput);
+  CHECK(workspace.status().focus == GuiSketchFocusTarget::NumericHud);
+  REQUIRE(workspace.set_numeric_input("25 mm"));
+  REQUIRE(workspace.show_preview(session));
+  CHECK(workspace.stage() == GuiSketchInteractionStage::Preview);
+  CHECK(session.task().stage() == GuiTaskStage::Preview);
+
+  REQUIRE(workspace.escape(session));
+  CHECK(workspace.stage() == GuiSketchInteractionStage::NumericInput);
+  CHECK(session.task().stage() == GuiTaskStage::EditingParameters);
+  REQUIRE(workspace.escape(session));
+  CHECK(workspace.stage() == GuiSketchInteractionStage::CollectingPicks);
+  CHECK(session.task().stage() == GuiTaskStage::CollectingSelection);
+  REQUIRE(workspace.escape(session));
+  CHECK(workspace.stage() == GuiSketchInteractionStage::Idle);
+  CHECK_FALSE(session.task().active());
+
+  REQUIRE(workspace.begin_command(session, "sketch.line", "Pick line start"));
+  REQUIRE(workspace.begin_numeric_input(session));
+  REQUIRE(workspace.set_numeric_input("10 mm"));
+  REQUIRE(workspace.show_preview(session));
+  REQUIRE(workspace.commit_command(session));
+  CHECK(workspace.last_repeatable_command() == "sketch.line");
+  REQUIRE(workspace.repeat_last_command(session));
+  CHECK(workspace.active_command() == "sketch.line");
+  CHECK(workspace.stage() == GuiSketchInteractionStage::CollectingPicks);
+  REQUIRE(workspace.escape(session));
+  CHECK_FALSE(session.task().active());
+}
+
+TEST_CASE("Block 106 drag candidates remain transient until commit or cancel",
+          "[gui][sketch-workspace][gui][sketch-command-lifecycle]") {
+  GuiDocumentSession session;
+  GuiSketchWorkbench workbench;
+  GuiSketchWorkspace workspace;
+  REQUIRE(session.create_part(DocumentId("part.drag"), "Drag"));
+  REQUIRE(workbench.create_xy_datum(session, DatumPlaneId("datum.xy"), "XY"));
+  REQUIRE(workbench.create_sketch(session,
+      Sketch::create(SketchId("sketch.drag"), "Drag", DatumPlaneId("datum.xy")).value()));
+  REQUIRE(workspace.enter(session, workbench, SketchId("sketch.drag")));
+
+  REQUIRE(workspace.select_handle(session, "line.1:end"));
+  CHECK(workspace.stage() == GuiSketchInteractionStage::SelectedHandle);
+  REQUIRE(workspace.show_drag_candidate(session));
+  CHECK(workspace.stage() == GuiSketchInteractionStage::DragCandidate);
+  CHECK(session.task().stage() == GuiTaskStage::Preview);
+  REQUIRE(workspace.escape(session));
+  CHECK(workspace.stage() == GuiSketchInteractionStage::Idle);
+  CHECK_FALSE(session.task().active());
+
+  REQUIRE(workspace.select_handle(session, "line.1:end"));
+  REQUIRE(workspace.show_drag_candidate(session));
+  REQUIRE(workspace.commit_drag(session));
+  CHECK(workspace.stage() == GuiSketchInteractionStage::Idle);
+  CHECK_FALSE(session.task().active());
+}
