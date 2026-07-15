@@ -1,0 +1,41 @@
+name: Block 106 PR verification
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build pkg-config git \
+            libocct-foundation-dev libocct-modeling-data-dev libocct-modeling-algorithms-dev \
+            libocct-data-exchange-dev libocct-visualization-dev libocct-ocaf-dev libocct-draw-dev \
+            qt6-base-dev libeigen3-dev libtbb-dev nlohmann-json3-dev libfmt-dev libspdlog-dev catch2
+
+      - name: Core workflow
+        run: cmake --workflow --preset dev-build-test
+
+      - name: Geometry workflow
+        run: cmake --workflow --preset dev-geometry-build-test
+
+      - name: Configure GUI
+        run: cmake --preset dev-gui
+
+      - name: Build GUI
+        run: cmake --build --preset dev-gui
+
+      - name: Test GUI
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: ctest --test-dir build/dev-gui --output-on-failure
