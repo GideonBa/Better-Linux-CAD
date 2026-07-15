@@ -8,7 +8,7 @@ namespace blcad::gui {
 
 enum class GuiDocumentKind { None, Part, Project };
 
-enum class GuiWorkspace { Part, Assembly, Inspect, Exchange };
+enum class GuiWorkspace { Part, Sketch, Assembly, Inspect, Exchange };
 
 enum class GuiTaskStage { Inactive, CollectingSelection, EditingParameters, Preview };
 
