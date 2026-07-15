@@ -240,6 +240,17 @@ void MainWindow::create_shell() {
     synchronize_tree_selection(selection ? selection->semantic_id : std::string_view{});
     refresh_command_state();
   });
+  viewport_->set_context_menu_callback([this](QPoint global_position) {
+    if (!sketch_workspace_.active())
+      return;
+    QMenu menu(this);
+    QAction* repeat = menu.addAction(QStringLiteral("Repeat last Sketch command"));
+    repeat->setEnabled(!sketch_workspace_.last_repeatable_command().empty() &&
+                       sketch_idle_stage(sketch_workspace_.stage()) && !session_.task().active());
+    QAction* selected = menu.exec(global_position);
+    if (selected == repeat)
+      repeat_last_sketch_command();
+  });
   setCentralWidget(viewport_);
 
   statusBar()->setObjectName(QStringLiteral("blcad.status_bar"));
@@ -771,6 +782,7 @@ void MainWindow::edit_selected_sketch() {
   viewport_->set_projection(GuiViewportProjection::Orthographic);
   perspective_action_->setChecked(false);
   viewport_->set_selection_filter_mask(GuiSketchWorkspace::selection_filter_mask());
+  viewport_->set_sketch_focus(active_sketch_->value(), GuiSketchSurroundingsMode::Dim);
   viewport_->setCursor(Qt::CrossCursor);
   synchronize_workspace_tab();
   refresh_command_state();
@@ -782,6 +794,7 @@ void MainWindow::finish_sketch() {
     show_error(result.error());
     return;
   }
+  viewport_->clear_sketch_focus();
   if (sketch_camera_bookmark_ && !viewport_->restore_camera_bookmark(*sketch_camera_bookmark_))
     show_error(Error::geometry("gui.sketch_workspace", "could not restore the pre-Sketch camera"));
   viewport_->set_selection_filter_mask(sketch_selection_filter_mask_);
@@ -955,8 +968,6 @@ void MainWindow::refresh_sketch_workspace_ui() {
       QStringLiteral("Solve: %1").arg(QString::fromStdString(status.solve_status)));
   if (sketch_workspace_.stage() == GuiSketchInteractionStage::NumericInput) {
     sketch_numeric_hud_->setFocus(Qt::OtherFocusReason);
-    sketch_workspace_.focus_canvas();
-    sketch_workspace_.focus_task_panel();
     (void)sketch_workspace_.set_numeric_input(sketch_numeric_hud_->text().toStdString());
   }
 }
