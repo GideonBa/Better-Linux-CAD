@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - block-109-planar-constraint-solver
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
