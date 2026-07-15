@@ -431,13 +431,13 @@ void MainWindow::create_command_bar() {
     label->setObjectName(QStringLiteral("blcad.sketch.command_group"));
     groups_layout->addWidget(label);
   }
-  command_bar->addWidget(sketch_command_groups_);
+  sketch_command_groups_action_ = command_bar->addWidget(sketch_command_groups_);
 
   sketch_numeric_hud_ = new QLineEdit(command_bar);
   sketch_numeric_hud_->setObjectName(QStringLiteral("blcad.sketch.numeric_hud"));
   sketch_numeric_hud_->setPlaceholderText(QStringLiteral("id, x1, y1, x2, y2 (mm)"));
   sketch_numeric_hud_->setMaximumWidth(280);
-  command_bar->addWidget(sketch_numeric_hud_);
+  sketch_numeric_hud_action_ = command_bar->addWidget(sketch_numeric_hud_);
   connect(sketch_numeric_hud_, &QLineEdit::textChanged, this, [this](const QString& text) {
     if (sketch_workspace_.stage() == GuiSketchInteractionStage::NumericInput)
       (void)sketch_workspace_.set_numeric_input(text.toStdString());
@@ -938,11 +938,16 @@ void MainWindow::repair_selected_sketch() {
 
 void MainWindow::refresh_sketch_workspace_ui() {
   const bool active = sketch_workspace_.active();
+  if (sketch_command_groups_action_)
+    sketch_command_groups_action_->setVisible(active);
   if (sketch_command_groups_)
     sketch_command_groups_->setVisible(active);
+  const bool numeric_hud_visible =
+      active && sketch_workspace_.stage() == GuiSketchInteractionStage::NumericInput;
+  if (sketch_numeric_hud_action_)
+    sketch_numeric_hud_action_->setVisible(numeric_hud_visible);
   if (sketch_numeric_hud_)
-    sketch_numeric_hud_->setVisible(active &&
-                                     sketch_workspace_.stage() == GuiSketchInteractionStage::NumericInput);
+    sketch_numeric_hud_->setVisible(numeric_hud_visible);
   for (QLabel* label : {sketch_cursor_status_, sketch_snap_status_, sketch_dof_status_, sketch_solve_status_})
     if (label)
       label->setVisible(active);

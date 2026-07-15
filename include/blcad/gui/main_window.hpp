@@ -99,7 +99,9 @@ private:
   std::uint32_t sketch_selection_filter_mask_{0xFFFFFFFFU};
   QTabBar* workspace_tabs_{nullptr};
   QWidget* sketch_command_groups_{nullptr};
+  QAction* sketch_command_groups_action_{nullptr};
   QLineEdit* sketch_numeric_hud_{nullptr};
+  QAction* sketch_numeric_hud_action_{nullptr};
   QLabel* sketch_cursor_status_{nullptr};
   QLabel* sketch_snap_status_{nullptr};
   QLabel* sketch_dof_status_{nullptr};
