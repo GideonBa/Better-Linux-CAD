@@ -54,6 +54,16 @@ TEST_CASE("OCCT viewport owns transient display and navigation state",
   REQUIRE(viewport.set_plane_camera({0.0, 0.0, 5.0}, {0.0, 0.0, 1.0}, {0.0, 1.0, 0.0}));
   REQUIRE(viewport.plane_camera().has_value());
   CHECK(viewport.plane_camera()->target == Point3{0.0, 0.0, 5.0});
+  const auto bookmark = viewport.camera_bookmark();
+  viewport.set_projection(GuiViewportProjection::Perspective);
+  viewport.set_standard_view(GuiStandardView::Isometric);
+  CHECK_FALSE(viewport.plane_camera().has_value());
+  REQUIRE(viewport.restore_camera_bookmark(bookmark));
+  CHECK(viewport.projection() == GuiViewportProjection::Orthographic);
+  REQUIRE(viewport.plane_camera().has_value());
+  CHECK(viewport.plane_camera()->target == Point3{0.0, 0.0, 5.0});
+  CHECK_FALSE(viewport.restore_camera_bookmark(
+      GuiViewportCameraBookmark{{1.0, 1.0, 1.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 1.0}, 0.0}));
   CHECK_FALSE(viewport.set_plane_camera({0.0, 0.0, 0.0}, {0.0, 0.0, 1.0},
                                         {0.0, 0.0, 1.0}));
   viewport.fit_all();
