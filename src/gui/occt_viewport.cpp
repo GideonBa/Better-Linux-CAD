@@ -47,6 +47,11 @@ public:
     update();
   }
 
+  void set_handles(std::vector<GuiSketchScreenPoint> handles) {
+    handles_ = std::move(handles);
+    update();
+  }
+
   void set_hover(std::vector<GuiSketchScreenPoint> polyline,
                  std::optional<GuiSketchScreenPoint> point) {
     hover_polyline_ = std::move(polyline);
@@ -73,6 +78,7 @@ public:
   }
 
   [[nodiscard]] std::size_t grid_line_count() const noexcept { return grid_.size(); }
+  [[nodiscard]] std::size_t handle_count() const noexcept { return handles_.size(); }
 
 protected:
   void paintEvent(QPaintEvent* event) override {
@@ -85,6 +91,12 @@ protected:
       pen.setWidthF(line.major ? 1.0 : 0.6);
       painter.setPen(pen);
       painter.drawLine(QPointF(line.start.x, line.start.y), QPointF(line.end.x, line.end.y));
+    }
+
+    for (const auto& handle : handles_) {
+      painter.setPen(QPen(QColor(84, 190, 255), 1.8));
+      painter.setBrush(QColor(48, 52, 59));
+      painter.drawEllipse(QPointF(handle.x, handle.y), 4.2, 4.2);
     }
 
     if (hover_polyline_.size() >= 2U) {
@@ -124,6 +136,7 @@ protected:
 
 private:
   std::vector<GuiSketchScreenSegment> grid_;
+  std::vector<GuiSketchScreenPoint> handles_;
   std::vector<GuiSketchScreenPoint> hover_polyline_;
   std::optional<GuiSketchScreenPoint> hover_point_;
   std::optional<GuiSketchScreenPoint> snap_point_;
@@ -493,6 +506,7 @@ OcctViewport::set_sketch_interaction(GuiSketchPlaneView plane,
   sketch_overlay_->show();
   sketch_overlay_->raise();
   rebuild_sketch_grid();
+  rebuild_sketch_drag_handles();
   return Result<std::size_t>::success(primitive_count);
 }
 
@@ -504,8 +518,10 @@ void OcctViewport::clear_sketch_interaction() {
   hovered_sketch_hit_.reset();
   sketch_box_selection_.reset();
   sketch_box_active_ = false;
+  sketch_drag_handles_.clear();
   if (auto* overlay = static_cast<SketchInteractionOverlay*>(sketch_overlay_)) {
     overlay->set_grid({});
+    overlay->set_handles({});
     overlay->clear_transient();
     overlay->hide();
   }
@@ -536,8 +552,21 @@ void OcctViewport::set_sketch_grid_config(GuiSketchGridConfig config) {
                          static_cast<double>(last_mouse_position_.y())});
 }
 
+void OcctViewport::set_sketch_drag_handles(std::vector<Point2> handles) {
+  sketch_drag_handles_ = std::move(handles);
+  rebuild_sketch_drag_handles();
+}
+
 void OcctViewport::set_sketch_pointer_callback(SketchPointerCallback callback) {
   sketch_pointer_callback_ = std::move(callback);
+}
+
+void OcctViewport::set_sketch_drag_pointer_callback(SketchDragPointerCallback callback) {
+  sketch_drag_pointer_callback_ = std::move(callback);
+}
+
+void OcctViewport::set_sketch_pointer_phase_callback(SketchPointerPhaseCallback callback) {
+  sketch_pointer_phase_callback_ = std::move(callback);
 }
 
 void OcctViewport::set_sketch_selection_callback(SketchSelectionCallback callback) {
@@ -684,6 +713,11 @@ std::size_t OcctViewport::sketch_grid_line_count() const noexcept {
   return overlay == nullptr ? 0U : overlay->grid_line_count();
 }
 
+std::size_t OcctViewport::sketch_drag_handle_count() const noexcept {
+  const auto* overlay = static_cast<const SketchInteractionOverlay*>(sketch_overlay_);
+  return overlay == nullptr ? 0U : overlay->handle_count();
+}
+
 bool OcctViewport::native_viewer_available() const noexcept {
   return !impl_->view.IsNull();
 }
@@ -730,6 +764,7 @@ void OcctViewport::resizeEvent(QResizeEvent* event) {
   } else {
     rebuild_sketch_grid();
   }
+  rebuild_sketch_drag_handles();
 }
 
 void OcctViewport::mousePressEvent(QMouseEvent* event) {
@@ -743,16 +778,18 @@ void OcctViewport::mousePressEvent(QMouseEvent* event) {
       impl_->view->StartRotation(last_mouse_position_.x(), last_mouse_position_.y());
     }
   }
-  if (event->button() == Qt::LeftButton && sketch_interaction_ && sketch_selection_enabled_) {
-    sketch_press_position_ = last_mouse_position_;
-    auto hits = sketch_interaction_->hits_at(
-        {event->position().x(), event->position().y()});
-    if (hits && hits.value().empty()) {
-      sketch_box_active_ = true;
-      sketch_box_selection_ = GuiSketchScreenRect{
-          {event->position().x(), event->position().y()},
-          {event->position().x(), event->position().y()}};
-      static_cast<SketchInteractionOverlay*>(sketch_overlay_)->set_box(sketch_box_selection_);
+  if (event->button() == Qt::LeftButton && sketch_interaction_) {
+    const GuiSketchScreenPoint current{event->position().x(), event->position().y()};
+    update_sketch_pointer(current);
+    publish_sketch_pointer_phase(GuiSketchPointerPhase::Press, current);
+    if (sketch_selection_enabled_) {
+      sketch_press_position_ = last_mouse_position_;
+      auto hits = sketch_interaction_->hits_at(current);
+      if (hits && hits.value().empty()) {
+        sketch_box_active_ = true;
+        sketch_box_selection_ = GuiSketchScreenRect{current, current};
+        static_cast<SketchInteractionOverlay*>(sketch_overlay_)->set_box(sketch_box_selection_);
+      }
     }
   }
   QWidget::mousePressEvent(event);
@@ -792,6 +829,8 @@ void OcctViewport::mouseReleaseEvent(QMouseEvent* event) {
   }
   if (event->button() == Qt::LeftButton && sketch_interaction_) {
     const GuiSketchScreenPoint current{event->position().x(), event->position().y()};
+    update_sketch_pointer(current);
+    publish_sketch_pointer_phase(GuiSketchPointerPhase::Release, current);
     if (sketch_selection_enabled_) {
       if (sketch_box_active_ &&
           (event->position().toPoint() - sketch_press_position_).manhattanLength() > 3) {
@@ -970,6 +1009,20 @@ void OcctViewport::rebuild_sketch_grid() {
     overlay->set_grid({});
 }
 
+void OcctViewport::rebuild_sketch_drag_handles() {
+  auto* overlay = static_cast<SketchInteractionOverlay*>(sketch_overlay_);
+  if (!sketch_interaction_ || overlay == nullptr)
+    return;
+  std::vector<GuiSketchScreenPoint> handles;
+  handles.reserve(sketch_drag_handles_.size());
+  for (const auto point : sketch_drag_handles_) {
+    auto screen = sketch_interaction_->mapping().plane_to_screen(point);
+    if (screen)
+      handles.push_back(screen.value());
+  }
+  overlay->set_handles(std::move(handles));
+}
+
 void OcctViewport::update_sketch_pointer(GuiSketchScreenPoint screen_point) {
   if (!sketch_interaction_)
     return;
@@ -1012,6 +1065,16 @@ void OcctViewport::update_sketch_pointer(GuiSketchScreenPoint screen_point) {
   if (sketch_pointer_callback_)
     sketch_pointer_callback_(sketch_snap_result_->raw_point, *sketch_snap_result_,
                              hovered_sketch_hit_);
+  if (sketch_drag_pointer_callback_)
+    sketch_drag_pointer_callback_(screen_point, sketch_snap_result_->raw_point,
+                                  *sketch_snap_result_, hovered_sketch_hit_);
+}
+
+void OcctViewport::publish_sketch_pointer_phase(GuiSketchPointerPhase phase,
+                                                GuiSketchScreenPoint screen_point) {
+  if (sketch_pointer_phase_callback_ && sketch_snap_result_)
+    sketch_pointer_phase_callback_(phase, screen_point, sketch_snap_result_->raw_point,
+                                   *sketch_snap_result_, hovered_sketch_hit_);
 }
 
 void OcctViewport::publish_sketch_selection() {

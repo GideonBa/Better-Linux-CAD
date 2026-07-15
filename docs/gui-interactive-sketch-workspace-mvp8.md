@@ -1,8 +1,8 @@
 # Interactive Sketch Workspace MVP-8
 
-Status: implemented in Block 106. Block 107 supplies plane-interaction producers, Block 108 supplies
-persistent shared point/entity topology, and Block 109 supplies the deterministic headless solver/DOF
-authority consumed by later GUI interaction.
+Status: implemented in Block 106. Blocks 107–109 supply plane interaction, shared topology, and the
+headless solver/DOF authority. Block 110 now implements the `SelectedHandle -> DragCandidate` live-solve
+consumer and one-transaction release commit.
 
 This document is the canonical GUI contract for the contextual planar Sketch workspace introduced by
 Block 106. It extends the Block-95/96 command/transaction rules and Block-99 Sketch workbench. It does
@@ -118,7 +118,7 @@ Preview / DragCandidate          -> Preview
 There is no second GUI transaction or undo authority. Block-108 `SketchTopologyUndoStack` is a headless
 Core snapshot utility. Document-level GUI commits still use session transaction/history authority.
 
-Block 110 fills the `SelectedHandle -> DragCandidate` path with Block-109 solving.
+Block 110 fills `SelectedHandle -> DragCandidate` with semantic handle selection, live Block-109 solving, and exact rollback/commit behavior.
 
 ## Escape and focus rules
 
@@ -131,8 +131,9 @@ CollectingPicks -> cancel command -> Idle
 Hover           -> Idle
 ```
 
-A selected-handle/drag-candidate command cancels atomically to Idle. Block 110 owns exact pre-drag
-snapshot restoration and solver-preview cleanup.
+A selected-handle/drag-candidate command cancels atomically to Idle. Block 110 restores the pre-drag
+interaction scene, clears its pending/processed pointer and solver preview, and leaves the persistent
+document/history unchanged. Lost mouse capture and window deactivation use the same rollback policy.
 
 Numeric input owns keyboard focus in `NumericInput`; `Enter` accepts the current field for candidate
 validation. Canvas owns ordinary selection/placement focus. `MainWindow` routes unconsumed `Esc` to the
@@ -209,9 +210,10 @@ Block 109 -> headless solve state, exact local remaining DOF, solver diagnostics
 Block 110 -> live drag solve invocation and status publication into GUI
 ```
 
-Block 109 means DOF/Solve now have a real Core producer. The existing GUI does not yet continuously
-invoke that producer, so it may still display `DOF: —` / `Solve: Not evaluated` outside a later
-solver-aware command. Block 110 owns the first live publication during drag.
+Block 109 provides the Core producer and Block 110 is the first continuous GUI consumer. Entering an
+editable Sketch builds a baseline solve request; baseline and live drag publication update the existing
+remaining-DOF and solve-status labels. The UI renders `SketchSolveResult` and never estimates DOF from
+endpoint or glyph counts.
 
 The UI must render `SketchSolveResult` status/remaining DOF; it must not infer them from endpoint counts,
 constraint glyph counts, or topology migration.
@@ -243,8 +245,9 @@ Block-108 topology commands provide exact Core before/after snapshots. The histo
 compatibility bridge requires lossless re-migration before atomic `PartDocument::update_sketch(...)`.
 Block 109 returns a disposable solved topology; it does not choose a document commit boundary.
 
-Block 110 must solve disposable candidates and commit exactly one validated document transaction on
-successful release.
+Block 110 solves disposable candidates, strips transient drag identities, requires lossless preview
+materialization/re-migration, flushes the exact release pointer, and commits exactly one validated
+`Drag sketch handle` document transaction on successful release.
 
 ## Failure policy
 
@@ -296,7 +299,6 @@ Block 109:
 
 ## Next boundary
 
-Block 110 uses Block-107 pointer mapping, Block-108 semantic topology handles, and Block-109 solving for
-live direct manipulation. It freezes handle identity, transient drag target semantics, throttled live
-preview without dropping the final pointer position, fixed-geometry refusal, cancellation/lost-capture
-rollback, and one atomic document commit on release.
+Block 111 adds basic point, line, continuous polyline, rectangle families, parallelogram, regular
+polygon, centerline, and construction-geometry creation. It reuses Block-107 snap/inference, Block-108
+topology commands, Block-109 solving, and the existing command/task lifecycle.

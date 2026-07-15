@@ -115,7 +115,7 @@ QT_QPA_PLATFORM=offscreen ctest --test-dir build/dev-gui -R '^gui\.' --output-on
 
 ## Interactive Sketcher focused proof
 
-Blocks 106–109 are implemented.
+Blocks 106–110 are implemented.
 
 Block 106 workspace and command lifecycle:
 
@@ -162,11 +162,23 @@ The Block-109 proof covers:
 - deterministic non-convergence classification;
 - adaptation of current persisted geometric constraints and parameter-backed dimensions.
 
-The current implementation handoff is Block 110. Its focused tags are:
+Block 110 solver-backed semantic-handle drag and live solve:
+
+```bash
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][sketch-drag]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][sketch-live-solve]"
+```
+
+The proof covers stable handle order and shared-junction deduplication, latest-pointer coalescing, exact
+release flush, source-document immutability during preview, cancel/refusal rollback, Arc center/radius
+solver targets, one `Drag sketch handle` session history entry, exact undo/redo, and an offscreen Qt
+Press/Move/Release path through the installed binder.
+
+The current implementation handoff is Block 111. Its focused tags are:
 
 ```text
-[gui][sketch-drag]
-[integration][sketch-live-solve]
+[gui][sketch-create-basic]
+[integration][sketch-basic-profile]
 ```
 
 ## Existing GUI validation tags
@@ -318,6 +330,81 @@ Block-109 public Core boundary:
 include/blcad/core/sketch_constraint_solver.hpp
 ```
 
+Block-110 public GUI boundaries:
+
+```text
+include/blcad/gui/gui_sketch_drag.hpp
+include/blcad/gui/gui_sketch_drag_binder.hpp
+```
+
+Registered Block-110 implementation/proof:
+
+```text
+src/gui/gui_sketch_drag.cpp
+src/gui/gui_sketch_drag_binder.cpp
+tests/gui/gui_sketch_drag_tests.cpp
+```
+
+Block-110 public GUI boundaries:
+
+```text
+include/blcad/gui/gui_sketch_drag.hpp
+include/blcad/gui/gui_sketch_drag_binder.hpp
+```
+
+Registered Block-110 implementation/proof:
+
+```text
+src/gui/gui_sketch_drag.cpp
+src/gui/gui_sketch_drag_binder.cpp
+tests/gui/gui_sketch_drag_tests.cpp
+```
+
+Block-110 public GUI boundaries:
+
+```text
+include/blcad/gui/gui_sketch_drag.hpp
+include/blcad/gui/gui_sketch_drag_binder.hpp
+```
+
+Registered Block-110 implementation/proof:
+
+```text
+src/gui/gui_sketch_drag.cpp
+src/gui/gui_sketch_drag_binder.cpp
+tests/gui/gui_sketch_drag_tests.cpp
+```
+
+Block-110 public GUI boundaries:
+
+```text
+include/blcad/gui/gui_sketch_drag.hpp
+include/blcad/gui/gui_sketch_drag_binder.hpp
+```
+
+Registered Block-110 implementation/proof:
+
+```text
+src/gui/gui_sketch_drag.cpp
+src/gui/gui_sketch_drag_binder.cpp
+tests/gui/gui_sketch_drag_tests.cpp
+```
+
+Block-110 public GUI boundaries:
+
+```text
+include/blcad/gui/gui_sketch_drag.hpp
+include/blcad/gui/gui_sketch_drag_binder.hpp
+```
+
+Registered Block-110 implementation/proof:
+
+```text
+src/gui/gui_sketch_drag.cpp
+src/gui/gui_sketch_drag_binder.cpp
+tests/gui/gui_sketch_drag_tests.cpp
+```
+
 `SketchTopology`/`SketchPointId` are persistent Core topology identity. `SketchConstraintSystem` is a
 canonical solve request. `SketchSolveResult`, variable order, residual summary, Jacobian rank, remaining
 DOF, and solver diagnostics are derived.
@@ -341,8 +428,13 @@ clang-format -i \
   include/blcad/core/sketch_constraint_solver.hpp \
   src/core/sketch_constraint_solver.cpp \
   src/core/sketch_solver_legacy_adapter.cpp \
+  include/blcad/gui/gui_sketch_drag.hpp \
+  include/blcad/gui/gui_sketch_drag_binder.hpp \
+  src/gui/gui_sketch_drag.cpp \
+  src/gui/gui_sketch_drag_binder.cpp \
   tests/core/sketch_tests.cpp \
-  tests/core/sketch_constraint_solver_tests.cpp
+  tests/core/sketch_constraint_solver_tests.cpp \
+  tests/gui/gui_sketch_drag_tests.cpp
 ```
 
 When adding a block, register new translation units/tests in `CMakeLists.txt` and document exact scope
@@ -363,11 +455,16 @@ rm -rf build/
 - `docs/interactive-sketcher-sequence-mvp8.md`: Blocks 106–121 phase authority
 - `docs/sketch-shared-topology-mvp8.md`: Block-108 topology/migration/edit/persistence contract
 - `docs/sketch-planar-constraint-solver-mvp8.md`: Block-109 solver/DOF/diagnostics contract
+- `docs/gui-sketch-solver-drag-mvp8.md`: Block-110 semantic handles/live solve/atomic drag contract
+- `docs/gui-sketch-solver-drag-mvp8.md`: Block-110 semantic handles/live solve/atomic drag contract
+- `docs/gui-sketch-solver-drag-mvp8.md`: Block-110 semantic handles/live solve/atomic drag contract
+- `docs/gui-sketch-solver-drag-mvp8.md`: Block-110 semantic handles/live solve/atomic drag contract
+- `docs/gui-sketch-solver-drag-mvp8.md`: Block-110 semantic handles/live solve/atomic drag contract
 
 ## Current development boundary
 
-Blocks 106–109 are implemented. Block 110 is next.
+Blocks 106–110 are implemented. Block 111 is next.
 
-Block 110 exposes semantic Sketch handles and uses Block-107 mapping, Block-108 topology snapshots, and
-Block-109 solving for live drag preview. Release commits one validated transaction; cancellation, lost
-capture, fixed geometry, or failed solve restores the exact pre-drag snapshot.
+Block 111 adds basic point/line/polyline/rectangle/parallelogram/polygon/centerline/construction
+creation. It reuses current Sketch workspace staging, Block-107 snap/inference, Block-108 topology
+identity/edit commands, and Block-109 solver authority.

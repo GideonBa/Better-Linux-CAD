@@ -2,9 +2,9 @@
 
 Status: MVP-7 accepted and Interactive Sketcher MVP-8 in progress. Blocks 95–105 provide the optional
 Qt shell, document transactions, OCCT viewport, deterministic browser/property surfaces, and semantic
-selection synchronization. Blocks 106–109 establish the contextual Sketch workspace, transient plane
-interaction, persistent shared planar topology, and deterministic general planar solver. Block 110 is
-the current next technical step and connects mouse dragging to those authorities. Blocks 122–131 add
+selection synchronization. Blocks 106–110 establish the contextual Sketch workspace, transient plane interaction, persistent
+shared planar topology, deterministic general planar solver, and solver-backed semantic-handle mouse
+dragging. Block 111 is the current next technical step and adds basic creation tools. Blocks 122–131 add
 interactive Part/Surface/Assembly modeling; STEP Import begins with Block 132.
 
 The UI is deliberately not built like FreeCAD. The goal is a modern, consistent, reduced interface
@@ -51,12 +51,12 @@ Producer boundaries are explicit:
 Block 107  cursor / hover / hit / box selection / grid / snap / inference
 Block 108  persistent shared SketchPointId / SketchTopology identity
 Block 109  deterministic solve result / exact local remaining DOF / solver diagnostics
-Block 110  semantic handles / live drag solve invocation / status publication / release commit
+Block 110  semantic handles / live drag solve invocation / status publication / release commit — implemented — implemented — implemented — implemented — implemented
 ```
 
-Block 109 means DOF/Solve have a real headless Core producer. The current shell does not yet continuously
-invoke it, so `DOF: —` / `Solve: Not evaluated` can still appear outside a solver-aware command. Block
-110 owns the first live solve/status publication during drag. The UI must render
+Block 109 provides the headless producer and Block 110 continuously publishes baseline/live drag
+`SketchSolveResult` status and remaining DOF through the existing status row. The UI does not count
+endpoints or glyphs to estimate DOF. The UI must render
 `SketchSolveResult`; it must not count endpoints or glyphs to estimate DOF.
 
 `Enter Sketch` captures workspace, semantic selection, full transient camera state, and viewport
@@ -200,9 +200,9 @@ The UI must not fill this with sampled endpoints or OCCT subshapes.
 
 Canonical contract: `docs/sketch-planar-constraint-solver-mvp8.md`.
 
-## Block-110 direct manipulation boundary
+## Solver-backed Sketch direct manipulation through Block 110
 
-Block 110 is the first GUI consumer that composes Blocks 107–109:
+Block 110 implements the first GUI consumer that composes Blocks 107–109:
 
 ```text
 screen pointer
@@ -215,9 +215,11 @@ screen pointer
   -> release: one validated document transaction
 ```
 
-Preview never mutates PartDocument. `Esc`, lost capture, fixed/fully-constrained refusal, or failed
-solve restores the exact pre-drag snapshot and clears preview. Solver throttling/coalescing must not
-drop the final pointer position.
+Preview never mutates `PartDocument`. Semantic handles are drawn as a separate cyan overlay and hit
+tested within 9 DIP by screen distance then stable handle id, without changing Block-107 hit priority.
+`Esc`, lost capture/window deactivation, reference geometry, incompatible fully constrained geometry,
+or failed solve restores the source preview and creates no history entry. Pointer moves coalesce to the
+latest pending sample; release synchronously flushes the exact final snapped position.
 
 The block must expose endpoint, midpoint, center, radius, arc, spline, and dimension handles only where
 semantic topology/constraint authority exists. Handle screen position is presentation; handle identity
@@ -268,16 +270,16 @@ but release cannot commit a failed candidate.
 5. Add contextual Sketch workspace and device-independent canvas interaction. Implemented in 106–107.
 6. Replace equal-coordinate connectivity with stable shared planar Core topology. Implemented in 108.
 7. Add deterministic general planar solving and exact local DOF over that topology. Implemented in 109.
-8. Add solver-backed drag, creation, constraints, dimensions, modify/project tools, regions, and
-   Interactive Sketch3D through Block 121. Block 110 next.
+8. Add solver-backed semantic-handle drag and atomic release commit. Implemented in 110.
+9. Add creation, constraints, dimensions, modify/project tools, regions, and Interactive Sketch3D
+   through Block 121. Block 111 next.
 9. Add selection-first Part/Surface/Assembly modeling through Blocks 122–131.
 10. Add STEP Reference/EditableBody import through Blocks 132–138.
 
 ## Current boundary
 
-Block 109 is implemented. Block 110 is next.
+Block 110 is implemented. Block 111 is next.
 
-No widget may implement substitute constraint mathematics. Direct manipulation must map transient
-pointer interaction to stable Block-108 identities, call Block-109 solver authority on disposable
-candidates, and commit through the existing validated document transaction/history boundary only on
-successful release.
+No widget may implement substitute constraint mathematics. Basic creation must map transient picks and
+snap results to explicit Block-108 topology/edit commands, use Block-109 solve authority for disposable
+candidates, and commit through the existing validated document transaction/history boundary.

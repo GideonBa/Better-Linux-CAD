@@ -1,8 +1,7 @@
 # Sketch Plane Interaction MVP-8
 
-Status: implemented in Block 107. Block 108 supplies persistent shared topology identity and Block 109
-supplies deterministic constraint solving. Block 110 is the first direct-manipulation consumer that
-connects those Core authorities to this transient plane interaction layer.
+Status: implemented in Block 107. Blocks 108–109 supply persistent topology and solving. Block 110 is
+implemented as the first direct-manipulation consumer of fresh mapped/snapped pointer state.
 
 This document is the canonical GUI interaction contract for Block 107. It extends the contextual
 Sketch workspace with device-independent mapping and one deterministic transient authority for hover,
@@ -125,9 +124,10 @@ Repeated selection at the same screen position cycles the deterministic hit stac
 when pointer movement exceeds tolerance or hit signature changes. Signature uses hit kind plus stable
 transient candidate id, never AIS owner address or OCCT traversal order.
 
-Block 110 may add explicit semantic handle presentation ahead of normal Sketch hits, but handle identity
-must resolve to Block-108 point/entity roles. It must not reuse arbitrary Block-107 candidate ids as
-solver identity.
+Block 110 renders semantic handles in a separate overlay collection and performs deterministic handle
+hit testing within 9 DIP, ordered by screen distance then stable handle id. This does not modify the
+frozen Block-107 Point/Curve/Dimension/Glyph hit stack or `GuiSelectionModel`; every handle still
+resolves explicitly to Block-108 point/entity roles.
 
 ## Window and Crossing selection
 
@@ -267,8 +267,10 @@ The separation is deliberate. A pixel-near endpoint hit may choose a visual cand
 Core topology establishes shared point identity and only stable topology point/entity ids can become
 solver targets.
 
-Block 109 evaluates exact Core topology definitions. It does not consume interaction samples,
-intersection approximations, or screen distances.
+Block 109 evaluates exact Core topology definitions. Block 110 adds separate drag-move and Press/Release
+callbacks to `OcctViewport`: pointer/snap/hit state is refreshed before Press and Release, moves may be
+coalesced, and Release synchronously flushes the exact final snapped point. The solver still does not
+consume interaction samples, approximated curves, or screen distances.
 
 ## Failure policy
 
@@ -311,7 +313,6 @@ Block 109:
 
 ## Next boundary
 
-Block 110 exposes semantic Sketch handles and connects this plane-space pointer authority to Block-108
-point/entity identity and Block-109 solving. Live drag solves disposable candidates and publishes
-transient preview. Release commits one validated transaction; `Esc`, lost capture, fixed geometry, or
-failed solve restores the exact pre-drag snapshot.
+Block 111 consumes the same active-plane mapping and snap/inference authority for multi-click creation.
+Accepted picks must create or reference explicit Block-108 topology identity; transient snap candidate
+ids remain presentation/query state.

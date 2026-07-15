@@ -195,8 +195,9 @@ No failure/diagnostic state mutates persistent Sketch intent.
 The historical seed remains available to existing repair/presentation code until those consumers are
 migrated deliberately.
 
-Block 110 may publish the Block-109 remaining DOF and solve status into the existing Sketch status
-surface while implementing live drag. Blocks 114/115 use stable solver constraint ids for glyph/
+Block 110 publishes Block-109 baseline/live remaining DOF and solve status into the existing Sketch
+status surface. Conflicting, non-convergent, or invalid-reference drag solves refuse/cancel the preview
+without persistent mutation. Blocks 114/115 use stable solver constraint ids for glyph/
 dimension conflict interaction. Block 119 may combine solver diagnostics with region/profile repair.
 
 Those consumers must not parse diagnostic prose to recover identity; stable constraint ids and enum

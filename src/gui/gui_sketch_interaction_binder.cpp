@@ -1,4 +1,5 @@
 #include "blcad/gui/gui_sketch_interaction_binder.hpp"
+#include "blcad/gui/gui_sketch_drag_binder.hpp"
 
 #include "blcad/gui/main_window.hpp"
 
@@ -394,6 +395,7 @@ void install_sketch_interaction_binder(MainWindow& window) {
   if (window.findChild<QObject*>(QStringLiteral("blcad.sketch.interaction_binder")) != nullptr)
     return;
   (void)new SketchInteractionBinder(window);
+  install_sketch_drag_binder(window);
 }
 
 } // namespace blcad::gui

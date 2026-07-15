@@ -4,10 +4,10 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 109
-current_block: 110
-current_boundary: Solver-backed Sketch mouse dragging, semantic handles, live preview, and atomic release commit
-current_tag: "[gui][sketch-drag]"
+implemented_through: Block 110
+current_block: 111
+current_boundary: Basic Sketch creation tools: point, line, polyline, rectangle families, polygon, centerline, and construction geometry
+current_tag: "[gui][sketch-create-basic]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -16,7 +16,7 @@ phase_status:
   mvp_5: "Assembly relationships, motion, hierarchy, analysis, exchange — Blocks 1–47 implemented"
   mvp_6: "Part Construction — Blocks 48–94 implemented; MVP complete"
   mvp_7: "GUI Feature Validation — Blocks 95–105 implemented; MVP complete"
-  mvp_8: "Interactive Sketcher — Blocks 106–109 implemented; Blocks 110–121 planned; Block 110 next"
+  mvp_8: "Interactive Sketcher — Blocks 106–110 implemented; Blocks 111–121 planned; Block 111 next"
   mvp_9: "Interactive Part & Assembly Modeling — Blocks 122–131 planned after Interactive Sketcher acceptance"
   mvp_10: "STEP Import — Blocks 132–138 planned after Interactive Modeling acceptance"
 ---
@@ -30,13 +30,13 @@ mathematics, persistence spellings, migration rules, and failure policy.
 ## Current status
 
 ```text
-implemented through  Block 109
-current block        Block 110
+implemented through  Block 110
+current block        Block 111
 current phase        Interactive Sketcher MVP-8
-current boundary     solver-backed Sketch mouse dragging
+current boundary     basic Sketch creation tools
 ```
 
-Block 109 is implemented. Block 110 is the current next technical step.
+Block 110 is implemented. Block 111 is the current next technical step.
 
 ## Phase map
 
@@ -106,8 +106,8 @@ Frozen order:
 107 plane mapping, hit testing, box selection, grid, snapping, inference preview — implemented
 108 shared planar point/entity topology, mutation commands, JSON migration, undo — implemented
 109 deterministic planar constraint solver, DOF accounting, conflicts, diagnostics — implemented
-110 solver-backed mouse dragging, handles, live preview, atomic commit — next
-111 point, line, polyline, rectangle, polygon, construction-geometry creation
+110 solver-backed mouse dragging, handles, live preview, atomic commit — implemented
+111 point, line, polyline, rectangle, polygon, construction-geometry creation — next — next — next — next — next
 112 circle, arc, ellipse, slot creation/editing
 113 spline editing, continuity handles, Sketch text
 114 manual and automatic geometric constraints with glyph interaction
@@ -237,51 +237,70 @@ Focused tags:
 [core][sketch-conflict-diagnostics]
 ```
 
-## Current next technical step — Block 110
+### Block 110 — Solver-backed Sketch mouse dragging — Implemented
 
-Block 110 owns solver-backed direct manipulation over Blocks 106–109.
+Block 110 adds stable semantic Endpoint, Midpoint, Center, Radius, Arc, Spline-control, and current
+Dimension target handles. Handle identity resolves to existing `SketchPointId` or canonical topology
+entity roles; shared profile junctions expose one endpoint handle for one shared point id.
 
-Required boundary:
+Pointer movement is translated to transient Block-109 Coincident, Midpoint, Concentric, or Radial
+constraints. Temporary `__gui.drag.pointer`, `__gui.drag.center`, and `zz.gui.drag.target` identities
+exist only in disposable solve requests. Before preview publication, transient topology is stripped and
+the source-only solved topology must materialize and re-migrate exactly through the Block-108 legacy
+compatibility bridge.
 
-```text
-semantic endpoint / midpoint / center / radius / arc / spline / dimension handles
-screen pointer
-  -> Block-107 plane mapping and snap/inference
-  -> semantic SketchPointId/entity drag target
-  -> disposable Block-108 topology candidate
-  -> transient drag target equation
-  -> Block-109 solve
-  -> live viewport preview
-  -> release: one validated document transaction
-```
+`GuiSketchDragController` coalesces move samples by replacing one pending pointer. The Qt binder schedules
+at most one zero-delay solve; `flush(final_pointer)` synchronously replaces any pending sample and solves
+the exact release position. Commit is illegal while a sample remains pending, so throttling cannot drop
+the final pointer.
 
-Freeze:
+Live preview rebuilds the transient interaction scene and publishes Block-109 solve state/remaining DOF
+without mutating `PartDocument`. Conflicting, non-convergent, invalid-reference, reference-geometry, or
+incompatible fully constrained drags fail closed and restore the pre-drag snapshot. `Esc`, lost mouse
+capture, and window deactivation also roll back without history.
 
-- handle identity and hit priority relative to normal Sketch hits;
-- which topology points/entities each handle controls;
-- temporary drag target semantics;
-- solver throttling/coalescing without dropping the final pointer position;
-- fixed/fully-constrained refusal behavior;
-- `Esc` and lost-capture rollback;
-- preview publication without PartDocument mutation;
-- one undo entry on successful release;
-- exact pre-drag snapshot restoration on failed solve or cancellation.
+Successful release rechecks current topology and adapted constraint-system equality, requires lossless
+materialization/re-migration, and commits exactly one
+`GuiDocumentSession::commit_part_transaction("Drag sketch handle", ...)`. Undo/redo therefore restore
+complete pre/post-drag document snapshots.
 
-Block 110 does not implement the broad creation surface from Block 111.
-
-Existing authority:
-
-- `docs/gui-interactive-sketch-workspace-mvp8.md`
-- `docs/gui-sketch-plane-interaction-mvp8.md`
-- `docs/sketch-shared-topology-mvp8.md`
-- `docs/sketch-planar-constraint-solver-mvp8.md`
-- Block-96 GUI transaction/undo contract
+Canonical contract: `docs/gui-sketch-solver-drag-mvp8.md`.
 
 Focused tags:
 
 ```text
 [gui][sketch-drag]
 [integration][sketch-live-solve]
+```
+
+## Current next technical step — Block 111
+
+Block 111 owns basic creation tools over the implemented workspace, plane interaction, shared topology,
+solver, and drag authorities.
+
+Required surface:
+
+```text
+point
+two-point line
+continuous polyline
+center/corner rectangle
+three-point rectangle
+parallelogram
+regular polygon
+centerline
+construction geometry
+```
+
+Multi-click commands reuse Block-107 snap/inference and Block-106 command staging. Persistent additions
+use Block-108 topology/edit authority and solved candidates use Block 109. Composite tools expand into
+ordinary points, lines, and constraints rather than GUI-only primitives.
+
+Focused tags:
+
+```text
+[gui][sketch-create-basic]
+[integration][sketch-basic-profile]
 ```
 
 ## Remaining Interactive Sketcher sequence
@@ -320,8 +339,8 @@ STEP Import MVP-10 is Blocks 132–138 and is canonical in `docs/step-import-seq
 
 ## Current handoff
 
-Block 109 is implemented. Block 110 is next.
+Block 110 is implemented. Block 111 is next.
 
-Read the Block-106/107 GUI interaction contracts, `docs/sketch-shared-topology-mvp8.md`, and
-`docs/sketch-planar-constraint-solver-mvp8.md`, then implement solver-backed semantic-handle dragging
-before beginning creation tools in Block 111.
+Read the Block-106/107 interaction contracts, `docs/sketch-shared-topology-mvp8.md`,
+`docs/sketch-planar-constraint-solver-mvp8.md`, and `docs/gui-sketch-solver-drag-mvp8.md`, then implement
+basic creation tools without introducing a second topology, solver, or transaction authority.

@@ -48,17 +48,18 @@ The project grows through controlled headless vertical slices:
 11. engineering modules.
 
 Phases 1–8 are implemented through GUI Feature Validation Block 105. Interactive Sketcher MVP-8 is in
-progress with Blocks 106–109 implemented:
+progress with Blocks 106–110 implemented:
 
 ```text
 106 contextual planar Sketch workspace and command lifecycle
 107 device-independent plane interaction / hit / box selection / grid / snap / inference
 108 stable shared SketchPointId / SketchTopology / migration / edit commands / topology persistence
 109 deterministic general planar constraint solver / exact local DOF / conflict and redundancy output
+110 semantic Sketch handles / solver-backed live drag / rollback / exact final sample / atomic release
 ```
 
-Block 110 is the current next technical step and owns solver-backed mouse dragging, semantic handles,
-live preview, rollback, and one atomic release commit.
+Block 111 is the current next technical step and owns basic point, line, polyline, rectangle, polygon,
+centerline, and construction-geometry creation.
 
 Development rule:
 
@@ -97,7 +98,7 @@ Blocks 95–105 implement and accept the optional Qt application layer over thos
 owns session/command/task/selection and transient presentation state; Core and Geometry remain model,
 solver, geometry, recompute, analysis, and exchange authorities.
 
-Blocks 106–109 establish the implemented Interactive Sketcher foundation:
+Blocks 106–110 establish the implemented Interactive Sketcher foundation:
 
 ```text
 contextual Sketch workspace and command lifecycle
@@ -117,6 +118,12 @@ contextual Sketch workspace and command lifecycle
   -> stable canonical redundancy attribution
   -> stable remove-one conflict attribution
   -> fully constrained / under constrained / redundant / conflicting / non-convergent / invalid reference
+  -> stable semantic drag handles over persistent point/entity roles
+  -> transient Coincident / Midpoint / Concentric / Radial drag equations
+  -> latest-pointer coalescing and synchronous exact release flush
+  -> live solved preview without PartDocument mutation
+  -> rollback on Esc / lost capture / solve refusal
+  -> one freshness-checked Drag sketch handle document transaction on release
 ```
 
 The canonical Block-108 topology is solver/direct-manipulation identity authority. The historical
@@ -127,9 +134,9 @@ Block 109 adds no opaque solved-coordinate cache. `SketchSolveResult`, solver va
 Jacobian, rank, remaining DOF, iteration state, and conflict/redundancy diagnostics are derived. The
 source topology is never mutated by `SketchConstraintSolver::solve(...)`.
 
-The current next boundary is Block 110: semantic handle identity, transient drag targets, live
-Block-109 solving on disposable Block-108 topology candidates, preview publication without document
-mutation, cancellation/lost-capture rollback, and one validated release transaction. Interactive
+The current next boundary is Block 111: basic creation commands over the implemented interaction,
+topology, solver, and drag authorities. Creation must use explicit Core topology/edit commands and
+ordinary points/lines/constraints rather than GUI-only composite primitives. Interactive
 Sketcher continues through Block 121. Interactive Part/Surface/Assembly Modeling follows in Blocks
 122–131, and STEP Part plus structured Assembly import follows in Blocks 132–138.
 
@@ -233,7 +240,7 @@ assistants.
 
 ## Non-goals for the current phase
 
-The current phase does not yet claim production-grade GUI parity. Blocks 106–109 establish workspace,
+The current phase does not yet claim production-grade GUI parity. Blocks 106–110 establish workspace,
 plane interaction, persistent shared Sketch topology, and deterministic solver foundations; Blocks
 110–121 deliberately add direct manipulation, creation, constraint/dimension authoring, modify/project
 workflows, regions, Sketch3D interaction, and acceptance in sequence.

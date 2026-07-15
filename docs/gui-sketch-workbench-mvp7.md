@@ -43,3 +43,14 @@ applied.
 Coverage includes atomic replacement/order preservation, construction and projected geometry,
 planar entities, constraints, coordinate mapping, semantic prompts, diagnostics/repair preview,
 undoable repair, and normal-to-plane camera activation.
+
+## Block-110 direct-manipulation integration
+
+The MVP-7 Sketch workbench remains a validation/transaction client over historical Sketch intent. Block
+110 does not move live drag authority into `GuiSketchWorkbench`. `GuiSketchDragController` consumes
+Block-108 topology and Block-109 solving; successful release enters the same
+`GuiDocumentSession::commit_part_transaction(...)` authority used by validation workbenches.
+
+The final solved topology is materialized and re-migrated exactly before `PartDocument::update_sketch`.
+Live handle positions, pointer samples, temporary drag constraints, and preview Sketches remain
+transient. This preserves MVP-7 atomic recompute/undo semantics while adding direct manipulation.
