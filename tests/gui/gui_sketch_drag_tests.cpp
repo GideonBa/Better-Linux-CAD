@@ -236,8 +236,7 @@ TEST_CASE("Block 110 coalesces pointer samples and commits the exact final sampl
                                ->find_line_segment(SketchEntityId("line.a"))->end();
   CHECK(committed.x == Catch::Approx(20.0).margin(1.0e-6));
   CHECK(committed.y == Catch::Approx(0.0).margin(1.0e-6));
-  REQUIRE(session.undo_label().has_value());
-  CHECK(*session.undo_label() == "Drag sketch handle");
+  CHECK(session.undo_label() == "Drag sketch handle");
 
   REQUIRE(session.undo());
   CHECK(session.part_document()->find_sketch(SketchId("sketch.drag"))
@@ -399,6 +398,5 @@ TEST_CASE("Block 110 offscreen mouse drag publishes live solve and one release t
                                ->find_line_segment(SketchEntityId("line.a"))->end();
   CHECK(committed.x == Catch::Approx(20.0).margin(1.0e-5));
   CHECK(committed.y == Catch::Approx(0.0).margin(1.0e-5));
-  REQUIRE(window.session().undo_label().has_value());
-  CHECK(*window.session().undo_label() == "Drag sketch handle");
+  CHECK(window.session().undo_label() == "Drag sketch handle");
 }
