@@ -4,8 +4,9 @@
 #include <utility>
 
 // Keep the Block-107 interaction authority in one GUI translation unit without changing the
-// frozen target matrix. The implementation remains isolated in its own source module.
+// frozen target matrix. The implementation remains isolated in its own source modules.
 #include "gui_sketch_interaction.cpp"
+#include "gui_sketch_interaction_binder.cpp"
 
 namespace blcad::gui {
 
