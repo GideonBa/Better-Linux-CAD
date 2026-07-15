@@ -20,7 +20,7 @@ Persistent or explicitly authored model intent already includes substantial part
 - Project-level occurrence-qualified geometric constraints, including persistent Coincident/Parallel/Perpendicular intent;
 - Project-level occurrence-qualified Revolute joints.
 
-Derived data such as OCCT shapes, generated-topology producer classification/recovery query results, hierarchy traversal, transform-authority mappings, typed target source classifications/descriptors/capabilities, residuals/Jacobians, solve/motion results, freshness snapshots, rooted exchange records, posed shapes, contact classifications, sampled motion products, XDE labels, and STEP products/entities remains regenerable query/execution output rather than primary model authority.
+Derived data such as OCCT shapes, generated-topology producer classification/recovery query results, hierarchy traversal, transform-authority mappings, typed target source classifications/descriptors/capabilities, residuals/Jacobians, solve/motion results, freshness snapshots, rooted exchange records, posed shapes, contact classifications, sampled motion products, XDE labels, STEP products/entities, Sketch interaction samples, screen mappings, hit stacks, grid lines, and snap/inference candidates remains regenerable query/execution output rather than primary model authority.
 
 ## Direction
 
@@ -38,7 +38,7 @@ The project grows through controlled headless vertical slices. Historical phase 
 10. STEP Part/Assembly import as Reference or EditableBody;
 11. engineering modules.
 
-Phases 1–8 are implemented through GUI Feature Validation Block 105. Interactive Sketcher MVP-8 is now in progress: Block 106 implements the contextual planar Sketch workspace, transient interaction lifecycle, numeric HUD, command repeat, Sketch-focus presentation, and camera/context restoration without moving solver or model authority into Qt. Block 107 is the current next technical step.
+Phases 1–8 are implemented through GUI Feature Validation Block 105. Interactive Sketcher MVP-8 is in progress with Blocks 106–107 implemented: Block 106 establishes the contextual planar Sketch workspace and command lifecycle; Block 107 adds device-independent plane mapping, zoom-stable hit testing, stacked-hit cycling, Window/Crossing selection, grid, snapping, and inference preview without moving model or solver authority into Qt. Block 108 is the current next technical step.
 
 Development rule:
 
@@ -90,10 +90,13 @@ executed path/guide-controlled multi-section Loft Geometry through verified G1/C
 persistent Surface-feature family plus executed Boundary/Fill, Trim/Extend, Stitch/Knit/Sew shell,
 Closed-shell-to-solid Surface Geometry, and deterministic visible Solid/Surface Body STEP export.
 Block 94 integrated Part Construction MVP acceptance and GUI Blocks 95–105 are implemented. Block
-106 establishes the real contextual Sketch workspace and its interaction contract. The current next
-technical step is Block 107 plane mapping, hit testing, box selection, grid, snapping, and inference
-preview. Interactive Sketcher continues through Block 121; Interactive Part & Assembly Modeling
-follows in Blocks 122–131 (`docs/interactive-modeling-sequence-mvp9.md`), and STEP Part and
+106 establishes the real contextual Sketch workspace and its command lifecycle. Block 107 adds the
+read-only plane-interaction authority: DIP-aware screen/ray/plane/model mapping, deterministic
+Point/Curve/Dimension/Glyph hit priority and cycling, Window/Crossing selection, bounded grid
+presentation, and deterministic snap/inference selection. The current next technical step is Block
+108 shared planar point/entity topology, editable Core mutation commands, JSON migration, and exact
+undo semantics. Interactive Sketcher continues through Block 121; Interactive Part & Assembly
+Modeling follows in Blocks 122–131 (`docs/interactive-modeling-sequence-mvp9.md`), and STEP Part and
 structured Assembly import follows in Blocks 132–138.
 
 Several identity/authority questions are deliberately separated.
@@ -144,7 +147,7 @@ SingleCircleSubtractiveExtrude
 
 Pattern result-vector position is not persistent semantic identity. Pattern-generated subelements remain unavailable until stable per-instance model identity exists.
 
-Raw OCCT hash/traversal/map identity, XDE label tags, STEP entity ids, and memory addresses are never promoted to semantic target identity.
+Raw OCCT hash/traversal/map identity, XDE label tags, STEP entity ids, memory addresses, screen coordinates, hit-cycle positions, and sampled Sketch polylines are never promoted to semantic target identity.
 
 ### Resolved source classification and capability
 
@@ -216,7 +219,7 @@ Blocks 32–34 established assembly-selectable reference geometry Core intent, s
 
 Block 35 establishes stable generated topology identity and recovery before Geometry topology lookup. Canonical `topo:` spellings encode exact semantic producer identities for cylindrical wall, rectangular linear-edge/vertex roles, and circular source/opposite rim roles. Producer role matrices publish expected cardinality and unsupported/ambiguous/patterned sources fail closed. Recovery is read-only and never writes raw kernel topology ids.
 
-Block 36 resolves the supported Block-35 semantic producers into Cylinder/Axis, Line, Circle/Axis/center Point, and Point capabilities, computed analytically from validated model intent for both component-local and exact rooted transform semantics. Block 37 adds deterministic relationship/target compatibility selection. Block 38 adds persistent local/Project-level relationship intent. Blocks 39–47 complete generic equations and the Assembly joint families through Spherical. Blocks 48–94 add stable Body identity, body-scoped recompute/inspection, Body Booleans, associative Body transforms, reusable Part-feature semantic input references, richer Extrude/Cut extent/taper/thin intent plus Geometry, persistent plus executed Revolve/RevolveCut, general Pattern Core intent plus Geometry, persistent plus executed MirrorFeature Geometry, persistent plus executed Fillet/Chamfer/Shell/Draft Geometry, persistent model-space 3D Sketch Geometry, reusable connected PathCurve Core/JSON intent, executed Sweep/SweepCut/SweepSurface through spatial paths, twist, and guide control, path-following Extrude/Extruded Cut, and persistent ordered Loft/LoftCut/LoftSurface intent. Block 85 Two-section Loft Geometry on arbitrary planes is implemented. Block 86 Multi-section Loft is implemented. Block 87 Guided and continuity-controlled Loft is implemented. Block 88 Surface feature Core intent and JSON is implemented. Block 89 Boundary and Fill Surface Geometry is implemented. Block 90 Trim and Extend Surface Geometry is implemented. Block 91 Stitch/Knit/Sew shell Geometry is implemented. Block 92 Closed shell to solid conversion is implemented. Block 93 multi-body STEP export and deterministic body naming is implemented. Block 94 integrated Part Construction MVP acceptance is implemented. Blocks 95–105 implement and accept the optional Qt GUI validation phase. Block 106 implements the contextual Sketch workspace, staged command lifecycle, camera/selection restoration, transient Dim/Isolate Sketch focus, command repeat, numeric HUD, and explicit cursor/snap/DOF/solve status surfaces. The next authority step is Block 107 plane interaction, hit testing, box selection, grid, snapping, and inference preview.
+Block 36 resolves the supported Block-35 semantic producers into Cylinder/Axis, Line, Circle/Axis/center Point, and Point capabilities, computed analytically from validated model intent for both component-local and exact rooted transform semantics. Block 37 adds deterministic relationship/target compatibility selection. Block 38 adds persistent local/Project-level relationship intent. Blocks 39–47 complete generic equations and the Assembly joint families through Spherical. Blocks 48–94 add stable Body identity, body-scoped recompute/inspection, Body Booleans, associative Body transforms, reusable Part-feature semantic input references, richer Extrude/Cut extent/taper/thin intent plus Geometry, persistent plus executed Revolve/RevolveCut, general Pattern Core intent plus Geometry, persistent plus executed MirrorFeature Geometry, persistent plus executed Fillet/Chamfer/Shell/Draft Geometry, persistent model-space 3D Sketch Geometry, reusable connected PathCurve Core/JSON intent, executed Sweep/SweepCut/SweepSurface through spatial paths, twist, and guide control, path-following Extrude/Extruded Cut, and persistent ordered Loft/LoftCut/LoftSurface intent. Block 85 Two-section Loft Geometry on arbitrary planes is implemented. Block 86 Multi-section Loft is implemented. Block 87 Guided and continuity-controlled Loft is implemented. Block 88 Surface feature Core intent and JSON is implemented. Block 89 Boundary and Fill Surface Geometry is implemented. Block 90 Trim and Extend Surface Geometry is implemented. Block 91 Stitch/Knit/Sew shell Geometry is implemented. Block 92 Closed shell to solid conversion is implemented. Block 93 multi-body STEP export and deterministic body naming is implemented. Block 94 integrated Part Construction MVP acceptance is implemented. Blocks 95–105 implement and accept the optional Qt GUI validation phase. Block 106 implements the contextual Sketch workspace, staged command lifecycle, camera/selection restoration, transient Dim/Isolate Sketch focus, command repeat, numeric HUD, and explicit cursor/snap/DOF/solve status surfaces. Block 107 implements the transient Sketch interaction layer with one DIP-aware plane mapping, scene projection, deterministic hit/cycle/box-selection behavior, grid, snap/inference candidate selection, viewport overlay, and shell binding. The next authority step is Block 108 shared planar point/entity topology, editable Core mutation commands, JSON migration, and exact undo semantics.
 
 Canonical sequence: `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`.
 
@@ -251,7 +254,7 @@ The aim is a modern engineering-oriented CAD system for Linux that combines clas
 
 The current phase should not attempt to deliver:
 
-- production-grade GUI parity; Block 106 establishes the Sketch workspace contract, while Blocks 107–121 deliberately add hit testing, topology, solver, direct manipulation, authoring tools, dimensions, modify/project workflows, regions, and acceptance in sequence;
+- production-grade GUI parity; Blocks 106–107 establish the contextual Sketch workspace and its interaction mapping/hit/snap layer, while Blocks 108–121 deliberately add shared topology, solver, direct manipulation, authoring tools, dimensions, modify/project workflows, regions, and acceptance in sequence;
 - arbitrary raw OCCT face/edge/vertex selection as persistent identity;
 - a second transform or occurrence-local pose authority without explicit persistence/application design;
 - whole-subassembly rigid solve variables before grounding and application semantics exist;
@@ -270,6 +273,7 @@ These are sequencing boundaries, not permanent product exclusions.
 
 `docs/interactive-sketcher-sequence-mvp8.md` is canonical for productive Sketch interaction.
 `docs/gui-interactive-sketch-workspace-mvp8.md` is canonical for the implemented Block-106 contextual Sketch workspace and command lifecycle.
+`docs/gui-sketch-plane-interaction-mvp8.md` is canonical for the implemented Block-107 plane mapping, hit testing, box selection, grid, snapping, and inference authority.
 `docs/interactive-modeling-sequence-mvp9.md` is canonical for interactive Part, Surface, and
 Assembly modeling over the Block-94 feature families.
 `docs/step-import-sequence-mvp10.md` is canonical for STEP Part and structured Assembly import.
