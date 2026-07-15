@@ -319,9 +319,10 @@ GuiSketchDragController::create(const PartDocument& document, SketchId sketch_id
   auto baseline = SketchConstraintSolver{}.solve(topology.value(), system.value());
   if (baseline.has_error())
     return Result<GuiSketchDragController>::failure(baseline.error());
+  auto handles = build_handles(source_sketch, topology.value());
   return Result<GuiSketchDragController>::success(GuiSketchDragController(
       std::move(source_sketch), std::move(topology.value()), std::move(system.value()),
-      std::move(baseline.value()), build_handles(*sketch, topology.value())));
+      std::move(baseline.value()), std::move(handles)));
 }
 
 GuiSketchDragController::GuiSketchDragController(
@@ -334,6 +335,8 @@ GuiSketchDragController::GuiSketchDragController(
 const SketchId& GuiSketchDragController::sketch_id() const noexcept {
   return source_topology_.sketch();
 }
+
+const Sketch& GuiSketchDragController::source_sketch() const noexcept { return source_sketch_; }
 
 const SketchTopology& GuiSketchDragController::source_topology() const noexcept {
   return source_topology_;

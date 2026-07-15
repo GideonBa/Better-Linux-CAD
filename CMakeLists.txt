@@ -287,6 +287,8 @@ if(BLCAD_BUILD_GUI)
     src/gui/gui_selection_model.cpp
     src/gui/gui_sketch_interaction.cpp
     src/gui/gui_sketch_interaction_binder.cpp
+    src/gui/gui_sketch_drag.cpp
+    src/gui/gui_sketch_drag_binder.cpp
     src/gui/gui_sketch_workbench.cpp
     src/gui/gui_spatial_surface_workbench.cpp
     src/gui/gui_task_state.cpp

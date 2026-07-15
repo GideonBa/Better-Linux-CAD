@@ -69,6 +69,7 @@ public:
   create(const PartDocument& document, SketchId sketch_id);
 
   [[nodiscard]] const SketchId& sketch_id() const noexcept;
+  [[nodiscard]] const Sketch& source_sketch() const noexcept;
   [[nodiscard]] const SketchTopology& source_topology() const noexcept;
   [[nodiscard]] const SketchConstraintSystem& source_system() const noexcept;
   [[nodiscard]] const SketchSolveResult& baseline_solve() const noexcept;

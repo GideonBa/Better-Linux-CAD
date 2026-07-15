@@ -343,16 +343,8 @@ private:
   void restore_source_preview() {
     if (!controller_)
       return;
-    publish_scene(controller_->source_topology().sketch() == controller_->sketch_id()
-                      ? source_sketch()
-                      : source_sketch());
+    publish_scene(controller_->source_sketch());
     publish_handles(controller_->handles());
-  }
-
-  [[nodiscard]] const Sketch& source_sketch() const {
-    const PartDocument* part = window_.session().part_document();
-    const Sketch* current = part != nullptr ? part->find_sketch(controller_->sketch_id()) : nullptr;
-    return current != nullptr ? *current : controller_->latest_preview()->preview_sketch();
   }
 
   void cancel_drag(bool cancel_workspace, std::string message) {
