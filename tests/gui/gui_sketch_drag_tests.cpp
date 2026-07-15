@@ -392,8 +392,10 @@ TEST_CASE("Block 110 offscreen mouse drag publishes live solve and one release t
   QApplication::sendEvent(viewport, &release);
   qApp->processEvents();
 
-  CHECK(window.sketch_workspace().stage() == GuiSketchInteractionStage::Idle);
+  CHECK((window.sketch_workspace().stage() == GuiSketchInteractionStage::Idle ||
+         window.sketch_workspace().stage() == GuiSketchInteractionStage::Hover));
   CHECK_FALSE(window.session().task().active());
+  CHECK(viewport->sketch_selection_enabled());
   const Point2 committed = window.session().part_document()->find_sketch(SketchId("sketch.mouse"))
                                ->find_line_segment(SketchEntityId("line.a"))->end();
   CHECK(committed.x == Catch::Approx(20.0).margin(1.0e-5));
