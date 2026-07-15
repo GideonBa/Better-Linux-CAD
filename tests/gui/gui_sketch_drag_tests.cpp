@@ -199,7 +199,7 @@ TEST_CASE("Block 110 coalesces pointer samples and commits the exact final sampl
   REQUIRE(controller);
   CHECK(controller.value().baseline_solve().status == SketchSolveStatus::UnderConstrained);
   CHECK(controller.value().baseline_solve().remaining_dof == 1U);
-  const auto* endpoint = std::find_if(
+  const auto endpoint = std::find_if(
       controller.value().handles().begin(), controller.value().handles().end(), [](const auto& handle) {
         return handle.kind == GuiSketchDragHandleKind::Endpoint && handle.point_id &&
                handle.position == Point2{8.0, 2.0};
