@@ -15,7 +15,7 @@ feature-specific documents under `docs/`.
 - nlohmann-json
 - Catch2 3
 
-The current assembly numeric engine uses project-owned dynamic containers plus deterministic dense
+The current Assembly numeric engine uses project-owned dynamic containers plus deterministic dense
 elimination routines. Eigen is installed by the reference dependency set but is not currently a
 BLCAD target dependency.
 
@@ -40,7 +40,7 @@ Complete Core workflow:
 cmake --workflow --preset dev-build-test
 ```
 
-Equivalent commands:
+Equivalent:
 
 ```bash
 cmake --preset dev
@@ -54,7 +54,7 @@ Complete Geometry workflow:
 cmake --workflow --preset dev-geometry-build-test
 ```
 
-Equivalent commands:
+Equivalent:
 
 ```bash
 cmake --preset dev-geometry
@@ -62,7 +62,7 @@ cmake --build --preset dev-geometry
 ctest --preset dev-geometry
 ```
 
-Current build directories are:
+Build directories:
 
 ```text
 build/dev
@@ -71,9 +71,9 @@ build/dev-gui
 build/release
 ```
 
-## GUI build and interactive GUI tests
+## GUI build and tests
 
-The GUI is optional and requires the Geometry layer.
+The GUI is optional and requires Geometry.
 
 ```bash
 cmake -S . -B build/dev-gui -G Ninja \
@@ -87,29 +87,28 @@ cmake --build build/dev-gui --target blcad_app blcad_gui_tests
 
 The executable output is `blcad`; the CMake target is `blcad_app`.
 
-The startup splash remains visible for 700 ms by default. For visual inspection its animation
-length can be overridden, for example:
+The startup splash defaults to 700 ms. For visual inspection:
 
 ```bash
 BLCAD_SPLASH_DURATION_MS=15000 ./build/dev-gui/blcad
 ```
 
-Accepted splash durations are clamped to 250–60000 ms.
+Accepted values are clamped to 250–60000 ms.
 
 On Linux the native OCCT viewport uses Qt's xcb platform. `blcad` selects xcb automatically when
 `DISPLAY` is available and `QT_QPA_PLATFORM` is unset. Offscreen GUI tests use a logical viewport
-without creating an X11/GLX window.
+without an X11/GLX window.
 
-`BLCAD_BUILD_GUI=ON` with `BLCAD_BUILD_GEOMETRY=OFF` is unsupported and fails during CMake
-configuration. Core-only and Geometry-without-GUI configurations remain supported.
+`BLCAD_BUILD_GUI=ON` with `BLCAD_BUILD_GEOMETRY=OFF` is unsupported and fails during configuration.
+Core-only and Geometry-without-GUI configurations remain supported.
 
-Run the complete GUI test target with:
+Complete GUI tests:
 
 ```bash
 QT_QPA_PLATFORM=offscreen ctest --test-dir build/dev-gui --output-on-failure
 ```
 
-Or only the discovered GUI tests:
+Only discovered GUI tests:
 
 ```bash
 QT_QPA_PLATFORM=offscreen ctest --test-dir build/dev-gui -R '^gui\.' --output-on-failure
@@ -117,7 +116,9 @@ QT_QPA_PLATFORM=offscreen ctest --test-dir build/dev-gui -R '^gui\.' --output-on
 
 ## Interactive Sketcher focused proof
 
-Blocks 106–107 are implemented. The current Sketch workspace and command-lifecycle proof is:
+Blocks 106–108 are implemented.
+
+Block 106 workspace and command lifecycle:
 
 ```bash
 ./build/dev-gui/blcad_gui_tests "[gui][sketch-workspace]"
@@ -125,7 +126,7 @@ Blocks 106–107 are implemented. The current Sketch workspace and command-lifec
 ./build/dev-gui/blcad_gui_tests "[gui][viewport][gui][navigation]"
 ```
 
-Block 107 plane interaction, hit testing, grid, snapping, inference, and box selection are covered by:
+Block 107 plane interaction, hit testing, grid, snapping, inference, and box selection:
 
 ```bash
 ./build/dev-gui/blcad_gui_tests "[gui][sketch-hit-test]"
@@ -133,22 +134,35 @@ Block 107 plane interaction, hit testing, grid, snapping, inference, and box sel
 ./build/dev-gui/blcad_gui_tests "[gui][sketch-box-selection]"
 ```
 
-For example, the Block-107 hit tests prove the frozen `Point -> Curve -> Dimension -> Glyph`
-priority and deterministic repeated-click cycling. The snap tests prove device-independent mapping,
-model-space-first snap selection with screen-space tie breaking, grid snap, and inference. The
-box-selection tests prove left-to-right Window versus right-to-left Crossing semantics.
+The Block-107 proof covers the frozen `Point -> Curve -> Dimension -> Glyph` hit priority,
+deterministic repeated-click cycling, device-independent mapping, model-space-first snap selection
+with screen-space tie breaking, grid snap/inference, and Window/Crossing selection.
 
-The current implementation handoff is Block 108. Its focused tags are:
+Block 108 shared planar topology, edit commands, and JSON migration:
 
-```text
-[core][sketch-topology]
-[core][sketch-edit-command]
-[core][sketch-json-migration]
+```bash
+./build/dev/blcad_core_tests "[core][sketch-topology]"
+./build/dev/blcad_core_tests "[core][sketch-edit-command]"
+./build/dev/blcad_core_tests "[core][sketch-json-migration]"
 ```
 
-## GUI validation and workbench tags
+These tests prove deterministic legacy migration independent of line insertion order, collapse of six
+triangle endpoint usages into three shared `SketchPointId` records, explicit migration identity-change
+reporting, ordered profile dependencies, shared-junction movement, dependency-safe removal, Add/
+Replace/Remove candidate validation, exact full-topology snapshot undo/redo, migration from existing
+PartDocument Sketch JSON, and exact `blcad.sketch_topology.mvp8` round-trip.
 
-Useful existing focused GUI tags include:
+The current implementation handoff is Block 109. Its focused tags are:
+
+```text
+[core][sketch-solver]
+[core][sketch-dof]
+[core][sketch-conflict-diagnostics]
+```
+
+## Existing GUI validation tags
+
+Useful focused tags include:
 
 ```bash
 ./build/dev-gui/blcad_gui_tests "[gui][application-shell]"
@@ -183,11 +197,13 @@ Useful existing focused GUI tags include:
 ./build/dev-gui/blcad_gui_tests "[integration][gui-headless-equivalence]"
 ```
 
-The exact source and test registration in `CMakeLists.txt` is authoritative.
+The exact source and test registration in `CMakeLists.txt` is authoritative. Block 108 adds public
+header-only Core authorities and extends the already-registered `tests/core/sketch_tests.cpp`; no new
+translation unit or CMake source registration is required.
 
-## Core and Geometry focused test examples
+## Core and Geometry focused examples
 
-Core model and persistence examples:
+Core model and persistence:
 
 ```bash
 ./build/dev/blcad_core_tests "[core][part-body]"
@@ -203,7 +219,7 @@ Core model and persistence examples:
 ./build/dev/blcad_core_tests "[integration][part-construction-mvp]"
 ```
 
-Geometry execution examples:
+Geometry execution:
 
 ```bash
 ./build/dev-geometry/blcad_geometry_tests "[geometry][body-transform]"
@@ -219,7 +235,7 @@ Geometry execution examples:
 ./build/dev-geometry/blcad_geometry_tests "[integration][part-construction-mvp]"
 ```
 
-Assembly target, solve, motion, and exchange examples:
+Assembly target, solve, motion, and exchange:
 
 ```bash
 ./build/dev/blcad_core_tests "[core][semantic-generated-topology-reference]"
@@ -244,7 +260,7 @@ Core inspection:
 ./build/dev/blcad_inspect_project_components examples/component_instances.blcad.project.json
 ```
 
-Part export examples:
+Part export:
 
 ```bash
 ./build/dev-geometry/blcad_export_step examples/reference_plate.blcad.json build/reference_plate.step
@@ -263,50 +279,52 @@ blcad_move_joint <input.blcad.project.json> <joint-id> <angle-deg> <output.blcad
 blcad_analyze_assembly <input.blcad.project.json> [clearance-threshold-mm]
 ```
 
-The typed target/capability, generated-topology identity, and Sketch interaction layers are public
-library contracts and intentionally add no CLI or persistent result format.
+Block-108 topology and migration are public library APIs and intentionally add no CLI.
 
 ## Public versus private boundaries
 
-Private Geometry headers remain private to `src/geometry`. Geometry tests have a private include
-path to that directory so focused integration tests may verify residual/Jacobian ordering and shared
-helper boundaries without promoting execution internals to the public API.
+Private Geometry headers remain private to `src/geometry`. Geometry tests have a private include path
+to that directory so focused integration tests may verify residual/Jacobian ordering and shared helper
+boundaries without promoting execution internals to the public API.
 
-The Block-107 public GUI interaction boundary is:
+Block-107 public GUI interaction boundaries:
 
 ```text
 include/blcad/gui/gui_sketch_interaction.hpp
-```
-
-The shell integration boundary is:
-
-```text
 include/blcad/gui/gui_sketch_interaction_binder.hpp
 ```
 
-`GuiSketchInteractionScene`, sampled curves, screen positions, hit stacks, grid lines, and snap
-results are transient. Persistent Sketch intent remains in Core.
+Block-108 public Core boundaries:
+
+```text
+include/blcad/core/sketch_topology.hpp
+include/blcad/core/sketch_edit_commands.hpp
+include/blcad/core/sketch_topology_json.hpp
+include/blcad/core/sketch_topology_part_document.hpp
+```
+
+`SketchTopology` and `SketchPointId` are Core identity. `SketchTopologyMigrationReport` and legacy
+materialization candidates are derived/adaptation products. `GuiSketchInteractionScene`, sampled
+curves, screen positions, hit stacks, grid lines, and snap results remain transient.
 
 ## Formatting
 
 Formatting is configured by `.editorconfig` and `.clang-format`.
 
-Format the Block-107 production and test files with:
+Format Block-108 headers and focused proof with:
 
 ```bash
 clang-format -i \
-  include/blcad/gui/gui_sketch_interaction.hpp \
-  include/blcad/gui/gui_sketch_interaction_binder.hpp \
-  include/blcad/gui/occt_viewport.hpp \
-  src/gui/gui_sketch_interaction.cpp \
-  src/gui/gui_sketch_interaction_binder.cpp \
-  src/gui/occt_viewport.cpp \
-  src/gui/main.cpp \
-  tests/gui/gui_sketch_interaction_tests.cpp
+  include/blcad/core/id.hpp \
+  include/blcad/core/sketch_topology.hpp \
+  include/blcad/core/sketch_edit_commands.hpp \
+  include/blcad/core/sketch_topology_json.hpp \
+  include/blcad/core/sketch_topology_part_document.hpp \
+  tests/core/sketch_tests.cpp
 ```
 
-When adding a feature block, register production and test sources in `CMakeLists.txt` and document
-exact scope in the feature-specific canonical document plus `docs/mvp-plan.md`.
+When adding a block, register new translation units/tests in `CMakeLists.txt` where required and
+document exact scope in the feature-specific canonical document plus `docs/mvp-plan.md`.
 
 ## Clean generated files
 
@@ -319,20 +337,22 @@ rm -rf build/
 - `README.md`: short repository entry point
 - `docs/mvp-plan.md`: implementation sequence and current numbered block
 - `docs/architecture-summary.md`: condensed implemented architecture
-- `docs/file-format.md`: persistent save-format authority
+- `docs/file-format.md`: historical PartDocument/Project save-format authority
 - `docs/interactive-sketcher-sequence-mvp8.md`: Blocks 106–121 Interactive Sketcher sequence
 - `docs/gui-interactive-sketch-workspace-mvp8.md`: Block-106 contextual workspace contract
-- `docs/gui-sketch-plane-interaction-mvp8.md`: Block-107 mapping, hit, selection, grid, snap, and inference contract
-- `docs/interactive-modeling-sequence-mvp9.md`: Blocks 122–131 interactive Part/Surface/Assembly plan
+- `docs/gui-sketch-plane-interaction-mvp8.md`: Block-107 plane interaction contract
+- `docs/sketch-shared-topology-mvp8.md`: Block-108 shared topology, migration, edit, and topology JSON contract
+- `docs/interactive-modeling-sequence-mvp9.md`: Blocks 122–131 interactive modeling plan
 - `docs/step-import-sequence-mvp10.md`: Blocks 132–138 STEP import plan
 - `docs/project-goal.md`: long-term direction
 
 ## Current development boundary
 
-Blocks 1–107 are implemented according to the numbered sequence. Interactive Sketcher MVP-8 is in
-progress. Block 108 is the immediate next technical step and owns shared planar point/entity
-topology, dependency-safe editable Core commands, construction/reference flags, canonical ordering,
-JSON migration from the existing planar Sketch format, and exact undo/redo semantics.
+Blocks 1–108 are implemented according to the numbered sequence. Interactive Sketcher MVP-8 is in
+progress. Block 109 is the immediate next technical step and owns the deterministic general planar
+constraint solver over Block-108 topology: solver-variable ordering, scale normalization, tolerances,
+iteration/damping limits, convergence classification, remaining-DOF accounting, and stable
+redundant/conflicting/non-convergent/invalid-reference diagnostics.
 
 Interactive Modeling remains sequenced for Blocks 122–131. STEP Import remains sequenced for Blocks
 132–138.
