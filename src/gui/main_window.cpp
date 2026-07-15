@@ -1,7 +1,6 @@
 #include "blcad/gui/main_window.hpp"
 
 #include "blcad/geometry/viewport_scene.hpp"
-#include "blcad/gui/occt_viewport.hpp"
 
 #include <QAction>
 #include <QActionGroup>
@@ -11,6 +10,7 @@
 #include <QHeaderView>
 #include <QHBoxLayout>
 #include <QInputDialog>
+#include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
@@ -62,7 +62,7 @@ QTreeWidgetItem* append_browser_item(QTreeWidgetItem* parent, QTreeWidget* tree,
   if (node.kind == GuiBrowserNodeKind::Group)
     item->setFlags(item->flags() & ~Qt::ItemIsSelectable);
   for (const auto& child : node.children)
-    append_browser_item(item, tree, child);
+    append_browser_item(item, tree, child)->setExpanded(true);
   return item;
 }
 
@@ -87,6 +87,10 @@ QString document_id_from_name(const QString& name, QStringView prefix) {
   while (id.endsWith(QLatin1Char('_')))
     id.chop(1);
   return id;
+}
+
+bool sketch_idle_stage(GuiSketchInteractionStage stage) noexcept {
+  return stage == GuiSketchInteractionStage::Idle || stage == GuiSketchInteractionStage::Hover;
 }
 
 } // namespace
@@ -118,6 +122,10 @@ const GuiCommandRegistry& MainWindow::command_registry() const noexcept {
 
 GuiSketchWorkbench& MainWindow::sketch_workbench() noexcept { return sketch_workbench_; }
 
+GuiSketchWorkspace& MainWindow::sketch_workspace() noexcept { return sketch_workspace_; }
+
+const GuiSketchWorkspace& MainWindow::sketch_workspace() const noexcept { return sketch_workspace_; }
+
 GuiPartFoundationWorkbench& MainWindow::part_foundation_workbench() noexcept {
   return part_foundation_workbench_;
 }
@@ -139,7 +147,8 @@ GuiAnalysisExportWorkbench& MainWindow::analysis_export_workbench() noexcept {
 const std::optional<SketchId>& MainWindow::active_sketch() const noexcept { return active_sketch_; }
 
 bool MainWindow::request_workspace(GuiWorkspace workspace) noexcept {
-  if (!session_.set_workspace(workspace)) {
+  if (sketch_workspace_.active() || workspace == GuiWorkspace::Sketch ||
+      !session_.set_workspace(workspace)) {
     synchronize_workspace_tab();
     return false;
   }
@@ -151,27 +160,48 @@ bool MainWindow::request_workspace(GuiWorkspace workspace) noexcept {
 void MainWindow::refresh_command_state() {
   const auto context = session_.command_context();
   const bool idle = !context.task_active();
-  new_part_action_->setEnabled(idle);
-  new_project_action_->setEnabled(idle);
-  open_action_->setEnabled(idle);
+  const bool sketch_active = sketch_workspace_.active();
+  const bool sketch_idle = sketch_active && idle && sketch_idle_stage(sketch_workspace_.stage());
+  new_part_action_->setEnabled(idle && !sketch_active);
+  new_project_action_->setEnabled(idle && !sketch_active);
+  open_action_->setEnabled(idle && !sketch_active);
   save_action_->setEnabled(command_registry_.is_enabled("document.save", context));
   save_as_action_->setEnabled(context.has_document() && idle);
-  undo_action_->setEnabled(session_.can_undo());
-  redo_action_->setEnabled(session_.can_redo());
+  undo_action_->setEnabled(session_.can_undo() && !sketch_active);
+  redo_action_->setEnabled(session_.can_redo() && !sketch_active);
   recompute_action_->setEnabled(context.has_document() && idle);
-  const bool part = context.document_kind == GuiDocumentKind::Part && idle;
+  const bool part = context.document_kind == GuiDocumentKind::Part;
+  const bool part_workspace_idle = part && idle && !sketch_active;
   for (QAction* action : {create_datum_action_, create_axis_action_, create_sketch_action_,
-                          edit_sketch_action_, add_line_action_, inspect_sketch_action_,
-                          repair_sketch_action_})
+                          edit_sketch_action_})
     if (action)
-      action->setEnabled(part);
-  statusBar()->showMessage(session_.task().active()
-                               ? QStringLiteral("Task active — Apply or Cancel")
-                               : QStringLiteral("Ready"));
+      action->setEnabled(part_workspace_idle);
+  if (finish_sketch_action_)
+    finish_sketch_action_->setEnabled(sketch_idle);
+  if (add_line_action_)
+    add_line_action_->setEnabled(part && sketch_idle);
+  if (repeat_sketch_action_)
+    repeat_sketch_action_->setEnabled(sketch_idle && !sketch_workspace_.last_repeatable_command().empty());
+  for (QAction* action : {inspect_sketch_action_, repair_sketch_action_})
+    if (action)
+      action->setEnabled(part && idle);
+
+  refresh_sketch_workspace_ui();
+  statusBar()->showMessage(sketch_active
+                               ? QString::fromStdString(sketch_workspace_.status().tool_hint)
+                               : session_.task().active()
+                                     ? QStringLiteral("Task active — Apply or Cancel")
+                                     : QStringLiteral("Ready"));
   refresh_document_presentation();
 }
 
 void MainWindow::closeEvent(QCloseEvent* event) {
+  if (sketch_workspace_.active()) {
+    QMessageBox::warning(this, QStringLiteral("Sketch workspace"),
+                         QStringLiteral("Finish Sketch before closing the document."));
+    event->ignore();
+    return;
+  }
   if (session_.task().active()) {
     QMessageBox::warning(this, QStringLiteral("Active task"),
                          QStringLiteral("Apply or cancel the active task before closing."));
@@ -183,6 +213,16 @@ void MainWindow::closeEvent(QCloseEvent* event) {
     return;
   }
   event->accept();
+}
+
+void MainWindow::keyPressEvent(QKeyEvent* event) {
+  if (event->key() == Qt::Key_Escape && sketch_workspace_.active() &&
+      sketch_workspace_.escape(session_)) {
+    refresh_command_state();
+    event->accept();
+    return;
+  }
+  QMainWindow::keyPressEvent(event);
 }
 
 void MainWindow::create_shell() {
@@ -204,6 +244,18 @@ void MainWindow::create_shell() {
 
   statusBar()->setObjectName(QStringLiteral("blcad.status_bar"));
   statusBar()->setSizeGripEnabled(true);
+  sketch_cursor_status_ = new QLabel(QStringLiteral("Cursor: —"), this);
+  sketch_snap_status_ = new QLabel(QStringLiteral("Snap: —"), this);
+  sketch_dof_status_ = new QLabel(QStringLiteral("DOF: —"), this);
+  sketch_solve_status_ = new QLabel(QStringLiteral("Solve: Not evaluated"), this);
+  sketch_cursor_status_->setObjectName(QStringLiteral("blcad.sketch.cursor_status"));
+  sketch_snap_status_->setObjectName(QStringLiteral("blcad.sketch.snap_status"));
+  sketch_dof_status_->setObjectName(QStringLiteral("blcad.sketch.dof_status"));
+  sketch_solve_status_->setObjectName(QStringLiteral("blcad.sketch.solve_status"));
+  statusBar()->addPermanentWidget(sketch_cursor_status_);
+  statusBar()->addPermanentWidget(sketch_snap_status_);
+  statusBar()->addPermanentWidget(sketch_dof_status_);
+  statusBar()->addPermanentWidget(sketch_solve_status_);
 }
 
 void MainWindow::create_menus() {
@@ -315,23 +367,29 @@ void MainWindow::create_menus() {
   create_datum_action_ = sketch_menu->addAction(QStringLiteral("New XY datum plane…"));
   create_axis_action_ = sketch_menu->addAction(QStringLiteral("New Z datum axis…"));
   create_sketch_action_ = sketch_menu->addAction(QStringLiteral("New sketch on selection…"));
-  edit_sketch_action_ = sketch_menu->addAction(QStringLiteral("Edit selected sketch"));
+  edit_sketch_action_ = sketch_menu->addAction(QStringLiteral("Enter Sketch"));
+  finish_sketch_action_ = sketch_menu->addAction(QStringLiteral("Finish Sketch"));
   sketch_menu->addSeparator();
-  add_line_action_ = sketch_menu->addAction(QStringLiteral("Add line (numeric)…"));
+  add_line_action_ = sketch_menu->addAction(QStringLiteral("Add line"));
+  repeat_sketch_action_ = sketch_menu->addAction(QStringLiteral("Repeat last Sketch command"));
   inspect_sketch_action_ = sketch_menu->addAction(QStringLiteral("Inspect selected sketch"));
   repair_sketch_action_ = sketch_menu->addAction(QStringLiteral("Preview/repair selected sketch…"));
   create_datum_action_->setObjectName(QStringLiteral("blcad.action.create_datum_plane"));
   create_axis_action_->setObjectName(QStringLiteral("blcad.action.create_datum_axis"));
   create_sketch_action_->setObjectName(QStringLiteral("blcad.action.create_sketch"));
   edit_sketch_action_->setObjectName(QStringLiteral("blcad.action.edit_sketch"));
+  finish_sketch_action_->setObjectName(QStringLiteral("blcad.action.finish_sketch"));
   add_line_action_->setObjectName(QStringLiteral("blcad.action.sketch_line"));
+  repeat_sketch_action_->setObjectName(QStringLiteral("blcad.action.sketch_repeat"));
   inspect_sketch_action_->setObjectName(QStringLiteral("blcad.action.inspect_sketch"));
   repair_sketch_action_->setObjectName(QStringLiteral("blcad.action.repair_sketch"));
   connect(create_datum_action_, &QAction::triggered, this, [this] { create_xy_datum(); });
   connect(create_axis_action_, &QAction::triggered, this, [this] { create_default_datum_axis(); });
   connect(create_sketch_action_, &QAction::triggered, this, [this] { create_sketch_on_selection(); });
   connect(edit_sketch_action_, &QAction::triggered, this, [this] { edit_selected_sketch(); });
+  connect(finish_sketch_action_, &QAction::triggered, this, [this] { finish_sketch(); });
   connect(add_line_action_, &QAction::triggered, this, [this] { add_numeric_sketch_line(); });
+  connect(repeat_sketch_action_, &QAction::triggered, this, [this] { repeat_last_sketch_command(); });
   connect(inspect_sketch_action_, &QAction::triggered, this, [this] { inspect_selected_sketch(); });
   connect(repair_sketch_action_, &QAction::triggered, this, [this] { repair_selected_sketch(); });
 }
@@ -350,6 +408,31 @@ void MainWindow::create_command_bar() {
   workspace_tabs_->addTab(QStringLiteral("Inspect"));
   workspace_tabs_->addTab(QStringLiteral("Exchange"));
   command_bar->addWidget(workspace_tabs_);
+
+  sketch_command_groups_ = new QWidget(command_bar);
+  sketch_command_groups_->setObjectName(QStringLiteral("blcad.sketch.command_groups"));
+  auto* groups_layout = new QHBoxLayout(sketch_command_groups_);
+  groups_layout->setContentsMargins(12, 0, 0, 0);
+  groups_layout->setSpacing(10);
+  for (const auto group : GuiSketchWorkspace::command_groups()) {
+    auto* label = new QLabel(QString::fromUtf8(group.data(), static_cast<qsizetype>(group.size())),
+                             sketch_command_groups_);
+    label->setObjectName(QStringLiteral("blcad.sketch.command_group"));
+    groups_layout->addWidget(label);
+  }
+  command_bar->addWidget(sketch_command_groups_);
+
+  sketch_numeric_hud_ = new QLineEdit(command_bar);
+  sketch_numeric_hud_->setObjectName(QStringLiteral("blcad.sketch.numeric_hud"));
+  sketch_numeric_hud_->setPlaceholderText(QStringLiteral("id, x1, y1, x2, y2 (mm)"));
+  sketch_numeric_hud_->setMaximumWidth(280);
+  command_bar->addWidget(sketch_numeric_hud_);
+  connect(sketch_numeric_hud_, &QLineEdit::textChanged, this, [this](const QString& text) {
+    if (sketch_workspace_.stage() == GuiSketchInteractionStage::NumericInput)
+      (void)sketch_workspace_.set_numeric_input(text.toStdString());
+  });
+  connect(sketch_numeric_hud_, &QLineEdit::returnPressed, this,
+          [this] { commit_numeric_sketch_line(); });
 
   connect(workspace_tabs_, &QTabBar::currentChanged, this, [this](int index) {
     if (index >= 0 && index < static_cast<int>(kWorkspaces.size())) {
@@ -438,6 +521,10 @@ void MainWindow::create_docks() {
 void MainWindow::create_default_commands() {
   const auto idle = [](const GuiCommandContext& context) { return !context.task_active(); };
   (void)command_registry_.register_command({"workspace.part", "Part", idle});
+  (void)command_registry_.register_command(
+      {"workspace.sketch", "Sketch", [](const GuiCommandContext& context) {
+         return context.document_kind == GuiDocumentKind::Part && !context.task_active();
+       }});
   (void)command_registry_.register_command({"workspace.assembly", "Assembly", idle});
   (void)command_registry_.register_command({"workspace.inspect", "Inspect", idle});
   (void)command_registry_.register_command({"workspace.exchange", "Exchange", idle});
@@ -459,7 +546,10 @@ void MainWindow::refresh_document_presentation() {
   const QString name = session_.has_document()
                            ? QString::fromStdString(std::string(session_.display_name()))
                            : QStringLiteral("No active document");
-  model_browser_->setHeaderLabel(name);
+  model_browser_->setHeaderLabel(
+      sketch_workspace_.active() && active_sketch_
+          ? QStringLiteral("Sketch — %1").arg(QString::fromStdString(active_sketch_->value()))
+          : name);
   setWindowTitle(session_.has_document()
                      ? QStringLiteral("%1%2 — BLCAD")
                            .arg(name, session_.dirty() ? QStringLiteral(" *") : QString{})
@@ -503,7 +593,9 @@ void MainWindow::show_node_properties(const GuiBrowserNode* node) {
   const QSignalBlocker blocker(property_table_);
   property_table_->setRowCount(0);
   if (!node) {
-    property_validation_->setText(QStringLiteral("Select a model item"));
+    property_validation_->setText(sketch_workspace_.active()
+                                      ? QString::fromStdString(sketch_workspace_.status().tool_hint)
+                                      : QStringLiteral("Select a model item"));
     preview_button_->setEnabled(false);
     apply_button_->setEnabled(false);
     cancel_button_->setEnabled(session_.task().active());
@@ -653,43 +745,74 @@ void MainWindow::create_sketch_on_selection() {
 
 void MainWindow::edit_selected_sketch() {
   const auto* node = browser_model_.find(selected_browser_id_);
-  if (!node || node->kind != GuiBrowserNodeKind::Sketch ||
+  if (!node || node->kind != GuiBrowserNodeKind::Sketch || !session_.part_document() ||
       session_.part_document()->find_sketch(SketchId(node->semantic_id)) == nullptr) {
     property_validation_->setText(QString::fromStdString(
         GuiSketchWorkbench::prompt_for(GuiSketchCommand::Diagnose).text));
     return;
   }
-  active_sketch_ = SketchId(node->semantic_id);
-  const auto plane = sketch_workbench_.plane_view(session_, *active_sketch_);
+
+  sketch_camera_bookmark_ = viewport_->camera_bookmark();
+  sketch_selection_filter_mask_ = viewport_->selection_filter_mask();
+  const auto plane = sketch_workspace_.enter(session_, sketch_workbench_, SketchId(node->semantic_id));
   if (plane.has_error()) {
     show_error(plane.error());
+    sketch_camera_bookmark_.reset();
     return;
   }
   if (!viewport_->set_plane_camera(plane.value().origin, plane.value().normal,
                                    plane.value().y_axis)) {
+    (void)sketch_workspace_.finish(session_, sketch_workbench_);
+    sketch_camera_bookmark_.reset();
     show_error(Error::geometry(node->semantic_id, "could not orient camera normal to sketch plane"));
     return;
   }
+  active_sketch_ = sketch_workspace_.active_sketch();
   viewport_->set_projection(GuiViewportProjection::Orthographic);
   perspective_action_->setChecked(false);
-  viewport_->set_selection_filter_mask(selection_kind_bit(GuiSelectionKind::SketchEntity) |
-                                       selection_kind_bit(GuiSelectionKind::Edge) |
-                                       selection_kind_bit(GuiSelectionKind::Vertex));
-  statusBar()->showMessage(QStringLiteral("Editing %1 — coordinates are in the sketch plane")
-                               .arg(QString::fromStdString(node->label)));
+  viewport_->set_selection_filter_mask(GuiSketchWorkspace::selection_filter_mask());
+  viewport_->setCursor(Qt::CrossCursor);
+  synchronize_workspace_tab();
+  refresh_command_state();
+}
+
+void MainWindow::finish_sketch() {
+  const auto result = sketch_workspace_.finish(session_, sketch_workbench_);
+  if (result.has_error()) {
+    show_error(result.error());
+    return;
+  }
+  if (sketch_camera_bookmark_ && !viewport_->restore_camera_bookmark(*sketch_camera_bookmark_))
+    show_error(Error::geometry("gui.sketch_workspace", "could not restore the pre-Sketch camera"));
+  viewport_->set_selection_filter_mask(sketch_selection_filter_mask_);
+  viewport_->unsetCursor();
+  perspective_action_->setChecked(viewport_->projection() == GuiViewportProjection::Perspective);
+  active_sketch_.reset();
+  sketch_camera_bookmark_.reset();
+  synchronize_workspace_tab();
+  refresh_command_state();
 }
 
 void MainWindow::add_numeric_sketch_line() {
-  if (!active_sketch_) {
-    property_validation_->setText(QStringLiteral("Edit a planar sketch before adding geometry."));
+  if (!active_sketch_ || !sketch_workspace_.active()) {
+    property_validation_->setText(QStringLiteral("Enter a planar Sketch before adding geometry."));
     return;
   }
-  bool accepted = false;
-  QString input = QInputDialog::getText(
-      this, QStringLiteral("Add sketch line"),
-      QStringLiteral("id, start-x, start-y, end-x, end-y (mm):"), QLineEdit::Normal,
-      QStringLiteral("line.1, 0, 0, 10, 0"), &accepted).trimmed();
-  if (!accepted || input.isEmpty()) return;
+  if (!sketch_workspace_.begin_command(session_, "sketch.line", "Pick line points or enter coordinates") ||
+      !sketch_workspace_.begin_numeric_input(session_)) {
+    property_validation_->setText(QStringLiteral("Finish or cancel the current Sketch command first."));
+    return;
+  }
+  sketch_numeric_hud_->setText(QStringLiteral("line.1, 0, 0, 10, 0"));
+  sketch_numeric_hud_->selectAll();
+  sketch_numeric_hud_->setFocus(Qt::ShortcutFocusReason);
+  refresh_command_state();
+}
+
+void MainWindow::commit_numeric_sketch_line() {
+  if (!active_sketch_ || sketch_workspace_.stage() != GuiSketchInteractionStage::NumericInput)
+    return;
+  QString input = sketch_numeric_hud_->text().trimmed();
   input.replace(QLatin1Char(','), QLatin1Char(' '));
   std::istringstream stream(input.toStdString());
   std::string id;
@@ -700,11 +823,43 @@ void MainWindow::add_numeric_sketch_line() {
   }
   auto line = LineSegment::create(SketchEntityId(id), {x1, y1}, {x2, y2});
   if (line.has_error()) {
-    show_error(line.error());
+    property_validation_->setText(QString::fromStdString(line.error().message()));
+    return;
+  }
+  const auto* existing = session_.part_document()->find_sketch(*active_sketch_);
+  if (!existing) {
+    property_validation_->setText(QStringLiteral("The active Sketch no longer exists."));
+    return;
+  }
+  Sketch candidate = *existing;
+  const auto candidate_result = candidate.add_entity(line.value());
+  if (candidate_result.has_error()) {
+    property_validation_->setText(QString::fromStdString(candidate_result.error().message()));
+    return;
+  }
+  (void)sketch_workspace_.set_numeric_input(sketch_numeric_hud_->text().toStdString());
+  if (!sketch_workspace_.show_preview(session_) || !sketch_workspace_.commit_command(session_)) {
+    property_validation_->setText(QStringLiteral("Sketch line preview could not be committed."));
     return;
   }
   const auto result = sketch_workbench_.add_line(session_, *active_sketch_, std::move(line.value()));
-  if (result.has_error()) show_error(result.error());
+  if (result.has_error())
+    show_error(result.error());
+  refresh_command_state();
+}
+
+void MainWindow::repeat_last_sketch_command() {
+  if (!sketch_workspace_.repeat_last_command(session_))
+    return;
+  if (sketch_workspace_.active_command() == "sketch.line") {
+    if (!sketch_workspace_.begin_numeric_input(session_)) {
+      (void)sketch_workspace_.escape(session_);
+      return;
+    }
+    sketch_numeric_hud_->setText(QStringLiteral("line.1, 0, 0, 10, 0"));
+    sketch_numeric_hud_->selectAll();
+    sketch_numeric_hud_->setFocus(Qt::ShortcutFocusReason);
+  }
   refresh_command_state();
 }
 
@@ -766,6 +921,44 @@ void MainWindow::repair_selected_sketch() {
   const auto applied = sketch_workbench_.apply_repair(session_, id, suggestion);
   if (applied.has_error()) show_error(applied.error());
   refresh_command_state();
+}
+
+void MainWindow::refresh_sketch_workspace_ui() {
+  const bool active = sketch_workspace_.active();
+  if (sketch_command_groups_)
+    sketch_command_groups_->setVisible(active);
+  if (sketch_numeric_hud_)
+    sketch_numeric_hud_->setVisible(active &&
+                                     sketch_workspace_.stage() == GuiSketchInteractionStage::NumericInput);
+  for (QLabel* label : {sketch_cursor_status_, sketch_snap_status_, sketch_dof_status_, sketch_solve_status_})
+    if (label)
+      label->setVisible(active);
+  if (!active)
+    return;
+
+  const auto& status = sketch_workspace_.status();
+  if (status.cursor_coordinates) {
+    sketch_cursor_status_->setText(
+        QStringLiteral("Cursor: %1, %2 mm")
+            .arg(status.cursor_coordinates->x, 0, 'f', 2)
+            .arg(status.cursor_coordinates->y, 0, 'f', 2));
+  } else {
+    sketch_cursor_status_->setText(QStringLiteral("Cursor: —"));
+  }
+  sketch_snap_status_->setText(status.snap_inference.empty()
+                                   ? QStringLiteral("Snap: —")
+                                   : QStringLiteral("Snap: %1").arg(QString::fromStdString(status.snap_inference)));
+  sketch_dof_status_->setText(status.remaining_dof
+                                  ? QStringLiteral("DOF: %1").arg(*status.remaining_dof)
+                                  : QStringLiteral("DOF: —"));
+  sketch_solve_status_->setText(
+      QStringLiteral("Solve: %1").arg(QString::fromStdString(status.solve_status)));
+  if (sketch_workspace_.stage() == GuiSketchInteractionStage::NumericInput) {
+    sketch_numeric_hud_->setFocus(Qt::OtherFocusReason);
+    sketch_workspace_.focus_canvas();
+    sketch_workspace_.focus_task_panel();
+    (void)sketch_workspace_.set_numeric_input(sketch_numeric_hud_->text().toStdString());
+  }
 }
 
 void MainWindow::refresh_viewport_scene() {
