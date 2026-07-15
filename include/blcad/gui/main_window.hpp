@@ -62,6 +62,7 @@ private:
   void synchronize_workspace_tab();
   void refresh_document_presentation();
   void refresh_model_browser();
+  void refresh_sketch_browser_sections();
   void show_node_properties(const GuiBrowserNode* node);
   void synchronize_tree_selection(std::string_view semantic_id);
   void preview_property_edit();
