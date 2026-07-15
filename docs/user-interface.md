@@ -1,17 +1,18 @@
 # User Interface Architecture
 
-Status: MVP-7 accepted. Blocks 95–105 provide the optional Qt shell, document transactions,
-OCCT viewport, deterministic model/assembly browser, typed property editor, and semantic selection
-synchronization. Block 99 adds datum, derived-workplane, planar Sketch, inspection, and explicit
-repair workflows. Block 100 adds parameters, Bodies, and foundational solid features. Block 101
-adds patterns, finishing, shell, draft, Body operations/transforms, and fresh-result STEP export.
-Block 102 adds model-space paths, Sweep, Loft, Surface workflows, and distinct path/Surface/Solid
-viewport products. Block 103 adds complete Assembly authoring, hierarchy, relationships, joints,
-DOF/solve diagnostics, and motion. Block 104 adds deterministic analysis and freshness-gated Part,
-flattened Assembly, and structured Assembly STEP export. Block 105 completes integrated acceptance.
-Blocks 106–121 add the productive Interactive Sketcher; Blocks 122–131 add interactive Part,
-Surface, and Assembly modeling (`docs/interactive-modeling-sequence-mvp9.md`); STEP Import begins
-with Block 132.
+Status: MVP-7 accepted and Interactive Sketcher MVP-8 in progress. Blocks 95–105 provide the
+optional Qt shell, document transactions, OCCT viewport, deterministic model/assembly browser, typed
+property editor, and semantic selection synchronization. Block 99 adds datum, derived-workplane,
+planar Sketch, inspection, and explicit repair workflows. Block 100 adds parameters, Bodies, and
+foundational solid features. Block 101 adds patterns, finishing, shell, draft, Body
+operations/transforms, and fresh-result STEP export. Block 102 adds model-space paths, Sweep, Loft,
+Surface workflows, and distinct path/Surface/Solid viewport products. Block 103 adds complete
+Assembly authoring, hierarchy, relationships, joints, DOF/solve diagnostics, and motion. Block 104
+adds deterministic analysis and freshness-gated Part, flattened Assembly, and structured Assembly
+STEP export. Block 105 completes integrated acceptance. Block 106 adds the real contextual Sketch
+workspace and command lifecycle; Block 107 is the current next technical step. Blocks 106–121 form
+the productive Interactive Sketcher; Blocks 122–131 add interactive Part, Surface, and Assembly
+modeling (`docs/interactive-modeling-sequence-mvp9.md`); STEP Import begins with Block 132.
 
 The UI is deliberately not built like FreeCAD. The goal is a modern, consistent, reduced interface with a clear separation between model, parameters, features, and assembly. Crucially, the UI only operates the core; it must not contain CAD logic (last of the core principles in `docs/architecture-summary.md`).
 
@@ -26,6 +27,40 @@ The UI is deliberately not built like FreeCAD. The goal is a modern, consistent,
 | Property panel | edit the currently selected object/feature. |
 | Command palette | quick access to Sketch, Extrude, Cut, Fillet, Hole, Pattern, Assembly Constraint. |
 | Engineering panel | access technical assistants (bolt, bearing, shaft). |
+
+## Contextual Sketch workspace
+
+Block 106 promotes planar Sketch editing to `GuiWorkspace::Sketch`, a transient contextual Part mode.
+The global tab row remains `Part | Assembly | Inspect | Exchange`; entering Sketch does not create a
+fifth persistent project mode or any Part feature.
+
+The Sketch command surface is frozen as:
+
+```text
+Create | Constrain | Dimension | Modify | Project
+```
+
+The Sketch browser contract is:
+
+```text
+Entities | Constraints | Dimensions | Diagnostics
+```
+
+The command bar renders the group strip and numeric HUD. The existing left model browser remains the
+semantic selection authority and the existing Properties / Tasks dock remains the contextual task
+surface. The status bar exposes tool hint, plane cursor coordinates, snap/inference, remaining DOF,
+and solve state. Before Blocks 107 and 109 supply those producers, the UI reports explicit `—` or
+`Not evaluated` states.
+
+`Enter Sketch` captures workspace, semantic selection, full transient camera state, and the viewport
+selection-filter mask. It resolves the Sketch workplane, enters normal orthographic view, restricts
+picking to SketchEntity/Edge/Vertex, and uses a crosshair. `Finish Sketch` rejects an active command
+or diagnostic errors, then restores the previous workspace, selection, Eye/Target/Up/Scale/projection
+camera state, and selection filter without inventing an Extrude or other feature.
+
+The command lifecycle is specified in `docs/gui-interactive-sketch-workspace-mvp8.md`. For example,
+the first HUD client accepts `line.web, 0, 0, 40, 0`, validates the line on a disposable Sketch copy,
+enters Preview, and commits through the existing undoable Block-99 workbench mutation path.
 
 ## Parameter window
 
@@ -73,7 +108,8 @@ After a change the UI updates the viewport, feature tree, and parameter window f
 6. Add feature-creation dialogs one module at a time.
 7. Add the assembly tree and constraint dialog once the assembly system exists.
 8. Replace the validation-level Sketch surface with the solver-backed direct-manipulation workbench
-   sequenced in `docs/interactive-sketcher-sequence-mvp8.md`.
+   sequenced in `docs/interactive-sketcher-sequence-mvp8.md`. Block 106 has established its
+   contextual workspace and command lifecycle; Block 107 adds plane interaction and snapping next.
 
 ## Out of scope for the first versions
 
