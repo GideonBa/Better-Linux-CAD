@@ -332,11 +332,44 @@ void append_intersection(std::vector<Point2>& intersections, Point2 point) {
     intersections.push_back(point);
 }
 
+struct PolylineBounds {
+  double min_x{std::numeric_limits<double>::infinity()};
+  double min_y{std::numeric_limits<double>::infinity()};
+  double max_x{-std::numeric_limits<double>::infinity()};
+  double max_y{-std::numeric_limits<double>::infinity()};
+};
+
+PolylineBounds polyline_bounds(const std::vector<Point2>& polyline) noexcept {
+  PolylineBounds bounds;
+  for (const Point2 point : polyline) {
+    bounds.min_x = std::min(bounds.min_x, point.x);
+    bounds.min_y = std::min(bounds.min_y, point.y);
+    bounds.max_x = std::max(bounds.max_x, point.x);
+    bounds.max_y = std::max(bounds.max_y, point.y);
+  }
+  return bounds;
+}
+
+bool bounds_overlap(const PolylineBounds& first, const PolylineBounds& second) noexcept {
+  constexpr double margin = 1.0e-7;
+  return first.min_x <= second.max_x + margin && second.min_x <= first.max_x + margin &&
+         first.min_y <= second.max_y + margin && second.min_y <= first.max_y + margin;
+}
+
 void build_intersections(GuiSketchInteractionScene& scene) {
+  // Curve-level bounding boxes cannot intersect when disjoint, so the exact
+  // pairwise segment test is skipped for provably disjoint curve pairs. The
+  // produced intersection set is identical to the exhaustive pairwise scan.
+  std::vector<PolylineBounds> bounds;
+  bounds.reserve(scene.curves.size());
+  for (const auto& curve : scene.curves)
+    bounds.push_back(polyline_bounds(curve.polyline));
   for (std::size_t first_curve = 0; first_curve < scene.curves.size(); ++first_curve) {
     const auto& first = scene.curves[first_curve].polyline;
     for (std::size_t second_curve = first_curve + 1U; second_curve < scene.curves.size();
          ++second_curve) {
+      if (!bounds_overlap(bounds[first_curve], bounds[second_curve]))
+        continue;
       const auto& second = scene.curves[second_curve].polyline;
       for (std::size_t first_segment = 1; first_segment < first.size(); ++first_segment) {
         for (std::size_t second_segment = 1; second_segment < second.size(); ++second_segment) {

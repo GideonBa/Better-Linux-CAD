@@ -647,24 +647,37 @@ build_jacobian(const SolveContext& context, const NumericVector& variables,
   return true;
 }
 
-[[nodiscard]] bool gauss_newton_step(const NumericMatrix& jacobian,
-                                     const NumericVector& residuals, double damping,
-                                     NumericVector& step) {
+struct NormalEquations {
+  NumericMatrix normal;
+  NumericVector rhs;
+};
+
+// Builds J^T J and -J^T r once per iteration; damping only perturbs the diagonal
+// per attempt, so the expensive accumulation is not repeated per damping attempt.
+[[nodiscard]] bool build_normal_equations(const NumericMatrix& jacobian,
+                                          const NumericVector& residuals,
+                                          NormalEquations& equations) {
   if (jacobian.size() != residuals.size()) return false;
   const std::size_t variable_count = jacobian.empty() ? 0U : jacobian.front().size();
-  NumericMatrix normal(variable_count, NumericVector(variable_count, 0.0));
-  NumericVector rhs(variable_count, 0.0);
+  equations.normal.assign(variable_count, NumericVector(variable_count, 0.0));
+  equations.rhs.assign(variable_count, 0.0);
   for (std::size_t row = 0U; row < jacobian.size(); ++row) {
     if (jacobian[row].size() != variable_count) return false;
     for (std::size_t column = 0U; column < variable_count; ++column) {
-      rhs[column] -= jacobian[row][column] * residuals[row];
+      equations.rhs[column] -= jacobian[row][column] * residuals[row];
       for (std::size_t other = 0U; other < variable_count; ++other)
-        normal[column][other] += jacobian[row][column] * jacobian[row][other];
+        equations.normal[column][other] += jacobian[row][column] * jacobian[row][other];
     }
   }
-  for (std::size_t index = 0U; index < variable_count; ++index)
+  return true;
+}
+
+[[nodiscard]] bool damped_gauss_newton_step(const NormalEquations& equations, double damping,
+                                            NumericVector& step) {
+  NumericMatrix normal = equations.normal;
+  for (std::size_t index = 0U; index < normal.size(); ++index)
     normal[index][index] += damping;
-  return solve_linear_system(std::move(normal), std::move(rhs), step);
+  return solve_linear_system(std::move(normal), equations.rhs, step);
 }
 
 enum class NumericSolveState { Converged, Stalled, MaximumIterations };
@@ -696,13 +709,17 @@ solve_numeric(const SolveContext& context, const std::vector<SketchSolverConstra
   for (std::size_t iteration = 0U; iteration < options.maximum_iterations; ++iteration) {
     auto jacobian = build_jacobian(context, variables, constraints, options);
     if (jacobian.has_error()) return Result<NumericSolveOutcome>::failure(jacobian.error());
+    NormalEquations equations;
+    if (!build_normal_equations(jacobian.value(), current, equations))
+      return Result<NumericSolveOutcome>::failure(Error::internal(
+          "sketch.solver", "solver Jacobian and residual dimensions are inconsistent"));
     const double current_rms = residual_rms(current);
     bool accepted = false;
     for (std::size_t damping_attempt = 0U;
          damping_attempt < options.maximum_damping_attempts && !accepted; ++damping_attempt) {
       const double damping = options.initial_damping * std::pow(10.0, damping_attempt);
       NumericVector step;
-      if (!gauss_newton_step(jacobian.value(), current, damping, step)) continue;
+      if (!damped_gauss_newton_step(equations, damping, step)) continue;
       for (std::size_t line_search = 0U; line_search < options.maximum_line_search_steps;
            ++line_search) {
         const double factor = std::ldexp(1.0, -static_cast<int>(line_search));
@@ -811,24 +828,40 @@ topology_from_variables(const SolveContext& context, const NumericVector& variab
       {0U, context.length_scale, 0.0, 0.0, 0.0}};
 }
 
+// Attributes canonical incremental redundancy by appending each constraint's
+// rows of the already-built final Jacobian. Central-difference rows of one
+// constraint are independent of the other constraints, so slicing the full
+// Jacobian in canonical block order is numerically identical to rebuilding
+// each single-constraint Jacobian.
 [[nodiscard]] Result<std::vector<std::string>>
 find_redundant_constraints(const SolveContext& context, const NumericVector& variables,
                            const std::vector<SketchSolverConstraint>& constraints,
-                           const SketchSolverOptions& options) {
+                           const NumericMatrix& jacobian, const SketchSolverOptions& options) {
   NumericMatrix accumulated;
+  accumulated.reserve(jacobian.size());
   std::size_t previous_rank = 0U;
+  std::size_t row_offset = 0U;
   std::vector<std::string> redundant;
   for (const auto& constraint : constraints) {
-    std::vector<SketchSolverConstraint> single{constraint};
-    auto block = build_jacobian(context, variables, single, options);
+    auto block = evaluate_constraint(context, variables, constraint);
     if (block.has_error()) return Result<std::vector<std::string>>::failure(block.error());
-    accumulated.insert(accumulated.end(), block.value().begin(), block.value().end());
+    const std::size_t block_rows = block.value().size();
+    if (row_offset + block_rows > jacobian.size())
+      return Result<std::vector<std::string>>::failure(Error::internal(
+          "sketch.solver", "solver Jacobian rows do not cover the canonical constraint blocks"));
+    accumulated.insert(accumulated.end(),
+                       jacobian.begin() + static_cast<std::ptrdiff_t>(row_offset),
+                       jacobian.begin() + static_cast<std::ptrdiff_t>(row_offset + block_rows));
+    row_offset += block_rows;
     auto rank = matrix_rank(accumulated, variables.size(), options);
     if (rank.has_error()) return Result<std::vector<std::string>>::failure(rank.error());
-    if (!block.value().empty() && rank.value() == previous_rank)
+    if (block_rows != 0U && rank.value() == previous_rank)
       redundant.push_back(constraint.id());
     previous_rank = rank.value();
   }
+  if (row_offset != jacobian.size())
+    return Result<std::vector<std::string>>::failure(Error::internal(
+        "sketch.solver", "solver Jacobian rows do not cover the canonical constraint blocks"));
   return Result<std::vector<std::string>>::success(std::move(redundant));
 }
 
@@ -1082,7 +1115,7 @@ SketchConstraintSolver::solve(const SketchTopology& topology, const SketchConstr
   auto rank = matrix_rank(jacobian.value(), outcome.value().variables.size(), options);
   if (rank.has_error()) return Result<SketchSolveResult>::failure(rank.error());
   auto redundant = find_redundant_constraints(context, outcome.value().variables,
-                                               system.constraints(), options);
+                                               system.constraints(), jacobian.value(), options);
   if (redundant.has_error()) return Result<SketchSolveResult>::failure(redundant.error());
   std::vector<SketchSolverDiagnostic> diagnostics;
   for (const auto& id : redundant.value())

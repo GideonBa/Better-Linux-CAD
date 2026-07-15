@@ -288,7 +288,7 @@ public:
     if (undo_.empty())
       return Result<std::size_t>::failure(
           Error::validation(current_.sketch().value(), "Sketch topology undo stack is empty"));
-    SketchEditTransaction transaction = undo_.back();
+    SketchEditTransaction transaction = std::move(undo_.back());
     undo_.pop_back();
     current_ = transaction.undo();
     redo_.push_back(std::move(transaction));
@@ -299,7 +299,7 @@ public:
     if (redo_.empty())
       return Result<std::size_t>::failure(
           Error::validation(current_.sketch().value(), "Sketch topology redo stack is empty"));
-    SketchEditTransaction transaction = redo_.back();
+    SketchEditTransaction transaction = std::move(redo_.back());
     redo_.pop_back();
     current_ = transaction.redo();
     undo_.push_back(std::move(transaction));

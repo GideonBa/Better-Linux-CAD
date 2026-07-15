@@ -163,7 +163,8 @@ private:
     if (controller.has_error()) {
       append_diagnostic(controller.error());
       controller_.reset();
-      viewport_->set_sketch_drag_handles({});
+      if (viewport_ != nullptr)
+        viewport_->set_sketch_drag_handles({});
       return;
     }
     controller_.emplace(std::move(controller.value()));

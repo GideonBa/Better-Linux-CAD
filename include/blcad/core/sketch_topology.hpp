@@ -256,19 +256,27 @@ public:
         return Result<SketchTopology>::failure(Error::validation(
             entities[index].id(), "sketch topology entity ids must be unique"));
 
-    const auto find_point = [&points](const SketchPointId& id) {
-      return std::find_if(points.begin(), points.end(),
-                          [&](const auto& point) { return point.id() == id; });
+    // Points and entities are sorted by id above, so reference validation may
+    // binary-search; this runs for every disposable solve/drag candidate.
+    const auto has_point = [&points](const SketchPointId& id) {
+      const auto found = std::lower_bound(points.begin(), points.end(), id.value(),
+                                          [](const auto& point, std::string_view value) {
+                                            return point.id().value() < value;
+                                          });
+      return found != points.end() && found->id() == id;
     };
     for (const auto& entity : entities)
       for (const auto& point : entity.points())
-        if (find_point(point) == points.end())
+        if (!has_point(point))
           return Result<SketchTopology>::failure(Error::validation(
               entity.id(), "sketch topology entity references an unknown point"));
 
     const auto find_entity = [&entities](std::string_view id) {
-      return std::find_if(entities.begin(), entities.end(),
-                          [&](const auto& entity) { return entity.id() == id; });
+      const auto found = std::lower_bound(entities.begin(), entities.end(), id,
+                                          [](const auto& entity, std::string_view value) {
+                                            return entity.id() < value;
+                                          });
+      return found != entities.end() && found->id() == id ? found : entities.end();
     };
     for (const auto& entity : entities)
       for (const auto& dependency : entity.entity_dependencies())
