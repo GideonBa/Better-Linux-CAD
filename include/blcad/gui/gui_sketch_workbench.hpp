@@ -206,6 +206,7 @@ private:
   std::optional<SketchId> active_sketch_;
   GuiWorkspace previous_workspace_{GuiWorkspace::Part};
   std::vector<GuiSelection> previous_selection_;
+  std::uint32_t previous_selection_filter_mask_{0xFFFFFFFFU};
   GuiSketchInteractionStage stage_{GuiSketchInteractionStage::Idle};
   GuiSketchFocusTarget focus_{GuiSketchFocusTarget::Canvas};
   std::string active_command_;
