@@ -37,6 +37,14 @@ bool GuiTaskState::return_to_editing() noexcept {
   return true;
 }
 
+bool GuiTaskState::return_to_selection() noexcept {
+  if (stage_ != GuiTaskStage::EditingParameters) {
+    return false;
+  }
+  stage_ = GuiTaskStage::CollectingSelection;
+  return true;
+}
+
 bool GuiTaskState::apply() noexcept {
   if (stage_ != GuiTaskStage::Preview) {
     return false;
