@@ -1,0 +1,40 @@
+name: Block 110 GUI Verify
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  gui:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: block-110-sketch-live-drag
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build pkg-config \
+            libocct-foundation-dev libocct-modeling-data-dev libocct-modeling-algorithms-dev \
+            libocct-data-exchange-dev libocct-visualization-dev libocct-ocaf-dev libocct-draw-dev \
+            qt6-base-dev nlohmann-json3-dev catch2
+      - name: Configure GUI
+        run: |
+          cmake -S . -B build/dev-gui -G Ninja \
+            -DBLCAD_BUILD_GEOMETRY=ON \
+            -DBLCAD_BUILD_GUI=ON \
+            -DBLCAD_BUILD_TESTS=ON \
+            -DCMAKE_BUILD_TYPE=Debug
+      - name: Build application and GUI tests
+        run: cmake --build build/dev-gui --target blcad_app blcad_gui_tests
+      - name: Run Block 110 focused tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          ./build/dev-gui/blcad_gui_tests "[gui][sketch-drag]"
+          ./build/dev-gui/blcad_gui_tests "[integration][sketch-live-solve]"
+      - name: Run complete dev-gui CTest
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: ctest --test-dir build/dev-gui --output-on-failure
