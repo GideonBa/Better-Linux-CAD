@@ -27,10 +27,10 @@ jobs:
             -DBLCAD_BUILD_GUI=ON \
             -DBLCAD_BUILD_TESTS=ON \
             -DCMAKE_BUILD_TYPE=Debug 2>&1 | tee configure.log
-      - name: Build application and GUI tests
+      - name: Build complete dev-gui tree
         run: |
           set -o pipefail
-          cmake --build build/dev-gui --target blcad_app blcad_gui_tests 2>&1 | tee build.log
+          cmake --build build/dev-gui 2>&1 | tee build.log
       - name: Run Block 110 focused tests
         env:
           QT_QPA_PLATFORM: offscreen
@@ -40,6 +40,17 @@ jobs:
             ./build/dev-gui/blcad_gui_tests "[gui][sketch-drag]"
             ./build/dev-gui/blcad_gui_tests "[integration][sketch-live-solve]"
           } 2>&1 | tee focused.log
+      - name: Repeat legacy Sketch lifecycle regression
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          set -o pipefail
+          {
+            for attempt in 1 2 3; do
+              echo "Legacy Sketch lifecycle attempt ${attempt}"
+              ./build/dev-gui/blcad_gui_tests "Block 106 shell enters edits repeats and finishes a contextual Sketch"
+            done
+          } 2>&1 | tee regression.log
       - name: Run complete dev-gui CTest
         env:
           QT_QPA_PLATFORM: offscreen
@@ -55,5 +66,6 @@ jobs:
             configure.log
             build.log
             focused.log
+            regression.log
             ctest.log
           if-no-files-found: ignore
