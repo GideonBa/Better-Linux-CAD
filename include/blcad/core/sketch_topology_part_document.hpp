@@ -3,9 +3,11 @@
 #include "blcad/core/part_document.hpp"
 #include "blcad/core/sketch_edit_commands.hpp"
 
+#include <cstddef>
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 namespace blcad {
 
@@ -20,31 +22,6 @@ public:
     auto result = Sketch::create(source.id(), source.name(), source.workplane());
     if (result.has_error()) return result;
 
-    const auto entity = [&](std::string_view family, const SketchEntityId& id,
-                            SketchTopologyEntityKind expected)
-        -> Result<const SketchTopologyEntity*> {
-      const std::string topology_id = std::string(family) + id.value();
-      const auto* found = topology.find_entity(topology_id);
-      if (found == nullptr)
-        return Result<const SketchTopologyEntity*>::failure(
-            Error::validation(topology_id, "Sketch topology is missing a legacy entity"));
-      if (found->kind() != expected)
-        return Result<const SketchTopologyEntity*>::failure(
-            Error::validation(topology_id, "Sketch topology entity kind does not match legacy entity"));
-      return Result<const SketchTopologyEntity*>::success(found);
-    };
-    const auto profile_entity = [&](const ProfileId& id, SketchTopologyEntityKind expected)
-        -> Result<const SketchTopologyEntity*> {
-      const std::string topology_id = "profile/" + id.value();
-      const auto* found = topology.find_entity(topology_id);
-      if (found == nullptr)
-        return Result<const SketchTopologyEntity*>::failure(
-            Error::validation(topology_id, "Sketch topology is missing a legacy profile"));
-      if (found->kind() != expected)
-        return Result<const SketchTopologyEntity*>::failure(
-            Error::validation(topology_id, "Sketch topology profile kind does not match legacy profile"));
-      return Result<const SketchTopologyEntity*>::success(found);
-    };
     const auto point = [&](const SketchTopologyEntity& owner, std::size_t index)
         -> Result<Point2> {
       if (index >= owner.points().size())
@@ -56,60 +33,97 @@ public:
             Error::validation(owner.id(), "Sketch topology entity references an unknown point"));
       return Result<Point2>::success(found->position());
     };
+    const auto sketch_entity_id = [](const SketchTopologyEntity& entity)
+        -> Result<SketchEntityId> {
+      constexpr std::string_view prefix = "entity/";
+      if (!std::string_view(entity.id()).starts_with(prefix) || entity.id().size() == prefix.size())
+        return Result<SketchEntityId>::failure(Error::validation(
+            entity.id(), "materialized Sketch entities require the canonical entity/ id prefix"));
+      return Result<SketchEntityId>::success(SketchEntityId(entity.id().substr(prefix.size())));
+    };
+    const auto profile_entity = [&](const ProfileId& id, SketchTopologyEntityKind expected)
+        -> Result<const SketchTopologyEntity*> {
+      const std::string topology_id = "profile/" + id.value();
+      const auto* found = topology.find_entity(topology_id);
+      if (found == nullptr)
+        return Result<const SketchTopologyEntity*>::failure(
+            Error::validation(topology_id, "Sketch topology is missing a legacy profile"));
+      if (found->kind() != expected)
+        return Result<const SketchTopologyEntity*>::failure(Error::validation(
+            topology_id, "Sketch topology profile kind does not match legacy profile"));
+      return Result<const SketchTopologyEntity*>::success(found);
+    };
 
-    for (const auto& legacy : source.line_segments()) {
-      auto current = entity("entity/", legacy.id(), SketchTopologyEntityKind::Line);
-      if (current.has_error()) return Result<Sketch>::failure(current.error());
-      auto start = point(*current.value(), 0U);
-      auto end = point(*current.value(), 1U);
-      if (start.has_error()) return Result<Sketch>::failure(start.error());
-      if (end.has_error()) return Result<Sketch>::failure(end.error());
-      auto line = LineSegment::create(legacy.id(), start.value(), end.value());
-      if (line.has_error()) return Result<Sketch>::failure(line.error());
-      auto added = result.value().add_entity(std::move(line.value()));
-      if (added.has_error()) return Result<Sketch>::failure(added.error());
-    }
-    for (const auto& legacy : source.arc_segments()) {
-      auto current = entity("entity/", legacy.id(), SketchTopologyEntityKind::Arc);
-      if (current.has_error()) return Result<Sketch>::failure(current.error());
-      auto start = point(*current.value(), 0U);
-      auto mid = point(*current.value(), 1U);
-      auto end = point(*current.value(), 2U);
-      if (start.has_error()) return Result<Sketch>::failure(start.error());
-      if (mid.has_error()) return Result<Sketch>::failure(mid.error());
-      if (end.has_error()) return Result<Sketch>::failure(end.error());
-      auto arc = ArcSegment::create_three_point(legacy.id(), start.value(), mid.value(), end.value());
-      if (arc.has_error()) return Result<Sketch>::failure(arc.error());
-      auto added = result.value().add_entity(std::move(arc.value()));
-      if (added.has_error()) return Result<Sketch>::failure(added.error());
-    }
-    for (const auto& legacy : source.spline_segments()) {
-      auto current = entity("entity/", legacy.id(), SketchTopologyEntityKind::Spline);
-      if (current.has_error()) return Result<Sketch>::failure(current.error());
-      auto start = point(*current.value(), 0U);
-      auto control1 = point(*current.value(), 1U);
-      auto control2 = point(*current.value(), 2U);
-      auto end = point(*current.value(), 3U);
-      if (start.has_error()) return Result<Sketch>::failure(start.error());
-      if (control1.has_error()) return Result<Sketch>::failure(control1.error());
-      if (control2.has_error()) return Result<Sketch>::failure(control2.error());
-      if (end.has_error()) return Result<Sketch>::failure(end.error());
-      auto spline = SplineSegment::create_cubic_bezier(
-          legacy.id(), start.value(), control1.value(), control2.value(), end.value());
-      if (spline.has_error()) return Result<Sketch>::failure(spline.error());
-      auto added = result.value().add_entity(std::move(spline.value()));
-      if (added.has_error()) return Result<Sketch>::failure(added.error());
+    for (const auto& current : topology.entities()) {
+      if (current.kind() != SketchTopologyEntityKind::Line &&
+          current.kind() != SketchTopologyEntityKind::Arc &&
+          current.kind() != SketchTopologyEntityKind::Spline)
+        continue;
+      if (current.reference())
+        return Result<Sketch>::failure(Error::validation(
+            current.id(), "authored legacy curves cannot materialize as reference geometry"));
+      if (current.construction())
+        return Result<Sketch>::failure(Error::validation(
+            current.id(),
+            "construction curve flags require canonical Sketch topology JSON persistence"));
+      auto id = sketch_entity_id(current);
+      if (id.has_error()) return Result<Sketch>::failure(id.error());
+
+      if (current.kind() == SketchTopologyEntityKind::Line) {
+        auto start = point(current, 0U);
+        auto end = point(current, 1U);
+        if (start.has_error()) return Result<Sketch>::failure(start.error());
+        if (end.has_error()) return Result<Sketch>::failure(end.error());
+        auto line = LineSegment::create(id.value(), start.value(), end.value());
+        if (line.has_error()) return Result<Sketch>::failure(line.error());
+        auto added = result.value().add_entity(std::move(line.value()));
+        if (added.has_error()) return Result<Sketch>::failure(added.error());
+      } else if (current.kind() == SketchTopologyEntityKind::Arc) {
+        auto start = point(current, 0U);
+        auto mid = point(current, 1U);
+        auto end = point(current, 2U);
+        if (start.has_error()) return Result<Sketch>::failure(start.error());
+        if (mid.has_error()) return Result<Sketch>::failure(mid.error());
+        if (end.has_error()) return Result<Sketch>::failure(end.error());
+        auto arc = ArcSegment::create_three_point(id.value(), start.value(), mid.value(), end.value());
+        if (arc.has_error()) return Result<Sketch>::failure(arc.error());
+        auto added = result.value().add_entity(std::move(arc.value()));
+        if (added.has_error()) return Result<Sketch>::failure(added.error());
+      } else {
+        auto start = point(current, 0U);
+        auto control1 = point(current, 1U);
+        auto control2 = point(current, 2U);
+        auto end = point(current, 3U);
+        if (start.has_error()) return Result<Sketch>::failure(start.error());
+        if (control1.has_error()) return Result<Sketch>::failure(control1.error());
+        if (control2.has_error()) return Result<Sketch>::failure(control2.error());
+        if (end.has_error()) return Result<Sketch>::failure(end.error());
+        auto spline = SplineSegment::create_cubic_bezier(
+            id.value(), start.value(), control1.value(), control2.value(), end.value());
+        if (spline.has_error()) return Result<Sketch>::failure(spline.error());
+        auto added = result.value().add_entity(std::move(spline.value()));
+        if (added.has_error()) return Result<Sketch>::failure(added.error());
+      }
     }
 
     for (const auto& reference : source.projected_points()) {
+      if (topology.find_entity("entity/" + reference.id().value()) == nullptr)
+        return Result<Sketch>::failure(Error::validation(
+            reference.id().value(), "reference Sketch topology entities are read-only"));
       auto added = result.value().add_reference(reference);
       if (added.has_error()) return Result<Sketch>::failure(added.error());
     }
     for (const auto& reference : source.projected_lines()) {
+      if (topology.find_entity("entity/" + reference.id().value()) == nullptr)
+        return Result<Sketch>::failure(Error::validation(
+            reference.id().value(), "reference Sketch topology entities are read-only"));
       auto added = result.value().add_reference(reference);
       if (added.has_error()) return Result<Sketch>::failure(added.error());
     }
     for (const auto& reference : source.reference_generated_lines()) {
+      if (topology.find_entity("entity/" + reference.id().value()) == nullptr)
+        return Result<Sketch>::failure(Error::validation(
+            reference.id().value(), "reference Sketch topology entities are read-only"));
       auto added = result.value().add_reference(reference);
       if (added.has_error()) return Result<Sketch>::failure(added.error());
     }
@@ -236,17 +250,27 @@ public:
           sketch_id.empty() ? "sketch_topology_edit" : sketch_id.value(),
           "Part document does not contain the requested Sketch"));
 
+    const Sketch source_snapshot = *source;
     SketchTopologyMigrationReport migration;
-    auto topology = SketchTopology::migrate_legacy(*source, &migration);
+    auto topology = SketchTopology::migrate_legacy(source_snapshot, &migration);
     if (topology.has_error())
       return Result<SketchTopologyPartEditResult>::failure(topology.error());
     auto transaction = SketchEditCommandExecutor{}.apply(topology.value(), command);
     if (transaction.has_error())
       return Result<SketchTopologyPartEditResult>::failure(transaction.error());
     auto materialized = SketchTopologyLegacyMaterializer{}.materialize(
-        *source, transaction.value().after());
+        source_snapshot, transaction.value().after());
     if (materialized.has_error())
       return Result<SketchTopologyPartEditResult>::failure(materialized.error());
+
+    auto representable = SketchTopology::migrate_legacy(materialized.value());
+    if (representable.has_error())
+      return Result<SketchTopologyPartEditResult>::failure(representable.error());
+    if (representable.value() != transaction.value().after())
+      return Result<SketchTopologyPartEditResult>::failure(Error::validation(
+          sketch_id.value(),
+          "topology edit cannot be represented by legacy PartDocument Sketch JSON without identity loss"));
+
     auto updated = document.update_sketch(std::move(materialized.value()));
     if (updated.has_error())
       return Result<SketchTopologyPartEditResult>::failure(updated.error());
