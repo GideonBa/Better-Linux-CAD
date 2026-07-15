@@ -125,10 +125,18 @@ public:
       if (point.empty())
         return Result<SketchTopologyEntity>::failure(
             Error::validation(object_id, "sketch topology point references must not be empty"));
-    for (const auto& dependency : entity_dependencies)
-      if (dependency.empty())
+    for (std::size_t index = 0; index < entity_dependencies.size(); ++index) {
+      if (entity_dependencies[index].empty())
         return Result<SketchTopologyEntity>::failure(
             Error::validation(object_id, "sketch topology dependencies must not be empty"));
+      if (entity_dependencies[index] == id)
+        return Result<SketchTopologyEntity>::failure(
+            Error::validation(object_id, "sketch topology entity cannot depend on itself"));
+      for (std::size_t previous = 0; previous < index; ++previous)
+        if (entity_dependencies[previous] == entity_dependencies[index])
+          return Result<SketchTopologyEntity>::failure(Error::validation(
+              object_id, "ordered sketch topology dependencies must be unique"));
+    }
 
     const std::size_t expected_points = [&] {
       switch (kind) {
@@ -156,10 +164,6 @@ public:
       return Result<SketchTopologyEntity>::failure(Error::validation(
           object_id, "sketch topology entity requires distinct defining point identities"));
 
-    std::sort(entity_dependencies.begin(), entity_dependencies.end());
-    entity_dependencies.erase(
-        std::unique(entity_dependencies.begin(), entity_dependencies.end()),
-        entity_dependencies.end());
     return Result<SketchTopologyEntity>::success(SketchTopologyEntity(
         std::move(id), kind, std::move(points), std::move(entity_dependencies), flags));
   }
@@ -242,6 +246,15 @@ public:
       if (points[index - 1].id() == points[index].id())
         return Result<SketchTopology>::failure(Error::validation(
             points[index].id().value(), "sketch point ids must be unique"));
+    constexpr double point_tolerance = 1.0e-9;
+    for (std::size_t first = 0; first < points.size(); ++first)
+      for (std::size_t second = first + 1U; second < points.size(); ++second)
+        if (points[first].flags() == points[second].flags() &&
+            std::abs(points[first].position().x - points[second].position().x) <= point_tolerance &&
+            std::abs(points[first].position().y - points[second].position().y) <= point_tolerance)
+          return Result<SketchTopology>::failure(Error::validation(
+              points[second].id().value(),
+              "coincident coordinates must share one canonical Sketch point identity"));
 
     std::sort(entities.begin(), entities.end(), [](const auto& left, const auto& right) {
       return left.id() < right.id();
@@ -323,24 +336,24 @@ public:
       candidates.push_back({profile_id(profile.id()), SketchTopologyEntityKind::CircleProfile,
                             {{"center", profile.center()}}, {}, {}});
     for (const auto& profile : sketch.closed_profiles()) {
-      std::vector<std::string> dependencies;
-      for (const auto& line : profile.line_segments()) dependencies.push_back(entity_id(line));
+      std::vector<std::string> ordered_dependencies;
+      for (const auto& line : profile.line_segments()) ordered_dependencies.push_back(entity_id(line));
       candidates.push_back({profile_id(profile.id()), SketchTopologyEntityKind::ClosedProfile,
-                            {}, std::move(dependencies), {}});
+                            {}, std::move(ordered_dependencies), {}});
     }
     for (const auto& profile : sketch.arc_closed_profiles()) {
-      std::vector<std::string> dependencies;
-      for (const auto& curve : profile.curve_segments()) dependencies.push_back(entity_id(curve));
+      std::vector<std::string> ordered_dependencies;
+      for (const auto& curve : profile.curve_segments()) ordered_dependencies.push_back(entity_id(curve));
       candidates.push_back({profile_id(profile.id()), SketchTopologyEntityKind::ArcClosedProfile,
-                            {}, std::move(dependencies), {}});
+                            {}, std::move(ordered_dependencies), {}});
     }
     for (const auto& profile : sketch.composite_closed_profiles()) {
-      std::vector<std::string> dependencies;
-      for (const auto& curve : profile.outer_contour()) dependencies.push_back(entity_id(curve));
+      std::vector<std::string> ordered_dependencies;
+      for (const auto& curve : profile.outer_contour()) ordered_dependencies.push_back(entity_id(curve));
       for (const auto& contour : profile.inner_contours())
-        for (const auto& curve : contour) dependencies.push_back(entity_id(curve));
+        for (const auto& curve : contour) ordered_dependencies.push_back(entity_id(curve));
       candidates.push_back({profile_id(profile.id()), SketchTopologyEntityKind::CompositeClosedProfile,
-                            {}, std::move(dependencies), {}});
+                            {}, std::move(ordered_dependencies), {}});
     }
     for (const auto& pattern : sketch.circular_hole_patterns())
       candidates.push_back({profile_id(pattern.id()), SketchTopologyEntityKind::CircularHolePattern,
@@ -364,7 +377,7 @@ public:
     std::vector<SketchTopologyPoint> points;
     std::vector<SketchTopologyEntity> entities;
     constexpr double tolerance = 1.0e-9;
-    const auto same_position = [](Point2 left, Point2 right) {
+    const auto same_position = [tolerance](Point2 left, Point2 right) {
       return std::abs(left.x - right.x) <= tolerance &&
              std::abs(left.y - right.y) <= tolerance;
     };
