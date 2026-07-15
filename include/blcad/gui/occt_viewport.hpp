@@ -101,6 +101,12 @@ public:
   [[nodiscard]] const std::optional<GuiSketchHit>& hovered_sketch_hit() const noexcept;
   [[nodiscard]] const std::optional<GuiSketchScreenRect>& sketch_box_selection() const noexcept;
   [[nodiscard]] std::size_t sketch_grid_line_count() const noexcept;
+  [[nodiscard]] Result<GuiSketchScreenPoint> sketch_plane_to_screen(Point2 point) const {
+    if (!sketch_interaction_)
+      return Result<GuiSketchScreenPoint>::failure(
+          Error::validation("gui.occt_viewport", "Sketch interaction is not active"));
+    return sketch_interaction_->mapping().plane_to_screen(point);
+  }
   [[nodiscard]] bool native_viewer_available() const noexcept;
   [[nodiscard]] const std::string& initialization_error() const noexcept;
 
