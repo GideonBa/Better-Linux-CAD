@@ -1,33 +1,41 @@
 # Interactive Sketcher Sequence MVP-8
 
-Status: in progress. Blocks 106–107 are implemented; Block 108 is the current next technical step.
+Status: in progress. Blocks 106–108 are implemented; Block 109 is the current next technical step.
 Blocks 106–121 precede Interactive Modeling MVP-9 (Blocks 122–131,
 `docs/interactive-modeling-sequence-mvp9.md`) and STEP Import MVP-10 (Blocks 132–138).
 
 This phase turns the Block-99 validation surface into a productive, Inventor-familiar Sketch
-workbench. The goal is the same interaction quality—direct manipulation, visible constraints,
-in-canvas dimensions, predictable commands, and immediate feedback—not a pixel-identical copy of
-Inventor or its protected assets.
+workbench. The target is direct manipulation, visible constraints, in-canvas dimensions, predictable
+commands, and immediate feedback without copying branded assets or product-specific UI layouts.
 
 ## Product outcome
 
-A user can enter a planar Sketch, create common mechanical profiles without typing JSON, drag
-unconstrained points with the mouse, watch constrained geometry solve continuously, add and edit
-dimensions in the canvas, repair conflicts, and leave the Sketch with one undoable document result.
-All persistent intent remains usable by the existing headless Core/Geometry path.
+A user can enter a planar Sketch, create common mechanical profiles without authoring JSON, drag
+unconstrained points, watch constrained geometry solve continuously, add and edit dimensions in the
+canvas, repair conflicts, and leave the Sketch with one undoable document result. Persistent intent
+remains available to headless Core/Geometry consumers.
 
-The phase also gives currently implemented Sketch3D points and curves direct manipulation. It does
-not claim full commercial-CAD parity; unsupported tools stay visibly unavailable.
+The phase also gives implemented Sketch3D points and curves direct manipulation. Unsupported tools
+remain visibly unavailable; the sequence does not claim commercial-CAD parity before acceptance.
 
-## Why this needs a separate phase
+## Core reason for the phase order
 
-The current planar model embeds endpoints directly in line, arc, and spline records and the current
-diagnostic layer does not solve a general constraint system. A GUI-only drag implementation would
-therefore tear connected profiles apart or create geometry that headless recompute cannot reproduce.
-Blocks 108–110 first establish shared point identity, a deterministic solver, and transactional
-candidate solving. The viewport then becomes a client of those authorities.
+The historical planar model embeds `Point2` coordinates directly in line, arc, spline, and profile
+records. Equal coordinates are not shared identity and the historical diagnostic layer is not a
+general constraint solver. A GUI-only drag implementation would therefore tear connected profiles
+apart or create results that headless recompute cannot reproduce.
 
-## Frozen Sketch workspace
+Blocks 108–110 deliberately establish:
+
+```text
+shared point/entity topology
+  -> deterministic general solver
+  -> transactional solver-backed drag
+```
+
+The viewport is a client of those authorities.
+
+## Frozen Sketch workspace and mouse contract
 
 ```text
 +--------------------------------------------------------------------------------+
@@ -46,304 +54,308 @@ candidate solving. The viewport then becomes a client of those authorities.
 +--------------------------------------------------------------------------------+
 ```
 
-Mouse conventions are frozen before implementation:
+Mouse conventions remain:
 
-- left click selects or places; drag moves a handle or box-selects from empty space;
-- `Esc` backs out one command stage, then exits the command; it never silently commits;
-- right click opens a small context menu and repeats the last compatible command where sensible;
-- `Ctrl` toggles selection, `Shift` adds selection, `Delete` removes validated selected intent;
-- numeric typing while creating or dragging opens a transient heads-up field;
-- middle drag pans, wheel zooms, and the existing orbit gesture remains disabled while normal to a
-  planar Sketch unless the user deliberately leaves the normal view;
-- double click edits a dimension or entity property; `Enter` accepts the active numeric value.
+- left click selects or places; drag moves a handle or box-selects from empty canvas;
+- `Esc` backs out one command stage and never silently commits;
+- right click opens contextual actions and may repeat the last compatible command;
+- `Ctrl` toggles selection and `Shift` adds selection;
+- `Delete` invokes validated remove intent rather than erasing presentation objects;
+- numeric typing during creation or drag opens the transient numeric HUD;
+- middle drag pans, wheel zooms, and normal-to-plane Sketch editing keeps orbit disabled until the
+  user deliberately leaves normal view;
+- double click edits a dimension or supported entity property; `Enter` accepts numeric input.
 
-## Architecture rules
+## Non-negotiable architecture rules
 
-1. Screen coordinates, hover state, snap candidates, rubber-band previews, and glyph placement are
-   transient GUI state and never persistent model identity.
+1. Screen coordinates, hover state, snap candidates, rubber-band previews, interaction samples, and
+   glyph placement are transient GUI state.
 2. Shared Sketch points, entities, constraints, dimensions, and construction/reference state are
-   persistent Core intent with stable ids and canonical JSON.
-3. The solver is a headless deterministic Core service. Widgets do not contain constraint math.
-4. Dragging solves a disposable candidate at interactive frequency. Mouse release commits exactly
-   one document transaction; `Esc` or solver failure restores the pre-drag state.
-5. A constrained point may move other geometry through the solver. Fixed or fully constrained
-   geometry refuses incompatible drag instead of deleting constraints.
-6. Automatic constraints are previewed as inference glyphs and become persistent only when the
-   placement is accepted. Holding the frozen suppression modifier disables inference for that pick.
-7. Projected geometry remains associative and read-only. Conversion to ordinary geometry is an
-   explicit command.
-8. Every creation and edit command has keyboard-accessible Apply/Cancel behavior and an equivalent
-   headless command path.
-9. Solver failure, non-convergence, ambiguity, or over-constraint publishes diagnostics but no
-   partial document mutation.
-10. Existing Block-99 JSON loads deterministically through an explicit schema migration; save/load
-    never depends on GUI session state.
+   Core intent with stable ids and canonical persistence.
+3. The solver is a deterministic headless Core service; widgets do not own constraint mathematics.
+4. Dragging solves a disposable candidate. Release commits one document transaction; `Esc`, lost
+   capture, or failed solve restores the pre-drag snapshot.
+5. Fixed or fully constrained geometry refuses incompatible drag instead of deleting constraints.
+6. Automatic constraints are transient inference candidates until accepted.
+7. Projected geometry remains associative and read-only until an explicit conversion command.
+8. Every creation/edit workflow has keyboard-accessible Apply/Cancel and a headless command path.
+9. Solver failure, non-convergence, ambiguity, or over-constraint publishes diagnostics and no
+   partial persistent mutation.
+10. Historical PartDocument Sketch JSON migrates deterministically through an explicit Core boundary;
+    save/load never depends on GUI session state.
 
-## Canonical authority references (anti-hallucination contract)
+## Canonical authority rule
 
-Every block below lists **Existing authority** — the canonical documents whose contracts the block
-may rely on. An implementing agent (human or AI) must read those documents before coding and may
-rely only on contracts named there or verified in the current code. A capability that is neither
-named in a block's Existing authority nor explicitly introduced by the block text does not exist
-for that block. Where a block extends Core intent (for example ellipses, slots, or Sketch text),
-the block text says so explicitly; new intent is never introduced silently to make a widget
-possible. The Block-94 sketch-domain coverage matrix at the end of this document is the
-authoritative feature-to-block mapping.
+Every block below names the existing authorities it may consume. A capability not present in those
+contracts or explicitly introduced by the block does not exist for that block. New persistent intent
+must be declared at the numbered boundary and proven headlessly before a GUI consumer depends on it.
 
 ## Frozen phase order
 
 ```text
-106 Sketch workspace, interaction state, command HUD, and usability contract — implemented
-107 plane mapping, hit testing, box selection, grid, snapping, and inference preview — implemented
-108 shared planar point/entity topology, mutation commands, JSON migration, and undo semantics — next
-109 deterministic planar constraint solver, DOF accounting, conflicts, and diagnostics
-110 solver-backed mouse dragging, handles, live preview, and atomic commit
-111 point, line, polyline, rectangle, polygon, and construction-geometry creation
-112 circle, arc, ellipse, and slot creation/editing
-113 spline fit/control-point editing, continuity handles, and Sketch text
+106 Sketch workspace, interaction state, command HUD, usability contract — implemented
+107 plane mapping, hit testing, box selection, grid, snapping, inference preview — implemented
+108 shared planar point/entity topology, mutation commands, JSON migration, undo — implemented
+109 deterministic planar constraint solver, DOF accounting, conflicts, diagnostics — next
+110 solver-backed mouse dragging, handles, live preview, atomic commit
+111 point, line, polyline, rectangle, polygon, construction-geometry creation
+112 circle, arc, ellipse, slot creation/editing
+113 spline editing, continuity handles, Sketch text
 114 manual and automatic geometric constraints with glyph interaction
-115 driving/reference dimensions, in-canvas editing, and parameter/expression binding
-116 trim, extend, split, corner fillet, and corner chamfer tools
-117 offset, project/include, construction axes, and associative reference workflows
-118 move, rotate, scale, copy, mirror, and rectangular/circular Sketch patterns
-119 region recognition, profile selection, diagnostics, repair, and Finish Sketch workflow
+115 driving/reference dimensions, in-canvas editing, parameter/expression binding
+116 trim, extend, split, corner fillet, corner chamfer
+117 offset, project/include, construction axes, associative references
+118 move, rotate, scale, copy, mirror, rectangular/circular Sketch patterns
+119 region recognition, profile selection, diagnostics, repair, Finish Sketch
 120 interactive Sketch3D creation and direct point/curve manipulation
-121 integrated usability, persistence, solver, performance, and GUI/headless acceptance
+121 integrated usability, persistence, solver, performance, GUI/headless acceptance
 122–131 Interactive Part & Assembly Modeling MVP-9
 132–138 STEP Import MVP-10
 ```
 
 ## Block 106 — Sketch workspace and interaction contract — Implemented
 
-Planar Sketch is now a real contextual `GuiWorkspace::Sketch`. `GuiSketchWorkspace` owns only
-transient interaction state and projects its Sketch-specific stages onto the existing `GuiTaskState`
-authority. The frozen state machine is implemented as:
+Planar Sketch is a real contextual `GuiWorkspace::Sketch`. `GuiSketchWorkspace` projects its
+Sketch-specific stages onto the existing generic `GuiTaskState` authority:
 
 ```text
-idle -> hover -> collecting picks -> numeric input -> preview -> commit | cancel
-idle -> selected handle -> drag candidate -> commit | cancel
+Idle
+Hover
+CollectingPicks
+NumericInput
+Preview
+SelectedHandle
+DragCandidate
 ```
 
-`Esc` backs Preview to Numeric Input, Numeric Input to pick collection, and pick collection to a full
-command cancel. Repeatable commands publish transient repeat state. The Sketch surface exposes the
-frozen `Create`, `Constrain`, `Dimension`, `Modify`, and `Project` groups plus
-`Entities`, `Constraints`, `Dimensions`, and `Diagnostics` browser-section contracts. The command
-bar renders the groups and a numeric HUD; the status bar exposes cursor, snap/inference, remaining
-DOF, and solve state. Block 107 now produces cursor/hit/snap interaction state; Block 109 remains the
-owner of DOF and general solve status.
-
-`Enter Sketch` resolves the existing workplane, captures previous workspace/selection plus a
-transient viewport camera bookmark and selection-filter mask, activates normal orthographic view,
-uses the `SketchEntity | Edge | Vertex` filter, and enables the crosshair. `Finish Sketch` rejects
-active command stages and existing diagnostic errors, restores the previous workspace, semantic
-selection, Eye/Target/Up/Scale/projection camera state, and selection filter, and does not invent a
-downstream Part feature. The existing line command is the first real HUD client: a disposable Sketch
-copy validates the numeric candidate before Preview and the existing Block-99 workbench commits one
-Part transaction.
+`Esc` backs out one stage. Enter/Finish Sketch capture and restore workspace, semantic selection,
+viewport filter, and complete camera bookmark. The Sketch surface exposes `Create`, `Constrain`,
+`Dimension`, `Modify`, and `Project` plus `Entities`, `Constraints`, `Dimensions`, and `Diagnostics`.
+The numeric HUD validates a disposable line candidate before Preview and commits through the existing
+atomic Part transaction path.
 
 Canonical contract: `docs/gui-interactive-sketch-workspace-mvp8.md`.
 
-Existing authority: `docs/gui-feature-validation-sequence-mvp7.md` (Block-95 command lifecycle,
-Block-96 transactions), `docs/gui-sketch-workbench-mvp7.md`, `docs/workplane-resolver-mvp2.md`,
+Existing authority: `docs/gui-feature-validation-sequence-mvp7.md`,
+`docs/gui-sketch-workbench-mvp7.md`, `docs/workplane-resolver-mvp2.md`,
 `docs/sketch-mvp1-data-model.md`.
 
 Focused tags: `[gui][sketch-workspace]`, `[gui][sketch-command-lifecycle]`.
 
 ## Block 107 — Plane interaction, hit testing, snapping, and inference — Implemented
 
-`GuiSketchPlaneMapping` now provides one device-independent Screen-DIP -> view-ray -> active-plane
--> model-space mapping and the reverse model -> Screen-DIP projection. The native OCCT bridge uses
-`V3d_View` pixel/ray conversion with explicit Qt device-pixel-ratio conversion; the deterministic
-offscreen provider uses an explicit plane center and model-units-per-DIP scale.
+`GuiSketchPlaneMapping` is the device-independent Screen-DIP -> view-ray -> active-plane ->
+model-space mapping and reverse projection. The native OCCT bridge converts Qt DIP to physical view
+pixels explicitly; the deterministic offscreen provider uses an explicit plane center and
+model-units-per-DIP scale.
 
-`GuiSketchInteractionSceneBuilder` derives transient line/arc/spline/profile/reference curves, snap
-landmarks, annotation anchors, and intersections from the current persistent Sketch. The controller
-uses zoom-stable DIP tolerances, the frozen `Point -> Curve -> Dimension -> Glyph` hit priority,
-stable repeated-click cycling, left-to-right Window selection, right-to-left Crossing selection,
-bounded grid display, grid snap, origin/axis/endpoint/midpoint/center/quadrant/intersection/nearest
-snaps, and horizontal/vertical/X/Y-alignment inference candidates. Eligible snap candidates are
-ordered by model-space distance, screen-space distance, stable snap-family priority, and candidate
-id.
+`GuiSketchInteractionSceneBuilder` derives transient curves, landmarks, annotations, and intersections.
+The frozen hit priority is:
 
-`OcctViewport` renders the grid, highest-priority hover product, snap marker, and box-selection
-rubber band in one transparent transient overlay. `install_sketch_interaction_binder(...)` projects
-the active Core Sketch into that authority, publishes raw plane cursor coordinates and snap/inference
-text into the Block-106 status surface, synchronizes semantic selection with the existing session,
-and disables direct selection while a Sketch command task is active. `Show grid` and `Snap to grid`
-are contextual Sketch actions. No interaction sample, pixel, hover, grid, or snap result is persisted.
+```text
+Point -> Curve -> Dimension -> Glyph
+```
+
+Repeated click cycles deterministic overlapping hits. Empty-space drag uses left-to-right Window and
+right-to-left Crossing semantics. Grid, grid snap, origin/axis/endpoint/midpoint/center/quadrant/
+intersection/nearest snaps, and horizontal/vertical/X/Y alignment inference are implemented.
 
 Canonical contract: `docs/gui-sketch-plane-interaction-mvp8.md`.
 
-Existing authority: `docs/gui-sketch-workbench-mvp7.md` (plane-coordinate mapper),
-`docs/workplane-resolver-mvp2.md`, `docs/bounded-workplane-validation-mvp2.md`,
-`docs/gui-feature-validation-sequence-mvp7.md` (Block-97 viewport/picking),
-`docs/gui-interactive-sketch-workspace-mvp8.md` (workspace status, selection filter, and command
-lifecycle consumers).
+Focused tags: `[gui][sketch-hit-test]`, `[gui][sketch-snap]`,
+`[gui][sketch-box-selection]`.
 
-Focused tags: `[gui][sketch-hit-test]`, `[gui][sketch-snap]`, `[gui][sketch-box-selection]`.
+## Block 108 — Shared point topology and editable Core commands — Implemented
 
-## Block 108 — Shared point topology and editable Core commands
+Block 108 adds `SketchPointId`, `SketchTopologyPoint`, `SketchTopologyEntity`, and one canonical
+`SketchTopology` snapshot. Lines, arcs, splines, rectangle/circle/pattern centers, profile
+relationships, and reference entities are projected into stable topology identities.
 
-Replace disconnected embedded endpoints with stable shared planar point identity. Lines, arcs,
-splines, and profiles reference points; coincident endpoints may share one point without relying on
-equal floating-point coordinates. Add headless add/move/replace/remove commands, dependency-safe
-deletion, construction/reference flags, canonical ordering, schema migration from existing Sketch
-JSON, and exact undo/redo. Migration must preserve existing generated geometry and semantic ids
-where possible and report every unavoidable identity change.
+Historical embedded `Point2` usages migrate deterministically. Candidate entities are processed by
+canonical topology id; same-flag coincident point usages within `1e-9` share one point id. Every
+collapsed legacy identity is recorded in `SketchTopologyMigrationReport`. For example, a triangle
+with six historical endpoint usages migrates to three shared points and three explicit identity-change
+records, independent of entity insertion order.
 
-Existing authority: `docs/sketch-mvp1-data-model.md`, `docs/general-closed-sketch-profile-mvp.md`,
-`docs/arc-and-trim-extend-sketch-profile-mvp.md`, `docs/spline-and-tangent-continuity-mvp.md`,
-`docs/construction-geometry-mvp.md`, `docs/semantic-references.md`, `docs/file-format.md`
-(current Sketch JSON being migrated), and `docs/gui-sketch-plane-interaction-mvp8.md` (stable
-transient selection/snap consumers that must survive the topology migration).
+Global points and entities are lexicographic id order. Ordered entity point roles and ordered profile
+curve dependencies remain semantic order and are never sorted.
+
+Explicit topology flags are:
+
+```text
+construction
+reference
+```
+
+Reference and construction cannot both be true. Projected point/line and reference-generated line
+intent migrates as read-only reference entities.
+
+`SketchEditCommandExecutor` implements:
+
+```text
+AddPoint / AddEntity
+MovePoint
+ReplaceEntity
+RemovePoint / RemoveEntity
+```
+
+Commands execute on disposable candidate collections and republish only through complete topology
+validation. Deletion is dependency-safe; reference intent is read-only. A move addresses exactly one
+shared point id, so every connected entity continues to reference the same moved point.
+
+Every successful command produces a `SketchEditTransaction` containing exact canonical `before` and
+`after` snapshots. `SketchTopologyUndoStack` uses those full snapshots for exact undo/redo and clears
+redo after a new command.
+
+Canonical topology persistence is:
+
+```text
+schema  = blcad.sketch_topology.mvp8
+version = 1
+```
+
+It persists point ids/coordinates/flags, entity ids/kinds/ordered point references/ordered entity
+dependencies/flags, and canonical dependency records. The loader applies the same duplicate,
+coincidence, flag, arity, and reference validation as direct Core creation.
+
+The historical `blcad.part_document.mvp1` schema remains load-compatible. The explicit
+`migrate_legacy_part_document_sketch_json(...)` boundary loads the old PartDocument, selects one
+Sketch, migrates it, and returns topology plus the identity-change report. No GUI state participates.
+
+`SketchTopologyPartDocumentEditor` additionally supports lossless compatibility application for a
+topology edit representable by the historical Sketch records. It migrates, edits, materializes,
+re-migrates, requires exact topology equality, and only then calls the existing atomic
+`PartDocument::update_sketch(...)`. Lossy identity or flag projection fails closed.
+
+Canonical contract: `docs/sketch-shared-topology-mvp8.md`.
+
+Existing authority: `docs/sketch-mvp1-data-model.md`,
+`docs/general-closed-sketch-profile-mvp.md`,
+`docs/arc-and-trim-extend-sketch-profile-mvp.md`,
+`docs/spline-and-tangent-continuity-mvp.md`, `docs/construction-geometry-mvp.md`,
+`docs/semantic-references.md`, `docs/file-format.md`,
+`docs/gui-sketch-plane-interaction-mvp8.md`.
 
 Focused tags: `[core][sketch-topology]`, `[core][sketch-edit-command]`,
 `[core][sketch-json-migration]`.
 
-## Block 109 — General planar constraint solver
+## Block 109 — General planar constraint solver — Current next technical step
 
-Add a deterministic headless nonlinear solver over planar point and curve parameters. Freeze
-variable ordering, scale normalization, tolerances, iteration limits, convergence reporting, and
-stable conflict attribution. Initially solve coincident, fixed, horizontal, vertical, parallel,
-perpendicular, collinear, equal, tangent, concentric, midpoint, symmetric, point-on-object, and
-horizontal/vertical/aligned/radial/diameter/angular distance constraints. Report:
+Add a deterministic headless nonlinear solver over Block-108 planar point and curve parameters.
+Freeze variable ordering, scale normalization, tolerances, iteration limits, convergence reporting,
+and stable conflict attribution.
+
+Initial solve families are:
 
 ```text
-fully constrained | under constrained (remaining DOF)
-redundant | conflicting | non-convergent | invalid reference
+coincident
+fixed
+horizontal
+vertical
+parallel
+perpendicular
+collinear
+equal
+tangent
+concentric
+midpoint
+symmetric
+point-on-object
+horizontal distance
+vertical distance
+aligned distance
+radial / diameter
+angular
 ```
 
-No solver result is persisted as an opaque cache; canonical intent plus deterministic solve remains
-the authority.
+Report exactly:
 
-Existing authority: `docs/sketch-constraints-and-dimensions-mvp.md` (current constraint/dimension
-families being generalized), `docs/sketch-solver-diagnostics-mvp.md` (current diagnostic layer
-being replaced by a real solve).
+```text
+fully constrained
+under constrained (remaining DOF)
+redundant
+conflicting
+non-convergent
+invalid reference
+```
+
+No solver result is persisted as opaque cache. Canonical point/entity/constraint/dimension intent plus
+deterministic solving remains authority.
+
+Existing authority: `docs/sketch-shared-topology-mvp8.md`,
+`docs/sketch-constraints-and-dimensions-mvp.md`, `docs/sketch-solver-diagnostics-mvp.md`.
 
 Focused tags: `[core][sketch-solver]`, `[core][sketch-dof]`,
 `[core][sketch-conflict-diagnostics]`.
 
-## Block 110 — Mouse-draggable points and live constrained solving
+## Block 110 — Solver-backed mouse dragging
 
-Expose endpoint, midpoint, center, radius, arc, spline, and dimension handles. Pressing a handle
-captures the pre-drag snapshot; every move maps to a target point and asks the Core solver for a
-candidate. The canvas draws solved candidate geometry without changing the document. Release
-commits one transaction; `Esc`, lost capture, or failed solve restores the snapshot. Throttle solves
-without dropping the final pointer position and keep typical mechanical sketches responsive.
+Expose endpoint, midpoint, center, radius, arc, spline, and dimension handles. Pointer movement maps to
+a target and asks the Block-109 solver for a disposable candidate. Preview never mutates the
+document. Release commits one transaction; `Esc`, lost capture, or failed solve restores the
+pre-drag state. The final pointer position is never dropped by throttling.
 
-Dragging selected geometry supports rigid candidate translation when constraints permit. Fixed and
-fully constrained geometry explains why it cannot move. Tests cover connected chains, dimensions,
-tangent arcs, conflict rejection, undo/redo, and identical results for scripted headless targets.
-
-Existing authority: Blocks 108–109 of this sequence, `docs/gui-sketch-workbench-mvp7.md`,
-`docs/gui-feature-validation-sequence-mvp7.md` (Block-96 transaction/undo rules).
+Existing authority: Blocks 108–109, `docs/gui-sketch-workbench-mvp7.md`, and the Block-96 GUI
+transaction/undo contract.
 
 Focused tags: `[gui][sketch-drag]`, `[integration][sketch-live-solve]`.
 
 ## Block 111 — Basic creation tools
 
-Implement persistent point, two-point line, continuous polyline, center/corner rectangle,
-three-point rectangle, parallelogram, regular polygon, centerline, and construction geometry tools.
-Multi-click commands show rubber-band previews, accept typed length/angle values, reuse snapped
-points, and preview automatic constraints. Composite tools expand into ordinary points, lines, and
-constraints rather than opaque GUI-only primitives.
-
-Existing authority: `docs/sketch-mvp1-data-model.md`, `docs/construction-geometry-mvp.md`,
-`docs/general-closed-sketch-profile-mvp.md`; polygon/parallelogram composites are Block-108
-topology plus Block-109 constraints, not new entity kinds.
+Implement point, two-point line, continuous polyline, center/corner rectangle, three-point rectangle,
+parallelogram, regular polygon, centerline, and construction geometry. Multi-click commands reuse
+Block-107 snap/inference and Block-109 solve authority. Composite tools expand into ordinary points,
+lines, and constraints rather than GUI-only primitives.
 
 Focused tags: `[gui][sketch-create-basic]`, `[integration][sketch-basic-profile]`.
 
 ## Block 112 — Circles, arcs, ellipses, and slots
 
-Extend Core/Geometry intent where required for center-radius/diameter, two-point, three-point, and
-tangent circles; center/start/end, three-point, and tangent arcs; ellipses/elliptical arcs; and
-center-to-center, overall-length, and three-point slots. Add center, radius, endpoint, quadrant,
-major/minor-axis, and slot handles. Full circles are real curve entities rather than nearly closed
-arcs. Degenerate radii and ambiguous collinear picks fail closed.
-
-Existing authority: `docs/sketch-mvp1-data-model.md` (circle profiles),
-`docs/arc-and-trim-extend-sketch-profile-mvp.md` (arc entities/profiles),
-`docs/general-closed-sketch-profile-mvp.md`. Ellipses, elliptical arcs, slots, and tangent
-construction variants are **new Core/Geometry intent introduced by this block**, as its focused
-`[core]`/`[geometry]` tags declare.
+Add the persistent Core/Geometry intent required for supported circle, arc, ellipse/elliptical-arc,
+and slot construction families. Full circles become real curve entities where required. Degenerate
+radii and ambiguous collinear picks fail closed.
 
 Focused tags: `[core][sketch-conics]`, `[geometry][sketch-conics]`,
 `[gui][sketch-create-conics]`.
 
 ## Block 113 — Spline editing and Sketch text
 
-Support fit-point and control-point cubic splines, insertion/removal of points, draggable control
-polygon, endpoint tangent/curvature handles, open/closed state, and deterministic conversion between
-supported representations where mathematically defined. Continuity constraints use the solver;
-screen-space handles remain transient. Self-intersection and insufficient-control-point diagnostics
-are explicit.
-
-Add parameter/expression-backed single- and multiline Sketch text with alignment, baseline/path
-placement, height, spacing, and explicit font-family fallback diagnostics. Text remains semantic
-Sketch intent; Geometry converts glyph outlines into selectable profile loops. Missing fonts and
-invalid/self-intersecting outlines fail visibly, and the JSON never embeds platform font handles.
-
-Existing authority: `docs/spline-and-tangent-continuity-mvp.md` (current fit/control splines and
-tangent-continuity seeds). Sketch text is **new Core/Geometry intent introduced by this block**.
+Add fit/control-point spline editing, insertion/removal, control polygon, continuity handles,
+supported deterministic representation conversion, and parameter/expression-backed Sketch text with
+explicit font fallback diagnostics.
 
 Focused tags: `[core][sketch-spline-edit]`, `[geometry][sketch-spline-edit]`,
 `[gui][sketch-spline]`, `[core][sketch-text]`, `[geometry][sketch-text]`.
 
 ## Block 114 — Constraint authoring and inference UX
 
-Expose every Block-109 constraint through selection-driven commands and familiar glyphs. The task
-panel explains required selection capabilities before accepting picks. Creation tools preview likely
-coincident, horizontal, vertical, tangent, parallel, perpendicular, midpoint, and concentric
-constraints. Users can select, inspect, suppress where Core intent permits, delete, and locate
-constraints from glyphs or browser entries. Conflicting additions preview the conflict set and do
-not mutate the document.
-
-Existing authority: `docs/sketch-constraints-and-dimensions-mvp.md`, Block 109 of this sequence
-(solver families and conflict attribution), `docs/sketch-solver-diagnostics-mvp.md`.
+Expose every Block-109 constraint through selection-driven commands and glyphs. Creation tools preview
+automatic constraint candidates. Conflicting additions preview the stable conflict set and do not
+mutate persistent intent.
 
 Focused tags: `[gui][sketch-constraints]`, `[integration][sketch-auto-constraint]`.
 
 ## Block 115 — Dimensions and expressions
 
 Add horizontal, vertical, aligned, point-to-point, length, radius, diameter, angle, and arc-length
-dimensions plus driven/reference mode. Placement includes extension lines, arrows, text collision
-avoidance, zoom-stable hit testing, and draggable annotation positions as transient presentation
-state. Double click edits value, unit, parameter name, or expression; driving values bind to the
-existing parameter authority and solve atomically. Switching driven/driving mode must diagnose
-over-constraint before commit.
-
-Existing authority: `docs/sketch-constraints-and-dimensions-mvp.md` (current dimension families),
-`docs/parameter-model.md`, `docs/parameter-expression-mvp.md`, `docs/parameter-update-mvp1.md`
-(the parameter/expression authority dimensions bind to).
+dimensions plus driven/reference mode, in-canvas editing, and parameter/expression binding.
 
 Focused tags: `[core][sketch-dimensions]`, `[gui][sketch-dimensions]`,
 `[integration][sketch-expression-edit]`.
 
 ## Block 116 — Trim, extend, split, fillet, and chamfer
 
-Implement hover-side preview and deterministic intersection choice for trim/extend/split. Add
-two-entity Sketch fillet and chamfer with typed radius/distance, optional trim, preserved usable
-constraints, and stable replacement mapping. Commands operate on candidate topology and commit one
-undo step. Ambiguous intersections or reference geometry never mutate partially.
-
-Existing authority: `docs/arc-and-trim-extend-sketch-profile-mvp.md` (current trim/extend intent
-being generalized to interactive candidate topology).
+Implement trim, extend, split, two-entity Sketch fillet, and Sketch chamfer over candidate topology.
+Ambiguous intersections or reference geometry never partially mutate the Sketch.
 
 Focused tags: `[core][sketch-modify]`, `[geometry][sketch-modify]`,
 `[gui][sketch-trim-extend]`.
 
 ## Block 117 — Offset, projection, and construction references
 
-Add single/chain/loop offset with side preview, distance parameter, corner policy, and robust
-self-intersection diagnostics. Expose associative projection of supported model edges, vertices,
-axes, and silhouette boundaries, plus explicit break-link conversion. Projected geometry is colored
-and locked as read-only; lost/ambiguous semantic references enter the existing repair workflow.
-
-Existing authority: `docs/projected-sketch-reference-geometry.md`,
-`docs/reference-generated-profile-helpers-mvp.md`, `docs/reference-recovery-mvp.md`,
-`docs/semantic-references.md`, `docs/construction-geometry-mvp.md`. Offset and silhouette
-projection are new intent introduced by this block, as its `[core]`/`[geometry]` tags declare.
+Add chain/loop offset, supported associative projection, explicit break-link conversion, and the
+matching lost/ambiguous reference workflow. Projected geometry remains read-only until explicitly
+converted.
 
 Focused tags: `[core][sketch-offset-project]`, `[geometry][sketch-offset-project]`,
 `[gui][sketch-project]`.
@@ -351,108 +363,58 @@ Focused tags: `[core][sketch-offset-project]`, `[geometry][sketch-offset-project
 ## Block 118 — Transform, mirror, and Sketch patterns
 
 Add move, rotate, scale, copy, mirror, rectangular pattern, and circular pattern for selected Sketch
-geometry. Preview includes a manipulator, base point, count, spacing/angle, and constraint-copy
-policy. Associative patterns require explicit Core intent; exploded copies are ordinary entities.
-The command reports which external constraints cannot be copied instead of silently discarding
-them.
-
-Existing authority: `docs/bolt-circle-pattern-mvp3.md` (the existing associative circular hole
-pattern with count parameters remains authoritative for holes and must stay reachable from the
-circular-pattern command), `docs/pattern-and-mirror-features.md` (capability catalog). General
-associative Sketch patterns beyond the hole pattern are new intent introduced by this block.
+geometry. Associative pattern intent is explicit; exploded copies are ordinary entities.
 
 Focused tags: `[core][sketch-transform-pattern]`, `[gui][sketch-transform-pattern]`.
 
 ## Block 119 — Regions, profiles, diagnostics, and Finish Sketch
 
-Recognize bounded regions continuously from solved visible non-construction geometry. Shade closed
-regions lightly, support click-to-select outer/inner loops, expose open endpoints and self-crossings,
-and build stable profile intent without requiring manual entity ordering. Finish Sketch shows
-remaining DOF, conflicts, unused geometry, lost references, and downstream profile effects; warnings
-may be accepted explicitly, errors cannot. Repair suggestions preview before one atomic commit.
-
-Existing authority: `docs/automatic-profile-region-detection-mvp.md`,
-`docs/composite-closed-sketch-profile-holes-mvp.md`, `docs/general-closed-sketch-profile-mvp.md`,
-`docs/sketch-plane-extrude-direction-mvp.md` (downstream profile consumers),
-`docs/sketch-repair-commands-mvp.md`, `docs/sketch-repair-suggestions-mvp.md`,
-`docs/sketch-repair-transactions-mvp.md`, `docs/sketch-repair-undo-stack-mvp.md`,
-`docs/sketch-solver-diagnostics-mvp.md`. The Finish-Sketch profile result is what Interactive
-Modeling Block 122 hands to feature commands (`docs/interactive-modeling-sequence-mvp9.md`).
+Continuously recognize bounded regions from solved visible non-construction geometry, expose profile
+selection and open/self-crossing diagnostics, and complete the solver-aware Finish Sketch workflow.
+The resulting profile handoff is consumed by Interactive Modeling Block 122/124.
 
 Focused tags: `[geometry][sketch-regions]`, `[gui][sketch-profile-selection]`,
 `[integration][sketch-finish]`.
 
 ## Block 120 — Interactive Sketch3D
 
-Provide orthogonal triad/plane locks, model-space point and line placement, direct point dragging,
-typed XYZ/distance/angle input, arc/spline/helix handles, guide-curve roles, and projection of planar
-Sketch points. A constrained 3D solver beyond currently supported relationships is not implied:
-unsupported constraint commands remain disabled and direct manipulation respects parameter-driven
-coordinates. Camera navigation and point manipulation have unambiguous modifier separation.
-
-Existing authority: `docs/part-sketch-3d-core-mvp6.md`, `docs/part-sketch-3d-curves-core-mvp6.md`,
-`docs/part-sketch-3d-json-mvp6.md`, `docs/part-sketch-3d-geometry-mvp6.md`,
-`docs/part-path-curve-core-mvp6.md` (guide/path consumers),
-`docs/gui-spatial-surface-workbench-mvp7.md`.
+Add orthogonal triad/plane locks, model-space point/line placement, typed XYZ/distance/angle input,
+3D curve handles, guide roles, and projection of planar Sketch points. This does not imply a full
+variational 3D constraint solver.
 
 Focused tags: `[gui][sketch-3d-edit]`, `[integration][sketch-3d-direct-manipulation]`.
 
 ## Block 121 — Interactive Sketcher acceptance
 
-Add deterministic tutorial documents and a coverage manifest for every planned tool. Acceptance
-creates and edits a dimensioned plate, bracket, slotted profile, tangent/filleted profile, projected
-reference profile, spline profile, and 3D Sweep path exclusively through public commands. It proves
-mouse/script equivalence, save/load/recompute, undo/redo, conflict atomicity, reference repair,
-keyboard-only Apply/Cancel, high-DPI coordinate mapping, and no stale preview publication.
-
-Performance budgets are measured, not guessed: hover and drag remain interactive on representative
-sketches; solver and region-recognition timings are reported by entity/constraint count. Manual
-smoke checks cover cursor feel and visual legibility that offscreen tests cannot establish.
-
-Existing authority: `docs/gui-feature-validation-mvp7-acceptance.md` and
-`docs/gui-feature-coverage-manifest-mvp7.json` (acceptance/manifest pattern being followed).
+Add deterministic tutorial documents and a coverage manifest for every planned Sketch tool. Prove
+mouse/script equivalence, persistence/recompute, exact undo/redo, conflict atomicity, reference
+repair, keyboard Apply/Cancel, high-DPI mapping, and no stale preview publication. Measure hover,
+drag, solve, and region-recognition performance on representative Sketch sizes.
 
 Focused tags: `[integration][interactive-sketcher]`, `[integration][sketch-gui-headless]`,
 `[performance][sketch-interaction]`.
 
-After Block 121, Interactive Part & Assembly Modeling MVP-9 begins with Block 122
-(`docs/interactive-modeling-sequence-mvp9.md`); STEP Import MVP-10 follows in Blocks 132–138
-(`docs/step-import-sequence-mvp10.md`).
+After Block 121, Interactive Part & Assembly Modeling MVP-9 begins at Block 122. STEP Import MVP-10
+follows in Blocks 132–138.
 
-## Block-94 sketch-domain coverage matrix
+## Sketch-domain coverage through Block 94
 
-Authoritative mapping from every sketch-domain capability implemented through Block 94 to the
-block that gives it interactive authoring and the canonical contract holding its details. The
-Part/Surface/Assembly feature families have their own matrix in
-`docs/interactive-modeling-sequence-mvp9.md`.
-
-| Sketch capability through Block 94 | Canonical contracts | Interactive owner |
+| Sketch capability | Canonical contracts | Interactive owner |
 |---|---|---:|
-| Datum planes, derived workplanes | `workplane-resolver-mvp2.md`, `derived-workplane-mvp2-seed.md`, `bounded-workplane-validation-mvp2.md`, `front-workplane-mvp2.md`, `back-workplane-mvp2.md`, `left-workplane-mvp2.md`, `right-workplane-mvp2.md`, `bottom-workplane-mvp2.md` | 106, 107 |
+| Datum/derived workplanes | workplane and bounded-workplane contracts | 106, 107 |
 | Planar lines and closed line profiles | `sketch-mvp1-data-model.md`, `general-closed-sketch-profile-mvp.md` | 108, 111 |
-| Construction geometry (lines, points) | `construction-geometry-mvp.md` | 111 |
+| Shared planar point/entity identity | `sketch-shared-topology-mvp8.md` | 108–121 |
+| Construction geometry | `construction-geometry-mvp.md` | 111 |
 | Circles and circle profiles | `sketch-mvp1-data-model.md` | 112 |
-| Arcs and arc/spline closed profiles | `arc-and-trim-extend-sketch-profile-mvp.md` | 112 |
-| Fit/control splines, tangent continuity | `spline-and-tangent-continuity-mvp.md` | 113 |
-| Constraints (current families) | `sketch-constraints-and-dimensions-mvp.md` | 109, 114 |
-| Dimensions and parameter/expression binding | `sketch-constraints-and-dimensions-mvp.md`, `parameter-model.md`, `parameter-expression-mvp.md` | 115 |
-| Solver/DOF diagnostics | `sketch-solver-diagnostics-mvp.md` | 109, 119 |
+| Arcs and arc/spline profiles | `arc-and-trim-extend-sketch-profile-mvp.md` | 112 |
+| Splines and tangent continuity | `spline-and-tangent-continuity-mvp.md` | 113 |
+| Constraints and DOF diagnostics | constraint/dimension and solver-diagnostic contracts | 109, 114, 119 |
+| Dimensions and parameter expressions | constraint/dimension and parameter contracts | 115 |
 | Trim/extend | `arc-and-trim-extend-sketch-profile-mvp.md` | 116 |
-| Projected/reference-driven geometry, recovery | `projected-sketch-reference-geometry.md`, `reference-generated-profile-helpers-mvp.md`, `reference-recovery-mvp.md`, `semantic-references.md` | 117 |
-| Circular hole pattern (bolt circle) | `bolt-circle-pattern-mvp3.md` | 118 (and hole command in MVP-9 Block 124) |
-| Composite/automatic profile regions | `automatic-profile-region-detection-mvp.md`, `composite-closed-profile-holes-mvp.md` | 119 |
-| Repair commands/suggestions/transactions/undo | `sketch-repair-commands-mvp.md`, `sketch-repair-suggestions-mvp.md`, `sketch-repair-transactions-mvp.md`, `sketch-repair-undo-stack-mvp.md` | 119 |
-| Extrude-direction seed of a profile | `sketch-plane-extrude-direction-mvp.md` | 119 (handoff), MVP-9 Block 124 |
-| 3D Sketch points/lines/polylines/arcs/splines/helices/guides | `part-sketch-3d-core-mvp6.md`, `part-sketch-3d-curves-core-mvp6.md`, `part-sketch-3d-json-mvp6.md`, `part-sketch-3d-geometry-mvp6.md` | 120 |
+| Projected/reference geometry and recovery | projection/reference/recovery contracts | 117 |
+| Circular hole pattern | `bolt-circle-pattern-mvp3.md` | 118 and MVP-9 Block 124 |
+| Composite/automatic regions | profile-region contracts | 119 |
+| Repair transactions and undo | Sketch repair contracts | 119 |
+| Sketch3D points and curves | Part Sketch3D MVP-6 contracts | 120 |
 
-Any sketch-domain capability implemented through Block 94 but absent from this matrix is added
-here with an owner before Block-121 acceptance is declared complete.
-
-## Explicit deferrals
-
-- automatic tracing from raster images;
-- unconstrained freehand drawing and handwriting recognition;
-- proprietary Inventor command names, icons, shortcuts, or exact layout cloning;
-- a full variational 3D Sketch constraint solver;
-- collaboration cursors or multi-user concurrent editing;
-- manufacturing-specific Sketch annotations.
+This matrix prevents later blocks from silently inventing currently absent Sketch capability.
