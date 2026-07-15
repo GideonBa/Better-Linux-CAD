@@ -1,27 +1,30 @@
 # Sketch Data Model
 
 Status: implemented historical planar Sketch/PartDocument representation; superseded as the
-Interactive Sketcher connectivity identity model by Block-108 shared topology.
+Interactive Sketcher connectivity identity model by Block-108 shared topology and consumed by the
+Block-109 general planar constraint solver through explicit migration/adaptation.
 
 This document describes the original Core records for `DatumPlane`, `Sketch`, `LineSegment`,
 `RectangleProfile`, `CircleProfile`, and `ClosedProfile`. These records remain supported, remain
-serialized by the historical `blcad.part_document.mvp1` format, and remain current Geometry
-compatibility inputs.
+serialized by historical `blcad.part_document.mvp1`, and remain current Geometry compatibility inputs.
 
-They are no longer the canonical identity model for future planar constraint solving and direct
-manipulation. Block 108 introduces stable shared `SketchPointId` and `SketchTopology`; its canonical
-contract is `docs/sketch-shared-topology-mvp8.md`.
+They are not the canonical identity model for planar solving/direct manipulation. Block 108 introduces
+stable shared `SketchPointId`/`SketchTopology`; Block 109 solves constraints over that topology.
+Canonical contracts are:
+
+- `docs/sketch-shared-topology-mvp8.md`
+- `docs/sketch-planar-constraint-solver-mvp8.md`
 
 ## Historical design goal
 
 The MVP-1 Sketch model captured planar design intent through:
 
 - one workplane reference;
-- primitive rectangle and circle profiles;
+- primitive rectangle/circle profiles;
 - explicit line segments;
-- ordered closed profiles referencing line-segment IDs;
+- ordered closed profiles referencing line ids;
 - parameter references for parameterized primitive sizes;
-- PartDocument validation of workplane and parameter references.
+- PartDocument validation of workplane/parameter references.
 
 Later blocks extended `Sketch` with arcs, splines, projected/reference-driven geometry, constraints,
 dimensions, trim/extend, tangent continuity, additional profile families, and repair workflows. Those
@@ -30,7 +33,7 @@ pipelines.
 
 ## Historical coordinate representation
 
-`Point2` is a simple planar value:
+`Point2` is a planar value:
 
 ```text
 Point2
@@ -38,7 +41,7 @@ Point2
   y
 ```
 
-The original curve records embed those values directly. For example:
+Original curve records embed values directly:
 
 ```text
 LineSegment
@@ -47,53 +50,67 @@ LineSegment
   end = (20, 0)
 ```
 
-Validation requires non-empty line id, distinct endpoints within the historical tolerance, and
-unique line ids in one Sketch.
-
-Line segments are Core model intent; they are not OCCT edges. However, an embedded endpoint value is
-not a shared point identity. Historically:
+Line segments are Core intent, not OCCT edges. However, an embedded endpoint value is not shared point
+identity. Historically:
 
 ```text
 line.a.end   = (20, 0)
 line.b.start = (20, 0)
 ```
 
-stores two coordinate usages whose numeric equality is interpreted by profile/geometry validation.
-That is the limitation Block 108 addresses.
+stores two coordinate usages. Profile validation may interpret equality for ordered connectivity, but
+Block 109 must not treat arbitrary equal coordinates as solver connectivity.
 
 ## Block-108 shared topology supersession
 
-For Interactive Sketcher solver and edit consumers, the canonical identity path is now:
+For Interactive Sketcher solver/edit consumers:
 
 ```text
 historical Sketch records
   -> SketchTopology::migrate_legacy(...)
   -> stable SketchPointId records
-  -> topology entities reference shared point ids
+  -> topology entities reference persistent point ids
 ```
 
-The previous example may migrate to:
+A validated connected profile may migrate to:
 
 ```text
 entity/line.a.points[1] = entity/line.a/end
 entity/line.b.points[0] = entity/line.a/end
 ```
 
-The two lines then reference one point identity. Future constraint solving and drag logic must consume
-that topology identity instead of searching for numerically equal `Point2` values.
+Both lines then reference one point identity. Migration derives sharing only from explicit ordered
+historical profile connectivity and reports every collapsed endpoint usage.
 
-`SketchTopologyMigrationReport` records every historical endpoint usage collapsed into an existing
-canonical shared point id. Migration is deterministic and does not mutate the source `Sketch`.
+Two unrelated equal-coordinate point usages remain two `SketchPointId` values. This is required so
+Block 109 can express `Coincident` between distinct variables.
 
-The canonical topology persistence schema is:
+Canonical topology persistence:
 
 ```text
 blcad.sketch_topology.mvp8
 version 1
 ```
 
-The historical `blcad.part_document.mvp1` schema remains load-compatible. It is not silently
-reinterpreted as if shared point ids had always been serialized.
+Historical `blcad.part_document.mvp1` remains load-compatible and is not reinterpreted as if shared ids
+had always been serialized.
+
+## Block-109 solver consumption
+
+`SketchConstraintSolver` consumes canonical Block-108 topology. Every non-reference point contributes
+X then Y variables in canonical point-id order. Constraint targets explicitly address persistent point
+or topology entity ids.
+
+Therefore the solver never performs endpoint fan-out by searching for equal `Point2` values. Connected
+entities move/solve together because they already reference the same `SketchPointId`; distinct
+coincident points remain distinct variables until a constraint relates them.
+
+`SketchConstraintSystemBuilder::from_legacy(...)` adapts current persistent geometric constraints,
+TangentContinuity, and parameter-backed distance dimensions to the Block-109 solve request. This is an
+explicit compatibility adapter, not a replacement of historical JSON schema.
+
+Solver variables, residuals, Jacobians, rank, remaining DOF, convergence state, and conflict/
+redundancy diagnostics are derived and are not added to the MVP-1 Sketch record.
 
 ## DatumPlane
 
@@ -109,12 +126,12 @@ DatumPlane XY
   normal = (0, 0, 1)
 ```
 
-Datum-plane id and name must not be empty. User-defined construction planes and broader workplane
-resolution are documented in the later workplane/construction contracts.
+Datum-plane id/name must not be empty. User-defined construction planes and broader workplane
+resolution are documented in later workplane/construction contracts.
 
 ## RectangleProfile and CircleProfile
 
-The rectangle fast path stores:
+Rectangle fast path stores:
 
 ```text
 RectangleProfile
@@ -124,7 +141,7 @@ RectangleProfile
   height_parameter
 ```
 
-The circle fast path stores:
+Circle fast path stores:
 
 ```text
 CircleProfile
@@ -133,15 +150,17 @@ CircleProfile
   diameter_parameter
 ```
 
-Profile-local constructors validate required ids. The owning `PartDocument` validates referenced
-parameters and their required types.
+Profile constructors validate required ids; owning `PartDocument` validates parameter references/types.
+Block-108 migration represents each primitive center through one topology point. Parameter references
+remain authored profile intent and are not copied into point identity.
 
-Block-108 legacy migration represents each primitive center through one shared topology point. The
-parameter references remain authored profile intent and are not copied into point identity.
+Block 109 can consume center-bearing topology entities for Concentric where the topology kind provides a
+persistent center point. Current direct Radial/Diameter residuals target three-point Arc; user-facing
+circle/radius dimension expansion remains Block 112/115 territory.
 
 ## ClosedProfile
 
-The historical line-loop profile stores an ordered curve list:
+Historical line loop stores an ordered curve list:
 
 ```text
 ClosedProfile
@@ -149,18 +168,16 @@ ClosedProfile
   line_segments = ["line.a", "line.b", "line.c"]
 ```
 
-Validation requires at least three unique non-empty line ids, existing referenced lines, an ordered
-connected loop, closure from last to first, and no non-adjacent self-intersection.
+Validation requires at least three unique non-empty ids, existing lines, ordered connected loop, closure,
+and no non-adjacent self-intersection.
 
-The curve order is semantic. Block-108 migration converts the references to ordered topology entity
-dependencies and deliberately does not lexicographically sort this contour order.
-
-Later ArcClosedProfile and CompositeClosedProfile families follow the same principle of ordered
-semantic curve dependencies.
+Curve order is semantic. Block-108 migration converts references to ordered topology entity dependencies
+and never sorts contour traversal order. ArcClosedProfile/CompositeClosedProfile follow the same
+ordered-dependency principle.
 
 ## Sketch
 
-The historical `Sketch` stores:
+Historical `Sketch` stores:
 
 ```text
 id
@@ -173,20 +190,22 @@ trim / extend and tangent-continuity records
 primitive and general profile records
 ```
 
-Sketch ids, names, and workplane ids must be non-empty. Entity/profile ids obey their family and
-cross-family uniqueness rules. Profile references and constraint/dimension targets are validated by
-the existing Sketch and PartDocument authorities.
+Sketch ids, names, and workplane ids must be non-empty. Entity/profile ids obey family/cross-family
+uniqueness. Profile references and constraint/dimension targets are validated by existing Sketch and
+PartDocument authorities.
+
+The historical Sketch object remains persistence/Geometry compatibility authority. It is not the
+Block-109 solver variable store.
 
 ## PartDocument integration
 
-`PartDocument` owns planar Sketch compatibility records and validates their document-level references.
-`PartDocument::update_sketch(...)` performs candidate-based atomic Sketch replacement: it validates
-the new Sketch through `add_sketch(...)`, restores the authored Sketch position and downstream graph
-edges, synchronizes invalidation state, marks the Sketch changed, and commits only the complete
-candidate.
+`PartDocument` owns historical planar Sketch compatibility records and validates document-level
+references. `PartDocument::update_sketch(...)` performs candidate-based atomic replacement: validate
+through `add_sketch(...)`, restore authored Sketch position/downstream graph edges, synchronize
+invalidation, mark changed, and commit only the complete candidate.
 
-Block 108 reuses that authority through `SketchTopologyPartDocumentEditor` only for topology edits
-that are exactly representable by the historical records. The bridge performs:
+Block 108 reuses that authority through `SketchTopologyPartDocumentEditor` only for exactly representable
+topology edits:
 
 ```text
 migrate
@@ -197,15 +216,18 @@ migrate
 -> PartDocument::update_sketch(...)
 ```
 
-If shared point identity, explicit topology flags, or ordered dependencies would be lost, the bridge
-fails closed. The canonical topology state remains persistable in `blcad.sketch_topology.mvp8`.
+If point identity, topology flags, orphan points, or ordered dependencies would be lost, the bridge
+fails closed.
+
+Block 109 solving does not automatically call `update_sketch(...)`. It returns derived solved topology.
+Block 110 and later interaction/command owners must explicitly choose one validated persistent commit
+boundary.
 
 ## Current proof
 
-Historical Sketch behavior remains covered by `[core][sketch]`, PartDocument JSON, profile, and
-Geometry tests.
+Historical behavior remains covered by `[core][sketch]`, PartDocument JSON, profile, and Geometry tests.
 
-Block-108 topology/migration proof is:
+Block 108:
 
 ```text
 [core][sketch-topology]
@@ -213,11 +235,20 @@ Block-108 topology/migration proof is:
 [core][sketch-json-migration]
 ```
 
-For example, the topology proof migrates a connected triangle created in different line insertion
-orders and obtains the same three shared point records and migration report in both cases.
+Block 109:
+
+```text
+[core][sketch-solver]
+[core][sketch-dof]
+[core][sketch-conflict-diagnostics]
+```
+
+The solver proof verifies canonical variable/constraint ordering, exact local remaining DOF, all initial
+residual families, convergence, redundancy/conflict attribution, invalid reference, non-convergence, and
+current historical constraint/dimension adaptation.
 
 ## Current next boundary
 
-Block 109 adds the deterministic general planar constraint solver over Block-108 shared point/entity
-topology. The historical embedded-coordinate records remain compatibility inputs; solver connectivity
-must not regress to equal-coordinate inference.
+Block 110 connects semantic Sketch handles and Block-107 pointer mapping to Block-108 topology candidates
+and Block-109 solving. Direct manipulation must continue to use persistent point/entity identity rather
+than coordinate-equality inference.
