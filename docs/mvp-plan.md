@@ -23,12 +23,9 @@ phase_status:
 
 # MVP Plan
 
-This document is the numbered implementation-sequence source of truth for BLCAD.
-
-Exact feature semantics are intentionally not duplicated here. Before implementing one block, read
-the block's canonical sequence and the feature-specific authorities named there. If current code and
-a planning document disagree, verify current implementation and update the affected canonical
-contract explicitly; do not invent capability inside a later block.
+This document is the numbered implementation-sequence source of truth for BLCAD. Exact feature
+semantics are intentionally not duplicated here; feature-specific contracts remain authoritative for
+mathematics, persistence spellings, migration rules, and failure policy.
 
 ## Current status
 
@@ -70,85 +67,38 @@ Canonical phase sequences:
 Blocks 1–47 establish the single-Part foundation, semantic workplane/reference workflows, Project
 container, local and cross-hierarchy Assembly authority, generic typed geometric targets, stable
 generated-topology producer identity, deterministic compatibility selection, eight geometric
-relationship families, the shared numeric solve path, freshness-gated application, rooted hierarchy
-semantics, Revolute/Prismatic/Cylindrical/Planar/Spherical joints, posed geometry, contact/sweep
-analysis, and flattened/structured STEP exchange.
+relationship families, shared numeric solving, freshness-gated application, rooted hierarchy,
+Revolute/Prismatic/Cylindrical/Planar/Spherical joints, posed geometry, contact/sweep analysis, and
+flattened/structured STEP exchange.
 
-Assembly model identity remains semantic. Raw OCCT topology, XDE labels, STEP entity ids, and memory
+Assembly identity remains semantic. Raw OCCT topology, XDE labels, STEP entity ids, and memory
 addresses are never persistent target identity.
 
 ## Implemented Blocks 48–94 — Part Construction MVP-6
 
-The Part Construction sequence implements:
-
-```text
-Body identity, visibility, scoped recompute, inspection
-NewBody / Join / Cut / Intersect result intent
-Body Boolean, BodyTransform, SketchOwnership
-reusable typed Part-feature input references
-rich Extrude / ExtrudedCut extent, taper, thin, path control
-Revolve / RevolveCut
-Linear / Circular Pattern
-MirrorFeature
-Fillet / Chamfer
-Shell / Draft
-Sketch3D and model-space curves
-PathCurve
-Sweep / SweepCut / SweepSurface
-spatial/twist/guide-controlled Sweep
-path-following Extrude / ExtrudedCut
-Loft / LoftCut / LoftSurface
-multi-section and guided continuity-controlled Loft
-Boundary / Fill Surface
-Surface Trim / Extend
-Stitch / Knit / Sew shell
-closed-shell-to-solid conversion
-visible Solid/Surface multi-body STEP export
-integrated Core/Geometry acceptance
-```
+Part Construction implements stable Body identity, Body-scoped recompute/inspection, NewBody/Join/
+Cut/Intersect result intent, Body Boolean and transform workflows, typed Part-feature inputs, richer
+Extrude/Cut, Revolve/RevolveCut, general Patterns, Mirror, Fillet, Chamfer, Shell, Draft, Sketch3D,
+PathCurve, Sweep, path Extrude, Loft, Surface features, closed-shell-to-solid conversion, multi-body
+STEP exchange, and integrated Core/Geometry acceptance.
 
 Canonical sequence: `docs/part-construction-sequence-mvp6.md`.
 
-The phase is accepted through Block 94. Later UI phases consume these Core/Geometry authorities rather
-than reimplementing feature mathematics in widgets.
-
 ## Implemented Blocks 95–105 — GUI Feature Validation MVP-7
 
-The optional Qt 6 application layer implements:
-
-```text
-CAD application shell and workspaces
-GuiDocumentSession
-GuiTaskState and command enablement
-open / save / save-as / dirty handling
-document transactions and exact undo/redo
-recompute and structured diagnostics
-OCCT viewport and navigation
-stable semantic viewport picking
-deterministic model / assembly browser
-property/task editing through Core mutation paths
-bidirectional semantic selection synchronization
-planar Sketch validation/edit/repair workbench
-parameter, Body, Extrude/Cut, Revolve, hole workflows
-Pattern, Mirror, finishing, Shell, Draft workflows
-Body Boolean / Transform workflows
-Sketch3D / PathCurve / Sweep / Loft / Surface workflows
-Assembly authoring, solve, motion, analysis, STEP export
-machine-checked feature coverage and GUI/headless equivalence
-```
+The optional Qt 6 layer implements the CAD shell, `GuiDocumentSession`, command/task state, document
+lifecycle, atomic candidate transactions, exact undo/redo, recompute/diagnostics, OCCT viewport,
+stable semantic picking, deterministic browser/property projection, synchronized selection, and
+Sketch/Part/Surface/Assembly/analysis/exchange validation workbenches.
 
 Canonical sequence: `docs/gui-feature-validation-sequence-mvp7.md`.
 
-Block 105 closes the validation phase. Qt remains a client; persistent model, solver, Geometry, and
-exchange authority do not move into widgets.
+Qt remains a client; persistent model, solver, Geometry, and exchange authority do not move into
+widgets.
 
 ## Interactive Sketcher MVP-8 — Blocks 106–121
 
 Canonical sequence: `docs/interactive-sketcher-sequence-mvp8.md`.
-
-The product target is a productive planar and 3D Sketch environment with direct manipulation,
-visible constraints, in-canvas dimensions, deterministic snapping, solver-backed dragging, complete
-creation/modify workflows, profile recognition, repair, and GUI/headless equivalence.
 
 Frozen order:
 
@@ -173,45 +123,28 @@ Frozen order:
 
 ### Block 106 — Contextual Sketch workspace — Implemented
 
-`GuiWorkspace::Sketch` and `GuiSketchWorkspace` implement the transient interaction stages:
-
-```text
-Idle
-Hover
-CollectingPicks
-NumericInput
-Preview
-SelectedHandle
-DragCandidate
-```
-
-Enter/Finish Sketch capture and restore workspace, semantic selection, viewport filter, and camera
-state. `Esc` backs out one stage. Numeric candidates validate on disposable Sketch state and commit
-through the existing atomic Part transaction authority.
+`GuiWorkspace::Sketch` and `GuiSketchWorkspace` implement Idle/Hover/CollectingPicks/NumericInput/
+Preview/SelectedHandle/DragCandidate staging over the existing generic task and transaction authority.
+Enter/Finish Sketch capture and restore workspace, selection, filter, and camera state. Numeric
+candidates validate on disposable Sketch state and commit through the existing Part transaction path.
 
 Canonical contract: `docs/gui-interactive-sketch-workspace-mvp8.md`.
 
-Focused tags: `[gui][sketch-workspace]`, `[gui][sketch-command-lifecycle]`.
-
 ### Block 107 — Plane interaction — Implemented
 
-Block 107 implements the device-independent Screen-DIP/view-ray/workplane/model mapping, transient
-interaction scene, zoom-stable `Point -> Curve -> Dimension -> Glyph` hit priority, deterministic
+Block 107 implements device-independent Screen-DIP/view-ray/workplane/model mapping, transient
+interaction scene projection, zoom-stable `Point -> Curve -> Dimension -> Glyph` hit priority,
 stacked-hit cycling, Window/Crossing selection, bounded grid display, grid snap, geometric snap
 families, and horizontal/vertical/X/Y alignment inference.
 
-No pixel, interaction sample, hover product, hit stack, grid line, or snap candidate becomes model
-identity.
+No screen or interaction product becomes model identity.
 
 Canonical contract: `docs/gui-sketch-plane-interaction-mvp8.md`.
 
-Focused tags: `[gui][sketch-hit-test]`, `[gui][sketch-snap]`,
-`[gui][sketch-box-selection]`.
-
 ### Block 108 — Shared planar Sketch topology — Implemented
 
-Block 108 introduces typed `SketchPointId` and canonical `SketchTopology` authority for future solver
-and direct-manipulation consumers.
+Block 108 introduces typed `SketchPointId` and canonical `SketchTopology` for future solver and
+direct-manipulation consumers.
 
 Implemented records:
 
@@ -236,19 +169,27 @@ SketchTopologyDependency
   role
 ```
 
-Supported topology families cover existing lines, arcs, splines, rectangle/circle/pattern centers,
-closed/arc/composite profile relationships, projected points/lines, and reference-generated lines.
-Global point/entity collections are canonical lexicographic id order. Defining point roles and
-profile dependencies keep semantic order.
+Supported topology families cover current lines, arcs, splines, rectangle/circle/hole-pattern
+centers, closed/arc/composite profile relationships, projected points/lines, and
+reference-generated lines. Global point/entity collections are canonical lexicographic id order;
+defining point roles and profile dependencies retain semantic order.
 
-`SketchTopology::migrate_legacy(...)` converts the historical embedded-`Point2` Sketch model.
-Same-flag point usages within `1e-9` share one canonical point id. Candidate processing is topology-id
-ordered, so source insertion order does not change the result. `SketchTopologyMigrationReport`
-records each legacy identity collapsed into a canonical shared point.
+`SketchTopology::migrate_legacy(...)` converts historical embedded-`Point2` Sketch records. It does
+**not** merge all numerically equal points. Shared point identity is derived only from explicit
+ordered historical `ClosedProfile`, `ArcClosedProfile`, and CompositeClosedProfile contour
+connectivity between supported curve endpoints. Connected endpoint coordinates must agree within
+`1e-9`; the canonical id of one connectivity group is the lexicographically smallest proposed usage
+id. `SketchTopologyMigrationReport` records every endpoint usage collapsed into that shared id.
 
-`SketchEditCommandExecutor` implements dependency-safe `Add`, `Move`, `Replace`, and `Remove`
-payloads. Reference topology is read-only. Every successful edit produces exact complete `before`
-and `after` canonical snapshots; `SketchTopologyUndoStack` uses these snapshots for exact undo/redo.
+Therefore a connected triangle migrates from six historical endpoint usages to three shared points
+and three identity-change records, independent of source entity insertion order. Two unrelated point
+usages at the same coordinate remain distinct `SketchPointId` values and can later participate in an
+explicit Block-109 `Coincident` constraint.
+
+`SketchEditCommandExecutor` implements dependency-safe Add, Move, Replace, and Remove payloads.
+Reference topology is read-only. Distinct point ids may occupy the same coordinate; Move never merges
+ids implicitly. Every successful edit produces complete exact `before`/`after` topology snapshots,
+and `SketchTopologyUndoStack` uses those snapshots for exact undo/redo.
 
 Canonical topology persistence is:
 
@@ -257,13 +198,18 @@ schema  = blcad.sketch_topology.mvp8
 version = 1
 ```
 
-`migrate_legacy_part_document_sketch_json(...)` explicitly loads historical
-`blcad.part_document.mvp1` JSON and migrates one selected Sketch without GUI state.
+It persists point ids/coordinates/flags, entity ids/kinds/ordered point references/ordered entity
+dependencies/flags, and canonical dependency records. Distinct equal-coordinate point ids round-trip
+exactly.
 
-`SketchTopologyPartDocumentEditor` supports topology edits that can be projected back to the current
-legacy Sketch records without any point-identity or flag loss. It materializes, re-migrates, requires
-exact topology equality, and only then calls `PartDocument::update_sketch(...)`. Non-representable
-states fail closed and remain persistable through the canonical topology JSON.
+The historical `blcad.part_document.mvp1` schema remains load-compatible.
+`migrate_legacy_part_document_sketch_json(...)` explicitly loads one historical PartDocument Sketch
+and returns canonical topology plus migration report without GUI state.
+
+`SketchTopologyPartDocumentEditor` supports topology edits exactly representable by current historical
+Sketch records. It migrates, edits, materializes, re-migrates, requires exact topology equality, and
+only then calls atomic `PartDocument::update_sketch(...)`. Point identity, flags, explicit orphan
+records, or ordered topology that would be lost causes fail-closed rejection.
 
 Canonical contract: `docs/sketch-shared-topology-mvp8.md`.
 
@@ -277,8 +223,7 @@ Focused tags:
 
 ## Current next technical step — Block 109
 
-Block 109 owns the deterministic general planar constraint solver over Block-108 point/entity
-topology.
+Block 109 owns the deterministic general planar constraint solver over Block-108 topology.
 
 Freeze:
 
@@ -343,7 +288,7 @@ Focused tags:
 [core][sketch-conflict-diagnostics]
 ```
 
-## Blocks 110–121 — Remaining Interactive Sketcher sequence
+## Remaining Interactive Sketcher sequence
 
 Block 110 adds solver-backed handle dragging and one-transaction release commits. Block 111 adds basic
 point/line/polyline/rectangle/polygon/construction creation. Block 112 adds circles, arcs, ellipses,
@@ -357,39 +302,12 @@ and measured performance.
 Exact per-block boundaries and focused tags are in
 `docs/interactive-sketcher-sequence-mvp8.md`.
 
-## Interactive Part & Assembly Modeling MVP-9 — Blocks 122–131
+## Later phases
 
-Canonical sequence: `docs/interactive-modeling-sequence-mvp9.md`.
+Interactive Part & Assembly Modeling MVP-9 is Blocks 122–131 and is canonical in
+`docs/interactive-modeling-sequence-mvp9.md`.
 
-```text
-122 modeling workspace, preselection command start, mini-toolbar, navigation aids
-123 transient viewport manipulator infrastructure and numeric coupling
-124 interactive Extrude, path Extrude, Revolve
-125 interactive Fillet, Chamfer, Shell, Draft
-126 interactive Pattern, Mirror, Body Boolean, Body Transform
-127 interactive PathCurve, Sweep, Loft
-128 interactive Surface authoring and surface-to-solid
-129 feature edit lifecycle and Core feature-update boundary
-130 interactive Assembly placement, relationships, joints, motion
-131 measure tool, coverage manifest v2, integrated acceptance
-```
-
-## STEP Import MVP-10 — Blocks 132–138
-
-Canonical sequence: `docs/step-import-sequence-mvp10.md`.
-
-```text
-132 STEP source identity, import modes, JSON, freshness
-133 OCCT STEP/XDE reader and deterministic imported body definitions
-134 stable imported topology identity, recovery, target resolution
-135 Reference Part integration with assemblies
-136 EditableBody ImportedBodyFeature and downstream modeling
-137 structured STEP assembly import
-138 integrated import, refresh, edit, assembly, re-export acceptance
-```
-
-The explicit modes remain `Reference` and `EditableBody`; imported foreign history is never
-heuristically reconstructed.
+STEP Import MVP-10 is Blocks 132–138 and is canonical in `docs/step-import-sequence-mvp10.md`.
 
 ## Sequencing rules
 
@@ -402,7 +320,7 @@ heuristically reconstructed.
 6. Failed validation, solve, recompute, import, or Geometry execution publishes no partial persistent
    mutation.
 7. Update this file, current phase sequence, feature-specific contract, relevant architecture/UI/setup
-   summaries, file-format authority where persistence changes, and README status after a block.
+   summaries, and README status after a block.
 8. Advance `implemented_through`, `current_block`, `current_boundary`, and `current_tag` only after the
    implementation and proof are checked in.
 
