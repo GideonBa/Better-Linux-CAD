@@ -388,6 +388,28 @@ commit. Qt renders the derived solve result/DOF and never evaluates substitute r
 
 Canonical integration contract: `docs/gui-sketch-solver-drag-mvp8.md`.
 
+## Block-110 live drag consumer
+
+Block 110 is the first continuous GUI consumer of this solver. It does not add solver mathematics. A
+semantic handle maps to one of four transient target forms:
+
+```text
+Point        -> Coincident(controlled point, temporary reference point)
+LineMidpoint -> Midpoint(temporary reference point, line)
+ArcCenter    -> Concentric(arc, temporary reference center entity)
+ArcRadius    -> Radial(arc, source-center-to-pointer distance)
+```
+
+The temporary constraint id is `zz.gui.drag.target`; temporary topology ids are
+`__gui.drag.pointer` and `__gui.drag.center`. They exist only in the augmented solve request and are
+removed before preview/commit. `FullyConstrained`, `UnderConstrained`, and `Redundant` are accepted
+preview states; `Conflicting`, `NonConvergent`, and `InvalidReference` refuse the drag candidate.
+
+Move samples may be coalesced by the GUI, but the exact release pointer is synchronously solved before
+commit. Qt renders the derived solve result/DOF and never evaluates substitute residuals.
+
+Canonical integration contract: `docs/gui-sketch-solver-drag-mvp8.md`.
+
 ## Next boundary
 
 Block 111 reuses the solver for disposable candidates produced by basic creation commands. Automatic

@@ -107,7 +107,7 @@ Frozen order:
 108 shared planar point/entity topology, mutation commands, JSON migration, undo — implemented
 109 deterministic planar constraint solver, DOF accounting, conflicts, diagnostics — implemented
 110 solver-backed mouse dragging, handles, live preview, atomic commit — implemented
-111 point, line, polyline, rectangle, polygon, construction-geometry creation — next
+111 point, line, polyline, rectangle, polygon, construction-geometry creation — next — next
 112 circle, arc, ellipse, slot creation/editing
 113 spline editing, continuity handles, Sketch text
 114 manual and automatic geometric constraints with glyph interaction
