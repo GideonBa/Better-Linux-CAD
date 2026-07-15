@@ -9,6 +9,8 @@
 #include <QLineEdit>
 #include <QMenu>
 #include <QMenuBar>
+#include <QPainter>
+#include <QPaintEvent>
 #include <QSignalBlocker>
 #include <QStatusBar>
 #include <QTextEdit>
@@ -67,6 +69,43 @@ QMenu* sketch_menu(MainWindow& window) {
   return nullptr;
 }
 
+class SketchInferenceOverlay final : public QWidget {
+public:
+  explicit SketchInferenceOverlay(QWidget* parent) : QWidget(parent) {
+    setObjectName(QStringLiteral("blcad.sketch.inference_overlay"));
+    setAttribute(Qt::WA_TransparentForMouseEvents);
+    setAttribute(Qt::WA_TranslucentBackground);
+    setFocusPolicy(Qt::NoFocus);
+    hide();
+  }
+
+  void set_guide(std::optional<Qt::Orientation> orientation,
+                 std::optional<double> coordinate) {
+    orientation_ = std::move(orientation);
+    coordinate_ = coordinate;
+    setVisible(orientation_.has_value() && coordinate_.has_value());
+    update();
+  }
+
+protected:
+  void paintEvent(QPaintEvent* event) override {
+    Q_UNUSED(event)
+    if (!orientation_ || !coordinate_)
+      return;
+    QPainter painter(this);
+    QPen pen(QColor(96, 220, 170, 190), 1.2, Qt::DashLine);
+    painter.setPen(pen);
+    if (*orientation_ == Qt::Horizontal)
+      painter.drawLine(QPointF(0.0, *coordinate_), QPointF(width(), *coordinate_));
+    else
+      painter.drawLine(QPointF(*coordinate_, 0.0), QPointF(*coordinate_, height()));
+  }
+
+private:
+  std::optional<Qt::Orientation> orientation_;
+  std::optional<double> coordinate_;
+};
+
 class SketchInteractionBinder final : public QObject {
 public:
   explicit SketchInteractionBinder(MainWindow& window)
@@ -78,6 +117,11 @@ public:
         snap_status_(window.findChild<QLabel*>(QStringLiteral("blcad.sketch.snap_status"))),
         numeric_hud_(window.findChild<QLineEdit*>(QStringLiteral("blcad.sketch.numeric_hud"))) {
     setObjectName(QStringLiteral("blcad.sketch.interaction_binder"));
+    if (viewport_ != nullptr) {
+      inference_overlay_ = new SketchInferenceOverlay(viewport_);
+      inference_overlay_->setGeometry(viewport_->rect());
+      viewport_->installEventFilter(this);
+    }
     create_grid_actions();
     bind_viewport();
     bind_shell_actions();
@@ -91,6 +135,9 @@ protected:
       const auto* key = static_cast<QKeyEvent*>(event);
       if (key->key() == Qt::Key_Escape)
         defer_selection_state();
+    } else if (watched == viewport_ && event->type() == QEvent::Resize &&
+               inference_overlay_ != nullptr) {
+      inference_overlay_->setGeometry(viewport_->rect());
     }
     return QObject::eventFilter(watched, event);
   }
@@ -127,6 +174,7 @@ private:
           window_.sketch_workspace().set_snap_inference(snap.inference);
           if (sketch_idle_stage(window_.sketch_workspace().stage()))
             (void)window_.sketch_workspace().set_hover(hit.has_value());
+          update_inference_preview(snap);
           refresh_status_surfaces();
         });
     viewport_->set_sketch_selection_callback(
@@ -180,6 +228,34 @@ private:
       viewport_->set_sketch_grid_config(grid_config());
   }
 
+  void update_inference_preview(const GuiSketchSnapResult& snap) {
+    if (inference_overlay_ == nullptr || viewport_ == nullptr) return;
+
+    std::optional<Qt::Orientation> orientation;
+    switch (snap.kind) {
+    case GuiSketchSnapKind::HorizontalInference:
+    case GuiSketchSnapKind::AlignmentY:
+      orientation = Qt::Horizontal;
+      break;
+    case GuiSketchSnapKind::VerticalInference:
+    case GuiSketchSnapKind::AlignmentX:
+      orientation = Qt::Vertical;
+      break;
+    default:
+      inference_overlay_->set_guide(std::nullopt, std::nullopt);
+      return;
+    }
+
+    const auto screen = viewport_->sketch_plane_to_screen(snap.snapped_point);
+    if (screen.has_error()) {
+      inference_overlay_->set_guide(std::nullopt, std::nullopt);
+      return;
+    }
+    const double coordinate = *orientation == Qt::Horizontal ? screen.value().y : screen.value().x;
+    inference_overlay_->set_guide(orientation, coordinate);
+    inference_overlay_->raise();
+  }
+
   void append_diagnostic(const Error& error) const {
     if (diagnostics_ != nullptr)
       diagnostics_->append(
@@ -203,6 +279,8 @@ private:
     if (!active) {
       if (viewport_ != nullptr)
         viewport_->clear_sketch_interaction();
+      if (inference_overlay_ != nullptr)
+        inference_overlay_->set_guide(std::nullopt, std::nullopt);
       refresh_status_surfaces();
       return;
     }
@@ -236,6 +314,10 @@ private:
     if (activated.has_error()) {
       append_diagnostic(activated.error());
       return;
+    }
+    if (inference_overlay_ != nullptr) {
+      inference_overlay_->setGeometry(viewport_->rect());
+      inference_overlay_->raise();
     }
     update_selection_state();
     refresh_status_surfaces();
@@ -302,6 +384,7 @@ private:
   QLineEdit* numeric_hud_{nullptr};
   QAction* grid_action_{nullptr};
   QAction* grid_snap_action_{nullptr};
+  SketchInferenceOverlay* inference_overlay_{nullptr};
   bool synchronizing_selection_{false};
 };
 
