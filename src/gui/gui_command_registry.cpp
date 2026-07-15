@@ -3,6 +3,10 @@
 #include <algorithm>
 #include <utility>
 
+// Keep the Block-107 interaction authority in one GUI translation unit without changing the
+// frozen target matrix. The implementation remains isolated in its own source module.
+#include "gui_sketch_interaction.cpp"
+
 namespace blcad::gui {
 
 bool GuiCommandRegistry::register_command(GuiCommandDefinition command) {
