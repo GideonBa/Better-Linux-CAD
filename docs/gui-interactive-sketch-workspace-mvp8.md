@@ -1,14 +1,18 @@
 # Interactive Sketch Workspace MVP-8
 
-Status: implemented in Block 106; Block 107 supplies plane-interaction status producers and Block 108
-now supplies the persistent shared point/entity topology used by future solver/edit consumers.
+Status: implemented in Block 106. Block 107 supplies plane-interaction producers, Block 108 supplies
+persistent shared point/entity topology, and Block 109 supplies the deterministic headless solver/DOF
+authority consumed by later GUI interaction.
 
 This document is the canonical GUI contract for the contextual planar Sketch workspace introduced by
-Block 106. It extends the Block-95/96 command and transaction rules and the Block-99 Sketch workbench.
-It does not own persistent Sketch geometry or solver mathematics. Device-independent mapping, hit
-testing, box selection, grid, snapping, and inference are implemented by Block 107 in
-`docs/gui-sketch-plane-interaction-mvp8.md`. Shared planar topology and headless edit commands are
-implemented by Block 108 in `docs/sketch-shared-topology-mvp8.md`.
+Block 106. It extends the Block-95/96 command/transaction rules and Block-99 Sketch workbench. It does
+not own persistent Sketch geometry or solver mathematics.
+
+Related canonical contracts:
+
+- `docs/gui-sketch-plane-interaction-mvp8.md` — Block-107 mapping/hit/selection/grid/snap/inference;
+- `docs/sketch-shared-topology-mvp8.md` — Block-108 point/entity identity and edit commands;
+- `docs/sketch-planar-constraint-solver-mvp8.md` — Block-109 general planar solver and DOF.
 
 ## Scope
 
@@ -28,69 +32,58 @@ The Sketch browser surface is organized around:
 Entities | Constraints | Dimensions | Diagnostics
 ```
 
-The existing model browser remains the semantic selection authority. The contextual Sketch surface
-changes presentation and command availability; it does not create a second browser model or second
-selection identity system.
+The existing model browser remains semantic selection authority. The contextual Sketch surface changes
+presentation and command availability; it does not create a second browser model or second selection
+identity system.
 
 ## Enter Sketch
 
 `GuiSketchWorkspace::enter(...)` requires:
 
-- an active Part document;
+- active Part document;
 - no active `GuiTaskState` command;
-- an existing planar `SketchId` in the active Part;
-- a workplane that resolves through the existing `geometry::WorkplaneResolver` path used by
-  `GuiSketchWorkbench::plane_view(...)`.
+- existing planar `SketchId` in the active Part;
+- workplane resolving through the existing `geometry::WorkplaneResolver` path.
 
-Before the contextual workspace becomes active, it captures the previous GUI workspace and complete
-semantic selection list. `MainWindow` captures a transient `GuiViewportCameraBookmark` and current
-viewport selection-filter mask.
+Before activation, the workspace captures previous GUI workspace and complete semantic selection.
+`MainWindow` captures a transient `GuiViewportCameraBookmark` and selection-filter mask.
 
 After successful entry:
 
-- `GuiDocumentSession::workspace()` is `GuiWorkspace::Sketch`;
+- session workspace is `GuiWorkspace::Sketch`;
 - Sketch is a contextual Part mode while global Part/Assembly/Inspect/Exchange tabs remain;
-- the active workplane camera is normal to the plane and orthographic;
-- the viewport uses `SketchEntity | Edge | Vertex` selection filtering;
-- the cursor becomes a crosshair;
-- the active Sketch remains undimmed while surrounding model presentation uses transient `Dim`
-  focus by default;
+- workplane camera is normal to plane and orthographic;
+- viewport selection mask is `SketchEntity | Edge | Vertex`;
+- cursor becomes a crosshair;
+- active Sketch remains undimmed while surrounding model presentation uses transient Dim by default;
 - Sketch command groups and cursor/snap/DOF/solve status surfaces become visible;
-- prior semantic selection is retained only as a restore bookmark and working selection starts clear.
+- prior selection is a restore bookmark and working selection starts clear.
 
-`OcctViewport` also exposes transient `GuiSketchSurroundingsMode::Isolate`. Both focus policies are
-view state only; no visibility/transparency intent is written to the Part.
+`OcctViewport` also exposes transient Isolate focus. Focus policies are view state only.
 
-Block 107's binder observes successful Sketch entry and installs the transient plane-interaction scene
-after the normal camera is active. This lets native OCCT mapping use the final view and does not alter
-the Enter-Sketch transaction boundary.
+Block 107 installs the transient plane-interaction scene after the final normal camera is active.
+Blocks 108 and 109 add no implicit Enter-Sketch mutation: entering the workspace does not migrate
+historical Sketch JSON, edit topology, or solve/commit coordinates.
 
-Block 108 adds no Enter-Sketch mutation. Shared topology is Core identity and is migrated/edited only
-through explicit Core calls; entering a workspace does not silently rewrite historical Sketch JSON.
-
-No Part feature is created by `Enter Sketch`.
+No Part feature is created by Enter Sketch.
 
 ## Finish Sketch
 
 `GuiSketchWorkspace::finish(...)` is legal only when the workspace is active and no command,
 numeric-input stage, preview, selected handle, or drag candidate remains active.
 
-Finish runs the existing Block-99 Sketch inspection/diagnostic authority. Diagnostic errors reject
-Finish; warnings remain visible and do not become hidden persistent consent. Finish does not
-synthesize Extrude, Revolve, or another downstream feature.
+Finish currently runs the existing Sketch inspection/diagnostic authority. Diagnostic errors reject
+Finish; warnings remain visible. Finish does not synthesize a downstream Part feature.
 
-On success the controller restores previous workspace and semantic selection. `MainWindow` clears
-transient Sketch focus, restores Eye/Target/Up/Scale/projection/plane-camera publication and selection
-filter, removes the crosshair, and clears active Sketch workspace state. Block 107 clears its scene,
-grid, hover, snap marker, inference guide, and box-selection products.
+On success the controller restores previous workspace/selection. `MainWindow` clears Sketch focus,
+restores Eye/Target/Up/Scale/projection/plane-camera state and selection filter, removes the crosshair,
+and clears active Sketch workspace state. Block 107 clears its scene, grid, hover, snap marker,
+inference guide, and box-selection products.
 
-For example, entering `sketch.bracket` from Inspect with a datum selected clears the working
-selection, edits normal to the Sketch plane with surrounding Bodies dimmed, and returns to Inspect
-with the same datum selection and camera when Finish succeeds.
+Block 109 does not silently commit a solve during Finish. Block 119 owns solver-aware region/profile/
+repair Finish Sketch behavior.
 
 ## Frozen command state machine
-
-Authoritative interaction stages are:
 
 ```text
 Idle
@@ -114,7 +107,7 @@ Direct-manipulation path:
 Idle -> SelectedHandle -> DragCandidate -> commit | cancel
 ```
 
-`GuiSketchWorkspace` projects these stages onto existing `GuiTaskState`:
+`GuiSketchWorkspace` projects stages onto existing `GuiTaskState`:
 
 ```text
 CollectingPicks / SelectedHandle -> CollectingSelection
@@ -122,13 +115,14 @@ NumericInput                     -> EditingParameters
 Preview / DragCandidate          -> Preview
 ```
 
-There is no second GUI transaction or undo authority. Block-108 `SketchTopologyUndoStack` is a
-headless Core snapshot utility for topology commands; document-level GUI commits still use the
-existing session transaction/history path.
+There is no second GUI transaction or undo authority. Block-108 `SketchTopologyUndoStack` is a headless
+Core snapshot utility. Document-level GUI commits still use session transaction/history authority.
+
+Block 110 fills the `SelectedHandle -> DragCandidate` path with Block-109 solving.
 
 ## Escape and focus rules
 
-`Esc` backs out exactly one command stage where a prior stage exists:
+`Esc` backs out one stage where a prior stage exists:
 
 ```text
 Preview         -> NumericInput
@@ -137,152 +131,138 @@ CollectingPicks -> cancel command -> Idle
 Hover           -> Idle
 ```
 
-A selected-handle or drag-candidate command cancels atomically to Idle because Block 110 owns
-solver-backed intermediate drag reconstruction. Block 106 only freezes transient lifecycle.
+A selected-handle/drag-candidate command cancels atomically to Idle. Block 110 owns exact pre-drag
+snapshot restoration and solver-preview cleanup.
 
-Numeric input owns keyboard focus in `NumericInput`. `Enter` accepts the current field for the active
-command's candidate validation. Canvas owns ordinary selection/placement focus; task panels may take
-focus for property editing. `MainWindow` routes unconsumed `Esc` to the Sketch workspace controller.
+Numeric input owns keyboard focus in `NumericInput`; `Enter` accepts the current field for candidate
+validation. Canvas owns ordinary selection/placement focus. `MainWindow` routes unconsumed `Esc` to the
+Sketch workspace controller.
 
-While the viewport remains on the published normal-to-plane `GuiPlaneCamera`, right-drag orbit is
-disabled. A deliberate standard-view change clears that plane-camera state and enables the existing
-orbit gesture. A short right click in active Sketch routes to contextual menu handling; the current
-shell exposes `Repeat last Sketch command` when compatible and idle.
-
-For example, while the line HUD contains `line.1, 0, 0, 25, 0`, first `Esc` returns from numeric
-entry to pick collection and second `Esc` cancels. Neither persists geometry.
+While viewport remains on published normal-to-plane `GuiPlaneCamera`, right-drag orbit is disabled. A
+deliberate standard-view change clears plane-camera state and enables existing orbit gesture. Short
+right click routes to Sketch context handling and may expose Repeat Last compatible command.
 
 ## Numeric HUD and Preview/Commit
 
 The numeric HUD is transient. Its text is not model identity and is never serialized.
 
-The first wired command remains the historical planar line authoring path:
+The first wired command remains the historical planar line path:
 
 ```text
 id, start-x, start-y, end-x, end-y
 ```
 
-Coordinates are interpreted in the active Sketch plane. Before commit, `MainWindow` creates a
-disposable Sketch copy and validates the candidate through `Sketch::add_entity(...)`. Only a valid
-candidate advances to Preview. Applying ends transient Preview and the existing
-`GuiSketchWorkbench::add_line(...)` path commits one document transaction.
+Coordinates are active-plane values. Before commit, `MainWindow` validates a disposable historical
+Sketch candidate through `Sketch::add_entity(...)`. Only a valid candidate advances to Preview. Apply
+uses `GuiSketchWorkbench::add_line(...)` and commits one document transaction. Block 107 then rebuilds
+its read-only interaction projection.
 
-For example, `line.web, 0, 0, 40, 0` validates on a copy, previews, and commits through the same
-Part-document mutation used by headless callers. Duplicate entity id fails before persistent Sketch
-replacement. After success, the Block-107 binder rebuilds its read-only interaction projection.
-
-Block 108 does not retrofit this initial HUD command to topology-native creation early. Blocks 110–111
-connect solver-backed drag and creation workflows to Block-108 topology commands in sequence.
+Blocks 108–109 do not retrofit this seed HUD command into topology-native solver creation early. Block
+110 adds topology-native solver-backed drag; Block 111 adds topology-native basic creation tools.
 
 ## Command repeat
 
-A successfully committed repeatable Sketch command records command id and tool hint as transient
-workspace state. `repeat_last_command(...)` may restart only from Idle/Hover with no active generic
-task.
-
-`Sketch -> Repeat last Sketch command` and the active-Sketch context menu expose this authority. The
-initial line integration reopens the HUD for `sketch.line`. Repeat state clears on workspace exit.
+A successful repeatable Sketch command records command id/tool hint as transient workspace state.
+`repeat_last_command(...)` restarts only from Idle/Hover with no active generic task. Repeat state
+clears on workspace exit.
 
 ## Selection filters and semantic identity
 
-The frozen Sketch mask is:
+Frozen Sketch mask:
 
 ```text
 SketchEntity | Edge | Vertex
 ```
 
-The mask reuses `GuiSelectionKind` and the existing viewport semantic bridge. No AIS owner,
-`TopoDS_Shape`, screen coordinate, hover object, or Block-107 candidate id becomes persistent
-identity.
+The mask reuses `GuiSelectionKind` and existing viewport semantic bridge. No AIS owner, `TopoDS_Shape`,
+screen coordinate, hover object, or Block-107 candidate id becomes persistent identity.
 
-Block 107 hit and box selection publishes stable Sketch semantic ids into `GuiSelectionModel`.
-Direct hit/box selection is disabled while the task state collects picks, edits numeric input, or
-previews a command.
+Block 107 hit/box selection publishes stable Sketch semantic ids to `GuiSelectionModel`. Direct
+selection is disabled while task state collects picks, edits numeric input, or previews a command.
 
-Block 108 adds `SketchPointId` as Core topology identity. The current GUI selection model does not
-synthesize point ids from screen hits. Later solver-backed handle/creation commands resolve accepted
-semantic picks and candidate positions through explicit Core topology operations.
+Block 108 adds `SketchPointId` as Core topology identity. Current selection code does not synthesize
+point ids from screen hits. Block 110 must expose explicit semantic handles that map accepted interaction
+landmarks to existing `SketchPointId`/entity roles.
+
+Block 109 solver targets only stable point/entity ids. Qt must not pass screen coordinates, sampled hit
+ids, AIS owners, or OCCT topology as solver identity.
 
 The pre-Sketch filter mask is restored on Finish.
 
 ## Cursor, snap, DOF, and solve status
 
-`GuiSketchWorkspaceStatus` is the transient presentation model for:
+`GuiSketchWorkspaceStatus` is transient presentation for:
 
 - tool hint;
 - cursor coordinates in plane space;
 - snap/inference text;
 - optional remaining DOF;
 - solve status;
-- current interaction stage and focus target.
+- interaction stage/focus target.
 
-Producer staging is:
+Producer boundaries are now:
 
-- Block 107 owns mapping, hit testing, snapping, inference, raw cursor coordinates, and selected
-  snap/inference text;
-- Block 108 owns persistent shared point/entity topology but does not publish solve status;
-- Block 109 owns general planar solve state and remaining DOF;
-- Block 110 owns solver-backed drag candidates.
+```text
+Block 107 -> cursor coordinates, hit, snap, inference
+Block 108 -> persistent shared point/entity topology identity
+Block 109 -> headless solve state, exact local remaining DOF, solver diagnostics
+Block 110 -> live drag solve invocation and status publication into GUI
+```
 
-Therefore the workspace may currently show real Cursor/Snap values while `DOF: —` and
-`Solve: Not evaluated` remain explicit. The UI does not infer solver results from topology migration.
+Block 109 means DOF/Solve now have a real Core producer. The existing GUI does not yet continuously
+invoke that producer, so it may still display `DOF: —` / `Solve: Not evaluated` outside a later
+solver-aware command. Block 110 owns the first live publication during drag.
+
+The UI must render `SketchSolveResult` status/remaining DOF; it must not infer them from endpoint counts,
+constraint glyph counts, or topology migration.
 
 ## Camera bookmark and Sketch focus
 
-`OcctViewport::camera_bookmark()` captures:
+`OcctViewport::camera_bookmark()` captures Eye, Target, Up, Scale, projection, and published plane-camera
+state. Restore rejects non-positive scale and does not persist camera data.
 
-```text
-Eye
-Target
-Up direction
-Scale
-Perspective/Orthographic projection
-published plane-camera state
-```
-
-`restore_camera_bookmark(...)` rejects non-positive scale and restores view state without persisting
-camera data in Part or Project JSON.
-
-`set_sketch_focus(...)` and `clear_sketch_focus()` are transient. The focus id is a stable Sketch
-semantic id used only to identify `sketch/<SketchId>/...` viewport presentations. `Dim` keeps active
-Sketch presentations opaque and increases surrounding transparency. `Isolate` erases non-active
-presentations from transient AIS context. Clearing focus restores ordinary presentation policy.
+`set_sketch_focus(...)` / `clear_sketch_focus()` are transient. Focus id is a stable Sketch semantic id
+used only to identify `sketch/<SketchId>/...` presentations. Dim keeps active Sketch opaque and
+increases surrounding transparency. Isolate erases non-active presentations from transient AIS
+context. Clearing focus restores ordinary presentation policy.
 
 ## Transaction and persistence boundaries
 
-Block 106 introduces no JSON field. Block 107 adds transient interaction products only. Block 108
-adds canonical Core topology persistence in separate `blcad.sketch_topology.mvp8` JSON and an explicit
-migration boundary from historical PartDocument Sketch JSON; entering/exiting the GUI workspace does
-not run persistence migration implicitly.
+Block 106 introduces no JSON field. Block 107 adds transient interaction products only. Block 108 adds
+canonical `blcad.sketch_topology.mvp8` persistence and explicit historical migration. Block 109 adds no
+JSON schema and persists no solver cache.
 
 Persistent document mutation still goes through `GuiDocumentSession::commit_part_transaction(...)`,
-which validates and recomputes a candidate before publishing one canonical session history entry.
-Preview state, HUD text, repeat state, hover, cursor coordinates, snap text, focus, workspace/camera
-bookmarks, screen mappings, grid products, hit cycles, and status are transient.
+which validates/recomputes a candidate before publishing one canonical history entry.
 
-Block-108 topology commands additionally provide exact Core `before`/`after` topology snapshots.
-When a topology edit is projected back to current PartDocument Sketch records, the compatibility
-bridge requires lossless re-migration and then uses atomic `PartDocument::update_sketch(...)`.
+Transient state includes Preview, HUD text, repeat state, hover, cursor, snap text, focus, workspace/
+camera bookmarks, screen mappings, grid products, hit cycles, solve status, remaining DOF, residuals,
+Jacobian/rank diagnostics, and future drag preview candidates.
+
+Block-108 topology commands provide exact Core before/after snapshots. The historical PartDocument
+compatibility bridge requires lossless re-migration before atomic `PartDocument::update_sketch(...)`.
+Block 109 returns a disposable solved topology; it does not choose a document commit boundary.
+
+Block 110 must solve disposable candidates and commit exactly one validated document transaction on
+successful release.
 
 ## Failure policy
 
-The workspace fails closed when:
-
-- Enter Sketch has no Part, has an active command, names a missing Sketch, or cannot resolve workplane;
-- camera orientation cannot be established;
-- Finish is requested while a command/drag stage remains active;
-- existing Sketch diagnostics contain errors;
-- a numeric candidate fails Core validation;
-- camera restore receives an invalid bookmark.
+The workspace fails closed when Enter Sketch lacks Part/Sketch/workplane or has an active command,
+camera orientation fails, Finish has an active command/drag stage, existing Finish diagnostics contain
+errors, a numeric candidate fails Core validation, or camera restore receives invalid state.
 
 A failed Enter leaves previous workspace authoritative. Failed Finish leaves Sketch workspace active.
-Failed candidate does not replace persistent Sketch intent. Block-107 mapping/scene failures publish
-a GUI diagnostic and leave persistent Sketch unchanged. Block-108 topology/migration/edit failures
-are Core failures and likewise publish no partial PartDocument mutation.
+Failed candidate does not replace persistent Sketch intent. Block-107 mapping/scene failures leave
+persistent Sketch unchanged. Block-108 topology failures publish no partial PartDocument mutation.
+
+Block-109 `InvalidReference`, `Conflicting`, or `NonConvergent` results are derived diagnostics and do
+not mutate persistent Sketch intent. Block 110 must restore the pre-drag snapshot and clear preview on
+failed solve.
 
 ## Focused proof
 
-Block-106 tags:
+Block 106:
 
 ```text
 [gui][sketch-workspace]
@@ -290,12 +270,7 @@ Block-106 tags:
 [gui][viewport][gui][navigation]
 ```
 
-They cover context capture/restore, command/browser surface order, selection mask, status publication,
-staged `Esc`, repeat, handle/drag-candidate transience, generic task backtracking, camera bookmark
-restoration, Dim/Isolate focus, and the shell path Enter Sketch -> numeric line commit -> repeat/cancel
--> Finish Sketch.
-
-Block 107 adds:
+Block 107:
 
 ```text
 [gui][sketch-hit-test]
@@ -303,7 +278,7 @@ Block 107 adds:
 [gui][sketch-box-selection]
 ```
 
-Block 108 adds:
+Block 108:
 
 ```text
 [core][sketch-topology]
@@ -311,9 +286,17 @@ Block 108 adds:
 [core][sketch-json-migration]
 ```
 
+Block 109:
+
+```text
+[core][sketch-solver]
+[core][sketch-dof]
+[core][sketch-conflict-diagnostics]
+```
+
 ## Next boundary
 
-Block 109 owns deterministic general planar constraint solving over Block-108 shared point/entity
-topology. It produces remaining DOF and solve-state diagnostics for the existing Block-106 status
-surfaces. The workspace and Block-107 interaction layer remain presentation/application clients and
-must not implement solver mathematics in Qt.
+Block 110 uses Block-107 pointer mapping, Block-108 semantic topology handles, and Block-109 solving for
+live direct manipulation. It freezes handle identity, transient drag target semantics, throttled live
+preview without dropping the final pointer position, fixed-geometry refusal, cancellation/lost-capture
+rollback, and one atomic document commit on release.
