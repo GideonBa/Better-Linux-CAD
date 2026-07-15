@@ -13,6 +13,7 @@ public:
   [[nodiscard]] bool begin_parameter_editing() noexcept;
   [[nodiscard]] bool show_preview() noexcept;
   [[nodiscard]] bool return_to_editing() noexcept;
+  [[nodiscard]] bool return_to_selection() noexcept;
   [[nodiscard]] bool apply() noexcept;
   [[nodiscard]] bool cancel() noexcept;
 

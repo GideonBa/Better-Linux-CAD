@@ -40,6 +40,7 @@ TEST_CASE("OCCT viewport owns transient display and navigation state",
     CHECK(viewport.native_viewer_available());
   CHECK(viewport.display_mode() == GuiViewportDisplayMode::ShadedWithEdges);
   CHECK(viewport.projection() == GuiViewportProjection::Perspective);
+  CHECK_FALSE(viewport.sketch_focus_active());
 
   std::vector<ViewportSceneItem> scene;
   scene.push_back({ViewportSceneKind::SolidBody, "body/main", box_shape()});
@@ -54,8 +55,28 @@ TEST_CASE("OCCT viewport owns transient display and navigation state",
   REQUIRE(viewport.set_plane_camera({0.0, 0.0, 5.0}, {0.0, 0.0, 1.0}, {0.0, 1.0, 0.0}));
   REQUIRE(viewport.plane_camera().has_value());
   CHECK(viewport.plane_camera()->target == Point3{0.0, 0.0, 5.0});
+  const auto bookmark = viewport.camera_bookmark();
+  viewport.set_projection(GuiViewportProjection::Perspective);
+  viewport.set_standard_view(GuiStandardView::Isometric);
+  CHECK_FALSE(viewport.plane_camera().has_value());
+  REQUIRE(viewport.restore_camera_bookmark(bookmark));
+  CHECK(viewport.projection() == GuiViewportProjection::Orthographic);
+  REQUIRE(viewport.plane_camera().has_value());
+  CHECK(viewport.plane_camera()->target == Point3{0.0, 0.0, 5.0});
+  CHECK_FALSE(viewport.restore_camera_bookmark(
+      GuiViewportCameraBookmark{{1.0, 1.0, 1.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 1.0}, 0.0}));
   CHECK_FALSE(viewport.set_plane_camera({0.0, 0.0, 0.0}, {0.0, 0.0, 1.0},
                                         {0.0, 0.0, 1.0}));
+
+  viewport.set_sketch_focus("sketch.path");
+  CHECK(viewport.sketch_focus_active());
+  CHECK(viewport.sketch_focus_id() == "sketch.path");
+  CHECK(viewport.sketch_surroundings_mode() == GuiSketchSurroundingsMode::Dim);
+  viewport.set_sketch_focus("sketch.path", GuiSketchSurroundingsMode::Isolate);
+  CHECK(viewport.sketch_surroundings_mode() == GuiSketchSurroundingsMode::Isolate);
+  viewport.clear_sketch_focus();
+  CHECK_FALSE(viewport.sketch_focus_active());
+  CHECK(viewport.sketch_focus_id().empty());
   viewport.fit_all();
 }
 

@@ -10,6 +10,10 @@ Result<std::size_t> part_only_error(std::string_view operation) {
       Error::validation("gui.sketch_workbench", std::string(operation) + " requires an active Part document"));
 }
 
+Error workspace_error(std::string message) {
+  return Error::validation("gui.sketch_workspace", std::move(message));
+}
+
 const PartDocument* active_part(const GuiDocumentSession& session) { return session.part_document(); }
 
 template <typename Object, typename Add>
@@ -233,6 +237,301 @@ Result<std::size_t> GuiSketchWorkbench::apply_repair(GuiDocumentSession& session
                                                   applied.value().changed_dimension_ids().size())
                    : Result<std::size_t>::failure(Error::validation(candidate.id().value(), applied.value().message()));
       });
+}
+
+const std::vector<std::string_view>& GuiSketchWorkspace::command_groups() noexcept {
+  static const std::vector<std::string_view> groups{
+      "Create", "Constrain", "Dimension", "Modify", "Project"};
+  return groups;
+}
+
+const std::vector<std::string_view>& GuiSketchWorkspace::browser_sections() noexcept {
+  static const std::vector<std::string_view> sections{
+      "Entities", "Constraints", "Dimensions", "Diagnostics"};
+  return sections;
+}
+
+Result<GuiSketchPlaneView> GuiSketchWorkspace::enter(GuiDocumentSession& session,
+                                                     const GuiSketchWorkbench& workbench,
+                                                     SketchId sketch) {
+  if (active())
+    return Result<GuiSketchPlaneView>::failure(workspace_error("a Sketch workspace is already active"));
+  if (session.document_kind() != GuiDocumentKind::Part)
+    return Result<GuiSketchPlaneView>::failure(workspace_error("Enter Sketch requires an active Part document"));
+  if (session.task().active())
+    return Result<GuiSketchPlaneView>::failure(
+        workspace_error("active task must be applied or cancelled before Enter Sketch"));
+  if (session.part_document()->find_sketch(sketch) == nullptr)
+    return Result<GuiSketchPlaneView>::failure(workspace_error("selected sketch must exist in the active Part"));
+
+  auto plane = workbench.plane_view(session, sketch);
+  if (plane.has_error())
+    return plane;
+
+  previous_workspace_ = session.workspace();
+  previous_selection_ = session.selection().entries();
+  if (!session.set_workspace(GuiWorkspace::Sketch))
+    return Result<GuiSketchPlaneView>::failure(workspace_error("could not activate Sketch workspace"));
+
+  session.selection().clear();
+  active_sketch_ = std::move(sketch);
+  last_repeatable_command_.clear();
+  last_repeatable_hint_.clear();
+  reset_interaction();
+  status_.tool_hint = "Choose a Sketch command or select sketch geometry";
+  return plane;
+}
+
+Result<GuiWorkspace> GuiSketchWorkspace::finish(GuiDocumentSession& session,
+                                                const GuiSketchWorkbench& workbench) {
+  if (!active())
+    return Result<GuiWorkspace>::failure(workspace_error("Finish Sketch requires an active Sketch workspace"));
+  if (session.task().active() || (stage_ != GuiSketchInteractionStage::Idle &&
+                                  stage_ != GuiSketchInteractionStage::Hover))
+    return Result<GuiWorkspace>::failure(
+        workspace_error("active Sketch command must be committed or cancelled before Finish Sketch"));
+
+  auto inspection = workbench.inspect(session, *active_sketch_);
+  if (inspection.has_error())
+    return Result<GuiWorkspace>::failure(inspection.error());
+  if (inspection.value().diagnostics.has_errors())
+    return Result<GuiWorkspace>::failure(
+        workspace_error("Sketch diagnostics contain errors; repair them before Finish Sketch"));
+
+  const GuiWorkspace restored_workspace = previous_workspace_;
+  const auto restored_selection = previous_selection_;
+  if (!session.set_workspace(restored_workspace))
+    return Result<GuiWorkspace>::failure(workspace_error("could not restore previous workspace"));
+
+  session.selection().clear();
+  for (const auto& selection : restored_selection)
+    (void)session.selection().add(selection);
+  leave_workspace();
+  return Result<GuiWorkspace>::success(restored_workspace);
+}
+
+bool GuiSketchWorkspace::set_hover(bool hovered) noexcept {
+  if (!active() || (stage_ != GuiSketchInteractionStage::Idle &&
+                    stage_ != GuiSketchInteractionStage::Hover))
+    return false;
+  stage_ = hovered ? GuiSketchInteractionStage::Hover : GuiSketchInteractionStage::Idle;
+  status_.stage = stage_;
+  status_.tool_hint = hovered ? "Hovering sketch geometry" :
+                                "Choose a Sketch command or select sketch geometry";
+  return true;
+}
+
+bool GuiSketchWorkspace::begin_command(GuiDocumentSession& session, std::string command_id,
+                                       std::string tool_hint, bool repeatable) {
+  if (!active() || command_id.empty() ||
+      (stage_ != GuiSketchInteractionStage::Idle && stage_ != GuiSketchInteractionStage::Hover) ||
+      !session.task().begin(command_id))
+    return false;
+  active_command_ = std::move(command_id);
+  active_tool_hint_ = std::move(tool_hint);
+  active_command_repeatable_ = repeatable;
+  stage_ = GuiSketchInteractionStage::CollectingPicks;
+  focus_ = GuiSketchFocusTarget::Canvas;
+  status_.stage = stage_;
+  status_.focus = focus_;
+  status_.tool_hint = active_tool_hint_;
+  numeric_input_.clear();
+  selected_handle_.clear();
+  return true;
+}
+
+bool GuiSketchWorkspace::begin_numeric_input(GuiDocumentSession& session) noexcept {
+  if (!active() || stage_ != GuiSketchInteractionStage::CollectingPicks ||
+      !session.task().begin_parameter_editing())
+    return false;
+  stage_ = GuiSketchInteractionStage::NumericInput;
+  focus_ = GuiSketchFocusTarget::NumericHud;
+  status_.stage = stage_;
+  status_.focus = focus_;
+  status_.tool_hint = "Enter a numeric value; Enter previews and Esc returns to picking";
+  return true;
+}
+
+bool GuiSketchWorkspace::set_numeric_input(std::string text) {
+  if (!active() || stage_ != GuiSketchInteractionStage::NumericInput)
+    return false;
+  numeric_input_ = std::move(text);
+  return true;
+}
+
+bool GuiSketchWorkspace::show_preview(GuiDocumentSession& session) noexcept {
+  if (!active() || stage_ != GuiSketchInteractionStage::NumericInput ||
+      !session.task().show_preview())
+    return false;
+  stage_ = GuiSketchInteractionStage::Preview;
+  status_.stage = stage_;
+  status_.tool_hint = "Preview ready — Apply commits; Esc returns to numeric input";
+  return true;
+}
+
+bool GuiSketchWorkspace::commit_command(GuiDocumentSession& session) noexcept {
+  if (!active() || stage_ != GuiSketchInteractionStage::Preview || !session.task().apply())
+    return false;
+  if (active_command_repeatable_) {
+    last_repeatable_command_ = active_command_;
+    last_repeatable_hint_ = active_tool_hint_;
+  }
+  reset_interaction();
+  return true;
+}
+
+bool GuiSketchWorkspace::repeat_last_command(GuiDocumentSession& session) {
+  if (!active() || last_repeatable_command_.empty() ||
+      (stage_ != GuiSketchInteractionStage::Idle && stage_ != GuiSketchInteractionStage::Hover))
+    return false;
+  const std::string command = last_repeatable_command_;
+  const std::string hint = last_repeatable_hint_;
+  return begin_command(session, command, hint, true);
+}
+
+bool GuiSketchWorkspace::escape(GuiDocumentSession& session) noexcept {
+  if (!active())
+    return false;
+  switch (stage_) {
+  case GuiSketchInteractionStage::Hover:
+    stage_ = GuiSketchInteractionStage::Idle;
+    status_.stage = stage_;
+    status_.tool_hint = "Choose a Sketch command or select sketch geometry";
+    return true;
+  case GuiSketchInteractionStage::Preview:
+    if (!session.task().return_to_editing())
+      return false;
+    stage_ = GuiSketchInteractionStage::NumericInput;
+    focus_ = GuiSketchFocusTarget::NumericHud;
+    status_.stage = stage_;
+    status_.focus = focus_;
+    status_.tool_hint = "Edit the numeric value or press Esc to return to picking";
+    return true;
+  case GuiSketchInteractionStage::NumericInput:
+    if (!session.task().return_to_selection())
+      return false;
+    stage_ = GuiSketchInteractionStage::CollectingPicks;
+    focus_ = GuiSketchFocusTarget::Canvas;
+    numeric_input_.clear();
+    status_.stage = stage_;
+    status_.focus = focus_;
+    status_.tool_hint = active_tool_hint_;
+    return true;
+  case GuiSketchInteractionStage::CollectingPicks:
+  case GuiSketchInteractionStage::SelectedHandle:
+  case GuiSketchInteractionStage::DragCandidate:
+    if (!session.task().cancel())
+      return false;
+    reset_interaction();
+    return true;
+  case GuiSketchInteractionStage::Idle:
+    return false;
+  }
+  return false;
+}
+
+bool GuiSketchWorkspace::select_handle(GuiDocumentSession& session, std::string semantic_id) {
+  if (!active() || semantic_id.empty() ||
+      (stage_ != GuiSketchInteractionStage::Idle && stage_ != GuiSketchInteractionStage::Hover) ||
+      !session.task().begin("sketch.drag"))
+    return false;
+  selected_handle_ = std::move(semantic_id);
+  stage_ = GuiSketchInteractionStage::SelectedHandle;
+  focus_ = GuiSketchFocusTarget::Canvas;
+  status_.stage = stage_;
+  status_.focus = focus_;
+  status_.tool_hint = "Drag the selected handle or press Esc to cancel";
+  return true;
+}
+
+bool GuiSketchWorkspace::show_drag_candidate(GuiDocumentSession& session) noexcept {
+  if (!active() || stage_ != GuiSketchInteractionStage::SelectedHandle ||
+      !session.task().begin_parameter_editing() || !session.task().show_preview())
+    return false;
+  stage_ = GuiSketchInteractionStage::DragCandidate;
+  status_.stage = stage_;
+  status_.tool_hint = "Drag candidate preview — release commits or Esc cancels";
+  return true;
+}
+
+bool GuiSketchWorkspace::commit_drag(GuiDocumentSession& session) noexcept {
+  if (!active() || stage_ != GuiSketchInteractionStage::DragCandidate || !session.task().apply())
+    return false;
+  reset_interaction();
+  return true;
+}
+
+void GuiSketchWorkspace::set_cursor_coordinates(std::optional<Point2> coordinates) noexcept {
+  status_.cursor_coordinates = std::move(coordinates);
+}
+
+void GuiSketchWorkspace::set_snap_inference(std::string inference) {
+  status_.snap_inference = std::move(inference);
+}
+
+void GuiSketchWorkspace::set_solve_feedback(std::optional<std::size_t> remaining_dof,
+                                            std::string solve_status) {
+  status_.remaining_dof = remaining_dof;
+  status_.solve_status = solve_status.empty() ? "Not evaluated" : std::move(solve_status);
+}
+
+void GuiSketchWorkspace::focus_canvas() noexcept {
+  if (!active())
+    return;
+  focus_ = GuiSketchFocusTarget::Canvas;
+  status_.focus = focus_;
+}
+
+void GuiSketchWorkspace::focus_task_panel() noexcept {
+  if (!active())
+    return;
+  focus_ = GuiSketchFocusTarget::TaskPanel;
+  status_.focus = focus_;
+}
+
+bool GuiSketchWorkspace::active() const noexcept { return active_sketch_.has_value(); }
+
+const std::optional<SketchId>& GuiSketchWorkspace::active_sketch() const noexcept {
+  return active_sketch_;
+}
+
+GuiSketchInteractionStage GuiSketchWorkspace::stage() const noexcept { return stage_; }
+
+std::string_view GuiSketchWorkspace::active_command() const noexcept { return active_command_; }
+
+std::string_view GuiSketchWorkspace::last_repeatable_command() const noexcept {
+  return last_repeatable_command_;
+}
+
+std::string_view GuiSketchWorkspace::numeric_input() const noexcept { return numeric_input_; }
+
+std::string_view GuiSketchWorkspace::selected_handle() const noexcept { return selected_handle_; }
+
+const GuiSketchWorkspaceStatus& GuiSketchWorkspace::status() const noexcept { return status_; }
+
+void GuiSketchWorkspace::reset_interaction() noexcept {
+  stage_ = GuiSketchInteractionStage::Idle;
+  focus_ = GuiSketchFocusTarget::Canvas;
+  active_command_.clear();
+  active_tool_hint_.clear();
+  active_command_repeatable_ = false;
+  numeric_input_.clear();
+  selected_handle_.clear();
+  status_ = {};
+  status_.stage = stage_;
+  status_.focus = focus_;
+  status_.tool_hint = active() ? "Choose a Sketch command or select sketch geometry" :
+                                "Select geometry or choose a Sketch command";
+}
+
+void GuiSketchWorkspace::leave_workspace() noexcept {
+  reset_interaction();
+  active_sketch_.reset();
+  previous_workspace_ = GuiWorkspace::Part;
+  previous_selection_.clear();
+  last_repeatable_command_.clear();
+  last_repeatable_hint_.clear();
+  status_.tool_hint = "Select geometry or choose a Sketch command";
 }
 
 } // namespace blcad::gui

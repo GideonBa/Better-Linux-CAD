@@ -9,11 +9,14 @@
 #include "blcad/gui/gui_part_operations_workbench.hpp"
 #include "blcad/gui/gui_sketch_workbench.hpp"
 #include "blcad/gui/gui_spatial_surface_workbench.hpp"
+#include "blcad/gui/occt_viewport.hpp"
 
 #include <QMainWindow>
 
 class QAction;
 class QCloseEvent;
+class QKeyEvent;
+class QLineEdit;
 class QTabBar;
 class QTextEdit;
 class QLabel;
@@ -21,10 +24,9 @@ class QPushButton;
 class QTableWidget;
 class QTreeWidget;
 class QTreeWidgetItem;
+class QWidget;
 
 namespace blcad::gui {
-
-class OcctViewport;
 
 class MainWindow final : public QMainWindow {
 public:
@@ -35,6 +37,8 @@ public:
   [[nodiscard]] GuiCommandRegistry& command_registry() noexcept;
   [[nodiscard]] const GuiCommandRegistry& command_registry() const noexcept;
   [[nodiscard]] GuiSketchWorkbench& sketch_workbench() noexcept;
+  [[nodiscard]] GuiSketchWorkspace& sketch_workspace() noexcept;
+  [[nodiscard]] const GuiSketchWorkspace& sketch_workspace() const noexcept;
   [[nodiscard]] GuiPartFoundationWorkbench& part_foundation_workbench() noexcept;
   [[nodiscard]] GuiPartOperationsWorkbench& part_operations_workbench() noexcept;
   [[nodiscard]] GuiSpatialSurfaceWorkbench& spatial_surface_workbench() noexcept;
@@ -47,6 +51,7 @@ public:
 
 protected:
   void closeEvent(QCloseEvent* event) override;
+  void keyPressEvent(QKeyEvent* event) override;
 
 private:
   void create_shell();
@@ -66,9 +71,13 @@ private:
   void create_default_datum_axis();
   void create_sketch_on_selection();
   void edit_selected_sketch();
+  void finish_sketch();
   void add_numeric_sketch_line();
+  void commit_numeric_sketch_line();
+  void repeat_last_sketch_command();
   void inspect_selected_sketch();
   void repair_selected_sketch();
+  void refresh_sketch_workspace_ui();
   void refresh_viewport_scene();
   [[nodiscard]] bool confirm_discard_dirty();
   void create_new_document(GuiDocumentKind kind);
@@ -79,13 +88,22 @@ private:
   GuiDocumentSession session_;
   GuiCommandRegistry command_registry_;
   GuiSketchWorkbench sketch_workbench_;
+  GuiSketchWorkspace sketch_workspace_;
   GuiPartFoundationWorkbench part_foundation_workbench_;
   GuiPartOperationsWorkbench part_operations_workbench_;
   GuiSpatialSurfaceWorkbench spatial_surface_workbench_;
   GuiAssemblyWorkbench assembly_workbench_;
   GuiAnalysisExportWorkbench analysis_export_workbench_;
   std::optional<SketchId> active_sketch_;
+  std::optional<GuiViewportCameraBookmark> sketch_camera_bookmark_;
+  std::uint32_t sketch_selection_filter_mask_{0xFFFFFFFFU};
   QTabBar* workspace_tabs_{nullptr};
+  QWidget* sketch_command_groups_{nullptr};
+  QLineEdit* sketch_numeric_hud_{nullptr};
+  QLabel* sketch_cursor_status_{nullptr};
+  QLabel* sketch_snap_status_{nullptr};
+  QLabel* sketch_dof_status_{nullptr};
+  QLabel* sketch_solve_status_{nullptr};
   QTreeWidget* model_browser_{nullptr};
   QTableWidget* property_table_{nullptr};
   QLabel* property_validation_{nullptr};
@@ -110,7 +128,9 @@ private:
   QAction* create_axis_action_{nullptr};
   QAction* create_sketch_action_{nullptr};
   QAction* edit_sketch_action_{nullptr};
+  QAction* finish_sketch_action_{nullptr};
   QAction* add_line_action_{nullptr};
+  QAction* repeat_sketch_action_{nullptr};
   QAction* inspect_sketch_action_{nullptr};
   QAction* repair_sketch_action_{nullptr};
   std::size_t viewport_revision_{static_cast<std::size_t>(-1)};

@@ -1,8 +1,8 @@
 # Interactive Sketcher Sequence MVP-8
 
-Status: planned. Blocks 106–121 precede Interactive Modeling MVP-9 (Blocks 122–131,
-`docs/interactive-modeling-sequence-mvp9.md`) and STEP Import MVP-10 (Blocks 132–138). Block 106
-is the current next technical step.
+Status: in progress. Block 106 is implemented; Block 107 is the current next technical step. Blocks
+106–121 precede Interactive Modeling MVP-9 (Blocks 122–131,
+`docs/interactive-modeling-sequence-mvp9.md`) and STEP Import MVP-10 (Blocks 132–138).
 
 This phase turns the Block-99 validation surface into a productive, Inventor-familiar Sketch
 workbench. The goal is the same interaction quality—direct manipulation, visible constraints,
@@ -93,8 +93,8 @@ authoritative feature-to-block mapping.
 ## Frozen phase order
 
 ```text
-106 Sketch workspace, interaction state, command HUD, and usability contract
-107 plane mapping, hit testing, box selection, grid, snapping, and inference preview
+106 Sketch workspace, interaction state, command HUD, and usability contract — implemented
+107 plane mapping, hit testing, box selection, grid, snapping, and inference preview — next
 108 shared planar point/entity topology, mutation commands, JSON migration, and undo semantics
 109 deterministic planar constraint solver, DOF accounting, conflicts, and diagnostics
 110 solver-backed mouse dragging, handles, live preview, and atomic commit
@@ -113,21 +113,35 @@ authoritative feature-to-block mapping.
 132–138 STEP Import MVP-10
 ```
 
-## Block 106 — Sketch workspace and interaction contract
+## Block 106 — Sketch workspace and interaction contract — Implemented
 
-Promote Sketch to a real contextual workspace. Add `Enter Sketch`/`Finish Sketch`, command groups,
-entity/constraint/dimension browser sections, a contextual task panel, numeric heads-up input,
-crosshair/cursor feedback, status-bar DOF and solve state, command repeat, keyboard focus rules, and
-consistent selection filters. Freeze the state machine:
+Planar Sketch is now a real contextual `GuiWorkspace::Sketch`. `GuiSketchWorkspace` owns only
+transient interaction state and projects its Sketch-specific stages onto the existing `GuiTaskState`
+authority. The frozen state machine is implemented as:
 
 ```text
 idle -> hover -> collecting picks -> numeric input -> preview -> commit | cancel
 idle -> selected handle -> drag candidate -> commit | cancel
 ```
 
-Entering Sketch saves the previous camera and selection, resolves the workplane, selects normal
-view, and isolates/dims surrounding bodies according to transient view settings. Finish Sketch
-validates the active profile state and returns to the previous workspace without inventing a feature.
+`Esc` backs Preview to Numeric Input, Numeric Input to pick collection, and pick collection to a full
+command cancel. Repeatable commands publish transient repeat state. The Sketch surface exposes the
+frozen `Create`, `Constrain`, `Dimension`, `Modify`, and `Project` groups plus
+`Entities`, `Constraints`, `Dimensions`, and `Diagnostics` browser-section contracts. The command
+bar renders the groups and a numeric HUD; the status bar exposes cursor, snap/inference, remaining
+DOF, and solve state. Block-107/109 producers intentionally leave explicit unavailable states until
+their own authorities exist.
+
+`Enter Sketch` resolves the existing workplane, captures previous workspace/selection plus a
+transient viewport camera bookmark and selection-filter mask, activates normal orthographic view,
+uses the `SketchEntity | Edge | Vertex` filter, and enables the crosshair. `Finish Sketch` rejects
+active command stages and existing diagnostic errors, restores the previous workspace, semantic
+selection, Eye/Target/Up/Scale/projection camera state, and selection filter, and does not invent a
+downstream Part feature. The existing line command is the first real HUD client: a disposable Sketch
+copy validates the numeric candidate before Preview and the existing Block-99 workbench commits one
+Part transaction.
+
+Canonical contract: `docs/gui-interactive-sketch-workspace-mvp8.md`.
 
 Existing authority: `docs/gui-feature-validation-sequence-mvp7.md` (Block-95 command lifecycle,
 Block-96 transactions), `docs/gui-sketch-workbench-mvp7.md`, `docs/workplane-resolver-mvp2.md`,
@@ -145,7 +159,9 @@ inference previews. Snap selection is deterministic in model space with screen-s
 
 Existing authority: `docs/gui-sketch-workbench-mvp7.md` (plane-coordinate mapper),
 `docs/workplane-resolver-mvp2.md`, `docs/bounded-workplane-validation-mvp2.md`,
-`docs/gui-feature-validation-sequence-mvp7.md` (Block-97 viewport/picking).
+`docs/gui-feature-validation-sequence-mvp7.md` (Block-97 viewport/picking),
+`docs/gui-interactive-sketch-workspace-mvp8.md` (workspace status, selection filter, and command
+lifecycle consumers).
 
 Focused tags: `[gui][sketch-hit-test]`, `[gui][sketch-snap]`, `[gui][sketch-box-selection]`.
 
