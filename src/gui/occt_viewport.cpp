@@ -33,6 +33,103 @@
 namespace blcad::gui {
 namespace {
 
+class SketchInteractionOverlay final : public QWidget {
+public:
+  explicit SketchInteractionOverlay(QWidget* parent) : QWidget(parent) {
+    setAttribute(Qt::WA_TransparentForMouseEvents);
+    setAttribute(Qt::WA_TranslucentBackground);
+    setFocusPolicy(Qt::NoFocus);
+    hide();
+  }
+
+  void set_grid(std::vector<GuiSketchScreenSegment> lines) {
+    grid_ = std::move(lines);
+    update();
+  }
+
+  void set_hover(std::vector<GuiSketchScreenPoint> polyline,
+                 std::optional<GuiSketchScreenPoint> point) {
+    hover_polyline_ = std::move(polyline);
+    hover_point_ = std::move(point);
+    update();
+  }
+
+  void set_snap(std::optional<GuiSketchScreenPoint> point) {
+    snap_point_ = std::move(point);
+    update();
+  }
+
+  void set_box(std::optional<GuiSketchScreenRect> rectangle) {
+    box_ = std::move(rectangle);
+    update();
+  }
+
+  void clear_transient() {
+    hover_polyline_.clear();
+    hover_point_.reset();
+    snap_point_.reset();
+    box_.reset();
+    update();
+  }
+
+  [[nodiscard]] std::size_t grid_line_count() const noexcept { return grid_.size(); }
+
+protected:
+  void paintEvent(QPaintEvent* event) override {
+    Q_UNUSED(event)
+    QPainter painter(this);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+
+    for (const auto& line : grid_) {
+      QPen pen(line.major ? QColor(116, 126, 139, 112) : QColor(104, 113, 125, 58));
+      pen.setWidthF(line.major ? 1.0 : 0.6);
+      painter.setPen(pen);
+      painter.drawLine(QPointF(line.start.x, line.start.y), QPointF(line.end.x, line.end.y));
+    }
+
+    if (hover_polyline_.size() >= 2U) {
+      QPen pen(QColor(255, 196, 61));
+      pen.setWidthF(2.2);
+      painter.setPen(pen);
+      for (std::size_t index = 1; index < hover_polyline_.size(); ++index)
+        painter.drawLine(QPointF(hover_polyline_[index - 1U].x, hover_polyline_[index - 1U].y),
+                         QPointF(hover_polyline_[index].x, hover_polyline_[index].y));
+    }
+
+    if (hover_point_) {
+      painter.setPen(QPen(QColor(255, 196, 61), 2.0));
+      painter.setBrush(Qt::NoBrush);
+      painter.drawEllipse(QPointF(hover_point_->x, hover_point_->y), 5.0, 5.0);
+    }
+
+    if (snap_point_) {
+      painter.setPen(QPen(QColor(96, 220, 170), 1.8));
+      painter.setBrush(Qt::NoBrush);
+      painter.drawRect(QRectF(snap_point_->x - 4.0, snap_point_->y - 4.0, 8.0, 8.0));
+    }
+
+    if (box_) {
+      const QRectF rectangle(QPointF(box_->left(), box_->top()),
+                             QPointF(box_->right(), box_->bottom()));
+      const bool window = box_->end.x >= box_->start.x;
+      const QColor stroke = window ? QColor(89, 171, 255) : QColor(95, 210, 150);
+      const QColor fill = window ? QColor(89, 171, 255, 36) : QColor(95, 210, 150, 36);
+      QPen pen(stroke, 1.2);
+      pen.setStyle(Qt::DashLine);
+      painter.setPen(pen);
+      painter.setBrush(fill);
+      painter.drawRect(rectangle);
+    }
+  }
+
+private:
+  std::vector<GuiSketchScreenSegment> grid_;
+  std::vector<GuiSketchScreenPoint> hover_polyline_;
+  std::optional<GuiSketchScreenPoint> hover_point_;
+  std::optional<GuiSketchScreenPoint> snap_point_;
+  std::optional<GuiSketchScreenRect> box_;
+};
+
 GuiSelectionKind selection_kind(geometry::ViewportSceneKind kind) {
   switch (kind) {
   case geometry::ViewportSceneKind::SolidBody:
@@ -109,6 +206,34 @@ bool belongs_to_sketch(std::string_view semantic_id, std::string_view sketch_id)
   return semantic_id.size() >= prefix.size() && semantic_id.substr(0, prefix.size()) == prefix;
 }
 
+bool contains_selection(const std::vector<GuiSelection>& selections,
+                        std::string_view semantic_id) {
+  return std::any_of(selections.begin(), selections.end(), [semantic_id](const GuiSelection& item) {
+    return item.kind == GuiSelectionKind::SketchEntity && item.semantic_id == semantic_id;
+  });
+}
+
+void apply_selection_set(std::vector<GuiSelection>& current,
+                         const std::vector<GuiSelection>& incoming,
+                         Qt::KeyboardModifiers modifiers) {
+  if (!(modifiers & Qt::ShiftModifier) && !(modifiers & Qt::ControlModifier))
+    current.clear();
+  for (const auto& selection : incoming) {
+    const auto found = std::find(current.begin(), current.end(), selection);
+    if (modifiers & Qt::ControlModifier) {
+      if (found == current.end())
+        current.push_back(selection);
+      else
+        current.erase(found);
+    } else if (found == current.end()) {
+      current.push_back(selection);
+    }
+  }
+  std::sort(current.begin(), current.end(), [](const GuiSelection& first, const GuiSelection& second) {
+    return first.semantic_id < second.semantic_id;
+  });
+}
+
 } // namespace
 
 struct OcctViewport::Impl {
@@ -138,6 +263,8 @@ OcctViewport::OcctViewport(QWidget* parent) : QWidget(parent), impl_(std::make_u
   setAttribute(Qt::WA_NativeWindow);
   setAttribute(Qt::WA_NoSystemBackground);
   setAutoFillBackground(false);
+  sketch_overlay_ = new SketchInteractionOverlay(this);
+  sketch_overlay_->setGeometry(rect());
 }
 
 OcctViewport::~OcctViewport() = default;
@@ -193,6 +320,7 @@ void OcctViewport::clear_scene() {
     impl_->context->RemoveAll(true);
   impl_->presentations.clear();
   impl_->owner_to_index.clear();
+  clear_sketch_interaction();
   publish_selection(std::nullopt);
   update();
 }
@@ -210,6 +338,7 @@ void OcctViewport::set_projection(GuiViewportProjection projection) {
                                                  : Graphic3d_Camera::Projection_Orthographic);
     impl_->view->Redraw();
   }
+  rebuild_sketch_grid();
 }
 
 void OcctViewport::set_standard_view(GuiStandardView view) {
@@ -218,6 +347,7 @@ void OcctViewport::set_standard_view(GuiStandardView view) {
     impl_->view->SetProj(occt_orientation(view));
     fit_all();
   }
+  rebuild_sketch_grid();
 }
 
 bool OcctViewport::set_plane_camera(Point3 target, Vector3 normal, Vector3 up) {
@@ -233,6 +363,7 @@ bool OcctViewport::set_plane_camera(Point3 target, Vector3 normal, Vector3 up) {
       impl_->view->SetUp(upward.X(), upward.Y(), upward.Z());
       fit_all();
     }
+    rebuild_sketch_grid();
     return true;
   } catch (const Standard_Failure&) {
     return false;
@@ -280,6 +411,7 @@ bool OcctViewport::restore_camera_bookmark(const GuiViewportCameraBookmark& book
               : Graphic3d_Camera::Projection_Orthographic);
       impl_->view->Redraw();
     }
+    rebuild_sketch_grid();
     return true;
   } catch (const Standard_Failure&) {
     return false;
@@ -298,7 +430,122 @@ void OcctViewport::clear_sketch_focus() {
   apply_sketch_focus();
 }
 
-void OcctViewport::set_context_menu_callback(std::function<void(QPoint)> callback) {
+Result<std::size_t>
+OcctViewport::set_sketch_interaction(GuiSketchPlaneView plane,
+                                     GuiSketchInteractionScene scene,
+                                     GuiSketchInteractionConfig config) {
+  Result<GuiSketchPlaneMapping> mapping = [&]() -> Result<GuiSketchPlaneMapping> {
+    if (!impl_->view.IsNull()) {
+      GuiSketchPlaneMapping::ScreenToRay screen_to_ray = [this](GuiSketchScreenPoint point) {
+        try {
+          const double ratio = devicePixelRatioF();
+          const int x = static_cast<int>(std::lround(point.x * ratio));
+          const int y = static_cast<int>(std::lround(point.y * ratio));
+          double px{}, py{}, pz{}, vx{}, vy{}, vz{};
+          impl_->view->ConvertWithProj(x, y, px, py, pz, vx, vy, vz);
+          return Result<GuiSketchViewRay>::success(
+              GuiSketchViewRay{{px, py, pz}, {vx, vy, vz}});
+        } catch (const Standard_Failure& failure) {
+          return Result<GuiSketchViewRay>::failure(
+              viewport_error(failure.GetMessageString() != nullptr
+                                 ? failure.GetMessageString()
+                                 : "could not convert Sketch pixel to view ray"));
+        }
+      };
+      GuiSketchPlaneMapping::ModelToScreen model_to_screen = [this](Point3 point) {
+        try {
+          int x{}, y{};
+          impl_->view->Convert(point.x, point.y, point.z, x, y);
+          const double ratio = devicePixelRatioF();
+          return Result<GuiSketchScreenPoint>::success(
+              GuiSketchScreenPoint{static_cast<double>(x) / ratio,
+                                   static_cast<double>(y) / ratio});
+        } catch (const Standard_Failure& failure) {
+          return Result<GuiSketchScreenPoint>::failure(
+              viewport_error(failure.GetMessageString() != nullptr
+                                 ? failure.GetMessageString()
+                                 : "could not convert Sketch model point to pixel"));
+        }
+      };
+      return GuiSketchPlaneMapping::create(std::move(plane), std::move(screen_to_ray),
+                                           std::move(model_to_screen));
+    }
+    const Point2 center = plane.model_to_plane(plane_camera_ ? plane_camera_->target : plane.origin);
+    return GuiSketchPlaneMapping::create_orthographic(
+        std::move(plane), std::max(1, width()), std::max(1, height()), center, 1.0);
+  }();
+  if (mapping.has_error())
+    return Result<std::size_t>::failure(mapping.error());
+  auto controller = GuiSketchInteractionController::create(
+      std::move(mapping.value()), std::move(scene), std::move(config));
+  if (controller.has_error())
+    return Result<std::size_t>::failure(controller.error());
+
+  const std::size_t primitive_count = controller.value().scene().curves.size() +
+                                      controller.value().scene().points.size() +
+                                      controller.value().scene().annotations.size();
+  sketch_interaction_ = std::make_unique<GuiSketchInteractionController>(
+      std::move(controller.value()));
+  sketch_snap_result_.reset();
+  hovered_sketch_hit_.reset();
+  sketch_box_selection_.reset();
+  sketch_box_active_ = false;
+  sketch_overlay_->show();
+  sketch_overlay_->raise();
+  rebuild_sketch_grid();
+  return Result<std::size_t>::success(primitive_count);
+}
+
+void OcctViewport::clear_sketch_interaction() {
+  sketch_interaction_.reset();
+  sketch_selections_.clear();
+  sketch_inference_anchor_.reset();
+  sketch_snap_result_.reset();
+  hovered_sketch_hit_.reset();
+  sketch_box_selection_.reset();
+  sketch_box_active_ = false;
+  if (auto* overlay = static_cast<SketchInteractionOverlay*>(sketch_overlay_)) {
+    overlay->set_grid({});
+    overlay->clear_transient();
+    overlay->hide();
+  }
+}
+
+void OcctViewport::set_sketch_selection_enabled(bool enabled) noexcept {
+  sketch_selection_enabled_ = enabled;
+  if (!enabled) {
+    sketch_box_active_ = false;
+    sketch_box_selection_.reset();
+    if (auto* overlay = static_cast<SketchInteractionOverlay*>(sketch_overlay_))
+      overlay->set_box(std::nullopt);
+  }
+}
+
+void OcctViewport::set_sketch_inference_anchor(std::optional<Point2> anchor) noexcept {
+  sketch_inference_anchor_ = std::move(anchor);
+}
+
+void OcctViewport::set_sketch_grid_config(GuiSketchGridConfig config) {
+  if (!sketch_interaction_)
+    return;
+  auto interaction_config = sketch_interaction_->config();
+  interaction_config.grid = std::move(config);
+  sketch_interaction_->set_config(std::move(interaction_config));
+  rebuild_sketch_grid();
+  update_sketch_pointer({static_cast<double>(last_mouse_position_.x()),
+                         static_cast<double>(last_mouse_position_.y())});
+}
+
+void OcctViewport::set_sketch_pointer_callback(SketchPointerCallback callback) {
+  sketch_pointer_callback_ = std::move(callback);
+}
+
+void OcctViewport::set_sketch_selection_callback(SketchSelectionCallback callback) {
+  sketch_selection_callback_ = std::move(callback);
+}
+
+void OcctViewport::set_context_menu_callback(
+    std::function<void(QPoint)> callback) {
   context_menu_callback_ = std::move(callback);
 }
 
@@ -308,12 +555,14 @@ void OcctViewport::fit_all() {
     impl_->view->ZFitAll();
     impl_->view->Redraw();
   }
+  rebuild_sketch_grid();
 }
 
 void OcctViewport::set_selection_filter_mask(std::uint32_t mask) {
   selection_filter_mask_ = mask;
   apply_selection_filters();
-  if (selected_semantic_.has_value() && (mask & selection_kind_bit(selected_semantic_->kind)) == 0U)
+  if (selected_semantic_.has_value() &&
+      (mask & selection_kind_bit(selected_semantic_->kind)) == 0U)
     clear_selection();
 }
 
@@ -323,6 +572,28 @@ void OcctViewport::set_selection_callback(
 }
 
 bool OcctViewport::select_semantic(std::string_view semantic_id) {
+  if (sketch_interaction_ &&
+      (selection_filter_mask_ & selection_kind_bit(GuiSelectionKind::SketchEntity)) != 0U) {
+    const auto& scene = sketch_interaction_->scene();
+    const bool known = std::any_of(scene.curves.begin(), scene.curves.end(),
+                                   [semantic_id](const auto& item) {
+                                     return item.semantic_id == semantic_id;
+                                   }) ||
+                       std::any_of(scene.points.begin(), scene.points.end(),
+                                   [semantic_id](const auto& item) {
+                                     return item.semantic_id == semantic_id;
+                                   }) ||
+                       std::any_of(scene.annotations.begin(), scene.annotations.end(),
+                                   [semantic_id](const auto& item) {
+                                     return item.semantic_id == semantic_id;
+                                   });
+    if (known) {
+      sketch_selections_ = {{GuiSelectionKind::SketchEntity, std::string(semantic_id)}};
+      publish_sketch_selection();
+      return true;
+    }
+  }
+
   const auto found = std::find_if(impl_->presentations.begin(), impl_->presentations.end(),
                                   [semantic_id](const Impl::Presentation& presentation) {
                                     return presentation.item.semantic_id == semantic_id;
@@ -343,6 +614,8 @@ bool OcctViewport::select_semantic(std::string_view semantic_id) {
 void OcctViewport::clear_selection() {
   if (!impl_->context.IsNull())
     impl_->context->ClearSelected(true);
+  sketch_selections_.clear();
+  publish_sketch_selection();
   publish_selection(std::nullopt);
 }
 
@@ -382,6 +655,35 @@ GuiSketchSurroundingsMode OcctViewport::sketch_surroundings_mode() const noexcep
   return sketch_surroundings_mode_;
 }
 
+bool OcctViewport::sketch_interaction_active() const noexcept {
+  return sketch_interaction_ != nullptr;
+}
+
+bool OcctViewport::sketch_selection_enabled() const noexcept {
+  return sketch_selection_enabled_;
+}
+
+const std::vector<GuiSelection>& OcctViewport::sketch_selections() const noexcept {
+  return sketch_selections_;
+}
+
+const std::optional<GuiSketchSnapResult>& OcctViewport::sketch_snap_result() const noexcept {
+  return sketch_snap_result_;
+}
+
+const std::optional<GuiSketchHit>& OcctViewport::hovered_sketch_hit() const noexcept {
+  return hovered_sketch_hit_;
+}
+
+const std::optional<GuiSketchScreenRect>& OcctViewport::sketch_box_selection() const noexcept {
+  return sketch_box_selection_;
+}
+
+std::size_t OcctViewport::sketch_grid_line_count() const noexcept {
+  const auto* overlay = static_cast<const SketchInteractionOverlay*>(sketch_overlay_);
+  return overlay == nullptr ? 0U : overlay->grid_line_count();
+}
+
 bool OcctViewport::native_viewer_available() const noexcept {
   return !impl_->view.IsNull();
 }
@@ -416,8 +718,18 @@ void OcctViewport::paintEvent(QPaintEvent* event) {
 
 void OcctViewport::resizeEvent(QResizeEvent* event) {
   QWidget::resizeEvent(event);
+  if (sketch_overlay_)
+    sketch_overlay_->setGeometry(rect());
   if (!impl_->view.IsNull())
     impl_->view->MustBeResized();
+  if (sketch_interaction_ && impl_->view.IsNull()) {
+    const auto plane = sketch_interaction_->mapping().plane();
+    const auto scene = sketch_interaction_->scene();
+    const auto config = sketch_interaction_->config();
+    (void)set_sketch_interaction(plane, scene, config);
+  } else {
+    rebuild_sketch_grid();
+  }
 }
 
 void OcctViewport::mousePressEvent(QMouseEvent* event) {
@@ -431,6 +743,18 @@ void OcctViewport::mousePressEvent(QMouseEvent* event) {
       impl_->view->StartRotation(last_mouse_position_.x(), last_mouse_position_.y());
     }
   }
+  if (event->button() == Qt::LeftButton && sketch_interaction_ && sketch_selection_enabled_) {
+    sketch_press_position_ = last_mouse_position_;
+    auto hits = sketch_interaction_->hits_at(
+        {event->position().x(), event->position().y()});
+    if (hits && hits.value().empty()) {
+      sketch_box_active_ = true;
+      sketch_box_selection_ = GuiSketchScreenRect{
+          {event->position().x(), event->position().y()},
+          {event->position().x(), event->position().y()}};
+      static_cast<SketchInteractionOverlay*>(sketch_overlay_)->set_box(sketch_box_selection_);
+    }
+  }
   QWidget::mousePressEvent(event);
 }
 
@@ -439,8 +763,16 @@ void OcctViewport::mouseMoveEvent(QMouseEvent* event) {
   if (!impl_->view.IsNull() && panning_) {
     const QPoint delta = current - last_mouse_position_;
     impl_->view->Pan(delta.x(), -delta.y(), 1.0, false);
+    rebuild_sketch_grid();
   } else if (!impl_->view.IsNull() && rotating_) {
     impl_->view->Rotation(current.x(), current.y());
+    rebuild_sketch_grid();
+  } else if (sketch_interaction_) {
+    if (sketch_box_active_) {
+      sketch_box_selection_->end = {event->position().x(), event->position().y()};
+      static_cast<SketchInteractionOverlay*>(sketch_overlay_)->set_box(sketch_box_selection_);
+    }
+    update_sketch_pointer({event->position().x(), event->position().y()});
   } else if (!impl_->context.IsNull()) {
     impl_->context->MoveTo(current.x(), current.y(), impl_->view, true);
   }
@@ -458,7 +790,40 @@ void OcctViewport::mouseReleaseEvent(QMouseEvent* event) {
         context_menu_callback_)
       context_menu_callback_(mapToGlobal(current));
   }
-  if (event->button() == Qt::LeftButton && !impl_->context.IsNull()) {
+  if (event->button() == Qt::LeftButton && sketch_interaction_) {
+    const GuiSketchScreenPoint current{event->position().x(), event->position().y()};
+    if (sketch_selection_enabled_) {
+      if (sketch_box_active_ &&
+          (event->position().toPoint() - sketch_press_position_).manhattanLength() > 3) {
+        sketch_box_selection_->end = current;
+        const auto mode = current.x >= sketch_box_selection_->start.x
+                              ? GuiSketchBoxSelectionMode::Window
+                              : GuiSketchBoxSelectionMode::Crossing;
+        auto selections = sketch_interaction_->box_select(*sketch_box_selection_, mode);
+        if (selections)
+          apply_selection_set(sketch_selections_, selections.value(), event->modifiers());
+      } else if (!sketch_box_active_) {
+        auto hit = sketch_interaction_->cycle_hit(current);
+        if (hit && hit.value()) {
+          apply_selection_set(sketch_selections_,
+                              {{GuiSelectionKind::SketchEntity,
+                                hit.value()->semantic_id}},
+                              event->modifiers());
+        } else if (!(event->modifiers() & Qt::ShiftModifier) &&
+                   !(event->modifiers() & Qt::ControlModifier)) {
+          sketch_selections_.clear();
+        }
+      } else if (!(event->modifiers() & Qt::ShiftModifier) &&
+                 !(event->modifiers() & Qt::ControlModifier)) {
+        sketch_selections_.clear();
+      }
+      publish_sketch_selection();
+    }
+    sketch_box_active_ = false;
+    sketch_box_selection_.reset();
+    static_cast<SketchInteractionOverlay*>(sketch_overlay_)->set_box(std::nullopt);
+    update_sketch_pointer(current);
+  } else if (event->button() == Qt::LeftButton && !impl_->context.IsNull()) {
     const QPoint current = event->position().toPoint();
     impl_->context->MoveTo(current.x(), current.y(), impl_->view, true);
     if (impl_->context->HasDetected()) {
@@ -476,6 +841,9 @@ void OcctViewport::wheelEvent(QWheelEvent* event) {
     const QPoint point = event->position().toPoint();
     const int step = std::clamp(event->angleDelta().y() / 4, -120, 120);
     impl_->view->Zoom(point.x(), point.y(), point.x(), point.y() + step);
+    rebuild_sketch_grid();
+    if (sketch_interaction_)
+      update_sketch_pointer({event->position().x(), event->position().y()});
     event->accept();
     return;
   }
@@ -499,7 +867,8 @@ void OcctViewport::initialize_native_viewer() {
     impl_->viewer->SetLightOn();
     impl_->context = new AIS_InteractiveContext(impl_->viewer);
     impl_->view = impl_->viewer->CreateView();
-    impl_->window = new Xw_Window(impl_->display_connection, static_cast<Aspect_Drawable>(winId()));
+    impl_->window = new Xw_Window(impl_->display_connection,
+                                  static_cast<Aspect_Drawable>(winId()));
     impl_->view->SetWindow(impl_->window);
     if (!impl_->window->IsMapped())
       impl_->window->Map();
@@ -554,7 +923,8 @@ void OcctViewport::apply_selection_filters() {
       continue;
     const GuiSelectionKind kind = selection_kind(presentation.item.kind);
     impl_->context->SetSelectionModeActive(
-        presentation.interactive, 0, (selection_filter_mask_ & selection_kind_bit(kind)) != 0U,
+        presentation.interactive, 0,
+        (selection_filter_mask_ & selection_kind_bit(kind)) != 0U,
         AIS_SelectionModesConcurrency_Single, true);
   }
   impl_->context->UpdateCurrentViewer();
@@ -587,6 +957,69 @@ void OcctViewport::apply_sketch_focus() {
     }
   }
   impl_->context->UpdateCurrentViewer();
+}
+
+void OcctViewport::rebuild_sketch_grid() {
+  auto* overlay = static_cast<SketchInteractionOverlay*>(sketch_overlay_);
+  if (!sketch_interaction_ || overlay == nullptr)
+    return;
+  auto lines = sketch_interaction_->grid_lines(std::max(1, width()), std::max(1, height()));
+  if (lines)
+    overlay->set_grid(std::move(lines.value()));
+  else
+    overlay->set_grid({});
+}
+
+void OcctViewport::update_sketch_pointer(GuiSketchScreenPoint screen_point) {
+  if (!sketch_interaction_)
+    return;
+  auto snap = sketch_interaction_->snap(screen_point, sketch_inference_anchor_);
+  auto hits = sketch_interaction_->hits_at(screen_point);
+  if (snap.has_error() || hits.has_error())
+    return;
+
+  sketch_snap_result_ = snap.value();
+  hovered_sketch_hit_ = hits.value().empty()
+                            ? std::optional<GuiSketchHit>{}
+                            : std::optional<GuiSketchHit>{hits.value().front()};
+  auto* overlay = static_cast<SketchInteractionOverlay*>(sketch_overlay_);
+  if (overlay != nullptr) {
+    std::vector<GuiSketchScreenPoint> hover_polyline;
+    std::optional<GuiSketchScreenPoint> hover_point;
+    if (hovered_sketch_hit_) {
+      const auto curve = std::find_if(
+          sketch_interaction_->scene().curves.begin(),
+          sketch_interaction_->scene().curves.end(), [this](const auto& item) {
+            return item.candidate_id == hovered_sketch_hit_->candidate_id;
+          });
+      if (curve != sketch_interaction_->scene().curves.end()) {
+        auto screen = sketch_interaction_->screen_polyline(*curve);
+        if (screen)
+          hover_polyline = std::move(screen.value());
+      } else {
+        auto screen = sketch_interaction_->mapping().plane_to_screen(
+            hovered_sketch_hit_->plane_point);
+        if (screen)
+          hover_point = screen.value();
+      }
+    }
+    overlay->set_hover(std::move(hover_polyline), hover_point);
+    auto snap_screen = sketch_interaction_->mapping().plane_to_screen(
+        sketch_snap_result_->snapped_point);
+    overlay->set_snap(snap_screen ? std::optional<GuiSketchScreenPoint>{snap_screen.value()}
+                                  : std::nullopt);
+  }
+  if (sketch_pointer_callback_)
+    sketch_pointer_callback_(sketch_snap_result_->raw_point, *sketch_snap_result_,
+                             hovered_sketch_hit_);
+}
+
+void OcctViewport::publish_sketch_selection() {
+  selected_semantic_ = sketch_selections_.size() == 1U
+                           ? std::optional<GuiSelection>{sketch_selections_.front()}
+                           : std::nullopt;
+  if (sketch_selection_callback_)
+    sketch_selection_callback_(sketch_selections_);
 }
 
 void OcctViewport::publish_selection(std::optional<GuiSelection> selection) {
