@@ -51,9 +51,9 @@ in progress with Blocks 106–108 implemented. Block 106 establishes the context
 workspace and command lifecycle. Block 107 adds device-independent plane interaction, zoom-stable
 hit testing, stacked-hit cycling, Window/Crossing selection, grid, snapping, and inference. Block 108
 adds stable shared planar point/entity topology, deterministic migration from embedded `Point2`
-Sketch intent, dependency-safe Core edit commands, exact topology undo/redo, and canonical topology
-JSON. Block 109 is the current next technical step and owns the deterministic general planar
-constraint solver.
+Sketch intent using explicit historical profile connectivity, dependency-safe Core edit commands,
+exact topology undo/redo, and canonical topology JSON. Block 109 is the current next technical step
+and owns the deterministic general planar constraint solver.
 
 Development rule:
 
@@ -92,20 +92,21 @@ Blocks 95–105 implement and accept the optional Qt application layer over thos
 owns session/command/task/selection and transient presentation state; Core and Geometry remain the
 model, solver, geometry, recompute, analysis, and exchange authorities.
 
-Blocks 106–108 now establish the first Interactive Sketcher foundation:
+Blocks 106–108 establish the first Interactive Sketcher foundation:
 
 ```text
 contextual Sketch workspace and command lifecycle
   -> device-independent plane interaction / hit / box selection / grid / snap / inference
   -> stable shared SketchPointId and canonical SketchTopology
-  -> deterministic legacy Sketch migration with explicit identity-change reporting
+  -> deterministic legacy migration from explicit ordered profile connectivity
+  -> distinct equal-coordinate point ids remain distinct without a topology relation
   -> dependency-safe Add / Move / Replace / Remove Core commands
   -> exact full-topology snapshot undo / redo
   -> blcad.sketch_topology.mvp8 persistence
   -> lossless compatibility application through PartDocument::update_sketch where representable
 ```
 
-The canonical Block-108 topology is the future solver/direct-manipulation identity authority. The
+The canonical Block-108 topology is future solver/direct-manipulation identity authority. The
 historical `blcad.part_document.mvp1` Sketch records remain a compatibility carrier for current
 Geometry consumers; they are not silently reinterpreted as if shared point ids had always existed.
 
@@ -125,9 +126,14 @@ SketchPointId
   -> referenced by one or more topology entities
 ```
 
-Equal floating-point coordinates are not the future solver identity model. Legacy migration may
-collapse coincident same-flag point usages into one canonical point id and reports every collapsed
-usage explicitly.
+Equal floating-point coordinates are not connectivity identity. Legacy migration shares point ids
+only where the historical Sketch already contains explicit ordered profile connectivity between
+supported curve endpoints. It reports every endpoint-usage identity collapsed into the canonical
+shared point.
+
+Two unrelated point ids may have identical coordinates. This is required so Block 109 can model an
+explicit `Coincident` relationship between logically distinct points instead of erasing one variable
+before solving.
 
 Block-107 screen coordinates, hover candidates, sampled polylines, hit-cycle positions, and snap
 markers are never promoted to `SketchPointId`.
