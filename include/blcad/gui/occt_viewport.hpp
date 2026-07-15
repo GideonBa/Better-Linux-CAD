@@ -53,6 +53,9 @@ class OcctViewport final : public QWidget {
 public:
   using SketchPointerCallback =
       std::function<void(Point2, const GuiSketchSnapResult&, const std::optional<GuiSketchHit>&)>;
+  using SketchDragPointerCallback =
+      std::function<void(GuiSketchScreenPoint, Point2, const GuiSketchSnapResult&,
+                         const std::optional<GuiSketchHit>&)>;
   using SketchPointerPhaseCallback =
       std::function<void(GuiSketchPointerPhase, GuiSketchScreenPoint, Point2,
                          const GuiSketchSnapResult&, const std::optional<GuiSketchHit>&)>;
@@ -81,6 +84,7 @@ public:
   void set_sketch_grid_config(GuiSketchGridConfig config);
   void set_sketch_drag_handles(std::vector<Point2> handles);
   void set_sketch_pointer_callback(SketchPointerCallback callback);
+  void set_sketch_drag_pointer_callback(SketchDragPointerCallback callback);
   void set_sketch_pointer_phase_callback(SketchPointerPhaseCallback callback);
   void set_sketch_selection_callback(SketchSelectionCallback callback);
   void set_context_menu_callback(std::function<void(QPoint)> callback);
@@ -147,6 +151,7 @@ private:
   std::unique_ptr<GuiSketchInteractionController> sketch_interaction_;
   std::function<void(std::optional<GuiSelection>)> selection_callback_;
   SketchPointerCallback sketch_pointer_callback_;
+  SketchDragPointerCallback sketch_drag_pointer_callback_;
   SketchPointerPhaseCallback sketch_pointer_phase_callback_;
   SketchSelectionCallback sketch_selection_callback_;
   std::function<void(QPoint)> context_menu_callback_;
