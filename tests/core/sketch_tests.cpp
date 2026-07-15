@@ -285,7 +285,7 @@ TEST_CASE("Sketch rejects disconnected and self-intersecting closed profiles", "
   CHECK(bowtie_added.error().message() == "closed profile line segments must not self-intersect");
 }
 
-TEST_CASE("Sketch topology migration shares coincident points deterministically",
+TEST_CASE("Sketch topology migration shares profile-connected points deterministically",
           "[core][sketch-topology]") {
   const auto make_triangle = [](const std::vector<std::string>& insertion_order) {
     auto sketch =
@@ -317,6 +317,8 @@ TEST_CASE("Sketch topology migration shares coincident points deterministically"
   CHECK(first_report.migrated());
   CHECK(first.value().points().size() == 3U);
   CHECK(first_report.identity_changes().size() == 3U);
+  CHECK(first_report.identity_changes().front().reason ==
+        "legacy profile connectivity now shares one canonical Sketch point");
 
   const auto* line_a = first.value().find_entity("entity/line.a");
   const auto* line_b = first.value().find_entity("entity/line.b");
@@ -334,6 +336,45 @@ TEST_CASE("Sketch topology migration shares coincident points deterministically"
   REQUIRE(second);
   CHECK(second.value() == first.value());
   CHECK(second_report == first_report);
+}
+
+TEST_CASE("Sketch topology preserves unrelated coincident point identities",
+          "[core][sketch-topology]") {
+  auto sketch =
+      Sketch::create(SketchId("sketch.coincident"), "Sketch_Coincident", DatumPlaneId("datum.xy"));
+  REQUIRE(sketch);
+  REQUIRE(sketch.value().add_entity(
+      LineSegment::create(SketchEntityId("line.a"), Point2{0.0, 0.0}, Point2{2.0, 0.0}).value()));
+  REQUIRE(sketch.value().add_entity(
+      LineSegment::create(SketchEntityId("line.b"), Point2{2.0, 0.0}, Point2{2.0, 2.0}).value()));
+
+  SketchTopologyMigrationReport report;
+  auto topology = SketchTopology::migrate_legacy(sketch.value(), &report);
+  REQUIRE(topology);
+  CHECK(topology.value().points().size() == 4U);
+  CHECK(report.identity_changes().empty());
+
+  const auto* line_a = topology.value().find_entity("entity/line.a");
+  const auto* line_b = topology.value().find_entity("entity/line.b");
+  REQUIRE(line_a != nullptr);
+  REQUIRE(line_b != nullptr);
+  CHECK(line_a->points()[1] != line_b->points()[0]);
+  REQUIRE(topology.value().find_point(line_a->points()[1]) != nullptr);
+  REQUIRE(topology.value().find_point(line_b->points()[0]) != nullptr);
+  CHECK(topology.value().find_point(line_a->points()[1])->position() == Point2{2.0, 0.0});
+  CHECK(topology.value().find_point(line_b->points()[0])->position() == Point2{2.0, 0.0});
+
+  auto new_point = SketchTopologyPoint::create(SketchPointId("point.coincident"), Point2{2.0, 0.0});
+  REQUIRE(new_point);
+  auto added = SketchEditCommandExecutor{}.apply(
+      topology.value(), SketchEditCommand::add_point(new_point.value()));
+  REQUIRE(added);
+  auto move = SketchEditCommand::move_point(SketchPointId("point.coincident"), Point2{0.0, 0.0});
+  REQUIRE(move);
+  auto moved = SketchEditCommandExecutor{}.apply(added.value().after(), move.value());
+  REQUIRE(moved);
+  CHECK(moved.value().after().find_point(SketchPointId("point.coincident"))->position() ==
+        Point2{0.0, 0.0});
 }
 
 TEST_CASE("Sketch topology edit commands are dependency-safe and exactly undoable",
@@ -424,6 +465,53 @@ TEST_CASE("Sketch topology edit commands are dependency-safe and exactly undoabl
       removed_line.value().after(), remove_extra_point.value());
   REQUIRE(removed_point);
   CHECK(removed_point.value().after().find_point(SketchPointId("point.extra")) == nullptr);
+}
+
+TEST_CASE("Lossless topology point edits apply through PartDocument Sketch replacement",
+          "[core][sketch-edit-command][core][sketch-json-migration]") {
+  auto document = PartDocument::create(DocumentId("part.edit"), "EditPart");
+  REQUIRE(document);
+  auto xy = DatumPlane::xy();
+  REQUIRE(xy);
+  REQUIRE(document.value().add_datum_plane(xy.value()));
+
+  auto sketch = Sketch::create(SketchId("sketch.edit.bridge"), "Sketch_EditBridge",
+                               DatumPlaneId("datum.xy"));
+  REQUIRE(sketch);
+  REQUIRE(sketch.value().add_entity(
+      LineSegment::create(SketchEntityId("line.a"), Point2{0.0, 0.0}, Point2{2.0, 0.0}).value()));
+  REQUIRE(sketch.value().add_entity(
+      LineSegment::create(SketchEntityId("line.b"), Point2{2.0, 0.0}, Point2{0.0, 2.0}).value()));
+  REQUIRE(sketch.value().add_entity(
+      LineSegment::create(SketchEntityId("line.c"), Point2{0.0, 2.0}, Point2{0.0, 0.0}).value()));
+  auto profile = ClosedProfile::create(
+      ProfileId("profile.triangle"),
+      {SketchEntityId("line.a"), SketchEntityId("line.b"), SketchEntityId("line.c")});
+  REQUIRE(profile);
+  REQUIRE(sketch.value().add_profile(profile.value()));
+  REQUIRE(document.value().add_sketch(sketch.value()));
+
+  auto topology = SketchTopology::migrate_legacy(sketch.value());
+  REQUIRE(topology);
+  const auto* line_a = topology.value().find_entity("entity/line.a");
+  REQUIRE(line_a != nullptr);
+  const SketchPointId shared = line_a->points()[1];
+  auto move = SketchEditCommand::move_point(shared, Point2{3.0, 0.0});
+  REQUIRE(move);
+
+  auto applied = SketchTopologyPartDocumentEditor{}.apply(
+      document.value(), SketchId("sketch.edit.bridge"), move.value());
+  REQUIRE(applied);
+  const Sketch* edited = document.value().find_sketch(SketchId("sketch.edit.bridge"));
+  REQUIRE(edited != nullptr);
+  REQUIRE(edited->find_line_segment(SketchEntityId("line.a")) != nullptr);
+  REQUIRE(edited->find_line_segment(SketchEntityId("line.b")) != nullptr);
+  CHECK(edited->find_line_segment(SketchEntityId("line.a"))->end() == Point2{3.0, 0.0});
+  CHECK(edited->find_line_segment(SketchEntityId("line.b"))->start() == Point2{3.0, 0.0});
+
+  auto remigrated = SketchTopology::migrate_legacy(*edited);
+  REQUIRE(remigrated);
+  CHECK(remigrated.value() == applied.value().transaction.after());
 }
 
 TEST_CASE("Legacy Part Sketch JSON migrates to canonical topology JSON",
