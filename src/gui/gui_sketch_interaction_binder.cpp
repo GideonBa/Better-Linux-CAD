@@ -19,6 +19,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace blcad::gui {
@@ -231,7 +232,7 @@ private:
     GuiSketchInteractionConfig config;
     config.grid = grid_config();
     const auto activated = viewport_->set_sketch_interaction(
-        plane.value(), std::move(scene.value()), config);
+        plane.value(), scene.value(), config);
     if (activated.has_error()) {
       append_diagnostic(activated.error());
       return;
@@ -254,12 +255,12 @@ private:
       return;
     synchronizing_selection_ = true;
 
-    if (selections.size() == 1U && tree_ != nullptr) {
-      if (QTreeWidgetItem* item = find_tree_item(tree_, selections.front().semantic_id))
-        tree_->setCurrentItem(item);
-    } else if (tree_ != nullptr) {
+    if (tree_ != nullptr) {
       const QSignalBlocker blocker(tree_);
-      tree_->setCurrentItem(nullptr);
+      QTreeWidgetItem* item = selections.size() == 1U
+                                  ? find_tree_item(tree_, selections.front().semantic_id)
+                                  : nullptr;
+      tree_->setCurrentItem(item);
     }
 
     window_.session().selection().clear();
