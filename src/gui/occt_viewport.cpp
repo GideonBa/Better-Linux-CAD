@@ -233,6 +233,53 @@ bool OcctViewport::set_plane_camera(Point3 target, Vector3 normal, Vector3 up) {
   }
 }
 
+GuiViewportCameraBookmark OcctViewport::camera_bookmark() const noexcept {
+  GuiViewportCameraBookmark bookmark;
+  bookmark.projection = projection_;
+  bookmark.plane_camera = plane_camera_;
+  if (plane_camera_) {
+    bookmark.target = plane_camera_->target;
+    bookmark.eye = {plane_camera_->target.x + plane_camera_->view_direction.x,
+                    plane_camera_->target.y + plane_camera_->view_direction.y,
+                    plane_camera_->target.z + plane_camera_->view_direction.z};
+    bookmark.up_direction = plane_camera_->up_direction;
+  }
+  if (impl_->view.IsNull())
+    return bookmark;
+  try {
+    impl_->view->Eye(bookmark.eye.x, bookmark.eye.y, bookmark.eye.z);
+    impl_->view->At(bookmark.target.x, bookmark.target.y, bookmark.target.z);
+    impl_->view->Up(bookmark.up_direction.x, bookmark.up_direction.y, bookmark.up_direction.z);
+    bookmark.scale = impl_->view->Scale();
+  } catch (const Standard_Failure&) {
+  }
+  return bookmark;
+}
+
+bool OcctViewport::restore_camera_bookmark(const GuiViewportCameraBookmark& bookmark) noexcept {
+  if (bookmark.scale <= 0.0)
+    return false;
+  try {
+    projection_ = bookmark.projection;
+    plane_camera_ = bookmark.plane_camera;
+    if (!impl_->view.IsNull()) {
+      impl_->view->SetEye(bookmark.eye.x, bookmark.eye.y, bookmark.eye.z);
+      impl_->view->SetAt(bookmark.target.x, bookmark.target.y, bookmark.target.z);
+      impl_->view->SetUp(bookmark.up_direction.x, bookmark.up_direction.y,
+                         bookmark.up_direction.z);
+      impl_->view->SetScale(bookmark.scale);
+      impl_->view->Camera()->SetProjectionType(
+          projection_ == GuiViewportProjection::Perspective
+              ? Graphic3d_Camera::Projection_Perspective
+              : Graphic3d_Camera::Projection_Orthographic);
+      impl_->view->Redraw();
+    }
+    return true;
+  } catch (const Standard_Failure&) {
+    return false;
+  }
+}
+
 void OcctViewport::fit_all() {
   if (!impl_->view.IsNull() && !impl_->presentations.empty()) {
     impl_->view->FitAll(0.05, false);
