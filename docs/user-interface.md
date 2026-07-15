@@ -2,14 +2,14 @@
 
 Status: MVP-7 accepted and Interactive Sketcher MVP-8 in progress. Blocks 95–105 provide the optional
 Qt shell, document transactions, OCCT viewport, deterministic browser/property surfaces, and semantic
-selection synchronization. Blocks 106–108 now establish the contextual Sketch workspace, transient
-plane interaction, and persistent shared planar point/entity topology. Block 109 is the current next
-technical step and owns the general planar constraint solver. Blocks 122–131 add interactive Part,
-Surface, and Assembly modeling; STEP Import begins with Block 132.
+selection synchronization. Blocks 106–109 establish the contextual Sketch workspace, transient plane
+interaction, persistent shared planar topology, and deterministic general planar solver. Block 110 is
+the current next technical step and connects mouse dragging to those authorities. Blocks 122–131 add
+interactive Part/Surface/Assembly modeling; STEP Import begins with Block 132.
 
 The UI is deliberately not built like FreeCAD. The goal is a modern, consistent, reduced interface
-with clear separation between model, parameters, features, Sketch topology, and Assembly. The UI only
-operates Core/Geometry authorities; it must not own CAD or solver logic.
+with clear separation between model, parameters, features, Sketch topology, solver results, and
+Assembly. The UI operates Core/Geometry authorities; it must not own CAD or solver mathematics.
 
 ## Main areas
 
@@ -19,15 +19,15 @@ operates Core/Geometry authorities; it must not own CAD or solver logic.
 | Feature tree | chronological/logical feature list of a Part |
 | Assembly tree | Parts, occurrences, relationships, and joints |
 | Parameter window | parameter name, value, unit, formula, scope, and usage sites |
-| Property panel | edit the selected object/feature through validated commands |
+| Property panel | edit selected object/feature through validated commands |
 | Command palette | quick access to Sketch, Part, Surface, Assembly, Inspect, and Exchange commands |
 | Engineering panel | later technical assistants for mechanical engineering domains |
 
 ## Contextual Sketch workspace
 
 Block 106 promotes planar Sketch editing to `GuiWorkspace::Sketch`, a transient contextual Part mode.
-The global workspace row remains `Part | Assembly | Inspect | Exchange`; entering Sketch does not
-create a persistent project mode or Part feature.
+The global workspace row remains `Part | Assembly | Inspect | Exchange`; entering Sketch does not create
+persistent project mode or Part feature.
 
 Sketch command surface:
 
@@ -41,44 +41,39 @@ Sketch browser contract:
 Entities | Constraints | Dimensions | Diagnostics
 ```
 
-The command bar renders the group strip and numeric HUD. The existing model browser remains semantic
-selection authority and Properties/Tasks remains the contextual task surface. The status bar exposes
-tool hint, raw plane cursor coordinates, snap/inference, remaining DOF, and solve state.
+The command bar renders group strip/numeric HUD. Existing model browser remains semantic selection
+authority and Properties/Tasks remains contextual task surface. Status bar exposes tool hint, raw plane
+cursor coordinates, snap/inference, remaining DOF, and solve state.
 
-Producer staging is explicit:
+Producer boundaries are explicit:
 
 ```text
 Block 107  cursor / hover / hit / box selection / grid / snap / inference
 Block 108  persistent shared SketchPointId / SketchTopology identity
-Block 109  general solve state and remaining DOF
-Block 110  solver-backed drag candidates
+Block 109  deterministic solve result / exact local remaining DOF / solver diagnostics
+Block 110  semantic handles / live drag solve invocation / status publication / release commit
 ```
 
-Therefore real Cursor/Snap values are already available while `DOF: —` and
-`Solve: Not evaluated` remain correct until Block 109. The UI does not infer DOF from topology
-connectivity alone.
+Block 109 means DOF/Solve have a real headless Core producer. The current shell does not yet continuously
+invoke it, so `DOF: —` / `Solve: Not evaluated` can still appear outside a solver-aware command. Block
+110 owns the first live solve/status publication during drag. The UI must render
+`SketchSolveResult`; it must not count endpoints or glyphs to estimate DOF.
 
 `Enter Sketch` captures workspace, semantic selection, full transient camera state, and viewport
-selection filter. It resolves the workplane, enters normal orthographic view, restricts picking to
-SketchEntity/Edge/Vertex, and uses a crosshair. `Finish Sketch` rejects active commands or diagnostic
-errors and restores workspace, selection, Eye/Target/Up/Scale/projection, and selection filtering.
-It never invents an Extrude or another downstream feature.
+selection filter. It resolves workplane, enters normal orthographic view, restricts picking to
+SketchEntity/Edge/Vertex, and uses a crosshair. `Finish Sketch` rejects active commands or current
+Finish diagnostics and restores workspace, selection, camera, and selection filtering. It does not
+invent an Extrude or another downstream feature.
 
-The command lifecycle is specified in `docs/gui-interactive-sketch-workspace-mvp8.md`. For example,
-the first HUD client accepts `line.web, 0, 0, 40, 0`, validates on a disposable historical Sketch
-copy, enters Preview, and commits through the existing undoable Block-99 workbench path. Block 108
-does not silently retrofit that seed command into topology-native creation; Blocks 110–111 integrate
-solver-backed direct manipulation and creation in sequence.
+The command lifecycle is canonical in `docs/gui-interactive-sketch-workspace-mvp8.md`.
 
 ## Sketch canvas interaction
 
-Block 107 gives the planar Sketch canvas one mapping between Qt device-independent pixels, OCCT view
-rays, active-plane coordinates, and model points. Hit/snap tolerances are specified in DIP, so a
-6-DIP curve tolerance remains a 6-DIP interaction tolerance across zoom and high-DPI displays. The
-native bridge converts through current device-pixel ratio; offscreen tests use a deterministic
-orthographic mapper.
+Block 107 provides one mapping between Qt DIP, OCCT view rays, active-plane coordinates, and model
+points. Hit/snap tolerances are DIP-based and remain zoom/high-DPI stable. Native mapping accounts for
+device-pixel ratio; offscreen tests use deterministic orthographic mapping.
 
-Hover and repeated-click priority is:
+Hover/repeated-click priority:
 
 ```text
 Point -> Curve -> Dimension -> Glyph
@@ -91,15 +86,14 @@ left -> right   Window: fully contained curves
 right -> left   Crossing: contained or crossed curves
 ```
 
-A transparent viewport overlay draws grid, highest-priority hover product, active snap marker, and
-rubber-band selection. The shell binder also draws transient dashed horizontal/vertical/alignment
-inference guides. These are view products only.
+A transparent overlay draws grid, highest-priority hover product, active snap marker, and rubber-band
+selection. The binder draws dashed horizontal/vertical/alignment inference guides. These are transient
+view products.
 
-The Sketch menu exposes `Show grid` and `Snap to grid`. Default grid spacing is 10 mm with every fifth
-line major. Grid display is generated only for the visible active-plane range and bounded for large
-views; display subsampling never changes snap spacing.
+Sketch menu exposes `Show grid` and `Snap to grid`. Default spacing is 10 mm with every fifth line
+major. Visible grid range is bounded; visual subsampling never changes snap spacing.
 
-Implemented snap/inference families are:
+Implemented snap/inference families:
 
 ```text
 origin | axis | endpoint | midpoint | center | quadrant
@@ -107,52 +101,127 @@ intersection | nearest | grid
 horizontal | vertical | X alignment | Y alignment
 ```
 
-Eligible candidates are ordered by model-space distance, screen-space distance, stable family
-priority, then candidate id. The status bar displays raw plane coordinates separately from chosen
-snap/inference text. For example:
+Eligible candidates are ordered by model-space distance, screen-space distance, stable family priority,
+then candidate id. Status displays raw plane coordinates separately from selected snap/inference text.
 
-```text
-Cursor: 19.84, 10.11 mm
-Snap: endpoint: line.web:end
-```
+Block 107 interaction samples are not Block-109 solver geometry. For example, an Arc hit uses a sampled
+interaction polyline, while the solver's arc residuals use the three persistent Block-108 defining
+points.
 
-The canonical Block-107 contract is `docs/gui-sketch-plane-interaction-mvp8.md`.
+Canonical contract: `docs/gui-sketch-plane-interaction-mvp8.md`.
 
 ## Shared point/entity topology and UI identity
 
-Block 108 introduces Core `SketchPointId` and `SketchTopology`. This is the persistent identity model
-for future solver and direct-manipulation workflows.
+Block 108 introduces Core `SketchPointId` and `SketchTopology`, the persistent identity model for solver
+and direct-manipulation workflows.
 
 Historical line/arc/spline records embed `Point2` values. Legacy migration converts them to topology
-entities referencing shared point ids. For example:
+entities referencing persistent point ids. Explicit ordered closed-profile connectivity shares endpoint
+ids; unrelated equal-coordinate points remain distinct identities.
+
+Example:
 
 ```text
 historical
   line.a.end   = (20, 0)
   line.b.start = (20, 0)
+  profile.loop = [line.a, line.b, ...]
 
 topology
   entity/line.a.points[1] = entity/line.a/end
   entity/line.b.points[0] = entity/line.a/end
 ```
 
-One moved topology point therefore remains one shared junction.
+One moved or solved topology point remains one shared junction.
 
-This does not mean a Block-107 point hit or snap landmark is automatically persistent point identity.
-The current interaction scene remains transient and still projects the historical Sketch compatibility
-representation. Later accepted drag/creation commands resolve or create `SketchPointId` through
-explicit Core topology operations.
+A Block-107 point hit/snap landmark is not automatically persistent point identity. Accepted drag/
+creation commands must resolve or create `SketchPointId` through explicit Core topology operations.
 
-Block-108 Core commands support Add, Move, Replace, and Remove with dependency-safe validation.
-Reference topology is read-only. Every successful command provides exact complete before/after
-topology snapshots for deterministic undo/redo.
-
-Canonical topology persistence is `blcad.sketch_topology.mvp8`. Historical PartDocument JSON remains
-load-compatible and migrates explicitly; entering Sketch does not rewrite it. A topology edit may be
-projected back through `PartDocument::update_sketch(...)` only when materialize -> re-migrate preserves
-the exact topology without identity/flag loss.
+Block-108 Core commands support Add, Move, Replace, Remove with dependency-safe validation. Reference
+topology is read-only. Successful commands provide exact complete before/after topology snapshots.
+Canonical topology persistence is `blcad.sketch_topology.mvp8`; historical PartDocument JSON remains
+load-compatible through explicit migration and only accepts losslessly materializable topology edits.
 
 Canonical contract: `docs/sketch-shared-topology-mvp8.md`.
+
+## General planar solver and UI contract
+
+Block 109 adds `SketchConstraintSolver` in Core. The direct headless solver supports:
+
+```text
+coincident | fixed | horizontal | vertical
+parallel | perpendicular | collinear | equal | tangent | concentric
+midpoint | symmetric | point-on-object
+horizontal distance | vertical distance | aligned distance
+radial | diameter | angular
+```
+
+Solver identity is semantic:
+
+```text
+point target      -> SketchPointId
+entity target     -> canonical SketchTopologyEntity id
+variable          -> (SketchPointId, X|Y)
+constraint        -> stable SketchSolverConstraint id
+```
+
+Constraint records are sorted lexicographically by id. Every non-reference point contributes X then Y
+variables in canonical point-id order. Reference points remain constant.
+
+Linear values are millimeters; angular values are degrees. Length residuals use deterministic Sketch
+scale; the Jacobian uses central differences and the numeric engine uses deterministic damped
+Gauss-Newton execution.
+
+Result states are:
+
+```text
+fully constrained
+under constrained + remaining DOF
+redundant + stable constraint ids
+conflicting + stable constraint ids
+non-convergent
+invalid reference
+```
+
+Remaining DOF is exact local differential DOF from final Jacobian rank, not a GUI endpoint-count
+heuristic. Redundancy uses canonical incremental rank attribution. Conflict uses deterministic
+single-removal re-solving in canonical constraint order.
+
+`SketchSolveResult` is derived. It contains disposable solved topology, variable order, rank, remaining
+DOF, diagnostics, iterations, and residual summary. It is not persistent model intent and solve does not
+mutate source topology.
+
+The current persisted Sketch adapter maps existing geometric constraints, TangentContinuity, and
+parameter-backed distance dimensions into this solver. The direct solver supports more families than
+historical Sketch JSON can currently author; Blocks 114/115 own persistence/UI authoring expansion.
+
+Projected-reference constraints without coordinate-capable Block-108 topology report invalid reference.
+The UI must not fill this with sampled endpoints or OCCT subshapes.
+
+Canonical contract: `docs/sketch-planar-constraint-solver-mvp8.md`.
+
+## Block-110 direct manipulation boundary
+
+Block 110 is the first GUI consumer that composes Blocks 107–109:
+
+```text
+screen pointer
+  -> active-plane position and snap/inference
+  -> explicit semantic handle
+  -> existing SketchPointId/entity role
+  -> disposable topology candidate + transient drag target
+  -> Block-109 solve
+  -> live viewport preview
+  -> release: one validated document transaction
+```
+
+Preview never mutates PartDocument. `Esc`, lost capture, fixed/fully-constrained refusal, or failed
+solve restores the exact pre-drag snapshot and clears preview. Solver throttling/coalescing must not
+drop the final pointer position.
+
+The block must expose endpoint, midpoint, center, radius, arc, spline, and dimension handles only where
+semantic topology/constraint authority exists. Handle screen position is presentation; handle identity
+must resolve to stable Core point/entity roles.
 
 ## Parameter window
 
@@ -168,43 +237,47 @@ plate_thickness          8      mm    -                BasePlate
 gasket_thickness         2      mm    -                Gasket
 ```
 
-The `Used by` column comes from parameter usage tracking.
+`Used by` comes from parameter usage tracking.
 
 ## Feature and Assembly command surfaces
 
-Feature-creation workflows share a consistent task/preview/commit structure and consume existing Core
-and Geometry authorities. Current validation workbenches expose Part, Surface, Assembly, analysis,
-and exchange families. Interactive selection-first manipulators are sequenced separately in
+Feature-creation workflows share consistent task/preview/commit structure and consume existing Core/
+Geometry authorities. Current validation workbenches expose Part, Surface, Assembly, analysis, and
+exchange families. Selection-first manipulators are sequenced in
 `docs/interactive-modeling-sequence-mvp9.md`.
 
 Constraint suggestions remain deterministic from compatible geometry/capability types; they do not
 require AI.
 
-## Recompute feedback
+## Recompute and solve feedback
 
-After a change, the UI updates viewport, browser, properties, and diagnostics from authoritative
-recompute/solve results. Errors are surfaced and the last valid result is retained; failed candidates
-do not publish partial state.
+After a committed change, UI updates viewport, browser, properties, and diagnostics from authoritative
+recompute/solve results. Failed candidates do not publish partial persistent state.
+
+During Block-110 drag, solve results are transient preview feedback. A failed live solve may keep the
+last valid visual preview or restore the pre-drag display according to the Block-110 frozen contract,
+but release cannot commit a failed candidate.
 
 ## Implementation sequence
 
-1. Keep model/recompute/serialization authorities headless-first. Implemented.
+1. Keep model/recompute/serialization headless-first. Implemented.
 2. Add read-only OCCT viewport and semantic presentation. Implemented.
 3. Add browser/property projections and synchronized semantic selection. Implemented.
 4. Add typed command/task transactions and feature-validation workbenches. Implemented through Block
    105 and accepted.
-5. Add a contextual Sketch workspace and device-independent canvas interaction. Implemented in Blocks
-   106–107.
-6. Replace equal-coordinate connectivity with stable shared planar Core topology. Implemented in
-   Block 108.
-7. Add deterministic general planar solving over that topology. Block 109 is next.
+5. Add contextual Sketch workspace and device-independent canvas interaction. Implemented in 106–107.
+6. Replace equal-coordinate connectivity with stable shared planar Core topology. Implemented in 108.
+7. Add deterministic general planar solving and exact local DOF over that topology. Implemented in 109.
 8. Add solver-backed drag, creation, constraints, dimensions, modify/project tools, regions, and
-   Interactive Sketch3D through Block 121.
+   Interactive Sketch3D through Block 121. Block 110 next.
 9. Add selection-first Part/Surface/Assembly modeling through Blocks 122–131.
 10. Add STEP Reference/EditableBody import through Blocks 132–138.
 
 ## Current boundary
 
-Block 109 is the next UI-enabling Core step. It must produce deterministic solve state and remaining
-DOF over Block-108 topology before Block 110 allows mouse dragging to commit constrained geometry.
-No widget may implement substitute constraint mathematics.
+Block 109 is implemented. Block 110 is next.
+
+No widget may implement substitute constraint mathematics. Direct manipulation must map transient
+pointer interaction to stable Block-108 identities, call Block-109 solver authority on disposable
+candidates, and commit through the existing validated document transaction/history boundary only on
+successful release.
