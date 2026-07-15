@@ -3,8 +3,10 @@
 #include "blcad/core/sketch_topology.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <string>
+#include <type_traits>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -135,7 +137,7 @@ public:
                           [&](const auto& entity) { return entity.id() == id; });
     };
     constexpr double tolerance = 1.0e-9;
-    const auto same_position = [](Point2 left, Point2 right) {
+    const auto same_position = [tolerance](Point2 left, Point2 right) {
       return std::abs(left.x - right.x) <= tolerance &&
              std::abs(left.y - right.y) <= tolerance;
     };
@@ -146,10 +148,14 @@ public:
         if (point_index(point) == points.end())
           return Result<std::size_t>::failure(Error::validation(
               entity.id(), "replacement entity references an unknown Sketch point"));
-      for (const auto& dependency : entity.entity_dependencies())
-        if (entity_index(dependency) == entities.end() && dependency != entity.id())
+      for (const auto& dependency : entity.entity_dependencies()) {
+        if (dependency == entity.id())
+          return Result<std::size_t>::failure(Error::validation(
+              entity.id(), "Sketch topology entity cannot depend on itself"));
+        if (entity_index(dependency) == entities.end())
           return Result<std::size_t>::failure(Error::validation(
               entity.id(), "replacement entity references an unknown Sketch entity"));
+      }
       return Result<std::size_t>::success(entity.points().size());
     };
 
