@@ -1,7 +1,7 @@
 name: Block 106 final verification
 
 on:
-  push:
+  pull_request:
     branches:
       - main
 
@@ -14,6 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: main
           fetch-depth: 0
 
       - name: Advance Block 106 status documentation
@@ -167,7 +168,7 @@ Block 107 is the current implementation handoff. Its focused tags are
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add docs
             git commit -m "Block 106: advance documentation to Block 107"
-            git push
+            git push origin HEAD:main
           fi
 
       - name: Install dependencies
