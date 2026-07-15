@@ -360,6 +360,21 @@ src/gui/gui_sketch_drag_binder.cpp
 tests/gui/gui_sketch_drag_tests.cpp
 ```
 
+Block-110 public GUI boundaries:
+
+```text
+include/blcad/gui/gui_sketch_drag.hpp
+include/blcad/gui/gui_sketch_drag_binder.hpp
+```
+
+Registered Block-110 implementation/proof:
+
+```text
+src/gui/gui_sketch_drag.cpp
+src/gui/gui_sketch_drag_binder.cpp
+tests/gui/gui_sketch_drag_tests.cpp
+```
+
 `SketchTopology`/`SketchPointId` are persistent Core topology identity. `SketchConstraintSystem` is a
 canonical solve request. `SketchSolveResult`, variable order, residual summary, Jacobian rank, remaining
 DOF, and solver diagnostics are derived.
@@ -410,6 +425,7 @@ rm -rf build/
 - `docs/interactive-sketcher-sequence-mvp8.md`: Blocks 106–121 phase authority
 - `docs/sketch-shared-topology-mvp8.md`: Block-108 topology/migration/edit/persistence contract
 - `docs/sketch-planar-constraint-solver-mvp8.md`: Block-109 solver/DOF/diagnostics contract
+- `docs/gui-sketch-solver-drag-mvp8.md`: Block-110 semantic handles/live solve/atomic drag contract
 - `docs/gui-sketch-solver-drag-mvp8.md`: Block-110 semantic handles/live solve/atomic drag contract
 - `docs/gui-sketch-solver-drag-mvp8.md`: Block-110 semantic handles/live solve/atomic drag contract
 
