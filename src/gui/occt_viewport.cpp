@@ -104,6 +104,11 @@ Error viewport_error(std::string message) {
   return Error::geometry("gui.occt_viewport", std::move(message));
 }
 
+bool belongs_to_sketch(std::string_view semantic_id, std::string_view sketch_id) {
+  const std::string prefix = "sketch/" + std::string(sketch_id) + "/";
+  return semantic_id.size() >= prefix.size() && semantic_id.substr(0, prefix.size()) == prefix;
+}
+
 } // namespace
 
 struct OcctViewport::Impl {
@@ -176,6 +181,7 @@ Result<std::size_t> OcctViewport::set_scene(std::vector<geometry::ViewportSceneI
   }
   apply_display_mode();
   apply_selection_filters();
+  apply_sketch_focus();
   clear_selection();
   fit_all();
   update();
@@ -280,6 +286,22 @@ bool OcctViewport::restore_camera_bookmark(const GuiViewportCameraBookmark& book
   }
 }
 
+void OcctViewport::set_sketch_focus(std::string sketch_id, GuiSketchSurroundingsMode mode) {
+  sketch_focus_id_ = std::move(sketch_id);
+  sketch_surroundings_mode_ = mode;
+  apply_sketch_focus();
+}
+
+void OcctViewport::clear_sketch_focus() {
+  sketch_focus_id_.clear();
+  sketch_surroundings_mode_ = GuiSketchSurroundingsMode::Dim;
+  apply_sketch_focus();
+}
+
+void OcctViewport::set_context_menu_callback(std::function<void(QPoint)> callback) {
+  context_menu_callback_ = std::move(callback);
+}
+
 void OcctViewport::fit_all() {
   if (!impl_->view.IsNull() && !impl_->presentations.empty()) {
     impl_->view->FitAll(0.05, false);
@@ -348,6 +370,18 @@ const std::optional<GuiPlaneCamera>& OcctViewport::plane_camera() const noexcept
   return plane_camera_;
 }
 
+bool OcctViewport::sketch_focus_active() const noexcept {
+  return !sketch_focus_id_.empty();
+}
+
+std::string_view OcctViewport::sketch_focus_id() const noexcept {
+  return sketch_focus_id_;
+}
+
+GuiSketchSurroundingsMode OcctViewport::sketch_surroundings_mode() const noexcept {
+  return sketch_surroundings_mode_;
+}
+
 bool OcctViewport::native_viewer_available() const noexcept {
   return !impl_->view.IsNull();
 }
@@ -390,9 +424,12 @@ void OcctViewport::mousePressEvent(QMouseEvent* event) {
   last_mouse_position_ = event->position().toPoint();
   if (event->button() == Qt::MiddleButton)
     panning_ = true;
-  if (event->button() == Qt::RightButton && !impl_->view.IsNull()) {
-    rotating_ = true;
-    impl_->view->StartRotation(last_mouse_position_.x(), last_mouse_position_.y());
+  if (event->button() == Qt::RightButton) {
+    right_press_position_ = last_mouse_position_;
+    if (!impl_->view.IsNull() && (!sketch_focus_active() || !plane_camera_.has_value())) {
+      rotating_ = true;
+      impl_->view->StartRotation(last_mouse_position_.x(), last_mouse_position_.y());
+    }
   }
   QWidget::mousePressEvent(event);
 }
@@ -414,8 +451,13 @@ void OcctViewport::mouseMoveEvent(QMouseEvent* event) {
 void OcctViewport::mouseReleaseEvent(QMouseEvent* event) {
   if (event->button() == Qt::MiddleButton)
     panning_ = false;
-  if (event->button() == Qt::RightButton)
+  if (event->button() == Qt::RightButton) {
     rotating_ = false;
+    const QPoint current = event->position().toPoint();
+    if (sketch_focus_active() && (current - right_press_position_).manhattanLength() <= 3 &&
+        context_menu_callback_)
+      context_menu_callback_(mapToGlobal(current));
+  }
   if (event->button() == Qt::LeftButton && !impl_->context.IsNull()) {
     const QPoint current = event->position().toPoint();
     impl_->context->MoveTo(current.x(), current.y(), impl_->view, true);
@@ -478,6 +520,7 @@ void OcctViewport::initialize_native_viewer() {
     set_projection(projection_);
     apply_display_mode();
     apply_selection_filters();
+    apply_sketch_focus();
     impl_->view->MustBeResized();
   } catch (const Standard_Failure& failure) {
     impl_->initialization_error = failure.GetMessageString() != nullptr
@@ -513,6 +556,35 @@ void OcctViewport::apply_selection_filters() {
     impl_->context->SetSelectionModeActive(
         presentation.interactive, 0, (selection_filter_mask_ & selection_kind_bit(kind)) != 0U,
         AIS_SelectionModesConcurrency_Single, true);
+  }
+  impl_->context->UpdateCurrentViewer();
+}
+
+void OcctViewport::apply_sketch_focus() {
+  if (impl_->context.IsNull())
+    return;
+  for (auto& presentation : impl_->presentations) {
+    if (presentation.interactive.IsNull())
+      continue;
+
+    if (!sketch_focus_active()) {
+      impl_->context->Display(presentation.interactive, false);
+      presentation.interactive->SetTransparency(
+          presentation.item.kind == geometry::ViewportSceneKind::Datum ? 0.72 : 0.0);
+      continue;
+    }
+
+    const bool active_sketch = belongs_to_sketch(presentation.item.semantic_id, sketch_focus_id_);
+    if (active_sketch) {
+      impl_->context->Display(presentation.interactive, false);
+      presentation.interactive->SetTransparency(0.0);
+    } else if (sketch_surroundings_mode_ == GuiSketchSurroundingsMode::Isolate) {
+      impl_->context->Erase(presentation.interactive, false);
+    } else {
+      impl_->context->Display(presentation.interactive, false);
+      presentation.interactive->SetTransparency(
+          presentation.item.kind == geometry::ViewportSceneKind::Datum ? 0.88 : 0.72);
+    }
   }
   impl_->context->UpdateCurrentViewer();
 }
