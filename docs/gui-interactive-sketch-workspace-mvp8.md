@@ -1,8 +1,8 @@
 # Interactive Sketch Workspace MVP-8
 
-Status: implemented in Block 106.
+Status: implemented in Block 106; Block 107 now supplies its plane-interaction status producers.
 
-This document is the canonical GUI contract for the contextual planar Sketch workspace introduced by Block 106. It extends the Block-95/96 command and transaction rules and the Block-99 Sketch workbench. It does not introduce new persistent Sketch geometry, solver mathematics, snapping, or hit-testing semantics.
+This document is the canonical GUI contract for the contextual planar Sketch workspace introduced by Block 106. It extends the Block-95/96 command and transaction rules and the Block-99 Sketch workbench. It does not introduce new persistent Sketch geometry or solver mathematics. Device-independent mapping, hit testing, box selection, grid, snapping, and inference are implemented by Block 107 in `docs/gui-sketch-plane-interaction-mvp8.md`.
 
 ## Scope
 
@@ -46,6 +46,8 @@ After successful entry:
 
 `OcctViewport` also exposes the alternative transient `GuiSketchSurroundingsMode::Isolate` policy. Both policies are view state only. The default `MainWindow` entry path uses `Dim`; no visibility or transparency intent is written to the Part.
 
+Block 107's shell binder observes successful Sketch entry and installs the transient plane-interaction scene after the Block-106 normal camera is active. This ordering lets the native mapper use the final OCCT view and does not change the Enter-Sketch transaction boundary.
+
 No Part feature is created by `Enter Sketch`.
 
 ## Finish Sketch
@@ -54,7 +56,7 @@ No Part feature is created by `Enter Sketch`.
 
 Finish runs the existing Block-99 Sketch inspection/diagnostic authority. Diagnostic errors reject Finish; warnings do not become hidden persistent consent and remain available through the diagnostic surface. The command does not synthesize an Extrude, Revolve, or any other downstream feature.
 
-On success the controller restores the previous GUI workspace and semantic selection. `MainWindow` clears the transient Sketch focus, restores the captured viewport Eye, Target, Up, Scale, projection, plane-camera publication, and selection-filter mask, removes the crosshair, and clears the active Sketch workspace state.
+On success the controller restores the previous GUI workspace and semantic selection. `MainWindow` clears the transient Sketch focus, restores the captured viewport Eye, Target, Up, Scale, projection, plane-camera publication, and selection-filter mask, removes the crosshair, and clears the active Sketch workspace state. Block 107 then clears its interaction scene, grid, hover, snap marker, and box-selection products.
 
 For example, entering `sketch.bracket` from the Inspect workspace with a datum selected clears the working selection, edits normal to the Sketch plane with surrounding Bodies dimmed, and returns to Inspect with the same datum selection and camera when Finish succeeds.
 
@@ -125,7 +127,7 @@ id, start-x, start-y, end-x, end-y
 
 Coordinates are interpreted in the active Sketch plane. Before commit, `MainWindow` creates a disposable Sketch copy and validates the candidate line through the existing Core `Sketch::add_entity(...)` authority. Only a valid candidate advances to Preview. Applying the generic task ends transient Preview and the existing `GuiSketchWorkbench::add_line(...)` path commits one document transaction.
 
-For example, `line.web, 0, 0, 40, 0` validates on a copy, previews, and then commits through the same Part-document mutation used by headless callers. A duplicate entity id fails before the persistent Sketch is replaced.
+For example, `line.web, 0, 0, 40, 0` validates on a copy, previews, and then commits through the same Part-document mutation used by headless callers. A duplicate entity id fails before the persistent Sketch is replaced. After a successful commit, the Block-107 binder rebuilds the read-only interaction projection from the newly published Sketch.
 
 ## Command repeat
 
@@ -143,6 +145,8 @@ SketchEntity | Edge | Vertex
 
 The mask reuses `GuiSelectionKind` and the existing viewport semantic bridge. No AIS owner, `TopoDS_Shape`, screen coordinate, or hover object becomes persistent identity.
 
+Block 107 applies this semantic rule to direct Sketch canvas interaction. Hit and box selection publish stable Sketch semantic ids into the existing `GuiSelectionModel`; the transient hit candidate id and interaction polyline are never promoted to persistent identity. Direct hit/box selection is disabled while the Block-106 task state is collecting picks, editing numeric input, or previewing a command.
+
 The pre-Sketch filter mask is restored on Finish.
 
 ## Cursor, snap, DOF, and solve status
@@ -156,13 +160,13 @@ The pre-Sketch filter mask is restored on Finish.
 - solve status;
 - current Sketch interaction stage and focus target.
 
-Block 106 provides and renders these surfaces. Their producers are intentionally staged:
+Block 106 provides and renders these surfaces. Their producers are staged:
 
-- Block 107 owns device-independent plane mapping, hit testing, snapping, and inference;
+- Block 107 now owns device-independent plane mapping, hit testing, snapping, and inference and publishes raw plane cursor coordinates plus selected snap/inference text;
 - Block 109 owns general planar solve state and remaining DOF;
 - Block 110 owns solver-backed drag candidates.
 
-Until those authorities exist, the Block-106 UI reports explicit unavailable/default states such as `Cursor: —`, `Snap: —`, `DOF: —`, and `Solve: Not evaluated` rather than inventing results.
+Therefore an active Block-107 workspace may report real `Cursor` and `Snap` values while `DOF: —` and `Solve: Not evaluated` remain explicit until Block 109. The UI does not invent solver results.
 
 ## Camera bookmark and Sketch focus
 
@@ -185,9 +189,9 @@ This closes the Block-106 requirement that normal-to-plane Sketch editing must r
 
 ## Transaction and persistence boundaries
 
-Block 106 introduces no new JSON field and no schema migration.
+Block 106 introduces no new JSON field and no schema migration. Block 107 likewise adds only transient interaction products.
 
-Persistent geometry mutation still goes through `GuiDocumentSession::commit_part_transaction(...)`, which validates and recomputes the candidate before publishing one canonical snapshot/history entry. Preview state, HUD text, command repeat, hover, cursor coordinates, snap text, focus, workspace bookmarks, camera bookmarks, Sketch-focus policy, and Sketch status are transient only.
+Persistent geometry mutation still goes through `GuiDocumentSession::commit_part_transaction(...)`, which validates and recomputes the candidate before publishing one canonical snapshot/history entry. Preview state, HUD text, command repeat, hover, cursor coordinates, snap text, focus, workspace bookmarks, camera bookmarks, Sketch-focus policy, screen mappings, grid products, hit cycles, and Sketch status are transient only.
 
 ## Failure policy
 
@@ -200,7 +204,7 @@ The workspace fails closed when:
 - a numeric candidate fails Core validation;
 - camera restore receives an invalid bookmark.
 
-A failed Enter leaves the previous workspace authoritative. A failed Finish leaves the Sketch workspace active. A failed candidate does not replace persistent Sketch intent.
+A failed Enter leaves the previous workspace authoritative. A failed Finish leaves the Sketch workspace active. A failed candidate does not replace persistent Sketch intent. Block-107 mapping/scene failures publish a GUI diagnostic and leave the persistent Sketch unchanged; their exact contract is in `docs/gui-sketch-plane-interaction-mvp8.md`.
 
 ## Focused proof
 
@@ -214,6 +218,8 @@ Focused tests use:
 
 They cover context capture/restore, command/browser surface order, the selection mask, status publication, staged `Esc`, repeat, handle/drag-candidate transience, generic task backtracking, camera bookmark restoration, transient Dim/Isolate Sketch focus state, and an end-to-end shell path that enters a Sketch, commits a numeric line, repeats/cancels the command, and finishes back into Part context. Existing Block-99 tests continue to prove normal-to-plane Sketch entry and the shared workbench mutation path.
 
+Block 107 adds `[gui][sketch-hit-test]`, `[gui][sketch-snap]`, and `[gui][sketch-box-selection]` proof for the concrete interaction producers consuming this workspace.
+
 ## Next boundary
 
-Block 107 owns plane interaction, zoom-stable hit testing, box selection, grid, snapping, and inference preview. Block 106 exposes the transient status and command lifecycle those producers will drive; it does not implement their geometry or selection algorithms early.
+Block 108 owns shared persistent planar point/entity topology, mutation commands, JSON migration, and exact undo semantics. The Block-106 workspace and Block-107 interaction layer remain consumers of that future Core authority; neither layer may invent shared point identity in Qt.

@@ -10,9 +10,11 @@ Surface workflows, and distinct path/Surface/Solid viewport products. Block 103 
 Assembly authoring, hierarchy, relationships, joints, DOF/solve diagnostics, and motion. Block 104
 adds deterministic analysis and freshness-gated Part, flattened Assembly, and structured Assembly
 STEP export. Block 105 completes integrated acceptance. Block 106 adds the real contextual Sketch
-workspace and command lifecycle; Block 107 is the current next technical step. Blocks 106–121 form
-the productive Interactive Sketcher; Blocks 122–131 add interactive Part, Surface, and Assembly
-modeling (`docs/interactive-modeling-sequence-mvp9.md`); STEP Import begins with Block 132.
+workspace and command lifecycle; Block 107 adds device-independent plane interaction, hit testing,
+box selection, grid, snapping, and inference preview. Block 108 is the current next technical step.
+Blocks 106–121 form the productive Interactive Sketcher; Blocks 122–131 add interactive Part,
+Surface, and Assembly modeling (`docs/interactive-modeling-sequence-mvp9.md`); STEP Import begins
+with Block 132.
 
 The UI is deliberately not built like FreeCAD. The goal is a modern, consistent, reduced interface with a clear separation between model, parameters, features, and assembly. Crucially, the UI only operates the core; it must not contain CAD logic (last of the core principles in `docs/architecture-summary.md`).
 
@@ -48,9 +50,9 @@ Entities | Constraints | Dimensions | Diagnostics
 
 The command bar renders the group strip and numeric HUD. The existing left model browser remains the
 semantic selection authority and the existing Properties / Tasks dock remains the contextual task
-surface. The status bar exposes tool hint, plane cursor coordinates, snap/inference, remaining DOF,
-and solve state. Before Blocks 107 and 109 supply those producers, the UI reports explicit `—` or
-`Not evaluated` states.
+surface. The status bar exposes tool hint, raw plane cursor coordinates, snap/inference, remaining
+DOF, and solve state. Block 107 now supplies cursor, hover, and snap/inference products; Block 109
+remains responsible for general DOF and solve status.
 
 `Enter Sketch` captures workspace, semantic selection, full transient camera state, and the viewport
 selection-filter mask. It resolves the Sketch workplane, enters normal orthographic view, restricts
@@ -61,6 +63,52 @@ camera state, and selection filter without inventing an Extrude or other feature
 The command lifecycle is specified in `docs/gui-interactive-sketch-workspace-mvp8.md`. For example,
 the first HUD client accepts `line.web, 0, 0, 40, 0`, validates the line on a disposable Sketch copy,
 enters Preview, and commits through the existing undoable Block-99 workbench mutation path.
+
+## Sketch canvas interaction
+
+Block 107 gives the planar Sketch canvas one mapping between Qt device-independent pixels, OCCT view
+rays, active-plane coordinates, and model points. Hit and snap tolerances are expressed in DIP, so a
+6-DIP curve tolerance remains a 6-DIP interaction tolerance after zoom or on a high-DPI display.
+The native OCCT bridge converts through the current device-pixel ratio; offscreen tests use a
+deterministic orthographic mapper.
+
+Hover and repeated click use the frozen priority:
+
+```text
+Point -> Curve -> Dimension -> Glyph
+```
+
+Repeated clicks at the same position cycle the stable overlapping-hit stack. Empty-space drag uses
+direction to select the conventional CAD mode:
+
+```text
+left -> right   Window: fully contained curves
+right -> left   Crossing: contained or crossed curves
+```
+
+A transparent viewport overlay draws the highest-priority hover product, active snap marker, and the
+rubber-band selection rectangle. These are view products only.
+
+The contextual Sketch menu now exposes `Show grid` and `Snap to grid`. The default grid is 10 mm
+with every fifth line marked major. Grid display is generated only for the visible active-plane
+range and is bounded for very large views. Display subsampling never changes the configured snap
+spacing.
+
+Implemented snap/inference families are:
+
+```text
+origin | axis | endpoint | midpoint | center | quadrant
+intersection | nearest | grid
+horizontal | vertical | X alignment | Y alignment
+```
+
+Snap choice is deterministic: eligible candidates inside the DIP tolerance are ordered by
+model-space distance, then screen-space distance, then stable family priority and candidate id. The
+status bar displays the raw plane coordinate separately from the chosen snap/inference text. For
+example, the pointer may show `Cursor: 19.84, 10.11 mm` while `Snap: endpoint: line.web:end` and the
+overlay marker is drawn at the endpoint.
+
+The canonical Block-107 contract is `docs/gui-sketch-plane-interaction-mvp8.md`.
 
 ## Parameter window
 
@@ -108,8 +156,9 @@ After a change the UI updates the viewport, feature tree, and parameter window f
 6. Add feature-creation dialogs one module at a time.
 7. Add the assembly tree and constraint dialog once the assembly system exists.
 8. Replace the validation-level Sketch surface with the solver-backed direct-manipulation workbench
-   sequenced in `docs/interactive-sketcher-sequence-mvp8.md`. Block 106 has established its
-   contextual workspace and command lifecycle; Block 107 adds plane interaction and snapping next.
+   sequenced in `docs/interactive-sketcher-sequence-mvp8.md`. Blocks 106–107 have established the
+   contextual workspace plus plane interaction/hit/snap authority; Block 108 adds shared persistent
+   point/entity topology and editable Core commands next.
 
 ## Out of scope for the first versions
 

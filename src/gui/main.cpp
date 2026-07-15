@@ -1,3 +1,4 @@
+#include "blcad/gui/gui_sketch_interaction_binder.hpp"
 #include "blcad/gui/main_window.hpp"
 #include "blcad/gui/startup_splash.hpp"
 
@@ -20,6 +21,7 @@ int main(int argc, char* argv[]) {
   splash.set_progress(20);
 
   blcad::gui::MainWindow window;
+  blcad::gui::install_sketch_interaction_binder(window);
   splash.set_progress(55);
   application.processEvents();
   bool duration_valid = false;
