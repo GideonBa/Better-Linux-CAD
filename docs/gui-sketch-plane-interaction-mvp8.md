@@ -1,20 +1,19 @@
 # Sketch Plane Interaction MVP-8
 
-Status: implemented in Block 107; Block 108 now provides the persistent shared topology identity for
-future solver/direct-manipulation consumers.
+Status: implemented in Block 107. Block 108 supplies persistent shared topology identity and Block 109
+supplies deterministic constraint solving. Block 110 is the first direct-manipulation consumer that
+connects those Core authorities to this transient plane interaction layer.
 
 This document is the canonical GUI interaction contract for Block 107. It extends the contextual
-Sketch workspace from Block 106 with one device-independent mapping and one deterministic transient
-interaction authority for hover, hit testing, stacked-hit cycling, Window/Crossing selection, grid
-presentation, snapping, and inference preview.
+Sketch workspace with device-independent mapping and one deterministic transient authority for hover,
+hit testing, stacked-hit cycling, Window/Crossing selection, grid presentation, snapping, and inference
+preview.
 
-Block 107 does not change persistent Sketch JSON and does not solve constraints. Block 108 now owns
-shared planar point/entity topology and editable Core commands. Block 109 owns the general planar
-constraint solver.
+Block 107 does not change persistent Sketch JSON and does not solve constraints.
 
 ## Authority boundary
 
-The current interaction path remains:
+Current interaction path:
 
 ```text
 persistent Part + historical Sketch compatibility intent
@@ -23,57 +22,58 @@ persistent Part + historical Sketch compatibility intent
   -> GuiSketchPlaneMapping
   -> GuiSketchInteractionController
   -> OcctViewport overlay / semantic selection
-  -> existing GuiSketchWorkspace status and GuiSelectionModel
+  -> GuiSketchWorkspace status and GuiSelectionModel
 ```
 
-The current Block-107 scene builder still projects the existing `Sketch` representation. It does not
-invent `SketchPointId` values from screen positions, sampled curves, or snap candidates. Block-108
-`SketchTopology` is a separate Core identity authority consumed by Block 109 and later interactive
-edit/drag blocks as those workflows are integrated.
+Core path introduced by later blocks:
 
-The Core `Sketch`, parameters, projected-reference intent, stable semantic ids, and Block-108
-`SketchTopology` remain authoritative at their respective model boundaries. `GuiSketchInteractionScene`,
-sampled curve polylines, screen coordinates, hover products, snap candidates, grid lines, hit cycles,
-and rubber-band rectangles are transient GUI products. They are never serialized and never become
-feature or topology identity.
+```text
+SketchTopology / SketchPointId         Block 108
+  -> SketchConstraintSystem            Block 109
+  -> SketchConstraintSolver            Block 109
+  -> semantic drag candidate            Block 110
+```
+
+The current Block-107 scene builder still projects existing historical `Sketch` representation. It
+does not invent `SketchPointId` values from screen positions, sampled curves, snap candidates, or hit
+landmarks.
+
+`GuiSketchInteractionScene`, sampled polylines, screen coordinates, hover products, snap candidates,
+grid lines, hit cycles, inference guides, and rubber-band rectangles are transient GUI products. They
+are never serialized and never become feature/topology/solver identity.
 
 For example, an authored `line.web` remains semantic Sketch entity intent. Its Block-107 endpoint,
-midpoint, nearest-point, screen-space polyline, and hover highlight are disposable interaction
-products. Block-108 migration may additionally establish a persistent `SketchPointId` for the line's
-shared endpoint; the Block-107 snap landmark itself is not that identity.
+midpoint, nearest-point, screen polyline, and hover highlight are disposable interaction products.
+Block-108 migration may establish a persistent `SketchPointId` for a shared endpoint; the Block-107
+landmark itself is not that identity. Block-109 solver variables address the persistent point id.
 
 ## Device-independent plane mapping
 
 `GuiSketchPlaneMapping` is the only Block-107 mapping boundary between:
 
 ```text
-screen position in Qt device-independent pixels (DIP)
-  <-> view ray in model space
+Qt screen position in device-independent pixels (DIP)
+  <-> model-space view ray
   <-> active workplane coordinates
   <-> model-space point
 ```
 
-The general mapping receives two view providers:
+The general mapping receives screen-DIP-to-ray and model-to-screen providers. Ray/plane intersection
+uses resolved `GuiSketchPlaneView`; plane/model conversion reuses Block-99 workplane axes.
 
-- screen DIP -> model-space view ray;
-- model-space point -> screen DIP.
+The native OCCT provider uses `V3d_View::ConvertWithProj(...)` and `V3d_View::Convert(...)`. Qt
+coordinates are multiplied by `devicePixelRatioF()` before OCCT pixel APIs and divided on return. Hit
+and snap tolerances therefore remain DIP-based.
 
-Ray/plane intersection is performed against the resolved `GuiSketchPlaneView`. Plane/model conversion
-reuses the Block-99 workplane axes.
+A deterministic orthographic provider exists for offscreen GUI tests/fallback. It uses explicit plane
+center and model-units-per-DIP scale and is not persistent camera intent.
 
-The native OCCT viewport provider uses `V3d_View::ConvertWithProj(...)` for pixel-to-ray conversion
-and `V3d_View::Convert(...)` for model-to-pixel projection. Qt coordinates are multiplied by
-`devicePixelRatioF()` before entering the OCCT pixel API and divided by the same ratio on the return
-path. Hit and snap tolerances therefore remain specified in DIP instead of physical device pixels.
-
-A deterministic orthographic provider exists for offscreen/headless GUI tests and non-native viewport
-fallback. It uses an explicit plane center and model-units-per-DIP scale; it is not a second
-persistent camera model.
+Block 109 does not consume this mapping directly. Block 110 maps the pointer to plane space and then
+constructs a semantic drag target over existing Block-108 identities before asking Block 109 to solve.
 
 ## Transient interaction scene
 
-`GuiSketchInteractionSceneBuilder` projects currently supported historical planar Sketch intent into
-four transient products:
+`GuiSketchInteractionSceneBuilder` projects supported historical planar Sketch intent into:
 
 ```text
 curves
@@ -82,39 +82,29 @@ annotations
 curve intersections
 ```
 
-The scene currently covers:
+The scene covers lines, three-point arcs, cubic Bezier splines, projected points/lines,
+reference-generated helper lines where Geometry resolves them, parameter-driven rectangle/circle
+profiles, circular hole-pattern circles, driving-dimension anchors, and reference/geometric/tangent
+glyph anchors.
 
-- line segments;
-- three-point arcs;
-- cubic Bezier splines;
-- projected Sketch points and lines;
-- reference-generated helper lines where existing Geometry authority resolves them;
-- parameter-driven rectangle profiles;
-- parameter-driven circle profiles;
-- circular hole-pattern circles;
-- driving-dimension anchor products;
-- existing reference/geometric/tangent constraint glyph anchors.
-
-Projected geometry is resolved through the existing `SketchReferenceProjector`. Lost projected
-references do not create replacement geometry and do not mutate the Sketch. The scene records an
+Lost projected references do not create replacement geometry. The scene increments
 `unresolved_reference_count` and omits the unavailable transient primitive.
 
-Curved entities are sampled only for interaction queries and overlay presentation:
+Curved interaction sampling is:
 
 ```text
-three-point arc   48 segments
-cubic Bezier      64 segments
-circle            72 segments
+three-point arc  48 segments
+cubic Bezier     64 segments
+circle           72 segments
 ```
 
-These samples are not Geometry output, profile identity, STEP output, Block-108 point identity, or
-persistent topology. Exact authored curve intent remains authoritative. Later interaction blocks may
-replace sampling with specialized analytic hit tests without a persistence migration.
+Samples are not Geometry output, profile identity, STEP output, Block-108 point identity, or Block-109
+solver geometry. Solver families evaluate exact topology definitions represented by their Core model;
+for example Arc residuals use the three persistent defining points, not the sampled 48-segment polyline.
 
 ## Hit testing and priority
 
-`GuiSketchInteractionController::hits_at(...)` evaluates the active scene with zoom-stable DIP
-tolerances. The frozen hit priority is:
+`GuiSketchInteractionController::hits_at(...)` uses zoom-stable DIP tolerances. Frozen hit priority:
 
 ```text
 Point
@@ -123,7 +113,7 @@ Dimension
 Glyph
 ```
 
-Within one priority class, candidates are ordered by:
+Within one class:
 
 ```text
 screen distance in DIP
@@ -131,44 +121,37 @@ model-space distance
 stable candidate id
 ```
 
-This keeps a handle/snap landmark selectable in front of its owning curve and keeps curves ahead of
-annotation text/glyph products.
+Repeated selection at the same screen position cycles the deterministic hit stack. The cycle resets
+when pointer movement exceeds tolerance or hit signature changes. Signature uses hit kind plus stable
+transient candidate id, never AIS owner address or OCCT traversal order.
 
-Repeated selection at the same screen position cycles through the deterministic ordered hit stack.
-The cycle resets when the pointer moves beyond the configured DIP reset tolerance or when the hit
-signature changes. The cycle signature uses hit kind plus stable transient candidate id; AIS owner
-addresses and OCCT traversal order are not selection identity.
-
-For example, when a midpoint, its owning line, a dimension anchor, and a constraint glyph overlap,
-the first four repeated clicks select them in exactly that order.
+Block 110 may add explicit semantic handle presentation ahead of normal Sketch hits, but handle identity
+must resolve to Block-108 point/entity roles. It must not reuse arbitrary Block-107 candidate ids as
+solver identity.
 
 ## Window and Crossing selection
 
-Dragging from empty Sketch canvas creates a transient rubber-band rectangle.
-
-Direction freezes the selection mode:
+Empty-canvas drag creates a transient rectangle:
 
 ```text
-left -> right   Window
-right -> left   Crossing
+left -> right  Window
+right -> left  Crossing
 ```
 
-`Window` selects a curve only when its complete interaction polyline lies inside the rectangle.
-`Crossing` selects a curve when any sampled point lies inside or any interaction segment crosses a
-rectangle edge. Point and annotation landmarks are selected when contained.
+Window selects a curve only when its complete interaction polyline lies inside. Crossing selects when
+any sampled point is inside or any interaction segment crosses a rectangle edge. Point/annotation
+landmarks select when contained.
 
-The result is a lexicographically ordered list of stable semantic ids represented as
-`GuiSelectionKind::SketchEntity`. Ordinary click replaces selection, `Shift` adds, and `Ctrl`
-toggles. The binder writes the resulting set into the existing session selection model. No second
-persistent selection identity system is introduced.
+Result is a lexicographically ordered semantic-id list represented as
+`GuiSelectionKind::SketchEntity`. Ordinary click replaces, Shift adds, Ctrl toggles. The binder writes
+the set to the existing session selection model.
 
-A selected Block-107 semantic entity may later be mapped to a Block-108 topology entity by explicit
-Core semantic identity. Selection never promotes a point hit candidate or screen coordinate directly
-to `SketchPointId`.
+A Block-107 semantic entity may later map explicitly to a Block-108 topology entity. Selection never
+promotes a point hit/screen coordinate directly to `SketchPointId`.
 
 ## Grid
 
-`GuiSketchGridConfig` controls the transient Sketch grid:
+`GuiSketchGridConfig` controls:
 
 ```text
 visible
@@ -177,26 +160,23 @@ spacing
 major_every
 ```
 
-The default shell policy is:
+Default shell policy:
 
 ```text
-spacing      = 10 mm
-major_every  = 5
-visible      = true
-grid snap    = true
+spacing      10 mm
+major_every  5
+visible      true
+grid snap    true
 ```
 
-The viewport maps its four screen corners into active-plane coordinates and generates only the
-visible plane-grid range. If the requested range exceeds the display budget, display lines are
-subsampled deterministically. This only reduces visual density; configured grid spacing remains the
-grid-snap authority.
+Visible range comes from mapping viewport corners to plane coordinates. Display lines may be
+subsampled deterministically to stay within budget; configured spacing remains grid-snap authority.
 
-The Sketch menu exposes `Show grid` and `Snap to grid`. Both actions are contextual and hidden when
-no Sketch workspace is active.
+Sketch menu exposes contextual `Show grid` and `Snap to grid`.
 
-## Snap candidates
+## Snap and inference candidates
 
-The implemented snap families are:
+Implemented families:
 
 ```text
 Origin
@@ -214,22 +194,20 @@ AlignmentX
 AlignmentY
 ```
 
-Origin and active-plane axes are implicit scene references. Endpoints, midpoints, centers, and
-quadrants are derived from authored Sketch intent. Intersections are deterministic pairwise
-intersections of transient interaction polyline segments. `Nearest` is the nearest point on an
-interaction polyline. Grid snap uses configured plane spacing.
+Origin/axes are implicit scene references. Geometry landmarks derive from authored intent.
+Intersections are deterministic pairwise intersections of interaction-polyline segments. Nearest is
+nearest point on an interaction polyline. Grid uses configured plane spacing.
 
-Horizontal and vertical inference consume an optional command anchor. Alignment inference compares
-the raw pointer plane coordinate with existing scene landmarks. Block 107 exposes the anchor API;
-creation tools in Blocks 111–113 become its primary clients.
+Horizontal/vertical inference may consume a command anchor. Alignment compares pointer plane
+coordinates with existing landmarks. Creation tools in Blocks 111–113 are primary clients.
 
-Snap candidates are presentation/query candidates. A later accepted command must resolve or create
-persistent Block-108 topology through Core commands; snap candidate ids are not saved as point ids.
+Snap candidates are presentation/query products. An accepted drag or creation command must resolve or
+create persistent Block-108 topology through explicit Core identity/edit boundaries. Snap ids are not
+saved as `SketchPointId` and are never passed directly to Block-109 solver targets.
 
 ## Deterministic snap choice
 
-Only candidates inside the configured DIP snap tolerance are eligible. Eligible candidates are
-ordered by:
+Only candidates within configured DIP tolerance are eligible. Ordering:
 
 ```text
 1. model-space distance
@@ -238,53 +216,31 @@ ordered by:
 4. stable candidate id
 ```
 
-The model-space-first rule makes the geometric candidate authoritative. Screen distance is an
-explicit tie breaker and preserves usable pixel behavior under zoom. Stable family and candidate-id
-ordering remove collection/traversal-order dependence.
+Selected result publishes raw/snapped plane coordinates, family, candidate id, inference text, and
+model/screen distance. Block-106 status receives raw cursor and separate snap/inference text. Overlay
+shows snap marker and optional dashed inference guide.
 
-The selected result publishes:
+## Viewport overlay and shell binder
 
-- raw plane coordinate;
-- snapped plane coordinate;
-- snap family;
-- candidate id;
-- inference/status text;
-- model-space distance;
-- screen-space distance in DIP.
+`OcctViewport` owns transparent `SketchInteractionOverlay` while interaction is active. It renders grid,
+highest-priority hover curve/point, active snap marker, and Window/Crossing preview. The shell binder
+owns dashed inference-guide presentation.
 
-The Block-106 status bar receives raw plane cursor coordinates and separate snap/inference text. A
-snap marker is drawn at the selected snapped coordinate. Horizontal/vertical/alignment inference may
-also render one transient dashed canvas guide.
+`install_sketch_interaction_binder(...)`:
 
-## Viewport overlay and shell binding
-
-`OcctViewport` owns one transparent `SketchInteractionOverlay` child while Block-107 interaction is
-active. The overlay renders:
-
-- minor and major grid lines;
-- highest-priority hover curve or point;
-- active snap marker;
-- Window/Crossing rubber-band preview.
-
-The shell binder also owns the transient dashed inference guide. These are presentation clients only;
-`GuiSketchInteractionController` performs mapping and query algorithms.
-
-`install_sketch_interaction_binder(...)` binds an already-created `MainWindow` to this authority. The
-application installs the binder after shell construction. The binder:
-
-- rebuilds the active interaction scene after Enter Sketch, numeric commit, repair, or recompute;
+- rebuilds scene after Enter Sketch, numeric commit, repair, or recompute;
 - clears interaction on Finish Sketch;
-- feeds raw plane coordinates and snap/inference text into `GuiSketchWorkspaceStatus`;
-- synchronizes semantic Sketch selections with the existing session selection model and browser;
-- disables direct hit/box selection while a Block-106 command task is active;
+- publishes raw plane coordinates and snap/inference text;
+- synchronizes semantic Sketch selection with session/browser;
+- disables direct hit/box selection while Block-106 task stages are active;
 - owns contextual grid actions and inference-guide presentation.
 
-The binder contains no curve mathematics, snapping algorithm, Core mutation, topology migration, or
+The binder contains no curve mathematics, solver mathematics, Core mutation, topology migration, or
 undo logic.
 
-## Block-108 relationship
+## Relationship to Blocks 108 and 109
 
-Block 108 now establishes:
+Block 108 establishes persistent:
 
 ```text
 SketchPointId
@@ -295,36 +251,41 @@ SketchEditCommandExecutor
 blcad.sketch_topology.mvp8
 ```
 
-That topology is the persistent identity boundary required by Block 109. Block 107 remains a read-only
-interaction projection of the historical Sketch compatibility representation until later
-Interactive Sketcher blocks connect accepted picks/drags/creation commands to topology-native Core
-operations.
+Block 109 establishes derived:
 
-The separation is deliberate. A pixel-near endpoint hit can help choose an entity or a candidate
-location, but only Core topology migration/edit commands establish persistent shared point identity.
+```text
+SketchConstraintSystem
+canonical point-variable order
+normalized residual vector
+central-difference Jacobian
+SketchConstraintSolver
+Jacobian rank and remaining DOF
+redundant/conflicting/non-convergent/invalid-reference diagnostics
+```
+
+The separation is deliberate. A pixel-near endpoint hit may choose a visual candidate or location; only
+Core topology establishes shared point identity and only stable topology point/entity ids can become
+solver targets.
+
+Block 109 evaluates exact Core topology definitions. It does not consume interaction samples,
+intersection approximations, or screen distances.
 
 ## Failure policy
 
-Block 107 fails closed when:
+Block 107 fails closed for missing providers, non-finite workplane/ray values, ray parallel to active
+plane, invalid tolerances/grid spacing, Sketch outside supplied Part, degenerate authored three-point
+arc, or native OCCT mapping failure.
 
-- a mapping provider is missing;
-- a workplane or ray contains non-finite values;
-- a ray is parallel to the active Sketch plane;
-- interaction tolerances or grid spacing are non-positive/non-finite;
-- the scene builder receives a Sketch outside the supplied Part;
-- an authored three-point arc is degenerate;
-- a native OCCT pixel/ray conversion fails.
+Mapping/scene failure publishes GUI diagnostic and does not mutate Part. Lost projected references are
+counted and omitted. Snap failure never creates geometry and box-selection failure never publishes a
+partial selection set.
 
-A mapping or interaction-scene failure publishes a GUI diagnostic and does not mutate the Part. Lost
-projected references are counted and omitted from the transient scene. Snap failure never creates
-geometry and box-selection failure never publishes a partial selection set.
-
-Block-108 topology/migration failures are separate Core errors and are documented in
-`docs/sketch-shared-topology-mvp8.md`.
+Block-108 topology failures and Block-109 solver failures remain separate Core diagnostics. GUI
+interaction must not convert either into a partial persistent Sketch mutation.
 
 ## Focused proof
 
-Block-107 focused tags are:
+Block 107:
 
 ```text
 [gui][sketch-hit-test]
@@ -332,19 +293,7 @@ Block-107 focused tags are:
 [gui][sketch-box-selection]
 ```
 
-The tests cover:
-
-- DIP -> ray -> plane -> model -> DIP roundtrip;
-- Point/Curve/Dimension/Glyph priority;
-- deterministic stacked-hit cycling and reset;
-- origin/axis/geometry/intersection/nearest snap behavior;
-- horizontal and alignment inference;
-- grid snap and bounded grid display;
-- Window versus Crossing semantics;
-- interaction-scene projection of lines, arcs, splines, circles, dimensions, and constraints;
-- contextual shell activation, grid actions, and interaction cleanup on Finish Sketch.
-
-Block-108 focused topology proof is separate:
+Block 108:
 
 ```text
 [core][sketch-topology]
@@ -352,10 +301,17 @@ Block-108 focused topology proof is separate:
 [core][sketch-json-migration]
 ```
 
+Block 109:
+
+```text
+[core][sketch-solver]
+[core][sketch-dof]
+[core][sketch-conflict-diagnostics]
+```
+
 ## Next boundary
 
-Block 109 owns the deterministic general planar constraint solver over Block-108 shared point/entity
-topology. It freezes solver-variable ordering, scale normalization, tolerances, convergence policy,
-remaining-DOF accounting, and stable redundant/conflicting/non-convergent/invalid-reference
-diagnostics. Block 107 remains the transient plane interaction producer that later solver-backed drag
-and creation commands consume.
+Block 110 exposes semantic Sketch handles and connects this plane-space pointer authority to Block-108
+point/entity identity and Block-109 solving. Live drag solves disposable candidates and publishes
+transient preview. Release commits one validated transaction; `Esc`, lost capture, fixed geometry, or
+failed solve restores the exact pre-drag snapshot.
