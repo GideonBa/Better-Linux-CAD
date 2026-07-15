@@ -119,19 +119,19 @@ TEST_CASE("Block 107 snapping covers origin axes geometry intersections nearest 
   CHECK(intersection.value().snapped_point == Point2{7.0, 0.0});
   CHECK(intersection.value().kind == GuiSketchSnapKind::Intersection);
 
-  const auto nearest = controller.snap({112.0, 103.0});
+  const auto nearest = controller.snap({112.0, 88.0});
   REQUIRE(nearest);
-  CHECK(nearest.value().snapped_point == Point2{12.0, 0.0});
+  CHECK(nearest.value().snapped_point == Point2{7.0, 12.0});
   CHECK(nearest.value().kind == GuiSketchSnapKind::Nearest);
 
   GuiSketchInteractionScene empty_scene;
   empty_scene.sketch = SketchId("sketch.empty");
   auto inference_controller =
       GuiSketchInteractionController::create(mapping(), empty_scene, config).value();
-  const auto horizontal = inference_controller.snap({104.0, 99.5}, Point2{0.0, 0.0});
+  const auto horizontal = inference_controller.snap({104.0, 89.5}, Point2{0.0, 10.0});
   REQUIRE(horizontal);
   CHECK(horizontal.value().kind == GuiSketchSnapKind::HorizontalInference);
-  CHECK(horizontal.value().snapped_point == Point2{4.0, 0.0});
+  CHECK(horizontal.value().snapped_point == Point2{4.0, 10.0});
   CHECK(horizontal.value().inference == "Horizontal");
 
   GuiSketchInteractionScene alignment_scene;
@@ -157,7 +157,7 @@ TEST_CASE("Block 107 grid snap and display remain zoom stable in device-independ
   auto controller =
       GuiSketchInteractionController::create(mapping(0.5), scene, config).value();
 
-  const auto snap = controller.snap({126.0, 69.0});
+  const auto snap = controller.snap({125.0, 65.0});
   REQUIRE(snap);
   CHECK(snap.value().kind == GuiSketchSnapKind::Grid);
   CHECK(snap.value().snapped_point == Point2{10.0, 20.0});
