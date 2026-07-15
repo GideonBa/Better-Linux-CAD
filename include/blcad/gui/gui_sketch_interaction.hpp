@@ -19,6 +19,8 @@ class ShapeCache;
 
 namespace blcad::gui {
 
+using blcad::to_string;
+
 struct GuiSketchScreenPoint {
   double x{0.0};
   double y{0.0};
