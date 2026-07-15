@@ -79,7 +79,7 @@ private:
 };
 
 enum class GuiSketchCurveKind { Line, Arc, Spline, Circle, ReferenceLine };
-enum class GuiSketchHitKind { Point, Curve, Dimension, Glyph };
+enum class GuiSketchHitKind { Handle, Point, Curve, Dimension, Glyph };
 enum class GuiSketchSnapKind {
   None,
   Origin,
@@ -117,6 +117,12 @@ struct GuiSketchPointPrimitive {
   GuiSketchSnapKind snap_kind{GuiSketchSnapKind::Endpoint};
 };
 
+struct GuiSketchHandlePrimitive {
+  std::string semantic_id;
+  std::string candidate_id;
+  Point2 point;
+};
+
 struct GuiSketchAnnotationPrimitive {
   std::string semantic_id;
   std::string candidate_id;
@@ -128,6 +134,7 @@ struct GuiSketchInteractionScene {
   SketchId sketch{SketchId("sketch.interaction")};
   std::vector<GuiSketchCurvePrimitive> curves;
   std::vector<GuiSketchPointPrimitive> points;
+  std::vector<GuiSketchHandlePrimitive> handles;
   std::vector<GuiSketchAnnotationPrimitive> annotations;
   std::vector<Point2> intersections;
   std::size_t unresolved_reference_count{0};
@@ -174,6 +181,7 @@ struct GuiSketchGridConfig {
 };
 
 struct GuiSketchInteractionConfig {
+  double handle_hit_tolerance_dip{9.0};
   double point_hit_tolerance_dip{8.0};
   double curve_hit_tolerance_dip{6.0};
   double annotation_hit_tolerance_dip{8.0};
