@@ -136,11 +136,6 @@ public:
       return std::find_if(entities.begin(), entities.end(),
                           [&](const auto& entity) { return entity.id() == id; });
     };
-    constexpr double tolerance = 1.0e-9;
-    const auto same_position = [tolerance](Point2 left, Point2 right) {
-      return std::abs(left.x - right.x) <= tolerance &&
-             std::abs(left.y - right.y) <= tolerance;
-    };
 
     const auto validate_entity_points = [&](const SketchTopologyEntity& entity)
         -> Result<std::size_t> {
@@ -167,14 +162,6 @@ public:
             if (point_index(payload.point.id()) != points.end())
               return Result<std::size_t>::failure(
                   Error::validation(object_id, "Sketch point id already exists"));
-            const auto coincident = std::find_if(points.begin(), points.end(), [&](const auto& point) {
-              return point.flags() == payload.point.flags() &&
-                     same_position(point.position(), payload.point.position());
-            });
-            if (coincident != points.end())
-              return Result<std::size_t>::failure(Error::validation(
-                  object_id, "coincident coordinates already have canonical point identity " +
-                                 coincident->id().value()));
             points.push_back(payload.point);
             return Result<std::size_t>::success(points.size() - 1U);
           } else if constexpr (std::is_same_v<T, SketchEditCommand::AddEntity>) {
@@ -197,14 +184,6 @@ public:
             if (point->reference())
               return Result<std::size_t>::failure(
                   Error::validation(object_id, "reference Sketch points are read-only"));
-            const auto collision = std::find_if(points.begin(), points.end(), [&](const auto& other) {
-              return other.id() != payload.point && other.flags() == point->flags() &&
-                     same_position(other.position(), payload.position);
-            });
-            if (collision != points.end())
-              return Result<std::size_t>::failure(Error::validation(
-                  object_id, "move would create duplicate point identity at " +
-                                 collision->id().value()));
             auto replacement = point->with_position(payload.position);
             if (replacement.has_error())
               return Result<std::size_t>::failure(replacement.error());
