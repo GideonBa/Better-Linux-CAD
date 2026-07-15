@@ -31,6 +31,7 @@ enum class GuiViewportDisplayMode { Shaded, ShadedWithEdges, Wireframe };
 enum class GuiViewportProjection { Perspective, Orthographic };
 enum class GuiStandardView { Isometric, Front, Back, Left, Right, Top, Bottom };
 enum class GuiSketchSurroundingsMode { Dim, Isolate };
+enum class GuiSketchPointerPhase { Press, Release };
 
 struct GuiPlaneCamera {
   Point3 target;
@@ -52,6 +53,9 @@ class OcctViewport final : public QWidget {
 public:
   using SketchPointerCallback =
       std::function<void(Point2, const GuiSketchSnapResult&, const std::optional<GuiSketchHit>&)>;
+  using SketchPointerPhaseCallback =
+      std::function<void(GuiSketchPointerPhase, GuiSketchScreenPoint, Point2,
+                         const GuiSketchSnapResult&, const std::optional<GuiSketchHit>&)>;
   using SketchSelectionCallback = std::function<void(const std::vector<GuiSelection>&)>;
 
   explicit OcctViewport(QWidget* parent = nullptr);
@@ -75,7 +79,9 @@ public:
   void set_sketch_selection_enabled(bool enabled) noexcept;
   void set_sketch_inference_anchor(std::optional<Point2> anchor) noexcept;
   void set_sketch_grid_config(GuiSketchGridConfig config);
+  void set_sketch_drag_handles(std::vector<Point2> handles);
   void set_sketch_pointer_callback(SketchPointerCallback callback);
+  void set_sketch_pointer_phase_callback(SketchPointerPhaseCallback callback);
   void set_sketch_selection_callback(SketchSelectionCallback callback);
   void set_context_menu_callback(std::function<void(QPoint)> callback);
   void fit_all();
@@ -101,6 +107,7 @@ public:
   [[nodiscard]] const std::optional<GuiSketchHit>& hovered_sketch_hit() const noexcept;
   [[nodiscard]] const std::optional<GuiSketchScreenRect>& sketch_box_selection() const noexcept;
   [[nodiscard]] std::size_t sketch_grid_line_count() const noexcept;
+  [[nodiscard]] std::size_t sketch_drag_handle_count() const noexcept;
   [[nodiscard]] Result<GuiSketchScreenPoint> sketch_plane_to_screen(Point2 point) const {
     if (!sketch_interaction_)
       return Result<GuiSketchScreenPoint>::failure(
@@ -128,7 +135,10 @@ private:
   void apply_selection_filters();
   void apply_sketch_focus();
   void rebuild_sketch_grid();
+  void rebuild_sketch_drag_handles();
   void update_sketch_pointer(GuiSketchScreenPoint screen_point);
+  void publish_sketch_pointer_phase(GuiSketchPointerPhase phase,
+                                    GuiSketchScreenPoint screen_point);
   void publish_sketch_selection();
   void publish_selection(std::optional<GuiSelection> selection);
   [[nodiscard]] std::optional<GuiSelection> detected_selection() const;
@@ -137,6 +147,7 @@ private:
   std::unique_ptr<GuiSketchInteractionController> sketch_interaction_;
   std::function<void(std::optional<GuiSelection>)> selection_callback_;
   SketchPointerCallback sketch_pointer_callback_;
+  SketchPointerPhaseCallback sketch_pointer_phase_callback_;
   SketchSelectionCallback sketch_selection_callback_;
   std::function<void(QPoint)> context_menu_callback_;
   std::optional<GuiSelection> selected_semantic_;
@@ -146,6 +157,7 @@ private:
   std::optional<GuiSketchSnapResult> sketch_snap_result_;
   std::optional<GuiSketchHit> hovered_sketch_hit_;
   std::optional<GuiSketchScreenRect> sketch_box_selection_;
+  std::vector<Point2> sketch_drag_handles_;
   GuiViewportDisplayMode display_mode_{GuiViewportDisplayMode::ShadedWithEdges};
   GuiViewportProjection projection_{GuiViewportProjection::Perspective};
   GuiSketchSurroundingsMode sketch_surroundings_mode_{GuiSketchSurroundingsMode::Dim};
