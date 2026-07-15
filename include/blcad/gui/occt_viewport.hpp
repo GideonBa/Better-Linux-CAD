@@ -29,6 +29,7 @@ namespace blcad::gui {
 enum class GuiViewportDisplayMode { Shaded, ShadedWithEdges, Wireframe };
 enum class GuiViewportProjection { Perspective, Orthographic };
 enum class GuiStandardView { Isometric, Front, Back, Left, Right, Top, Bottom };
+enum class GuiSketchSurroundingsMode { Dim, Isolate };
 
 struct GuiPlaneCamera {
   Point3 target;
@@ -59,6 +60,10 @@ public:
   [[nodiscard]] bool set_plane_camera(Point3 target, Vector3 normal, Vector3 up);
   [[nodiscard]] GuiViewportCameraBookmark camera_bookmark() const noexcept;
   [[nodiscard]] bool restore_camera_bookmark(const GuiViewportCameraBookmark& bookmark) noexcept;
+  void set_sketch_focus(std::string sketch_id,
+                        GuiSketchSurroundingsMode mode = GuiSketchSurroundingsMode::Dim);
+  void clear_sketch_focus();
+  void set_context_menu_callback(std::function<void(QPoint)> callback);
   void fit_all();
 
   void set_selection_filter_mask(std::uint32_t mask);
@@ -72,6 +77,9 @@ public:
   [[nodiscard]] std::uint32_t selection_filter_mask() const noexcept;
   [[nodiscard]] const std::optional<GuiSelection>& selected_semantic() const noexcept;
   [[nodiscard]] const std::optional<GuiPlaneCamera>& plane_camera() const noexcept;
+  [[nodiscard]] bool sketch_focus_active() const noexcept;
+  [[nodiscard]] std::string_view sketch_focus_id() const noexcept;
+  [[nodiscard]] GuiSketchSurroundingsMode sketch_surroundings_mode() const noexcept;
   [[nodiscard]] bool native_viewer_available() const noexcept;
   [[nodiscard]] const std::string& initialization_error() const noexcept;
 
@@ -91,17 +99,22 @@ private:
   void initialize_native_viewer();
   void apply_display_mode();
   void apply_selection_filters();
+  void apply_sketch_focus();
   void publish_selection(std::optional<GuiSelection> selection);
   [[nodiscard]] std::optional<GuiSelection> detected_selection() const;
 
   std::unique_ptr<Impl> impl_;
   std::function<void(std::optional<GuiSelection>)> selection_callback_;
+  std::function<void(QPoint)> context_menu_callback_;
   std::optional<GuiSelection> selected_semantic_;
   std::optional<GuiPlaneCamera> plane_camera_;
   GuiViewportDisplayMode display_mode_{GuiViewportDisplayMode::ShadedWithEdges};
   GuiViewportProjection projection_{GuiViewportProjection::Perspective};
+  GuiSketchSurroundingsMode sketch_surroundings_mode_{GuiSketchSurroundingsMode::Dim};
   std::uint32_t selection_filter_mask_{0xFFFFFFFFU};
+  std::string sketch_focus_id_;
   QPoint last_mouse_position_;
+  QPoint right_press_position_;
   bool panning_{false};
   bool rotating_{false};
 };
