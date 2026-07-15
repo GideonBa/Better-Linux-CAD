@@ -37,6 +37,15 @@ struct GuiPlaneCamera {
   friend bool operator==(const GuiPlaneCamera&, const GuiPlaneCamera&) = default;
 };
 
+struct GuiViewportCameraBookmark {
+  Point3 eye{1.0, 1.0, 1.0};
+  Point3 target{0.0, 0.0, 0.0};
+  Vector3 up_direction{0.0, 0.0, 1.0};
+  double scale{1.0};
+  GuiViewportProjection projection{GuiViewportProjection::Perspective};
+  std::optional<GuiPlaneCamera> plane_camera;
+};
+
 class OcctViewport final : public QWidget {
 public:
   explicit OcctViewport(QWidget* parent = nullptr);
@@ -48,6 +57,8 @@ public:
   void set_projection(GuiViewportProjection projection);
   void set_standard_view(GuiStandardView view);
   [[nodiscard]] bool set_plane_camera(Point3 target, Vector3 normal, Vector3 up);
+  [[nodiscard]] GuiViewportCameraBookmark camera_bookmark() const noexcept;
+  [[nodiscard]] bool restore_camera_bookmark(const GuiViewportCameraBookmark& bookmark) noexcept;
   void fit_all();
 
   void set_selection_filter_mask(std::uint32_t mask);
