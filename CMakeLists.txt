@@ -84,6 +84,8 @@ add_library(
   src/core/sketch_ownership.cpp
   src/core/sketch_arc_profile.cpp
   src/core/sketch_constraints.cpp
+  src/core/sketch_constraint_solver.cpp
+  src/core/sketch_solver_legacy_adapter.cpp
   src/core/sketch_diagnostics.cpp
   src/core/sketch_repair_command_labels.cpp
   src/core/sketch_repair_commands.cpp
@@ -411,6 +413,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/sketch_arc_profile_json_tests.cpp
     tests/core/sketch_arc_profile_tests.cpp
     tests/core/sketch_diagnostics_tests.cpp
+    tests/core/sketch_constraint_solver_tests.cpp
     tests/core/sketch_dimension_tests.cpp
     tests/core/sketch_repair_command_labels_tests.cpp
     tests/core/sketch_repair_commands_tests.cpp
