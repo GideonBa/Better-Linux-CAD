@@ -93,8 +93,9 @@ persistent Surface-feature family plus executed Boundary/Fill, Trim/Extend, Stit
 Closed-shell-to-solid Surface Geometry, and deterministic visible Solid/Surface Body STEP export.
 Block 94 integrated Part Construction MVP acceptance and GUI Blocks 95–105 are implemented. The
 current next technical step is Block 106 Interactive Sketch workspace and command lifecycle.
-Interactive Sketcher continues through Block 121; STEP Part and structured Assembly import follows
-in Blocks 122–128.
+Interactive Sketcher continues through Block 121; Interactive Part & Assembly Modeling follows in
+Blocks 122–131 (`docs/interactive-modeling-sequence-mvp9.md`), and STEP Part and structured
+Assembly import follows in Blocks 132–138.
 
 Several identity/authority questions are deliberately separated.
 
@@ -240,7 +241,7 @@ The system should eventually cover:
 - engineering assistants for bolts, holes, shafts, bearings, and gears;
 - standard-parts libraries and a material database;
 - structured assembly exchange, STEP import/export, and STL export; STEP import is concretely
-  sequenced in Blocks 122–128 as immutable Reference Parts or EditableBody base features;
+  sequenced in Blocks 132–138 as immutable Reference Parts or EditableBody base features;
 - richer contact/interference/motion analysis;
 - technical drawings and bills of materials;
 - later CAM or FEM coupling.
@@ -269,7 +270,9 @@ These are sequencing boundaries, not permanent product exclusions.
 `docs/mvp-plan.md` is the implementation-sequence source of truth.
 
 `docs/interactive-sketcher-sequence-mvp8.md` is canonical for productive Sketch interaction.
-`docs/step-import-sequence-mvp9.md` is canonical for STEP Part and structured Assembly import.
+`docs/interactive-modeling-sequence-mvp9.md` is canonical for interactive Part, Surface, and
+Assembly modeling over the Block-94 feature families.
+`docs/step-import-sequence-mvp10.md` is canonical for STEP Part and structured Assembly import.
 
 `docs/architecture-summary.md` summarizes implemented architecture.
 

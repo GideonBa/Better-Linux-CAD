@@ -1,7 +1,8 @@
 # GUI Feature Validation Sequence MVP-7
 
 Status: complete. Blocks 95–105 are implemented and accepted. Block 106 begins Interactive
-Sketcher MVP-8; STEP Import follows in Blocks 122–128.
+Sketcher MVP-8; Interactive Modeling MVP-9 follows in Blocks 122–131 and STEP Import MVP-10 in
+Blocks 132–138.
 
 This document is the canonical numbered implementation sequence for a simple desktop UI that makes
 every feature implemented through Block 94 reachable and testable. The interaction model follows
@@ -37,7 +38,9 @@ Included:
 Explicitly deferred:
 
 - productive direct-manipulation Sketch editing, which starts in Block 106;
-- STEP import, which starts after Interactive Sketcher acceptance in Block 122;
+- direct-manipulation Part/Surface/Assembly modeling, which starts in Block 122
+  (`docs/interactive-modeling-sequence-mvp9.md`);
+- STEP import, which starts after Interactive Modeling acceptance in Block 132;
 - production styling, custom themes, workspace customization, macros, add-ins, and command search;
 - manufacturing, drawings, simulation, rendering, collaboration, and cloud workflows;
 - exact parity with any commercial CAD product;
@@ -103,7 +106,8 @@ inactive -> collecting semantic selections -> editing parameters -> preview -> a
 104 analysis and STEP-export workflows
 105 integrated GUI feature-coverage acceptance
 106–121 Interactive Sketcher MVP-8
-122–128 STEP Import MVP-9
+122–131 Interactive Part & Assembly Modeling MVP-9
+132–138 STEP Import MVP-10
 ```
 
 Do not collapse Blocks 95–105 into one large GUI change. The shell, viewport, editing surfaces, and
@@ -479,7 +483,9 @@ Focused tags:
 ```
 
 After Block 105, the GUI Validation MVP is complete and Block 106 begins Interactive Sketcher
-MVP-8. STEP Import MVP-9 begins after its Block-121 acceptance.
+MVP-8. Interactive Modeling MVP-9 (Blocks 122–131, `docs/interactive-modeling-sequence-mvp9.md`)
+deepens the Part/Surface/Assembly feature families after Block-121 acceptance; STEP Import MVP-10
+follows in Blocks 132–138.
 
 ## Coverage ownership summary
 

@@ -9,7 +9,9 @@ Block 102 adds model-space paths, Sweep, Loft, Surface workflows, and distinct p
 viewport products. Block 103 adds complete Assembly authoring, hierarchy, relationships, joints,
 DOF/solve diagnostics, and motion. Block 104 adds deterministic analysis and freshness-gated Part,
 flattened Assembly, and structured Assembly STEP export. Block 105 completes integrated acceptance.
-Blocks 106–121 add the productive Interactive Sketcher; STEP Import begins with Block 122.
+Blocks 106–121 add the productive Interactive Sketcher; Blocks 122–131 add interactive Part,
+Surface, and Assembly modeling (`docs/interactive-modeling-sequence-mvp9.md`); STEP Import begins
+with Block 132.
 
 The UI is deliberately not built like FreeCAD. The goal is a modern, consistent, reduced interface with a clear separation between model, parameters, features, and assembly. Crucially, the UI only operates the core; it must not contain CAD logic (last of the core principles in `docs/architecture-summary.md`).
 

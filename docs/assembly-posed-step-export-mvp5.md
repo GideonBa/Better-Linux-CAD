@@ -243,7 +243,7 @@ also compares structured STEP re-imported geometry against this flattened compat
 
 These re-import checks validate exported geometry only. They do not create persistent BLCAD Parts,
 features, component instances, or subassemblies. That production import boundary is planned in
-Blocks 122–128 of `docs/step-import-sequence-mvp9.md`.
+Blocks 132–138 of `docs/step-import-sequence-mvp10.md`.
 
 ## Persistence boundary
 

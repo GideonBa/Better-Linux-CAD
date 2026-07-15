@@ -885,10 +885,10 @@ Surface shell reference and the Solid result Body id. The produced solid, its sh
 state remain transient cache products. Canonical Geometry details are in
 `docs/part-closed-shell-to-solid-geometry-mvp6.md`.
 
-## Planned STEP import persistence after Interactive Sketcher Block 121
+## Planned STEP import persistence after Interactive Modeling Block 131
 
-This section is planned architecture, not part of the current schema. Blocks 122–128 in
-`docs/step-import-sequence-mvp9.md` will freeze the exact additive JSON shape.
+This section is planned architecture, not part of the current schema. Blocks 132–138 in
+`docs/step-import-sequence-mvp10.md` will freeze the exact additive JSON shape.
 
 Planned persistent import intent includes:
 

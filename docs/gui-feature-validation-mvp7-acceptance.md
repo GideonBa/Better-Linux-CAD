@@ -29,4 +29,5 @@ their focused tags. Manual camera, pointer, and bidirectional picking checks are
 ```
 
 Block 106 starts Interactive Sketcher MVP-8; it extends direct manipulation without reopening or
-weakening this validation boundary. STEP Import MVP-9 follows in Block 122.
+weakening this validation boundary. Interactive Modeling MVP-9 follows in Block 122 and STEP
+Import MVP-10 in Block 132.

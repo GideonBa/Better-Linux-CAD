@@ -568,9 +568,9 @@ tools, in-canvas dimensions, region recognition, and Interactive Sketch3D. Qt ow
 mapping, glyph placement, and candidate presentation; Core owns persistent points, entities,
 constraints, and dimensions.
 
-## Planned STEP import authority after Block 121
+## Planned STEP import authority after Block 131
 
-Blocks 122–128 in `docs/step-import-sequence-mvp9.md` add two explicit modes without weakening the
+Blocks 132–138 in `docs/step-import-sequence-mvp10.md` add two explicit modes without weakening the
 authority model:
 
 ```text
@@ -669,7 +669,8 @@ Canonical numbered sequence:
 - `docs/part-construction-mvp6-acceptance.md`
 - `docs/gui-feature-validation-sequence-mvp7.md`
 - `docs/interactive-sketcher-sequence-mvp8.md`
-- `docs/step-import-sequence-mvp9.md`
+- `docs/interactive-modeling-sequence-mvp9.md`
+- `docs/step-import-sequence-mvp10.md`
 
 Block 47 Spherical completes the Assembly MVP sequence. Blocks 48–94 Body identity, body-scoped
 recompute/inspection, Body Booleans, associative BodyTransform/SketchOwnership execution, and
@@ -700,7 +701,8 @@ Assembly authoring, relationships, joints, hierarchy, solve, and motion workflow
 DOF/interference/clearance/contact/motion analysis and Part plus
 flattened/structured Assembly STEP export. Block 105 completes integrated GUI feature coverage and
 headless equivalence. The next technical step is Block 106 Interactive Sketch workspace and command
-lifecycle. STEP Import begins after Interactive Sketcher acceptance in Block 122.
+lifecycle. Interactive Part & Assembly Modeling begins after Interactive Sketcher acceptance in
+Block 122 (`docs/interactive-modeling-sequence-mvp9.md`); STEP Import begins in Block 132.
 
 Block 47 adds passive Point/Point Spherical intent through the shared local/root-space path. Scalar
 Revolute APIs remain adapters; transform variables and the shared numeric engine are unchanged.

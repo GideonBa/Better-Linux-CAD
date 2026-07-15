@@ -75,8 +75,8 @@ Current geometry tests check:
 
 Not included yet:
 
-- STEP import (planned after Interactive Sketcher MVP-8 in Blocks 122–128 of
-  `docs/step-import-sequence-mvp9.md`)
+- STEP import (planned after Interactive Modeling MVP-9 in Blocks 132–138 of
+  `docs/step-import-sequence-mvp10.md`)
 - metadata roundtrip
 - colors or materials
 - assembly STEP

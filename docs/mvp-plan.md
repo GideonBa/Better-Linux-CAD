@@ -17,7 +17,8 @@ phase_status:
   mvp_6: "Part Construction — Blocks 48–94 implemented; MVP complete"
   mvp_7: "GUI Feature Validation — Blocks 95–105 implemented; MVP complete"
   mvp_8: "Interactive Sketcher — Blocks 106–121 planned; Block 106 next"
-  mvp_9: "STEP Import — Blocks 122–128 planned after Interactive Sketcher acceptance"
+  mvp_9: "Interactive Part & Assembly Modeling — Blocks 122–131 planned after Interactive Sketcher acceptance"
+  mvp_10: "STEP Import — Blocks 132–138 planned after Interactive Modeling acceptance"
 ---
 
 # MVP Plan
@@ -642,10 +643,41 @@ Mandatory order:
 121     integrated usability, persistence, performance, and GUI/headless acceptance
 ```
 
-## MVP 9 — STEP Import after Interactive Sketcher
+## MVP 9 — Interactive Part & Assembly Modeling
 
-**Status:** Planned — Blocks 122–128 follow Block 121
-**Canonical:** `docs/step-import-sequence-mvp9.md`
+**Status:** Planned — Blocks 122–131 follow Block 121
+**Canonical:** `docs/interactive-modeling-sequence-mvp9.md`
+
+This phase closes the interaction gap for every feature family implemented through Block 94: the
+validation-level MVP-7 task panels become an Inventor-familiar direct experience with
+preselection-driven commands, in-viewport manipulators, live candidate previews, feature editing,
+and joint motion manipulation. Every block lists its canonical Block-94 contracts as binding
+Existing authority and declares allowed new intent explicitly; the sequence document carries the
+authoritative Block-94 feature coverage matrix.
+
+Mandatory order:
+
+```text
+122 modeling workspace, preselection command start, mini-toolbar, and navigation aids
+123 transient viewport manipulator infrastructure and numeric coupling
+124 interactive Extrude, path Extrude, and Revolve authoring
+125 interactive Fillet, Chamfer, Shell, and Draft authoring
+126 interactive Pattern, Mirror, Body Boolean, and Body Transform authoring
+127 interactive PathCurve, Sweep, and Loft authoring
+128 interactive Surface authoring and surface-to-solid conversion
+129 feature edit lifecycle and the Core feature-update command boundary
+130 interactive Assembly placement, relationships, joints, and motion
+131 measure tool, coverage manifest v2, and integrated acceptance
+```
+
+Blocks 122–131 add no modeling semantics except the explicitly declared per-family Core
+update/remove commands in Block 129. Feature reorder, persistent appearance, section views, direct
+modeling, and constrained assembly free-drag remain explicit deferrals.
+
+## MVP 10 — STEP Import after Interactive Modeling
+
+**Status:** Planned — Blocks 132–138 follow Block 131
+**Canonical:** `docs/step-import-sequence-mvp10.md`
 
 The STEP Import sequence provides two explicit user modes:
 
@@ -661,16 +693,16 @@ EditableBody
 Mandatory order:
 
 ```text
-122 STEP source identity, import modes, JSON, and freshness
-123 OCCT STEP/XDE reader and deterministic imported body definitions
-124 stable imported topology identity, recovery, and target resolution
-125 Reference Part integration with assemblies
-126 EditableBody ImportedBodyFeature and downstream modeling
-127 structured STEP assembly import
-128 integrated import, refresh, edit, assembly, and re-export acceptance
+132 STEP source identity, import modes, JSON, and freshness
+133 OCCT STEP/XDE reader and deterministic imported body definitions
+134 stable imported topology identity, recovery, and target resolution
+135 Reference Part integration with assemblies
+136 EditableBody ImportedBodyFeature and downstream modeling
+137 structured STEP assembly import
+138 integrated import, refresh, edit, assembly, and re-export acceptance
 ```
 
-Blocks 122–128 do not reconstruct foreign feature history and do not implement direct face
+Blocks 132–138 do not reconstruct foreign feature history and do not implement direct face
 push/pull. EditableBody means that new BLCAD features are built after a persistent imported base
 feature.
 

@@ -1,7 +1,9 @@
 # Future Roadmap: Inventor-like Sketcher and Feature Parity
 
 Status: capability catalog. The numbered implementation authority is now
-`docs/interactive-sketcher-sequence-mvp8.md` for Blocks 106–121.
+`docs/interactive-sketcher-sequence-mvp8.md` for Blocks 106–121 (sketch environment) and
+`docs/interactive-modeling-sequence-mvp9.md` for Blocks 122–131 (feature, surface, and assembly
+interaction).
 
 This document records the target that BLCAD should eventually grow from its current minimal CAD-kernel MVP into a serious parametric sketch and feature system. The reference quality bar is an Inventor-like workflow: rich 2D sketches, 3D sketches, constraints, dimensions, automatic profile detection, feature creation from profiles, and advanced curve/surface workflows.
 

@@ -405,7 +405,7 @@ differently.
 
 GUI Feature Validation is deliberately sequenced first in
 `docs/gui-feature-validation-sequence-mvp7.md`. STEP import then follows in
-`docs/step-import-sequence-mvp9.md`: Blocks 122–128 reuse this roadmap's body and feature-result
+`docs/step-import-sequence-mvp10.md`: Blocks 132–138 reuse this roadmap's body and feature-result
 authority for Reference and EditableBody import modes instead of adding foreign BRep authority
 prematurely.
 
