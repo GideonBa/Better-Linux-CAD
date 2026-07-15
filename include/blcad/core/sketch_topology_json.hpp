@@ -2,6 +2,7 @@
 
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/core/sketch_topology.hpp"
+#include "blcad/core/sketch_topology_part_document.hpp"
 
 #include <nlohmann/json.hpp>
 
