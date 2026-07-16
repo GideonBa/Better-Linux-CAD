@@ -97,7 +97,7 @@ On Linux the native OCCT viewport uses Qt xcb when `DISPLAY` is available and
 
 ## Interactive Sketcher focused proof
 
-Blocks 106–114 are implemented.
+Blocks 106–115 are implemented.
 
 Block 106 workspace and command lifecycle:
 
@@ -147,8 +147,8 @@ QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][sketch-
 Block 112 conic and slot creation:
 
 ```bash
-QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[core][sketch-conics]"
-QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[geometry][sketch-conics]"
+./build/dev/blcad_core_tests "[core][sketch-conics]"
+./build/dev-geometry/blcad_geometry_tests "[geometry][sketch-conics]"
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][sketch-create-conics]"
 ```
 
@@ -172,11 +172,20 @@ QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][sketch-constrai
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][sketch-auto-constraint]"
 ```
 
-The Block-114 proof covers stable point/entity targets, geometric-family signature validation,
-manual/automatic provenance, deterministic selection compatibility, Sidecar JSON roundtrip, disposable
-solve and source immutability, stable conflict/redundancy ids, deterministic accepted/preview/conflict/
-redundant glyph anchors, semantic glyph hit primitives, one `Add sketch constraint` transaction,
-refused conflict/redundancy commits, and coordinated exact Sketch/catalog undo and redo.
+Block 115 driving/reference dimensions, typed parameters, expressions, and annotation editing:
+
+```bash
+./build/dev/blcad_core_tests "[core][sketch-dimensions]"
+./build/dev-geometry/blcad_geometry_tests "[geometry][sketch-dimensions]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][sketch-dimensions]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][sketch-expression-edit]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][sketch-live-solve]"
+```
+
+The Block-115 proof covers all nine family signatures, deterministic sidecar roundtrip, typed
+Length/Angle parameter compatibility, direct and expression-backed value changes, driving/reference
+semantics, calibrated arc length, stable semantic dimension annotations, exact endpoint hit roles,
+atomic add/edit/rebind/mode history, Save/Open, Qt command registration, and later drag enforcement.
 
 ## Representative existing validation tags
 
@@ -195,11 +204,9 @@ QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][model-browser]"
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][gui-feature-coverage]"
 ```
 
-The exact test registration in `CMakeLists.txt` is authoritative. Block-114 GUI cases are included by
-`tests/gui/gui_test_main.cpp` through `tests/gui/gui_sketch_constraint_tests.inc`,
-`tests/gui/gui_sketch_constraint_redundancy_tests.inc`, and
-`tests/gui/gui_sketch_constraint_family_tests.inc`, so no second GUI test executable or Qt application
-instance is introduced.
+The exact test registration in `CMakeLists.txt` is authoritative. Block-114 and Block-115 GUI cases are
+included by `tests/gui/gui_test_main.cpp`; no second GUI test executable or Qt application instance is
+introduced.
 
 ## Headless tools
 
@@ -214,22 +221,24 @@ instance is introduced.
 ./build/dev-geometry/blcad_analyze_assembly input.blcad.project.json
 ```
 
-## Public Block-114 boundaries
+## Public Block-115 boundaries
 
 ```text
-include/blcad/core/sketch_constraint_authoring.hpp
-include/blcad/core/sketch_constraint_authoring_json.hpp
-include/blcad/geometry/sketch_constraint_glyph.hpp
-include/blcad/gui/gui_sketch_constraints.hpp
-tests/gui/gui_sketch_constraint_tests.inc
-tests/gui/gui_sketch_constraint_redundancy_tests.inc
-tests/gui/gui_sketch_constraint_family_tests.inc
+include/blcad/core/sketch_dimension_authoring.hpp
+include/blcad/core/sketch_dimension_authoring_json.hpp
+include/blcad/core/sketch_dimension_catalog_system.hpp
+include/blcad/geometry/sketch_dimension_glyph.hpp
+include/blcad/gui/gui_sketch_dimensions.hpp
+include/blcad/gui/gui_sketch_dimension_binder.hpp
+include/blcad/gui/gui_document_session.hpp
+include/blcad/gui/gui_sketch_drag.hpp
+tests/core/sketch_dimension_tests.cpp
+tests/geometry/spline_profile_pipeline_tests.cpp
+tests/gui/gui_sketch_dimension_tests.inc
 ```
 
-These boundaries are header-only deterministic services layered over existing Block-108/109 and
-`GuiDocumentSession` authority. Persistent intent is the explicit
-`blcad.sketch_constraints.mvp8` catalog. Solve status, solved candidate topology, conflict/redundancy
-analysis, glyph token/anchor/state, and hit-test products are derived.
+Persistent intent is the explicit `blcad.sketch_dimensions.mvp8` catalog. Measurements, calibrated
+solver products, formatted values, anchors, hit-test products, and Qt dialog state are derived.
 
 ## Formatting
 
@@ -237,16 +246,22 @@ Formatting is configured by `.editorconfig` and `.clang-format`.
 
 ```bash
 clang-format -i \
-  include/blcad/core/sketch_constraint_authoring.hpp \
-  include/blcad/core/sketch_constraint_authoring_json.hpp \
-  include/blcad/geometry/sketch_constraint_glyph.hpp \
-  include/blcad/gui/gui_sketch_constraints.hpp \
-  tests/core/sketch_spline_profile_json_tests.cpp \
+  include/blcad/core/sketch_dimension_authoring.hpp \
+  include/blcad/core/sketch_dimension_authoring_json.hpp \
+  include/blcad/core/sketch_dimension_catalog_system.hpp \
+  include/blcad/geometry/sketch_dimension_glyph.hpp \
+  include/blcad/gui/gui_document_session.hpp \
+  include/blcad/gui/gui_sketch_dimensions.hpp \
+  include/blcad/gui/gui_sketch_dimension_binder.hpp \
+  include/blcad/gui/gui_sketch_drag.hpp \
+  include/blcad/gui/gui_types.hpp \
+  src/gui/gui_document_session.cpp \
+  src/gui/gui_selection_model.cpp \
+  src/gui/gui_sketch_interaction_binder.cpp \
+  tests/core/sketch_dimension_tests.cpp \
   tests/geometry/spline_profile_pipeline_tests.cpp \
   tests/gui/gui_test_main.cpp \
-  tests/gui/gui_sketch_constraint_tests.inc \
-  tests/gui/gui_sketch_constraint_redundancy_tests.inc \
-  tests/gui/gui_sketch_constraint_family_tests.inc
+  tests/gui/gui_sketch_dimension_tests.inc
 ```
 
 ## Clean generated files
@@ -260,13 +275,14 @@ rm -rf build/
 - `README.md`: repository entry point
 - `docs/mvp-plan.md`: numbered status/current block
 - `docs/architecture-summary.md`: condensed authority model
-- `docs/file-format.md`: save-format authority
+- `docs/file-format.md`: historical save-format authority
 - `docs/interactive-sketcher-sequence-mvp8.md`: Blocks 106–121 sequence
-- `docs/sketch-planar-constraint-solver-mvp8.md`: solver mathematics and Block-114 consumer boundary
-- `docs/gui-sketch-spline-text-mvp8.md`: Block-113 spline/text contract
+- `docs/sketch-planar-constraint-solver-mvp8.md`: solver mathematics and dimension mappings
+- `docs/gui-sketch-solver-drag-mvp8.md`: constraint/dimension-aware direct manipulation
 - `docs/gui-sketch-constraint-authoring-mvp8.md`: Block-114 constraint/glyph contract
+- `docs/gui-sketch-dimension-authoring-mvp8.md`: Block-115 dimension/expression contract
 
 ## Current development boundary
 
-Blocks 106–114 are implemented. Block 115 is next: driving/reference dimension families, in-canvas
-value editing, and parameter/expression binding through typed Core quantity authority.
+Blocks 106–115 are implemented. Block 116 is next: trim, extend, split, Sketch corner fillet, and
+Sketch corner chamfer with explicit dependency remap or fail-closed behavior.
