@@ -11,7 +11,7 @@ feature-specific documents under `docs/`.
 - CMake 3.28 or newer
 - Ninja
 - OCCT/Open CASCADE for optional Geometry targets
-- Qt 6 for the optional desktop and Interactive Sketcher
+- Qt 6 for the optional desktop, Interactive Sketcher, and Interactive Modeling
 - nlohmann-json
 - Catch2 3
 
@@ -227,6 +227,21 @@ Block 120 Interactive Sketch3D (headless Core proof):
 ./build/dev/blcad_core_tests "[integration][sketch-3d-direct-manipulation]"
 ```
 
+## Interactive Modeling focused proof
+
+Block 122 selection-first modeling workspace, visible Qt shell, materialized profile handoff,
+selection filters, repeat, and navigation aids:
+
+```bash
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][modeling-workspace]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][in-context-command]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][view-navigation-aids]"
+```
+
+These cases verify capability-exact enablement, deterministic mini-toolbar ordering, preselection
+consumption and complete Cancel restoration, rejection of a non-materialized profile, synchronized
+session/viewport filters, stable shell object names, ViewCube targets, Home, and camera bookmarks.
+
 ## Representative existing validation tags
 
 ```bash
@@ -244,9 +259,8 @@ QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][model-browser]"
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][gui-feature-coverage]"
 ```
 
-The exact test registration in `CMakeLists.txt` is authoritative. Block-114 and Block-115 GUI cases are
-included by `tests/gui/gui_test_main.cpp`; no second GUI test executable or Qt application instance is
-introduced.
+The exact test registration in `CMakeLists.txt` is authoritative. Block-122 cases remain in the
+existing `blcad_gui_tests` executable; no second Qt application instance is introduced.
 
 ## Headless tools
 
@@ -261,24 +275,19 @@ introduced.
 ./build/dev-geometry/blcad_analyze_assembly input.blcad.project.json
 ```
 
-## Public Block-115 boundaries
+## Public Block-122 boundaries
 
 ```text
-include/blcad/core/sketch_dimension_authoring.hpp
-include/blcad/core/sketch_dimension_authoring_json.hpp
-include/blcad/core/sketch_dimension_catalog_system.hpp
-include/blcad/geometry/sketch_dimension_glyph.hpp
-include/blcad/gui/gui_sketch_dimensions.hpp
-include/blcad/gui/gui_sketch_dimension_binder.hpp
-include/blcad/gui/gui_document_session.hpp
-include/blcad/gui/gui_sketch_drag.hpp
-tests/core/sketch_dimension_tests.cpp
-tests/geometry/spline_profile_pipeline_tests.cpp
-tests/gui/gui_sketch_dimension_tests.inc
+include/blcad/gui/gui_modeling_workspace.hpp
+include/blcad/gui/gui_modeling_workspace_binder.hpp
+include/blcad/gui/main_window.hpp
+tests/gui/gui_feature_coverage_acceptance_tests.cpp
+docs/gui-modeling-workspace-mvp9.md
 ```
 
-Persistent intent is the explicit `blcad.sketch_dimensions.mvp8` catalog. Measurements, calibrated
-solver products, formatted values, anchors, hit-test products, and Qt dialog state are derived.
+All Block-122 state is transient. The command catalog, verified preselection capabilities, mini-toolbar,
+repeat command, filters, Home view, and named camera bookmarks do not change Core/Geometry or any save
+format.
 
 ## Formatting
 
@@ -286,22 +295,10 @@ Formatting is configured by `.editorconfig` and `.clang-format`.
 
 ```bash
 clang-format -i \
-  include/blcad/core/sketch_dimension_authoring.hpp \
-  include/blcad/core/sketch_dimension_authoring_json.hpp \
-  include/blcad/core/sketch_dimension_catalog_system.hpp \
-  include/blcad/geometry/sketch_dimension_glyph.hpp \
-  include/blcad/gui/gui_document_session.hpp \
-  include/blcad/gui/gui_sketch_dimensions.hpp \
-  include/blcad/gui/gui_sketch_dimension_binder.hpp \
-  include/blcad/gui/gui_sketch_drag.hpp \
-  include/blcad/gui/gui_types.hpp \
-  src/gui/gui_document_session.cpp \
-  src/gui/gui_selection_model.cpp \
-  src/gui/gui_sketch_interaction_binder.cpp \
-  tests/core/sketch_dimension_tests.cpp \
-  tests/geometry/spline_profile_pipeline_tests.cpp \
-  tests/gui/gui_test_main.cpp \
-  tests/gui/gui_sketch_dimension_tests.inc
+  include/blcad/gui/gui_modeling_workspace.hpp \
+  include/blcad/gui/gui_modeling_workspace_binder.hpp \
+  include/blcad/gui/main_window.hpp \
+  tests/gui/gui_feature_coverage_acceptance_tests.cpp
 ```
 
 ## Clean generated files
@@ -317,6 +314,8 @@ rm -rf build/
 - `docs/architecture-summary.md`: condensed authority model
 - `docs/file-format.md`: historical save-format authority
 - `docs/interactive-sketcher-sequence-mvp8.md`: Blocks 106–121 sequence
+- `docs/interactive-modeling-sequence-mvp9.md`: Blocks 122–131 sequence
+- `docs/gui-modeling-workspace-mvp9.md`: Block-122 selection-first shell contract
 - `docs/sketch-planar-constraint-solver-mvp8.md`: solver mathematics and dimension mappings
 - `docs/gui-sketch-solver-drag-mvp8.md`: constraint/dimension-aware direct manipulation
 - `docs/gui-sketch-constraint-authoring-mvp8.md`: Block-114 constraint/glyph contract
@@ -324,9 +323,7 @@ rm -rf build/
 
 ## Current development boundary
 
-Blocks 106–121 are implemented and accepted: line-chain/loop offset with associative projection and break-link
-conversion (`docs/gui-sketch-offset-project-mvp8.md`), Sketch transforms/mirror/patterns
-(`docs/gui-sketch-transform-pattern-mvp8.md`), region recognition with Finish Sketch
-(`docs/gui-sketch-regions-finish-mvp8.md`), and Interactive Sketch3D
-(`docs/gui-sketch3d-interaction-mvp8.md`). Block 121 adds the coverage manifest, GUI/headless
-equivalence, atomicity, high-DPI, and measured interaction acceptance. Block 122 is next.
+Blocks 106–121 are implemented and accepted. Block 122 adds the shell-owned selection-first
+Part/Surface/Assembly workspace, capability-exact contextual commands, persistent-profile-only Finish
+Sketch handoff, repeat, synchronized selection filters, ViewCube/Home, and session-local camera
+bookmarks. Block 123, reusable transient viewport manipulators with numeric-HUD coupling, is next.
