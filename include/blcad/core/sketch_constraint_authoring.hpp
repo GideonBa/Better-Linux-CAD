@@ -81,8 +81,7 @@ public:
     if (!geometric_kind(kind))
       return Result<SketchConstraintIntent>::failure(Error::validation(
           object_id, "Block 114 accepts geometric constraints only; dimensions belong to Block 115"));
-    const std::size_t expected = expected_target_count(kind);
-    if (targets.size() != expected)
+    if (targets.size() != expected_target_count(kind))
       return Result<SketchConstraintIntent>::failure(Error::validation(
           object_id, "constraint intent has the wrong number of semantic targets"));
     if (!target_signature_valid(kind, targets))
@@ -296,29 +295,32 @@ public:
     auto system = SketchConstraintSystem::create(sketch->id(), std::move(constraints));
     if (system.has_error())
       return Result<SketchConstraintAuthoringPreview>::failure(system.error());
-    auto solve = SketchConstraintSolver{}.solve(topology.value(), system.value());
-    if (solve.has_error())
-      return Result<SketchConstraintAuthoringPreview>::failure(solve.error());
+    auto solved = SketchConstraintSolver{}.solve(topology.value(), system.value());
+    if (solved.has_error())
+      return Result<SketchConstraintAuthoringPreview>::failure(solved.error());
 
     SketchConstraintCatalog after = catalog;
     auto added = after.add(candidate);
     if (added.has_error())
       return Result<SketchConstraintAuthoringPreview>::failure(added.error());
 
-    const bool accepted = solve.value().status == SketchSolveStatus::UnderConstrained ||
-                          solve.value().status == SketchSolveStatus::FullyConstrained;
+    const bool accepted = solved.value().status == SketchSolveStatus::UnderConstrained ||
+                          solved.value().status == SketchSolveStatus::FullyConstrained;
     std::optional<Sketch> solved_sketch;
     if (accepted) {
-      auto materialized = SketchTopologyLegacyMaterializer{}.materialize(*sketch, solve.value().topology);
+      auto materialized =
+          SketchTopologyLegacyMaterializer{}.materialize(*sketch, solved.value().topology);
       if (materialized.has_error())
         return Result<SketchConstraintAuthoringPreview>::failure(materialized.error());
       solved_sketch = std::move(materialized.value());
     }
+    auto conflicts = strip_intent_prefixes(solved.value().conflicting_constraint_ids);
+    auto redundant = strip_intent_prefixes(solved.value().redundant_constraint_ids);
+    SketchSolveResult solve_result = std::move(solved.value());
 
     return Result<SketchConstraintAuthoringPreview>::success(
-        {candidate, std::move(after), std::move(solve.value()), std::move(solved_sketch), accepted,
-         strip_intent_prefixes(solve.value().conflicting_constraint_ids),
-         strip_intent_prefixes(solve.value().redundant_constraint_ids)});
+        {candidate, std::move(after), std::move(solve_result), std::move(solved_sketch), accepted,
+         std::move(conflicts), std::move(redundant)});
   }
 
 private:
@@ -336,14 +338,16 @@ private:
           return Result<SketchSolverConstraint>::failure(Error::validation(
               intent.id().value(), "constraint intent references an unknown Sketch point"));
         auto converted = SketchSolverTarget::point(SketchPointId(target.id()));
-        if (converted.has_error()) return Result<SketchSolverConstraint>::failure(converted.error());
+        if (converted.has_error())
+          return Result<SketchSolverConstraint>::failure(converted.error());
         targets.push_back(std::move(converted.value()));
       } else {
         if (topology.find_entity(target.id()) == nullptr)
           return Result<SketchSolverConstraint>::failure(Error::validation(
               intent.id().value(), "constraint intent references an unknown Sketch entity"));
         auto converted = SketchSolverTarget::entity(target.id());
-        if (converted.has_error()) return Result<SketchSolverConstraint>::failure(converted.error());
+        if (converted.has_error())
+          return Result<SketchSolverConstraint>::failure(converted.error());
         targets.push_back(std::move(converted.value()));
       }
     }
