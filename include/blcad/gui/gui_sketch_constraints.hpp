@@ -201,6 +201,17 @@ public:
     const auto point = [](const SketchConstraintIntentTarget& target) {
       return target.kind() == SketchConstraintIntentTargetKind::Point;
     };
+    const auto shares_point = [&entity](const SketchConstraintIntentTarget& first,
+                                        const SketchConstraintIntentTarget& second) {
+      const auto* first_entity = entity(first);
+      const auto* second_entity = entity(second);
+      if (first_entity == nullptr || second_entity == nullptr) return false;
+      for (const auto& first_point : first_entity->points())
+        if (std::find(second_entity->points().begin(), second_entity->points().end(),
+                      first_point) != second_entity->points().end())
+          return true;
+      return false;
+    };
 
     if (targets.size() == 1U) {
       const auto* selected_entity = entity(targets[0]);
@@ -221,7 +232,8 @@ public:
       }
       if (measurable(targets[0]) && measurable(targets[1]))
         result.push_back(SketchSolverConstraintKind::Equal);
-      if (curve(targets[0]) && curve(targets[1]))
+      if (curve(targets[0]) && curve(targets[1]) &&
+          shares_point(targets[0], targets[1]))
         result.push_back(SketchSolverConstraintKind::Tangent);
       if (centered(targets[0]) && centered(targets[1]))
         result.push_back(SketchSolverConstraintKind::Concentric);
