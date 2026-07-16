@@ -17,11 +17,13 @@ Fundamental decisions are:
 - solve planar constraints over Core topology identity, never over screen/OCCT objects;
 - keep Core model intent below Geometry query/execution types;
 - separate source identity, geometric capability, hierarchy occurrence, transform, and exchange identity;
-- keep viewport pixels, hover, grid, hit stacks, snaps, sampled curves, control polygons, glyphs, and
-  font rasterization transient;
+- keep viewport pixels, hover, grid, hit stacks, snaps, sampled curves, control polygons, glyph layout,
+  and font rasterization transient;
 - keep solver variables, residuals, Jacobians, rank, DOF, conflict diagnostics, curvature samples,
   resolved text, glyph strokes, and fallback font choices derived;
 - use explicit migration or versioned sidecar persistence when a new identity model is required;
+- include every persistent sidecar owned by an editing session in dirty-state, Save/Open, and exact
+  document history;
 - require validated complete candidates before solve/recompute/edit products mutate persistent intent.
 
 A lower authority layer must not depend on a higher execution or presentation layer for persistent
@@ -32,10 +34,11 @@ identity.
 ```text
 Qt user interface / commands / transient interaction
   -> GUI headless controllers and complete candidate transactions
-  -> Core planar Sketch topology + edit/annotation intent
+  -> GuiDocumentSession document + sidecar history authority
+  -> Core planar Sketch topology + edit/annotation/constraint intent
   -> Core deterministic planar constraint solver
   -> Core Part/Assembly persistent model intent
-  -> Geometry semantic resolution / curve evaluation / layout
+  -> Geometry semantic resolution / curve evaluation / glyph layout
   -> Geometry equation / recompute execution
   -> freshness validation + atomic application
   -> posed geometry / analysis / exchange consumers
@@ -44,15 +47,15 @@ Qt user interface / commands / transient interaction
 
 The optional GUI is a client of Core and Geometry. Qt types stay out of `blcad_core`; widgets never
 own BRep, constraint mathematics, transform authority, expressions, recompute, persistent Sketch
-topology, spline representation, or text persistence.
+topology, constraint targets, spline representation, or text persistence.
 
 ## PartDocument and Part construction authority
 
 `PartDocument` is persistent parametric definition authority. Implemented Part intent includes typed
 quantities/parameters and formulas, datum/derived workplanes, construction geometry, planar Sketch and
-profile records, projected/reference-driven Sketch geometry, constraints/dimensions, Body identity,
-feature history, multi-body result operations, broad solid features, Sketch3D/PathCurve, Sweep, path
-Extrude, Loft, Surface features, closed-shell conversion, and multi-body STEP export intent.
+profile records, projected/reference-driven Sketch geometry, historical constraints/dimensions, Body
+identity, feature history, multi-body result operations, broad solid features, Sketch3D/PathCurve,
+Sweep, path Extrude, Loft, Surface features, closed-shell conversion, and multi-body STEP export intent.
 
 Stable `BodyId` and persistent result intent let recompute publish deterministic Body-scoped products.
 Core does not persist `TopoDS_Shape`. `ShapeCache` and OCCT shapes are derived and consumers requiring
@@ -87,10 +90,9 @@ Canonical contract: `docs/sketch-shared-topology-mvp8.md`.
 ## Deterministic planar solver
 
 `SketchConstraintSolver` consumes `SketchTopology` plus a canonical `SketchConstraintSystem`. Stable
-constraint ids and non-reference `SketchPointId` order define variables/residuals. Supported initial
-families include Coincident, Fixed, Horizontal, Vertical, Parallel, Perpendicular, Collinear, Equal,
-Tangent, Concentric, Midpoint, Symmetric, PointOnObject, linear distances, Radial, Diameter, and
-Angular.
+constraint ids and non-reference `SketchPointId` order define variables/residuals. Supported families
+include Coincident, Fixed, Horizontal, Vertical, Parallel, Perpendicular, Collinear, Equal, Tangent,
+Concentric, Midpoint, Symmetric, PointOnObject, linear distances, Radial, Diameter, and Angular.
 
 The solver normalizes by characteristic length, computes a central-difference Jacobian, uses
 deterministic damped Gauss-Newton execution, derives local DOF from final Jacobian rank, and publishes
@@ -98,7 +100,7 @@ stable redundancy/conflict diagnostics. `SketchSolveResult` is derived and never
 
 Canonical contract: `docs/sketch-planar-constraint-solver-mvp8.md`.
 
-## Interactive Sketch architecture through Block 113
+## Interactive Sketch architecture through Block 114
 
 ### Workspace and plane interaction
 
@@ -115,12 +117,19 @@ the exact final sample; successful acceptance rechecks topology/constraint fresh
 `Drag sketch handle` transaction. Cancel, lost capture, stale source, or failed solve restores the
 original document.
 
+After Block 114, the real viewport binder constructs drag controllers from `GuiDocumentSession`.
+`SketchConstraintCatalogSystemBuilder` combines historical constraints and accepted session sidecar
+intent before baseline/pointer solve. Release also compares the current catalog and rebuilt effective
+system against the preview snapshots, so accepted constraints remain active during later direct
+manipulation.
+
 ### Creation tools
 
 Block 111 creates lines and line-based profiles plus construction points/centerlines through one
 transaction. Block 112 creates exact full circles as `CircleProfile` plus diameter `Parameter`, arcs as
 `ArcSegment`, ellipses as deterministic cubic `SplineSegment` spans, and slots as ordered line/arc
-profiles. Rubber bands, sampled previews, and automatic/tangent inference remain transient.
+profiles. Rubber bands and sampled previews remain transient. Snap/tangent inference becomes persistent
+only when Block 114 receives explicit stable targets and accepts the candidate solve.
 
 ### Spline editing
 
@@ -133,8 +142,7 @@ and continuity diagnostics.
 `GuiSketchSplineController` previews a complete candidate without `PartDocument` mutation, snapshots
 selected source segments, rechecks freshness, rebuilds the complete Sketch, and commits one
 `Edit sketch spline` transaction. Profiles, constraints, dimensions, references, and continuity are
-validated again before `PartDocument::update_sketch(...)`. Undo/redo stores complete document
-snapshots.
+validated again before `PartDocument::update_sketch(...)`.
 
 Canonical contract: `docs/gui-sketch-spline-text-mvp8.md`.
 
@@ -153,11 +161,41 @@ version = 1
 ```
 
 `SketchTextLayoutResolver` receives available font families and resolves requested family, configured
-fallback families, then deterministic built-in `BLCAD Simplex Stroke`. Missing/fallback choices emit
-explicit diagnostics. Resolved strings, selected fallback, glyph strokes, and rasterization are
-derived.
+fallback families, then deterministic built-in `BLCAD Simplex Stroke`. Resolved strings, selected
+fallback, glyph strokes, and rasterization are derived.
 
 Canonical contract: `docs/gui-sketch-spline-text-mvp8.md`.
+
+### Geometric constraint authoring and glyph interaction
+
+Block 114 adds `SketchConstraintIntent` and `SketchConstraintCatalog` as stable non-dimensional
+constraint authoring intent over Block-108 point/entity ids. Each record stores a stable
+`SketchConstraintId`, Block-109 family, ordered semantic targets, and `manual|automatic` provenance.
+Canonical sidecar persistence is:
+
+```text
+schema  = blcad.sketch_constraints.mvp8
+version = 1
+```
+
+Historical embedded constraints remain adapted into every solve. Accepted sidecar constraints and one
+new candidate are composed into a disposable canonical `SketchConstraintSystem`. Only
+`under_constrained` or `fully_constrained` results materialize a complete candidate Sketch. Redundant,
+conflicting, invalid-reference, and non-convergent candidates publish stable diagnostics without
+mutation.
+
+`GuiSketchConstraintController` derives selection-compatible commands, converts supported snap
+inference to automatic candidates, and rechecks Part/topology/catalog freshness.
+`GuiDocumentSession::commit_part_constraint_transaction(...)` clones and validates Part plus complete
+catalog collection, recomputes, and publishes one `Add sketch constraint` history entry. Generic global
+undo/redo restores both. Dirty-state and saved-state comparisons include the catalog collection.
+
+A Part saved as `model.blcad.json` stores the session-owned catalog collection in
+`model.blcad.json.sketch-constraints.json`; Open restores it before initializing saved history.
+`SketchConstraintGlyphLayoutResolver` derives accepted/preview/conflict/redundancy glyph tokens and
+plane anchors; GUI publishes them as semantic `GuiSketchHitKind::Glyph` annotations.
+
+Canonical contract: `docs/gui-sketch-constraint-authoring-mvp8.md`.
 
 ## Semantic Part-feature input and generated topology identity
 
@@ -199,6 +237,7 @@ parameters / expressions / workplanes / construction geometry
 historical planar Sketch curves, profiles, constraints, dimensions, continuity
 canonical SketchTopology when topology persistence is used
 Block-113 SketchText sidecar records and parameter bindings
+session-owned Block-114 SketchConstraintCatalog collections with stable targets/provenance
 Body / Part feature history and semantic references
 Project / Assembly relationships / joints / hierarchy boundaries
 stable exchange/product intent
@@ -215,12 +254,15 @@ interaction mapping / hit stacks / grid / snaps / rubber bands
 semantic drag/spline handles / control polygons / fit authoring state
 spline samples / derivatives / curvature / continuity diagnostics
 resolved Sketch text / available-font discovery / fallback choice / glyph strokes
+constraint candidate solves / solved preview topology / conflict and redundant sets
+constraint glyph token / anchor / state / hit-test presentation
+temporary drag target equations and augmented topology
 Assembly solve/motion proposals and freshness snapshots
 posed shapes / analysis / XDE and STEP transfer identity
 ```
 
 ## Current boundary
 
-Blocks 106–113 are implemented. Block 114 is the current next technical step: selection-driven manual
-constraints, accepted automatic constraints, semantic glyph interaction, and conflict preview through
-the existing Block-109 solver and atomic document transaction authority.
+Blocks 106–114 are implemented. Block 115 is the current next technical step: driving/reference
+dimensions, in-canvas value editing, and typed parameter/expression binding over the existing Block-109
+solver and Block-114 semantic target/glyph/session infrastructure.

@@ -159,8 +159,8 @@ private:
     }
     if (controller_ && controller_->active())
       return;
-    auto controller = GuiSketchDragController::create(*window_.session().part_document(),
-                                                       *window_.active_sketch());
+    auto controller =
+        GuiSketchDragController::create(window_.session(), *window_.active_sketch());
     if (controller.has_error()) {
       append_diagnostic(controller.error());
       controller_.reset();
@@ -224,7 +224,7 @@ private:
     }
     publish_preview(preview.value());
 
-    auto committed = controller_->commit(window_.session());
+    auto committed = controller_->commit_session_constraints(window_.session());
     if (committed.has_error()) {
       cancel_drag(true, committed.error().message());
       return;

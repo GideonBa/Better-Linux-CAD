@@ -1,4 +1,6 @@
 #include "blcad/core/part_document_json.hpp"
+#include "blcad/core/sketch_constraint_authoring.hpp"
+#include "blcad/core/sketch_constraint_authoring_json.hpp"
 #include "blcad/core/sketch_spline_edit.hpp"
 #include "blcad/core/sketch_text.hpp"
 #include "blcad/core/sketch_text_json.hpp"
@@ -55,6 +57,21 @@ PartDocument make_document() {
   REQUIRE(datum);
   REQUIRE(document.value().add_datum_plane(datum.value()));
   REQUIRE(document.value().add_sketch(make_spline_profile_sketch()));
+  return document.value();
+}
+
+PartDocument make_constraint_document(Point2 end = {10.0, 3.0}) {
+  auto document = PartDocument::create(DocumentId("part.constraints"), "Constraints");
+  REQUIRE(document);
+  auto datum = DatumPlane::xy();
+  REQUIRE(datum);
+  REQUIRE(document.value().add_datum_plane(datum.value()));
+  auto sketch = Sketch::create(SketchId("sketch.constraints"), "Constraints",
+                               DatumPlaneId("datum.xy"));
+  REQUIRE(sketch);
+  REQUIRE(sketch.value().add_entity(
+      LineSegment::create(SketchEntityId("line.a"), {0.0, 0.0}, end).value()));
+  REQUIRE(document.value().add_sketch(std::move(sketch.value())));
   return document.value();
 }
 
@@ -168,9 +185,9 @@ TEST_CASE("Block 113 connected spline junctions expose one endpoint and reject p
   REQUIRE(chain);
   const auto preview = chain.value().preview();
   const auto endpoint_count = std::count_if(preview.handles.begin(), preview.handles.end(),
-                                            [](const auto& handle) {
-                                              return handle.kind == SketchSplineHandleKind::Endpoint;
-                                            });
+                                             [](const auto& handle) {
+                                               return handle.kind == SketchSplineHandleKind::Endpoint;
+                                             });
   CHECK(endpoint_count == 3);
 
   PartDocument document = make_document();
@@ -221,4 +238,78 @@ TEST_CASE("Block 113 Sketch text resolves expression parameters and roundtrips s
   auto restored_resolved = restored_text->resolve(document.value());
   REQUIRE(restored_resolved);
   CHECK(restored_resolved.value().text == "WIDTH=20 mm");
+}
+
+TEST_CASE("Block 114 topological constraint intent solves and roundtrips deterministically",
+          "[core][sketch-constraints]") {
+  PartDocument document = make_constraint_document();
+  auto catalog = SketchConstraintCatalog::create(document.id(), SketchId("sketch.constraints"));
+  REQUIRE(catalog);
+  auto entity = SketchConstraintIntentTarget::entity("entity/line.a");
+  REQUIRE(entity);
+  auto horizontal = SketchConstraintIntent::create(
+      SketchConstraintId("constraint.horizontal"), SketchSolverConstraintKind::Horizontal,
+      {entity.value()});
+  REQUIRE(horizontal);
+
+  auto preview = SketchConstraintAuthoringService{}.preview(
+      document, catalog.value(), horizontal.value());
+  REQUIRE(preview);
+  CHECK(preview.value().accepted);
+  CHECK(preview.value().solve.status == SketchSolveStatus::UnderConstrained);
+  REQUIRE(preview.value().solved_sketch.has_value());
+  const auto* solved_line =
+      preview.value().solved_sketch->find_line_segment(SketchEntityId("line.a"));
+  REQUIRE(solved_line != nullptr);
+  CHECK(solved_line->start().y == Catch::Approx(solved_line->end().y).margin(1.0e-7));
+
+  auto serialized =
+      serialize_sketch_constraint_catalog_to_json(preview.value().catalog_after);
+  REQUIRE(serialized);
+  CHECK(serialized.value().find("blcad.sketch_constraints.mvp8") != std::string::npos);
+  auto restored = deserialize_sketch_constraint_catalog_from_json(serialized.value());
+  REQUIRE(restored);
+  REQUIRE(restored.value().constraints().size() == 1U);
+  CHECK(restored.value().constraints().front().id().value() == "constraint.horizontal");
+  CHECK(restored.value().constraints().front().source() ==
+        SketchConstraintIntentSource::Manual);
+}
+
+TEST_CASE("Block 114 conflicting additions remain preview-only with stable ids",
+          "[core][sketch-constraints][core][sketch-conflict-diagnostics]") {
+  PartDocument document = make_constraint_document({10.0, 0.0});
+  auto entity = SketchConstraintIntentTarget::entity("entity/line.a");
+  REQUIRE(entity);
+  auto fixed = SketchConstraintIntent::create(
+      SketchConstraintId("constraint.fixed"), SketchSolverConstraintKind::Fixed,
+      {entity.value()});
+  auto vertical = SketchConstraintIntent::create(
+      SketchConstraintId("constraint.vertical"), SketchSolverConstraintKind::Vertical,
+      {entity.value()});
+  REQUIRE(fixed);
+  REQUIRE(vertical);
+  auto catalog = SketchConstraintCatalog::create(
+      document.id(), SketchId("sketch.constraints"), {fixed.value()});
+  REQUIRE(catalog);
+
+  const auto before = document.find_sketch(SketchId("sketch.constraints"))
+                          ->find_line_segment(SketchEntityId("line.a"))->end();
+  auto preview = SketchConstraintAuthoringService{}.preview(
+      document, catalog.value(), vertical.value());
+  REQUIRE(preview);
+  CHECK_FALSE(preview.value().accepted);
+  CHECK_FALSE(preview.value().solved_sketch.has_value());
+  CHECK(preview.value().solve.status == SketchSolveStatus::Conflicting);
+  CHECK(std::find(preview.value().conflict_ids.begin(), preview.value().conflict_ids.end(),
+                  "constraint.vertical") != preview.value().conflict_ids.end());
+  CHECK(catalog.value().constraints().size() == 1U);
+  CHECK(document.find_sketch(SketchId("sketch.constraints"))
+            ->find_line_segment(SketchEntityId("line.a"))->end() == before);
+
+  auto rejected_dimension = SketchConstraintIntent::create(
+      SketchConstraintId("constraint.distance"),
+      SketchSolverConstraintKind::AlignedDistance,
+      {SketchConstraintIntentTarget::point(SketchPointId("a")).value(),
+       SketchConstraintIntentTarget::point(SketchPointId("b")).value()});
+  CHECK_FALSE(rejected_dimension);
 }

@@ -1,6 +1,6 @@
 # GUI Sketch Spline Editing and Text MVP-8
 
-Status: implemented in Block 113.
+Status: implemented in Block 113; Block-114 constraint integration is implemented.
 
 This contract adds fit/control-point spline authoring, insertion/removal, control polygons, continuity
 handles, deterministic representation conversion, and parameter/expression-backed Sketch text. It
@@ -61,12 +61,17 @@ points must remain. Non-finite points, duplicate consecutive points, degenerate 
 source state, invalidated profile connectivity, or invalidated external continuity fail closed. The
 source Sketch remains unchanged during preview.
 
-## Continuity handles
+## Continuity handles and Block-114 constraints
 
 Every adjacent spline pair exposes one continuity handle containing the junction, incoming tangent,
 outgoing tangent, C0 state, and G1 state. Tangent alignment preserves each handle length while placing
-both tangent vectors on one directed line. Successful commits persist ordinary cubic control points
-and the existing `SketchTangentContinuity` records; no opaque solver result is serialized.
+both tangent vectors on one directed line. Successful Block-113 commits persist ordinary cubic control
+points and preserve existing continuity records; Block 113 does not implicitly create a new persistent
+constraint.
+
+Block 114 may create explicit `Tangent` intent for a selected compatible line/arc/spline pair only after
+the normal disposable solve/conflict preview. That intent is stored in
+`blcad.sketch_constraints.mvp8`, not hidden inside spline editor state.
 
 `SketchSplineGeometryEvaluator` publishes deterministic per-segment positions, first derivatives,
 second-derivative curvature, control polygons, and C0/G1 diagnostics. These products are derived and
@@ -171,6 +176,6 @@ built-in vector-font fallback.
 
 ## Next boundary
 
-Block 114 owns selection-driven manual constraints, accepted automatic constraints, glyph interaction,
-and conflict preview against the Block-109 solver. Block 115 owns driving/reference dimensions and
+Block 114 constraint authoring and glyph interaction is implemented in
+`docs/gui-sketch-constraint-authoring-mvp8.md`. Block 115 owns driving/reference dimensions and
 in-canvas parameter/expression editing.

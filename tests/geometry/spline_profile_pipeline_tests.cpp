@@ -1,4 +1,5 @@
 #include "blcad/geometry/recompute_executor.hpp"
+#include "blcad/geometry/sketch_constraint_glyph.hpp"
 #include "blcad/geometry/sketch_spline_geometry.hpp"
 #include "blcad/geometry/sketch_text_layout.hpp"
 
@@ -81,7 +82,7 @@ PartDocument make_subtractive_spline_document() {
   auto base_sketch = Sketch::create(SketchId("sketch.base"), "Base", DatumPlaneId("datum.xy"));
   REQUIRE(base_sketch);
   auto rectangle = RectangleProfile::create(ProfileId("profile.base"), ParameterId("part.width"),
-                                            ParameterId("part.height"));
+                                             ParameterId("part.height"));
   REQUIRE(rectangle);
   REQUIRE(base_sketch.value().add_profile(rectangle.value()));
   REQUIRE(document.value().add_sketch(base_sketch.value()));
@@ -203,4 +204,32 @@ TEST_CASE("Block 113 text layout resolves explicit system and built-in font fall
                     }));
   CHECK(std::any_of(built_in.value().glyphs.begin(), built_in.value().glyphs.end(),
                     [](const auto& glyph) { return !glyph.strokes.empty(); }));
+}
+
+TEST_CASE("Block 114 semantic constraint glyphs use deterministic topology anchors",
+          "[geometry][sketch-constraints]") {
+  auto sketch = Sketch::create(SketchId("sketch.glyph"), "Glyph", DatumPlaneId("datum.xy"));
+  REQUIRE(sketch);
+  add_line(sketch.value(), "line.a", {0.0, 2.0}, {10.0, 6.0});
+  auto topology = SketchTopology::migrate_legacy(sketch.value());
+  REQUIRE(topology);
+  auto target = SketchConstraintIntentTarget::entity("entity/line.a");
+  REQUIRE(target);
+  auto constraint = SketchConstraintIntent::create(
+      SketchConstraintId("constraint.horizontal"), SketchSolverConstraintKind::Horizontal,
+      {target.value()}, SketchConstraintIntentSource::Automatic);
+  REQUIRE(constraint);
+
+  auto glyph = SketchConstraintGlyphLayoutResolver{}.resolve(
+      topology.value(), constraint.value(), SketchConstraintGlyphState::Preview);
+  REQUIRE(glyph);
+  CHECK(glyph.value().semantic_id ==
+        "sketch/sketch.glyph/constraint/constraint.horizontal");
+  CHECK(glyph.value().candidate_id == "constraint.horizontal");
+  CHECK(glyph.value().token == "H");
+  CHECK(glyph.value().anchor.x == Catch::Approx(5.0));
+  CHECK(glyph.value().anchor.y == Catch::Approx(4.0));
+  CHECK(glyph.value().state == SketchConstraintGlyphState::Preview);
+  REQUIRE(glyph.value().target_ids.size() == 1U);
+  CHECK(glyph.value().target_ids.front() == "entity/line.a");
 }
