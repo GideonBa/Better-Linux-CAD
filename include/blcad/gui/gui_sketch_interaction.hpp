@@ -11,6 +11,8 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace blcad::geometry {
@@ -131,6 +133,50 @@ struct GuiSketchInteractionScene {
   std::vector<GuiSketchAnnotationPrimitive> annotations;
   std::vector<Point2> intersections;
   std::size_t unresolved_reference_count{0};
+
+  GuiSketchInteractionScene() = default;
+  GuiSketchInteractionScene(const GuiSketchInteractionScene&) = default;
+  GuiSketchInteractionScene& operator=(const GuiSketchInteractionScene&) = default;
+
+  GuiSketchInteractionScene(GuiSketchInteractionScene&& other) noexcept
+      : sketch(std::move(other.sketch)), curves(std::move(other.curves)),
+        points(std::move(other.points)), annotations(std::move(other.annotations)),
+        intersections(std::move(other.intersections)),
+        unresolved_reference_count(other.unresolved_reference_count) {
+    qualify_duplicate_point_roles();
+  }
+
+  GuiSketchInteractionScene& operator=(GuiSketchInteractionScene&& other) noexcept {
+    if (this == &other) return *this;
+    sketch = std::move(other.sketch);
+    curves = std::move(other.curves);
+    points = std::move(other.points);
+    annotations = std::move(other.annotations);
+    intersections = std::move(other.intersections);
+    unresolved_reference_count = other.unresolved_reference_count;
+    qualify_duplicate_point_roles();
+    return *this;
+  }
+
+private:
+  void qualify_duplicate_point_roles() {
+    std::unordered_map<std::string, std::size_t> counts;
+    for (const auto& point : points) {
+      const auto marker = point.semantic_id.find(kGuiSketchHitRoleMarker);
+      const std::string key = marker == std::string::npos
+                                  ? point.semantic_id
+                                  : point.semantic_id.substr(0U, marker);
+      ++counts[key];
+    }
+    for (auto& point : points) {
+      if (point.semantic_id.find(kGuiSketchHitRoleMarker) != std::string::npos ||
+          point.candidate_id.empty())
+        continue;
+      const auto found = counts.find(point.semantic_id);
+      if (found != counts.end() && found->second > 1U)
+        point.semantic_id += std::string(kGuiSketchHitRoleMarker) + point.candidate_id;
+    }
+  }
 };
 
 class GuiSketchInteractionSceneBuilder {
