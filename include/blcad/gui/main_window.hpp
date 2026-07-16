@@ -5,6 +5,7 @@
 #include "blcad/gui/gui_analysis_export_workbench.hpp"
 #include "blcad/gui/gui_document_browser.hpp"
 #include "blcad/gui/gui_document_session.hpp"
+#include "blcad/gui/gui_modeling_workspace.hpp"
 #include "blcad/gui/gui_part_foundation_workbench.hpp"
 #include "blcad/gui/gui_part_operations_workbench.hpp"
 #include "blcad/gui/gui_sketch_workbench.hpp"
@@ -39,6 +40,10 @@ public:
   [[nodiscard]] GuiSketchWorkbench& sketch_workbench() noexcept;
   [[nodiscard]] GuiSketchWorkspace& sketch_workspace() noexcept;
   [[nodiscard]] const GuiSketchWorkspace& sketch_workspace() const noexcept;
+  [[nodiscard]] GuiModelingWorkspace& modeling_workspace() noexcept { return modeling_workspace_; }
+  [[nodiscard]] const GuiModelingWorkspace& modeling_workspace() const noexcept {
+    return modeling_workspace_;
+  }
   [[nodiscard]] GuiPartFoundationWorkbench& part_foundation_workbench() noexcept;
   [[nodiscard]] GuiPartOperationsWorkbench& part_operations_workbench() noexcept;
   [[nodiscard]] GuiSpatialSurfaceWorkbench& spatial_surface_workbench() noexcept;
@@ -89,6 +94,7 @@ private:
   GuiCommandRegistry command_registry_;
   GuiSketchWorkbench sketch_workbench_;
   GuiSketchWorkspace sketch_workspace_;
+  GuiModelingWorkspace modeling_workspace_;
   GuiPartFoundationWorkbench part_foundation_workbench_;
   GuiPartOperationsWorkbench part_operations_workbench_;
   GuiSpatialSurfaceWorkbench spatial_surface_workbench_;
