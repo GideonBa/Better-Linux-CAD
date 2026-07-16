@@ -22,6 +22,8 @@ Fundamental decisions are:
 - keep solver variables, residuals, Jacobians, rank, DOF, conflict diagnostics, curvature samples,
   resolved text, glyph strokes, and fallback font choices derived;
 - use explicit migration or versioned sidecar persistence when a new identity model is required;
+- include every persistent sidecar owned by an editing session in dirty-state, Save/Open, and exact
+  document history;
 - require validated complete candidates before solve/recompute/edit products mutate persistent intent.
 
 A lower authority layer must not depend on a higher execution or presentation layer for persistent
@@ -32,6 +34,7 @@ identity.
 ```text
 Qt user interface / commands / transient interaction
   -> GUI headless controllers and complete candidate transactions
+  -> GuiDocumentSession document + sidecar history authority
   -> Core planar Sketch topology + edit/annotation/constraint intent
   -> Core deterministic planar constraint solver
   -> Core Part/Assembly persistent model intent
@@ -114,6 +117,12 @@ the exact final sample; successful acceptance rechecks topology/constraint fresh
 `Drag sketch handle` transaction. Cancel, lost capture, stale source, or failed solve restores the
 original document.
 
+After Block 114, the real viewport binder constructs drag controllers from `GuiDocumentSession`.
+`SketchConstraintCatalogSystemBuilder` combines historical constraints and accepted session sidecar
+intent before baseline/pointer solve. Release also compares the current catalog and rebuilt effective
+system against the preview snapshots, so accepted constraints remain active during later direct
+manipulation.
+
 ### Creation tools
 
 Block 111 creates lines and line-based profiles plus construction points/centerlines through one
@@ -176,11 +185,15 @@ conflicting, invalid-reference, and non-convergent candidates publish stable dia
 mutation.
 
 `GuiSketchConstraintController` derives selection-compatible commands, converts supported snap
-inference to automatic candidates, rechecks Part/topology/catalog freshness, and commits one
-`Add sketch constraint` transaction. The controller coordinates the matching catalog snapshot with
-exact document undo/redo. `SketchConstraintGlyphLayoutResolver` derives accepted/preview/conflict/
-redundancy glyph tokens and plane anchors; GUI publishes them as semantic `GuiSketchHitKind::Glyph`
-annotations.
+inference to automatic candidates, and rechecks Part/topology/catalog freshness.
+`GuiDocumentSession::commit_part_constraint_transaction(...)` clones and validates Part plus complete
+catalog collection, recomputes, and publishes one `Add sketch constraint` history entry. Generic global
+undo/redo restores both. Dirty-state and saved-state comparisons include the catalog collection.
+
+A Part saved as `model.blcad.json` stores the session-owned catalog collection in
+`model.blcad.json.sketch-constraints.json`; Open restores it before initializing saved history.
+`SketchConstraintGlyphLayoutResolver` derives accepted/preview/conflict/redundancy glyph tokens and
+plane anchors; GUI publishes them as semantic `GuiSketchHitKind::Glyph` annotations.
 
 Canonical contract: `docs/gui-sketch-constraint-authoring-mvp8.md`.
 
@@ -224,7 +237,7 @@ parameters / expressions / workplanes / construction geometry
 historical planar Sketch curves, profiles, constraints, dimensions, continuity
 canonical SketchTopology when topology persistence is used
 Block-113 SketchText sidecar records and parameter bindings
-Block-114 SketchConstraintCatalog records with stable targets/provenance
+session-owned Block-114 SketchConstraintCatalog collections with stable targets/provenance
 Body / Part feature history and semantic references
 Project / Assembly relationships / joints / hierarchy boundaries
 stable exchange/product intent
@@ -243,6 +256,7 @@ spline samples / derivatives / curvature / continuity diagnostics
 resolved Sketch text / available-font discovery / fallback choice / glyph strokes
 constraint candidate solves / solved preview topology / conflict and redundant sets
 constraint glyph token / anchor / state / hit-test presentation
+temporary drag target equations and augmented topology
 Assembly solve/motion proposals and freshness snapshots
 posed shapes / analysis / XDE and STEP transfer identity
 ```
@@ -251,4 +265,4 @@ posed shapes / analysis / XDE and STEP transfer identity
 
 Blocks 106–114 are implemented. Block 115 is the current next technical step: driving/reference
 dimensions, in-canvas value editing, and typed parameter/expression binding over the existing Block-109
-solver and Block-114 semantic target/glyph infrastructure.
+solver and Block-114 semantic target/glyph/session infrastructure.
