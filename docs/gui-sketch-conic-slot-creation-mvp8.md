@@ -1,6 +1,6 @@
 # GUI Sketch Conic and Slot Creation MVP-8
 
-Status: implemented in Block 112.
+Status: implemented in Block 112; Block-114 constraint acceptance is implemented.
 
 This contract extends the Block-111 multi-click creation authority with circles, circular arcs,
 ellipses, elliptical arcs, and mechanical slots. It keeps all screen-space interaction transient and
@@ -15,8 +15,9 @@ profiles, validation, JSON, dependency tracking, and undo/redo. Geometry remains
 later region and feature materialization.
 
 The Block-107 snap result supplies plane coordinates. Snap kinds may publish automatic-constraint
-previews, but no inferred relation becomes persistent in Block 112. Block 114 owns accepted automatic
-and manual constraint authoring.
+previews. Block 112 itself never persists an inferred relation. Block 114 may convert an explicitly
+identified authored/reference topology pair into a `SketchConstraintIntent`, run the normal disposable
+solve/conflict preview, and persist only an accepted candidate.
 
 ## Implemented tools and pick sequences
 
@@ -26,10 +27,10 @@ and manual constraint authoring.
 | Center/diameter circle | center, rim | `CircleProfile` + diameter `Parameter` |
 | Two-point circle | diameter endpoint, diameter endpoint | `CircleProfile` + diameter `Parameter` |
 | Three-point circle | three non-collinear rim points | `CircleProfile` + diameter `Parameter` |
-| Tangent circle | three candidate points | three-point `CircleProfile`; tangency remains preview-only |
+| Tangent circle | three candidate points | three-point `CircleProfile`; tangency is a separate Block-114 candidate |
 | Center/start/end arc | center, start, end direction | one three-point `ArcSegment` |
 | Three-point arc | start, through-point, end | one `ArcSegment` |
-| Tangent arc | start, through-point, end | one `ArcSegment`; tangency remains preview-only |
+| Tangent arc | start, through-point, end | one `ArcSegment`; tangency is a separate Block-114 candidate |
 | Ellipse | center, major-axis point, minor-radius point | four cubic `SplineSegment` entities + `ArcClosedProfile` |
 | Elliptical arc | center, major-axis point, minor-radius point, start, end | one or more cubic `SplineSegment` entities |
 | Center-to-center slot | first cap center, second cap center, half-width point | two lines + two semicircular arcs + `ArcClosedProfile` |
@@ -84,8 +85,8 @@ polyline:
 - a full ellipse adds one ordered `ArcClosedProfile`; an open elliptical arc adds no profile.
 
 This representation survives JSON, topology migration, Geometry materialization, and exact undo/redo.
-Block 113 now edits these ordinary spline spans through the same cubic representation, with control/
-fit handles and complete candidate validation; no hidden ellipse-specific GUI curve is introduced.
+Block 113 edits these ordinary spline spans through the same cubic representation, with control/fit
+handles and complete candidate validation; no hidden ellipse-specific GUI curve is introduced.
 
 ## Slot representation
 
@@ -106,7 +107,7 @@ cap center inward by the radius and rejects an overall length that is not greate
 Because the contour is ordinary line/arc intent, existing region, profile, drag-handle, JSON, and
 Geometry paths consume it without a slot-specific persistence type.
 
-## Preview and handle behavior
+## Preview, handles, and accepted inference
 
 Preview samples are transient and never serialized:
 
@@ -114,7 +115,12 @@ Preview samples are transient and never serialized:
 - arcs and elliptical arcs publish open sampled rubber bands;
 - slots publish a closed line/arc-shaped rubber band;
 - center, endpoint, quadrant, nearest, and inference snaps publish automatic-constraint previews;
-- tangent tools additionally publish explicit `tangent` preview records.
+- tangent tools additionally publish explicit tangent preview records.
+
+After geometry commit, a supported preview becomes persistent only when Block 114 receives stable
+point/entity targets, produces a valid automatic candidate, and the disposable Block-109 solve returns
+`under_constrained` or `fully_constrained`. Conflicting, redundant, invalid, or non-convergent inference
+remains preview-only.
 
 After commit, arcs expose endpoint, through-point, center, and radius handles through Block 110.
 Ellipse splines expose Block-113 control/fit/continuity handles. Slot lines and arcs expose ordinary
@@ -149,7 +155,6 @@ action registration in the Sketch command lifecycle.
 
 ## Following boundaries
 
-Block 113 is implemented in `docs/gui-sketch-spline-text-mvp8.md` and owns fit/control-point spline
-editing, control polygons, insertion/removal, continuity handles, deterministic conversion, and Sketch
-text. Block 114 is next and owns persistent tangent and other automatic/manual constraint acceptance;
-Block 115 owns radius/diameter dimensions and direct parameter editing.
+Block 113 is implemented in `docs/gui-sketch-spline-text-mvp8.md`. Block 114 is implemented in
+`docs/gui-sketch-constraint-authoring-mvp8.md` and owns accepted tangent and other automatic/manual
+constraint intent. Block 115 owns radius/diameter dimensions and direct parameter editing.
