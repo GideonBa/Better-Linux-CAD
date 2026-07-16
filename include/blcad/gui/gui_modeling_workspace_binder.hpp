@@ -9,9 +9,11 @@
 #include <QHBoxLayout>
 #include <QInputDialog>
 #include <QKeyEvent>
+#include <QLineEdit>
 #include <QMainWindow>
 #include <QMenu>
 #include <QMouseEvent>
+#include <QObject>
 #include <QPointer>
 #include <QSignalBlocker>
 #include <QStatusBar>
@@ -21,6 +23,7 @@
 #include <QToolButton>
 
 #include <algorithm>
+#include <array>
 #include <functional>
 #include <string>
 #include <utility>
@@ -62,6 +65,7 @@ public:
             [this](const QString&) { refresh(); });
 
     workspace_->capture_home_view(*viewport_);
+    workspace_->apply_selection_filter(*session_, *viewport_, workspace_->selection_filter());
     installed_ = true;
     refresh();
   }
@@ -91,18 +95,16 @@ protected:
       const auto* key = static_cast<QKeyEvent*>(event);
       if (key->key() == Qt::Key_Escape && workspace_->cancel_command(*session_)) {
         window_->statusBar()->showMessage(QStringLiteral("Modeling command cancelled"));
-        refresh();
-        if (refresh_commands_)
-          refresh_commands_();
+        refresh_and_publish();
         return true;
       }
     }
 
-    if (watched == viewport_ && event->type() == QEvent::MouseButtonRelease) {
+    if (watched == viewport_.data() && event->type() == QEvent::MouseButtonRelease) {
       const auto* mouse = static_cast<QMouseEvent*>(event);
       mini_toolbar_anchor_ = mouse->position().toPoint() + QPoint(12, 12);
       schedule_refresh();
-    } else if ((watched == viewport_ || watched == browser_) &&
+    } else if ((watched == viewport_.data() || watched == browser_.data()) &&
                (event->type() == QEvent::MouseButtonRelease ||
                 event->type() == QEvent::KeyRelease || event->type() == QEvent::FocusIn)) {
       schedule_refresh();
@@ -113,16 +115,29 @@ protected:
 private:
   static std::vector<std::string> capabilities_for(const GuiSelection& selection) {
     switch (selection.kind) {
-    case GuiSelectionKind::Body: return {"Body"};
-    case GuiSelectionKind::Face: return {"Face"};
-    case GuiSelectionKind::Edge: return {"Edge"};
-    case GuiSelectionKind::Datum: return {"Datum"};
-    case GuiSelectionKind::Component: return {"Component"};
-    case GuiSelectionKind::AssemblyTarget: return {"AssemblyTarget"};
+    case GuiSelectionKind::Body:
+      return {"Body"};
+    case GuiSelectionKind::Face:
+      return {"Face"};
+    case GuiSelectionKind::Edge:
+      return {"Edge"};
+    case GuiSelectionKind::Datum:
+      return {"Datum"};
+    case GuiSelectionKind::Component:
+      return {"Component"};
+    case GuiSelectionKind::AssemblyTarget:
+      return {"AssemblyTarget"};
     case GuiSelectionKind::SketchEntity:
-    case GuiSelectionKind::Vertex: return {};
+    case GuiSelectionKind::Vertex:
+      return {};
     }
     return {};
+  }
+
+  void refresh_and_publish() {
+    refresh();
+    if (refresh_commands_)
+      refresh_commands_();
   }
 
   void schedule_refresh() {
@@ -148,18 +163,17 @@ private:
       area_tabs_->addTab(QString::fromUtf8(tab.data(), static_cast<qsizetype>(tab.size())));
     context_toolbar_->addWidget(area_tabs_);
     connect(area_tabs_, &QTabBar::currentChanged, this, [this](int index) {
-      if (synchronizing_controls_ || index < 0 || index > 2)
+      if (synchronizing_controls_ || index < 0 || index > 2 || viewport_.isNull())
         return;
       const auto area = static_cast<GuiModelingArea>(index);
       if (!workspace_->set_area(*session_, area)) {
         synchronize_area_tabs();
         return;
       }
+      workspace_->apply_selection_filter(*session_, *viewport_, GuiModelingSelectionFilter::All);
       window_->statusBar()->showMessage(
           QStringLiteral("%1 modeling workspace").arg(area_tabs_->tabText(index)));
-      if (refresh_commands_)
-        refresh_commands_();
-      refresh();
+      refresh_and_publish();
     });
 
     filter_combo_ = new QComboBox(context_toolbar_);
@@ -184,9 +198,7 @@ private:
               const auto filter = static_cast<GuiModelingSelectionFilter>(
                   filter_combo_->itemData(index).toInt());
               workspace_->apply_selection_filter(*session_, *viewport_, filter);
-              refresh();
-              if (refresh_commands_)
-                refresh_commands_();
+              refresh_and_publish();
             });
 
     repeat_button_ = new QToolButton(context_toolbar_);
@@ -197,14 +209,12 @@ private:
     connect(repeat_button_, &QToolButton::clicked, this, [this] {
       if (!workspace_->repeat_last_command(*session_))
         return;
-      window_->statusBar()->showMessage(QStringLiteral("Repeated %1 — select command inputs or press Esc")
-                                            .arg(QString::fromUtf8(
-                                                workspace_->active_command_id().data(),
-                                                static_cast<qsizetype>(
-                                                    workspace_->active_command_id().size()))));
-      refresh();
-      if (refresh_commands_)
-        refresh_commands_();
+      window_->statusBar()->showMessage(
+          QStringLiteral("Repeated %1 — select command inputs or press Esc")
+              .arg(QString::fromUtf8(workspace_->active_command_id().data(),
+                                     static_cast<qsizetype>(
+                                         workspace_->active_command_id().size()))));
+      refresh_and_publish();
     });
 
     view_cube_button_ = new QToolButton(context_toolbar_);
@@ -257,7 +267,8 @@ private:
       bool accepted = false;
       const QString name = QInputDialog::getText(window_, QStringLiteral("Camera bookmark"),
                                                   QStringLiteral("Name:"), QLineEdit::Normal,
-                                                  QString{}, &accepted).trimmed();
+                                                  QString{}, &accepted)
+                               .trimmed();
       if (accepted && !name.isEmpty() &&
           workspace_->save_camera_bookmark(name.toStdString(), *viewport_))
         synchronize_bookmarks(name);
@@ -269,8 +280,8 @@ private:
     context_toolbar_->addWidget(remove_bookmark);
     connect(remove_bookmark, &QToolButton::clicked, this, [this] {
       const int index = bookmark_combo_->currentIndex();
-      if (index > 0 && workspace_->remove_camera_bookmark(
-                           bookmark_combo_->itemText(index).toStdString()))
+      if (index > 0 &&
+          workspace_->remove_camera_bookmark(bookmark_combo_->itemText(index).toStdString()))
         synchronize_bookmarks();
     });
   }
@@ -296,13 +307,23 @@ private:
     QObject::disconnect(finish, nullptr, window_, nullptr);
     connect(finish, &QAction::triggered, this, [this] {
       finish_sketch_handoff_();
-      refresh();
-      if (refresh_commands_)
-        refresh_commands_();
+      refresh_and_publish();
     });
   }
 
   void synchronize_area_tabs() {
+    if (session_->document_kind() == GuiDocumentKind::Part &&
+        workspace_->area() == GuiModelingArea::Assembly && !session_->task().active()) {
+      (void)workspace_->set_area(*session_, GuiModelingArea::Part);
+      if (!viewport_.isNull())
+        workspace_->apply_selection_filter(*session_, *viewport_, GuiModelingSelectionFilter::All);
+    } else if (session_->document_kind() == GuiDocumentKind::Project &&
+               workspace_->area() != GuiModelingArea::Assembly && !session_->task().active()) {
+      (void)workspace_->set_area(*session_, GuiModelingArea::Assembly);
+      if (!viewport_.isNull())
+        workspace_->apply_selection_filter(*session_, *viewport_, GuiModelingSelectionFilter::All);
+    }
+
     const QSignalBlocker blocker(area_tabs_);
     synchronizing_controls_ = true;
     const bool part = session_->document_kind() == GuiDocumentKind::Part;
@@ -317,12 +338,13 @@ private:
   void synchronize_filter() {
     const QSignalBlocker blocker(filter_combo_);
     synchronizing_controls_ = true;
-    for (int index = 0; index < filter_combo_->count(); ++index)
+    for (int index = 0; index < filter_combo_->count(); ++index) {
       if (filter_combo_->itemData(index).toInt() ==
           static_cast<int>(workspace_->selection_filter())) {
         filter_combo_->setCurrentIndex(index);
         break;
       }
+    }
     synchronizing_controls_ = false;
   }
 
@@ -342,7 +364,7 @@ private:
       return true;
     const auto& entries = session_->selection().entries();
     if (entries.empty()) {
-      workspace_->clear_preselection(*session_);
+      workspace_->clear_preselection_context();
       return false;
     }
 
@@ -352,8 +374,10 @@ private:
       return true;
 
     auto capabilities = capabilities_for(selected);
-    if (capabilities.empty())
+    if (capabilities.empty()) {
+      workspace_->clear_preselection_context();
       return false;
+    }
     return workspace_->set_preselection(*session_, {selected, std::move(capabilities)});
   }
 
@@ -370,14 +394,12 @@ private:
       auto* cancel = new QToolButton(mini_toolbar_);
       cancel->setText(QStringLiteral("Cancel %1")
                           .arg(QString::fromUtf8(workspace_->active_command_id().data(),
-                                                 static_cast<qsizetype>(
-                                                     workspace_->active_command_id().size()))));
+                                                static_cast<qsizetype>(
+                                                    workspace_->active_command_id().size()))));
       connect(cancel, &QToolButton::clicked, this, [this] {
         if (workspace_->cancel_command(*session_)) {
           window_->statusBar()->showMessage(QStringLiteral("Modeling command cancelled"));
-          refresh();
-          if (refresh_commands_)
-            refresh_commands_();
+          refresh_and_publish();
         }
       });
       mini_toolbar_layout_->addWidget(cancel);
@@ -386,19 +408,18 @@ private:
         auto* button = new QToolButton(mini_toolbar_);
         button->setText(QString::fromUtf8(descriptor.label.data(),
                                           static_cast<qsizetype>(descriptor.label.size())));
-        button->setToolTip(QStringLiteral("Start %1 from the current selection")
-                               .arg(button->text()));
-        connect(button, &QToolButton::clicked, this, [this, command = descriptor.command,
-                                                       label = std::string(descriptor.label)] {
-          if (!workspace_->begin_command(*session_, command))
-            return;
-          window_->statusBar()->showMessage(
-              QStringLiteral("%1 started — select remaining inputs or press Esc")
-                  .arg(QString::fromStdString(label)));
-          refresh();
-          if (refresh_commands_)
-            refresh_commands_();
-        });
+        button->setToolTip(
+            QStringLiteral("Start %1 from the current selection").arg(button->text()));
+        connect(button, &QToolButton::clicked, this,
+                [this, command = descriptor.command,
+                 label = std::string(descriptor.label)] {
+                  if (!workspace_->begin_command(*session_, command))
+                    return;
+                  window_->statusBar()->showMessage(
+                      QStringLiteral("%1 started — select remaining inputs or press Esc")
+                          .arg(QString::fromStdString(label)));
+                  refresh_and_publish();
+                });
         mini_toolbar_layout_->addWidget(button);
       }
     }
