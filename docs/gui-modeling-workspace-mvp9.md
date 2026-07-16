@@ -4,8 +4,8 @@ Status: implemented in Block 122.
 
 Block 122 introduces the shared application-layer interaction boundary used by the Part, Surface, and
 Assembly modeling workspaces. It upgrades the existing MVP-7 form-driven workbenches with
-capability-driven preselection, contextual command recommendations, transient navigation state, and a
-single command-start lifecycle without adding persistent Part or Assembly intent.
+capability-driven preselection, contextual command recommendations, visible transient navigation
+controls, and a single command-start lifecycle without adding persistent Part or Assembly intent.
 
 ## Authority boundary
 
@@ -30,6 +30,12 @@ feature, relationship, joint, geometry result, or save-format field. Core and Ge
 unchanged. The existing workbenches remain the mutation and preview clients of public Core/Geometry
 contracts.
 
+`GuiModelingWorkspaceShellBinder` is the Qt presentation adapter owned by `MainWindow`. It adds the
+visible Part/Surface/Assembly modeling tabs, selection-filter control, Repeat command, contextual
+floating mini-toolbar, ViewCube menu, Home capture, and named camera-bookmark controls. Stable Qt
+object names make each control reachable by offscreen acceptance tests without making widgets model
+authority.
+
 ## Workspace areas and command catalog
 
 The frozen modeling areas are:
@@ -40,7 +46,7 @@ Part | Surface | Assembly
 
 Part and Surface require an active Part document. Assembly requires an active Project. Switching an
 area is rejected while a task is active. Area switching clears stale preselection and restores the
-workspace-wide selection filter.
+workspace-wide selection filter in both the session and viewport.
 
 The catalog records, for every exposed command:
 
@@ -74,10 +80,11 @@ capability names. Command enablement requires all of the following:
 The workspace does not infer capabilities from semantic-id spelling, display shape, OCCT topology, or
 widget-local type guesses. For example, a selected Sketch region carrying `ProfileRegion` enables the
 profile-first command family, while an `Edge` selection enables Fillet/Chamfer. Unsupported or
-filter-hidden selections enable nothing.
+filter-hidden selections clear transient capability context and enable nothing.
 
-The contextual mini-toolbar is a deterministic priority-sorted subset of enabled commands. It is a
-presentation product and is never persisted.
+The contextual mini-toolbar is a deterministic priority-sorted subset of enabled commands. The Qt
+binder positions it next to the latest viewport click and exposes a Cancel action while a Block-122
+command-start task is active. It is a presentation product and is never persisted.
 
 ## Command lifecycle, cancellation, and repeat
 
@@ -91,28 +98,33 @@ preselection -> begin command -> collect remaining inputs -> edit -> preview -> 
 
 Apply records the last repeatable command after the task reaches preview and is accepted. Repeat
 starts the same command id in the current compatible area without inventing prior parameter or
-selection state. Cancel restores both the consumed semantic selection and its complete capability
-context, so the mini-toolbar and command enablement return exactly to their pre-command state.
+selection state. Cancel or `Esc` restores both the consumed semantic selection and its complete
+capability context, so the mini-toolbar and command enablement return exactly to their pre-command
+state.
 
 ## Finish Sketch handoff
 
-`finish_sketch_handoff(...)` accepts an authoritative `SketchId` and materialized `ProfileId`, returns
-to the Part area, and publishes one transient profile-region preselection:
+`finish_sketch_handoff(...)` accepts an authoritative `SketchId` and `ProfileId`, verifies that the
+Sketch exists in the active Part and that the profile is already present as one of the persistent
+Sketch profile families, returns to the Part area, and publishes one transient profile-region
+preselection:
 
 ```text
 profile-region:<sketch-id>:<profile-id>
 capability: ProfileRegion
 ```
 
-This gives Extrude/Revolve and the other profile-first commands the same command-start path as a
-viewport-picked region. The handoff does not create another profile, alter the Sketch, or persist the
-transient semantic presentation id.
+A geometrically detected but not materialized region is rejected. The `MainWindow` Finish Sketch
+adapter preserves the existing camera/filter/workspace exit and performs the handoff only when the
+inspected region resolves to an existing profile. This gives Extrude/Revolve and the other
+profile-first commands the same command-start path as a viewport-picked region without creating a
+second profile, altering the Sketch, or persisting the transient semantic presentation id.
 
 ## Selection filters
 
 The frozen filters are All, Profiles, Datums, Faces, Edges, Bodies, Components, and Assembly Targets.
-The workspace maps each filter to the existing `GuiSelectionKind` bit mask and can publish the same
-mask to both `GuiSelectionModel` and `OcctViewport`. Changing a filter removes incompatible transient
+The workspace maps each filter to the existing `GuiSelectionKind` bit mask and publishes the same mask
+to both `GuiSelectionModel` and `OcctViewport`. Changing a filter removes incompatible transient
 selection and capability context instead of retaining an invisible command source.
 
 ## ViewCube, home view, and camera bookmarks
@@ -129,15 +141,16 @@ removal affects no model history.
 ## Focused proof
 
 ```bash
-./build/dev-gui/blcad_gui_tests "[gui][modeling-workspace]"
-./build/dev-gui/blcad_gui_tests "[gui][in-context-command]"
-./build/dev-gui/blcad_gui_tests "[gui][view-navigation-aids]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][modeling-workspace]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][in-context-command]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][view-navigation-aids]"
 ```
 
 The proof covers capability-exact command enablement, deterministic mini-toolbar ordering,
-preselection consumption and complete Cancel restoration, Finish Sketch handoff, command repeat,
-selection-filter rejection and viewport synchronization, shell ownership through `MainWindow`,
-ViewCube targets, home restoration, and named camera bookmark replacement/removal.
+preselection consumption and complete Cancel restoration, rejection of a non-materialized profile,
+materialized Finish Sketch handoff, command repeat, selection-filter rejection and viewport
+synchronization, visible shell ownership through `MainWindow`, ViewCube targets, home restoration,
+and named camera bookmark replacement/removal.
 
 ## Next boundary
 
