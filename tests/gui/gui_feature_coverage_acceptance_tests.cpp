@@ -2,6 +2,7 @@
 #include "blcad/gui/gui_modeling_workspace.hpp"
 #include "blcad/gui/gui_part_foundation_workbench.hpp"
 #include "blcad/gui/gui_sketch_workbench.hpp"
+#include "blcad/gui/gui_viewport_manipulator.hpp"
 #include "blcad/gui/main_window.hpp"
 #include "blcad/gui/occt_viewport.hpp"
 
@@ -15,10 +16,12 @@
 #include <QApplication>
 #include <QComboBox>
 #include <QFrame>
+#include <QLineEdit>
 #include <QTabBar>
 #include <QToolBar>
 #include <QToolButton>
 
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <set>
@@ -36,6 +39,16 @@ nlohmann::json read_json(const std::filesystem::path& path) {
   nlohmann::json value;
   stream >> value;
   return value;
+}
+
+GuiViewportManipulatorMapping orthographic_manipulator_mapping() {
+  GuiViewportCameraBookmark camera;
+  camera.eye = {0.0, 0.0, 100.0};
+  camera.target = {0.0, 0.0, 0.0};
+  camera.up_direction = {0.0, 1.0, 0.0};
+  camera.scale = 200.0;
+  camera.projection = GuiViewportProjection::Orthographic;
+  return GuiViewportManipulatorMapping::create_camera(camera, 200.0, 200.0).value();
 }
 } // namespace
 
@@ -280,4 +293,152 @@ TEST_CASE("Block 122 exposes visible transient workspace and camera controls thr
   CHECK(workspace.camera_bookmarks().front().name == "front inspection");
   REQUIRE(workspace.remove_camera_bookmark("front inspection"));
   CHECK(workspace.camera_bookmarks().empty());
+}
+
+TEST_CASE("Block 123 linear manipulators are zoom-stable and release the exact final sample",
+          "[gui][viewport-manipulators]") {
+  GuiViewportManipulatorLayer layer;
+  REQUIRE(layer.set_mapping(orthographic_manipulator_mapping()));
+  GuiViewportManipulatorHandle linear;
+  linear.id = "distance.arrow";
+  linear.kind = GuiViewportManipulatorKind::Linear;
+  linear.origin = {0.0, 0.0, 0.0};
+  linear.axis = {1.0, 0.0, 0.0};
+  linear.reference_value = 10.0;
+  REQUIRE(layer.set_handles({linear}));
+
+  const auto presentation = layer.presentations();
+  REQUIRE(presentation.size() == 1);
+  CHECK(std::abs(std::hypot(presentation.front().endpoint.x - presentation.front().anchor.x,
+                            presentation.front().endpoint.y - presentation.front().anchor.y) -
+                 68.0) < 1.0e-9);
+  REQUIRE(layer.begin_drag({160.0, 100.0}));
+  REQUIRE(layer.update_drag({175.0, 100.0}));
+  REQUIRE(layer.candidate().has_value());
+  CHECK(std::abs(layer.candidate()->scalar_value - 25.0) < 1.0e-9);
+
+  const auto released = layer.end_drag({180.0, 100.0});
+  REQUIRE(released.has_value());
+  CHECK(std::abs(released->scalar_value - 30.0) < 1.0e-9);
+  CHECK(released->source == GuiViewportManipulatorInputSource::Drag);
+  CHECK(layer.active_handle_id().empty());
+}
+
+TEST_CASE("Block 123 hit ties and numeric override are deterministic and non-mutating",
+          "[gui][viewport-manipulators][gui][manipulator-numeric-coupling]") {
+  GuiDocumentSession session;
+  REQUIRE(session.create_part(DocumentId("part.manipulator"), "Manipulator"));
+  const std::string before = serialize_part_document_to_json(*session.part_document()).value();
+
+  GuiViewportManipulatorLayer layer;
+  REQUIRE(layer.set_mapping(orthographic_manipulator_mapping()));
+  GuiViewportManipulatorHandle second;
+  second.id = "b.handle";
+  second.origin = {0.0, 0.0, 0.0};
+  second.axis = {1.0, 0.0, 0.0};
+  GuiViewportManipulatorHandle first = second;
+  first.id = "a.handle";
+  REQUIRE(layer.set_handles({second, first}));
+
+  const auto hits = layer.hits_at({160.0, 100.0});
+  REQUIRE(hits.size() == 2);
+  CHECK(hits[0].handle_id == "a.handle");
+  CHECK(hits[1].handle_id == "b.handle");
+  REQUIRE(layer.begin_drag({160.0, 100.0}));
+  REQUIRE(layer.update_drag({170.0, 100.0}));
+  REQUIRE(layer.set_numeric_input("42.5 mm"));
+  REQUIRE(layer.candidate().has_value());
+  CHECK(layer.candidate()->source == GuiViewportManipulatorInputSource::Numeric);
+  CHECK(std::abs(layer.candidate()->scalar_value - 42.5) < 1.0e-9);
+  CHECK(layer.numeric_text() == "42.5 mm");
+  REQUIRE(layer.update_drag({190.0, 100.0}));
+  CHECK(std::abs(layer.candidate()->scalar_value - 42.5) < 1.0e-9);
+  const auto released = layer.end_drag({195.0, 100.0});
+  REQUIRE(released.has_value());
+  CHECK(std::abs(released->scalar_value - 42.5) < 1.0e-9);
+  CHECK(serialize_part_document_to_json(*session.part_document()).value() == before);
+}
+
+TEST_CASE("Block 123 supports angular radial triad and pattern candidate families",
+          "[gui][viewport-manipulators][gui][manipulator-numeric-coupling]") {
+  GuiViewportManipulatorLayer layer;
+  REQUIRE(layer.set_mapping(orthographic_manipulator_mapping()));
+
+  GuiViewportManipulatorHandle angle;
+  angle.id = "angle.wheel";
+  angle.kind = GuiViewportManipulatorKind::Angular;
+  angle.origin = {0.0, 0.0, 0.0};
+  angle.plane_normal = {0.0, 0.0, 1.0};
+  angle.reference_direction = {1.0, 0.0, 0.0};
+  angle.display_size_dip = 50.0;
+  REQUIRE(layer.set_handles({angle}));
+  REQUIRE(layer.begin_drag({150.0, 100.0}));
+  const auto angle_candidate = layer.end_drag({100.0, 50.0});
+  REQUIRE(angle_candidate.has_value());
+  CHECK(angle_candidate->value_kind == GuiViewportManipulatorValueKind::Angle);
+  CHECK(std::abs(angle_candidate->scalar_value - 90.0) < 1.0e-9);
+
+  GuiViewportManipulatorHandle radial;
+  radial.id = "radius.handle";
+  radial.kind = GuiViewportManipulatorKind::Radial;
+  radial.origin = {0.0, 0.0, 0.0};
+  radial.plane_normal = {0.0, 0.0, 1.0};
+  radial.reference_direction = {1.0, 0.0, 0.0};
+  radial.reference_value = 10.0;
+  radial.display_size_dip = 50.0;
+  REQUIRE(layer.set_handles({radial}));
+  REQUIRE(layer.begin_drag({150.0, 100.0}));
+  const auto radius_candidate = layer.end_drag({170.0, 100.0});
+  REQUIRE(radius_candidate.has_value());
+  CHECK(radius_candidate->value_kind == GuiViewportManipulatorValueKind::Radius);
+  CHECK(std::abs(radius_candidate->scalar_value - 30.0) < 1.0e-9);
+
+  const auto translate =
+      GuiViewportManipulatorLayer::translation_triad("move", {0.0, 0.0, 0.0});
+  const auto rotate =
+      GuiViewportManipulatorLayer::rotation_triad("rotate", {0.0, 0.0, 0.0});
+  CHECK(translate.size() == 3);
+  CHECK(rotate.size() == 3);
+  CHECK(translate[0].kind == GuiViewportManipulatorKind::TranslateAxis);
+  CHECK(rotate[2].kind == GuiViewportManipulatorKind::RotateAxis);
+
+  GuiViewportManipulatorHandle count;
+  count.id = "pattern.count";
+  count.kind = GuiViewportManipulatorKind::PatternCount;
+  count.origin = {0.0, 0.0, 0.0};
+  count.axis = {1.0, 0.0, 0.0};
+  count.reference_value = 4.0;
+  count.count_model_step = 12.0;
+  REQUIRE(layer.set_handles({count}));
+  REQUIRE(layer.begin_drag({150.0, 100.0}));
+  const auto count_candidate = layer.end_drag({174.0, 100.0});
+  REQUIRE(count_candidate.has_value());
+  CHECK(count_candidate->value_kind == GuiViewportManipulatorValueKind::Count);
+  CHECK(count_candidate->count_value == 6);
+}
+
+TEST_CASE("Block 123 exposes the reusable manipulator overlay and numeric HUD through MainWindow",
+          "[gui][viewport-manipulators][gui][manipulator-numeric-coupling]") {
+  REQUIRE(qApp != nullptr);
+  MainWindow window;
+  REQUIRE(window.session().create_part(DocumentId("part.manipulator.shell"),
+                                       "Manipulator Shell"));
+  auto& layer = window.viewport_manipulators();
+  GuiViewportManipulatorHandle handle;
+  handle.id = "shell.distance";
+  handle.kind = GuiViewportManipulatorKind::Linear;
+  handle.origin = {0.0, 0.0, 0.0};
+  handle.axis = {1.0, 0.0, 0.0};
+  REQUIRE(layer.set_handles({handle}));
+  window.refresh_viewport_manipulators();
+  qApp->processEvents();
+
+  auto* overlay =
+      window.findChild<QWidget*>(QStringLiteral("blcad.viewport_manipulator_overlay"));
+  auto* hud = window.findChild<QLineEdit*>(QStringLiteral("blcad.manipulator_numeric_hud"));
+  REQUIRE(overlay != nullptr);
+  REQUIRE(hud != nullptr);
+  CHECK_FALSE(overlay->isHidden());
+  CHECK_FALSE(hud->isHidden());
+  CHECK(layer.presentations().size() == 1);
 }
