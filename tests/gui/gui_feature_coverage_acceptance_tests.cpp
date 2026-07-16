@@ -160,12 +160,12 @@ TEST_CASE("Block 122 capability preselection drives the contextual modeling mini
   CHECK(session.selection().empty());
   CHECK(session.task().command_id() == "part.extrude");
   REQUIRE(workspace.cancel_command(session));
+  REQUIRE(workspace.preselection().has_value());
+  CHECK(workspace.preselection()->supports("ProfileRegion"));
   CHECK(session.selection().contains(GuiSelectionKind::SketchEntity,
                                      "profile-region:sketch.main:profile.outer"));
+  CHECK(workspace.mini_toolbar_commands(session).front().id == "part.extrude");
 
-  REQUIRE(workspace.set_preselection(
-      session, {{GuiSelectionKind::SketchEntity, "profile-region:sketch.main:profile.outer"},
-                {"ProfileRegion"}}));
   REQUIRE(workspace.begin_command(session, GuiModelingCommand::Extrude));
   REQUIRE(session.task().begin_parameter_editing());
   REQUIRE(session.task().show_preview());
@@ -213,6 +213,12 @@ TEST_CASE("Block 122 exposes transient ViewCube home and camera bookmarks throug
   CHECK(GuiModelingWorkspace::tabs()[0] == "Part");
   CHECK(GuiModelingWorkspace::tabs()[1] == "Surface");
   CHECK(GuiModelingWorkspace::tabs()[2] == "Assembly");
+
+  workspace.apply_selection_filter(window.session(), *viewport,
+                                   GuiModelingSelectionFilter::Bodies);
+  CHECK(window.session().selection().filter_mask() ==
+        selection_kind_bit(GuiSelectionKind::Body));
+  CHECK(viewport->selection_filter_mask() == selection_kind_bit(GuiSelectionKind::Body));
 
   workspace.capture_home_view(*viewport);
   REQUIRE(workspace.activate_view_cube_target(*viewport, GuiViewCubeTarget::Front));
