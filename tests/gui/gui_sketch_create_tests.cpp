@@ -388,3 +388,201 @@ TEST_CASE("Block 111 offscreen mouse creation commits a rectangle profile throug
             ->line_segments()
             .size() == 4U);
 }
+
+TEST_CASE("Block 112 circle tools persist exact profile and diameter intent atomically",
+          "[core][sketch-conics][gui][sketch-create-conics]") {
+  GuiDocumentSession session;
+  GuiSketchWorkbench workbench;
+  seed_sketch_part(session, workbench, "part.create_circle", "sketch.circle");
+
+  auto controller = controller_for(GuiSketchCreateTool::CenterRadiusCircle, "sketch.circle");
+  REQUIRE(controller.add_pick(pick(5.0, -2.0, GuiSketchSnapKind::Center)));
+  const auto preview = controller.preview(pick(15.0, -2.0, GuiSketchSnapKind::Quadrant));
+  CHECK(preview.closed);
+  CHECK(preview.rubber_band.size() == 64U);
+  REQUIRE(controller.add_pick(pick(15.0, -2.0, GuiSketchSnapKind::Quadrant)));
+
+  auto expansion = controller.expansion(*session.part_document());
+  REQUIRE(expansion);
+  REQUIRE(expansion.value().circle_profile.has_value());
+  REQUIRE(expansion.value().parameter.has_value());
+  CHECK(expansion.value().circle_profile->center() == Point2{5.0, -2.0});
+  CHECK(expansion.value().parameter->value().millimeters() == Catch::Approx(20.0));
+
+  REQUIRE(controller.commit(session, workbench));
+  const Sketch* sketch = session.part_document()->find_sketch(SketchId("sketch.circle"));
+  REQUIRE(sketch != nullptr);
+  REQUIRE(sketch->circle_profiles().size() == 1U);
+  REQUIRE(session.part_document()->parameters().size() == 1U);
+  CHECK(session.undo_label() == "Create sketch center_radius_circle");
+
+  auto serialized = serialize_part_document_to_json(*session.part_document());
+  REQUIRE(serialized);
+  auto reloaded = deserialize_part_document_from_json(serialized.value());
+  REQUIRE(reloaded);
+  const Sketch* restored = reloaded.value().find_sketch(SketchId("sketch.circle"));
+  REQUIRE(restored != nullptr);
+  REQUIRE(restored->circle_profiles().size() == 1U);
+  REQUIRE(reloaded.value().parameters().size() == 1U);
+  CHECK(reloaded.value()
+            .find_parameter(restored->circle_profiles().front().diameter_parameter())
+            ->value()
+            .millimeters() == Catch::Approx(20.0));
+
+  REQUIRE(session.undo());
+  CHECK(session.part_document()->parameters().empty());
+  CHECK(session.part_document()
+            ->find_sketch(SketchId("sketch.circle"))
+            ->circle_profiles()
+            .empty());
+  REQUIRE(session.redo());
+  CHECK(session.part_document()->parameters().size() == 1U);
+  CHECK(session.part_document()
+            ->find_sketch(SketchId("sketch.circle"))
+            ->circle_profiles()
+            .size() == 1U);
+}
+
+TEST_CASE("Block 112 three-point conics reject degenerate picks and publish tangent preview",
+          "[core][sketch-conics][gui][sketch-create-conics]") {
+  GuiDocumentSession session;
+  GuiSketchWorkbench workbench;
+  seed_sketch_part(session, workbench, "part.create_three_point", "sketch.conic");
+
+  auto circle = controller_for(GuiSketchCreateTool::ThreePointCircle, "sketch.conic");
+  REQUIRE(circle.add_pick(pick(0.0, 0.0)));
+  REQUIRE(circle.add_pick(pick(5.0, 0.0)));
+  REQUIRE(circle.add_pick(pick(10.0, 0.0)));
+  CHECK_FALSE(circle.expansion(*session.part_document()));
+
+  auto arc = controller_for(GuiSketchCreateTool::ThreePointArc, "sketch.conic");
+  REQUIRE(arc.add_pick(pick(0.0, 0.0)));
+  REQUIRE(arc.add_pick(pick(5.0, 0.0)));
+  REQUIRE(arc.add_pick(pick(10.0, 0.0)));
+  CHECK_FALSE(arc.expansion(*session.part_document()));
+
+  auto tangent = controller_for(GuiSketchCreateTool::TangentCircle, "sketch.conic");
+  REQUIRE(tangent.add_pick(pick(0.0, 5.0, GuiSketchSnapKind::Nearest)));
+  REQUIRE(tangent.add_pick(pick(5.0, 0.0, GuiSketchSnapKind::Nearest)));
+  const auto preview = tangent.preview(pick(-5.0, 0.0, GuiSketchSnapKind::Nearest));
+  CHECK(preview.closed);
+  CHECK(std::count_if(preview.constraints.begin(), preview.constraints.end(),
+                      [](const auto& constraint) { return constraint.kind == "tangent"; }) == 3);
+}
+
+TEST_CASE("Block 112 ellipse and elliptical arc expand into persistent cubic spline geometry",
+          "[geometry][sketch-conics][gui][sketch-create-conics]") {
+  GuiDocumentSession session;
+  GuiSketchWorkbench workbench;
+  seed_sketch_part(session, workbench, "part.create_ellipse", "sketch.ellipse");
+
+  auto ellipse = controller_for(GuiSketchCreateTool::Ellipse, "sketch.ellipse");
+  REQUIRE(ellipse.add_pick(pick(0.0, 0.0)));
+  REQUIRE(ellipse.add_pick(pick(12.0, 0.0)));
+  REQUIRE(ellipse.add_pick(pick(0.0, 5.0)));
+  const auto preview = ellipse.preview(std::nullopt);
+  CHECK(preview.closed);
+  CHECK(preview.rubber_band.size() == 64U);
+
+  auto expansion = ellipse.expansion(*session.part_document());
+  REQUIRE(expansion);
+  REQUIRE(expansion.value().splines.size() == 4U);
+  REQUIRE(expansion.value().curve_profile.has_value());
+  REQUIRE(expansion.value().curve_profile->curve_segments().size() == 4U);
+  REQUIRE(ellipse.commit(session, workbench));
+  const Sketch* sketch = session.part_document()->find_sketch(SketchId("sketch.ellipse"));
+  REQUIRE(sketch != nullptr);
+  CHECK(sketch->spline_segments().size() == 4U);
+  CHECK(sketch->arc_closed_profiles().size() == 1U);
+
+  auto elliptical_arc = controller_for(GuiSketchCreateTool::EllipticalArc, "sketch.ellipse");
+  REQUIRE(elliptical_arc.add_pick(pick(30.0, 0.0)));
+  REQUIRE(elliptical_arc.add_pick(pick(42.0, 0.0)));
+  REQUIRE(elliptical_arc.add_pick(pick(30.0, 5.0)));
+  REQUIRE(elliptical_arc.add_pick(pick(42.0, 0.0)));
+  REQUIRE(elliptical_arc.add_pick(pick(30.0, 5.0)));
+  auto arc_expansion = elliptical_arc.expansion(*session.part_document());
+  REQUIRE(arc_expansion);
+  CHECK(arc_expansion.value().splines.size() == 1U);
+  CHECK_FALSE(arc_expansion.value().curve_profile.has_value());
+}
+
+TEST_CASE("Block 112 slot families expand into ordered line and semicircular arc profiles",
+          "[geometry][sketch-conics][gui][sketch-create-conics]") {
+  GuiDocumentSession session;
+  GuiSketchWorkbench workbench;
+  seed_sketch_part(session, workbench, "part.create_slot", "sketch.slot");
+
+  auto center_slot = controller_for(GuiSketchCreateTool::CenterSlot, "sketch.slot");
+  REQUIRE(center_slot.add_pick(pick(0.0, 0.0)));
+  REQUIRE(center_slot.add_pick(pick(20.0, 0.0)));
+  REQUIRE(center_slot.add_pick(pick(0.0, 4.0)));
+  auto expansion = center_slot.expansion(*session.part_document());
+  REQUIRE(expansion);
+  CHECK(expansion.value().lines.size() == 2U);
+  CHECK(expansion.value().arcs.size() == 2U);
+  REQUIRE(expansion.value().curve_profile.has_value());
+  CHECK(expansion.value().curve_profile->curve_segments().size() == 4U);
+  REQUIRE(center_slot.commit(session, workbench));
+  const Sketch* sketch = session.part_document()->find_sketch(SketchId("sketch.slot"));
+  REQUIRE(sketch != nullptr);
+  CHECK(sketch->line_segments().size() == 2U);
+  CHECK(sketch->arc_segments().size() == 2U);
+  CHECK(sketch->arc_closed_profiles().size() == 1U);
+
+  auto overall_slot = controller_for(GuiSketchCreateTool::OverallSlot, "sketch.slot");
+  REQUIRE(overall_slot.add_pick(pick(0.0, 15.0)));
+  REQUIRE(overall_slot.add_pick(pick(20.0, 15.0)));
+  REQUIRE(overall_slot.add_pick(pick(0.0, 19.0)));
+  auto overall_expansion = overall_slot.expansion(*session.part_document());
+  REQUIRE(overall_expansion);
+  CHECK(overall_expansion.value().lines.front().start().x == Catch::Approx(4.0));
+  CHECK(overall_expansion.value().lines.front().end().x == Catch::Approx(16.0));
+
+  auto invalid = controller_for(GuiSketchCreateTool::OverallSlot, "sketch.slot");
+  REQUIRE(invalid.add_pick(pick(0.0, 30.0)));
+  REQUIRE(invalid.add_pick(pick(6.0, 30.0)));
+  REQUIRE(invalid.add_pick(pick(0.0, 34.0)));
+  CHECK_FALSE(invalid.expansion(*session.part_document()));
+}
+
+TEST_CASE("Block 112 conic and slot actions are registered in the Sketch lifecycle",
+          "[gui][sketch-create-conics][integration]") {
+  REQUIRE(qApp != nullptr);
+  MainWindow window;
+  install_sketch_interaction_binder(window);
+  seed_sketch_part(window.session(), window.sketch_workbench(), "part.conic_actions",
+                   "sketch.actions");
+  window.refresh_command_state();
+
+  const std::vector<QString> names{
+      QStringLiteral("blcad.action.sketch_create_center_radius_circle"),
+      QStringLiteral("blcad.action.sketch_create_center_diameter_circle"),
+      QStringLiteral("blcad.action.sketch_create_two_point_circle"),
+      QStringLiteral("blcad.action.sketch_create_three_point_circle"),
+      QStringLiteral("blcad.action.sketch_create_tangent_circle"),
+      QStringLiteral("blcad.action.sketch_create_center_start_end_arc"),
+      QStringLiteral("blcad.action.sketch_create_three_point_arc"),
+      QStringLiteral("blcad.action.sketch_create_tangent_arc"),
+      QStringLiteral("blcad.action.sketch_create_ellipse"),
+      QStringLiteral("blcad.action.sketch_create_elliptical_arc"),
+      QStringLiteral("blcad.action.sketch_create_center_slot"),
+      QStringLiteral("blcad.action.sketch_create_overall_slot"),
+  };
+  for (const auto& name : names)
+    REQUIRE(window.findChild<QAction*>(name) != nullptr);
+
+  auto* tree = window.findChild<QTreeWidget*>(QStringLiteral("blcad.model_browser"));
+  auto* edit = window.findChild<QAction*>(QStringLiteral("blcad.action.edit_sketch"));
+  REQUIRE(tree != nullptr);
+  REQUIRE(edit != nullptr);
+  QTreeWidgetItem* sketch_item = nullptr;
+  for (int index = 0; index < tree->topLevelItemCount() && sketch_item == nullptr; ++index)
+    sketch_item = find_item(tree->topLevelItem(index), u"sketch.actions");
+  REQUIRE(sketch_item != nullptr);
+  tree->setCurrentItem(sketch_item);
+  edit->trigger();
+  qApp->processEvents();
+  for (const auto& name : names)
+    CHECK(window.findChild<QAction*>(name)->isEnabled());
+}
