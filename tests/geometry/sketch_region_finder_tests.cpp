@@ -1,4 +1,5 @@
 #include "blcad/geometry/recompute_executor.hpp"
+#include "blcad/geometry/sketch_finish.hpp"
 #include "blcad/geometry/sketch_region_finder.hpp"
 
 #include <catch2/catch_approx.hpp>
@@ -154,4 +155,67 @@ TEST_CASE("Geometry recomputes subtractive cut from detected sketch region",
   CHECK(summary.value().executed_feature_count == 2U);
   CHECK(cache.value().has_final_shape());
   CHECK(cache.value().final_feature_id() == FeatureId("feature.cut"));
+}
+
+TEST_CASE("Block 119 recognizes and selects multiple disjoint bounded regions",
+          "[geometry][sketch-regions][gui][sketch-profile-selection]") {
+  auto document = PartDocument::create(DocumentId("part.multi-region"), "MultiRegion");
+  REQUIRE(document);
+  REQUIRE(document.value().add_datum_plane(DatumPlane::xy().value()));
+  auto sketch = Sketch::create(SketchId("sketch.multi"), "Multi", DatumPlaneId("datum.xy"));
+  REQUIRE(sketch);
+  add_line(sketch.value(), "a.bottom", {0.0, 0.0}, {4.0, 0.0});
+  add_line(sketch.value(), "a.right", {4.0, 0.0}, {4.0, 4.0});
+  add_line(sketch.value(), "a.top", {4.0, 4.0}, {0.0, 4.0});
+  add_line(sketch.value(), "a.left", {0.0, 4.0}, {0.0, 0.0});
+  add_line(sketch.value(), "b.bottom", {10.0, 0.0}, {14.0, 0.0});
+  add_line(sketch.value(), "b.right", {14.0, 0.0}, {14.0, 4.0});
+  add_line(sketch.value(), "b.top", {14.0, 4.0}, {10.0, 4.0});
+  add_line(sketch.value(), "b.left", {10.0, 4.0}, {10.0, 0.0});
+  REQUIRE(document.value().add_sketch(sketch.value()));
+
+  auto analysis = SketchFinishService::analyze(document.value(), sketch.value());
+  REQUIRE(analysis);
+  CHECK(analysis.value().regions.size() == 2U);
+  CHECK(analysis.value().diagnostics.empty());
+  auto selected = SketchFinishService::select_region_at(analysis.value(), {12.0, 2.0});
+  REQUIRE(selected.has_value());
+  CHECK(selected->value() == "generated.region.sketch.multi.1");
+}
+
+TEST_CASE("Block 119 emits open-contour diagnostics and fails Finish Sketch atomically",
+          "[geometry][sketch-regions][integration][sketch-finish]") {
+  auto document = PartDocument::create(DocumentId("part.open"), "Open");
+  REQUIRE(document);
+  REQUIRE(document.value().add_datum_plane(DatumPlane::xy().value()));
+  auto sketch = Sketch::create(SketchId("sketch.open"), "Open", DatumPlaneId("datum.xy"));
+  REQUIRE(sketch);
+  add_line(sketch.value(), "line.a", {0.0, 0.0}, {5.0, 0.0});
+  add_line(sketch.value(), "line.b", {5.0, 0.0}, {5.0, 5.0});
+  REQUIRE(document.value().add_sketch(sketch.value()));
+
+  auto analysis = SketchFinishService::analyze(document.value(), sketch.value());
+  REQUIRE(analysis);
+  REQUIRE(analysis.value().diagnostics.size() == 1U);
+  CHECK(analysis.value().diagnostics.front().kind == SketchRegionDiagnosticKind::OpenContour);
+  auto finished = SketchFinishService::finish(document.value(), SketchId("sketch.open"));
+  REQUIRE_FALSE(finished);
+  CHECK(document.value().find_sketch(SketchId("sketch.open"))->profile_count() == 0U);
+}
+
+TEST_CASE("Block 119 Finish Sketch materializes the selected region in one document candidate",
+          "[integration][sketch-finish]") {
+  auto document = PartDocument::create(DocumentId("part.finish"), "Finish");
+  REQUIRE(document);
+  REQUIRE(document.value().add_datum_plane(DatumPlane::xy().value()));
+  Sketch sketch = make_unordered_square_sketch();
+  REQUIRE(document.value().add_sketch(sketch));
+
+  auto finished = SketchFinishService::finish(document.value(), SketchId("sketch.region"));
+  REQUIRE(finished);
+  CHECK(finished.value().selected_profile == ProfileId("generated.region.sketch.region.0"));
+  const auto* completed = finished.value().document.find_sketch(SketchId("sketch.region"));
+  REQUIRE(completed != nullptr);
+  CHECK(completed->closed_profiles().size() == 1U);
+  CHECK(document.value().find_sketch(SketchId("sketch.region"))->closed_profiles().empty());
 }
