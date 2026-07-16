@@ -88,7 +88,8 @@ public:
     return values;
   }
 
-  [[nodiscard]] static const std::array<GuiModelingCommandDescriptor, 22>& command_catalog() noexcept {
+  [[nodiscard]] static const std::array<GuiModelingCommandDescriptor, 22>&
+  command_catalog() noexcept {
     static constexpr std::array<GuiModelingCommandDescriptor, 22> commands{{
         {GuiModelingCommand::Extrude, "part.extrude", "Extrude", GuiModelingArea::Part,
          GuiDocumentKind::Part, GuiSelectionKind::SketchEntity, "ProfileRegion", 0, true},
@@ -144,6 +145,16 @@ public:
     return commands;
   }
 
+  [[nodiscard]] static bool has_materialized_profile(const Sketch& sketch,
+                                                      const ProfileId& profile) noexcept {
+    return sketch.find_rectangle_profile(profile) != nullptr ||
+           sketch.find_circle_profile(profile) != nullptr ||
+           sketch.find_closed_profile(profile) != nullptr ||
+           sketch.find_arc_closed_profile(profile) != nullptr ||
+           sketch.find_composite_closed_profile(profile) != nullptr ||
+           sketch.find_circular_hole_pattern(profile) != nullptr;
+  }
+
   [[nodiscard]] static constexpr std::uint32_t
   selection_filter_mask(GuiModelingSelectionFilter filter) noexcept {
     switch (filter) {
@@ -174,12 +185,14 @@ public:
   }
 
   [[nodiscard]] bool set_area(GuiDocumentSession& session, GuiModelingArea area) noexcept {
-    if (session.task().active()) return false;
+    if (session.task().active())
+      return false;
     const bool assembly = area == GuiModelingArea::Assembly;
     if ((assembly && session.document_kind() != GuiDocumentKind::Project) ||
         (!assembly && session.document_kind() != GuiDocumentKind::Part))
       return false;
-    if (!session.set_workspace(assembly ? GuiWorkspace::Assembly : GuiWorkspace::Part)) return false;
+    if (!session.set_workspace(assembly ? GuiWorkspace::Assembly : GuiWorkspace::Part))
+      return false;
     area_ = area;
     preselection_.reset();
     consumed_preselection_context_.reset();
@@ -206,10 +219,12 @@ public:
     preselection.capabilities.erase(
         std::unique(preselection.capabilities.begin(), preselection.capabilities.end()),
         preselection.capabilities.end());
-    if (preselection.capabilities.empty()) return false;
+    if (preselection.capabilities.empty())
+      return false;
 
     session.selection().clear();
-    if (!session.selection().add(preselection.selection)) return false;
+    if (!session.selection().add(preselection.selection))
+      return false;
     preselection_ = std::move(preselection);
     return true;
   }
@@ -219,6 +234,8 @@ public:
     session.selection().clear();
   }
 
+  void clear_preselection_context() noexcept { preselection_.reset(); }
+
   [[nodiscard]] const std::optional<GuiModelingPreselection>& preselection() const noexcept {
     return preselection_;
   }
@@ -227,7 +244,8 @@ public:
   enabled_commands(const GuiDocumentSession& session) const {
     std::vector<GuiModelingCommandDescriptor> enabled;
     for (const auto& command : command_catalog())
-      if (eligible(session, command)) enabled.push_back(command);
+      if (eligible(session, command))
+        enabled.push_back(command);
     return enabled;
   }
 
@@ -239,13 +257,15 @@ public:
         return left.mini_toolbar_priority < right.mini_toolbar_priority;
       return left.label < right.label;
     });
-    if (enabled.size() > limit) enabled.resize(limit);
+    if (enabled.size() > limit)
+      enabled.resize(limit);
     return enabled;
   }
 
   [[nodiscard]] bool begin_command(GuiDocumentSession& session, GuiModelingCommand command) {
     const auto* descriptor = find_command(command);
-    if (descriptor == nullptr || !eligible(session, *descriptor)) return false;
+    if (descriptor == nullptr || !eligible(session, *descriptor))
+      return false;
 
     consumed_preselection_ = session.selection().entries();
     consumed_preselection_context_ = preselection_;
@@ -262,9 +282,13 @@ public:
   [[nodiscard]] bool finish_sketch_handoff(GuiDocumentSession& session, SketchId sketch,
                                             ProfileId profile) {
     if (session.document_kind() != GuiDocumentKind::Part || session.task().active() ||
-        sketch.value().empty() || profile.value().empty())
+        sketch.value().empty() || profile.value().empty() || session.part_document() == nullptr)
       return false;
-    if (!set_area(session, GuiModelingArea::Part)) return false;
+    const Sketch* source = session.part_document()->find_sketch(sketch);
+    if (source == nullptr || !has_materialized_profile(*source, profile))
+      return false;
+    if (!set_area(session, GuiModelingArea::Part))
+      return false;
     return set_preselection(
         session, {{GuiSelectionKind::SketchEntity,
                    "profile-region:" + sketch.value() + ":" + profile.value()},
@@ -272,9 +296,11 @@ public:
   }
 
   [[nodiscard]] bool mark_committed(GuiDocumentSession& session) noexcept {
-    if (!active_command_.has_value() || !session.task().apply()) return false;
+    if (!active_command_.has_value() || !session.task().apply())
+      return false;
     const auto* descriptor = find_command(*active_command_);
-    if (descriptor != nullptr && descriptor->repeatable) last_repeatable_command_ = *active_command_;
+    if (descriptor != nullptr && descriptor->repeatable)
+      last_repeatable_command_ = *active_command_;
     active_command_.reset();
     consumed_preselection_.clear();
     consumed_preselection_context_.reset();
@@ -282,19 +308,22 @@ public:
   }
 
   [[nodiscard]] bool cancel_command(GuiDocumentSession& session) {
-    if (!active_command_.has_value() || !session.task().cancel()) return false;
+    if (!active_command_.has_value() || !session.task().cancel())
+      return false;
     restore_consumed_preselection(session);
     active_command_.reset();
     return true;
   }
 
   [[nodiscard]] bool repeat_last_command(GuiDocumentSession& session) {
-    if (!last_repeatable_command_.has_value() || session.task().active()) return false;
+    if (!last_repeatable_command_.has_value() || session.task().active())
+      return false;
     const auto* descriptor = find_command(*last_repeatable_command_);
     if (descriptor == nullptr || descriptor->area != area_ ||
         descriptor->document_kind != session.document_kind())
       return false;
-    if (!session.task().begin(std::string(descriptor->id))) return false;
+    if (!session.task().begin(std::string(descriptor->id)))
+      return false;
     active_command_ = descriptor->command;
     consumed_preselection_.clear();
     consumed_preselection_context_.reset();
@@ -309,7 +338,8 @@ public:
   }
 
   [[nodiscard]] std::string_view last_repeatable_command_id() const noexcept {
-    const auto* descriptor = last_repeatable_command_ ? find_command(*last_repeatable_command_) : nullptr;
+    const auto* descriptor =
+        last_repeatable_command_ ? find_command(*last_repeatable_command_) : nullptr;
     return descriptor ? descriptor->id : std::string_view{};
   }
 
@@ -340,20 +370,36 @@ public:
     if (target == GuiViewCubeTarget::Home)
       return home_view_.has_value() && viewport.restore_camera_bookmark(*home_view_);
     switch (target) {
-    case GuiViewCubeTarget::Isometric: viewport.set_standard_view(GuiStandardView::Isometric); break;
-    case GuiViewCubeTarget::Front: viewport.set_standard_view(GuiStandardView::Front); break;
-    case GuiViewCubeTarget::Back: viewport.set_standard_view(GuiStandardView::Back); break;
-    case GuiViewCubeTarget::Left: viewport.set_standard_view(GuiStandardView::Left); break;
-    case GuiViewCubeTarget::Right: viewport.set_standard_view(GuiStandardView::Right); break;
-    case GuiViewCubeTarget::Top: viewport.set_standard_view(GuiStandardView::Top); break;
-    case GuiViewCubeTarget::Bottom: viewport.set_standard_view(GuiStandardView::Bottom); break;
-    case GuiViewCubeTarget::Home: break;
+    case GuiViewCubeTarget::Isometric:
+      viewport.set_standard_view(GuiStandardView::Isometric);
+      break;
+    case GuiViewCubeTarget::Front:
+      viewport.set_standard_view(GuiStandardView::Front);
+      break;
+    case GuiViewCubeTarget::Back:
+      viewport.set_standard_view(GuiStandardView::Back);
+      break;
+    case GuiViewCubeTarget::Left:
+      viewport.set_standard_view(GuiStandardView::Left);
+      break;
+    case GuiViewCubeTarget::Right:
+      viewport.set_standard_view(GuiStandardView::Right);
+      break;
+    case GuiViewCubeTarget::Top:
+      viewport.set_standard_view(GuiStandardView::Top);
+      break;
+    case GuiViewCubeTarget::Bottom:
+      viewport.set_standard_view(GuiStandardView::Bottom);
+      break;
+    case GuiViewCubeTarget::Home:
+      break;
     }
     return true;
   }
 
   [[nodiscard]] bool save_camera_bookmark(std::string name, const OcctViewport& viewport) {
-    if (name.empty()) return false;
+    if (name.empty())
+      return false;
     const auto found = std::find_if(camera_bookmarks_.begin(), camera_bookmarks_.end(),
                                     [&name](const auto& value) { return value.name == name; });
     if (found != camera_bookmarks_.end()) {
@@ -374,7 +420,8 @@ public:
   [[nodiscard]] bool remove_camera_bookmark(std::string_view name) noexcept {
     const auto found = std::find_if(camera_bookmarks_.begin(), camera_bookmarks_.end(),
                                     [name](const auto& value) { return value.name == name; });
-    if (found == camera_bookmarks_.end()) return false;
+    if (found == camera_bookmarks_.end())
+      return false;
     camera_bookmarks_.erase(found);
     return true;
   }
