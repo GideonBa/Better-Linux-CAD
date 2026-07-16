@@ -182,6 +182,8 @@ public:
     if (!session.set_workspace(assembly ? GuiWorkspace::Assembly : GuiWorkspace::Part)) return false;
     area_ = area;
     preselection_.reset();
+    consumed_preselection_context_.reset();
+    consumed_preselection_.clear();
     session.selection().clear();
     apply_selection_filter(session, GuiModelingSelectionFilter::All);
     return true;
@@ -246,6 +248,7 @@ public:
     if (descriptor == nullptr || !eligible(session, *descriptor)) return false;
 
     consumed_preselection_ = session.selection().entries();
+    consumed_preselection_context_ = preselection_;
     session.selection().clear();
     if (!session.task().begin(std::string(descriptor->id))) {
       restore_consumed_preselection(session);
@@ -274,10 +277,11 @@ public:
     if (descriptor != nullptr && descriptor->repeatable) last_repeatable_command_ = *active_command_;
     active_command_.reset();
     consumed_preselection_.clear();
+    consumed_preselection_context_.reset();
     return true;
   }
 
-  [[nodiscard]] bool cancel_command(GuiDocumentSession& session) noexcept {
+  [[nodiscard]] bool cancel_command(GuiDocumentSession& session) {
     if (!active_command_.has_value() || !session.task().cancel()) return false;
     restore_consumed_preselection(session);
     active_command_.reset();
@@ -293,6 +297,7 @@ public:
     if (!session.task().begin(std::string(descriptor->id))) return false;
     active_command_ = descriptor->command;
     consumed_preselection_.clear();
+    consumed_preselection_context_.reset();
     preselection_.reset();
     session.selection().clear();
     return true;
@@ -316,6 +321,12 @@ public:
       preselection_.reset();
       session.selection().clear();
     }
+  }
+
+  void apply_selection_filter(GuiDocumentSession& session, OcctViewport& viewport,
+                              GuiModelingSelectionFilter filter) noexcept {
+    apply_selection_filter(session, filter);
+    viewport.set_selection_filter_mask(selection_filter_mask(filter));
   }
 
   [[nodiscard]] GuiModelingSelectionFilter selection_filter() const noexcept {
@@ -390,16 +401,19 @@ private:
            preselection_->supports(command.required_capability);
   }
 
-  void restore_consumed_preselection(GuiDocumentSession& session) noexcept {
+  void restore_consumed_preselection(GuiDocumentSession& session) {
     session.selection().clear();
     for (const auto& selection : consumed_preselection_)
       (void)session.selection().add(selection);
+    preselection_ = consumed_preselection_context_;
     consumed_preselection_.clear();
+    consumed_preselection_context_.reset();
   }
 
   GuiModelingArea area_{GuiModelingArea::Part};
   GuiModelingSelectionFilter selection_filter_{GuiModelingSelectionFilter::All};
   std::optional<GuiModelingPreselection> preselection_;
+  std::optional<GuiModelingPreselection> consumed_preselection_context_;
   std::optional<GuiModelingCommand> active_command_;
   std::optional<GuiModelingCommand> last_repeatable_command_;
   std::vector<GuiSelection> consumed_preselection_;
