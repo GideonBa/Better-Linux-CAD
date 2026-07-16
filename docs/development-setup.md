@@ -97,7 +97,7 @@ On Linux the native OCCT viewport uses Qt xcb when `DISPLAY` is available and
 
 ## Interactive Sketcher focused proof
 
-Blocks 106–115 are implemented.
+Blocks 106–116 are implemented.
 
 Block 106 workspace and command lifecycle:
 
@@ -186,6 +186,20 @@ The Block-115 proof covers all nine family signatures, deterministic sidecar rou
 Length/Angle parameter compatibility, direct and expression-backed value changes, driving/reference
 semantics, calibrated arc length, stable semantic dimension annotations, exact endpoint hit roles,
 atomic add/edit/rebind/mode history, Save/Open, Qt command registration, and later drag enforcement.
+
+Block 116 trim/extend/split, two-line fillet/chamfer, and remap-or-reject rewrite:
+
+```bash
+./build/dev/blcad_core_tests "[core][sketch-modify]"
+./build/dev-geometry/blcad_geometry_tests "[geometry][sketch-modify]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][sketch-trim-extend]"
+```
+
+The Block-116 proof covers trim shorten/split-middle/remove, extend to the next intersection,
+line/arc/spline split, fillet tangent-arc and chamfer connector insertion, preserved in-place
+constraints, explicit rejection of modifications that invalidate a referencing dimension or profile,
+a chamfer result resolving through the Geometry region pipeline, atomic GUI preview/commit with exact
+undo/redo, and fail-closed commit against a Block-114 catalog reference.
 
 ## Representative existing validation tags
 
@@ -284,5 +298,6 @@ rm -rf build/
 
 ## Current development boundary
 
-Blocks 106–115 are implemented. Block 116 is next: trim, extend, split, Sketch corner fillet, and
-Sketch corner chamfer with explicit dependency remap or fail-closed behavior.
+Blocks 106–116 are implemented. Block 117 is next: single/chain/loop offset, associative
+projection/include, construction axes, and break-link conversion over the existing reference-recovery
+and transaction authorities.

@@ -1,6 +1,6 @@
 # Interactive Sketcher Sequence MVP-8
 
-Status: in progress. Blocks 106–115 are implemented; Block 116 is the current next technical step.
+Status: in progress. Blocks 106–116 are implemented; Block 117 is the current next technical step.
 Blocks 106–121 precede Interactive Modeling MVP-9 (Blocks 122–131) and STEP Import MVP-10
 (Blocks 132–138).
 
@@ -48,8 +48,8 @@ Core/Geometry consumers.
 113 spline editing, continuity handles, Sketch text — implemented
 114 manual and automatic geometric constraints with glyph interaction — implemented
 115 driving/reference dimensions, in-canvas editing, parameter/expression binding — implemented
-116 trim, extend, split, corner fillet, corner chamfer — next
-117 offset, project/include, construction axes, associative references
+116 trim, extend, split, corner fillet, corner chamfer — implemented
+117 offset, project/include, construction axes, associative references — next
 118 move, rotate, scale, copy, mirror, rectangular/circular Sketch patterns
 119 region recognition, profile selection, diagnostics, repair, Finish Sketch
 120 interactive Sketch3D creation and direct point/curve manipulation
@@ -226,12 +226,22 @@ Focused tags: `[core][sketch-dimensions]`, `[geometry][sketch-dimensions]`,
 `[gui][sketch-dimensions]`, `[integration][sketch-expression-edit]`,
 `[integration][sketch-live-solve]`.
 
-## Block 116 — Trim, extend, split, fillet, and chamfer — Next
+## Block 116 — Trim, extend, split, fillet, and chamfer — Implemented
 
-Implement trim, extend, split, two-entity Sketch fillet, and Sketch chamfer over complete candidate
-topology. Every rewrite must remap or explicitly reject affected profiles, references, Block-114
-constraints, Block-115 dimensions, and spline continuity records. Ambiguous intersections or reference
-geometry never partially mutate the Sketch.
+`SketchModifyService` (Core) rewrites a disposable candidate Sketch for trim, extend, split, two-line
+fillet, and two-line chamfer using analytic line/arc intersection and De Casteljau spline splitting.
+Trim shortens to the picked bounding intersection, removes a bounded middle as a split, or removes an
+entity with no bounding intersection; extend moves the picked end to the nearest intersection beyond
+it; fillet/chamfer trim both lines to the setback and insert a tangent arc or connector line.
+
+In-place edits keep entity ids so referencing constraints, dimensions, and tangent continuity are
+preserved; removed/split source ids that are referenced by embedded intent, and any modification of a
+profile-contour entity, fail closed with an explicit diagnostic before any candidate is built.
+`GuiSketchModifyController` previews without mutation and commits one atomic transaction that
+re-derives the operation from the current Sketch and re-validates the Block-114 and Block-115
+catalogs, so a modification dropping a catalog-referenced entity fails closed.
+
+Canonical contract: `docs/gui-sketch-modify-mvp8.md`.
 
 Focused tags: `[core][sketch-modify]`, `[geometry][sketch-modify]`,
 `[gui][sketch-trim-extend]`.
@@ -277,7 +287,7 @@ drag, solve, and region-recognition performance.
 Focused tags: `[integration][interactive-sketcher]`, `[integration][sketch-gui-headless]`,
 `[performance][sketch-interaction]`.
 
-## Coverage matrix through Block 115
+## Coverage matrix through Block 116
 
 | Sketch capability | Canonical contract | Interactive owner |
 |---|---|---:|
@@ -292,7 +302,7 @@ Focused tags: `[integration][interactive-sketcher]`, `[integration][sketch-gui-h
 | Parameter-backed Sketch text and font fallback | `gui-sketch-spline-text-mvp8.md` | 113 |
 | Constraint intent, inference, glyphs, conflict preview | `gui-sketch-constraint-authoring-mvp8.md` | 114 |
 | Dimensions, typed parameters, expressions, annotation editing | `gui-sketch-dimension-authoring-mvp8.md` | 115 |
-| Trim/extend and corner modification | future Block-116 contract | 116 |
+| Trim/extend/split and corner fillet/chamfer | `gui-sketch-modify-mvp8.md` | 116 |
 | Offset/project/reference recovery | projection/reference contracts | 117 |
 | Sketch transforms/patterns | pattern contracts | 118 |
 | Automatic regions and Finish Sketch | region/repair contracts | 119 |

@@ -106,7 +106,7 @@ or Geometry variational solver exists.
 
 Canonical contract: `docs/sketch-planar-constraint-solver-mvp8.md`.
 
-## Interactive Sketch architecture through Block 115
+## Interactive Sketch architecture through Block 116
 
 ### Workspace and plane interaction
 
@@ -297,6 +297,7 @@ posed shapes / analysis / XDE and STEP transfer identity
 
 ## Current boundary
 
-Blocks 106–115 are implemented. Block 116 is the current next technical step: trim, extend, split,
-Sketch corner fillet, and Sketch corner chamfer with explicit remap-or-reject behavior for profiles,
-references, constraints, dimensions, and continuity intent.
+Blocks 106–116 are implemented. Block 116 added `SketchModifyService` trim/extend/split/two-line
+fillet/two-line chamfer with explicit remap-or-reject behavior for profiles, references, constraints,
+dimensions, and continuity intent (`docs/gui-sketch-modify-mvp8.md`). Block 117 is the current next
+technical step: offset, associative projection/include, and construction references.

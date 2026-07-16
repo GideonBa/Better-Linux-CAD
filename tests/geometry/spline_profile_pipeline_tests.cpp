@@ -1,8 +1,11 @@
 #include "blcad/geometry/recompute_executor.hpp"
 #include "blcad/geometry/sketch_constraint_glyph.hpp"
 #include "blcad/geometry/sketch_dimension_glyph.hpp"
+#include "blcad/geometry/sketch_region_finder.hpp"
 #include "blcad/geometry/sketch_spline_geometry.hpp"
 #include "blcad/geometry/sketch_text_layout.hpp"
+
+#include "blcad/core/sketch_modify.hpp"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -287,4 +290,39 @@ TEST_CASE("Block 115 dimension glyphs distinguish driving and reference values d
   CHECK(reference_glyph.value().value_text == "(20.000 mm)");
   CHECK(driving_glyph.value().anchor.x == Catch::Approx(10.88).margin(1.0e-9));
   CHECK(driving_glyph.value().anchor.y == Catch::Approx(0.88).margin(1.0e-9));
+}
+
+TEST_CASE("Block 116 chamfer output resolves through the Geometry region pipeline",
+          "[geometry][sketch-modify]") {
+  auto document = PartDocument::create(DocumentId("part.modify.region"), "ModifyRegion");
+  REQUIRE(document);
+  auto xy = DatumPlane::xy();
+  REQUIRE(xy);
+  REQUIRE(document.value().add_datum_plane(xy.value()));
+  auto sketch = Sketch::create(SketchId("sketch.modify"), "Modify", DatumPlaneId("datum.xy"));
+  REQUIRE(sketch);
+  const auto add_line = [&sketch](const char* id, Point2 start, Point2 end) {
+    REQUIRE(sketch.value().add_entity(LineSegment::create(SketchEntityId(id), start, end).value()));
+  };
+  add_line("line.a", {0.0, 0.0}, {10.0, 0.0});
+  add_line("line.b", {10.0, 0.0}, {10.0, 10.0});
+  add_line("line.c", {10.0, 10.0}, {0.0, 10.0});
+  add_line("line.d", {0.0, 10.0}, {0.0, 0.0});
+
+  auto chamfered = SketchModifyService::chamfer(sketch.value(), SketchEntityId("line.a"),
+                                                SketchEntityId("line.d"), 3.0);
+  REQUIRE(chamfered);
+  REQUIRE(document.value().add_sketch(chamfered.value().sketch));
+
+  const Sketch* stored = document.value().find_sketch(SketchId("sketch.modify"));
+  REQUIRE(stored != nullptr);
+  CHECK(stored->line_segments().size() == 5U);
+
+  const SketchRegionFinder finder;
+  auto region = finder.find_single_region(document.value(), *stored);
+  INFO((region.has_error() ? region.error().message() : std::string("region resolved")));
+  REQUIRE(region);
+  CHECK(region.value().line_segments.size() == 5U);
+  auto profile = finder.make_closed_profile(region.value());
+  REQUIRE(profile);
 }

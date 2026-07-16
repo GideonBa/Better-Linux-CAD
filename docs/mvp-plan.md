@@ -4,10 +4,10 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 115
-current_block: 116
-current_boundary: Trim, extend, split, Sketch corner fillet and corner chamfer
-current_tag: "[core][sketch-topology-edit]"
+implemented_through: Block 116
+current_block: 117
+current_boundary: Offset, projection/include, construction axes, and associative references
+current_tag: "[core][sketch-offset-project]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -16,7 +16,7 @@ phase_status:
   mvp_5: "Assembly relationships, motion, hierarchy, analysis, exchange — Blocks 1–47 implemented"
   mvp_6: "Part Construction — Blocks 48–94 implemented; MVP complete"
   mvp_7: "GUI Feature Validation — Blocks 95–105 implemented; MVP complete"
-  mvp_8: "Interactive Sketcher — Blocks 106–115 implemented; Blocks 116–121 planned; Block 116 next"
+  mvp_8: "Interactive Sketcher — Blocks 106–116 implemented; Blocks 117–121 planned; Block 117 next"
   mvp_9: "Interactive Part & Assembly Modeling — Blocks 122–131 planned after Interactive Sketcher acceptance"
   mvp_10: "STEP Import — Blocks 132–138 planned after Interactive Modeling acceptance"
 ---
@@ -30,13 +30,13 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 ## Current status
 
 ```text
-implemented through  Block 115
-current block        Block 116
+implemented through  Block 116
+current block        Block 117
 current phase        Interactive Sketcher MVP-8
-current boundary     trim, extend, split, Sketch fillet/chamfer
+current boundary     offset, projection/include, construction axes, associative references
 ```
 
-Block 115 is implemented. Block 116 is the current next technical step.
+Block 116 is implemented. Block 117 is the current next technical step.
 
 ## Phase map
 
@@ -193,12 +193,37 @@ Focused tags:
 [integration][sketch-live-solve]
 ```
 
-## Current next technical step — Block 116
+### Block 116 — Trim, extend, split, fillet, and chamfer — Implemented
 
-Implement trim, extend, split, Sketch corner fillet, and Sketch corner chamfer over stable Block-108
-topology. Every topology rewrite must remap or explicitly reject affected Block-114 constraints,
-Block-115 dimensions, profiles, references, and spline continuity records. Preview and commit remain
-complete-candidate and fail-closed.
+Block 116 adds `SketchModifyService` (Core) trim, extend, split, two-line fillet, and two-line
+chamfer. It rewrites a disposable candidate Sketch with analytic line/arc intersection and De
+Casteljau spline splitting: trim shortens to the picked bounding intersection, removes a bounded
+middle as a split, or removes an unbounded entity; extend moves the picked end to the nearest
+intersection beyond it; fillet/chamfer trim both lines to the setback and insert a tangent arc or
+connector line.
+
+In-place edits keep entity ids so referencing constraints, dimensions, and tangent continuity are
+preserved. Removed/split ids referenced by embedded intent, and any modification of a profile-contour
+entity, fail closed with an explicit diagnostic before a candidate is built.
+`GuiSketchModifyController` previews without mutation and commits one atomic transaction that
+re-derives the operation from the current Sketch and re-validates the Block-114 and Block-115 catalogs.
+
+Canonical contract: `docs/gui-sketch-modify-mvp8.md`.
+
+Focused tags:
+
+```text
+[core][sketch-modify]
+[geometry][sketch-modify]
+[gui][sketch-trim-extend]
+```
+
+## Current next technical step — Block 117
+
+Implement single/chain/loop offset with side preview, associative projection/include of supported
+model edges/vertices/axes/silhouettes, construction axes, and explicit break-link conversion over the
+existing Sketch reference-recovery and transaction authorities. Lost or ambiguous semantic references
+enter the existing repair workflow; nothing partially mutates the Sketch.
 
 ## Remaining Interactive Sketcher sequence
 

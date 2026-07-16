@@ -9,18 +9,19 @@ page.
 
 The assembly sequence is implemented through Block 47, Part Construction MVP-6 is complete through
 Block 94, and GUI Feature Validation MVP-7 is accepted through Block 105. Interactive Sketcher MVP-8
-is in progress: Blocks 106–115 implement the contextual Sketch workspace, device-independent plane
+is in progress: Blocks 106–116 implement the contextual Sketch workspace, device-independent plane
 interaction, stable shared `SketchPointId` topology, deterministic planar solving with local
 DOF/conflict diagnostics, solver-backed semantic-handle dragging, line/conic/slot creation, spline
-editing, parameter-backed Sketch text, geometric constraint authoring, and typed driving/reference
-Sketch dimensions.
+editing, parameter-backed Sketch text, geometric constraint authoring, typed driving/reference
+Sketch dimensions, and trim/extend/split/fillet/chamfer geometry modification.
 
 Block 115 adds horizontal, vertical, aligned, point-to-point, line-length, arc-radius, arc-diameter,
 angle, and arc-length dimensions; explicit driving/reference semantics; typed Length/Angle parameter
 and expression binding; deterministic semantic in-canvas annotations; canonical
 `blcad.sketch_dimensions.mvp8` sidecar persistence; combined constraint/dimension drag enforcement; and
-atomic parameter/Sketch/catalog undo and redo. Topology-rewriting trim/extend/split/corner operations
-remain Block 116.
+atomic parameter/Sketch/catalog undo and redo. Block 116 adds trim, extend, split, two-line fillet,
+and two-line chamfer that rewrite a disposable candidate Sketch and preserve or explicitly reject
+affected profiles, constraints, dimensions, and continuity.
 
 Canonical Interactive Sketcher contracts include
 [`docs/gui-interactive-sketch-workspace-mvp8.md`](docs/gui-interactive-sketch-workspace-mvp8.md),
@@ -32,8 +33,9 @@ Canonical Interactive Sketcher contracts include
 [`docs/gui-sketch-conic-slot-creation-mvp8.md`](docs/gui-sketch-conic-slot-creation-mvp8.md),
 [`docs/gui-sketch-spline-text-mvp8.md`](docs/gui-sketch-spline-text-mvp8.md),
 [`docs/gui-sketch-constraint-authoring-mvp8.md`](docs/gui-sketch-constraint-authoring-mvp8.md), and
-[`docs/gui-sketch-dimension-authoring-mvp8.md`](docs/gui-sketch-dimension-authoring-mvp8.md). Block 116,
-trim/extend/split/Sketch fillet/chamfer, is next in
+[`docs/gui-sketch-dimension-authoring-mvp8.md`](docs/gui-sketch-dimension-authoring-mvp8.md), and
+[`docs/gui-sketch-modify-mvp8.md`](docs/gui-sketch-modify-mvp8.md). Block 117, offset/projection and
+associative references, is next in
 [`docs/interactive-sketcher-sequence-mvp8.md`](docs/interactive-sketcher-sequence-mvp8.md).
 
 The optional Qt desktop covers document, Sketch, Part, Surface, Assembly, motion, analysis, and

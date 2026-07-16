@@ -419,6 +419,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/sketch_diagnostics_tests.cpp
     tests/core/sketch_constraint_solver_tests.cpp
     tests/core/sketch_dimension_tests.cpp
+    tests/core/sketch_modify_tests.cpp
     tests/core/sketch_repair_command_labels_tests.cpp
     tests/core/sketch_repair_commands_tests.cpp
     tests/core/sketch_repair_presentation_metadata_tests.cpp

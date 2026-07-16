@@ -65,8 +65,10 @@ Blocks 112–115 are implemented: circle/arc/ellipse/slot creation
 (`docs/gui-sketch-conic-slot-creation-mvp8.md`), spline editing plus parameter-backed Sketch text
 (`docs/gui-sketch-spline-text-mvp8.md`), constraint authoring with glyphs and conflict preview
 (`docs/gui-sketch-constraint-authoring-mvp8.md`), and driving/reference dimensions with
-parameter/expression binding (`docs/gui-sketch-dimension-authoring-mvp8.md`). Block 116 is the
-current next technical step and adds trim, extend, split, Sketch fillet, and Sketch chamfer.
+parameter/expression binding (`docs/gui-sketch-dimension-authoring-mvp8.md`). Block 116 adds
+trim, extend, split, two-line fillet, and two-line chamfer geometry modification
+(`docs/gui-sketch-modify-mvp8.md`). Block 117 is the current next technical step and adds offset,
+associative projection/include, and construction references.
 
 Development rule:
 

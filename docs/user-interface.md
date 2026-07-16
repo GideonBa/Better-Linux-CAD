@@ -5,9 +5,10 @@ Qt shell, document transactions, OCCT viewport, deterministic browser/property s
 selection synchronization. Blocks 106–110 establish the contextual Sketch workspace, transient plane interaction, persistent
 shared planar topology, deterministic general planar solver, and solver-backed semantic-handle mouse
 dragging. Block 111 adds multi-click basic creation tools with rubber-band previews and numeric
-entry. Blocks 112–115 add circle/arc/ellipse/slot creation, spline editing with Sketch text,
-constraint authoring with semantic glyphs, and driving/reference dimensions with expression binding.
-Block 116 is the current next technical step and adds trim/extend/split and Sketch corner tools.
+entry. Blocks 112–116 add circle/arc/ellipse/slot creation, spline editing with Sketch text,
+constraint authoring with semantic glyphs, driving/reference dimensions with expression binding, and
+trim/extend/split/fillet/chamfer modification. Block 117 is the current next technical step and adds
+offset, associative projection, and construction references.
 Blocks 122–131 add interactive Part/Surface/Assembly modeling; STEP Import begins with Block 132.
 
 The UI is deliberately not built like FreeCAD. The goal is a modern, consistent, reduced interface
@@ -281,7 +282,7 @@ but release cannot commit a failed candidate.
 
 ## Current boundary
 
-Blocks 110–115 are implemented. Block 116 is next.
+Blocks 110–116 are implemented. Block 117 is next.
 
 No widget may implement substitute constraint mathematics. Basic creation must map transient picks and
 snap results to explicit Block-108 topology/edit commands, use Block-109 solve authority for disposable
