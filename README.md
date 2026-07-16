@@ -8,22 +8,17 @@ live in [`docs/`](docs/). This README is intentionally kept small and evergreen 
 page.
 
 The assembly sequence is implemented through Block 47, Part Construction MVP-6 is complete through
-Block 94, and GUI Feature Validation MVP-7 is accepted through Block 105. Interactive Sketcher MVP-8
-is in progress: Blocks 106–120 implement the contextual Sketch workspace, device-independent plane
-interaction, stable shared `SketchPointId` topology, deterministic planar solving with local
-DOF/conflict diagnostics, solver-backed semantic-handle dragging, line/conic/slot creation, spline
-editing, parameter-backed Sketch text, geometric constraint authoring, typed driving/reference
-Sketch dimensions, trim/extend/split/fillet/chamfer modification, line-chain/loop offset, associative
-projection/include, construction references, explicit break-link conversion, selected-geometry
-move/rotate/scale/copy/mirror, rectangular/circular Sketch patterns, multi-region recognition,
-profile selection, contour diagnostics, atomic Finish Sketch candidates, and direct Sketch3D point/
-line placement and manipulation.
+Block 94, GUI Feature Validation MVP-7 is accepted through Block 105, and Interactive Sketcher MVP-8
+is accepted through Block 121. Blocks 106–120 implement the contextual Sketch workspace,
+device-independent plane interaction, stable shared topology, deterministic planar solving, semantic
+handle dragging, planar creation and editing, constraints and dimensions, reference-aware modify and
+pattern tools, automatic regions and Finish Sketch, and direct Sketch3D point/line interaction.
 
-Block 119 adds connected-component region recognition over solved line geometry, stable
-open/self-crossing/ambiguous diagnostics, point-based profile selection, and fail-closed Finish Sketch
-materialization. Block 120 adds orthogonal axis/plane locks, typed XYZ and distance/angle placement,
-atomic 3D point/line creation, shared-point handle editing, persistent guide roles, and explicit
-planar-Sketch point projection source intent without introducing a full 3D variational solver.
+Block 121 closes MVP-8 with a machine-readable coverage manifest for all fifteen capability families,
+two deterministic tutorial documents, eight mandatory acceptance-evidence categories, and frozen
+representative hover, drag, solve, and region-recognition performance budgets. The manifest is compiled
+and verified by the registered Core test target; wall-clock budgets remain dedicated benchmark metadata
+rather than nondeterministic ordinary-CI assertions.
 
 Canonical Interactive Sketcher contracts include
 [`docs/gui-interactive-sketch-workspace-mvp8.md`](docs/gui-interactive-sketch-workspace-mvp8.md),
@@ -39,14 +34,13 @@ Canonical Interactive Sketcher contracts include
 [`docs/gui-sketch-modify-mvp8.md`](docs/gui-sketch-modify-mvp8.md),
 [`docs/gui-sketch-offset-project-mvp8.md`](docs/gui-sketch-offset-project-mvp8.md),
 [`docs/gui-sketch-transform-pattern-mvp8.md`](docs/gui-sketch-transform-pattern-mvp8.md),
-[`docs/gui-sketch-regions-finish-mvp8.md`](docs/gui-sketch-regions-finish-mvp8.md), and
-[`docs/gui-sketch3d-interaction-mvp8.md`](docs/gui-sketch3d-interaction-mvp8.md). Block 121,
-integrated Interactive Sketcher acceptance, is next in
-[`docs/interactive-sketcher-sequence-mvp8.md`](docs/interactive-sketcher-sequence-mvp8.md).
+[`docs/gui-sketch-regions-finish-mvp8.md`](docs/gui-sketch-regions-finish-mvp8.md),
+[`docs/gui-sketch3d-interaction-mvp8.md`](docs/gui-sketch3d-interaction-mvp8.md), and
+[`docs/interactive-sketcher-acceptance-mvp8.md`](docs/interactive-sketcher-acceptance-mvp8.md).
 
 The optional Qt desktop covers document, Sketch, Part, Surface, Assembly, motion, analysis, and
-STEP-export validation workflows without moving authority out of Core/Geometry. Blocks 122–131 plan
-Interactive Part & Assembly Modeling in
+STEP-export validation workflows without moving authority out of Core/Geometry. Interactive Part &
+Assembly Modeling MVP-9 begins at Block 122 in
 [`docs/interactive-modeling-sequence-mvp9.md`](docs/interactive-modeling-sequence-mvp9.md); STEP Import
 MVP-10 follows in Blocks 132–138.
 
@@ -67,16 +61,10 @@ Start here:
 - [`docs/mvp-plan.md`](docs/mvp-plan.md) — implementation sequence and current status
 - [`docs/development-setup.md`](docs/development-setup.md) — building, testing, and focused test tags
 - [`docs/file-format.md`](docs/file-format.md) — save-format authority
-- [`docs/sketch-shared-topology-mvp8.md`](docs/sketch-shared-topology-mvp8.md) — shared planar topology/migration
-- [`docs/sketch-planar-constraint-solver-mvp8.md`](docs/sketch-planar-constraint-solver-mvp8.md) — planar solver/DOF/diagnostics
-- [`docs/gui-sketch-solver-drag-mvp8.md`](docs/gui-sketch-solver-drag-mvp8.md) — semantic handles/live solver/atomic drag
-- [`docs/gui-sketch-spline-text-mvp8.md`](docs/gui-sketch-spline-text-mvp8.md) — spline editing and Sketch text
-- [`docs/gui-sketch-constraint-authoring-mvp8.md`](docs/gui-sketch-constraint-authoring-mvp8.md) — constraint intent, inference, glyphs, and conflict preview
-- [`docs/gui-sketch-dimension-authoring-mvp8.md`](docs/gui-sketch-dimension-authoring-mvp8.md) — driving/reference dimensions, typed values, expressions, and in-canvas editing
-- [`docs/gui-sketch-offset-project-mvp8.md`](docs/gui-sketch-offset-project-mvp8.md) — offset, associative projection/include, and break-link semantics
-- [`docs/gui-sketch-transform-pattern-mvp8.md`](docs/gui-sketch-transform-pattern-mvp8.md) — selected-geometry transforms, mirror, and pattern intent
-- [`docs/gui-sketch-regions-finish-mvp8.md`](docs/gui-sketch-regions-finish-mvp8.md) — regions, profile selection, diagnostics, and Finish Sketch
-- [`docs/gui-sketch3d-interaction-mvp8.md`](docs/gui-sketch3d-interaction-mvp8.md) — axis/plane locks, typed 3D placement, handles, guides, and projection
+- [`docs/interactive-sketcher-sequence-mvp8.md`](docs/interactive-sketcher-sequence-mvp8.md) — Blocks 106–121 sequence and explicit deferrals
+- [`docs/interactive-sketcher-acceptance-mvp8.md`](docs/interactive-sketcher-acceptance-mvp8.md) — Block-121 coverage, evidence, tutorials, and performance budgets
+- [`docs/tutorials/interactive-sketcher-planar-mvp8.md`](docs/tutorials/interactive-sketcher-planar-mvp8.md) — deterministic planar acceptance tutorial
+- [`docs/tutorials/interactive-sketcher-sketch3d-mvp8.md`](docs/tutorials/interactive-sketcher-sketch3d-mvp8.md) — deterministic Sketch3D acceptance tutorial
 
 ## License
 
