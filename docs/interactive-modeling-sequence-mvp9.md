@@ -1,7 +1,7 @@
 # Interactive Part & Assembly Modeling Sequence MVP-9
 
-Status: active through implemented Block 122 after accepted Interactive Sketcher Block 121. Blocks
-123–131 precede STEP Import MVP-10 (Blocks 132–138); Block 123 is the current next technical step.
+Status: active through implemented Block 123 after accepted Interactive Sketcher Block 121. Blocks
+124–131 precede STEP Import MVP-10 (Blocks 132–138); Block 124 is the current next technical step.
 
 This phase closes the interaction gap between the accepted validation GUI (MVP-7, Blocks 95–105)
 and an intuitive, Inventor-familiar modeling experience for **every feature family implemented
@@ -162,15 +162,26 @@ Canonical contract: `docs/gui-modeling-workspace-mvp9.md`.
 Focused tags: `[gui][modeling-workspace]`, `[gui][in-context-command]`,
 `[gui][view-navigation-aids]`.
 
-## Block 123 — Transient viewport manipulator infrastructure
+## Block 123 — Transient viewport manipulator infrastructure — Implemented
 
-Create one reusable manipulator layer: linear drag arrow (distances/thicknesses), angular wheel
-(angles/twist), radial handle (radii/diameters), translate/rotate triad, and pattern count/spacing
-handles. Handles are zoom-stable, have deterministic model-space mapping with screen-space tie
-breaking (the Block-107 convention generalized off the sketch plane), couple bidirectionally with
-the numeric HUD (typing overrides dragging), and emit candidate parameter values only. Manipulators
-never mutate documents; the owning command turns candidate values into one preview/apply
-transaction.
+`GuiViewportManipulatorLayer` now supplies reusable Linear, Angular, Radial, TranslateAxis,
+RotateAxis, PatternCount, and PatternSpacing handles. Each stable handle descriptor carries a
+model-space origin/frame, current reference value, optional limits, fixed DIP presentation size, and
+fixed DIP hit tolerance. Camera-ray mapping resolves linear values against model axes and radial or
+angular values against explicit model planes. Display arrows and rings remain zoom-stable while the
+resulting candidate values follow the current camera scale.
+
+Hit testing uses point-to-segment or distance-to-ring screen metrics, ordered by DIP distance and then
+stable handle id. Drag start freezes the initial model measurement so the parameter does not jump to
+the visual handle endpoint. Release processes the exact final pointer sample. Valid numeric input
+updates the same candidate and overrides later pointer movement until the override is cleared;
+invalid units or fractional pattern counts leave the last valid candidate unchanged.
+
+`GuiViewportManipulatorShellBinder` owns the transparent viewport overlay, mouse capture, `Esc` and
+window-deactivation cancellation, camera refresh, and the shared numeric HUD. The controller and
+binder emit candidate parameter values only and have no `GuiDocumentSession`, Core mutation,
+Geometry-preview, or persistence authority. Blocks 124–130 remain responsible for disposable
+feature previews and one validated Apply transaction.
 
 Existing authority:
 
@@ -179,6 +190,8 @@ Existing authority:
 - `docs/gui-feature-validation-sequence-mvp7.md` (Block 97 viewport and picking boundary)
 
 New intent allowed: none.
+
+Canonical contract: `docs/gui-viewport-manipulators-mvp9.md`.
 
 Focused tags: `[gui][viewport-manipulators]`, `[gui][manipulator-numeric-coupling]`.
 
