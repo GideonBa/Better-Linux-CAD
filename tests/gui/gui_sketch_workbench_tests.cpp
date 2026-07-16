@@ -1,3 +1,4 @@
+#include "blcad/gui/gui_sketch_spline.hpp"
 #include "blcad/gui/gui_sketch_workbench.hpp"
 #include "blcad/gui/main_window.hpp"
 #include "blcad/gui/occt_viewport.hpp"
@@ -298,4 +299,60 @@ TEST_CASE("Block 106 drag candidates remain transient until commit or cancel",
   REQUIRE(workspace.commit_drag(session));
   CHECK(workspace.stage() == GuiSketchInteractionStage::Idle);
   CHECK_FALSE(session.task().active());
+}
+
+TEST_CASE("Block 113 GUI spline editing previews without mutation and commits one transaction",
+          "[gui][sketch-spline]") {
+  GuiDocumentSession session;
+  GuiSketchWorkbench workbench;
+  REQUIRE(session.create_part(DocumentId("part.gui_spline"), "GUI Spline"));
+  REQUIRE(workbench.create_xy_datum(session, DatumPlaneId("datum.xy"), "XY"));
+
+  auto sketch = Sketch::create(SketchId("sketch.gui_spline"), "GUI Spline",
+                               DatumPlaneId("datum.xy"));
+  REQUIRE(sketch);
+  REQUIRE(sketch.value().add_entity(SplineSegment::create_cubic_bezier(
+      SketchEntityId("spline.a"), {0.0, 0.0}, {3.0, 0.0}, {7.0, 5.0}, {10.0, 5.0}).value()));
+  REQUIRE(sketch.value().add_entity(SplineSegment::create_cubic_bezier(
+      SketchEntityId("spline.b"), {10.0, 5.0}, {10.0, 8.0}, {17.0, 0.0}, {20.0, 0.0}).value()));
+  REQUIRE(workbench.create_sketch(session, std::move(sketch.value())));
+
+  const Point2 original_control = session.part_document()
+                                      ->find_sketch(SketchId("sketch.gui_spline"))
+                                      ->find_spline_segment(SketchEntityId("spline.b"))
+                                      ->control1();
+  auto controller = GuiSketchSplineController::create(
+      *session.part_document(), SketchId("sketch.gui_spline"),
+      {SketchEntityId("spline.a"), SketchEntityId("spline.b")});
+  REQUIRE(controller);
+  REQUIRE(controller.value().align_tangent(0U));
+
+  auto preview = controller.value().preview();
+  REQUIRE(preview);
+  REQUIRE(preview.value().authoring.continuity_handles.size() == 1U);
+  CHECK(preview.value().authoring.continuity_handles.front().tangent_continuous);
+  REQUIRE(preview.value().geometry.continuity.size() == 1U);
+  CHECK(preview.value().geometry.continuity.front().tangent_continuous);
+  CHECK(session.part_document()
+            ->find_sketch(SketchId("sketch.gui_spline"))
+            ->find_spline_segment(SketchEntityId("spline.b"))
+            ->control1() == original_control);
+
+  REQUIRE(controller.value().commit(session));
+  CHECK(session.undo_label() == "Edit sketch spline");
+  const Point2 committed_control = session.part_document()
+                                       ->find_sketch(SketchId("sketch.gui_spline"))
+                                       ->find_spline_segment(SketchEntityId("spline.b"))
+                                       ->control1();
+  CHECK_FALSE(committed_control == original_control);
+  REQUIRE(session.undo());
+  CHECK(session.part_document()
+            ->find_sketch(SketchId("sketch.gui_spline"))
+            ->find_spline_segment(SketchEntityId("spline.b"))
+            ->control1() == original_control);
+  REQUIRE(session.redo());
+  CHECK(session.part_document()
+            ->find_sketch(SketchId("sketch.gui_spline"))
+            ->find_spline_segment(SketchEntityId("spline.b"))
+            ->control1() == committed_control);
 }

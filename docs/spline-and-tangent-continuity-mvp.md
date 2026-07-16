@@ -1,30 +1,29 @@
 # Spline and tangent-continuity sketch profile seed
 
-This document describes the first spline-profile seed.
+This document describes the original spline-profile seed and its Block-113 interactive extension.
 
-The goal is to add one deterministic spline representation to the sketch/profile pipeline without introducing a full spline editor, a NURBS model, or a sketch constraint solver.
-
-## Implemented scope
-
-The core sketch model now includes `SplineSegment` as a cubic Bezier curve:
+The persistent spline representation remains one deterministic cubic Bezier curve:
 
 ```text
 start -> control1 -> control2 -> end
 ```
 
-A spline segment is explicit model intent. It stores its own control points and is not computed from solver state.
+A spline segment is explicit model intent. It stores its own control points and is not computed from
+screen state or an opaque solver cache.
 
-The existing `ArcClosedProfile` profile record is extended to accept ordered line, circular-arc, and spline curve segment IDs. The name remains historical; at this stage it acts as the first mixed-curve closed-profile record.
+## Original implemented scope
 
-## Tangent metadata
+The Core Sketch model includes `SplineSegment` as a cubic Bezier curve. The historical
+`ArcClosedProfile` record accepts ordered line, circular-arc, and spline entity ids and therefore acts
+as the mixed-curve closed-profile carrier.
 
-`SketchTangentContinuity` stores first tangent-continuity intent between two explicit sketch curve entities.
-
-The first seed validates that both referenced entities exist and that the two entities are distinct. It does not solve or modify curve control points. Tangency is persisted as model intent for later solver work.
+`SketchTangentContinuity` stores tangent-continuity intent between two distinct explicit Sketch curve
+entities. The record validates references and persists semantic intent; Geometry and solver consumers
+remain responsible for evaluation.
 
 ## JSON persistence
 
-Sketch JSON now supports:
+Historical Part Sketch JSON supports:
 
 ```json
 {
@@ -49,28 +48,50 @@ Sketch JSON now supports:
 }
 ```
 
-Existing `arc_closed_profiles` can reference spline IDs in their ordered `curve_segments` list.
+Existing `arc_closed_profiles` can reference spline ids in their ordered `curve_segments` list.
 
 ## Geometry behavior
 
-The optional geometry layer maps spline control points through the resolved sketch workplane and builds an OCCT Bezier edge from four poles.
+The optional Geometry layer maps spline control points through the resolved Sketch workplane and
+builds an OCCT Bezier edge from four poles. Spline profiles support additive extrude and subtractive
+through-all cut. Through-all cuts use the resolved Sketch-normal axis and are not restricted to
+principal axes.
 
-Spline profiles can be used for:
+## Block-113 interactive extension
 
-- additive extrude from one mixed line/arc/spline closed profile
-- subtractive through-all cut from one mixed line/arc/spline closed profile
+Block 113 adds `SketchSplineEditModel`, `SketchSplineGeometryEvaluator`, and
+`GuiSketchSplineController` while preserving cubic `SplineSegment` as the sole persistent curve type.
+The extension implements:
 
-Through-all cuts use the resolved sketch-normal axis and are no longer restricted to principal X/Y/Z axes for this path.
+- semantic endpoint, control-point, fit-point, and continuity handles;
+- visible control polygons;
+- control-point movement with connected endpoint preservation;
+- deterministic control-to-fit and fit-to-control conversion;
+- fit-point insertion and removal with at least two retained points;
+- Catmull-Rom-to-cubic-Bezier fit expansion;
+- C0/G1 continuity diagnostics and tangent-handle alignment;
+- immutable preview candidates and one atomic `Edit sketch spline` document transaction;
+- stale-source and dependency-aware fail-closed behavior.
+
+Fit points, control polygons, sampled display curves, curvature samples, and handle positions are
+derived authoring state. Persisted output remains cubic segments plus existing tangent-continuity
+records and survives the existing Part JSON path.
+
+The complete interactive contract, including Sketch text and font fallback, is
+`docs/gui-sketch-spline-text-mvp8.md`.
 
 ## Test coverage
 
-The tests cover:
+The original and Block-113 tests cover:
 
-- JSON roundtrip for `spline_segments`
-- JSON roundtrip for `tangent_continuities`
-- restored spline control points
-- additive spline-profile recompute
-- subtractive spline-profile recompute
+- spline and tangent-continuity JSON roundtrip;
+- restored spline control points;
+- additive and subtractive spline-profile recompute;
+- deterministic fit/control conversion and generated ids;
+- fit-point insertion/removal;
+- control polygons and C0/G1 continuity handles;
+- candidate immutability, atomic commit, and exact undo/redo;
+- deterministic spline sampling, derivatives, curvature, and continuity diagnostics.
 
 A checked-in example model is available at:
 
@@ -80,8 +101,7 @@ examples/spline_profile_prism.blcad.json
 
 ## Deliberate limitations
 
-This block does not implement a full spline editor.
-
-It does not implement NURBS weights, knot vectors, degree elevation, automatic tangent solving, automatic fillets, constraint solving, driven tangent dimensions, GUI spline handles, 3D splines, sweep, loft, surface stitching, or closed-shell-to-solid conversion.
-
-Spline self-intersection validation is intentionally conservative. The first seed validates profile connectivity and uses a chord-level approximation for spline interactions where exact spline-curve intersection is not implemented yet.
+The persistent model does not introduce NURBS weights, knot vectors, arbitrary degree elevation, or a
+second fit-spline save format. Exact spline self-intersection remains conservative where the existing
+profile pipeline uses chord-level interaction tests. Block 114 owns general constraint authoring;
+Block 115 owns driving/reference dimensions.

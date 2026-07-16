@@ -73,20 +73,19 @@ transaction begins. No fallback line or partial entity is emitted.
 
 ## Ellipse representation
 
-The current Core model has exact circle and three-point arc intent but no independent analytic ellipse
-record. Block 112 therefore uses a deterministic persistent cubic-Bezier representation rather than a
-sampled polyline:
+The Core model has exact circle and three-point arc intent but no independent analytic ellipse record.
+Block 112 therefore uses a deterministic persistent cubic-Bezier representation rather than a sampled
+polyline:
 
 - a full ellipse is split into four 90-degree cubic `SplineSegment` spans;
 - an elliptical arc is split into the minimum number of spans whose absolute sweep is at most 90
   degrees;
-- control points use the standard endpoint-tangent coefficient
-  `4/3 * tan(delta_parameter / 4)`;
+- control points use `4/3 * tan(delta_parameter / 4)`;
 - a full ellipse adds one ordered `ArcClosedProfile`; an open elliptical arc adds no profile.
 
-This representation survives JSON, topology migration, solver-backed spline handles, Geometry
-materialization, and exact undo/redo through existing authorities. Block 113 may edit the resulting
-control points and continuity, but does not reinterpret them as a different hidden GUI curve.
+This representation survives JSON, topology migration, Geometry materialization, and exact undo/redo.
+Block 113 now edits these ordinary spline spans through the same cubic representation, with control/
+fit handles and complete candidate validation; no hidden ellipse-specific GUI curve is introduced.
 
 ## Slot representation
 
@@ -114,14 +113,13 @@ Preview samples are transient and never serialized:
 - circles and ellipses publish closed sampled rubber bands;
 - arcs and elliptical arcs publish open sampled rubber bands;
 - slots publish a closed line/arc-shaped rubber band;
-- center, endpoint, quadrant, nearest, and inference snaps publish the same automatic-constraint
-  preview records as Block 111;
+- center, endpoint, quadrant, nearest, and inference snaps publish automatic-constraint previews;
 - tangent tools additionally publish explicit `tangent` preview records.
 
-After commit, arcs expose endpoint, through-point, center, and radius handles through the Block-110
-arc authority. Ellipse splines expose endpoints and both control handles. Slot lines and arcs expose
-their ordinary line/arc handles. Exact full-circle diameter editing remains parameter-owned and is
-surfaced by Block 115.
+After commit, arcs expose endpoint, through-point, center, and radius handles through Block 110.
+Ellipse splines expose Block-113 control/fit/continuity handles. Slot lines and arcs expose ordinary
+line/arc handles. Exact full-circle diameter editing remains parameter-owned and is surfaced by
+Block 115.
 
 ## Determinism and failure rules
 
@@ -139,8 +137,6 @@ surfaced by Block 115.
 
 ## Verification
 
-Focused tests:
-
 ```bash
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[core][sketch-conics]"
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[geometry][sketch-conics]"
@@ -149,11 +145,11 @@ QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][sketch-create-c
 
 Acceptance covers exact CircleProfile/Parameter persistence, JSON roundtrip, atomic undo/redo,
 degenerate three-point rejection, tangent preview, cubic ellipse expansion, ordered slot contours, and
-registration of every new action in the Sketch command lifecycle.
+action registration in the Sketch command lifecycle.
 
-## Next boundary
+## Following boundaries
 
-Block 113 owns fit/control-point spline editing, control polygon and insertion/removal UX, continuity
-handles, supported representation conversion, and Sketch text. Block 114 owns persistent tangent and
-other automatic/manual constraint acceptance; Block 115 owns radius/diameter dimensions and direct
-parameter editing.
+Block 113 is implemented in `docs/gui-sketch-spline-text-mvp8.md` and owns fit/control-point spline
+editing, control polygons, insertion/removal, continuity handles, deterministic conversion, and Sketch
+text. Block 114 is next and owns persistent tangent and other automatic/manual constraint acceptance;
+Block 115 owns radius/diameter dimensions and direct parameter editing.
