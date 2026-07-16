@@ -13,6 +13,11 @@
 #include <nlohmann/json.hpp>
 
 #include <QApplication>
+#include <QComboBox>
+#include <QFrame>
+#include <QTabBar>
+#include <QToolBar>
+#include <QToolButton>
 
 #include <filesystem>
 #include <fstream>
@@ -55,7 +60,8 @@ TEST_CASE("Block 105 coverage manifest accounts for every implemented GUI featur
       CHECK_FALSE(family.at(field).get<std::string>().empty());
     CHECK(family.at("owner").get<int>() >= 95);
     CHECK(family.at("owner").get<int>() <= 104);
-    if (family.at("disposition") == "read_only") CHECK(family.at("core_read_only") == true);
+    if (family.at("disposition") == "read_only")
+      CHECK(family.at("core_read_only") == true);
   }
   CHECK(covered == required);
   for (const auto& sample : manifest.at("sample_documents"))
@@ -85,7 +91,8 @@ TEST_CASE("Block 105 GUI Part sample is canonically equivalent to headless load 
   const Parameter& parameter = gui.part_document()->parameters().front();
   REQUIRE(parameter.type() == ParameterType::Length);
   GuiPartFoundationWorkbench foundation;
-  REQUIRE(foundation.set_parameter_value(gui, parameter.id(),
+  REQUIRE(foundation.set_parameter_value(
+      gui, parameter.id(),
       Quantity::length_mm(parameter.value().millimeters() + 1.0, parameter.id().value()).value()));
   const std::string edited = serialize_part_document_to_json(*gui.part_document()).value();
   CHECK(edited != original);
@@ -104,7 +111,8 @@ TEST_CASE("Block 105 GUI Project sample equals headless intent and survives reco
   GuiDocumentSession gui;
   REQUIRE(gui.open_file(path));
   REQUIRE(gui.project() != nullptr);
-  CHECK(serialize_project_to_json(*gui.project()).value() == serialize_project_to_json(headless.value()).value());
+  CHECK(serialize_project_to_json(*gui.project()).value() ==
+        serialize_project_to_json(headless.value()).value());
   REQUIRE(gui.recompute());
   CHECK(gui.project()->validate_assembly_structure());
   CHECK(gui.project()->assembly().subassembly_instance_count() > 0);
@@ -115,11 +123,15 @@ TEST_CASE("Block 105 integrated fail-closed paths publish no partial GUI state",
   GuiDocumentSession session;
   REQUIRE(session.create_part(DocumentId("part.fail_closed"), "Fail closed"));
   GuiPartFoundationWorkbench foundation;
-  REQUIRE(foundation.create_parameter(session, Parameter::create_length(ParameterId("depth"),
-      "Depth", Quantity::length_mm(10).value()).value()));
+  REQUIRE(foundation.create_parameter(
+      session, Parameter::create_length(ParameterId("depth"), "Depth",
+                                        Quantity::length_mm(10).value())
+                   .value()));
   const auto before_revision = session.presentation_revision();
   auto invalid = Feature::create_additive_extrude(FeatureId("feature.invalid"), "Invalid",
-      SketchId("missing.sketch"), ParameterId("depth")).value();
+                                                   SketchId("missing.sketch"),
+                                                   ParameterId("depth"))
+                     .value();
   CHECK(foundation.preview_extrude(session, invalid).has_error());
   CHECK(session.part_document()->feature_count() == 0);
   CHECK(session.presentation_revision() == before_revision);
@@ -129,8 +141,9 @@ TEST_CASE("Block 105 integrated fail-closed paths publish no partial GUI state",
   GuiAnalysisExportWorkbench export_workbench;
   const auto output = std::filesystem::temp_directory_path() / "blcad-block105-invalid.step";
   std::filesystem::remove(output);
-  CHECK(export_workbench.preflight_step_export(
-      session, {GuiStepExportMode::PartMultiBody, output}).has_error());
+  CHECK(export_workbench
+            .preflight_step_export(session, {GuiStepExportMode::PartMultiBody, output})
+            .has_error());
   CHECK_FALSE(std::filesystem::exists(output));
   std::filesystem::remove(output);
 }
@@ -180,7 +193,25 @@ TEST_CASE("Block 122 Finish Sketch handoff and selection filters fail closed",
           "[gui][modeling-workspace][gui][in-context-command]") {
   GuiDocumentSession session;
   GuiModelingWorkspace workspace;
+  GuiPartFoundationWorkbench foundation;
+  GuiSketchWorkbench sketches;
   REQUIRE(session.create_part(DocumentId("part.finish_handoff"), "Finish Handoff"));
+  REQUIRE(sketches.create_xy_datum(session, DatumPlaneId("datum.profile"), "Profile Plane"));
+  REQUIRE(foundation.create_parameter(
+      session, Parameter::create_length(ParameterId("profile.diameter"), "Profile Diameter",
+                                        Quantity::length_mm(20).value())
+                   .value()));
+  REQUIRE(sketches.create_sketch(
+      session, Sketch::create(SketchId("sketch.profile"), "Profile",
+                              DatumPlaneId("datum.profile"))
+                   .value()));
+  REQUIRE(sketches.add_profile(
+      session, SketchId("sketch.profile"),
+      CircleProfile::create(ProfileId("profile.finished"), ParameterId("profile.diameter"))
+          .value()));
+
+  CHECK_FALSE(workspace.finish_sketch_handoff(session, SketchId("sketch.profile"),
+                                              ProfileId("profile.missing")));
   REQUIRE(workspace.finish_sketch_handoff(session, SketchId("sketch.profile"),
                                           ProfileId("profile.finished")));
   REQUIRE(workspace.preselection().has_value());
@@ -200,7 +231,7 @@ TEST_CASE("Block 122 Finish Sketch handoff and selection filters fail closed",
   CHECK(commands[1].id == "part.chamfer");
 }
 
-TEST_CASE("Block 122 exposes transient ViewCube home and camera bookmarks through MainWindow",
+TEST_CASE("Block 122 exposes visible transient workspace and camera controls through MainWindow",
           "[gui][modeling-workspace][gui][view-navigation-aids]") {
   REQUIRE(qApp != nullptr);
   MainWindow window;
@@ -209,6 +240,25 @@ TEST_CASE("Block 122 exposes transient ViewCube home and camera bookmarks throug
   REQUIRE(viewport != nullptr);
 
   auto& workspace = window.modeling_workspace();
+  auto* toolbar = window.findChild<QToolBar*>(QStringLiteral("blcad.modeling_toolbar"));
+  auto* tabs = window.findChild<QTabBar*>(QStringLiteral("blcad.modeling_tabs"));
+  auto* filter = window.findChild<QComboBox*>(QStringLiteral("blcad.modeling_selection_filter"));
+  auto* mini_toolbar =
+      window.findChild<QFrame*>(QStringLiteral("blcad.modeling_mini_toolbar"));
+  auto* view_cube = window.findChild<QToolButton*>(QStringLiteral("blcad.view_cube"));
+  auto* bookmarks = window.findChild<QComboBox*>(QStringLiteral("blcad.camera_bookmarks"));
+  REQUIRE(toolbar != nullptr);
+  REQUIRE(tabs != nullptr);
+  REQUIRE(filter != nullptr);
+  REQUIRE(mini_toolbar != nullptr);
+  REQUIRE(view_cube != nullptr);
+  REQUIRE(bookmarks != nullptr);
+  CHECK(tabs->count() == 3);
+  CHECK(tabs->tabText(0) == QStringLiteral("Part"));
+  CHECK(tabs->tabText(1) == QStringLiteral("Surface"));
+  CHECK(tabs->tabText(2) == QStringLiteral("Assembly"));
+  CHECK(filter->count() == 8);
+
   REQUIRE(workspace.set_area(window.session(), GuiModelingArea::Part));
   CHECK(GuiModelingWorkspace::tabs()[0] == "Part");
   CHECK(GuiModelingWorkspace::tabs()[1] == "Surface");
