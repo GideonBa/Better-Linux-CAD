@@ -2,6 +2,8 @@
 
 #include "blcad/core/sketch_dimension_authoring.hpp"
 
+#include <algorithm>
+#include <cmath>
 #include <iomanip>
 #include <sstream>
 #include <string>
