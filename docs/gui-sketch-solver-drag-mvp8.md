@@ -414,7 +414,7 @@ The proof covers:
 
 ## Next boundary
 
-Block 111 owns basic Sketch creation tools: point, two-point line, continuous polyline, rectangle
-families, parallelogram, regular polygon, centerline, and construction geometry. Multi-click creation
-reuses Block-107 snap/inference, Block-108 topology edit authority, Block-109 solving, and the Block-106
-command lifecycle. It does not add a second drag or solver authority.
+Block 111 basic creation is implemented (`docs/gui-sketch-basic-creation-mvp8.md`); it adds no
+second drag or solver authority, and a successful creation commit triggers
+`blcad.action.sketch_topology_changed` so this drag binder rebuilds its handles and baseline solve
+against the new topology. Block 112 adds circle/arc/ellipse/slot entities and their handles.

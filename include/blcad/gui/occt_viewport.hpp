@@ -83,6 +83,7 @@ public:
   void set_sketch_inference_anchor(std::optional<Point2> anchor) noexcept;
   void set_sketch_grid_config(GuiSketchGridConfig config);
   void set_sketch_drag_handles(std::vector<Point2> handles);
+  void set_sketch_preview_polyline(std::vector<Point2> polyline, bool closed);
   void set_sketch_pointer_callback(SketchPointerCallback callback);
   void set_sketch_drag_pointer_callback(SketchDragPointerCallback callback);
   void set_sketch_pointer_phase_callback(SketchPointerPhaseCallback callback);
@@ -112,6 +113,9 @@ public:
   [[nodiscard]] const std::optional<GuiSketchScreenRect>& sketch_box_selection() const noexcept;
   [[nodiscard]] std::size_t sketch_grid_line_count() const noexcept;
   [[nodiscard]] std::size_t sketch_drag_handle_count() const noexcept;
+  [[nodiscard]] std::size_t sketch_preview_point_count() const noexcept {
+    return sketch_preview_polyline_.size();
+  }
   [[nodiscard]] Result<GuiSketchScreenPoint> sketch_plane_to_screen(Point2 point) const {
     if (!sketch_interaction_)
       return Result<GuiSketchScreenPoint>::failure(
@@ -140,6 +144,7 @@ private:
   void apply_sketch_focus();
   void rebuild_sketch_grid();
   void rebuild_sketch_drag_handles();
+  void rebuild_sketch_preview_polyline();
   void update_sketch_pointer(GuiSketchScreenPoint screen_point);
   void publish_sketch_pointer_phase(GuiSketchPointerPhase phase,
                                     GuiSketchScreenPoint screen_point);
@@ -163,6 +168,8 @@ private:
   std::optional<GuiSketchHit> hovered_sketch_hit_;
   std::optional<GuiSketchScreenRect> sketch_box_selection_;
   std::vector<Point2> sketch_drag_handles_;
+  std::vector<Point2> sketch_preview_polyline_;
+  bool sketch_preview_closed_{false};
   GuiViewportDisplayMode display_mode_{GuiViewportDisplayMode::ShadedWithEdges};
   GuiViewportProjection projection_{GuiViewportProjection::Perspective};
   GuiSketchSurroundingsMode sketch_surroundings_mode_{GuiSketchSurroundingsMode::Dim};

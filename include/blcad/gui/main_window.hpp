@@ -135,6 +135,7 @@ private:
   QAction* repeat_sketch_action_{nullptr};
   QAction* inspect_sketch_action_{nullptr};
   QAction* repair_sketch_action_{nullptr};
+  std::vector<QAction*> sketch_create_actions_;
   std::size_t viewport_revision_{static_cast<std::size_t>(-1)};
   std::size_t browser_revision_{static_cast<std::size_t>(-1)};
   GuiDocumentBrowser browser_model_;

@@ -159,7 +159,8 @@ uses `GuiSketchWorkbench::add_line(...)` and commits one document transaction. B
 its read-only interaction projection.
 
 Blocks 108–109 do not retrofit this seed HUD command into topology-native solver creation early. Block
-110 adds topology-native solver-backed drag; Block 111 adds topology-native basic creation tools.
+110 adds topology-native solver-backed drag; Block 111 implements the basic creation tools
+(`docs/gui-sketch-basic-creation-mvp8.md`).
 
 ## Command repeat
 
@@ -299,6 +300,6 @@ Block 109:
 
 ## Next boundary
 
-Block 111 adds basic point, line, continuous polyline, rectangle families, parallelogram, regular
-polygon, centerline, and construction-geometry creation. It reuses Block-107 snap/inference, Block-108
-topology commands, Block-109 solving, and the existing command/task lifecycle.
+Block 111 is implemented (`docs/gui-sketch-basic-creation-mvp8.md`): basic creation walks this
+command/task lifecycle, including numeric-input and preview stages, Esc stage backout, and one
+transaction per completed tool. Block 112 adds the conic and slot creation families.

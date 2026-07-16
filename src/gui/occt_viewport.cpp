@@ -59,6 +59,12 @@ public:
     update();
   }
 
+  void set_preview(std::vector<GuiSketchScreenPoint> polyline, bool closed) {
+    preview_polyline_ = std::move(polyline);
+    preview_closed_ = closed;
+    update();
+  }
+
   void set_snap(std::optional<GuiSketchScreenPoint> point) {
     snap_point_ = std::move(point);
     update();
@@ -108,6 +114,23 @@ protected:
                          QPointF(hover_polyline_[index].x, hover_polyline_[index].y));
     }
 
+    if (!preview_polyline_.empty()) {
+      QPen pen(QColor(120, 205, 255));
+      pen.setWidthF(1.6);
+      pen.setStyle(Qt::DashLine);
+      painter.setPen(pen);
+      painter.setBrush(Qt::NoBrush);
+      for (std::size_t index = 1; index < preview_polyline_.size(); ++index)
+        painter.drawLine(
+            QPointF(preview_polyline_[index - 1U].x, preview_polyline_[index - 1U].y),
+            QPointF(preview_polyline_[index].x, preview_polyline_[index].y));
+      if (preview_closed_ && preview_polyline_.size() >= 3U)
+        painter.drawLine(QPointF(preview_polyline_.back().x, preview_polyline_.back().y),
+                         QPointF(preview_polyline_.front().x, preview_polyline_.front().y));
+      painter.drawEllipse(
+          QPointF(preview_polyline_.front().x, preview_polyline_.front().y), 3.0, 3.0);
+    }
+
     if (hover_point_) {
       painter.setPen(QPen(QColor(255, 196, 61), 2.0));
       painter.setBrush(Qt::NoBrush);
@@ -138,6 +161,8 @@ private:
   std::vector<GuiSketchScreenSegment> grid_;
   std::vector<GuiSketchScreenPoint> handles_;
   std::vector<GuiSketchScreenPoint> hover_polyline_;
+  std::vector<GuiSketchScreenPoint> preview_polyline_;
+  bool preview_closed_{false};
   std::optional<GuiSketchScreenPoint> hover_point_;
   std::optional<GuiSketchScreenPoint> snap_point_;
   std::optional<GuiSketchScreenRect> box_;
@@ -507,6 +532,7 @@ OcctViewport::set_sketch_interaction(GuiSketchPlaneView plane,
   sketch_overlay_->raise();
   rebuild_sketch_grid();
   rebuild_sketch_drag_handles();
+  rebuild_sketch_preview_polyline();
   return Result<std::size_t>::success(primitive_count);
 }
 
@@ -519,9 +545,12 @@ void OcctViewport::clear_sketch_interaction() {
   sketch_box_selection_.reset();
   sketch_box_active_ = false;
   sketch_drag_handles_.clear();
+  sketch_preview_polyline_.clear();
+  sketch_preview_closed_ = false;
   if (auto* overlay = static_cast<SketchInteractionOverlay*>(sketch_overlay_)) {
     overlay->set_grid({});
     overlay->set_handles({});
+    overlay->set_preview({}, false);
     overlay->clear_transient();
     overlay->hide();
   }
@@ -555,6 +584,12 @@ void OcctViewport::set_sketch_grid_config(GuiSketchGridConfig config) {
 void OcctViewport::set_sketch_drag_handles(std::vector<Point2> handles) {
   sketch_drag_handles_ = std::move(handles);
   rebuild_sketch_drag_handles();
+}
+
+void OcctViewport::set_sketch_preview_polyline(std::vector<Point2> polyline, bool closed) {
+  sketch_preview_polyline_ = std::move(polyline);
+  sketch_preview_closed_ = closed;
+  rebuild_sketch_preview_polyline();
 }
 
 void OcctViewport::set_sketch_pointer_callback(SketchPointerCallback callback) {
@@ -765,6 +800,7 @@ void OcctViewport::resizeEvent(QResizeEvent* event) {
     rebuild_sketch_grid();
   }
   rebuild_sketch_drag_handles();
+  rebuild_sketch_preview_polyline();
 }
 
 void OcctViewport::mousePressEvent(QMouseEvent* event) {
@@ -1021,6 +1057,24 @@ void OcctViewport::rebuild_sketch_drag_handles() {
       handles.push_back(screen.value());
   }
   overlay->set_handles(std::move(handles));
+}
+
+void OcctViewport::rebuild_sketch_preview_polyline() {
+  auto* overlay = static_cast<SketchInteractionOverlay*>(sketch_overlay_);
+  if (overlay == nullptr)
+    return;
+  if (!sketch_interaction_) {
+    overlay->set_preview({}, false);
+    return;
+  }
+  std::vector<GuiSketchScreenPoint> screen_points;
+  screen_points.reserve(sketch_preview_polyline_.size());
+  for (const auto point : sketch_preview_polyline_) {
+    auto screen = sketch_interaction_->mapping().plane_to_screen(point);
+    if (screen)
+      screen_points.push_back(screen.value());
+  }
+  overlay->set_preview(std::move(screen_points), sketch_preview_closed_);
 }
 
 void OcctViewport::update_sketch_pointer(GuiSketchScreenPoint screen_point) {

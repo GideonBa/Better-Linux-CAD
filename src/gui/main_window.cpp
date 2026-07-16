@@ -180,6 +180,9 @@ void MainWindow::refresh_command_state() {
     finish_sketch_action_->setEnabled(sketch_idle);
   if (add_line_action_)
     add_line_action_->setEnabled(part && sketch_idle);
+  for (QAction* action : sketch_create_actions_)
+    if (action)
+      action->setEnabled(part && sketch_idle);
   if (repeat_sketch_action_)
     repeat_sketch_action_->setEnabled(sketch_idle && !sketch_workspace_.last_repeatable_command().empty());
   for (QAction* action : {inspect_sketch_action_, repair_sketch_action_})
@@ -381,6 +384,25 @@ void MainWindow::create_menus() {
   edit_sketch_action_ = sketch_menu->addAction(QStringLiteral("Enter Sketch"));
   finish_sketch_action_ = sketch_menu->addAction(QStringLiteral("Finish Sketch"));
   sketch_menu->addSeparator();
+  auto* create_menu = sketch_menu->addMenu(QStringLiteral("Create"));
+  create_menu->setObjectName(QStringLiteral("blcad.menu.sketch_create"));
+  const std::array<std::pair<const char*, const char*>, 9> create_tools{{
+      {"blcad.action.sketch_create_point", "Point"},
+      {"blcad.action.sketch_create_line", "Line"},
+      {"blcad.action.sketch_create_polyline", "Polyline"},
+      {"blcad.action.sketch_create_corner_rectangle", "Corner rectangle"},
+      {"blcad.action.sketch_create_center_rectangle", "Center rectangle"},
+      {"blcad.action.sketch_create_three_point_rectangle", "Three-point rectangle"},
+      {"blcad.action.sketch_create_parallelogram", "Parallelogram"},
+      {"blcad.action.sketch_create_polygon", "Regular polygon"},
+      {"blcad.action.sketch_create_centerline", "Centerline"},
+  }};
+  sketch_create_actions_.reserve(create_tools.size());
+  for (const auto& [object_name, label] : create_tools) {
+    QAction* action = create_menu->addAction(QString::fromUtf8(label));
+    action->setObjectName(QString::fromUtf8(object_name));
+    sketch_create_actions_.push_back(action);
+  }
   add_line_action_ = sketch_menu->addAction(QStringLiteral("Add line"));
   repeat_sketch_action_ = sketch_menu->addAction(QStringLiteral("Repeat last Sketch command"));
   inspect_sketch_action_ = sketch_menu->addAction(QStringLiteral("Inspect selected sketch"));

@@ -1,6 +1,6 @@
 # Interactive Sketcher Sequence MVP-8
 
-Status: in progress. Blocks 106–110 are implemented; Block 111 is the current next technical step.
+Status: in progress. Blocks 106–111 are implemented; Block 112 is the current next technical step.
 Blocks 106–121 precede Interactive Modeling MVP-9 (Blocks 122–131) and STEP Import MVP-10
 (Blocks 132–138).
 
@@ -345,12 +345,17 @@ Canonical contract: `docs/gui-sketch-solver-drag-mvp8.md`.
 
 Focused tags: `[gui][sketch-drag]`, `[integration][sketch-live-solve]`.
 
-## Block 111 — Basic creation tools — Current next technical step
+## Block 111 — Basic creation tools — Implemented
 
-Implement point, two-point line, continuous polyline, center/corner rectangle, three-point rectangle,
-parallelogram, regular polygon, centerline, and construction geometry. Multi-click commands reuse
-Block-107 snap/inference and Block-109 solve authority. Composite tools expand into ordinary points,
-lines, and constraints rather than GUI-only primitives.
+Implemented point, two-point line, continuous polyline, corner/center/three-point rectangle,
+parallelogram, regular polygon, and centerline creation. Multi-click commands reuse Block-107
+snap/inference and the Block-106 stage machine, show rubber-band and automatic-constraint previews,
+accept absolute/relative/polar numeric entry, and commit one undoable workbench transaction per
+completed tool. Composite tools expand into ordinary shared-corner lines plus one explicit closed
+profile; Point and Centerline create PartDocument construction geometry. Automatic constraints stay
+preview-only until Block 114.
+
+Canonical contract: `docs/gui-sketch-basic-creation-mvp8.md`.
 
 Focused tags: `[gui][sketch-create-basic]`, `[integration][sketch-basic-profile]`.
 

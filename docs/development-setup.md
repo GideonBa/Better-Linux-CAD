@@ -115,7 +115,7 @@ QT_QPA_PLATFORM=offscreen ctest --test-dir build/dev-gui -R '^gui\.' --output-on
 
 ## Interactive Sketcher focused proof
 
-Blocks 106–110 are implemented.
+Blocks 106–111 are implemented.
 
 Block 106 workspace and command lifecycle:
 
@@ -174,11 +174,24 @@ release flush, source-document immutability during preview, cancel/refusal rollb
 solver targets, one `Drag sketch handle` session history entry, exact undo/redo, and an offscreen Qt
 Press/Move/Release path through the installed binder.
 
-The current implementation handoff is Block 111. Its focused tags are:
+Block 111 basic creation tools and the end-to-end profile creation proof:
+
+```bash
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][sketch-create-basic]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][sketch-basic-profile]"
+```
+
+The proof covers every tool's deterministic expansion, degenerate fail-closed inputs,
+absolute/relative/polar numeric picks, polygon side-count entry, rubber-band and
+automatic-constraint previews, pick backout, one-transaction commits with exact undo/redo, and an
+offscreen Qt mouse path that creates a corner-rectangle profile through the installed binder.
+
+The current implementation handoff is Block 112. Its focused tags are:
 
 ```text
-[gui][sketch-create-basic]
-[integration][sketch-basic-profile]
+[core][sketch-conics]
+[geometry][sketch-conics]
+[gui][sketch-create-conics]
 ```
 
 ## Existing GUI validation tags
@@ -456,15 +469,15 @@ rm -rf build/
 - `docs/sketch-shared-topology-mvp8.md`: Block-108 topology/migration/edit/persistence contract
 - `docs/sketch-planar-constraint-solver-mvp8.md`: Block-109 solver/DOF/diagnostics contract
 - `docs/gui-sketch-solver-drag-mvp8.md`: Block-110 semantic handles/live solve/atomic drag contract
-- `docs/gui-sketch-solver-drag-mvp8.md`: Block-110 semantic handles/live solve/atomic drag contract
-- `docs/gui-sketch-solver-drag-mvp8.md`: Block-110 semantic handles/live solve/atomic drag contract
+- `docs/gui-sketch-basic-creation-mvp8.md`: Block-111 multi-click creation tools contract
 - `docs/gui-sketch-solver-drag-mvp8.md`: Block-110 semantic handles/live solve/atomic drag contract
 - `docs/gui-sketch-solver-drag-mvp8.md`: Block-110 semantic handles/live solve/atomic drag contract
 
 ## Current development boundary
 
-Blocks 106–110 are implemented. Block 111 is next.
+Blocks 106–111 are implemented. Block 112 is next.
 
-Block 111 adds basic point/line/polyline/rectangle/parallelogram/polygon/centerline/construction
-creation. It reuses current Sketch workspace staging, Block-107 snap/inference, Block-108 topology
-identity/edit commands, and Block-109 solver authority.
+Block 112 adds persistent Core/Geometry intent and creation/editing for circles, arcs,
+ellipses/elliptical arcs, and slots with center/radius/endpoint/quadrant handles. It reuses the
+Block-111 creation lifecycle, Block-107 snap/inference, Block-108 topology identity, and Block-109
+solver authority; full circles become real curve entities.

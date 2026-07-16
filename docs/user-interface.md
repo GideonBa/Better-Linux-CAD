@@ -4,8 +4,9 @@ Status: MVP-7 accepted and Interactive Sketcher MVP-8 in progress. Blocks 95–1
 Qt shell, document transactions, OCCT viewport, deterministic browser/property surfaces, and semantic
 selection synchronization. Blocks 106–110 establish the contextual Sketch workspace, transient plane interaction, persistent
 shared planar topology, deterministic general planar solver, and solver-backed semantic-handle mouse
-dragging. Block 111 is the current next technical step and adds basic creation tools. Blocks 122–131 add
-interactive Part/Surface/Assembly modeling; STEP Import begins with Block 132.
+dragging. Block 111 adds multi-click basic creation tools with rubber-band previews and numeric
+entry. Block 112 is the current next technical step and adds circle/arc/ellipse/slot creation.
+Blocks 122–131 add interactive Part/Surface/Assembly modeling; STEP Import begins with Block 132.
 
 The UI is deliberately not built like FreeCAD. The goal is a modern, consistent, reduced interface
 with clear separation between model, parameters, features, Sketch topology, solver results, and
@@ -278,7 +279,7 @@ but release cannot commit a failed candidate.
 
 ## Current boundary
 
-Block 110 is implemented. Block 111 is next.
+Blocks 110–111 are implemented. Block 112 is next.
 
 No widget may implement substitute constraint mathematics. Basic creation must map transient picks and
 snap results to explicit Block-108 topology/edit commands, use Block-109 solve authority for disposable

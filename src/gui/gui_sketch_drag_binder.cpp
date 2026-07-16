@@ -132,6 +132,7 @@ private:
     defer_for(u"blcad.action.finish_sketch");
     defer_for(u"blcad.action.repair_sketch");
     defer_for(u"blcad.action.recompute");
+    defer_for(u"blcad.action.sketch_topology_changed");
   }
 
   void defer_sync() {

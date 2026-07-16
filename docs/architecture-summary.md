@@ -410,9 +410,10 @@ GUI hover / preview / rubber-band / HUD staging
 
 ## Current boundary
 
-Blocks 106–110 are implemented. Block 111 is the current next technical step.
+Blocks 106–111 are implemented. Block 112 is the current next technical step.
 
-Block 111 adds basic point/line/polyline/rectangle/parallelogram/polygon/centerline/construction
-creation over the existing workspace, plane mapping, shared topology, solver, and document transaction
-authorities. Creation commands must not turn Block-107 snap candidates or Block-110 handle positions
-into implicit persistent identity.
+Block 111 implemented basic point/line/polyline/rectangle/parallelogram/polygon/centerline/
+construction creation over the existing workspace, plane mapping, shared topology, and document
+transaction authorities (`docs/gui-sketch-basic-creation-mvp8.md`); snap candidates and handle
+positions never became implicit persistent identity. Block 112 adds persistent circle, arc,
+ellipse, and slot entity families with their creation/editing handles over the same boundary.

@@ -373,6 +373,7 @@ Block-109 consumer proof is documented in `docs/sketch-planar-constraint-solver-
 
 ## Next boundary
 
-Block 111 uses the same stable point/entity topology for basic Sketch creation. Snap positions may seed
-new point coordinates, but only explicit topology/edit commands create persistent point identity or
-shared connectivity.
+Block 111 is implemented (`docs/gui-sketch-basic-creation-mvp8.md`). Basic creation expands into
+ordinary lines plus explicit ordered closed profiles, so shared corner identity still derives only
+from profile connectivity under this contract; snap positions seed coordinates, never identity.
+Block 112 extends the entity kinds for circles, arcs, ellipses, and slots.

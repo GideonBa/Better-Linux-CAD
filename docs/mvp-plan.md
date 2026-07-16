@@ -4,10 +4,10 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 110
-current_block: 111
-current_boundary: Basic Sketch creation tools: point, line, polyline, rectangle families, polygon, centerline, and construction geometry
-current_tag: "[gui][sketch-create-basic]"
+implemented_through: Block 111
+current_block: 112
+current_boundary: Circle, arc, ellipse, and slot creation and editing
+current_tag: "[core][sketch-conics]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -16,7 +16,7 @@ phase_status:
   mvp_5: "Assembly relationships, motion, hierarchy, analysis, exchange — Blocks 1–47 implemented"
   mvp_6: "Part Construction — Blocks 48–94 implemented; MVP complete"
   mvp_7: "GUI Feature Validation — Blocks 95–105 implemented; MVP complete"
-  mvp_8: "Interactive Sketcher — Blocks 106–110 implemented; Blocks 111–121 planned; Block 111 next"
+  mvp_8: "Interactive Sketcher — Blocks 106–111 implemented; Blocks 112–121 planned; Block 112 next"
   mvp_9: "Interactive Part & Assembly Modeling — Blocks 122–131 planned after Interactive Sketcher acceptance"
   mvp_10: "STEP Import — Blocks 132–138 planned after Interactive Modeling acceptance"
 ---
@@ -30,13 +30,13 @@ mathematics, persistence spellings, migration rules, and failure policy.
 ## Current status
 
 ```text
-implemented through  Block 110
-current block        Block 111
+implemented through  Block 111
+current block        Block 112
 current phase        Interactive Sketcher MVP-8
-current boundary     basic Sketch creation tools
+current boundary     circle, arc, ellipse, and slot creation and editing
 ```
 
-Block 110 is implemented. Block 111 is the current next technical step.
+Block 111 is implemented. Block 112 is the current next technical step.
 
 ## Phase map
 
@@ -273,39 +273,44 @@ Focused tags:
 [integration][sketch-live-solve]
 ```
 
-## Current next technical step — Block 111
+## Block 111 — Basic Sketch creation tools — Implemented
 
-Block 111 owns basic creation tools over the implemented workspace, plane interaction, shared topology,
-solver, and drag authorities.
+Block 111 implements point, two-point line, continuous polyline, corner/center/three-point
+rectangle, parallelogram, regular polygon, and centerline creation over the implemented workspace,
+plane-interaction, and transaction authorities. The headless `GuiSketchCreateController` owns
+picks, rubber-band/auto-constraint previews, absolute/relative/polar numeric entry, and
+deterministic expansion into ordinary `LineSegment`/`ClosedProfile` intent or PartDocument
+construction geometry; every completed tool commits exactly one undoable workbench transaction.
+Composite tools expand into ordinary shared-corner lines plus one explicit closed profile, and the
+Qt binder walks the frozen Block-106 stage machine with Esc stage backout. Automatic constraints
+are preview-only until Block 114.
 
-Required surface:
-
-```text
-point
-two-point line
-continuous polyline
-center/corner rectangle
-three-point rectangle
-parallelogram
-regular polygon
-centerline
-construction geometry
-```
-
-Multi-click commands reuse Block-107 snap/inference and Block-106 command staging. Persistent additions
-use Block-108 topology/edit authority and solved candidates use Block 109. Composite tools expand into
-ordinary points, lines, and constraints rather than GUI-only primitives.
-
-Focused tags:
+Canonical contract: `docs/gui-sketch-basic-creation-mvp8.md`.
 
 ```text
 [gui][sketch-create-basic]
 [integration][sketch-basic-profile]
 ```
 
+## Current next technical step — Block 112
+
+Block 112 extends Core/Geometry intent where required for center-radius/diameter, two-point,
+three-point, and tangent circles; center/start/end, three-point, and tangent arcs;
+ellipses/elliptical arcs; and slot families, with center/radius/endpoint/quadrant handles. Full
+circles become real curve entities rather than nearly closed arcs; degenerate radii and ambiguous
+collinear picks fail closed.
+
+Focused tags:
+
+```text
+[core][sketch-conics]
+[geometry][sketch-conics]
+[gui][sketch-create-conics]
+```
+
 ## Remaining Interactive Sketcher sequence
 
-Block 111 adds basic point/line/polyline/rectangle/polygon/construction creation. Block 112 adds
+Block 112 adds
 circles, arcs, ellipses, and slots. Block 113 adds spline editing and Sketch text. Block 114 exposes
 constraint authoring and automatic-constraint UX. Block 115 completes dimensions and expression
 binding. Block 116 adds trim/extend/split/Sketch fillet/chamfer. Block 117 adds offset and associative
@@ -339,8 +344,11 @@ STEP Import MVP-10 is Blocks 132–138 and is canonical in `docs/step-import-seq
 
 ## Current handoff
 
-Block 110 is implemented. Block 111 is next.
+Block 111 is implemented. Block 112 is next.
 
 Read the Block-106/107 interaction contracts, `docs/sketch-shared-topology-mvp8.md`,
-`docs/sketch-planar-constraint-solver-mvp8.md`, and `docs/gui-sketch-solver-drag-mvp8.md`, then implement
-basic creation tools without introducing a second topology, solver, or transaction authority.
+`docs/sketch-planar-constraint-solver-mvp8.md`, `docs/gui-sketch-solver-drag-mvp8.md`, and
+`docs/gui-sketch-basic-creation-mvp8.md`, then implement the conic/slot entity families without
+introducing a second topology, solver, or transaction authority. Full circles are real curve
+entities; the Block-108 materialization bridge and Block-111 creation lifecycle are extended, not
+bypassed.

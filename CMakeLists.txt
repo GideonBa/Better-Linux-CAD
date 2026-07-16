@@ -287,6 +287,8 @@ if(BLCAD_BUILD_GUI)
     src/gui/gui_selection_model.cpp
     src/gui/gui_sketch_interaction.cpp
     src/gui/gui_sketch_interaction_binder.cpp
+    src/gui/gui_sketch_create.cpp
+    src/gui/gui_sketch_create_binder.cpp
     src/gui/gui_sketch_drag.cpp
     src/gui/gui_sketch_drag_binder.cpp
     src/gui/gui_sketch_workbench.cpp
@@ -556,6 +558,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_part_foundation_workbench_tests.cpp
       tests/gui/gui_part_operations_workbench_tests.cpp
       tests/gui/gui_sketch_interaction_tests.cpp
+      tests/gui/gui_sketch_create_tests.cpp
       tests/gui/gui_sketch_drag_tests.cpp
       tests/gui/gui_sketch_workbench_tests.cpp
       tests/gui/gui_spatial_surface_workbench_tests.cpp

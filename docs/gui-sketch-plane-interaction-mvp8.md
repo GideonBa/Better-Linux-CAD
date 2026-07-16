@@ -313,6 +313,6 @@ Block 109:
 
 ## Next boundary
 
-Block 111 consumes the same active-plane mapping and snap/inference authority for multi-click creation.
-Accepted picks must create or reference explicit Block-108 topology identity; transient snap candidate
-ids remain presentation/query state.
+Block 111 is implemented (`docs/gui-sketch-basic-creation-mvp8.md`): multi-click creation consumes
+this active-plane mapping and snap/inference authority, and transient snap candidate ids remain
+presentation/query state. Block 112 adds the conic/slot creation families over the same boundary.

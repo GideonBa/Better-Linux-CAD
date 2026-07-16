@@ -58,8 +58,10 @@ progress with Blocks 106–110 implemented:
 110 semantic Sketch handles / solver-backed live drag / rollback / exact final sample / atomic release
 ```
 
-Block 111 is the current next technical step and owns basic point, line, polyline, rectangle, polygon,
-centerline, and construction-geometry creation.
+Block 111 basic creation — point, line, polyline, rectangle families, parallelogram, regular
+polygon, centerline, and construction geometry with rubber-band previews, numeric entry, and one
+transaction per completed tool — is implemented (`docs/gui-sketch-basic-creation-mvp8.md`).
+Block 112 is the current next technical step and adds circle, arc, ellipse, and slot creation.
 
 Development rule:
 

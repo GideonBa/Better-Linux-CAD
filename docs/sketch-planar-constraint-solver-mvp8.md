@@ -390,5 +390,7 @@ Canonical integration contract: `docs/gui-sketch-solver-drag-mvp8.md`.
 
 ## Next boundary
 
-Block 111 reuses the solver for disposable candidates produced by basic creation commands. Automatic
-constraint authoring remains Block 114 and dimension editing remains Block 115.
+Block 111 basic creation is implemented (`docs/gui-sketch-basic-creation-mvp8.md`); committed
+creation results are re-solved through the Block-110 baseline resync and automatic constraints stay
+preview-only. Automatic constraint authoring remains Block 114 and dimension editing remains
+Block 115.
