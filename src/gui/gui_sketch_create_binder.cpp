@@ -6,6 +6,7 @@
 #include <QAction>
 #include <QEvent>
 #include <QKeyEvent>
+#include <QMenu>
 #include <QMouseEvent>
 #include <QTextEdit>
 #include <QTimer>
@@ -15,36 +16,65 @@
 #include <optional>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace blcad::gui {
 namespace {
 
 struct ToolActionBinding {
   const char* action_name;
+  const char* label;
   GuiSketchCreateTool tool;
   const char* hint;
 };
 
-constexpr std::array<ToolActionBinding, 9> kToolActions{{
-    {"blcad.action.sketch_create_point", GuiSketchCreateTool::Point,
+constexpr std::array<ToolActionBinding, 21> kToolActions{{
+    {"blcad.action.sketch_create_point", "Point", GuiSketchCreateTool::Point,
      "Pick the construction point position"},
-    {"blcad.action.sketch_create_line", GuiSketchCreateTool::Line,
+    {"blcad.action.sketch_create_line", "Line", GuiSketchCreateTool::Line,
      "Pick the line start and end"},
-    {"blcad.action.sketch_create_polyline", GuiSketchCreateTool::Polyline,
+    {"blcad.action.sketch_create_polyline", "Polyline", GuiSketchCreateTool::Polyline,
      "Pick polyline points; Enter or double-click finishes"},
-    {"blcad.action.sketch_create_corner_rectangle", GuiSketchCreateTool::CornerRectangle,
-     "Pick two opposite rectangle corners"},
-    {"blcad.action.sketch_create_center_rectangle", GuiSketchCreateTool::CenterRectangle,
-     "Pick the rectangle center and one corner"},
-    {"blcad.action.sketch_create_three_point_rectangle",
-     GuiSketchCreateTool::ThreePointRectangle,
-     "Pick the base edge and one height point"},
-    {"blcad.action.sketch_create_parallelogram", GuiSketchCreateTool::Parallelogram,
-     "Pick three parallelogram corners"},
-    {"blcad.action.sketch_create_polygon", GuiSketchCreateTool::RegularPolygon,
-     "Type the side count, then pick center and vertex"},
-    {"blcad.action.sketch_create_centerline", GuiSketchCreateTool::Centerline,
+    {"blcad.action.sketch_create_corner_rectangle", "Corner rectangle",
+     GuiSketchCreateTool::CornerRectangle, "Pick two opposite rectangle corners"},
+    {"blcad.action.sketch_create_center_rectangle", "Center rectangle",
+     GuiSketchCreateTool::CenterRectangle, "Pick the rectangle center and one corner"},
+    {"blcad.action.sketch_create_three_point_rectangle", "Three-point rectangle",
+     GuiSketchCreateTool::ThreePointRectangle, "Pick the base edge and one height point"},
+    {"blcad.action.sketch_create_parallelogram", "Parallelogram",
+     GuiSketchCreateTool::Parallelogram, "Pick three parallelogram corners"},
+    {"blcad.action.sketch_create_polygon", "Regular polygon",
+     GuiSketchCreateTool::RegularPolygon, "Type the side count, then pick center and vertex"},
+    {"blcad.action.sketch_create_centerline", "Centerline", GuiSketchCreateTool::Centerline,
      "Pick the centerline start and end"},
+    {"blcad.action.sketch_create_center_radius_circle", "Circle: center/radius",
+     GuiSketchCreateTool::CenterRadiusCircle, "Pick the circle center and one radius point"},
+    {"blcad.action.sketch_create_center_diameter_circle", "Circle: center/diameter",
+     GuiSketchCreateTool::CenterDiameterCircle,
+     "Pick the circle center and one point on the diameter"},
+    {"blcad.action.sketch_create_two_point_circle", "Circle: two-point diameter",
+     GuiSketchCreateTool::TwoPointCircle, "Pick the two diameter endpoints"},
+    {"blcad.action.sketch_create_three_point_circle", "Circle: three points",
+     GuiSketchCreateTool::ThreePointCircle, "Pick three non-collinear points on the circle"},
+    {"blcad.action.sketch_create_tangent_circle", "Circle: tangent three-point",
+     GuiSketchCreateTool::TangentCircle,
+     "Pick three tangent candidates; tangent constraints remain preview-only"},
+    {"blcad.action.sketch_create_center_start_end_arc", "Arc: center/start/end",
+     GuiSketchCreateTool::CenterStartEndArc, "Pick the arc center, start, and end direction"},
+    {"blcad.action.sketch_create_three_point_arc", "Arc: three points",
+     GuiSketchCreateTool::ThreePointArc, "Pick the arc start, through-point, and end"},
+    {"blcad.action.sketch_create_tangent_arc", "Arc: tangent three-point",
+     GuiSketchCreateTool::TangentArc,
+     "Pick start, through-point, and end; tangent constraints remain preview-only"},
+    {"blcad.action.sketch_create_ellipse", "Ellipse", GuiSketchCreateTool::Ellipse,
+     "Pick center, major-axis point, and minor-axis distance"},
+    {"blcad.action.sketch_create_elliptical_arc", "Elliptical arc",
+     GuiSketchCreateTool::EllipticalArc,
+     "Pick center, major axis, minor radius, start, and end"},
+    {"blcad.action.sketch_create_center_slot", "Slot: center-to-center",
+     GuiSketchCreateTool::CenterSlot, "Pick both cap centers and the slot half-width"},
+    {"blcad.action.sketch_create_overall_slot", "Slot: overall length",
+     GuiSketchCreateTool::OverallSlot, "Pick overall endpoints and the slot half-width"},
 }};
 
 [[nodiscard]] bool collecting_stage(GuiSketchInteractionStage stage) noexcept {
@@ -71,11 +101,37 @@ public:
     if (viewport_ != nullptr)
       viewport_->installEventFilter(this);
     window_.installEventFilter(this);
-    for (const auto& binding : kToolActions)
-      if (QAction* action =
-              window_.findChild<QAction*>(QString::fromUtf8(binding.action_name)))
+
+    QMenu* create_menu =
+        window_.findChild<QMenu*>(QStringLiteral("blcad.menu.sketch_create"));
+    QAction* finish_action =
+        window_.findChild<QAction*>(QStringLiteral("blcad.action.finish_sketch"));
+    bool inserted_conic_separator = false;
+    for (std::size_t index = 0U; index < kToolActions.size(); ++index) {
+      const auto& binding = kToolActions[index];
+      QAction* action =
+          window_.findChild<QAction*>(QString::fromUtf8(binding.action_name));
+      if (action == nullptr && create_menu != nullptr) {
+        if (!inserted_conic_separator && index >= 9U) {
+          create_menu->addSeparator();
+          inserted_conic_separator = true;
+        }
+        action = create_menu->addAction(QString::fromUtf8(binding.label));
+        action->setObjectName(QString::fromUtf8(binding.action_name));
+        action->setEnabled(finish_action != nullptr && finish_action->isEnabled());
+        dynamic_actions_.push_back(action);
+      }
+      if (action != nullptr)
         connect(action, &QAction::triggered, this,
                 [this, binding] { begin_tool(binding.tool, binding.hint, binding.action_name); });
+    }
+    if (finish_action != nullptr)
+      connect(finish_action, &QAction::changed, this, [this, finish_action] {
+        for (QAction* action : dynamic_actions_)
+          if (action != nullptr)
+            action->setEnabled(finish_action->isEnabled());
+      });
+
     for (const auto* cancel_action :
          {"blcad.action.finish_sketch", "blcad.action.edit_sketch", "blcad.action.recompute"})
       if (QAction* action = window_.findChild<QAction*>(QString::fromUtf8(cancel_action)))
@@ -366,6 +422,7 @@ private:
   OcctViewport* viewport_{nullptr};
   QTextEdit* diagnostics_{nullptr};
   QAction* topology_changed_action_{nullptr};
+  std::vector<QAction*> dynamic_actions_;
   std::optional<GuiSketchCreateController> controller_;
   std::string numeric_buffer_;
   bool preview_scheduled_{false};
