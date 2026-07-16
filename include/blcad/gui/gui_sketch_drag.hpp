@@ -67,6 +67,8 @@ class GuiSketchDragController {
 public:
   [[nodiscard]] static Result<GuiSketchDragController>
   create(const PartDocument& document, SketchId sketch_id);
+  [[nodiscard]] static Result<GuiSketchDragController>
+  create(const GuiDocumentSession& session, SketchId sketch_id);
 
   [[nodiscard]] const SketchId& sketch_id() const noexcept;
   [[nodiscard]] const Sketch& source_sketch() const noexcept;
@@ -96,7 +98,8 @@ private:
   GuiSketchDragController(Sketch source_sketch, SketchTopology source_topology,
                           SketchConstraintSystem source_system,
                           SketchSolveResult baseline_solve,
-                          std::vector<GuiSketchDragHandle> handles);
+                          std::vector<GuiSketchDragHandle> handles,
+                          std::optional<SketchConstraintCatalog> source_catalog = std::nullopt);
 
   [[nodiscard]] Result<GuiSketchDragPreview> solve_pointer(Point2 pointer);
 
@@ -105,6 +108,7 @@ private:
   SketchConstraintSystem source_system_;
   SketchSolveResult baseline_solve_;
   std::vector<GuiSketchDragHandle> handles_;
+  std::optional<SketchConstraintCatalog> source_catalog_;
   std::optional<std::size_t> active_handle_index_;
   std::optional<Point2> pending_pointer_;
   std::optional<Point2> processed_pointer_;
