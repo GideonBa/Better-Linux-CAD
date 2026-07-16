@@ -1,6 +1,6 @@
 # GUI Selection-First Modeling Workspace MVP-9
 
-Status: implemented in Block 122.
+Status: implemented in Block 122; consumed by the Block-123 manipulator layer.
 
 Block 122 introduces the shared application-layer interaction boundary used by the Part, Surface, and
 Assembly modeling workspaces. It upgrades the existing MVP-7 form-driven workbenches with
@@ -21,6 +21,7 @@ semantic viewport/browser selection
      consumes preselection
      Apply records repeatable command
      Cancel restores complete preselection context
+  -> Block-123 transient viewport manipulators
   -> existing MVP-7 Part / Surface / Assembly workbench
   -> existing GuiDocumentSession candidate transaction
 ```
@@ -63,8 +64,9 @@ repeatability
 
 The catalog covers the interactive families owned by Blocks 124–130: Extrude/Revolve/path Extrude,
 Sweep/Loft, finishing, patterns/mirror, Body Boolean/Transform, Surface operations, component
-placement, relationships, joints, and joint drives. Block 122 only freezes selection-first command
-start; manipulators, previews, authoring, and motion remain owned by their later blocks.
+placement, relationships, joints, and joint drives. Block 122 freezes selection-first command start;
+Block 123 now supplies reusable candidate-only manipulators. Feature-specific previews, authoring, and
+motion remain owned by their later blocks.
 
 ## Capability-driven preselection
 
@@ -93,14 +95,16 @@ and enters the existing `GuiTaskState` collecting-selection stage. The owning la
 continues through parameter editing and preview.
 
 ```text
-preselection -> begin command -> collect remaining inputs -> edit -> preview -> Apply | Cancel
+preselection -> begin command -> collect remaining inputs
+             -> Block-123 candidate manipulation
+             -> feature-specific preview -> Apply | Cancel
 ```
 
 Apply records the last repeatable command after the task reaches preview and is accepted. Repeat
 starts the same command id in the current compatible area without inventing prior parameter or
 selection state. Cancel or `Esc` restores both the consumed semantic selection and its complete
 capability context, so the mini-toolbar and command enablement return exactly to their pre-command
-state.
+state. Active Block-123 handles are likewise transient and can be cleared without a document rollback.
 
 ## Finish Sketch handoff
 
@@ -136,7 +140,8 @@ plane camera.
 
 Home and named bookmarks are intentionally session-local. They do not enter Part, Project, sidecar,
 or exchange persistence. Saving an existing bookmark name replaces its transient camera snapshot;
-removal affects no model history.
+removal affects no model history. Block 123 derives its transient camera mapping from the same
+bookmark structure without persisting manipulator state.
 
 ## Focused proof
 
@@ -152,8 +157,8 @@ materialized Finish Sketch handoff, command repeat, selection-filter rejection a
 synchronization, visible shell ownership through `MainWindow`, ViewCube targets, home restoration,
 and named camera bookmark replacement/removal.
 
-## Next boundary
+## Following boundary
 
-Block 123 adds reusable transient linear, angular, radial, triad, and pattern manipulators with
-numeric-HUD coupling. Block 122 deliberately emits command and navigation state only; it does not
-preview or mutate feature parameters.
+Block 123 is implemented in `docs/gui-viewport-manipulators-mvp9.md`. Block 124 now consumes the
+selection-first workspace and candidate-only manipulator layer for interactive Extrude, path Extrude,
+and Revolve authoring.
