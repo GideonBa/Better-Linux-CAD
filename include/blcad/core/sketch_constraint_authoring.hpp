@@ -299,15 +299,14 @@ public:
     if (solved.has_error())
       return Result<SketchConstraintAuthoringPreview>::failure(solved.error());
 
-    SketchConstraintCatalog after = catalog;
-    auto added = after.add(candidate);
-    if (added.has_error())
-      return Result<SketchConstraintAuthoringPreview>::failure(added.error());
-
     const bool accepted = solved.value().status == SketchSolveStatus::UnderConstrained ||
                           solved.value().status == SketchSolveStatus::FullyConstrained;
+    SketchConstraintCatalog after = catalog;
     std::optional<Sketch> solved_sketch;
     if (accepted) {
+      auto added = after.add(candidate);
+      if (added.has_error())
+        return Result<SketchConstraintAuthoringPreview>::failure(added.error());
       auto materialized =
           SketchTopologyLegacyMaterializer{}.materialize(*sketch, solved.value().topology);
       if (materialized.has_error())
