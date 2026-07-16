@@ -192,3 +192,54 @@ TEST_CASE("Block 118 rejects empty selections and degenerate transform parameter
   CHECK_FALSE(SketchTransformPatternService::mirror(
       sketch, {SketchEntityId("line.a")}, {0.0, 0.0}, {0.0, 0.0}));
 }
+
+TEST_CASE("Block 118 move preserves referencing constraints and dimensions in place",
+          "[core][sketch-transform-pattern]") {
+  auto sketch = make_offset_project_sketch();
+  add_offset_project_line(sketch, "line.a", {0.0, 0.0}, {10.0, 0.0});
+  REQUIRE(sketch.add_constraint(
+      SketchGeometricConstraint::create_horizontal(
+          SketchConstraintId("horizontal.a"),
+          SketchReferenceTarget::create_line_segment(SketchEntityId("line.a")).value())
+          .value()));
+  REQUIRE(sketch.add_dimension(
+      SketchDrivingDimension::create_point_to_point_distance(
+          SketchDimensionId("length.a"),
+          SketchReferenceTarget::create_line_segment_start(SketchEntityId("line.a")).value(),
+          SketchReferenceTarget::create_line_segment_end(SketchEntityId("line.a")).value(),
+          ParameterId("length"))
+          .value()));
+
+  auto moved = SketchTransformPatternService::move(sketch, {SketchEntityId("line.a")}, {5.0, 5.0});
+  REQUIRE(moved);
+  CHECK(moved.value().sketch.geometric_constraints().size() == 1U);
+  CHECK(moved.value().sketch.driving_dimensions().size() == 1U);
+  CHECK(moved.value().uncopied_references.empty());
+  const auto* line = moved.value().sketch.find_line_segment(SketchEntityId("line.a"));
+  REQUIRE(line != nullptr);
+  CHECK(line->start() == Point2{5.0, 5.0});
+  CHECK(line->end() == Point2{15.0, 5.0});
+}
+
+TEST_CASE("Block 118 copy and patterns report constraints that are not duplicated",
+          "[core][sketch-transform-pattern]") {
+  auto sketch = make_offset_project_sketch();
+  add_offset_project_line(sketch, "line.a", {0.0, 0.0}, {10.0, 0.0});
+  REQUIRE(sketch.add_constraint(
+      SketchGeometricConstraint::create_horizontal(
+          SketchConstraintId("horizontal.a"),
+          SketchReferenceTarget::create_line_segment(SketchEntityId("line.a")).value())
+          .value()));
+
+  auto copied = SketchTransformPatternService::copy(sketch, {SketchEntityId("line.a")}, {0.0, 4.0});
+  REQUIRE(copied);
+  REQUIRE(copied.value().uncopied_references.size() == 1U);
+  CHECK(copied.value().uncopied_references.front() == "horizontal.a");
+
+  auto pattern = SketchTransformPatternService::rectangular_pattern(
+      sketch, {SketchEntityId("line.a")}, {0.0, 5.0}, 1U, {0.0, 5.0}, 3U,
+      SketchPatternMode::Exploded);
+  REQUIRE(pattern);
+  CHECK(pattern.value().uncopied_references ==
+        std::vector<std::string>{"horizontal.a"});
+}

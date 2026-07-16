@@ -46,3 +46,14 @@ The service fails closed for missing handles, duplicate IDs, invalid source Sket
 ./build/dev/blcad_core_tests "[gui][sketch-3d-edit]"
 ./build/dev/blcad_core_tests "[integration][sketch-3d-direct-manipulation]"
 ```
+
+Both tags are registered on headless Core tests in `tests/core/sketch_3d_tests.cpp`; the interaction
+service is proven without a Qt viewport, matching the headless-first authority split above.
+
+## Next boundary
+
+Block 121 owns integrated Interactive Sketcher acceptance: deterministic tutorial documents, a
+coverage manifest for every planned Sketch tool, mouse/script equivalence, persistence/recompute,
+exact undo/redo, conflict atomicity, reference repair, and measured interaction performance. Direct
+handles for arc/spline/helix parameters and any variational 3D constraint solving remain bounded
+later extensions and are not implied by Block 120.

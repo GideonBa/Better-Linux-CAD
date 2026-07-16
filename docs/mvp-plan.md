@@ -4,10 +4,10 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 116
-current_block: 117
-current_boundary: Offset, projection/include, construction axes, and associative references
-current_tag: "[core][sketch-offset-project]"
+implemented_through: Block 120
+current_block: 121
+current_boundary: Integrated Interactive Sketcher acceptance and measured interaction performance
+current_tag: "[integration][interactive-sketcher]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -16,7 +16,7 @@ phase_status:
   mvp_5: "Assembly relationships, motion, hierarchy, analysis, exchange — Blocks 1–47 implemented"
   mvp_6: "Part Construction — Blocks 48–94 implemented; MVP complete"
   mvp_7: "GUI Feature Validation — Blocks 95–105 implemented; MVP complete"
-  mvp_8: "Interactive Sketcher — Blocks 106–116 implemented; Blocks 117–121 planned; Block 117 next"
+  mvp_8: "Interactive Sketcher — Blocks 106–120 implemented; Block 121 (acceptance) next"
   mvp_9: "Interactive Part & Assembly Modeling — Blocks 122–131 planned after Interactive Sketcher acceptance"
   mvp_10: "STEP Import — Blocks 132–138 planned after Interactive Modeling acceptance"
 ---
@@ -30,13 +30,13 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 ## Current status
 
 ```text
-implemented through  Block 116
-current block        Block 117
+implemented through  Block 120
+current block        Block 121
 current phase        Interactive Sketcher MVP-8
-current boundary     offset, projection/include, construction axes, associative references
+current boundary     integrated acceptance, coverage manifest, measured interaction performance
 ```
 
-Block 116 is implemented. Block 117 is the current next technical step.
+Block 120 is implemented. Block 121 is the current next technical step.
 
 ## Phase map
 
@@ -218,18 +218,85 @@ Focused tags:
 [gui][sketch-trim-extend]
 ```
 
-## Current next technical step — Block 117
+### Block 117 — Offset, projection, and construction references — Implemented
 
-Implement single/chain/loop offset with side preview, associative projection/include of supported
-model edges/vertices/axes/silhouettes, construction axes, and explicit break-link conversion over the
-existing Sketch reference-recovery and transaction authorities. Lost or ambiguous semantic references
-enter the existing repair workflow; nothing partially mutates the Sketch.
+Block 117 adds `SketchOffsetProjectService` (Core): ordered line-chain and closed-loop offset along
+left-hand normals with deterministic miter joints, associative Project/Include of existing
+`ProjectedSketchPoint`/`ProjectedSketchLine` records (construction axes project through their
+`ConstructionLineId`), and explicit break-link conversion of a projected line into an ordinary
+`LineSegment` with the same stable id. Break-link fails closed while embedded reference constraints
+still depend on the projected entity. No new JSON schema; no parallel recovery semantics.
 
-## Remaining Interactive Sketcher sequence
+Canonical contract: `docs/gui-sketch-offset-project-mvp8.md`.
 
-Block 117 adds offset and associative projection. Block 118 adds transforms, copy, mirror, and Sketch
-patterns. Block 119 closes region/profile/repair and Finish Sketch behavior. Block 120 adds Interactive
-Sketch3D. Block 121 is integrated acceptance and measured performance.
+Focused tags:
+
+```text
+[core][sketch-offset-project]
+```
+
+### Block 118 — Transform, mirror, and Sketch patterns — Implemented
+
+Block 118 adds `SketchTransformPatternService` (Core): id-preserving move/rotate/scale that weave
+transformed replacement curves into the candidate before embedded intent is copied, so referencing
+constraints, dimensions, and continuity are preserved in place; ordinary copy/mirror with
+deterministic `.copy.N`/`.mirror.N` ids; and rectangular/circular patterns with explicit
+`SketchPatternMode` (`Associative` returns a `SketchPatternIntent`, `Exploded` returns ordinary
+entities). Copy, mirror, and patterns report non-duplicated referencing intent through
+`uncopied_references` instead of silently discarding it.
+
+Canonical contract: `docs/gui-sketch-transform-pattern-mvp8.md`.
+
+Focused tags:
+
+```text
+[core][sketch-transform-pattern]
+```
+
+### Block 119 — Regions, profiles, diagnostics, and Finish Sketch — Implemented
+
+Block 119 adds `SketchFinishService` (Geometry): endpoint-connected component partition of explicit
+line entities, per-component validation through the established `SketchRegionFinder` failure policy,
+typed open-contour/self-intersection/ambiguous-topology diagnostics, point-in-region profile
+selection, and a fail-closed Finish Sketch that adds one ordinary `ClosedProfile` through
+`PartDocument::update_sketch(...)`. Region ids are deterministic
+`generated.region.<sketch>.<index>` values.
+
+Canonical contract: `docs/gui-sketch-regions-finish-mvp8.md`.
+
+Focused tags:
+
+```text
+[geometry][sketch-regions]
+[gui][sketch-profile-selection]
+[integration][sketch-finish]
+```
+
+### Block 120 — Interactive Sketch3D — Implemented
+
+Block 120 adds `Sketch3DInteractionService` (Core) over the persistent `Sketch3D` model: orthogonal
+axis/plane locks with typed XYZ and distance/azimuth/elevation input, atomic point/line placement
+with optional guide roles, reference-preserving point-handle moves, and planar-point projection that
+publishes an explicit `Sketch3DProjectedPointIntent`. No second spatial-curve representation and no
+variational 3D constraint solver are introduced.
+
+Canonical contract: `docs/gui-sketch3d-interaction-mvp8.md`.
+
+Focused tags:
+
+```text
+[gui][sketch-3d-edit]
+[integration][sketch-3d-direct-manipulation]
+```
+
+Both Block-120 tags are registered on headless Core tests in `tests/core/sketch_3d_tests.cpp`.
+
+## Current next technical step — Block 121
+
+Prove integrated Interactive Sketcher acceptance: deterministic tutorial documents, a coverage
+manifest for every planned Sketch tool, mouse/script equivalence, persistence/recompute, exact
+undo/redo, conflict atomicity, reference repair, keyboard Apply/Cancel, high-DPI mapping, no stale
+preview publication, and measured hover/drag/solve/region-recognition performance.
 
 ## Later phases
 

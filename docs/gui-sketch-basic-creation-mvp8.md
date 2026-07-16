@@ -154,5 +154,6 @@ persistent expansion, exact full-circle parameter contract, transient conic prev
 are canonical in `docs/gui-sketch-conic-slot-creation-mvp8.md`.
 
 Block 113 spline editing and Sketch text, Block 114 accepted constraint authoring, Block 115
-dimension authoring, and Block 116 trim/extend/split/fillet/chamfer are implemented in their canonical
-contracts. Block 117 is next and owns offset, associative projection, and construction references.
+dimension authoring, Block 116 trim/extend/split/fillet/chamfer, Block 117 offset/projection,
+Block 118 transforms/patterns, Block 119 regions/Finish Sketch, and Block 120 Interactive Sketch3D
+are implemented in their canonical contracts. Block 121 integrated acceptance is next.

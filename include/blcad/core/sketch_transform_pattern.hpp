@@ -34,6 +34,10 @@ struct SketchTransformPatternResult {
   Sketch sketch;
   std::vector<SketchEntityId> created_entities;
   std::optional<SketchPatternIntent> pattern_intent;
+  // Constraint/dimension/continuity ids that reference a selected source and
+  // are therefore not duplicated onto copied/mirrored/patterned instances. The
+  // caller must surface this instead of silently discarding the relationship.
+  std::vector<std::string> uncopied_references;
 };
 
 class SketchTransformPatternService {
@@ -117,7 +121,8 @@ public:
       intent = SketchPatternIntent{std::move(intent_id), SketchPatternKind::Rectangular, mode, ids,
                                    first_step, second_step, {}, first_count, second_count, 0.0};
     return Result<SketchTransformPatternResult>::success(
-        {std::move(candidate.value()), std::move(created), std::move(intent)});
+        {std::move(candidate.value()), std::move(created), std::move(intent),
+         external_intent_on(source, ids)});
   }
 
   [[nodiscard]] static Result<SketchTransformPatternResult>
@@ -146,7 +151,8 @@ public:
       intent = SketchPatternIntent{std::move(intent_id), SketchPatternKind::Circular, mode, ids,
                                    {}, {}, center, count, 1U, step};
     return Result<SketchTransformPatternResult>::success(
-        {std::move(candidate.value()), std::move(created), std::move(intent)});
+        {std::move(candidate.value()), std::move(created), std::move(intent),
+         external_intent_on(source, ids)});
   }
 
 private:
@@ -232,34 +238,73 @@ private:
     auto created = append_to(candidate.value(), curves.value(), suffix, f);
     if (created.has_error()) return Result<SketchTransformPatternResult>::failure(created.error());
     return Result<SketchTransformPatternResult>::success(
-        {std::move(candidate.value()), std::move(created.value()), std::nullopt});
+        {std::move(candidate.value()), std::move(created.value()), std::nullopt,
+         external_intent_on(source, ids)});
   }
   template <typename F>
   [[nodiscard]] static Result<SketchTransformPatternResult> replace(
       const Sketch& source, const std::vector<SketchEntityId>& ids, F f) {
     auto curves = selected(source, ids);
     if (curves.has_error()) return Result<SketchTransformPatternResult>::failure(curves.error());
-    auto candidate = clone(source, ids);
-    if (candidate.has_error()) return Result<SketchTransformPatternResult>::failure(candidate.error());
+    // The transformed curves keep their ids and must exist before referencing
+    // constraints/dimensions/profiles are copied, so they are woven into the
+    // clone instead of being appended afterwards.
+    std::vector<Curve> replacements;
+    replacements.reserve(curves.value().size());
     for (const auto& curve : curves.value()) {
       auto value = transformed(curve, id_of(curve), f);
       if (value.has_error()) return Result<SketchTransformPatternResult>::failure(value.error());
-      auto added = add(candidate.value(), value.value());
-      if (added.has_error()) return Result<SketchTransformPatternResult>::failure(added.error());
+      replacements.push_back(std::move(value.value()));
     }
-    return Result<SketchTransformPatternResult>::success({std::move(candidate.value()), {}, std::nullopt});
+    auto candidate = clone(source, ids, &replacements);
+    if (candidate.has_error()) return Result<SketchTransformPatternResult>::failure(candidate.error());
+    return Result<SketchTransformPatternResult>::success(
+        {std::move(candidate.value()), {}, std::nullopt, {}});
+  }
+  // Stable ids of embedded intent that references any selected source entity.
+  [[nodiscard]] static std::vector<std::string> external_intent_on(
+      const Sketch& source, const std::vector<SketchEntityId>& ids) {
+    const auto selected_id = [&ids](const SketchEntityId& id) {
+      return std::find(ids.begin(), ids.end(), id) != ids.end();
+    };
+    const auto on = [&selected_id](const SketchReferenceTarget& target) {
+      return selected_id(target.entity());
+    };
+    std::vector<std::string> result;
+    for (const auto& constraint : source.constraints())
+      if (on(constraint.constrained_target()) || on(constraint.reference_target()))
+        result.push_back(constraint.id().value());
+    for (const auto& constraint : source.geometric_constraints())
+      if (on(constraint.first_target()) ||
+          (constraint.second_target() && on(*constraint.second_target())))
+        result.push_back(constraint.id().value());
+    for (const auto& dimension : source.driving_dimensions())
+      if (on(dimension.first_target()) || on(dimension.second_target()))
+        result.push_back(dimension.id().value());
+    for (const auto& continuity : source.tangent_continuities())
+      if (selected_id(continuity.first_entity()) || selected_id(continuity.second_entity()))
+        result.push_back(continuity.id().value());
+    std::sort(result.begin(), result.end());
+    result.erase(std::unique(result.begin(), result.end()), result.end());
+    return result;
   }
   [[nodiscard]] static bool omitted(const std::vector<SketchEntityId>& ids, const SketchEntityId& id) {
     return std::find(ids.begin(), ids.end(), id) != ids.end();
   }
   [[nodiscard]] static Result<Sketch> clone(const Sketch& source,
-                                            const std::vector<SketchEntityId>& omitted_ids = {}) {
+                                            const std::vector<SketchEntityId>& omitted_ids = {},
+                                            const std::vector<Curve>* replacements = nullptr) {
     auto candidate = Sketch::create(source.id(), source.name(), source.workplane());
     if (candidate.has_error()) return candidate;
 #define BLCAD_COPY(range, method) for (const auto& item : source.range()) { auto r = candidate.value().method(item); if (r.has_error()) return Result<Sketch>::failure(r.error()); }
     for (const auto& v : source.line_segments()) if (!omitted(omitted_ids, v.id())) { auto r = candidate.value().add_entity(v); if (r.has_error()) return Result<Sketch>::failure(r.error()); }
     for (const auto& v : source.arc_segments()) if (!omitted(omitted_ids, v.id())) { auto r = candidate.value().add_entity(v); if (r.has_error()) return Result<Sketch>::failure(r.error()); }
     for (const auto& v : source.spline_segments()) if (!omitted(omitted_ids, v.id())) { auto r = candidate.value().add_entity(v); if (r.has_error()) return Result<Sketch>::failure(r.error()); }
+    if (replacements != nullptr)
+      for (const auto& curve : *replacements) {
+        auto r = add(candidate.value(), curve);
+        if (r.has_error()) return Result<Sketch>::failure(r.error());
+      }
     BLCAD_COPY(projected_points, add_reference)
     BLCAD_COPY(projected_lines, add_reference)
     BLCAD_COPY(reference_generated_lines, add_reference)

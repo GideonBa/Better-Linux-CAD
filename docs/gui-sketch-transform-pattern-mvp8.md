@@ -24,7 +24,19 @@ selection + typed transform/pattern parameters
 - `copy(...)` creates ordinary detached copies using deterministic `<source>.copy.N` ids.
 - `mirror(...)` reflects every defining point across a non-degenerate line and creates deterministic `<source>.mirror.N` ordinary curves.
 
-Preserving ids for move/rotate/scale keeps stable entity identity. Copy and mirror intentionally create independent ordinary entities; no hidden transform relationship is introduced.
+Preserving ids for move/rotate/scale keeps stable entity identity. The transformed replacement
+curves are woven into the candidate before any embedded intent is copied, so constraints, geometric
+constraints, driving dimensions, and tangent continuity that reference a selected entity are
+preserved in place and keep resolving against the same ids. Copy and mirror intentionally create
+independent ordinary entities; no hidden transform relationship is introduced.
+
+## Non-duplicated intent report
+
+Copy, mirror, and both pattern families never duplicate embedded intent onto the generated
+instances. Instead, `SketchTransformPatternResult::uncopied_references` lists the sorted, deduplicated
+ids of every constraint, geometric constraint, driving dimension, and tangent-continuity record that
+references a selected source entity. The caller must surface this report to the user; the
+relationship is reported, never silently discarded. Id-preserving transforms return an empty report.
 
 ## Rectangular and circular patterns
 
@@ -49,7 +61,7 @@ The service fails closed for empty selections, unknown or reference-only entitie
 ./build/dev/blcad_core_tests "[core][sketch-transform-pattern]"
 ```
 
-The registered Core proof covers stable-id move, ordinary copy and mirror, rectangular associative intent, circular exploded output, deterministic created ids, and rejection of invalid selections and degenerate parameters.
+The registered Core proof covers stable-id move, ordinary copy and mirror, rectangular associative intent, circular exploded output, deterministic created ids, rejection of invalid selections and degenerate parameters, constraint- and dimension-preserving move on referenced geometry, and the `uncopied_references` report for copy and pattern output.
 
 ## Next boundary
 

@@ -1,6 +1,7 @@
 # Interactive Sketcher Sequence MVP-8
 
-Status: in progress. Blocks 106–116 are implemented; Block 117 is the current next technical step.
+Status: in progress. Blocks 106–120 are implemented; Block 121 (integrated acceptance) is the
+current next technical step.
 Blocks 106–121 precede Interactive Modeling MVP-9 (Blocks 122–131) and STEP Import MVP-10
 (Blocks 132–138).
 
@@ -49,11 +50,11 @@ Core/Geometry consumers.
 114 manual and automatic geometric constraints with glyph interaction — implemented
 115 driving/reference dimensions, in-canvas editing, parameter/expression binding — implemented
 116 trim, extend, split, corner fillet, corner chamfer — implemented
-117 offset, project/include, construction axes, associative references — next
-118 move, rotate, scale, copy, mirror, rectangular/circular Sketch patterns
-119 region recognition, profile selection, diagnostics, repair, Finish Sketch
-120 interactive Sketch3D creation and direct point/curve manipulation
-121 integrated usability, persistence, solver, performance, GUI/headless acceptance
+117 offset, project/include, construction axes, associative references — implemented
+118 move, rotate, scale, copy, mirror, rectangular/circular Sketch patterns — implemented
+119 region recognition, profile selection, diagnostics, repair, Finish Sketch — implemented
+120 interactive Sketch3D creation and direct point/curve manipulation — implemented
+121 integrated usability, persistence, solver, performance, GUI/headless acceptance — next
 122–131 Interactive Part & Assembly Modeling MVP-9
 132–138 STEP Import MVP-10
 ```
@@ -246,36 +247,52 @@ Canonical contract: `docs/gui-sketch-modify-mvp8.md`.
 Focused tags: `[core][sketch-modify]`, `[geometry][sketch-modify]`,
 `[gui][sketch-trim-extend]`.
 
-## Block 117 — Offset, projection, and construction references
+## Block 117 — Offset, projection, and construction references — Implemented
 
-Add chain/loop offset, supported associative projection, explicit break-link conversion, and matching
-lost/ambiguous reference workflow.
+`SketchOffsetProjectService` (Core) offsets ordered line chains/loops with deterministic miter
+joints, adds associative `ProjectedSketchPoint`/`ProjectedSketchLine` records (construction axes
+through their `ConstructionLineId`), and converts a projected line into an ordinary `LineSegment`
+with the same stable id via explicit break-link. Break-link fails closed while embedded reference
+constraints depend on the projected entity. Canonical contract:
+`docs/gui-sketch-offset-project-mvp8.md`.
 
-Focused tags: `[core][sketch-offset-project]`, `[geometry][sketch-offset-project]`,
-`[gui][sketch-project]`.
+Focused tags: `[core][sketch-offset-project]`. The planned `[geometry][sketch-offset-project]` and
+`[gui][sketch-project]` tags were narrowed away with the Core-only implementation; see Explicit
+deferrals.
 
-## Block 118 — Transform, mirror, and Sketch patterns
+## Block 118 — Transform, mirror, and Sketch patterns — Implemented
 
-Add move, rotate, scale, copy, mirror, rectangular pattern, and circular pattern for selected Sketch
-geometry. Associative pattern intent is explicit; exploded copies are ordinary entities.
+`SketchTransformPatternService` (Core) provides id-preserving move/rotate/scale that keep
+referencing constraints, dimensions, and continuity resolved in place; ordinary copy/mirror with
+deterministic `.copy.N`/`.mirror.N` ids; and rectangular/circular patterns with explicit
+`SketchPatternMode`. Associative mode returns a `SketchPatternIntent`; exploded copies are ordinary
+entities. Non-duplicated referencing intent is reported through `uncopied_references`, never
+silently discarded. Canonical contract: `docs/gui-sketch-transform-pattern-mvp8.md`.
 
-Focused tags: `[core][sketch-transform-pattern]`, `[gui][sketch-transform-pattern]`.
+Focused tags: `[core][sketch-transform-pattern]`. The planned `[gui][sketch-transform-pattern]` tag
+was narrowed away with the Core-only implementation; see Explicit deferrals.
 
-## Block 119 — Regions, profiles, diagnostics, and Finish Sketch
+## Block 119 — Regions, profiles, diagnostics, and Finish Sketch — Implemented
 
-Continuously recognize bounded regions from solved visible non-construction geometry, expose profile
-selection and open/self-crossing diagnostics, and complete the solver-aware Finish Sketch workflow.
+`SketchFinishService` (Geometry) partitions explicit line entities into endpoint-connected
+components, validates each through the established `SketchRegionFinder` failure policy, publishes
+typed open-contour/self-intersection/ambiguous-topology diagnostics and point-in-region profile
+selection, and finishes fail-closed by adding one ordinary `ClosedProfile` through
+`PartDocument::update_sketch(...)`. Canonical contract: `docs/gui-sketch-regions-finish-mvp8.md`.
 
 Focused tags: `[geometry][sketch-regions]`, `[gui][sketch-profile-selection]`,
-`[integration][sketch-finish]`.
+`[integration][sketch-finish]` (all registered on headless Geometry tests).
 
-## Block 120 — Interactive Sketch3D
+## Block 120 — Interactive Sketch3D — Implemented
 
-Add orthogonal triad/plane locks, model-space point/line placement, typed XYZ/distance/angle input, 3D
-curve handles, guide roles, and projection of planar Sketch points. This does not imply a full
-variational 3D constraint solver.
+`Sketch3DInteractionService` (Core) adds orthogonal axis/plane locks with typed XYZ and
+distance/azimuth/elevation input, atomic point/line placement with optional guide roles,
+reference-preserving point-handle moves, and planar-point projection publishing an explicit
+`Sketch3DProjectedPointIntent`. No full variational 3D constraint solver is implied. Canonical
+contract: `docs/gui-sketch3d-interaction-mvp8.md`.
 
-Focused tags: `[gui][sketch-3d-edit]`, `[integration][sketch-3d-direct-manipulation]`.
+Focused tags: `[gui][sketch-3d-edit]`, `[integration][sketch-3d-direct-manipulation]` (both
+registered on headless Core tests in `tests/core/sketch_3d_tests.cpp`).
 
 ## Block 121 — Interactive Sketcher acceptance
 
@@ -287,7 +304,7 @@ drag, solve, and region-recognition performance.
 Focused tags: `[integration][interactive-sketcher]`, `[integration][sketch-gui-headless]`,
 `[performance][sketch-interaction]`.
 
-## Coverage matrix through Block 116
+## Coverage matrix through Block 120
 
 | Sketch capability | Canonical contract | Interactive owner |
 |---|---|---:|
@@ -303,10 +320,10 @@ Focused tags: `[integration][interactive-sketcher]`, `[integration][sketch-gui-h
 | Constraint intent, inference, glyphs, conflict preview | `gui-sketch-constraint-authoring-mvp8.md` | 114 |
 | Dimensions, typed parameters, expressions, annotation editing | `gui-sketch-dimension-authoring-mvp8.md` | 115 |
 | Trim/extend/split and corner fillet/chamfer | `gui-sketch-modify-mvp8.md` | 116 |
-| Offset/project/reference recovery | projection/reference contracts | 117 |
-| Sketch transforms/patterns | pattern contracts | 118 |
-| Automatic regions and Finish Sketch | region/repair contracts | 119 |
-| Sketch3D interaction | Sketch3D contracts | 120 |
+| Offset, project/include, break-link conversion | `gui-sketch-offset-project-mvp8.md` | 117 |
+| Sketch transforms, mirror, patterns | `gui-sketch-transform-pattern-mvp8.md` | 118 |
+| Region recognition, diagnostics, Finish Sketch | `gui-sketch-regions-finish-mvp8.md` | 119 |
+| Sketch3D locks, placement, handles, projection | `gui-sketch3d-interaction-mvp8.md` | 120 |
 
 ## Explicit deferrals
 
@@ -335,7 +352,20 @@ boundary instead of silent inclusion:
 - dimension **extension lines, arrows, text-collision avoidance, and draggable annotation
   positions**; Block 115 publishes one semantic anchor annotation per dimension;
 - dimensions targeting full **CircleProfile** records; radius/diameter/arc-length target
-  three-point arcs until shared topology covers circle-profile entities.
+  three-point arcs until shared topology covers circle-profile entities;
+- **Qt binder wiring for Blocks 117 and 118** — the planned `[geometry][sketch-offset-project]`,
+  `[gui][sketch-project]`, and `[gui][sketch-transform-pattern]` proofs were not registered; both
+  blocks are Core-only headless authorities (`SketchOffsetProjectService`,
+  `SketchTransformPatternService`), and interactive command/preview wiring needs its own explicit
+  boundary (at latest justified against the Block-121 coverage manifest);
+- **arc/spline offset**, automatic chain discovery, bevel/round offset joins, variable-distance
+  offset, and automatic rewriting of dependent references on break-link (Block 117 offsets ordered
+  line chains with miter joints only);
+- **region recognition over arcs and splines** — Block 119 partitions explicit line entities only;
+  curved-boundary regions need their own boundary;
+- Block-120 **arc/spline/helix parameter handles** and interactive creation of curved 3D geometry —
+  the interaction service covers point/line placement, point-handle moves, and planar-point
+  projection; curved Sketch3D records remain script/document-authored.
 
 After Block 121, Interactive Part & Assembly Modeling MVP-9 begins at Block 122. STEP Import MVP-10
 follows in Blocks 132–138.

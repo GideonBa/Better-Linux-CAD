@@ -106,7 +106,7 @@ or Geometry variational solver exists.
 
 Canonical contract: `docs/sketch-planar-constraint-solver-mvp8.md`.
 
-## Interactive Sketch architecture through Block 116
+## Interactive Sketch architecture through Block 120
 
 ### Workspace and plane interaction
 
@@ -297,7 +297,11 @@ posed shapes / analysis / XDE and STEP transfer identity
 
 ## Current boundary
 
-Blocks 106–116 are implemented. Block 116 added `SketchModifyService` trim/extend/split/two-line
-fillet/two-line chamfer with explicit remap-or-reject behavior for profiles, references, constraints,
-dimensions, and continuity intent (`docs/gui-sketch-modify-mvp8.md`). Block 117 is the current next
-technical step: offset, associative projection/include, and construction references.
+Blocks 106–120 are implemented. Blocks 117–120 added `SketchOffsetProjectService` offset/projection/
+break-link (`docs/gui-sketch-offset-project-mvp8.md`), `SketchTransformPatternService`
+move/rotate/scale/copy/mirror/patterns with the `uncopied_references` report
+(`docs/gui-sketch-transform-pattern-mvp8.md`), `SketchFinishService` region recognition and
+fail-closed Finish Sketch (`docs/gui-sketch-regions-finish-mvp8.md`), and
+`Sketch3DInteractionService` lock-based 3D placement and handles
+(`docs/gui-sketch3d-interaction-mvp8.md`). Block 121 is the current next technical step: integrated
+Interactive Sketcher acceptance and measured performance.

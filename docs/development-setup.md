@@ -97,7 +97,7 @@ On Linux the native OCCT viewport uses Qt xcb when `DISPLAY` is available and
 
 ## Interactive Sketcher focused proof
 
-Blocks 106–116 are implemented.
+Blocks 106–120 are implemented.
 
 Block 106 workspace and command lifecycle:
 
@@ -201,6 +201,32 @@ constraints, explicit rejection of modifications that invalidate a referencing d
 a chamfer result resolving through the Geometry region pipeline, atomic GUI preview/commit with exact
 undo/redo, and fail-closed commit against a Block-114 catalog reference.
 
+Block 117 offset, associative projection/include, and break-link conversion:
+
+```bash
+./build/dev/blcad_core_tests "[core][sketch-offset-project]"
+```
+
+Block 118 transforms, mirror, and Sketch patterns:
+
+```bash
+./build/dev/blcad_core_tests "[core][sketch-transform-pattern]"
+```
+
+Block 119 region recognition, profile selection, diagnostics, and Finish Sketch:
+
+```bash
+./build/dev-geometry/blcad_geometry_tests "[geometry][sketch-regions]"
+./build/dev-geometry/blcad_geometry_tests "[integration][sketch-finish]"
+```
+
+Block 120 Interactive Sketch3D (headless Core proof):
+
+```bash
+./build/dev/blcad_core_tests "[gui][sketch-3d-edit]"
+./build/dev/blcad_core_tests "[integration][sketch-3d-direct-manipulation]"
+```
+
 ## Representative existing validation tags
 
 ```bash
@@ -298,6 +324,9 @@ rm -rf build/
 
 ## Current development boundary
 
-Blocks 106–116 are implemented. Block 117 is next: single/chain/loop offset, associative
-projection/include, construction axes, and break-link conversion over the existing reference-recovery
-and transaction authorities.
+Blocks 106–120 are implemented: line-chain/loop offset with associative projection and break-link
+conversion (`docs/gui-sketch-offset-project-mvp8.md`), Sketch transforms/mirror/patterns
+(`docs/gui-sketch-transform-pattern-mvp8.md`), region recognition with Finish Sketch
+(`docs/gui-sketch-regions-finish-mvp8.md`), and Interactive Sketch3D
+(`docs/gui-sketch3d-interaction-mvp8.md`). Block 121 is next: integrated Interactive Sketcher
+acceptance with a coverage manifest and measured interaction performance.

@@ -67,8 +67,12 @@ Blocks 112–115 are implemented: circle/arc/ellipse/slot creation
 (`docs/gui-sketch-constraint-authoring-mvp8.md`), and driving/reference dimensions with
 parameter/expression binding (`docs/gui-sketch-dimension-authoring-mvp8.md`). Block 116 adds
 trim, extend, split, two-line fillet, and two-line chamfer geometry modification
-(`docs/gui-sketch-modify-mvp8.md`). Block 117 is the current next technical step and adds offset,
-associative projection/include, and construction references.
+(`docs/gui-sketch-modify-mvp8.md`). Blocks 117–120 are implemented: offset with associative
+projection and break-link conversion (`docs/gui-sketch-offset-project-mvp8.md`), Sketch
+transforms/mirror/patterns (`docs/gui-sketch-transform-pattern-mvp8.md`), region recognition with
+Finish Sketch (`docs/gui-sketch-regions-finish-mvp8.md`), and Interactive Sketch3D
+(`docs/gui-sketch3d-interaction-mvp8.md`). Block 121 is the current next technical step: integrated
+Interactive Sketcher acceptance.
 
 Development rule:
 

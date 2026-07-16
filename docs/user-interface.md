@@ -7,8 +7,10 @@ shared planar topology, deterministic general planar solver, and solver-backed s
 dragging. Block 111 adds multi-click basic creation tools with rubber-band previews and numeric
 entry. Blocks 112–116 add circle/arc/ellipse/slot creation, spline editing with Sketch text,
 constraint authoring with semantic glyphs, driving/reference dimensions with expression binding, and
-trim/extend/split/fillet/chamfer modification. Block 117 is the current next technical step and adds
-offset, associative projection, and construction references.
+trim/extend/split/fillet/chamfer modification. Blocks 117–120 add offset with associative
+projection, Sketch transforms/mirror/patterns, region recognition with Finish Sketch, and
+Interactive Sketch3D. Block 121 is the current next technical step: integrated Interactive Sketcher
+acceptance.
 Blocks 122–131 add interactive Part/Surface/Assembly modeling; STEP Import begins with Block 132.
 
 The UI is deliberately not built like FreeCAD. The goal is a modern, consistent, reduced interface
@@ -276,13 +278,13 @@ but release cannot commit a failed candidate.
 7. Add deterministic general planar solving and exact local DOF over that topology. Implemented in 109.
 8. Add solver-backed semantic-handle drag and atomic release commit. Implemented in 110.
 9. Add creation, constraints, dimensions, modify/project tools, regions, and Interactive Sketch3D
-   through Block 121. Block 111 next.
-9. Add selection-first Part/Surface/Assembly modeling through Blocks 122–131.
-10. Add STEP Reference/EditableBody import through Blocks 132–138.
+   through Block 120. Implemented in 111–120; Block 121 acceptance next.
+10. Add selection-first Part/Surface/Assembly modeling through Blocks 122–131.
+11. Add STEP Reference/EditableBody import through Blocks 132–138.
 
 ## Current boundary
 
-Blocks 110–116 are implemented. Block 117 is next.
+Blocks 110–120 are implemented. Block 121 (integrated Interactive Sketcher acceptance) is next.
 
 No widget may implement substitute constraint mathematics. Basic creation must map transient picks and
 snap results to explicit Block-108 topology/edit commands, use Block-109 solve authority for disposable
