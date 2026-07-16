@@ -27,8 +27,9 @@ Sketch residuals/Jacobians, solve/motion results, planar Sketch variable order, 
 remaining DOF, conflict/redundancy diagnostics, freshness snapshots, exchange records, posed shapes,
 contact classifications, motion samples, XDE labels, STEP entities, Sketch interaction samples, screen
 mappings, hit stacks, grid lines, snap/inference candidates, legacy Sketch-topology migration reports,
-and PartDocument compatibility materialization candidates. These are regenerable query/execution
-products rather than primary model authority.
+PartDocument compatibility materialization candidates, modeling preselection capabilities, contextual
+command recommendations, selection filters, repeat state, ViewCube/Home state, and camera bookmarks.
+These are regenerable query/execution/presentation products rather than primary model authority.
 
 ## Direction
 
@@ -44,36 +45,24 @@ The project grows through controlled headless vertical slices:
 7. broad multi-body Part Construction;
 8. GUI/application workflows and complete implemented-feature validation;
 9. productive deterministic solver-backed Interactive Sketcher with direct manipulation;
-10. STEP Part/Assembly import as Reference or EditableBody;
-11. engineering modules.
+10. selection-first Interactive Part/Surface/Assembly Modeling;
+11. STEP Part/Assembly import as Reference or EditableBody;
+12. engineering modules.
 
-Phases 1–8 are implemented through GUI Feature Validation Block 105. Interactive Sketcher MVP-8 is in
-progress with Blocks 106–110 implemented:
+Phases 1–9 are implemented through accepted Interactive Sketcher Block 121. Interactive Part &
+Assembly Modeling MVP-9 is active through Block 122:
 
 ```text
-106 contextual planar Sketch workspace and command lifecycle
-107 device-independent plane interaction / hit / box selection / grid / snap / inference
-108 stable shared SketchPointId / SketchTopology / migration / edit commands / topology persistence
-109 deterministic general planar constraint solver / exact local DOF / conflict and redundancy output
-110 semantic Sketch handles / solver-backed live drag / rollback / exact final sample / atomic release
+122 selection-first Part/Surface/Assembly workspace
+    capability-exact contextual command start
+    visible contextual mini-toolbar and repeat
+    persistent-profile-only Finish Sketch handoff
+    synchronized session/viewport selection filters
+    ViewCube, captured Home, and session-local camera bookmarks
 ```
 
-Block 111 basic creation — point, line, polyline, rectangle families, parallelogram, regular
-polygon, centerline, and construction geometry with rubber-band previews, numeric entry, and one
-transaction per completed tool — is implemented (`docs/gui-sketch-basic-creation-mvp8.md`).
-Blocks 112–115 are implemented: circle/arc/ellipse/slot creation
-(`docs/gui-sketch-conic-slot-creation-mvp8.md`), spline editing plus parameter-backed Sketch text
-(`docs/gui-sketch-spline-text-mvp8.md`), constraint authoring with glyphs and conflict preview
-(`docs/gui-sketch-constraint-authoring-mvp8.md`), and driving/reference dimensions with
-parameter/expression binding (`docs/gui-sketch-dimension-authoring-mvp8.md`). Block 116 adds
-trim, extend, split, two-line fillet, and two-line chamfer geometry modification
-(`docs/gui-sketch-modify-mvp8.md`). Blocks 117–120 are implemented: offset with associative
-projection and break-link conversion (`docs/gui-sketch-offset-project-mvp8.md`), Sketch
-transforms/mirror/patterns (`docs/gui-sketch-transform-pattern-mvp8.md`), region recognition with
-Finish Sketch (`docs/gui-sketch-regions-finish-mvp8.md`), and Interactive Sketch3D
-(`docs/gui-sketch3d-interaction-mvp8.md`). Block 121 completes Interactive Sketcher acceptance with
-machine-checked coverage, GUI/headless equivalence, atomicity, and measured performance. Block 122
-is the current next technical step.
+Block 123, reusable transient viewport manipulators with numeric-HUD coupling, is the current next
+technical step. STEP Import starts at Block 132 after Interactive Modeling acceptance.
 
 Development rule:
 
@@ -112,7 +101,7 @@ Blocks 95–105 implement and accept the optional Qt application layer over thos
 owns session/command/task/selection and transient presentation state; Core and Geometry remain model,
 solver, geometry, recompute, analysis, and exchange authorities.
 
-Blocks 106–110 establish the implemented Interactive Sketcher foundation:
+Blocks 106–121 implement and accept Interactive Sketcher MVP-8:
 
 ```text
 contextual Sketch workspace and command lifecycle
@@ -138,6 +127,8 @@ contextual Sketch workspace and command lifecycle
   -> live solved preview without PartDocument mutation
   -> rollback on Esc / lost capture / solve refusal
   -> one freshness-checked Drag sketch handle document transaction on release
+  -> creation, constraints, dimensions, modify/project, transforms, patterns, regions, and Sketch3D
+  -> machine-checked coverage, GUI/headless equivalence, atomicity, and measured performance
 ```
 
 The canonical Block-108 topology is solver/direct-manipulation identity authority. The historical
@@ -148,9 +139,11 @@ Block 109 adds no opaque solved-coordinate cache. `SketchSolveResult`, solver va
 Jacobian, rank, remaining DOF, iteration state, and conflict/redundancy diagnostics are derived. The
 source topology is never mutated by `SketchConstraintSolver::solve(...)`.
 
-Interactive Sketcher is implemented and accepted through Block 121. Interactive Part/Surface/
-Assembly Modeling begins at Block 122, and STEP Part plus structured Assembly import follows in
-Blocks 132–138.
+Block 122 begins Interactive Part/Surface/Assembly Modeling without extending persistent model intent.
+`GuiModelingWorkspace` combines one semantic selection with verified capabilities, starts the existing
+`GuiTaskState`, and restores complete preselection on cancellation. `GuiModelingWorkspaceShellBinder`
+renders the visible context tabs, filters, mini-toolbar, Repeat, ViewCube, Home, and camera-bookmark
+controls. Core, Geometry, Part JSON, Project JSON, and sidecar formats are unchanged.
 
 ## Identity and authority distinctions
 
@@ -252,21 +245,27 @@ assistants.
 
 ## Non-goals for the current phase
 
-The current phase does not yet claim production-grade GUI parity. Blocks 106–110 establish workspace,
-plane interaction, persistent shared Sketch topology, and deterministic solver foundations; Blocks
-110–121 deliberately add direct manipulation, creation, constraint/dimension authoring, modify/project
-workflows, regions, Sketch3D interaction, and acceptance in sequence.
+Interactive Modeling MVP-9 does not yet claim full production-grade GUI parity. Block 122 establishes
+selection-first command start and navigation; Blocks 123–131 add manipulators, family-specific Part/
+Surface/Assembly authoring, feature editing, motion interaction, measure, and integrated acceptance in
+sequence.
 
-The current phase also does not introduce arbitrary raw OCCT topology as persistent identity, a second
-Assembly transform authority, whole-subassembly solve variables, a general physics engine, full
-contact dynamics, or continuous collision detection without a proved continuous algorithm. These are
-sequencing boundaries rather than permanent product exclusions.
+The current phase does not introduce arbitrary raw OCCT topology as persistent identity, a second
+Assembly transform authority, whole-subassembly solve variables, feature-history reorder, persistent
+appearance, direct modeling, section views, general constrained assembly free-drag, a general physics
+engine, full contact dynamics, or continuous collision detection without a proved continuous
+algorithm. These are sequencing boundaries rather than permanent product exclusions.
 
 ## Documentation authority
 
 `docs/mvp-plan.md` is the implementation-sequence source of truth.
 
 `docs/interactive-sketcher-sequence-mvp8.md` is canonical for productive Sketch interaction.
+
+`docs/interactive-modeling-sequence-mvp9.md` is canonical for Blocks 122–131.
+
+`docs/gui-modeling-workspace-mvp9.md` is canonical for the Block-122 selection-first workspace,
+contextual command, filter, Finish-Sketch handoff, and navigation contract.
 
 `docs/sketch-shared-topology-mvp8.md` is canonical for Block-108 planar point/entity identity,
 migration, edit commands, topology JSON, and compatibility materialization.
