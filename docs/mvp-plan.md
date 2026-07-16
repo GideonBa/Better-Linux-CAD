@@ -4,10 +4,10 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 114
-current_block: 115
-current_boundary: Driving/reference dimensions, in-canvas editing, parameter/expression binding
-current_tag: "[core][sketch-dimensions]"
+implemented_through: Block 115
+current_block: 116
+current_boundary: Trim, extend, split, Sketch corner fillet and corner chamfer
+current_tag: "[core][sketch-topology-edit]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -16,7 +16,7 @@ phase_status:
   mvp_5: "Assembly relationships, motion, hierarchy, analysis, exchange — Blocks 1–47 implemented"
   mvp_6: "Part Construction — Blocks 48–94 implemented; MVP complete"
   mvp_7: "GUI Feature Validation — Blocks 95–105 implemented; MVP complete"
-  mvp_8: "Interactive Sketcher — Blocks 106–114 implemented; Blocks 115–121 planned; Block 115 next"
+  mvp_8: "Interactive Sketcher — Blocks 106–115 implemented; Blocks 116–121 planned; Block 116 next"
   mvp_9: "Interactive Part & Assembly Modeling — Blocks 122–131 planned after Interactive Sketcher acceptance"
   mvp_10: "STEP Import — Blocks 132–138 planned after Interactive Modeling acceptance"
 ---
@@ -30,13 +30,13 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 ## Current status
 
 ```text
-implemented through  Block 114
-current block        Block 115
+implemented through  Block 115
+current block        Block 116
 current phase        Interactive Sketcher MVP-8
-current boundary     dimensions, in-canvas editing, parameter/expression binding
+current boundary     trim, extend, split, Sketch fillet/chamfer
 ```
 
-Block 114 is implemented. Block 115 is the current next technical step.
+Block 115 is implemented. Block 116 is the current next technical step.
 
 ## Phase map
 
@@ -111,8 +111,8 @@ Frozen order:
 112 circle, arc, ellipse, slot creation/editing — implemented
 113 spline editing, continuity handles, Sketch text — implemented
 114 manual and automatic geometric constraints with glyph interaction — implemented
-115 driving/reference dimensions, in-canvas editing, parameter/expression binding — next
-116 trim, extend, split, corner fillet, corner chamfer
+115 driving/reference dimensions, in-canvas editing, parameter/expression binding — implemented
+116 trim, extend, split, corner fillet, corner chamfer — next
 117 offset, project/include, construction axes, associative references
 118 move, rotate, scale, copy, mirror, rectangular/circular Sketch patterns
 119 region recognition, profile selection, diagnostics, repair, Finish Sketch
@@ -164,41 +164,47 @@ candidates, disposable solve/conflict/redundancy preview, and semantic accepted/
 
 Accepted candidates materialize a complete solved Sketch and commit one `Add sketch constraint` Part
 transaction. The versioned `blcad.sketch_constraints.mvp8` sidecar stores only persistent intent;
-solver results and glyph layout remain derived. The GUI controller coordinates exact Sketch/catalog
-undo and redo and refuses stale topology/catalog snapshots.
+solver results and glyph layout remain derived. `GuiDocumentSession` owns the catalog through dirty
+state, Save/Open, global history, and later solver-backed drag.
 
 Canonical contract: `docs/gui-sketch-constraint-authoring-mvp8.md`.
 
-Focused tags:
+### Block 115 — Driving/reference dimensions and expressions — Implemented
 
-```text
-[core][sketch-constraints]
-[core][sketch-conflict-diagnostics]
-[geometry][sketch-constraints]
-[gui][sketch-constraints]
-[integration][sketch-auto-constraint]
-```
+Block 115 adds horizontal, vertical, aligned, point-to-point, line-length, arc-radius, arc-diameter,
+angle, and calibrated arc-length dimensions over stable topology targets. Driving dimensions bind an
+existing typed Length/Angle parameter or expression; reference dimensions only measure current solved
+topology.
 
-## Current next technical step — Block 115
+The versioned `blcad.sketch_dimensions.mvp8` sidecar is part of `GuiDocumentSession` dirty state,
+Save/Open, and every global history snapshot. Parameter edits, complete solved Sketch geometry, and the
+dimension catalog publish together. Semantic in-canvas annotations remain derived and clickable.
+Block-110 drag now consumes both accepted Block-114 constraints and Block-115 dimensions.
 
-Implement horizontal, vertical, aligned, point-to-point, length, radius, diameter, angle, and arc-length
-dimensions. Add driving/reference mode, in-canvas value editing, and explicit parameter/expression
-binding without moving unit or expression authority into Qt.
+Canonical contract: `docs/gui-sketch-dimension-authoring-mvp8.md`.
 
 Focused tags:
 
 ```text
 [core][sketch-dimensions]
+[geometry][sketch-dimensions]
 [gui][sketch-dimensions]
 [integration][sketch-expression-edit]
+[integration][sketch-live-solve]
 ```
+
+## Current next technical step — Block 116
+
+Implement trim, extend, split, Sketch corner fillet, and Sketch corner chamfer over stable Block-108
+topology. Every topology rewrite must remap or explicitly reject affected Block-114 constraints,
+Block-115 dimensions, profiles, references, and spline continuity records. Preview and commit remain
+complete-candidate and fail-closed.
 
 ## Remaining Interactive Sketcher sequence
 
-Block 116 adds trim/extend/split/Sketch fillet/chamfer. Block 117 adds offset and associative projection.
-Block 118 adds transforms, copy, mirror, and Sketch patterns. Block 119 closes region/profile/repair and
-Finish Sketch behavior. Block 120 adds Interactive Sketch3D. Block 121 is integrated acceptance and
-measured performance.
+Block 117 adds offset and associative projection. Block 118 adds transforms, copy, mirror, and Sketch
+patterns. Block 119 closes region/profile/repair and Finish Sketch behavior. Block 120 adds Interactive
+Sketch3D. Block 121 is integrated acceptance and measured performance.
 
 ## Later phases
 
