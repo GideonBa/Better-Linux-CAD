@@ -1,6 +1,6 @@
 # Interactive Sketcher Sequence MVP-8
 
-Status: in progress. Blocks 106–111 are implemented; Block 112 is the current next technical step.
+Status: in progress. Blocks 106–112 are implemented; Block 113 is the current next technical step.
 Blocks 106–121 precede Interactive Modeling MVP-9 (Blocks 122–131) and STEP Import MVP-10
 (Blocks 132–138).
 
@@ -101,8 +101,8 @@ must be declared at the numbered boundary and proven headlessly before a GUI con
 108 shared planar point/entity topology, mutation commands, JSON migration, undo — implemented
 109 deterministic planar constraint solver, DOF accounting, conflicts, diagnostics — implemented
 110 solver-backed mouse dragging, handles, live preview, atomic commit — implemented
-111 point, line, polyline, rectangle, polygon, construction-geometry creation — next — next — next — next — next
-112 circle, arc, ellipse, slot creation/editing
+111 point, line, polyline, rectangle, polygon, construction-geometry creation — implemented
+112 circle, arc, ellipse, slot creation/editing — implemented
 113 spline editing, continuity handles, Sketch text
 114 manual and automatic geometric constraints with glyph interaction
 115 driving/reference dimensions, in-canvas editing, parameter/expression binding
@@ -359,11 +359,24 @@ Canonical contract: `docs/gui-sketch-basic-creation-mvp8.md`.
 
 Focused tags: `[gui][sketch-create-basic]`, `[integration][sketch-basic-profile]`.
 
-## Block 112 — Circles, arcs, ellipses, and slots
+## Block 112 — Circles, arcs, ellipses, and slots — Implemented
 
-Add persistent Core/Geometry intent for supported circle, arc, ellipse/elliptical-arc, and slot
-construction families. Full circles become real curve entities where required. Degenerate radii and
-ambiguous collinear picks fail closed.
+Block 112 extends `GuiSketchCreateController` and the same command binder with center-radius/diameter,
+two-point, three-point, and tangent-circle families; center/start/end, three-point, and tangent arcs;
+ellipse/elliptical-arc families; and center-to-center/overall-length slots.
+
+Full circles are exact `CircleProfile` plus positive diameter-`Parameter` intent committed atomically.
+Circular arcs remain `ArcSegment`. Full ellipses use four deterministic cubic `SplineSegment` spans and
+one `ArcClosedProfile`; open elliptical arcs use the minimum number of cubic spans whose absolute sweep
+is at most 90 degrees. Slots expand into two lines, two semicircular arcs, and one ordered
+`ArcClosedProfile`. Preview sampling and automatic/tangent inference remain transient. Tangent target
+relationships are accepted only by Block 114.
+
+Degenerate radii, collinear three-point input, zero ellipse axes/sweeps, zero slot width/axis, and an
+overall slot length not greater than its width fail closed. No new JSON schema or parallel topology is
+introduced; exact undo/redo and JSON roundtrip use existing PartDocument authorities.
+
+Canonical contract: `docs/gui-sketch-conic-slot-creation-mvp8.md`.
 
 Focused tags: `[core][sketch-conics]`, `[geometry][sketch-conics]`,
 `[gui][sketch-create-conics]`.
@@ -446,7 +459,7 @@ Focused tags: `[integration][interactive-sketcher]`, `[integration][sketch-gui-h
 After Block 121, Interactive Part & Assembly Modeling MVP-9 begins at Block 122. STEP Import MVP-10
 follows in Blocks 132–138.
 
-## Sketch-domain coverage through Block 94
+## Sketch-domain coverage through Block 112
 
 | Sketch capability | Canonical contracts | Interactive owner |
 |---|---|---:|
@@ -455,8 +468,9 @@ follows in Blocks 132–138.
 | Shared planar point/entity identity | `sketch-shared-topology-mvp8.md` | 108–121 |
 | General planar constraint solve and DOF | `sketch-planar-constraint-solver-mvp8.md` | 109–121 |
 | Construction geometry | `construction-geometry-mvp.md` | 111 |
-| Circles and circle profiles | `sketch-mvp1-data-model.md` | 112 |
-| Arcs and arc/spline profiles | `arc-and-trim-extend-sketch-profile-mvp.md` | 112 |
+| Circles and circle profiles | `sketch-mvp1-data-model.md`, `gui-sketch-conic-slot-creation-mvp8.md` | 112 |
+| Arcs and arc/spline profiles | `arc-and-trim-extend-sketch-profile-mvp.md`, `gui-sketch-conic-slot-creation-mvp8.md` | 112 |
+| Ellipse and slot creation | `gui-sketch-conic-slot-creation-mvp8.md` | 112 |
 | Splines and tangent continuity | `spline-and-tangent-continuity-mvp.md` | 113 |
 | Constraint authoring/glyph UX | constraint and solver contracts | 114 |
 | Dimensions and parameter expressions | constraint/dimension and parameter contracts | 115 |
