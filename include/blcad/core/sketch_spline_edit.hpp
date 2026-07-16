@@ -94,7 +94,8 @@ public:
     for (std::size_t index = 1U; index < segments.size(); ++index)
       if (!same_point(segments[index - 1U].end(), segments[index].start()))
         return Result<SketchSplineEditModel>::failure(Error::validation(
-            ordered_entities[index].value(), "ordered spline edit entities must form a connected chain"));
+            ordered_entities[index].value(),
+            "ordered spline edit entities must form a connected chain"));
 
     return Result<SketchSplineEditModel>::success(SketchSplineEditModel(
         sketch.id(), std::move(ordered_entities), std::move(segments)));
@@ -221,8 +222,8 @@ public:
           Error::validation(sketch_.value(), "invalid fit-point insertion target"));
     if ((index > 0U && same_point(position, fit_points_[index - 1U])) ||
         (index < fit_points_.size() && same_point(position, fit_points_[index])))
-      return Result<std::size_t>::failure(
-          Error::validation(sketch_.value(), "inserted fit point must be distinct from its neighbours"));
+      return Result<std::size_t>::failure(Error::validation(
+          sketch_.value(), "inserted fit point must be distinct from its neighbours"));
     fit_points_.insert(fit_points_.begin() + static_cast<std::ptrdiff_t>(index), position);
     auto rebuilt = rebuild_from_fit_points();
     if (rebuilt.has_error()) return rebuilt;
@@ -289,13 +290,16 @@ public:
       const auto points = control_points(segments_[segment_index]);
       result.control_polygons.push_back({points[0], points[1], points[2], points[3]});
       if (representation_ == SketchSplineRepresentation::ControlPoints) {
-        for (std::size_t point_index = 0U; point_index < points.size(); ++point_index)
-          result.handles.push_back({"spline/" + segments_[segment_index].id().value() + "/control/" +
-                                        std::to_string(point_index),
+        for (std::size_t point_index = 0U; point_index < points.size(); ++point_index) {
+          // One connected junction is one semantic endpoint handle.
+          if (point_index == 0U && segment_index > 0U) continue;
+          result.handles.push_back({"spline/" + segments_[segment_index].id().value() +
+                                        "/control/" + std::to_string(point_index),
                                     point_index == 0U || point_index == 3U
                                         ? SketchSplineHandleKind::Endpoint
                                         : SketchSplineHandleKind::ControlPoint,
                                     segment_index, point_index, points[point_index]});
+        }
       }
     }
     if (representation_ == SketchSplineRepresentation::FitPoints)
@@ -307,7 +311,7 @@ public:
   }
 
   [[nodiscard]] Result<Sketch> build_sketch(const Sketch& source,
-                                            bool persist_internal_tangency = true) const {
+                                             bool persist_internal_tangency = true) const {
     if (source.id() != sketch_)
       return Result<Sketch>::failure(
           Error::validation(sketch_.value(), "spline edit source belongs to another Sketch"));
@@ -320,12 +324,32 @@ public:
     const auto removed = [&](const SketchEntityId& id) {
       return selected.contains(id.value()) && !generated.contains(id.value());
     };
-    for (const auto& profile : source.arc_closed_profiles())
+    const bool cardinality_changed = selected != generated;
+    const auto selected_profile_reference = [&](const auto& ordered_ids) {
+      return std::any_of(ordered_ids.begin(), ordered_ids.end(), [&](const SketchEntityId& id) {
+        return selected.contains(id.value());
+      });
+    };
+    for (const auto& profile : source.arc_closed_profiles()) {
+      if (cardinality_changed && selected_profile_reference(profile.curve_segments()))
+        return Result<Sketch>::failure(Error::dependency(
+            profile.id().value(),
+            "spline insertion/removal requires an explicit arc profile contour rewrite"));
       for (const auto& id : profile.curve_segments())
         if (removed(id))
           return Result<Sketch>::failure(Error::dependency(
               id.value(), "spline insertion/removal would invalidate an arc closed profile"));
+    }
     for (const auto& profile : source.composite_closed_profiles()) {
+      if (cardinality_changed && selected_profile_reference(profile.outer_contour()))
+        return Result<Sketch>::failure(Error::dependency(
+            profile.id().value(),
+            "spline insertion/removal requires an explicit composite profile contour rewrite"));
+      for (const auto& contour : profile.inner_contours())
+        if (cardinality_changed && selected_profile_reference(contour))
+          return Result<Sketch>::failure(Error::dependency(
+              profile.id().value(),
+              "spline insertion/removal requires an explicit composite profile contour rewrite"));
       for (const auto& id : profile.outer_contour())
         if (removed(id))
           return Result<Sketch>::failure(Error::dependency(
@@ -394,15 +418,18 @@ public:
       auto added = candidate.value().add_tangent_continuity(continuity);
       if (added.has_error()) return Result<Sketch>::failure(added.error());
     }
-    if (persist_internal_tangency)
+    if (persist_internal_tangency) {
+      const std::string continuity_prefix =
+          "constraint.spline.edit." + source_entities_.front().value() + ".tangent.";
       for (std::size_t index = 1U; index < segments_.size(); ++index) {
         auto continuity = SketchTangentContinuity::create_tangent(
-            SketchConstraintId("constraint.spline.edit.tangent." + std::to_string(index)),
+            SketchConstraintId(continuity_prefix + std::to_string(index)),
             segments_[index - 1U].id(), segments_[index].id());
         if (continuity.has_error()) return Result<Sketch>::failure(continuity.error());
         auto added = candidate.value().add_tangent_continuity(std::move(continuity.value()));
         if (added.has_error()) return Result<Sketch>::failure(added.error());
       }
+    }
     for (const auto& profile : source.rectangle_profiles()) {
       auto added = candidate.value().add_profile(profile);
       if (added.has_error()) return Result<Sketch>::failure(added.error());
@@ -464,7 +491,8 @@ private:
 
   [[nodiscard]] SketchEntityId generated_id(std::size_t index) const {
     if (index < source_entities_.size()) return source_entities_[index];
-    const std::string base = source_entities_.empty() ? "spline.edit" : source_entities_.front().value();
+    const std::string base =
+        source_entities_.empty() ? "spline.edit" : source_entities_.front().value();
     return SketchEntityId(base + ".fit." + std::to_string(index + 1U));
   }
 
@@ -502,10 +530,12 @@ private:
       const Point2 outgoing{second.control1().x - second.start().x,
                             second.control1().y - second.start().y};
       const double cross = incoming.x * outgoing.y - incoming.y * outgoing.x;
-      const double scale = std::hypot(incoming.x, incoming.y) * std::hypot(outgoing.x, outgoing.y);
+      const double dot = incoming.x * outgoing.x + incoming.y * outgoing.y;
+      const double scale =
+          std::hypot(incoming.x, incoming.y) * std::hypot(outgoing.x, outgoing.y);
       handles.push_back({"spline/continuity/" + std::to_string(index), index - 1U, index,
                          first.end(), incoming, outgoing, same_point(first.end(), second.start()),
-                         scale > kTolerance && std::abs(cross) <= kTolerance * scale});
+                         scale > kTolerance && std::abs(cross) <= kTolerance * scale && dot > 0.0});
     }
     return handles;
   }
