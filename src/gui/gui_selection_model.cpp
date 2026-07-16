@@ -6,8 +6,20 @@
 namespace blcad::gui {
 
 bool GuiSelectionModel::add(GuiSelection selection) {
-  if (selection.semantic_id.empty() || !allows(selection.kind) ||
-      contains(selection.kind, selection.semantic_id)) {
+  if (selection.semantic_id.empty() || !allows(selection.kind)) {
+    return false;
+  }
+  const bool duplicate = std::any_of(
+      entries_.begin(), entries_.end(), [&selection](const GuiSelection& entry) {
+        if (entry.kind != selection.kind || entry.semantic_id != selection.semantic_id)
+          return false;
+        // A Sketch entity may publish several independently selectable semantic
+        // roles (start/end point, curve, dimension/glyph). Other model selection
+        // kinds retain the historical one-entry-per-semantic-id behavior.
+        return selection.kind != GuiSelectionKind::SketchEntity ||
+               entry.candidate_id == selection.candidate_id;
+      });
+  if (duplicate) {
     return false;
   }
   entries_.push_back(std::move(selection));
