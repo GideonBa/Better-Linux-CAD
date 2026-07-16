@@ -1,6 +1,9 @@
 #include "blcad/gui/gui_analysis_export_workbench.hpp"
+#include "blcad/gui/gui_modeling_workspace.hpp"
 #include "blcad/gui/gui_part_foundation_workbench.hpp"
 #include "blcad/gui/gui_sketch_workbench.hpp"
+#include "blcad/gui/main_window.hpp"
+#include "blcad/gui/occt_viewport.hpp"
 
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/core/project_json.hpp"
@@ -8,6 +11,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include <nlohmann/json.hpp>
+
+#include <QApplication>
 
 #include <filesystem>
 #include <fstream>
@@ -128,4 +133,95 @@ TEST_CASE("Block 105 integrated fail-closed paths publish no partial GUI state",
       session, {GuiStepExportMode::PartMultiBody, output}).has_error());
   CHECK_FALSE(std::filesystem::exists(output));
   std::filesystem::remove(output);
+}
+
+TEST_CASE("Block 122 capability preselection drives the contextual modeling mini-toolbar",
+          "[gui][modeling-workspace][gui][in-context-command]") {
+  GuiDocumentSession session;
+  GuiModelingWorkspace workspace;
+  REQUIRE(session.create_part(DocumentId("part.modeling_workspace"), "Modeling Workspace"));
+  REQUIRE(workspace.set_area(session, GuiModelingArea::Part));
+  workspace.apply_selection_filter(session, GuiModelingSelectionFilter::Profiles);
+  REQUIRE(workspace.set_preselection(
+      session, {{GuiSelectionKind::SketchEntity, "profile-region:sketch.main:profile.outer"},
+                {"ProfileRegion"}}));
+
+  const auto enabled = workspace.enabled_commands(session);
+  REQUIRE(enabled.size() == 5);
+  CHECK(enabled.front().id == "part.extrude");
+  const auto mini_toolbar = workspace.mini_toolbar_commands(session);
+  REQUIRE(mini_toolbar.size() == 4);
+  CHECK(mini_toolbar[0].label == "Extrude");
+  CHECK(mini_toolbar[1].label == "Revolve");
+  CHECK(mini_toolbar[2].label == "Sweep");
+  CHECK(mini_toolbar[3].label == "Loft");
+
+  REQUIRE(workspace.begin_command(session, GuiModelingCommand::Extrude));
+  CHECK(session.selection().empty());
+  CHECK(session.task().command_id() == "part.extrude");
+  REQUIRE(workspace.cancel_command(session));
+  CHECK(session.selection().contains(GuiSelectionKind::SketchEntity,
+                                     "profile-region:sketch.main:profile.outer"));
+
+  REQUIRE(workspace.set_preselection(
+      session, {{GuiSelectionKind::SketchEntity, "profile-region:sketch.main:profile.outer"},
+                {"ProfileRegion"}}));
+  REQUIRE(workspace.begin_command(session, GuiModelingCommand::Extrude));
+  REQUIRE(session.task().begin_parameter_editing());
+  REQUIRE(session.task().show_preview());
+  REQUIRE(workspace.mark_committed(session));
+  CHECK(workspace.last_repeatable_command_id() == "part.extrude");
+  REQUIRE(workspace.repeat_last_command(session));
+  CHECK(session.task().command_id() == "part.extrude");
+  REQUIRE(workspace.cancel_command(session));
+}
+
+TEST_CASE("Block 122 Finish Sketch handoff and selection filters fail closed",
+          "[gui][modeling-workspace][gui][in-context-command]") {
+  GuiDocumentSession session;
+  GuiModelingWorkspace workspace;
+  REQUIRE(session.create_part(DocumentId("part.finish_handoff"), "Finish Handoff"));
+  REQUIRE(workspace.finish_sketch_handoff(session, SketchId("sketch.profile"),
+                                          ProfileId("profile.finished")));
+  REQUIRE(workspace.preselection().has_value());
+  CHECK(workspace.preselection()->supports("ProfileRegion"));
+  CHECK(workspace.mini_toolbar_commands(session).front().id == "part.extrude");
+
+  workspace.apply_selection_filter(session, GuiModelingSelectionFilter::Faces);
+  CHECK_FALSE(workspace.preselection().has_value());
+  CHECK_FALSE(workspace.set_preselection(
+      session, {{GuiSelectionKind::Edge, "edge:feature.one:outer"}, {"Edge"}}));
+  workspace.apply_selection_filter(session, GuiModelingSelectionFilter::Edges);
+  REQUIRE(workspace.set_preselection(
+      session, {{GuiSelectionKind::Edge, "edge:feature.one:outer"}, {"Edge"}}));
+  const auto commands = workspace.mini_toolbar_commands(session);
+  REQUIRE(commands.size() == 2);
+  CHECK(commands[0].id == "part.fillet");
+  CHECK(commands[1].id == "part.chamfer");
+}
+
+TEST_CASE("Block 122 exposes transient ViewCube home and camera bookmarks through MainWindow",
+          "[gui][modeling-workspace][gui][view-navigation-aids]") {
+  REQUIRE(qApp != nullptr);
+  MainWindow window;
+  REQUIRE(window.session().create_part(DocumentId("part.navigation"), "Navigation"));
+  auto* viewport = window.findChild<OcctViewport*>(QStringLiteral("blcad.occt_viewport"));
+  REQUIRE(viewport != nullptr);
+
+  auto& workspace = window.modeling_workspace();
+  REQUIRE(workspace.set_area(window.session(), GuiModelingArea::Part));
+  CHECK(GuiModelingWorkspace::tabs()[0] == "Part");
+  CHECK(GuiModelingWorkspace::tabs()[1] == "Surface");
+  CHECK(GuiModelingWorkspace::tabs()[2] == "Assembly");
+
+  workspace.capture_home_view(*viewport);
+  REQUIRE(workspace.activate_view_cube_target(*viewport, GuiViewCubeTarget::Front));
+  REQUIRE(workspace.save_camera_bookmark("front inspection", *viewport));
+  REQUIRE(workspace.activate_view_cube_target(*viewport, GuiViewCubeTarget::Top));
+  REQUIRE(workspace.restore_camera_bookmark("front inspection", *viewport));
+  REQUIRE(workspace.activate_view_cube_target(*viewport, GuiViewCubeTarget::Home));
+  REQUIRE(workspace.camera_bookmarks().size() == 1);
+  CHECK(workspace.camera_bookmarks().front().name == "front inspection");
+  REQUIRE(workspace.remove_camera_bookmark("front inspection"));
+  CHECK(workspace.camera_bookmarks().empty());
 }
