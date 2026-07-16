@@ -87,7 +87,7 @@ TEST_CASE("Block 114 GUI constraint preview commits geometry and catalog with ex
             ->find_line_segment(SketchEntityId("line.a"))->end() == solved_end);
 }
 
-TEST_CASE("Block 114 selection compatibility exposes every non-dimensional solver family",
+TEST_CASE("Block 114 selection compatibility uses semantic target capabilities",
           "[gui][sketch-constraints]") {
   auto sketch = Sketch::create(SketchId("sketch.compatibility"), "Compatibility",
                                DatumPlaneId("datum.xy"));
@@ -118,7 +118,7 @@ TEST_CASE("Block 114 selection compatibility exposes every non-dimensional solve
   CHECK(contains_kind(line_pair, SketchSolverConstraintKind::Perpendicular));
   CHECK(contains_kind(line_pair, SketchSolverConstraintKind::Collinear));
   CHECK(contains_kind(line_pair, SketchSolverConstraintKind::Equal));
-  CHECK(contains_kind(line_pair, SketchSolverConstraintKind::Tangent));
+  CHECK_FALSE(contains_kind(line_pair, SketchSolverConstraintKind::Tangent));
 
   const auto point_pair = GuiSketchConstraintController::compatible_kinds(
       topology.value(), {point_a.value(), point_b.value()});
@@ -167,6 +167,7 @@ TEST_CASE("Block 114 conflict glyph refuses commit without document or catalog m
       *session.part_document(), catalog.value(), vertical.value());
   REQUIRE(controller);
   CHECK_FALSE(controller.value().preview().authoring.accepted);
+  CHECK(controller.value().preview().authoring.catalog_after == catalog.value());
   CHECK(controller.value().preview().glyph.state ==
         geometry::SketchConstraintGlyphState::Conflict);
   CHECK(std::find(controller.value().preview().authoring.conflict_ids.begin(),
