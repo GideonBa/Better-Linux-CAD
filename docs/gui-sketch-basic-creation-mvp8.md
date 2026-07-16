@@ -147,8 +147,11 @@ construction point/centerline products, and an offscreen Qt mouse path through t
 binder that creates a corner-rectangle profile, verifies region inspection, JSON roundtrip, and
 undo/redo.
 
-## Next boundary
+## Extension and next boundary
 
-Block 112 extends Core/Geometry intent for circles, arcs, ellipses, and slots with their
-center/radius/quadrant handles. It reuses this command lifecycle and expansion pattern; full
-circles become real curve entities rather than nearly closed arcs.
+Block 112 reuses this command lifecycle for circles, arcs, ellipses, elliptical arcs, and slots. Its
+persistent expansion, exact full-circle parameter contract, transient conic preview, and failure rules
+are canonical in `docs/gui-sketch-conic-slot-creation-mvp8.md`.
+
+Block 113 is next and owns spline editing, continuity handles, supported representation conversion,
+and Sketch text. Block 114 continues to own accepted automatic-constraint intent.
