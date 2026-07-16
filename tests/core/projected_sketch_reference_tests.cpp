@@ -1,5 +1,6 @@
 #include "blcad/core/sketch.hpp"
 #include "blcad/core/sketch_offset_project.hpp"
+#include "blcad/core/sketch_transform_pattern.hpp"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -134,4 +135,60 @@ TEST_CASE("Block 117 keeps construction projection associative until explicit br
   REQUIRE(line != nullptr);
   CHECK(line->start().x == Catch::Approx(-5.0));
   CHECK(line->end().x == Catch::Approx(5.0));
+}
+
+TEST_CASE("Block 118 transforms preserve ids and copy mirror create ordinary curves",
+          "[core][sketch-transform-pattern]") {
+  auto sketch = make_offset_project_sketch();
+  add_offset_project_line(sketch, "line.transform", {1.0, 1.0}, {3.0, 1.0});
+  auto moved = SketchTransformPatternService::move(
+      sketch, {SketchEntityId("line.transform")}, {2.0, 3.0});
+  REQUIRE(moved);
+  const auto* moved_line = moved.value().sketch.find_line_segment(SketchEntityId("line.transform"));
+  REQUIRE(moved_line != nullptr);
+  CHECK(moved_line->start().x == Catch::Approx(3.0));
+  CHECK(moved_line->start().y == Catch::Approx(4.0));
+
+  auto copied = SketchTransformPatternService::copy(
+      sketch, {SketchEntityId("line.transform")}, {0.0, 5.0});
+  REQUIRE(copied);
+  CHECK(copied.value().created_entities.front().value() == "line.transform.copy.1");
+  auto mirrored = SketchTransformPatternService::mirror(
+      sketch, {SketchEntityId("line.transform")}, {0.0, 0.0}, {0.0, 1.0});
+  REQUIRE(mirrored);
+  const auto* mirrored_line = mirrored.value().sketch.find_line_segment(
+      mirrored.value().created_entities.front());
+  REQUIRE(mirrored_line != nullptr);
+  CHECK(mirrored_line->start().x == Catch::Approx(-1.0));
+}
+
+TEST_CASE("Block 118 rectangular and circular patterns expose explicit associative intent",
+          "[core][sketch-transform-pattern]") {
+  auto sketch = make_offset_project_sketch();
+  add_offset_project_line(sketch, "line.seed", {1.0, 0.0}, {2.0, 0.0});
+  auto rectangular = SketchTransformPatternService::rectangular_pattern(
+      sketch, {SketchEntityId("line.seed")}, {4.0, 0.0}, 3U, {0.0, 5.0}, 2U,
+      SketchPatternMode::Associative, "pattern.grid");
+  REQUIRE(rectangular);
+  CHECK(rectangular.value().created_entities.size() == 5U);
+  REQUIRE(rectangular.value().pattern_intent.has_value());
+  CHECK(rectangular.value().pattern_intent->id == "pattern.grid");
+
+  auto circular = SketchTransformPatternService::circular_pattern(
+      sketch, {SketchEntityId("line.seed")}, {0.0, 0.0}, 4U,
+      3.14159265358979323846 * 1.5, SketchPatternMode::Exploded);
+  REQUIRE(circular);
+  CHECK(circular.value().created_entities.size() == 3U);
+  CHECK_FALSE(circular.value().pattern_intent.has_value());
+}
+
+TEST_CASE("Block 118 rejects empty selections and degenerate transform parameters",
+          "[core][sketch-transform-pattern]") {
+  auto sketch = make_offset_project_sketch();
+  add_offset_project_line(sketch, "line.a", {0.0, 0.0}, {1.0, 0.0});
+  CHECK_FALSE(SketchTransformPatternService::move(sketch, {}, {1.0, 0.0}));
+  CHECK_FALSE(SketchTransformPatternService::scale(
+      sketch, {SketchEntityId("line.a")}, {0.0, 0.0}, 0.0));
+  CHECK_FALSE(SketchTransformPatternService::mirror(
+      sketch, {SketchEntityId("line.a")}, {0.0, 0.0}, {0.0, 0.0}));
 }
