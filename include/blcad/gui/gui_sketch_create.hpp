@@ -4,6 +4,7 @@
 #include "blcad/gui/gui_sketch_workbench.hpp"
 
 #include <cstddef>
+#include <iterator>
 #include <optional>
 #include <string>
 #include <string_view>
