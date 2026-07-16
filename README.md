@@ -9,15 +9,18 @@ page.
 
 The assembly sequence is implemented through Block 47, Part Construction MVP-6 is complete through
 Block 94, and GUI Feature Validation MVP-7 is accepted through Block 105. Interactive Sketcher MVP-8
-is in progress: Blocks 106–114 implement the contextual Sketch workspace, device-independent plane
+is in progress: Blocks 106–115 implement the contextual Sketch workspace, device-independent plane
 interaction, stable shared `SketchPointId` topology, deterministic planar solving with local
 DOF/conflict diagnostics, solver-backed semantic-handle dragging, line/conic/slot creation, spline
-editing, parameter-backed Sketch text, and manual/automatic geometric constraint authoring.
+editing, parameter-backed Sketch text, geometric constraint authoring, and typed driving/reference
+Sketch dimensions.
 
-Block 114 adds stable point/entity constraint targets, selection-driven family compatibility, automatic
-snap-to-constraint candidates, disposable conflict/redundancy preview, semantic clickable glyphs,
-canonical `blcad.sketch_constraints.mvp8` sidecar persistence, and coordinated atomic Sketch/catalog
-undo and redo. Dimension value and expression workflows remain Block 115.
+Block 115 adds horizontal, vertical, aligned, point-to-point, line-length, arc-radius, arc-diameter,
+angle, and arc-length dimensions; explicit driving/reference semantics; typed Length/Angle parameter
+and expression binding; deterministic semantic in-canvas annotations; canonical
+`blcad.sketch_dimensions.mvp8` sidecar persistence; combined constraint/dimension drag enforcement; and
+atomic parameter/Sketch/catalog undo and redo. Topology-rewriting trim/extend/split/corner operations
+remain Block 116.
 
 Canonical Interactive Sketcher contracts include
 [`docs/gui-interactive-sketch-workspace-mvp8.md`](docs/gui-interactive-sketch-workspace-mvp8.md),
@@ -27,9 +30,10 @@ Canonical Interactive Sketcher contracts include
 [`docs/gui-sketch-solver-drag-mvp8.md`](docs/gui-sketch-solver-drag-mvp8.md),
 [`docs/gui-sketch-basic-creation-mvp8.md`](docs/gui-sketch-basic-creation-mvp8.md),
 [`docs/gui-sketch-conic-slot-creation-mvp8.md`](docs/gui-sketch-conic-slot-creation-mvp8.md),
-[`docs/gui-sketch-spline-text-mvp8.md`](docs/gui-sketch-spline-text-mvp8.md), and
-[`docs/gui-sketch-constraint-authoring-mvp8.md`](docs/gui-sketch-constraint-authoring-mvp8.md). Block
-115, dimensions and expression-backed in-canvas editing, is next in
+[`docs/gui-sketch-spline-text-mvp8.md`](docs/gui-sketch-spline-text-mvp8.md),
+[`docs/gui-sketch-constraint-authoring-mvp8.md`](docs/gui-sketch-constraint-authoring-mvp8.md), and
+[`docs/gui-sketch-dimension-authoring-mvp8.md`](docs/gui-sketch-dimension-authoring-mvp8.md). Block 116,
+trim/extend/split/Sketch fillet/chamfer, is next in
 [`docs/interactive-sketcher-sequence-mvp8.md`](docs/interactive-sketcher-sequence-mvp8.md).
 
 The optional Qt desktop covers document, Sketch, Part, Surface, Assembly, motion, analysis, and
@@ -60,6 +64,7 @@ Start here:
 - [`docs/gui-sketch-solver-drag-mvp8.md`](docs/gui-sketch-solver-drag-mvp8.md) — semantic handles/live solver/atomic drag
 - [`docs/gui-sketch-spline-text-mvp8.md`](docs/gui-sketch-spline-text-mvp8.md) — spline editing and Sketch text
 - [`docs/gui-sketch-constraint-authoring-mvp8.md`](docs/gui-sketch-constraint-authoring-mvp8.md) — constraint intent, inference, glyphs, and conflict preview
+- [`docs/gui-sketch-dimension-authoring-mvp8.md`](docs/gui-sketch-dimension-authoring-mvp8.md) — driving/reference dimensions, typed values, expressions, and in-canvas editing
 
 ## License
 
