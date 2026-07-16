@@ -1,5 +1,7 @@
 #pragma once
 
+#include <QLineEdit>
+
 namespace blcad::gui {
 
 class MainWindow;
