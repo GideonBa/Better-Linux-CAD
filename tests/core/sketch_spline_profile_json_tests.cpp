@@ -6,6 +6,7 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <string>
 
 using namespace blcad;
@@ -151,6 +152,37 @@ TEST_CASE("Block 113 fit-point insertion removal and conversion are deterministi
   REQUIRE(model.value().convert_to_control_points());
   CHECK(model.value().representation() == SketchSplineRepresentation::ControlPoints);
   CHECK_FALSE(model.value().preview().handles.empty());
+}
+
+TEST_CASE("Block 113 connected spline junctions expose one endpoint and reject profile cardinality changes",
+          "[core][sketch-spline-edit]") {
+  auto sketch = Sketch::create(SketchId("sketch.chain"), "Chain", DatumPlaneId("datum.xy"));
+  REQUIRE(sketch);
+  REQUIRE(sketch.value().add_entity(SplineSegment::create_cubic_bezier(
+      SketchEntityId("spline.a"), {0.0, 0.0}, {2.0, 0.0}, {8.0, 5.0}, {10.0, 5.0}).value()));
+  REQUIRE(sketch.value().add_entity(SplineSegment::create_cubic_bezier(
+      SketchEntityId("spline.b"), {10.0, 5.0}, {12.0, 5.0}, {18.0, 0.0}, {20.0, 0.0}).value()));
+
+  auto chain = SketchSplineEditModel::from_segments(
+      sketch.value(), {SketchEntityId("spline.a"), SketchEntityId("spline.b")});
+  REQUIRE(chain);
+  const auto preview = chain.value().preview();
+  const auto endpoint_count = std::count_if(preview.handles.begin(), preview.handles.end(),
+                                            [](const auto& handle) {
+                                              return handle.kind == SketchSplineHandleKind::Endpoint;
+                                            });
+  CHECK(endpoint_count == 3);
+
+  PartDocument document = make_document();
+  const Sketch* profile_sketch = document.find_sketch(SketchId("sketch.spline"));
+  REQUIRE(profile_sketch != nullptr);
+  auto profile_edit = SketchSplineEditModel::from_segments(
+      *profile_sketch, {SketchEntityId("spline.right")});
+  REQUIRE(profile_edit);
+  REQUIRE(profile_edit.value().convert_to_fit_points());
+  auto rejected = profile_edit.value().build_sketch(*profile_sketch);
+  REQUIRE_FALSE(rejected);
+  CHECK(rejected.error().category() == ErrorCategory::Dependency);
 }
 
 TEST_CASE("Block 113 Sketch text resolves expression parameters and roundtrips sidecar JSON",
