@@ -9,21 +9,24 @@ page.
 
 The assembly sequence is implemented through Block 47, Part Construction MVP-6 is complete through
 Block 94, and GUI Feature Validation MVP-7 is accepted through Block 105. Interactive Sketcher MVP-8
-is in progress: Blocks 106–112 implement the contextual Sketch workspace, device-independent plane
-interaction, stable shared `SketchPointId` topology, deterministic general planar solving with exact
-local DOF/conflict diagnostics, solver-backed semantic-handle mouse dragging with one atomic undoable
-release commit, multi-click basic creation tools, and circle/arc/ellipse/slot creation with transient
-rubber-band previews and one transaction per completed tool. Full circles persist exact
-`CircleProfile` plus diameter-Parameter intent; ellipses use deterministic cubic spline spans; slots
-use ordinary line/arc closed profiles. Canonical contracts are
+is in progress: Blocks 106–113 implement the contextual Sketch workspace, device-independent plane
+interaction, stable shared `SketchPointId` topology, deterministic planar solving with local
+DOF/conflict diagnostics, solver-backed semantic-handle dragging, multi-click creation tools,
+circle/arc/ellipse/slot creation, and fit/control-point spline editing with control polygons,
+continuity handles, deterministic conversion, and atomic undo/redo. Block 113 also adds
+parameter/expression-backed Sketch text, canonical `blcad.sketch_text.mvp8` sidecar persistence, and
+explicit system/built-in vector-font fallback diagnostics.
+
+Canonical Interactive Sketcher contracts include
 [`docs/gui-interactive-sketch-workspace-mvp8.md`](docs/gui-interactive-sketch-workspace-mvp8.md),
 [`docs/gui-sketch-plane-interaction-mvp8.md`](docs/gui-sketch-plane-interaction-mvp8.md),
 [`docs/sketch-shared-topology-mvp8.md`](docs/sketch-shared-topology-mvp8.md),
 [`docs/sketch-planar-constraint-solver-mvp8.md`](docs/sketch-planar-constraint-solver-mvp8.md),
 [`docs/gui-sketch-solver-drag-mvp8.md`](docs/gui-sketch-solver-drag-mvp8.md),
-[`docs/gui-sketch-basic-creation-mvp8.md`](docs/gui-sketch-basic-creation-mvp8.md), and
-[`docs/gui-sketch-conic-slot-creation-mvp8.md`](docs/gui-sketch-conic-slot-creation-mvp8.md). Block 113,
-spline editing and Sketch text, is next in
+[`docs/gui-sketch-basic-creation-mvp8.md`](docs/gui-sketch-basic-creation-mvp8.md),
+[`docs/gui-sketch-conic-slot-creation-mvp8.md`](docs/gui-sketch-conic-slot-creation-mvp8.md), and
+[`docs/gui-sketch-spline-text-mvp8.md`](docs/gui-sketch-spline-text-mvp8.md). Block 114, manual and
+automatic constraint authoring with glyph interaction, is next in
 [`docs/interactive-sketcher-sequence-mvp8.md`](docs/interactive-sketcher-sequence-mvp8.md).
 
 The optional Qt desktop covers document, Sketch, Part, Surface, Assembly, motion, analysis, and
@@ -51,8 +54,9 @@ Start here:
 - [`docs/file-format.md`](docs/file-format.md) — save-format authority
 - [`docs/sketch-shared-topology-mvp8.md`](docs/sketch-shared-topology-mvp8.md) — shared planar topology/migration
 - [`docs/sketch-planar-constraint-solver-mvp8.md`](docs/sketch-planar-constraint-solver-mvp8.md) — planar solver/DOF/diagnostics
-- [`docs/gui-sketch-solver-drag-mvp8.md`](docs/gui-sketch-solver-drag-mvp8.md) — semantic handles/live solver drag/atomic release
-- [`docs/gui-sketch-conic-slot-creation-mvp8.md`](docs/gui-sketch-conic-slot-creation-mvp8.md) — Block-112 conic/slot tools and persistence
+- [`docs/gui-sketch-solver-drag-mvp8.md`](docs/gui-sketch-solver-drag-mvp8.md) — semantic handles/live solver/atomic drag
+- [`docs/gui-sketch-conic-slot-creation-mvp8.md`](docs/gui-sketch-conic-slot-creation-mvp8.md) — conic/slot tools and persistence
+- [`docs/gui-sketch-spline-text-mvp8.md`](docs/gui-sketch-spline-text-mvp8.md) — spline editing, text intent, and font fallback
 
 ## License
 
