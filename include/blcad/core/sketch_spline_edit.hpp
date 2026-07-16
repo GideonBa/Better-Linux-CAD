@@ -311,7 +311,7 @@ public:
   }
 
   [[nodiscard]] Result<Sketch> build_sketch(const Sketch& source,
-                                             bool persist_internal_tangency = true) const {
+                                             bool persist_internal_tangency = false) const {
     if (source.id() != sketch_)
       return Result<Sketch>::failure(
           Error::validation(sketch_.value(), "spline edit source belongs to another Sketch"));
@@ -411,7 +411,17 @@ public:
     for (const auto& continuity : source.tangent_continuities()) {
       const bool first_selected = selected.contains(continuity.first_entity().value());
       const bool second_selected = selected.contains(continuity.second_entity().value());
-      if (first_selected && second_selected) continue;
+      if (first_selected && second_selected) {
+        if (generated.contains(continuity.first_entity().value()) &&
+            generated.contains(continuity.second_entity().value())) {
+          auto added = candidate.value().add_tangent_continuity(continuity);
+          if (added.has_error()) return Result<Sketch>::failure(added.error());
+          continue;
+        }
+        return Result<Sketch>::failure(Error::dependency(
+            continuity.id().value(),
+            "spline insertion/removal requires an explicit tangent-continuity rewrite"));
+      }
       if (removed(continuity.first_entity()) || removed(continuity.second_entity()))
         return Result<Sketch>::failure(Error::dependency(
             continuity.id().value(), "spline insertion/removal would invalidate tangent continuity"));
