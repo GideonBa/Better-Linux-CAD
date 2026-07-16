@@ -63,6 +63,23 @@ public:
          std::move(target_ids)});
   }
 
+  [[nodiscard]] Result<std::vector<SketchConstraintGlyph>>
+  resolve_catalog(const SketchTopology& topology,
+                  const SketchConstraintCatalog& catalog) const {
+    if (topology.sketch() != catalog.sketch())
+      return Result<std::vector<SketchConstraintGlyph>>::failure(Error::validation(
+          catalog.sketch().value(), "constraint glyph catalog belongs to another Sketch"));
+    std::vector<SketchConstraintGlyph> glyphs;
+    glyphs.reserve(catalog.constraints().size());
+    for (const auto& constraint : catalog.constraints()) {
+      auto glyph = resolve(topology, constraint, SketchConstraintGlyphState::Accepted);
+      if (glyph.has_error())
+        return Result<std::vector<SketchConstraintGlyph>>::failure(glyph.error());
+      glyphs.push_back(std::move(glyph.value()));
+    }
+    return Result<std::vector<SketchConstraintGlyph>>::success(std::move(glyphs));
+  }
+
 private:
   [[nodiscard]] static Result<Point2>
   target_anchor(const SketchTopology& topology,
