@@ -1,6 +1,8 @@
 #include "blcad/core/part_document.hpp"
 #include "blcad/core/part_document_json.hpp"
+#include "blcad/core/sketch_3d_interaction.hpp"
 
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
@@ -182,4 +184,71 @@ TEST_CASE("Block 75 validates document and entity identity transactionally", "[c
             .has_error());
   CHECK(SketchPolyline3D::create(SketchEntityId("polyline.short"), {SketchEntityId("point.a")})
             .has_error());
+}
+
+TEST_CASE("Block 120 resolves orthogonal locks and typed distance-angle input",
+          "[core][sketch-3d][gui][sketch-3d-edit]") {
+  auto locked = Sketch3DInteractionService::resolve_point(
+      {1.0, 2.0, 3.0}, {8.0, 9.0, 10.0}, Sketch3DLock::AxisX);
+  REQUIRE(locked);
+  CHECK(locked.value().x == Catch::Approx(8.0));
+  CHECK(locked.value().y == Catch::Approx(2.0));
+  CHECK(locked.value().z == Catch::Approx(3.0));
+
+  Sketch3DTypedInput typed;
+  typed.distance = 10.0;
+  typed.azimuth_radians = 0.0;
+  typed.elevation_radians = 3.14159265358979323846 / 6.0;
+  auto directed = Sketch3DInteractionService::resolve_point(
+      {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, Sketch3DLock::Free, typed);
+  REQUIRE(directed);
+  CHECK(directed.value().x == Catch::Approx(8.6602540378));
+  CHECK(directed.value().y == Catch::Approx(0.0));
+  CHECK(directed.value().z == Catch::Approx(5.0));
+}
+
+TEST_CASE("Block 120 creates line points and guide role atomically",
+          "[core][sketch-3d][integration][sketch-3d-direct-manipulation]") {
+  auto sketch = Sketch3D::create(Sketch3DId("sketch3d.interactive"), "Interactive");
+  REQUIRE(sketch);
+  auto result = Sketch3DInteractionService::add_line(
+      sketch.value(), SketchEntityId("line.path"), SketchEntityId("point.start"), {0.0, 0.0, 0.0},
+      SketchEntityId("point.end"), {10.0, 5.0, 2.0}, SketchGuideCurve3DRole::SweepPath);
+  REQUIRE(result);
+  CHECK(result.value().created_entities.size() == 4U);
+  REQUIRE(result.value().sketch.find_line(SketchEntityId("line.path")) != nullptr);
+  const auto* guide = result.value().sketch.find_guide_curve(SketchEntityId("line.path.guide"));
+  REQUIRE(guide != nullptr);
+  CHECK(guide->role() == SketchGuideCurve3DRole::SweepPath);
+}
+
+TEST_CASE("Block 120 moves a shared point handle while preserving curve identity",
+          "[core][sketch-3d][integration][sketch-3d-direct-manipulation]") {
+  auto sketch = populated_sketch();
+  auto moved = Sketch3DInteractionService::move_point(
+      sketch, SketchEntityId("point.b"), {20.0, 4.0, -3.0});
+  REQUIRE(moved);
+  const auto* point_b = moved.value().sketch.find_point(SketchEntityId("point.b"));
+  REQUIRE(point_b != nullptr);
+  REQUIRE(point_b->x().explicit_coordinate().has_value());
+  CHECK(point_b->x().explicit_coordinate()->millimeters() == Catch::Approx(20.0));
+  REQUIRE(moved.value().sketch.find_line(SketchEntityId("line.ab")) != nullptr);
+  REQUIRE(moved.value().sketch.find_polyline(SketchEntityId("polyline.path")) != nullptr);
+  CHECK(sketch.find_point(SketchEntityId("point.b"))->x().explicit_coordinate()->millimeters() ==
+        Catch::Approx(10.0));
+}
+
+TEST_CASE("Block 120 projects a planar Sketch point with explicit source intent",
+          "[core][sketch-3d][gui][sketch-3d-edit]") {
+  auto sketch = Sketch3D::create(Sketch3DId("sketch3d.project"), "Projection");
+  REQUIRE(sketch);
+  auto target = SketchReferenceTarget::line_start(SketchEntityId("line.planar"));
+  auto projected = Sketch3DInteractionService::project_planar_point(
+      sketch.value(), SketchEntityId("point.projected"), {3.0, 4.0, 5.0},
+      SketchId("sketch.planar"), target);
+  REQUIRE(projected);
+  REQUIRE(projected.value().projected_point.has_value());
+  CHECK(projected.value().projected_point->source_sketch == SketchId("sketch.planar"));
+  CHECK(projected.value().projected_point->local_point == SketchEntityId("point.projected"));
+  REQUIRE(projected.value().sketch.find_point(SketchEntityId("point.projected")) != nullptr);
 }
