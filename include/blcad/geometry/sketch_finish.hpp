@@ -35,7 +35,7 @@ public:
   [[nodiscard]] static Result<SketchRegionAnalysis> analyze(const PartDocument& document,
                                                             const Sketch& sketch) {
     constexpr double tolerance = 1.0e-9;
-    const auto same = [](Point2 a, Point2 b) {
+    const auto same = [tolerance](Point2 a, Point2 b) {
       return std::abs(a.x - b.x) <= tolerance && std::abs(a.y - b.y) <= tolerance;
     };
 
