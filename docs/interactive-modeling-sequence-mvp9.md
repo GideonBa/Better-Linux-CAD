@@ -1,7 +1,7 @@
 # Interactive Part & Assembly Modeling Sequence MVP-9
 
-Status: active after accepted Interactive Sketcher Block 121. Blocks 122–131 precede STEP Import
-MVP-10 (Blocks 132–138); Block 122 is the current next technical step.
+Status: active through implemented Block 122 after accepted Interactive Sketcher Block 121. Blocks
+123–131 precede STEP Import MVP-10 (Blocks 132–138); Block 123 is the current next technical step.
 
 This phase closes the interaction gap between the accepted validation GUI (MVP-7, Blocks 95–105)
 and an intuitive, Inventor-familiar modeling experience for **every feature family implemented
@@ -125,14 +125,25 @@ Do not merge these blocks. Manipulator infrastructure (123) precedes every featu
 update boundary (129) precedes nothing else but must not leak into 124–128, which author new
 features only.
 
-## Block 122 — Modeling workspace, in-context commands, and navigation aids
+## Block 122 — Modeling workspace, in-context commands, and navigation aids — Implemented
 
-Promote the Part/Surface/Assembly tabs from form-first to selection-first. Selecting a profile
-region, face, edge, body, or component enables exactly the commands whose first input the selection
-satisfies; starting the command consumes the preselection. Add a contextual mini-toolbar near the
-selection with the most likely commands, `Finish Sketch -> feature` handoff (a Block-119 profile
-region flows directly into Extrude/Revolve), command repeat, a selection-filter toolbar, a
-ViewCube/orientation widget with home view, and camera bookmarks. All view aids are transient.
+`GuiModelingWorkspace` is now owned by the application shell and provides the shared selection-first
+boundary for Part, Surface, and Assembly. Its catalog maps every later interactive command to an
+active modeling area, document kind, first semantic selection kind, required verified capability,
+mini-toolbar priority, and repeatability. Exact capability matching, rather than semantic-id or OCCT
+shape heuristics, controls command enablement.
+
+Starting a command consumes the current semantic preselection and enters the existing `GuiTaskState`.
+Cancel restores both the selected object and its complete capability context; accepted preview-stage
+commands record an area-compatible repeat command. Finish Sketch handoff publishes a transient
+`ProfileRegion` preselection from authoritative `SketchId`/`ProfileId` values. All/Profile/Datum/
+Face/Edge/Body/Component/AssemblyTarget filters synchronize the session and viewport masks and
+remove incompatible hidden selections.
+
+The same transient controller owns Part/Surface/Assembly tab state, deterministic contextual command
+recommendations, ViewCube standard orientations, an explicit captured home view, and named camera
+bookmarks. Camera state, mini-toolbar state, capabilities, filters, and handoff presentation ids are
+not serialized. Core, Geometry, Part JSON, Project JSON, and sidecar formats are unchanged.
 
 Existing authority:
 
@@ -145,6 +156,8 @@ Existing authority:
   (capability-driven enablement)
 
 New intent allowed: none.
+
+Canonical contract: `docs/gui-modeling-workspace-mvp9.md`.
 
 Focused tags: `[gui][modeling-workspace]`, `[gui][in-context-command]`,
 `[gui][view-navigation-aids]`.
