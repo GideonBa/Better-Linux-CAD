@@ -9,19 +9,20 @@ page.
 
 The assembly sequence is implemented through Block 47, Part Construction MVP-6 is complete through
 Block 94, and GUI Feature Validation MVP-7 is accepted through Block 105. Interactive Sketcher MVP-8
-is in progress: Blocks 106–118 implement the contextual Sketch workspace, device-independent plane
+is in progress: Blocks 106–119 implement the contextual Sketch workspace, device-independent plane
 interaction, stable shared `SketchPointId` topology, deterministic planar solving with local
 DOF/conflict diagnostics, solver-backed semantic-handle dragging, line/conic/slot creation, spline
 editing, parameter-backed Sketch text, geometric constraint authoring, typed driving/reference
 Sketch dimensions, trim/extend/split/fillet/chamfer modification, line-chain/loop offset, associative
 projection/include, construction references, explicit break-link conversion, selected-geometry
-move/rotate/scale/copy/mirror, and rectangular/circular Sketch patterns.
+move/rotate/scale/copy/mirror, rectangular/circular Sketch patterns, multi-region recognition,
+profile selection, contour diagnostics, and atomic Finish Sketch candidates.
 
-Block 117 adds signed ordered line-chain and closed-loop offsets with deterministic miter joints,
-associative construction/semantic point and line projection through existing reference intent, and
-explicit projected-line break-link conversion into ordinary Sketch geometry. Block 118 adds stable-id
-move/rotate/scale, detached copy/mirror, rectangular and circular pattern generation, and an explicit
-associative-versus-exploded pattern mode.
+Block 118 adds stable-id move/rotate/scale, detached copy/mirror, rectangular and circular pattern
+generation, and an explicit associative-versus-exploded pattern mode. Block 119 adds connected-component
+region recognition over solved line geometry, stable open/self-crossing/ambiguous diagnostics,
+point-based profile selection, and fail-closed Finish Sketch materialization through one copied document
+candidate.
 
 Canonical Interactive Sketcher contracts include
 [`docs/gui-interactive-sketch-workspace-mvp8.md`](docs/gui-interactive-sketch-workspace-mvp8.md),
@@ -35,9 +36,10 @@ Canonical Interactive Sketcher contracts include
 [`docs/gui-sketch-constraint-authoring-mvp8.md`](docs/gui-sketch-constraint-authoring-mvp8.md),
 [`docs/gui-sketch-dimension-authoring-mvp8.md`](docs/gui-sketch-dimension-authoring-mvp8.md),
 [`docs/gui-sketch-modify-mvp8.md`](docs/gui-sketch-modify-mvp8.md),
-[`docs/gui-sketch-offset-project-mvp8.md`](docs/gui-sketch-offset-project-mvp8.md), and
-[`docs/gui-sketch-transform-pattern-mvp8.md`](docs/gui-sketch-transform-pattern-mvp8.md). Block 119,
-region recognition, profile selection, diagnostics, repair, and Finish Sketch, is next in
+[`docs/gui-sketch-offset-project-mvp8.md`](docs/gui-sketch-offset-project-mvp8.md),
+[`docs/gui-sketch-transform-pattern-mvp8.md`](docs/gui-sketch-transform-pattern-mvp8.md), and
+[`docs/gui-sketch-regions-finish-mvp8.md`](docs/gui-sketch-regions-finish-mvp8.md). Block 120,
+interactive Sketch3D creation and direct manipulation, is next in
 [`docs/interactive-sketcher-sequence-mvp8.md`](docs/interactive-sketcher-sequence-mvp8.md).
 
 The optional Qt desktop covers document, Sketch, Part, Surface, Assembly, motion, analysis, and
@@ -71,6 +73,7 @@ Start here:
 - [`docs/gui-sketch-dimension-authoring-mvp8.md`](docs/gui-sketch-dimension-authoring-mvp8.md) — driving/reference dimensions, typed values, expressions, and in-canvas editing
 - [`docs/gui-sketch-offset-project-mvp8.md`](docs/gui-sketch-offset-project-mvp8.md) — offset, associative projection/include, and break-link semantics
 - [`docs/gui-sketch-transform-pattern-mvp8.md`](docs/gui-sketch-transform-pattern-mvp8.md) — selected-geometry transforms, mirror, and pattern intent
+- [`docs/gui-sketch-regions-finish-mvp8.md`](docs/gui-sketch-regions-finish-mvp8.md) — regions, profile selection, diagnostics, and Finish Sketch
 
 ## License
 
