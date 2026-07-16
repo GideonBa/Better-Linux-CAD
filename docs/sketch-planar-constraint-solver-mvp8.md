@@ -1,6 +1,6 @@
 # Planar Sketch Constraint Solver MVP-8
 
-Status: implemented in Block 109.
+Status: implemented in Block 109; Block-114 geometric authoring integration is implemented.
 
 This document is the canonical Core contract for the deterministic planar constraint solver introduced
 by Block 109. The solver consumes Block-108 `SketchTopology`; Qt, screen coordinates, OCCT topology,
@@ -347,9 +347,9 @@ but Block-108 projected point/line entities deliberately contain no invented res
 Such a solve therefore reports `invalid_reference` until the associative reference workflow supplies a
 persistent/derived coordinate-capable solver target at its later owner block.
 
-Block 109 does not add persistence/UI authoring records for every direct solver family. Blocks 114 and
-115 own user-facing constraint and dimension authoring. The direct solver API exists now so those later
-consumers share one headless mathematical authority.
+Block 109 itself does not add persistence/UI authoring records for every direct solver family. Block
+114 now owns user-facing non-dimensional geometric constraint authoring; Block 115 owns value-bearing
+dimension authoring. Both consumers share this single mathematical authority.
 
 ## Focused proof
 
@@ -388,9 +388,35 @@ commit. Qt renders the derived solve result/DOF and never evaluates substitute r
 
 Canonical integration contract: `docs/gui-sketch-solver-drag-mvp8.md`.
 
+## Block-114 persistent geometric authoring consumer
+
+Block 114 introduces no new residual equations. `SketchConstraintAuthoringService` composes three
+sources into one canonical solve request:
+
+```text
+historical embedded Sketch constraints
+accepted blcad.sketch_constraints.mvp8 records
+one disposable manual or automatic candidate
+```
+
+Sidecar targets are stable `SketchPointId` or `SketchTopologyEntity` ids. Internal solver ids use the
+`intent/<SketchConstraintId>` prefix; published conflict and redundancy ids remove that internal
+prefix. The same candidate path serves selection-driven manual commands and supported snap/inference
+candidates.
+
+Only `under_constrained` and `fully_constrained` are persistent-authoring acceptance states. Unlike the
+Block-110 drag preview, `redundant` is deliberately not accepted for a new persistent constraint
+record. `redundant`, `conflicting`, `invalid_reference`, and `non_convergent` retain the original Sketch
+and original constraint catalog exactly and publish diagnostic glyph state only.
+
+A successful authoring solve materializes the complete solved topology through the historical Sketch
+compatibility bridge and commits one `Add sketch constraint` Part transaction. Solver state itself is
+not serialized.
+
+Canonical integration contract: `docs/gui-sketch-constraint-authoring-mvp8.md`.
+
 ## Next boundary
 
-Block 111 basic creation is implemented (`docs/gui-sketch-basic-creation-mvp8.md`); committed
-creation results are re-solved through the Block-110 baseline resync and automatic constraints stay
-preview-only. Automatic constraint authoring remains Block 114 and dimension editing remains
-Block 115.
+Block 115 adds value/parameter-backed driving and reference dimension authoring for the existing
+horizontal, vertical, aligned, radial, diameter, and angular solver families. Typed quantity and
+expression authority remains in Core rather than Qt.
