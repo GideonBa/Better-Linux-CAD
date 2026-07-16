@@ -1,0 +1,165 @@
+{
+  "schema": "blcad.interactive-sketcher-coverage.v1",
+  "implemented_through": 121,
+  "tutorial_documents": [
+    "examples/triangle_prism.blcad.json",
+    "examples/arc_profile_prism.blcad.json",
+    "examples/spline_profile_prism.blcad.json",
+    "examples/projected_sketch_references.blcad.json"
+  ],
+  "families": [
+    {
+      "family": "workspace-command-lifecycle",
+      "owner": 106,
+      "contract": "docs/gui-interactive-sketch-workspace-mvp8.md",
+      "implementation": "GuiSketchWorkspace",
+      "interaction": "enter/finish, staged picks, numeric HUD, preview, Apply/Cancel, repeat",
+      "proof": "[gui][sketch-workspace],[gui][sketch-command-lifecycle]",
+      "disposition": "interactive"
+    },
+    {
+      "family": "mapping-hit-test-snap-selection",
+      "owner": 107,
+      "contract": "docs/gui-sketch-plane-interaction-mvp8.md",
+      "implementation": "GuiSketchPlaneMapping and GuiSketchInteractionController",
+      "interaction": "DIP mapping, hit cycling, box selection, grid, snap and inference",
+      "proof": "[gui][sketch-hit-test],[gui][sketch-snap],[gui][sketch-box-selection]",
+      "disposition": "interactive"
+    },
+    {
+      "family": "shared-planar-topology",
+      "owner": 108,
+      "contract": "docs/sketch-shared-topology-mvp8.md",
+      "implementation": "SketchTopology and SketchTopologyPartDocument",
+      "interaction": "stable shared points, edit commands, migration and exact replacement",
+      "proof": "[core][sketch-topology],[core][sketch-edit-command],[core][sketch-json-migration]",
+      "disposition": "headless_authority"
+    },
+    {
+      "family": "planar-solver-dof-conflicts",
+      "owner": 109,
+      "contract": "docs/sketch-planar-constraint-solver-mvp8.md",
+      "implementation": "SketchConstraintSolver",
+      "interaction": "deterministic solve, remaining DOF, redundant/conflicting diagnostics",
+      "proof": "[core][sketch-solver],[core][sketch-dof],[core][sketch-conflict-diagnostics]",
+      "disposition": "headless_authority"
+    },
+    {
+      "family": "solver-backed-drag",
+      "owner": 110,
+      "contract": "docs/gui-sketch-solver-drag-mvp8.md",
+      "implementation": "GuiSketchDragController",
+      "interaction": "semantic handles, live candidate solve, one release transaction and cancel",
+      "proof": "[gui][sketch-drag],[integration][sketch-live-solve]",
+      "disposition": "interactive"
+    },
+    {
+      "family": "basic-creation",
+      "owner": 111,
+      "contract": "docs/gui-sketch-basic-creation-mvp8.md",
+      "implementation": "GuiSketchCreateController",
+      "interaction": "point, line, polyline, rectangle, polygon, centerline and numeric picks",
+      "proof": "[gui][sketch-create-basic],[integration][sketch-basic-profile]",
+      "disposition": "interactive"
+    },
+    {
+      "family": "conics-and-slots",
+      "owner": 112,
+      "contract": "docs/gui-sketch-conic-slot-creation-mvp8.md",
+      "implementation": "GuiSketchCreateController conic and slot tools",
+      "interaction": "circle, arc, ellipse approximation and straight slot families",
+      "proof": "[core][sketch-conics],[geometry][sketch-conics],[gui][sketch-create-conics]",
+      "disposition": "interactive_with_documented_narrowing"
+    },
+    {
+      "family": "splines-and-text",
+      "owner": 113,
+      "contract": "docs/gui-sketch-spline-text-mvp8.md",
+      "implementation": "GuiSketchSplineController and SketchTextCatalog",
+      "interaction": "fit/control editing, continuity and parameter-backed stroke text",
+      "proof": "[core][sketch-spline-edit],[geometry][sketch-spline-edit],[gui][sketch-spline],[core][sketch-text]",
+      "disposition": "interactive_with_documented_narrowing"
+    },
+    {
+      "family": "constraint-authoring",
+      "owner": 114,
+      "contract": "docs/gui-sketch-constraint-authoring-mvp8.md",
+      "implementation": "GuiSketchConstraintController and SketchConstraintCatalog",
+      "interaction": "selection compatibility, inference preview, glyphs, add/delete and conflicts",
+      "proof": "[gui][sketch-constraints],[integration][sketch-auto-constraint]",
+      "disposition": "interactive"
+    },
+    {
+      "family": "dimension-authoring",
+      "owner": 115,
+      "contract": "docs/gui-sketch-dimension-authoring-mvp8.md",
+      "implementation": "GuiSketchDimensionController and SketchDimensionCatalog",
+      "interaction": "driving/reference families, literal/expression edits and annotations",
+      "proof": "[gui][sketch-dimensions],[integration][sketch-expression-edit]",
+      "disposition": "interactive_with_documented_narrowing"
+    },
+    {
+      "family": "trim-extend-and-corners",
+      "owner": 116,
+      "contract": "docs/gui-sketch-modify-mvp8.md",
+      "implementation": "SketchModifyService and GuiSketchModifyController",
+      "interaction": "trim, extend, split, fillet and chamfer candidate transactions",
+      "proof": "[core][sketch-modify],[gui][sketch-trim-extend]",
+      "disposition": "interactive"
+    },
+    {
+      "family": "offset-project-break-link",
+      "owner": 117,
+      "contract": "docs/gui-sketch-offset-project-mvp8.md",
+      "implementation": "SketchOffsetProjectService",
+      "interaction": "ordered line offset, associative projection and explicit break-link",
+      "proof": "[core][sketch-offset-project]",
+      "disposition": "headless_authority_gui_deferred"
+    },
+    {
+      "family": "transform-mirror-pattern",
+      "owner": 118,
+      "contract": "docs/gui-sketch-transform-pattern-mvp8.md",
+      "implementation": "SketchTransformPatternService",
+      "interaction": "move/rotate/scale/copy/mirror and rectangular/circular pattern intent",
+      "proof": "[core][sketch-transform-pattern]",
+      "disposition": "headless_authority_gui_deferred"
+    },
+    {
+      "family": "regions-profiles-finish",
+      "owner": 119,
+      "contract": "docs/gui-sketch-regions-finish-mvp8.md",
+      "implementation": "SketchFinishService",
+      "interaction": "line-region diagnostics, point selection and fail-closed Finish Sketch",
+      "proof": "[geometry][sketch-regions],[gui][sketch-profile-selection],[integration][sketch-finish]",
+      "disposition": "headless_geometry_gui_presentation_deferred"
+    },
+    {
+      "family": "interactive-sketch3d",
+      "owner": 120,
+      "contract": "docs/gui-sketch3d-interaction-mvp8.md",
+      "implementation": "Sketch3DInteractionService",
+      "interaction": "orthogonal locks, typed placement, point/line handles and planar projection",
+      "proof": "[gui][sketch-3d-edit],[integration][sketch-3d-direct-manipulation]",
+      "disposition": "headless_authority_gui_presentation_deferred"
+    },
+    {
+      "family": "integrated-acceptance",
+      "owner": 121,
+      "contract": "docs/interactive-sketcher-mvp8-acceptance.md",
+      "implementation": "coverage manifest, deterministic tutorials and integrated acceptance tests",
+      "interaction": "GUI/headless equivalence, atomicity, high-DPI and measured interaction paths",
+      "proof": "[integration][interactive-sketcher],[integration][sketch-gui-headless],[performance][sketch-interaction]",
+      "disposition": "accepted"
+    },
+    {
+      "family": "reference-repair",
+      "owner": 121,
+      "contract": "docs/reference-recovery-mvp.md",
+      "implementation": "GuiSketchWorkbench inspection, preview_repair and apply_repair",
+      "interaction": "lost/under-constrained diagnostics, disposable repair preview and exact undo",
+      "proof": "[gui][sketch-workbench],[gui][sketch-repair]",
+      "disposition": "interactive"
+    }
+  ]
+}

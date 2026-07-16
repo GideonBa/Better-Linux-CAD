@@ -1,7 +1,7 @@
 # Interactive Sketcher Sequence MVP-8
 
-Status: in progress. Blocks 106–120 are implemented; Block 121 (integrated acceptance) is the
-current next technical step.
+Status: complete. Blocks 106–121 are implemented and accepted. Block 122 begins Interactive Part &
+Assembly Modeling MVP-9.
 Blocks 106–121 precede Interactive Modeling MVP-9 (Blocks 122–131) and STEP Import MVP-10
 (Blocks 132–138).
 
@@ -294,17 +294,20 @@ contract: `docs/gui-sketch3d-interaction-mvp8.md`.
 Focused tags: `[gui][sketch-3d-edit]`, `[integration][sketch-3d-direct-manipulation]` (both
 registered on headless Core tests in `tests/core/sketch_3d_tests.cpp`).
 
-## Block 121 — Interactive Sketcher acceptance
+## Block 121 — Interactive Sketcher acceptance — Implemented
 
-Add deterministic tutorial documents and a coverage manifest for every planned Sketch tool. Prove
-mouse/script equivalence, persistence/recompute, exact undo/redo, conflict atomicity, reference repair,
-keyboard Apply/Cancel, high-DPI mapping, and no stale preview publication. Measure representative hover,
-drag, solve, and region-recognition performance.
+The checked-in manifest maps every planned Sketch family to its canonical contract, implementation,
+interaction, focused proof, and honest GUI disposition. Four deterministic tutorial Parts prove
+canonical GUI/headless load and recompute equivalence. Integrated tests additionally prove
+pointer/model-target equivalence, exact drag Undo/Redo, keyboard Cancel and stale-preview atomicity,
+high-DPI mapping, plus measured hit-test, solve, drag, and region-recognition paths. Canonical
+acceptance: `docs/interactive-sketcher-mvp8-acceptance.md`; machine-readable coverage:
+`docs/interactive-sketcher-coverage-manifest-mvp8.json`.
 
 Focused tags: `[integration][interactive-sketcher]`, `[integration][sketch-gui-headless]`,
 `[performance][sketch-interaction]`.
 
-## Coverage matrix through Block 120
+## Coverage matrix through Block 121
 
 | Sketch capability | Canonical contract | Interactive owner |
 |---|---|---:|
@@ -324,6 +327,7 @@ Focused tags: `[integration][interactive-sketcher]`, `[integration][sketch-gui-h
 | Sketch transforms, mirror, patterns | `gui-sketch-transform-pattern-mvp8.md` | 118 |
 | Region recognition, diagnostics, Finish Sketch | `gui-sketch-regions-finish-mvp8.md` | 119 |
 | Sketch3D locks, placement, handles, projection | `gui-sketch3d-interaction-mvp8.md` | 120 |
+| Integrated coverage, equivalence, atomicity, performance | `interactive-sketcher-mvp8-acceptance.md` | 121 |
 
 ## Explicit deferrals
 

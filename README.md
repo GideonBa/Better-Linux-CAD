@@ -8,8 +8,8 @@ live in [`docs/`](docs/). This README is intentionally kept small and evergreen 
 page.
 
 The assembly sequence is implemented through Block 47, Part Construction MVP-6 is complete through
-Block 94, and GUI Feature Validation MVP-7 is accepted through Block 105. Interactive Sketcher MVP-8
-is in progress: Blocks 106–120 implement the contextual Sketch workspace, device-independent plane
+Block 94, GUI Feature Validation MVP-7 is accepted through Block 105, and Interactive Sketcher MVP-8
+is accepted through Block 121. Blocks 106–120 implement the contextual Sketch workspace, device-independent plane
 interaction, stable shared `SketchPointId` topology, deterministic planar solving with local
 DOF/conflict diagnostics, solver-backed semantic-handle dragging, line/conic/slot creation, spline
 editing, parameter-backed Sketch text, geometric constraint authoring, typed driving/reference
@@ -40,12 +40,13 @@ Canonical Interactive Sketcher contracts include
 [`docs/gui-sketch-offset-project-mvp8.md`](docs/gui-sketch-offset-project-mvp8.md),
 [`docs/gui-sketch-transform-pattern-mvp8.md`](docs/gui-sketch-transform-pattern-mvp8.md),
 [`docs/gui-sketch-regions-finish-mvp8.md`](docs/gui-sketch-regions-finish-mvp8.md), and
-[`docs/gui-sketch3d-interaction-mvp8.md`](docs/gui-sketch3d-interaction-mvp8.md). Block 121,
-integrated Interactive Sketcher acceptance, is next in
-[`docs/interactive-sketcher-sequence-mvp8.md`](docs/interactive-sketcher-sequence-mvp8.md).
+[`docs/gui-sketch3d-interaction-mvp8.md`](docs/gui-sketch3d-interaction-mvp8.md). Block 121 adds the
+machine-checked coverage manifest, GUI/headless equivalence, atomic interaction checks, and measured
+performance acceptance in
+[`docs/interactive-sketcher-mvp8-acceptance.md`](docs/interactive-sketcher-mvp8-acceptance.md).
 
 The optional Qt desktop covers document, Sketch, Part, Surface, Assembly, motion, analysis, and
-STEP-export validation workflows without moving authority out of Core/Geometry. Blocks 122–131 plan
+STEP-export validation workflows without moving authority out of Core/Geometry. Block 122 begins
 Interactive Part & Assembly Modeling in
 [`docs/interactive-modeling-sequence-mvp9.md`](docs/interactive-modeling-sequence-mvp9.md); STEP Import
 MVP-10 follows in Blocks 132–138.

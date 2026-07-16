@@ -71,8 +71,9 @@ trim, extend, split, two-line fillet, and two-line chamfer geometry modification
 projection and break-link conversion (`docs/gui-sketch-offset-project-mvp8.md`), Sketch
 transforms/mirror/patterns (`docs/gui-sketch-transform-pattern-mvp8.md`), region recognition with
 Finish Sketch (`docs/gui-sketch-regions-finish-mvp8.md`), and Interactive Sketch3D
-(`docs/gui-sketch3d-interaction-mvp8.md`). Block 121 is the current next technical step: integrated
-Interactive Sketcher acceptance.
+(`docs/gui-sketch3d-interaction-mvp8.md`). Block 121 completes Interactive Sketcher acceptance with
+machine-checked coverage, GUI/headless equivalence, atomicity, and measured performance. Block 122
+is the current next technical step.
 
 Development rule:
 
@@ -147,11 +148,9 @@ Block 109 adds no opaque solved-coordinate cache. `SketchSolveResult`, solver va
 Jacobian, rank, remaining DOF, iteration state, and conflict/redundancy diagnostics are derived. The
 source topology is never mutated by `SketchConstraintSolver::solve(...)`.
 
-The current next boundary is Block 111: basic creation commands over the implemented interaction,
-topology, solver, and drag authorities. Creation must use explicit Core topology/edit commands and
-ordinary points/lines/constraints rather than GUI-only composite primitives. Interactive
-Sketcher continues through Block 121. Interactive Part/Surface/Assembly Modeling follows in Blocks
-122–131, and STEP Part plus structured Assembly import follows in Blocks 132–138.
+Interactive Sketcher is implemented and accepted through Block 121. Interactive Part/Surface/
+Assembly Modeling begins at Block 122, and STEP Part plus structured Assembly import follows in
+Blocks 132–138.
 
 ## Identity and authority distinctions
 

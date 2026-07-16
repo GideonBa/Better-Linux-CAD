@@ -4,10 +4,10 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 120
-current_block: 121
-current_boundary: Integrated Interactive Sketcher acceptance and measured interaction performance
-current_tag: "[integration][interactive-sketcher]"
+implemented_through: Block 121
+current_block: 122
+current_boundary: Interactive modeling selection context and command contracts
+current_tag: "[gui][interactive-modeling-context]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -16,8 +16,8 @@ phase_status:
   mvp_5: "Assembly relationships, motion, hierarchy, analysis, exchange — Blocks 1–47 implemented"
   mvp_6: "Part Construction — Blocks 48–94 implemented; MVP complete"
   mvp_7: "GUI Feature Validation — Blocks 95–105 implemented; MVP complete"
-  mvp_8: "Interactive Sketcher — Blocks 106–120 implemented; Block 121 (acceptance) next"
-  mvp_9: "Interactive Part & Assembly Modeling — Blocks 122–131 planned after Interactive Sketcher acceptance"
+  mvp_8: "Interactive Sketcher — Blocks 106–121 implemented; MVP complete"
+  mvp_9: "Interactive Part & Assembly Modeling — Blocks 122–131 planned; Block 122 next"
   mvp_10: "STEP Import — Blocks 132–138 planned after Interactive Modeling acceptance"
 ---
 
@@ -30,13 +30,13 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 ## Current status
 
 ```text
-implemented through  Block 120
-current block        Block 121
-current phase        Interactive Sketcher MVP-8
-current boundary     integrated acceptance, coverage manifest, measured interaction performance
+implemented through  Block 121
+current block        Block 122
+current phase        Interactive Part & Assembly Modeling MVP-9
+current boundary     selection context, command contracts, task panels, preview/apply/cancel
 ```
 
-Block 120 is implemented. Block 121 is the current next technical step.
+Interactive Sketcher MVP-8 is complete and accepted. Block 122 is the current next technical step.
 
 ## Phase map
 
@@ -48,8 +48,8 @@ MVP-4   assembly parameters and Project container                 implemented
 MVP-5   Assembly system                                 Blocks 1–47 implemented
 MVP-6   Part Construction                              Blocks 48–94 implemented
 MVP-7   GUI Feature Validation                        Blocks 95–105 implemented
-MVP-8   Interactive Sketcher                          Blocks 106–121 in progress
-MVP-9   Interactive Part & Assembly Modeling          Blocks 122–131 planned
+MVP-8   Interactive Sketcher                          Blocks 106–121 implemented
+MVP-9   Interactive Part & Assembly Modeling          Blocks 122–131 planned; Block 122 next
 MVP-10  STEP Import                                    Blocks 132–138 planned
 ```
 
@@ -112,12 +112,12 @@ Frozen order:
 113 spline editing, continuity handles, Sketch text — implemented
 114 manual and automatic geometric constraints with glyph interaction — implemented
 115 driving/reference dimensions, in-canvas editing, parameter/expression binding — implemented
-116 trim, extend, split, corner fillet, corner chamfer — next
-117 offset, project/include, construction axes, associative references
-118 move, rotate, scale, copy, mirror, rectangular/circular Sketch patterns
-119 region recognition, profile selection, diagnostics, repair, Finish Sketch
-120 interactive Sketch3D creation and direct point/curve manipulation
-121 integrated usability, persistence, solver, performance, GUI/headless acceptance
+116 trim, extend, split, corner fillet, corner chamfer — implemented
+117 offset, project/include, construction axes, associative references — implemented
+118 move, rotate, scale, copy, mirror, rectangular/circular Sketch patterns — implemented
+119 region recognition, profile selection, diagnostics, repair, Finish Sketch — implemented
+120 interactive Sketch3D creation and direct point/curve manipulation — implemented
+121 integrated usability, persistence, solver, performance, GUI/headless acceptance — implemented
 ```
 
 ### Blocks 106–110 — Workspace, topology, solver, and drag — Implemented
@@ -291,14 +291,19 @@ Focused tags:
 
 Both Block-120 tags are registered on headless Core tests in `tests/core/sketch_3d_tests.cpp`.
 
-## Current next technical step — Block 121
+## Block 121 — Integrated Interactive Sketcher acceptance — Implemented
 
-Prove integrated Interactive Sketcher acceptance: deterministic tutorial documents, a coverage
-manifest for every planned Sketch tool, mouse/script equivalence, persistence/recompute, exact
-undo/redo, conflict atomicity, reference repair, keyboard Apply/Cancel, high-DPI mapping, no stale
-preview publication, and measured hover/drag/solve/region-recognition performance.
+The machine-checked coverage manifest and integrated acceptance prove deterministic tutorial
+documents, GUI/headless recompute equivalence, pointer/model-target equivalence, exact drag
+Undo/Redo, Cancel/stale-preview atomicity, high-DPI mapping, and measured interaction paths. See
+`docs/interactive-sketcher-mvp8-acceptance.md`.
+
+## Current next technical step — Block 122
+
+Begin Interactive Part & Assembly Modeling MVP-9 with the selection context and command contracts
+in `docs/interactive-modeling-sequence-mvp9.md`.
 
 ## Later phases
 
-Interactive Part & Assembly Modeling MVP-9 begins at Block 122 after Interactive Sketcher acceptance.
-STEP Import MVP-10 follows in Blocks 132–138.
+Interactive Part & Assembly Modeling MVP-9 begins at Block 122. STEP Import MVP-10 follows in
+Blocks 132–138.

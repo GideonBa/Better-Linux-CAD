@@ -97,7 +97,7 @@ On Linux the native OCCT viewport uses Qt xcb when `DISPLAY` is available and
 
 ## Interactive Sketcher focused proof
 
-Blocks 106–120 are implemented.
+Blocks 106–121 are implemented and accepted.
 
 Block 106 workspace and command lifecycle:
 
@@ -324,9 +324,9 @@ rm -rf build/
 
 ## Current development boundary
 
-Blocks 106–120 are implemented: line-chain/loop offset with associative projection and break-link
+Blocks 106–121 are implemented and accepted: line-chain/loop offset with associative projection and break-link
 conversion (`docs/gui-sketch-offset-project-mvp8.md`), Sketch transforms/mirror/patterns
 (`docs/gui-sketch-transform-pattern-mvp8.md`), region recognition with Finish Sketch
 (`docs/gui-sketch-regions-finish-mvp8.md`), and Interactive Sketch3D
-(`docs/gui-sketch3d-interaction-mvp8.md`). Block 121 is next: integrated Interactive Sketcher
-acceptance with a coverage manifest and measured interaction performance.
+(`docs/gui-sketch3d-interaction-mvp8.md`). Block 121 adds the coverage manifest, GUI/headless
+equivalence, atomicity, high-DPI, and measured interaction acceptance. Block 122 is next.

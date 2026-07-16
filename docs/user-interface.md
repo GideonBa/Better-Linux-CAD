@@ -1,6 +1,6 @@
 # User Interface Architecture
 
-Status: MVP-7 accepted and Interactive Sketcher MVP-8 in progress. Blocks 95–105 provide the optional
+Status: MVP-7 and Interactive Sketcher MVP-8 accepted through Block 121. Blocks 95–105 provide the optional
 Qt shell, document transactions, OCCT viewport, deterministic browser/property surfaces, and semantic
 selection synchronization. Blocks 106–110 establish the contextual Sketch workspace, transient plane interaction, persistent
 shared planar topology, deterministic general planar solver, and solver-backed semantic-handle mouse
@@ -9,9 +9,9 @@ entry. Blocks 112–116 add circle/arc/ellipse/slot creation, spline editing wit
 constraint authoring with semantic glyphs, driving/reference dimensions with expression binding, and
 trim/extend/split/fillet/chamfer modification. Blocks 117–120 add offset with associative
 projection, Sketch transforms/mirror/patterns, region recognition with Finish Sketch, and
-Interactive Sketch3D. Block 121 is the current next technical step: integrated Interactive Sketcher
-acceptance.
-Blocks 122–131 add interactive Part/Surface/Assembly modeling; STEP Import begins with Block 132.
+Interactive Sketch3D. Block 121 completes integrated coverage, equivalence, atomicity, and measured
+performance acceptance. Block 122 begins interactive Part/Surface/Assembly modeling; STEP Import
+begins with Block 132.
 
 The UI is deliberately not built like FreeCAD. The goal is a modern, consistent, reduced interface
 with clear separation between model, parameters, features, Sketch topology, solver results, and
@@ -277,14 +277,14 @@ but release cannot commit a failed candidate.
 6. Replace equal-coordinate connectivity with stable shared planar Core topology. Implemented in 108.
 7. Add deterministic general planar solving and exact local DOF over that topology. Implemented in 109.
 8. Add solver-backed semantic-handle drag and atomic release commit. Implemented in 110.
-9. Add creation, constraints, dimensions, modify/project tools, regions, and Interactive Sketch3D
-   through Block 120. Implemented in 111–120; Block 121 acceptance next.
+9. Add creation, constraints, dimensions, modify/project tools, regions, Interactive Sketch3D, and
+   integrated acceptance through Block 121. Implemented and accepted.
 10. Add selection-first Part/Surface/Assembly modeling through Blocks 122–131.
 11. Add STEP Reference/EditableBody import through Blocks 132–138.
 
 ## Current boundary
 
-Blocks 110–120 are implemented. Block 121 (integrated Interactive Sketcher acceptance) is next.
+Blocks 106–121 are implemented and Interactive Sketcher MVP-8 is accepted. Block 122 is next.
 
 No widget may implement substitute constraint mathematics. Basic creation must map transient picks and
 snap results to explicit Block-108 topology/edit commands, use Block-109 solve authority for disposable

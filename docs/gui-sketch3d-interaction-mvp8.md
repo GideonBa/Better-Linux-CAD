@@ -52,8 +52,8 @@ service is proven without a Qt viewport, matching the headless-first authority s
 
 ## Next boundary
 
-Block 121 owns integrated Interactive Sketcher acceptance: deterministic tutorial documents, a
-coverage manifest for every planned Sketch tool, mouse/script equivalence, persistence/recompute,
-exact undo/redo, conflict atomicity, reference repair, and measured interaction performance. Direct
-handles for arc/spline/helix parameters and any variational 3D constraint solving remain bounded
-later extensions and are not implied by Block 120.
+Block 121 implements and accepts deterministic tutorial documents, machine-checked tool coverage,
+GUI/headless equivalence, exact undo/redo, atomicity, high-DPI mapping, and measured interaction
+performance in `docs/interactive-sketcher-mvp8-acceptance.md`. Direct handles for arc/spline/helix
+parameters and any variational 3D constraint solving remain bounded later extensions and are not
+implied by Block 120. Block 122 begins Interactive Modeling MVP-9.

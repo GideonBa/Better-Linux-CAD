@@ -156,4 +156,5 @@ are canonical in `docs/gui-sketch-conic-slot-creation-mvp8.md`.
 Block 113 spline editing and Sketch text, Block 114 accepted constraint authoring, Block 115
 dimension authoring, Block 116 trim/extend/split/fillet/chamfer, Block 117 offset/projection,
 Block 118 transforms/patterns, Block 119 regions/Finish Sketch, and Block 120 Interactive Sketch3D
-are implemented in their canonical contracts. Block 121 integrated acceptance is next.
+are implemented in their canonical contracts. Block 121 integrated acceptance is implemented and
+accepted in `docs/interactive-sketcher-mvp8-acceptance.md`; Block 122 is next.

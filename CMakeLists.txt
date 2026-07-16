@@ -562,6 +562,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_sketch_create_tests.cpp
       tests/gui/gui_sketch_drag_tests.cpp
       tests/gui/gui_sketch_workbench_tests.cpp
+      tests/gui/gui_interactive_sketcher_acceptance_tests.cpp
       tests/gui/gui_spatial_surface_workbench_tests.cpp
       tests/gui/gui_feature_coverage_acceptance_tests.cpp
       tests/gui/gui_startup_splash_tests.cpp

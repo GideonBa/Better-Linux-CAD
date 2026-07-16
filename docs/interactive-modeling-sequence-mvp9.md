@@ -1,7 +1,7 @@
 # Interactive Part & Assembly Modeling Sequence MVP-9
 
-Status: planned. Blocks 122–131 follow Interactive Sketcher Block 121 and precede STEP Import
-MVP-10 (Blocks 132–138). Block 122 is the first technical step of this phase.
+Status: active after accepted Interactive Sketcher Block 121. Blocks 122–131 precede STEP Import
+MVP-10 (Blocks 132–138); Block 122 is the current next technical step.
 
 This phase closes the interaction gap between the accepted validation GUI (MVP-7, Blocks 95–105)
 and an intuitive, Inventor-familiar modeling experience for **every feature family implemented
