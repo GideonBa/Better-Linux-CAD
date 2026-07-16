@@ -25,7 +25,12 @@ TEST_CASE("Block 114 selection and inference matrices cover every geometric solv
   REQUIRE(sketch.value().add_entity(
       LineSegment::create(SketchEntityId("line.a"), {0.0, 0.0}, {10.0, 2.0}).value()));
   REQUIRE(sketch.value().add_entity(
-      LineSegment::create(SketchEntityId("line.b"), {0.0, 5.0}, {10.0, 8.0}).value()));
+      LineSegment::create(SketchEntityId("line.b"), {10.0, 2.0}, {10.0, 8.0}).value()));
+  REQUIRE(sketch.value().add_entity(
+      LineSegment::create(SketchEntityId("line.c"), {10.0, 8.0}, {0.0, 0.0}).value()));
+  REQUIRE(sketch.value().add_profile(ClosedProfile::create(
+      ProfileId("profile.lines"), {SketchEntityId("line.a"), SketchEntityId("line.b"),
+                                   SketchEntityId("line.c")}).value()));
   REQUIRE(sketch.value().add_entity(ArcSegment::create_three_point(
       SketchEntityId("arc.a"), {20.0, 0.0}, {25.0, 5.0}, {30.0, 0.0}).value()));
   REQUIRE(sketch.value().add_entity(ArcSegment::create_three_point(
@@ -37,13 +42,14 @@ TEST_CASE("Block 114 selection and inference matrices cover every geometric solv
   const auto* line_b_entity = topology.value().find_entity("entity/line.b");
   REQUIRE(line_a_entity != nullptr);
   REQUIRE(line_b_entity != nullptr);
+  REQUIRE(line_a_entity->points().back() == line_b_entity->points().front());
 
   auto line_a = SketchConstraintIntentTarget::entity("entity/line.a");
   auto line_b = SketchConstraintIntentTarget::entity("entity/line.b");
   auto arc_a = SketchConstraintIntentTarget::entity("entity/arc.a");
   auto arc_b = SketchConstraintIntentTarget::entity("entity/arc.b");
   auto point_a = SketchConstraintIntentTarget::point(line_a_entity->points().front());
-  auto point_b = SketchConstraintIntentTarget::point(line_b_entity->points().front());
+  auto point_b = SketchConstraintIntentTarget::point(line_b_entity->points().back());
   REQUIRE(line_a);
   REQUIRE(line_b);
   REQUIRE(arc_a);
@@ -76,7 +82,7 @@ TEST_CASE("Block 114 selection and inference matrices cover every geometric solv
   const auto two_arcs = GuiSketchConstraintController::compatible_kinds(
       topology.value(), {arc_a.value(), arc_b.value()});
   CHECK(block114_has_kind(two_arcs, SketchSolverConstraintKind::Equal));
-  CHECK(block114_has_kind(two_arcs, SketchSolverConstraintKind::Tangent));
+  CHECK_FALSE(block114_has_kind(two_arcs, SketchSolverConstraintKind::Tangent));
   CHECK(block114_has_kind(two_arcs, SketchSolverConstraintKind::Concentric));
 
   const auto point_line = GuiSketchConstraintController::compatible_kinds(
