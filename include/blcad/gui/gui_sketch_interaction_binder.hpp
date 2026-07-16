@@ -9,4 +9,8 @@ class MainWindow;
 // and feeds pointer/selection results back into the existing Block-106 workspace/session surfaces.
 void install_sketch_interaction_binder(MainWindow& window);
 
+// Rebuilds the current interaction scene after a constraint/dimension transaction so
+// accepted semantic annotations and solved geometry become immediately selectable.
+void refresh_sketch_interaction_binder(MainWindow& window);
+
 } // namespace blcad::gui

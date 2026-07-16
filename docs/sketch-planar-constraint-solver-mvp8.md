@@ -1,41 +1,47 @@
 # Planar Sketch Constraint Solver MVP-8
 
-Status: implemented in Block 109; Block-114 geometric authoring integration is implemented.
+Status: implemented in Block 109. Persistent non-dimensional authoring integration is implemented in
+Block 114; typed driving/reference dimension integration is implemented in Block 115.
 
-This document is the canonical Core contract for the deterministic planar constraint solver introduced
-by Block 109. The solver consumes Block-108 `SketchTopology`; Qt, screen coordinates, OCCT topology,
-and sampled interaction geometry do not participate in its mathematics or identity model.
+This document is the canonical mathematical and diagnostic contract for the deterministic planar
+Sketch solver. Block-114 and Block-115 documents remain canonical for their persistence, GUI,
+parameter, and transaction semantics.
 
 ## Authority boundary
 
 ```text
-canonical SketchTopology
-  + canonical SketchConstraintSystem
-  -> SketchConstraintSolver
-  -> derived SketchSolveResult
+SketchTopology + SketchConstraintSystem
+  -> deterministic variable/residual construction
+  -> normalized damped Gauss-Newton solve
+  -> final Jacobian rank / local DOF
+  -> redundancy and conflict attribution
+  -> SketchSolveResult
 ```
 
-`SketchTopology` remains persistent point/entity identity authority. `SketchConstraintSystem` is the
-canonical solve request. `SketchSolveResult`, Jacobians, residuals, rank, DOF, convergence state, and
-conflict/redundancy diagnostics are derived and are not persisted as opaque solver cache.
+The solver owns no screen state, Qt state, OCCT topology, persistence sidecar, parameter editing, or
+history. It consumes stable Block-108 point/entity identities and numeric values already resolved by
+higher Core authoring services.
 
-The solver never mutates its source topology. A caller may use the solved topology from a successful
-result as a disposable candidate. Persistent mutation remains the responsibility of the existing
-validated document/edit transaction boundaries.
+## Canonical inputs
 
-## Canonical ordering
+`SketchTopology` supplies persistent point/entity identity and source coordinates.
+`SketchConstraintSystem` supplies a single Sketch id and a lexicographically ordered set of uniquely
+identified `SketchSolverConstraint` records.
 
-Constraint systems sort constraints lexicographically by stable constraint id before solving.
-
-Solver variables contain every non-reference topology point in canonical `SketchPointId` order. Each
-point contributes variables in this family-local order:
+A solver target is exactly one of:
 
 ```text
-X
-Y
+point  -> SketchPointId
+entity -> SketchTopologyEntity id
 ```
 
-Therefore:
+Constraint target order is semantic. It is not normalized inside the solver because distance and angle
+families assign directed roles to their operands.
+
+## Variable ordering
+
+Only non-reference topology points become variables. Variables are ordered lexicographically by
+`SketchPointId`, with X before Y:
 
 ```text
 point/a.x
@@ -45,257 +51,142 @@ point/b.y
 ...
 ```
 
-is stable independently of source insertion order. Reference points are not variables and retain their
-source topology coordinates.
+Reference points are read-only constants. The ordering is independent of insertion order, UI selection,
+allocation, OCCT traversal, or hash-table order.
 
-Residual row order is canonical constraint order followed by the documented family-local row order.
-Finite-difference columns are canonical solver-variable order.
+## Supported families
 
-## Units and scale normalization
-
-Direct solver values use:
+Block 109 implements:
 
 ```text
-linear values  -> millimeters
-angular values -> degrees
+Coincident
+Fixed
+Horizontal
+Vertical
+Parallel
+Perpendicular
+Collinear
+Equal
+Tangent
+Concentric
+Midpoint
+Symmetric
+PointOnObject
+HorizontalDistance
+VerticalDistance
+AlignedDistance
+Radial
+Diameter
+Angular
 ```
 
-The deterministic characteristic length is:
+Non-dimensional target signatures are defined in
+`docs/gui-sketch-constraint-authoring-mvp8.md`. Dimension family mappings are defined in
+`docs/gui-sketch-dimension-authoring-mvp8.md`.
+
+## Representative residuals
+
+Let `L` be the characteristic Sketch length used for normalization.
+
+Coincident points:
 
 ```text
-max(1.0 mm, planar topology point bounding-box diagonal)
+rx = (x1 - x2) / L
+ry = (y1 - y2) / L
 ```
 
-Length residuals are divided by this characteristic length. Dimensionless orientation residuals use
-normalized dot/cross forms. Angular residuals use wrapped radians divided by pi.
-
-Default numeric policy:
+Horizontal and vertical lines:
 
 ```text
-convergence RMS                  1e-9
-central-difference relative step 1e-7
-rank absolute tolerance          1e-10
-rank relative tolerance          1e-8
-initial damping                  1e-6
-maximum iterations               80
-maximum damping attempts         8
-maximum line-search steps        12
+horizontal: (y_end - y_start) / L
+vertical:   (x_end - x_start) / L
 ```
 
-The central-difference coordinate step is `relative_step * characteristic_length`.
-
-## Residual families
-
-The direct headless `SketchSolverConstraint` request supports every Block-109 initial family:
+Horizontal/vertical directed distance:
 
 ```text
-coincident
-fixed
-horizontal
-vertical
-parallel
-perpendicular
-collinear
-equal
-tangent
-concentric
-midpoint
-symmetric
-point-on-object
-horizontal distance
-vertical distance
-aligned distance
-radial
-diameter
-angular
+horizontal: (x2 - x1 - d) / L
+vertical:   (y2 - y1 - d) / L
 ```
 
-Family target contracts are validated before numeric solving. An invalid target or unavailable
-reference produces `invalid_reference`; the solver does not guess a point, center, tangent, or curve.
-
-### Coincident
-
-Targets: two points.
-
-Rows, in order:
+Aligned distance:
 
 ```text
-dx / characteristic_length
-dy / characteristic_length
+(||p2 - p1|| - d) / L
 ```
 
-Distinct point ids remain distinct variables even when solved to the same coordinate.
-
-### Fixed
-
-Target: one point or one entity with defining topology points.
-
-A point contributes X then Y residuals against its source topology coordinate. An entity contributes
-X then Y for each defining point in entity point-role order. Fixed therefore anchors intent to the
-input topology snapshot rather than to an external screen position.
-
-### Horizontal and vertical
-
-Target: one line.
-
-Horizontal constrains normalized line `dy`; vertical constrains normalized line `dx`.
-
-### Parallel and perpendicular
-
-Targets: two lines.
-
-Parallel uses normalized 2D cross product. Perpendicular uses normalized dot product.
-
-### Collinear
-
-Targets: two lines.
-
-Rows, in order:
+Radius and diameter:
 
 ```text
-normalized direction cross product
-signed second-line start distance from the first infinite line / characteristic_length
+(radius(arc) - r) / L
+(2 * radius(arc) - d) / L
 ```
 
-### Equal
-
-Targets: two measurable line or arc entities.
-
-Line measure is segment length. Arc measure is circumradius. The measure difference is normalized by
-characteristic length.
-
-### Tangent
-
-Targets: two line, arc, or cubic-Bezier spline entities.
-
-The curves must share one persistent topology endpoint. Tangent direction is evaluated at that shared
-`SketchPointId`; line direction, arc circumcircle tangent, and Bezier endpoint-control direction are
-supported. No coordinate-equality endpoint inference is allowed.
-
-### Concentric
-
-Targets: two center-bearing entities.
-
-Implemented center-bearing entity families are Arc, CircleProfile, and CircularHolePattern. Arc center
-is the three-point circumcenter; profile/pattern center is the entity's persistent center point.
-
-Rows are normalized center `dx`, then center `dy`.
-
-### Midpoint
-
-Targets: one point and one line.
-
-Rows are normalized X then Y delta from the line endpoint midpoint.
-
-### Symmetric
-
-Targets: two points and one line axis.
-
-Rows, in order:
+Angular:
 
 ```text
-pair midpoint on axis
-pair segment perpendicular to axis
+wrap(atan2(cross(v1,v2), dot(v1,v2)) - targetRadians) / pi
 ```
 
-### Point-on-object
+Parallel/perpendicular/collinear, tangent, concentric, midpoint, symmetric, equal, and point-on-object
+use scale-normalized geometric residuals over their stable topology targets. Tangent requires a shared
+persistent endpoint; coordinate equality is insufficient.
 
-Targets: one point and one object.
+## Characteristic scale and degeneracy policy
 
-Implemented objects are line and arc. Line uses normalized signed infinite-line distance. Arc uses
-radial distance from the three-point circumcircle.
+The characteristic length is derived deterministically from topology extents with a positive floor.
+Length residuals divide by this scale; angular/directional residuals use normalized vectors or `pi`.
+Degenerate line/arc calculations use deterministic numerical floors for evaluation, but invalid target
+kinds, missing targets, or structurally unsupported entities produce `invalid_reference` rather than
+inventing geometry.
 
-### Horizontal and vertical distance
+## Numeric solve
 
-Targets: two points plus a signed linear value in millimeters.
+The implementation uses deterministic damped Gauss-Newton iteration:
 
-Horizontal constrains `second.x - first.x`; vertical constrains `second.y - first.y`.
+1. construct the canonical variable vector from source topology;
+2. evaluate all constraint residual blocks in canonical constraint order;
+3. build a central-difference Jacobian;
+4. solve the damped normal equations with project-owned dense elimination;
+5. accept a step only under the deterministic improvement rule;
+6. stop at convergence, stall, or the fixed iteration limit.
 
-### Aligned distance
+No randomization, wall-clock termination, sparse-library ordering, or UI frame timing influences the
+result.
 
-Targets: two points plus a positive linear value in millimeters.
+## Rank and degrees of freedom
 
-The Euclidean point distance is constrained.
-
-### Radial and diameter
-
-Target: one arc plus a positive millimeter value.
-
-The three-point arc circumradius is constrained directly or at twice its value.
-
-### Angular
-
-Targets: two lines plus a value in degrees.
-
-The signed angle from the first line direction to the second uses `atan2(cross, dot)`. The difference
-to the target angle is wrapped to `(-pi, pi]` and normalized by pi.
-
-## Numeric solve engine
-
-The solver evaluates the canonical residual vector and builds a central-difference Jacobian. Each
-iteration forms damped Gauss-Newton normal equations:
+After a converged solve, the final Jacobian rank is computed with the canonical tolerance policy.
 
 ```text
-(J^T J + lambda I) step = -J^T r
+remaining_dof = variable_count - jacobian_rank
 ```
 
-Damping attempts use the deterministic sequence:
+Status is:
 
 ```text
-initial_damping * 10^attempt
+fully_constrained  remaining_dof == 0 and no redundant constraint
+under_constrained  remaining_dof  > 0 and no redundant constraint
+redundant          at least one canonical residual block adds no rank
 ```
 
-Line search tests deterministic powers of one half. A candidate is accepted only when RMS reaches the
-convergence threshold or strictly decreases.
+DOF is local to the final solved state. It is not a persistent property and may change at singular
+configurations.
 
-A solve that reaches the fixed maximum iteration count reports `non_convergent`. A stalled solve is
-examined by deterministic conflict attribution; a stall without attributable single-removal conflict
-also reports `non_convergent`.
+## Conflict and redundancy attribution
 
-## Jacobian rank and remaining DOF
+Redundancy is attributed in canonical constraint order by accumulating Jacobian blocks and reporting a
+constraint whose non-empty residual block does not increase rank.
 
-After convergence, rank is computed by deterministic Gaussian elimination over the final Jacobian.
-The pivot threshold is:
+When the numeric solve stalls, conflict attribution removes each constraint in canonical order and
+re-solves. A constraint is reported conflicting when its removal makes the reduced system converge.
+If no single removal restores convergence, status is `non_convergent` rather than an invented conflict
+set.
 
-```text
-max(rank_absolute_tolerance,
-    rank_relative_tolerance * maximum_absolute_jacobian_entry)
-```
+Stable constraint ids are returned unchanged. Authoring adapters may strip only their explicit internal
+prefixes (`intent/` or `dimension/`) before presentation.
 
-Remaining planar DOF is:
-
-```text
-canonical variable count - Jacobian rank
-```
-
-This is a local differential DOF count at the converged solution. It is not the historical Block-99
-endpoint-warning heuristic.
-
-## Redundancy attribution
-
-Constraints are processed in canonical id order. Their final-solution Jacobian rows are appended one
-constraint block at a time. A non-empty constraint block is attributed as redundant when adding the
-block does not increase cumulative rank.
-
-This policy is deterministic and order-frozen. It intentionally reports canonical incremental
-redundancy rather than every mathematically interchangeable member of a redundant set.
-
-## Conflict attribution
-
-When the full system stalls above convergence tolerance, Block 109 applies canonical remove-one
-attribution:
-
-1. Iterate constraints in canonical id order.
-2. Remove exactly one constraint.
-3. Re-solve the reduced system from the original variable snapshot with the same solver options.
-4. Attribute the omitted constraint when the reduced system converges.
-
-The resulting id list is stable and sorted by canonical constraint order. This is deterministic
-single-removal attribution, not a claim of a globally minimal unsatisfiable subset.
-
-## Solve status precedence
-
-The result states are exactly:
+## Solve statuses
 
 ```text
 fully_constrained
@@ -306,117 +197,122 @@ non_convergent
 invalid_reference
 ```
 
-Classification order is:
+Only `fully_constrained` and `under_constrained` are generally publication-capable. Authoring services
+may impose stricter postconditions, such as historical-materialization equality or Block-115 measured
+value validation.
 
-1. invalid target/reference -> `invalid_reference`;
-2. deterministic iteration limit -> `non_convergent`;
-3. numeric stall with non-empty remove-one attribution -> `conflicting`;
-4. numeric stall without attribution -> `non_convergent`;
-5. converged with canonical redundant ids -> `redundant`;
-6. converged with zero remaining DOF -> `fully_constrained`;
-7. otherwise -> `under_constrained` with exact remaining DOF.
+## Block-114 persistent constraint consumer
 
-Failed or diagnostic results do not mutate persistent Sketch intent.
-
-## Persisted Sketch adapter
-
-`SketchConstraintSystemBuilder::from_legacy(...)` projects currently persisted planar Sketch intent
-onto the Block-109 solve request.
-
-Implemented mappings are:
-
-```text
-Fixed         -> fixed
-Horizontal    -> horizontal
-Vertical      -> vertical
-Parallel      -> parallel
-Perpendicular -> perpendicular
-EqualLength   -> equal
-TangentContinuity -> tangent
-HorizontalDistance -> horizontal distance
-VerticalDistance   -> vertical distance
-AlignedDistance    -> aligned distance
-PointToPointDistance -> aligned distance
-```
-
-Horizontal/vertical parameter magnitudes use current topology direction to preserve the historical
-signed-axis convention. Length parameters are read in millimeters.
-
-The older projected-reference constraint records are also translated to their semantic solver family,
-but Block-108 projected point/line entities deliberately contain no invented resolved coordinates.
-Such a solve therefore reports `invalid_reference` until the associative reference workflow supplies a
-persistent/derived coordinate-capable solver target at its later owner block.
-
-Block 109 itself does not add persistence/UI authoring records for every direct solver family. Block
-114 now owns user-facing non-dimensional geometric constraint authoring; Block 115 owns value-bearing
-dimension authoring. Both consumers share this single mathematical authority.
-
-## Focused proof
-
-Focused tags:
-
-```text
-[core][sketch-solver]
-[core][sketch-dof]
-[core][sketch-conflict-diagnostics]
-```
-
-The proof covers canonical variable/constraint ordering, under-constrained remaining DOF, a fully
-constrained solve, every initial residual family, canonical redundancy attribution, stable conflict
-attribution, invalid-reference classification, non-convergence classification, and adaptation of
-current persisted geometric constraints/driving dimensions into the solver.
-
-## Block-110 live drag consumer
-
-Block 110 is the first continuous GUI consumer of this solver. It does not add solver mathematics. A
-semantic handle maps to one of four transient target forms:
-
-```text
-Point        -> Coincident(controlled point, temporary reference point)
-LineMidpoint -> Midpoint(temporary reference point, line)
-ArcCenter    -> Concentric(arc, temporary reference center entity)
-ArcRadius    -> Radial(arc, source-center-to-pointer distance)
-```
-
-The temporary constraint id is `zz.gui.drag.target`; temporary topology ids are
-`__gui.drag.pointer` and `__gui.drag.center`. They exist only in the augmented solve request and are
-removed before preview/commit. `FullyConstrained`, `UnderConstrained`, and `Redundant` are accepted
-preview states; `Conflicting`, `NonConvergent`, and `InvalidReference` refuse the drag candidate.
-
-Move samples may be coalesced by the GUI, but the exact release pointer is synchronously solved before
-commit. Qt renders the derived solve result/DOF and never evaluates substitute residuals.
-
-Canonical integration contract: `docs/gui-sketch-solver-drag-mvp8.md`.
-
-## Block-114 persistent geometric authoring consumer
-
-Block 114 introduces no new residual equations. `SketchConstraintAuthoringService` composes three
-sources into one canonical solve request:
+`SketchConstraintCatalogSystemBuilder` composes:
 
 ```text
 historical embedded Sketch constraints
-accepted blcad.sketch_constraints.mvp8 records
-one disposable manual or automatic candidate
++ accepted blcad.sketch_constraints.mvp8 records
 ```
 
-Sidecar targets are stable `SketchPointId` or `SketchTopologyEntity` ids. Internal solver ids use the
-`intent/<SketchConstraintId>` prefix; published conflict and redundancy ids remove that internal
-prefix. The same candidate path serves selection-driven manual commands and supported snap/inference
-candidates.
+A candidate is added with an internal stable `intent/<id>` solver identity. Block 114 accepts only an
+under-/fully-constrained solve that materializes exactly. Redundant, conflicting, invalid, and
+non-convergent candidates remain transient.
 
-Only `under_constrained` and `fully_constrained` are persistent-authoring acceptance states. Unlike the
-Block-110 drag preview, `redundant` is deliberately not accepted for a new persistent constraint
-record. `redundant`, `conflicting`, `invalid_reference`, and `non_convergent` retain the original Sketch
-and original constraint catalog exactly and publish diagnostic glyph state only.
+Canonical contract: `docs/gui-sketch-constraint-authoring-mvp8.md`.
 
-A successful authoring solve materializes the complete solved topology through the historical Sketch
-compatibility bridge and commits one `Add sketch constraint` Part transaction. Solver state itself is
-not serialized.
+## Block-115 typed dimension consumer
 
-Canonical integration contract: `docs/gui-sketch-constraint-authoring-mvp8.md`.
+`SketchDimensionCatalogSystemBuilder` composes:
 
-## Next boundary
+```text
+historical embedded Sketch constraints
++ accepted Block-114 constraints
++ all driving Block-115 dimensions
+```
 
-Block 115 adds value/parameter-backed driving and reference dimension authoring for the existing
-horizontal, vertical, aligned, radial, diameter, and angular solver families. Typed quantity and
-expression authority remains in Core rather than Qt.
+The existing Part parameter/expression system resolves numeric values before solver construction.
+Mappings are:
+
+```text
+horizontal distance        -> HorizontalDistance
+vertical distance          -> VerticalDistance
+aligned / point-to-point   -> AlignedDistance
+line length                -> AlignedDistance(line start, line end)
+radius                     -> Radial
+diameter                   -> Diameter
+angle                       -> Angular
+arc length                  -> calibrated equivalent Radial
+reference dimension         -> no solver constraint
+```
+
+Arc length is not a new residual in Block 109. Block 115 iteratively derives an equivalent radius from
+the requested length and current three-point-arc sweep, solves from the original topology, and then
+measures actual arc length. At most ten deterministic calibration passes are used. Publication requires
+all final driving measurements to match their parameters within the canonical relative tolerance.
+
+This post-solve measurement check is essential: a solver-converged equivalent-radius state is not by
+itself authoritative arc-length satisfaction.
+
+Canonical contract: `docs/gui-sketch-dimension-authoring-mvp8.md`.
+
+## Block-110 drag consumer after Blocks 114–115
+
+Session-backed dragging builds its baseline from the same historical, constraint-catalog, and
+dimension-catalog composition. The temporary pointer equation is appended only for preview. Release
+must compare the current catalogs/effective system against the source snapshot and validate every final
+driving measurement before materialization.
+
+Canonical contract: `docs/gui-sketch-solver-drag-mvp8.md`.
+
+## Persistence boundary
+
+The solver result is always derived. Never persist:
+
+```text
+variables
+residual vectors
+Jacobian
+rank
+remaining DOF
+iteration count
+conflict/redundancy diagnostics
+solved preview topology
+arc-length calibration state
+```
+
+Persistent intent belongs to historical Sketch JSON or explicit versioned sidecars:
+
+```text
+blcad.sketch_constraints.mvp8
+blcad.sketch_dimensions.mvp8
+```
+
+## Failure policy
+
+No persistent mutation occurs for:
+
+- wrong Sketch scope;
+- missing or wrong-kind targets;
+- duplicate solver ids;
+- missing/forbidden numeric values;
+- non-finite values;
+- non-positive aligned/radial/diameter values;
+- structurally invalid tangent or arc targets;
+- invalid solver options;
+- stalled or maximum-iteration solves rejected by the authoring consumer;
+- final dimension measurement mismatch;
+- materialization identity loss;
+- stale source/catalog snapshots.
+
+## Focused proof
+
+```bash
+./build/dev/blcad_core_tests "[core][sketch-solver]"
+./build/dev/blcad_core_tests "[core][sketch-dof]"
+./build/dev/blcad_core_tests "[core][sketch-conflict-diagnostics]"
+./build/dev/blcad_core_tests "[core][sketch-constraints]"
+./build/dev/blcad_core_tests "[core][sketch-dimensions]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][sketch-live-solve]"
+```
+
+## Current next boundary
+
+Block 116 owns topology-rewriting trim, extend, split, Sketch corner fillet, and Sketch corner chamfer.
+Those operations must explicitly remap or reject constraints and dimensions before invoking this solver;
+the solver does not infer semantic retargeting after topology replacement.

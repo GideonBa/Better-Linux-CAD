@@ -1,6 +1,6 @@
 #pragma once
 
-#include "blcad/core/sketch_constraint_catalog_system.hpp"
+#include "blcad/core/sketch_dimension_catalog_system.hpp"
 #include "blcad/core/sketch_constraint_solver.hpp"
 #include "blcad/core/sketch_topology_part_document.hpp"
 #include "blcad/gui/gui_document_session.hpp"
@@ -77,20 +77,34 @@ public:
           sketch_id.value(), "solver-backed drag requires an active Part session"));
     auto controller = create(*session.part_document(), sketch_id);
     if (controller.has_error()) return controller;
-    auto catalog = session.sketch_constraint_catalog(sketch_id);
-    if (catalog.has_error())
-      return Result<GuiSketchDragController>::failure(catalog.error());
-    auto system = SketchConstraintCatalogSystemBuilder::build(
-        *session.part_document(), controller.value().source_topology_, catalog.value());
+    auto constraints = session.sketch_constraint_catalog(sketch_id);
+    if (constraints.has_error())
+      return Result<GuiSketchDragController>::failure(constraints.error());
+    auto dimensions = session.sketch_dimension_catalog(sketch_id);
+    if (dimensions.has_error())
+      return Result<GuiSketchDragController>::failure(dimensions.error());
+    auto system = SketchDimensionCatalogSystemBuilder::build(
+        *session.part_document(), controller.value().source_topology_,
+        constraints.value(), dimensions.value());
     if (system.has_error())
       return Result<GuiSketchDragController>::failure(system.error());
     auto baseline = SketchConstraintSolver{}.solve(
         controller.value().source_topology_, system.value());
     if (baseline.has_error())
       return Result<GuiSketchDragController>::failure(baseline.error());
+    const bool accepted = baseline.value().status == SketchSolveStatus::UnderConstrained ||
+                          baseline.value().status == SketchSolveStatus::FullyConstrained;
+    if (!accepted)
+      return Result<GuiSketchDragController>::failure(Error::validation(
+          sketch_id.value(), "Sketch dimensions do not have a valid drag baseline solve"));
+    auto valid = SketchDimensionCatalogSystemBuilder::validate_measurements(
+        *session.part_document(), baseline.value().topology, dimensions.value());
+    if (valid.has_error())
+      return Result<GuiSketchDragController>::failure(valid.error());
     controller.value().source_system_ = std::move(system.value());
     controller.value().baseline_solve_ = std::move(baseline.value());
-    controller.value().source_catalog_ = std::move(catalog.value());
+    controller.value().source_catalog_ = std::move(constraints.value());
+    controller.value().source_dimension_catalog_ = std::move(dimensions.value());
     return controller;
   }
 
@@ -115,27 +129,42 @@ public:
       return Result<std::size_t>::failure(Error::validation(
           source_topology_.sketch().value(),
           "committing a Sketch drag requires a flushed valid final preview"));
-    if (session.part_document() == nullptr || !source_catalog_)
+    if (session.part_document() == nullptr || !source_catalog_ ||
+        !source_dimension_catalog_)
       return Result<std::size_t>::failure(Error::validation(
           source_topology_.sketch().value(),
-          "session constraint drag requires its original Part catalog snapshot"));
-    auto current_catalog = session.sketch_constraint_catalog(source_topology_.sketch());
-    if (current_catalog.has_error())
-      return Result<std::size_t>::failure(current_catalog.error());
-    if (current_catalog.value() != *source_catalog_)
+          "session drag requires its original constraint and dimension snapshots"));
+    auto current_constraints = session.sketch_constraint_catalog(source_topology_.sketch());
+    if (current_constraints.has_error())
+      return Result<std::size_t>::failure(current_constraints.error());
+    if (current_constraints.value() != *source_catalog_)
       return Result<std::size_t>::failure(Error::dependency(
           source_topology_.sketch().value(),
           "Sketch constraint catalog changed after drag preview; commit refused"));
+    auto current_dimensions = session.sketch_dimension_catalog(source_topology_.sketch());
+    if (current_dimensions.has_error())
+      return Result<std::size_t>::failure(current_dimensions.error());
+    if (current_dimensions.value() != *source_dimension_catalog_)
+      return Result<std::size_t>::failure(Error::dependency(
+          source_topology_.sketch().value(),
+          "Sketch dimension catalog changed after drag preview; commit refused"));
+    auto valid = SketchDimensionCatalogSystemBuilder::validate_measurements(
+        *session.part_document(), latest_preview_->topology(), *source_dimension_catalog_);
+    if (valid.has_error())
+      return Result<std::size_t>::failure(Error::validation(
+          source_topology_.sketch().value(),
+          "dragged topology violates a driving Sketch dimension"));
 
     const SketchTopology expected_source = source_topology_;
     const SketchConstraintSystem expected_system = source_system_;
     const SketchTopology final_topology = latest_preview_->topology();
     const SketchId target_sketch = source_topology_.sketch();
-    const SketchConstraintCatalog catalog = *source_catalog_;
+    const SketchConstraintCatalog constraints = *source_catalog_;
+    const SketchDimensionCatalog dimensions = *source_dimension_catalog_;
     auto committed = session.commit_part_transaction(
         "Drag sketch handle",
         [expected_source, expected_system, final_topology, target_sketch,
-         catalog](PartDocument& document) -> Result<std::size_t> {
+         constraints, dimensions](PartDocument& document) -> Result<std::size_t> {
           const auto* current = document.find_sketch(target_sketch);
           if (current == nullptr)
             return Result<std::size_t>::failure(
@@ -147,14 +176,19 @@ public:
           if (current_topology.value() != expected_source)
             return Result<std::size_t>::failure(Error::validation(
                 target_sketch.value(), "Sketch changed after drag preview; commit refused"));
-          auto current_system = SketchConstraintCatalogSystemBuilder::build(
-              document, current_topology.value(), catalog);
+          auto current_system = SketchDimensionCatalogSystemBuilder::build(
+              document, current_topology.value(), constraints, dimensions);
           if (current_system.has_error())
             return Result<std::size_t>::failure(current_system.error());
           if (current_system.value() != expected_system)
             return Result<std::size_t>::failure(Error::validation(
                 target_sketch.value(),
-                "Sketch constraint system changed after drag preview; commit refused"));
+                "Sketch constraint or dimension system changed after drag preview"));
+          auto valid_dimensions = SketchDimensionCatalogSystemBuilder::validate_measurements(
+              document, final_topology, dimensions);
+          if (valid_dimensions.has_error())
+            return Result<std::size_t>::failure(Error::validation(
+                target_sketch.value(), "dragged topology violates a driving dimension"));
           auto materialized = SketchTopologyLegacyMaterializer{}.materialize(
               current_snapshot, final_topology);
           if (materialized.has_error())
@@ -197,6 +231,7 @@ private:
   SketchSolveResult baseline_solve_;
   std::vector<GuiSketchDragHandle> handles_;
   std::optional<SketchConstraintCatalog> source_catalog_;
+  std::optional<SketchDimensionCatalog> source_dimension_catalog_;
   std::optional<std::size_t> active_handle_index_;
   std::optional<Point2> pending_pointer_;
   std::optional<Point2> processed_pointer_;

@@ -6,6 +6,8 @@
 #include "gui_sketch_constraint_tests.inc"
 #include "gui_sketch_constraint_redundancy_tests.inc"
 #include "gui_sketch_constraint_family_tests.inc"
+#include "gui_sketch_dimension_tests.inc"
+#include "gui_sketch_dimension_selection_tests.inc"
 
 int main(int argc, char* argv[]) {
   if (qEnvironmentVariableIsEmpty("QT_QPA_PLATFORM")) {

@@ -1,7 +1,10 @@
 #include "blcad/gui/gui_sketch_interaction_binder.hpp"
 #include "blcad/gui/gui_sketch_create_binder.hpp"
 #include "blcad/gui/gui_sketch_drag_binder.hpp"
+#include "blcad/gui/gui_sketch_dimension_binder.hpp"
 
+#include "blcad/gui/gui_sketch_constraints.hpp"
+#include "blcad/gui/gui_sketch_dimensions.hpp"
 #include "blcad/gui/main_window.hpp"
 
 #include <QAction>
@@ -23,6 +26,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -131,6 +135,8 @@ public:
     sync_workspace();
   }
 
+  void refresh() { sync_workspace(); }
+
 protected:
   bool eventFilter(QObject* watched, QEvent* event) override {
     if (watched == &window_ && event->type() == QEvent::KeyPress) {
@@ -174,6 +180,8 @@ private:
             return;
           window_.sketch_workspace().set_cursor_coordinates(raw_point);
           window_.sketch_workspace().set_snap_inference(snap.inference);
+          if (hit)
+            candidate_by_semantic_[hit->semantic_id] = hit->candidate_id;
           if (sketch_idle_stage(window_.sketch_workspace().stage()))
             (void)window_.sketch_workspace().set_hover(hit.has_value());
           update_inference_preview(snap);
@@ -213,6 +221,7 @@ private:
     QTimer::singleShot(0, this, [this] {
       update_selection_state();
       refresh_status_surfaces();
+      refresh_sketch_dimension_actions(window_);
     });
   }
 
@@ -279,11 +288,13 @@ private:
       grid_snap_action_->setEnabled(active);
     }
     if (!active) {
+      candidate_by_semantic_.clear();
       if (viewport_ != nullptr)
         viewport_->clear_sketch_interaction();
       if (inference_overlay_ != nullptr)
         inference_overlay_->set_guide(std::nullopt, std::nullopt);
       refresh_status_surfaces();
+      refresh_sketch_dimension_actions(window_);
       return;
     }
 
@@ -300,19 +311,37 @@ private:
       append_diagnostic(plane.error());
       return;
     }
-    const auto scene = window_.session().part_shape_cache() != nullptr
-                           ? GuiSketchInteractionSceneBuilder{}.build(
-                                 *part, *sketch, *window_.session().part_shape_cache())
-                           : GuiSketchInteractionSceneBuilder{}.build(*part, *sketch);
+    auto scene = window_.session().part_shape_cache() != nullptr
+                     ? GuiSketchInteractionSceneBuilder{}.build(
+                           *part, *sketch, *window_.session().part_shape_cache())
+                     : GuiSketchInteractionSceneBuilder{}.build(*part, *sketch);
     if (scene.has_error()) {
       append_diagnostic(scene.error());
       return;
     }
+    auto constraint_annotations = GuiSketchConstraintController::accepted_annotations(
+        window_.session(), *window_.active_sketch());
+    if (constraint_annotations.has_error()) {
+      append_diagnostic(constraint_annotations.error());
+      return;
+    }
+    scene.value().annotations.insert(scene.value().annotations.end(),
+                                     constraint_annotations.value().begin(),
+                                     constraint_annotations.value().end());
+    auto dimension_annotations = GuiSketchDimensionController::accepted_annotations(
+        window_.session(), *window_.active_sketch());
+    if (dimension_annotations.has_error()) {
+      append_diagnostic(dimension_annotations.error());
+      return;
+    }
+    scene.value().annotations.insert(scene.value().annotations.end(),
+                                     dimension_annotations.value().begin(),
+                                     dimension_annotations.value().end());
 
     GuiSketchInteractionConfig config;
     config.grid = grid_config();
     const auto activated = viewport_->set_sketch_interaction(
-        plane.value(), scene.value(), config);
+        plane.value(), std::move(scene.value()), config);
     if (activated.has_error()) {
       append_diagnostic(activated.error());
       return;
@@ -323,6 +352,7 @@ private:
     }
     update_selection_state();
     refresh_status_surfaces();
+    refresh_sketch_dimension_actions(window_);
   }
 
   void update_selection_state() {
@@ -348,9 +378,16 @@ private:
     }
 
     window_.session().selection().clear();
-    for (const auto& selection : selections)
-      (void)window_.session().selection().add(selection);
+    for (auto selection : selections) {
+      if (selection.candidate_id.empty()) {
+        const auto candidate = candidate_by_semantic_.find(selection.semantic_id);
+        if (candidate != candidate_by_semantic_.end())
+          selection.candidate_id = candidate->second;
+      }
+      (void)window_.session().selection().add(std::move(selection));
+    }
     synchronizing_selection_ = false;
+    refresh_sketch_dimension_actions(window_);
   }
 
   void refresh_status_surfaces() const {
@@ -387,6 +424,7 @@ private:
   QAction* grid_action_{nullptr};
   QAction* grid_snap_action_{nullptr};
   SketchInferenceOverlay* inference_overlay_{nullptr};
+  std::unordered_map<std::string, std::string> candidate_by_semantic_;
   bool synchronizing_selection_{false};
 };
 
@@ -398,6 +436,13 @@ void install_sketch_interaction_binder(MainWindow& window) {
   (void)new SketchInteractionBinder(window);
   install_sketch_create_binder(window);
   install_sketch_drag_binder(window);
+  install_sketch_dimension_binder(window);
+}
+
+void refresh_sketch_interaction_binder(MainWindow& window) {
+  if (auto* binder =
+          window.findChild<SketchInteractionBinder*>(QStringLiteral("blcad.sketch.interaction_binder")))
+    binder->refresh();
 }
 
 } // namespace blcad::gui

@@ -1,9 +1,13 @@
 #include "blcad/core/part_document.hpp"
 #include "blcad/core/part_document_json.hpp"
+#include "blcad/core/sketch_dimension_authoring_json.hpp"
+#include "blcad/core/sketch_dimension_catalog_system.hpp"
 
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <string>
 #include <vector>
 
@@ -15,6 +19,14 @@ Parameter make_length_parameter(const char* id, const char* name, double value_m
   auto quantity = Quantity::length_mm(value_mm, id);
   REQUIRE(quantity);
   auto parameter = Parameter::create_length(ParameterId(id), name, quantity.value());
+  REQUIRE(parameter);
+  return parameter.value();
+}
+
+Parameter make_angle_parameter(const char* id, const char* name, double value_deg) {
+  auto quantity = Quantity::angle_deg(value_deg, id);
+  REQUIRE(quantity);
+  auto parameter = Parameter::create_angle(ParameterId(id), name, quantity.value());
   REQUIRE(parameter);
   return parameter.value();
 }
@@ -123,12 +135,48 @@ PartDocument make_dimensioned_document() {
   REQUIRE(sketch);
   add_dimensioned_rectangle_intent(sketch.value());
   REQUIRE(document.value().add_sketch(sketch.value()));
-  auto feature =
-      Feature::create_additive_extrude(FeatureId("feature.dimensioned"), "Dimensioned",
-                                       SketchId("sketch.dimensioned"), ParameterId("part.depth"));
+  auto feature = Feature::create_additive_extrude(
+      FeatureId("feature.dimensioned"), "Dimensioned", SketchId("sketch.dimensioned"),
+      ParameterId("part.depth"));
   REQUIRE(feature);
   REQUIRE(document.value().add_feature(feature.value()));
   return document.value();
+}
+
+PartDocument make_block115_document() {
+  auto document = PartDocument::create(DocumentId("part.block115"), "Block115");
+  REQUIRE(document);
+  REQUIRE(document.value().add_parameter(make_length_parameter("dim.length", "dim_length", 20.0)));
+  REQUIRE(document.value().add_parameter(make_length_parameter("dim.arc", "dim_arc", 15.7079632679)));
+  REQUIRE(document.value().add_parameter(make_angle_parameter("dim.angle", "dim_angle", 90.0)));
+  REQUIRE(document.value().add_parameter(make_length_parameter("base.length", "base_length", 10.0)));
+  REQUIRE(document.value().add_expression_parameter(
+      ParameterId("expr.length"), "expr_length", ParameterType::Length, "base_length * 2"));
+  auto xy = DatumPlane::xy();
+  REQUIRE(xy);
+  REQUIRE(document.value().add_datum_plane(xy.value()));
+  auto sketch = Sketch::create(SketchId("sketch.block115"), "Block115", DatumPlaneId("datum.xy"));
+  REQUIRE(sketch);
+  REQUIRE(sketch.value().add_entity(
+      LineSegment::create(SketchEntityId("line.a"), {0.0, 0.0}, {10.0, 0.0}).value()));
+  REQUIRE(sketch.value().add_entity(
+      LineSegment::create(SketchEntityId("line.b"), {0.0, 0.0}, {0.0, 10.0}).value()));
+  REQUIRE(sketch.value().add_entity(ArcSegment::create_three_point(
+      SketchEntityId("arc.a"), {0.0, 0.0}, {5.0, 5.0}, {10.0, 0.0}).value()));
+  REQUIRE(document.value().add_sketch(std::move(sketch.value())));
+  return document.value();
+}
+
+SketchConstraintIntentTarget entity_target(const char* id) {
+  auto target = SketchConstraintIntentTarget::entity(id);
+  REQUIRE(target);
+  return target.value();
+}
+
+SketchConstraintIntentTarget point_target(const SketchPointId& id) {
+  auto target = SketchConstraintIntentTarget::point(id);
+  REQUIRE(target);
+  return target.value();
 }
 
 bool contains(const std::vector<std::string>& values, const char* needle) {
@@ -163,4 +211,152 @@ TEST_CASE("Driving dimension parameters dirty sketches and dependent features",
   CHECK(contains(affected.value(), "part.width"));
   CHECK(contains(affected.value(), "sketch.dimensioned"));
   CHECK(contains(affected.value(), "feature.dimensioned"));
+}
+
+TEST_CASE("Block 115 dimension catalog validates all families and sidecar ordering",
+          "[core][sketch-dimensions]") {
+  PartDocument document = make_block115_document();
+  const Sketch* sketch = document.find_sketch(SketchId("sketch.block115"));
+  REQUIRE(sketch != nullptr);
+  auto topology = SketchTopology::migrate_legacy(*sketch);
+  REQUIRE(topology);
+  const auto* line = topology.value().find_entity("entity/line.a");
+  REQUIRE(line != nullptr);
+
+  auto length = SketchDimensionIntent::create(
+      SketchDimensionId("dimension.z.length"), SketchDimensionKind::Length,
+      SketchDimensionMode::Driving, {entity_target("entity/line.a")},
+      ParameterId("dim.length"));
+  auto reference = SketchDimensionIntent::create(
+      SketchDimensionId("dimension.a.reference"), SketchDimensionKind::PointToPointDistance,
+      SketchDimensionMode::Reference,
+      {point_target(line->points()[0]), point_target(line->points()[1])});
+  REQUIRE(length);
+  REQUIRE(reference);
+  auto catalog = SketchDimensionCatalog::create(
+      document.id(), sketch->id(), {length.value(), reference.value()});
+  REQUIRE(catalog);
+  CHECK(catalog.value().dimensions().front().id().value() == "dimension.a.reference");
+
+  auto serialized = serialize_sketch_dimension_catalog_to_json(catalog.value());
+  REQUIRE(serialized);
+  CHECK(serialized.value().find("blcad.sketch_dimensions.mvp8") != std::string::npos);
+  CHECK(serialized.value().find("point_to_point_distance") != std::string::npos);
+  CHECK(serialized.value().find("reference") != std::string::npos);
+  auto restored = deserialize_sketch_dimension_catalog_from_json(serialized.value());
+  REQUIRE(restored);
+  CHECK(restored.value() == catalog.value());
+
+  CHECK_FALSE(SketchDimensionIntent::create(
+      SketchDimensionId("dimension.invalid"), SketchDimensionKind::Length,
+      SketchDimensionMode::Reference, {entity_target("entity/line.a")},
+      ParameterId("dim.length")));
+}
+
+TEST_CASE("Block 115 driving length solves while reference distance only measures",
+          "[core][sketch-dimensions]") {
+  PartDocument document = make_block115_document();
+  const Sketch* sketch = document.find_sketch(SketchId("sketch.block115"));
+  REQUIRE(sketch != nullptr);
+  auto topology = SketchTopology::migrate_legacy(*sketch);
+  REQUIRE(topology);
+  const auto* line = topology.value().find_entity("entity/line.a");
+  REQUIRE(line != nullptr);
+  auto driving = SketchDimensionIntent::create(
+      SketchDimensionId("dimension.length"), SketchDimensionKind::Length,
+      SketchDimensionMode::Driving, {entity_target("entity/line.a")},
+      ParameterId("dim.length"));
+  auto reference = SketchDimensionIntent::create(
+      SketchDimensionId("dimension.reference"), SketchDimensionKind::PointToPointDistance,
+      SketchDimensionMode::Reference,
+      {point_target(line->points()[0]), point_target(line->points()[1])});
+  REQUIRE(driving);
+  REQUIRE(reference);
+  auto dimensions = SketchDimensionCatalog::create(
+      document.id(), sketch->id(), {driving.value(), reference.value()});
+  auto constraints = SketchConstraintCatalog::create(document.id(), sketch->id());
+  REQUIRE(dimensions);
+  REQUIRE(constraints);
+
+  auto solved = SketchDimensionCatalogSystemBuilder::solve(
+      document, constraints.value(), dimensions.value());
+  REQUIRE(solved);
+  CHECK(solved.value().accepted);
+  REQUIRE(solved.value().solved_sketch.has_value());
+  const auto* solved_line = solved.value().solved_sketch->find_line_segment(
+      SketchEntityId("line.a"));
+  REQUIRE(solved_line != nullptr);
+  CHECK(std::hypot(solved_line->end().x - solved_line->start().x,
+                   solved_line->end().y - solved_line->start().y) ==
+        Catch::Approx(20.0).margin(1.0e-6));
+  auto measured = SketchDimensionMeasurementEvaluator::measure(
+      solved.value().solve.topology, reference.value());
+  REQUIRE(measured);
+  CHECK(measured.value().value.millimeters() == Catch::Approx(20.0).margin(1.0e-6));
+  CHECK(sketch->find_line_segment(SketchEntityId("line.a"))->end() == Point2{10.0, 0.0});
+}
+
+TEST_CASE("Block 115 arc length uses calibrated solve and validates actual measurement",
+          "[core][sketch-dimensions]") {
+  PartDocument document = make_block115_document();
+  const Sketch* sketch = document.find_sketch(SketchId("sketch.block115"));
+  REQUIRE(sketch != nullptr);
+  auto arc_length = SketchDimensionIntent::create(
+      SketchDimensionId("dimension.arc_length"), SketchDimensionKind::ArcLength,
+      SketchDimensionMode::Driving, {entity_target("entity/arc.a")},
+      ParameterId("dim.arc"));
+  REQUIRE(arc_length);
+  auto dimensions = SketchDimensionCatalog::create(
+      document.id(), sketch->id(), {arc_length.value()});
+  auto constraints = SketchConstraintCatalog::create(document.id(), sketch->id());
+  REQUIRE(dimensions);
+  REQUIRE(constraints);
+  auto solved = SketchDimensionCatalogSystemBuilder::solve(
+      document, constraints.value(), dimensions.value());
+  REQUIRE(solved);
+  CHECK(solved.value().accepted);
+  auto measured = SketchDimensionMeasurementEvaluator::measure(
+      solved.value().solve.topology, arc_length.value());
+  REQUIRE(measured);
+  CHECK(measured.value().value.millimeters() ==
+        Catch::Approx(15.7079632679).margin(1.0e-6));
+}
+
+TEST_CASE("Block 115 literal and expression edits preserve typed parameter authority",
+          "[core][sketch-dimensions][integration][sketch-expression-edit]") {
+  PartDocument document = make_block115_document();
+  auto direct = SketchDimensionIntent::create(
+      SketchDimensionId("dimension.direct"), SketchDimensionKind::Length,
+      SketchDimensionMode::Driving, {entity_target("entity/line.a")},
+      ParameterId("dim.length"));
+  auto expression = SketchDimensionIntent::create(
+      SketchDimensionId("dimension.expression"), SketchDimensionKind::Length,
+      SketchDimensionMode::Driving, {entity_target("entity/line.b")},
+      ParameterId("expr.length"));
+  REQUIRE(direct);
+  REQUIRE(expression);
+  auto catalog = SketchDimensionCatalog::create(
+      document.id(), SketchId("sketch.block115"), {direct.value(), expression.value()});
+  REQUIRE(catalog);
+
+  auto literal = SketchDimensionEditService::set_literal(
+      document, catalog.value(), direct.value().id(),
+      Quantity::length_mm(25.0, "dimension.direct").value());
+  REQUIRE(literal);
+  CHECK(document.find_parameter(ParameterId("dim.length"))->value().millimeters() ==
+        Catch::Approx(25.0));
+
+  auto formula = SketchDimensionEditService::set_formula(
+      document, catalog.value(), expression.value().id(), "base_length * 3");
+  REQUIRE(formula);
+  const Parameter* expression_parameter = document.find_parameter(ParameterId("expr.length"));
+  REQUIRE(expression_parameter != nullptr);
+  REQUIRE(expression_parameter->formula().has_value());
+  CHECK(*expression_parameter->formula() == "base_length * 3");
+  CHECK(expression_parameter->value().millimeters() == Catch::Approx(30.0));
+
+  auto rejected = SketchDimensionEditService::set_literal(
+      document, catalog.value(), expression.value().id(),
+      Quantity::length_mm(12.0, "dimension.expression").value());
+  CHECK_FALSE(rejected);
 }

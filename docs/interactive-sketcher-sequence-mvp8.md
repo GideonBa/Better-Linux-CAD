@@ -1,6 +1,6 @@
 # Interactive Sketcher Sequence MVP-8
 
-Status: in progress. Blocks 106–114 are implemented; Block 115 is the current next technical step.
+Status: in progress. Blocks 106–115 are implemented; Block 116 is the current next technical step.
 Blocks 106–121 precede Interactive Modeling MVP-9 (Blocks 122–131) and STEP Import MVP-10
 (Blocks 132–138).
 
@@ -12,27 +12,28 @@ into Qt.
 ## Product outcome
 
 A user can enter a planar Sketch, create common mechanical profiles, edit curves directly, add manual
-or inferred geometric constraints, inspect semantic glyphs and conflicts, create parameter-backed
-annotations, repair conflicts, and leave the Sketch with atomic undoable document results. Persistent
-intent remains available to headless Core/Geometry consumers.
+or inferred geometric constraints, author typed driving/reference dimensions, edit bound values or
+expressions through semantic annotations, inspect glyphs and conflicts, repair topology, and leave the
+Sketch with atomic undoable document results. Persistent intent remains available to headless
+Core/Geometry consumers.
 
 ## Frozen authority rules
 
 1. Screen coordinates, hover state, snaps, rubber bands, control polygons, selected handles, sampled
-   curves, glyph placement, and font rasterization are transient.
-2. Shared Sketch points, entities, accepted constraints, dimensions, annotations, and
-   construction/reference state are stable semantic intent.
+   curves, glyph placement, formatted dimension text, and font rasterization are transient.
+2. Shared Sketch points, entities, accepted constraints, dimension targets/modes/bindings, annotations,
+   and construction/reference state are stable semantic intent.
 3. Numeric coordinate equality is not topology connectivity.
 4. The planar solver is a deterministic headless Core service.
-5. Dragging, editing, and constraint authoring operate on disposable complete candidates; successful
-   acceptance commits one document transaction.
-6. Fixed, reference, stale, ambiguous, conflicting, redundant, invalid, or non-convergent candidates
-   fail closed.
+5. Dragging, editing, constraint authoring, and dimension authoring operate on disposable complete
+   candidates; successful acceptance commits one document transaction.
+6. Fixed, reference, stale, ambiguous, conflicting, redundant, invalid, measurement-mismatched, or
+   non-convergent candidates fail closed.
 7. Automatic constraints remain transient inference until Block-114 disposable solve accepts them.
 8. Projected geometry remains associative/read-only until explicit conversion.
 9. Historical persistence is never silently reinterpreted; new schemas are explicit and versioned.
-10. Derived solve, Geometry, font, layout, glyph, and interaction products are never opaque persistent
-    caches.
+10. Derived solve, Geometry, font, layout, glyph, measurement, and interaction products are never opaque
+    persistent caches.
 
 ## Frozen phase order
 
@@ -46,8 +47,8 @@ intent remains available to headless Core/Geometry consumers.
 112 circle, arc, ellipse, slot creation/editing — implemented
 113 spline editing, continuity handles, Sketch text — implemented
 114 manual and automatic geometric constraints with glyph interaction — implemented
-115 driving/reference dimensions, in-canvas editing, parameter/expression binding — next
-116 trim, extend, split, corner fillet, corner chamfer
+115 driving/reference dimensions, in-canvas editing, parameter/expression binding — implemented
+116 trim, extend, split, corner fillet, corner chamfer — next
 117 offset, project/include, construction axes, associative references
 118 move, rotate, scale, copy, mirror, rectangular/circular Sketch patterns
 119 region recognition, profile selection, diagnostics, repair, Finish Sketch
@@ -73,7 +74,8 @@ Focused tags: `[gui][sketch-workspace]`, `[gui][sketch-command-lifecycle]`.
 `GuiSketchPlaneMapping` provides device-independent Screen-DIP/view-ray/active-plane mapping.
 Deterministic hit priority is `Point -> Curve -> Dimension -> Glyph`. Window/Crossing selection,
 bounded grid display, geometric snaps, and horizontal/vertical/X/Y alignment inference remain
-transient GUI products.
+transient GUI products. Sketch selections preserve the exact hit `candidate_id` in addition to the
+persistent semantic id, allowing separate endpoint roles on one entity.
 
 Canonical contract: `docs/gui-sketch-plane-interaction-mvp8.md`.
 
@@ -101,6 +103,10 @@ vertical/aligned distances, Radial, Diameter, and Angular families over Block-10
 variable/constraint ordering, normalized residuals, damped Gauss-Newton execution, Jacobian-rank DOF,
 redundancy attribution, and stable conflict diagnostics are headless derived authority.
 
+Block 115 maps all driving dimensions onto these existing families. Arc length uses an iterative
+Block-115 equivalent-radius calibration followed by final measured-value validation rather than a
+parallel Qt or Geometry solver.
+
 Canonical contract: `docs/sketch-planar-constraint-solver-mvp8.md`.
 
 Focused tags: `[core][sketch-solver]`, `[core][sketch-dof]`,
@@ -112,6 +118,10 @@ Semantic endpoint, midpoint, center, radius, arc, spline-control, and dimension-
 to persistent topology roles. Pointer samples coalesce into disposable solve candidates; release
 flushes the exact final position and commits one `Drag sketch handle` transaction. Cancel, lost
 capture, stale source, reference geometry, or failed solve restore the original document.
+
+Session-backed drag now composes accepted Block-114 constraints and Block-115 driving dimensions into
+the baseline. Release rechecks both catalogs and rejects any final topology that violates a driving
+measurement, including arc-length dimensions.
 
 Canonical contract: `docs/gui-sketch-solver-drag-mvp8.md`.
 
@@ -178,28 +188,49 @@ complete candidate Sketch. Redundant, conflicting, invalid-reference, and non-co
 preview-only and publish stable ids without source mutation.
 
 `SketchConstraintGlyphLayoutResolver` and the GUI controller publish deterministic accepted, preview,
-conflict, and redundancy glyphs as `GuiSketchHitKind::Glyph` annotations. Commit rechecks Part,
-topology, and catalog freshness and performs one `Add sketch constraint` Part transaction. Coordinated
-undo/redo restores both complete Sketch and sidecar catalog snapshots.
+conflict, and redundancy glyphs as `GuiSketchHitKind::Glyph` annotations. `GuiDocumentSession` owns
+constraint catalogs through Save/Open, dirty state, global history, and later drag solves.
 
 Canonical contract: `docs/gui-sketch-constraint-authoring-mvp8.md`.
 
 Focused tags: `[core][sketch-constraints]`, `[geometry][sketch-constraints]`,
 `[gui][sketch-constraints]`, `[integration][sketch-auto-constraint]`.
 
-## Block 115 — Dimensions and expressions — Next
+## Block 115 — Dimensions and expressions — Implemented
 
-Add horizontal, vertical, aligned, point-to-point, length, radius, diameter, angle, and arc-length
-dimensions plus driving/reference mode, in-canvas editing, and parameter/expression binding. Dimension
-values remain typed Core `Parameter`/`Quantity` intent rather than widget text.
+Block 115 adds horizontal, vertical, aligned, point-to-point, line-length, arc-radius, arc-diameter,
+angle, and calibrated arc-length dimensions over stable Block-108 point/entity targets.
 
-Focused tags: `[core][sketch-dimensions]`, `[gui][sketch-dimensions]`,
-`[integration][sketch-expression-edit]`.
+`SketchDimensionIntent` freezes stable id, family, ordered targets, `driving|reference` mode, and an
+optional typed `ParameterId`. Driving dimensions require an existing compatible Length/Angle parameter
+or expression and contribute to the combined Block-109 solve. Reference dimensions contribute no
+residual and measure current solved topology only.
 
-## Block 116 — Trim, extend, split, fillet, and chamfer
+`SketchDimensionCatalogSystemBuilder` composes historical constraints, Block-114 constraints, and all
+driving dimensions. Arc length uses iterative equivalent-radius calibration and final actual-length
+validation. Only under-/fully-constrained, measurement-valid, exactly materializable candidates publish.
+
+`GuiSketchDimensionController` provides semantic preview annotations, compatibility/parameter lists,
+atomic add/edit/rebind/mode transactions, exact undo/redo, and later-drag enforcement. Literal editing
+updates direct parameters; formula editing uses the existing expression graph. The Qt binder exposes all
+nine families plus reference creation and annotation editing without owning values or formulas.
+
+Canonical persistence is `blcad.sketch_dimensions.mvp8`, version 1, stored by `GuiDocumentSession` as
+`<part>.sketch-dimensions.json`. Dimension catalogs participate in dirty state, Save/Open, and every
+history snapshot; measured values and glyph layout remain derived.
+
+Canonical contract: `docs/gui-sketch-dimension-authoring-mvp8.md`.
+
+Focused tags: `[core][sketch-dimensions]`, `[geometry][sketch-dimensions]`,
+`[gui][sketch-dimensions]`, `[integration][sketch-expression-edit]`,
+`[integration][sketch-live-solve]`.
+
+## Block 116 — Trim, extend, split, fillet, and chamfer — Next
 
 Implement trim, extend, split, two-entity Sketch fillet, and Sketch chamfer over complete candidate
-topology. Ambiguous intersections or reference geometry never partially mutate the Sketch.
+topology. Every rewrite must remap or explicitly reject affected profiles, references, Block-114
+constraints, Block-115 dimensions, and spline continuity records. Ambiguous intersections or reference
+geometry never partially mutate the Sketch.
 
 Focused tags: `[core][sketch-modify]`, `[geometry][sketch-modify]`,
 `[gui][sketch-trim-extend]`.
@@ -245,7 +276,7 @@ drag, solve, and region-recognition performance.
 Focused tags: `[integration][interactive-sketcher]`, `[integration][sketch-gui-headless]`,
 `[performance][sketch-interaction]`.
 
-## Coverage matrix through Block 114
+## Coverage matrix through Block 115
 
 | Sketch capability | Canonical contract | Interactive owner |
 |---|---|---:|
@@ -253,14 +284,14 @@ Focused tags: `[integration][interactive-sketcher]`, `[integration][sketch-gui-h
 | Plane mapping, hit testing, snapping | `gui-sketch-plane-interaction-mvp8.md` | 107 |
 | Shared point/entity topology | `sketch-shared-topology-mvp8.md` | 108–121 |
 | Planar solver and DOF | `sketch-planar-constraint-solver-mvp8.md` | 109–121 |
-| Solver-backed handles and drag | `gui-sketch-solver-drag-mvp8.md` | 110 |
+| Solver-backed handles and drag | `gui-sketch-solver-drag-mvp8.md` | 110, 114–115 consumers |
 | Basic line/profile creation | `gui-sketch-basic-creation-mvp8.md` | 111 |
 | Circles, arcs, ellipses, slots | `gui-sketch-conic-slot-creation-mvp8.md` | 112 |
 | Spline editing and continuity | `gui-sketch-spline-text-mvp8.md` | 113 |
 | Parameter-backed Sketch text and font fallback | `gui-sketch-spline-text-mvp8.md` | 113 |
 | Constraint intent, inference, glyphs, conflict preview | `gui-sketch-constraint-authoring-mvp8.md` | 114 |
-| Dimensions and expressions | dimension/parameter contracts | 115 |
-| Trim/extend and corner modification | arc/trim contracts | 116 |
+| Dimensions, typed parameters, expressions, annotation editing | `gui-sketch-dimension-authoring-mvp8.md` | 115 |
+| Trim/extend and corner modification | future Block-116 contract | 116 |
 | Offset/project/reference recovery | projection/reference contracts | 117 |
 | Sketch transforms/patterns | pattern contracts | 118 |
 | Automatic regions and Finish Sketch | region/repair contracts | 119 |

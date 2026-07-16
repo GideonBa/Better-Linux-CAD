@@ -1,5 +1,6 @@
 #include "blcad/geometry/recompute_executor.hpp"
 #include "blcad/geometry/sketch_constraint_glyph.hpp"
+#include "blcad/geometry/sketch_dimension_glyph.hpp"
 #include "blcad/geometry/sketch_spline_geometry.hpp"
 #include "blcad/geometry/sketch_text_layout.hpp"
 
@@ -232,4 +233,58 @@ TEST_CASE("Block 114 semantic constraint glyphs use deterministic topology ancho
   CHECK(glyph.value().state == SketchConstraintGlyphState::Preview);
   REQUIRE(glyph.value().target_ids.size() == 1U);
   CHECK(glyph.value().target_ids.front() == "entity/line.a");
+}
+
+TEST_CASE("Block 115 dimension glyphs distinguish driving and reference values deterministically",
+          "[geometry][sketch-dimensions]") {
+  auto document = PartDocument::create(DocumentId("part.dimension_glyph"), "DimensionGlyph");
+  REQUIRE(document);
+  auto datum = DatumPlane::xy();
+  REQUIRE(datum);
+  REQUIRE(document.value().add_datum_plane(datum.value()));
+  auto sketch = Sketch::create(SketchId("sketch.dimension_glyph"), "DimensionGlyph",
+                               DatumPlaneId("datum.xy"));
+  REQUIRE(sketch);
+  add_line(sketch.value(), "line.a", {0.0, 0.0}, {20.0, 0.0});
+  REQUIRE(document.value().add_sketch(sketch.value()));
+  REQUIRE(document.value().add_parameter(
+      make_length_parameter("dimension.length", "dimension_length", 20.0)));
+  auto topology = SketchTopology::migrate_legacy(sketch.value());
+  REQUIRE(topology);
+  const auto* line = topology.value().find_entity("entity/line.a");
+  REQUIRE(line != nullptr);
+  auto entity = SketchConstraintIntentTarget::entity("entity/line.a");
+  auto first = SketchConstraintIntentTarget::point(line->points()[0]);
+  auto second = SketchConstraintIntentTarget::point(line->points()[1]);
+  REQUIRE(entity);
+  REQUIRE(first);
+  REQUIRE(second);
+  auto driving = SketchDimensionIntent::create(
+      SketchDimensionId("dimension.length"), SketchDimensionKind::Length,
+      SketchDimensionMode::Driving, {entity.value()}, ParameterId("dimension.length"));
+  auto reference = SketchDimensionIntent::create(
+      SketchDimensionId("dimension.reference"), SketchDimensionKind::PointToPointDistance,
+      SketchDimensionMode::Reference, {first.value(), second.value()});
+  REQUIRE(driving);
+  REQUIRE(reference);
+  auto driving_measurement = SketchDimensionMeasurementEvaluator::measure(
+      topology.value(), driving.value());
+  auto reference_measurement = SketchDimensionMeasurementEvaluator::measure(
+      topology.value(), reference.value());
+  REQUIRE(driving_measurement);
+  REQUIRE(reference_measurement);
+
+  auto driving_glyph = SketchDimensionGlyphLayoutResolver{}.resolve(
+      topology.value(), driving.value(), driving_measurement.value());
+  auto reference_glyph = SketchDimensionGlyphLayoutResolver{}.resolve(
+      topology.value(), reference.value(), reference_measurement.value());
+  REQUIRE(driving_glyph);
+  REQUIRE(reference_glyph);
+  CHECK(driving_glyph.value().semantic_id ==
+        "sketch/sketch.dimension_glyph/dimension/dimension.length");
+  CHECK(driving_glyph.value().token == "L");
+  CHECK(driving_glyph.value().value_text == "20.000 mm");
+  CHECK(reference_glyph.value().value_text == "(20.000 mm)");
+  CHECK(driving_glyph.value().anchor.x == Catch::Approx(10.88).margin(1.0e-9));
+  CHECK(driving_glyph.value().anchor.y == Catch::Approx(0.88).margin(1.0e-9));
 }
