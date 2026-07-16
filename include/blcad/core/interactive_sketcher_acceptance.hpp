@@ -17,10 +17,6 @@ enum class SketchAcceptanceEvidence : unsigned {
   NoStalePreview = 1U << 7U
 };
 
-constexpr unsigned operator|(SketchAcceptanceEvidence left, SketchAcceptanceEvidence right) noexcept {
-  return static_cast<unsigned>(left) | static_cast<unsigned>(right);
-}
-
 struct SketchToolCoverageRecord {
   std::string_view capability;
   std::string_view contract;
