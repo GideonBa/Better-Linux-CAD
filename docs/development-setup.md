@@ -93,10 +93,9 @@ For splash inspection:
 BLCAD_SPLASH_DURATION_MS=15000 ./build/dev-gui/blcad
 ```
 
-Accepted splash values are clamped to 250–60000 ms.
-
-On Linux the native OCCT viewport uses Qt xcb when `DISPLAY` is available and
-`QT_QPA_PLATFORM` is unset. Offscreen GUI tests use a logical viewport without X11/GLX.
+Accepted splash values are clamped to 250–60000 ms. On Linux the native OCCT viewport uses Qt xcb
+when `DISPLAY` is available and `QT_QPA_PLATFORM` is unset. Offscreen GUI tests use a logical viewport
+without X11/GLX.
 
 `BLCAD_BUILD_GUI=ON` with `BLCAD_BUILD_GEOMETRY=OFF` is unsupported. Core-only and
 Geometry-without-GUI configurations remain supported.
@@ -115,22 +114,21 @@ QT_QPA_PLATFORM=offscreen ctest --test-dir build/dev-gui -R '^gui\.' --output-on
 
 ## Interactive Sketcher focused proof
 
-Blocks 106–111 are implemented.
+Blocks 106–112 are implemented.
 
 Block 106 workspace and command lifecycle:
 
 ```bash
-./build/dev-gui/blcad_gui_tests "[gui][sketch-workspace]"
-./build/dev-gui/blcad_gui_tests "[gui][sketch-command-lifecycle]"
-./build/dev-gui/blcad_gui_tests "[gui][viewport][gui][navigation]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][sketch-workspace]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][sketch-command-lifecycle]"
 ```
 
 Block 107 plane interaction, hit testing, grid, snapping, inference, and box selection:
 
 ```bash
-./build/dev-gui/blcad_gui_tests "[gui][sketch-hit-test]"
-./build/dev-gui/blcad_gui_tests "[gui][sketch-snap]"
-./build/dev-gui/blcad_gui_tests "[gui][sketch-box-selection]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][sketch-hit-test]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][sketch-snap]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][sketch-box-selection]"
 ```
 
 Block 108 shared planar topology, edit commands, and JSON migration:
@@ -149,18 +147,9 @@ Block 109 deterministic planar solver, exact local DOF, and conflict diagnostics
 ./build/dev/blcad_core_tests "[core][sketch-conflict-diagnostics]"
 ```
 
-The Block-109 proof covers:
-
-- canonical lexicographic constraint ordering;
-- canonical non-reference `SketchPointId` variable ordering with X then Y;
-- under-constrained remaining DOF from final Jacobian rank;
-- fully constrained convergence and solved topology publication;
-- every initial Block-109 residual family;
-- deterministic canonical incremental redundancy attribution;
-- stable remove-one conflict attribution;
-- invalid-reference classification;
-- deterministic non-convergence classification;
-- adaptation of current persisted geometric constraints and parameter-backed dimensions.
+The Block-109 proof covers canonical variable/constraint ordering, every initial residual family,
+Jacobian-rank DOF, deterministic redundancy/conflict attribution, invalid-reference classification,
+non-convergence classification, and adaptation of current persisted constraints and dimensions.
 
 Block 110 solver-backed semantic-handle drag and live solve:
 
@@ -170,75 +159,48 @@ QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][sketch-
 ```
 
 The proof covers stable handle order and shared-junction deduplication, latest-pointer coalescing, exact
-release flush, source-document immutability during preview, cancel/refusal rollback, Arc center/radius
-solver targets, one `Drag sketch handle` session history entry, exact undo/redo, and an offscreen Qt
-Press/Move/Release path through the installed binder.
+release flush, immutable source documents during preview, cancel/refusal rollback, Arc center/radius
+solver targets, one session history entry, exact undo/redo, and the installed offscreen Qt binder.
 
-Block 111 basic creation tools and the end-to-end profile creation proof:
+Block 111 basic creation tools:
 
 ```bash
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][sketch-create-basic]"
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][sketch-basic-profile]"
 ```
 
-The proof covers every tool's deterministic expansion, degenerate fail-closed inputs,
-absolute/relative/polar numeric picks, polygon side-count entry, rubber-band and
-automatic-constraint previews, pick backout, one-transaction commits with exact undo/redo, and an
-offscreen Qt mouse path that creates a corner-rectangle profile through the installed binder.
-
-The current implementation handoff is Block 112. Its focused tags are:
-
-```text
-[core][sketch-conics]
-[geometry][sketch-conics]
-[gui][sketch-create-conics]
-```
-
-## Existing GUI validation tags
-
-Representative tags:
+Block 112 circles, arcs, ellipses, elliptical arcs, and slots:
 
 ```bash
-./build/dev-gui/blcad_gui_tests "[gui][application-shell]"
-./build/dev-gui/blcad_gui_tests "[gui][command-state]"
-./build/dev-gui/blcad_gui_tests "[gui][document-session]"
-./build/dev-gui/blcad_gui_tests "[gui][document-transaction]"
-./build/dev-gui/blcad_gui_tests "[gui][diagnostics]"
-./build/dev-gui/blcad_gui_tests "[gui][viewport]"
-./build/dev-gui/blcad_gui_tests "[gui][semantic-picking]"
-./build/dev-gui/blcad_gui_tests "[gui][model-browser]"
-./build/dev-gui/blcad_gui_tests "[gui][property-editor]"
-./build/dev-gui/blcad_gui_tests "[gui][selection-sync]"
-./build/dev-gui/blcad_gui_tests "[gui][datum-workplane]"
-./build/dev-gui/blcad_gui_tests "[gui][sketch-workbench]"
-./build/dev-gui/blcad_gui_tests "[gui][sketch-repair]"
-./build/dev-gui/blcad_gui_tests "[gui][parameters]"
-./build/dev-gui/blcad_gui_tests "[gui][part-foundation]"
-./build/dev-gui/blcad_gui_tests "[gui][extrude-revolve]"
-./build/dev-gui/blcad_gui_tests "[gui][part-pattern]"
-./build/dev-gui/blcad_gui_tests "[gui][part-finishing]"
-./build/dev-gui/blcad_gui_tests "[gui][body-operation]"
-./build/dev-gui/blcad_gui_tests "[gui][path-workbench]"
-./build/dev-gui/blcad_gui_tests "[gui][sweep-loft]"
-./build/dev-gui/blcad_gui_tests "[gui][surface-workbench]"
-./build/dev-gui/blcad_gui_tests "[gui][assembly-authoring]"
-./build/dev-gui/blcad_gui_tests "[gui][assembly-relationships]"
-./build/dev-gui/blcad_gui_tests "[gui][assembly-motion]"
-./build/dev-gui/blcad_gui_tests "[gui][analysis]"
-./build/dev-gui/blcad_gui_tests "[gui][step-export]"
-./build/dev-gui/blcad_gui_tests "[integration][gui-feature-coverage]"
-./build/dev-gui/blcad_gui_tests "[integration][gui-headless-equivalence]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[core][sketch-conics]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[geometry][sketch-conics]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][sketch-create-conics]"
+```
+
+The Block-112 proof covers exact CircleProfile/diameter-Parameter persistence, one atomic history entry,
+JSON roundtrip and undo/redo, degenerate three-point rejection, tangent inference previews,
+deterministic cubic ellipse spans, ordered line/arc slot profiles, and Qt action registration.
+
+## Representative GUI validation tags
+
+```bash
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][application-shell]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][command-state]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][document-session]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][viewport]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][model-browser]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][property-editor]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][selection-sync]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][sketch-workbench]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][part-foundation]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][surface-workbench]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][assembly-authoring]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][analysis]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][step-export]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][gui-feature-coverage]"
 ```
 
 The exact source/test registration in `CMakeLists.txt` is authoritative.
-
-Block 109 registers:
-
-```text
-src/core/sketch_constraint_solver.cpp
-src/core/sketch_solver_legacy_adapter.cpp
-tests/core/sketch_constraint_solver_tests.cpp
-```
 
 ## Core and Geometry focused examples
 
@@ -252,7 +214,6 @@ Core model/persistence:
 ./build/dev/blcad_core_tests "[core][path-curve]"
 ./build/dev/blcad_core_tests "[core][loft-feature]"
 ./build/dev/blcad_core_tests "[core][surface-feature]"
-./build/dev/blcad_core_tests "[integration][part-construction-mvp]"
 ```
 
 Geometry execution:
@@ -267,37 +228,23 @@ Geometry execution:
 ./build/dev-geometry/blcad_geometry_tests "[geometry][guided-loft]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][surface-boundary-fill]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][surface-stitch]"
-./build/dev-geometry/blcad_geometry_tests "[geometry][multi-body-step-export]"
-./build/dev-geometry/blcad_geometry_tests "[integration][part-construction-mvp]"
 ```
 
 Assembly target/solve/motion/exchange:
 
 ```bash
 ./build/dev/blcad_core_tests "[core][semantic-generated-topology-reference]"
-./build/dev/blcad_core_tests "[core][semantic-generated-topology-recovery]"
 ./build/dev/blcad_core_tests "[core][assembly-cross-hierarchy-graph]"
-./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-geometric-target-taxonomy]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-target-compatibility]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-cross-hierarchy-solver]"
-./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-cross-hierarchy-application]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-cross-hierarchy-motion]"
-./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-contact]"
-./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-revolute-sweep]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-structured-step-export]"
 ```
 
 ## Headless tools
 
-Core inspection:
-
 ```bash
 ./build/dev/blcad_inspect_project_components examples/component_instances.blcad.project.json
-```
-
-Part export:
-
-```bash
 ./build/dev-geometry/blcad_export_step examples/reference_plate.blcad.json build/reference_plate.step
 ./build/dev-geometry/blcad_export_step examples/bolt_circle_plate.blcad.json build/bolt_circle_plate.step
 ```
@@ -350,104 +297,38 @@ include/blcad/gui/gui_sketch_drag.hpp
 include/blcad/gui/gui_sketch_drag_binder.hpp
 ```
 
-Registered Block-110 implementation/proof:
+Blocks 111–112 public GUI creation boundary:
 
 ```text
-src/gui/gui_sketch_drag.cpp
-src/gui/gui_sketch_drag_binder.cpp
-tests/gui/gui_sketch_drag_tests.cpp
+include/blcad/gui/gui_sketch_create.hpp
+include/blcad/gui/gui_sketch_create_binder.hpp
 ```
 
-Block-110 public GUI boundaries:
+Registered implementation/proof:
 
 ```text
-include/blcad/gui/gui_sketch_drag.hpp
-include/blcad/gui/gui_sketch_drag_binder.hpp
-```
-
-Registered Block-110 implementation/proof:
-
-```text
-src/gui/gui_sketch_drag.cpp
-src/gui/gui_sketch_drag_binder.cpp
-tests/gui/gui_sketch_drag_tests.cpp
-```
-
-Block-110 public GUI boundaries:
-
-```text
-include/blcad/gui/gui_sketch_drag.hpp
-include/blcad/gui/gui_sketch_drag_binder.hpp
-```
-
-Registered Block-110 implementation/proof:
-
-```text
-src/gui/gui_sketch_drag.cpp
-src/gui/gui_sketch_drag_binder.cpp
-tests/gui/gui_sketch_drag_tests.cpp
-```
-
-Block-110 public GUI boundaries:
-
-```text
-include/blcad/gui/gui_sketch_drag.hpp
-include/blcad/gui/gui_sketch_drag_binder.hpp
-```
-
-Registered Block-110 implementation/proof:
-
-```text
-src/gui/gui_sketch_drag.cpp
-src/gui/gui_sketch_drag_binder.cpp
-tests/gui/gui_sketch_drag_tests.cpp
-```
-
-Block-110 public GUI boundaries:
-
-```text
-include/blcad/gui/gui_sketch_drag.hpp
-include/blcad/gui/gui_sketch_drag_binder.hpp
-```
-
-Registered Block-110 implementation/proof:
-
-```text
-src/gui/gui_sketch_drag.cpp
-src/gui/gui_sketch_drag_binder.cpp
-tests/gui/gui_sketch_drag_tests.cpp
+src/gui/gui_sketch_create.cpp
+src/gui/gui_sketch_create_binder.cpp
+tests/gui/gui_sketch_create_tests.cpp
 ```
 
 `SketchTopology`/`SketchPointId` are persistent Core topology identity. `SketchConstraintSystem` is a
-canonical solve request. `SketchSolveResult`, variable order, residual summary, Jacobian rank, remaining
-DOF, and solver diagnostics are derived.
-
-`GuiSketchInteractionScene`, sampled curves, screen positions, hit stacks, grid lines, and snap results
-remain transient.
+canonical solve request. `SketchSolveResult`, variables, residuals, Jacobian rank, DOF, and diagnostics
+are derived. Creation previews, sampled conic curves, snap results, tangent inference, numeric buffers,
+and pointer samples remain transient.
 
 ## Formatting
 
 Formatting is configured by `.editorconfig` and `.clang-format`.
 
-Format Blocks 108–109 Core changes with:
+Format the current Interactive Sketcher creation changes with:
 
 ```bash
 clang-format -i \
-  include/blcad/core/id.hpp \
-  include/blcad/core/sketch_topology.hpp \
-  include/blcad/core/sketch_edit_commands.hpp \
-  include/blcad/core/sketch_topology_json.hpp \
-  include/blcad/core/sketch_topology_part_document.hpp \
-  include/blcad/core/sketch_constraint_solver.hpp \
-  src/core/sketch_constraint_solver.cpp \
-  src/core/sketch_solver_legacy_adapter.cpp \
-  include/blcad/gui/gui_sketch_drag.hpp \
-  include/blcad/gui/gui_sketch_drag_binder.hpp \
-  src/gui/gui_sketch_drag.cpp \
-  src/gui/gui_sketch_drag_binder.cpp \
-  tests/core/sketch_tests.cpp \
-  tests/core/sketch_constraint_solver_tests.cpp \
-  tests/gui/gui_sketch_drag_tests.cpp
+  include/blcad/gui/gui_sketch_create.hpp \
+  src/gui/gui_sketch_create.cpp \
+  src/gui/gui_sketch_create_binder.cpp \
+  tests/gui/gui_sketch_create_tests.cpp
 ```
 
 When adding a block, register new translation units/tests in `CMakeLists.txt` and document exact scope
@@ -469,15 +350,15 @@ rm -rf build/
 - `docs/sketch-shared-topology-mvp8.md`: Block-108 topology/migration/edit/persistence contract
 - `docs/sketch-planar-constraint-solver-mvp8.md`: Block-109 solver/DOF/diagnostics contract
 - `docs/gui-sketch-solver-drag-mvp8.md`: Block-110 semantic handles/live solve/atomic drag contract
-- `docs/gui-sketch-basic-creation-mvp8.md`: Block-111 multi-click creation tools contract
-- `docs/gui-sketch-solver-drag-mvp8.md`: Block-110 semantic handles/live solve/atomic drag contract
-- `docs/gui-sketch-solver-drag-mvp8.md`: Block-110 semantic handles/live solve/atomic drag contract
+- `docs/gui-sketch-basic-creation-mvp8.md`: Block-111 multi-click creation contract
+- `docs/gui-sketch-conic-slot-creation-mvp8.md`: Block-112 conic/slot creation contract
 
 ## Current development boundary
 
-Blocks 106–111 are implemented. Block 112 is next.
+Blocks 106–112 are implemented. Block 113 is next.
 
-Block 112 adds persistent Core/Geometry intent and creation/editing for circles, arcs,
-ellipses/elliptical arcs, and slots with center/radius/endpoint/quadrant handles. It reuses the
-Block-111 creation lifecycle, Block-107 snap/inference, Block-108 topology identity, and Block-109
-solver authority; full circles become real curve entities.
+Block 113 adds fit/control-point spline editing, insertion/removal, control polygon and continuity
+handles, supported deterministic representation conversion, and parameter/expression-backed Sketch
+text. It must reuse the Block-108 topology, Block-109 solver, Block-110 drag transaction, and
+Blocks-111/112 creation authorities rather than introducing a second curve, solver, font, or history
+model.
