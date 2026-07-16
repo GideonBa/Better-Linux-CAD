@@ -48,6 +48,7 @@ TEST_CASE("Block 114 redundant candidates remain preview-only and accepted catal
       document.value(), catalog.value(), redundant.value());
   REQUIRE(controller);
   CHECK_FALSE(controller.value().preview().authoring.accepted);
+  CHECK(controller.value().preview().authoring.catalog_after == catalog.value());
   CHECK(controller.value().preview().authoring.solve.status ==
         SketchSolveStatus::Redundant);
   CHECK(controller.value().preview().glyph.state ==
