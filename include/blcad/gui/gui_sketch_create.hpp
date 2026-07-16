@@ -21,6 +21,18 @@ enum class GuiSketchCreateTool {
   Parallelogram,
   RegularPolygon,
   Centerline,
+  CenterRadiusCircle,
+  CenterDiameterCircle,
+  TwoPointCircle,
+  ThreePointCircle,
+  TangentCircle,
+  CenterStartEndArc,
+  ThreePointArc,
+  TangentArc,
+  Ellipse,
+  EllipticalArc,
+  CenterSlot,
+  OverallSlot,
 };
 
 [[nodiscard]] std::string_view to_string(GuiSketchCreateTool tool) noexcept;
@@ -54,16 +66,24 @@ struct GuiSketchCreatePreview {
 
 struct GuiSketchCreateExpansion {
   std::vector<LineSegment> lines;
+  std::vector<ArcSegment> arcs;
+  std::vector<SplineSegment> splines;
   std::optional<ClosedProfile> profile;
+  std::optional<ArcClosedProfile> curve_profile;
+  std::optional<CircleProfile> circle_profile;
+  std::optional<Parameter> parameter;
   std::optional<ConstructionPoint> construction_point;
   std::optional<ConstructionLine> construction_line;
   std::string label;
 };
 
-// Headless multi-click creation authority for Block 111. Picks are snapped
-// plane coordinates supplied by the Block-107 interaction layer; expansion
-// produces ordinary persistent Sketch/construction intent and commit publishes
-// exactly one document transaction per completed tool.
+// Headless multi-click creation authority for Blocks 111-112. Picks are
+// snapped plane coordinates supplied by the Block-107 interaction layer.
+// Block 112 deliberately expands conics and slots into the existing persistent
+// Core authorities: CircleProfile + diameter Parameter for exact full circles,
+// ArcSegment for circular arcs, cubic SplineSegment chains for ellipses and
+// elliptical arcs, and line/arc ArcClosedProfile contours for slots. Commit
+// publishes exactly one document transaction per completed tool.
 class GuiSketchCreateController {
 public:
   [[nodiscard]] static Result<GuiSketchCreateController>
@@ -103,6 +123,8 @@ private:
                             GuiSketchCreateOptions options);
 
   [[nodiscard]] Result<std::vector<Point2>> corner_ring(std::optional<Point2> hover) const;
+  [[nodiscard]] Result<std::vector<Point2>> conic_preview(std::optional<Point2> hover,
+                                                          bool& closed) const;
 
   GuiSketchCreateTool tool_;
   SketchId sketch_;
