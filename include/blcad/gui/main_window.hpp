@@ -5,7 +5,7 @@
 #include "blcad/gui/gui_analysis_export_workbench.hpp"
 #include "blcad/gui/gui_document_browser.hpp"
 #include "blcad/gui/gui_document_session.hpp"
-#include "blcad/gui/gui_modeling_workspace.hpp"
+#include "blcad/gui/gui_modeling_workspace_binder.hpp"
 #include "blcad/gui/gui_part_foundation_workbench.hpp"
 #include "blcad/gui/gui_part_operations_workbench.hpp"
 #include "blcad/gui/gui_sketch_workbench.hpp"
@@ -40,8 +40,14 @@ public:
   [[nodiscard]] GuiSketchWorkbench& sketch_workbench() noexcept;
   [[nodiscard]] GuiSketchWorkspace& sketch_workspace() noexcept;
   [[nodiscard]] const GuiSketchWorkspace& sketch_workspace() const noexcept;
-  [[nodiscard]] GuiModelingWorkspace& modeling_workspace() noexcept { return modeling_workspace_; }
+  [[nodiscard]] GuiModelingWorkspace& modeling_workspace() noexcept {
+    modeling_workspace_shell_.ensure_installed();
+    modeling_workspace_shell_.refresh();
+    return modeling_workspace_;
+  }
   [[nodiscard]] const GuiModelingWorkspace& modeling_workspace() const noexcept {
+    modeling_workspace_shell_.ensure_installed();
+    modeling_workspace_shell_.refresh();
     return modeling_workspace_;
   }
   [[nodiscard]] GuiPartFoundationWorkbench& part_foundation_workbench() noexcept;
@@ -77,6 +83,23 @@ private:
   void create_sketch_on_selection();
   void edit_selected_sketch();
   void finish_sketch();
+  void finish_sketch_with_modeling_handoff() {
+    const auto sketch = active_sketch_;
+    std::optional<ProfileId> profile;
+    if (sketch.has_value() && session_.part_document() != nullptr) {
+      const auto inspection = sketch_workbench_.inspect(session_, *sketch);
+      const Sketch* source = session_.part_document()->find_sketch(*sketch);
+      if (!inspection.has_error() && source != nullptr &&
+          inspection.value().detected_region.has_value() &&
+          GuiModelingWorkspace::has_materialized_profile(
+              *source, *inspection.value().detected_region))
+        profile = inspection.value().detected_region;
+    }
+
+    finish_sketch();
+    if (sketch.has_value() && profile.has_value() && !active_sketch_.has_value())
+      (void)modeling_workspace_.finish_sketch_handoff(session_, *sketch, *profile);
+  }
   void add_numeric_sketch_line();
   void commit_numeric_sketch_line();
   void repeat_last_sketch_command();
@@ -100,6 +123,10 @@ private:
   GuiSpatialSurfaceWorkbench spatial_surface_workbench_;
   GuiAssemblyWorkbench assembly_workbench_;
   GuiAnalysisExportWorkbench analysis_export_workbench_;
+  mutable GuiModelingWorkspaceShellBinder modeling_workspace_shell_{
+      this, &session_, &modeling_workspace_,
+      [this] { finish_sketch_with_modeling_handoff(); },
+      [this] { refresh_command_state(); }};
   std::optional<SketchId> active_sketch_;
   std::optional<GuiViewportCameraBookmark> sketch_camera_bookmark_;
   std::uint32_t sketch_selection_filter_mask_{0xFFFFFFFFU};
