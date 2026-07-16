@@ -55,6 +55,19 @@ public:
         {std::move(preview.value()), std::move(glyph.value()), std::move(annotation)}));
   }
 
+  [[nodiscard]] static Result<GuiSketchConstraintController>
+  create(const GuiDocumentSession& session, SketchId sketch,
+         SketchConstraintIntent candidate) {
+    if (session.part_document() == nullptr)
+      return Result<GuiSketchConstraintController>::failure(Error::validation(
+          sketch.value(), "constraint controller requires an active Part session"));
+    auto catalog = session.sketch_constraint_catalog(sketch);
+    if (catalog.has_error())
+      return Result<GuiSketchConstraintController>::failure(catalog.error());
+    return create(*session.part_document(), std::move(catalog.value()),
+                  std::move(candidate));
+  }
+
   [[nodiscard]] const GuiSketchConstraintPreview& preview() const noexcept { return preview_; }
   [[nodiscard]] const SketchConstraintCatalog& catalog_before() const noexcept {
     return catalog_before_;
@@ -86,8 +99,18 @@ public:
         std::move(annotations));
   }
 
-  [[nodiscard]] Result<std::size_t>
-  commit(GuiDocumentSession& session, SketchConstraintCatalog& catalog) {
+  [[nodiscard]] static Result<std::vector<GuiSketchAnnotationPrimitive>>
+  accepted_annotations(const GuiDocumentSession& session, SketchId sketch) {
+    if (session.part_document() == nullptr)
+      return Result<std::vector<GuiSketchAnnotationPrimitive>>::failure(Error::validation(
+          sketch.value(), "constraint annotations require an active Part session"));
+    auto catalog = session.sketch_constraint_catalog(sketch);
+    if (catalog.has_error())
+      return Result<std::vector<GuiSketchAnnotationPrimitive>>::failure(catalog.error());
+    return accepted_annotations(*session.part_document(), catalog.value());
+  }
+
+  [[nodiscard]] Result<std::size_t> commit(GuiDocumentSession& session) {
     if (!preview_.authoring.accepted || !preview_.authoring.solved_sketch.has_value())
       return Result<std::size_t>::failure(Error::validation(
           preview_.authoring.candidate.id().value(),
@@ -95,67 +118,98 @@ public:
     if (committed_)
       return Result<std::size_t>::failure(Error::validation(
           preview_.authoring.candidate.id().value(), "constraint preview already committed"));
-    if (catalog != catalog_before_)
-      return Result<std::size_t>::failure(Error::dependency(
-          catalog.sketch().value(), "constraint catalog changed after preview"));
-    const PartDocument* document = session.part_document();
-    if (document == nullptr || document->id() != document_)
+    if (session.part_document() == nullptr || session.part_document()->id() != document_)
       return Result<std::size_t>::failure(Error::validation(
           document_.value(), "constraint commit requires the original active Part"));
-    const Sketch* current = document->find_sketch(catalog.sketch());
+
+    auto current_catalog = session.sketch_constraint_catalog(catalog_before_.sketch());
+    if (current_catalog.has_error())
+      return Result<std::size_t>::failure(current_catalog.error());
+    if (current_catalog.value() != catalog_before_)
+      return Result<std::size_t>::failure(Error::dependency(
+          catalog_before_.sketch().value(), "constraint catalog changed after preview"));
+    const Sketch* current = session.part_document()->find_sketch(catalog_before_.sketch());
     if (current == nullptr)
-      return Result<std::size_t>::failure(
-          Error::validation(catalog.sketch().value(), "constraint target Sketch no longer exists"));
+      return Result<std::size_t>::failure(Error::validation(
+          catalog_before_.sketch().value(), "constraint target Sketch no longer exists"));
     auto current_topology = SketchTopology::migrate_legacy(*current);
     if (current_topology.has_error())
       return Result<std::size_t>::failure(current_topology.error());
     if (current_topology.value() != source_topology_)
       return Result<std::size_t>::failure(Error::dependency(
-          catalog.sketch().value(), "constraint source topology changed after preview"));
+          catalog_before_.sketch().value(), "constraint source topology changed after preview"));
 
     const Sketch solved = *preview_.authoring.solved_sketch;
-    const SketchId sketch_id = solved.id();
-    auto committed = session.commit_part_transaction(
+    const SketchConstraintCatalog before = catalog_before_;
+    const SketchConstraintCatalog after = preview_.authoring.catalog_after;
+    auto committed = session.commit_part_constraint_transaction(
         "Add sketch constraint",
-        [sketch_id, solved](PartDocument& part) -> Result<std::size_t> {
-          if (part.find_sketch(sketch_id) == nullptr)
-            return Result<std::size_t>::failure(
-                Error::validation(sketch_id.value(), "constraint target Sketch no longer exists"));
-          return part.update_sketch(solved);
+        [solved, before, after](PartDocument& part,
+                                std::vector<SketchConstraintCatalog>& catalogs)
+            -> Result<std::size_t> {
+          const Sketch* current_sketch = part.find_sketch(before.sketch());
+          if (current_sketch == nullptr)
+            return Result<std::size_t>::failure(Error::validation(
+                before.sketch().value(), "constraint target Sketch no longer exists"));
+          auto found = std::find_if(catalogs.begin(), catalogs.end(),
+                                    [&before](const auto& catalog) {
+                                      return catalog.sketch() == before.sketch();
+                                    });
+          SketchConstraintCatalog current_catalog = before;
+          if (found != catalogs.end()) current_catalog = *found;
+          if (current_catalog != before)
+            return Result<std::size_t>::failure(Error::dependency(
+                before.sketch().value(), "constraint catalog changed during transaction"));
+          auto updated = part.update_sketch(solved);
+          if (updated.has_error()) return updated;
+          if (found == catalogs.end())
+            catalogs.push_back(after);
+          else
+            *found = after;
+          return updated;
         });
     if (committed.has_error()) return committed;
-    catalog = preview_.authoring.catalog_after;
     committed_ = true;
     undone_ = false;
     return committed;
   }
 
-  [[nodiscard]] Result<std::size_t>
-  undo(GuiDocumentSession& session, SketchConstraintCatalog& catalog) {
-    if (!committed_ || undone_ || catalog != preview_.authoring.catalog_after ||
-        session.undo_label() != "Add sketch constraint")
+  [[nodiscard]] Result<std::size_t> undo(GuiDocumentSession& session) {
+    if (!committed_ || undone_ || session.undo_label() != "Add sketch constraint")
       return Result<std::size_t>::failure(Error::validation(
           preview_.authoring.candidate.id().value(),
-          "constraint undo bridge is not aligned with the document history"));
-    auto undone = session.undo();
-    if (undone.has_error()) return undone;
-    catalog = catalog_before_;
+          "constraint undo is not aligned with the document history"));
+    auto current = session.sketch_constraint_catalog(catalog_before_.sketch());
+    if (current.has_error() || current.value() != preview_.authoring.catalog_after)
+      return Result<std::size_t>::failure(Error::dependency(
+          catalog_before_.sketch().value(), "constraint catalog is not at the committed snapshot"));
+    auto result = session.undo();
+    if (result.has_error()) return result;
+    auto restored = session.sketch_constraint_catalog(catalog_before_.sketch());
+    if (restored.has_error() || restored.value() != catalog_before_)
+      return Result<std::size_t>::failure(Error::internal(
+          catalog_before_.sketch().value(), "constraint undo did not restore the catalog snapshot"));
     undone_ = true;
-    return undone;
+    return result;
   }
 
-  [[nodiscard]] Result<std::size_t>
-  redo(GuiDocumentSession& session, SketchConstraintCatalog& catalog) {
-    if (!committed_ || !undone_ || catalog != catalog_before_ ||
-        session.redo_label() != "Add sketch constraint")
+  [[nodiscard]] Result<std::size_t> redo(GuiDocumentSession& session) {
+    if (!committed_ || !undone_ || session.redo_label() != "Add sketch constraint")
       return Result<std::size_t>::failure(Error::validation(
           preview_.authoring.candidate.id().value(),
-          "constraint redo bridge is not aligned with the document history"));
-    auto redone = session.redo();
-    if (redone.has_error()) return redone;
-    catalog = preview_.authoring.catalog_after;
+          "constraint redo is not aligned with the document history"));
+    auto current = session.sketch_constraint_catalog(catalog_before_.sketch());
+    if (current.has_error() || current.value() != catalog_before_)
+      return Result<std::size_t>::failure(Error::dependency(
+          catalog_before_.sketch().value(), "constraint catalog is not at the pre-commit snapshot"));
+    auto result = session.redo();
+    if (result.has_error()) return result;
+    auto restored = session.sketch_constraint_catalog(catalog_before_.sketch());
+    if (restored.has_error() || restored.value() != preview_.authoring.catalog_after)
+      return Result<std::size_t>::failure(Error::internal(
+          catalog_before_.sketch().value(), "constraint redo did not restore the catalog snapshot"));
     undone_ = false;
-    return redone;
+    return result;
   }
 
   [[nodiscard]] static std::vector<SketchSolverConstraintKind>
@@ -232,8 +286,7 @@ public:
       }
       if (measurable(targets[0]) && measurable(targets[1]))
         result.push_back(SketchSolverConstraintKind::Equal);
-      if (curve(targets[0]) && curve(targets[1]) &&
-          shares_point(targets[0], targets[1]))
+      if (curve(targets[0]) && curve(targets[1]) && shares_point(targets[0], targets[1]))
         result.push_back(SketchSolverConstraintKind::Tangent);
       if (centered(targets[0]) && centered(targets[1]))
         result.push_back(SketchSolverConstraintKind::Concentric);
