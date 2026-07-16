@@ -292,3 +292,44 @@ TEST_CASE("Block 114 conflict glyph refuses session commit without document or c
             ->find_sketch(SketchId("sketch.constraints"))
             ->find_line_segment(SketchEntityId("line.a"))->end() == before);
 }
+
+TEST_CASE("Block 114 accepted constraints can be removed atomically with exact undo redo",
+          "[gui][sketch-constraints]") {
+  GuiDocumentSession session;
+  GuiSketchWorkbench workbench;
+  seed_constraint_sketch(session, workbench, "part.gui_constraint_remove", {10.0, 3.0});
+  auto controller = GuiSketchConstraintController::create(
+      session, SketchId("sketch.constraints"),
+      automatic_horizontal_constraint("constraint.auto.removable"));
+  REQUIRE(controller);
+  REQUIRE(controller.value().commit(session));
+  REQUIRE(session.sketch_constraint_catalog(SketchId("sketch.constraints"))
+              .value().constraints().size() == 1U);
+
+  SECTION("removal deletes the catalog record as one history entry") {
+    REQUIRE(GuiSketchConstraintController::remove_accepted(
+        session, SketchId("sketch.constraints"),
+        SketchConstraintId("constraint.auto.removable")));
+    CHECK(session.undo_label() == "Remove sketch constraint");
+    CHECK(session.sketch_constraint_catalog(SketchId("sketch.constraints"))
+              .value().constraints().empty());
+
+    REQUIRE(session.undo());
+    CHECK(session.sketch_constraint_catalog(SketchId("sketch.constraints"))
+              .value().constraints().size() == 1U);
+    REQUIRE(session.redo());
+    CHECK(session.sketch_constraint_catalog(SketchId("sketch.constraints"))
+              .value().constraints().empty());
+  }
+
+  SECTION("removal rejects unknown and already-removed constraint ids") {
+    CHECK_FALSE(GuiSketchConstraintController::remove_accepted(
+        session, SketchId("sketch.constraints"), SketchConstraintId("constraint.missing")));
+    REQUIRE(GuiSketchConstraintController::remove_accepted(
+        session, SketchId("sketch.constraints"),
+        SketchConstraintId("constraint.auto.removable")));
+    CHECK_FALSE(GuiSketchConstraintController::remove_accepted(
+        session, SketchId("sketch.constraints"),
+        SketchConstraintId("constraint.auto.removable")));
+  }
+}

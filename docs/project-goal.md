@@ -61,7 +61,12 @@ progress with Blocks 106–110 implemented:
 Block 111 basic creation — point, line, polyline, rectangle families, parallelogram, regular
 polygon, centerline, and construction geometry with rubber-band previews, numeric entry, and one
 transaction per completed tool — is implemented (`docs/gui-sketch-basic-creation-mvp8.md`).
-Block 112 is the current next technical step and adds circle, arc, ellipse, and slot creation.
+Blocks 112–115 are implemented: circle/arc/ellipse/slot creation
+(`docs/gui-sketch-conic-slot-creation-mvp8.md`), spline editing plus parameter-backed Sketch text
+(`docs/gui-sketch-spline-text-mvp8.md`), constraint authoring with glyphs and conflict preview
+(`docs/gui-sketch-constraint-authoring-mvp8.md`), and driving/reference dimensions with
+parameter/expression binding (`docs/gui-sketch-dimension-authoring-mvp8.md`). Block 116 is the
+current next technical step and adds trim, extend, split, Sketch fillet, and Sketch chamfer.
 
 Development rule:
 

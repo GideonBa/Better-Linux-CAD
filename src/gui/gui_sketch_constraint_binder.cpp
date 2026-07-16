@@ -158,6 +158,40 @@ void append_diagnostic(MainWindow& window, std::string message) {
                             .arg(QString::fromStdString(std::move(message))));
 }
 
+// Resolves exactly one selected accepted-catalog constraint id from the
+// current semantic selection ("sketch/<sketch>/constraint/<id>" glyphs).
+[[nodiscard]] std::optional<SketchConstraintId>
+selected_accepted_constraint(const MainWindow& window) {
+  if (!window.active_sketch() || window.session().part_document() == nullptr)
+    return std::nullopt;
+  const std::string prefix =
+      "sketch/" + window.active_sketch()->value() + "/constraint/";
+  std::optional<SketchConstraintId> selected;
+  for (const auto& selection : window.session().selection().entries()) {
+    if (!std::string_view(selection.semantic_id).starts_with(prefix)) continue;
+    if (selected.has_value()) return std::nullopt;
+    selected = SketchConstraintId(selection.semantic_id.substr(prefix.size()));
+  }
+  if (!selected.has_value()) return std::nullopt;
+  auto catalog = window.session().sketch_constraint_catalog(*window.active_sketch());
+  if (catalog.has_error() || catalog.value().find(*selected) == nullptr) return std::nullopt;
+  return selected;
+}
+
+Result<std::size_t> execute_constraint_removal(MainWindow& window) {
+  const auto selected = selected_accepted_constraint(window);
+  if (!selected)
+    return Result<std::size_t>::failure(Error::validation(
+        "sketch_constraint_gui",
+        "removal requires exactly one selected accepted constraint glyph"));
+  const SketchId sketch = *window.active_sketch();
+  auto removed = GuiSketchConstraintController::remove_accepted(window.session(), sketch, *selected);
+  if (removed.has_error()) return removed;
+  window.session().selection().clear();
+  window.render_sketch(sketch);
+  return removed;
+}
+
 Result<std::size_t> execute_constraint(MainWindow& window,
                                        SketchSolverConstraintKind kind) {
   auto topology = active_topology(window);
@@ -238,6 +272,39 @@ public:
       if (menu != nullptr) menu->addAction(action);
       actions_.push_back(action);
     }
+
+    GuiCommandSpec delete_spec;
+    delete_spec.id = "sketch.constraint.delete";
+    delete_spec.label = "Delete constraint";
+    delete_spec.description = "Remove the selected accepted sketch constraint";
+    delete_spec.workspace = GuiWorkspace::Sketch;
+    delete_spec.allowed_documents = {GuiDocumentKind::Part};
+    delete_spec.requires_idle_task = true;
+    delete_spec.minimum_selection_count = 1U;
+    delete_spec.required_selection_mask = selection_kind_bit(GuiSelectionKind::SketchEntity);
+    delete_spec.enabled_when = [this](const GuiCommandContext& context) {
+      return context.workspace == GuiWorkspace::Sketch && window_.active_sketch().has_value();
+    };
+    auto delete_added = window_.command_registry().add(std::move(delete_spec), [this]() {
+      auto result = execute_constraint_removal(window_);
+      if (result.has_error()) append_diagnostic(window_, result.error().message());
+      window_.refresh_command_state();
+      return result;
+    });
+    if (!delete_added.has_error()) {
+      delete_action_ = new QAction(QStringLiteral("Delete constraint"), &window_);
+      delete_action_->setObjectName(QStringLiteral("blcad.action.sketch_constraint.delete"));
+      delete_action_->setToolTip(
+          QStringLiteral("Remove the selected accepted sketch constraint"));
+      connect(delete_action_, &QAction::triggered, this, [this] {
+        auto executed = window_.command_registry().execute("sketch.constraint.delete",
+                                                           window_.command_context());
+        if (executed.has_error()) append_diagnostic(window_, executed.error().message());
+        window_.refresh_command_state();
+      });
+      if (menu != nullptr) menu->addAction(delete_action_);
+    }
+
     if (auto* viewport = window_.findChild<OcctViewport*>(QStringLiteral("blcad.occt_viewport")))
       viewport->installEventFilter(this);
     refresh();
@@ -260,6 +327,9 @@ public:
           action->property("blcad.constraint_kind").toInt());
       action->setEnabled(std::find(compatible.begin(), compatible.end(), kind) != compatible.end());
     }
+    if (delete_action_ != nullptr)
+      delete_action_->setEnabled(selected_accepted_constraint(window_).has_value() &&
+                                 !window_.session().task().active());
   }
 
 protected:
@@ -274,6 +344,7 @@ protected:
 private:
   MainWindow& window_;
   std::vector<QAction*> actions_;
+  QAction* delete_action_{nullptr};
 };
 
 } // namespace

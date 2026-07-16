@@ -102,7 +102,7 @@ inline std::optional<std::string> resolve_entity(const SketchTopology& topology,
 inline std::optional<SketchPointId> resolve_point_role(
     const SketchTopology& topology, const SketchTopologyEntity& entity,
     std::string_view candidate) {
-  const SketchPointId direct(std::string(candidate));
+  const SketchPointId direct{std::string(candidate)};
   if (topology.find_point(direct) != nullptr) return direct;
   const auto separator = candidate.rfind(':');
   if (separator == std::string_view::npos) return std::nullopt;

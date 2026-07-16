@@ -188,8 +188,9 @@ complete candidate Sketch. Redundant, conflicting, invalid-reference, and non-co
 preview-only and publish stable ids without source mutation.
 
 `SketchConstraintGlyphLayoutResolver` and the GUI controller publish deterministic accepted, preview,
-conflict, and redundancy glyphs as `GuiSketchHitKind::Glyph` annotations. `GuiDocumentSession` owns
-constraint catalogs through Save/Open, dirty state, global history, and later drag solves.
+conflict, and redundancy glyphs as `GuiSketchHitKind::Glyph` annotations. Selecting one accepted
+glyph enables atomic `Remove sketch constraint` deletion. `GuiDocumentSession` owns constraint
+catalogs through Save/Open, dirty state, global history, and later drag solves.
 
 Canonical contract: `docs/gui-sketch-constraint-authoring-mvp8.md`.
 
@@ -296,6 +297,35 @@ Focused tags: `[integration][interactive-sketcher]`, `[integration][sketch-gui-h
 | Sketch transforms/patterns | pattern contracts | 118 |
 | Automatic regions and Finish Sketch | region/repair contracts | 119 |
 | Sketch3D interaction | Sketch3D contracts | 120 |
+
+## Explicit deferrals
+
+Deliberately outside Blocks 106–121; none of these may be introduced implicitly by a later block:
+
+- automatic tracing from raster images, unconstrained freehand drawing, and handwriting recognition;
+- proprietary Inventor command names, icons, shortcuts, or exact layout cloning;
+- a full variational 3D Sketch constraint solver;
+- collaboration cursors, multi-user concurrent editing, and manufacturing-specific annotations.
+
+Scope narrowed against the original per-block planning; each item needs its own explicit later
+boundary instead of silent inclusion:
+
+- a curved/three-point **arc slot** family (Block 112 implements the two straight slot families);
+- an analytic persistent **ellipse entity** — ellipses persist as deterministic cubic
+  `SplineSegment` spans per `docs/gui-sketch-conic-slot-creation-mvp8.md`;
+- geometrically solved tangent circle/arc **construction**; tangency is authored as an explicit
+  accepted Block-114 constraint, never inferred from coordinates;
+- spline **open/closed-state toggling** and explicit **self-intersection diagnostics** (Block 113
+  edits open chains; degenerate/stale candidates fail closed);
+- Sketch text **alignment, multiline layout, letter spacing, and baseline/path placement**, and
+  conversion of glyph outlines into **closed selectable profile loops** — Block 113 text uses one
+  anchor, height/rotation parameters, and stroke-vector layout;
+- constraint **suppression** (no Core suppression intent exists for planar constraints) —
+  Block 114 offers add, inspect, locate, and delete;
+- dimension **extension lines, arrows, text-collision avoidance, and draggable annotation
+  positions**; Block 115 publishes one semantic anchor annotation per dimension;
+- dimensions targeting full **CircleProfile** records; radius/diameter/arc-length target
+  three-point arcs until shared topology covers circle-profile entities.
 
 After Block 121, Interactive Part & Assembly Modeling MVP-9 begins at Block 122. STEP Import MVP-10
 follows in Blocks 132–138.

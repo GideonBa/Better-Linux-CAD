@@ -194,6 +194,17 @@ mutation, validation, recompute, or stale check publishes neither half.
 Generic Part transactions preserve and validate the current catalog collection. Deleting or replacing a
 Sketch that still owns a catalog fails before publication.
 
+## Constraint removal
+
+`GuiSketchConstraintController::remove_accepted(session, sketch, id)` deletes one accepted
+session-owned catalog constraint as its own atomic `Remove sketch constraint` history entry. The
+transaction re-verifies the target Sketch and rejects a catalog that changed since the caller read
+it; Sketch geometry is left exactly as solved. The Qt binder exposes
+`blcad.action.sketch_constraint.delete`, enabled when exactly one accepted constraint glyph
+(`sketch/<SketchId>/constraint/<id>`) is selected. Historical embedded Sketch constraint records
+remain Block-99 Sketch-edit intent and are not deletable through this command. Constraint
+suppression has no Core intent and remains an explicit deferral.
+
 ## Session history, dirty state, save, and open
 
 `GuiDocumentSession::HistoryEntry` stores:
@@ -309,7 +320,8 @@ QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][sketch-
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][sketch-live-solve]"
 ```
 
-The proof covers topological target validation, document-level sidecar roundtrip through
+The proof covers accepted-constraint removal with exact undo/redo and unknown-id rejection,
+topological target validation, document-level sidecar roundtrip through
 `GuiDocumentSession`, manual/automatic provenance, complete family compatibility, shared-topology
 Tangent gating, stable solver/conflict/redundancy ids, source immutability, deterministic glyph anchors,
 glyph hit primitives, accepted atomic commit, refused conflict/redundancy commit, global exact undo/

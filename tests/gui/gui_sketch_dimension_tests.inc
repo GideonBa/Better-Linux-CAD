@@ -205,17 +205,19 @@ TEST_CASE("Block 115 reference dimension measures without changing Sketch geomet
       {point(line->points()[0]), point(line->points()[1])});
   REQUIRE(reference);
   const Point2 before = sketch->find_line_segment(SketchEntityId("line.a"))->end();
+  const SketchId sketch_id = sketch->id();
   auto controller = GuiSketchDimensionController::create(
-      session, sketch->id(), reference.value());
+      session, sketch_id, reference.value());
   REQUIRE(controller);
   CHECK(controller.value().preview().authoring.accepted);
   CHECK(controller.value().preview().glyph.value_text == "(10.000 mm)");
+  // Committing replaces the session PartDocument; `sketch` dangles afterwards.
   REQUIRE(controller.value().commit(session));
   CHECK(session.part_document()
-            ->find_sketch(sketch->id())
+            ->find_sketch(sketch_id)
             ->find_line_segment(SketchEntityId("line.a"))
             ->end() == before);
-  auto annotations = GuiSketchDimensionController::accepted_annotations(session, sketch->id());
+  auto annotations = GuiSketchDimensionController::accepted_annotations(session, sketch_id);
   REQUIRE(annotations);
   REQUIRE(annotations.value().size() == 1U);
   CHECK(annotations.value().front().semantic_id ==

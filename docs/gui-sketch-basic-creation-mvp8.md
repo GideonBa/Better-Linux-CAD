@@ -153,5 +153,6 @@ Block 112 reuses this command lifecycle for circles, arcs, ellipses, elliptical 
 persistent expansion, exact full-circle parameter contract, transient conic preview, and failure rules
 are canonical in `docs/gui-sketch-conic-slot-creation-mvp8.md`.
 
-Block 113 is next and owns spline editing, continuity handles, supported representation conversion,
-and Sketch text. Block 114 continues to own accepted automatic-constraint intent.
+Block 113 spline editing and Sketch text, Block 114 accepted constraint authoring, and Block 115
+dimension authoring are implemented in their canonical contracts. Block 116 is next and owns trim,
+extend, split, Sketch fillet, and Sketch chamfer.

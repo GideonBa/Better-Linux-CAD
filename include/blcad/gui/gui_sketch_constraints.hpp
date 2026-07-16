@@ -212,6 +212,38 @@ public:
     return result;
   }
 
+  // Removes one accepted session-owned catalog constraint as its own atomic
+  // "Remove sketch constraint" history entry. Historical embedded Sketch
+  // constraint records remain Block-99 Sketch-edit intent and are not touched.
+  [[nodiscard]] static Result<std::size_t>
+  remove_accepted(GuiDocumentSession& session, SketchId sketch, SketchConstraintId id) {
+    if (session.part_document() == nullptr)
+      return Result<std::size_t>::failure(Error::validation(
+          sketch.value(), "constraint removal requires an active Part session"));
+    auto catalog = session.sketch_constraint_catalog(sketch);
+    if (catalog.has_error()) return Result<std::size_t>::failure(catalog.error());
+    if (catalog.value().find(id) == nullptr)
+      return Result<std::size_t>::failure(Error::validation(
+          id.value(), "constraint is not an accepted session catalog record"));
+    const SketchConstraintCatalog before = std::move(catalog.value());
+    return session.commit_part_constraint_transaction(
+        "Remove sketch constraint",
+        [sketch, id, before](PartDocument& part,
+                             std::vector<SketchConstraintCatalog>& catalogs)
+            -> Result<std::size_t> {
+          if (part.find_sketch(sketch) == nullptr)
+            return Result<std::size_t>::failure(Error::validation(
+                sketch.value(), "constraint target Sketch no longer exists"));
+          const auto found = std::find_if(
+              catalogs.begin(), catalogs.end(),
+              [&sketch](const auto& catalog) { return catalog.sketch() == sketch; });
+          if (found == catalogs.end() || *found != before)
+            return Result<std::size_t>::failure(Error::dependency(
+                sketch.value(), "constraint catalog changed during removal"));
+          return found->remove(id);
+        });
+  }
+
   [[nodiscard]] static std::vector<SketchSolverConstraintKind>
   compatible_kinds(const SketchTopology& topology,
                    const std::vector<SketchConstraintIntentTarget>& targets) {
