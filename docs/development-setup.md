@@ -97,7 +97,7 @@ On Linux the native OCCT viewport uses Qt xcb when `DISPLAY` is available and
 
 ## Interactive Sketcher focused proof
 
-Blocks 106–113 are implemented.
+Blocks 106–114 are implemented.
 
 Block 106 workspace and command lifecycle:
 
@@ -162,11 +162,21 @@ Block 113 spline editing and Sketch text:
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][sketch-spline]"
 ```
 
-The Block-113 proof covers connected-chain validation, control/fit handles, control polygons,
-deterministic fit/control conversion, insertion/removal and stable ids, C0/G1 continuity, tangent
-alignment, spline sampling/curvature, immutable preview, source freshness, one atomic document
-transaction, exact undo/redo, expression-backed text substitution, sidecar JSON roundtrip, system font
-fallback, and built-in vector-font fallback.
+Block 114 manual/automatic constraints, conflict preview, and glyph interaction:
+
+```bash
+./build/dev/blcad_core_tests "[core][sketch-constraints]"
+./build/dev/blcad_core_tests "[core][sketch-conflict-diagnostics]"
+./build/dev-geometry/blcad_geometry_tests "[geometry][sketch-constraints]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][sketch-constraints]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][sketch-auto-constraint]"
+```
+
+The Block-114 proof covers stable point/entity targets, geometric-family signature validation,
+manual/automatic provenance, deterministic selection compatibility, Sidecar JSON roundtrip, disposable
+solve and source immutability, stable conflict ids, deterministic accepted/preview/conflict glyph
+anchors, semantic glyph hit primitives, one `Add sketch constraint` transaction, refused conflict
+commit, and coordinated exact Sketch/catalog undo and redo.
 
 ## Representative existing validation tags
 
@@ -185,7 +195,9 @@ QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][model-browser]"
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][gui-feature-coverage]"
 ```
 
-The exact test registration in `CMakeLists.txt` is authoritative.
+The exact test registration in `CMakeLists.txt` is authoritative. Block-114 GUI cases are included by
+`tests/gui/gui_test_main.cpp` through `tests/gui/gui_sketch_constraint_tests.inc`, so no second GUI test
+executable or Qt application instance is introduced.
 
 ## Headless tools
 
@@ -200,23 +212,20 @@ The exact test registration in `CMakeLists.txt` is authoritative.
 ./build/dev-geometry/blcad_analyze_assembly input.blcad.project.json
 ```
 
-## Public Block-113 boundaries
+## Public Block-114 boundaries
 
 ```text
-include/blcad/core/sketch_spline_edit.hpp
-include/blcad/core/sketch_text.hpp
-include/blcad/core/sketch_text_json.hpp
-include/blcad/geometry/sketch_spline_geometry.hpp
-include/blcad/geometry/sketch_text_layout.hpp
-include/blcad/gui/gui_sketch_spline.hpp
+include/blcad/core/sketch_constraint_authoring.hpp
+include/blcad/core/sketch_constraint_authoring_json.hpp
+include/blcad/geometry/sketch_constraint_glyph.hpp
+include/blcad/gui/gui_sketch_constraints.hpp
+tests/gui/gui_sketch_constraint_tests.inc
 ```
 
-These boundaries are header-only deterministic services. Existing registered Core, Geometry, and GUI
-test translation units exercise them without adding duplicate execution targets.
-
-`SketchSplineEditModel` authoring state, spline samples, continuity diagnostics, resolved text, font
-discovery, glyph strokes, and fallback selection are derived. Persistent products are existing cubic
-SplineSegments/TangentContinuity and the explicit `blcad.sketch_text.mvp8` sidecar schema.
+These boundaries are header-only deterministic services layered over existing Block-108/109 and
+`GuiDocumentSession` authority. Persistent intent is the explicit
+`blcad.sketch_constraints.mvp8` catalog. Solve status, solved candidate topology, conflict/redundancy
+analysis, glyph token/anchor/state, and hit-test products are derived.
 
 ## Formatting
 
@@ -224,15 +233,14 @@ Formatting is configured by `.editorconfig` and `.clang-format`.
 
 ```bash
 clang-format -i \
-  include/blcad/core/sketch_spline_edit.hpp \
-  include/blcad/core/sketch_text.hpp \
-  include/blcad/core/sketch_text_json.hpp \
-  include/blcad/geometry/sketch_spline_geometry.hpp \
-  include/blcad/geometry/sketch_text_layout.hpp \
-  include/blcad/gui/gui_sketch_spline.hpp \
+  include/blcad/core/sketch_constraint_authoring.hpp \
+  include/blcad/core/sketch_constraint_authoring_json.hpp \
+  include/blcad/geometry/sketch_constraint_glyph.hpp \
+  include/blcad/gui/gui_sketch_constraints.hpp \
   tests/core/sketch_spline_profile_json_tests.cpp \
   tests/geometry/spline_profile_pipeline_tests.cpp \
-  tests/gui/gui_sketch_workbench_tests.cpp
+  tests/gui/gui_test_main.cpp \
+  tests/gui/gui_sketch_constraint_tests.inc
 ```
 
 ## Clean generated files
@@ -249,8 +257,9 @@ rm -rf build/
 - `docs/file-format.md`: save-format authority
 - `docs/interactive-sketcher-sequence-mvp8.md`: Blocks 106–121 sequence
 - `docs/gui-sketch-spline-text-mvp8.md`: Block-113 spline/text contract
+- `docs/gui-sketch-constraint-authoring-mvp8.md`: Block-114 constraint/glyph contract
 
 ## Current development boundary
 
-Blocks 106–113 are implemented. Block 114 is next: selection-driven manual constraints, accepted
-automatic constraints, glyph interaction, and conflict preview through the existing Block-109 solver.
+Blocks 106–114 are implemented. Block 115 is next: driving/reference dimension families, in-canvas
+value editing, and parameter/expression binding through typed Core quantity authority.
