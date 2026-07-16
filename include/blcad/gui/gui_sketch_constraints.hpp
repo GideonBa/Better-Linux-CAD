@@ -60,6 +60,32 @@ public:
     return catalog_before_;
   }
 
+  [[nodiscard]] static Result<std::vector<GuiSketchAnnotationPrimitive>>
+  accepted_annotations(const PartDocument& document,
+                       const SketchConstraintCatalog& catalog) {
+    if (document.id() != catalog.document())
+      return Result<std::vector<GuiSketchAnnotationPrimitive>>::failure(Error::validation(
+          catalog.document().value(), "constraint annotation catalog belongs to another Part"));
+    const Sketch* sketch = document.find_sketch(catalog.sketch());
+    if (sketch == nullptr)
+      return Result<std::vector<GuiSketchAnnotationPrimitive>>::failure(
+          Error::validation(catalog.sketch().value(), "constraint annotation Sketch does not exist"));
+    auto topology = SketchTopology::migrate_legacy(*sketch);
+    if (topology.has_error())
+      return Result<std::vector<GuiSketchAnnotationPrimitive>>::failure(topology.error());
+    auto glyphs = geometry::SketchConstraintGlyphLayoutResolver{}.resolve_catalog(
+        topology.value(), catalog);
+    if (glyphs.has_error())
+      return Result<std::vector<GuiSketchAnnotationPrimitive>>::failure(glyphs.error());
+    std::vector<GuiSketchAnnotationPrimitive> annotations;
+    annotations.reserve(glyphs.value().size());
+    for (const auto& glyph : glyphs.value())
+      annotations.push_back(
+          {glyph.semantic_id, glyph.candidate_id, glyph.anchor, GuiSketchHitKind::Glyph});
+    return Result<std::vector<GuiSketchAnnotationPrimitive>>::success(
+        std::move(annotations));
+  }
+
   [[nodiscard]] Result<std::size_t>
   commit(GuiDocumentSession& session, SketchConstraintCatalog& catalog) {
     if (!preview_.authoring.accepted || !preview_.authoring.solved_sketch.has_value())
@@ -91,11 +117,11 @@ public:
     const SketchId sketch_id = solved.id();
     auto committed = session.commit_part_transaction(
         "Add sketch constraint",
-        [sketch_id, solved](PartDocument& part) mutable -> Result<std::size_t> {
+        [sketch_id, solved](PartDocument& part) -> Result<std::size_t> {
           if (part.find_sketch(sketch_id) == nullptr)
             return Result<std::size_t>::failure(
                 Error::validation(sketch_id.value(), "constraint target Sketch no longer exists"));
-          return part.update_sketch(std::move(solved));
+          return part.update_sketch(solved);
         });
     if (committed.has_error()) return committed;
     catalog = preview_.authoring.catalog_after;
@@ -136,34 +162,50 @@ public:
   compatible_kinds(const SketchTopology& topology,
                    const std::vector<SketchConstraintIntentTarget>& targets) {
     std::vector<SketchSolverConstraintKind> result;
-    const auto entity_kind = [&topology](const SketchConstraintIntentTarget& target)
+    const auto entity = [&topology](const SketchConstraintIntentTarget& target)
+        -> const SketchTopologyEntity* {
+      return target.kind() == SketchConstraintIntentTargetKind::Entity
+                 ? topology.find_entity(target.id())
+                 : nullptr;
+    };
+    const auto kind = [&entity](const SketchConstraintIntentTarget& target)
         -> std::optional<SketchTopologyEntityKind> {
-      if (target.kind() != SketchConstraintIntentTargetKind::Entity) return std::nullopt;
-      const auto* entity = topology.find_entity(target.id());
-      return entity == nullptr ? std::nullopt : std::optional(entity->kind());
+      const auto* found = entity(target);
+      return found == nullptr ? std::nullopt : std::optional(found->kind());
     };
-    const auto line = [&entity_kind](const SketchConstraintIntentTarget& target) {
-      const auto kind = entity_kind(target);
-      return kind && *kind == SketchTopologyEntityKind::Line;
+    const auto line = [&kind](const SketchConstraintIntentTarget& target) {
+      const auto value = kind(target);
+      return value && *value == SketchTopologyEntityKind::Line;
     };
-    const auto curve = [&entity_kind](const SketchConstraintIntentTarget& target) {
-      const auto kind = entity_kind(target);
-      return kind && (*kind == SketchTopologyEntityKind::Line ||
-                      *kind == SketchTopologyEntityKind::Arc ||
-                      *kind == SketchTopologyEntityKind::Spline);
+    const auto arc = [&kind](const SketchConstraintIntentTarget& target) {
+      const auto value = kind(target);
+      return value && *value == SketchTopologyEntityKind::Arc;
     };
-    const auto centered = [&entity_kind](const SketchConstraintIntentTarget& target) {
-      const auto kind = entity_kind(target);
-      return kind && (*kind == SketchTopologyEntityKind::Arc ||
-                      *kind == SketchTopologyEntityKind::CircleProfile ||
-                      *kind == SketchTopologyEntityKind::CircularHolePattern);
+    const auto curve = [&kind](const SketchConstraintIntentTarget& target) {
+      const auto value = kind(target);
+      return value && (*value == SketchTopologyEntityKind::Line ||
+                       *value == SketchTopologyEntityKind::Arc ||
+                       *value == SketchTopologyEntityKind::Spline);
+    };
+    const auto measurable = [&kind](const SketchConstraintIntentTarget& target) {
+      const auto value = kind(target);
+      return value && (*value == SketchTopologyEntityKind::Line ||
+                       *value == SketchTopologyEntityKind::Arc);
+    };
+    const auto centered = [&kind](const SketchConstraintIntentTarget& target) {
+      const auto value = kind(target);
+      return value && (*value == SketchTopologyEntityKind::Arc ||
+                       *value == SketchTopologyEntityKind::CircleProfile ||
+                       *value == SketchTopologyEntityKind::CircularHolePattern);
     };
     const auto point = [](const SketchConstraintIntentTarget& target) {
       return target.kind() == SketchConstraintIntentTargetKind::Point;
     };
 
     if (targets.size() == 1U) {
-      if (point(targets[0]) || entity_kind(targets[0]))
+      const auto* selected_entity = entity(targets[0]);
+      if (point(targets[0]) ||
+          (selected_entity != nullptr && !selected_entity->points().empty()))
         result.push_back(SketchSolverConstraintKind::Fixed);
       if (line(targets[0])) {
         result.push_back(SketchSolverConstraintKind::Horizontal);
@@ -176,16 +218,16 @@ public:
         result.push_back(SketchSolverConstraintKind::Parallel);
         result.push_back(SketchSolverConstraintKind::Perpendicular);
         result.push_back(SketchSolverConstraintKind::Collinear);
-        result.push_back(SketchSolverConstraintKind::Equal);
       }
+      if (measurable(targets[0]) && measurable(targets[1]))
+        result.push_back(SketchSolverConstraintKind::Equal);
       if (curve(targets[0]) && curve(targets[1]))
         result.push_back(SketchSolverConstraintKind::Tangent);
       if (centered(targets[0]) && centered(targets[1]))
         result.push_back(SketchSolverConstraintKind::Concentric);
       if (point(targets[0]) && line(targets[1]))
         result.push_back(SketchSolverConstraintKind::Midpoint);
-      if (point(targets[0]) &&
-          (line(targets[1]) || entity_kind(targets[1]) == SketchTopologyEntityKind::Arc))
+      if (point(targets[0]) && (line(targets[1]) || arc(targets[1])))
         result.push_back(SketchSolverConstraintKind::PointOnObject);
     } else if (targets.size() == 3U && point(targets[0]) && point(targets[1]) &&
                line(targets[2])) {
