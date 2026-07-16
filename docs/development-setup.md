@@ -174,9 +174,9 @@ QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][sketch-
 
 The Block-114 proof covers stable point/entity targets, geometric-family signature validation,
 manual/automatic provenance, deterministic selection compatibility, Sidecar JSON roundtrip, disposable
-solve and source immutability, stable conflict ids, deterministic accepted/preview/conflict glyph
-anchors, semantic glyph hit primitives, one `Add sketch constraint` transaction, refused conflict
-commit, and coordinated exact Sketch/catalog undo and redo.
+solve and source immutability, stable conflict/redundancy ids, deterministic accepted/preview/conflict/
+redundant glyph anchors, semantic glyph hit primitives, one `Add sketch constraint` transaction,
+refused conflict/redundancy commits, and coordinated exact Sketch/catalog undo and redo.
 
 ## Representative existing validation tags
 
@@ -196,8 +196,10 @@ QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][gui-fea
 ```
 
 The exact test registration in `CMakeLists.txt` is authoritative. Block-114 GUI cases are included by
-`tests/gui/gui_test_main.cpp` through `tests/gui/gui_sketch_constraint_tests.inc`, so no second GUI test
-executable or Qt application instance is introduced.
+`tests/gui/gui_test_main.cpp` through `tests/gui/gui_sketch_constraint_tests.inc`,
+`tests/gui/gui_sketch_constraint_redundancy_tests.inc`, and
+`tests/gui/gui_sketch_constraint_family_tests.inc`, so no second GUI test executable or Qt application
+instance is introduced.
 
 ## Headless tools
 
@@ -220,6 +222,8 @@ include/blcad/core/sketch_constraint_authoring_json.hpp
 include/blcad/geometry/sketch_constraint_glyph.hpp
 include/blcad/gui/gui_sketch_constraints.hpp
 tests/gui/gui_sketch_constraint_tests.inc
+tests/gui/gui_sketch_constraint_redundancy_tests.inc
+tests/gui/gui_sketch_constraint_family_tests.inc
 ```
 
 These boundaries are header-only deterministic services layered over existing Block-108/109 and
@@ -240,7 +244,9 @@ clang-format -i \
   tests/core/sketch_spline_profile_json_tests.cpp \
   tests/geometry/spline_profile_pipeline_tests.cpp \
   tests/gui/gui_test_main.cpp \
-  tests/gui/gui_sketch_constraint_tests.inc
+  tests/gui/gui_sketch_constraint_tests.inc \
+  tests/gui/gui_sketch_constraint_redundancy_tests.inc \
+  tests/gui/gui_sketch_constraint_family_tests.inc
 ```
 
 ## Clean generated files
@@ -256,6 +262,7 @@ rm -rf build/
 - `docs/architecture-summary.md`: condensed authority model
 - `docs/file-format.md`: save-format authority
 - `docs/interactive-sketcher-sequence-mvp8.md`: Blocks 106–121 sequence
+- `docs/sketch-planar-constraint-solver-mvp8.md`: solver mathematics and Block-114 consumer boundary
 - `docs/gui-sketch-spline-text-mvp8.md`: Block-113 spline/text contract
 - `docs/gui-sketch-constraint-authoring-mvp8.md`: Block-114 constraint/glyph contract
 
