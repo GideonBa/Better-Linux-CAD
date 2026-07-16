@@ -230,6 +230,23 @@ remain derived.
 
 Canonical contract: `docs/gui-sketch-dimension-authoring-mvp8.md`.
 
+## Selection-first modeling workspace
+
+Block 122 adds `GuiModelingWorkspace` as a shell-owned transient application boundary over the existing
+MVP-7 Part, Surface, and Assembly workbenches. One frozen catalog describes each later interactive
+command by area, document kind, first semantic selection kind, verified required capability,
+mini-toolbar priority, and repeatability. Command enablement therefore consumes semantic capability
+facts supplied by the existing Part-reference and Assembly-target taxonomies rather than inferring
+support from OCCT shapes or widget-local ids.
+
+A command start consumes the preselection and enters `GuiTaskState`; Cancel restores both the selected
+semantic object and its complete capability context. Finish Sketch publishes a transient
+`ProfileRegion` handoff. Selection-filter masks are shared by `GuiSelectionModel` and `OcctViewport`.
+ViewCube targets, captured home view, named camera bookmarks, contextual toolbar order, repeat state,
+and handoff presentation ids remain transient and never enter document history or persistence.
+
+Canonical contract: `docs/gui-modeling-workspace-mvp9.md`.
+
 ## Semantic Part-feature input and generated topology identity
 
 Part features use typed semantic input references and expected capabilities instead of raw kernel
@@ -291,18 +308,21 @@ resolved Sketch text / available-font discovery / fallback choice / glyph stroke
 constraint and dimension candidate solves / solved preview topology / diagnostics
 constraint/dimension glyph token / formatted value / anchor / state / hit-test presentation
 temporary drag target equations and augmented topology
+modeling preselection capabilities / mini-toolbar / repeat / filters / home view / camera bookmarks
 Assembly solve/motion proposals and freshness snapshots
 posed shapes / analysis / XDE and STEP transfer identity
 ```
 
 ## Current boundary
 
-Blocks 106–121 are implemented and accepted. Blocks 117–120 added `SketchOffsetProjectService` offset/projection/
-break-link (`docs/gui-sketch-offset-project-mvp8.md`), `SketchTransformPatternService`
-move/rotate/scale/copy/mirror/patterns with the `uncopied_references` report
-(`docs/gui-sketch-transform-pattern-mvp8.md`), `SketchFinishService` region recognition and
-fail-closed Finish Sketch (`docs/gui-sketch-regions-finish-mvp8.md`), and
+Blocks 106–121 are implemented and accepted. Blocks 117–120 added `SketchOffsetProjectService`
+offset/projection/break-link (`docs/gui-sketch-offset-project-mvp8.md`),
+`SketchTransformPatternService` move/rotate/scale/copy/mirror/patterns with the
+`uncopied_references` report (`docs/gui-sketch-transform-pattern-mvp8.md`), `SketchFinishService`
+region recognition and fail-closed Finish Sketch (`docs/gui-sketch-regions-finish-mvp8.md`), and
 `Sketch3DInteractionService` lock-based 3D placement and handles
 (`docs/gui-sketch3d-interaction-mvp8.md`). Block 121 adds machine-checked coverage, GUI/headless
-equivalence, interaction atomicity, high-DPI mapping, and measured performance. Block 122 is the
-current next technical step.
+equivalence, interaction atomicity, high-DPI mapping, and measured performance. Block 122 adds the
+selection-first modeling workspace, capability-exact in-context command start, Finish-Sketch handoff,
+repeat, synchronized filters, and transient ViewCube/home/bookmark state. Block 123 is the current
+next technical step.
