@@ -30,6 +30,10 @@ enum class GuiSelectionKind {
 struct GuiSelection {
   GuiSelectionKind kind{GuiSelectionKind::Body};
   std::string semantic_id;
+  // Sketch interaction may expose several semantic hit roles for one persistent
+  // entity. The candidate id preserves the exact endpoint/curve/glyph role while
+  // semantic_id remains the document-level selection identity.
+  std::string candidate_id;
 
   [[nodiscard]] bool operator==(const GuiSelection&) const = default;
 };
