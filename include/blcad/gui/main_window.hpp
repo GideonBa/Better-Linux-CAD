@@ -10,6 +10,7 @@
 #include "blcad/gui/gui_part_operations_workbench.hpp"
 #include "blcad/gui/gui_sketch_workbench.hpp"
 #include "blcad/gui/gui_spatial_surface_workbench.hpp"
+#include "blcad/gui/gui_viewport_manipulator_binder.hpp"
 #include "blcad/gui/occt_viewport.hpp"
 
 #include <QMainWindow>
@@ -49,6 +50,19 @@ public:
     modeling_workspace_shell_.ensure_installed();
     modeling_workspace_shell_.refresh();
     return modeling_workspace_;
+  }
+  [[nodiscard]] GuiViewportManipulatorLayer& viewport_manipulators() noexcept {
+    viewport_manipulator_shell_.ensure_installed();
+    viewport_manipulator_shell_.refresh();
+    return viewport_manipulators_;
+  }
+  [[nodiscard]] const GuiViewportManipulatorLayer& viewport_manipulators() const noexcept {
+    viewport_manipulator_shell_.ensure_installed();
+    viewport_manipulator_shell_.refresh();
+    return viewport_manipulators_;
+  }
+  void refresh_viewport_manipulators() {
+    viewport_manipulator_shell_.refresh();
   }
   [[nodiscard]] GuiPartFoundationWorkbench& part_foundation_workbench() noexcept;
   [[nodiscard]] GuiPartOperationsWorkbench& part_operations_workbench() noexcept;
@@ -118,6 +132,7 @@ private:
   GuiSketchWorkbench sketch_workbench_;
   GuiSketchWorkspace sketch_workspace_;
   GuiModelingWorkspace modeling_workspace_;
+  GuiViewportManipulatorLayer viewport_manipulators_;
   GuiPartFoundationWorkbench part_foundation_workbench_;
   GuiPartOperationsWorkbench part_operations_workbench_;
   GuiSpatialSurfaceWorkbench spatial_surface_workbench_;
@@ -127,6 +142,8 @@ private:
       this, &session_, &modeling_workspace_,
       [this] { finish_sketch_with_modeling_handoff(); },
       [this] { refresh_command_state(); }};
+  mutable GuiViewportManipulatorShellBinder viewport_manipulator_shell_{
+      this, &viewport_manipulators_};
   std::optional<SketchId> active_sketch_;
   std::optional<GuiViewportCameraBookmark> sketch_camera_bookmark_;
   std::uint32_t sketch_selection_filter_mask_{0xFFFFFFFFU};

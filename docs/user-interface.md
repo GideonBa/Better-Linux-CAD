@@ -6,9 +6,8 @@ and semantic selection synchronization. Blocks 106–120 establish the contextua
 device-independent interaction, stable shared planar topology, deterministic solving, direct creation
 and modification, profile/Finish-Sketch workflows, and Interactive Sketch3D. Block 121 completes
 integrated coverage, equivalence, atomicity, and measured performance acceptance. Block 122 implements
-the first Interactive Part & Assembly Modeling boundary: visible Part/Surface/Assembly context tabs,
-capability-exact command start, contextual mini-toolbar, selection filters, repeat, ViewCube, Home, and
-camera bookmarks. Block 123 is next; STEP Import begins with Block 132.
+the selection-first Part/Surface/Assembly workspace. Block 123 implements reusable candidate-only
+viewport manipulators and numeric-HUD coupling. Block 124 is next; STEP Import begins with Block 132.
 
 The UI is deliberately not built like FreeCAD. The goal is a modern, consistent, reduced interface
 with clear separation between model, parameters, features, Sketch topology, solver results, and
@@ -68,6 +67,41 @@ ViewCube reuses viewport standard-camera authority; Home and named bookmarks sto
 camera snapshots and never enter Part, Project, sidecar, undo history, or exchange persistence.
 
 Canonical contract: `docs/gui-modeling-workspace-mvp9.md`.
+
+## Viewport manipulators and numeric HUD
+
+Block 123 adds one common direct-manipulation surface for later Part, Surface, and Assembly commands:
+
+```text
+linear arrow | angular wheel | radial handle
+translation triad | rotation triad
+pattern count | pattern spacing
+```
+
+`GuiViewportManipulatorLayer` owns only transient handle descriptors, camera/model mapping, hit
+products, pointer measurements, numeric text, and candidate values. It does not receive a
+`GuiDocumentSession` and cannot mutate a feature, Body, component, relationship, joint, or save format.
+The owning Block-124–130 command supplies handles and turns the returned candidate into its own
+validated Geometry preview and Apply transaction.
+
+Handle presentation has a fixed DIP size and tolerance, so arrows and rings remain visible across
+zoom levels. Value mapping remains in model space: linear families use a model axis, angular/radial
+families use an explicit model plane. Overlapping handle hits sort by screen distance and stable handle
+id. Drag start freezes the initial measurement, avoiding a value jump to the visual endpoint, and
+release evaluates the exact final pointer sample.
+
+The Qt binder exposes:
+
+```text
+blcad.viewport_manipulator_overlay
+blcad.manipulator_numeric_hud
+```
+
+Dragging updates the HUD. Valid typed `mm`, `deg`, or unitless count input updates the same candidate
+and overrides later pointer motion until explicitly cleared. `Esc`, window deactivation, invalid
+mapping, or invalid release clears transient interaction without a compensating document transaction.
+
+Canonical contract: `docs/gui-viewport-manipulators-mvp9.md`.
 
 ## Contextual Sketch workspace
 
@@ -291,9 +325,9 @@ gasket_thickness         2      mm    -                Gasket
 
 Feature-creation workflows share consistent task/preview/commit structure and consume existing Core/
 Geometry authorities. Current validation workbenches expose Part, Surface, Assembly, analysis, and
-exchange families. Block 122 now supplies their common selection-first command-start and navigation
-surface. Blocks 123–130 add manipulators and family-specific authoring in the order frozen by
-`docs/interactive-modeling-sequence-mvp9.md`.
+exchange families. Block 122 supplies their common selection-first command-start and navigation
+surface. Block 123 supplies reusable candidate-only manipulators. Blocks 124–130 add family-specific
+preview and authoring in the order frozen by `docs/interactive-modeling-sequence-mvp9.md`.
 
 Constraint suggestions remain deterministic from compatible geometry/capability types; they do not
 require AI.
@@ -305,7 +339,8 @@ recompute/solve results. Failed candidates do not publish partial persistent sta
 
 During Block-110 drag, solve results are transient preview feedback. A failed live solve may keep the
 last valid visual preview or restore the pre-drag display according to the Block-110 frozen contract,
-but release cannot commit a failed candidate.
+but release cannot commit a failed candidate. Block-123 candidates are even narrower: they are numeric
+input only and do not claim a valid feature preview until the owning later command validates Geometry.
 
 ## Implementation sequence
 
@@ -322,13 +357,15 @@ but release cannot commit a failed candidate.
    integrated acceptance through Block 121. Implemented and accepted.
 10. Add the selection-first Part/Surface/Assembly workspace, contextual commands, filters, and
     navigation aids. Implemented in Block 122.
-11. Add transient manipulators and interactive Part/Surface/Assembly authoring through Blocks 123–131.
-12. Add STEP Reference/EditableBody import through Blocks 132–138.
+11. Add reusable transient viewport manipulators and numeric coupling. Implemented in Block 123.
+12. Add family-specific interactive Part/Surface/Assembly authoring through Blocks 124–131.
+13. Add STEP Reference/EditableBody import through Blocks 132–138.
 
 ## Current boundary
 
-Blocks 106–121 are implemented and Interactive Sketcher MVP-8 is accepted. Block 122 is implemented.
-Block 123, reusable transient viewport manipulators with numeric-HUD coupling, is next.
+Blocks 106–121 are implemented and Interactive Sketcher MVP-8 is accepted. Blocks 122–123 implement
+the selection-first modeling shell and reusable candidate-only manipulators. Block 124 interactive
+Extrude, path Extrude, and Revolve authoring is next.
 
 No widget may implement substitute constraint mathematics. Sketch and modeling interactions map
 transient picks to explicit semantic capabilities and public Core/application commands, use existing

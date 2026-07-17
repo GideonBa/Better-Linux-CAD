@@ -18,9 +18,9 @@ Fundamental decisions are:
 - keep Core model intent below Geometry query/execution types;
 - separate source identity, geometric capability, hierarchy occurrence, transform, and exchange identity;
 - keep viewport pixels, hover, grid, hit stacks, snaps, sampled curves, control polygons, formatted
-  dimension text, glyph layout, and font rasterization transient;
+  dimension text, glyph layout, font rasterization, manipulator handles, and HUD state transient;
 - keep solver variables, residuals, Jacobians, rank, DOF, conflict diagnostics, measured display values,
-  curvature samples, resolved text, glyph strokes, and fallback font choices derived;
+  curvature samples, resolved text, glyph strokes, fallback font choices, and manipulator candidates derived;
 - use explicit migration or versioned sidecar persistence when a new identity model is required;
 - include every persistent sidecar owned by an editing session in dirty-state, Save/Open, and exact
   document history;
@@ -247,6 +247,27 @@ and handoff presentation ids remain transient and never enter document history o
 
 Canonical contract: `docs/gui-modeling-workspace-mvp9.md`.
 
+## Transient viewport manipulator infrastructure
+
+Block 123 adds `GuiViewportManipulatorLayer` as a reusable candidate-only boundary below the later
+interactive feature commands. Stable handle descriptors define model-space origin, axis or plane,
+reference value, optional limits, fixed-DIP display size, and fixed-DIP hit tolerance. Supported
+families are linear, angular, radial, X/Y/Z translation and rotation triads, PatternCount, and
+PatternSpacing.
+
+`GuiViewportManipulatorMapping` derives deterministic camera rays and model-to-screen projection from
+the transient viewport camera. Linear values use closest-point model-axis mapping; radial and angular
+values use explicit ray/plane intersections. Presentation stays fixed in DIP. Overlapping handles sort
+by screen distance and stable handle id. Drag start freezes the initial model measurement, release
+processes the exact final pointer sample, and valid typed HUD values override subsequent pointer motion.
+
+`GuiViewportManipulatorShellBinder` owns the transparent Qt overlay, mouse capture, cancellation, camera
+refresh, and numeric-HUD synchronization. Neither the controller nor binder receives document mutation
+or Geometry-preview authority. The emitted candidate becomes input to an owning Block-124–130 command,
+which remains responsible for validation, preview, Apply, and one undoable transaction.
+
+Canonical contract: `docs/gui-viewport-manipulators-mvp9.md`.
+
 ## Semantic Part-feature input and generated topology identity
 
 Part features use typed semantic input references and expected capabilities instead of raw kernel
@@ -309,20 +330,15 @@ constraint and dimension candidate solves / solved preview topology / diagnostic
 constraint/dimension glyph token / formatted value / anchor / state / hit-test presentation
 temporary drag target equations and augmented topology
 modeling preselection capabilities / mini-toolbar / repeat / filters / home view / camera bookmarks
+manipulator camera mapping / fixed-DIP handles / hit products / pointer measurements / HUD candidates
 Assembly solve/motion proposals and freshness snapshots
 posed shapes / analysis / XDE and STEP transfer identity
 ```
 
 ## Current boundary
 
-Blocks 106–121 are implemented and accepted. Blocks 117–120 added `SketchOffsetProjectService`
-offset/projection/break-link (`docs/gui-sketch-offset-project-mvp8.md`),
-`SketchTransformPatternService` move/rotate/scale/copy/mirror/patterns with the
-`uncopied_references` report (`docs/gui-sketch-transform-pattern-mvp8.md`), `SketchFinishService`
-region recognition and fail-closed Finish Sketch (`docs/gui-sketch-regions-finish-mvp8.md`), and
-`Sketch3DInteractionService` lock-based 3D placement and handles
-(`docs/gui-sketch3d-interaction-mvp8.md`). Block 121 adds machine-checked coverage, GUI/headless
-equivalence, interaction atomicity, high-DPI mapping, and measured performance. Block 122 adds the
-selection-first modeling workspace, capability-exact in-context command start, Finish-Sketch handoff,
-repeat, synchronized filters, and transient ViewCube/home/bookmark state. Block 123 is the current
-next technical step.
+Blocks 106–121 are implemented and accepted. Block 122 adds the selection-first modeling workspace,
+capability-exact in-context command start, Finish-Sketch handoff, repeat, synchronized filters, and
+transient ViewCube/Home/bookmark state. Block 123 adds reusable candidate-only viewport manipulators,
+model-space mapping, deterministic fixed-DIP hit testing, exact release, and numeric-HUD coupling.
+Block 124 interactive Extrude, path Extrude, and Revolve authoring is the current next technical step.

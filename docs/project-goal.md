@@ -28,8 +28,10 @@ remaining DOF, conflict/redundancy diagnostics, freshness snapshots, exchange re
 contact classifications, motion samples, XDE labels, STEP entities, Sketch interaction samples, screen
 mappings, hit stacks, grid lines, snap/inference candidates, legacy Sketch-topology migration reports,
 PartDocument compatibility materialization candidates, modeling preselection capabilities, contextual
-command recommendations, selection filters, repeat state, ViewCube/Home state, and camera bookmarks.
-These are regenerable query/execution/presentation products rather than primary model authority.
+command recommendations, selection filters, repeat state, ViewCube/Home state, camera bookmarks,
+manipulator handle descriptors, camera-ray mappings, fixed-DIP hit products, pointer measurements,
+numeric-HUD text, and candidate parameter values. These are regenerable query/execution/presentation
+products rather than primary model authority.
 
 ## Direction
 
@@ -50,7 +52,7 @@ The project grows through controlled headless vertical slices:
 12. engineering modules.
 
 Phases 1–9 are implemented through accepted Interactive Sketcher Block 121. Interactive Part &
-Assembly Modeling MVP-9 is active through Block 122:
+Assembly Modeling MVP-9 is active through Block 123:
 
 ```text
 122 selection-first Part/Surface/Assembly workspace
@@ -59,10 +61,17 @@ Assembly Modeling MVP-9 is active through Block 122:
     persistent-profile-only Finish Sketch handoff
     synchronized session/viewport selection filters
     ViewCube, captured Home, and session-local camera bookmarks
+123 reusable transient viewport manipulators
+    linear / angular / radial handles
+    translate / rotate triads
+    pattern count / spacing handles
+    model-space mapping + fixed-DIP hit testing
+    exact final release + numeric-HUD override
+    candidate values only; no document mutation
 ```
 
-Block 123, reusable transient viewport manipulators with numeric-HUD coupling, is the current next
-technical step. STEP Import starts at Block 132 after Interactive Modeling acceptance.
+Block 124, interactive Extrude, path Extrude, and Revolve authoring, is the current next technical
+step. STEP Import starts at Block 132 after Interactive Modeling acceptance.
 
 Development rule:
 
@@ -143,7 +152,13 @@ Block 122 begins Interactive Part/Surface/Assembly Modeling without extending pe
 `GuiModelingWorkspace` combines one semantic selection with verified capabilities, starts the existing
 `GuiTaskState`, and restores complete preselection on cancellation. `GuiModelingWorkspaceShellBinder`
 renders the visible context tabs, filters, mini-toolbar, Repeat, ViewCube, Home, and camera-bookmark
-controls. Core, Geometry, Part JSON, Project JSON, and sidecar formats are unchanged.
+controls.
+
+Block 123 adds `GuiViewportManipulatorLayer` and `GuiViewportManipulatorShellBinder`. Stable
+model-space handle frames map pointer rays to signed distances, radii, angles, triad coordinates, and
+pattern values. Presentation and hit tolerances remain fixed in DIP; ties use stable handle ids. Typed
+HUD values override dragging, and release evaluates the exact final pointer sample. The layer emits
+candidate values only and cannot modify Core, Geometry, Part JSON, Project JSON, or sidecar state.
 
 ## Identity and authority distinctions
 
@@ -245,10 +260,10 @@ assistants.
 
 ## Non-goals for the current phase
 
-Interactive Modeling MVP-9 does not yet claim full production-grade GUI parity. Block 122 establishes
-selection-first command start and navigation; Blocks 123–131 add manipulators, family-specific Part/
-Surface/Assembly authoring, feature editing, motion interaction, measure, and integrated acceptance in
-sequence.
+Interactive Modeling MVP-9 does not yet claim full production-grade GUI parity. Blocks 122–123
+establish selection-first command start, navigation, reusable candidate-only manipulators, and numeric
+coupling; Blocks 124–131 add family-specific Part/Surface/Assembly authoring, feature editing, motion
+interaction, measure, and integrated acceptance in sequence.
 
 The current phase does not introduce arbitrary raw OCCT topology as persistent identity, a second
 Assembly transform authority, whole-subassembly solve variables, feature-history reorder, persistent
@@ -266,6 +281,10 @@ algorithm. These are sequencing boundaries rather than permanent product exclusi
 
 `docs/gui-modeling-workspace-mvp9.md` is canonical for the Block-122 selection-first workspace,
 contextual command, filter, Finish-Sketch handoff, and navigation contract.
+
+`docs/gui-viewport-manipulators-mvp9.md` is canonical for Block-123 handle families, model-space
+mapping, fixed-DIP presentation/hit testing, exact release, numeric coupling, and candidate-only
+authority.
 
 `docs/sketch-shared-topology-mvp8.md` is canonical for Block-108 planar point/entity identity,
 migration, edit commands, topology JSON, and compatibility materialization.

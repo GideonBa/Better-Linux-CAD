@@ -4,10 +4,10 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 122
-current_block: 123
-current_boundary: Transient viewport manipulator infrastructure and numeric coupling
-current_tag: "[gui][viewport-manipulators]"
+implemented_through: Block 123
+current_block: 124
+current_boundary: Interactive Extrude, path Extrude, and Revolve authoring
+current_tag: "[gui][interactive-extrude]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -17,7 +17,7 @@ phase_status:
   mvp_6: "Part Construction — Blocks 48–94 implemented; MVP complete"
   mvp_7: "GUI Feature Validation — Blocks 95–105 implemented; MVP complete"
   mvp_8: "Interactive Sketcher — Blocks 106–121 implemented; MVP complete"
-  mvp_9: "Interactive Part & Assembly Modeling — Block 122 implemented; Block 123 next"
+  mvp_9: "Interactive Part & Assembly Modeling — Blocks 122–123 implemented; Block 124 next"
   mvp_10: "STEP Import — Blocks 132–138 planned after Interactive Modeling acceptance"
 ---
 
@@ -30,14 +30,15 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 ## Current status
 
 ```text
-implemented through  Block 122
-current block        Block 123
+implemented through  Block 123
+current block        Block 124
 current phase        Interactive Part & Assembly Modeling MVP-9
-current boundary     transient viewport manipulators and numeric HUD coupling
+current boundary     interactive Extrude, path Extrude, and Revolve authoring
 ```
 
-Interactive Sketcher MVP-8 is complete and accepted. Block 122 establishes the selection-first
-modeling workspace; Block 123 is the current next technical step.
+Interactive Sketcher MVP-8 is complete and accepted. Blocks 122–123 establish the selection-first
+modeling workspace and reusable candidate-only viewport manipulators; Block 124 is the current next
+technical step.
 
 ## Phase map
 
@@ -50,7 +51,7 @@ MVP-5   Assembly system                                 Blocks 1–47 implemente
 MVP-6   Part Construction                              Blocks 48–94 implemented
 MVP-7   GUI Feature Validation                        Blocks 95–105 implemented
 MVP-8   Interactive Sketcher                          Blocks 106–121 implemented
-MVP-9   Interactive Part & Assembly Modeling          Block 122 implemented; Block 123 next
+MVP-9   Interactive Part & Assembly Modeling          Blocks 122–123 implemented; Block 124 next
 MVP-10  STEP Import                                    Blocks 132–138 planned
 ```
 
@@ -319,9 +320,29 @@ Focused tags:
 [gui][view-navigation-aids]
 ```
 
-## Current next technical step — Block 123
+## Block 123 — Transient viewport manipulators and numeric coupling — Implemented
 
-Implement the reusable transient viewport manipulator layer and numeric-HUD coupling defined in
+`GuiViewportManipulatorLayer` provides reusable linear, angular, radial, translate/rotate-triad,
+PatternCount, and PatternSpacing handles. Presentation and hit tolerances are fixed in DIP, while
+candidate values derive from deterministic camera rays, model axes, and explicit handle planes.
+Overlapping hits resolve by screen distance and stable handle id. Dragging emits candidate values only;
+release processes the exact final sample. Valid numeric HUD input overrides later pointer movement
+until explicitly cleared. `GuiViewportManipulatorShellBinder` owns the transparent overlay, mouse
+capture, cancellation, and HUD synchronization without receiving document mutation authority.
+
+Canonical contract: `docs/gui-viewport-manipulators-mvp9.md`.
+
+Focused tags:
+
+```text
+[gui][viewport-manipulators]
+[gui][manipulator-numeric-coupling]
+```
+
+## Current next technical step — Block 124
+
+Implement interactive Extrude, path Extrude, and Revolve authoring over the Block-122 workspace and
+Block-123 candidate-only manipulator infrastructure as defined in
 `docs/interactive-modeling-sequence-mvp9.md`.
 
 ## Later phases

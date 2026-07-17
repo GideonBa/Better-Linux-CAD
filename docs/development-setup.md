@@ -242,6 +242,18 @@ These cases verify capability-exact enablement, deterministic mini-toolbar order
 consumption and complete Cancel restoration, rejection of a non-materialized profile, synchronized
 session/viewport filters, stable shell object names, ViewCube targets, Home, and camera bookmarks.
 
+Block 123 reusable viewport manipulators and numeric coupling:
+
+```bash
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][viewport-manipulators]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][manipulator-numeric-coupling]"
+```
+
+These cases verify fixed-DIP presentation, deterministic hit tie breaking, model-space linear,
+angular, and radial mapping, exact final release, typed-value precedence, translation/rotation triad
+construction, PatternCount quantization, candidate-only behavior over a live Part session, and the
+visible overlay/HUD shell.
+
 ## Representative existing validation tags
 
 ```bash
@@ -259,8 +271,8 @@ QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][model-browser]"
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][gui-feature-coverage]"
 ```
 
-The exact test registration in `CMakeLists.txt` is authoritative. Block-122 cases remain in the
-existing `blcad_gui_tests` executable; no second Qt application instance is introduced.
+The exact test registration in `CMakeLists.txt` is authoritative. Block-122 and Block-123 cases remain
+in the existing `blcad_gui_tests` executable; no second Qt application instance is introduced.
 
 ## Headless tools
 
@@ -275,19 +287,22 @@ existing `blcad_gui_tests` executable; no second Qt application instance is intr
 ./build/dev-geometry/blcad_analyze_assembly input.blcad.project.json
 ```
 
-## Public Block-122 boundaries
+## Public Blocks 122–123 boundaries
 
 ```text
 include/blcad/gui/gui_modeling_workspace.hpp
 include/blcad/gui/gui_modeling_workspace_binder.hpp
+include/blcad/gui/gui_viewport_manipulator.hpp
+include/blcad/gui/gui_viewport_manipulator_binder.hpp
 include/blcad/gui/main_window.hpp
 tests/gui/gui_feature_coverage_acceptance_tests.cpp
 docs/gui-modeling-workspace-mvp9.md
+docs/gui-viewport-manipulators-mvp9.md
 ```
 
-All Block-122 state is transient. The command catalog, verified preselection capabilities, mini-toolbar,
-repeat command, filters, Home view, and named camera bookmarks do not change Core/Geometry or any save
-format.
+All Block-122 and Block-123 state is transient. Command catalogs, verified preselection capabilities,
+mini-toolbar state, repeat, filters, Home/bookmarks, camera mappings, handle descriptors, pointer
+measurements, hit products, HUD text, and candidates do not change Core/Geometry or any save format.
 
 ## Formatting
 
@@ -297,6 +312,8 @@ Formatting is configured by `.editorconfig` and `.clang-format`.
 clang-format -i \
   include/blcad/gui/gui_modeling_workspace.hpp \
   include/blcad/gui/gui_modeling_workspace_binder.hpp \
+  include/blcad/gui/gui_viewport_manipulator.hpp \
+  include/blcad/gui/gui_viewport_manipulator_binder.hpp \
   include/blcad/gui/main_window.hpp \
   tests/gui/gui_feature_coverage_acceptance_tests.cpp
 ```
@@ -316,6 +333,7 @@ rm -rf build/
 - `docs/interactive-sketcher-sequence-mvp8.md`: Blocks 106–121 sequence
 - `docs/interactive-modeling-sequence-mvp9.md`: Blocks 122–131 sequence
 - `docs/gui-modeling-workspace-mvp9.md`: Block-122 selection-first shell contract
+- `docs/gui-viewport-manipulators-mvp9.md`: Block-123 manipulator and HUD contract
 - `docs/sketch-planar-constraint-solver-mvp8.md`: solver mathematics and dimension mappings
 - `docs/gui-sketch-solver-drag-mvp8.md`: constraint/dimension-aware direct manipulation
 - `docs/gui-sketch-constraint-authoring-mvp8.md`: Block-114 constraint/glyph contract
@@ -324,6 +342,6 @@ rm -rf build/
 ## Current development boundary
 
 Blocks 106–121 are implemented and accepted. Block 122 adds the shell-owned selection-first
-Part/Surface/Assembly workspace, capability-exact contextual commands, persistent-profile-only Finish
-Sketch handoff, repeat, synchronized selection filters, ViewCube/Home, and session-local camera
-bookmarks. Block 123, reusable transient viewport manipulators with numeric-HUD coupling, is next.
+Part/Surface/Assembly workspace. Block 123 adds reusable candidate-only viewport manipulators,
+model-space mapping, deterministic fixed-DIP hit testing, exact release, and numeric-HUD coupling.
+Block 124 interactive Extrude, path Extrude, and Revolve authoring is next.
