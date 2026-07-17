@@ -254,6 +254,32 @@ angular, and radial mapping, exact final release, typed-value precedence, transl
 construction, PatternCount quantization, candidate-only behavior over a live Part session, and the
 visible overlay/HUD shell.
 
+Block 124 interactive Extrude, path Extrude, and Revolve authoring:
+
+```bash
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][interactive-extrude]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][interactive-revolve]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][extrude-revolve-manipulator]"
+```
+
+These cases verify extent-parameter driving with one atomic transaction and exact undo, operation/
+taper/thin/through-all modes with their offered handles, fail-closed rejection of invalid inputs,
+full/angle/symmetric revolve authoring, manipulator/typed document equivalence, and `MainWindow`
+ownership of the interactive feature coordinator.
+
+Block 125 interactive Fillet, Chamfer, Shell, and Draft authoring:
+
+```bash
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][interactive-finishing]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][interactive-shell-draft]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][edge-chain-picking]"
+```
+
+These cases verify ordered edge collection with duplicate rejection and exact undo, the three chamfer
+modes with their offered handles, shell direction toggle and thickness, draft pull/neutral/angle
+authoring, fail-closed rejection of invalid inputs, and manipulator/typed document equivalence for
+fillet radius and coordinator-routed shell thickness.
+
 ## Representative existing validation tags
 
 ```bash
@@ -287,22 +313,31 @@ in the existing `blcad_gui_tests` executable; no second Qt application instance 
 ./build/dev-geometry/blcad_analyze_assembly input.blcad.project.json
 ```
 
-## Public Blocks 122–123 boundaries
+## Public Blocks 122–125 boundaries
 
 ```text
 include/blcad/gui/gui_modeling_workspace.hpp
 include/blcad/gui/gui_modeling_workspace_binder.hpp
 include/blcad/gui/gui_viewport_manipulator.hpp
 include/blcad/gui/gui_viewport_manipulator_binder.hpp
+include/blcad/gui/gui_interactive_extrude_revolve.hpp
+include/blcad/gui/gui_interactive_extrude_revolve_binder.hpp
+include/blcad/gui/gui_interactive_finishing.hpp
 include/blcad/gui/main_window.hpp
 tests/gui/gui_feature_coverage_acceptance_tests.cpp
+tests/gui/gui_interactive_features_tests.cpp
+tests/gui/gui_interactive_finishing_tests.cpp
 docs/gui-modeling-workspace-mvp9.md
 docs/gui-viewport-manipulators-mvp9.md
+docs/gui-interactive-extrude-revolve-mvp9.md
+docs/gui-interactive-finishing-mvp9.md
 ```
 
-All Block-122 and Block-123 state is transient. Command catalogs, verified preselection capabilities,
-mini-toolbar state, repeat, filters, Home/bookmarks, camera mappings, handle descriptors, pointer
-measurements, hit products, HUD text, and candidates do not change Core/Geometry or any save format.
+All Block-122 through Block-125 transient state — command catalogs, verified preselection
+capabilities, mini-toolbar state, repeat, filters, Home/bookmarks, camera mappings, handle
+descriptors, pointer measurements, hit products, HUD text, edge/face chains, candidate feature
+parameters, and previews — does not change Core/Geometry or any save format. A controller's Apply is
+the only mutation, and it flows through one existing `commit_part_transaction`.
 
 ## Formatting
 
@@ -314,8 +349,13 @@ clang-format -i \
   include/blcad/gui/gui_modeling_workspace_binder.hpp \
   include/blcad/gui/gui_viewport_manipulator.hpp \
   include/blcad/gui/gui_viewport_manipulator_binder.hpp \
+  include/blcad/gui/gui_interactive_extrude_revolve.hpp \
+  include/blcad/gui/gui_interactive_extrude_revolve_binder.hpp \
+  include/blcad/gui/gui_interactive_finishing.hpp \
   include/blcad/gui/main_window.hpp \
-  tests/gui/gui_feature_coverage_acceptance_tests.cpp
+  tests/gui/gui_feature_coverage_acceptance_tests.cpp \
+  tests/gui/gui_interactive_features_tests.cpp \
+  tests/gui/gui_interactive_finishing_tests.cpp
 ```
 
 ## Clean generated files

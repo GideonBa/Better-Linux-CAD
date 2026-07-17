@@ -268,6 +268,34 @@ which remains responsible for validation, preview, Apply, and one undoable trans
 
 Canonical contract: `docs/gui-viewport-manipulators-mvp9.md`.
 
+## Interactive Extrude, path Extrude, and Revolve
+
+Block 124 adds `GuiInteractiveExtrudeController` and `GuiInteractiveRevolveController` as headless
+authoring controllers over the frozen Block-52..62 extrude/revolve contracts. Each owns a disposable
+candidate feature parameter set, seeds Block-123 extent/taper/thin/angle handles, previews a
+PartDocument clone through the recompute plan, and commits one `commit_part_transaction` that seeds the
+driving `Length` parameters and adds the feature — so undo reverts parameter and feature together. All
+seven extent modes, taper, thin intent, path direction, and the three revolve extents stay frozen Core
+intent; no widget owns feature mathematics. `GuiInteractiveFeatureCoordinator` (owned by `MainWindow`)
+publishes the active controller's handles to the shared Block-123 manipulator layer and folds
+viewport candidates back into the candidate; the manipulator shell forwards its candidate callback into
+the coordinator.
+
+Canonical contract: `docs/gui-interactive-extrude-revolve-mvp9.md`.
+
+## Interactive Fillet, Chamfer, Shell, and Draft
+
+Block 125 adds `GuiInteractiveFinishingController` (Fillet/Chamfer) and
+`GuiInteractiveShellDraftController` (Shell/Draft) over the frozen Block-56..61 finishing contracts.
+Each collects an ordered, duplicate-free chain of semantic edges or faces — rejected at pick time with
+the same identity the Core edge/face-treatment contracts use — drives Block-123
+radius/distance/angle/thickness handles into existing `Length`/`Angle` driving parameters, previews a
+PartDocument clone through the recompute plan, and commits one transaction that seeds the parameters
+and adds the feature. Edges/faces without stable semantic identity are unpickable. The Block-124
+`GuiInteractiveFeatureCoordinator` owns these controllers alongside Extrude/Revolve.
+
+Canonical contract: `docs/gui-interactive-finishing-mvp9.md`.
+
 ## Semantic Part-feature input and generated topology identity
 
 Part features use typed semantic input references and expected capabilities instead of raw kernel
@@ -341,4 +369,7 @@ Blocks 106–121 are implemented and accepted. Block 122 adds the selection-firs
 capability-exact in-context command start, Finish-Sketch handoff, repeat, synchronized filters, and
 transient ViewCube/Home/bookmark state. Block 123 adds reusable candidate-only viewport manipulators,
 model-space mapping, deterministic fixed-DIP hit testing, exact release, and numeric-HUD coupling.
-Block 124 interactive Extrude, path Extrude, and Revolve authoring is the current next technical step.
+Block 124 adds interactive Extrude, path Extrude, and Revolve authoring over that infrastructure with
+one atomic Apply transaction, and Block 125 adds interactive Fillet, Chamfer, Shell, and Draft with
+ordered edge/face chain picking. Block 126 (interactive Pattern, Mirror, Body Boolean, and Body
+Transform) is the current next technical step.

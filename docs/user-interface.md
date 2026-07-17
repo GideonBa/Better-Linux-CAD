@@ -7,7 +7,9 @@ device-independent interaction, stable shared planar topology, deterministic sol
 and modification, profile/Finish-Sketch workflows, and Interactive Sketch3D. Block 121 completes
 integrated coverage, equivalence, atomicity, and measured performance acceptance. Block 122 implements
 the selection-first Part/Surface/Assembly workspace. Block 123 implements reusable candidate-only
-viewport manipulators and numeric-HUD coupling. Block 124 is next; STEP Import begins with Block 132.
+viewport manipulators and numeric-HUD coupling. Block 124 implements interactive Extrude, path
+Extrude, and Revolve authoring; Block 125 implements interactive Fillet, Chamfer, Shell, and Draft
+authoring. Block 126 is next; STEP Import begins with Block 132.
 
 The UI is deliberately not built like FreeCAD. The goal is a modern, consistent, reduced interface
 with clear separation between model, parameters, features, Sketch topology, solver results, and

@@ -5,6 +5,7 @@
 #include "blcad/gui/gui_analysis_export_workbench.hpp"
 #include "blcad/gui/gui_document_browser.hpp"
 #include "blcad/gui/gui_document_session.hpp"
+#include "blcad/gui/gui_interactive_extrude_revolve_binder.hpp"
 #include "blcad/gui/gui_modeling_workspace_binder.hpp"
 #include "blcad/gui/gui_part_foundation_workbench.hpp"
 #include "blcad/gui/gui_part_operations_workbench.hpp"
@@ -63,6 +64,10 @@ public:
   }
   void refresh_viewport_manipulators() {
     viewport_manipulator_shell_.refresh();
+  }
+  [[nodiscard]] GuiInteractiveFeatureCoordinator& interactive_features() noexcept {
+    viewport_manipulator_shell_.ensure_installed();
+    return interactive_features_;
   }
   [[nodiscard]] GuiPartFoundationWorkbench& part_foundation_workbench() noexcept;
   [[nodiscard]] GuiPartOperationsWorkbench& part_operations_workbench() noexcept;
@@ -133,6 +138,7 @@ private:
   GuiSketchWorkspace sketch_workspace_;
   GuiModelingWorkspace modeling_workspace_;
   GuiViewportManipulatorLayer viewport_manipulators_;
+  GuiInteractiveFeatureCoordinator interactive_features_{&session_, &viewport_manipulators_};
   GuiPartFoundationWorkbench part_foundation_workbench_;
   GuiPartOperationsWorkbench part_operations_workbench_;
   GuiSpatialSurfaceWorkbench spatial_surface_workbench_;

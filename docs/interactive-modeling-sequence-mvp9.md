@@ -1,7 +1,7 @@
 # Interactive Part & Assembly Modeling Sequence MVP-9
 
-Status: active through implemented Block 123 after accepted Interactive Sketcher Block 121. Blocks
-124–131 precede STEP Import MVP-10 (Blocks 132–138); Block 124 is the current next technical step.
+Status: active through implemented Block 125 after accepted Interactive Sketcher Block 121. Blocks
+126–131 precede STEP Import MVP-10 (Blocks 132–138); Block 126 is the current next technical step.
 
 This phase closes the interaction gap between the accepted validation GUI (MVP-7, Blocks 95–105)
 and an intuitive, Inventor-familiar modeling experience for **every feature family implemented
@@ -108,11 +108,11 @@ numeric typing opens the transient HUD, `Enter` accepts, double click edits.
 ## Frozen phase order
 
 ```text
-122 modeling workspace, preselection command start, mini-toolbar, and navigation aids
-123 transient viewport manipulator infrastructure and numeric coupling
-124 interactive Extrude, path Extrude, and Revolve authoring
-125 interactive Fillet, Chamfer, Shell, and Draft authoring
-126 interactive Pattern, Mirror, Body Boolean, and Body Transform authoring
+122 modeling workspace, preselection command start, mini-toolbar, and navigation aids — implemented
+123 transient viewport manipulator infrastructure and numeric coupling — implemented
+124 interactive Extrude, path Extrude, and Revolve authoring — implemented
+125 interactive Fillet, Chamfer, Shell, and Draft authoring — implemented
+126 interactive Pattern, Mirror, Body Boolean, and Body Transform authoring — next
 127 interactive PathCurve, Sweep, and Loft authoring
 128 interactive Surface authoring and surface-to-solid conversion
 129 feature edit lifecycle and the Core feature-update command boundary
@@ -195,7 +195,15 @@ Canonical contract: `docs/gui-viewport-manipulators-mvp9.md`.
 
 Focused tags: `[gui][viewport-manipulators]`, `[gui][manipulator-numeric-coupling]`.
 
-## Block 124 — Interactive Extrude, path Extrude, and Revolve
+## Block 124 — Interactive Extrude, path Extrude, and Revolve — Implemented
+
+`GuiInteractiveExtrudeController` and `GuiInteractiveRevolveController` (headless) author additive
+extrude, path extrude, and revolve from a materialized profile region, driving Block-123 extent/taper/
+thin/angle handles, previewing a disposable PartDocument clone, and committing one transaction that
+seeds the driving parameters and adds the feature. `GuiInteractiveFeatureCoordinator` (owned by
+`MainWindow`) publishes the active handles to the shared manipulator layer and folds manipulator
+candidates back into the controller. No new Core/Geometry intent was added. Canonical contract:
+`docs/gui-interactive-extrude-revolve-mvp9.md`.
 
 Start from a picked profile region or Finish-Sketch handoff. Show a live shaded candidate preview
 with the operation mode color-coded; NewBody/Join/Cut/Intersect is a one-click toggle. The extent
@@ -225,7 +233,15 @@ commit; incompatible profile selections disable the command with the required ca
 Focused tags: `[gui][interactive-extrude]`, `[gui][interactive-revolve]`,
 `[integration][extrude-revolve-manipulator]`.
 
-## Block 125 — Interactive Fillet, Chamfer, Shell, and Draft
+## Block 125 — Interactive Fillet, Chamfer, Shell, and Draft — Implemented
+
+`GuiInteractiveFinishingController` (Fillet/Chamfer) and `GuiInteractiveShellDraftController`
+(Shell/Draft) are headless controllers that collect an ordered, duplicate-free chain of semantic
+edges/faces, drive Block-123 radius/distance/angle/thickness handles into existing driving parameters,
+preview a disposable PartDocument clone, and commit one transaction that seeds the parameters and adds
+the feature. Edges/faces without stable semantic identity are unpickable at the selection layer. The
+Block-124 `GuiInteractiveFeatureCoordinator` now also owns these controllers. No new Core/Geometry
+intent was added. Canonical contract: `docs/gui-interactive-finishing-mvp9.md`.
 
 Hover highlights supported semantic edges/faces; clicking collects an ordered chain with duplicate
 rejection. Edges without stable semantic identity are visibly unpickable with the reason from the

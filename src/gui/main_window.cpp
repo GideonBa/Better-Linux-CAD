@@ -101,6 +101,10 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
   resize(1280, 800);
   create_default_commands();
   create_shell();
+  viewport_manipulator_shell_.set_candidate_callback(
+      [this](const GuiViewportManipulatorCandidate& candidate) {
+        interactive_features_.on_candidate(candidate);
+      });
   refresh_command_state();
 }
 

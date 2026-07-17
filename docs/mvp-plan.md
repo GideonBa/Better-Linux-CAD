@@ -4,10 +4,10 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 123
-current_block: 124
-current_boundary: Interactive Extrude, path Extrude, and Revolve authoring
-current_tag: "[gui][interactive-extrude]"
+implemented_through: Block 125
+current_block: 126
+current_boundary: Interactive Pattern, Mirror, Body Boolean, and Body Transform authoring
+current_tag: "[gui][interactive-pattern-mirror]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -17,7 +17,7 @@ phase_status:
   mvp_6: "Part Construction — Blocks 48–94 implemented; MVP complete"
   mvp_7: "GUI Feature Validation — Blocks 95–105 implemented; MVP complete"
   mvp_8: "Interactive Sketcher — Blocks 106–121 implemented; MVP complete"
-  mvp_9: "Interactive Part & Assembly Modeling — Blocks 122–123 implemented; Block 124 next"
+  mvp_9: "Interactive Part & Assembly Modeling — Blocks 122–125 implemented; Block 126 next"
   mvp_10: "STEP Import — Blocks 132–138 planned after Interactive Modeling acceptance"
 ---
 
@@ -30,15 +30,16 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 ## Current status
 
 ```text
-implemented through  Block 123
-current block        Block 124
+implemented through  Block 125
+current block        Block 126
 current phase        Interactive Part & Assembly Modeling MVP-9
-current boundary     interactive Extrude, path Extrude, and Revolve authoring
+current boundary     interactive Pattern, Mirror, Body Boolean, and Body Transform authoring
 ```
 
 Interactive Sketcher MVP-8 is complete and accepted. Blocks 122–123 establish the selection-first
-modeling workspace and reusable candidate-only viewport manipulators; Block 124 is the current next
-technical step.
+modeling workspace and reusable candidate-only viewport manipulators; Block 124 adds interactive
+Extrude, path Extrude, and Revolve authoring, and Block 125 adds interactive Fillet, Chamfer, Shell,
+and Draft authoring over that infrastructure. Block 126 is the current next technical step.
 
 ## Phase map
 
@@ -51,7 +52,7 @@ MVP-5   Assembly system                                 Blocks 1–47 implemente
 MVP-6   Part Construction                              Blocks 48–94 implemented
 MVP-7   GUI Feature Validation                        Blocks 95–105 implemented
 MVP-8   Interactive Sketcher                          Blocks 106–121 implemented
-MVP-9   Interactive Part & Assembly Modeling          Blocks 122–123 implemented; Block 124 next
+MVP-9   Interactive Part & Assembly Modeling          Blocks 122–125 implemented; Block 126 next
 MVP-10  STEP Import                                    Blocks 132–138 planned
 ```
 
@@ -339,10 +340,52 @@ Focused tags:
 [gui][manipulator-numeric-coupling]
 ```
 
-## Current next technical step — Block 124
+## Block 124 — Interactive Extrude, path Extrude, and Revolve — Implemented
 
-Implement interactive Extrude, path Extrude, and Revolve authoring over the Block-122 workspace and
-Block-123 candidate-only manipulator infrastructure as defined in
+`GuiInteractiveExtrudeController` and `GuiInteractiveRevolveController` (headless) upgrade the MVP-7
+form-driven commands into direct manipulation: a materialized profile region, driving `Length`
+parameter or revolve axis, and result `Body` seed a disposable candidate feature. Block-123
+extent/taper/thin/angle handles drive the parameters; preview validates a PartDocument clone through
+the recompute plan; Apply commits one transaction that seeds the driving parameters and adds the
+feature. All seven extent modes, taper, thin intent, path direction, and the three revolve extents
+remain frozen Core contracts. `GuiInteractiveFeatureCoordinator` (owned by `MainWindow`) connects the
+active controller to the shared Block-123 manipulator layer, folding viewport candidates into the
+candidate without moving authority into a widget.
+
+Canonical contract: `docs/gui-interactive-extrude-revolve-mvp9.md`.
+
+Focused tags:
+
+```text
+[gui][interactive-extrude]
+[gui][interactive-revolve]
+[integration][extrude-revolve-manipulator]
+```
+
+## Block 125 — Interactive Fillet, Chamfer, Shell, and Draft — Implemented
+
+`GuiInteractiveFinishingController` (Fillet/Chamfer) and `GuiInteractiveShellDraftController`
+(Shell/Draft) are headless controllers that collect an ordered, duplicate-free chain of semantic
+edges/faces, drive Block-123 radius/distance/angle/thickness handles into existing `Length`/`Angle`
+driving parameters, preview a disposable PartDocument clone through the recompute plan, and commit one
+transaction that seeds the parameters and adds the feature. The three chamfer modes, shell direction,
+and the draft pull/neutral/angle inputs stay frozen Core contracts; edges/faces without stable
+semantic identity are unpickable. `GuiInteractiveFeatureCoordinator` now also owns these controllers.
+
+Canonical contract: `docs/gui-interactive-finishing-mvp9.md`.
+
+Focused tags:
+
+```text
+[gui][interactive-finishing]
+[gui][interactive-shell-draft]
+[integration][edge-chain-picking]
+```
+
+## Current next technical step — Block 126
+
+Implement interactive Pattern, Mirror, Body Boolean, and Body Transform authoring with ghost previews
+over the Block-122 workspace and Block-123 manipulator infrastructure, as defined in
 `docs/interactive-modeling-sequence-mvp9.md`.
 
 ## Later phases
