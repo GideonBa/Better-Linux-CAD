@@ -4,10 +4,10 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 121
-current_block: 122
-current_boundary: Interactive modeling selection context and command contracts
-current_tag: "[gui][interactive-modeling-context]"
+implemented_through: Block 122
+current_block: 123
+current_boundary: Transient viewport manipulator infrastructure and numeric coupling
+current_tag: "[gui][viewport-manipulators]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -17,7 +17,7 @@ phase_status:
   mvp_6: "Part Construction — Blocks 48–94 implemented; MVP complete"
   mvp_7: "GUI Feature Validation — Blocks 95–105 implemented; MVP complete"
   mvp_8: "Interactive Sketcher — Blocks 106–121 implemented; MVP complete"
-  mvp_9: "Interactive Part & Assembly Modeling — Blocks 122–131 planned; Block 122 next"
+  mvp_9: "Interactive Part & Assembly Modeling — Block 122 implemented; Block 123 next"
   mvp_10: "STEP Import — Blocks 132–138 planned after Interactive Modeling acceptance"
 ---
 
@@ -30,13 +30,14 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 ## Current status
 
 ```text
-implemented through  Block 121
-current block        Block 122
+implemented through  Block 122
+current block        Block 123
 current phase        Interactive Part & Assembly Modeling MVP-9
-current boundary     selection context, command contracts, task panels, preview/apply/cancel
+current boundary     transient viewport manipulators and numeric HUD coupling
 ```
 
-Interactive Sketcher MVP-8 is complete and accepted. Block 122 is the current next technical step.
+Interactive Sketcher MVP-8 is complete and accepted. Block 122 establishes the selection-first
+modeling workspace; Block 123 is the current next technical step.
 
 ## Phase map
 
@@ -49,7 +50,7 @@ MVP-5   Assembly system                                 Blocks 1–47 implemente
 MVP-6   Part Construction                              Blocks 48–94 implemented
 MVP-7   GUI Feature Validation                        Blocks 95–105 implemented
 MVP-8   Interactive Sketcher                          Blocks 106–121 implemented
-MVP-9   Interactive Part & Assembly Modeling          Blocks 122–131 planned; Block 122 next
+MVP-9   Interactive Part & Assembly Modeling          Block 122 implemented; Block 123 next
 MVP-10  STEP Import                                    Blocks 132–138 planned
 ```
 
@@ -298,12 +299,32 @@ documents, GUI/headless recompute equivalence, pointer/model-target equivalence,
 Undo/Redo, Cancel/stale-preview atomicity, high-DPI mapping, and measured interaction paths. See
 `docs/interactive-sketcher-mvp8-acceptance.md`.
 
-## Current next technical step — Block 122
+## Block 122 — Selection-first modeling workspace and navigation — Implemented
 
-Begin Interactive Part & Assembly Modeling MVP-9 with the selection context and command contracts
-in `docs/interactive-modeling-sequence-mvp9.md`.
+`GuiModelingWorkspace` gives the application shell one shared transient Part/Surface/Assembly
+interaction authority. Verified semantic capabilities drive exact first-input command enablement and
+deterministic mini-toolbar ordering. Command start consumes preselection; Cancel restores the complete
+semantic selection and capability context; accepted commands become repeatable. Finish Sketch can
+handoff an authoritative profile directly to the profile-first command family. Session and viewport
+selection filters stay synchronized, and ViewCube targets, home view, and named camera bookmarks are
+transient.
+
+Canonical contract: `docs/gui-modeling-workspace-mvp9.md`.
+
+Focused tags:
+
+```text
+[gui][modeling-workspace]
+[gui][in-context-command]
+[gui][view-navigation-aids]
+```
+
+## Current next technical step — Block 123
+
+Implement the reusable transient viewport manipulator layer and numeric-HUD coupling defined in
+`docs/interactive-modeling-sequence-mvp9.md`.
 
 ## Later phases
 
-Interactive Part & Assembly Modeling MVP-9 begins at Block 122. STEP Import MVP-10 follows in
-Blocks 132–138.
+Interactive Part & Assembly Modeling MVP-9 continues through Block 131. STEP Import MVP-10 follows
+in Blocks 132–138.

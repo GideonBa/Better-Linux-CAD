@@ -8,12 +8,13 @@ live in [`docs/`](docs/). This README is intentionally kept small and evergreen 
 page.
 
 The assembly sequence is implemented through Block 47, Part Construction MVP-6 is complete through
-Block 94, GUI Feature Validation MVP-7 is accepted through Block 105, and Interactive Sketcher MVP-8
-is accepted through Block 121. Blocks 106–120 implement the contextual Sketch workspace, device-independent plane
-interaction, stable shared `SketchPointId` topology, deterministic planar solving with local
-DOF/conflict diagnostics, solver-backed semantic-handle dragging, line/conic/slot creation, spline
-editing, parameter-backed Sketch text, geometric constraint authoring, typed driving/reference
-Sketch dimensions, trim/extend/split/fillet/chamfer modification, line-chain/loop offset, associative
+Block 94, GUI Feature Validation MVP-7 is accepted through Block 105, Interactive Sketcher MVP-8 is
+accepted through Block 121, and Interactive Part & Assembly Modeling MVP-9 is active through Block
+122. Blocks 106–120 implement the contextual Sketch workspace, device-independent plane interaction,
+stable shared `SketchPointId` topology, deterministic planar solving with local DOF/conflict
+diagnostics, solver-backed semantic-handle dragging, line/conic/slot creation, spline editing,
+parameter-backed Sketch text, geometric constraint authoring, typed driving/reference Sketch
+dimensions, trim/extend/split/fillet/chamfer modification, line-chain/loop offset, associative
 projection/include, construction references, explicit break-link conversion, selected-geometry
 move/rotate/scale/copy/mirror, rectangular/circular Sketch patterns, multi-region recognition,
 profile selection, contour diagnostics, atomic Finish Sketch candidates, and direct Sketch3D point/
@@ -24,6 +25,9 @@ open/self-crossing/ambiguous diagnostics, point-based profile selection, and fai
 materialization. Block 120 adds orthogonal axis/plane locks, typed XYZ and distance/angle placement,
 atomic 3D point/line creation, shared-point handle editing, persistent guide roles, and explicit
 planar-Sketch point projection source intent without introducing a full 3D variational solver.
+Block 122 adds the shared selection-first Part/Surface/Assembly workspace authority: capability-exact
+preselection, deterministic contextual command recommendations, Finish-Sketch handoff, command
+repeat, synchronized selection filters, and transient ViewCube/home/bookmark navigation.
 
 Canonical Interactive Sketcher contracts include
 [`docs/gui-interactive-sketch-workspace-mvp8.md`](docs/gui-interactive-sketch-workspace-mvp8.md),
@@ -46,10 +50,12 @@ performance acceptance in
 [`docs/interactive-sketcher-mvp8-acceptance.md`](docs/interactive-sketcher-mvp8-acceptance.md).
 
 The optional Qt desktop covers document, Sketch, Part, Surface, Assembly, motion, analysis, and
-STEP-export validation workflows without moving authority out of Core/Geometry. Block 122 begins
-Interactive Part & Assembly Modeling in
-[`docs/interactive-modeling-sequence-mvp9.md`](docs/interactive-modeling-sequence-mvp9.md); STEP Import
-MVP-10 follows in Blocks 132–138.
+STEP-export validation workflows without moving authority out of Core/Geometry. Block 122 starts
+Interactive Part & Assembly Modeling with the selection-first workspace contract in
+[`docs/gui-modeling-workspace-mvp9.md`](docs/gui-modeling-workspace-mvp9.md). Block 123, transient
+viewport manipulators and numeric coupling, is next in
+[`docs/interactive-modeling-sequence-mvp9.md`](docs/interactive-modeling-sequence-mvp9.md); STEP
+Import MVP-10 follows in Blocks 132–138.
 
 ## Repository layout
 
@@ -78,6 +84,7 @@ Start here:
 - [`docs/gui-sketch-transform-pattern-mvp8.md`](docs/gui-sketch-transform-pattern-mvp8.md) — selected-geometry transforms, mirror, and pattern intent
 - [`docs/gui-sketch-regions-finish-mvp8.md`](docs/gui-sketch-regions-finish-mvp8.md) — regions, profile selection, diagnostics, and Finish Sketch
 - [`docs/gui-sketch3d-interaction-mvp8.md`](docs/gui-sketch3d-interaction-mvp8.md) — axis/plane locks, typed 3D placement, handles, guides, and projection
+- [`docs/gui-modeling-workspace-mvp9.md`](docs/gui-modeling-workspace-mvp9.md) — selection-first modeling commands, filters, handoff, repeat, and transient navigation
 
 ## License
 

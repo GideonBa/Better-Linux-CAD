@@ -1,17 +1,14 @@
 # User Interface Architecture
 
-Status: MVP-7 and Interactive Sketcher MVP-8 accepted through Block 121. Blocks 95–105 provide the optional
-Qt shell, document transactions, OCCT viewport, deterministic browser/property surfaces, and semantic
-selection synchronization. Blocks 106–110 establish the contextual Sketch workspace, transient plane interaction, persistent
-shared planar topology, deterministic general planar solver, and solver-backed semantic-handle mouse
-dragging. Block 111 adds multi-click basic creation tools with rubber-band previews and numeric
-entry. Blocks 112–116 add circle/arc/ellipse/slot creation, spline editing with Sketch text,
-constraint authoring with semantic glyphs, driving/reference dimensions with expression binding, and
-trim/extend/split/fillet/chamfer modification. Blocks 117–120 add offset with associative
-projection, Sketch transforms/mirror/patterns, region recognition with Finish Sketch, and
-Interactive Sketch3D. Block 121 completes integrated coverage, equivalence, atomicity, and measured
-performance acceptance. Block 122 begins interactive Part/Surface/Assembly modeling; STEP Import
-begins with Block 132.
+Status: MVP-7 and Interactive Sketcher MVP-8 are accepted through Block 121. Blocks 95–105 provide
+the optional Qt shell, document transactions, OCCT viewport, deterministic browser/property surfaces,
+and semantic selection synchronization. Blocks 106–120 establish the contextual Sketch workspace,
+device-independent interaction, stable shared planar topology, deterministic solving, direct creation
+and modification, profile/Finish-Sketch workflows, and Interactive Sketch3D. Block 121 completes
+integrated coverage, equivalence, atomicity, and measured performance acceptance. Block 122 implements
+the first Interactive Part & Assembly Modeling boundary: visible Part/Surface/Assembly context tabs,
+capability-exact command start, contextual mini-toolbar, selection filters, repeat, ViewCube, Home, and
+camera bookmarks. Block 123 is next; STEP Import begins with Block 132.
 
 The UI is deliberately not built like FreeCAD. The goal is a modern, consistent, reduced interface
 with clear separation between model, parameters, features, Sketch topology, solver results, and
@@ -28,6 +25,49 @@ Assembly. The UI operates Core/Geometry authorities; it must not own CAD or solv
 | Property panel | edit selected object/feature through validated commands |
 | Command palette | quick access to Sketch, Part, Surface, Assembly, Inspect, and Exchange commands |
 | Engineering panel | later technical assistants for mechanical engineering domains |
+
+## Selection-first modeling workspace
+
+Block 122 adds a second, model-context command surface over the accepted MVP-7 shell. The global
+workspace row remains `Part | Assembly | Inspect | Exchange`; the modeling context row is:
+
+```text
+Part | Surface | Assembly | Selection filter | Repeat | ViewCube | Camera bookmarks
+```
+
+`GuiModelingWorkspace` owns transient command-selection state. `GuiModelingWorkspaceShellBinder`
+renders it through stable Qt object names:
+
+```text
+blcad.modeling_toolbar
+blcad.modeling_tabs
+blcad.modeling_selection_filter
+blcad.modeling_repeat
+blcad.modeling_mini_toolbar
+blcad.view_cube
+blcad.camera_bookmarks
+```
+
+A semantic viewport/browser selection becomes a command source only when its verified capability
+matches a command's first input. A Body can expose Boolean/Transform/Pattern/Mirror starts; an Edge can
+expose Fillet/Chamfer; a materialized profile region can expose Extrude/Revolve/Sweep/Loft/path
+Extrude. The UI does not infer capability from OCCT topology, display labels, or semantic-id spelling.
+
+The mini-toolbar appears near the latest viewport click, orders commands deterministically, consumes
+the selected object on command start, and exposes Cancel while the existing task state is active.
+`Esc` and Cancel restore the complete semantic selection plus capability context. Repeat starts the
+same command id without replaying hidden parameter or selection state.
+
+Finish Sketch keeps the existing camera, cursor, workspace, and selection-filter restoration. A
+feature handoff is emitted only when the inspected region resolves to a profile already materialized
+in the persistent Sketch. Detected but non-materialized regions fail closed and do not become feature
+inputs.
+
+The selection-filter combo publishes one mask to both `GuiSelectionModel` and `OcctViewport`. The
+ViewCube reuses viewport standard-camera authority; Home and named bookmarks store complete transient
+camera snapshots and never enter Part, Project, sidecar, undo history, or exchange persistence.
+
+Canonical contract: `docs/gui-modeling-workspace-mvp9.md`.
 
 ## Contextual Sketch workspace
 
@@ -57,19 +97,19 @@ Producer boundaries are explicit:
 Block 107  cursor / hover / hit / box selection / grid / snap / inference
 Block 108  persistent shared SketchPointId / SketchTopology identity
 Block 109  deterministic solve result / exact local remaining DOF / solver diagnostics
-Block 110  semantic handles / live drag solve invocation / status publication / release commit — implemented — implemented — implemented — implemented — implemented
+Block 110  semantic handles / live drag solve invocation / status publication / release commit
 ```
 
 Block 109 provides the headless producer and Block 110 continuously publishes baseline/live drag
-`SketchSolveResult` status and remaining DOF through the existing status row. The UI does not count
-endpoints or glyphs to estimate DOF. The UI must render
+`SketchSolveResult` status and remaining DOF through the existing status row. The UI must render
 `SketchSolveResult`; it must not count endpoints or glyphs to estimate DOF.
 
 `Enter Sketch` captures workspace, semantic selection, full transient camera state, and viewport
 selection filter. It resolves workplane, enters normal orthographic view, restricts picking to
 SketchEntity/Edge/Vertex, and uses a crosshair. `Finish Sketch` rejects active commands or current
 Finish diagnostics and restores workspace, selection, camera, and selection filtering. It does not
-invent an Extrude or another downstream feature.
+invent an Extrude or another downstream feature; the Block-122 handoff only publishes an existing
+materialized profile as transient preselection.
 
 The command lifecycle is canonical in `docs/gui-interactive-sketch-workspace-mvp8.md`.
 
@@ -227,7 +267,7 @@ tested within 9 DIP by screen distance then stable handle id, without changing B
 or failed solve restores the source preview and creates no history entry. Pointer moves coalesce to the
 latest pending sample; release synchronously flushes the exact final snapped position.
 
-The block must expose endpoint, midpoint, center, radius, arc, spline, and dimension handles only where
+The block exposes endpoint, midpoint, center, radius, arc, spline, and dimension handles only where
 semantic topology/constraint authority exists. Handle screen position is presentation; handle identity
 must resolve to stable Core point/entity roles.
 
@@ -251,7 +291,8 @@ gasket_thickness         2      mm    -                Gasket
 
 Feature-creation workflows share consistent task/preview/commit structure and consume existing Core/
 Geometry authorities. Current validation workbenches expose Part, Surface, Assembly, analysis, and
-exchange families. Selection-first manipulators are sequenced in
+exchange families. Block 122 now supplies their common selection-first command-start and navigation
+surface. Blocks 123–130 add manipulators and family-specific authoring in the order frozen by
 `docs/interactive-modeling-sequence-mvp9.md`.
 
 Constraint suggestions remain deterministic from compatible geometry/capability types; they do not
@@ -279,13 +320,17 @@ but release cannot commit a failed candidate.
 8. Add solver-backed semantic-handle drag and atomic release commit. Implemented in 110.
 9. Add creation, constraints, dimensions, modify/project tools, regions, Interactive Sketch3D, and
    integrated acceptance through Block 121. Implemented and accepted.
-10. Add selection-first Part/Surface/Assembly modeling through Blocks 122–131.
-11. Add STEP Reference/EditableBody import through Blocks 132–138.
+10. Add the selection-first Part/Surface/Assembly workspace, contextual commands, filters, and
+    navigation aids. Implemented in Block 122.
+11. Add transient manipulators and interactive Part/Surface/Assembly authoring through Blocks 123–131.
+12. Add STEP Reference/EditableBody import through Blocks 132–138.
 
 ## Current boundary
 
-Blocks 106–121 are implemented and Interactive Sketcher MVP-8 is accepted. Block 122 is next.
+Blocks 106–121 are implemented and Interactive Sketcher MVP-8 is accepted. Block 122 is implemented.
+Block 123, reusable transient viewport manipulators with numeric-HUD coupling, is next.
 
-No widget may implement substitute constraint mathematics. Basic creation must map transient picks and
-snap results to explicit Block-108 topology/edit commands, use Block-109 solve authority for disposable
-candidates, and commit through the existing validated document transaction/history boundary.
+No widget may implement substitute constraint mathematics. Sketch and modeling interactions map
+transient picks to explicit semantic capabilities and public Core/application commands, use existing
+solver/Geometry authorities for disposable candidates, and commit through the validated document
+transaction/history boundary.
