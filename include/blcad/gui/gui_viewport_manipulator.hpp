@@ -7,11 +7,10 @@
 
 #include <algorithm>
 #include <array>
-#include <cerrno>
 #include <cctype>
+#include <charconv>
 #include <cmath>
 #include <cstddef>
-#include <cstdlib>
 #include <functional>
 #include <iomanip>
 #include <limits>
@@ -696,13 +695,18 @@ private:
     const auto first = text.find_first_not_of(" \t\r\n");
     if (first == std::string::npos) return std::nullopt;
     text = text.substr(first, text.find_last_not_of(" \t\r\n") - first + 1);
-    errno = 0;
-    char* end = nullptr;
-    const double value = std::strtod(text.c_str(), &end);
-    if (end == text.c_str() || errno == ERANGE || !std::isfinite(value))
+    // Parse locale-independently: a Qt QApplication resets the C locale
+    // (LC_NUMERIC) to the system locale, so std::strtod would reject a '.'
+    // decimal on locales that use ',' (e.g. de_DE). std::from_chars always uses
+    // '.', which also matches the dot-formatted HUD text from format_candidate.
+    double value = 0.0;
+    const char* const begin = text.data();
+    const char* const stop = begin + text.size();
+    auto [end, ec] = std::from_chars(begin, stop, value);
+    if (end == begin || ec != std::errc() || !std::isfinite(value))
       return std::nullopt;
-    while (*end != '\0' && std::isspace(static_cast<unsigned char>(*end))) ++end;
-    const std::string suffix(end);
+    while (end != stop && std::isspace(static_cast<unsigned char>(*end))) ++end;
+    const std::string suffix(end, stop);
     const auto kind = manipulator_detail::value_kind(h.kind);
     if (!suffix.empty() && suffix != manipulator_unit(kind)) return std::nullopt;
     if (kind == GuiViewportManipulatorValueKind::Count &&

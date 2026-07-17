@@ -133,7 +133,9 @@ source. While a numeric override is active, further pointer movement does not re
 The override may be explicitly cleared to resume drag-derived values from the latest pointer sample.
 
 Invalid text, incompatible unit suffixes, and fractional PatternCount values are rejected without
-changing the last valid candidate.
+changing the last valid candidate. Numeric input is parsed locale-independently (`.` decimal),
+matching the layer's own dot-formatted HUD text; a Qt application resetting the C locale to a
+comma-decimal system locale does not change parsing.
 
 ## Qt shell boundary
 

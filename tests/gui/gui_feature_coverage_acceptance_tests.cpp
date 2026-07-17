@@ -283,6 +283,13 @@ TEST_CASE("Block 122 exposes visible transient workspace and camera controls thr
         selection_kind_bit(GuiSelectionKind::Body));
   CHECK(viewport->selection_filter_mask() == selection_kind_bit(GuiSelectionKind::Body));
 
+  // "All" must publish the unfiltered sentinel so activating the modeling
+  // workspace never narrows viewport selectability below the Block-106 default.
+  workspace.apply_selection_filter(window.session(), *viewport,
+                                   GuiModelingSelectionFilter::All);
+  CHECK(window.session().selection().filter_mask() == 0xFFFFFFFFU);
+  CHECK(viewport->selection_filter_mask() == 0xFFFFFFFFU);
+
   workspace.capture_home_view(*viewport);
   REQUIRE(workspace.activate_view_cube_target(*viewport, GuiViewCubeTarget::Front));
   REQUIRE(workspace.save_camera_bookmark("front inspection", *viewport));

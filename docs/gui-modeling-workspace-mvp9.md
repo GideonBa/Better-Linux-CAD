@@ -127,9 +127,12 @@ second profile, altering the Sketch, or persisting the transient semantic presen
 ## Selection filters
 
 The frozen filters are All, Profiles, Datums, Faces, Edges, Bodies, Components, and Assembly Targets.
-The workspace maps each filter to the existing `GuiSelectionKind` bit mask and publishes the same mask
-to both `GuiSelectionModel` and `OcctViewport`. Changing a filter removes incompatible transient
-selection and capability context instead of retaining an invisible command source.
+The workspace maps each specific filter to the existing `GuiSelectionKind` bit mask and publishes the
+same mask to both `GuiSelectionModel` and `OcctViewport`. `All` maps to the viewport's unfiltered
+sentinel rather than a union of the modeling kinds, so activating the workspace never narrows viewport
+selectability or overrides the default restored when a Sketch is finished. Changing a filter removes
+incompatible transient selection and capability context instead of retaining an invisible command
+source.
 
 ## ViewCube, home view, and camera bookmarks
 

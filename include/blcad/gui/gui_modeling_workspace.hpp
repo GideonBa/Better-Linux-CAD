@@ -173,13 +173,12 @@ public:
     case GuiModelingSelectionFilter::AssemblyTargets:
       return selection_kind_bit(GuiSelectionKind::AssemblyTarget);
     case GuiModelingSelectionFilter::All:
-      return selection_kind_bit(GuiSelectionKind::SketchEntity) |
-             selection_kind_bit(GuiSelectionKind::Datum) |
-             selection_kind_bit(GuiSelectionKind::Face) |
-             selection_kind_bit(GuiSelectionKind::Edge) |
-             selection_kind_bit(GuiSelectionKind::Body) |
-             selection_kind_bit(GuiSelectionKind::Component) |
-             selection_kind_bit(GuiSelectionKind::AssemblyTarget);
+      // "All" means no narrowing. It must equal the viewport's unfiltered
+      // sentinel (0xFFFFFFFF), not a union of the specific modeling kinds:
+      // enumerating kinds would silently drop Vertex and, when the workspace
+      // publishes the mask to OcctViewport on install/refresh, would override
+      // the viewport default and regress the Finish-Sketch reset contract.
+      return ~std::uint32_t{0};
     }
     return 0;
   }
