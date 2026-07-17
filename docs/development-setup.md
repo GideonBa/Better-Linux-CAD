@@ -280,6 +280,19 @@ modes with their offered handles, shell direction toggle and thickness, draft pu
 authoring, fail-closed rejection of invalid inputs, and manipulator/typed document equivalence for
 fillet radius and coordinator-routed shell thickness.
 
+Block 126 interactive Pattern, Mirror, Body Boolean, and Body Transform authoring:
+
+```bash
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][interactive-pattern-mirror]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][interactive-body-operation]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][pattern-ghost-preview]"
+```
+
+These cases verify linear/circular pattern parameter driving with exact undo, mirror authoring,
+boolean role validation and keep toggle, the translate/rotate/scale transform stack, fail-closed
+rejection of invalid inputs, and manipulator/typed document equivalence for pattern spacing and
+coordinator-routed transform translation.
+
 ## Representative existing validation tags
 
 ```bash
@@ -313,7 +326,7 @@ in the existing `blcad_gui_tests` executable; no second Qt application instance 
 ./build/dev-geometry/blcad_analyze_assembly input.blcad.project.json
 ```
 
-## Public Blocks 122–125 boundaries
+## Public Blocks 122–126 boundaries
 
 ```text
 include/blcad/gui/gui_modeling_workspace.hpp
@@ -323,21 +336,24 @@ include/blcad/gui/gui_viewport_manipulator_binder.hpp
 include/blcad/gui/gui_interactive_extrude_revolve.hpp
 include/blcad/gui/gui_interactive_extrude_revolve_binder.hpp
 include/blcad/gui/gui_interactive_finishing.hpp
+include/blcad/gui/gui_interactive_pattern_body.hpp
 include/blcad/gui/main_window.hpp
 tests/gui/gui_feature_coverage_acceptance_tests.cpp
 tests/gui/gui_interactive_features_tests.cpp
 tests/gui/gui_interactive_finishing_tests.cpp
+tests/gui/gui_interactive_pattern_body_tests.cpp
 docs/gui-modeling-workspace-mvp9.md
 docs/gui-viewport-manipulators-mvp9.md
 docs/gui-interactive-extrude-revolve-mvp9.md
 docs/gui-interactive-finishing-mvp9.md
+docs/gui-interactive-pattern-body-mvp9.md
 ```
 
-All Block-122 through Block-125 transient state — command catalogs, verified preselection
+All Block-122 through Block-126 transient state — command catalogs, verified preselection
 capabilities, mini-toolbar state, repeat, filters, Home/bookmarks, camera mappings, handle
-descriptors, pointer measurements, hit products, HUD text, edge/face chains, candidate feature
-parameters, and previews — does not change Core/Geometry or any save format. A controller's Apply is
-the only mutation, and it flows through one existing `commit_part_transaction`.
+descriptors, pointer measurements, hit products, HUD text, edge/face chains, pattern sources, tool
+bodies, candidate feature parameters, and previews — does not change Core/Geometry or any save format.
+A controller's Apply is the only mutation, and it flows through one existing `commit_part_transaction`.
 
 ## Formatting
 
@@ -352,10 +368,12 @@ clang-format -i \
   include/blcad/gui/gui_interactive_extrude_revolve.hpp \
   include/blcad/gui/gui_interactive_extrude_revolve_binder.hpp \
   include/blcad/gui/gui_interactive_finishing.hpp \
+  include/blcad/gui/gui_interactive_pattern_body.hpp \
   include/blcad/gui/main_window.hpp \
   tests/gui/gui_feature_coverage_acceptance_tests.cpp \
   tests/gui/gui_interactive_features_tests.cpp \
-  tests/gui/gui_interactive_finishing_tests.cpp
+  tests/gui/gui_interactive_finishing_tests.cpp \
+  tests/gui/gui_interactive_pattern_body_tests.cpp
 ```
 
 ## Clean generated files

@@ -2,6 +2,7 @@
 
 #include "blcad/gui/gui_interactive_extrude_revolve.hpp"
 #include "blcad/gui/gui_interactive_finishing.hpp"
+#include "blcad/gui/gui_interactive_pattern_body.hpp"
 #include "blcad/gui/gui_viewport_manipulator.hpp"
 
 #include <utility>
@@ -9,12 +10,13 @@
 
 namespace blcad::gui {
 
-// Block 124/125 coordinator that connects the interactive Extrude, Revolve,
-// Fillet/Chamfer, and Shell/Draft controllers to the Block-123 candidate-only
-// manipulator layer. It is deliberately Qt-free: MainWindow owns one instance
-// and routes the manipulator shell's candidate callback into on_candidate(...).
-// No document authority lives here; every mutation still flows through a
-// controller's one Apply transaction. At most one controller is active.
+// Block 124/125/126 coordinator that connects the interactive Extrude, Revolve,
+// Fillet/Chamfer, Shell/Draft, Pattern/Mirror, and Body Boolean/Transform
+// controllers to the Block-123 candidate-only manipulator layer. It is
+// deliberately Qt-free: MainWindow owns one instance and routes the manipulator
+// shell's candidate callback into on_candidate(...). No document authority lives
+// here; every mutation still flows through a controller's one Apply transaction.
+// At most one controller is active.
 class GuiInteractiveFeatureCoordinator {
 public:
   GuiInteractiveFeatureCoordinator(GuiDocumentSession* session,
@@ -25,8 +27,15 @@ public:
   [[nodiscard]] GuiInteractiveRevolveController& revolve() noexcept { return revolve_; }
   [[nodiscard]] GuiInteractiveFinishingController& finishing() noexcept { return finishing_; }
   [[nodiscard]] GuiInteractiveShellDraftController& shell_draft() noexcept { return shell_draft_; }
+  [[nodiscard]] GuiInteractivePatternMirrorController& pattern_mirror() noexcept {
+    return pattern_mirror_;
+  }
+  [[nodiscard]] GuiInteractiveBodyOperationController& body_operation() noexcept {
+    return body_operation_;
+  }
   [[nodiscard]] bool active() const noexcept {
-    return extrude_.active() || revolve_.active() || finishing_.active() || shell_draft_.active();
+    return extrude_.active() || revolve_.active() || finishing_.active() || shell_draft_.active() ||
+           pattern_mirror_.active() || body_operation_.active();
   }
 
   // Re-publish the active controller's handles to the shared manipulator layer.
@@ -76,6 +85,8 @@ public:
     else if (revolve_.active()) changed = revolve_.apply_manipulator(candidate);
     else if (finishing_.active()) changed = finishing_.apply_manipulator(candidate);
     else if (shell_draft_.active()) changed = shell_draft_.apply_manipulator(candidate);
+    else if (pattern_mirror_.active()) changed = pattern_mirror_.apply_manipulator(candidate);
+    else if (body_operation_.active()) changed = body_operation_.apply_manipulator(candidate);
     if (changed && layer_ != nullptr && layer_->active_handle_id().empty()) publish_handles();
   }
 
@@ -87,6 +98,8 @@ public:
     if (revolve_.active()) return revolve_.preview(*session_);
     if (finishing_.active()) return finishing_.preview(*session_);
     if (shell_draft_.active()) return shell_draft_.preview(*session_);
+    if (pattern_mirror_.active()) return pattern_mirror_.preview(*session_);
+    if (body_operation_.active()) return body_operation_.preview(*session_);
     return Result<GuiPartFeaturePreview>::failure(
         Error::validation("gui.interactive_features", "no interactive feature is active"));
   }
@@ -101,6 +114,8 @@ public:
     else if (revolve_.active()) applied = revolve_.apply(*session_);
     else if (finishing_.active()) applied = finishing_.apply(*session_);
     else if (shell_draft_.active()) applied = shell_draft_.apply(*session_);
+    else if (pattern_mirror_.active()) applied = pattern_mirror_.apply(*session_);
+    else if (body_operation_.active()) applied = body_operation_.apply(*session_);
     if (!applied.has_error()) clear_handles();
     return applied;
   }
@@ -110,6 +125,8 @@ public:
     revolve_.cancel();
     finishing_.cancel();
     shell_draft_.cancel();
+    pattern_mirror_.cancel();
+    body_operation_.cancel();
     clear_handles();
   }
 
@@ -127,6 +144,10 @@ private:
       handles = finishing_.handles();
     } else if (shell_draft_.active()) {
       handles = shell_draft_.handles();
+    } else if (pattern_mirror_.active()) {
+      handles = pattern_mirror_.handles();
+    } else if (body_operation_.active()) {
+      handles = body_operation_.handles();
     }
     (void)layer_->set_handles(std::move(handles));
   }
@@ -141,6 +162,8 @@ private:
   GuiInteractiveRevolveController revolve_;
   GuiInteractiveFinishingController finishing_;
   GuiInteractiveShellDraftController shell_draft_;
+  GuiInteractivePatternMirrorController pattern_mirror_;
+  GuiInteractiveBodyOperationController body_operation_;
 };
 
 } // namespace blcad::gui

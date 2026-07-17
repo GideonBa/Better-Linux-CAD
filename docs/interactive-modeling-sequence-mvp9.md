@@ -1,7 +1,7 @@
 # Interactive Part & Assembly Modeling Sequence MVP-9
 
-Status: active through implemented Block 125 after accepted Interactive Sketcher Block 121. Blocks
-126–131 precede STEP Import MVP-10 (Blocks 132–138); Block 126 is the current next technical step.
+Status: active through implemented Block 126 after accepted Interactive Sketcher Block 121. Blocks
+127–131 precede STEP Import MVP-10 (Blocks 132–138); Block 127 is the current next technical step.
 
 This phase closes the interaction gap between the accepted validation GUI (MVP-7, Blocks 95–105)
 and an intuitive, Inventor-familiar modeling experience for **every feature family implemented
@@ -112,8 +112,8 @@ numeric typing opens the transient HUD, `Enter` accepts, double click edits.
 123 transient viewport manipulator infrastructure and numeric coupling — implemented
 124 interactive Extrude, path Extrude, and Revolve authoring — implemented
 125 interactive Fillet, Chamfer, Shell, and Draft authoring — implemented
-126 interactive Pattern, Mirror, Body Boolean, and Body Transform authoring — next
-127 interactive PathCurve, Sweep, and Loft authoring
+126 interactive Pattern, Mirror, Body Boolean, and Body Transform authoring — implemented
+127 interactive PathCurve, Sweep, and Loft authoring — next
 128 interactive Surface authoring and surface-to-solid conversion
 129 feature edit lifecycle and the Core feature-update command boundary
 130 interactive Assembly placement, relationships, joints, and motion
@@ -270,7 +270,16 @@ diagnostics instead of guessing.
 Focused tags: `[gui][interactive-finishing]`, `[gui][interactive-shell-draft]`,
 `[integration][edge-chain-picking]`.
 
-## Block 126 — Interactive Pattern, Mirror, Body Boolean, and Body Transform
+## Block 126 — Interactive Pattern, Mirror, Body Boolean, and Body Transform — Implemented
+
+`GuiInteractivePatternMirrorController` (Linear/Circular Pattern, Mirror) and
+`GuiInteractiveBodyOperationController` (Body Boolean, Body Transform) are headless controllers that
+collect ordered Feature/Body sources or tool Bodies, drive Block-123 spacing/count/angle handles or
+translate-triad/rotate/scale handles into existing driving parameters and literals, preview a
+disposable PartDocument clone, and commit one transaction. Body Transform appends exactly one
+Translate/Rotate/UniformScale record to the persistent stack and never collapses it. The Block-124
+`GuiInteractiveFeatureCoordinator` now also owns these controllers. No new Core/Geometry intent was
+added. Canonical contract: `docs/gui-interactive-pattern-body-mvp9.md`.
 
 Patterns pick ordered Feature/Body sources, a typed direction or axis, and preview instance ghosts;
 spacing/total-extent drags linearly, total-angle drags angularly, count edits through the HUD.

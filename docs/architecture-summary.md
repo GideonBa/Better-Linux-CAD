@@ -296,6 +296,19 @@ and adds the feature. Edges/faces without stable semantic identity are unpickabl
 
 Canonical contract: `docs/gui-interactive-finishing-mvp9.md`.
 
+## Interactive Pattern, Mirror, Body Boolean, and Body Transform
+
+Block 126 adds `GuiInteractivePatternMirrorController` (Linear/Circular Pattern, Mirror) and
+`GuiInteractiveBodyOperationController` (Body Boolean, Body Transform) over the frozen Block-63..69
+contracts. Patterns and Mirror collect ordered, duplicate-free Feature/Body sources; Boolean collects
+tool Bodies with the target excluded; Body Transform appends one Translate/Rotate/UniformScale record
+to the persistent stack without ever collapsing it. Block-123 spacing/count/angle handles or a
+translate-triad/rotate/scale drive existing `Count`/`Length` parameters and literals; preview validates
+a PartDocument clone through the recompute plan, and Apply commits one transaction. The Block-124
+`GuiInteractiveFeatureCoordinator` owns these controllers alongside the earlier interactive commands.
+
+Canonical contract: `docs/gui-interactive-pattern-body-mvp9.md`.
+
 ## Semantic Part-feature input and generated topology identity
 
 Part features use typed semantic input references and expected capabilities instead of raw kernel
@@ -370,6 +383,7 @@ capability-exact in-context command start, Finish-Sketch handoff, repeat, synchr
 transient ViewCube/Home/bookmark state. Block 123 adds reusable candidate-only viewport manipulators,
 model-space mapping, deterministic fixed-DIP hit testing, exact release, and numeric-HUD coupling.
 Block 124 adds interactive Extrude, path Extrude, and Revolve authoring over that infrastructure with
-one atomic Apply transaction, and Block 125 adds interactive Fillet, Chamfer, Shell, and Draft with
-ordered edge/face chain picking. Block 126 (interactive Pattern, Mirror, Body Boolean, and Body
-Transform) is the current next technical step.
+one atomic Apply transaction, Block 125 adds interactive Fillet, Chamfer, Shell, and Draft with
+ordered edge/face chain picking, and Block 126 adds interactive Pattern, Mirror, Body Boolean, and
+Body Transform with the persistent transform stack. Block 127 (interactive PathCurve, Sweep, and Loft)
+is the current next technical step.

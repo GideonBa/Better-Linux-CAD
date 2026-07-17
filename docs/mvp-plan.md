@@ -4,10 +4,10 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 125
-current_block: 126
-current_boundary: Interactive Pattern, Mirror, Body Boolean, and Body Transform authoring
-current_tag: "[gui][interactive-pattern-mirror]"
+implemented_through: Block 126
+current_block: 127
+current_boundary: Interactive PathCurve, Sweep, and Loft authoring
+current_tag: "[gui][interactive-path-sweep]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -17,7 +17,7 @@ phase_status:
   mvp_6: "Part Construction — Blocks 48–94 implemented; MVP complete"
   mvp_7: "GUI Feature Validation — Blocks 95–105 implemented; MVP complete"
   mvp_8: "Interactive Sketcher — Blocks 106–121 implemented; MVP complete"
-  mvp_9: "Interactive Part & Assembly Modeling — Blocks 122–125 implemented; Block 126 next"
+  mvp_9: "Interactive Part & Assembly Modeling — Blocks 122–126 implemented; Block 127 next"
   mvp_10: "STEP Import — Blocks 132–138 planned after Interactive Modeling acceptance"
 ---
 
@@ -30,16 +30,17 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 ## Current status
 
 ```text
-implemented through  Block 125
-current block        Block 126
+implemented through  Block 126
+current block        Block 127
 current phase        Interactive Part & Assembly Modeling MVP-9
-current boundary     interactive Pattern, Mirror, Body Boolean, and Body Transform authoring
+current boundary     interactive PathCurve, Sweep, and Loft authoring
 ```
 
 Interactive Sketcher MVP-8 is complete and accepted. Blocks 122–123 establish the selection-first
 modeling workspace and reusable candidate-only viewport manipulators; Block 124 adds interactive
-Extrude, path Extrude, and Revolve authoring, and Block 125 adds interactive Fillet, Chamfer, Shell,
-and Draft authoring over that infrastructure. Block 126 is the current next technical step.
+Extrude, path Extrude, and Revolve authoring, Block 125 adds interactive Fillet, Chamfer, Shell, and
+Draft authoring, and Block 126 adds interactive Pattern, Mirror, Body Boolean, and Body Transform
+authoring over that infrastructure. Block 127 is the current next technical step.
 
 ## Phase map
 
@@ -52,7 +53,7 @@ MVP-5   Assembly system                                 Blocks 1–47 implemente
 MVP-6   Part Construction                              Blocks 48–94 implemented
 MVP-7   GUI Feature Validation                        Blocks 95–105 implemented
 MVP-8   Interactive Sketcher                          Blocks 106–121 implemented
-MVP-9   Interactive Part & Assembly Modeling          Blocks 122–125 implemented; Block 126 next
+MVP-9   Interactive Part & Assembly Modeling          Blocks 122–126 implemented; Block 127 next
 MVP-10  STEP Import                                    Blocks 132–138 planned
 ```
 
@@ -382,10 +383,30 @@ Focused tags:
 [integration][edge-chain-picking]
 ```
 
-## Current next technical step — Block 126
+## Block 126 — Interactive Pattern, Mirror, Body Boolean, and Body Transform — Implemented
 
-Implement interactive Pattern, Mirror, Body Boolean, and Body Transform authoring with ghost previews
-over the Block-122 workspace and Block-123 manipulator infrastructure, as defined in
+`GuiInteractivePatternMirrorController` (Linear/Circular Pattern, Mirror) and
+`GuiInteractiveBodyOperationController` (Body Boolean, Body Transform) are headless controllers that
+collect ordered Feature/Body sources or tool Bodies, drive Block-123 spacing/count/angle handles or
+translate-triad/rotate/scale handles into existing `Count`/`Length` parameters and literals, preview a
+disposable PartDocument clone, and commit one transaction. Body Transform appends exactly one
+Translate/Rotate/UniformScale record to the persistent stack and never collapses it; the target Body
+can never also be a boolean tool. `GuiInteractiveFeatureCoordinator` now also owns these controllers.
+
+Canonical contract: `docs/gui-interactive-pattern-body-mvp9.md`.
+
+Focused tags:
+
+```text
+[gui][interactive-pattern-mirror]
+[gui][interactive-body-operation]
+[integration][pattern-ghost-preview]
+```
+
+## Current next technical step — Block 127
+
+Implement interactive PathCurve, Sweep, and Loft authoring with ordered-section picking over the
+Block-122 workspace and Block-123 manipulator infrastructure, as defined in
 `docs/interactive-modeling-sequence-mvp9.md`.
 
 ## Later phases

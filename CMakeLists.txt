@@ -567,6 +567,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_feature_coverage_acceptance_tests.cpp
       tests/gui/gui_interactive_features_tests.cpp
       tests/gui/gui_interactive_finishing_tests.cpp
+      tests/gui/gui_interactive_pattern_body_tests.cpp
       tests/gui/gui_startup_splash_tests.cpp
     )
     target_link_libraries(blcad_gui_tests PRIVATE BLCAD::gui Catch2::Catch2)
