@@ -57,19 +57,30 @@ TEST_CASE("Block 105 coverage manifest accounts for every implemented GUI featur
   const auto manifest = read_json(source_dir / "docs/gui-feature-coverage-manifest-mvp7.json");
   CHECK(manifest.at("schema") == "blcad.gui-feature-coverage.v1");
   CHECK(manifest.at("implemented_through") == 105);
-  const std::set<std::string> required = {
-      "document-session", "viewport-selection", "browser-properties", "parameters-expressions",
-      "datum-construction-workplanes", "planar-sketch-reference-repair",
-      "bodies-extrude-revolve-holes", "pattern-mirror-finishing-shell-draft",
-      "body-boolean-transform", "sketch3d-pathcurve", "sweep-path-extrude-loft",
-      "surface-features", "assembly-project-hierarchy", "assembly-relationships-joints",
-      "assembly-solve-motion", "assembly-analysis", "part-step-export", "assembly-step-export"};
+  const std::set<std::string> required = {"document-session",
+                                          "viewport-selection",
+                                          "browser-properties",
+                                          "parameters-expressions",
+                                          "datum-construction-workplanes",
+                                          "planar-sketch-reference-repair",
+                                          "bodies-extrude-revolve-holes",
+                                          "pattern-mirror-finishing-shell-draft",
+                                          "body-boolean-transform",
+                                          "sketch3d-pathcurve",
+                                          "sweep-path-extrude-loft",
+                                          "surface-features",
+                                          "assembly-project-hierarchy",
+                                          "assembly-relationships-joints",
+                                          "assembly-solve-motion",
+                                          "assembly-analysis",
+                                          "part-step-export",
+                                          "assembly-step-export"};
   std::set<std::string> covered;
   for (const auto& family : manifest.at("families")) {
     const std::string name = family.at("family");
     CHECK(covered.insert(name).second);
-    for (const char* field : {"command", "inspection", "presentation", "persistence", "test",
-                              "disposition"})
+    for (const char* field :
+         {"command", "inspection", "presentation", "persistence", "test", "disposition"})
       CHECK_FALSE(family.at(field).get<std::string>().empty());
     CHECK(family.at("owner").get<int>() >= 95);
     CHECK(family.at("owner").get<int>() <= 104);
@@ -79,6 +90,41 @@ TEST_CASE("Block 105 coverage manifest accounts for every implemented GUI featur
   CHECK(covered == required);
   for (const auto& sample : manifest.at("sample_documents"))
     CHECK(std::filesystem::is_regular_file(source_dir / sample.get<std::string>()));
+}
+
+TEST_CASE("Block 131 coverage manifest accounts for every MVP7 family",
+          "[integration][modeling-coverage-manifest]") {
+  const auto baseline = read_json(source_dir / "docs/gui-feature-coverage-manifest-mvp7.json");
+  const auto manifest = read_json(source_dir / "docs/gui-feature-coverage-manifest-mvp9.json");
+
+  CHECK(manifest.at("schema") == "blcad.gui-feature-coverage.v2");
+  CHECK(manifest.at("implemented_through") == 131);
+  CHECK(std::filesystem::is_regular_file(source_dir /
+                                         manifest.at("acceptance_contract").get<std::string>()));
+
+  std::set<std::string> required;
+  for (const auto& family : baseline.at("families"))
+    required.insert(family.at("family").get<std::string>());
+
+  std::set<std::string> covered;
+  for (const auto& family : manifest.at("families")) {
+    const auto name = family.at("family").get<std::string>();
+    CHECK(covered.insert(name).second);
+    const auto& interactive = family.at("interactive");
+    const auto disposition = interactive.at("disposition").get<std::string>();
+    if (disposition == "interactive") {
+      CHECK(interactive.at("owner").get<int>() >= 106);
+      CHECK(interactive.at("owner").get<int>() <= 131);
+      const auto contract = interactive.at("contract").get<std::string>();
+      CHECK_FALSE(contract.empty());
+      CHECK(std::filesystem::is_regular_file(source_dir / contract));
+      CHECK_FALSE(interactive.at("proof").get<std::string>().empty());
+    } else {
+      CHECK(disposition == "validation_sufficient");
+      CHECK_FALSE(interactive.at("justification").get<std::string>().empty());
+    }
+  }
+  CHECK(covered == required);
 }
 
 TEST_CASE("Block 105 GUI Part sample is canonically equivalent to headless load and recompute",
@@ -136,14 +182,13 @@ TEST_CASE("Block 105 integrated fail-closed paths publish no partial GUI state",
   GuiDocumentSession session;
   REQUIRE(session.create_part(DocumentId("part.fail_closed"), "Fail closed"));
   GuiPartFoundationWorkbench foundation;
-  REQUIRE(foundation.create_parameter(
-      session, Parameter::create_length(ParameterId("depth"), "Depth",
-                                        Quantity::length_mm(10).value())
-                   .value()));
+  REQUIRE(
+      foundation.create_parameter(session, Parameter::create_length(ParameterId("depth"), "Depth",
+                                                                    Quantity::length_mm(10).value())
+                                               .value()));
   const auto before_revision = session.presentation_revision();
   auto invalid = Feature::create_additive_extrude(FeatureId("feature.invalid"), "Invalid",
-                                                   SketchId("missing.sketch"),
-                                                   ParameterId("depth"))
+                                                  SketchId("missing.sketch"), ParameterId("depth"))
                      .value();
   CHECK(foundation.preview_extrude(session, invalid).has_error());
   CHECK(session.part_document()->feature_count() == 0);
@@ -154,8 +199,7 @@ TEST_CASE("Block 105 integrated fail-closed paths publish no partial GUI state",
   GuiAnalysisExportWorkbench export_workbench;
   const auto output = std::filesystem::temp_directory_path() / "blcad-block105-invalid.step";
   std::filesystem::remove(output);
-  CHECK(export_workbench
-            .preflight_step_export(session, {GuiStepExportMode::PartMultiBody, output})
+  CHECK(export_workbench.preflight_step_export(session, {GuiStepExportMode::PartMultiBody, output})
             .has_error());
   CHECK_FALSE(std::filesystem::exists(output));
   std::filesystem::remove(output);
@@ -215,8 +259,7 @@ TEST_CASE("Block 122 Finish Sketch handoff and selection filters fail closed",
                                         Quantity::length_mm(20).value())
                    .value()));
   REQUIRE(sketches.create_sketch(
-      session, Sketch::create(SketchId("sketch.profile"), "Profile",
-                              DatumPlaneId("datum.profile"))
+      session, Sketch::create(SketchId("sketch.profile"), "Profile", DatumPlaneId("datum.profile"))
                    .value()));
   REQUIRE(sketches.add_profile(
       session, SketchId("sketch.profile"),
@@ -256,8 +299,7 @@ TEST_CASE("Block 122 exposes visible transient workspace and camera controls thr
   auto* toolbar = window.findChild<QToolBar*>(QStringLiteral("blcad.modeling_toolbar"));
   auto* tabs = window.findChild<QTabBar*>(QStringLiteral("blcad.modeling_tabs"));
   auto* filter = window.findChild<QComboBox*>(QStringLiteral("blcad.modeling_selection_filter"));
-  auto* mini_toolbar =
-      window.findChild<QFrame*>(QStringLiteral("blcad.modeling_mini_toolbar"));
+  auto* mini_toolbar = window.findChild<QFrame*>(QStringLiteral("blcad.modeling_mini_toolbar"));
   auto* view_cube = window.findChild<QToolButton*>(QStringLiteral("blcad.view_cube"));
   auto* bookmarks = window.findChild<QComboBox*>(QStringLiteral("blcad.camera_bookmarks"));
   REQUIRE(toolbar != nullptr);
@@ -277,16 +319,13 @@ TEST_CASE("Block 122 exposes visible transient workspace and camera controls thr
   CHECK(GuiModelingWorkspace::tabs()[1] == "Surface");
   CHECK(GuiModelingWorkspace::tabs()[2] == "Assembly");
 
-  workspace.apply_selection_filter(window.session(), *viewport,
-                                   GuiModelingSelectionFilter::Bodies);
-  CHECK(window.session().selection().filter_mask() ==
-        selection_kind_bit(GuiSelectionKind::Body));
+  workspace.apply_selection_filter(window.session(), *viewport, GuiModelingSelectionFilter::Bodies);
+  CHECK(window.session().selection().filter_mask() == selection_kind_bit(GuiSelectionKind::Body));
   CHECK(viewport->selection_filter_mask() == selection_kind_bit(GuiSelectionKind::Body));
 
   // "All" must publish the unfiltered sentinel so activating the modeling
   // workspace never narrows viewport selectability below the Block-106 default.
-  workspace.apply_selection_filter(window.session(), *viewport,
-                                   GuiModelingSelectionFilter::All);
+  workspace.apply_selection_filter(window.session(), *viewport, GuiModelingSelectionFilter::All);
   CHECK(window.session().selection().filter_mask() == 0xFFFFFFFFU);
   CHECK(viewport->selection_filter_mask() == 0xFFFFFFFFU);
 
@@ -400,10 +439,8 @@ TEST_CASE("Block 123 supports angular radial triad and pattern candidate familie
   CHECK(radius_candidate->value_kind == GuiViewportManipulatorValueKind::Radius);
   CHECK(std::abs(radius_candidate->scalar_value - 30.0) < 1.0e-9);
 
-  const auto translate =
-      GuiViewportManipulatorLayer::translation_triad("move", {0.0, 0.0, 0.0});
-  const auto rotate =
-      GuiViewportManipulatorLayer::rotation_triad("rotate", {0.0, 0.0, 0.0});
+  const auto translate = GuiViewportManipulatorLayer::translation_triad("move", {0.0, 0.0, 0.0});
+  const auto rotate = GuiViewportManipulatorLayer::rotation_triad("rotate", {0.0, 0.0, 0.0});
   CHECK(translate.size() == 3);
   CHECK(rotate.size() == 3);
   CHECK(translate[0].kind == GuiViewportManipulatorKind::TranslateAxis);
@@ -428,8 +465,7 @@ TEST_CASE("Block 123 exposes the reusable manipulator overlay and numeric HUD th
           "[gui][viewport-manipulators][gui][manipulator-numeric-coupling]") {
   REQUIRE(qApp != nullptr);
   MainWindow window;
-  REQUIRE(window.session().create_part(DocumentId("part.manipulator.shell"),
-                                       "Manipulator Shell"));
+  REQUIRE(window.session().create_part(DocumentId("part.manipulator.shell"), "Manipulator Shell"));
   auto& layer = window.viewport_manipulators();
   GuiViewportManipulatorHandle handle;
   handle.id = "shell.distance";
@@ -440,8 +476,7 @@ TEST_CASE("Block 123 exposes the reusable manipulator overlay and numeric HUD th
   window.refresh_viewport_manipulators();
   qApp->processEvents();
 
-  auto* overlay =
-      window.findChild<QWidget*>(QStringLiteral("blcad.viewport_manipulator_overlay"));
+  auto* overlay = window.findChild<QWidget*>(QStringLiteral("blcad.viewport_manipulator_overlay"));
   auto* hud = window.findChild<QLineEdit*>(QStringLiteral("blcad.manipulator_numeric_hud"));
   REQUIRE(overlay != nullptr);
   REQUIRE(hud != nullptr);

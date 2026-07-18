@@ -359,6 +359,14 @@ returns oriented frames in root space. Motion exposes typed coordinate slots and
 selected slot to one vector drive, reports transient DOF/solve HUD state, and delegates atomic pose +
 coordinate mutation to the snapshot-validating motion applier. Spherical remains passive.
 
+## Read-only Measure and Interactive Modeling acceptance
+
+Block 131 adds `GeometryMeasureQuery` as a Qt-free analytic query over resolved point, line, plane,
+circle, and cylinder descriptors. `GuiMeasureController` owns only transient picks, witness overlays,
+and status values; Body volume/solid counts reuse `BodyResultInspector`. Freshness and typed-target
+validation fail closed, and no Measure state enters Core or JSON. Coverage manifest v2 and the
+integrated Part/Assembly acceptance close MVP-9; Block 132 is the next architecture boundary.
+
 Canonical contract: `docs/gui-interactive-assembly-mvp9.md`.
 
 ## Semantic Part-feature input and generated topology identity
@@ -440,7 +448,7 @@ ordered edge/face chain picking, and Block 126 adds interactive Pattern, Mirror,
 Body Transform with the persistent transform stack, Block 127 adds interactive PathCurve, Sweep,
 and Loft with ordered-section reorder, Block 128 adds interactive Surface authoring and
 surface-to-solid conversion with geometry diagnostics surfaced before commit, Block 129 adds the
-feature edit lifecycle and Core feature-update commands, and Block 130 adds interactive Assembly
+feature edit lifecycle and Core feature-update commands, Block 130 adds interactive Assembly
 placement, compatibility-filtered relationships, oriented joint-frame previews, and coordinate
-motion. Block 131 (Measure, coverage manifest v2, and integrated acceptance) is the current next
-technical step.
+motion, and Block 131 closes the phase with transient Measure, coverage manifest v2, and integrated
+acceptance. Block 132 (STEP source identity, modes, JSON, and freshness) is next.

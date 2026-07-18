@@ -9,8 +9,8 @@ page.
 
 The assembly sequence is implemented through Block 47, Part Construction MVP-6 is complete through
 Block 94, GUI Feature Validation MVP-7 is accepted through Block 105, Interactive Sketcher MVP-8 is
-accepted through Block 121, and Interactive Part & Assembly Modeling MVP-9 is active through Block
-130. Blocks 106–120 implement the contextual Sketch workspace, device-independent plane interaction,
+accepted through Block 121, and Interactive Part & Assembly Modeling MVP-9 is accepted through Block
+131. Blocks 106–120 implement the contextual Sketch workspace, device-independent plane interaction,
 stable shared `SketchPointId` topology, deterministic planar solving with local DOF/conflict
 diagnostics, solver-backed semantic-handle dragging, line/conic/slot creation, spline editing,
 parameter-backed Sketch text, geometric constraint authoring, typed driving/reference Sketch
@@ -71,9 +71,10 @@ the feature edit lifecycle and Core feature-update commands in
 [`docs/gui-feature-edit-mvp9.md`](docs/gui-feature-edit-mvp9.md).
 Block 130 implements interactive Assembly placement, compatibility-filtered relationships, joint
 frame preview, and coordinate motion in
-[`docs/gui-interactive-assembly-mvp9.md`](docs/gui-interactive-assembly-mvp9.md). Block 131, Measure,
-coverage manifest v2, and integrated acceptance, is next; STEP Import MVP-10 follows in Blocks
-132–138.
+[`docs/gui-interactive-assembly-mvp9.md`](docs/gui-interactive-assembly-mvp9.md). Block 131 adds
+read-only Measure, coverage manifest v2, and integrated acceptance in
+[`docs/interactive-modeling-mvp9-acceptance.md`](docs/interactive-modeling-mvp9-acceptance.md).
+STEP Import MVP-10 starts next with Block 132.
 
 ## Repository layout
 

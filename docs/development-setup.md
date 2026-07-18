@@ -344,6 +344,14 @@ editing and undo, compatibility-filtered relationship/joint picking, solved rela
 root-space joint frames, typed slot limits, one-coordinate vector drives, motion HUD solve/DOF state,
 atomic pose/intent application, and Spherical drive rejection.
 
+Block 131 Measure, coverage, and integrated acceptance:
+
+```bash
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][measure]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][modeling-coverage-manifest]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][interactive-modeling]"
+```
+
 ## Representative existing validation tags
 
 ```bash
@@ -377,7 +385,7 @@ in the existing `blcad_gui_tests` executable; no second Qt application instance 
 ./build/dev-geometry/blcad_analyze_assembly input.blcad.project.json
 ```
 
-## Public Blocks 122–130 boundaries
+## Public Blocks 122–131 boundaries
 
 ```text
 include/blcad/gui/gui_modeling_workspace.hpp
@@ -392,6 +400,8 @@ include/blcad/gui/gui_interactive_path_sweep_loft.hpp
 include/blcad/gui/gui_interactive_surface.hpp
 include/blcad/gui/gui_feature_edit.hpp
 include/blcad/gui/gui_interactive_assembly.hpp
+include/blcad/gui/gui_measure.hpp
+include/blcad/geometry/geometry_measure.hpp
 include/blcad/core/part_document.hpp
 include/blcad/gui/main_window.hpp
 tests/gui/gui_feature_coverage_acceptance_tests.cpp
@@ -402,6 +412,8 @@ tests/gui/gui_interactive_path_sweep_loft_tests.cpp
 tests/gui/gui_interactive_surface_tests.cpp
 tests/gui/gui_feature_edit_tests.cpp
 tests/gui/gui_interactive_assembly_tests.cpp
+tests/gui/gui_measure_tests.cpp
+tests/gui/gui_interactive_modeling_mvp9_acceptance_tests.cpp
 tests/core/feature_update_command_tests.cpp
 docs/gui-modeling-workspace-mvp9.md
 docs/gui-viewport-manipulators-mvp9.md
@@ -413,6 +425,9 @@ docs/gui-interactive-surface-mvp9.md
 docs/gui-feature-edit-mvp9.md
 docs/gui-feature-update-inventory-mvp9.json
 docs/gui-interactive-assembly-mvp9.md
+docs/gui-measure-mvp9.md
+docs/gui-feature-coverage-manifest-mvp9.json
+docs/interactive-modeling-mvp9-acceptance.md
 ```
 
 All Block-122 through Block-128 transient state — command catalogs, verified preselection
@@ -427,6 +442,8 @@ boundary) that preserve ids, ordered position, and JSON shape, consumed by the h
 Block 130 adds no new persistence authority: its transient occurrence candidates, resolved target
 capabilities, oriented frames, solved poses, coordinate-control/HUD state, and motion results apply
 through existing `commit_project_transaction`, solver-result, and motion-result boundaries.
+Block 131 likewise adds no persistent authority: Measure selections/readouts/overlays are transient,
+and coverage plus integrated acceptance are checked-in validation artifacts.
 
 ## Formatting
 
@@ -482,7 +499,7 @@ rm -rf build/
 
 ## Current development boundary
 
-Blocks 106–121 are implemented and accepted. Interactive Modeling is implemented through Block 130:
-selection-first workspace, reusable candidate-only manipulators, interactive Part/Surface features,
-feature editing, and direct Assembly placement/relationship/joint/motion workflows. Block 131,
-Measure, coverage manifest v2, and integrated acceptance, is next.
+Blocks 106–121 and Interactive Modeling Blocks 122–131 are implemented and accepted: selection-first
+workspace, reusable candidate-only manipulators, interactive Part/Surface features, feature editing,
+direct Assembly placement/relationship/joint/motion workflows, transient Measure, coverage manifest
+v2, and integrated acceptance. Block 132 is next.

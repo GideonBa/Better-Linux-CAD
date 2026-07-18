@@ -31,3 +31,7 @@ their focused tags. Manual camera, pointer, and bidirectional picking checks are
 Block 106 starts Interactive Sketcher MVP-8; it extends direct manipulation without reopening or
 weakening this validation boundary. Interactive Modeling MVP-9 follows in Block 122 and STEP
 Import MVP-10 in Block 132.
+
+Block 131 preserves this manifest as the baseline and extends it with
+`docs/gui-feature-coverage-manifest-mvp9.json`; CI requires an interactive owner or explicit
+`validation_sufficient` reason for every family above.

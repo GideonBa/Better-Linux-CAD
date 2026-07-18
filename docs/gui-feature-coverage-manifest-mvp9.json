@@ -1,0 +1,180 @@
+{
+  "schema": "blcad.gui-feature-coverage.v2",
+  "implemented_through": 131,
+  "extends": "docs/gui-feature-coverage-manifest-mvp7.json",
+  "acceptance_contract": "docs/interactive-modeling-mvp9-acceptance.md",
+  "families": [
+    {
+      "family": "document-session",
+      "validation_owner": 96,
+      "interactive": {
+        "disposition": "validation_sufficient",
+        "justification": "Document lifecycle, transactions, save/load, undo/redo, and recompute are list/menu actions without a direct-manipulation upgrade path."
+      }
+    },
+    {
+      "family": "viewport-selection",
+      "validation_owner": 97,
+      "interactive": {
+        "disposition": "interactive",
+        "owner": 122,
+        "contract": "docs/gui-modeling-workspace-mvp9.md",
+        "proof": "[gui][modeling-workspace],[gui][in-context-command],[gui][view-navigation-aids]"
+      }
+    },
+    {
+      "family": "browser-properties",
+      "validation_owner": 98,
+      "interactive": {
+        "disposition": "interactive",
+        "owner": 129,
+        "contract": "docs/gui-feature-edit-mvp9.md",
+        "proof": "[gui][feature-edit],[integration][feature-edit-recompute]"
+      }
+    },
+    {
+      "family": "parameters-expressions",
+      "validation_owner": 100,
+      "interactive": {
+        "disposition": "interactive",
+        "owner": 115,
+        "contract": "docs/gui-sketch-dimension-authoring-mvp8.md",
+        "proof": "[gui][sketch-dimensions],[integration][sketch-expression-edit]"
+      }
+    },
+    {
+      "family": "datum-construction-workplanes",
+      "validation_owner": 99,
+      "interactive": {
+        "disposition": "interactive",
+        "owner": 122,
+        "contract": "docs/gui-modeling-workspace-mvp9.md",
+        "proof": "[gui][modeling-workspace],[gui][in-context-command]"
+      }
+    },
+    {
+      "family": "planar-sketch-reference-repair",
+      "validation_owner": 99,
+      "interactive": {
+        "disposition": "interactive",
+        "owner": 121,
+        "contract": "docs/interactive-sketcher-mvp8-acceptance.md",
+        "proof": "[integration][interactive-sketcher],[integration][sketch-gui-headless]"
+      }
+    },
+    {
+      "family": "bodies-extrude-revolve-holes",
+      "validation_owner": 100,
+      "interactive": {
+        "disposition": "interactive",
+        "owner": 124,
+        "contract": "docs/gui-interactive-extrude-revolve-mvp9.md",
+        "proof": "[gui][interactive-extrude],[gui][interactive-revolve],[integration][extrude-revolve-manipulator]"
+      }
+    },
+    {
+      "family": "pattern-mirror-finishing-shell-draft",
+      "validation_owner": 101,
+      "interactive": {
+        "disposition": "interactive",
+        "owner": 126,
+        "contract": "docs/gui-interactive-pattern-body-mvp9.md",
+        "proof": "[gui][interactive-finishing],[gui][interactive-shell-draft],[gui][interactive-pattern-mirror]"
+      }
+    },
+    {
+      "family": "body-boolean-transform",
+      "validation_owner": 101,
+      "interactive": {
+        "disposition": "interactive",
+        "owner": 126,
+        "contract": "docs/gui-interactive-pattern-body-mvp9.md",
+        "proof": "[gui][interactive-body-operation],[integration][pattern-ghost-preview]"
+      }
+    },
+    {
+      "family": "sketch3d-pathcurve",
+      "validation_owner": 102,
+      "interactive": {
+        "disposition": "interactive",
+        "owner": 127,
+        "contract": "docs/gui-interactive-path-sweep-loft-mvp9.md",
+        "proof": "[gui][sketch-3d-edit],[gui][interactive-path-sweep]"
+      }
+    },
+    {
+      "family": "sweep-path-extrude-loft",
+      "validation_owner": 102,
+      "interactive": {
+        "disposition": "interactive",
+        "owner": 127,
+        "contract": "docs/gui-interactive-path-sweep-loft-mvp9.md",
+        "proof": "[gui][interactive-path-sweep],[gui][interactive-loft],[integration][ordered-section-picking]"
+      }
+    },
+    {
+      "family": "surface-features",
+      "validation_owner": 102,
+      "interactive": {
+        "disposition": "interactive",
+        "owner": 128,
+        "contract": "docs/gui-interactive-surface-mvp9.md",
+        "proof": "[gui][interactive-surface],[integration][stitch-diagnostic-overlay]"
+      }
+    },
+    {
+      "family": "assembly-project-hierarchy",
+      "validation_owner": 103,
+      "interactive": {
+        "disposition": "interactive",
+        "owner": 130,
+        "contract": "docs/gui-interactive-assembly-mvp9.md",
+        "proof": "[gui][interactive-assembly-placement]"
+      }
+    },
+    {
+      "family": "assembly-relationships-joints",
+      "validation_owner": 103,
+      "interactive": {
+        "disposition": "interactive",
+        "owner": 130,
+        "contract": "docs/gui-interactive-assembly-mvp9.md",
+        "proof": "[gui][interactive-relationships],[gui][interactive-joint-motion]"
+      }
+    },
+    {
+      "family": "assembly-solve-motion",
+      "validation_owner": 103,
+      "interactive": {
+        "disposition": "interactive",
+        "owner": 130,
+        "contract": "docs/gui-interactive-assembly-mvp9.md",
+        "proof": "[gui][interactive-joint-motion]"
+      }
+    },
+    {
+      "family": "assembly-analysis",
+      "validation_owner": 104,
+      "interactive": {
+        "disposition": "validation_sufficient",
+        "justification": "Analysis is a read-only query with deterministic result tables and occurrence highlights; direct manipulation would not add model authority."
+      }
+    },
+    {
+      "family": "part-step-export",
+      "validation_owner": 104,
+      "interactive": {
+        "disposition": "validation_sufficient",
+        "justification": "STEP export is a preflight/file-output workflow whose existing dialog and progress presentation are complete."
+      }
+    },
+    {
+      "family": "assembly-step-export",
+      "validation_owner": 104,
+      "interactive": {
+        "disposition": "validation_sufficient",
+        "justification": "Flattened and structured STEP export are explicit file consumers with no direct-manipulation authoring semantics."
+      }
+    }
+  ]
+}

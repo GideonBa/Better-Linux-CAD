@@ -1,12 +1,13 @@
 #pragma once
 
-#include "blcad/gui/gui_command_registry.hpp"
-#include "blcad/gui/gui_assembly_workbench.hpp"
 #include "blcad/gui/gui_analysis_export_workbench.hpp"
+#include "blcad/gui/gui_assembly_workbench.hpp"
+#include "blcad/gui/gui_command_registry.hpp"
 #include "blcad/gui/gui_document_browser.hpp"
 #include "blcad/gui/gui_document_session.hpp"
 #include "blcad/gui/gui_interactive_assembly.hpp"
 #include "blcad/gui/gui_interactive_extrude_revolve_binder.hpp"
+#include "blcad/gui/gui_measure.hpp"
 #include "blcad/gui/gui_modeling_workspace_binder.hpp"
 #include "blcad/gui/gui_part_foundation_workbench.hpp"
 #include "blcad/gui/gui_part_operations_workbench.hpp"
@@ -79,6 +80,9 @@ public:
   [[nodiscard]] GuiSpatialSurfaceWorkbench& spatial_surface_workbench() noexcept;
   [[nodiscard]] GuiAssemblyWorkbench& assembly_workbench() noexcept;
   [[nodiscard]] GuiAnalysisExportWorkbench& analysis_export_workbench() noexcept;
+  [[nodiscard]] GuiMeasureController& measure_controller() noexcept {
+    return measure_controller_;
+  }
   [[nodiscard]] const std::optional<SketchId>& active_sketch() const noexcept;
 
   [[nodiscard]] bool request_workspace(GuiWorkspace workspace) noexcept;
@@ -115,8 +119,8 @@ private:
       const Sketch* source = session_.part_document()->find_sketch(*sketch);
       if (!inspection.has_error() && source != nullptr &&
           inspection.value().detected_region.has_value() &&
-          GuiModelingWorkspace::has_materialized_profile(
-              *source, *inspection.value().detected_region))
+          GuiModelingWorkspace::has_materialized_profile(*source,
+                                                         *inspection.value().detected_region))
         profile = inspection.value().detected_region;
     }
 
@@ -150,12 +154,12 @@ private:
   GuiSpatialSurfaceWorkbench spatial_surface_workbench_;
   GuiAssemblyWorkbench assembly_workbench_;
   GuiAnalysisExportWorkbench analysis_export_workbench_;
+  GuiMeasureController measure_controller_;
   mutable GuiModelingWorkspaceShellBinder modeling_workspace_shell_{
-      this, &session_, &modeling_workspace_,
-      [this] { finish_sketch_with_modeling_handoff(); },
+      this, &session_, &modeling_workspace_, [this] { finish_sketch_with_modeling_handoff(); },
       [this] { refresh_command_state(); }};
-  mutable GuiViewportManipulatorShellBinder viewport_manipulator_shell_{
-      this, &viewport_manipulators_};
+  mutable GuiViewportManipulatorShellBinder viewport_manipulator_shell_{this,
+                                                                        &viewport_manipulators_};
   std::optional<SketchId> active_sketch_;
   std::optional<GuiViewportCameraBookmark> sketch_camera_bookmark_;
   std::uint32_t sketch_selection_filter_mask_{0xFFFFFFFFU};

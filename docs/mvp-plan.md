@@ -4,10 +4,10 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 130
-current_block: 131
-current_boundary: Measure, coverage manifest v2, and integrated acceptance
-current_tag: "[gui][measure]"
+implemented_through: Block 131
+current_block: 132
+current_boundary: STEP source identity, import modes, JSON, and freshness
+current_tag: "[core][step-import-source]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -17,8 +17,8 @@ phase_status:
   mvp_6: "Part Construction — Blocks 48–94 implemented; MVP complete"
   mvp_7: "GUI Feature Validation — Blocks 95–105 implemented; MVP complete"
   mvp_8: "Interactive Sketcher — Blocks 106–121 implemented; MVP complete"
-  mvp_9: "Interactive Part & Assembly Modeling — Blocks 122–130 implemented; Block 131 next"
-  mvp_10: "STEP Import — Blocks 132–138 planned after Interactive Modeling acceptance"
+  mvp_9: "Interactive Part & Assembly Modeling — Blocks 122–131 implemented; MVP complete"
+  mvp_10: "STEP Import — Block 132 next; Blocks 132–138 planned"
 ---
 
 # MVP Plan
@@ -30,10 +30,10 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 ## Current status
 
 ```text
-implemented through  Block 130
-current block        Block 131
-current phase        Interactive Part & Assembly Modeling MVP-9
-current boundary     Measure, coverage manifest v2, and integrated acceptance
+implemented through  Block 131
+current block        Block 132
+current phase        STEP Import MVP-10
+current boundary     STEP source identity, import modes, JSON, and freshness
 ```
 
 Interactive Sketcher MVP-8 is complete and accepted. Blocks 122–123 establish the selection-first
@@ -43,8 +43,8 @@ Draft authoring, Block 126 adds interactive Pattern, Mirror, Body Boolean, and B
 authoring, Block 127 adds interactive PathCurve, Sweep, and Loft authoring, Block 128 adds
 interactive Surface authoring and surface-to-solid conversion, and Block 129 adds the feature edit
 lifecycle and Core feature-update commands over that infrastructure, and Block 130 adds interactive
-Assembly placement, compatibility-filtered relationships, joint frames, and coordinate motion. Block
-131 is the current next technical step.
+Assembly placement, compatibility-filtered relationships, joint frames, and coordinate motion.
+Block 131 closes MVP-9 with read-only Measure, coverage manifest v2, and integrated acceptance.
 
 ## Phase map
 
@@ -57,8 +57,8 @@ MVP-5   Assembly system                                 Blocks 1–47 implemente
 MVP-6   Part Construction                              Blocks 48–94 implemented
 MVP-7   GUI Feature Validation                        Blocks 95–105 implemented
 MVP-8   Interactive Sketcher                          Blocks 106–121 implemented
-MVP-9   Interactive Part & Assembly Modeling          Blocks 122–130 implemented; Block 131 next
-MVP-10  STEP Import                                    Blocks 132–138 planned
+MVP-9   Interactive Part & Assembly Modeling          Blocks 122–131 implemented
+MVP-10  STEP Import                                    Block 132 next; Blocks 132–138 planned
 ```
 
 Canonical phase sequences:
@@ -485,12 +485,22 @@ Focused tags:
 [gui][interactive-joint-motion]
 ```
 
-## Current next technical step — Block 131
+## Block 131 — Measure, coverage manifest v2, and integrated acceptance — Implemented
 
-Implement read-only Measure, publish the GUI feature coverage manifest v2, and complete integrated
-Interactive Modeling acceptance as defined in `docs/interactive-modeling-sequence-mvp9.md`.
+Read-only Measure queries fresh derived Geometry for point/edge/face distances, angles,
+radius/diameter, and Body volume/solid counts without document mutation. Coverage manifest v2
+machine-checks every MVP-7 family disposition, and integrated Part/Assembly, equivalence,
+fail-closed, persistence/export, and measured interaction proofs complete MVP-9.
+
+Canonical contracts: `docs/gui-measure-mvp9.md` and
+`docs/interactive-modeling-mvp9-acceptance.md`.
+
+## Current next technical step — Block 132
+
+Implement STEP source identity, explicit Reference/EditableBody modes, JSON, and freshness as
+defined in `docs/step-import-sequence-mvp10.md`.
 
 ## Later phases
 
-Interactive Part & Assembly Modeling MVP-9 continues through Block 131. STEP Import MVP-10 follows
-in Blocks 132–138.
+Interactive Part & Assembly Modeling MVP-9 is complete through Block 131. STEP Import MVP-10 starts
+with Block 132 and continues through Block 138.

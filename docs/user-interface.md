@@ -13,8 +13,8 @@ authoring; Block 126 implements interactive Pattern, Mirror, Body Boolean, and B
 authoring; Block 127 implements interactive PathCurve, Sweep, and Loft authoring; Block 128 implements
 interactive Surface authoring and surface-to-solid conversion; Block 129 adds the feature edit
 lifecycle and Core feature-update commands; and Block 130 implements direct Assembly placement,
-compatibility-filtered relationships, joint-frame preview, and coordinate motion. Block 131 is next;
-STEP Import begins with Block 132.
+compatibility-filtered relationships, joint-frame preview, and coordinate motion. Block 131 adds
+transient Measure and completes integrated MVP-9 acceptance. STEP Import begins next with Block 132.
 
 The UI is deliberately not built like FreeCAD. The goal is a modern, consistent, reduced interface
 with clear separation between model, parameters, features, Sketch topology, solver results, and
@@ -30,7 +30,12 @@ Assembly. The UI operates Core/Geometry authorities; it must not own CAD or solv
 | Parameter window | parameter name, value, unit, formula, scope, and usage sites |
 | Property panel | edit selected object/feature through validated commands |
 | Command palette | quick access to Sketch, Part, Surface, Assembly, Inspect, and Exchange commands |
+| Measure readout | transient distance, angle, radius/diameter, volume, solids, and witness overlay |
 | Engineering panel | later technical assistants for mechanical engineering domains |
+
+The Block-131 Measure command is an Inspect action over fresh derived Geometry. Point/edge/face and
+Body picks produce a transient readout and optional witness overlay. Cancel, incompatible targets,
+or stale Geometry produce no document mutation; Measure state is never serialized.
 
 ## Selection-first modeling workspace
 

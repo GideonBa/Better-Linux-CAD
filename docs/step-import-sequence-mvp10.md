@@ -1,7 +1,7 @@
 # STEP Import Sequence MVP-10
 
-Status: queued after Interactive Modeling MVP-9. Blocks 132–138 are planned; Block 132 follows
-after Block 131 acceptance.
+Status: active after accepted Interactive Modeling MVP-9. Blocks 132–138 are planned; Block 132 is
+the current next technical step.
 
 This document is the canonical numbered implementation sequence for importing STEP parts and
 structured STEP assemblies in one of two explicit modes:

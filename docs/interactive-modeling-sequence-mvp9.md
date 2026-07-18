@@ -1,7 +1,7 @@
 # Interactive Part & Assembly Modeling Sequence MVP-9
 
-Status: active through implemented Block 130 after accepted Interactive Sketcher Block 121. Block
-131 precedes STEP Import MVP-10 (Blocks 132–138); Block 131 is the current next technical step.
+Status: accepted through implemented Block 131 after accepted Interactive Sketcher Block 121. STEP
+Import MVP-10 (Blocks 132–138) is active next at Block 132.
 
 This phase closes the interaction gap between the accepted validation GUI (MVP-7, Blocks 95–105)
 and an intuitive, Inventor-familiar modeling experience for **every feature family implemented
@@ -116,8 +116,8 @@ numeric typing opens the transient HUD, `Enter` accepts, double click edits.
 127 interactive PathCurve, Sweep, and Loft authoring — implemented
 128 interactive Surface authoring and surface-to-solid conversion — implemented
 129 feature edit lifecycle and the Core feature-update command boundary — implemented
-130 interactive Assembly placement, relationships, joints, and motion — next
-131 measure tool, coverage manifest v2, and integrated acceptance
+130 interactive Assembly placement, relationships, joints, and motion — implemented
+131 measure tool, coverage manifest v2, and integrated acceptance — implemented
 132–138 STEP Import MVP-10
 ```
 
@@ -466,13 +466,26 @@ is deferred and may only arrive later as its own `[geometry][assembly-drag-solve
 Focused tags: `[gui][interactive-assembly-placement]`, `[gui][interactive-relationships]`,
 `[gui][interactive-joint-motion]`.
 
-## Block 131 — Measure, coverage manifest v2, and integrated acceptance
+## Block 131 — Measure, coverage manifest v2, and integrated acceptance — Implemented
 
-Add a read-only measure command over derived Geometry queries: point/edge/face distance, angle,
+`GeometryMeasureQuery` and `GuiMeasureController` implement transient point/edge/face distances,
+angles, circular/cylindrical radius and diameter, and Body volume/solid inspection over fresh derived
+Geometry. Invalid or stale selections fail without transactions or persisted overlay state.
+
+`docs/gui-feature-coverage-manifest-mvp9.json` uses schema
+`blcad.gui-feature-coverage.v2`; CI compares it with every MVP-7 family and validates interactive
+owners/contracts or explicit `validation_sufficient` reasons. Integrated acceptance exercises the
+Part and Assembly workflows below, canonical GUI/headless round-trips, failure atomicity, STEP
+export, analysis, and model-size-labelled hit/preview budgets.
+
+Canonical contracts: `docs/gui-measure-mvp9.md` and
+`docs/interactive-modeling-mvp9-acceptance.md`.
+
+The read-only measure command queries derived Geometry for point/edge/face distance, angle,
 radius/diameter, and body volume/solid counts from the existing inspection summaries. Results are
 transient overlays and status readouts; nothing is persisted.
 
-Publish `docs/gui-feature-coverage-manifest-mvp9.json` (schema
+The published `docs/gui-feature-coverage-manifest-mvp9.json` (schema
 `blcad.gui-feature-coverage.v2`): every family of the MVP-7 manifest gains an `interactive`
 disposition naming its owning Block 106–131 — or the explicit value `validation_sufficient` with a
 one-line justification. CI fails when a family through Block 94 lacks an interactive disposition.
@@ -510,7 +523,7 @@ After Block 131, STEP Import MVP-10 begins with Block 132
 ## Block-94 feature coverage matrix
 
 Authoritative mapping from every capability family implemented through Block 94 to its validation
-owner (implemented, MVP-7), its interactive owner (planned, MVP-8/MVP-9), and the canonical
+owner (implemented, MVP-7), its interactive owner (implemented, MVP-8/MVP-9), and the canonical
 contracts an implementer must read. `validation sufficient` means the MVP-7 workflow already fits
 the interaction model (list/dialog workflows without a direct-manipulation upgrade path) — the
 family is deliberately dispositioned, not forgotten.

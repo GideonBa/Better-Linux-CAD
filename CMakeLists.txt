@@ -180,6 +180,7 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/construction_point_resolver.cpp
     src/geometry/dimension_driven_profile_resolver.cpp
     src/geometry/fillet_adapter.cpp
+    src/geometry/geometry_measure.cpp
     src/geometry/chamfer_adapter.cpp
     src/geometry/shell_adapter.cpp
     src/geometry/draft_adapter.cpp
@@ -566,6 +567,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_interactive_sketcher_acceptance_tests.cpp
       tests/gui/gui_spatial_surface_workbench_tests.cpp
       tests/gui/gui_feature_coverage_acceptance_tests.cpp
+      tests/gui/gui_interactive_modeling_mvp9_acceptance_tests.cpp
       tests/gui/gui_interactive_features_tests.cpp
       tests/gui/gui_interactive_finishing_tests.cpp
       tests/gui/gui_interactive_pattern_body_tests.cpp
@@ -573,6 +575,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_interactive_surface_tests.cpp
       tests/gui/gui_feature_edit_tests.cpp
       tests/gui/gui_interactive_assembly_tests.cpp
+      tests/gui/gui_measure_tests.cpp
       tests/gui/gui_startup_splash_tests.cpp
     )
     target_link_libraries(blcad_gui_tests PRIVATE BLCAD::gui Catch2::Catch2)
