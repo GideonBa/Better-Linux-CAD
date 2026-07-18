@@ -309,6 +309,31 @@ a PartDocument clone through the recompute plan, and Apply commits one transacti
 
 Canonical contract: `docs/gui-interactive-pattern-body-mvp9.md`.
 
+## Interactive PathCurve, Sweep, and Loft
+
+Block 127 adds `GuiInteractivePathSweepController` (PathCurve, Sweep) and `GuiInteractiveLoftController`
+(Loft) over the frozen Block-70..79 contracts. PathCurve collects an ordered, duplicate-free chain of
+connected segments; Sweep picks a profile and trajectory with an optional twist `Angle` parameter or
+guide (never both); Loft collects ordered sections with `reorder_section` drag-reorder editing the
+persistent order and a C0/G1/G2 continuity. The sweep twist is the only Block-123 handle; combined
+guide-plus-twist and unsupported G2 continuity surface as fail-closed recompute diagnostics. Preview
+validates a PartDocument clone through the recompute plan, and Apply commits one transaction. The
+Block-124 `GuiInteractiveFeatureCoordinator` owns these controllers alongside the earlier commands.
+
+Canonical contract: `docs/gui-interactive-path-sweep-loft-mvp9.md`.
+
+## Interactive Surface authoring and surface-to-solid
+
+Block 128 adds `GuiInteractiveSurfaceController` over the frozen Block-88..92 `SurfaceFeature` variant:
+Boundary/Fill collect boundary curves, Trim picks a target surface and contour, Extend drags a
+`Length` distance, Stitch collects surfaces with a typed tolerance, and ClosedShellToSolid converts a
+closed shell. Because stitch free-edge/gap and closed-shell closedness/manifold diagnostics are
+geometric, preview runs the real `GeometryRecomputeExecutor` on a throwaway clone so the authoritative
+diagnostic surfaces before commit; Apply commits one transaction seeding the driving parameter. The
+Block-124 `GuiInteractiveFeatureCoordinator` owns this controller alongside the earlier commands.
+
+Canonical contract: `docs/gui-interactive-surface-mvp9.md`.
+
 ## Semantic Part-feature input and generated topology identity
 
 Part features use typed semantic input references and expected capabilities instead of raw kernel
@@ -385,5 +410,7 @@ model-space mapping, deterministic fixed-DIP hit testing, exact release, and num
 Block 124 adds interactive Extrude, path Extrude, and Revolve authoring over that infrastructure with
 one atomic Apply transaction, Block 125 adds interactive Fillet, Chamfer, Shell, and Draft with
 ordered edge/face chain picking, and Block 126 adds interactive Pattern, Mirror, Body Boolean, and
-Body Transform with the persistent transform stack. Block 127 (interactive PathCurve, Sweep, and Loft)
-is the current next technical step.
+Body Transform with the persistent transform stack, Block 127 adds interactive PathCurve, Sweep,
+and Loft with ordered-section reorder, and Block 128 adds interactive Surface authoring and
+surface-to-solid conversion with geometry diagnostics surfaced before commit. Block 129 (the feature
+edit lifecycle and Core feature-update commands) is the current next technical step.

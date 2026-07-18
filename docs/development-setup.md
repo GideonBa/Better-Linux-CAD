@@ -293,6 +293,31 @@ boolean role validation and keep toggle, the translate/rotate/scale transform st
 rejection of invalid inputs, and manipulator/typed document equivalence for pattern spacing and
 coordinator-routed transform translation.
 
+Block 127 interactive PathCurve, Sweep, and Loft authoring:
+
+```bash
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][interactive-path-sweep]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][interactive-loft]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][ordered-section-picking]"
+```
+
+These cases verify ordered connected path collection with duplicate rejection, sweep authoring with
+exact undo, the sweep-twist handle and combined guide-plus-twist rejection, loft two-section authoring
+with G2 rejection, fail-closed rejection of invalid inputs, and drag-reorder/direct-order document
+equivalence.
+
+Block 128 interactive Surface authoring and surface-to-solid conversion:
+
+```bash
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][interactive-surface]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][stitch-diagnostic-overlay]"
+```
+
+These cases verify fill authoring with duplicate rejection, extend distance driving and apply,
+closed-shell-to-solid fail-closed reporting, fail-closed rejection of invalid inputs, the
+tolerance-driven stitch free-edge/gap diagnostic surfaced before commit, a clean coplanar stitch, and
+coordinator-routed extend-distance/typed document equivalence.
+
 ## Representative existing validation tags
 
 ```bash
@@ -326,7 +351,7 @@ in the existing `blcad_gui_tests` executable; no second Qt application instance 
 ./build/dev-geometry/blcad_analyze_assembly input.blcad.project.json
 ```
 
-## Public Blocks 122–126 boundaries
+## Public Blocks 122–128 boundaries
 
 ```text
 include/blcad/gui/gui_modeling_workspace.hpp
@@ -337,23 +362,30 @@ include/blcad/gui/gui_interactive_extrude_revolve.hpp
 include/blcad/gui/gui_interactive_extrude_revolve_binder.hpp
 include/blcad/gui/gui_interactive_finishing.hpp
 include/blcad/gui/gui_interactive_pattern_body.hpp
+include/blcad/gui/gui_interactive_path_sweep_loft.hpp
+include/blcad/gui/gui_interactive_surface.hpp
 include/blcad/gui/main_window.hpp
 tests/gui/gui_feature_coverage_acceptance_tests.cpp
 tests/gui/gui_interactive_features_tests.cpp
 tests/gui/gui_interactive_finishing_tests.cpp
 tests/gui/gui_interactive_pattern_body_tests.cpp
+tests/gui/gui_interactive_path_sweep_loft_tests.cpp
+tests/gui/gui_interactive_surface_tests.cpp
 docs/gui-modeling-workspace-mvp9.md
 docs/gui-viewport-manipulators-mvp9.md
 docs/gui-interactive-extrude-revolve-mvp9.md
 docs/gui-interactive-finishing-mvp9.md
 docs/gui-interactive-pattern-body-mvp9.md
+docs/gui-interactive-path-sweep-loft-mvp9.md
+docs/gui-interactive-surface-mvp9.md
 ```
 
-All Block-122 through Block-126 transient state — command catalogs, verified preselection
+All Block-122 through Block-128 transient state — command catalogs, verified preselection
 capabilities, mini-toolbar state, repeat, filters, Home/bookmarks, camera mappings, handle
 descriptors, pointer measurements, hit products, HUD text, edge/face chains, pattern sources, tool
-bodies, candidate feature parameters, and previews — does not change Core/Geometry or any save format.
-A controller's Apply is the only mutation, and it flows through one existing `commit_part_transaction`.
+bodies, path segments, loft section order, boundary/surface selections, candidate feature parameters,
+and previews — does not change Core/Geometry or any save format. A controller's Apply is the only
+mutation, and it flows through one existing `commit_part_transaction`.
 
 ## Formatting
 
@@ -369,11 +401,15 @@ clang-format -i \
   include/blcad/gui/gui_interactive_extrude_revolve_binder.hpp \
   include/blcad/gui/gui_interactive_finishing.hpp \
   include/blcad/gui/gui_interactive_pattern_body.hpp \
+  include/blcad/gui/gui_interactive_path_sweep_loft.hpp \
+  include/blcad/gui/gui_interactive_surface.hpp \
   include/blcad/gui/main_window.hpp \
   tests/gui/gui_feature_coverage_acceptance_tests.cpp \
   tests/gui/gui_interactive_features_tests.cpp \
   tests/gui/gui_interactive_finishing_tests.cpp \
-  tests/gui/gui_interactive_pattern_body_tests.cpp
+  tests/gui/gui_interactive_pattern_body_tests.cpp \
+  tests/gui/gui_interactive_path_sweep_loft_tests.cpp \
+  tests/gui/gui_interactive_surface_tests.cpp
 ```
 
 ## Clean generated files

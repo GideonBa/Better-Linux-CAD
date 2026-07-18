@@ -10,7 +10,7 @@ page.
 The assembly sequence is implemented through Block 47, Part Construction MVP-6 is complete through
 Block 94, GUI Feature Validation MVP-7 is accepted through Block 105, Interactive Sketcher MVP-8 is
 accepted through Block 121, and Interactive Part & Assembly Modeling MVP-9 is active through Block
-126. Blocks 106–120 implement the contextual Sketch workspace, device-independent plane interaction,
+128. Blocks 106–120 implement the contextual Sketch workspace, device-independent plane interaction,
 stable shared `SketchPointId` topology, deterministic planar solving with local DOF/conflict
 diagnostics, solver-backed semantic-handle dragging, line/conic/slot creation, spline editing,
 parameter-backed Sketch text, geometric constraint authoring, typed driving/reference Sketch
@@ -62,8 +62,12 @@ implements interactive Extrude, path Extrude, and Revolve authoring in
 Block 125 implements interactive Fillet, Chamfer, Shell, and Draft authoring in
 [`docs/gui-interactive-finishing-mvp9.md`](docs/gui-interactive-finishing-mvp9.md). Block 126
 implements interactive Pattern, Mirror, Body Boolean, and Body Transform authoring in
-[`docs/gui-interactive-pattern-body-mvp9.md`](docs/gui-interactive-pattern-body-mvp9.md).
-Block 127, interactive PathCurve/Sweep/Loft, is next in
+[`docs/gui-interactive-pattern-body-mvp9.md`](docs/gui-interactive-pattern-body-mvp9.md). Block 127
+implements interactive PathCurve, Sweep, and Loft authoring in
+[`docs/gui-interactive-path-sweep-loft-mvp9.md`](docs/gui-interactive-path-sweep-loft-mvp9.md).
+Block 128 implements interactive Surface authoring and surface-to-solid conversion in
+[`docs/gui-interactive-surface-mvp9.md`](docs/gui-interactive-surface-mvp9.md).
+Block 129, the feature edit lifecycle and Core feature-update commands, is next in
 [`docs/interactive-modeling-sequence-mvp9.md`](docs/interactive-modeling-sequence-mvp9.md); STEP
 Import MVP-10 follows in Blocks 132–138.
 

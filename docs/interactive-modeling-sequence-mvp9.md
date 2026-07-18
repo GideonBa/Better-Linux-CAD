@@ -1,7 +1,7 @@
 # Interactive Part & Assembly Modeling Sequence MVP-9
 
-Status: active through implemented Block 126 after accepted Interactive Sketcher Block 121. Blocks
-127–131 precede STEP Import MVP-10 (Blocks 132–138); Block 127 is the current next technical step.
+Status: active through implemented Block 128 after accepted Interactive Sketcher Block 121. Blocks
+129–131 precede STEP Import MVP-10 (Blocks 132–138); Block 129 is the current next technical step.
 
 This phase closes the interaction gap between the accepted validation GUI (MVP-7, Blocks 95–105)
 and an intuitive, Inventor-familiar modeling experience for **every feature family implemented
@@ -113,9 +113,9 @@ numeric typing opens the transient HUD, `Enter` accepts, double click edits.
 124 interactive Extrude, path Extrude, and Revolve authoring — implemented
 125 interactive Fillet, Chamfer, Shell, and Draft authoring — implemented
 126 interactive Pattern, Mirror, Body Boolean, and Body Transform authoring — implemented
-127 interactive PathCurve, Sweep, and Loft authoring — next
-128 interactive Surface authoring and surface-to-solid conversion
-129 feature edit lifecycle and the Core feature-update command boundary
+127 interactive PathCurve, Sweep, and Loft authoring — implemented
+128 interactive Surface authoring and surface-to-solid conversion — implemented
+129 feature edit lifecycle and the Core feature-update command boundary — next
 130 interactive Assembly placement, relationships, joints, and motion
 131 measure tool, coverage manifest v2, and integrated acceptance
 132–138 STEP Import MVP-10
@@ -304,7 +304,16 @@ Translate/Rotate/UniformScale records and never collapses the stack.
 Focused tags: `[gui][interactive-pattern-mirror]`, `[gui][interactive-body-operation]`,
 `[integration][pattern-ghost-preview]`.
 
-## Block 127 — Interactive PathCurve, Sweep, and Loft
+## Block 127 — Interactive PathCurve, Sweep, and Loft — Implemented
+
+`GuiInteractivePathSweepController` (PathCurve, Sweep) and `GuiInteractiveLoftController` (Loft) are
+headless controllers that collect an ordered, duplicate-free chain of connected segments, a
+profile+trajectory with an optional twist parameter or guide (never both), or ordered loft sections
+with `reorder_section` drag-reorder and C0/G1/G2 continuity. Each previews a disposable PartDocument
+clone and commits one transaction; the sweep twist is the only Block-123 handle. Combined
+guide-plus-twist and unsupported G2 continuity surface as fail-closed diagnostics. The Block-124
+`GuiInteractiveFeatureCoordinator` now also owns these controllers. No new Core/Geometry intent was
+added. Canonical contract: `docs/gui-interactive-path-sweep-loft-mvp9.md`.
 
 PathCurve authoring picks connected segments (planar entities, ConstructionLines, Sketch3D curves,
 semantic edges) with live connectivity/tolerance feedback; open/closed state and orientation rule
@@ -331,7 +340,15 @@ through the normal transaction path.
 Focused tags: `[gui][interactive-path-sweep]`, `[gui][interactive-loft]`,
 `[integration][ordered-section-picking]`.
 
-## Block 128 — Interactive Surface authoring and surface-to-solid
+## Block 128 — Interactive Surface authoring and surface-to-solid — Implemented
+
+`GuiInteractiveSurfaceController` (headless) authors all six `SurfaceFeature` kinds — Boundary/Fill,
+Trim, Extend, Stitch, and ClosedShellToSolid — collecting boundary curves or surfaces, driving the
+`surface.extend` distance handle and a typed stitch tolerance, and committing one transaction. Because
+stitch free-edge/gap and closed-shell closedness diagnostics are geometric, preview runs the real
+recompute on a throwaway clone so the authoritative diagnostic surfaces before commit. The Block-124
+`GuiInteractiveFeatureCoordinator` now also owns this controller. No new Core/Geometry intent was
+added. Canonical contract: `docs/gui-interactive-surface-mvp9.md`.
 
 Boundary/Fill collect boundary-curve chains with connectivity preview. Trim picks one target
 surface and one closed contour, highlighting the deterministic kept region (the no-keep-side-choice

@@ -4,10 +4,10 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 126
-current_block: 127
-current_boundary: Interactive PathCurve, Sweep, and Loft authoring
-current_tag: "[gui][interactive-path-sweep]"
+implemented_through: Block 128
+current_block: 129
+current_boundary: Feature edit lifecycle and the Core feature-update command boundary
+current_tag: "[core][feature-update-command]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -17,7 +17,7 @@ phase_status:
   mvp_6: "Part Construction — Blocks 48–94 implemented; MVP complete"
   mvp_7: "GUI Feature Validation — Blocks 95–105 implemented; MVP complete"
   mvp_8: "Interactive Sketcher — Blocks 106–121 implemented; MVP complete"
-  mvp_9: "Interactive Part & Assembly Modeling — Blocks 122–126 implemented; Block 127 next"
+  mvp_9: "Interactive Part & Assembly Modeling — Blocks 122–128 implemented; Block 129 next"
   mvp_10: "STEP Import — Blocks 132–138 planned after Interactive Modeling acceptance"
 ---
 
@@ -30,17 +30,19 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 ## Current status
 
 ```text
-implemented through  Block 126
-current block        Block 127
+implemented through  Block 128
+current block        Block 129
 current phase        Interactive Part & Assembly Modeling MVP-9
-current boundary     interactive PathCurve, Sweep, and Loft authoring
+current boundary     feature edit lifecycle and the Core feature-update command boundary
 ```
 
 Interactive Sketcher MVP-8 is complete and accepted. Blocks 122–123 establish the selection-first
 modeling workspace and reusable candidate-only viewport manipulators; Block 124 adds interactive
 Extrude, path Extrude, and Revolve authoring, Block 125 adds interactive Fillet, Chamfer, Shell, and
-Draft authoring, and Block 126 adds interactive Pattern, Mirror, Body Boolean, and Body Transform
-authoring over that infrastructure. Block 127 is the current next technical step.
+Draft authoring, Block 126 adds interactive Pattern, Mirror, Body Boolean, and Body Transform
+authoring, Block 127 adds interactive PathCurve, Sweep, and Loft authoring, and Block 128 adds
+interactive Surface authoring and surface-to-solid conversion over that infrastructure. Block 129 is
+the current next technical step.
 
 ## Phase map
 
@@ -53,7 +55,7 @@ MVP-5   Assembly system                                 Blocks 1–47 implemente
 MVP-6   Part Construction                              Blocks 48–94 implemented
 MVP-7   GUI Feature Validation                        Blocks 95–105 implemented
 MVP-8   Interactive Sketcher                          Blocks 106–121 implemented
-MVP-9   Interactive Part & Assembly Modeling          Blocks 122–126 implemented; Block 127 next
+MVP-9   Interactive Part & Assembly Modeling          Blocks 122–128 implemented; Block 129 next
 MVP-10  STEP Import                                    Blocks 132–138 planned
 ```
 
@@ -403,11 +405,49 @@ Focused tags:
 [integration][pattern-ghost-preview]
 ```
 
-## Current next technical step — Block 127
+## Block 127 — Interactive PathCurve, Sweep, and Loft — Implemented
 
-Implement interactive PathCurve, Sweep, and Loft authoring with ordered-section picking over the
-Block-122 workspace and Block-123 manipulator infrastructure, as defined in
-`docs/interactive-modeling-sequence-mvp9.md`.
+`GuiInteractivePathSweepController` (PathCurve, Sweep) and `GuiInteractiveLoftController` (Loft) are
+headless controllers that collect an ordered, duplicate-free chain of connected segments, a
+profile+trajectory with an optional twist `Angle` parameter or guide (never both), or ordered loft
+sections with `reorder_section` drag-reorder and C0/G1/G2 continuity. Each previews a disposable
+PartDocument clone and commits one transaction; the sweep twist is the only Block-123 handle. Combined
+guide-plus-twist and unsupported G2 continuity surface as fail-closed diagnostics.
+`GuiInteractiveFeatureCoordinator` now also owns these controllers.
+
+Canonical contract: `docs/gui-interactive-path-sweep-loft-mvp9.md`.
+
+Focused tags:
+
+```text
+[gui][interactive-path-sweep]
+[gui][interactive-loft]
+[integration][ordered-section-picking]
+```
+
+## Block 128 — Interactive Surface authoring and surface-to-solid — Implemented
+
+`GuiInteractiveSurfaceController` (headless) authors all six `SurfaceFeature` kinds — Boundary/Fill,
+Trim, Extend, Stitch, and ClosedShellToSolid — collecting boundary curves or surfaces, driving the
+`surface.extend` distance handle and a typed stitch tolerance, and committing one transaction. Because
+stitch free-edge/gap and closed-shell closedness diagnostics are geometric, preview runs the real
+`GeometryRecomputeExecutor` on a throwaway clone so the authoritative diagnostic surfaces before
+commit. `GuiInteractiveFeatureCoordinator` now also owns this controller.
+
+Canonical contract: `docs/gui-interactive-surface-mvp9.md`.
+
+Focused tags:
+
+```text
+[gui][interactive-surface]
+[integration][stitch-diagnostic-overlay]
+```
+
+## Current next technical step — Block 129
+
+Produce the checked-in feature update-capability inventory and add per-family Core feature-update/remove
+commands where the inventory proves them missing, then open the double-click feature edit lifecycle
+over the Block-124..128 controllers, as defined in `docs/interactive-modeling-sequence-mvp9.md`.
 
 ## Later phases
 

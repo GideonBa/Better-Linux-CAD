@@ -10,7 +10,9 @@ the selection-first Part/Surface/Assembly workspace. Block 123 implements reusab
 viewport manipulators and numeric-HUD coupling. Block 124 implements interactive Extrude, path
 Extrude, and Revolve authoring; Block 125 implements interactive Fillet, Chamfer, Shell, and Draft
 authoring; Block 126 implements interactive Pattern, Mirror, Body Boolean, and Body Transform
-authoring. Block 127 is next; STEP Import begins with Block 132.
+authoring; Block 127 implements interactive PathCurve, Sweep, and Loft authoring; Block 128 implements
+interactive Surface authoring and surface-to-solid conversion. Block 129 is next;
+STEP Import begins with Block 132.
 
 The UI is deliberately not built like FreeCAD. The goal is a modern, consistent, reduced interface
 with clear separation between model, parameters, features, Sketch topology, solver results, and
