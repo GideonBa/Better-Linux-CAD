@@ -348,6 +348,19 @@ recompute fails. BodyTransform stack edits and feature reorder are explicit non-
 
 Canonical contract: `docs/gui-feature-edit-mvp9.md`.
 
+## Interactive Assembly placement, relationships, joints, and motion
+
+Block 130 adds Qt-free Assembly interaction controllers without changing Core, Geometry, or JSON
+authority. Component and rigid-subassembly placement use candidate-only translate/rotate triads and
+one Project transaction. Relationship and joint selection resolve semantic targets and filter the
+second pick through the existing compatibility matrices. Relationship preview runs the real rank/DOF
+analysis and rigid-body solve; Apply adds intent and applies the solved pose atomically. Joint preview
+returns oriented frames in root space. Motion exposes typed coordinate slots and limits, maps one
+selected slot to one vector drive, reports transient DOF/solve HUD state, and delegates atomic pose +
+coordinate mutation to the snapshot-validating motion applier. Spherical remains passive.
+
+Canonical contract: `docs/gui-interactive-assembly-mvp9.md`.
+
 ## Semantic Part-feature input and generated topology identity
 
 Part features use typed semantic input references and expected capabilities instead of raw kernel
@@ -426,6 +439,8 @@ one atomic Apply transaction, Block 125 adds interactive Fillet, Chamfer, Shell,
 ordered edge/face chain picking, and Block 126 adds interactive Pattern, Mirror, Body Boolean, and
 Body Transform with the persistent transform stack, Block 127 adds interactive PathCurve, Sweep,
 and Loft with ordered-section reorder, Block 128 adds interactive Surface authoring and
-surface-to-solid conversion with geometry diagnostics surfaced before commit, and Block 129 adds the
-feature edit lifecycle and Core feature-update commands. Block 130 (interactive Assembly placement,
-relationships, joints, and motion) is the current next technical step.
+surface-to-solid conversion with geometry diagnostics surfaced before commit, Block 129 adds the
+feature edit lifecycle and Core feature-update commands, and Block 130 adds interactive Assembly
+placement, compatibility-filtered relationships, oriented joint-frame previews, and coordinate
+motion. Block 131 (Measure, coverage manifest v2, and integrated acceptance) is the current next
+technical step.

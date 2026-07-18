@@ -331,6 +331,19 @@ co-producer edges, dependency-protected remove, double-click family identificati
 transaction with exact undo and fail-closed rejection, and downstream recompute after an upstream
 edit.
 
+Block 130 interactive Assembly placement, relationships, joints, and motion:
+
+```bash
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][interactive-assembly-placement]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][interactive-relationships]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][interactive-joint-motion]"
+```
+
+These cases verify component and rigid-subassembly placement, translate/rotate triads, one-click state
+editing and undo, compatibility-filtered relationship/joint picking, solved relationship candidates,
+root-space joint frames, typed slot limits, one-coordinate vector drives, motion HUD solve/DOF state,
+atomic pose/intent application, and Spherical drive rejection.
+
 ## Representative existing validation tags
 
 ```bash
@@ -364,7 +377,7 @@ in the existing `blcad_gui_tests` executable; no second Qt application instance 
 ./build/dev-geometry/blcad_analyze_assembly input.blcad.project.json
 ```
 
-## Public Blocks 122–129 boundaries
+## Public Blocks 122–130 boundaries
 
 ```text
 include/blcad/gui/gui_modeling_workspace.hpp
@@ -378,6 +391,7 @@ include/blcad/gui/gui_interactive_pattern_body.hpp
 include/blcad/gui/gui_interactive_path_sweep_loft.hpp
 include/blcad/gui/gui_interactive_surface.hpp
 include/blcad/gui/gui_feature_edit.hpp
+include/blcad/gui/gui_interactive_assembly.hpp
 include/blcad/core/part_document.hpp
 include/blcad/gui/main_window.hpp
 tests/gui/gui_feature_coverage_acceptance_tests.cpp
@@ -387,6 +401,7 @@ tests/gui/gui_interactive_pattern_body_tests.cpp
 tests/gui/gui_interactive_path_sweep_loft_tests.cpp
 tests/gui/gui_interactive_surface_tests.cpp
 tests/gui/gui_feature_edit_tests.cpp
+tests/gui/gui_interactive_assembly_tests.cpp
 tests/core/feature_update_command_tests.cpp
 docs/gui-modeling-workspace-mvp9.md
 docs/gui-viewport-manipulators-mvp9.md
@@ -397,6 +412,7 @@ docs/gui-interactive-path-sweep-loft-mvp9.md
 docs/gui-interactive-surface-mvp9.md
 docs/gui-feature-edit-mvp9.md
 docs/gui-feature-update-inventory-mvp9.json
+docs/gui-interactive-assembly-mvp9.md
 ```
 
 All Block-122 through Block-128 transient state — command catalogs, verified preselection
@@ -408,6 +424,9 @@ mutation, and it flows through one existing `commit_part_transaction`. Block 129
 exception: it adds Core `update_<family>`/`remove_<family>` commands (the `[core][feature-update-command]`
 boundary) that preserve ids, ordered position, and JSON shape, consumed by the headless
 `GuiFeatureEditController` through the same transaction path.
+Block 130 adds no new persistence authority: its transient occurrence candidates, resolved target
+capabilities, oriented frames, solved poses, coordinate-control/HUD state, and motion results apply
+through existing `commit_project_transaction`, solver-result, and motion-result boundaries.
 
 ## Formatting
 
@@ -426,6 +445,7 @@ clang-format -i \
   include/blcad/gui/gui_interactive_path_sweep_loft.hpp \
   include/blcad/gui/gui_interactive_surface.hpp \
   include/blcad/gui/gui_feature_edit.hpp \
+  include/blcad/gui/gui_interactive_assembly.hpp \
   include/blcad/gui/main_window.hpp \
   tests/gui/gui_feature_coverage_acceptance_tests.cpp \
   tests/gui/gui_interactive_features_tests.cpp \
@@ -434,6 +454,7 @@ clang-format -i \
   tests/gui/gui_interactive_path_sweep_loft_tests.cpp \
   tests/gui/gui_interactive_surface_tests.cpp \
   tests/gui/gui_feature_edit_tests.cpp \
+  tests/gui/gui_interactive_assembly_tests.cpp \
   tests/core/feature_update_command_tests.cpp
 ```
 
@@ -453,6 +474,7 @@ rm -rf build/
 - `docs/interactive-modeling-sequence-mvp9.md`: Blocks 122–131 sequence
 - `docs/gui-modeling-workspace-mvp9.md`: Block-122 selection-first shell contract
 - `docs/gui-viewport-manipulators-mvp9.md`: Block-123 manipulator and HUD contract
+- `docs/gui-interactive-assembly-mvp9.md`: Block-130 Assembly interaction contract
 - `docs/sketch-planar-constraint-solver-mvp8.md`: solver mathematics and dimension mappings
 - `docs/gui-sketch-solver-drag-mvp8.md`: constraint/dimension-aware direct manipulation
 - `docs/gui-sketch-constraint-authoring-mvp8.md`: Block-114 constraint/glyph contract
@@ -460,7 +482,7 @@ rm -rf build/
 
 ## Current development boundary
 
-Blocks 106–121 are implemented and accepted. Block 122 adds the shell-owned selection-first
-Part/Surface/Assembly workspace. Block 123 adds reusable candidate-only viewport manipulators,
-model-space mapping, deterministic fixed-DIP hit testing, exact release, and numeric-HUD coupling.
-Block 124 interactive Extrude, path Extrude, and Revolve authoring is next.
+Blocks 106–121 are implemented and accepted. Interactive Modeling is implemented through Block 130:
+selection-first workspace, reusable candidate-only manipulators, interactive Part/Surface features,
+feature editing, and direct Assembly placement/relationship/joint/motion workflows. Block 131,
+Measure, coverage manifest v2, and integrated acceptance, is next.

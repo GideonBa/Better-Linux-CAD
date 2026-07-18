@@ -10,7 +10,7 @@ page.
 The assembly sequence is implemented through Block 47, Part Construction MVP-6 is complete through
 Block 94, GUI Feature Validation MVP-7 is accepted through Block 105, Interactive Sketcher MVP-8 is
 accepted through Block 121, and Interactive Part & Assembly Modeling MVP-9 is active through Block
-129. Blocks 106–120 implement the contextual Sketch workspace, device-independent plane interaction,
+130. Blocks 106–120 implement the contextual Sketch workspace, device-independent plane interaction,
 stable shared `SketchPointId` topology, deterministic planar solving with local DOF/conflict
 diagnostics, solver-backed semantic-handle dragging, line/conic/slot creation, spline editing,
 parameter-backed Sketch text, geometric constraint authoring, typed driving/reference Sketch
@@ -69,9 +69,11 @@ Block 128 implements interactive Surface authoring and surface-to-solid conversi
 [`docs/gui-interactive-surface-mvp9.md`](docs/gui-interactive-surface-mvp9.md). Block 129 implements
 the feature edit lifecycle and Core feature-update commands in
 [`docs/gui-feature-edit-mvp9.md`](docs/gui-feature-edit-mvp9.md).
-Block 130, interactive Assembly placement, relationships, joints, and motion, is next in
-[`docs/interactive-modeling-sequence-mvp9.md`](docs/interactive-modeling-sequence-mvp9.md); STEP
-Import MVP-10 follows in Blocks 132–138.
+Block 130 implements interactive Assembly placement, compatibility-filtered relationships, joint
+frame preview, and coordinate motion in
+[`docs/gui-interactive-assembly-mvp9.md`](docs/gui-interactive-assembly-mvp9.md). Block 131, Measure,
+coverage manifest v2, and integrated acceptance, is next; STEP Import MVP-10 follows in Blocks
+132–138.
 
 ## Repository layout
 
@@ -102,6 +104,7 @@ Start here:
 - [`docs/gui-sketch3d-interaction-mvp8.md`](docs/gui-sketch3d-interaction-mvp8.md) — axis/plane locks, typed 3D placement, handles, guides, and projection
 - [`docs/gui-modeling-workspace-mvp9.md`](docs/gui-modeling-workspace-mvp9.md) — selection-first modeling commands, filters, handoff, repeat, and transient navigation
 - [`docs/gui-viewport-manipulators-mvp9.md`](docs/gui-viewport-manipulators-mvp9.md) — reusable candidate-only handles, mapping, hit testing, and numeric coupling
+- [`docs/gui-interactive-assembly-mvp9.md`](docs/gui-interactive-assembly-mvp9.md) — placement, relationships, joints, and coordinate motion
 
 ## License
 

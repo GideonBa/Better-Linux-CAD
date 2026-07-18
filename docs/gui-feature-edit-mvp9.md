@@ -86,4 +86,6 @@ and fail-closed rejection, and downstream recompute after an upstream edit.
 
 ## Next boundary
 
-Block 130 adds interactive Assembly placement, relationships, joints, and motion.
+Block 130 adds interactive Assembly placement, relationships, joints, and motion in
+`docs/gui-interactive-assembly-mvp9.md`. Block 131 adds Measure, the coverage manifest v2, and
+integrated acceptance.

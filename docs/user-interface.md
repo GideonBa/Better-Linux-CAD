@@ -12,7 +12,8 @@ Extrude, and Revolve authoring; Block 125 implements interactive Fillet, Chamfer
 authoring; Block 126 implements interactive Pattern, Mirror, Body Boolean, and Body Transform
 authoring; Block 127 implements interactive PathCurve, Sweep, and Loft authoring; Block 128 implements
 interactive Surface authoring and surface-to-solid conversion; Block 129 adds the feature edit
-lifecycle and Core feature-update commands. Block 130 is next;
+lifecycle and Core feature-update commands; and Block 130 implements direct Assembly placement,
+compatibility-filtered relationships, joint-frame preview, and coordinate motion. Block 131 is next;
 STEP Import begins with Block 132.
 
 The UI is deliberately not built like FreeCAD. The goal is a modern, consistent, reduced interface
@@ -332,8 +333,10 @@ gasket_thickness         2      mm    -                Gasket
 Feature-creation workflows share consistent task/preview/commit structure and consume existing Core/
 Geometry authorities. Current validation workbenches expose Part, Surface, Assembly, analysis, and
 exchange families. Block 122 supplies their common selection-first command-start and navigation
-surface. Block 123 supplies reusable candidate-only manipulators. Blocks 124–130 add family-specific
-preview and authoring in the order frozen by `docs/interactive-modeling-sequence-mvp9.md`.
+surface. Block 123 supplies reusable candidate-only manipulators. Blocks 124–130 add implemented
+family-specific preview and authoring in the order frozen by
+`docs/interactive-modeling-sequence-mvp9.md`; the Assembly interaction contract is
+`docs/gui-interactive-assembly-mvp9.md`.
 
 Constraint suggestions remain deterministic from compatible geometry/capability types; they do not
 require AI.

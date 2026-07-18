@@ -20,6 +20,12 @@ component transforms remain derived result data. Only converged, fresh results p
 existing atomic solve/motion appliers in one GUI transaction; failed or stale results cannot partly
 move an Assembly.
 
+Block 130 adds the direct-manipulation layer over this validation workbench in
+`docs/gui-interactive-assembly-mvp9.md`: component/subassembly triads, capability-filtered second
+targets, solved relationship candidates, oriented joint frames, typed coordinate controls, and
+in-viewport single-coordinate motion. The MVP-7 commands remain the form-driven and cross-hierarchy
+fallback; authority continues to reside in the same Project transactions and solve/motion appliers.
+
 ## Verification
 
 ```bash

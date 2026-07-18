@@ -572,6 +572,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_interactive_path_sweep_loft_tests.cpp
       tests/gui/gui_interactive_surface_tests.cpp
       tests/gui/gui_feature_edit_tests.cpp
+      tests/gui/gui_interactive_assembly_tests.cpp
       tests/gui/gui_startup_splash_tests.cpp
     )
     target_link_libraries(blcad_gui_tests PRIVATE BLCAD::gui Catch2::Catch2)

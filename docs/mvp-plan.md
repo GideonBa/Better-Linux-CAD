@@ -4,10 +4,10 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 129
-current_block: 130
-current_boundary: Interactive Assembly placement, relationships, joints, and motion
-current_tag: "[gui][interactive-assembly-placement]"
+implemented_through: Block 130
+current_block: 131
+current_boundary: Measure, coverage manifest v2, and integrated acceptance
+current_tag: "[gui][measure]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -17,7 +17,7 @@ phase_status:
   mvp_6: "Part Construction — Blocks 48–94 implemented; MVP complete"
   mvp_7: "GUI Feature Validation — Blocks 95–105 implemented; MVP complete"
   mvp_8: "Interactive Sketcher — Blocks 106–121 implemented; MVP complete"
-  mvp_9: "Interactive Part & Assembly Modeling — Blocks 122–129 implemented; Block 130 next"
+  mvp_9: "Interactive Part & Assembly Modeling — Blocks 122–130 implemented; Block 131 next"
   mvp_10: "STEP Import — Blocks 132–138 planned after Interactive Modeling acceptance"
 ---
 
@@ -30,10 +30,10 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 ## Current status
 
 ```text
-implemented through  Block 129
-current block        Block 130
+implemented through  Block 130
+current block        Block 131
 current phase        Interactive Part & Assembly Modeling MVP-9
-current boundary     interactive Assembly placement, relationships, joints, and motion
+current boundary     Measure, coverage manifest v2, and integrated acceptance
 ```
 
 Interactive Sketcher MVP-8 is complete and accepted. Blocks 122–123 establish the selection-first
@@ -42,8 +42,9 @@ Extrude, path Extrude, and Revolve authoring, Block 125 adds interactive Fillet,
 Draft authoring, Block 126 adds interactive Pattern, Mirror, Body Boolean, and Body Transform
 authoring, Block 127 adds interactive PathCurve, Sweep, and Loft authoring, Block 128 adds
 interactive Surface authoring and surface-to-solid conversion, and Block 129 adds the feature edit
-lifecycle and Core feature-update commands over that infrastructure. Block 130 is the current next
-technical step.
+lifecycle and Core feature-update commands over that infrastructure, and Block 130 adds interactive
+Assembly placement, compatibility-filtered relationships, joint frames, and coordinate motion. Block
+131 is the current next technical step.
 
 ## Phase map
 
@@ -56,7 +57,7 @@ MVP-5   Assembly system                                 Blocks 1–47 implemente
 MVP-6   Part Construction                              Blocks 48–94 implemented
 MVP-7   GUI Feature Validation                        Blocks 95–105 implemented
 MVP-8   Interactive Sketcher                          Blocks 106–121 implemented
-MVP-9   Interactive Part & Assembly Modeling          Blocks 122–129 implemented; Block 130 next
+MVP-9   Interactive Part & Assembly Modeling          Blocks 122–130 implemented; Block 131 next
 MVP-10  STEP Import                                    Blocks 132–138 planned
 ```
 
@@ -465,11 +466,29 @@ Focused tags:
 [integration][feature-edit-recompute]
 ```
 
-## Current next technical step — Block 130
+## Block 130 — Interactive Assembly placement, relationships, joints, and motion — Implemented
 
-Implement interactive Assembly placement, relationships, joints, and motion over the existing
-component-instance, relationship, joint, and vector-drive authorities, as defined in
-`docs/interactive-modeling-sequence-mvp9.md`.
+The headless Block-130 controllers insert/edit component and rigid-subassembly occurrences through
+translate/rotate triads, filter second relationship/joint targets through the existing capability
+matrices, preview relationships with the real solver and joints with root-space oriented frames, and
+drive exactly one typed joint coordinate with limits plus transient DOF/solve HUD status. Relationship
+intent and solved pose, and motion coordinate plus posed transforms, each commit in one Project
+transaction. Spherical is rejected as a selected drive; no Core/Geometry/persistence intent changes.
+
+Canonical contract: `docs/gui-interactive-assembly-mvp9.md`.
+
+Focused tags:
+
+```text
+[gui][interactive-assembly-placement]
+[gui][interactive-relationships]
+[gui][interactive-joint-motion]
+```
+
+## Current next technical step — Block 131
+
+Implement read-only Measure, publish the GUI feature coverage manifest v2, and complete integrated
+Interactive Modeling acceptance as defined in `docs/interactive-modeling-sequence-mvp9.md`.
 
 ## Later phases
 

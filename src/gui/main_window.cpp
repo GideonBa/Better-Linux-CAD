@@ -103,7 +103,10 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
   create_shell();
   viewport_manipulator_shell_.set_candidate_callback(
       [this](const GuiViewportManipulatorCandidate& candidate) {
-        interactive_features_.on_candidate(candidate);
+        if (interactive_assembly_.active())
+          interactive_assembly_.on_candidate(candidate);
+        else
+          interactive_features_.on_candidate(candidate);
       });
   refresh_command_state();
 }

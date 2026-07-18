@@ -1,7 +1,7 @@
 # Interactive Part & Assembly Modeling Sequence MVP-9
 
-Status: active through implemented Block 129 after accepted Interactive Sketcher Block 121. Blocks
-130–131 precede STEP Import MVP-10 (Blocks 132–138); Block 130 is the current next technical step.
+Status: active through implemented Block 130 after accepted Interactive Sketcher Block 121. Block
+131 precedes STEP Import MVP-10 (Blocks 132–138); Block 131 is the current next technical step.
 
 This phase closes the interaction gap between the accepted validation GUI (MVP-7, Blocks 95–105)
 and an intuitive, Inventor-familiar modeling experience for **every feature family implemented
@@ -416,7 +416,7 @@ and this block must not invent one.
 Focused tags: `[core][feature-update-command]`, `[gui][feature-edit]`,
 `[integration][feature-edit-recompute]`.
 
-## Block 130 — Interactive Assembly placement, relationships, joints, and motion
+## Block 130 — Interactive Assembly placement, relationships, joints, and motion — Implemented
 
 Insert a component by choosing the shared Part/subassembly and placing it with a triad; the triad
 edits the persistent `ComponentInstance` placement. Grounding, visibility, and suppression stay one
@@ -449,6 +449,15 @@ Existing authority:
 
 New intent allowed: none. Placement transforms and coordinate drives are existing authorities;
 Spherical remains rejected as a selected drive.
+
+Implemented boundary: `GuiInteractiveAssemblyPlacementController` inserts/edits root component and
+rigid-subassembly occurrences with candidate-only translate/rotate triads and atomic state changes;
+`GuiInteractiveAssemblyRelationshipController` filters second targets through the Block-37 matrix,
+previews rank/DOF and a converged solved pose, then commits relationship plus pose atomically;
+`GuiInteractiveAssemblyJointController` repeats compatibility validation and returns root-space
+oriented frames; `GuiInteractiveAssemblyMotionController` exposes typed slots/limits, drives exactly
+one coordinate, and applies the snapshot-validated motion result atomically. Canonical contract:
+`docs/gui-interactive-assembly-mvp9.md`.
 
 Explicit non-goal: general constrained free-drag (dragging a constrained component anywhere while
 the solver follows). That requires a drag-objective solve mode that no Core contract provides; it

@@ -52,7 +52,7 @@ The project grows through controlled headless vertical slices:
 12. engineering modules.
 
 Phases 1–9 are implemented through accepted Interactive Sketcher Block 121. Interactive Part &
-Assembly Modeling MVP-9 is active through Block 129:
+Assembly Modeling MVP-9 is active through Block 130:
 
 ```text
 122 selection-first Part/Surface/Assembly workspace
@@ -77,9 +77,11 @@ Pattern, Mirror, Body Boolean, and Body Transform authoring
 (`docs/gui-interactive-pattern-body-mvp9.md`), and Block 127 adds interactive PathCurve, Sweep, and
 Loft authoring (`docs/gui-interactive-path-sweep-loft-mvp9.md`), and Block 128 adds interactive Surface
 authoring and surface-to-solid conversion (`docs/gui-interactive-surface-mvp9.md`), and Block 129 adds
-the feature edit lifecycle and Core feature-update commands (`docs/gui-feature-edit-mvp9.md`).
-Block 130, interactive Assembly placement, relationships, joints, and motion, is the current next
-technical step. STEP Import starts at Block 132 after Interactive Modeling acceptance.
+the feature edit lifecycle and Core feature-update commands (`docs/gui-feature-edit-mvp9.md`), and
+Block 130 adds interactive Assembly placement, compatibility-filtered relationships, oriented joint
+frames, and coordinate motion (`docs/gui-interactive-assembly-mvp9.md`). Block 131, Measure, coverage
+manifest v2, and integrated acceptance, is the current next technical step. STEP Import starts at
+Block 132 after Interactive Modeling acceptance.
 
 Development rule:
 
