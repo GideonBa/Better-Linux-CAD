@@ -1,0 +1,33 @@
+{
+  "schema": "blcad.feature-update-inventory.v1",
+  "block": 129,
+  "description": "Checked-in inventory of public PartDocument mutation authorities for every feature family implemented through Block 94, before and after the Block-129 feature-update boundary. 'add' has always existed; Block 129 added the missing 'update' and 'remove' commands. Parameter-value edits (set_parameter_value / set_parameter_formula) drive every parameter-bound feature without a feature update.",
+  "parameter_driven_recompute": {
+    "commands": ["PartDocument::set_parameter_value", "PartDocument::set_parameter_formula"],
+    "note": "Editing a bound Length/Angle/Count parameter re-drives every feature that references it on recompute; no feature update is required for a value change."
+  },
+  "families": [
+    {"family": "extrude", "type": "Feature", "add": "add_feature", "update": "update_feature", "remove": "remove_feature", "update_added_in_block": 129, "remove_added_in_block": 129},
+    {"family": "revolve", "type": "RevolveFeature", "add": "add_revolve_feature", "update": "update_revolve_feature", "remove": "remove_revolve_feature", "update_added_in_block": 129, "remove_added_in_block": 129},
+    {"family": "sweep", "type": "SweepFeature", "add": "add_sweep_feature", "update": "update_sweep_feature", "remove": "remove_sweep_feature", "update_added_in_block": 129, "remove_added_in_block": 129},
+    {"family": "loft", "type": "LoftFeature", "add": "add_loft_feature", "update": "update_loft_feature", "remove": "remove_loft_feature", "update_added_in_block": 129, "remove_added_in_block": 129},
+    {"family": "surface", "type": "SurfaceFeature", "add": "add_surface_feature", "update": "update_surface_feature", "remove": "remove_surface_feature", "update_added_in_block": 129, "remove_added_in_block": 92},
+    {"family": "linear_pattern", "type": "LinearPatternFeature", "add": "add_linear_pattern_feature", "update": "update_linear_pattern_feature", "remove": "remove_linear_pattern_feature", "update_added_in_block": 129, "remove_added_in_block": 129},
+    {"family": "circular_pattern", "type": "CircularPatternFeature", "add": "add_circular_pattern_feature", "update": "update_circular_pattern_feature", "remove": "remove_circular_pattern_feature", "update_added_in_block": 129, "remove_added_in_block": 129},
+    {"family": "mirror", "type": "MirrorFeature", "add": "add_mirror_feature", "update": "update_mirror_feature", "remove": "remove_mirror_feature", "update_added_in_block": 129, "remove_added_in_block": 129},
+    {"family": "fillet", "type": "FilletFeature", "add": "add_fillet_feature", "update": "update_fillet_feature", "remove": "remove_fillet_feature", "update_added_in_block": 129, "remove_added_in_block": 129},
+    {"family": "chamfer", "type": "ChamferFeature", "add": "add_chamfer_feature", "update": "update_chamfer_feature", "remove": "remove_chamfer_feature", "update_added_in_block": 129, "remove_added_in_block": 129},
+    {"family": "shell", "type": "ShellFeature", "add": "add_shell_feature", "update": "update_shell_feature", "remove": "remove_shell_feature", "update_added_in_block": 129, "remove_added_in_block": 129},
+    {"family": "draft", "type": "DraftFeature", "add": "add_draft_feature", "update": "update_draft_feature", "remove": "remove_draft_feature", "update_added_in_block": 129, "remove_added_in_block": 129},
+    {"family": "body_boolean", "type": "BodyBooleanFeature", "add": "add_body_boolean_feature", "update": "update_body_boolean_feature", "remove": "remove_body_boolean_feature", "update_added_in_block": 129, "remove_added_in_block": 129}
+  ],
+  "sketch_geometry_families": [
+    {"family": "sketch", "type": "Sketch", "add": "add_sketch", "update": "update_sketch", "remove": null, "note": "planar Sketch editing has its own update since MVP-8"},
+    {"family": "sketch_3d", "type": "Sketch3D", "add": "add_sketch_3d", "update": null, "remove": "remove_sketch_3d"},
+    {"family": "path_curve", "type": "PathCurve", "add": "add_path_curve", "update": null, "remove": "remove_path_curve"}
+  ],
+  "explicit_non_goals": [
+    {"family": "body_transform", "type": "BodyTransform", "reason": "The persistent transform stack is ordered append-only intent (Block 126). Editing or removing an individual stack record is deliberately out of scope for the Block-129 feature-edit boundary; the stack is never collapsed and no reorder contract exists."},
+    {"topic": "feature_reorder", "reason": "Feature order is dependency-derived (part-feature-body-dependency-mvp6.md). No Core reorder contract exists and Block 129 does not invent one."}
+  ]
+}

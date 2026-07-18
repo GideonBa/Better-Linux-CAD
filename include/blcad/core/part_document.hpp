@@ -76,6 +76,39 @@ public:
   [[nodiscard]] Result<std::size_t> add_shell_feature(ShellFeature feature);
   [[nodiscard]] Result<std::size_t> add_draft_feature(DraftFeature feature);
   [[nodiscard]] Result<std::size_t> add_body_boolean_feature(BodyBooleanFeature feature);
+
+  // Block 129 feature-update commands. update_* replaces an existing feature
+  // record in place: it must keep the same FeatureId, ordered position, JSON
+  // shape, and downstream dependency edges, and it re-runs the same validation
+  // as the corresponding add. remove_* deletes a feature record only when
+  // nothing downstream depends on its result. Both fail closed and never
+  // partially mutate the document.
+  [[nodiscard]] Result<std::size_t> update_feature(Feature feature);
+  [[nodiscard]] Result<std::size_t> remove_feature(FeatureId id);
+  [[nodiscard]] Result<std::size_t> update_revolve_feature(RevolveFeature feature);
+  [[nodiscard]] Result<std::size_t> remove_revolve_feature(FeatureId id);
+  [[nodiscard]] Result<std::size_t> update_sweep_feature(SweepFeature feature);
+  [[nodiscard]] Result<std::size_t> remove_sweep_feature(FeatureId id);
+  [[nodiscard]] Result<std::size_t> update_loft_feature(LoftFeature feature);
+  [[nodiscard]] Result<std::size_t> remove_loft_feature(FeatureId id);
+  [[nodiscard]] Result<std::size_t> update_surface_feature(SurfaceFeature feature);
+  [[nodiscard]] Result<std::size_t> update_linear_pattern_feature(LinearPatternFeature feature);
+  [[nodiscard]] Result<std::size_t> remove_linear_pattern_feature(FeatureId id);
+  [[nodiscard]] Result<std::size_t> update_circular_pattern_feature(CircularPatternFeature feature);
+  [[nodiscard]] Result<std::size_t> remove_circular_pattern_feature(FeatureId id);
+  [[nodiscard]] Result<std::size_t> update_mirror_feature(MirrorFeature feature);
+  [[nodiscard]] Result<std::size_t> remove_mirror_feature(FeatureId id);
+  [[nodiscard]] Result<std::size_t> update_fillet_feature(FilletFeature feature);
+  [[nodiscard]] Result<std::size_t> remove_fillet_feature(FeatureId id);
+  [[nodiscard]] Result<std::size_t> update_chamfer_feature(ChamferFeature feature);
+  [[nodiscard]] Result<std::size_t> remove_chamfer_feature(FeatureId id);
+  [[nodiscard]] Result<std::size_t> update_shell_feature(ShellFeature feature);
+  [[nodiscard]] Result<std::size_t> remove_shell_feature(FeatureId id);
+  [[nodiscard]] Result<std::size_t> update_draft_feature(DraftFeature feature);
+  [[nodiscard]] Result<std::size_t> remove_draft_feature(FeatureId id);
+  [[nodiscard]] Result<std::size_t> update_body_boolean_feature(BodyBooleanFeature feature);
+  [[nodiscard]] Result<std::size_t> remove_body_boolean_feature(FeatureId id);
+
   [[nodiscard]] Result<std::size_t> add_sketch_ownership(SketchOwnership ownership);
   [[nodiscard]] Result<std::size_t> add_body_transform(BodyTransform transform);
   [[nodiscard]] Result<std::size_t> add_body(Body body);
@@ -252,6 +285,15 @@ private:
                                   const std::vector<ParameterId>& parameters);
   [[nodiscard]] Result<std::size_t> add_shell_dependencies(const ShellFeature& feature);
   [[nodiscard]] Result<std::size_t> add_draft_dependencies(const DraftFeature& feature);
+
+  // Block 129 generic feature update/remove over the typed feature vectors.
+  template <typename FeatureT>
+  [[nodiscard]] Result<std::size_t>
+  update_feature_record(std::vector<FeatureT> PartDocument::*member, FeatureT replacement,
+                        Result<std::size_t> (PartDocument::*adder)(FeatureT));
+  template <typename FeatureT>
+  [[nodiscard]] Result<std::size_t>
+  remove_feature_record(std::vector<FeatureT> PartDocument::*member, const FeatureId& id);
 
   DocumentId id_;
   std::string name_;

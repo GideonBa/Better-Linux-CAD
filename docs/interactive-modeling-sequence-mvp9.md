@@ -1,7 +1,7 @@
 # Interactive Part & Assembly Modeling Sequence MVP-9
 
-Status: active through implemented Block 128 after accepted Interactive Sketcher Block 121. Blocks
-129–131 precede STEP Import MVP-10 (Blocks 132–138); Block 129 is the current next technical step.
+Status: active through implemented Block 129 after accepted Interactive Sketcher Block 121. Blocks
+130–131 precede STEP Import MVP-10 (Blocks 132–138); Block 130 is the current next technical step.
 
 This phase closes the interaction gap between the accepted validation GUI (MVP-7, Blocks 95–105)
 and an intuitive, Inventor-familiar modeling experience for **every feature family implemented
@@ -115,8 +115,8 @@ numeric typing opens the transient HUD, `Enter` accepts, double click edits.
 126 interactive Pattern, Mirror, Body Boolean, and Body Transform authoring — implemented
 127 interactive PathCurve, Sweep, and Loft authoring — implemented
 128 interactive Surface authoring and surface-to-solid conversion — implemented
-129 feature edit lifecycle and the Core feature-update command boundary — next
-130 interactive Assembly placement, relationships, joints, and motion
+129 feature edit lifecycle and the Core feature-update command boundary — implemented
+130 interactive Assembly placement, relationships, joints, and motion — next
 131 measure tool, coverage manifest v2, and integrated acceptance
 132–138 STEP Import MVP-10
 ```
@@ -371,7 +371,17 @@ New intent allowed: none.
 
 Focused tags: `[gui][interactive-surface]`, `[integration][stitch-diagnostic-overlay]`.
 
-## Block 129 — Feature edit lifecycle and Core feature-update commands
+## Block 129 — Feature edit lifecycle and Core feature-update commands — Implemented
+
+`PartDocument` gained `update_<family>`/`remove_<family>` for all thirteen feature families (the
+checked-in inventory `docs/gui-feature-update-inventory-mvp9.json` records the before/after
+authorities): update replaces a record in place with a stable id, position, and JSON shape,
+preserving downstream and result-body co-producer edges; remove is dependency-protected. The headless
+`GuiFeatureEditController` identifies a double-clicked feature's family, previews a disposable edited
+candidate, and commits one update transaction that fails closed when the edit or any downstream
+recompute fails. New Core intent is confined to `[core][feature-update-command]`; no JSON shape
+changes. BodyTransform stack edits and feature reorder are explicit non-goals. Canonical contract:
+`docs/gui-feature-edit-mvp9.md`.
 
 Primary boundary: editing existing persistent feature intent as first-class interaction.
 

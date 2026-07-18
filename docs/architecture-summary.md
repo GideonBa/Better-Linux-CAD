@@ -334,6 +334,20 @@ Block-124 `GuiInteractiveFeatureCoordinator` owns this controller alongside the 
 
 Canonical contract: `docs/gui-interactive-surface-mvp9.md`.
 
+## Feature edit lifecycle and Core feature-update commands
+
+Block 129 adds `update_<family>`/`remove_<family>` to `PartDocument` for all thirteen feature families
+(inventoried in `docs/gui-feature-update-inventory-mvp9.json`). update replaces a record in place with
+a stable `FeatureId`, ordered position, and JSON shape, re-running the family add validation while
+preserving downstream dependency edges and the result body's co-producers; remove is
+dependency-protected like `remove_surface_feature`. This is the only block that adds new Core intent
+since MVP-8, confined to `[core][feature-update-command]` with no JSON shape change. The headless
+`GuiFeatureEditController` identifies a double-clicked feature's family, previews a disposable edited
+candidate, and commits one update transaction that fails closed when the edit or any downstream
+recompute fails. BodyTransform stack edits and feature reorder are explicit non-goals.
+
+Canonical contract: `docs/gui-feature-edit-mvp9.md`.
+
 ## Semantic Part-feature input and generated topology identity
 
 Part features use typed semantic input references and expected capabilities instead of raw kernel
@@ -411,6 +425,7 @@ Block 124 adds interactive Extrude, path Extrude, and Revolve authoring over tha
 one atomic Apply transaction, Block 125 adds interactive Fillet, Chamfer, Shell, and Draft with
 ordered edge/face chain picking, and Block 126 adds interactive Pattern, Mirror, Body Boolean, and
 Body Transform with the persistent transform stack, Block 127 adds interactive PathCurve, Sweep,
-and Loft with ordered-section reorder, and Block 128 adds interactive Surface authoring and
-surface-to-solid conversion with geometry diagnostics surfaced before commit. Block 129 (the feature
-edit lifecycle and Core feature-update commands) is the current next technical step.
+and Loft with ordered-section reorder, Block 128 adds interactive Surface authoring and
+surface-to-solid conversion with geometry diagnostics surfaced before commit, and Block 129 adds the
+feature edit lifecycle and Core feature-update commands. Block 130 (interactive Assembly placement,
+relationships, joints, and motion) is the current next technical step.

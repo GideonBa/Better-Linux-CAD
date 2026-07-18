@@ -345,6 +345,7 @@ if(BLCAD_BUILD_TESTS)
 
   add_executable(
     blcad_core_tests
+    tests/core/feature_update_command_tests.cpp
     tests/core/assembly_angle_constraint_tests.cpp
     tests/core/assembly_constraint_graph_tests.cpp
     tests/core/assembly_constraint_tests.cpp
@@ -570,6 +571,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_interactive_pattern_body_tests.cpp
       tests/gui/gui_interactive_path_sweep_loft_tests.cpp
       tests/gui/gui_interactive_surface_tests.cpp
+      tests/gui/gui_feature_edit_tests.cpp
       tests/gui/gui_startup_splash_tests.cpp
     )
     target_link_libraries(blcad_gui_tests PRIVATE BLCAD::gui Catch2::Catch2)

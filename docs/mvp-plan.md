@@ -4,10 +4,10 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 128
-current_block: 129
-current_boundary: Feature edit lifecycle and the Core feature-update command boundary
-current_tag: "[core][feature-update-command]"
+implemented_through: Block 129
+current_block: 130
+current_boundary: Interactive Assembly placement, relationships, joints, and motion
+current_tag: "[gui][interactive-assembly-placement]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -17,7 +17,7 @@ phase_status:
   mvp_6: "Part Construction — Blocks 48–94 implemented; MVP complete"
   mvp_7: "GUI Feature Validation — Blocks 95–105 implemented; MVP complete"
   mvp_8: "Interactive Sketcher — Blocks 106–121 implemented; MVP complete"
-  mvp_9: "Interactive Part & Assembly Modeling — Blocks 122–128 implemented; Block 129 next"
+  mvp_9: "Interactive Part & Assembly Modeling — Blocks 122–129 implemented; Block 130 next"
   mvp_10: "STEP Import — Blocks 132–138 planned after Interactive Modeling acceptance"
 ---
 
@@ -30,19 +30,20 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 ## Current status
 
 ```text
-implemented through  Block 128
-current block        Block 129
+implemented through  Block 129
+current block        Block 130
 current phase        Interactive Part & Assembly Modeling MVP-9
-current boundary     feature edit lifecycle and the Core feature-update command boundary
+current boundary     interactive Assembly placement, relationships, joints, and motion
 ```
 
 Interactive Sketcher MVP-8 is complete and accepted. Blocks 122–123 establish the selection-first
 modeling workspace and reusable candidate-only viewport manipulators; Block 124 adds interactive
 Extrude, path Extrude, and Revolve authoring, Block 125 adds interactive Fillet, Chamfer, Shell, and
 Draft authoring, Block 126 adds interactive Pattern, Mirror, Body Boolean, and Body Transform
-authoring, Block 127 adds interactive PathCurve, Sweep, and Loft authoring, and Block 128 adds
-interactive Surface authoring and surface-to-solid conversion over that infrastructure. Block 129 is
-the current next technical step.
+authoring, Block 127 adds interactive PathCurve, Sweep, and Loft authoring, Block 128 adds
+interactive Surface authoring and surface-to-solid conversion, and Block 129 adds the feature edit
+lifecycle and Core feature-update commands over that infrastructure. Block 130 is the current next
+technical step.
 
 ## Phase map
 
@@ -55,7 +56,7 @@ MVP-5   Assembly system                                 Blocks 1–47 implemente
 MVP-6   Part Construction                              Blocks 48–94 implemented
 MVP-7   GUI Feature Validation                        Blocks 95–105 implemented
 MVP-8   Interactive Sketcher                          Blocks 106–121 implemented
-MVP-9   Interactive Part & Assembly Modeling          Blocks 122–128 implemented; Block 129 next
+MVP-9   Interactive Part & Assembly Modeling          Blocks 122–129 implemented; Block 130 next
 MVP-10  STEP Import                                    Blocks 132–138 planned
 ```
 
@@ -443,11 +444,32 @@ Focused tags:
 [integration][stitch-diagnostic-overlay]
 ```
 
-## Current next technical step — Block 129
+## Block 129 — Feature edit lifecycle and Core feature-update commands — Implemented
 
-Produce the checked-in feature update-capability inventory and add per-family Core feature-update/remove
-commands where the inventory proves them missing, then open the double-click feature edit lifecycle
-over the Block-124..128 controllers, as defined in `docs/interactive-modeling-sequence-mvp9.md`.
+`PartDocument` gained `update_<family>`/`remove_<family>` for all thirteen feature families; update
+replaces a record in place with a stable id, ordered position, and JSON shape while preserving
+downstream and result-body co-producer edges, and remove is dependency-protected. The checked-in
+inventory `docs/gui-feature-update-inventory-mvp9.json` records the before/after authorities. The
+headless `GuiFeatureEditController` identifies a double-clicked feature's family, previews a disposable
+edited candidate, and commits one update transaction that fails closed when the edit or any downstream
+recompute fails. New Core intent is confined to `[core][feature-update-command]`; no JSON shape
+changes; BodyTransform stack edits and feature reorder are explicit non-goals.
+
+Canonical contract: `docs/gui-feature-edit-mvp9.md`.
+
+Focused tags:
+
+```text
+[core][feature-update-command]
+[gui][feature-edit]
+[integration][feature-edit-recompute]
+```
+
+## Current next technical step — Block 130
+
+Implement interactive Assembly placement, relationships, joints, and motion over the existing
+component-instance, relationship, joint, and vector-drive authorities, as defined in
+`docs/interactive-modeling-sequence-mvp9.md`.
 
 ## Later phases
 

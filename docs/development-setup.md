@@ -318,6 +318,19 @@ closed-shell-to-solid fail-closed reporting, fail-closed rejection of invalid in
 tolerance-driven stitch free-edge/gap diagnostic surfaced before commit, a clean coplanar stitch, and
 coordinator-routed extend-distance/typed document equivalence.
 
+Block 129 feature edit lifecycle and Core feature-update commands:
+
+```bash
+./build/dev/blcad_core_tests "[core][feature-update-command]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][feature-edit]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][feature-edit-recompute]"
+```
+
+These cases verify in-place feature update with stable id/position/JSON and preserved downstream and
+co-producer edges, dependency-protected remove, double-click family identification, one update
+transaction with exact undo and fail-closed rejection, and downstream recompute after an upstream
+edit.
+
 ## Representative existing validation tags
 
 ```bash
@@ -351,7 +364,7 @@ in the existing `blcad_gui_tests` executable; no second Qt application instance 
 ./build/dev-geometry/blcad_analyze_assembly input.blcad.project.json
 ```
 
-## Public Blocks 122–128 boundaries
+## Public Blocks 122–129 boundaries
 
 ```text
 include/blcad/gui/gui_modeling_workspace.hpp
@@ -364,6 +377,8 @@ include/blcad/gui/gui_interactive_finishing.hpp
 include/blcad/gui/gui_interactive_pattern_body.hpp
 include/blcad/gui/gui_interactive_path_sweep_loft.hpp
 include/blcad/gui/gui_interactive_surface.hpp
+include/blcad/gui/gui_feature_edit.hpp
+include/blcad/core/part_document.hpp
 include/blcad/gui/main_window.hpp
 tests/gui/gui_feature_coverage_acceptance_tests.cpp
 tests/gui/gui_interactive_features_tests.cpp
@@ -371,6 +386,8 @@ tests/gui/gui_interactive_finishing_tests.cpp
 tests/gui/gui_interactive_pattern_body_tests.cpp
 tests/gui/gui_interactive_path_sweep_loft_tests.cpp
 tests/gui/gui_interactive_surface_tests.cpp
+tests/gui/gui_feature_edit_tests.cpp
+tests/core/feature_update_command_tests.cpp
 docs/gui-modeling-workspace-mvp9.md
 docs/gui-viewport-manipulators-mvp9.md
 docs/gui-interactive-extrude-revolve-mvp9.md
@@ -378,6 +395,8 @@ docs/gui-interactive-finishing-mvp9.md
 docs/gui-interactive-pattern-body-mvp9.md
 docs/gui-interactive-path-sweep-loft-mvp9.md
 docs/gui-interactive-surface-mvp9.md
+docs/gui-feature-edit-mvp9.md
+docs/gui-feature-update-inventory-mvp9.json
 ```
 
 All Block-122 through Block-128 transient state — command catalogs, verified preselection
@@ -385,7 +404,10 @@ capabilities, mini-toolbar state, repeat, filters, Home/bookmarks, camera mappin
 descriptors, pointer measurements, hit products, HUD text, edge/face chains, pattern sources, tool
 bodies, path segments, loft section order, boundary/surface selections, candidate feature parameters,
 and previews — does not change Core/Geometry or any save format. A controller's Apply is the only
-mutation, and it flows through one existing `commit_part_transaction`.
+mutation, and it flows through one existing `commit_part_transaction`. Block 129 is the single
+exception: it adds Core `update_<family>`/`remove_<family>` commands (the `[core][feature-update-command]`
+boundary) that preserve ids, ordered position, and JSON shape, consumed by the headless
+`GuiFeatureEditController` through the same transaction path.
 
 ## Formatting
 
@@ -403,13 +425,16 @@ clang-format -i \
   include/blcad/gui/gui_interactive_pattern_body.hpp \
   include/blcad/gui/gui_interactive_path_sweep_loft.hpp \
   include/blcad/gui/gui_interactive_surface.hpp \
+  include/blcad/gui/gui_feature_edit.hpp \
   include/blcad/gui/main_window.hpp \
   tests/gui/gui_feature_coverage_acceptance_tests.cpp \
   tests/gui/gui_interactive_features_tests.cpp \
   tests/gui/gui_interactive_finishing_tests.cpp \
   tests/gui/gui_interactive_pattern_body_tests.cpp \
   tests/gui/gui_interactive_path_sweep_loft_tests.cpp \
-  tests/gui/gui_interactive_surface_tests.cpp
+  tests/gui/gui_interactive_surface_tests.cpp \
+  tests/gui/gui_feature_edit_tests.cpp \
+  tests/core/feature_update_command_tests.cpp
 ```
 
 ## Clean generated files

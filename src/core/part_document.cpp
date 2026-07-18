@@ -17,6 +17,48 @@ constexpr double k_tolerance = 1.0e-9;
   return "body:" + id.value();
 }
 
+// Block 129 feature-record identity/result-body accessors, uniform across the
+// typed feature vectors so update/remove can be generic.
+template <typename FeatureT>
+[[nodiscard]] const FeatureId& record_feature_id(const FeatureT& feature) {
+  return feature.id();
+}
+[[nodiscard]] inline const FeatureId& record_feature_id(const SurfaceFeature& feature) {
+  return surface_feature_id(feature);
+}
+
+[[nodiscard]] inline BodyId record_result_body(const Feature& f) {
+  return f.body_result_context() ? f.body_result_context()->effective_produced_body() : BodyId{};
+}
+[[nodiscard]] inline BodyId record_result_body(const RevolveFeature& f) {
+  return f.body_result_context().effective_produced_body();
+}
+[[nodiscard]] inline BodyId record_result_body(const SweepFeature& f) {
+  return f.body_result_context().effective_produced_body();
+}
+[[nodiscard]] inline BodyId record_result_body(const LoftFeature& f) {
+  return f.body_result_context().effective_produced_body();
+}
+[[nodiscard]] inline BodyId record_result_body(const LinearPatternFeature& f) {
+  return f.body_result_context().effective_produced_body();
+}
+[[nodiscard]] inline BodyId record_result_body(const CircularPatternFeature& f) {
+  return f.body_result_context().effective_produced_body();
+}
+[[nodiscard]] inline BodyId record_result_body(const MirrorFeature& f) {
+  return f.body_result_context().effective_produced_body();
+}
+[[nodiscard]] inline BodyId record_result_body(const FilletFeature& f) { return f.target_body(); }
+[[nodiscard]] inline BodyId record_result_body(const ChamferFeature& f) { return f.target_body(); }
+[[nodiscard]] inline BodyId record_result_body(const ShellFeature& f) { return f.target_body(); }
+[[nodiscard]] inline BodyId record_result_body(const DraftFeature& f) { return f.target_body(); }
+[[nodiscard]] inline BodyId record_result_body(const BodyBooleanFeature& f) {
+  return f.effective_result_body();
+}
+[[nodiscard]] inline BodyId record_result_body(const SurfaceFeature& f) {
+  return surface_feature_result_body(f);
+}
+
 [[nodiscard]] std::string sketch_ownership_node_id(const SketchId& id) {
   return "sketch_ownership:" + id.value();
 }
@@ -3587,6 +3629,216 @@ bool PartDocument::has_reference_remap_id(const ReferenceRemapId& id) const noex
 }
 bool PartDocument::has_sketch_origin_override_id(const SketchId& id) const noexcept {
   return find_sketch_origin_override(id) != nullptr;
+}
+
+// Block 129 generic feature update: replace the record with the same id in the
+// same ordered position, re-validating through the family's add and preserving
+// the downstream dependency edges. Fails closed with no partial mutation.
+template <typename FeatureT>
+Result<std::size_t>
+PartDocument::update_feature_record(std::vector<FeatureT> PartDocument::*member,
+                                    FeatureT replacement,
+                                    Result<std::size_t> (PartDocument::*adder)(FeatureT)) {
+  const std::string node_id = record_feature_id(replacement).value();
+  std::vector<FeatureT>& records = this->*member;
+  const auto found = std::find_if(records.begin(), records.end(), [&node_id](const FeatureT& item) {
+    return record_feature_id(item).value() == node_id;
+  });
+  if (found == records.end())
+    return Result<std::size_t>::failure(
+        Error::validation(node_id.empty() ? "feature" : node_id,
+                          "feature to update must exist in part document"));
+  const std::size_t index = static_cast<std::size_t>(std::distance(records.begin(), found));
+
+  // Downstream dependents (feature -> X) are restored after the re-add.
+  std::vector<std::string> downstream;
+  for (const auto& [dependency, dependent] : dependency_graph_.dependencies())
+    if (dependency == node_id) downstream.push_back(dependent);
+
+  // The result body may be produced by another feature: a downstream feature
+  // that modifies it in place (for example a fillet on this extrude's body), or,
+  // when this feature itself modifies a body in place, the upstream producer.
+  const BodyId result_body = record_result_body(replacement);
+  const std::string result_node = body_dependency_node_id(result_body);
+  std::vector<std::string> co_producers;
+  if (!result_body.empty())
+    for (const auto& source : dependency_sources_of(dependency_graph_, result_node))
+      if (source != node_id) co_producers.push_back(source);
+
+  // Rebuild the record through the family add. First try without releasing the
+  // body's other producers so an in-place modifier's own chain re-forms
+  // naturally. If the add rejects the body as "already produced" (this feature
+  // is a NewBody producer whose body a downstream feature also modifies), retry
+  // with those producer edges released and restored around the add.
+  auto rebuild = [&](bool release_body) -> Result<PartDocument> {
+    PartDocument candidate = *this;
+    std::vector<FeatureT>& candidate_records = candidate.*member;
+    candidate_records.erase(candidate_records.begin() + static_cast<std::ptrdiff_t>(index));
+    auto removed = candidate.dependency_graph_.remove_node(node_id);
+    if (removed.has_error()) return Result<PartDocument>::failure(removed.error());
+    candidate.invalidation_state_.untrack_node(node_id);
+    if (release_body && !result_body.empty())
+      candidate.dependency_graph_.remove_dependencies_of_dependent(result_node);
+
+    FeatureT copy = replacement;
+    auto added = (candidate.*adder)(std::move(copy));
+    if (added.has_error()) return Result<PartDocument>::failure(added.error());
+    FeatureT moved = std::move(candidate_records.back());
+    candidate_records.pop_back();
+    candidate_records.insert(candidate_records.begin() + static_cast<std::ptrdiff_t>(index),
+                             std::move(moved));
+
+    for (const auto& dependent : downstream) {
+      if (!candidate.dependency_graph_.has_node(dependent)) continue;
+      auto restored = add_dependency_if_missing(candidate.dependency_graph_, node_id, dependent);
+      if (restored.has_error()) return Result<PartDocument>::failure(restored.error());
+    }
+    if (release_body)
+      for (const auto& producer : co_producers) {
+        if (!candidate.dependency_graph_.has_node(producer)) continue;
+        auto restored =
+            add_dependency_if_missing(candidate.dependency_graph_, producer, result_node);
+        if (restored.has_error()) return Result<PartDocument>::failure(restored.error());
+      }
+    auto synced = candidate.invalidation_state_.sync_from_graph(candidate.dependency_graph_);
+    if (synced.has_error()) return Result<PartDocument>::failure(synced.error());
+    auto changed = candidate.invalidation_state_.mark_changed(candidate.dependency_graph_, node_id);
+    if (changed.has_error()) return Result<PartDocument>::failure(changed.error());
+    return Result<PartDocument>::success(std::move(candidate));
+  };
+
+  auto direct = rebuild(false);
+  if (!direct.has_error()) {
+    *this = std::move(direct.value());
+    return Result<std::size_t>::success(index);
+  }
+  if (co_producers.empty()) return Result<std::size_t>::failure(direct.error());
+  auto released = rebuild(true);
+  if (released.has_error()) return Result<std::size_t>::failure(direct.error());
+  *this = std::move(released.value());
+  return Result<std::size_t>::success(index);
+}
+
+// Block 129 generic feature remove: delete a record only when nothing downstream
+// depends on its result body or its intent (mirrors remove_surface_feature).
+template <typename FeatureT>
+Result<std::size_t>
+PartDocument::remove_feature_record(std::vector<FeatureT> PartDocument::*member,
+                                    const FeatureId& id) {
+  std::vector<FeatureT>& records = this->*member;
+  const auto found = std::find_if(records.begin(), records.end(), [&id](const FeatureT& item) {
+    return record_feature_id(item) == id;
+  });
+  if (found == records.end())
+    return Result<std::size_t>::failure(Error::validation(
+        id.empty() ? "feature" : id.value(), "feature to remove must exist in part document"));
+  const std::string result_node = body_dependency_node_id(record_result_body(*found));
+  if (!dependency_graph_.direct_dependents(result_node).empty())
+    return Result<std::size_t>::failure(
+        Error::dependency(id.value(), "feature with a dependent result cannot be removed"));
+  const auto feature_dependents = dependency_graph_.direct_dependents(id.value());
+  if (std::any_of(feature_dependents.begin(), feature_dependents.end(),
+                  [&result_node](const std::string& dependent) { return dependent != result_node; }))
+    return Result<std::size_t>::failure(
+        Error::dependency(id.value(), "feature with dependent intent cannot be removed"));
+  auto graph = dependency_graph_;
+  auto removed = graph.remove_node(id.value());
+  if (removed.has_error()) return Result<std::size_t>::failure(removed.error());
+  auto invalidation = invalidation_state_;
+  invalidation.untrack_node(id.value());
+  dependency_graph_ = std::move(graph);
+  invalidation_state_ = std::move(invalidation);
+  records.erase(found);
+  return Result<std::size_t>::success(1U);
+}
+
+Result<std::size_t> PartDocument::update_feature(Feature feature) {
+  return update_feature_record(&PartDocument::features_, std::move(feature),
+                               &PartDocument::add_feature);
+}
+Result<std::size_t> PartDocument::remove_feature(FeatureId id) {
+  return remove_feature_record(&PartDocument::features_, id);
+}
+Result<std::size_t> PartDocument::update_revolve_feature(RevolveFeature feature) {
+  return update_feature_record(&PartDocument::revolve_features_, std::move(feature),
+                               &PartDocument::add_revolve_feature);
+}
+Result<std::size_t> PartDocument::remove_revolve_feature(FeatureId id) {
+  return remove_feature_record(&PartDocument::revolve_features_, id);
+}
+Result<std::size_t> PartDocument::update_sweep_feature(SweepFeature feature) {
+  return update_feature_record(&PartDocument::sweep_features_, std::move(feature),
+                               &PartDocument::add_sweep_feature);
+}
+Result<std::size_t> PartDocument::remove_sweep_feature(FeatureId id) {
+  return remove_feature_record(&PartDocument::sweep_features_, id);
+}
+Result<std::size_t> PartDocument::update_loft_feature(LoftFeature feature) {
+  return update_feature_record(&PartDocument::loft_features_, std::move(feature),
+                               &PartDocument::add_loft_feature);
+}
+Result<std::size_t> PartDocument::remove_loft_feature(FeatureId id) {
+  return remove_feature_record(&PartDocument::loft_features_, id);
+}
+Result<std::size_t> PartDocument::update_surface_feature(SurfaceFeature feature) {
+  return update_feature_record(&PartDocument::surface_features_, std::move(feature),
+                               &PartDocument::add_surface_feature);
+}
+Result<std::size_t> PartDocument::update_linear_pattern_feature(LinearPatternFeature feature) {
+  return update_feature_record(&PartDocument::linear_pattern_features_, std::move(feature),
+                               &PartDocument::add_linear_pattern_feature);
+}
+Result<std::size_t> PartDocument::remove_linear_pattern_feature(FeatureId id) {
+  return remove_feature_record(&PartDocument::linear_pattern_features_, id);
+}
+Result<std::size_t> PartDocument::update_circular_pattern_feature(CircularPatternFeature feature) {
+  return update_feature_record(&PartDocument::circular_pattern_features_, std::move(feature),
+                               &PartDocument::add_circular_pattern_feature);
+}
+Result<std::size_t> PartDocument::remove_circular_pattern_feature(FeatureId id) {
+  return remove_feature_record(&PartDocument::circular_pattern_features_, id);
+}
+Result<std::size_t> PartDocument::update_mirror_feature(MirrorFeature feature) {
+  return update_feature_record(&PartDocument::mirror_features_, std::move(feature),
+                               &PartDocument::add_mirror_feature);
+}
+Result<std::size_t> PartDocument::remove_mirror_feature(FeatureId id) {
+  return remove_feature_record(&PartDocument::mirror_features_, id);
+}
+Result<std::size_t> PartDocument::update_fillet_feature(FilletFeature feature) {
+  return update_feature_record(&PartDocument::fillet_features_, std::move(feature),
+                               &PartDocument::add_fillet_feature);
+}
+Result<std::size_t> PartDocument::remove_fillet_feature(FeatureId id) {
+  return remove_feature_record(&PartDocument::fillet_features_, id);
+}
+Result<std::size_t> PartDocument::update_chamfer_feature(ChamferFeature feature) {
+  return update_feature_record(&PartDocument::chamfer_features_, std::move(feature),
+                               &PartDocument::add_chamfer_feature);
+}
+Result<std::size_t> PartDocument::remove_chamfer_feature(FeatureId id) {
+  return remove_feature_record(&PartDocument::chamfer_features_, id);
+}
+Result<std::size_t> PartDocument::update_shell_feature(ShellFeature feature) {
+  return update_feature_record(&PartDocument::shell_features_, std::move(feature),
+                               &PartDocument::add_shell_feature);
+}
+Result<std::size_t> PartDocument::remove_shell_feature(FeatureId id) {
+  return remove_feature_record(&PartDocument::shell_features_, id);
+}
+Result<std::size_t> PartDocument::update_draft_feature(DraftFeature feature) {
+  return update_feature_record(&PartDocument::draft_features_, std::move(feature),
+                               &PartDocument::add_draft_feature);
+}
+Result<std::size_t> PartDocument::remove_draft_feature(FeatureId id) {
+  return remove_feature_record(&PartDocument::draft_features_, id);
+}
+Result<std::size_t> PartDocument::update_body_boolean_feature(BodyBooleanFeature feature) {
+  return update_feature_record(&PartDocument::body_boolean_features_, std::move(feature),
+                               &PartDocument::add_body_boolean_feature);
+}
+Result<std::size_t> PartDocument::remove_body_boolean_feature(FeatureId id) {
+  return remove_feature_record(&PartDocument::body_boolean_features_, id);
 }
 
 } // namespace blcad
