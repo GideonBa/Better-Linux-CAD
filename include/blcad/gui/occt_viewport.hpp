@@ -19,13 +19,14 @@
 #include <vector>
 
 class QMouseEvent;
-class QPaintEngine;
 class QPaintEvent;
 class QResizeEvent;
 class QShowEvent;
 class QWheelEvent;
 
 namespace blcad::gui {
+
+class OcctViewportRenderSurface;
 
 enum class GuiViewportDisplayMode { Shaded, ShadedWithEdges, Wireframe };
 enum class GuiViewportProjection { Perspective, Orthographic };
@@ -126,7 +127,6 @@ public:
   [[nodiscard]] const std::string& initialization_error() const noexcept;
 
 protected:
-  [[nodiscard]] QPaintEngine* paintEngine() const override;
   void showEvent(QShowEvent* event) override;
   void paintEvent(QPaintEvent* event) override;
   void resizeEvent(QResizeEvent* event) override;
@@ -136,9 +136,19 @@ protected:
   void wheelEvent(QWheelEvent* event) override;
 
 private:
+  friend class OcctViewportRenderSurface;
+
   struct Impl;
 
   void initialize_native_viewer();
+  // OCCT renders exclusively inside the render surface's paintGL; these two run
+  // with Qt's GL context current.
+  void initialize_gl();
+  void paint_gl();
+  // Schedules the single OCCT repaint (render surface update). Every state
+  // change that needs a redraw funnels through here; nothing redraws directly.
+  void render_update();
+  [[nodiscard]] QPoint to_render_point(QPoint point) const;
   void apply_display_mode();
   void apply_selection_filters();
   void apply_sketch_focus();
@@ -175,6 +185,7 @@ private:
   GuiSketchSurroundingsMode sketch_surroundings_mode_{GuiSketchSurroundingsMode::Dim};
   std::uint32_t selection_filter_mask_{0xFFFFFFFFU};
   std::string sketch_focus_id_;
+  OcctViewportRenderSurface* gl_surface_{nullptr};
   QWidget* sketch_overlay_{nullptr};
   QPoint last_mouse_position_;
   QPoint right_press_position_;

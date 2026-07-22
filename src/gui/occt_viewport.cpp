@@ -5,7 +5,10 @@
 #include <AIS_InteractiveContext.hxx>
 #include <AIS_Shape.hxx>
 #include <Aspect_DisplayConnection.hxx>
+#include <Aspect_NeutralWindow.hxx>
 #include <Graphic3d_Camera.hxx>
+#include <OpenGl_Context.hxx>
+#include <OpenGl_FrameBuffer.hxx>
 #include <OpenGl_GraphicDriver.hxx>
 #include <Prs3d_Drawer.hxx>
 #include <Quantity_Color.hxx>
@@ -13,15 +16,16 @@
 #include <V3d_TypeOfOrientation.hxx>
 #include <V3d_View.hxx>
 #include <V3d_Viewer.hxx>
-#include <Xw_Window.hxx>
 #include <gp_Dir.hxx>
 
 #include <QApplication>
 #include <QMouseEvent>
-#include <QPaintEngine>
+#include <QOpenGLWidget>
+#include <QtGui/qguiapplication_platform.h>
 #include <QPainter>
 #include <QResizeEvent>
 #include <QShowEvent>
+#include <QSurfaceFormat>
 #include <QWheelEvent>
 
 #include <algorithm>
@@ -29,6 +33,9 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
+
+#include <xcb/xcb.h> // X server round-trip before OCCT window queries; last to limit macro pollution
+#include <cstdlib>
 
 namespace blcad::gui {
 namespace {
@@ -285,11 +292,42 @@ struct OcctViewport::Impl {
   Handle(V3d_Viewer) viewer;
   Handle(AIS_InteractiveContext) context;
   Handle(V3d_View) view;
-  Handle(Xw_Window) window;
+  Handle(Aspect_NeutralWindow) window;
+  // Native X drawable of the top-level window, captured in showEvent BEFORE the
+  // GL surface exists. Forcing native-window creation later (inside
+  // initializeGL) would invalidate Qt's freshly created GL context.
+  Aspect_Drawable native_drawable{0};
   std::vector<Presentation> presentations;
   std::unordered_map<const AIS_InteractiveObject*, std::size_t> owner_to_index;
   std::string initialization_error;
   bool initialization_attempted{false};
+};
+
+// QOpenGLWidget child that hosts the OCCT rendering. OCCT draws into Qt's GL
+// context (framebuffer wrapping, driver buffersNoSwap), so Qt composites the
+// 3D view like any other widget: no foreign native window, no erase/redraw
+// races, and child overlays stack cleanly on top. Input stays on the parent
+// OcctViewport; this surface is mouse-transparent.
+class OcctViewportRenderSurface final : public QOpenGLWidget {
+public:
+  explicit OcctViewportRenderSurface(OcctViewport& owner)
+      : QOpenGLWidget(&owner), owner_(owner) {
+    setObjectName(QStringLiteral("blcad.occt_viewport.render_surface"));
+    setAttribute(Qt::WA_TransparentForMouseEvents);
+    setFocusPolicy(Qt::NoFocus);
+    setUpdateBehavior(QOpenGLWidget::NoPartialUpdate);
+    QSurfaceFormat format;
+    format.setDepthBufferSize(24);
+    format.setStencilBufferSize(8);
+    setFormat(format);
+  }
+
+protected:
+  void initializeGL() override { owner_.initialize_gl(); }
+  void paintGL() override { owner_.paint_gl(); }
+
+private:
+  OcctViewport& owner_;
 };
 
 OcctViewport::OcctViewport(QWidget* parent) : QWidget(parent), impl_(std::make_unique<Impl>()) {
@@ -298,14 +336,36 @@ OcctViewport::OcctViewport(QWidget* parent) : QWidget(parent), impl_(std::make_u
   setFocusPolicy(Qt::StrongFocus);
   setMouseTracking(true);
   setMinimumSize(480, 320);
-  setAttribute(Qt::WA_NativeWindow);
-  setAttribute(Qt::WA_NoSystemBackground);
   setAutoFillBackground(false);
   sketch_overlay_ = new SketchInteractionOverlay(this);
   sketch_overlay_->setGeometry(rect());
 }
 
-OcctViewport::~OcctViewport() = default;
+OcctViewport::~OcctViewport() {
+  // Release OCCT's GL resources while Qt's context is still current; the
+  // context dies with the render surface during child destruction.
+  if (gl_surface_ != nullptr && !impl_->view.IsNull()) {
+    gl_surface_->makeCurrent();
+    impl_.reset();
+    gl_surface_->doneCurrent();
+  }
+}
+
+void OcctViewport::render_update() {
+  if (gl_surface_ != nullptr)
+    gl_surface_->update();
+  else
+    update();
+}
+
+QPoint OcctViewport::to_render_point(QPoint point) const {
+  // OCCT window/framebuffer coordinates are device pixels; Qt events are
+  // logical pixels.
+  const qreal scale =
+      gl_surface_ != nullptr ? gl_surface_->devicePixelRatioF() : devicePixelRatioF();
+  return {static_cast<int>(std::lround(point.x() * scale)),
+          static_cast<int>(std::lround(point.y() * scale))};
+}
 
 Result<std::size_t> OcctViewport::set_scene(std::vector<geometry::ViewportSceneItem> items) {
   std::unordered_set<std::string> semantic_ids;
@@ -326,12 +386,23 @@ Result<std::size_t> OcctViewport::set_scene(std::vector<geometry::ViewportSceneI
         return Result<std::size_t>::failure(viewport_error("OCCT presentation shape is null"));
       interactive = new AIS_Shape(*native);
       interactive->SetColor(presentation_color(item.kind));
-      if (item.kind == geometry::ViewportSceneKind::Datum)
+      if (item.kind == geometry::ViewportSceneKind::Datum) {
         interactive->SetTransparency(0.72);
+        // Highlight datum planes in wireframe (edges only). Otherwise hovering or
+        // selecting a large plane redraws its filled face over the whole viewport,
+        // flashing it grey.
+        interactive->SetHilightMode(0);
+      }
     }
     candidate.push_back({std::move(item), std::move(interactive)});
   }
 
+  // Only auto-fit when content first appears. Re-fitting on every scene refresh
+  // (each edit, sketch pointer update, or selection change bumps the
+  // presentation revision) would reset the user's zoom/pan on every interaction
+  // and make the view jump, especially while sketching. After first content the
+  // camera is preserved; the user re-frames with Fit/Home or a standard view.
+  const bool was_empty = impl_->presentations.empty();
   if (!impl_->context.IsNull()) {
     impl_->context->RemoveAll(false);
     for (auto& presentation : candidate)
@@ -348,14 +419,19 @@ Result<std::size_t> OcctViewport::set_scene(std::vector<geometry::ViewportSceneI
   apply_selection_filters();
   apply_sketch_focus();
   clear_selection();
-  fit_all();
+  if (was_empty && !impl_->presentations.empty())
+    fit_all();
+  else
+    render_update();
   update();
   return Result<std::size_t>::success(impl_->presentations.size());
 }
 
 void OcctViewport::clear_scene() {
-  if (!impl_->context.IsNull())
-    impl_->context->RemoveAll(true);
+  if (!impl_->context.IsNull()) {
+    impl_->context->RemoveAll(false);
+    render_update();
+  }
   impl_->presentations.clear();
   impl_->owner_to_index.clear();
   clear_sketch_interaction();
@@ -374,7 +450,7 @@ void OcctViewport::set_projection(GuiViewportProjection projection) {
     impl_->view->Camera()->SetProjectionType(projection == GuiViewportProjection::Perspective
                                                  ? Graphic3d_Camera::Projection_Perspective
                                                  : Graphic3d_Camera::Projection_Orthographic);
-    impl_->view->Redraw();
+    render_update();
   }
   rebuild_sketch_grid();
 }
@@ -447,7 +523,7 @@ bool OcctViewport::restore_camera_bookmark(const GuiViewportCameraBookmark& book
           projection_ == GuiViewportProjection::Perspective
               ? Graphic3d_Camera::Projection_Perspective
               : Graphic3d_Camera::Projection_Orthographic);
-      impl_->view->Redraw();
+      render_update();
     }
     rebuild_sketch_grid();
     return true;
@@ -617,7 +693,7 @@ void OcctViewport::fit_all() {
   if (!impl_->view.IsNull() && !impl_->presentations.empty()) {
     impl_->view->FitAll(0.05, false);
     impl_->view->ZFitAll();
-    impl_->view->Redraw();
+    render_update();
   }
   rebuild_sketch_grid();
 }
@@ -669,15 +745,18 @@ bool OcctViewport::select_semantic(std::string_view semantic_id) {
     return false;
   if (!impl_->context.IsNull() && !found->interactive.IsNull()) {
     impl_->context->ClearSelected(false);
-    impl_->context->AddOrRemoveSelected(found->interactive, true);
+    impl_->context->AddOrRemoveSelected(found->interactive, false);
+    render_update();
   }
   publish_selection(std::move(selection));
   return true;
 }
 
 void OcctViewport::clear_selection() {
-  if (!impl_->context.IsNull())
-    impl_->context->ClearSelected(true);
+  if (!impl_->context.IsNull()) {
+    impl_->context->ClearSelected(false);
+    render_update();
+  }
   sketch_selections_.clear();
   publish_sketch_selection();
   publish_selection(std::nullopt);
@@ -761,10 +840,6 @@ const std::string& OcctViewport::initialization_error() const noexcept {
   return impl_->initialization_error;
 }
 
-QPaintEngine* OcctViewport::paintEngine() const {
-  return impl_->view.IsNull() ? QWidget::paintEngine() : nullptr;
-}
-
 void OcctViewport::showEvent(QShowEvent* event) {
   QWidget::showEvent(event);
   initialize_native_viewer();
@@ -772,10 +847,8 @@ void OcctViewport::showEvent(QShowEvent* event) {
 
 void OcctViewport::paintEvent(QPaintEvent* event) {
   Q_UNUSED(event)
-  if (!impl_->view.IsNull()) {
-    impl_->view->Redraw();
-    return;
-  }
+  if (!impl_->view.IsNull())
+    return; // The render surface child paints the 3D view.
   QPainter painter(this);
   painter.fillRect(rect(), QColor(48, 52, 59));
   painter.setPen(QColor(215, 220, 226));
@@ -787,10 +860,10 @@ void OcctViewport::paintEvent(QPaintEvent* event) {
 
 void OcctViewport::resizeEvent(QResizeEvent* event) {
   QWidget::resizeEvent(event);
+  if (gl_surface_ != nullptr)
+    gl_surface_->setGeometry(rect());
   if (sketch_overlay_)
     sketch_overlay_->setGeometry(rect());
-  if (!impl_->view.IsNull())
-    impl_->view->MustBeResized();
   if (sketch_interaction_ && impl_->view.IsNull()) {
     const auto plane = sketch_interaction_->mapping().plane();
     const auto scene = sketch_interaction_->scene();
@@ -811,7 +884,8 @@ void OcctViewport::mousePressEvent(QMouseEvent* event) {
     right_press_position_ = last_mouse_position_;
     if (!impl_->view.IsNull() && (!sketch_focus_active() || !plane_camera_.has_value())) {
       rotating_ = true;
-      impl_->view->StartRotation(last_mouse_position_.x(), last_mouse_position_.y());
+      const QPoint start = to_render_point(last_mouse_position_);
+      impl_->view->StartRotation(start.x(), start.y());
     }
   }
   if (event->button() == Qt::LeftButton && sketch_interaction_) {
@@ -834,11 +908,14 @@ void OcctViewport::mousePressEvent(QMouseEvent* event) {
 void OcctViewport::mouseMoveEvent(QMouseEvent* event) {
   const QPoint current = event->position().toPoint();
   if (!impl_->view.IsNull() && panning_) {
-    const QPoint delta = current - last_mouse_position_;
+    const QPoint delta = to_render_point(current) - to_render_point(last_mouse_position_);
     impl_->view->Pan(delta.x(), -delta.y(), 1.0, false);
+    render_update();
     rebuild_sketch_grid();
   } else if (!impl_->view.IsNull() && rotating_) {
-    impl_->view->Rotation(current.x(), current.y());
+    const QPoint point = to_render_point(current);
+    impl_->view->Rotation(point.x(), point.y());
+    render_update();
     rebuild_sketch_grid();
   } else if (sketch_interaction_) {
     if (sketch_box_active_) {
@@ -847,7 +924,9 @@ void OcctViewport::mouseMoveEvent(QMouseEvent* event) {
     }
     update_sketch_pointer({event->position().x(), event->position().y()});
   } else if (!impl_->context.IsNull()) {
-    impl_->context->MoveTo(current.x(), current.y(), impl_->view, true);
+    const QPoint point = to_render_point(current);
+    impl_->context->MoveTo(point.x(), point.y(), impl_->view, false);
+    render_update();
   }
   last_mouse_position_ = current;
   QWidget::mouseMoveEvent(event);
@@ -899,23 +978,30 @@ void OcctViewport::mouseReleaseEvent(QMouseEvent* event) {
     static_cast<SketchInteractionOverlay*>(sketch_overlay_)->set_box(std::nullopt);
     update_sketch_pointer(current);
   } else if (event->button() == Qt::LeftButton && !impl_->context.IsNull()) {
-    const QPoint current = event->position().toPoint();
-    impl_->context->MoveTo(current.x(), current.y(), impl_->view, true);
+    const QPoint current = to_render_point(event->position().toPoint());
+    impl_->context->MoveTo(current.x(), current.y(), impl_->view, false);
     if (impl_->context->HasDetected()) {
       impl_->context->SelectDetected(AIS_SelectionScheme_Replace);
       publish_selection(detected_selection());
     } else {
       clear_selection();
     }
+    render_update();
   }
   QWidget::mouseReleaseEvent(event);
 }
 
 void OcctViewport::wheelEvent(QWheelEvent* event) {
-  if (!impl_->view.IsNull()) {
-    const QPoint point = event->position().toPoint();
-    const int step = std::clamp(event->angleDelta().y() / 4, -120, 120);
-    impl_->view->Zoom(point.x(), point.y(), point.x(), point.y() + step);
+  if (!impl_->view.IsNull() && event->angleDelta().y() != 0) {
+    // Cursor-anchored zoom. OCCT's Zoom(x1,y1,x2,y2) derives the factor from the
+    // (x2,y2)-(x1,y1) delta, so both axes must move with an explicit sign:
+    // wheel up (positive delta) zooms in, wheel down zooms out. Anchoring at the
+    // cursor keeps the point under the pointer stable.
+    const QPoint point = to_render_point(event->position().toPoint());
+    const int factor = event->angleDelta().y() > 0 ? 15 : -15;
+    impl_->view->StartZoomAtPoint(point.x(), point.y());
+    impl_->view->ZoomAtPoint(point.x(), point.y(), point.x() + factor, point.y() + factor);
+    render_update();
     rebuild_sketch_grid();
     if (sketch_interaction_)
       update_sketch_pointer({event->position().x(), event->position().y()});
@@ -936,17 +1022,18 @@ void OcctViewport::initialize_native_viewer() {
   }
   try {
     impl_->display_connection = new Aspect_DisplayConnection();
-    impl_->graphic_driver = new OpenGl_GraphicDriver(impl_->display_connection);
+    // Deferred driver init: the GL context is Qt's and only becomes available
+    // inside the render surface's initializeGL. Qt swaps buffers, not OCCT.
+    impl_->graphic_driver = new OpenGl_GraphicDriver(impl_->display_connection, false);
+    impl_->graphic_driver->ChangeOptions().buffersNoSwap = true;
+    impl_->graphic_driver->ChangeOptions().buffersOpaqueAlpha = true;
+    impl_->graphic_driver->ChangeOptions().useSystemBuffer = false;
     impl_->viewer = new V3d_Viewer(impl_->graphic_driver);
     impl_->viewer->SetDefaultLights();
     impl_->viewer->SetLightOn();
     impl_->context = new AIS_InteractiveContext(impl_->viewer);
     impl_->view = impl_->viewer->CreateView();
-    impl_->window = new Xw_Window(impl_->display_connection,
-                                  static_cast<Aspect_Drawable>(winId()));
-    impl_->view->SetWindow(impl_->window);
-    if (!impl_->window->IsMapped())
-      impl_->window->Map();
+    impl_->view->SetImmediateUpdate(false);
     impl_->view->SetBackgroundColor(Quantity_Color(0.08, 0.10, 0.13, Quantity_TOC_RGB));
     impl_->owner_to_index.clear();
     for (std::size_t index = 0; index < impl_->presentations.size(); ++index) {
@@ -956,8 +1043,10 @@ void OcctViewport::initialize_native_viewer() {
         continue;
       presentation.interactive = new AIS_Shape(*native);
       presentation.interactive->SetColor(presentation_color(presentation.item.kind));
-      if (presentation.item.kind == geometry::ViewportSceneKind::Datum)
+      if (presentation.item.kind == geometry::ViewportSceneKind::Datum) {
         presentation.interactive->SetTransparency(0.72);
+        presentation.interactive->SetHilightMode(0);
+      }
       impl_->context->Display(presentation.interactive, false);
       impl_->owner_to_index.emplace(presentation.interactive.get(), index);
     }
@@ -965,7 +1054,12 @@ void OcctViewport::initialize_native_viewer() {
     apply_display_mode();
     apply_selection_filters();
     apply_sketch_focus();
-    impl_->view->MustBeResized();
+    gl_surface_ = new OcctViewportRenderSurface(*this);
+    gl_surface_->setGeometry(rect());
+    // Keep the render surface below every overlay child (sketch, inference,
+    // manipulators), regardless of creation order.
+    gl_surface_->lower();
+    gl_surface_->show();
   } catch (const Standard_Failure& failure) {
     impl_->initialization_error = failure.GetMessageString() != nullptr
                                       ? failure.GetMessageString()
@@ -976,6 +1070,79 @@ void OcctViewport::initialize_native_viewer() {
   update();
 }
 
+void OcctViewport::initialize_gl() {
+  if (impl_->view.IsNull() || gl_surface_ == nullptr)
+    return;
+  try {
+    Handle(OpenGl_Context) gl_context = new OpenGl_Context();
+    if (!gl_context->Init()) {
+      throw Standard_Failure("OCCT could not wrap the Qt OpenGL context");
+    }
+    Handle(Aspect_NeutralWindow) neutral_window =
+        Handle(Aspect_NeutralWindow)::DownCast(impl_->view->Window());
+    if (neutral_window.IsNull()) {
+      neutral_window = new Aspect_NeutralWindow();
+      impl_->window = neutral_window;
+    }
+    // OCCT's GLX path needs a real X drawable for its visual query even though
+    // rendering goes to the wrapped Qt framebuffer. Query it here: earlier the
+    // top-level may still get recreated (adding the GL child switches its
+    // surface type), which would invalidate a captured handle. The top-level is
+    // native by now, so winId() forces nothing.
+    impl_->native_drawable = static_cast<Aspect_Drawable>(window()->winId());
+    // Qt batches window creation on its xcb connection; round-trip so the X
+    // server knows the window before OCCT queries it over its own connection
+    // (otherwise XGetWindowAttributes fails and OCCT crashes).
+    if (auto* x11_app = qGuiApp->nativeInterface<QNativeInterface::QX11Application>();
+        x11_app != nullptr && x11_app->connection() != nullptr)
+      std::free(xcb_get_input_focus_reply(x11_app->connection(),
+                                          xcb_get_input_focus(x11_app->connection()), nullptr));
+    neutral_window->SetNativeHandle(impl_->native_drawable);
+    const QPoint size = to_render_point({gl_surface_->width(), gl_surface_->height()});
+    neutral_window->SetSize(size.x(), size.y());
+    impl_->view->SetWindow(neutral_window, gl_context->RenderingContext());
+  } catch (const Standard_Failure& failure) {
+    impl_->initialization_error = failure.GetMessageString() != nullptr
+                                      ? failure.GetMessageString()
+                                      : "OCCT viewport initialization failed";
+    for (auto& presentation : impl_->presentations)
+      presentation.interactive.Nullify();
+    impl_->owner_to_index.clear();
+    impl_->view.Nullify();
+    impl_->context.Nullify();
+    update();
+  }
+}
+
+void OcctViewport::paint_gl() {
+  if (impl_->view.IsNull() || impl_->view->Window().IsNull() ||
+      impl_->graphic_driver.IsNull())
+    return;
+  const Handle(OpenGl_Context)& gl_context = impl_->graphic_driver->GetSharedContext();
+  if (gl_context.IsNull())
+    return;
+  Handle(OpenGl_FrameBuffer) default_fbo = gl_context->DefaultFrameBuffer();
+  if (default_fbo.IsNull()) {
+    default_fbo = new OpenGl_FrameBuffer();
+    gl_context->SetDefaultFrameBuffer(default_fbo);
+  }
+  // Redirect OCCT's default framebuffer to the QOpenGLWidget framebuffer for
+  // this frame; Qt composites and swaps.
+  if (!default_fbo->InitWrapper(gl_context))
+    return;
+  const Graphic3d_Vec2i fbo_size(default_fbo->GetVPSizeX(), default_fbo->GetVPSizeY());
+  Standard_Integer width = 0;
+  Standard_Integer height = 0;
+  impl_->window->Size(width, height);
+  if (fbo_size.x() != width || fbo_size.y() != height) {
+    impl_->window->SetSize(fbo_size.x(), fbo_size.y());
+    impl_->view->MustBeResized();
+    impl_->view->Invalidate();
+  }
+  impl_->view->InvalidateImmediate();
+  impl_->view->Redraw();
+}
+
 void OcctViewport::apply_display_mode() {
   if (impl_->context.IsNull())
     return;
@@ -983,11 +1150,15 @@ void OcctViewport::apply_display_mode() {
   for (auto& presentation : impl_->presentations) {
     if (presentation.interactive.IsNull())
       continue;
+    // Datum planes are drawn as a wireframe border (Inventor-style), never as a
+    // shaded face. A large shaded plane fills the whole viewport grey the moment
+    // it is hovered or selected; a wireframe border highlights only its edges.
+    const bool datum = presentation.item.kind == geometry::ViewportSceneKind::Datum;
     presentation.interactive->Attributes()->SetFaceBoundaryDraw(
         display_mode_ == GuiViewportDisplayMode::ShadedWithEdges);
-    impl_->context->SetDisplayMode(presentation.interactive, mode, false);
+    impl_->context->SetDisplayMode(presentation.interactive, datum ? 0 : mode, false);
   }
-  impl_->context->UpdateCurrentViewer();
+  render_update();
 }
 
 void OcctViewport::apply_selection_filters() {
@@ -1002,7 +1173,7 @@ void OcctViewport::apply_selection_filters() {
         (selection_filter_mask_ & selection_kind_bit(kind)) != 0U,
         AIS_SelectionModesConcurrency_Single, true);
   }
-  impl_->context->UpdateCurrentViewer();
+  render_update();
 }
 
 void OcctViewport::apply_sketch_focus() {
@@ -1031,7 +1202,7 @@ void OcctViewport::apply_sketch_focus() {
           presentation.item.kind == geometry::ViewportSceneKind::Datum ? 0.88 : 0.72);
     }
   }
-  impl_->context->UpdateCurrentViewer();
+  render_update();
 }
 
 void OcctViewport::rebuild_sketch_grid() {

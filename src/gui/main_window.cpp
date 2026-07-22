@@ -385,6 +385,7 @@ void MainWindow::create_menus() {
   });
 
   auto* sketch_menu = menuBar()->addMenu(QStringLiteral("&Sketch"));
+  sketch_menu->setObjectName(QStringLiteral("blcad.menu.sketch"));
   create_datum_action_ = sketch_menu->addAction(QStringLiteral("New XY datum plane…"));
   create_axis_action_ = sketch_menu->addAction(QStringLiteral("New Z datum axis…"));
   create_sketch_action_ = sketch_menu->addAction(QStringLiteral("New sketch on selection…"));

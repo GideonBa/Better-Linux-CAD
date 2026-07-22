@@ -290,6 +290,7 @@ if(BLCAD_BUILD_GUI)
     src/gui/gui_sketch_interaction_binder.cpp
     src/gui/gui_sketch_create.cpp
     src/gui/gui_sketch_create_binder.cpp
+    src/gui/gui_sketch_constraint_binder.cpp
     src/gui/gui_sketch_drag.cpp
     src/gui/gui_sketch_drag_binder.cpp
     src/gui/gui_sketch_workbench.cpp
@@ -324,6 +325,7 @@ if(BLCAD_BUILD_GUI)
       TKOpenGl
       TKV3d
       TKService
+      xcb
   )
   target_include_directories(blcad_gui SYSTEM PRIVATE ${OpenCASCADE_INCLUDE_DIR})
 

@@ -4,10 +4,10 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 131
-current_block: 132
-current_boundary: STEP source identity, import modes, JSON, and freshness
-current_tag: "[core][step-import-source]"
+implemented_through: Block 132
+current_block: 133
+current_boundary: Shell reset — ShellWindow, ribbon, browser, direct wiring
+current_tag: "[gui][shell-reset]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -18,7 +18,8 @@ phase_status:
   mvp_7: "GUI Feature Validation — Blocks 95–105 implemented; MVP complete"
   mvp_8: "Interactive Sketcher — Blocks 106–121 implemented; MVP complete"
   mvp_9: "Interactive Part & Assembly Modeling — Blocks 122–131 implemented; MVP complete"
-  mvp_10: "STEP Import — Block 132 next; Blocks 132–138 planned"
+  mvp_9r: "GUI Shell Reset — Block 132 implemented; Blocks 133–136 planned"
+  mvp_10: "STEP Import — Blocks 137–143 planned"
 ---
 
 # MVP Plan
@@ -30,10 +31,10 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 ## Current status
 
 ```text
-implemented through  Block 131
-current block        Block 132
-current phase        STEP Import MVP-10
-current boundary     STEP source identity, import modes, JSON, and freshness
+implemented through  Block 132
+current block        Block 133
+current phase        GUI Shell Reset MVP-9R
+current boundary     Shell reset — ShellWindow, ribbon, browser, direct wiring
 ```
 
 Interactive Sketcher MVP-8 is complete and accepted. Blocks 122–123 establish the selection-first
@@ -58,7 +59,8 @@ MVP-6   Part Construction                              Blocks 48–94 implemente
 MVP-7   GUI Feature Validation                        Blocks 95–105 implemented
 MVP-8   Interactive Sketcher                          Blocks 106–121 implemented
 MVP-9   Interactive Part & Assembly Modeling          Blocks 122–131 implemented
-MVP-10  STEP Import                                    Block 132 next; Blocks 132–138 planned
+MVP-9R  GUI Shell Reset                      Block 132 implemented; Blocks 133–136 planned
+MVP-10  STEP Import                                            Blocks 137–143 planned
 ```
 
 Canonical phase sequences:
@@ -495,12 +497,45 @@ fail-closed, persistence/export, and measured interaction proofs complete MVP-9.
 Canonical contracts: `docs/gui-measure-mvp9.md` and
 `docs/interactive-modeling-mvp9-acceptance.md`.
 
-## Current next technical step — Block 132
+## GUI Shell Reset MVP-9R — Blocks 132–136
 
-Implement STEP source identity, explicit Reference/EditableBody modes, JSON, and freshness as
-defined in `docs/step-import-sequence-mvp10.md`.
+The Qt shell that accumulated through MVP-7..9 (MainWindow plus seven self-installing binders that
+discover widgets via `findChild` object names, hijack foreign QActions, and poll on timers, with two
+competing workspace tab bars) proved unusable as a foundation and is replaced outright. Everything
+below the shell is kept unchanged: Core, Geometry, `GuiDocumentSession`, `GuiCommandRegistry`,
+selection/browser models, all workbenches, and the Qt-free interactive controllers and coordinators
+of Blocks 106–131. The replacement shell is Inventor-inspired: one ribbon, one browser, one
+viewport, direct ownership wiring (the shell constructs its components and passes references —
+no `findChild` discovery, no self-installation, no action rewiring, no polling).
+
+Sequence contract: `docs/gui-shell-reset-sequence-mvp9r.md`.
+
+- Block 132 — QOpenGLWidget viewport foundation — Implemented: `OcctViewport` rendering internals
+  rebuilt on a mouse-transparent `QOpenGLWidget` render-surface child (OCCT renders into Qt's GL
+  context via `Aspect_NeutralWindow` + `OpenGl_Context`/FBO wrapping, driver `buffersNoSwap`; the
+  official OCCT Qt pattern). `paintGL` is the only redraw site; every state change funnels through
+  a single scheduled repaint. Public viewport API unchanged; Block-122/123 layers and headless
+  tests untouched. Eliminates the native-window flicker class at the root.
+- Block 133 — Shell reset: delete MainWindow, all binders, and shell-bound tests; new `ShellWindow`
+  with Inventor-style ribbon, model browser, properties/tasks panel, diagnostics, status bar,
+  document lifecycle (new/open/save), selection and revision-gated refresh flow, view controls.
+- Block 134 — Sketch in the new shell: sketch ribbon tab (draw, modify, constrain, dimension,
+  finish), porting the sketch interaction/create/drag/constraint/dimension logic as shell-owned
+  components with explicit references.
+- Block 135 — Interactive features minimal: Extrude and Revolve in the ribbon with manipulator
+  overlay and numeric coupling — the first fully usable end-to-end shell (sketch → extrude).
+- Block 136 — Feature full coverage: remaining feature commands (Fillet, Chamfer, Shell, Draft,
+  Pattern, Mirror, Boolean, Transform, Sweep, Loft, Surface, Measure, Assembly), feature edit via
+  browser double-click, acceptance coverage.
+
+## Current next technical step — Block 133
+
+Delete the old shell (MainWindow and all binders) and build the new `ShellWindow` with the
+Inventor-style ribbon, model browser, and direct ownership wiring as defined in
+`docs/gui-shell-reset-sequence-mvp9r.md`.
 
 ## Later phases
 
-Interactive Part & Assembly Modeling MVP-9 is complete through Block 131. STEP Import MVP-10 starts
-with Block 132 and continues through Block 138.
+Interactive Part & Assembly Modeling MVP-9 is complete through Block 131. GUI Shell Reset MVP-9R
+runs through Blocks 132–136. STEP Import MVP-10 shifts to Blocks 137–143 (contract unchanged in
+`docs/step-import-sequence-mvp10.md`; only the numbering moves).

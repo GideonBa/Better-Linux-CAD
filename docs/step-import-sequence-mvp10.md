@@ -1,7 +1,9 @@
 # STEP Import Sequence MVP-10
 
-Status: active after accepted Interactive Modeling MVP-9. Blocks 132–138 are planned; Block 132 is
-the current next technical step.
+Status: planned after GUI Shell Reset MVP-9R (Blocks 132–136, see
+`docs/gui-shell-reset-sequence-mvp9r.md`). The blocks of this sequence are renumbered to 137–143;
+their content and ordering are unchanged. Where this document says Block 132..138, read Block
+137..143.
 
 This document is the canonical numbered implementation sequence for importing STEP parts and
 structured STEP assemblies in one of two explicit modes:

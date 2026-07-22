@@ -388,54 +388,14 @@ private:
     }
   }
 
-  void render_mini_toolbar(bool context_matches) {
+  void render_mini_toolbar(bool /*context_matches*/) {
+    // The floating contextual mini-toolbar is disabled: it popped up at the
+    // cursor on every viewport click, which reads as erratic behaviour. Modeling
+    // commands live in the persistent ribbon/menus instead. The frame stays in
+    // the widget tree (kept hidden) so its stable object name remains
+    // discoverable for acceptance tests.
     clear_mini_toolbar();
-    if (!workspace_->active_command_id().empty()) {
-      auto* cancel = new QToolButton(mini_toolbar_);
-      cancel->setText(QStringLiteral("Cancel %1")
-                          .arg(QString::fromUtf8(workspace_->active_command_id().data(),
-                                                static_cast<qsizetype>(
-                                                    workspace_->active_command_id().size()))));
-      connect(cancel, &QToolButton::clicked, this, [this] {
-        if (workspace_->cancel_command(*session_)) {
-          window_->statusBar()->showMessage(QStringLiteral("Modeling command cancelled"));
-          refresh_and_publish();
-        }
-      });
-      mini_toolbar_layout_->addWidget(cancel);
-    } else if (context_matches) {
-      for (const auto& descriptor : workspace_->mini_toolbar_commands(*session_)) {
-        auto* button = new QToolButton(mini_toolbar_);
-        button->setText(QString::fromUtf8(descriptor.label.data(),
-                                          static_cast<qsizetype>(descriptor.label.size())));
-        button->setToolTip(
-            QStringLiteral("Start %1 from the current selection").arg(button->text()));
-        connect(button, &QToolButton::clicked, this,
-                [this, command = descriptor.command,
-                 label = std::string(descriptor.label)] {
-                  if (!workspace_->begin_command(*session_, command))
-                    return;
-                  window_->statusBar()->showMessage(
-                      QStringLiteral("%1 started — select remaining inputs or press Esc")
-                          .arg(QString::fromStdString(label)));
-                  refresh_and_publish();
-                });
-        mini_toolbar_layout_->addWidget(button);
-      }
-    }
-
-    if (mini_toolbar_layout_->count() == 0 || viewport_.isNull()) {
-      mini_toolbar_->hide();
-      return;
-    }
-    mini_toolbar_->adjustSize();
-    const int x = std::clamp(mini_toolbar_anchor_.x(), 0,
-                             std::max(0, viewport_->width() - mini_toolbar_->width()));
-    const int y = std::clamp(mini_toolbar_anchor_.y(), 0,
-                             std::max(0, viewport_->height() - mini_toolbar_->height()));
-    mini_toolbar_->move(x, y);
-    mini_toolbar_->show();
-    mini_toolbar_->raise();
+    if (mini_toolbar_) mini_toolbar_->hide();
   }
 
   QPointer<QMainWindow> window_;
