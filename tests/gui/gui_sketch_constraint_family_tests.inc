@@ -77,7 +77,9 @@ TEST_CASE("Block 114 selection and inference matrices cover every geometric solv
   CHECK(block114_has_kind(two_lines, SketchSolverConstraintKind::Perpendicular));
   CHECK(block114_has_kind(two_lines, SketchSolverConstraintKind::Collinear));
   CHECK(block114_has_kind(two_lines, SketchSolverConstraintKind::Equal));
-  CHECK(block114_has_kind(two_lines, SketchSolverConstraintKind::Tangent));
+  // GUI Shell Reset MVP-9R: tangent between two straight lines is degenerate
+  // (that is Parallel) and no longer offered.
+  CHECK_FALSE(block114_has_kind(two_lines, SketchSolverConstraintKind::Tangent));
 
   const auto two_arcs = GuiSketchConstraintController::compatible_kinds(
       topology.value(), {arc_a.value(), arc_b.value()});

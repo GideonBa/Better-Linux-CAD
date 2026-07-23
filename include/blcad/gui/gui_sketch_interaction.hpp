@@ -124,6 +124,13 @@ struct GuiSketchAnnotationPrimitive {
   std::string candidate_id;
   Point2 point;
   GuiSketchHitKind hit_kind{GuiSketchHitKind::Dimension};
+  // Display text (dimension value or constraint token); empty annotations are
+  // hit-testable but render nothing.
+  std::string label;
+  // Dimension leader extremities in plane space (empty for constraints and for
+  // leaderless dimensions like angle); the overlay draws the dimension line and
+  // arrowheads across these, projected each frame.
+  std::vector<Point2> leader;
 };
 
 struct GuiSketchInteractionScene {
@@ -217,6 +224,10 @@ struct GuiSketchGridConfig {
   bool snap_enabled{true};
   double spacing{10.0};
   std::size_t major_every{5};
+  // Inventor-style decade ladder: the effective spacing switches between
+  // 1/10/100/1000 mm depending on the current zoom so grid lines stay
+  // readable. When false, `spacing` is used verbatim (zoom-stable contract).
+  bool adaptive{false};
 };
 
 struct GuiSketchInteractionConfig {
@@ -255,6 +266,11 @@ public:
   [[nodiscard]] Result<std::vector<GuiSketchScreenSegment>>
   grid_lines(double viewport_width_dip, double viewport_height_dip,
              std::size_t maximum_lines = 512) const;
+
+  // Grid spacing actually used by grid_lines and grid snapping: the configured
+  // spacing, or with `grid.adaptive` the zoom-dependent 1/10/100/1000 mm
+  // decade whose lines stay readable on screen.
+  [[nodiscard]] double effective_grid_spacing() const noexcept;
 
   [[nodiscard]] Result<std::vector<GuiSketchScreenPoint>>
   screen_polyline(const GuiSketchCurvePrimitive& curve) const;

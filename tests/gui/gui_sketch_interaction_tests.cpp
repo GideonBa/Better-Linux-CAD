@@ -1,14 +1,9 @@
 #include "blcad/gui/gui_sketch_interaction.hpp"
-#include "blcad/gui/gui_sketch_interaction_binder.hpp"
-#include "blcad/gui/main_window.hpp"
 
 #include "blcad/core/parameter.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
-#include <QAction>
-#include <QApplication>
-#include <QTreeWidget>
 
 #include <algorithm>
 #include <cmath>
@@ -52,15 +47,6 @@ GuiSketchInteractionScene simple_scene() {
                                {0.0, 0.0}, GuiSketchHitKind::Glyph});
   scene.intersections.push_back({7.0, 0.0});
   return scene;
-}
-
-QTreeWidgetItem* find_item(QTreeWidgetItem* item, QStringView id) {
-  if (item->data(0, Qt::UserRole).toString() == id)
-    return item;
-  for (int index = 0; index < item->childCount(); ++index)
-    if (auto* found = find_item(item->child(index), id))
-      return found;
-  return nullptr;
 }
 
 } // namespace
@@ -186,6 +172,39 @@ TEST_CASE("Block 107 grid snap and display remain zoom stable in device-independ
   CHECK(lines.value().size() <= 514U);
 }
 
+TEST_CASE("Adaptive grid switches 1/10/100/1000 mm decades with zoom",
+          "[gui][sketch-snap][grid-adaptive]") {
+  GuiSketchInteractionScene scene;
+  scene.sketch = SketchId("sketch.adaptive_grid");
+  GuiSketchInteractionConfig config;
+  config.grid.adaptive = true;
+
+  const auto controller_at = [&](double units_per_dip) {
+    return GuiSketchInteractionController::create(mapping(units_per_dip), scene, config).value();
+  };
+  // units_per_dip is plane units per pixel; the readable decade coarsens as
+  // pixels-per-unit shrinks.
+  CHECK(controller_at(0.05).effective_grid_spacing() == 1.0);
+  CHECK(controller_at(0.5).effective_grid_spacing() == 10.0);
+  CHECK(controller_at(5.0).effective_grid_spacing() == 100.0);
+  CHECK(controller_at(50.0).effective_grid_spacing() == 1000.0);
+  CHECK(controller_at(500.0).effective_grid_spacing() == 1000.0);
+
+  // Non-adaptive configs keep the configured spacing verbatim.
+  GuiSketchInteractionConfig fixed;
+  fixed.grid.spacing = 10.0;
+  CHECK(GuiSketchInteractionController::create(mapping(0.05), scene, fixed)
+            .value()
+            .effective_grid_spacing() == 10.0);
+
+  // The rendered grid follows the effective decade: 1000 mm of plane across a
+  // 200 dip viewport at 100 mm spacing yields ~22 lines, not ~200.
+  const auto coarse = controller_at(5.0).grid_lines(200.0, 200.0);
+  REQUIRE(coarse);
+  CHECK(coarse.value().size() >= 18U);
+  CHECK(coarse.value().size() <= 30U);
+}
+
 TEST_CASE("Block 107 box selection distinguishes window and crossing semantics",
           "[gui][sketch-box-selection]") {
   GuiSketchInteractionScene scene;
@@ -257,67 +276,3 @@ TEST_CASE("Block 107 scene builder publishes explicit curve snap and annotation 
                     }));
 }
 
-TEST_CASE("Block 107 shell binds grid and interaction scene to contextual Sketch entry",
-          "[gui][sketch-hit-test][gui][sketch-snap][gui][sketch-box-selection]") {
-  REQUIRE(qApp != nullptr);
-  MainWindow window;
-  install_sketch_interaction_binder(window);
-  window.show();
-  qApp->processEvents();
-
-  REQUIRE(window.session().create_part(DocumentId("part.shell107"), "Shell 107"));
-  REQUIRE(window.sketch_workbench().create_xy_datum(
-      window.session(), DatumPlaneId("datum.xy"), "XY"));
-  REQUIRE(window.sketch_workbench().create_sketch(
-      window.session(), Sketch::create(SketchId("sketch.shell107"), "Shell 107 Sketch",
-                                        DatumPlaneId("datum.xy")).value()));
-  REQUIRE(window.sketch_workbench().add_line(
-      window.session(), SketchId("sketch.shell107"),
-      LineSegment::create(SketchEntityId("line.shell107"), {-20.0, 0.0}, {20.0, 0.0}).value()));
-  window.refresh_command_state();
-  qApp->processEvents();
-
-  auto* tree = window.findChild<QTreeWidget*>(QStringLiteral("blcad.model_browser"));
-  auto* enter = window.findChild<QAction*>(QStringLiteral("blcad.action.edit_sketch"));
-  auto* finish = window.findChild<QAction*>(QStringLiteral("blcad.action.finish_sketch"));
-  auto* grid = window.findChild<QAction*>(QStringLiteral("blcad.action.sketch_grid"));
-  auto* grid_snap = window.findChild<QAction*>(QStringLiteral("blcad.action.sketch_grid_snap"));
-  auto* viewport = window.findChild<OcctViewport*>(QStringLiteral("blcad.occt_viewport"));
-  REQUIRE(tree != nullptr);
-  REQUIRE(enter != nullptr);
-  REQUIRE(finish != nullptr);
-  REQUIRE(grid != nullptr);
-  REQUIRE(grid_snap != nullptr);
-  REQUIRE(viewport != nullptr);
-
-  QTreeWidgetItem* sketch_item = nullptr;
-  for (int index = 0; index < tree->topLevelItemCount() && !sketch_item; ++index)
-    sketch_item = find_item(tree->topLevelItem(index), u"sketch.shell107");
-  REQUIRE(sketch_item != nullptr);
-  tree->setCurrentItem(sketch_item);
-  enter->trigger();
-  qApp->processEvents();
-  qApp->processEvents();
-
-  CHECK(window.session().workspace() == GuiWorkspace::Sketch);
-  CHECK(viewport->sketch_interaction_active());
-  CHECK(viewport->sketch_selection_enabled());
-  CHECK(viewport->sketch_grid_line_count() > 0U);
-  CHECK(grid->isVisible());
-  CHECK(grid->isChecked());
-  CHECK(grid_snap->isChecked());
-
-  grid->setChecked(false);
-  qApp->processEvents();
-  CHECK(viewport->sketch_grid_line_count() == 0U);
-  grid->setChecked(true);
-  qApp->processEvents();
-  CHECK(viewport->sketch_grid_line_count() > 0U);
-
-  finish->trigger();
-  qApp->processEvents();
-  qApp->processEvents();
-  CHECK_FALSE(viewport->sketch_interaction_active());
-  CHECK_FALSE(grid->isVisible());
-  CHECK(window.session().workspace() == GuiWorkspace::Part);
-}

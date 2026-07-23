@@ -287,17 +287,16 @@ if(BLCAD_BUILD_GUI)
     src/gui/gui_part_operations_workbench.cpp
     src/gui/gui_selection_model.cpp
     src/gui/gui_sketch_interaction.cpp
-    src/gui/gui_sketch_interaction_binder.cpp
     src/gui/gui_sketch_create.cpp
-    src/gui/gui_sketch_create_binder.cpp
-    src/gui/gui_sketch_constraint_binder.cpp
     src/gui/gui_sketch_drag.cpp
-    src/gui/gui_sketch_drag_binder.cpp
     src/gui/gui_sketch_workbench.cpp
     src/gui/gui_spatial_surface_workbench.cpp
     src/gui/gui_task_state.cpp
-    src/gui/main_window.cpp
     src/gui/occt_viewport.cpp
+    src/gui/shell/shell_origin.cpp
+    src/gui/shell/shell_ribbon.cpp
+    src/gui/shell/shell_sketch_tools.cpp
+    src/gui/shell/shell_window.cpp
     src/gui/startup_splash.cpp
   )
   add_library(BLCAD::gui ALIAS blcad_gui)
@@ -553,7 +552,6 @@ if(BLCAD_BUILD_TESTS)
     add_executable(
       blcad_gui_tests
       tests/gui/gui_test_main.cpp
-      tests/gui/gui_application_shell_tests.cpp
       tests/gui/gui_assembly_workbench_tests.cpp
       tests/gui/gui_analysis_export_workbench_tests.cpp
       tests/gui/gui_command_state_tests.cpp
@@ -562,22 +560,20 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_occt_viewport_tests.cpp
       tests/gui/gui_part_foundation_workbench_tests.cpp
       tests/gui/gui_part_operations_workbench_tests.cpp
+      tests/gui/gui_shell_window_tests.cpp
+      tests/gui/gui_shell_sketch_tools_tests.cpp
+      tests/gui/gui_shell_sketch_interaction_tests.cpp
       tests/gui/gui_sketch_interaction_tests.cpp
-      tests/gui/gui_sketch_create_tests.cpp
-      tests/gui/gui_sketch_drag_tests.cpp
       tests/gui/gui_sketch_workbench_tests.cpp
       tests/gui/gui_interactive_sketcher_acceptance_tests.cpp
       tests/gui/gui_spatial_surface_workbench_tests.cpp
-      tests/gui/gui_feature_coverage_acceptance_tests.cpp
       tests/gui/gui_interactive_modeling_mvp9_acceptance_tests.cpp
-      tests/gui/gui_interactive_features_tests.cpp
       tests/gui/gui_interactive_finishing_tests.cpp
       tests/gui/gui_interactive_pattern_body_tests.cpp
       tests/gui/gui_interactive_path_sweep_loft_tests.cpp
       tests/gui/gui_interactive_surface_tests.cpp
       tests/gui/gui_feature_edit_tests.cpp
       tests/gui/gui_interactive_assembly_tests.cpp
-      tests/gui/gui_measure_tests.cpp
       tests/gui/gui_startup_splash_tests.cpp
     )
     target_link_libraries(blcad_gui_tests PRIVATE BLCAD::gui Catch2::Catch2)

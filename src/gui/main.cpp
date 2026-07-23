@@ -1,7 +1,4 @@
-#include "blcad/gui/gui_sketch_constraint_binder.hpp"
-#include "blcad/gui/gui_sketch_dimension_binder.hpp"
-#include "blcad/gui/gui_sketch_interaction_binder.hpp"
-#include "blcad/gui/main_window.hpp"
+#include "blcad/gui/shell/shell_window.hpp"
 #include "blcad/gui/startup_splash.hpp"
 
 #include <QApplication>
@@ -22,10 +19,7 @@ int main(int argc, char* argv[]) {
   application.processEvents();
   splash.set_progress(20);
 
-  blcad::gui::MainWindow window;
-  blcad::gui::install_sketch_interaction_binder(window);
-  blcad::gui::install_sketch_constraint_binder(window);
-  blcad::gui::install_sketch_dimension_binder(window);
+  blcad::gui::ShellWindow window;
   splash.set_progress(55);
   application.processEvents();
   bool duration_valid = false;

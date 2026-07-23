@@ -179,3 +179,30 @@ TEST_CASE("PartDocument JSON rejects unsupported feature types", "[core][json]")
   CHECK(restored.error().object_id() == "part_document_json");
   CHECK(restored.error().message() == "unsupported feature type in part document json");
 }
+
+TEST_CASE("Part JSON round-trips principal XZ and YZ origin planes", "[core][json][datum_plane]") {
+  auto document = PartDocument::create(DocumentId("part.origin_planes"), "OriginPlanes");
+  REQUIRE(document);
+  auto xy = DatumPlane::xy();
+  auto xz = DatumPlane::xz();
+  auto yz = DatumPlane::yz();
+  REQUIRE(xy);
+  REQUIRE(xz);
+  REQUIRE(yz);
+  REQUIRE(document.value().add_datum_plane(xy.value()));
+  REQUIRE(document.value().add_datum_plane(xz.value()));
+  REQUIRE(document.value().add_datum_plane(yz.value()));
+
+  const auto json_text = serialize_part_document_to_json(document.value());
+  REQUIRE(json_text);
+  const auto restored = deserialize_part_document_from_json(json_text.value());
+  REQUIRE(restored);
+  REQUIRE(restored.value().datum_plane_count() == 3);
+  const auto* restored_xz = restored.value().find_datum_plane(DatumPlaneId("datum.xz"));
+  const auto* restored_yz = restored.value().find_datum_plane(DatumPlaneId("datum.yz"));
+  REQUIRE(restored_xz != nullptr);
+  REQUIRE(restored_yz != nullptr);
+  CHECK(restored_xz->normal() == Vector3{0.0, -1.0, 0.0});
+  CHECK(restored_xz->y_axis() == Vector3{0.0, 0.0, 1.0});
+  CHECK(restored_yz->normal() == Vector3{1.0, 0.0, 0.0});
+}

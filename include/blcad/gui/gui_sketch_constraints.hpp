@@ -93,8 +93,8 @@ public:
     std::vector<GuiSketchAnnotationPrimitive> annotations;
     annotations.reserve(glyphs.value().size());
     for (const auto& glyph : glyphs.value())
-      annotations.push_back(
-          {glyph.semantic_id, glyph.candidate_id, glyph.anchor, GuiSketchHitKind::Glyph});
+      annotations.push_back({glyph.semantic_id, glyph.candidate_id, glyph.anchor,
+                             GuiSketchHitKind::Glyph, glyph.token});
     return Result<std::vector<GuiSketchAnnotationPrimitive>>::success(
         std::move(annotations));
   }
@@ -309,6 +309,42 @@ public:
         result.push_back(SketchSolverConstraintKind::Vertical);
       }
     } else if (targets.size() == 2U) {
+      // Selection order must not matter (GUI Shell Reset MVP-9R usability):
+      // every mixed-kind rule accepts both orders; intent creation normalizes.
+      const auto pair = [&targets](const auto& first_predicate, const auto& second_predicate) {
+        return (first_predicate(targets[0]) && second_predicate(targets[1])) ||
+               (first_predicate(targets[1]) && second_predicate(targets[0]));
+      };
+      // Curves count as connected when they share a topology point or when two
+      // of their endpoints coincide positionally (e.g. coupled via a
+      // Coincident constraint rather than a shared point). The tolerance
+      // matches the solver's tangent corner pairing (0.1 mm) — a coincident
+      // SOLVE leaves points equal only to convergence tolerance.
+      const auto connected = [&entity, &topology, &shares_point](
+                                 const SketchConstraintIntentTarget& first,
+                                 const SketchConstraintIntentTarget& second) {
+        if (shares_point(first, second))
+          return true;
+        const auto* first_entity = entity(first);
+        const auto* second_entity = entity(second);
+        if (first_entity == nullptr || second_entity == nullptr)
+          return false;
+        for (const auto& first_id : first_entity->points()) {
+          const auto* first_point = topology.find_point(first_id);
+          if (first_point == nullptr)
+            continue;
+          for (const auto& second_id : second_entity->points()) {
+            const auto* second_point = topology.find_point(second_id);
+            if (second_point == nullptr)
+              continue;
+            const double dx = first_point->position().x - second_point->position().x;
+            const double dy = first_point->position().y - second_point->position().y;
+            if (dx * dx + dy * dy < 1.0e-2)
+              return true;
+          }
+        }
+        return false;
+      };
       if (point(targets[0]) && point(targets[1]))
         result.push_back(SketchSolverConstraintKind::Coincident);
       if (line(targets[0]) && line(targets[1])) {
@@ -318,17 +354,38 @@ public:
       }
       if (measurable(targets[0]) && measurable(targets[1]))
         result.push_back(SketchSolverConstraintKind::Equal);
-      if (curve(targets[0]) && curve(targets[1]) && shares_point(targets[0], targets[1]))
+      // Tangent between two straight lines is degenerate (that is Parallel);
+      // require at least one non-line curve.
+      if (curve(targets[0]) && curve(targets[1]) && !(line(targets[0]) && line(targets[1])) &&
+          connected(targets[0], targets[1]))
+        result.push_back(SketchSolverConstraintKind::Tangent);
+      // Line↔circle tangency needs no shared corner (radius baked at build).
+      const auto circle_profile = [&kind](const SketchConstraintIntentTarget& target) {
+        const auto value = kind(target);
+        return value && *value == SketchTopologyEntityKind::CircleProfile;
+      };
+      if (pair(line, circle_profile))
         result.push_back(SketchSolverConstraintKind::Tangent);
       if (centered(targets[0]) && centered(targets[1]))
         result.push_back(SketchSolverConstraintKind::Concentric);
-      if (point(targets[0]) && line(targets[1]))
+      if (pair(point, line))
         result.push_back(SketchSolverConstraintKind::Midpoint);
-      if (point(targets[0]) && (line(targets[1]) || arc(targets[1])))
+      if (pair(point, [&](const auto& target) {
+            const auto value = kind(target);
+            return value && (*value == SketchTopologyEntityKind::Line ||
+                             *value == SketchTopologyEntityKind::Arc ||
+                             *value == SketchTopologyEntityKind::CircleProfile);
+          }))
         result.push_back(SketchSolverConstraintKind::PointOnObject);
-    } else if (targets.size() == 3U && point(targets[0]) && point(targets[1]) &&
-               line(targets[2])) {
-      result.push_back(SketchSolverConstraintKind::Symmetric);
+    } else if (targets.size() == 3U) {
+      std::size_t points = 0;
+      std::size_t lines = 0;
+      for (const auto& target : targets) {
+        points += point(target) ? 1U : 0U;
+        lines += line(target) ? 1U : 0U;
+      }
+      if (points == 2U && lines == 1U)
+        result.push_back(SketchSolverConstraintKind::Symmetric);
     }
     std::sort(result.begin(), result.end(), [](auto left, auto right) {
       return static_cast<int>(left) < static_cast<int>(right);

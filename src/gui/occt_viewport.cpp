@@ -11,6 +11,7 @@
 #include <OpenGl_FrameBuffer.hxx>
 #include <OpenGl_GraphicDriver.hxx>
 #include <Prs3d_Drawer.hxx>
+#include <Prs3d_LineAspect.hxx>
 #include <Quantity_Color.hxx>
 #include <Standard_Failure.hxx>
 #include <V3d_TypeOfOrientation.hxx>
@@ -72,6 +73,28 @@ public:
     update();
   }
 
+  void set_selected(std::vector<std::vector<GuiSketchScreenPoint>> polylines) {
+    selected_polylines_ = std::move(polylines);
+    update();
+  }
+
+  void set_scene_points(std::vector<GuiSketchScreenPoint> points) {
+    scene_points_ = std::move(points);
+    update();
+  }
+
+  struct AnnotationBadge {
+    GuiSketchScreenPoint point;
+    QString label;
+    bool dimension{true};
+    std::vector<GuiSketchScreenPoint> leader; // dimension line extremities (screen)
+  };
+
+  void set_annotations(std::vector<AnnotationBadge> annotations) {
+    annotations_ = std::move(annotations);
+    update();
+  }
+
   void set_snap(std::optional<GuiSketchScreenPoint> point) {
     snap_point_ = std::move(point);
     update();
@@ -87,6 +110,7 @@ public:
     hover_point_.reset();
     snap_point_.reset();
     box_.reset();
+    selected_polylines_.clear();
     update();
   }
 
@@ -100,16 +124,35 @@ protected:
     painter.setRenderHint(QPainter::Antialiasing, true);
 
     for (const auto& line : grid_) {
-      QPen pen(line.major ? QColor(116, 126, 139, 112) : QColor(104, 113, 125, 58));
+      // Inventor-style white plane grid; majors brighter than minors.
+      QPen pen(line.major ? QColor(255, 255, 255, 122) : QColor(255, 255, 255, 52));
       pen.setWidthF(line.major ? 1.0 : 0.6);
       painter.setPen(pen);
       painter.drawLine(QPointF(line.start.x, line.start.y), QPointF(line.end.x, line.end.y));
     }
 
+    // Selected entities: Inventor-style clear blue highlight.
+    for (const auto& polyline : selected_polylines_) {
+      QPen pen(QColor(66, 150, 250), 2.6);
+      painter.setPen(pen);
+      for (std::size_t index = 1; index < polyline.size(); ++index)
+        painter.drawLine(QPointF(polyline[index - 1U].x, polyline[index - 1U].y),
+                         QPointF(polyline[index].x, polyline[index].y));
+    }
+
+    // Sketch points (endpoints, centers): always-visible dots in the entity
+    // line color, independent of the drag layer.
+    for (const auto& point : scene_points_) {
+      painter.setPen(QPen(QColor(77, 229, 140), 1.0));
+      painter.setBrush(QColor(77, 229, 140));
+      painter.drawEllipse(QPointF(point.x, point.y), 2.8, 2.8);
+    }
+
+    // Point handles: small filled dots in the sketch-entity line color.
     for (const auto& handle : handles_) {
-      painter.setPen(QPen(QColor(84, 190, 255), 1.8));
-      painter.setBrush(QColor(48, 52, 59));
-      painter.drawEllipse(QPointF(handle.x, handle.y), 4.2, 4.2);
+      painter.setPen(QPen(QColor(77, 229, 140), 1.0));
+      painter.setBrush(QColor(77, 229, 140));
+      painter.drawEllipse(QPointF(handle.x, handle.y), 2.4, 2.4);
     }
 
     if (hover_polyline_.size() >= 2U) {
@@ -145,9 +188,66 @@ protected:
     }
 
     if (snap_point_) {
-      painter.setPen(QPen(QColor(96, 220, 170), 1.8));
+      painter.setPen(QPen(QColor(96, 220, 170), 1.4));
       painter.setBrush(Qt::NoBrush);
-      painter.drawRect(QRectF(snap_point_->x - 4.0, snap_point_->y - 4.0, 8.0, 8.0));
+      painter.drawRect(QRectF(snap_point_->x - 3.0, snap_point_->y - 3.0, 6.0, 6.0));
+    }
+
+    // Dimension leaders: the dimension line across the measured extremities
+    // with arrowheads, plus a thin extension to the value badge.
+    for (const auto& annotation : annotations_) {
+      if (annotation.leader.size() < 2U)
+        continue;
+      const QPointF a(annotation.leader.front().x, annotation.leader.front().y);
+      const QPointF b(annotation.leader.back().x, annotation.leader.back().y);
+      QPen pen(QColor(150, 190, 235, 220), 1.2);
+      painter.setPen(pen);
+      painter.setBrush(Qt::NoBrush);
+      painter.drawLine(a, b);
+      // Arrowheads pointing outward at both ends.
+      const QPointF direction = b - a;
+      const double length = std::hypot(direction.x(), direction.y());
+      if (length > 1.0e-3) {
+        const QPointF unit = direction / length;
+        const QPointF normal(-unit.y(), unit.x());
+        constexpr double kArrow = 7.0;
+        const auto arrow = [&](const QPointF tip, const QPointF along) {
+          const QPointF base = tip - along * kArrow;
+          painter.setBrush(QColor(150, 190, 235, 220));
+          const QPointF poly[3] = {tip, base + normal * (kArrow * 0.42),
+                                   base - normal * (kArrow * 0.42)};
+          painter.drawPolygon(poly, 3);
+        };
+        arrow(a, -unit);
+        arrow(b, unit);
+      }
+      // Thin extension from the dimension-line midpoint to the value badge.
+      const QPointF midpoint = (a + b) * 0.5;
+      QPen extension(QColor(150, 190, 235, 120), 0.8, Qt::DotLine);
+      painter.setPen(extension);
+      painter.setBrush(Qt::NoBrush);
+      painter.drawLine(midpoint, QPointF(annotation.point.x, annotation.point.y));
+    }
+
+    // Dimension values and constraint tokens.
+    for (const auto& annotation : annotations_) {
+      if (annotation.label.isEmpty())
+        continue;
+      QFont font = painter.font();
+      font.setPointSizeF(annotation.dimension ? 9.5 : 10.0);
+      painter.setFont(font);
+      const QFontMetricsF metrics(font);
+      const QRectF text_rect = metrics.boundingRect(annotation.label);
+      const QRectF badge(annotation.point.x - text_rect.width() * 0.5 - 4.0,
+                         annotation.point.y - text_rect.height() * 0.5 - 2.0,
+                         text_rect.width() + 8.0, text_rect.height() + 4.0);
+      painter.setPen(Qt::NoPen);
+      painter.setBrush(annotation.dimension ? QColor(30, 34, 40, 215)
+                                            : QColor(30, 34, 40, 170));
+      painter.drawRoundedRect(badge, 3.0, 3.0);
+      painter.setPen(annotation.dimension ? QColor(235, 240, 245) : QColor(255, 196, 61));
+      painter.setBrush(Qt::NoBrush);
+      painter.drawText(badge, Qt::AlignCenter, annotation.label);
     }
 
     if (box_) {
@@ -166,6 +266,9 @@ protected:
 
 private:
   std::vector<GuiSketchScreenSegment> grid_;
+  std::vector<std::vector<GuiSketchScreenPoint>> selected_polylines_;
+  std::vector<AnnotationBadge> annotations_;
+  std::vector<GuiSketchScreenPoint> scene_points_;
   std::vector<GuiSketchScreenPoint> handles_;
   std::vector<GuiSketchScreenPoint> hover_polyline_;
   std::vector<GuiSketchScreenPoint> preview_polyline_;
@@ -240,6 +343,19 @@ V3d_TypeOfOrientation occt_orientation(GuiStandardView view) {
     return V3d_TypeOfOrientation_Zup_AxoRight;
   }
   return V3d_TypeOfOrientation_Zup_AxoRight;
+}
+
+// Construction lines / centerlines render dash-dot (technical-drawing look).
+void apply_construction_line_style(const geometry::ViewportSceneItem& item,
+                                   const Handle(AIS_Shape)& interactive) {
+  if (interactive.IsNull() ||
+      item.semantic_id.rfind("construction-line/", 0U) != 0U)
+    return;
+  const Quantity_Color color = presentation_color(item.kind);
+  Handle(Prs3d_LineAspect) aspect =
+      new Prs3d_LineAspect(color, Aspect_TOL_DOTDASH, 1.2);
+  interactive->Attributes()->SetLineAspect(aspect);
+  interactive->Attributes()->SetWireAspect(aspect);
 }
 
 Error viewport_error(std::string message) {
@@ -393,6 +509,7 @@ Result<std::size_t> OcctViewport::set_scene(std::vector<geometry::ViewportSceneI
         // flashing it grey.
         interactive->SetHilightMode(0);
       }
+      apply_construction_line_style(item, interactive);
     }
     candidate.push_back({std::move(item), std::move(interactive)});
   }
@@ -418,7 +535,14 @@ Result<std::size_t> OcctViewport::set_scene(std::vector<geometry::ViewportSceneI
   apply_display_mode();
   apply_selection_filters();
   apply_sketch_focus();
-  clear_selection();
+  // Rebuilding the 3D presentations invalidates the 3D pick state only; the
+  // sketch-mode selection must survive scene refreshes (they happen between
+  // multi-select clicks whenever the presentation revision moves).
+  if (!impl_->context.IsNull()) {
+    impl_->context->ClearSelected(false);
+    render_update();
+  }
+  publish_selection(std::nullopt);
   if (was_empty && !impl_->presentations.empty())
     fit_all();
   else
@@ -959,9 +1083,12 @@ void OcctViewport::mouseReleaseEvent(QMouseEvent* event) {
       } else if (!sketch_box_active_) {
         auto hit = sketch_interaction_->cycle_hit(current);
         if (hit && hit.value()) {
+          // hit.semantic_id already carries the endpoint/midpoint role via the
+          // hit-role marker; the GuiSelection constructor splits it back into
+          // semantic_id + candidate_id. (Passing candidate_id here instead would
+          // suppress that split and leave the marker embedded.)
           apply_selection_set(sketch_selections_,
-                              {{GuiSelectionKind::SketchEntity,
-                                hit.value()->semantic_id}},
+                              {{GuiSelectionKind::SketchEntity, hit.value()->semantic_id}},
                               event->modifiers());
         } else if (!(event->modifiers() & Qt::ShiftModifier) &&
                    !(event->modifiers() & Qt::ControlModifier)) {
@@ -1047,6 +1174,7 @@ void OcctViewport::initialize_native_viewer() {
         presentation.interactive->SetTransparency(0.72);
         presentation.interactive->SetHilightMode(0);
       }
+      apply_construction_line_style(presentation.item, presentation.interactive);
       impl_->context->Display(presentation.interactive, false);
       impl_->owner_to_index.emplace(presentation.interactive.get(), index);
     }
@@ -1214,6 +1342,79 @@ void OcctViewport::rebuild_sketch_grid() {
     overlay->set_grid(std::move(lines.value()));
   else
     overlay->set_grid({});
+  // Every screen-space overlay must follow camera changes (zoom/pan/rotate);
+  // this is called on each of them, so re-project the rest here too.
+  rebuild_sketch_drag_handles();
+  rebuild_sketch_preview_polyline();
+  rebuild_sketch_selection_highlight();
+  rebuild_sketch_annotations();
+  rebuild_sketch_scene_points();
+}
+
+void OcctViewport::rebuild_sketch_scene_points() {
+  auto* overlay = static_cast<SketchInteractionOverlay*>(sketch_overlay_);
+  if (overlay == nullptr)
+    return;
+  std::vector<GuiSketchScreenPoint> points;
+  if (sketch_interaction_) {
+    for (const auto& point : sketch_interaction_->scene().points) {
+      // Endpoints and centers are permanent visual anchors (Inventor look);
+      // midpoints/quadrants stay snap-only to avoid clutter.
+      if (point.snap_kind != GuiSketchSnapKind::Endpoint &&
+          point.snap_kind != GuiSketchSnapKind::Center)
+        continue;
+      auto screen = sketch_interaction_->mapping().plane_to_screen(point.point);
+      if (screen)
+        points.push_back(screen.value());
+    }
+  }
+  overlay->set_scene_points(std::move(points));
+}
+
+void OcctViewport::rebuild_sketch_annotations() {
+  auto* overlay = static_cast<SketchInteractionOverlay*>(sketch_overlay_);
+  if (overlay == nullptr)
+    return;
+  std::vector<SketchInteractionOverlay::AnnotationBadge> badges;
+  if (sketch_interaction_) {
+    for (const auto& annotation : sketch_interaction_->scene().annotations) {
+      if (annotation.label.empty())
+        continue;
+      auto screen = sketch_interaction_->mapping().plane_to_screen(annotation.point);
+      if (!screen)
+        continue;
+      std::vector<GuiSketchScreenPoint> leader;
+      leader.reserve(annotation.leader.size());
+      for (const auto& plane_point : annotation.leader) {
+        auto leader_screen = sketch_interaction_->mapping().plane_to_screen(plane_point);
+        if (leader_screen)
+          leader.push_back(leader_screen.value());
+      }
+      badges.push_back({screen.value(), QString::fromStdString(annotation.label),
+                        annotation.hit_kind == GuiSketchHitKind::Dimension, std::move(leader)});
+    }
+  }
+  overlay->set_annotations(std::move(badges));
+}
+
+void OcctViewport::rebuild_sketch_selection_highlight() {
+  auto* overlay = static_cast<SketchInteractionOverlay*>(sketch_overlay_);
+  if (overlay == nullptr)
+    return;
+  std::vector<std::vector<GuiSketchScreenPoint>> polylines;
+  if (sketch_interaction_) {
+    for (const auto& selection : sketch_selections_) {
+      const auto curve = std::find_if(
+          sketch_interaction_->scene().curves.begin(), sketch_interaction_->scene().curves.end(),
+          [&selection](const auto& item) { return item.semantic_id == selection.semantic_id; });
+      if (curve == sketch_interaction_->scene().curves.end())
+        continue;
+      auto screen = sketch_interaction_->screen_polyline(*curve);
+      if (screen)
+        polylines.push_back(std::move(screen.value()));
+    }
+  }
+  overlay->set_selected(std::move(polylines));
 }
 
 void OcctViewport::rebuild_sketch_drag_handles() {
@@ -1282,10 +1483,16 @@ void OcctViewport::update_sketch_pointer(GuiSketchScreenPoint screen_point) {
       }
     }
     overlay->set_hover(std::move(hover_polyline), hover_point);
+    // Show the snap marker only for meaningful geometric snaps; a marker that
+    // permanently follows the cursor (grid snap is almost always active) reads
+    // as a "dragging square" instead of a snap cue.
+    const bool meaningful_snap = sketch_snap_result_->kind != GuiSketchSnapKind::None &&
+                                 sketch_snap_result_->kind != GuiSketchSnapKind::Grid;
     auto snap_screen = sketch_interaction_->mapping().plane_to_screen(
         sketch_snap_result_->snapped_point);
-    overlay->set_snap(snap_screen ? std::optional<GuiSketchScreenPoint>{snap_screen.value()}
-                                  : std::nullopt);
+    overlay->set_snap(meaningful_snap && snap_screen
+                          ? std::optional<GuiSketchScreenPoint>{snap_screen.value()}
+                          : std::nullopt);
   }
   if (sketch_pointer_callback_)
     sketch_pointer_callback_(sketch_snap_result_->raw_point, *sketch_snap_result_,
@@ -1303,6 +1510,7 @@ void OcctViewport::publish_sketch_pointer_phase(GuiSketchPointerPhase phase,
 }
 
 void OcctViewport::publish_sketch_selection() {
+  rebuild_sketch_selection_highlight();
   selected_semantic_ = sketch_selections_.size() == 1U
                            ? std::optional<GuiSelection>{sketch_selections_.front()}
                            : std::nullopt;

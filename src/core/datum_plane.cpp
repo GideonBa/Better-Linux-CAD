@@ -243,7 +243,8 @@ std::string SemanticVertexReference::node_id() const {
 SemanticVertexReference::SemanticVertexReference(FeatureId source_feature, SemanticVertex vertex)
     : source_feature_(std::move(source_feature)), vertex_(vertex) {}
 
-Result<DatumPlane> DatumPlane::xy(DatumPlaneId id, std::string name) {
+Result<DatumPlane> DatumPlane::principal(DatumPlaneId id, std::string name, Vector3 x_axis,
+                                         Vector3 y_axis, Vector3 normal) {
   const auto object_id = id.empty() ? std::string("datum_plane") : id.value();
 
   if (id.empty()) {
@@ -256,9 +257,23 @@ Result<DatumPlane> DatumPlane::xy(DatumPlaneId id, std::string name) {
         Error::validation(object_id, "datum plane name must not be empty"));
   }
 
-  return Result<DatumPlane>::success(DatumPlane(std::move(id), std::move(name),
-                                                Point3{0.0, 0.0, 0.0}, Vector3{1.0, 0.0, 0.0},
-                                                Vector3{0.0, 1.0, 0.0}, Vector3{0.0, 0.0, 1.0}));
+  return Result<DatumPlane>::success(
+      DatumPlane(std::move(id), std::move(name), Point3{0.0, 0.0, 0.0}, x_axis, y_axis, normal));
+}
+
+Result<DatumPlane> DatumPlane::xy(DatumPlaneId id, std::string name) {
+  return principal(std::move(id), std::move(name), Vector3{1.0, 0.0, 0.0}, Vector3{0.0, 1.0, 0.0},
+                   Vector3{0.0, 0.0, 1.0});
+}
+
+Result<DatumPlane> DatumPlane::xz(DatumPlaneId id, std::string name) {
+  return principal(std::move(id), std::move(name), Vector3{1.0, 0.0, 0.0}, Vector3{0.0, 0.0, 1.0},
+                   Vector3{0.0, -1.0, 0.0});
+}
+
+Result<DatumPlane> DatumPlane::yz(DatumPlaneId id, std::string name) {
+  return principal(std::move(id), std::move(name), Vector3{0.0, 1.0, 0.0}, Vector3{0.0, 0.0, 1.0},
+                   Vector3{1.0, 0.0, 0.0});
 }
 
 const DatumPlaneId& DatumPlane::id() const noexcept {

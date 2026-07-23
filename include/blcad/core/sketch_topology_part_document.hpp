@@ -41,6 +41,12 @@ public:
             entity.id(), "materialized Sketch entities require the canonical entity/ id prefix"));
       return Result<SketchEntityId>::success(SketchEntityId(entity.id().substr(prefix.size())));
     };
+    // An intentionally removed profile (its topology entity was deleted via an
+    // explicit Remove command) is dropped from the materialized Sketch; only
+    // kind mismatches stay errors.
+    const auto profile_removed = [&](const ProfileId& id) {
+      return topology.find_entity("profile/" + id.value()) == nullptr;
+    };
     const auto profile_entity = [&](const ProfileId& id, SketchTopologyEntityKind expected)
         -> Result<const SketchTopologyEntity*> {
       const std::string topology_id = "profile/" + id.value();
@@ -150,6 +156,8 @@ public:
     }
 
     for (const auto& legacy : source.rectangle_profiles()) {
+      if (profile_removed(legacy.id()))
+        continue;
       auto current = profile_entity(legacy.id(), SketchTopologyEntityKind::RectangleProfile);
       if (current.has_error()) return Result<Sketch>::failure(current.error());
       auto center = point(*current.value(), 0U);
@@ -161,6 +169,8 @@ public:
       if (added.has_error()) return Result<Sketch>::failure(added.error());
     }
     for (const auto& legacy : source.circle_profiles()) {
+      if (profile_removed(legacy.id()))
+        continue;
       auto current = profile_entity(legacy.id(), SketchTopologyEntityKind::CircleProfile);
       if (current.has_error()) return Result<Sketch>::failure(current.error());
       auto center = point(*current.value(), 0U);
@@ -171,6 +181,8 @@ public:
       if (added.has_error()) return Result<Sketch>::failure(added.error());
     }
     for (const auto& legacy : source.closed_profiles()) {
+      if (profile_removed(legacy.id()))
+        continue;
       auto current = profile_entity(legacy.id(), SketchTopologyEntityKind::ClosedProfile);
       if (current.has_error()) return Result<Sketch>::failure(current.error());
       std::vector<SketchEntityId> curve_ids;
@@ -187,6 +199,8 @@ public:
       if (added.has_error()) return Result<Sketch>::failure(added.error());
     }
     for (const auto& legacy : source.arc_closed_profiles()) {
+      if (profile_removed(legacy.id()))
+        continue;
       auto current = profile_entity(legacy.id(), SketchTopologyEntityKind::ArcClosedProfile);
       if (current.has_error()) return Result<Sketch>::failure(current.error());
       std::vector<SketchEntityId> curve_ids;
@@ -203,6 +217,8 @@ public:
       if (added.has_error()) return Result<Sketch>::failure(added.error());
     }
     for (const auto& legacy : source.composite_closed_profiles()) {
+      if (profile_removed(legacy.id()))
+        continue;
       auto current = profile_entity(legacy.id(), SketchTopologyEntityKind::CompositeClosedProfile);
       if (current.has_error()) return Result<Sketch>::failure(current.error());
       if (current.value()->entity_dependencies() != [&legacy] {
@@ -219,6 +235,8 @@ public:
       if (added.has_error()) return Result<Sketch>::failure(added.error());
     }
     for (const auto& legacy : source.circular_hole_patterns()) {
+      if (profile_removed(legacy.id()))
+        continue;
       auto current = profile_entity(legacy.id(), SketchTopologyEntityKind::CircularHolePattern);
       if (current.has_error()) return Result<Sketch>::failure(current.error());
       auto center = point(*current.value(), 0U);

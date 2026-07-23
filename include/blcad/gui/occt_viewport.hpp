@@ -153,6 +153,9 @@ private:
   void apply_selection_filters();
   void apply_sketch_focus();
   void rebuild_sketch_grid();
+  void rebuild_sketch_annotations();
+  void rebuild_sketch_scene_points();
+  void rebuild_sketch_selection_highlight();
   void rebuild_sketch_drag_handles();
   void rebuild_sketch_preview_polyline();
   void update_sketch_pointer(GuiSketchScreenPoint screen_point);

@@ -152,6 +152,12 @@ class DatumPlane {
 public:
   [[nodiscard]] static Result<DatumPlane> xy(DatumPlaneId id = DatumPlaneId("datum.xy"),
                                              std::string name = "XY");
+  // Origin planes for the remaining principal orientations (GUI Shell Reset
+  // MVP-9R origin geometry). Axes are right-handed: x_axis × y_axis == normal.
+  [[nodiscard]] static Result<DatumPlane> xz(DatumPlaneId id = DatumPlaneId("datum.xz"),
+                                             std::string name = "XZ");
+  [[nodiscard]] static Result<DatumPlane> yz(DatumPlaneId id = DatumPlaneId("datum.yz"),
+                                             std::string name = "YZ");
 
   [[nodiscard]] const DatumPlaneId& id() const noexcept;
   [[nodiscard]] const std::string& name() const noexcept;
@@ -161,6 +167,10 @@ public:
   [[nodiscard]] Vector3 normal() const noexcept;
 
 private:
+  [[nodiscard]] static Result<DatumPlane> principal(DatumPlaneId id, std::string name,
+                                                    Vector3 x_axis, Vector3 y_axis,
+                                                    Vector3 normal);
+
   DatumPlane(DatumPlaneId id, std::string name, Point3 origin, Vector3 x_axis, Vector3 y_axis,
              Vector3 normal);
 

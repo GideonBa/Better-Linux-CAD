@@ -399,10 +399,17 @@ sketch_origin_override_from_json(const json& value) {
 }
 
 [[nodiscard]] Result<DatumPlane> datum_plane_from_json(const json& datum_plane_json) {
-  if (datum_plane_json.at("kind").get<std::string>() != "xy")
-    return Result<DatumPlane>::failure(json_error("only XY datum planes are supported"));
-  return DatumPlane::xy(DatumPlaneId(datum_plane_json.at("id").get<std::string>()),
-                        datum_plane_json.at("name").get<std::string>());
+  const auto kind = datum_plane_json.at("kind").get<std::string>();
+  DatumPlaneId id(datum_plane_json.at("id").get<std::string>());
+  auto name = datum_plane_json.at("name").get<std::string>();
+  if (kind == "xy")
+    return DatumPlane::xy(std::move(id), std::move(name));
+  if (kind == "xz")
+    return DatumPlane::xz(std::move(id), std::move(name));
+  if (kind == "yz")
+    return DatumPlane::yz(std::move(id), std::move(name));
+  return Result<DatumPlane>::failure(
+      json_error("only principal (xy/xz/yz) datum planes are supported"));
 }
 
 [[nodiscard]] Result<BodyKind> body_kind_from_json(const json& value) {
@@ -3600,14 +3607,19 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
     root["parameters"].push_back(std::move(parameter_json));
   }
   root["datum_planes"] = json::array();
-  for (const auto& datum_plane : document.datum_planes())
+  for (const auto& datum_plane : document.datum_planes()) {
+    // Principal planes are identified by their normal; the factories only
+    // produce these three orientations.
+    const Vector3 normal = datum_plane.normal();
+    const char* plane_kind = normal.z != 0.0 ? "xy" : (normal.y != 0.0 ? "xz" : "yz");
     root["datum_planes"].push_back(json{{"id", datum_plane.id().value()},
                                         {"name", datum_plane.name()},
-                                        {"kind", "xy"},
+                                        {"kind", plane_kind},
                                         {"origin", point3_to_json(datum_plane.origin())},
                                         {"x_axis", vector3_to_json(datum_plane.x_axis())},
                                         {"y_axis", vector3_to_json(datum_plane.y_axis())},
                                         {"normal", vector3_to_json(datum_plane.normal())}});
+  }
   root["construction_points"] = json::array();
   for (const auto& point : document.construction_points()) {
     json point_json{{"id", point.id().value()},

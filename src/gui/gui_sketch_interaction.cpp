@@ -1059,8 +1059,9 @@ GuiSketchInteractionController::snap(GuiSketchScreenPoint screen_point,
   }
 
   if (config_.grid.snap_enabled) {
-    append_candidate({std::round(raw.value().x / config_.grid.spacing) * config_.grid.spacing,
-                      std::round(raw.value().y / config_.grid.spacing) * config_.grid.spacing},
+    const double grid_spacing = effective_grid_spacing();
+    append_candidate({std::round(raw.value().x / grid_spacing) * grid_spacing,
+                      std::round(raw.value().y / grid_spacing) * grid_spacing},
                      GuiSketchSnapKind::Grid, "grid");
   }
 
@@ -1179,10 +1180,11 @@ GuiSketchInteractionController::grid_lines(double viewport_width_dip,
       plane_corners.begin(), plane_corners.end(),
       [](Point2 first, Point2 second) { return first.y < second.y; });
 
-  const long long first_x = static_cast<long long>(std::floor(min_x->x / config_.grid.spacing));
-  const long long last_x = static_cast<long long>(std::ceil(max_x->x / config_.grid.spacing));
-  const long long first_y = static_cast<long long>(std::floor(min_y->y / config_.grid.spacing));
-  const long long last_y = static_cast<long long>(std::ceil(max_y->y / config_.grid.spacing));
+  const double grid_spacing = effective_grid_spacing();
+  const long long first_x = static_cast<long long>(std::floor(min_x->x / grid_spacing));
+  const long long last_x = static_cast<long long>(std::ceil(max_x->x / grid_spacing));
+  const long long first_y = static_cast<long long>(std::floor(min_y->y / grid_spacing));
+  const long long last_y = static_cast<long long>(std::ceil(max_y->y / grid_spacing));
   const std::size_t x_count = static_cast<std::size_t>(std::max(0LL, last_x - first_x + 1LL));
   const std::size_t y_count = static_cast<std::size_t>(std::max(0LL, last_y - first_y + 1LL));
   const std::size_t total = x_count + y_count;
@@ -1204,12 +1206,31 @@ GuiSketchInteractionController::grid_lines(double viewport_width_dip,
     lines.push_back({screen_start.value(), screen_end.value(), major});
   };
   for (long long index = first_x; index <= last_x; index += static_cast<long long>(stride))
-    append_line({static_cast<double>(index) * config_.grid.spacing, min_y->y},
-                {static_cast<double>(index) * config_.grid.spacing, max_y->y}, index);
+    append_line({static_cast<double>(index) * grid_spacing, min_y->y},
+                {static_cast<double>(index) * grid_spacing, max_y->y}, index);
   for (long long index = first_y; index <= last_y; index += static_cast<long long>(stride))
-    append_line({min_x->x, static_cast<double>(index) * config_.grid.spacing},
-                {max_x->x, static_cast<double>(index) * config_.grid.spacing}, index);
+    append_line({min_x->x, static_cast<double>(index) * grid_spacing},
+                {max_x->x, static_cast<double>(index) * grid_spacing}, index);
   return Result<std::vector<GuiSketchScreenSegment>>::success(std::move(lines));
+}
+
+double GuiSketchInteractionController::effective_grid_spacing() const noexcept {
+  if (!config_.grid.adaptive)
+    return config_.grid.spacing;
+  const auto origin = mapping_.plane_to_screen({0.0, 0.0});
+  const auto unit = mapping_.plane_to_screen({1.0, 0.0});
+  if (origin.has_error() || unit.has_error())
+    return config_.grid.spacing;
+  const double pixels_per_unit = std::hypot(unit.value().x - origin.value().x,
+                                            unit.value().y - origin.value().y);
+  if (!finite(pixels_per_unit) || pixels_per_unit <= 0.0)
+    return config_.grid.spacing;
+  // Densest decade whose lines keep a readable on-screen distance.
+  constexpr double kMinimumPixelSpacing = 9.0;
+  for (const double spacing : {1.0, 10.0, 100.0})
+    if (spacing * pixels_per_unit >= kMinimumPixelSpacing)
+      return spacing;
+  return 1000.0;
 }
 
 } // namespace blcad::gui

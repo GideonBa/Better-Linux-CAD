@@ -232,11 +232,18 @@ public:
     std::vector<GuiSketchAnnotationPrimitive> annotations;
     annotations.reserve(glyphs.value().size());
     for (const auto& glyph : glyphs.value())
-      annotations.push_back(
-          {glyph.semantic_id, glyph.candidate_id, glyph.anchor,
-           GuiSketchHitKind::Dimension});
+      annotations.push_back({glyph.semantic_id, glyph.candidate_id, glyph.anchor,
+                             GuiSketchHitKind::Dimension, glyph.value_text, glyph.leader});
     return Result<std::vector<GuiSketchAnnotationPrimitive>>::success(
         std::move(annotations));
+  }
+
+  [[nodiscard]] static Result<std::size_t>
+  remove_accepted(GuiDocumentSession& session, SketchId sketch, SketchDimensionId dimension) {
+    return edit_catalog(session, sketch, "Remove sketch dimension",
+                        [dimension](PartDocument&, SketchDimensionCatalog& catalog) {
+                          return catalog.remove(dimension);
+                        });
   }
 
   [[nodiscard]] static Result<std::size_t>

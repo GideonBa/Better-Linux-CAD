@@ -181,9 +181,11 @@ resolved_entity(const SolveContext& context, const SketchSolverTarget& target) n
 }
 
 [[nodiscard]] bool is_point_on_supported_object(const SketchTopologyEntity* entity) noexcept {
+  // CircleProfile needs the dimension-driven radius baked as constraint value.
   return entity != nullptr &&
          (entity->kind() == SketchTopologyEntityKind::Line ||
-          entity->kind() == SketchTopologyEntityKind::Arc);
+          entity->kind() == SketchTopologyEntityKind::Arc ||
+          entity->kind() == SketchTopologyEntityKind::CircleProfile);
 }
 
 [[nodiscard]] Result<std::size_t>
@@ -229,10 +231,22 @@ validate_constraint_targets(const SolveContext& context, const SketchSolverConst
     if (!has_length_measure(require_entity(0U)) || !has_length_measure(require_entity(1U)))
       return fail("equal constraint requires two measurable line or arc entities");
     break;
-  case SketchSolverConstraintKind::Tangent:
-    if (!is_curve(require_entity(0U)) || !is_curve(require_entity(1U)))
-      return fail("tangent constraint requires two existing line, arc, or spline entities");
+  case SketchSolverConstraintKind::Tangent: {
+    const auto* first_entity = require_entity(0U);
+    const auto* second_entity = require_entity(1U);
+    const bool curve_pair = is_curve(first_entity) && is_curve(second_entity);
+    const auto is_circle_profile = [](const SketchTopologyEntity* entity) {
+      return entity != nullptr && entity->kind() == SketchTopologyEntityKind::CircleProfile;
+    };
+    // Line↔circle tangency: the circle's radius is dimension-driven and baked
+    // into the constraint value by the catalog system builder.
+    const bool circle_line = constraint.value().has_value() &&
+                             ((is_line(first_entity) && is_circle_profile(second_entity)) ||
+                              (is_circle_profile(first_entity) && is_line(second_entity)));
+    if (!curve_pair && !circle_line)
+      return fail("tangent constraint requires two curves or a line and a circle with radius");
     break;
+  }
   case SketchSolverConstraintKind::Concentric:
     if (!has_center(require_entity(0U)) || !has_center(require_entity(1U)))
       return fail("concentric constraint requires two center-bearing arc or circle entities");
@@ -387,6 +401,60 @@ shared_curve_endpoint(const SketchTopologyEntity& first,
   return Point2{-radial.y, radial.x};
 }
 
+// Tangent anchors: the endpoint of each curve at the shared corner. Curves
+// connected through one shared topology point use it for both; curves coupled
+// positionally (e.g. via a Coincident constraint between their distinct
+// endpoints — the normal case for interactively drawn geometry) use the
+// closest coincident endpoint pair.
+struct SharedEndpointPair {
+  SketchPointId first;
+  SketchPointId second;
+};
+
+[[nodiscard]] std::optional<SharedEndpointPair>
+shared_curve_endpoint_pair(const SolveContext& context, const SketchTopologyEntity& first,
+                           const SketchTopologyEntity& second) noexcept {
+  if (const auto shared = shared_curve_endpoint(first, second))
+    return SharedEndpointPair{*shared, *shared};
+  const auto endpoint_ids = [](const SketchTopologyEntity& entity) {
+    std::vector<SketchPointId> result;
+    if (entity.kind() == SketchTopologyEntityKind::Line) {
+      result = {entity.points()[0], entity.points()[1]};
+    } else if (entity.kind() == SketchTopologyEntityKind::Arc) {
+      result = {entity.points()[0], entity.points()[2]};
+    } else if (entity.kind() == SketchTopologyEntityKind::Spline) {
+      result = {entity.points()[0], entity.points()[3]};
+    }
+    return result;
+  };
+  // Pair on the SOURCE topology positions so the pairing is stable across
+  // solve iterations (the free corner may drift while iterating).
+  const auto source_position = [&context](const SketchPointId& id) -> std::optional<Point2> {
+    const auto* point = context.topology.find_point(id);
+    return point == nullptr ? std::nullopt : std::optional(point->position());
+  };
+  std::optional<SharedEndpointPair> best;
+  double best_distance = 1.0e-2; // squared (0.1 mm): touching corners only
+  for (const auto& left : endpoint_ids(first)) {
+    const auto left_position = source_position(left);
+    if (!left_position)
+      continue;
+    for (const auto& right : endpoint_ids(second)) {
+      const auto right_position = source_position(right);
+      if (!right_position)
+        continue;
+      const double dx = left_position->x - right_position->x;
+      const double dy = left_position->y - right_position->y;
+      const double squared = dx * dx + dy * dy;
+      if (squared < best_distance) {
+        best_distance = squared;
+        best = SharedEndpointPair{left, right};
+      }
+    }
+  }
+  return best;
+}
+
 [[nodiscard]] double wrapped_angle(double angle) noexcept {
   while (angle <= -kPi) angle += 2.0 * kPi;
   while (angle > kPi) angle -= 2.0 * kPi;
@@ -464,12 +532,32 @@ evaluate_constraint(const SolveContext& context, const NumericVector& variables,
           entity_measure(context, variables, entity(1U))) /
          length_scale});
   case SketchSolverConstraintKind::Tangent: {
-    const auto shared = shared_curve_endpoint(entity(0U), entity(1U));
+    const bool first_is_circle =
+        entity(0U).kind() == SketchTopologyEntityKind::CircleProfile;
+    const bool second_is_circle =
+        entity(1U).kind() == SketchTopologyEntityKind::CircleProfile;
+    if (constraint.value() && (first_is_circle || second_is_circle)) {
+      // Line↔circle tangency: squared center-to-line distance equals the
+      // (constant, dimension-driven) squared radius — smooth at contact.
+      const auto& circle = first_is_circle ? entity(0U) : entity(1U);
+      const auto& line = first_is_circle ? entity(1U) : entity(0U);
+      const Point2 center = entity_center(context, variables, circle);
+      const Point2 start = point_position(context, variables, line.points()[0]);
+      const Point2 direction = line_vector(context, variables, line);
+      const double crossed = cross(direction, subtract(center, start));
+      const double length_squared = std::max(dot(direction, direction), 1.0e-12);
+      const double radius = *constraint.value();
+      return Result<NumericVector>::success(
+          {(crossed * crossed / length_squared - radius * radius) /
+           (length_scale * length_scale)});
+    }
+    const auto shared = shared_curve_endpoint_pair(context, entity(0U), entity(1U));
     if (!shared)
       return Result<NumericVector>::failure(validation_error(
-          constraint.id(), "tangent constraint curves must share a topology endpoint"));
-    const Point2 first_tangent = curve_tangent(context, variables, entity(0U), *shared);
-    const Point2 second_tangent = curve_tangent(context, variables, entity(1U), *shared);
+          constraint.id(),
+          "tangent constraint curves must share or touch at a common endpoint"));
+    const Point2 first_tangent = curve_tangent(context, variables, entity(0U), shared->first);
+    const Point2 second_tangent = curve_tangent(context, variables, entity(1U), shared->second);
     return Result<NumericVector>::success(
         {cross(first_tangent, second_tangent) /
          (safe_magnitude(first_tangent, length_scale) *
@@ -509,6 +597,14 @@ evaluate_constraint(const SolveContext& context, const NumericVector& variables,
       return Result<NumericVector>::success(
           {cross(direction, subtract(candidate, start)) /
            (safe_magnitude(direction, length_scale) * length_scale)});
+    }
+    if (entity(1U).kind() == SketchTopologyEntityKind::CircleProfile) {
+      if (!constraint.value())
+        return Result<NumericVector>::failure(validation_error(
+            constraint.id(), "point-on-circle requires the baked circle radius"));
+      const Point2 center = entity_center(context, variables, entity(1U));
+      return Result<NumericVector>::success(
+          {(magnitude(subtract(candidate, center)) - *constraint.value()) / length_scale});
     }
     const ArcGeometry arc = arc_geometry(context, variables, entity(1U));
     return Result<NumericVector>::success(
@@ -951,10 +1047,17 @@ SketchSolverConstraint::create(std::string id, SketchSolverConstraintKind kind,
   if (targets.size() != expected_target_count(kind))
     return Result<SketchSolverConstraint>::failure(validation_error(
         object_id, "Sketch solver constraint has the wrong number of targets"));
-  if (requires_value(kind) != value.has_value())
+  // Tangent and PointOnObject optionally carry a value: the dimension-driven
+  // circle radius for circle-profile targets (other targets stay value-free).
+  const bool value_permitted = requires_value(kind) ||
+                               kind == SketchSolverConstraintKind::Tangent ||
+                               kind == SketchSolverConstraintKind::PointOnObject;
+  if (requires_value(kind) && !value.has_value())
     return Result<SketchSolverConstraint>::failure(validation_error(
-        object_id, requires_value(kind) ? "Sketch solver constraint requires a numeric value"
-                                        : "Sketch solver constraint must not carry a numeric value"));
+        object_id, "Sketch solver constraint requires a numeric value"));
+  if (!value_permitted && value.has_value())
+    return Result<SketchSolverConstraint>::failure(validation_error(
+        object_id, "Sketch solver constraint must not carry a numeric value"));
   if (value && !std::isfinite(*value))
     return Result<SketchSolverConstraint>::failure(
         validation_error(object_id, "Sketch solver constraint value must be finite"));

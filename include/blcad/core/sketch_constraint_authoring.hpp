@@ -257,6 +257,39 @@ struct SketchConstraintAuthoringPreview {
   std::vector<std::string> redundant_ids;
 };
 
+// Tangent and PointOnObject intents that target a circle profile carry the
+// circle's dimension-driven radius as the solver-constraint value (the solver
+// has no parameter access). Shared by the authoring preview and the catalog
+// system builder.
+[[nodiscard]] inline std::optional<double>
+tangent_circle_radius_for_intent(const SketchConstraintIntent& intent,
+                                 const SketchTopology& topology, const PartDocument& document,
+                                 const Sketch& sketch) {
+  if (intent.kind() != SketchSolverConstraintKind::Tangent &&
+      intent.kind() != SketchSolverConstraintKind::PointOnObject)
+    return std::nullopt;
+  constexpr std::string_view kProfilePrefix = "profile/";
+  for (const auto& target : intent.targets()) {
+    if (target.kind() != SketchConstraintIntentTargetKind::Entity)
+      continue;
+    const auto* entity = topology.find_entity(target.id());
+    if (entity == nullptr || entity->kind() != SketchTopologyEntityKind::CircleProfile)
+      continue;
+    if (!std::string_view(target.id()).starts_with(kProfilePrefix))
+      continue;
+    const ProfileId profile_id(target.id().substr(kProfilePrefix.size()));
+    for (const auto& profile : sketch.circle_profiles()) {
+      if (profile.id() != profile_id)
+        continue;
+      const Parameter* diameter = document.find_parameter(profile.diameter_parameter());
+      if (diameter == nullptr)
+        return std::nullopt;
+      return diameter->value().millimeters() * 0.5;
+    }
+  }
+  return std::nullopt;
+}
+
 class SketchConstraintAuthoringService {
 public:
   [[nodiscard]] Result<SketchConstraintAuthoringPreview>
@@ -282,12 +315,12 @@ public:
 
     std::vector<SketchSolverConstraint> constraints = legacy.value().constraints();
     for (const auto& intent : catalog.constraints()) {
-      auto converted = solver_constraint(intent, topology.value());
+      auto converted = solver_constraint(intent, topology.value(), document, *sketch);
       if (converted.has_error())
         return Result<SketchConstraintAuthoringPreview>::failure(converted.error());
       constraints.push_back(std::move(converted.value()));
     }
-    auto converted_candidate = solver_constraint(candidate, topology.value());
+    auto converted_candidate = solver_constraint(candidate, topology.value(), document, *sketch);
     if (converted_candidate.has_error())
       return Result<SketchConstraintAuthoringPreview>::failure(converted_candidate.error());
     constraints.push_back(std::move(converted_candidate.value()));
@@ -328,7 +361,8 @@ private:
   }
 
   [[nodiscard]] static Result<SketchSolverConstraint>
-  solver_constraint(const SketchConstraintIntent& intent, const SketchTopology& topology) {
+  solver_constraint(const SketchConstraintIntent& intent, const SketchTopology& topology,
+                    const PartDocument& document, const Sketch& sketch) {
     std::vector<SketchSolverTarget> targets;
     targets.reserve(intent.targets().size());
     for (const auto& target : intent.targets()) {
@@ -350,7 +384,9 @@ private:
         targets.push_back(std::move(converted.value()));
       }
     }
-    return SketchSolverConstraint::create(solver_id(intent.id()), intent.kind(), std::move(targets));
+    return SketchSolverConstraint::create(
+        solver_id(intent.id()), intent.kind(), std::move(targets),
+        tangent_circle_radius_for_intent(intent, topology, document, sketch));
   }
 
   [[nodiscard]] static std::vector<std::string>

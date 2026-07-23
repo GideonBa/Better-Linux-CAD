@@ -1,15 +1,10 @@
 #include "blcad/gui/gui_sketch_spline.hpp"
 #include "blcad/gui/gui_sketch_workbench.hpp"
-#include "blcad/gui/main_window.hpp"
-#include "blcad/gui/occt_viewport.hpp"
 
 #include "blcad/core/parameter.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
-#include <QAction>
-#include <QApplication>
-#include <QTreeWidget>
 
 using namespace blcad;
 using namespace blcad::gui;
@@ -26,13 +21,6 @@ Parameter length_parameter(const char* id, double value) {
 
 Parameter count_parameter(const char* id, double value) {
   return Parameter::create_count(ParameterId(id), id, Quantity::count(value, id).value()).value();
-}
-
-QTreeWidgetItem* find_item(QTreeWidgetItem* item, QStringView id) {
-  if (item->data(0, Qt::UserRole).toString() == id) return item;
-  for (int index = 0; index < item->childCount(); ++index)
-    if (auto* found = find_item(item->child(index), id)) return found;
-  return nullptr;
 }
 
 } // namespace
@@ -146,38 +134,6 @@ TEST_CASE("Block 99 selection prompts name semantic capabilities",
         "projectable_reference");
   CHECK(GuiSketchWorkbench::prompt_for(GuiSketchCommand::AddDimension).text.find("two compatible") !=
         std::string::npos);
-}
-
-TEST_CASE("Block 99 main window enters orthographic normal-to-plane sketch editing",
-          "[gui][sketch-workbench][gui][datum-workplane]") {
-  REQUIRE(qApp != nullptr);
-  MainWindow window;
-  REQUIRE(window.session().create_part(DocumentId("part.camera"), "Camera"));
-  REQUIRE(window.sketch_workbench().create_xy_datum(window.session(), DatumPlaneId("datum.xy"), "XY"));
-  REQUIRE(window.sketch_workbench().create_sketch(
-      window.session(), Sketch::create(SketchId("sketch.camera"), "Camera Sketch",
-                                        DatumPlaneId("datum.xy")).value()));
-  window.refresh_command_state();
-
-  auto* tree = window.findChild<QTreeWidget*>(QStringLiteral("blcad.model_browser"));
-  auto* edit = window.findChild<QAction*>(QStringLiteral("blcad.action.edit_sketch"));
-  auto* viewport = window.findChild<OcctViewport*>(QStringLiteral("blcad.occt_viewport"));
-  REQUIRE(tree != nullptr);
-  REQUIRE(edit != nullptr);
-  REQUIRE(viewport != nullptr);
-  QTreeWidgetItem* sketch_item = nullptr;
-  for (int index = 0; index < tree->topLevelItemCount() && !sketch_item; ++index)
-    sketch_item = find_item(tree->topLevelItem(index), u"sketch.camera");
-  REQUIRE(sketch_item != nullptr);
-  tree->setCurrentItem(sketch_item);
-  edit->trigger();
-  qApp->processEvents();
-
-  REQUIRE(window.active_sketch().has_value());
-  CHECK(window.active_sketch()->value() == "sketch.camera");
-  REQUIRE(viewport->plane_camera().has_value());
-  CHECK(viewport->plane_camera()->view_direction == Vector3{0.0, 0.0, 1.0});
-  CHECK(viewport->projection() == GuiViewportProjection::Orthographic);
 }
 
 TEST_CASE("Block 106 Sketch workspace preserves context and publishes the frozen surface",

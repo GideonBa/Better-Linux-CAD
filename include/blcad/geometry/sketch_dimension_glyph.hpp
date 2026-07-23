@@ -34,6 +34,9 @@ struct SketchDimensionGlyph {
   SketchDimensionMode mode{SketchDimensionMode::Driving};
   SketchDimensionGlyphState state{SketchDimensionGlyphState::Accepted};
   std::vector<std::string> target_ids;
+  // Dimension leader in plane space: the two measured extremities the dimension
+  // line and its arrowheads span (empty when a leader is not drawn, e.g. angle).
+  std::vector<Point2> leader;
 
   friend bool operator==(const SketchDimensionGlyph&, const SketchDimensionGlyph&) = default;
 };
@@ -71,10 +74,11 @@ public:
       centroid.x += offset * 0.55;
       centroid.y += offset * 0.55;
     }
+    std::vector<Point2> leader = leader_points(topology, dimension, measurement, anchors);
     return Result<SketchDimensionGlyph>::success(
         {"sketch/" + topology.sketch().value() + "/dimension/" + dimension.id().value(),
          dimension.id().value(), token(dimension.kind()), format(measurement.value, dimension.mode()),
-         centroid, dimension.mode(), state, std::move(target_ids)});
+         centroid, dimension.mode(), state, std::move(target_ids), std::move(leader)});
   }
 
   [[nodiscard]] Result<std::vector<SketchDimensionGlyph>>
@@ -111,6 +115,64 @@ private:
       max_y = std::max(max_y, point.position().y);
     }
     return std::hypot(max_x - min_x, max_y - min_y);
+  }
+
+  // Extremities the dimension line spans, in plane space. Distance/length
+  // dimensions span their measured points; radius/diameter span the circle;
+  // angle draws no leader (badge only).
+  [[nodiscard]] static std::vector<Point2>
+  leader_points(const SketchTopology& topology, const SketchDimensionIntent& dimension,
+                const SketchDimensionMeasurement& measurement,
+                const std::vector<Point2>& anchors) {
+    const double value = measurement.value.millimeters();
+    switch (dimension.kind()) {
+    case SketchDimensionKind::Radius:
+    case SketchDimensionKind::Diameter: {
+      // Single circle/arc entity target: span a diameter through the center.
+      if (dimension.targets().empty())
+        return {};
+      const auto* entity = topology.find_entity(dimension.targets().front().id());
+      if (entity == nullptr)
+        return anchors;
+      Point2 center{};
+      std::size_t count = 0;
+      for (const auto& point_id : entity->points()) {
+        const auto* point = topology.find_point(point_id);
+        if (point == nullptr)
+          continue;
+        center.x += point->position().x;
+        center.y += point->position().y;
+        ++count;
+      }
+      if (count == 0)
+        return {};
+      center.x /= static_cast<double>(count);
+      center.y /= static_cast<double>(count);
+      const double radius = dimension.kind() == SketchDimensionKind::Radius ? value : value * 0.5;
+      if (dimension.kind() == SketchDimensionKind::Radius)
+        return {center, {center.x + radius, center.y}};
+      return {{center.x - radius, center.y}, {center.x + radius, center.y}};
+    }
+    case SketchDimensionKind::Angle:
+      return {};
+    default:
+      // Distance/length/point-to-point/aligned/arc-length: the measured points.
+      // A single line entity resolves to its centroid; use its endpoints so the
+      // dimension line actually spans the edge.
+      if (dimension.targets().size() == 1U &&
+          dimension.targets().front().kind() == SketchConstraintIntentTargetKind::Entity) {
+        const auto* entity = topology.find_entity(dimension.targets().front().id());
+        if (entity != nullptr && entity->points().size() >= 2U) {
+          const auto* start = topology.find_point(entity->points().front());
+          const auto* end = topology.find_point(entity->points().back());
+          if (start != nullptr && end != nullptr)
+            return {start->position(), end->position()};
+        }
+      }
+      if (anchors.size() >= 2U)
+        return {anchors.front(), anchors.back()};
+      return {};
+    }
   }
 
   [[nodiscard]] static Result<Point2>

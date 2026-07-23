@@ -1,15 +1,10 @@
 #include "blcad/gui/gui_document_browser.hpp"
-#include "blcad/gui/main_window.hpp"
-#include "blcad/gui/occt_viewport.hpp"
 
 #include "blcad/core/assembly_document.hpp"
 #include "blcad/core/body.hpp"
 #include "blcad/core/datum_plane.hpp"
 #include "blcad/core/parameter.hpp"
 
-#include <QApplication>
-#include <QTableWidget>
-#include <QTreeWidget>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -22,15 +17,6 @@ const GuiPropertyValue* find_property(const GuiBrowserNode& node, std::string_vi
   for (const auto& property : node.properties)
     if (property.key == key)
       return &property;
-  return nullptr;
-}
-
-QTreeWidgetItem* find_item(QTreeWidgetItem* item, QStringView id) {
-  if (item->data(0, Qt::UserRole).toString() == id)
-    return item;
-  for (int index = 0; index < item->childCount(); ++index)
-    if (auto* found = find_item(item->child(index), id))
-      return found;
   return nullptr;
 }
 
@@ -56,11 +42,14 @@ TEST_CASE("Block 98 Part browser exposes deterministic groups and typed editable
   const auto browser = GuiDocumentBrowser::build(session);
   REQUIRE(browser.roots().size() == 1);
   const auto& root = browser.roots().front();
-  REQUIRE(root.children.size() == 9);
+  // datum.xy is an origin id and lands in the MVP-9R "Ursprung" folder that
+  // precedes "Datums / Workplanes".
+  REQUIRE(root.children.size() == 10);
   CHECK(root.children[0].label == "Parameters");
-  CHECK(root.children[1].label == "Datums / Workplanes");
-  CHECK(root.children[6].label == "Bodies");
-  CHECK(root.children[8].label == "Session diagnostics");
+  CHECK(root.children[1].label == "Ursprung");
+  CHECK(root.children[2].label == "Datums / Workplanes");
+  CHECK(root.children[7].label == "Bodies");
+  CHECK(root.children[9].label == "Session diagnostics");
 
   const auto* parameter = browser.find("parameter.width");
   REQUIRE(parameter != nullptr);
@@ -116,40 +105,3 @@ TEST_CASE("Block 98 Assembly browser edits occurrence state through Project tran
             ->grounding_state() == ComponentGroundingState::Grounded);
 }
 
-TEST_CASE("Block 98 tree selection updates semantic session selection and property table",
-          "[gui][selection-sync][gui][model-browser]") {
-  REQUIRE(qApp != nullptr);
-  MainWindow window;
-  REQUIRE(window.session().create_part(DocumentId("part.sync"), "Selection Sync"));
-  REQUIRE(window.session().commit_part_transaction("Add selectable body", [](PartDocument& part) {
-    auto body = Body::create(BodyId("body.sync"), "Sync Body", BodyKind::Solid);
-    if (body.has_error()) return Result<std::size_t>::failure(body.error());
-    if (auto added = part.add_body(std::move(body.value())); added.has_error()) return added;
-    auto datum = DatumPlane::xy();
-    if (datum.has_error()) return Result<std::size_t>::failure(datum.error());
-    return part.add_datum_plane(std::move(datum.value()));
-  }));
-  window.refresh_command_state();
-
-  auto* tree = window.findChild<QTreeWidget*>(QStringLiteral("blcad.model_browser"));
-  auto* table = window.findChild<QTableWidget*>(QStringLiteral("blcad.property_table"));
-  REQUIRE(tree != nullptr);
-  REQUIRE(table != nullptr);
-  QTreeWidgetItem* body_item = nullptr;
-  for (int index = 0; index < tree->topLevelItemCount() && !body_item; ++index)
-    body_item = find_item(tree->topLevelItem(index), u"body.sync");
-  REQUIRE(body_item != nullptr);
-  tree->setCurrentItem(body_item);
-  qApp->processEvents();
-
-  CHECK(window.session().selection().contains(GuiSelectionKind::Body, "body/body.sync"));
-  CHECK(table->rowCount() >= 8);
-
-  auto* viewport = window.findChild<OcctViewport*>(QStringLiteral("blcad.occt_viewport"));
-  REQUIRE(viewport != nullptr);
-  REQUIRE(viewport->select_semantic("datum-plane/datum.xy"));
-  qApp->processEvents();
-  REQUIRE(tree->currentItem() != nullptr);
-  CHECK(tree->currentItem()->data(0, Qt::UserRole).toString() == QStringLiteral("datum.xy"));
-  CHECK(window.session().selection().contains(GuiSelectionKind::Datum, "datum-plane/datum.xy"));
-}

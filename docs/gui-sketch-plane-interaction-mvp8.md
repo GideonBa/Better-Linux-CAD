@@ -158,6 +158,7 @@ visible
 snap_enabled
 spacing
 major_every
+adaptive
 ```
 
 Default shell policy:
@@ -167,10 +168,18 @@ spacing      10 mm
 major_every  5
 visible      true
 grid snap    true
+adaptive     true (shell); struct default false
 ```
 
 Visible range comes from mapping viewport corners to plane coordinates. Display lines may be
-subsampled deterministically to stay within budget; configured spacing remains grid-snap authority.
+subsampled deterministically to stay within budget; the effective spacing remains grid-snap
+authority.
+
+With `adaptive` (extended for GUI Shell Reset MVP-9R) the effective spacing is the densest decade
+of `1 / 10 / 100 / 1000 mm` whose on-screen line distance stays readable (≥ 9 dip), queried live
+from the plane mapping so it follows zoom; `effective_grid_spacing()` is the single authority used
+by both grid display and grid snapping. Without `adaptive`, `spacing` is used verbatim (zoom-stable
+contract, unchanged). The shell renders the grid white (majors brighter than minors).
 
 Sketch menu exposes contextual `Show grid` and `Snap to grid`.
 

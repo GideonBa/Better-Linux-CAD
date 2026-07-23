@@ -241,9 +241,38 @@ GuiBrowserNode build_part(const PartDocument& part) {
   }
   root.children.push_back(std::move(parameters));
 
+  // Origin geometry (GUI Shell Reset MVP-9R): the seeded principal planes and
+  // axes get their own browser folder. The ids match the shell's origin
+  // seeding; documents without them see no behavior change.
+  const auto is_origin_plane = [](const DatumPlane& plane) {
+    const auto& id = plane.id().value();
+    return id == "datum.xy" || id == "datum.xz" || id == "datum.yz";
+  };
+  const auto is_origin_axis = [](const DatumAxis& axis) {
+    const auto& id = axis.id().value();
+    return id == "datum.axis.x" || id == "datum.axis.y" || id == "datum.axis.z";
+  };
+  std::vector<DatumPlane> origin_planes;
+  std::vector<DatumPlane> other_planes;
+  for (const auto& plane : part.datum_planes())
+    (is_origin_plane(plane) ? origin_planes : other_planes).push_back(plane);
+  std::vector<DatumAxis> origin_axes;
+  std::vector<DatumAxis> other_axes;
+  for (const auto& axis : part.datum_axes())
+    (is_origin_axis(axis) ? origin_axes : other_axes).push_back(axis);
+
+  if (!origin_planes.empty() || !origin_axes.empty()) {
+    auto origin = group("Ursprung");
+    append_part_nodes(origin, part, origin_planes, GuiBrowserNodeKind::Datum,
+                      GuiSelectionKind::Datum, "datum-plane/");
+    append_part_nodes(origin, part, origin_axes, GuiBrowserNodeKind::Datum, GuiSelectionKind::Datum,
+                      "datum-axis/");
+    root.children.push_back(std::move(origin));
+  }
+
   auto datums = group("Datums / Workplanes");
-  append_part_nodes(datums, part, part.datum_planes(), GuiBrowserNodeKind::Datum, GuiSelectionKind::Datum, "datum-plane/");
-  append_part_nodes(datums, part, part.datum_axes(), GuiBrowserNodeKind::Datum, GuiSelectionKind::Datum, "datum-axis/");
+  append_part_nodes(datums, part, other_planes, GuiBrowserNodeKind::Datum, GuiSelectionKind::Datum, "datum-plane/");
+  append_part_nodes(datums, part, other_axes, GuiBrowserNodeKind::Datum, GuiSelectionKind::Datum, "datum-axis/");
   append_part_nodes(datums, part, part.derived_workplanes(), GuiBrowserNodeKind::Datum, GuiSelectionKind::Datum);
   root.children.push_back(std::move(datums));
 

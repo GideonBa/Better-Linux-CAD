@@ -25,7 +25,7 @@ public:
       return Result<SketchConstraintSystem>::failure(legacy.error());
     std::vector<SketchSolverConstraint> constraints = legacy.value().constraints();
     for (const auto& intent : catalog.constraints()) {
-      auto converted = solver_constraint(intent, topology);
+      auto converted = solver_constraint(intent, topology, document, *sketch);
       if (converted.has_error())
         return Result<SketchConstraintSystem>::failure(converted.error());
       constraints.push_back(std::move(converted.value()));
@@ -35,7 +35,8 @@ public:
 
 private:
   [[nodiscard]] static Result<SketchSolverConstraint>
-  solver_constraint(const SketchConstraintIntent& intent, const SketchTopology& topology) {
+  solver_constraint(const SketchConstraintIntent& intent, const SketchTopology& topology,
+                    const PartDocument& document, const Sketch& sketch) {
     std::vector<SketchSolverTarget> targets;
     targets.reserve(intent.targets().size());
     for (const auto& target : intent.targets()) {
@@ -57,8 +58,9 @@ private:
         targets.push_back(std::move(converted.value()));
       }
     }
-    return SketchSolverConstraint::create(
-        "intent/" + intent.id().value(), intent.kind(), std::move(targets));
+    return SketchSolverConstraint::create("intent/" + intent.id().value(), intent.kind(),
+                                          std::move(targets),
+                                          tangent_circle_radius_for_intent(intent, topology, document, sketch));
   }
 };
 

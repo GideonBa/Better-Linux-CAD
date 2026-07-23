@@ -21,6 +21,29 @@ TEST_CASE("DatumPlane creates the standard XY plane", "[core][datum_plane]") {
   CHECK(plane.value().normal() == expected_normal);
 }
 
+TEST_CASE("DatumPlane creates the principal XZ and YZ origin planes", "[core][datum_plane]") {
+  const auto xz = DatumPlane::xz();
+  REQUIRE(xz);
+  CHECK(xz.value().id().value() == "datum.xz");
+  CHECK(xz.value().name() == "XZ");
+  CHECK(xz.value().origin() == Point3{0.0, 0.0, 0.0});
+  CHECK(xz.value().x_axis() == Vector3{1.0, 0.0, 0.0});
+  CHECK(xz.value().y_axis() == Vector3{0.0, 0.0, 1.0});
+  // Right-handed: x_axis × y_axis == normal.
+  CHECK(xz.value().normal() == Vector3{0.0, -1.0, 0.0});
+
+  const auto yz = DatumPlane::yz();
+  REQUIRE(yz);
+  CHECK(yz.value().id().value() == "datum.yz");
+  CHECK(yz.value().name() == "YZ");
+  CHECK(yz.value().x_axis() == Vector3{0.0, 1.0, 0.0});
+  CHECK(yz.value().y_axis() == Vector3{0.0, 0.0, 1.0});
+  CHECK(yz.value().normal() == Vector3{1.0, 0.0, 0.0});
+
+  CHECK(DatumPlane::xz(DatumPlaneId(), "XZ").has_error());
+  CHECK(DatumPlane::yz(DatumPlaneId("datum.yz"), "").has_error());
+}
+
 TEST_CASE("DatumPlane rejects empty ids", "[core][datum_plane]") {
   const auto plane = DatumPlane::xy(DatumPlaneId(), "XY");
 

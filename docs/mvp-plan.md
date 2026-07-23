@@ -4,10 +4,10 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 132
-current_block: 133
-current_boundary: Shell reset — ShellWindow, ribbon, browser, direct wiring
-current_tag: "[gui][shell-reset]"
+implemented_through: Block 134
+current_block: 135
+current_boundary: Interactive features minimal — Extrude/Revolve with manipulators in the shell
+current_tag: "[gui][shell-features]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -18,7 +18,7 @@ phase_status:
   mvp_7: "GUI Feature Validation — Blocks 95–105 implemented; MVP complete"
   mvp_8: "Interactive Sketcher — Blocks 106–121 implemented; MVP complete"
   mvp_9: "Interactive Part & Assembly Modeling — Blocks 122–131 implemented; MVP complete"
-  mvp_9r: "GUI Shell Reset — Block 132 implemented; Blocks 133–136 planned"
+  mvp_9r: "GUI Shell Reset — Blocks 132–134 implemented; Blocks 135–136 planned"
   mvp_10: "STEP Import — Blocks 137–143 planned"
 ---
 
@@ -31,10 +31,10 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 ## Current status
 
 ```text
-implemented through  Block 132
-current block        Block 133
+implemented through  Block 134
+current block        Block 135
 current phase        GUI Shell Reset MVP-9R
-current boundary     Shell reset — ShellWindow, ribbon, browser, direct wiring
+current boundary     Interactive features minimal — Extrude/Revolve with manipulators
 ```
 
 Interactive Sketcher MVP-8 is complete and accepted. Blocks 122–123 establish the selection-first
@@ -59,7 +59,7 @@ MVP-6   Part Construction                              Blocks 48–94 implemente
 MVP-7   GUI Feature Validation                        Blocks 95–105 implemented
 MVP-8   Interactive Sketcher                          Blocks 106–121 implemented
 MVP-9   Interactive Part & Assembly Modeling          Blocks 122–131 implemented
-MVP-9R  GUI Shell Reset                      Block 132 implemented; Blocks 133–136 planned
+MVP-9R  GUI Shell Reset                 Blocks 132–134 implemented; Blocks 135–136 planned
 MVP-10  STEP Import                                            Blocks 137–143 planned
 ```
 
@@ -516,23 +516,29 @@ Sequence contract: `docs/gui-shell-reset-sequence-mvp9r.md`.
   official OCCT Qt pattern). `paintGL` is the only redraw site; every state change funnels through
   a single scheduled repaint. Public viewport API unchanged; Block-122/123 layers and headless
   tests untouched. Eliminates the native-window flicker class at the root.
-- Block 133 — Shell reset: delete MainWindow, all binders, and shell-bound tests; new `ShellWindow`
-  with Inventor-style ribbon, model browser, properties/tasks panel, diagnostics, status bar,
-  document lifecycle (new/open/save), selection and revision-gated refresh flow, view controls.
-- Block 134 — Sketch in the new shell: sketch ribbon tab (draw, modify, constrain, dimension,
-  finish), porting the sketch interaction/create/drag/constraint/dimension logic as shell-owned
-  components with explicit references.
+- Block 133 — Shell reset — Implemented: MainWindow, all seven binders, and the shell-bound tests
+  deleted; new `ShellWindow` (src/gui/shell/) with Inventor-style `ShellRibbon`
+  (3D-Modell/Skizze/Ansicht), model browser with "Ursprung" folder, diagnostics, status bar,
+  document lifecycle, selection and revision-gated refresh flow, view controls, origin seeding
+  (`DatumPlane::xz/yz` Core extension + `seed_origin_geometry`), and the sketch entry skeleton
+  ("2D-Skizze erstellen" on a selected origin plane with the adaptive white grid).
+- Block 134 — Sketch in the new shell — Implemented: `ShellSketchTools` replaces the five deleted
+  binders as one shell-owned component with explicit references; Zeichnen (21 Werkzeuge als
+  Familien-Menüs), Abhängigkeiten (13 Familien + Löschen, end-to-end verifiziert), Bemaßung
+  (9 Arten, Referenz/treibend, Bearbeiten), Raster-Toggles, solver-backed Drag als Standard-
+  werkzeug. Ändern-Gruppe (Modify) dokumentiert nach Block 136 verschoben.
 - Block 135 — Interactive features minimal: Extrude and Revolve in the ribbon with manipulator
   overlay and numeric coupling — the first fully usable end-to-end shell (sketch → extrude).
 - Block 136 — Feature full coverage: remaining feature commands (Fillet, Chamfer, Shell, Draft,
   Pattern, Mirror, Boolean, Transform, Sweep, Loft, Surface, Measure, Assembly), feature edit via
   browser double-click, acceptance coverage.
 
-## Current next technical step — Block 133
+## Current next technical step — Block 135
 
-Delete the old shell (MainWindow and all binders) and build the new `ShellWindow` with the
-Inventor-style ribbon, model browser, and direct ownership wiring as defined in
-`docs/gui-shell-reset-sequence-mvp9r.md`.
+Make Extrude and Revolve reachable from the ribbon: selection-first flow through
+`GuiInteractiveFeatureCoordinator`, a shell-owned manipulator overlay (notification-driven
+replacement of the deleted Block-123 overlay binder), numeric coupling, and preview/apply/cancel,
+as defined in `docs/gui-shell-reset-sequence-mvp9r.md`.
 
 ## Later phases
 

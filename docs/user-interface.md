@@ -1,5 +1,13 @@
 # User Interface Architecture
 
+> **GUI Shell Reset MVP-9R (Blocks 132–136):** the Qt shell layer described in parts of this
+> document (MainWindow, workspace tab bars, binder installation) was **deleted and replaced** in
+> Block 133 by `ShellWindow` + `ShellRibbon` (`src/gui/shell/`, contract:
+> `docs/gui-shell-reset-sequence-mvp9r.md`). The headless authorities documented here (session,
+> transactions, browser model, selection semantics, viewport contracts, sketch workspace) remain
+> canonical and are consumed unchanged by the new shell. Shell-widget specifics below are
+> historical until this document is rewritten at the end of MVP-9R (Block 136).
+
 Status: MVP-7 and Interactive Sketcher MVP-8 are accepted through Block 121. Blocks 95–105 provide
 the optional Qt shell, document transactions, OCCT viewport, deterministic browser/property surfaces,
 and semantic selection synchronization. Blocks 106–120 establish the contextual Sketch workspace,

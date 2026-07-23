@@ -6,6 +6,7 @@
 #include "blcad/geometry/sketch_3d_geometry_adapter.hpp"
 #include "blcad/geometry/workplane_resolver.hpp"
 
+#include <BRep_Builder.hxx>
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepBuilderAPI_MakePolygon.hxx>
@@ -13,12 +14,16 @@
 #include <Geom_BezierCurve.hxx>
 #include <Standard_Failure.hxx>
 #include <TColgp_Array1OfPnt.hxx>
+#include <TopoDS_Compound.hxx>
 #include <TopoDS_Shape.hxx>
+#include <gp_Circ.hxx>
 #include <gp_Dir.hxx>
 #include <gp_Pnt.hxx>
 #include <gp_Vec.hxx>
 
 #include <algorithm>
+#include <array>
+#include <optional>
 #include <memory>
 #include <string>
 #include <utility>
@@ -150,6 +155,58 @@ ViewportSceneBuilder::build_part(const PartDocument& document,
         const Handle(Geom_BezierCurve) curve = new Geom_BezierCurve(poles);
         items.push_back({ViewportSceneKind::SketchEntity, sketch_entity_id(sketch, spline.id()),
                          wrap(BRepBuilderAPI_MakeEdge(curve).Shape())});
+      }
+
+      // Dimension-driven sketch profiles (rectangle/circle) are authored
+      // geometry too; without these items the interactive circle and
+      // rectangle tools would commit invisible results.
+      const auto parameter_mm = [&document](const ParameterId& id) -> std::optional<double> {
+        const Parameter* parameter = document.find_parameter(id);
+        if (parameter == nullptr)
+          return std::nullopt;
+        return parameter->value().millimeters();
+      };
+      const std::string profile_prefix = "sketch/" + sketch.id().value() + "/profile/";
+      for (const RectangleProfile& profile : sketch.rectangle_profiles()) {
+        const auto profile_width = parameter_mm(profile.width_parameter());
+        const auto profile_height = parameter_mm(profile.height_parameter());
+        if (!profile_width || !profile_height)
+          continue;
+        const Point2 center = profile.center();
+        const double half_width = *profile_width * 0.5;
+        const double half_height = *profile_height * 0.5;
+        const std::array<Point2, 4> corners{{{center.x - half_width, center.y - half_height},
+                                             {center.x + half_width, center.y - half_height},
+                                             {center.x + half_width, center.y + half_height},
+                                             {center.x - half_width, center.y + half_height}}};
+        BRep_Builder compound_builder;
+        TopoDS_Compound compound;
+        compound_builder.MakeCompound(compound);
+        for (std::size_t index = 0; index < corners.size(); ++index)
+          compound_builder.Add(
+              compound, BRepBuilderAPI_MakeEdge(point(corners[index]),
+                                                point(corners[(index + 1U) % corners.size()]))
+                            .Shape());
+        items.push_back({ViewportSceneKind::SketchEntity,
+                         profile_prefix + profile.id().value(), wrap(compound)});
+      }
+      for (const CircleProfile& profile : sketch.circle_profiles()) {
+        const auto diameter = parameter_mm(profile.diameter_parameter());
+        if (!diameter || *diameter <= 0.0)
+          continue;
+        const Point2 center = profile.center();
+        const gp_Pnt center_3d = point(center);
+        const gp_Pnt x_3d = point({center.x + *diameter * 0.5, center.y});
+        const gp_Pnt y_3d = point({center.x, center.y + *diameter * 0.5});
+        const gp_Vec x_vec(center_3d, x_3d);
+        const gp_Vec y_vec(center_3d, y_3d);
+        const gp_Vec normal = x_vec.Crossed(y_vec);
+        if (x_vec.Magnitude() <= gp::Resolution() || normal.Magnitude() <= gp::Resolution())
+          continue;
+        const gp_Ax2 axes(center_3d, gp_Dir(normal), gp_Dir(x_vec));
+        items.push_back(
+            {ViewportSceneKind::SketchEntity, profile_prefix + profile.id().value(),
+             wrap(BRepBuilderAPI_MakeEdge(gp_Circ(axes, x_vec.Magnitude())).Shape())});
       }
     }
 
