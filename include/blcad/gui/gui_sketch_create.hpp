@@ -69,6 +69,7 @@ struct GuiSketchCreateExpansion {
   std::vector<LineSegment> lines;
   std::vector<ArcSegment> arcs;
   std::vector<SplineSegment> splines;
+  std::vector<SketchPoint> points;
   std::optional<ClosedProfile> profile;
   std::optional<ArcClosedProfile> curve_profile;
   std::optional<CircleProfile> circle_profile;

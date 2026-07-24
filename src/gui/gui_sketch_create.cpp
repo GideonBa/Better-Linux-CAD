@@ -160,8 +160,8 @@ struct SlotGeometry {
 
 [[nodiscard]] bool sketch_entity_id_taken(const Sketch& sketch, const SketchEntityId& id) {
   return sketch.find_line_segment(id) != nullptr || sketch.find_arc_segment(id) != nullptr ||
-         sketch.find_spline_segment(id) != nullptr || sketch.find_projected_point(id) != nullptr ||
-         sketch.find_projected_line(id) != nullptr ||
+         sketch.find_spline_segment(id) != nullptr || sketch.find_point(id) != nullptr ||
+         sketch.find_projected_point(id) != nullptr || sketch.find_projected_line(id) != nullptr ||
          sketch.find_reference_generated_line(id) != nullptr;
 }
 
@@ -814,17 +814,18 @@ GuiSketchCreateController::expansion(const PartDocument& document) const {
 
   switch (tool_) {
   case GuiSketchCreateTool::Point: {
-    const Point3 position = plane_.plane_to_model(picks_.front().point);
-    auto point = ConstructionPoint::create_explicit(
-        ConstructionPointId(next_free_id(
-            "construction.point.create.",
-            [&document](const std::string& candidate) {
-              return document.find_construction_point(ConstructionPointId(candidate)) != nullptr;
-            })),
-        "Sketch point", position);
+    const Sketch* sketch = document.find_sketch(sketch_);
+    if (sketch == nullptr)
+      return Result<GuiSketchCreateExpansion>::failure(
+          create_error("Sketch point target no longer exists"));
+    const SketchEntityId id(next_free_id(
+        "sketch.point.", [sketch](const std::string& candidate) {
+          return sketch_entity_id_taken(*sketch, SketchEntityId(candidate));
+        }));
+    auto point = SketchPoint::create(id, picks_.front().point);
     if (point.has_error()) return Result<GuiSketchCreateExpansion>::failure(point.error());
-    result.construction_point = std::move(point.value());
-    result.label = "Create construction point";
+    result.points.push_back(std::move(point.value()));
+    result.label = "Create sketch point";
     return Result<GuiSketchCreateExpansion>::success(std::move(result));
   }
   case GuiSketchCreateTool::Centerline: {
@@ -1035,6 +1036,11 @@ Result<std::size_t> GuiSketchCreateController::commit(GuiDocumentSession& sessio
         }
         for (auto& spline : value.splines) {
           auto added = candidate.add_entity(std::move(spline));
+          if (added.has_error()) return added;
+          added_count = added.value();
+        }
+        for (auto& point : value.points) {
+          auto added = candidate.add_entity(std::move(point));
           if (added.has_error()) return added;
           added_count = added.value();
         }

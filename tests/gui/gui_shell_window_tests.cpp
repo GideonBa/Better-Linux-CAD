@@ -1,11 +1,15 @@
+#include "blcad/core/parameter.hpp"
 #include "blcad/gui/shell/shell_origin.hpp"
 #include "blcad/gui/shell/shell_ribbon.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <QTableWidget>
+#include <QTableWidgetItem>
 #include <QTemporaryDir>
 #include <QTreeWidget>
+#include <QTreeWidgetItem>
 
 #include <algorithm>
 
@@ -19,6 +23,22 @@ const GuiBrowserNode* find_group(const GuiDocumentBrowser& browser, std::string_
     for (const auto& child : root.children)
       if (child.kind == GuiBrowserNodeKind::Group && child.label == label)
         return &child;
+  return nullptr;
+}
+
+QTreeWidgetItem* find_tree_item(QTreeWidgetItem* item, const QString& semantic_id) {
+  if (item->data(0, Qt::UserRole).toString() == semantic_id)
+    return item;
+  for (int index = 0; index < item->childCount(); ++index)
+    if (auto* found = find_tree_item(item->child(index), semantic_id))
+      return found;
+  return nullptr;
+}
+
+QTreeWidgetItem* find_tree_item(QTreeWidget& tree, const QString& semantic_id) {
+  for (int index = 0; index < tree.topLevelItemCount(); ++index)
+    if (auto* found = find_tree_item(tree.topLevelItem(index), semantic_id))
+      return found;
   return nullptr;
 }
 
@@ -131,4 +151,61 @@ TEST_CASE("Block 133 save and open round-trip preserves the seeded origin",
     CHECK(origin->children.size() == 6U);
     CHECK(window.viewport().presentation_count() == 6U);
   }
+}
+
+TEST_CASE("Double-clicking a Sketch node re-enters it for editing",
+          "[gui][shell][gui][sketch-reentry]") {
+  ShellWindow window;
+  REQUIRE(window.new_part(QStringLiteral("Reentry")));
+  REQUIRE(window.viewport().select_semantic("datum-plane/datum.xy"));
+  REQUIRE(window.create_sketch_on_selection());
+  REQUIRE(window.active_sketch().has_value());
+  const std::string sketch_id = window.active_sketch()->value();
+  REQUIRE(window.finish_active_sketch());
+  CHECK_FALSE(window.active_sketch().has_value());
+
+  auto& tree = window.model_browser();
+  QTreeWidgetItem* item = find_tree_item(tree, QString::fromStdString(sketch_id));
+  REQUIRE(item != nullptr);
+
+  // Emitting the browser's double-click signal drives handle_tree_activation.
+  tree.itemDoubleClicked(item, 0);
+  REQUIRE(window.active_sketch().has_value());
+  CHECK(window.active_sketch()->value() == sketch_id);
+}
+
+TEST_CASE("Property inspector shows and edits a parameter value",
+          "[gui][shell][gui][property-editor]") {
+  ShellWindow window;
+  REQUIRE(window.new_part(QStringLiteral("Params")));
+  REQUIRE(window.session().commit_part_transaction("Seed parameter", [](PartDocument& part) {
+    auto parameter = Parameter::create_length(ParameterId("parameter.width"), "Width",
+                                              Quantity::length_mm(20.0).value());
+    if (parameter.has_error())
+      return Result<std::size_t>::failure(parameter.error());
+    return part.add_parameter(std::move(parameter.value()));
+  }));
+  window.refresh();
+
+  auto& tree = window.model_browser();
+  QTreeWidgetItem* item = find_tree_item(tree, QStringLiteral("parameter.width"));
+  REQUIRE(item != nullptr);
+  tree.setCurrentItem(item); // populates the inspector for the selected node
+
+  auto& table = window.property_inspector();
+  int value_row = -1;
+  for (int row = 0; row < table.rowCount(); ++row) {
+    const auto* cell = table.item(row, 1);
+    if (cell != nullptr && cell->data(Qt::UserRole).toString() == QStringLiteral("value"))
+      value_row = row;
+  }
+  REQUIRE(value_row >= 0);
+  CHECK(table.item(value_row, 1)->text() == QStringLiteral("20"));
+
+  // Editing the value cell commits through edit_browser_property.
+  table.item(value_row, 1)->setText(QStringLiteral("35"));
+  const auto* parameter =
+      window.session().part_document()->find_parameter(ParameterId("parameter.width"));
+  REQUIRE(parameter != nullptr);
+  CHECK(parameter->value().millimeters() == 35.0);
 }

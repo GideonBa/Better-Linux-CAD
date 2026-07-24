@@ -129,8 +129,28 @@ wrap(atan2(cross(v1,v2), dot(v1,v2)) - targetRadians) / pi
 ```
 
 Parallel/perpendicular/collinear, tangent, concentric, midpoint, symmetric, equal, and point-on-object
-use scale-normalized geometric residuals over their stable topology targets. Tangent requires a shared
-persistent endpoint; coordinate equality is insufficient.
+use scale-normalized geometric residuals over their stable topology targets. Curve↔curve tangent
+requires a shared or touching endpoint (angle between the two corner tangents); coordinate equality
+alone is insufficient.
+
+Collinear is **variable-arity**: two-plus lines, a point and a line, or three-plus points (nothing
+else mixed in). A reference direction and anchor are taken from the first line target, or — when only
+points are given — from the first two points. Each further line contributes parallelism plus an
+anchor-on-line residual; each aligned point contributes a single on-line residual
+(`direction × (point − anchor)`). Two lines reduces to the original parallel + second-start-on-first
+formulation, so existing behaviour is unchanged. Point↔line collinearity reuses the point-on-object
+semantics (point on the line's infinite extension). The intent/catalog layers validate the arity by
+signature rather than a fixed target count.
+
+Line↔circle-profile tangent instead uses the perpendicular center-to-line distance and the circle's
+dimension-driven radius baked as the constraint value. The residual is first order in length
+(`|distance| − radius`), matching the coincidence/point-on-object residuals: if the line's endpoint is
+also held on the same circle by a coincidence (`PointOnObject`), the contact point is that endpoint and
+the residual switches to perpendicularity of the line to the radius there
+(`direction · (endpoint − center)`). Both residuals are the same length order, so the coupled
+"coincident endpoint + tangent" system stays well conditioned. An earlier squared distance form
+(`distance² − radius²`) shared the point-on-circle radial gradient at the solution and left that coupled
+system degenerate, so the solver crept to the iteration limit and reported `non_convergent`.
 
 ## Characteristic scale and degeneracy policy
 

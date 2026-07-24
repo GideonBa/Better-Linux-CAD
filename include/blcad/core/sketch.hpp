@@ -167,6 +167,21 @@ private:
   ParameterId parameter_;
 };
 
+// A free-standing 2D sketch point: unlike a projected point (reference geometry
+// driven by a construction point), a SketchPoint is ordinary editable sketch
+// geometry — draggable, constrainable, and dimensionable like a line endpoint.
+class SketchPoint {
+public:
+  [[nodiscard]] static Result<SketchPoint> create(SketchEntityId id, Point2 position);
+  [[nodiscard]] const SketchEntityId& id() const noexcept;
+  [[nodiscard]] Point2 position() const noexcept;
+
+private:
+  SketchPoint(SketchEntityId id, Point2 position);
+  SketchEntityId id_;
+  Point2 position_;
+};
+
 class ProjectedSketchPoint {
 public:
   [[nodiscard]] static Result<ProjectedSketchPoint>
@@ -430,6 +445,7 @@ public:
   [[nodiscard]] Result<std::size_t> add_entity(LineSegment line_segment);
   [[nodiscard]] Result<std::size_t> add_entity(ArcSegment arc_segment);
   [[nodiscard]] Result<std::size_t> add_entity(SplineSegment spline_segment);
+  [[nodiscard]] Result<std::size_t> add_entity(SketchPoint point);
   [[nodiscard]] Result<std::size_t> add_reference(ProjectedSketchPoint point_reference);
   [[nodiscard]] Result<std::size_t> add_reference(ProjectedSketchLine line_reference);
   [[nodiscard]] Result<std::size_t> add_reference(ReferenceGeneratedLine line_reference);
@@ -452,6 +468,7 @@ public:
   [[nodiscard]] const std::vector<LineSegment>& line_segments() const noexcept;
   [[nodiscard]] const std::vector<ArcSegment>& arc_segments() const noexcept;
   [[nodiscard]] const std::vector<SplineSegment>& spline_segments() const noexcept;
+  [[nodiscard]] const std::vector<SketchPoint>& points() const noexcept;
   [[nodiscard]] const std::vector<ProjectedSketchPoint>& projected_points() const noexcept;
   [[nodiscard]] const std::vector<ProjectedSketchLine>& projected_lines() const noexcept;
   [[nodiscard]] const std::vector<ReferenceGeneratedLine>&
@@ -474,6 +491,7 @@ public:
   [[nodiscard]] const LineSegment* find_line_segment(SketchEntityId id) const noexcept;
   [[nodiscard]] const ArcSegment* find_arc_segment(SketchEntityId id) const noexcept;
   [[nodiscard]] const SplineSegment* find_spline_segment(SketchEntityId id) const noexcept;
+  [[nodiscard]] const SketchPoint* find_point(SketchEntityId id) const noexcept;
   [[nodiscard]] const ProjectedSketchPoint* find_projected_point(SketchEntityId id) const noexcept;
   [[nodiscard]] const ProjectedSketchLine* find_projected_line(SketchEntityId id) const noexcept;
   [[nodiscard]] const ReferenceGeneratedLine*
@@ -524,6 +542,7 @@ private:
   std::vector<LineSegment> line_segments_;
   std::vector<ArcSegment> arc_segments_;
   std::vector<SplineSegment> spline_segments_;
+  std::vector<SketchPoint> points_;
   std::vector<ProjectedSketchPoint> projected_points_;
   std::vector<ProjectedSketchLine> projected_lines_;
   std::vector<ReferenceGeneratedLine> reference_generated_lines_;

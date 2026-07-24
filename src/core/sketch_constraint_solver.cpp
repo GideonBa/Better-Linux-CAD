@@ -109,6 +109,10 @@ struct SolveContext {
   std::vector<SketchSolverVariable> variable_order;
   std::unordered_map<std::string, std::size_t> point_variable_base;
   double length_scale;
+  // All constraints in the system, so a single constraint's residual can see
+  // its neighbours (e.g. line↔circle tangent checks whether an endpoint is
+  // held on the circle by a coincidence). Null while the context is built.
+  const std::vector<SketchSolverConstraint>* constraints{nullptr};
 };
 
 [[nodiscard]] SolveContext make_context(const SketchTopology& topology) {
@@ -222,11 +226,31 @@ validate_constraint_targets(const SolveContext& context, const SketchSolverConst
     break;
   case SketchSolverConstraintKind::Parallel:
   case SketchSolverConstraintKind::Perpendicular:
-  case SketchSolverConstraintKind::Collinear:
   case SketchSolverConstraintKind::Angular:
     if (!is_line(require_entity(0U)) || !is_line(require_entity(1U)))
       return fail("line relationship constraint requires two existing line entities");
     break;
+  case SketchSolverConstraintKind::Collinear: {
+    // Every target is either a line entity or a resolvable point; the mix must
+    // define a direction (a line, or two points) plus something to align.
+    std::size_t line_count = 0U;
+    std::size_t point_count = 0U;
+    for (std::size_t index = 0U; index < targets.size(); ++index) {
+      if (targets[index].kind() == SketchSolverTargetKind::Point) {
+        if (!require_point(index))
+          return fail("collinear constraint references an unknown Sketch point");
+        point_count += 1U;
+      } else if (is_line(require_entity(index))) {
+        line_count += 1U;
+      } else {
+        return fail("collinear constraint targets must be lines or points");
+      }
+    }
+    if (!(line_count >= 2U || (line_count == 1U && point_count >= 1U) ||
+          (line_count == 0U && point_count >= 3U)))
+      return fail("collinear needs two-plus lines, a point and a line, or three-plus points");
+    break;
+  }
   case SketchSolverConstraintKind::Equal:
     if (!has_length_measure(require_entity(0U)) || !has_length_measure(require_entity(1U)))
       return fail("equal constraint requires two measurable line or arc entities");
@@ -505,8 +529,7 @@ evaluate_constraint(const SolveContext& context, const NumericVector& variables,
     return Result<NumericVector>::success({direction.x / length_scale});
   }
   case SketchSolverConstraintKind::Parallel:
-  case SketchSolverConstraintKind::Perpendicular:
-  case SketchSolverConstraintKind::Collinear: {
+  case SketchSolverConstraintKind::Perpendicular: {
     const Point2 first_direction = line_vector(context, variables, entity(0U));
     const Point2 second_direction = line_vector(context, variables, entity(1U));
     const double denominator = safe_magnitude(first_direction, length_scale) *
@@ -514,17 +537,59 @@ evaluate_constraint(const SolveContext& context, const NumericVector& variables,
     if (constraint.kind() == SketchSolverConstraintKind::Parallel)
       return Result<NumericVector>::success(
           {cross(first_direction, second_direction) / denominator});
-    if (constraint.kind() == SketchSolverConstraintKind::Perpendicular)
-      return Result<NumericVector>::success(
-          {dot(first_direction, second_direction) / denominator});
-    const Point2 first_start =
-        point_position(context, variables, entity(0U).points()[0]);
-    const Point2 second_start =
-        point_position(context, variables, entity(1U).points()[0]);
     return Result<NumericVector>::success(
-        {cross(first_direction, second_direction) / denominator,
-         cross(first_direction, subtract(second_start, first_start)) /
-             (safe_magnitude(first_direction, length_scale) * length_scale)});
+        {dot(first_direction, second_direction) / denominator});
+  }
+  case SketchSolverConstraintKind::Collinear: {
+    // Generalized: everything shares one infinite line. The reference direction
+    // and anchor come from the first line target, or (all-points) from the
+    // first two points. Each other line contributes parallelism + anchor-on-line
+    // residuals; each aligned point contributes an on-line residual. Two lines
+    // reduces to the original (parallel + second-start-on-first) formulation.
+    Point2 reference_direction{};
+    Point2 reference_anchor{};
+    std::size_t first_point_to_align = 0U;
+    const auto* first_line = [&]() -> const SketchTopologyEntity* {
+      for (const auto& target : targets)
+        if (target.kind() == SketchSolverTargetKind::Point)
+          continue;
+        else
+          return context.topology.find_entity(target.id());
+      return nullptr;
+    }();
+    if (first_line != nullptr) {
+      reference_direction = line_vector(context, variables, *first_line);
+      reference_anchor = point_position(context, variables, first_line->points()[0]);
+    } else {
+      // All points: the first two define the reference line, align the rest.
+      reference_anchor = point(0U);
+      reference_direction = subtract(point(1U), reference_anchor);
+      first_point_to_align = 2U;
+    }
+    const double direction_scale = safe_magnitude(reference_direction, length_scale);
+    NumericVector residuals;
+    std::size_t point_index = 0U;
+    for (const auto& target : targets) {
+      if (target.kind() == SketchSolverTargetKind::Point) {
+        const std::size_t current = point_index++;
+        if (first_line == nullptr && current < first_point_to_align)
+          continue; // reference points define the line, not aligned to it
+        const Point2 position = point_position(context, variables, SketchPointId(target.id()));
+        residuals.push_back(cross(reference_direction, subtract(position, reference_anchor)) /
+                            (direction_scale * length_scale));
+        continue;
+      }
+      const auto* line = context.topology.find_entity(target.id());
+      if (line == first_line)
+        continue; // the reference line is not constrained against itself
+      const Point2 direction = line_vector(context, variables, *line);
+      const Point2 start = point_position(context, variables, line->points()[0]);
+      residuals.push_back(cross(reference_direction, direction) /
+                          (direction_scale * safe_magnitude(direction, length_scale)));
+      residuals.push_back(cross(reference_direction, subtract(start, reference_anchor)) /
+                          (direction_scale * length_scale));
+    }
+    return Result<NumericVector>::success(std::move(residuals));
   }
   case SketchSolverConstraintKind::Equal:
     return Result<NumericVector>::success(
@@ -537,19 +602,64 @@ evaluate_constraint(const SolveContext& context, const NumericVector& variables,
     const bool second_is_circle =
         entity(1U).kind() == SketchTopologyEntityKind::CircleProfile;
     if (constraint.value() && (first_is_circle || second_is_circle)) {
-      // Line↔circle tangency: squared center-to-line distance equals the
-      // (constant, dimension-driven) squared radius — smooth at contact.
+      // Line↔circle tangency: perpendicular center-to-line distance equals the
+      // (constant, dimension-driven) radius. The residual is first order in
+      // length (distance − radius), matching coincidence/point-on-object, so a
+      // line whose endpoint is coincident on the same circle stays well
+      // conditioned. The earlier squared form (d²−r²) scaled with length² and
+      // made such mixed systems ill-conditioned — the solver crept toward the
+      // tolerance and hit the iteration limit (non_convergent). abs() admits
+      // both tangent sides, matching the squared form's solution set.
       const auto& circle = first_is_circle ? entity(0U) : entity(1U);
       const auto& line = first_is_circle ? entity(1U) : entity(0U);
       const Point2 center = entity_center(context, variables, circle);
-      const Point2 start = point_position(context, variables, line.points()[0]);
       const Point2 direction = line_vector(context, variables, line);
-      const double crossed = cross(direction, subtract(center, start));
-      const double length_squared = std::max(dot(direction, direction), 1.0e-12);
+      const double length = std::sqrt(std::max(dot(direction, direction), 1.0e-12));
       const double radius = *constraint.value();
+      // If a line endpoint is held on this circle by a coincidence
+      // (PointOnObject — how the GUI models "coincident point-on-curve"), the
+      // contact point IS that endpoint. Express tangency as the line being
+      // perpendicular to the radius there (direction · (endpoint − center) = 0).
+      // This stays orthogonal to the point-on-circle constraint, whereas the
+      // distance form (below) shares its radial gradient at the solution and
+      // leaves the coupled system degenerate — the solver then crept to the
+      // iteration limit (non_convergent) even though the geometry was solvable.
+      const auto endpoint_on_circle = [&]() -> std::optional<SketchPointId> {
+        if (context.constraints == nullptr)
+          return std::nullopt;
+        for (const auto& other : *context.constraints) {
+          if (other.kind() != SketchSolverConstraintKind::PointOnObject &&
+              other.kind() != SketchSolverConstraintKind::Coincident)
+            continue;
+          const auto& other_targets = other.targets();
+          if (other_targets.size() != 2U)
+            continue;
+          const bool holds_circle = std::any_of(
+              other_targets.begin(), other_targets.end(), [&](const SketchSolverTarget& target) {
+                return target.kind() == SketchSolverTargetKind::Entity &&
+                       target.id() == circle.id();
+              });
+          if (!holds_circle)
+            continue;
+          for (const auto& target : other_targets) {
+            if (target.kind() != SketchSolverTargetKind::Point)
+              continue;
+            const SketchPointId held(target.id());
+            if (held == line.points()[0] || held == line.points()[1])
+              return held;
+          }
+        }
+        return std::nullopt;
+      }();
+      if (endpoint_on_circle) {
+        const Point2 contact = point_position(context, variables, *endpoint_on_circle);
+        return Result<NumericVector>::success(
+            {dot(direction, subtract(contact, center)) / (length * length_scale)});
+      }
+      const Point2 start = point_position(context, variables, line.points()[0]);
+      const double crossed = cross(direction, subtract(center, start));
       return Result<NumericVector>::success(
-          {(crossed * crossed / length_squared - radius * radius) /
-           (length_scale * length_scale)});
+          {(std::abs(crossed) / length - radius) / length_scale});
     }
     const auto shared = shared_curve_endpoint_pair(context, entity(0U), entity(1U));
     if (!shared)
@@ -1044,9 +1154,16 @@ SketchSolverConstraint::create(std::string id, SketchSolverConstraintKind kind,
   if (id.empty())
     return Result<SketchSolverConstraint>::failure(
         validation_error(object_id, "Sketch solver constraint id must not be empty"));
-  if (targets.size() != expected_target_count(kind))
+  // Collinear is variable-arity (two-plus lines, a point and a line, or
+  // three-plus points); every other kind has a fixed target count.
+  if (kind == SketchSolverConstraintKind::Collinear) {
+    if (targets.size() < 2U)
+      return Result<SketchSolverConstraint>::failure(validation_error(
+          object_id, "collinear constraint needs at least two targets"));
+  } else if (targets.size() != expected_target_count(kind)) {
     return Result<SketchSolverConstraint>::failure(validation_error(
         object_id, "Sketch solver constraint has the wrong number of targets"));
+  }
   // Tangent and PointOnObject optionally carry a value: the dimension-driven
   // circle radius for circle-profile targets (other targets stay value-free).
   const bool value_permitted = requires_value(kind) ||
@@ -1149,7 +1266,8 @@ SketchConstraintSolver::solve(const SketchTopology& topology, const SketchConstr
     return Result<SketchSolveResult>::failure(validation_error(
         system.sketch().value(), "Sketch constraint system and topology must reference the same Sketch"));
 
-  const SolveContext context = make_context(topology);
+  SolveContext context = make_context(topology);
+  context.constraints = &system.constraints();
   const NumericVector initial = initial_variables(context);
   for (const auto& constraint : system.constraints()) {
     auto valid = validate_constraint_targets(context, constraint);

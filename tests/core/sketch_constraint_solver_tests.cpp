@@ -4,6 +4,7 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <cmath>
 #include <optional>
 #include <string>
 #include <utility>
@@ -316,4 +317,104 @@ TEST_CASE("Persisted Sketch constraints and dimensions adapt to the Block 109 so
   REQUIRE(solved_end != nullptr);
   CHECK(solved_end->position().x == Catch::Approx(10.0).margin(1.0e-7));
   CHECK(solved_end->position().y == Catch::Approx(0.0).margin(1.0e-7));
+}
+
+TEST_CASE("Sketch solver converges a line tangent to a circle at a coincident endpoint",
+          "[core][sketch-solver][core][sketch-tangent]") {
+  // Regression: a line whose endpoint is held on a circle by a coincidence
+  // (PointOnObject) plus a Tangent between the same line and circle used to
+  // creep to the iteration limit (non_convergent) because the squared
+  // distance tangent residual (d²−r²) shared the point-on-circle radial
+  // gradient at the solution. The tangent residual now switches to
+  // perpendicularity (direction · (endpoint − center) = 0) at a held endpoint.
+  constexpr double kRadius = 5.0;
+  std::vector<SketchTopologyPoint> points{
+      make_point("circ.center", {10.0, 0.0}),
+      make_point("line.on", {10.0, 5.0}), // on the circle (12 o'clock)
+      make_point("line.far", {-5.0, -10.0})};
+  std::vector<SketchTopologyEntity> entities{
+      make_entity("profile/circ", SketchTopologyEntityKind::CircleProfile,
+                  {SketchPointId("circ.center")}),
+      make_entity("entity/line", SketchTopologyEntityKind::Line,
+                  {SketchPointId("line.on"), SketchPointId("line.far")})};
+  const SketchTopology topology =
+      SketchTopology::create(SketchId("sketch.tangent"), std::move(points), std::move(entities))
+          .value();
+  auto system = SketchConstraintSystem::create(
+      topology.sketch(),
+      {make_constraint("point_on.end", SketchSolverConstraintKind::PointOnObject,
+                       {point_target("line.on"), entity_target("profile/circ")}, kRadius),
+       make_constraint("tangent.line", SketchSolverConstraintKind::Tangent,
+                       {entity_target("entity/line"), entity_target("profile/circ")}, kRadius)});
+  REQUIRE(system);
+
+  auto solved = SketchConstraintSolver{}.solve(topology, system.value());
+  REQUIRE(solved);
+  CHECK(solved.value().status == SketchSolveStatus::UnderConstrained);
+  CHECK(solved.value().residuals.final_rms <= 1.0e-8);
+
+  const auto* center = solved.value().topology.find_point(SketchPointId("circ.center"));
+  const auto* on = solved.value().topology.find_point(SketchPointId("line.on"));
+  const auto* far = solved.value().topology.find_point(SketchPointId("line.far"));
+  REQUIRE(center != nullptr);
+  REQUIRE(on != nullptr);
+  REQUIRE(far != nullptr);
+  // Endpoint stays on the circle.
+  const double on_dx = on->position().x - center->position().x;
+  const double on_dy = on->position().y - center->position().y;
+  CHECK(std::sqrt(on_dx * on_dx + on_dy * on_dy) == Catch::Approx(kRadius).margin(1.0e-6));
+  // Line is perpendicular to the radius at the contact point (i.e. tangent).
+  const double dir_x = far->position().x - on->position().x;
+  const double dir_y = far->position().y - on->position().y;
+  const double dot = dir_x * on_dx + dir_y * on_dy;
+  const double dir_len = std::sqrt(dir_x * dir_x + dir_y * dir_y);
+  CHECK(dot / dir_len == Catch::Approx(0.0).margin(1.0e-6));
+}
+
+TEST_CASE("Sketch solver generalized collinear aligns three points and a point to a line",
+          "[core][sketch-solver][core][sketch-collinear]") {
+  std::vector<SketchTopologyPoint> points{
+      make_point("p0", {0.0, 0.0}),  make_point("p1", {10.0, 0.0}),
+      make_point("p2", {5.0, 4.0}),  make_point("l0", {0.0, -3.0}),
+      make_point("l1", {8.0, -3.0}), make_point("onl", {5.0, 5.0})};
+  std::vector<SketchTopologyEntity> entities{
+      make_entity("entity/base", SketchTopologyEntityKind::Line,
+                  {SketchPointId("l0"), SketchPointId("l1")})};
+  const SketchTopology topology =
+      SketchTopology::create(SketchId("sketch.collinear"), std::move(points), std::move(entities))
+          .value();
+
+  SECTION("three points collinear snaps the free point onto the reference line") {
+    auto system = SketchConstraintSystem::create(
+        topology.sketch(),
+        {make_constraint("fix.0", SketchSolverConstraintKind::Fixed, {point_target("p0")}),
+         make_constraint("fix.1", SketchSolverConstraintKind::Fixed, {point_target("p1")}),
+         make_constraint("collinear.3", SketchSolverConstraintKind::Collinear,
+                         {point_target("p0"), point_target("p1"), point_target("p2")})});
+    REQUIRE(system);
+    auto solved = SketchConstraintSolver{}.solve(topology, system.value());
+    REQUIRE(solved);
+    CHECK(solved.value().status != SketchSolveStatus::Conflicting);
+    CHECK(solved.value().residuals.final_rms <= 1.0e-8);
+    const auto* p2 = solved.value().topology.find_point(SketchPointId("p2"));
+    REQUIRE(p2 != nullptr);
+    CHECK(p2->position().y == Catch::Approx(0.0).margin(1.0e-6)); // on the y=0 line
+  }
+
+  SECTION("point collinear with a line moves onto the line's infinite extension") {
+    auto system = SketchConstraintSystem::create(
+        topology.sketch(),
+        {make_constraint("fix.l0", SketchSolverConstraintKind::Fixed, {point_target("l0")}),
+         make_constraint("fix.l1", SketchSolverConstraintKind::Fixed, {point_target("l1")}),
+         make_constraint("collinear.pl", SketchSolverConstraintKind::Collinear,
+                         {point_target("onl"), entity_target("entity/base")})});
+    REQUIRE(system);
+    auto solved = SketchConstraintSolver{}.solve(topology, system.value());
+    REQUIRE(solved);
+    CHECK(solved.value().status != SketchSolveStatus::Conflicting);
+    CHECK(solved.value().residuals.final_rms <= 1.0e-8);
+    const auto* onl = solved.value().topology.find_point(SketchPointId("onl"));
+    REQUIRE(onl != nullptr);
+    CHECK(onl->position().y == Catch::Approx(-3.0).margin(1.0e-6)); // on the y=-3 line
+  }
 }

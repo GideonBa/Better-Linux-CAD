@@ -700,6 +700,13 @@ GuiSketchInteractionSceneBuilder::build_impl(const PartDocument& document, const
     add_point(scene, semantic, spline.id().value() + ":end", spline.end(), GuiSketchSnapKind::Endpoint);
   }
 
+  for (const auto& point : sketch.points()) {
+    // Free-standing sketch points render (and snap/select) as an endpoint-class
+    // point primitive, just like a curve endpoint.
+    add_point(scene, entity_semantic(sketch, point.id()), point.id().value() + ":point",
+              point.position(), GuiSketchSnapKind::Endpoint);
+  }
+
   geometry::SketchReferenceProjector projector;
   for (const auto& reference : sketch.projected_points()) {
     const auto resolved = shape_cache != nullptr

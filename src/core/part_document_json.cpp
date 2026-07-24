@@ -984,6 +984,15 @@ driving_dimension_from_json(const json& dimension_json) {
     if (added.has_error())
       return Result<Sketch>::failure(added.error());
   }
+  for (const auto& point_json : sketch_json.value("sketch_points", json::array())) {
+    auto point = SketchPoint::create(SketchEntityId(point_json.at("id").get<std::string>()),
+                                     point2_from_json(point_json.at("position")));
+    if (point.has_error())
+      return Result<Sketch>::failure(point.error());
+    auto added = sketch.value().add_entity(point.value());
+    if (added.has_error())
+      return Result<Sketch>::failure(added.error());
+  }
   for (const auto& point_json : sketch_json.value("projected_points", json::array())) {
     auto point = projected_point_from_json(point_json);
     if (point.has_error())
@@ -3691,6 +3700,7 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
                      {"line_segments", json::array()},
                      {"arc_segments", json::array()},
                      {"spline_segments", json::array()},
+                     {"sketch_points", json::array()},
                      {"projected_points", json::array()},
                      {"projected_lines", json::array()},
                      {"reference_generated_lines", json::array()},
@@ -3713,6 +3723,9 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
       sketch_json["arc_segments"].push_back(arc_segment_to_json(arc));
     for (const auto& spline : sketch.spline_segments())
       sketch_json["spline_segments"].push_back(spline_segment_to_json(spline));
+    for (const auto& point : sketch.points())
+      sketch_json["sketch_points"].push_back(json{{"id", point.id().value()},
+                                                  {"position", point2_to_json(point.position())}});
     for (const auto& point : sketch.projected_points())
       sketch_json["projected_points"].push_back(projected_point_to_json(point));
     for (const auto& line : sketch.projected_lines())

@@ -183,10 +183,9 @@ shown in the status bar (the dedicated numeric-HUD line edit of the old shell wa
 folded into the status bar; contract surface unchanged). The interaction scene (topology, glyphs,
 constraint and dimension annotations) is rebuilt after every commit.
 
-Scope narrowing (documented): the Ändern group (trim/extend/split/fillet via
-`GuiSketchModifyController`) is not yet on the ribbon; it moves into Block 136 alongside feature
-full coverage. The inference guide overlay (visual dashed guide line) is deferred with it; snap
-inference itself works and is reported in the status bar.
+Scope narrowing (documented): the Ändern group was initially deferred; it is now wired (see "Shell
+usability additions" below). The inference guide overlay (visual dashed guide line) is still
+deferred; snap inference itself works and is reported in the status bar.
 
 Verified: core 485, geometry 882, gui 89 offscreen tests green (4 new Block-134 suites: create,
 constraints end-to-end, dimensions incl. driving edit, ribbon lifecycle); shell-sketch, shell, and
@@ -322,6 +321,79 @@ Seventh fix round (2026-07-23, user retest):
 - Constraint tokens and dimension badges render larger with a backdrop and use a 12 dip hit
   tolerance.
 - gui suite now 106 offscreen tests.
+
+### Shell usability additions (post-134) — Implemented
+
+Incremental shell polish requested during use, independent of the numbered feature blocks:
+
+- **Sketch re-entry.** Double-clicking a planar Sketch node in the "Modell" tree re-enters it for
+  editing (`ShellWindow::handle_tree_activation` → the existing `enter_sketch`). A planar Sketch
+  node carries the `SketchId` as its semantic id; child records and other node kinds are ignored,
+  and re-entry is refused while a Sketch is already active.
+- **Property inspector.** A second left dock ("Eigenschaften", a two-column `QTableWidget` split
+  below the tree) mirrors the selected browser node's `GuiBrowserNode::properties`. Editable
+  properties (currently parameter `value`/`formula`, per `edit_browser_property`) are editable
+  in place; a commit runs `edit_browser_property(..., commit=true)` and a queued `refresh()`
+  repaints from the model (reverting a rejected edit) — queued so the edited `QTableWidgetItem` is
+  not deleted inside its own `itemChanged` emission. Nodes without a viewport id (parameters) are
+  restored across a rebuild by semantic id so the inspector keeps its target after an edit.
+- **Ändern group (Block 116 wiring).** The `Ändern` ribbon group exposes the headless
+  `GuiSketchModifyController`: **Trimmen / Verlängern / Teilen** are modal pick tools (arm the tool,
+  then click a curve — the press hit gives the target entity and the pick point; the tool stays
+  armed for repeated ops, Escape or switching tools ends it), and **Verrundung / Fase** act on
+  exactly two selected curves with a numeric radius/distance prompt. Command surface
+  (`apply_modify_pick`, `apply_fillet`, `apply_chamfer`, `begin_modify_tool`) doubles as the test
+  surface; each op previews once and commits one atomic transaction (constraint/dimension catalogs
+  re-validated). Fillet/Chamfer enablement gates on a two-curve selection. Selections resolve to
+  raw core entity ids via `selection_target` (strip the `entity/` topology prefix), so both the
+  `sketch/<id>/entity/<id>` viewport form and the bare topology form work.
+- **Auto-constraints on Fillet/Chamfer.** The core modify service is geometry-only, so an inserted
+  fillet arc / chamfer line would drift apart on drag. After the geometry commit,
+  `auto_constrain_corner` finds the inserted curve (the new-id Arc/Line), matches each of its
+  endpoints positionally to the touched trimmed-line endpoint, and authors catalog constraints:
+  **Coincident** at both corner touch points and, for fillets, **Tangent** between the arc and each
+  line. Constraints go into the Block-114 constraint catalog (embedded geometric constraints have no
+  general point-point coincidence), which the drag solver consumes via
+  `SketchConstraintCatalogSystemBuilder` (`from_legacy` + catalog) — so the corner survives dragging.
+  Each is authored through `GuiSketchConstraintController` (preview → accept → commit) and skipped
+  silently if the solver rejects it (redundant/conflicting), never failing the modify. A right-angle
+  fillet yields 2 Coincident + 2 Tangent; a chamfer 2 Coincident.
+- **Stale-corner pruning (drag-collapse fix).** Chained corners carry an auto Coincident between the
+  two corner points. A fillet/chamfer *separates* those points onto the two tangent/cut points, but
+  the old coincidence lingered in the catalog and pulled them back together on the next solve/drag —
+  collapsing the corner (the reported "fillet breaks when you move something", and it also broke
+  chamfer). Before authoring the new corner constraints, `prune_broken_coincidences` removes any
+  catalog Coincident whose two points are now apart (> 1e-4) or whose points vanished. Pruning does
+  not re-solve, so the just-committed clean geometry is preserved; the drag then keeps the corner
+  intact (proven by a real `GuiSketchDragController` drag in the tests: the arc endpoints stay glued
+  to the lines).
+- **Fixed corner size.** Coincident + Tangent keep the corner attached but leave the radius / chamfer
+  length as a free DOF (it floated when a line was dragged). `auto_constrain_corner` therefore also
+  authors a driving **Radius** dimension on the fillet arc (**Length** on the chamfer line) via
+  `apply_dimension`, which bakes the CURRENT measured value into an auto `dN` parameter so the commit
+  never moves geometry. The size then stays constant under drag (tests drag a line and assert the arc
+  radius / chamfer length are unchanged). Skipped silently if the dimension is not accepted.
+- gui suite now 116 offscreen tests (adds sketch-reentry, property-editor, and eight sketch-modify
+  shell tests incl. the auto-constraint, drag-robustness, and fixed-size proofs).
+
+### Sketch usability fixes (post-modify)
+
+- **Generalized Collinear.** The `Kollinear` constraint is now variable-arity — two-plus lines, a
+  point and a line, or three-plus points — instead of line-line only (see
+  `docs/sketch-planar-constraint-solver-mvp8.md`). `compatible_kinds` offers it for the new
+  selections; the authoring/solver validate the arity by signature.
+- **Free sketch points (`SketchPoint`).** A new first-class core entity: a free-standing 2D sketch
+  point that is ordinary editable geometry — rendered, selectable, **draggable**, and
+  **constrainable/dimensionable** like a line endpoint. It spans core (`SketchPoint` + `Sketch`
+  storage/`add_entity`/`find_point`), topology (new `SketchTopologyEntityKind::Point` migrating to a
+  single **non-reference** free point), JSON (`sketch_points`), the interaction scene (`add_point`
+  over `sketch.points()`), the drag handle builder (Point → endpoint handle), and selection
+  (`selected_targets` maps a selected Point entity to its underlying topology point so constraints
+  and dimensions address the point directly). The **Point tool** now creates a `SketchPoint` (and
+  re-arms after each placement, Inventor-style) instead of a bare part-level `ConstructionPoint`,
+  which was invisible and inert inside the sketch. Proven by tests: place two points → two free
+  points; drag one → it follows the pointer; coincident with a line → it lands on the line; and a
+  JSON round-trip preserves it. DOF accounting confirms each point contributes two free DOF.
 
 ### Block 135 — Interactive features minimal
 

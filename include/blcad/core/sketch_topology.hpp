@@ -15,6 +15,7 @@
 namespace blcad {
 
 enum class SketchTopologyEntityKind {
+  Point,
   Line,
   Arc,
   Spline,
@@ -31,6 +32,7 @@ enum class SketchTopologyEntityKind {
 
 [[nodiscard]] constexpr std::string_view to_string(SketchTopologyEntityKind kind) noexcept {
   switch (kind) {
+  case SketchTopologyEntityKind::Point: return "point";
   case SketchTopologyEntityKind::Line: return "line";
   case SketchTopologyEntityKind::Arc: return "arc";
   case SketchTopologyEntityKind::Spline: return "spline";
@@ -49,6 +51,7 @@ enum class SketchTopologyEntityKind {
 
 [[nodiscard]] inline std::optional<SketchTopologyEntityKind>
 sketch_topology_entity_kind_from_string(std::string_view value) noexcept {
+  if (value == "point") return SketchTopologyEntityKind::Point;
   if (value == "line") return SketchTopologyEntityKind::Line;
   if (value == "arc") return SketchTopologyEntityKind::Arc;
   if (value == "spline") return SketchTopologyEntityKind::Spline;
@@ -141,6 +144,7 @@ public:
 
     const std::size_t expected_points = [&] {
       switch (kind) {
+      case SketchTopologyEntityKind::Point: return std::size_t{1};
       case SketchTopologyEntityKind::Line: return std::size_t{2};
       case SketchTopologyEntityKind::Arc: return std::size_t{3};
       case SketchTopologyEntityKind::Spline: return std::size_t{4};
@@ -367,6 +371,9 @@ public:
     for (const auto& pattern : sketch.circular_hole_patterns())
       candidates.push_back({profile_id(pattern.id()), SketchTopologyEntityKind::CircularHolePattern,
                             {{"center", pattern.center()}}, {}, {}});
+    for (const auto& point : sketch.points())
+      candidates.push_back({entity_id(point.id()), SketchTopologyEntityKind::Point,
+                            {{"point", point.position()}}, {}, {}});
     for (const auto& point : sketch.projected_points())
       candidates.push_back({entity_id(point.id()), SketchTopologyEntityKind::ProjectedPoint,
                             {}, {}, {.construction = false, .reference = true}});

@@ -15,6 +15,8 @@
 
 class QAction;
 class QPlainTextEdit;
+class QTableWidget;
+class QTableWidgetItem;
 class QTreeWidget;
 class QTreeWidgetItem;
 
@@ -39,6 +41,7 @@ public:
   [[nodiscard]] OcctViewport& viewport() noexcept { return *viewport_; }
   [[nodiscard]] ShellRibbon& ribbon() noexcept { return *ribbon_; }
   [[nodiscard]] QTreeWidget& model_browser() noexcept { return *browser_tree_; }
+  [[nodiscard]] QTableWidget& property_inspector() noexcept { return *properties_; }
   [[nodiscard]] const GuiDocumentBrowser& browser_model() const noexcept { return browser_model_; }
   [[nodiscard]] const std::optional<SketchId>& active_sketch() const noexcept {
     return active_sketch_;
@@ -70,7 +73,13 @@ private:
   [[nodiscard]] bool enter_sketch(SketchId sketch);
   void apply_viewport_selection(const std::optional<GuiSelection>& selection);
   void handle_tree_selection(QTreeWidgetItem* current);
+  // Double-clicking a planar Sketch node re-enters it for editing.
+  void handle_tree_activation(QTreeWidgetItem* item);
   void synchronize_tree_selection(const std::string& viewport_semantic_id);
+  // Property inspector: mirrors the selected browser node's properties and
+  // commits edits to editable ones (e.g. parameter value/expression).
+  void refresh_properties();
+  void handle_property_changed(QTableWidgetItem* item);
   void refresh_browser();
   void refresh_viewport_scene();
   void append_diagnostic(const Error& error);
@@ -86,6 +95,7 @@ private:
   OcctViewport* viewport_{nullptr};
   ShellRibbon* ribbon_{nullptr};
   QTreeWidget* browser_tree_{nullptr};
+  QTableWidget* properties_{nullptr};
   QPlainTextEdit* diagnostics_{nullptr};
 
   QAction* action_undo_{nullptr};
@@ -110,6 +120,9 @@ private:
   std::optional<GuiViewportCameraBookmark> sketch_camera_bookmark_;
   std::uint32_t model_selection_filter_mask_{0xFFFFFFFFU};
   std::string selected_semantic_id_;
+  // Semantic id of the browser node shown in the property inspector (a node
+  // may have no viewport id — e.g. parameters — so this is tracked separately).
+  std::string property_semantic_id_;
   std::size_t browser_revision_{std::numeric_limits<std::size_t>::max()};
   std::size_t viewport_revision_{std::numeric_limits<std::size_t>::max()};
   bool synchronizing_selection_{false};

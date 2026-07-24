@@ -258,6 +258,22 @@ SketchConstraint::SketchConstraint(SketchConstraintId id, SketchConstraintKind k
     : id_(std::move(id)), kind_(kind), constrained_target_(std::move(constrained_target)),
       reference_target_(std::move(reference_target)) {}
 
+Result<SketchPoint> SketchPoint::create(SketchEntityId id, Point2 position) {
+  const auto object_id = id.empty() ? std::string("sketch_point") : id.value();
+  if (id.empty())
+    return Result<SketchPoint>::failure(
+        Error::validation(object_id, "sketch point id must not be empty"));
+  if (!std::isfinite(position.x) || !std::isfinite(position.y))
+    return Result<SketchPoint>::failure(
+        Error::validation(object_id, "sketch point position must be finite"));
+  return Result<SketchPoint>::success(SketchPoint(std::move(id), position));
+}
+
+const SketchEntityId& SketchPoint::id() const noexcept { return id_; }
+Point2 SketchPoint::position() const noexcept { return position_; }
+SketchPoint::SketchPoint(SketchEntityId id, Point2 position)
+    : id_(std::move(id)), position_(position) {}
+
 Result<ProjectedSketchPoint>
 ProjectedSketchPoint::create_from_construction_point(SketchEntityId id, ConstructionPointId point) {
   const auto object_id = id.empty() ? std::string("projected_sketch_point") : id.value();
@@ -564,6 +580,24 @@ Result<std::size_t> Sketch::add_entity(LineSegment line_segment) {
   return Result<std::size_t>::success(line_segments_.size() - 1U);
 }
 
+Result<std::size_t> Sketch::add_entity(SketchPoint point) {
+  if (has_entity_id(point.id())) {
+    return Result<std::size_t>::failure(Error::validation(
+        point.id().value(), "sketch entity id must be unique within sketch"));
+  }
+  points_.push_back(std::move(point));
+  return Result<std::size_t>::success(points_.size() - 1U);
+}
+
+const std::vector<SketchPoint>& Sketch::points() const noexcept { return points_; }
+
+const SketchPoint* Sketch::find_point(SketchEntityId id) const noexcept {
+  for (const auto& point : points_)
+    if (point.id() == id)
+      return &point;
+  return nullptr;
+}
+
 Result<std::size_t> Sketch::add_reference(ProjectedSketchPoint point_reference) {
   if (has_entity_id(point_reference.id())) {
     return Result<std::size_t>::failure(Error::validation(
@@ -822,8 +856,9 @@ Sketch::Sketch(SketchId id, std::string name, DatumPlaneId workplane)
     : id_(std::move(id)), name_(std::move(name)), workplane_(std::move(workplane)) {}
 
 bool Sketch::has_entity_id(const SketchEntityId& id) const noexcept {
-  return find_line_segment(id) != nullptr || find_projected_point(id) != nullptr ||
-         find_projected_line(id) != nullptr || find_reference_generated_line(id) != nullptr;
+  return find_line_segment(id) != nullptr || find_point(id) != nullptr ||
+         find_projected_point(id) != nullptr || find_projected_line(id) != nullptr ||
+         find_reference_generated_line(id) != nullptr;
 }
 
 bool Sketch::has_constraint_id(const SketchConstraintId& id) const noexcept {

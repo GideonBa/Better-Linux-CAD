@@ -1,4 +1,5 @@
 #include "blcad/core/part_document_json.hpp"
+#include "blcad/core/sketch_topology.hpp"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -205,4 +206,42 @@ TEST_CASE("Part JSON round-trips principal XZ and YZ origin planes", "[core][jso
   CHECK(restored_xz->normal() == Vector3{0.0, -1.0, 0.0});
   CHECK(restored_xz->y_axis() == Vector3{0.0, 0.0, 1.0});
   CHECK(restored_yz->normal() == Vector3{1.0, 0.0, 0.0});
+}
+
+TEST_CASE("Sketch free points migrate to free topology and round-trip through JSON",
+          "[core][json][core][sketch-point]") {
+  auto document = PartDocument::create(DocumentId("part.sketch_point"), "PointPart");
+  REQUIRE(document);
+  auto xy = DatumPlane::xy();
+  REQUIRE(xy);
+  REQUIRE(document.value().add_datum_plane(xy.value()));
+  auto sketch = Sketch::create(SketchId("sketch.pts"), "Sketch_Points", DatumPlaneId("datum.xy"));
+  REQUIRE(sketch);
+  REQUIRE(sketch.value().add_entity(SketchPoint::create(SketchEntityId("p.1"), {3.0, 4.0}).value()));
+  REQUIRE(document.value().add_sketch(sketch.value()));
+
+  // Migrates to a free (non-reference) Point topology entity carrying the point.
+  auto topology = SketchTopology::migrate_legacy(*document.value().find_sketch(SketchId("sketch.pts")));
+  REQUIRE(topology);
+  const auto* entity = topology.value().find_entity("entity/p.1");
+  REQUIRE(entity != nullptr);
+  CHECK(entity->kind() == SketchTopologyEntityKind::Point);
+  CHECK_FALSE(entity->reference());
+  REQUIRE(entity->points().size() == 1U);
+  const auto* point = topology.value().find_point(entity->points()[0]);
+  REQUIRE(point != nullptr);
+  CHECK(point->position().x == Catch::Approx(3.0));
+  CHECK(point->position().y == Catch::Approx(4.0));
+
+  // JSON round-trip preserves the free point.
+  const auto serialized = serialize_part_document_to_json(document.value());
+  REQUIRE(serialized);
+  const auto restored = deserialize_part_document_from_json(serialized.value());
+  REQUIRE(restored);
+  const auto* restored_sketch = restored.value().find_sketch(SketchId("sketch.pts"));
+  REQUIRE(restored_sketch != nullptr);
+  REQUIRE(restored_sketch->points().size() == 1U);
+  CHECK(restored_sketch->points().front().id() == SketchEntityId("p.1"));
+  CHECK(restored_sketch->points().front().position().x == Catch::Approx(3.0));
+  CHECK(restored_sketch->points().front().position().y == Catch::Approx(4.0));
 }

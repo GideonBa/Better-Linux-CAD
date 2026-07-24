@@ -5,6 +5,7 @@
 #include "blcad/gui/shell/shell_ribbon.hpp"
 #include "blcad/gui/shell/shell_sketch_tools.hpp"
 
+#include <QAbstractItemView>
 #include <QAction>
 #include <QActionGroup>
 #include <QDockWidget>
@@ -14,6 +15,8 @@
 #include <QMessageBox>
 #include <QPlainTextEdit>
 #include <QStatusBar>
+#include <QTableWidget>
+#include <QTableWidgetItem>
 #include <QTreeWidget>
 #include <QVBoxLayout>
 
@@ -64,6 +67,15 @@ QTreeWidgetItem* find_item_by_viewport_id(QTreeWidgetItem* item, const QString& 
     return item;
   for (int index = 0; index < item->childCount(); ++index)
     if (auto* found = find_item_by_viewport_id(item->child(index), id))
+      return found;
+  return nullptr;
+}
+
+QTreeWidgetItem* find_item_by_semantic_id(QTreeWidgetItem* item, const QString& id) {
+  if (item->data(0, kSemanticIdRole).toString() == id)
+    return item;
+  for (int index = 0; index < item->childCount(); ++index)
+    if (auto* found = find_item_by_semantic_id(item->child(index), id))
       return found;
   return nullptr;
 }
@@ -235,6 +247,29 @@ void ShellWindow::build_docks() {
   resizeDocks({browser_dock}, {300}, Qt::Horizontal);
   connect(browser_tree_, &QTreeWidget::currentItemChanged, this,
           [this](QTreeWidgetItem* current, QTreeWidgetItem*) { handle_tree_selection(current); });
+  connect(browser_tree_, &QTreeWidget::itemDoubleClicked, this,
+          [this](QTreeWidgetItem* item, int) { handle_tree_activation(item); });
+
+  // Property inspector below the model tree: read-only for most properties,
+  // editable for the ones Core contracts support (parameter value/expression).
+  auto* property_dock = new QDockWidget(QStringLiteral("Eigenschaften"), this);
+  property_dock->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetClosable);
+  properties_ = new QTableWidget(property_dock);
+  properties_->setColumnCount(2);
+  properties_->setHorizontalHeaderLabels(
+      {QStringLiteral("Eigenschaft"), QStringLiteral("Wert")});
+  properties_->verticalHeader()->setVisible(false);
+  properties_->horizontalHeader()->setStretchLastSection(true);
+  properties_->setSelectionMode(QAbstractItemView::SingleSelection);
+  properties_->setSelectionBehavior(QAbstractItemView::SelectItems);
+  properties_->setEditTriggers(QAbstractItemView::DoubleClicked |
+                               QAbstractItemView::SelectedClicked |
+                               QAbstractItemView::EditKeyPressed);
+  properties_->setMinimumWidth(220);
+  property_dock->setWidget(properties_);
+  splitDockWidget(browser_dock, property_dock, Qt::Vertical);
+  connect(properties_, &QTableWidget::itemChanged, this,
+          [this](QTableWidgetItem* item) { handle_property_changed(item); });
 
   auto* diagnostics_dock = new QDockWidget(QStringLiteral("Diagnose"), this);
   diagnostics_dock->setFeatures(QDockWidget::DockWidgetMovable |
@@ -438,6 +473,9 @@ void ShellWindow::handle_tree_selection(QTreeWidgetItem* current) {
     return;
   session_.selection().clear();
   selected_semantic_id_.clear();
+  property_semantic_id_ =
+      current != nullptr ? current->data(0, kSemanticIdRole).toString().toStdString()
+                         : std::string{};
   if (current != nullptr) {
     const std::string viewport_id = current->data(0, kViewportIdRole).toString().toStdString();
     selected_semantic_id_ = viewport_id;
@@ -453,6 +491,72 @@ void ShellWindow::handle_tree_selection(QTreeWidgetItem* current) {
     synchronizing_selection_ = false;
   }
   refresh();
+}
+
+void ShellWindow::handle_tree_activation(QTreeWidgetItem* item) {
+  // Re-enter an existing planar Sketch by double-clicking its node. A planar
+  // Sketch node carries the SketchId as its semantic id; child records and
+  // other node kinds are ignored. Guarded against re-entry while a Sketch is
+  // already active.
+  if (item == nullptr || active_sketch_ || session_.part_document() == nullptr)
+    return;
+  const std::string semantic_id = item->data(0, kSemanticIdRole).toString().toStdString();
+  if (semantic_id.empty())
+    return;
+  const SketchId sketch_id(semantic_id);
+  if (session_.part_document()->find_sketch(sketch_id) == nullptr)
+    return;
+  (void)enter_sketch(sketch_id);
+}
+
+void ShellWindow::refresh_properties() {
+  if (properties_ == nullptr)
+    return;
+  const QSignalBlocker blocker(properties_);
+  properties_->clearContents();
+  properties_->setRowCount(0);
+  const GuiBrowserNode* node =
+      property_semantic_id_.empty() ? nullptr : browser_model_.find(property_semantic_id_);
+  if (node == nullptr)
+    return;
+  properties_->setRowCount(static_cast<int>(node->properties.size()));
+  int row = 0;
+  for (const auto& property : node->properties) {
+    auto* label = new QTableWidgetItem(QString::fromStdString(property.label));
+    label->setFlags(Qt::ItemIsEnabled);
+    auto* value = new QTableWidgetItem(QString::fromStdString(property.value));
+    if (property.editable) {
+      value->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsEditable);
+      value->setData(kSemanticIdRole, QString::fromStdString(property.key));
+    } else {
+      value->setFlags(Qt::ItemIsEnabled);
+      if (!property.read_only_reason.empty())
+        value->setToolTip(QString::fromStdString(property.read_only_reason));
+    }
+    properties_->setItem(row, 0, label);
+    properties_->setItem(row, 1, value);
+    ++row;
+  }
+}
+
+void ShellWindow::handle_property_changed(QTableWidgetItem* item) {
+  if (item == nullptr || item->column() != 1)
+    return;
+  const std::string key = item->data(kSemanticIdRole).toString().toStdString();
+  if (key.empty())
+    return;
+  const GuiBrowserNode* node =
+      property_semantic_id_.empty() ? nullptr : browser_model_.find(property_semantic_id_);
+  if (node == nullptr)
+    return;
+  const auto edited =
+      edit_browser_property(session_, *node, key, item->text().toStdString(), true);
+  if (edited.has_error())
+    show_error(edited.error());
+  // Repopulate outside this itemChanged emission: refresh() rebuilds the table
+  // and would delete `item` while Qt is still inside its setData() call. The
+  // queued refresh repaints the cell from the model, reverting a rejected edit.
+  QMetaObject::invokeMethod(this, [this] { refresh(); }, Qt::QueuedConnection);
 }
 
 void ShellWindow::synchronize_tree_selection(const std::string& viewport_semantic_id) {
@@ -494,6 +598,7 @@ void ShellWindow::refresh() {
   diagnostics_->setPlainText(lines.join(QLatin1Char('\n')));
 
   refresh_browser();
+  refresh_properties();
   refresh_viewport_scene();
   if (sketch_tools_)
     sketch_tools_->refresh_enablement();
@@ -523,8 +628,19 @@ void ShellWindow::refresh_browser() {
         item->child(child)->setExpanded(true);
     }
   }
-  if (!retained.empty())
+  if (!retained.empty()) {
     synchronize_tree_selection(retained);
+  } else if (!property_semantic_id_.empty()) {
+    // Nodes without a viewport id (e.g. parameters) are restored by semantic id
+    // so the property inspector keeps its target across a rebuild (after an edit).
+    synchronizing_selection_ = true;
+    QTreeWidgetItem* found = nullptr;
+    const QString id = QString::fromStdString(property_semantic_id_);
+    for (int index = 0; index < browser_tree_->topLevelItemCount() && found == nullptr; ++index)
+      found = find_item_by_semantic_id(browser_tree_->topLevelItem(index), id);
+    browser_tree_->setCurrentItem(found);
+    synchronizing_selection_ = false;
+  }
 }
 
 void ShellWindow::refresh_viewport_scene() {

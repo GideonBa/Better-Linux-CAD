@@ -81,7 +81,10 @@ public:
     if (!geometric_kind(kind))
       return Result<SketchConstraintIntent>::failure(Error::validation(
           object_id, "Block 114 accepts geometric constraints only; dimensions belong to Block 115"));
-    if (targets.size() != expected_target_count(kind))
+    // Collinear takes a variable number of targets (two lines, a point and a
+    // line, or three-plus points); its count is validated by the signature.
+    if (kind != SketchSolverConstraintKind::Collinear &&
+        targets.size() != expected_target_count(kind))
       return Result<SketchConstraintIntent>::failure(Error::validation(
           object_id, "constraint intent has the wrong number of semantic targets"));
     if (!target_signature_valid(kind, targets))
@@ -163,10 +166,22 @@ private:
     case SketchSolverConstraintKind::Vertical: return entity(0U);
     case SketchSolverConstraintKind::Parallel:
     case SketchSolverConstraintKind::Perpendicular:
-    case SketchSolverConstraintKind::Collinear:
     case SketchSolverConstraintKind::Equal:
     case SketchSolverConstraintKind::Tangent:
     case SketchSolverConstraintKind::Concentric: return entity(0U) && entity(1U);
+    case SketchSolverConstraintKind::Collinear: {
+      // Variable arity: two-plus lines, a point and a line, or three-plus
+      // points. Every target must be a point or an entity, and the mix must
+      // yield a defining direction plus at least one thing to align.
+      std::size_t entities = 0U;
+      std::size_t points = 0U;
+      for (std::size_t index = 0U; index < targets.size(); ++index)
+        (entity(index) ? entities : points) += 1U;
+      if (entities + points != targets.size())
+        return false;
+      return entities >= 2U || (entities == 1U && points >= 1U) ||
+             (entities == 0U && points >= 3U);
+    }
     case SketchSolverConstraintKind::Midpoint:
     case SketchSolverConstraintKind::PointOnObject: return point(0U) && entity(1U);
     case SketchSolverConstraintKind::Symmetric:

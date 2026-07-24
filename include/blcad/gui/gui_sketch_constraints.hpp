@@ -387,6 +387,18 @@ public:
       if (points == 2U && lines == 1U)
         result.push_back(SketchSolverConstraintKind::Symmetric);
     }
+    // Collinear is variable-arity across any selection size: two-plus lines, a
+    // point and a line, or three-plus points, with nothing else mixed in.
+    {
+      std::size_t lines = 0U;
+      std::size_t points = 0U;
+      std::size_t others = 0U;
+      for (const auto& target : targets)
+        (point(target) ? points : line(target) ? lines : others) += 1U;
+      if (others == 0U && (lines >= 2U || (lines == 1U && points >= 1U) ||
+                           (lines == 0U && points >= 3U)))
+        result.push_back(SketchSolverConstraintKind::Collinear);
+    }
     std::sort(result.begin(), result.end(), [](auto left, auto right) {
       return static_cast<int>(left) < static_cast<int>(right);
     });

@@ -232,6 +232,24 @@ TEST_CASE("Block 114 selection compatibility uses semantic target capabilities",
       topology.value(), {point_a.value(), point_b.value(), line_a.value()});
   CHECK(contains_kind(symmetric, SketchSolverConstraintKind::Symmetric));
 
+  // Generalized Collinear: a point and a line, and three-plus points, are
+  // collinear-eligible; two points alone are not.
+  CHECK(contains_kind(point_line, SketchSolverConstraintKind::Collinear));
+  CHECK_FALSE(contains_kind(point_pair, SketchSolverConstraintKind::Collinear));
+  auto point_c = SketchConstraintIntentTarget::point(second_entity->points().back());
+  REQUIRE(point_c);
+  const auto three_points = GuiSketchConstraintController::compatible_kinds(
+      topology.value(), {point_a.value(), point_b.value(), point_c.value()});
+  CHECK(contains_kind(three_points, SketchSolverConstraintKind::Collinear));
+
+  // The authoring layer accepts the variable-arity Collinear intent.
+  CHECK(SketchConstraintIntent::create(
+            SketchConstraintId("c.collinear.multi"), SketchSolverConstraintKind::Collinear,
+            {point_a.value(), point_b.value(), point_c.value()}));
+  CHECK(SketchConstraintIntent::create(SketchConstraintId("c.collinear.pl"),
+                                       SketchSolverConstraintKind::Collinear,
+                                       {point_a.value(), line_b.value()}));
+
   auto coincident = GuiSketchConstraintController::automatic_candidate(
       SketchConstraintId("constraint.auto.coincident"), GuiSketchSnapKind::Endpoint,
       point_a.value(), point_b.value());

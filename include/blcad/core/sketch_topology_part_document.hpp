@@ -61,6 +61,17 @@ public:
     };
 
     for (const auto& current : topology.entities()) {
+      if (current.kind() == SketchTopologyEntityKind::Point) {
+        auto id = sketch_entity_id(current);
+        if (id.has_error()) return Result<Sketch>::failure(id.error());
+        auto position = point(current, 0U);
+        if (position.has_error()) return Result<Sketch>::failure(position.error());
+        auto sketch_point = SketchPoint::create(id.value(), position.value());
+        if (sketch_point.has_error()) return Result<Sketch>::failure(sketch_point.error());
+        auto added = result.value().add_entity(std::move(sketch_point.value()));
+        if (added.has_error()) return Result<Sketch>::failure(added.error());
+        continue;
+      }
       if (current.kind() != SketchTopologyEntityKind::Line &&
           current.kind() != SketchTopologyEntityKind::Arc &&
           current.kind() != SketchTopologyEntityKind::Spline)

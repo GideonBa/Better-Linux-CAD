@@ -121,7 +121,9 @@ build_handles(const Sketch& sketch, const SketchTopology& topology) {
   };
 
   for (const auto& entity : topology.entities()) {
-    if (entity.kind() == SketchTopologyEntityKind::Line) {
+    if (entity.kind() == SketchTopologyEntityKind::Point) {
+      append_endpoint(entity.points()[0]); // free sketch point: draggable like an endpoint
+    } else if (entity.kind() == SketchTopologyEntityKind::Line) {
       append_endpoint(entity.points()[0]);
       append_endpoint(entity.points()[1]);
       const auto* start = topology.find_point(entity.points()[0]);
