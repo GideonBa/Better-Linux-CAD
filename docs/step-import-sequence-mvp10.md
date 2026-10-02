@@ -1,9 +1,9 @@
 # STEP Import Sequence MVP-10
 
-Status: planned after GUI Shell Reset MVP-9R (Blocks 132–136, see
-`docs/gui-shell-reset-sequence-mvp9r.md`). The blocks of this sequence are renumbered to 137–143;
-their content and ordering are unchanged. Where this document says Block 132..138, read Block
-137..143.
+Status: planned, Blocks 137–143. The sequence follows GUI Shell Reset MVP-9R (Blocks 132–136,
+`docs/gui-shell-reset-sequence-mvp9r.md`); `docs/mvp-plan.md` is the status authority. An earlier
+revision numbered these blocks 132–138, before MVP-9R took that range; only the numbering moved,
+never the content or the ordering.
 
 This document is the canonical numbered implementation sequence for importing STEP parts and
 structured STEP assemblies in one of two explicit modes:
@@ -13,10 +13,10 @@ Reference
 EditableBody
 ```
 
-The sequence begins after Block 131 because editable imports depend on the multi-body,
+The sequence begins after Block 136 because editable imports depend on the multi-body,
 feature-result, semantic-topology, downstream-feature, and STEP exchange authorities established by
-Blocks 48–94, and because the interactive GUI surfaces from Blocks 95–131 give every import block a
-mature host workbench.
+Blocks 48–94, and because the interactive surfaces from Blocks 95–131, rehosted on the MVP-9R shell in
+Blocks 132–136, give every import block a mature host workbench.
 
 ## User-visible import modes
 
@@ -93,7 +93,7 @@ dimensions, constraints, patterns, or design tables remain separate future work.
 138 integrated import, refresh, edit, assembly, and re-export acceptance
 ```
 
-Do not merge Blocks 132–138 into one importer. Each block crosses a different persistent or Geometry
+Do not merge Blocks 137–143 into one importer. Each block crosses a different persistent or Geometry
 authority boundary.
 
 The existing GUI grows with the same sequence:
@@ -108,7 +108,7 @@ The existing GUI grows with the same sequence:
 | 137 | structured product-tree preview and Project import |
 | 138 | end-to-end GUI/headless equivalence and failure-atomicity acceptance |
 
-## Block 132 — STEP source identity, modes, JSON, and freshness
+## Block 137 — STEP source identity, modes, JSON, and freshness
 
 Primary boundary: Core external-source intent.
 
@@ -149,7 +149,7 @@ Focused tags:
 [core][step-import-freshness]
 ```
 
-## Block 133 — OCCT STEP/XDE reader and imported body definitions
+## Block 138 — OCCT STEP/XDE reader and imported body definitions
 
 Primary boundary: deterministic STEP-to-Geometry translation.
 
@@ -172,7 +172,7 @@ Focused tag:
 [geometry][step-import-reader]
 ```
 
-## Block 134 — Stable imported topology identity and recovery
+## Block 139 — Stable imported topology identity and recovery
 
 Primary boundary: persistent selection identity over foreign geometry.
 
@@ -209,7 +209,7 @@ Focused tags:
 [geometry][step-import-assembly-target]
 ```
 
-## Block 135 — Reference Part integration with assemblies
+## Block 140 — Reference Part integration with assemblies
 
 Primary boundary: immutable imported Part definitions as Assembly members.
 
@@ -234,7 +234,7 @@ Focused tags:
 [geometry][assembly-step-reference-part]
 ```
 
-## Block 136 — EditableBody ImportedBodyFeature and downstream modeling
+## Block 141 — EditableBody ImportedBodyFeature and downstream modeling
 
 Primary boundary: imported geometry as a Part feature-result authority.
 
@@ -267,7 +267,7 @@ Focused tags:
 [geometry][imported-body-downstream-feature]
 ```
 
-## Block 137 — Structured STEP assembly import
+## Block 142 — Structured STEP assembly import
 
 Primary boundary: foreign product structure to BLCAD Project hierarchy.
 
@@ -297,7 +297,7 @@ Focused tags:
 [geometry][structured-step-import]
 ```
 
-## Block 138 — Integrated STEP import acceptance and application workflows
+## Block 143 — Integrated STEP import acceptance and application workflows
 
 Primary boundary: end-to-end import proof and application commands.
 
@@ -335,9 +335,9 @@ Focused tag:
 [integration][gui-step-import]
 ```
 
-After Block 138, the first STEP Import MVP is complete.
+After Block 143, the first STEP Import MVP is complete.
 
-## Explicit deferrals after Block 138
+## Explicit deferrals after Block 143
 
 ```text
 automatic foreign feature-history recognition
@@ -350,4 +350,4 @@ lossless vendor-specific metadata and appearance parity
 arbitrary topology healing or silent geometric repair
 ```
 
-The next phase after Block 138 must be planned from measured import and topology-recovery gaps.
+The next phase after Block 143 must be planned from measured import and topology-recovery gaps.

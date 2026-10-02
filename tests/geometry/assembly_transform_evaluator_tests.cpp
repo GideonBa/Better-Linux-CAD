@@ -25,14 +25,6 @@ void check_vector_approx(const Vector3& actual, const Vector3& expected) {
   CHECK(actual.z == Approx(expected.z).margin(kTolerance));
 }
 
-[[nodiscard]] double magnitude(const Vector3& vector) {
-  return std::sqrt(vector.x * vector.x + vector.y * vector.y + vector.z * vector.z);
-}
-
-[[nodiscard]] double dot(const Vector3& lhs, const Vector3& rhs) {
-  return lhs.x * rhs.x + lhs.y * rhs.y + lhs.z * rhs.z;
-}
-
 Parameter make_length_parameter(const char* id, const char* name, double value_mm) {
   auto quantity = Quantity::length_mm(value_mm, id);
   REQUIRE(quantity);
@@ -196,11 +188,11 @@ TEST_CASE("Assembly transform evaluation is deterministic, length-preserving, an
   CHECK(first == second);
   CHECK(transform == transform_before);
   CHECK(local_plane == local_plane_before);
-  CHECK(magnitude(first.x_axis) == Approx(1.0).margin(kTolerance));
-  CHECK(magnitude(first.y_axis) == Approx(1.0).margin(kTolerance));
-  CHECK(magnitude(first.normal) == Approx(1.0).margin(kTolerance));
+  CHECK(length(first.x_axis) == Approx(1.0).margin(kTolerance));
+  CHECK(length(first.y_axis) == Approx(1.0).margin(kTolerance));
+  CHECK(length(first.normal) == Approx(1.0).margin(kTolerance));
   CHECK(dot(first.x_axis, first.y_axis) == Approx(0.0).margin(kTolerance));
   CHECK(dot(first.x_axis, first.normal) == Approx(0.0).margin(kTolerance));
   CHECK(dot(first.y_axis, first.normal) == Approx(0.0).margin(kTolerance));
-  CHECK(magnitude(assembly_vector) == Approx(magnitude(local_vector)).margin(kTolerance));
+  CHECK(length(assembly_vector) == Approx(length(local_vector)).margin(kTolerance));
 }

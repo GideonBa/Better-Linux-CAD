@@ -47,10 +47,6 @@ constexpr std::size_t kControlSamplesPerSpan = 4U;
   return {value.x, value.y, value.z};
 }
 
-[[nodiscard]] double distance(Point3 left, Point3 right) {
-  return std::hypot(std::hypot(left.x - right.x, left.y - right.y), left.z - right.z);
-}
-
 [[nodiscard]] Point3 interpolate(Point3 first, Point3 second, double ratio) {
   return {first.x + (second.x - first.x) * ratio, first.y + (second.y - first.y) * ratio,
           first.z + (second.z - first.z) * ratio};

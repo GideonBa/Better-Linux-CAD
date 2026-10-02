@@ -25,15 +25,6 @@ namespace {
   return Vector3{target.x - source.x, target.y - source.y, target.z - source.z};
 }
 
-[[nodiscard]] double dot(const Vector3& lhs, const Vector3& rhs) noexcept {
-  return lhs.x * rhs.x + lhs.y * rhs.y + lhs.z * rhs.z;
-}
-
-[[nodiscard]] Vector3 cross(const Vector3& lhs, const Vector3& rhs) noexcept {
-  return Vector3{lhs.y * rhs.z - lhs.z * rhs.y, lhs.z * rhs.x - lhs.x * rhs.z,
-                 lhs.x * rhs.y - lhs.y * rhs.x};
-}
-
 [[nodiscard]] Point3 evaluate_point_to_root(const AssemblyResolvedGeometricTarget& target,
                                             const Point3& point) {
   if (target.coordinate_space == AssemblyGeometricTargetCoordinateSpace::RootAssembly) {

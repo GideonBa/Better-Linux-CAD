@@ -184,6 +184,8 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/chamfer_adapter.cpp
     src/geometry/shell_adapter.cpp
     src/geometry/draft_adapter.cpp
+    src/geometry/semantic_face_resolution.cpp
+    src/geometry/semantic_edge_resolution.cpp
     src/geometry/recompute_executor.cpp
     src/geometry/circular_pattern_adapter.cpp
     src/geometry/linear_pattern_adapter.cpp
@@ -591,6 +593,6 @@ if(BLCAD_BUILD_TESTS)
   endif()
 endif()
 
-message(STATUS "BLCAD MVP-1 core skeleton configured.")
+message(STATUS "BLCAD core configured.")
 message(STATUS "Geometry/OCCT targets enabled: ${BLCAD_BUILD_GEOMETRY}")
 message(STATUS "GUI/Qt targets enabled: ${BLCAD_BUILD_GUI}")

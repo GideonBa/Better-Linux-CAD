@@ -64,26 +64,8 @@ constexpr double kTolerance = 1.0e-7;
   return {value.x, value.y, value.z};
 }
 
-[[nodiscard]] double distance(Point3 left, Point3 right) {
-  return std::hypot(std::hypot(left.x - right.x, left.y - right.y), left.z - right.z);
-}
-
 [[nodiscard]] bool same_point(Point3 left, Point3 right) {
   return distance(left, right) <= kTolerance;
-}
-
-[[nodiscard]] double dot(Vector3 left, Vector3 right) {
-  return left.x * right.x + left.y * right.y + left.z * right.z;
-}
-
-[[nodiscard]] Vector3 normalized(Vector3 value) {
-  const double magnitude = std::sqrt(dot(value, value));
-  return {value.x / magnitude, value.y / magnitude, value.z / magnitude};
-}
-
-[[nodiscard]] Vector3 cross(Vector3 left, Vector3 right) {
-  return {left.y * right.z - left.z * right.y, left.z * right.x - left.x * right.z,
-          left.x * right.y - left.y * right.x};
 }
 
 [[nodiscard]] Point3 point3(const gp_Pnt& value) {
@@ -591,10 +573,9 @@ Result<GeometryShape> SurfaceAdapter::extend_surface(FeatureId feature_id,
   }
 }
 
-Result<GeometryShape>
-SurfaceAdapter::stitch_surfaces(FeatureId feature_id,
-                                const std::vector<GeometryShape>& surfaces,
-                                double tolerance_mm) const {
+Result<GeometryShape> SurfaceAdapter::stitch_surfaces(FeatureId feature_id,
+                                                      const std::vector<GeometryShape>& surfaces,
+                                                      double tolerance_mm) const {
   if (feature_id.empty())
     return Result<GeometryShape>::failure(
         Error::validation("surface_stitch", "feature id must not be empty"));
@@ -641,8 +622,8 @@ SurfaceAdapter::stitch_surfaces(FeatureId feature_id,
           feature_id, "stitched surfaces do not form one connected shell within tolerance"));
     const TopoDS_Shell& shell = shells.front();
     if (face_count(shell) != input_face_count || face_count(sewn) != input_face_count)
-      return Result<GeometryShape>::failure(surface_error(
-          feature_id, "stitched shell left free faces or gaps outside tolerance"));
+      return Result<GeometryShape>::failure(
+          surface_error(feature_id, "stitched shell left free faces or gaps outside tolerance"));
     if (is_non_manifold_shell(shell))
       return Result<GeometryShape>::failure(
           surface_error(feature_id, "stitched shell is non-manifold"));
@@ -657,7 +638,8 @@ SurfaceAdapter::stitch_surfaces(FeatureId feature_id,
   } catch (const std::exception& exception) {
     return Result<GeometryShape>::failure(surface_error(feature_id, exception.what()));
   } catch (...) {
-    return Result<GeometryShape>::failure(surface_error(feature_id, "unknown surface stitch error"));
+    return Result<GeometryShape>::failure(
+        surface_error(feature_id, "unknown surface stitch error"));
   }
 }
 
@@ -671,8 +653,8 @@ Result<GeometryShape> SurfaceAdapter::close_shell_to_solid(FeatureId feature_id,
         surface_error(feature_id, "closed-shell-to-solid input must not be empty"));
   const TopoDS_Shape& input = shell.impl_->shape;
   if (TopExp_Explorer(input, TopAbs_SOLID).More())
-    return Result<GeometryShape>::failure(
-        surface_error(feature_id, "closed-shell-to-solid input must be a surface shell, not a solid"));
+    return Result<GeometryShape>::failure(surface_error(
+        feature_id, "closed-shell-to-solid input must be a surface shell, not a solid"));
 
   std::vector<TopoDS_Shell> shells;
   for (TopExp_Explorer explorer(input, TopAbs_SHELL); explorer.More(); explorer.Next())
@@ -708,8 +690,8 @@ Result<GeometryShape> SurfaceAdapter::close_shell_to_solid(FeatureId feature_id,
     TopoDS_Solid solid = maker.Solid();
     BRepLib::OrientClosedSolid(solid);
     if (solid.IsNull() || !BRepCheck_Analyzer(solid, true).IsValid())
-      return Result<GeometryShape>::failure(
-          surface_error(feature_id, "closed-shell-to-solid produced a topologically invalid solid"));
+      return Result<GeometryShape>::failure(surface_error(
+          feature_id, "closed-shell-to-solid produced a topologically invalid solid"));
     std::size_t solid_count = 0U;
     for (TopExp_Explorer explorer(solid, TopAbs_SOLID); explorer.More(); explorer.Next())
       ++solid_count;

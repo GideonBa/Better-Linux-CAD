@@ -46,24 +46,6 @@ constexpr double kPi = 3.14159265358979323846;
   return {to.x - from.x, to.y - from.y, to.z - from.z};
 }
 
-[[nodiscard]] double dot(Vector3 left, Vector3 right) {
-  return left.x * right.x + left.y * right.y + left.z * right.z;
-}
-
-[[nodiscard]] Vector3 cross(Vector3 left, Vector3 right) {
-  return {left.y * right.z - left.z * right.y, left.z * right.x - left.x * right.z,
-          left.x * right.y - left.y * right.x};
-}
-
-[[nodiscard]] double length(Vector3 value) {
-  return std::sqrt(dot(value, value));
-}
-
-[[nodiscard]] Vector3 normalized(Vector3 value) {
-  const double magnitude = length(value);
-  return {value.x / magnitude, value.y / magnitude, value.z / magnitude};
-}
-
 [[nodiscard]] Vector3 rotated(Vector3 value, Vector3 axis, double angle) {
   axis = normalized(axis);
   const double c = std::cos(angle), s = std::sin(angle);

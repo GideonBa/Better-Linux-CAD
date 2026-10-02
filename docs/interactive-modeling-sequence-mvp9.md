@@ -1,7 +1,15 @@
 # Interactive Part & Assembly Modeling Sequence MVP-9
 
 Status: accepted through implemented Block 131 after accepted Interactive Sketcher Block 121. STEP
-Import MVP-10 (Blocks 132–138) is active next at Block 132.
+Shell Reset MVP-9R (Blocks 132–136) is active next at Block 132, followed by STEP Import MVP-10
+(Blocks 137–143).
+
+> **GUI Shell Reset MVP-9R:** Block 133 deleted the Qt shell this document names — `MainWindow` and
+> all seven self-installing binders — and replaced it with `ShellWindow` + `ShellRibbon`
+> (`src/gui/shell/`, contract: `docs/gui-shell-reset-sequence-mvp9r.md`). The headless authorities and
+> the Core/Geometry contracts below are unchanged and are consumed by the new shell; read every
+> "`MainWindow`" and "binder" below as the shell's Qt presentation layer, whose current form is
+> Block 135/136 work.
 
 This phase closes the interaction gap between the accepted validation GUI (MVP-7, Blocks 95–105)
 and an intuitive, Inventor-familiar modeling experience for **every feature family implemented
@@ -517,7 +525,7 @@ New intent allowed: none.
 Focused tags: `[gui][measure]`, `[integration][interactive-modeling]`,
 `[integration][modeling-coverage-manifest]`.
 
-After Block 131, STEP Import MVP-10 begins with Block 132
+After Block 131, GUI Shell Reset MVP-9R begins with Block 132, and STEP Import MVP-10 with Block 137
 (`docs/step-import-sequence-mvp10.md`).
 
 ## Block-94 feature coverage matrix

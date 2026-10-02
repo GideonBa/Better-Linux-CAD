@@ -10,19 +10,6 @@ namespace {
 
 constexpr double k_tolerance = 1.0e-9;
 
-[[nodiscard]] double dot(Vector3 left, Vector3 right) noexcept {
-  return left.x * right.x + left.y * right.y + left.z * right.z;
-}
-
-[[nodiscard]] double length(Vector3 vector) noexcept {
-  return std::sqrt(dot(vector, vector));
-}
-
-[[nodiscard]] Vector3 cross(Vector3 left, Vector3 right) noexcept {
-  return Vector3{left.y * right.z - left.z * right.y, left.z * right.x - left.x * right.z,
-                 left.x * right.y - left.y * right.x};
-}
-
 [[nodiscard]] bool is_unit(Vector3 vector) noexcept {
   return std::abs(length(vector) - 1.0) <= k_tolerance;
 }

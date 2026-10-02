@@ -373,7 +373,7 @@ Incremental shell polish requested during use, independent of the numbered featu
   `apply_dimension`, which bakes the CURRENT measured value into an auto `dN` parameter so the commit
   never moves geometry. The size then stays constant under drag (tests drag a line and assert the arc
   radius / chamfer length are unchanged). Skipped silently if the dimension is not accepted.
-- gui suite now 116 offscreen tests (adds sketch-reentry, property-editor, and eight sketch-modify
+- gui suite now 119 offscreen test cases (adds sketch-reentry, property-editor, and eight sketch-modify
   shell tests incl. the auto-constraint, drag-robustness, and fixed-size proofs).
 
 ### Sketch usability fixes (post-modify)

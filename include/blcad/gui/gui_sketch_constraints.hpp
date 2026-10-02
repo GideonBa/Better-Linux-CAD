@@ -263,10 +263,6 @@ public:
       const auto value = kind(target);
       return value && *value == SketchTopologyEntityKind::Line;
     };
-    const auto arc = [&kind](const SketchConstraintIntentTarget& target) {
-      const auto value = kind(target);
-      return value && *value == SketchTopologyEntityKind::Arc;
-    };
     const auto curve = [&kind](const SketchConstraintIntentTarget& target) {
       const auto value = kind(target);
       return value && (*value == SketchTopologyEntityKind::Line ||

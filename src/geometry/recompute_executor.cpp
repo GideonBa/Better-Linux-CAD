@@ -38,11 +38,6 @@ struct TransformFrame {
   Vector3 z_axis{0.0, 0.0, 1.0};
 };
 
-[[nodiscard]] Vector3 normalized(Vector3 value) noexcept {
-  const double magnitude = std::sqrt(value.x * value.x + value.y * value.y + value.z * value.z);
-  return {value.x / magnitude, value.y / magnitude, value.z / magnitude};
-}
-
 [[nodiscard]] Vector3 frame_vector(const TransformFrame& frame, Vector3 value) noexcept {
   return {frame.x_axis.x * value.x + frame.y_axis.x * value.y + frame.z_axis.x * value.z,
           frame.x_axis.y * value.x + frame.y_axis.y * value.y + frame.z_axis.y * value.z,

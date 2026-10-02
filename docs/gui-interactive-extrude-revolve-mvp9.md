@@ -1,6 +1,8 @@
 # GUI Interactive Extrude, Path Extrude, and Revolve MVP-9
 
-Status: implemented in Block 124.
+Status: implemented in Block 124. The headless controllers below are unchanged; their Qt binding was
+deleted with the Block-133 shell reset (`docs/gui-shell-reset-sequence-mvp9r.md`) and Block 135
+re-establishes it on `ShellWindow`. Every sentence about `MainWindow` ownership is historical.
 
 Block 124 upgrades the MVP-7 form-driven Extrude and Revolve validation commands
 (`docs/gui-part-foundation-workbench-mvp7.md`) into direct-manipulation authoring. It consumes the
@@ -81,10 +83,13 @@ partial `ShapeCache`; Apply re-validates and commits exactly one transaction.
 ## Focused proof
 
 ```bash
-QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][interactive-extrude]"
-QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][interactive-revolve]"
-QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][extrude-revolve-manipulator]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][extrude-revolve]"
 ```
+
+The dedicated `[gui][interactive-extrude]`, `[gui][interactive-revolve]`, and
+`[integration][extrude-revolve-manipulator]` cases asserted against the deleted MainWindow shell and
+its manipulator overlay binder. They were removed with Block 133 and are restored against
+`ShellWindow` by Block 135.
 
 The proof covers extent-parameter driving with one atomic transaction and exact undo, operation/taper/
 thin/through-all modes with their offered handles, fail-closed rejection of invalid inputs, full/angle/

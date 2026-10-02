@@ -15,6 +15,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 namespace blcad::gui {
 
@@ -151,6 +152,16 @@ public:
     handle.reference_value = thin_->thickness_mm;
     handle.minimum_value = 0.0;
     return handle;
+  }
+
+  // Every interactive controller exposes the same `handles()` surface so the
+  // coordinator can publish them without knowing which family is active.
+  [[nodiscard]] std::vector<GuiViewportManipulatorHandle> handles() const {
+    std::vector<GuiViewportManipulatorHandle> handles;
+    if (auto handle = extent_handle()) handles.push_back(std::move(*handle));
+    if (auto handle = taper_handle()) handles.push_back(std::move(*handle));
+    if (auto handle = thin_handle()) handles.push_back(std::move(*handle));
+    return handles;
   }
 
   // Fold a Block-123 candidate into the matching parameter. Returns true when a
@@ -404,6 +415,12 @@ public:
     handle.reference_direction = frame_.reference_direction;
     handle.reference_value = angle_deg_;
     return handle;
+  }
+
+  [[nodiscard]] std::vector<GuiViewportManipulatorHandle> handles() const {
+    std::vector<GuiViewportManipulatorHandle> handles;
+    if (auto handle = angle_handle()) handles.push_back(std::move(*handle));
+    return handles;
   }
 
   [[nodiscard]] bool apply_manipulator(const GuiViewportManipulatorCandidate& candidate) {

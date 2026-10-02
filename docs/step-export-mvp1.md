@@ -75,7 +75,7 @@ Current geometry tests check:
 
 Not included yet:
 
-- STEP import (planned after Interactive Modeling MVP-9 in Blocks 132–138 of
+- STEP import (planned after Interactive Modeling MVP-9 in Blocks 137–143 of
   `docs/step-import-sequence-mvp10.md`)
 - metadata roundtrip
 - colors or materials

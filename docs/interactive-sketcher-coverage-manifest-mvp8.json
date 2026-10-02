@@ -1,6 +1,7 @@
 {
   "schema": "blcad.interactive-sketcher-coverage.v1",
   "implemented_through": 121,
+  "tag_validity_note": "Accepted record of the MVP-8 coverage as of Block 121. These tags no longer resolve: [gui][sketch-create-basic] and [integration][sketch-basic-profile] were deleted with the Block-133 shell reset (docs/gui-shell-reset-sequence-mvp9r.md) and are now covered by [gui][sketch-create] on the shell tool surface; [gui][sketch-create-conics] was deleted by the same reset and [core][sketch-conics]/[geometry][sketch-conics] were never implemented, since conic and slot creation exists in the GUI layer only. Block 136 owns restoring conic coverage.",
   "tutorial_documents": [
     "examples/triangle_prism.blcad.json",
     "examples/arc_profile_prism.blcad.json",

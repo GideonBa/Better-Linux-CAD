@@ -22,7 +22,8 @@ authoring; Block 127 implements interactive PathCurve, Sweep, and Loft authoring
 interactive Surface authoring and surface-to-solid conversion; Block 129 adds the feature edit
 lifecycle and Core feature-update commands; and Block 130 implements direct Assembly placement,
 compatibility-filtered relationships, joint-frame preview, and coordinate motion. Block 131 adds
-transient Measure and completes integrated MVP-9 acceptance. STEP Import begins next with Block 132.
+transient Measure and completes integrated MVP-9 acceptance. Blocks 132–136 are GUI Shell Reset
+MVP-9R; STEP Import MVP-10 begins with Block 137.
 
 The UI is deliberately not built like FreeCAD. The goal is a modern, consistent, reduced interface
 with clear separation between model, parameters, features, Sketch topology, solver results, and
@@ -55,7 +56,8 @@ Part | Surface | Assembly | Selection filter | Repeat | ViewCube | Camera bookma
 ```
 
 `GuiModelingWorkspace` owns transient command-selection state. `GuiModelingWorkspaceShellBinder`
-renders it through stable Qt object names:
+rendered it through the stable Qt object names below until the Block-133 shell reset deleted it;
+Block 136 re-establishes this surface on `ShellWindow`, and the names below are historical:
 
 ```text
 blcad.modeling_toolbar
@@ -110,7 +112,8 @@ families use an explicit model plane. Overlapping handle hits sort by screen dis
 id. Drag start freezes the initial measurement, avoiding a value jump to the visual endpoint, and
 release evaluates the exact final pointer sample.
 
-The Qt binder exposes:
+The deleted Qt overlay binder exposed the object names below; Block 135 re-establishes an equivalent
+shell-owned overlay:
 
 ```text
 blcad.viewport_manipulator_overlay
@@ -187,8 +190,8 @@ right -> left   Crossing: contained or crossed curves
 ```
 
 A transparent overlay draws grid, highest-priority hover product, active snap marker, and rubber-band
-selection. The binder draws dashed horizontal/vertical/alignment inference guides. These are transient
-view products.
+selection, and dashed horizontal/vertical/alignment inference guides. These are transient view
+products; since Block 134 the shell's sketch tool surface owns them.
 
 Sketch menu exposes `Show grid` and `Snap to grid`. Default spacing is 10 mm with every fifth line
 major. Visible grid range is bounded; visual subsampling never changes snap spacing.
@@ -381,7 +384,7 @@ input only and do not claim a valid feature preview until the owning later comma
     navigation aids. Implemented in Block 122.
 11. Add reusable transient viewport manipulators and numeric coupling. Implemented in Block 123.
 12. Add family-specific interactive Part/Surface/Assembly authoring through Blocks 124–131.
-13. Add STEP Reference/EditableBody import through Blocks 132–138.
+13. Add STEP Reference/EditableBody import through Blocks 137–143.
 
 ## Current boundary
 

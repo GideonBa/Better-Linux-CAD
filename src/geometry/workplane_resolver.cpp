@@ -33,22 +33,9 @@ constexpr double k_tolerance = 1.0e-9;
   return Vector3{to.x - from.x, to.y - from.y, to.z - from.z};
 }
 
-[[nodiscard]] double dot(Vector3 left, Vector3 right) noexcept {
-  return left.x * right.x + left.y * right.y + left.z * right.z;
-}
-
-[[nodiscard]] double length(Vector3 vector) noexcept {
-  return std::sqrt(dot(vector, vector));
-}
-
 [[nodiscard]] Vector3 normalize(Vector3 vector) noexcept {
   const double vector_length = length(vector);
   return Vector3{vector.x / vector_length, vector.y / vector_length, vector.z / vector_length};
-}
-
-[[nodiscard]] Vector3 cross(Vector3 left, Vector3 right) noexcept {
-  return Vector3{left.y * right.z - left.z * right.y, left.z * right.x - left.x * right.z,
-                 left.x * right.y - left.y * right.x};
 }
 
 [[nodiscard]] Point3 translated(Point3 point, Vector3 direction, double distance) noexcept {

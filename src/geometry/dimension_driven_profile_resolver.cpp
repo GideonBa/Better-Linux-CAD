@@ -21,10 +21,6 @@ constexpr double k_tolerance = 1.0e-9;
   return Vector2{to.x - from.x, to.y - from.y};
 }
 
-[[nodiscard]] double length(Vector2 vector) noexcept {
-  return std::sqrt(vector.x * vector.x + vector.y * vector.y);
-}
-
 [[nodiscard]] Vector2 normalize(Vector2 vector) noexcept {
   const double vector_length = length(vector);
   return Vector2{vector.x / vector_length, vector.y / vector_length};

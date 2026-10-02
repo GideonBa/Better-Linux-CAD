@@ -1,6 +1,7 @@
 #include "blcad/geometry/assembly_contact_analyzer.hpp"
 
 #include "assembly_posed_leaf_shapes.hpp"
+#include "occt_failure_message.hpp"
 
 #include <BRepAlgoAPI_Common.hxx>
 #include <BRepExtrema_DistShapeShape.hxx>
@@ -29,14 +30,6 @@ struct OrderedPosedOccurrence {
 
 [[nodiscard]] Error make_geometry_error(std::string message) {
   return Error::geometry(kContactAnalyzerId, std::move(message));
-}
-
-[[nodiscard]] std::string standard_failure_message(const Standard_Failure& failure) {
-  const char* const message = failure.GetMessageString();
-  if (message == nullptr || *message == '\0') {
-    return "OCCT operation failed";
-  }
-  return message;
 }
 
 [[nodiscard]] bool leaf_matches_occurrence(

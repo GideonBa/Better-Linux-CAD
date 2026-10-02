@@ -3,6 +3,13 @@
 Status: implemented in Block 110. Session-backed Block-114 constraint and Block-115 dimension reuse is
 implemented.
 
+> **GUI Shell Reset MVP-9R:** Block 133 deleted the Qt shell this document names — `MainWindow` and
+> all seven self-installing binders — and replaced it with `ShellWindow` + `ShellRibbon`
+> (`src/gui/shell/`, contract: `docs/gui-shell-reset-sequence-mvp9r.md`). The headless authorities and
+> the Core/Geometry contracts below are unchanged and are consumed by the new shell; read every
+> "`MainWindow`" and "binder" below as the shell's Qt presentation layer, whose current form is
+> Block 135/136 work.
+
 This document is the canonical GUI/Core integration contract for solver-backed planar Sketch mouse
 dragging. Pointer motion remains transient; persistent geometry changes publish only through one final
 `GuiDocumentSession` transaction.

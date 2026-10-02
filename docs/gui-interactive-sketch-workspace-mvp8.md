@@ -4,6 +4,13 @@ Status: implemented in Block 106. Blocks 107–109 supply plane interaction, sha
 headless solver/DOF authority. Block 110 now implements the `SelectedHandle -> DragCandidate` live-solve
 consumer and one-transaction release commit.
 
+> **GUI Shell Reset MVP-9R:** Block 133 deleted the Qt shell this document names — `MainWindow` and
+> all seven self-installing binders — and replaced it with `ShellWindow` + `ShellRibbon`
+> (`src/gui/shell/`, contract: `docs/gui-shell-reset-sequence-mvp9r.md`). The headless authorities and
+> the Core/Geometry contracts below are unchanged and are consumed by the new shell; read every
+> "`MainWindow`" and "binder" below as the shell's Qt presentation layer, whose current form is
+> Block 135/136 work.
+
 This document is the canonical GUI contract for the contextual planar Sketch workspace introduced by
 Block 106. It extends the Block-95/96 command/transaction rules and Block-99 Sketch workbench. It does
 not own persistent Sketch geometry or solver mathematics.

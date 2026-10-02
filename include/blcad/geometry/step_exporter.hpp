@@ -25,14 +25,13 @@ struct PartStepExportSummary {
   std::vector<PartStepExportBodySummary> bodies;
 };
 
-// Schreibt einen berechneten Einzel-Shape oder die sichtbaren Body-Ergebnisse
-// eines Parts als STEP-Datei. Der Exporter kapselt die OCCT-STEP/XDE-Writer und
-// bleibt auf der Geometry-Seite der Core/OCCT-Grenze.
+// Writes one computed shape, or a Part's visible Body results, as a STEP file.
+// The exporter encapsulates the OCCT STEP/XDE writers and stays on the Geometry
+// side of the Core/OCCT boundary.
 class StepExporter {
 public:
-  // Exportiert `shape` nach `path` und liefert die Groesse der geschriebenen
-  // Datei in Bytes. Erwartbare Fehler werden als `ErrorCategory::Export`
-  // gemeldet.
+  // Exports `shape` to `path` and returns the written file size in bytes.
+  // Expected failures are reported as `ErrorCategory::Export`.
   [[nodiscard]] Result<std::size_t> write_step(const GeometryShape& shape,
                                                const std::string& path) const;
 

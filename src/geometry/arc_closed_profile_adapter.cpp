@@ -1,6 +1,7 @@
 #include "blcad/geometry/closed_profile_adapter.hpp"
 
 #include "geometry_shape_internal.hpp"
+#include "occt_failure_message.hpp"
 
 #include <BRepAlgoAPI_Cut.hxx>
 #include <BRepBndLib.hxx>
@@ -38,13 +39,6 @@ constexpr double kAxisTolerance = 1.0e-9;
   return Error::geometry(kArcProfileId, std::move(message));
 }
 
-[[nodiscard]] std::string standard_failure_message(const Standard_Failure& failure) {
-  const char* const message = failure.GetMessageString();
-  if (message == nullptr || *message == '\0')
-    return "OCCT operation failed";
-  return message;
-}
-
 [[nodiscard]] gp_Pnt to_gp_point(Point3 point) noexcept {
   return gp_Pnt(point.x, point.y, point.z);
 }
@@ -53,14 +47,6 @@ constexpr double kAxisTolerance = 1.0e-9;
   return std::abs(left.x - right.x) <= kAxisTolerance &&
          std::abs(left.y - right.y) <= kAxisTolerance &&
          std::abs(left.z - right.z) <= kAxisTolerance;
-}
-
-[[nodiscard]] double dot(Point3 point, Vector3 axis) noexcept {
-  return point.x * axis.x + point.y * axis.y + point.z * axis.z;
-}
-
-[[nodiscard]] double length(Vector3 vector) noexcept {
-  return std::sqrt(vector.x * vector.x + vector.y * vector.y + vector.z * vector.z);
 }
 
 [[nodiscard]] Point3 translate_along_axis(Point3 point, Vector3 axis, double delta) noexcept {
@@ -98,7 +84,7 @@ struct ThroughAllPlacement {
   double max_projection = 0.0;
   bool first = true;
   for (const Point3 corner : bounding_box_corners(x_min, y_min, z_min, x_max, y_max, z_max)) {
-    const double projection = dot(corner, axis);
+    const double projection = project_onto_axis(corner, axis);
     if (first) {
       min_projection = projection;
       max_projection = projection;
@@ -208,7 +194,7 @@ move_curves_to_through_all_start(const std::vector<ClosedProfileCurveSegment>& c
     return Result<std::vector<ClosedProfileCurveSegment>>::failure(
         make_geometry_error("arc closed profile requires curves"));
   }
-  const double profile_projection = dot(curves.front().start, placement.axis);
+  const double profile_projection = project_onto_axis(curves.front().start, placement.axis);
   const double delta = placement.start_projection - profile_projection;
   std::vector<ClosedProfileCurveSegment> moved;
   moved.reserve(curves.size());

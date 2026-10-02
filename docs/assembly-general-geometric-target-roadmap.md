@@ -17,7 +17,8 @@ Implemented contracts are canonical in:
 - `docs/assembly-vector-joint-drive-mvp5.md`
 - `docs/assembly-spherical-joint-mvp5.md`
 
-The complete pre-implementation planning detail for Blocks 32–47 is preserved byte-for-byte in:
+The complete pre-implementation planning detail for Blocks 32–47 is preserved, under a header banner
+marking it historical, in:
 
 - `docs/assembly-general-geometric-target-roadmap-planning-baseline.md`
 

@@ -1,6 +1,7 @@
 #include "blcad/geometry/step_exporter.hpp"
 
 #include "geometry_shape_internal.hpp"
+#include "occt_failure_message.hpp"
 
 #include <IFSelect_ReturnStatus.hxx>
 #include <Interface_Static.hxx>
@@ -83,15 +84,6 @@ constexpr const char* kStepExporterId = "geometry.step_exporter";
         "' must contain face topology without solid topology"));
   }
   return Result<bool>::success(true);
-}
-
-[[nodiscard]] std::string standard_failure_message(const Standard_Failure& failure) {
-  const char* const message = failure.GetMessageString();
-  if (message == nullptr || *message == '\0') {
-    return "OCCT operation failed";
-  }
-
-  return message;
 }
 
 } // namespace

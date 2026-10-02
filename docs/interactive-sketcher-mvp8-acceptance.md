@@ -31,4 +31,4 @@ Manual visual and pointer checks are frozen in
 `docs/interactive-sketcher-manual-smoke-mvp8.md`.
 
 Block 122 begins Interactive Part & Assembly Modeling MVP-9. STEP Import remains sequenced after
-that phase in Blocks 132–138.
+that phase in Blocks 137–143.

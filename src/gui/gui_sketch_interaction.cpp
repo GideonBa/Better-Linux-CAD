@@ -49,14 +49,6 @@ double screen_distance(GuiSketchScreenPoint first, GuiSketchScreenPoint second) 
   return std::sqrt(square(first.x - second.x) + square(first.y - second.y));
 }
 
-double dot(Vector3 first, Vector3 second) noexcept {
-  return first.x * second.x + first.y * second.y + first.z * second.z;
-}
-
-Vector3 displacement(Point3 from, Point3 to) noexcept {
-  return {to.x - from.x, to.y - from.y, to.z - from.z};
-}
-
 Point3 translated(Point3 point, Vector3 direction, double scale) noexcept {
   return {point.x + direction.x * scale, point.y + direction.y * scale,
           point.z + direction.z * scale};

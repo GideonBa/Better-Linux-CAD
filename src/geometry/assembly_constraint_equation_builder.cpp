@@ -30,15 +30,6 @@ struct ResolvedAssemblySpaceGeometricTarget {
   return Vector3{lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z};
 }
 
-[[nodiscard]] double dot(const Vector3& lhs, const Vector3& rhs) noexcept {
-  return lhs.x * rhs.x + lhs.y * rhs.y + lhs.z * rhs.z;
-}
-
-[[nodiscard]] Vector3 cross(const Vector3& lhs, const Vector3& rhs) noexcept {
-  return Vector3{lhs.y * rhs.z - lhs.z * rhs.y, lhs.z * rhs.x - lhs.x * rhs.z,
-                 lhs.x * rhs.y - lhs.y * rhs.x};
-}
-
 [[nodiscard]] bool legacy_feature_target(std::string_view semantic_reference) noexcept {
   return !semantic_reference.starts_with("ref:") && !semantic_reference.starts_with("topo:");
 }

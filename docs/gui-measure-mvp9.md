@@ -2,6 +2,13 @@
 
 Status: implemented in Block 131.
 
+> **GUI Shell Reset MVP-9R:** Block 133 deleted the Qt shell this document names — `MainWindow` and
+> all seven self-installing binders — and replaced it with `ShellWindow` + `ShellRibbon`
+> (`src/gui/shell/`, contract: `docs/gui-shell-reset-sequence-mvp9r.md`). The headless authorities and
+> the Core/Geometry contracts below are unchanged and are consumed by the new shell; read every
+> "`MainWindow`" and "binder" below as the shell's Qt presentation layer, whose current form is
+> Block 135/136 work.
+
 `GuiMeasureController` is the read-only inspection command for fresh derived Geometry. It accepts
 typed point, linear-edge, planar-face, circular-edge, and cylindrical-face descriptors and reports:
 
@@ -22,5 +29,6 @@ Focused proof: `[gui][measure]`.
 
 ## Next boundary
 
-Interactive Modeling MVP-9 is complete. Block 132 starts STEP Import MVP-10 with persistent STEP
+Interactive Modeling MVP-9 is complete. Block 132 starts GUI Shell Reset MVP-9R; Block 137 starts
+STEP Import MVP-10 with persistent STEP
 source identity, explicit Reference/EditableBody modes, JSON, and freshness.

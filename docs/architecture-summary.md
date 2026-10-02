@@ -2,7 +2,14 @@
 
 This document summarizes implemented BLCAD architecture and the current technical direction.
 Feature-specific documents remain canonical for exact formulas, save-format spellings,
-validation/failure policy, ordering, and focused proof.
+validation/failure policy, ordering, and focused proof. `docs/mvp-plan.md` is the status authority.
+
+> **GUI Shell Reset MVP-9R:** Block 133 deleted the Qt shell that MVP-7..9 grew — `MainWindow` and all
+> seven self-installing binders — and replaced it with `ShellWindow` + `ShellRibbon` (`src/gui/shell/`,
+> contract: `docs/gui-shell-reset-sequence-mvp9r.md`). Nothing below the shell moved: Core, Geometry,
+> `GuiDocumentSession`, `GuiCommandRegistry`, the selection/browser models, the workbenches, and the
+> Qt-free interactive controllers are unchanged. Passages below that name a binder describe the Qt
+> presentation layer, whose current form is Blocks 135–136 work.
 
 ## Goal and authority model
 
@@ -213,8 +220,8 @@ and all driving dimensions; it accepts only under-/fully-constrained, measuremen
 materializable results.
 
 `GuiSketchDimensionController` owns disposable preview, semantic annotation, source/catalog freshness,
-and atomic add/literal/formula/rebind/mode transactions. Qt action and dialog state is header-only binder
-presentation; it never stores dimension values. `GuiDocumentSession` publishes parameter state, solved
+and atomic add/literal/formula/rebind/mode transactions. Qt action and dialog state is shell
+presentation only (`ShellSketchTools` since Block 134); it never stores dimension values. `GuiDocumentSession` publishes parameter state, solved
 Sketch, constraint catalog, and dimension catalog as one history snapshot.
 
 Canonical sidecar persistence is:
@@ -261,9 +268,10 @@ values use explicit ray/plane intersections. Presentation stays fixed in DIP. Ov
 by screen distance and stable handle id. Drag start freezes the initial model measurement, release
 processes the exact final pointer sample, and valid typed HUD values override subsequent pointer motion.
 
-`GuiViewportManipulatorShellBinder` owns the transparent Qt overlay, mouse capture, cancellation, camera
-refresh, and numeric-HUD synchronization. Neither the controller nor binder receives document mutation
-or Geometry-preview authority. The emitted candidate becomes input to an owning Block-124–130 command,
+The transparent Qt overlay, mouse capture, cancellation, camera refresh, and numeric-HUD
+synchronization belong to the shell. `GuiViewportManipulatorShellBinder` held them until Block 133
+deleted it; Block 135 re-establishes them as a shell-owned, notification-driven overlay. Neither the
+controller nor that presentation layer receives document mutation or Geometry-preview authority. The emitted candidate becomes input to an owning Block-124–130 command,
 which remains responsible for validation, preview, Apply, and one undoable transaction.
 
 Canonical contract: `docs/gui-viewport-manipulators-mvp9.md`.
@@ -276,10 +284,12 @@ candidate feature parameter set, seeds Block-123 extent/taper/thin/angle handles
 PartDocument clone through the recompute plan, and commits one `commit_part_transaction` that seeds the
 driving `Length` parameters and adds the feature — so undo reverts parameter and feature together. All
 seven extent modes, taper, thin intent, path direction, and the three revolve extents stay frozen Core
-intent; no widget owns feature mathematics. `GuiInteractiveFeatureCoordinator` (owned by `MainWindow`)
-publishes the active controller's handles to the shared Block-123 manipulator layer and folds
-viewport candidates back into the candidate; the manipulator shell forwards its candidate callback into
-the coordinator.
+intent; no widget owns feature mathematics. `GuiInteractiveFeatureCoordinator`
+(`include/blcad/gui/gui_interactive_feature_coordinator.hpp`, owned by the shell) publishes the active
+controller's handles to the shared Block-123 manipulator layer and folds viewport candidates back into
+the candidate; the manipulator overlay forwards its candidate callback into the coordinator. The
+coordinator dispatches over one ordered controller list, so every operation — active, handles,
+candidate, preview, apply, cancel — walks the same nine Block-124..128 controllers.
 
 Canonical contract: `docs/gui-interactive-extrude-revolve-mvp9.md`.
 
@@ -365,7 +375,9 @@ Block 131 adds `GeometryMeasureQuery` as a Qt-free analytic query over resolved 
 circle, and cylinder descriptors. `GuiMeasureController` owns only transient picks, witness overlays,
 and status values; Body volume/solid counts reuse `BodyResultInspector`. Freshness and typed-target
 validation fail closed, and no Measure state enters Core or JSON. Coverage manifest v2 and the
-integrated Part/Assembly acceptance close MVP-9; Block 132 is the next architecture boundary.
+integrated Part/Assembly acceptance close MVP-9. GUI Shell Reset MVP-9R (Blocks 132–136) replaces
+the Qt shell without moving any authority; STEP Import MVP-10 (Blocks 137–143) is the next
+architecture boundary.
 
 Canonical contract: `docs/gui-interactive-assembly-mvp9.md`.
 
@@ -451,4 +463,5 @@ surface-to-solid conversion with geometry diagnostics surfaced before commit, Bl
 feature edit lifecycle and Core feature-update commands, Block 130 adds interactive Assembly
 placement, compatibility-filtered relationships, oriented joint-frame previews, and coordinate
 motion, and Block 131 closes the phase with transient Measure, coverage manifest v2, and integrated
-acceptance. Block 132 (STEP source identity, modes, JSON, and freshness) is next.
+acceptance. Blocks 132–136 rehost that surface on the MVP-9R shell; Block 137 (STEP source identity,
+modes, JSON, and freshness) is the next new architecture.

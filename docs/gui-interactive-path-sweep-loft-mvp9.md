@@ -2,6 +2,13 @@
 
 Status: implemented in Block 127.
 
+> **GUI Shell Reset MVP-9R:** Block 133 deleted the Qt shell this document names — `MainWindow` and
+> all seven self-installing binders — and replaced it with `ShellWindow` + `ShellRibbon`
+> (`src/gui/shell/`, contract: `docs/gui-shell-reset-sequence-mvp9r.md`). The headless authorities and
+> the Core/Geometry contracts below are unchanged and are consumed by the new shell; read every
+> "`MainWindow`" and "binder" below as the shell's Qt presentation layer, whose current form is
+> Block 135/136 work.
+
 Block 127 upgrades the MVP-7 form-driven spatial commands
 (`docs/gui-spatial-surface-workbench-mvp7.md`) into direct-manipulation authoring over the frozen
 Block-70..79 contracts (`docs/part-path-curve-core-mvp6.md`, `docs/part-sweep-intent-mvp6.md`,

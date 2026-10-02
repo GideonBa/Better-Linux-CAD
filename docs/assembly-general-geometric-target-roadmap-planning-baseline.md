@@ -1,4 +1,15 @@
-# General Assembly Geometric Target and Relationship Roadmap
+# General Assembly Geometric Target and Relationship Roadmap — Planning Baseline (historical)
+
+> **Historical planning snapshot — not current status.** This is the pre-implementation planning
+> baseline for Blocks 32–47, preserved for its required-work, failure-policy, acceptance-tag, proof
+> matrix, compatibility table, residual seed, and deferral detail, which
+> [`docs/assembly-general-geometric-target-roadmap.md`](assembly-general-geometric-target-roadmap.md)
+> incorporates by reference. Blocks 31–47 are implemented; that roadmap is canonical and
+> [`docs/mvp-plan.md`](mvp-plan.md) is the status authority. Every status statement below — including
+> "Blocks 31-47 are not implemented yet" and the "This document is canonical" claim — was true when
+> written and is not current.
+
+## Snapshot content
 
 Status: planned headless architecture after Block 30. Blocks 31-47 are not implemented yet.
 

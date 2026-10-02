@@ -2,6 +2,13 @@
 
 Status: implemented in Block 126.
 
+> **GUI Shell Reset MVP-9R:** Block 133 deleted the Qt shell this document names — `MainWindow` and
+> all seven self-installing binders — and replaced it with `ShellWindow` + `ShellRibbon`
+> (`src/gui/shell/`, contract: `docs/gui-shell-reset-sequence-mvp9r.md`). The headless authorities and
+> the Core/Geometry contracts below are unchanged and are consumed by the new shell; read every
+> "`MainWindow`" and "binder" below as the shell's Qt presentation layer, whose current form is
+> Block 135/136 work.
+
 Block 126 upgrades the MVP-7 form-driven pattern/mirror/body commands
 (`docs/gui-part-operations-workbench-mvp7.md`) into direct-manipulation authoring over the frozen
 Block-63..69 contracts (`docs/part-pattern-core-mvp6.md`, `docs/part-mirror-intent-mvp6.md`,

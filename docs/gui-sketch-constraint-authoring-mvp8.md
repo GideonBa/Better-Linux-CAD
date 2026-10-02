@@ -2,6 +2,13 @@
 
 Status: implemented in Block 114.
 
+> **GUI Shell Reset MVP-9R:** Block 133 deleted the Qt shell this document names — `MainWindow` and
+> all seven self-installing binders — and replaced it with `ShellWindow` + `ShellRibbon`
+> (`src/gui/shell/`, contract: `docs/gui-shell-reset-sequence-mvp9r.md`). The headless authorities and
+> the Core/Geometry contracts below are unchanged and are consumed by the new shell; read every
+> "`MainWindow`" and "binder" below as the shell's Qt presentation layer, whose current form is
+> Block 135/136 work.
+
 This contract exposes the non-dimensional Block-109 planar constraint families through stable
 Block-108 topology targets, selection-driven compatibility, automatic snap inference, semantic glyphs,
 disposable solver preview, session-owned persistence, and one atomic Part/catalog transaction. Driving

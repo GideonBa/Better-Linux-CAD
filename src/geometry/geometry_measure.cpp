@@ -19,18 +19,12 @@ Point3 add(Point3 p, Vector3 v) noexcept {
 Vector3 scale(Vector3 v, double factor) noexcept {
   return {v.x * factor, v.y * factor, v.z * factor};
 }
-double dot(Vector3 a, Vector3 b) noexcept {
-  return a.x * b.x + a.y * b.y + a.z * b.z;
-}
-Vector3 cross(Vector3 a, Vector3 b) noexcept {
-  return {a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x};
-}
-double magnitude(Vector3 v) noexcept {
-  return std::sqrt(dot(v, v));
-}
-Vector3 normalized(Vector3 v) noexcept {
-  const double length = magnitude(v);
-  return length > epsilon ? scale(v, 1.0 / length) : Vector3{};
+// Measure treats a degenerate direction as "no direction" and reports it through
+// the `length(...) <= epsilon` guards at each call site, so normalization here
+// must return zero rather than NaN.
+Vector3 normalized_or_zero(Vector3 v) noexcept {
+  const double magnitude = length(v);
+  return magnitude > epsilon ? scale(v, 1.0 / magnitude) : Vector3{};
 }
 bool finite(Point3 p) noexcept {
   return std::isfinite(p.x) && std::isfinite(p.y) && std::isfinite(p.z);
@@ -47,28 +41,27 @@ Result<GeometryDistanceMeasurement> point_point(Point3 a, Point3 b) {
   if (!finite(a) || !finite(b))
     return Result<GeometryDistanceMeasurement>::failure(
         measure_error("measure points must be finite"));
-  return Result<GeometryDistanceMeasurement>::success({magnitude(subtract(b, a)), a, b});
+  return Result<GeometryDistanceMeasurement>::success({length(subtract(b, a)), a, b});
 }
 
 Result<GeometryDistanceMeasurement>
 point_line(Point3 point, const AssemblyLineTargetDescriptor& line, bool point_first) {
-  const Vector3 direction = normalized(line.direction);
+  const Vector3 direction = normalized_or_zero(line.direction);
   if (!finite(point) || !finite(line.origin) || !finite(line.direction) ||
-      magnitude(direction) <= epsilon)
+      length(direction) <= epsilon)
     return Result<GeometryDistanceMeasurement>::failure(
         measure_error("point/edge distance requires a finite point and line"));
   const Point3 witness =
       add(line.origin, scale(direction, dot(subtract(point, line.origin), direction)));
-  const double distance = magnitude(subtract(point, witness));
+  const double distance = length(subtract(point, witness));
   return point_first ? Result<GeometryDistanceMeasurement>::success({distance, point, witness})
                      : Result<GeometryDistanceMeasurement>::success({distance, witness, point});
 }
 
 Result<GeometryDistanceMeasurement>
 point_plane(Point3 point, const AssemblyPlanarTargetDescriptor& plane, bool point_first) {
-  const Vector3 normal = normalized(plane.normal);
-  if (!finite(point) || !finite(plane.origin) || !finite(plane.normal) ||
-      magnitude(normal) <= epsilon)
+  const Vector3 normal = normalized_or_zero(plane.normal);
+  if (!finite(point) || !finite(plane.origin) || !finite(plane.normal) || length(normal) <= epsilon)
     return Result<GeometryDistanceMeasurement>::failure(
         measure_error("point/face distance requires a finite point and plane"));
   const double signed_distance = dot(subtract(point, plane.origin), normal);
@@ -81,9 +74,9 @@ point_plane(Point3 point, const AssemblyPlanarTargetDescriptor& plane, bool poin
 
 Result<GeometryDistanceMeasurement> line_line(const AssemblyLineTargetDescriptor& a,
                                               const AssemblyLineTargetDescriptor& b) {
-  const Vector3 u = normalized(a.direction);
-  const Vector3 v = normalized(b.direction);
-  if (!finite(a.origin) || !finite(b.origin) || magnitude(u) <= epsilon || magnitude(v) <= epsilon)
+  const Vector3 u = normalized_or_zero(a.direction);
+  const Vector3 v = normalized_or_zero(b.direction);
+  if (!finite(a.origin) || !finite(b.origin) || length(u) <= epsilon || length(v) <= epsilon)
     return Result<GeometryDistanceMeasurement>::failure(
         measure_error("edge/edge distance requires two finite lines"));
   const Vector3 w = subtract(a.origin, b.origin);
@@ -105,10 +98,10 @@ Result<GeometryDistanceMeasurement> line_line(const AssemblyLineTargetDescriptor
 Result<GeometryDistanceMeasurement> line_plane(const AssemblyLineTargetDescriptor& line,
                                                const AssemblyPlanarTargetDescriptor& plane,
                                                bool line_first) {
-  const Vector3 direction = normalized(line.direction);
-  const Vector3 normal = normalized(plane.normal);
+  const Vector3 direction = normalized_or_zero(line.direction);
+  const Vector3 normal = normalized_or_zero(plane.normal);
   if (!finite(line.origin) || !finite(line.direction) || !finite(plane.origin) ||
-      !finite(plane.normal) || magnitude(direction) <= epsilon || magnitude(normal) <= epsilon)
+      !finite(plane.normal) || length(direction) <= epsilon || length(normal) <= epsilon)
     return Result<GeometryDistanceMeasurement>::failure(
         measure_error("edge/face distance requires a finite line and plane"));
   const double denominator = dot(direction, normal);
@@ -127,13 +120,13 @@ Result<GeometryDistanceMeasurement> line_plane(const AssemblyLineTargetDescripto
 
 Result<GeometryDistanceMeasurement> plane_plane(const AssemblyPlanarTargetDescriptor& a,
                                                 const AssemblyPlanarTargetDescriptor& b) {
-  const Vector3 na = normalized(a.normal);
-  const Vector3 nb = normalized(b.normal);
+  const Vector3 na = normalized_or_zero(a.normal);
+  const Vector3 nb = normalized_or_zero(b.normal);
   if (!finite(a.origin) || !finite(b.origin) || !finite(a.normal) || !finite(b.normal) ||
-      magnitude(na) <= epsilon || magnitude(nb) <= epsilon)
+      length(na) <= epsilon || length(nb) <= epsilon)
     return Result<GeometryDistanceMeasurement>::failure(
         measure_error("face/face distance requires two finite planes"));
-  if (magnitude(cross(na, nb)) > epsilon)
+  if (length(cross(na, nb)) > epsilon)
     return Result<GeometryDistanceMeasurement>::success({0.0, a.origin, a.origin});
   return point_plane(a.origin, b, true);
 }
@@ -147,9 +140,9 @@ Result<Vector3> direction(const GeometryMeasureTarget& target) {
   else
     return Result<Vector3>::failure(
         measure_error("angle requires linear-edge or planar-face targets"));
-  if (!finite(value) || magnitude(value) <= epsilon)
+  if (!finite(value) || length(value) <= epsilon)
     return Result<Vector3>::failure(measure_error("angle target direction must be finite"));
-  return Result<Vector3>::success(normalized(value));
+  return Result<Vector3>::success(normalized_or_zero(value));
 }
 
 const Point3* point(const GeometryMeasureTarget& target) noexcept {
@@ -201,7 +194,7 @@ Result<GeometryAngleMeasurement> GeometryMeasureQuery::angle(const GeometryMeasu
     return Result<GeometryAngleMeasurement>::failure(first.error());
   if (second.has_error())
     return Result<GeometryAngleMeasurement>::failure(second.error());
-  if (magnitude(first.value()) <= epsilon || magnitude(second.value()) <= epsilon)
+  if (length(first.value()) <= epsilon || length(second.value()) <= epsilon)
     return Result<GeometryAngleMeasurement>::failure(
         measure_error("angle target direction must be non-degenerate"));
   const double cosine = std::clamp(std::abs(dot(first.value(), second.value())), 0.0, 1.0);
@@ -215,14 +208,14 @@ Result<GeometryRadialMeasurement>
 GeometryMeasureQuery::radius_diameter(const GeometryMeasureTarget& target) const {
   double radius = 0.0;
   if (const auto* circle = std::get_if<AssemblyCircularEdgeTargetDescriptor>(&target)) {
-    if (!finite(circle->center) || !finite(circle->normal) || magnitude(circle->normal) <= epsilon)
+    if (!finite(circle->center) || !finite(circle->normal) || length(circle->normal) <= epsilon)
       return Result<GeometryRadialMeasurement>::failure(
           measure_error("circular edge target must be finite and non-degenerate"));
     radius = circle->radius_mm;
   } else if (const auto* cylinder =
                  std::get_if<AssemblyCylindricalSurfaceTargetDescriptor>(&target)) {
     if (!finite(cylinder->axis_origin) || !finite(cylinder->axis_direction) ||
-        magnitude(cylinder->axis_direction) <= epsilon)
+        length(cylinder->axis_direction) <= epsilon)
       return Result<GeometryRadialMeasurement>::failure(
           measure_error("cylindrical face target must be finite and non-degenerate"));
     radius = cylinder->radius_mm;

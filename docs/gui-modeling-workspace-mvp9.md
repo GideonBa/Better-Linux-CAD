@@ -1,6 +1,10 @@
 # GUI Selection-First Modeling Workspace MVP-9
 
-Status: implemented in Block 122; consumed by the Block-123 manipulator layer.
+Status: implemented in Block 122; consumed by the Block-123 manipulator layer. `GuiModelingWorkspace`
+itself is unchanged, but the Qt surface described here (`GuiModelingWorkspaceShellBinder`, the shell
+object names, the mini toolbar, the ViewCube/bookmark widgets) was deleted with the Block-133 shell
+reset (`docs/gui-shell-reset-sequence-mvp9r.md`). Block 136 re-establishes it on `ShellWindow`; the Qt
+specifics below are historical until then.
 
 Block 122 introduces the shared application-layer interaction boundary used by the Part, Surface, and
 Assembly modeling workspaces. It upgrades the existing MVP-7 form-driven workbenches with
@@ -148,10 +152,14 @@ bookmark structure without persisting manipulator state.
 
 ## Focused proof
 
+The `[gui][modeling-workspace]`, `[gui][in-context-command]`, and `[gui][view-navigation-aids]` cases
+asserted against the deleted MainWindow shell and were removed with Block 133; Block 136 restores them
+against `ShellWindow`. `GuiModelingWorkspace` is meanwhile exercised through the Block 124–130
+controller proofs:
+
 ```bash
-QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][modeling-workspace]"
-QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][in-context-command]"
-QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][view-navigation-aids]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][extrude-revolve]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][interactive-modeling]"
 ```
 
 The proof covers capability-exact command enablement, deterministic mini-toolbar ordering,

@@ -110,4 +110,5 @@ operate on root-Assembly occurrences so one existing local solve/application bou
 ## Next boundary
 
 Block 131 adds read-only Measure, the coverage manifest v2, and integrated MVP-9 acceptance in
-`docs/interactive-modeling-mvp9-acceptance.md`. Block 132 is next.
+`docs/interactive-modeling-mvp9-acceptance.md`. Block 132 starts GUI Shell Reset MVP-9R
+(`docs/gui-shell-reset-sequence-mvp9r.md`).

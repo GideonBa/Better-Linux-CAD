@@ -135,11 +135,6 @@ parse_generated_seating_plane_reference(std::string_view semantic_reference) {
   return Vector3{-vector.x, -vector.y, -vector.z};
 }
 
-[[nodiscard]] Vector3 cross(const Vector3& lhs, const Vector3& rhs) noexcept {
-  return Vector3{lhs.y * rhs.z - lhs.z * rhs.y, lhs.z * rhs.x - lhs.x * rhs.z,
-                 lhs.x * rhs.y - lhs.y * rhs.x};
-}
-
 [[nodiscard]] Vector3 extrude_direction(const ResolvedWorkplane& workplane,
                                         ExtrudeDirection direction) noexcept {
   if (direction == ExtrudeDirection::OppositeSketchNormal) {
@@ -353,10 +348,6 @@ struct RectangularBoxExtent {
   double thickness_mm = 0.0;
 };
 
-[[nodiscard]] double dot(const Point3& point, const Vector3& axis) noexcept {
-  return point.x * axis.x + point.y * axis.y + point.z * axis.z;
-}
-
 [[nodiscard]] Result<RectangularBoxExtent>
 resolve_rectangular_box_extent(const PartDocument& part, const FeatureId& feature_id,
                                const AssemblyConstraintTarget& target,
@@ -477,15 +468,15 @@ generated_linear_edge_descriptor(SemanticEdge edge, const RectangularBoxExtent& 
       Point3{x_hi, y_lo, 0.0},          Point3{x_hi, y_lo, box.thickness_mm},
       Point3{x_hi, y_hi, 0.0},          Point3{x_hi, y_hi, box.thickness_mm}};
 
-  double s_min = dot(corners.front(), axis.direction);
+  double s_min = project_onto_axis(corners.front(), axis.direction);
   double s_max = s_min;
   for (const Point3& corner : corners) {
-    const double projection = dot(corner, axis.direction);
+    const double projection = project_onto_axis(corner, axis.direction);
     s_min = std::min(s_min, projection);
     s_max = std::max(s_max, projection);
   }
 
-  const double s0 = dot(axis.origin, axis.direction);
+  const double s0 = project_onto_axis(axis.origin, axis.direction);
   const bool min_is_near = std::abs(s_min - s0) <= std::abs(s_max - s0);
   const double near = min_is_near ? s_min : s_max;
   const double far = min_is_near ? s_max : s_min;

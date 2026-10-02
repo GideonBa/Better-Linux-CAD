@@ -523,10 +523,12 @@ Sequence contract: `docs/gui-shell-reset-sequence-mvp9r.md`.
   (`DatumPlane::xz/yz` Core extension + `seed_origin_geometry`), and the sketch entry skeleton
   ("2D-Skizze erstellen" on a selected origin plane with the adaptive white grid).
 - Block 134 — Sketch in the new shell — Implemented: `ShellSketchTools` replaces the five deleted
-  binders as one shell-owned component with explicit references; Zeichnen (21 Werkzeuge als
-  Familien-Menüs), Abhängigkeiten (13 Familien + Löschen, end-to-end verifiziert), Bemaßung
-  (9 Arten, Referenz/treibend, Bearbeiten), Raster-Toggles, solver-backed Drag als Standard-
-  werkzeug. Ändern-Gruppe (Modify) dokumentiert nach Block 136 verschoben.
+  binders as one shell-owned component with explicit references. Ribbon groups (German UI labels):
+  `Zeichnen` (21 tools as family menus), `Abhängigkeiten` (13 families plus delete, verified
+  end-to-end), `Bemaßung` (9 kinds, reference/driving, edit), `Raster` toggles, and solver-backed drag
+  as the default tool. The `Ändern` group (Modify) was initially deferred to Block 136 but is wired in
+  Block 134: Trim/Extend/Split as modal pick tools, two-curve Fillet/Chamfer with auto-constraints and
+  a driving size dimension (`docs/gui-shell-reset-sequence-mvp9r.md`, "Ändern group").
 - Block 135 — Interactive features minimal: Extrude and Revolve in the ribbon with manipulator
   overlay and numeric coupling — the first fully usable end-to-end shell (sketch → extrude).
 - Block 136 — Feature full coverage: remaining feature commands (Fillet, Chamfer, Shell, Draft,
@@ -539,6 +541,12 @@ Make Extrude and Revolve reachable from the ribbon: selection-first flow through
 `GuiInteractiveFeatureCoordinator`, a shell-owned manipulator overlay (notification-driven
 replacement of the deleted Block-123 overlay binder), numeric coupling, and preview/apply/cancel,
 as defined in `docs/gui-shell-reset-sequence-mvp9r.md`.
+
+The coordinator now lives in `include/blcad/gui/gui_interactive_feature_coordinator.hpp` (renamed from
+`gui_interactive_extrude_revolve_binder.hpp`: it never was a binder, and it coordinates all nine Block
+124–128 controllers). It dispatches over one ordered controller list, and every controller — Extrude
+and Revolve included — now exposes `handles()`, so the shell overlay publishes handles without knowing
+which family is active.
 
 ## Later phases
 

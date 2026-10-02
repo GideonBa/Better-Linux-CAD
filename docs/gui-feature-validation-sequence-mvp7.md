@@ -2,7 +2,14 @@
 
 Status: complete. Blocks 95–105 are implemented and accepted. Block 106 begins Interactive
 Sketcher MVP-8; Interactive Modeling MVP-9 follows in Blocks 122–131 and STEP Import MVP-10 in
-Blocks 132–138.
+Blocks 137–143.
+
+> **GUI Shell Reset MVP-9R:** Block 133 deleted the Qt shell this document names — `MainWindow` and
+> all seven self-installing binders — and replaced it with `ShellWindow` + `ShellRibbon`
+> (`src/gui/shell/`, contract: `docs/gui-shell-reset-sequence-mvp9r.md`). The headless authorities and
+> the Core/Geometry contracts below are unchanged and are consumed by the new shell; read every
+> "`MainWindow`" and "binder" below as the shell's Qt presentation layer, whose current form is
+> Block 135/136 work.
 
 This document is the canonical numbered implementation sequence for a simple desktop UI that makes
 every feature implemented through Block 94 reachable and testable. The interaction model follows
@@ -40,7 +47,8 @@ Explicitly deferred:
 - productive direct-manipulation Sketch editing, which starts in Block 106;
 - direct-manipulation Part/Surface/Assembly modeling, which starts in Block 122
   (`docs/interactive-modeling-sequence-mvp9.md`);
-- STEP import, which starts after Interactive Modeling acceptance in Block 132;
+- STEP import, which starts after Interactive Modeling acceptance and the MVP-9R shell reset, in
+  Block 137;
 - production styling, custom themes, workspace customization, macros, add-ins, and command search;
 - manufacturing, drawings, simulation, rendering, collaboration, and cloud workflows;
 - exact parity with any commercial CAD product;
@@ -485,7 +493,7 @@ Focused tags:
 After Block 105, the GUI Validation MVP is complete and Block 106 begins Interactive Sketcher
 MVP-8. Interactive Modeling MVP-9 (Blocks 122–131, `docs/interactive-modeling-sequence-mvp9.md`)
 deepens the Part/Surface/Assembly feature families after Block-121 acceptance; STEP Import MVP-10
-follows in Blocks 132–138.
+follows in Blocks 137–143.
 
 ## Coverage ownership summary
 

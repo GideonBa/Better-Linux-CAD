@@ -6,10 +6,10 @@
 
 #include <utility>
 
-// Interne, nicht oeffentliche Definition des OCCT-Backings von GeometryShape.
-// Dieser Header wird nur von Geometry-Adapter-Uebersetzungseinheiten inkludiert,
-// die als friend von GeometryShape auf die OCCT-Shape zugreifen duerfen. Der
-// oeffentliche Header haelt GeometryShape absichtlich OCCT-frei.
+// Internal, non-public definition of the OCCT backing of GeometryShape. Only
+// Geometry adapter translation units include this header; they are friends of
+// GeometryShape and may reach the OCCT shape. The public header deliberately
+// keeps GeometryShape OCCT-free.
 namespace blcad::geometry {
 
 struct GeometryShape::Impl {

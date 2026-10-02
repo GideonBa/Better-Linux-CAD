@@ -26,14 +26,6 @@ constexpr double k_tolerance = 1.0e-9;
   return Point3{point.x + direction.x, point.y + direction.y, point.z + direction.z};
 }
 
-[[nodiscard]] double dot(Vector3 left, Vector3 right) noexcept {
-  return left.x * right.x + left.y * right.y + left.z * right.z;
-}
-
-[[nodiscard]] double length(Vector2 vector) noexcept {
-  return std::sqrt(vector.x * vector.x + vector.y * vector.y);
-}
-
 [[nodiscard]] Vector2 normalize(Vector2 vector) noexcept {
   const double vector_length = length(vector);
   return Vector2{vector.x / vector_length, vector.y / vector_length};

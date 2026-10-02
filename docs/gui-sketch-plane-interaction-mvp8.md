@@ -3,6 +3,13 @@
 Status: implemented in Block 107. Blocks 108–109 supply persistent topology and solving. Block 110 is
 implemented as the first direct-manipulation consumer of fresh mapped/snapped pointer state.
 
+> **GUI Shell Reset MVP-9R:** Block 133 deleted the Qt shell this document names — `MainWindow` and
+> all seven self-installing binders — and replaced it with `ShellWindow` + `ShellRibbon`
+> (`src/gui/shell/`, contract: `docs/gui-shell-reset-sequence-mvp9r.md`). The headless authorities and
+> the Core/Geometry contracts below are unchanged and are consumed by the new shell; read every
+> "`MainWindow`" and "binder" below as the shell's Qt presentation layer, whose current form is
+> Block 135/136 work.
+
 This document is the canonical GUI interaction contract for Block 107. It extends the contextual
 Sketch workspace with device-independent mapping and one deterministic transient authority for hover,
 hit testing, stacked-hit cycling, Window/Crossing selection, grid presentation, snapping, and inference

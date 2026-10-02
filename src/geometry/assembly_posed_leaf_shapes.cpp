@@ -2,6 +2,7 @@
 
 #include "assembly_occt_rigid_transform.hpp"
 #include "assembly_part_shape_definitions.hpp"
+#include "occt_failure_message.hpp"
 
 #include <BRepBuilderAPI_Transform.hxx>
 #include <Standard_Failure.hxx>
@@ -20,14 +21,6 @@ constexpr const char* kPosedLeafShapesId = "geometry.assembly_posed_leaf_shapes"
 
 [[nodiscard]] Error make_geometry_error(std::string message) {
   return Error::geometry(kPosedLeafShapesId, std::move(message));
-}
-
-[[nodiscard]] std::string standard_failure_message(const Standard_Failure& failure) {
-  const char* const message = failure.GetMessageString();
-  if (message == nullptr || *message == '\0') {
-    return "OCCT operation failed";
-  }
-  return message;
 }
 
 [[nodiscard]] Result<TopoDS_Shape> apply_occt_transform(const TopoDS_Shape& shape,

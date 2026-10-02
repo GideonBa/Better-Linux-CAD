@@ -32,12 +32,6 @@ const Sketch* find_sketch(const GuiDocumentSession& session, SketchId id) {
   return part ? part->find_sketch(std::move(id)) : nullptr;
 }
 
-double dot(Vector3 a, Vector3 b) noexcept { return a.x * b.x + a.y * b.y + a.z * b.z; }
-
-Vector3 displacement(Point3 from, Point3 to) noexcept {
-  return {to.x - from.x, to.y - from.y, to.z - from.z};
-}
-
 } // namespace
 
 Point2 GuiSketchPlaneView::model_to_plane(Point3 point) const noexcept {

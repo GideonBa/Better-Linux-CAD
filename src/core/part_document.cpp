@@ -89,15 +89,6 @@ Result<std::size_t> add_dependency_if_missing(DependencyGraph& graph, std::strin
   return Vector3{to.x - from.x, to.y - from.y, to.z - from.z};
 }
 
-[[nodiscard]] Vector3 cross(Vector3 left, Vector3 right) noexcept {
-  return Vector3{left.y * right.z - left.z * right.y, left.z * right.x - left.x * right.z,
-                 left.x * right.y - left.y * right.x};
-}
-
-[[nodiscard]] double length(Vector3 vector) noexcept {
-  return std::sqrt(vector.x * vector.x + vector.y * vector.y + vector.z * vector.z);
-}
-
 [[nodiscard]] bool are_collinear(Point3 first, Point3 second, Point3 third) noexcept {
   return length(cross(vector_between(first, second), vector_between(first, third))) <= k_tolerance;
 }

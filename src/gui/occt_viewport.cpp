@@ -367,13 +367,6 @@ bool belongs_to_sketch(std::string_view semantic_id, std::string_view sketch_id)
   return semantic_id.size() >= prefix.size() && semantic_id.substr(0, prefix.size()) == prefix;
 }
 
-bool contains_selection(const std::vector<GuiSelection>& selections,
-                        std::string_view semantic_id) {
-  return std::any_of(selections.begin(), selections.end(), [semantic_id](const GuiSelection& item) {
-    return item.kind == GuiSelectionKind::SketchEntity && item.semantic_id == semantic_id;
-  });
-}
-
 void apply_selection_set(std::vector<GuiSelection>& current,
                          const std::vector<GuiSelection>& incoming,
                          Qt::KeyboardModifiers modifiers) {

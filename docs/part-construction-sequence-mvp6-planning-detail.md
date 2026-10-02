@@ -1,4 +1,15 @@
-# Part Construction Sequence MVP-6
+# Part Construction Sequence MVP-6 — Planning Detail (historical)
+
+> **Historical planning snapshot — not current status.** This is the pre-implementation per-block
+> planning detail for Blocks 48–94, preserved for its required-work, failure-policy, acceptance-tag,
+> and proof-matrix detail. Blocks 48–94 are implemented and MVP-6 is complete; the canonical status,
+> phase order, and authority boundaries are in
+> [`docs/part-construction-sequence-mvp6.md`](part-construction-sequence-mvp6.md), and
+> [`docs/mvp-plan.md`](mvp-plan.md) is the status authority. Every status statement below — including
+> "Blocks 48-94 are not implemented yet" and "Current repository work remains on Block 35" — was true
+> when written and is not current.
+
+## Snapshot content
 
 Status: planned post-Assembly-MVP sequence. Blocks 48-94 are not implemented yet.
 

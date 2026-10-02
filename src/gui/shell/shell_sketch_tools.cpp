@@ -1213,8 +1213,8 @@ Result<std::size_t> ShellSketchTools::apply_constraint(SketchSolverConstraintKin
       }
       message += "]";
     }
-    // Solver-Detail für die Diagnose: unterscheidet Stall (0 Iterationen) von
-    // Iterationslimit und zeigt, wie weit das Residuum gefallen ist.
+    // Solver detail for diagnosis: separates a stall (zero iterations) from the
+    // iteration limit, and shows how far the residual fell.
     const auto& solve = preview.solve;
     message += " (iter=" + std::to_string(solve.iterations) +
                ", rms " + std::to_string(solve.residuals.initial_rms) + "→" +

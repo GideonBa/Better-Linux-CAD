@@ -1,6 +1,7 @@
 #include "blcad/geometry/rectangle_extrusion_adapter.hpp"
 
 #include "geometry_shape_internal.hpp"
+#include "occt_failure_message.hpp"
 
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepBuilderAPI_MakePolygon.hxx>
@@ -26,15 +27,6 @@ constexpr const char* kRectangleExtrusionId = "geometry.rectangle_extrusion";
 
 [[nodiscard]] Error make_geometry_error(std::string message) {
   return Error::geometry(kRectangleExtrusionId, std::move(message));
-}
-
-[[nodiscard]] std::string standard_failure_message(const Standard_Failure& failure) {
-  const char* const message = failure.GetMessageString();
-  if (message == nullptr || *message == '\0') {
-    return "OCCT operation failed";
-  }
-
-  return message;
 }
 
 } // namespace

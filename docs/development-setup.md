@@ -66,34 +66,44 @@ ctest --preset dev-geometry --output-on-failure
 
 ## GUI build and tests
 
-The GUI requires Geometry.
+The GUI requires Geometry. Complete GUI workflow:
 
 ```bash
-cmake -S . -B build/dev-gui -G Ninja \
-  -DBLCAD_BUILD_GEOMETRY=ON \
-  -DBLCAD_BUILD_GUI=ON \
-  -DBLCAD_BUILD_TESTS=ON \
-  -DCMAKE_BUILD_TYPE=Debug
-cmake --build build/dev-gui --target blcad_app blcad_gui_tests
+cmake --workflow --preset dev-gui-build-test
+```
+
+Equivalent commands:
+
+```bash
+cmake --preset dev-gui
+cmake --build --preset dev-gui
+ctest --preset dev-gui --output-on-failure
+```
+
+The executable output is `blcad`; the CMake target is `blcad_app`. Run it with:
+
+```bash
 ./build/dev-gui/blcad
 ```
 
-The executable output is `blcad`; the CMake target is `blcad_app`.
-
-Complete GUI tests:
-
-```bash
-QT_QPA_PLATFORM=offscreen ctest --test-dir build/dev-gui --output-on-failure
-```
-
-Only discovered GUI tests:
+The `dev-gui` build directory registers the Core, Geometry, and GUI test executables, so
+`ctest --preset dev-gui` is the broadest run. Only the discovered GUI cases:
 
 ```bash
-QT_QPA_PLATFORM=offscreen ctest --test-dir build/dev-gui -R '^gui\.' --output-on-failure
+ctest --preset dev-gui -R '^gui\.' --output-on-failure
 ```
 
-On Linux the native OCCT viewport uses Qt xcb when `DISPLAY` is available and
-`QT_QPA_PLATFORM` is unset. Offscreen GUI tests use a logical viewport without X11/GLX.
+`CMakeLists.txt` sets `ENVIRONMENT "QT_QPA_PLATFORM=offscreen"` on every discovered GUI test, so
+ctest needs no platform prefix. Invoking the test binary directly does:
+
+```bash
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][shell]"
+```
+
+On Linux the OCCT viewport uses Qt xcb when `DISPLAY` is available and `QT_QPA_PLATFORM` is unset.
+Offscreen GUI tests use a logical viewport without X11/GLX. A change to viewport rendering or to
+interactive behaviour therefore needs a targeted run under `QT_QPA_PLATFORM=xcb` against the test
+binary directly, plus a smoke run of `./build/dev-gui/blcad`; offscreen alone does not prove it.
 
 ## Interactive Sketcher focused proof
 
@@ -137,20 +147,18 @@ QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][sketch-drag]"
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][sketch-live-solve]"
 ```
 
-Block 111 basic creation:
+Block 111 basic creation — the Block-133 shell reset replaced the MVP-8 creation binder and its
+tests; line, circle, and rectangle creation is now proved through the shell tool surface:
 
 ```bash
-QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][sketch-create-basic]"
-QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][sketch-basic-profile]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][sketch-create]"
+./build/dev-geometry/blcad_geometry_tests "[gui][sketch-profile-selection]"
 ```
 
-Block 112 conic and slot creation:
-
-```bash
-./build/dev/blcad_core_tests "[core][sketch-conics]"
-./build/dev-geometry/blcad_geometry_tests "[geometry][sketch-conics]"
-QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][sketch-create-conics]"
-```
+Block 112 conic and slot creation has no focused proof. Ellipse/slot creation lives in the GUI layer
+only (`gui_sketch_create`, `shell/shell_sketch_tools`); there is no Core or Geometry conic intent, and
+the shell tool tests cover line/circle/rectangle. Closing this gap belongs to Block 136 (feature full
+coverage, `docs/gui-shell-reset-sequence-mvp9r.md`).
 
 Block 113 spline editing and Sketch text:
 
@@ -178,7 +186,7 @@ Block 115 driving/reference dimensions, typed parameters, expressions, and annot
 ./build/dev/blcad_core_tests "[core][sketch-dimensions]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][sketch-dimensions]"
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][sketch-dimensions]"
-QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][sketch-expression-edit]"
+./build/dev/blcad_core_tests "[integration][sketch-expression-edit]"
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][sketch-live-solve]"
 ```
 
@@ -229,43 +237,28 @@ Block 120 Interactive Sketch3D (headless Core proof):
 
 ## Interactive Modeling focused proof
 
-Block 122 selection-first modeling workspace, visible Qt shell, materialized profile handoff,
-selection filters, repeat, and navigation aids:
+Blocks 122 and 123 have no focused proof in the tree. Their cases asserted against the deleted
+MainWindow shell — stable Qt object names, the mini toolbar, the ViewCube/bookmark widgets, and the
+manipulator overlay binder — and were removed with the Block-133 shell reset
+(`docs/gui-shell-reset-sequence-mvp9r.md`). The headless authorities they covered,
+`GuiModelingWorkspace` and `GuiViewportManipulatorLayer`, are unchanged and still exercised by the
+Block 124–130 controller proofs below. Block 135 re-establishes manipulator overlay coverage against
+`ShellWindow`, and Block 136 restores the workspace-level coverage.
 
-```bash
-QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][modeling-workspace]"
-QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][in-context-command]"
-QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][view-navigation-aids]"
-```
-
-These cases verify capability-exact enablement, deterministic mini-toolbar ordering, preselection
-consumption and complete Cancel restoration, rejection of a non-materialized profile, synchronized
-session/viewport filters, stable shell object names, ViewCube targets, Home, and camera bookmarks.
-
-Block 123 reusable viewport manipulators and numeric coupling:
-
-```bash
-QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][viewport-manipulators]"
-QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][manipulator-numeric-coupling]"
-```
-
-These cases verify fixed-DIP presentation, deterministic hit tie breaking, model-space linear,
-angular, and radial mapping, exact final release, typed-value precedence, translation/rotation triad
-construction, PatternCount quantization, candidate-only behavior over a live Part session, and the
-visible overlay/HUD shell.
+The Block 124–130 proofs below are headless controller tests and are unaffected by the shell reset.
 
 Block 124 interactive Extrude, path Extrude, and Revolve authoring:
 
 ```bash
-QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][interactive-extrude]"
-QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][interactive-revolve]"
-QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][extrude-revolve-manipulator]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][extrude-revolve]"
 ```
 
 These cases verify extent-parameter driving with one atomic transaction and exact undo, operation/
 taper/thin/through-all modes with their offered handles, fail-closed rejection of invalid inputs,
-full/angle/symmetric revolve authoring, manipulator/typed document equivalence, and `MainWindow`
-ownership of the interactive feature coordinator.
+full/angle/symmetric revolve authoring, and manipulator/typed document equivalence. The dedicated
+`[gui][interactive-extrude]`, `[gui][interactive-revolve]`, and
+`[integration][extrude-revolve-manipulator]` cases asserted against the deleted MainWindow shell and
+were removed with the Block-133 shell reset; Block 135 restores them against `ShellWindow`.
 
 Block 125 interactive Fillet, Chamfer, Shell, and Draft authoring:
 
@@ -344,13 +337,16 @@ editing and undo, compatibility-filtered relationship/joint picking, solved rela
 root-space joint frames, typed slot limits, one-coordinate vector drives, motion HUD solve/DOF state,
 atomic pose/intent application, and Spherical drive rejection.
 
-Block 131 Measure, coverage, and integrated acceptance:
+Block 131 integrated acceptance:
 
 ```bash
-QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][measure]"
-QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][modeling-coverage-manifest]"
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][interactive-modeling]"
 ```
+
+Measure (`include/blcad/geometry/geometry_measure.hpp`) and the coverage-manifest check currently have
+no tests: `[gui][measure]` and `[integration][modeling-coverage-manifest]` lived in the shell-bound
+files deleted by Block 133, and nothing replaced them. `GeometryMeasure` is therefore an uncovered
+Geometry authority; Block 136 owns restoring both (`docs/gui-shell-reset-sequence-mvp9r.md`).
 
 ## Representative existing validation tags
 
@@ -362,15 +358,16 @@ QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][interac
 ./build/dev-geometry/blcad_geometry_tests "[geometry][sweep-feature]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][surface-stitch]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][assembly-structured-step-export]"
-QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][application-shell]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][shell]"
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][document-session]"
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][viewport]"
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][model-browser]"
-QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][gui-feature-coverage]"
 ```
 
-The exact test registration in `CMakeLists.txt` is authoritative. Block-122 and Block-123 cases remain
-in the existing `blcad_gui_tests` executable; no second Qt application instance is introduced.
+The exact test registration in `CMakeLists.txt` is authoritative, and the tags there are the only
+authority for what exists — this document lists representative entry points, not a complete set. All
+cases live in the single `blcad_gui_tests` executable; no second Qt application instance is
+introduced.
 
 ## Headless tools
 
@@ -387,32 +384,32 @@ in the existing `blcad_gui_tests` executable; no second Qt application instance 
 
 ## Public Blocks 122–131 boundaries
 
+Block 133 deleted the MainWindow shell, all seven binders, and the shell-bound test files; the headless
+boundaries below are what survived and are consumed unchanged by `ShellWindow`
+(`docs/gui-shell-reset-sequence-mvp9r.md`). `gui_interactive_extrude_revolve_binder.hpp` was renamed to
+`gui_interactive_feature_coordinator.hpp`: it never was a binder, and it coordinates all nine Block
+124–128 controllers, not just Extrude/Revolve.
+
 ```text
 include/blcad/gui/gui_modeling_workspace.hpp
-include/blcad/gui/gui_modeling_workspace_binder.hpp
 include/blcad/gui/gui_viewport_manipulator.hpp
-include/blcad/gui/gui_viewport_manipulator_binder.hpp
 include/blcad/gui/gui_interactive_extrude_revolve.hpp
-include/blcad/gui/gui_interactive_extrude_revolve_binder.hpp
 include/blcad/gui/gui_interactive_finishing.hpp
 include/blcad/gui/gui_interactive_pattern_body.hpp
 include/blcad/gui/gui_interactive_path_sweep_loft.hpp
 include/blcad/gui/gui_interactive_surface.hpp
 include/blcad/gui/gui_feature_edit.hpp
 include/blcad/gui/gui_interactive_assembly.hpp
+include/blcad/gui/gui_interactive_feature_coordinator.hpp
 include/blcad/gui/gui_measure.hpp
 include/blcad/geometry/geometry_measure.hpp
 include/blcad/core/part_document.hpp
-include/blcad/gui/main_window.hpp
-tests/gui/gui_feature_coverage_acceptance_tests.cpp
-tests/gui/gui_interactive_features_tests.cpp
 tests/gui/gui_interactive_finishing_tests.cpp
 tests/gui/gui_interactive_pattern_body_tests.cpp
 tests/gui/gui_interactive_path_sweep_loft_tests.cpp
 tests/gui/gui_interactive_surface_tests.cpp
 tests/gui/gui_feature_edit_tests.cpp
 tests/gui/gui_interactive_assembly_tests.cpp
-tests/gui/gui_measure_tests.cpp
 tests/gui/gui_interactive_modeling_mvp9_acceptance_tests.cpp
 tests/core/feature_update_command_tests.cpp
 docs/gui-modeling-workspace-mvp9.md
@@ -450,29 +447,13 @@ and coverage plus integrated acceptance are checked-in validation artifacts.
 Formatting is configured by `.editorconfig` and `.clang-format`.
 
 ```bash
-clang-format -i \
-  include/blcad/gui/gui_modeling_workspace.hpp \
-  include/blcad/gui/gui_modeling_workspace_binder.hpp \
-  include/blcad/gui/gui_viewport_manipulator.hpp \
-  include/blcad/gui/gui_viewport_manipulator_binder.hpp \
-  include/blcad/gui/gui_interactive_extrude_revolve.hpp \
-  include/blcad/gui/gui_interactive_extrude_revolve_binder.hpp \
-  include/blcad/gui/gui_interactive_finishing.hpp \
-  include/blcad/gui/gui_interactive_pattern_body.hpp \
-  include/blcad/gui/gui_interactive_path_sweep_loft.hpp \
-  include/blcad/gui/gui_interactive_surface.hpp \
-  include/blcad/gui/gui_feature_edit.hpp \
-  include/blcad/gui/gui_interactive_assembly.hpp \
-  include/blcad/gui/main_window.hpp \
-  tests/gui/gui_feature_coverage_acceptance_tests.cpp \
-  tests/gui/gui_interactive_features_tests.cpp \
-  tests/gui/gui_interactive_finishing_tests.cpp \
-  tests/gui/gui_interactive_pattern_body_tests.cpp \
-  tests/gui/gui_interactive_path_sweep_loft_tests.cpp \
-  tests/gui/gui_interactive_surface_tests.cpp \
-  tests/gui/gui_feature_edit_tests.cpp \
-  tests/gui/gui_interactive_assembly_tests.cpp \
-  tests/core/feature_update_command_tests.cpp
+find include src tests -name '*.hpp' -o -name '*.cpp' | xargs clang-format -i
+```
+
+Formatting a focused change set instead:
+
+```bash
+git diff --name-only --diff-filter=ACM -- '*.hpp' '*.cpp' | xargs -r clang-format -i
 ```
 
 ## Clean generated files
@@ -499,7 +480,26 @@ rm -rf build/
 
 ## Current development boundary
 
-Blocks 106–121 and Interactive Modeling Blocks 122–131 are implemented and accepted: selection-first
-workspace, reusable candidate-only manipulators, interactive Part/Surface features, feature editing,
-direct Assembly placement/relationship/joint/motion workflows, transient Measure, coverage manifest
-v2, and integrated acceptance. Block 132 is next.
+`docs/mvp-plan.md` is the status authority; this section only names the current build/test boundary.
+
+Interactive Sketcher MVP-8 (Blocks 106–121) and Interactive Part & Assembly Modeling MVP-9 (Blocks
+122–131) are implemented and accepted. GUI Shell Reset MVP-9R replaces the Qt shell those phases grew:
+Blocks 132 (QOpenGLWidget viewport), 133 (`ShellWindow` + `ShellRibbon`, origin seeding), and 134
+(`ShellSketchTools`) are implemented; Block 135 (Extrude/Revolve in the ribbon with a manipulator
+overlay) is next, and Block 136 restores full feature and acceptance coverage.
+
+## GUI Shell Reset focused proof
+
+```bash
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][viewport]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][shell]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][ribbon]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][origin]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][sketch-entry]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][shell-sketch]"
+```
+
+Block 132 proves the QOpenGLWidget render surface and the single-repaint funnel; Block 133 proves the
+ribbon, model browser with its origin folder, document lifecycle, selection and revision-gated refresh,
+and origin seeding; Block 134 proves the shell-owned draw/constraint/dimension/modify tool surface and
+solver-backed dragging.

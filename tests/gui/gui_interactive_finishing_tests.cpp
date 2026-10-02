@@ -1,4 +1,4 @@
-#include "blcad/gui/gui_interactive_extrude_revolve_binder.hpp"
+#include "blcad/gui/gui_interactive_feature_coordinator.hpp"
 #include "blcad/gui/gui_interactive_finishing.hpp"
 
 #include "blcad/core/body.hpp"

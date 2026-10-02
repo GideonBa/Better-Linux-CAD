@@ -127,22 +127,15 @@ inline constexpr double pi = 3.141592653589793238462643383279502884;
 [[nodiscard]] inline Vector3 scale(Vector3 v, double s) noexcept {
   return {v.x * s, v.y * s, v.z * s};
 }
-[[nodiscard]] inline double dot(Vector3 a, Vector3 b) noexcept {
-  return a.x * b.x + a.y * b.y + a.z * b.z;
-}
-[[nodiscard]] inline Vector3 cross(Vector3 a, Vector3 b) noexcept {
-  return {a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z,
-          a.x * b.y - a.y * b.x};
-}
-[[nodiscard]] inline double length(Vector3 v) noexcept {
-  return std::sqrt(dot(v, v));
-}
-[[nodiscard]] inline Vector3 normalized(Vector3 v) noexcept {
+// A manipulator axis that collapses to zero length must disable the handle, not
+// produce NaN, so normalization here deliberately returns the zero vector where
+// `blcad::normalized` has a non-degenerate precondition.
+[[nodiscard]] inline Vector3 normalized_or_zero(Vector3 v) noexcept {
   const double l = length(v);
   return l <= epsilon ? Vector3{} : scale(v, 1.0 / l);
 }
 [[nodiscard]] inline Vector3 project_to_plane(Vector3 v, Vector3 normal) noexcept {
-  normal = normalized(normal);
+  normal = normalized_or_zero(normal);
   return add(v, scale(normal, -dot(v, normal)));
 }
 [[nodiscard]] inline double screen_length(GuiSketchScreenPoint v) noexcept {
@@ -193,7 +186,7 @@ value_kind(GuiViewportManipulatorKind kind) noexcept {
   return GuiViewportManipulatorValueKind::Distance;
 }
 [[nodiscard]] inline GuiSketchScreenPoint fallback_screen_direction(Vector3 axis) noexcept {
-  axis = normalized(axis);
+  axis = normalized_or_zero(axis);
   const double ax = std::abs(axis.x), ay = std::abs(axis.y), az = std::abs(axis.z);
   if (ax >= ay && ax >= az) return {axis.x < 0.0 ? -1.0 : 1.0, 0.0};
   if (ay >= ax && ay >= az) return {0.0, axis.y < 0.0 ? 1.0 : -1.0};
@@ -229,13 +222,13 @@ public:
           Error::validation("gui.viewport_manipulator.mapping",
                             "camera and viewport values must be finite and positive"));
 
-    const Vector3 view = normalized(subtract(camera.target, camera.eye));
-    const Vector3 right = normalized(cross(view, camera.up_direction));
+    const Vector3 view = normalized_or_zero(subtract(camera.target, camera.eye));
+    const Vector3 right = normalized_or_zero(cross(view, camera.up_direction));
     if (length(view) <= epsilon || length(right) <= epsilon)
       return Result<GuiViewportManipulatorMapping>::failure(
           Error::validation("gui.viewport_manipulator.mapping",
                             "camera frame is degenerate"));
-    const Vector3 up = normalized(cross(right, view));
+    const Vector3 up = normalized_or_zero(cross(right, view));
     const double target_distance = length(subtract(camera.target, camera.eye));
     const double model_per_dip = camera.scale / height_dip;
     if (!std::isfinite(model_per_dip) || model_per_dip <= epsilon)
@@ -284,7 +277,7 @@ public:
       const double v = (height_dip * 0.5 - screen.y) * model_per_dip;
       const Point3 target_plane = add(camera.target, add(scale(right, h), scale(up, v)));
       if (camera.projection == GuiViewportProjection::Perspective) {
-        const Vector3 direction = normalized(subtract(target_plane, camera.eye));
+        const Vector3 direction = normalized_or_zero(subtract(target_plane, camera.eye));
         if (length(direction) <= epsilon)
           return Result<GuiSketchViewRay>::failure(
               Error::validation("gui.viewport_manipulator.mapping",
@@ -326,9 +319,9 @@ public:
     for (auto& handle : handles) {
       const auto valid = validate_handle(handle);
       if (valid.has_error()) return Result<std::size_t>::failure(valid.error());
-      handle.axis = normalized(handle.axis);
-      handle.plane_normal = normalized(handle.plane_normal);
-      handle.reference_direction = normalized(handle.reference_direction);
+      handle.axis = normalized_or_zero(handle.axis);
+      handle.plane_normal = normalized_or_zero(handle.plane_normal);
+      handle.reference_direction = normalized_or_zero(handle.reference_direction);
     }
     std::sort(handles.begin(), handles.end(),
               [](const auto& a, const auto& b) { return a.id < b.id; });
@@ -548,7 +541,7 @@ private:
     if (anchor.has_error()) return std::nullopt;
     const Vector3 model_direction =
         is_ring(h.kind) || h.kind == GuiViewportManipulatorKind::Radial
-            ? normalized(project_to_plane(h.reference_direction, h.plane_normal))
+            ? normalized_or_zero(project_to_plane(h.reference_direction, h.plane_normal))
             : h.axis;
     const auto projected = mapping_->model_to_screen(add(h.origin, model_direction));
     GuiSketchScreenPoint direction{};
@@ -590,8 +583,8 @@ private:
                      const GuiSketchViewRay& ray,
                      GuiSketchScreenPoint pointer) const {
     using namespace manipulator_detail;
-    const Vector3 axis = normalized(h.axis);
-    const Vector3 direction = normalized(ray.direction);
+    const Vector3 axis = normalized_or_zero(h.axis);
+    const Vector3 direction = normalized_or_zero(ray.direction);
     const Vector3 w0 = subtract(h.origin, ray.origin);
     const double a = dot(axis, axis), b = dot(axis, direction), c = dot(direction, direction);
     const double d = dot(axis, w0), e = dot(direction, w0);
@@ -618,7 +611,7 @@ private:
   [[nodiscard]] static std::optional<Point3>
   intersect_plane(const GuiSketchViewRay& ray, Point3 origin, Vector3 normal) {
     using namespace manipulator_detail;
-    normal = normalized(normal);
+    normal = normalized_or_zero(normal);
     const double denominator = dot(ray.direction, normal);
     if (std::abs(denominator) <= epsilon) return std::nullopt;
     const double t = dot(subtract(origin, ray.origin), normal) / denominator;
@@ -642,9 +635,9 @@ private:
     using namespace manipulator_detail;
     const auto point = intersect_plane(ray, h.origin, h.plane_normal);
     if (!point) return std::nullopt;
-    const Vector3 normal = normalized(h.plane_normal);
-    const Vector3 reference = normalized(project_to_plane(h.reference_direction, normal));
-    const Vector3 radial = normalized(project_to_plane(subtract(*point, h.origin), normal));
+    const Vector3 normal = normalized_or_zero(h.plane_normal);
+    const Vector3 reference = normalized_or_zero(project_to_plane(h.reference_direction, normal));
+    const Vector3 radial = normalized_or_zero(project_to_plane(subtract(*point, h.origin), normal));
     if (length(reference) <= epsilon || length(radial) <= epsilon) return std::nullopt;
     return std::atan2(dot(cross(reference, radial), normal),
                       std::clamp(dot(reference, radial), -1.0, 1.0)) *
@@ -686,7 +679,7 @@ private:
     }
     if (h.kind == GuiViewportManipulatorKind::TranslateAxis ||
         h.kind == GuiViewportManipulatorKind::RotateAxis)
-      c.vector_value = scale(normalized(h.axis), c.scalar_value);
+      c.vector_value = scale(normalized_or_zero(h.axis), c.scalar_value);
     return c;
   }
 

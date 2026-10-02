@@ -150,15 +150,6 @@ evaluate_geometric_descriptor(const std::vector<RigidTransform>& transforms,
   return Vector3{lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z};
 }
 
-[[nodiscard]] double dot(const Vector3& lhs, const Vector3& rhs) noexcept {
-  return lhs.x * rhs.x + lhs.y * rhs.y + lhs.z * rhs.z;
-}
-
-[[nodiscard]] Vector3 cross(const Vector3& lhs, const Vector3& rhs) noexcept {
-  return Vector3{lhs.y * rhs.z - lhs.z * rhs.y, lhs.z * rhs.x - lhs.x * rhs.z,
-                 lhs.x * rhs.y - lhs.y * rhs.x};
-}
-
 [[nodiscard]] Result<ResolvedHierarchyGeometricTarget>
 resolve_hierarchy_geometric_target(const Project& project,
                                    const AssemblyHierarchyConstraintTarget& target) {

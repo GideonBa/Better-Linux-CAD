@@ -2,6 +2,13 @@
 
 Status: implemented in Block 115.
 
+> **GUI Shell Reset MVP-9R:** Block 133 deleted the Qt shell this document names — `MainWindow` and
+> all seven self-installing binders — and replaced it with `ShellWindow` + `ShellRibbon`
+> (`src/gui/shell/`, contract: `docs/gui-shell-reset-sequence-mvp9r.md`). The headless authorities and
+> the Core/Geometry contracts below are unchanged and are consumed by the new shell; read every
+> "`MainWindow`" and "binder" below as the shell's Qt presentation layer, whose current form is
+> Block 135/136 work.
+
 This contract exposes typed driving and reference dimensions over stable Block-108 topology targets,
 reuses the Block-109 planar solver and Block-114 constraint catalog, binds driving values to the existing
 Part parameter/expression authority, publishes semantic in-canvas annotations, and commits parameter,
@@ -275,7 +282,7 @@ rejected rather than publishing a stale equivalent-radius approximation.
 ./build/dev/blcad_core_tests "[core][sketch-dimensions]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][sketch-dimensions]"
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][sketch-dimensions]"
-QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][sketch-expression-edit]"
+./build/dev/blcad_core_tests "[integration][sketch-expression-edit]"
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][sketch-live-solve]"
 ```
 

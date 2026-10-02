@@ -33,4 +33,6 @@ case has a 5000 ms CI ceiling; the model size and measured duration are emitted 
 
 ## Result
 
-Blocks 122–131 are accepted. Block 132 is the next implementation boundary.
+Blocks 122–131 are accepted. Block 132 starts GUI Shell Reset MVP-9R
+(`docs/gui-shell-reset-sequence-mvp9r.md`), which replaces the Qt shell these blocks grew without
+moving authority out of Core/Geometry.

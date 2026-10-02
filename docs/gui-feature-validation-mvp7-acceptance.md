@@ -24,13 +24,19 @@ their focused tags. Manual camera, pointer, and bidirectional picking checks are
 `docs/gui-feature-validation-manual-smoke-mvp7.md`.
 
 ```bash
-./build/dev-gui/blcad_gui_tests "[integration][gui-feature-coverage]"
-./build/dev-gui/blcad_gui_tests "[integration][gui-headless-equivalence]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][gui-headless-equivalence]"
 ```
 
+The machine-checked coverage case `[integration][gui-feature-coverage]` lived in
+`tests/gui/gui_feature_coverage_acceptance_tests.cpp`, which the Block-133 shell reset deleted
+(`docs/gui-shell-reset-sequence-mvp9r.md`). The checked-in manifest
+`docs/gui-feature-coverage-manifest-mvp7.json` remains the accepted record of the MVP-7 dispositions;
+Block 136 restores the machine check against `ShellWindow`.
+
 Block 106 starts Interactive Sketcher MVP-8; it extends direct manipulation without reopening or
-weakening this validation boundary. Interactive Modeling MVP-9 follows in Block 122 and STEP
-Import MVP-10 in Block 132.
+weakening this validation boundary. Interactive Modeling MVP-9 follows in Block 122, GUI Shell Reset
+MVP-9R in Block 132, and STEP Import MVP-10 in Block 137 (`docs/mvp-plan.md` is the status
+authority).
 
 Block 131 preserves this manifest as the baseline and extends it with
 `docs/gui-feature-coverage-manifest-mvp9.json`; CI requires an interactive owner or explicit

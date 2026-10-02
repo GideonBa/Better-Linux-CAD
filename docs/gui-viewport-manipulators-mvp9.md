@@ -1,6 +1,9 @@
 # GUI Viewport Manipulator Infrastructure MVP-9
 
-Status: implemented in Block 123.
+Status: implemented in Block 123. `GuiViewportManipulatorLayer` is unchanged, but
+`GuiViewportManipulatorShellBinder` — the transparent Qt overlay described here — was deleted with the
+Block-133 shell reset (`docs/gui-shell-reset-sequence-mvp9r.md`). Block 135 replaces it with a
+shell-owned, notification-driven overlay; the Qt overlay specifics below are historical until then.
 
 Block 123 provides one reusable transient manipulation layer for the interactive Part, Surface, and
 Assembly commands sequenced in Blocks 124–130. The layer maps viewport pointer motion to candidate
@@ -155,9 +158,13 @@ binder performs no Core/Geometry mutation and no preview transaction.
 
 ## Focused proof
 
+The `[gui][viewport-manipulators]` and `[gui][manipulator-numeric-coupling]` cases asserted against
+the deleted overlay binder and were removed with Block 133; Block 135 restores them against
+`ShellWindow`. The layer's model-space mapping and candidate contract are meanwhile exercised through
+the Block 124–128 controller proofs, and its hit performance budget still has a focused case:
+
 ```bash
-QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][viewport-manipulators]"
-QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][manipulator-numeric-coupling]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[performance][manipulator-hit]"
 ```
 
 The proof covers fixed-DIP presentation, deterministic tie breaking, model-space linear mapping, exact

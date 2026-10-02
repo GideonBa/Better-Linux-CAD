@@ -4,6 +4,7 @@
 
 #include "assembly_posed_leaf_shapes.hpp"
 #include "geometry_shape_internal.hpp"
+#include "occt_failure_message.hpp"
 
 #include <BRep_Builder.hxx>
 #include <Standard_Failure.hxx>
@@ -26,14 +27,6 @@ constexpr const char* kAssemblyStepExporterId = "geometry.assembly_step_exporter
 
 [[nodiscard]] Error make_export_error(std::string message) {
   return Error::export_error(kAssemblyStepExporterId, std::move(message));
-}
-
-[[nodiscard]] std::string standard_failure_message(const Standard_Failure& failure) {
-  const char* const message = failure.GetMessageString();
-  if (message == nullptr || *message == '\0') {
-    return "OCCT operation failed";
-  }
-  return message;
 }
 
 } // namespace

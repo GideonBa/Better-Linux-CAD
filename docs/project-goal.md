@@ -81,7 +81,8 @@ the feature edit lifecycle and Core feature-update commands (`docs/gui-feature-e
 Block 130 adds interactive Assembly placement, compatibility-filtered relationships, oriented joint
 frames, and coordinate motion (`docs/gui-interactive-assembly-mvp9.md`). Block 131 adds read-only
 Measure, coverage manifest v2, and integrated acceptance
-(`docs/interactive-modeling-mvp9-acceptance.md`). STEP Import starts next at Block 132.
+(`docs/interactive-modeling-mvp9-acceptance.md`). GUI Shell Reset MVP-9R runs through Blocks 132–136
+(`docs/gui-shell-reset-sequence-mvp9r.md`); STEP Import MVP-10 starts at Block 137.
 
 Development rule:
 
@@ -160,11 +161,13 @@ source topology is never mutated by `SketchConstraintSolver::solve(...)`.
 
 Block 122 begins Interactive Part/Surface/Assembly Modeling without extending persistent model intent.
 `GuiModelingWorkspace` combines one semantic selection with verified capabilities, starts the existing
-`GuiTaskState`, and restores complete preselection on cancellation. `GuiModelingWorkspaceShellBinder`
-renders the visible context tabs, filters, mini-toolbar, Repeat, ViewCube, Home, and camera-bookmark
-controls.
+`GuiTaskState`, and restores complete preselection on cancellation. The visible context tabs, filters,
+mini-toolbar, Repeat, ViewCube, Home, and camera-bookmark controls were rendered by
+`GuiModelingWorkspaceShellBinder` until Block 133 deleted it with the MVP-9R shell reset; Block 136
+re-establishes them on `ShellWindow` (`docs/gui-shell-reset-sequence-mvp9r.md`).
 
-Block 123 adds `GuiViewportManipulatorLayer` and `GuiViewportManipulatorShellBinder`. Stable
+Block 123 adds `GuiViewportManipulatorLayer` and, until the Block-133 shell reset deleted it,
+`GuiViewportManipulatorShellBinder`; Block 135 replaces that overlay with a shell-owned one. Stable
 model-space handle frames map pointer rays to signed distances, radii, angles, triad coordinates, and
 pattern values. Presentation and hit tolerances remain fixed in DIP; ties use stable handle ids. Typed
 HUD values override dragging, and release evaluates the exact final pointer sample. The layer emits

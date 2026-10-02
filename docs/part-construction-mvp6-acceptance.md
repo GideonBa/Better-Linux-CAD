@@ -76,4 +76,5 @@ kernel entity order.
 
 Part Construction MVP-6 is complete through Block 94 and GUI Feature Validation MVP-7 is accepted
 through Block 105. Interactive Sketcher MVP-8 begins in Block 106; Interactive Modeling MVP-9
-follows after its acceptance in Block 122, and STEP Import MVP-10 in Block 132.
+follows after its acceptance in Block 122, GUI Shell Reset MVP-9R in Block 132, and STEP Import
+MVP-10 in Block 137.

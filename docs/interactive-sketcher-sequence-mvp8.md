@@ -3,7 +3,14 @@
 Status: complete. Blocks 106–121 are implemented and accepted. Block 122 begins Interactive Part &
 Assembly Modeling MVP-9.
 Blocks 106–121 precede Interactive Modeling MVP-9 (Blocks 122–131) and STEP Import MVP-10
-(Blocks 132–138).
+(Blocks 137–143).
+
+> **GUI Shell Reset MVP-9R:** Block 133 deleted the Qt shell this document names — `MainWindow` and
+> all seven self-installing binders — and replaced it with `ShellWindow` + `ShellRibbon`
+> (`src/gui/shell/`, contract: `docs/gui-shell-reset-sequence-mvp9r.md`). The headless authorities and
+> the Core/Geometry contracts below are unchanged and are consumed by the new shell; read every
+> "`MainWindow`" and "binder" below as the shell's Qt presentation layer, whose current form is
+> Block 135/136 work.
 
 This phase turns the Block-99 validation surface into a productive, Inventor-familiar Sketch
 workbench. The target is direct manipulation, visible constraints, in-canvas dimensions, predictable
@@ -372,4 +379,4 @@ boundary instead of silent inclusion:
   projection; curved Sketch3D records remain script/document-authored.
 
 After Block 121, Interactive Part & Assembly Modeling MVP-9 begins at Block 122. STEP Import MVP-10
-follows in Blocks 132–138.
+follows in Blocks 137–143.

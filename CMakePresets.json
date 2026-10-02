@@ -23,6 +23,15 @@
       }
     },
     {
+      "name": "dev-gui",
+      "displayName": "Development with Geometry and Qt GUI",
+      "inherits": "dev-geometry",
+      "binaryDir": "${sourceDir}/build/dev-gui",
+      "cacheVariables": {
+        "BLCAD_BUILD_GUI": "ON"
+      }
+    },
+    {
       "name": "release",
       "displayName": "Release",
       "generator": "Ninja",
@@ -38,6 +47,7 @@
   "buildPresets": [
     {"name": "dev", "configurePreset": "dev"},
     {"name": "dev-geometry", "configurePreset": "dev-geometry"},
+    {"name": "dev-gui", "configurePreset": "dev-gui"},
     {"name": "release", "configurePreset": "release"}
   ],
   "testPresets": [
@@ -49,6 +59,11 @@
     {
       "name": "dev-geometry",
       "configurePreset": "dev-geometry",
+      "output": {"outputOnFailure": true}
+    },
+    {
+      "name": "dev-gui",
+      "configurePreset": "dev-gui",
       "output": {"outputOnFailure": true}
     }
   ],
@@ -67,6 +82,14 @@
         {"type": "configure", "name": "dev-geometry"},
         {"type": "build", "name": "dev-geometry"},
         {"type": "test", "name": "dev-geometry"}
+      ]
+    },
+    {
+      "name": "dev-gui-build-test",
+      "steps": [
+        {"type": "configure", "name": "dev-gui"},
+        {"type": "build", "name": "dev-gui"},
+        {"type": "test", "name": "dev-gui"}
       ]
     }
   ]

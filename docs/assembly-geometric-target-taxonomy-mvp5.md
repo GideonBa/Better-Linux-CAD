@@ -6,6 +6,10 @@ This document is canonical for the Geometry-layer derived assembly target taxono
 
 Generated-topology Core identity/recovery is canonical in `docs/assembly-generated-topology-reference-mvp5.md`. Geometry resolution of those Block-35 `topo:` identities through this taxonomy is implemented as Block 36; explicit relationship target compatibility is implemented as Block 37. Block 38 adds persistent generic relationship intent. Block 39 extends capability compatibility and shared equation execution for the documented Point/Line/Axis/Plane generic relationship matrix. Their canonical contracts live in `docs/assembly-general-geometric-target-roadmap.md`, `docs/assembly-generic-relationship-intent-mvp5.md`, and `docs/assembly-generic-relationship-equations-mvp5.md`.
 
+The expanded Block-31 working detail behind this contract is preserved in
+`docs/assembly-geometric-target-taxonomy-mvp5-block31-detail.md`. This document wins wherever the two
+differ.
+
 ## Scope
 
 Implemented in the target taxonomy:

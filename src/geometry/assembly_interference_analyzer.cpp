@@ -1,6 +1,7 @@
 #include "blcad/geometry/assembly_interference_analyzer.hpp"
 
 #include "assembly_posed_leaf_shapes.hpp"
+#include "occt_failure_message.hpp"
 
 #include <BRepAlgoAPI_Common.hxx>
 #include <BRepExtrema_DistShapeShape.hxx>
@@ -24,14 +25,6 @@ constexpr const char* kInterferenceAnalyzerId = "geometry.assembly_interference_
 
 [[nodiscard]] Error make_geometry_error(std::string message) {
   return Error::geometry(kInterferenceAnalyzerId, std::move(message));
-}
-
-[[nodiscard]] std::string standard_failure_message(const Standard_Failure& failure) {
-  const char* const message = failure.GetMessageString();
-  if (message == nullptr || *message == '\0') {
-    return "OCCT operation failed";
-  }
-  return message;
 }
 
 [[nodiscard]] AssemblyLeafIdentity make_leaf_identity(const detail::PosedLeafShape& posed) {

@@ -1,6 +1,10 @@
 # GUI Sketch Conic and Slot Creation MVP-8
 
-Status: implemented in Block 112; Block-114 constraint acceptance is implemented.
+Status: implemented in Block 112 in the GUI layer only; Block-114 constraint acceptance is
+implemented. There is no Core or Geometry conic intent, and no focused proof exists: the
+`[gui][sketch-create-conics]` cases were deleted with the Block-133 shell reset, and
+`[core][sketch-conics]`/`[geometry][sketch-conics]` were never implemented. Block 136 owns closing this
+gap (`docs/gui-shell-reset-sequence-mvp9r.md`).
 
 This contract extends the Block-111 multi-click creation authority with circles, circular arcs,
 ellipses, elliptical arcs, and mechanical slots. It keeps all screen-space interaction transient and
@@ -143,10 +147,11 @@ Block 115.
 
 ## Verification
 
+No focused proof exists for this contract — see the status note above. The shell tool surface that
+replaced the deleted creation binder currently covers line, circle, and rectangle:
+
 ```bash
-QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[core][sketch-conics]"
-QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[geometry][sketch-conics]"
-QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][sketch-create-conics]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][sketch-create]"
 ```
 
 Acceptance covers exact CircleProfile/Parameter persistence, JSON roundtrip, atomic undo/redo,

@@ -4,6 +4,7 @@
 
 #include "assembly_occt_rigid_transform.hpp"
 #include "assembly_part_shape_definitions.hpp"
+#include "occt_failure_message.hpp"
 
 #include <IFSelect_ReturnStatus.hxx>
 #include <Interface_Static.hxx>
@@ -42,14 +43,6 @@ struct PartDefinitionLabel {
 
 [[nodiscard]] Error make_export_error(std::string message) {
   return Error::export_error(kStructuredStepExporterId, std::move(message));
-}
-
-[[nodiscard]] std::string standard_failure_message(const Standard_Failure& failure) {
-  const char* const message = failure.GetMessageString();
-  if (message == nullptr || *message == '\0') {
-    return "OCCT operation failed";
-  }
-  return message;
 }
 
 void set_label_name(const TDF_Label& label, const std::string& name) {

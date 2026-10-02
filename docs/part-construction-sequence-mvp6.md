@@ -2,13 +2,14 @@
 
 Status: complete. Blocks 48–94 and GUI Feature Validation Blocks 95–105 are implemented and
 accepted. Interactive Sketcher Blocks 106–121 and Interactive Modeling Blocks 122–131 form the
-planned GUI continuation, followed by STEP Import Blocks 132–138.
+planned GUI continuation, followed by STEP Import Blocks 137–143.
 
 Block 47 completed the Assembly MVP handoff. Blocks 48–94 establish Body identity, body-scoped recompute/inspection, Body Boolean execution, associative transform Geometry, reusable semantic Part-feature inputs, richer Extrude/Cut intent plus Geometry, persistent plus executed Revolve/RevolveCut, general Pattern and Mirror Geometry, persistent plus executed Fillet/Chamfer/Shell/Draft Geometry, persistent model-space 3D Sketch Geometry, connected PathCurve Core intent, executed Sweep/SweepCut/SweepSurface through spatial paths, twist, and guide control, path-following Extrude/Extruded Cut, persistent plus executed guided multi-section Loft intent through verified G1/C1, persistent Surface-feature intent, executed Boundary/Fill, Trim/Extend, Stitch/Knit/Sew shell and Closed-shell-to-solid Surface Geometry, plus deterministic multi-body STEP export. Block 94 proves those contracts together through reproducible headless acceptance workflows. GUI Feature Validation Blocks 95–105 are implemented and accepted (`docs/gui-feature-validation-sequence-mvp7.md`); Block 106 Interactive Sketch workspace and command lifecycle is the current next technical step.
 
 This document is the completed status, phase-order, authority-boundary, and handoff summary for the first broad BLCAD Part Construction MVP after the Assembly MVP.
 
-The complete original Blocks 48-94 per-block planning detail is preserved byte-for-byte in:
+The complete original Blocks 48-94 per-block planning detail is preserved, under a header banner
+marking it historical, in:
 
 - `docs/part-construction-sequence-mvp6-planning-detail.md`
 
@@ -218,7 +219,8 @@ ordered and guided Loft Geometry, Surface-feature intent, Boundary/Fill, Trim/Ex
 Stitch/Knit/Sew shell, Closed-shell-to-solid execution, and deterministic multi-body STEP export.
 Block 94 integrates these authorities under one acceptance tag; its canonical result is
 `docs/part-construction-mvp6-acceptance.md`. The original planning contract remains preserved in
-`docs/part-construction-sequence-mvp6-planning-detail.md`.
+`docs/part-construction-sequence-mvp6-planning-detail.md`, which is a historical snapshot and not
+status authority.
 
 ## Post-Block-94 handoff
 
@@ -227,7 +229,7 @@ all feature families implemented through Block 94 testable through familiar CAD 
 closes with a GUI/headless feature-coverage acceptance. Blocks 106–121 then add the productive
 Interactive Sketcher. Blocks 122–131 add interactive Part, Surface, and Assembly modeling —
 preselection-driven commands, viewport manipulators, live previews, feature editing, and joint
-motion manipulation — over the same Block-94 feature families. Blocks 132–138 add STEP import with
+motion manipulation — over the same Block-94 feature families. Blocks 137–143 add STEP import with
 two explicit modes: immutable Reference Parts for Assembly use and EditableBody Parts whose
 `ImportedBodyFeature` is followed by normal BLCAD feature history. Stable imported topology, source
 freshness, structured STEP assembly import, and integrated refresh/re-export behavior remain

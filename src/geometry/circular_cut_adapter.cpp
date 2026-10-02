@@ -1,6 +1,7 @@
 #include "blcad/geometry/circular_cut_adapter.hpp"
 
 #include "geometry_shape_internal.hpp"
+#include "occt_failure_message.hpp"
 
 #include <BRepAlgoAPI_Cut.hxx>
 #include <BRepBndLib.hxx>
@@ -30,25 +31,10 @@ constexpr double kAxisTolerance = 1.0e-9;
   return Error::geometry(kCircularCutId, std::move(message));
 }
 
-[[nodiscard]] std::string standard_failure_message(const Standard_Failure& failure) {
-  const char* const message = failure.GetMessageString();
-  if (message == nullptr || *message == '\0')
-    return "OCCT operation failed";
-  return message;
-}
-
 struct CutAxisPlacement {
   gp_Ax2 axis;
   double height = 0.0;
 };
-
-[[nodiscard]] double dot(Point3 point, Vector3 axis) noexcept {
-  return point.x * axis.x + point.y * axis.y + point.z * axis.z;
-}
-
-[[nodiscard]] double length(Vector3 vector) noexcept {
-  return std::sqrt(vector.x * vector.x + vector.y * vector.y + vector.z * vector.z);
-}
 
 [[nodiscard]] Result<Vector3> normalize_axis(Vector3 direction) {
   const double axis_length = length(direction);
@@ -78,7 +64,7 @@ struct CutAxisPlacement {
   double max_projection = 0.0;
   bool first = true;
   for (const Point3 corner : bounding_box_corners(x_min, y_min, z_min, x_max, y_max, z_max)) {
-    const double projection = dot(corner, axis.value());
+    const double projection = project_onto_axis(corner, axis.value());
     if (first) {
       min_projection = projection;
       max_projection = projection;
@@ -89,7 +75,7 @@ struct CutAxisPlacement {
     }
   }
 
-  const double center_projection = dot(center, axis.value());
+  const double center_projection = project_onto_axis(center, axis.value());
   const double base_projection = min_projection - kThroughAllMargin;
   const double delta = base_projection - center_projection;
   const Point3 base{center.x + axis.value().x * delta, center.y + axis.value().y * delta,

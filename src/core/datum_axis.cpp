@@ -11,10 +11,6 @@ namespace {
 
 constexpr double k_tolerance = 1.0e-9;
 
-[[nodiscard]] double length(Vector3 vector) noexcept {
-  return std::sqrt(vector.x * vector.x + vector.y * vector.y + vector.z * vector.z);
-}
-
 [[nodiscard]] bool is_unit(Vector3 vector) noexcept {
   return std::abs(length(vector) - 1.0) <= k_tolerance;
 }

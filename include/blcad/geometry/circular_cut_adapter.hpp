@@ -7,10 +7,10 @@
 
 namespace blcad::geometry {
 
-// Erzeugt aus einem bestehenden Volumenkoerper einen durchgehenden Kreis-Cut.
-// Der Cut entspricht dem MVP-`SubtractiveExtrude` mit `through_all`.
-// Der Adapter kapselt den OCCT-Boolean-Cut und bleibt damit auf der
-// Geometry-Seite der Core/OCCT-Grenze.
+// Cuts a through-all circular hole out of an existing solid body. The cut is the
+// MVP `SubtractiveExtrude` with `through_all`. The adapter encapsulates the OCCT
+// boolean cut and therefore stays on the Geometry side of the Core/OCCT
+// boundary.
 class CircularCutAdapter {
 public:
   [[nodiscard]] Result<GeometryShape> cut_circular_hole(const GeometryShape& target,

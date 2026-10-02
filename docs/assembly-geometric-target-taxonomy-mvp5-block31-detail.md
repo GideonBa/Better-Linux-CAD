@@ -1,4 +1,14 @@
-# Assembly Geometric Target Taxonomy and Capability Projection MVP-5
+# Assembly Geometric Target Taxonomy and Capability Projection MVP-5 — Block 31 Detail (historical)
+
+> **Historical planning snapshot — not current status.** This is the expanded Block-31 working detail
+> behind
+> [`docs/assembly-geometric-target-taxonomy-mvp5.md`](assembly-geometric-target-taxonomy-mvp5.md),
+> which is canonical for the implemented taxonomy, descriptors, projection matrix, resolved-target
+> contract, and compatibility adaptation. Where the two differ, the canonical document wins, and
+> [`docs/mvp-plan.md`](mvp-plan.md) is the status authority. The "This document is canonical" claim
+> below refers to the canonical document, not to this snapshot.
+
+## Snapshot content
 
 Status: implemented as Block 31 of `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`.
 

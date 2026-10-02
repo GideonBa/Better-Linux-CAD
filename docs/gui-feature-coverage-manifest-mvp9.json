@@ -1,6 +1,7 @@
 {
   "schema": "blcad.gui-feature-coverage.v2",
   "implemented_through": 131,
+  "tag_validity_note": "Accepted record of the MVP-9 dispositions as of Block 131. The Block-133 shell reset (docs/gui-shell-reset-sequence-mvp9r.md) deleted the shell-bound test files, so these tags no longer resolve: [gui][modeling-workspace], [gui][in-context-command], [gui][view-navigation-aids], [gui][interactive-extrude], [gui][interactive-revolve], [integration][extrude-revolve-manipulator]. The headless authorities they covered are unchanged; Block 135 restores the manipulator and Extrude/Revolve tags and Block 136 the workspace tags, both against ShellWindow. The machine check [integration][gui-feature-coverage] was deleted with the same reset and Block 136 restores it.",
   "extends": "docs/gui-feature-coverage-manifest-mvp7.json",
   "acceptance_contract": "docs/interactive-modeling-mvp9-acceptance.md",
   "families": [

@@ -1,6 +1,7 @@
 #include "blcad/geometry/body_boolean_adapter.hpp"
 
 #include "geometry_shape_internal.hpp"
+#include "occt_failure_message.hpp"
 
 #include <BRepAlgoAPI_Common.hxx>
 #include <BRepAlgoAPI_Cut.hxx>
@@ -20,11 +21,6 @@ namespace {
 
 [[nodiscard]] Error boolean_error(const FeatureId& feature_id, std::string message) {
   return Error::geometry(feature_id.value(), std::move(message));
-}
-
-[[nodiscard]] std::string standard_failure_message(const Standard_Failure& failure) {
-  const char* const message = failure.GetMessageString();
-  return message == nullptr || *message == '\0' ? "OCCT body boolean operation failed" : message;
 }
 
 template <typename Algorithm>
@@ -102,7 +98,7 @@ Result<GeometryShape> BodyBooleanAdapter::combine(FeatureId feature_id,
         GeometryShape(std::make_shared<GeometryShape::Impl>(std::move(current))));
   } catch (const Standard_Failure& failure) {
     return Result<GeometryShape>::failure(
-        boolean_error(feature_id, standard_failure_message(failure)));
+        boolean_error(feature_id, standard_failure_message(failure, "OCCT body boolean operation failed")));
   } catch (const std::exception& exception) {
     return Result<GeometryShape>::failure(boolean_error(feature_id, exception.what()));
   } catch (...) {

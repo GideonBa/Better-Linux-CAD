@@ -2,6 +2,13 @@
 
 Status: implemented in Block 129.
 
+> **GUI Shell Reset MVP-9R:** Block 133 deleted the Qt shell this document names — `MainWindow` and
+> all seven self-installing binders — and replaced it with `ShellWindow` + `ShellRibbon`
+> (`src/gui/shell/`, contract: `docs/gui-shell-reset-sequence-mvp9r.md`). The headless authorities and
+> the Core/Geometry contracts below are unchanged and are consumed by the new shell; read every
+> "`MainWindow`" and "binder" below as the shell's Qt presentation layer, whose current form is
+> Block 135/136 work.
+
 Block 129 makes editing existing persistent feature intent a first-class interaction. It adds the
 missing per-family Core feature-update/remove commands and a GUI edit lifecycle that reuses the
 Block-124..128 authoring controllers preloaded with the persistent intent. Unlike Blocks 124–128, this
