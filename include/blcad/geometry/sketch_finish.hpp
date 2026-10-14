@@ -80,7 +80,20 @@ public:
       }
 
       SketchRegionDiagnosticKind kind = SketchRegionDiagnosticKind::AmbiguousTopology;
-      if (region.error().message().find("self-intersect") != std::string::npos)
+      bool branched = false;
+      for (const auto index : component) {
+        for (const Point2 endpoint : {lines[index].start(), lines[index].end()}) {
+          std::size_t degree = 0U;
+          for (const auto other : component) {
+            degree += same(endpoint, lines[other].start()) ? 1U : 0U;
+            degree += same(endpoint, lines[other].end()) ? 1U : 0U;
+          }
+          branched = branched || degree > 2U;
+        }
+      }
+      if (branched)
+        kind = SketchRegionDiagnosticKind::AmbiguousTopology;
+      else if (region.error().message().find("self-intersect") != std::string::npos)
         kind = SketchRegionDiagnosticKind::SelfIntersection;
       else if (region.error().message().find("gap") != std::string::npos ||
                region.error().message().find("at least three") != std::string::npos ||

@@ -168,8 +168,9 @@ Block 109 provides the headless producer and Block 110 continuously publishes ba
 
 `Enter Sketch` captures workspace, semantic selection, full transient camera state, and viewport
 selection filter. It resolves workplane, enters normal orthographic view, restricts picking to
-SketchEntity/Edge/Vertex, and uses a crosshair. `Finish Sketch` rejects active commands or current
-Finish diagnostics and restores workspace, selection, camera, and selection filtering. It does not
+SketchEntity/Edge/Vertex. `Finish Sketch` cancels unfinished creation previews and restores the
+workspace, camera and selection filtering after validation. Open contours remain editable and do
+not become profiles; invalid closed/branched contours and document errors reject completion. It does not
 invent an Extrude or another downstream feature; the handoff publishes an existing profile or the
 single bounded line region materialized as part of finishing the Sketch.
 

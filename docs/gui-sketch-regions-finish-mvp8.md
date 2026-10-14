@@ -1,6 +1,6 @@
 # GUI Sketch Regions, Profiles, Diagnostics, and Finish Sketch MVP-8
 
-Status: implemented in Block 119.
+Status: Block-119 profile extraction plus open-Sketch completion in the replacement shell.
 
 Block 119 turns solved visible planar line geometry into selectable bounded-region products and adds a fail-closed Finish Sketch candidate. Region recognition remains a derived Geometry service; the persistent result of finishing is an ordinary `ClosedProfile` added through `PartDocument::update_sketch(...)`.
 
@@ -71,3 +71,21 @@ The proof covers two disjoint selectable regions, stable point selection, open-c
 ## Next boundary
 
 Block 120 owns interactive Sketch3D creation and direct manipulation. Curved multi-region recognition, nested contour/hole classification, and automatic geometric repair beyond deterministic diagnostics remain explicit later extensions.
+
+## Open-Sketch completion
+
+`ShellWindow::finish_active_sketch` also completes an open planar Sketch. It cancels unfinished tool
+previews, validates document diagnostics and materializes any independent closed line regions, then
+restores the model workspace and camera. Open components remain ordinary editable curves; they do
+not gain a fabricated profile. Completing a purely open Sketch changes no document intent or history.
+The status bar explains that its open contours remain available for later editing, including browser
+re-entry and Save/Open.
+
+Self-intersecting closed loops and branched region topology still reject completion without mutation.
+Region diagnostics explicitly distinguish endpoint degree greater than two from a genuine open end.
+`SketchFinishService::finish` remains the strict bounded-profile extraction API. Extrude/Revolve
+continue to require a real bounded profile. An existing independent closed profile can be used even
+when unrelated open geometry remains in the Sketch.
+
+Proof: `[gui][shell-sketch][sketch-finish]` covers open completion, exact geometry/history preservation,
+re-entry, profile handoff beside open geometry, and rejection of invalid closed topology.

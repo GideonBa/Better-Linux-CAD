@@ -645,6 +645,7 @@ bool ShellWindow::finish_active_sketch() {
   if (!active_sketch_)
     return false;
   const SketchId finished_sketch = *active_sketch_;
+  bool has_open_contours = false;
 
   // Creation tools such as Line and Point deliberately re-arm themselves
   // after committing geometry. In that state the document already contains
@@ -681,13 +682,15 @@ bool ShellWindow::finish_active_sketch() {
       auto analysis = geometry::SketchFinishService::analyze_unmaterialized(*part, *sketch);
       if (analysis.has_error())
         return reject_finish(analysis.error());
-      if (!analysis.value().diagnostics.empty()) {
-        const auto kind = analysis.value().diagnostics.front().kind;
+      for (const auto& diagnostic : analysis.value().diagnostics) {
+        const auto kind = diagnostic.kind;
+        if (kind == geometry::SketchRegionDiagnosticKind::OpenContour) {
+          has_open_contours = true;
+          continue;
+        }
         std::string message;
         switch (kind) {
         case geometry::SketchRegionDiagnosticKind::OpenContour:
-          message = "Keine geschlossene Fläche: Die Kontur ist offen. Endpunkte verbinden oder "
-                    "beim Schließen auf den ersten Endpunkt fangen.";
           break;
         case geometry::SketchRegionDiagnosticKind::SelfIntersection:
           message = "Keine geschlossene Fläche: Die Kontur überschneidet sich selbst.";
@@ -764,6 +767,9 @@ bool ShellWindow::finish_active_sketch() {
   if (feature_tools_ && finished_profile.has_value() &&
       feature_tools_->select_profile(finished_sketch, *finished_profile))
     statusBar()->showMessage(QStringLiteral("Profil bereit — Extrusion oder Drehung wählen"));
+  else if (has_open_contours)
+    statusBar()->showMessage(QStringLiteral(
+        "Skizze beendet — offene Konturen bleiben zum Weiterbearbeiten erhalten"));
   return true;
 }
 

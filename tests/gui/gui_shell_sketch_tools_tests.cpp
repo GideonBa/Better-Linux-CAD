@@ -7,6 +7,8 @@
 #include "blcad/gui/gui_sketch_interaction.hpp"
 
 #include "blcad/core/sketch.hpp"
+#include "blcad/core/part_document_json.hpp"
+#include "blcad/gui/shell/shell_feature_tools.hpp"
 #include "blcad/geometry/sketch_finish.hpp"
 #include "blcad/geometry/viewport_scene.hpp"
 
@@ -17,6 +19,8 @@
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QStatusBar>
+#include <QTreeWidget>
+#include <QTreeWidgetItemIterator>
 
 #include <algorithm>
 #include <array>
@@ -37,6 +41,18 @@ void enter_sketch(ShellWindow& window) {
   REQUIRE(window.viewport().select_semantic("datum-plane/datum.xy"));
   REQUIRE(window.create_sketch_on_selection());
   REQUIRE(window.active_sketch().has_value());
+}
+
+void reenter_sketch(ShellWindow& window, const SketchId& sketch) {
+  auto& tree = window.model_browser();
+  for (QTreeWidgetItemIterator it(&tree); *it; ++it) {
+    if ((*it)->data(0, Qt::UserRole).toString().toStdString() == sketch.value()) {
+      tree.itemDoubleClicked(*it, 0);
+      REQUIRE(window.active_sketch() == sketch);
+      return;
+    }
+  }
+  FAIL("Sketch browser node missing");
 }
 
 [[nodiscard]] SketchTopology topology_of(ShellWindow& window) {
@@ -325,7 +341,7 @@ TEST_CASE("Line pointer endpoint snap closes a visually closed loop",
   verify_pointer_drawn_line_region(4.0);
 }
 
-TEST_CASE("Finish Sketch keeps a genuinely open line contour editable",
+TEST_CASE("Finish Sketch leaves an open contour intact for later editing",
           "[gui][shell-sketch][gui][line-region-regression][sketch-finish]") {
   ShellWindow window;
   enter_sketch(window);
@@ -338,14 +354,22 @@ TEST_CASE("Finish Sketch keeps a genuinely open line contour editable",
   REQUIRE(tools.add_pick({50.0, 90.0}));
   // Deliberately bypass pointer snapping to model a real remaining gap.
   REQUIRE(tools.add_pick({50.5, 50.0}));
+  tools.cancel_tool();
 
-  REQUIRE_FALSE(window.finish_active_sketch());
-  REQUIRE(window.active_sketch().has_value());
-  CHECK(*window.active_sketch() == sketch_id);
+  const auto before = serialize_part_document_to_json(*window.session().part_document());
+  REQUIRE(before);
+  const auto history = window.session().undo_label();
+  REQUIRE(window.finish_active_sketch());
+  CHECK_FALSE(window.active_sketch());
+  CHECK_FALSE(window.viewport().sketch_interaction_active());
   const auto* sketch = window.session().part_document()->find_sketch(sketch_id);
   REQUIRE(sketch != nullptr);
   CHECK(sketch->profile_count() == 0U);
-  CHECK(window.statusBar()->currentMessage().contains(QStringLiteral("Kontur ist offen")));
+  CHECK(window.statusBar()->currentMessage().contains(QStringLiteral("offene Konturen")));
+  CHECK(serialize_part_document_to_json(*window.session().part_document()).value() == before.value());
+  CHECK(window.session().undo_label() == history);
+  CHECK_FALSE(window.feature_tools().begin_extrude());
+  reenter_sketch(window, sketch_id);
   CHECK(window.viewport().sketch_interaction_active());
 }
 
@@ -1346,4 +1370,50 @@ TEST_CASE("Abhängigkeiten: two lines can be made collinear",
                          (ends[1].y - ends[0].y) * (ends[index].x - ends[0].x);
     CHECK(std::abs(cross) <= 1.0e-6);
   }
+}
+
+TEST_CASE("Finish Sketch preserves open construction work alongside a bounded profile",
+          "[gui][shell-sketch][sketch-finish]") {
+  ShellWindow window;
+  enter_sketch(window);
+  const SketchId sketch_id = *window.active_sketch();
+  auto& tools = window.sketch_tools();
+  REQUIRE(tools.begin_tool(GuiSketchCreateTool::CornerRectangle));
+  REQUIRE(tools.add_pick({0, 0}));
+  REQUIRE(tools.add_pick({20, 10}));
+  REQUIRE(tools.begin_tool(GuiSketchCreateTool::Line));
+  REQUIRE(tools.add_pick({40, 0}));
+  REQUIRE(tools.add_pick({50, 5}));
+  REQUIRE(window.finish_active_sketch());
+  const auto* sketch = window.session().part_document()->find_sketch(sketch_id);
+  REQUIRE(sketch);
+  CHECK(sketch->profile_count() == 1U);
+  CHECK(sketch->line_segments().size() == 5U);
+  REQUIRE(window.feature_tools().begin_extrude());
+  window.feature_tools().cancel();
+  reenter_sketch(window, sketch_id);
+}
+
+TEST_CASE("Finish Sketch still rejects branched and self-intersecting profile topology",
+          "[gui][shell-sketch][sketch-finish]") {
+  ShellWindow window;
+  enter_sketch(window);
+  const SketchId sketch_id = *window.active_sketch();
+  REQUIRE(window.session().commit_part_transaction(
+      "Seed invalid contours", [sketch_id](PartDocument& part) -> Result<std::size_t> {
+        Sketch sketch = *part.find_sketch(sketch_id);
+        const std::array<Point2, 4> corners{{{0, 0}, {20, 10}, {0, 10}, {20, 0}}};
+        for (std::size_t i = 0; i < corners.size(); ++i) {
+          auto line = LineSegment::create(SketchEntityId("cross." + std::to_string(i)),
+                                          corners[i], corners[(i + 1) % corners.size()]);
+          if (!line) return Result<std::size_t>::failure(line.error());
+          auto added = sketch.add_entity(line.value());
+          if (!added) return added;
+        }
+        return part.update_sketch(std::move(sketch));
+      }));
+  const auto before = serialize_part_document_to_json(*window.session().part_document()).value();
+  CHECK_FALSE(window.finish_active_sketch());
+  CHECK(window.active_sketch() == sketch_id);
+  CHECK(serialize_part_document_to_json(*window.session().part_document()).value() == before);
 }
