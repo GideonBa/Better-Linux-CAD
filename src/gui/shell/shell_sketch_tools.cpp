@@ -1431,18 +1431,6 @@ Result<std::size_t> ShellSketchTools::apply_modify_profile_pick(SketchModifyKind
   return committed;
 }
 
-namespace {
-// Topology entity ids present before a modify commit, so the newly inserted
-// fillet arc / chamfer line can be told apart afterwards.
-[[nodiscard]] std::vector<std::string> entity_ids_of(const SketchTopology& topology) {
-  std::vector<std::string> ids;
-  ids.reserve(topology.entities().size());
-  for (const auto& entity : topology.entities())
-    ids.push_back(entity.id());
-  return ids;
-}
-} // namespace
-
 Result<std::size_t> ShellSketchTools::apply_fillet(double radius) {
   if (!sketch_context_ready())
     return Result<std::size_t>::failure(
@@ -1451,21 +1439,15 @@ Result<std::size_t> ShellSketchTools::apply_fillet(double radius) {
   if (ids.size() != 2U)
     return Result<std::size_t>::failure(Error::validation(
         "gui.shell.sketch", "genau zwei verbundene Kurven für die Verrundung wählen"));
-  auto before = active_topology();
-  if (before.has_error())
-    return Result<std::size_t>::failure(before.error());
-  const std::vector<std::string> before_ids = entity_ids_of(before.value());
   auto controller = GuiSketchModifyController::create(session_, *window_.active_sketch());
   if (controller.has_error())
     return Result<std::size_t>::failure(controller.error());
   auto preview = controller.value().fillet(ids[0], ids[1], radius);
   if (preview.has_error())
     return Result<std::size_t>::failure(preview.error());
-  auto committed = controller.value().commit(session_);
+  auto committed = controller.value().commit(session_, true);
   if (committed.has_error())
     return committed;
-  prune_broken_coincidences(); // drop the stale corner coincidence the trim split
-  auto_constrain_corner(before_ids, ids[0], ids[1], /*add_tangent=*/true);
   session_.selection().clear();
   publish_scene();
   arm_drag_controller();
@@ -1480,168 +1462,19 @@ Result<std::size_t> ShellSketchTools::apply_chamfer(double distance) {
   if (ids.size() != 2U)
     return Result<std::size_t>::failure(
         Error::validation("gui.shell.sketch", "genau zwei verbundene Kurven für die Fase wählen"));
-  auto before = active_topology();
-  if (before.has_error())
-    return Result<std::size_t>::failure(before.error());
-  const std::vector<std::string> before_ids = entity_ids_of(before.value());
   auto controller = GuiSketchModifyController::create(session_, *window_.active_sketch());
   if (controller.has_error())
     return Result<std::size_t>::failure(controller.error());
   auto preview = controller.value().chamfer(ids[0], ids[1], distance);
   if (preview.has_error())
     return Result<std::size_t>::failure(preview.error());
-  auto committed = controller.value().commit(session_);
+  auto committed = controller.value().commit(session_, true);
   if (committed.has_error())
     return committed;
-  prune_broken_coincidences(); // drop the stale corner coincidence the trim split
-  auto_constrain_corner(before_ids, ids[0], ids[1], /*add_tangent=*/false);
   session_.selection().clear();
   publish_scene();
   arm_drag_controller();
   return committed;
-}
-
-bool ShellSketchTools::author_catalog_constraint(
-    SketchSolverConstraintKind kind, std::vector<SketchConstraintIntentTarget> targets) {
-  if (!window_.active_sketch())
-    return false;
-  const SketchId sketch = *window_.active_sketch();
-  auto catalog = session_.sketch_constraint_catalog(sketch);
-  if (catalog.has_error())
-    return false;
-  auto intent = SketchConstraintIntent::create(next_constraint_id(catalog.value(), kind), kind,
-                                               std::move(targets));
-  if (intent.has_error())
-    return false;
-  auto controller =
-      GuiSketchConstraintController::create(session_, sketch, std::move(intent.value()));
-  if (controller.has_error())
-    return false;
-  // A rejected preview (redundant/conflicting/non-convergent) is skipped
-  // silently: the corner just gets fewer auto-constraints, never a hard error.
-  if (!controller.value().preview().authoring.accepted)
-    return false;
-  return !controller.value().commit(session_).has_error();
-}
-
-void ShellSketchTools::prune_broken_coincidences() {
-  auto topology = active_topology();
-  if (topology.has_error())
-    return;
-  const SketchTopology& topo = topology.value();
-  const SketchId sketch = *window_.active_sketch();
-  auto catalog = session_.sketch_constraint_catalog(sketch);
-  if (catalog.has_error())
-    return;
-  std::vector<SketchConstraintId> doomed;
-  for (const auto& intent : catalog.value().constraints()) {
-    if (intent.kind() != SketchSolverConstraintKind::Coincident || intent.targets().size() != 2U)
-      continue;
-    const auto& targets = intent.targets();
-    if (targets[0].kind() != SketchConstraintIntentTargetKind::Point ||
-        targets[1].kind() != SketchConstraintIntentTargetKind::Point)
-      continue;
-    const auto* first = topo.find_point(SketchPointId(targets[0].id()));
-    const auto* second = topo.find_point(SketchPointId(targets[1].id()));
-    if (first == nullptr || second == nullptr) {
-      doomed.push_back(intent.id()); // references a point the edit removed
-      continue;
-    }
-    if (std::hypot(first->position().x - second->position().x,
-                   first->position().y - second->position().y) > 1.0e-4)
-      doomed.push_back(intent.id()); // the two points were pulled apart
-  }
-  for (const auto& id : doomed)
-    (void)GuiSketchConstraintController::remove_accepted(session_, sketch, id);
-}
-
-void ShellSketchTools::auto_constrain_corner(const std::vector<std::string>& before_entity_ids,
-                                             SketchEntityId first_line, SketchEntityId second_line,
-                                             bool add_tangent) {
-  auto topology = active_topology();
-  if (topology.has_error())
-    return;
-  const SketchTopology& topo = topology.value();
-
-  // The inserted curve is the one entity whose id is new and whose kind is a
-  // curve (Arc for a fillet, Line for a chamfer).
-  const SketchTopologyEntity* inserted = nullptr;
-  for (const auto& entity : topo.entities()) {
-    if (std::find(before_entity_ids.begin(), before_entity_ids.end(), entity.id()) !=
-        before_entity_ids.end())
-      continue;
-    if (entity.kind() == SketchTopologyEntityKind::Arc ||
-        entity.kind() == SketchTopologyEntityKind::Line) {
-      inserted = &entity;
-      break;
-    }
-  }
-  if (inserted == nullptr)
-    return;
-
-  const auto endpoint_ids = [](const SketchTopologyEntity& entity) -> std::vector<SketchPointId> {
-    if (entity.kind() == SketchTopologyEntityKind::Arc)
-      return {entity.points().front(), entity.points().back()};
-    return {entity.points().front(), entity.points().back()};
-  };
-  const auto position = [&topo](const SketchPointId& id) -> std::optional<Point2> {
-    const auto* point = topo.find_point(id);
-    return point == nullptr ? std::nullopt : std::optional(point->position());
-  };
-
-  // For each trimmed input line, find the line endpoint that coincides with an
-  // inserted-curve endpoint (the corner touch point), pin them Coincident, and
-  // for fillets add a Tangent between the line and the arc.
-  for (const SketchEntityId& line : {first_line, second_line}) {
-    const std::string line_topology_id = "entity/" + line.value();
-    const auto* line_entity = topo.find_entity(line_topology_id);
-    if (line_entity == nullptr)
-      continue;
-    std::optional<SketchPointId> line_point;
-    std::optional<SketchPointId> inserted_point;
-    for (const auto& line_id : endpoint_ids(*line_entity)) {
-      const auto line_pos = position(line_id);
-      if (!line_pos)
-        continue;
-      for (const auto& inserted_id : endpoint_ids(*inserted)) {
-        const auto inserted_pos = position(inserted_id);
-        if (!inserted_pos)
-          continue;
-        if (std::hypot(line_pos->x - inserted_pos->x, line_pos->y - inserted_pos->y) <= 1.0e-6) {
-          line_point = line_id;
-          inserted_point = inserted_id;
-          break;
-        }
-      }
-      if (line_point)
-        break;
-    }
-    if (!line_point || !inserted_point)
-      continue;
-    auto point_a = SketchConstraintIntentTarget::point(*line_point);
-    auto point_b = SketchConstraintIntentTarget::point(*inserted_point);
-    if (!point_a.has_error() && !point_b.has_error())
-      (void)author_catalog_constraint(SketchSolverConstraintKind::Coincident,
-                                      {point_a.value(), point_b.value()});
-    if (add_tangent) {
-      auto line_target = SketchConstraintIntentTarget::entity(line_topology_id);
-      auto arc_target = SketchConstraintIntentTarget::entity(inserted->id());
-      if (!line_target.has_error() && !arc_target.has_error())
-        (void)author_catalog_constraint(SketchSolverConstraintKind::Tangent,
-                                        {line_target.value(), arc_target.value()});
-    }
-  }
-
-  // Pin the corner SIZE so it stays constant on drag. Coincident + Tangent keep
-  // the corner attached and tangent but leave the radius / chamfer length as a
-  // free DOF (it floated when a line was dragged). A driving Radius (fillet) or
-  // Length (chamfer) dimension on the inserted curve removes exactly that DOF;
-  // apply_dimension bakes the CURRENT measured value into an auto dN parameter,
-  // so the commit does not move geometry. Skipped silently if not accepted.
-  session_.selection().clear();
-  if (session_.selection().add({GuiSelectionKind::SketchEntity, inserted->id()}))
-    (void)apply_dimension(add_tangent ? SketchDimensionKind::Radius : SketchDimensionKind::Length,
-                          /*reference=*/false);
 }
 
 void ShellSketchTools::begin_modify_tool(SketchModifyKind kind) {

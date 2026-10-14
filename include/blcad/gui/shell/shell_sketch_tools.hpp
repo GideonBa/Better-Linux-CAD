@@ -103,21 +103,6 @@ private:
   void handle_trim_stroke_hit(const std::optional<GuiSketchHit>& hit, bool report_miss);
   void end_trim_stroke() noexcept;
   void cancel_trim_stroke() noexcept;
-  // Authors one catalog constraint (preview → accept → commit); returns false
-  // and stays silent when the preview is not accepted (e.g. already implied).
-  [[nodiscard]] bool author_catalog_constraint(SketchSolverConstraintKind kind,
-                                               std::vector<SketchConstraintIntentTarget> targets);
-  // Removes catalog Coincident constraints whose two points are no longer at the
-  // same place (or have vanished) — e.g. the old chained-corner coincidence that
-  // a fillet/chamfer just pulled apart. Left in place it would collapse the new
-  // corner on the next solve/drag. No geometry re-solve happens here.
-  void prune_broken_coincidences();
-  // After a fillet/chamfer commit, pins the inserted curve to the two trimmed
-  // lines with Coincident (both corners) and, for fillets, Tangent — so the
-  // corner survives dragging. Silently skips constraints the solver rejects.
-  void auto_constrain_corner(const std::vector<std::string>& before_entity_ids,
-                             SketchEntityId first_line, SketchEntityId second_line,
-                             bool add_tangent);
   void after_pick();
   void apply_chain_coincidence();
   void update_preview();

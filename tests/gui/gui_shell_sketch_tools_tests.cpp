@@ -1417,3 +1417,64 @@ TEST_CASE("Finish Sketch still rejects branched and self-intersecting profile to
   CHECK(window.active_sketch() == sketch_id);
   CHECK(serialize_part_document_to_json(*window.session().part_document()).value() == before);
 }
+
+TEST_CASE("Corner geometry, relations and size share one undo transaction",
+          "[gui][sketch-modify][sketch-modify-expanded]") {
+  ShellWindow window;
+  enter_sketch(window);
+  seed_two_lines(window, {0, 0}, {20, 0}, {20, 0}, {20, 10});
+  const auto id = *window.active_sketch();
+  const auto before = serialize_part_document_to_json(*window.session().part_document());
+  REQUIRE(before);
+  window.session().selection().clear();
+  REQUIRE(window.session().selection().add({GuiSelectionKind::SketchEntity, "entity/line.h"}));
+  REQUIRE(window.session().selection().add({GuiSelectionKind::SketchEntity, "entity/line.v"}));
+  SECTION("fillet") { REQUIRE(window.sketch_tools().apply_fillet(2)); }
+  SECTION("chamfer") { REQUIRE(window.sketch_tools().apply_chamfer(2)); }
+  auto dimensions = window.session().sketch_dimension_catalog(id);
+  REQUIRE(dimensions);
+  REQUIRE(dimensions.value().dimensions().size() == 1U);
+  const auto after = serialize_part_document_to_json(*window.session().part_document());
+  REQUIRE(after);
+  REQUIRE(window.session().undo());
+  CHECK(serialize_part_document_to_json(*window.session().part_document()).value() == before.value());
+  CHECK(window.session().sketch_constraint_catalog(id).value().constraints().empty());
+  CHECK(window.session().sketch_dimension_catalog(id).value().dimensions().empty());
+  REQUIRE(window.session().redo());
+  CHECK(serialize_part_document_to_json(*window.session().part_document()).value() == after.value());
+  CHECK(window.session().sketch_dimension_catalog(id).value().dimensions().size() == 1U);
+}
+
+TEST_CASE("Curved fillet commits persistent tangency and rolls back an oversized request",
+          "[gui][sketch-modify][sketch-modify-expanded]") {
+  ShellWindow window;
+  enter_sketch(window);
+  const auto id = *window.active_sketch();
+  REQUIRE(window.session().commit_part_transaction("Seed curved corner",
+      [id](PartDocument& part) -> Result<std::size_t> {
+        Sketch sketch = *part.find_sketch(id);
+        auto line = LineSegment::create(SketchEntityId("first"), {0, -10}, {0, 0});
+        auto arc = ArcSegment::create_three_point(SketchEntityId("second"), {0, 0},
+                                                   {7.0710678118654755, 2.9289321881345245}, {10, 10});
+        if (!line) return Result<std::size_t>::failure(line.error());
+        if (!arc) return Result<std::size_t>::failure(arc.error());
+        auto added = sketch.add_entity(line.value());
+        if (!added) return added;
+        added = sketch.add_entity(arc.value());
+        if (!added) return added;
+        return part.update_sketch(sketch);
+      }));
+  window.session().selection().clear();
+  REQUIRE(window.session().selection().add({GuiSelectionKind::SketchEntity, "entity/first"}));
+  REQUIRE(window.session().selection().add({GuiSelectionKind::SketchEntity, "entity/second"}));
+  const auto before = serialize_part_document_to_json(*window.session().part_document()).value();
+  CHECK_FALSE(window.sketch_tools().apply_chamfer(100));
+  CHECK(serialize_part_document_to_json(*window.session().part_document()).value() == before);
+  REQUIRE(window.sketch_tools().apply_fillet(1));
+  const auto catalog = window.session().sketch_constraint_catalog(id).value();
+  CHECK(std::count_if(catalog.constraints().begin(), catalog.constraints().end(), [](const auto& c) {
+    return c.kind() == SketchSolverConstraintKind::Tangent;
+  }) == 2);
+  REQUIRE(window.session().undo());
+  CHECK(serialize_part_document_to_json(*window.session().part_document()).value() == before);
+}

@@ -1,119 +1,88 @@
 # GUI Sketch Modify: Trim, Extend, Split, Fillet, Chamfer MVP-8
 
-Status: implemented in Block 116.
+Status: Block 116 implemented; shell hardening expands profile editing, curved corners and cubic
+extension. This document describes the current contract rather than the original two-line MVP.
 
-This contract adds curve trimming, extending, splitting, two-line fillet, and two-line chamfer over
-the existing Block-108 Sketch entity model. Every operation rewrites a disposable candidate Sketch
-that copies all unaffected intent verbatim and commits exactly one document transaction. No
-operation partially mutates the source Sketch.
+## Authority and transaction boundary
 
-## Authority boundary
+`SketchModifyService` (`blcad/core/sketch_modify.hpp`) owns intersection, projection and exact curve
+rewrites. It builds a disposable Sketch and reports invalidated entity, endpoint and profile identities.
+`GuiSketchModifyController` owns preview and re-derives the operation from the current document at
+commit. Qt supplies selection and picks. Preview never changes document history.
 
-```text
-selection / picked plane point
-  -> SketchModifyService operation (headless Core)
-     analytic line/arc intersection + rewrite plan
-  -> remap-or-reject of profiles, embedded constraints/dimensions, tangent continuity
-  -> candidate Sketch + invalidated source-entity ids
-  -> GuiSketchModifyController preview
-  -> one GuiDocumentSession::commit_part_transaction(...)
-     re-derives the operation from the current committed Sketch
-     re-validates Block-114 constraint and Block-115 dimension catalogs
-  -> PartDocument::update_sketch(...)
-```
+The shell commits geometry, catalog cleanup, connector attachments, tangency and a driving connector
+size through one `commit_part_sketch_intent_transaction`. Failure publishes none of these changes;
+one undo restores geometry, parameters and both intent catalogs together. Corner intent authoring is
+implemented in `gui_sketch_corner_constraints.hpp` and uses the combined dimension/constraint solver.
 
-`SketchModifyService` (Core, `blcad/core/sketch_modify.hpp`) owns the intersection mathematics and
-the rewrite. `GuiSketchModifyController` (`blcad/gui/gui_sketch_modify.hpp`) owns preview and atomic
-commit. Qt owns only action wiring and pick delivery. Intersections, projected parameters, rubber
-bands, and picked points are transient; the persistent result is ordinary `LineSegment`,
-`ArcSegment`, and `SplineSegment` intent.
+## Operations
 
-## Implemented operations
+| Operation | Supported inputs | Result |
+|---|---|---|
+| Trim | line, circular arc, cubic spline, full circle | remove the picked intersection-bounded span |
+| Extend | line, circular arc, cubic spline | move the picked endpoint to the nearest reachable cutter |
+| Split | line, circular arc, cubic spline, including ordered profile members | exact subdivision; first half retains the id |
+| Fillet | two lines, or connected line/arc/spline pairs | circular connector of the requested radius, tangent to both sources |
+| Chamfer | two lines, or connected line/arc/spline pairs | straight connector with equal arc-length setbacks |
 
-| Operation | Inputs | Result |
-|---|---|---:|
-| Trim | line/arc target + pick point | shortened entity (id kept), removed-middle split, or removed entity |
-| Extend | line/arc target + pick near an end | picked end moved to the nearest intersection beyond it (id kept) |
-| Split | line/arc/spline target + point | two entities: first keeps the id, second gets `<id>.split.N` |
-| Fillet | two line entities + radius | both lines trimmed to tangent points (id kept) + one tangent `ArcSegment` |
-| Chamfer | two line entities + distance | both lines trimmed (id kept) + one connecting `LineSegment` |
+Trim considers explicit curves and parameter-backed full circles as cutters. A middle span removal
+creates two retained pieces; an unbounded end span shortens the source; without intersections the
+whole target is removed. Trimming a full circle creates a circular arc. Trim may open an ordered
+profile: the obsolete profile container is removed while remaining explicit curves survive.
 
-Trim removes the picked span bounded by the target's nearest intersections with other line/arc
-entities: an unbounded pick side shortens toward the interior, a span bounded on both sides removes
-the middle and splits the target, and a target with no bounding intersection is removed entirely.
-Extend treats the target support as unbounded and moves the endpoint nearest the pick to the closest
-intersection strictly beyond it. Split uses De Casteljau subdivision for cubic splines.
+Line and circular-arc extension use their supporting line/circle. Cubic extension continues the
+original polynomial, rather than adding a straight tangent. It searches successively larger intervals
+up to 64 original parameter lengths and chooses the first reachable intersection with another explicit
+curve. An unreachable cutter produces a diagnostic. An extended cubic retains its exact original
+subcurve through parameter rescaling. Extend can open a profile and therefore invalidate its container.
 
-Fillet and chamfer resolve the two lines' infinite-line intersection as the corner, move each line's
-corner-side endpoint to its setback/tangent point, and insert the connector. `keep_trim=false`
-inserts the connector without trimming the source lines.
+Split uses exact curve subdivision, splices both halves into each affected ordered contour, and
+preserves the profile id. The second half receives `<source>.split.N`.
 
-## Remap or reject discipline
+Two-line corners use the line intersection. Curved pairs must meet at one unambiguous endpoint.
+Fillets solve intersections of the radius-offset curves and choose the valid solution with the
+smallest total setback. Chamfer distances are measured along each source curve, including arcs and
+splines. A requested setback that consumes an edge is rejected. `keep_trim=false` adds a connector
+without replacing the source curves and does not add shell corner constraints.
 
-Every rewrite preserves or explicitly rejects affected intent before any candidate is built; the
-source Sketch is never partially mutated.
+## Profile and intent preservation
 
-- **In-place edits (id preserved, endpoint roles preserved):** trim/extend that moves one endpoint,
-  and the fillet/chamfer setback of both lines keep the entity id. All referencing constraints,
-  dimensions, and tangent continuity are preserved so usable constraints survive; a Horizontal
-  constraint or a length dimension re-solves against the moved endpoint.
-- **Invalidated ids (removed or split source):** a removed entity or the two halves of a split no
-  longer carry the original endpoint semantics. If any embedded `SketchConstraint`,
-  `SketchGeometricConstraint`, `SketchDrivingDimension`, or `SketchTangentContinuity` references an
-  invalidated id, the operation fails closed and names the referencing intent.
-- **Profiles:** any modification of an entity used by an ordered profile contour (closed,
-  arc-closed, or composite) is rejected with an explicit diagnostic. Block 116 modifies loose
-  geometry; profile-contour rewriting with connector splicing and profile-type promotion is a
-  bounded later extension, not a silent partial mutation.
-- **Block-114 / Block-115 catalogs:** the GUI commit reuses the generic Part transaction, which
-  re-validates the constraint and dimension catalogs against the rewritten Sketch. A modification
-  that drops an entity a catalog references fails closed with no partial mutation; in-place edits
-  keep the catalog references valid.
+Split and corner edits preserve ordered closed, arc-closed and composite profile identities. Corner
+targets in a profile must be adjacent in the same contour. Connector direction follows the contour,
+regardless of selection order. A polygon receiving a fillet becomes an `ArcClosedProfile` under the
+same id; a chamfer remains a polygon. Inner composite contours are treated in the same way.
 
-`SketchModifyResult` returns the candidate Sketch plus the list of invalidated source ids so callers
-can surface the affected geometry.
+Unchanged source ids and untouched endpoint relations survive. The GUI removes catalog entries whose
+entity, profile or moved endpoint semantics have been invalidated; it does not silently retarget an
+old whole-edge dimension to one half of a split. New corner attachments are coincident and fillets
+receive tangent relations. The connector receives a driving radius (fillet) or length (chamfer); the
+latter measures connector length, while the creation input specifies the two setbacks.
 
-## Determinism and failure policy
+Legacy embedded references that cannot be remapped unambiguously still reject a destructive split
+or removal and identify the blocking constraint, dimension or continuity. Projected/reference entities
+are not editable source curves. Removing a profile required by an existing feature can likewise fail
+recompute; the complete transaction then rolls back. These diagnostics protect existing design intent.
 
-- new split ids use `<source>.split.N`; fillet arcs use `arc.fillet.N`; chamfer lines use
-  `line.chamfer.N`, each allocated as the first free id.
-- non-finite picks, picks off the target curve, degenerate arcs, parallel or collinear
-  fillet/chamfer lines, non-positive radius/distance, identical fillet/chamfer targets, missing
-  targets, and unreachable extend all fail closed before any rewrite.
-- fillet/chamfer require two `LineSegment` entities in this block; line/arc corners are a later
-  extension.
-- the GUI controller previews without mutating the document; commit re-derives the operation from
-  the current committed Sketch, so a source that changed after preview cannot apply stale geometry.
+## Numerical and persistence rules
 
-## Persistence
+- New connector ids use first-free `arc.fillet.N` / `line.chamfer.N` allocation.
+- Nonfinite input, zero/negative size, identical targets, off-curve split points, degenerate sources,
+  ambiguous joins, consumed edges and unreachable extensions fail before publication.
+- Curve intersection and offset solving use bounded numerical iteration; unsuccessful convergence
+  returns an error rather than an approximate connector without tangency.
+- All results persist as ordinary Core curves and profiles through the existing Part JSON. Preview
+  samples, cutters, invalidation reports and numerical iteration state are transient.
 
-Block 116 adds no JSON field or schema. Trimmed, extended, split, filleted, and chamfered entities
-persist through the existing Sketch and PartDocument authorities. Intersections, projected
-parameters, rubber-band previews, and invalidated-id lists are transient.
-
-## Focused proof
-
-```text
-[core][sketch-modify]
-[geometry][sketch-modify]
-[gui][sketch-trim-extend]
-```
+## Verification
 
 ```bash
-./build/dev/blcad_core_tests "[core][sketch-modify]"
-./build/dev-geometry/blcad_geometry_tests "[geometry][sketch-modify]"
-QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][sketch-trim-extend]"
+./build/dev-gui/blcad_core_tests '[core][sketch-modify]'
+./build/dev-gui/blcad_geometry_tests '[geometry][sketch-modify]'
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests '[gui][sketch-modify]'
 ```
 
-The proof covers trim shorten/split-middle/remove, extend to the next intersection, line/arc/spline
-split, fillet tangent-arc and chamfer line insertion, preservation of an in-place orientation
-constraint, explicit rejection of split/trim that would invalidate a referencing dimension or
-profile, degenerate and unknown-request rejection, a chamfer result resolving through the Geometry
-region pipeline, atomic GUI preview/commit with exact undo/redo, and fail-closed commit against a
-Block-114 catalog reference.
-
-## Next boundary
-
-Block 117 owns offset, projection/include, construction axes, and associative reference workflows.
-Profile-contour rewriting under fillet/chamfer/trim, and line/arc corner treatment, remain bounded
-later extensions of this contract.
+Core regressions cover trim, split, exact cubic continuation, line/arc, arc/arc and line/spline corners,
+requested radius and tangent residuals, profile preservation/promotion, reversed selection, oversize
+rejection and immutable source geometry. GUI cases cover persistent attachments, drag behavior,
+combined geometry/constraint/dimension undo/redo and rejection without partial publication. Geometry
+coverage verifies that rewritten curves continue through profile materialization.

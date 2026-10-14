@@ -496,3 +496,118 @@ TEST_CASE("Block 116 rejects degenerate and unknown modify requests", "[core][sk
   CHECK_FALSE(SketchModifyService::chamfer(sketch, SketchEntityId("line.h"),
                                            SketchEntityId("line.p"), -1.0));
 }
+
+TEST_CASE("Profile edge splitting and corner treatment preserve the profile identity",
+          "[core][sketch-modify][sketch-modify-expanded]") {
+  Sketch sketch = make_sketch();
+  add_line(sketch, "bottom", {0, 0}, {20, 0});
+  add_line(sketch, "right", {20, 0}, {20, 10});
+  add_line(sketch, "top", {20, 10}, {0, 10});
+  add_line(sketch, "left", {0, 10}, {0, 0});
+  const ProfileId profile("rectangle");
+  REQUIRE(sketch.add_profile(ClosedProfile::create(profile,
+      {SketchEntityId("bottom"), SketchEntityId("right"), SketchEntityId("top"),
+       SketchEntityId("left")}).value()));
+  SECTION("split splices both halves into the polygon") {
+    auto split = SketchModifyService::split(sketch, SketchEntityId("bottom"), {8, 0});
+    REQUIRE(split);
+    REQUIRE(split.value().sketch.find_closed_profile(profile));
+    CHECK(split.value().sketch.find_closed_profile(profile)->line_segments().size() == 5U);
+    CHECK(split.value().invalidated_profile_ids.empty());
+  }
+  SECTION("fillet promotes the polygon to an ordered curve profile") {
+    auto rounded = SketchModifyService::fillet(sketch, SketchEntityId("bottom"),
+                                               SketchEntityId("right"), 2);
+    REQUIRE(rounded);
+    CHECK(rounded.value().sketch.find_closed_profile(profile) == nullptr);
+    REQUIRE(rounded.value().sketch.find_arc_closed_profile(profile));
+    CHECK(rounded.value().sketch.find_arc_closed_profile(profile)->curve_segments().size() == 5U);
+    CHECK(rounded.value().invalidated_profile_ids.empty());
+    CHECK(same(line(rounded.value().sketch, "bottom")->end(), {18, 0}));
+    CHECK(same(line(rounded.value().sketch, "right")->start(), {20, 2}));
+  }
+  SECTION("selection order does not change contour traversal") {
+    auto rounded = SketchModifyService::fillet(sketch, SketchEntityId("right"),
+                                               SketchEntityId("bottom"), 2);
+    REQUIRE(rounded);
+    const auto& arc = rounded.value().sketch.arc_segments().front();
+    CHECK(same(arc.start(), {18, 0}));
+    CHECK(same(arc.end(), {20, 2}));
+  }
+  SECTION("chamfer preserves a polygon profile") {
+    auto cut = SketchModifyService::chamfer(sketch, SketchEntityId("left"),
+                                            SketchEntityId("bottom"), 2);
+    REQUIRE(cut);
+    REQUIRE(cut.value().sketch.find_closed_profile(profile));
+    CHECK(cut.value().sketch.find_closed_profile(profile)->line_segments().size() == 5U);
+  }
+  SECTION("oversized corners and unrelated edges are rejected") {
+    CHECK_FALSE(SketchModifyService::fillet(sketch, SketchEntityId("bottom"),
+                                           SketchEntityId("right"), 11));
+    CHECK_FALSE(SketchModifyService::chamfer(sketch, SketchEntityId("bottom"),
+                                            SketchEntityId("top"), 2));
+  }
+  CHECK(sketch.closed_profiles().front().line_segments().size() == 4U);
+  CHECK(sketch.arc_segments().empty());
+}
+
+TEST_CASE("Spline extension continues the original cubic to the nearest cutter",
+          "[core][sketch-modify][sketch-modify-expanded]") {
+  Sketch sketch = make_sketch();
+  add_spline(sketch, "curve", {0, 0}, {1, 0}, {2, 1}, {3, 3});
+  add_line(sketch, "far", {6, -10}, {6, 30});
+  add_line(sketch, "near", {4.5, -10}, {4.5, 30});
+  auto extended = SketchModifyService::extend(sketch, SketchEntityId("curve"), {3, 3});
+  REQUIRE(extended);
+  const auto* curve = extended.value().sketch.find_spline_segment(SketchEntityId("curve"));
+  REQUIRE(curve);
+  CHECK(curve->end().x == Catch::Approx(4.5));
+  const auto original = detail::spline_sampler(*sketch.find_spline_segment(SketchEntityId("curve")));
+  const auto continued = detail::spline_sampler(*curve);
+  for (double t : {0.0, 0.25, 0.5, 0.75, 1.0})
+    CHECK(same(detail::sampler_point(*original, t), detail::sampler_point(*continued, t / 1.5)));
+  CHECK(same(sketch.find_spline_segment(SketchEntityId("curve"))->end(), {3, 3}));
+}
+
+TEST_CASE("Fillet and chamfer operate on connected circular and spline corners",
+          "[core][sketch-modify][sketch-modify-expanded]") {
+  Sketch sketch = make_sketch();
+  SECTION("line and arc") {
+    add_line(sketch, "first", {0, -10}, {0, 0});
+    add_arc(sketch, "second", {0, 0}, {7.0710678118654755, 2.9289321881345245}, {10, 10});
+  }
+  SECTION("arc and arc") {
+    add_arc(sketch, "first", {-10, -10}, {-2.9289321881345245, -7.0710678118654755}, {0, 0});
+    add_arc(sketch, "second", {0, 0}, {7.0710678118654755, 2.9289321881345245}, {10, 10});
+  }
+  SECTION("line and spline") {
+    add_line(sketch, "first", {0, -10}, {0, 0});
+    add_spline(sketch, "second", {0, 0}, {5, 0}, {10, 5}, {10, 10});
+  }
+  auto rounded = SketchModifyService::fillet(sketch, SketchEntityId("first"),
+                                             SketchEntityId("second"), 1.0);
+  REQUIRE(rounded);
+  const auto* connector = rounded.value().sketch.find_arc_segment(SketchEntityId("arc.fillet.1"));
+  REQUIRE(connector);
+  const auto circle = detail::arc_geometry(connector->start(), connector->mid(), connector->end());
+  REQUIRE(circle);
+  CHECK(circle->radius == Catch::Approx(1.0).margin(1e-6));
+  const auto a = detail::curve_sampler_for(rounded.value().sketch, SketchEntityId("first"));
+  const auto b = detail::curve_sampler_for(rounded.value().sketch, SketchEntityId("second"));
+  REQUIRE(a); REQUIRE(b);
+  CHECK(same(detail::sampler_point(*a, 1), connector->start()));
+  CHECK(same(detail::sampler_point(*b, 0), connector->end()));
+  for (const auto& [curve, t] : {std::pair{*a, 1.0}, std::pair{*b, 0.0}}) {
+    const auto point = detail::sampler_point(curve, t);
+    const auto tangent = detail::sampler_derivative(curve, t);
+    const double dot = (point.x - circle->center.x) * tangent.x +
+                       (point.y - circle->center.y) * tangent.y;
+    CHECK(dot / std::hypot(tangent.x, tangent.y) == Catch::Approx(0).margin(1e-6));
+  }
+  auto chamfer = SketchModifyService::chamfer(sketch, SketchEntityId("first"),
+                                              SketchEntityId("second"), 1.0);
+  REQUIRE(chamfer);
+  CHECK(chamfer.value().sketch.find_line_segment(SketchEntityId("line.chamfer.1")));
+  CHECK_FALSE(SketchModifyService::chamfer(sketch, SketchEntityId("first"),
+                                          SketchEntityId("second"), 100.0));
+}

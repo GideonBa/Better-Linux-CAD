@@ -799,16 +799,46 @@ public:
     if (!sketch_modify_finite(pick))
       return fail(target.value(), "extend pick coordinates must be finite");
     auto sampler = curve_sampler_for(sketch, target);
-    if (!sampler || sampler->kind == CurveSampler::Kind::Spline)
-      return fail(target.value(), "extend target must be an existing line or arc entity");
-    if (entity_in_profile(sketch, target))
-      return fail(target.value(),
-                  "extending an entity used by a profile requires an explicit profile rewrite");
+    if (!sampler)
+      return fail(target.value(), "extend target must be an existing line, arc or spline entity");
     const Point2 start = sampler_point(*sampler, 0.0);
     const Point2 end = sampler_point(*sampler, 1.0);
     const bool extend_end =
         sketch_modify_distance(pick, end) <= sketch_modify_distance(pick, start);
 
+    if (sampler->kind == CurveSampler::Kind::Spline) {
+      // Continue the same cubic polynomial, preserving its original interval.
+      // Bound the search explicitly instead of replacing the curve by a line.
+      std::optional<double> closest;
+      for (double reach = 1.0; reach <= 64.0 && !closest; reach *= 2.0) {
+        const double from = extend_end ? 1.0 : -reach;
+        const double to = extend_end ? 1.0 + reach : 0.0;
+        const Point2 a = bezier_point(sampler->spline, from);
+        const Point2 b = bezier_point(sampler->spline, to);
+        const Point2 da = bezier_derivative(sampler->spline, from);
+        const Point2 db = bezier_derivative(sampler->spline, to);
+        const double scale = (to - from) / 3.0;
+        const CurveSampler continuation{CurveSampler::Kind::Spline, {}, {}, {},
+            {a, {a.x + scale * da.x, a.y + scale * da.y},
+                {b.x - scale * db.x, b.y - scale * db.y}, b}};
+        for (const auto& other : other_samplers(sketch, target)) {
+          for (const auto point : curve_intersections(continuation, other.sampler)) {
+            auto local = sampler_project(continuation, point);
+            if (!local) continue;
+            const double t = from + (to - from) * *local;
+            if ((extend_end && t <= 1.0 + kSketchModifyParamTolerance) ||
+                (!extend_end && t >= -kSketchModifyParamTolerance)) continue;
+            if (!closest || (extend_end ? t < *closest : t > *closest)) closest = t;
+          }
+        }
+      }
+      if (!closest) return fail(target.value(), "spline continuation found no reachable intersection");
+      auto extended = subcurve(sketch, target, extend_end ? 0.0 : *closest,
+                               extend_end ? *closest : 1.0, target);
+      if (!extended) return Result<SketchModifyResult>::failure(extended.error());
+      return build(sketch, {target.value()}, {std::move(extended.value())}, {}, {}, {},
+                   {{target, extend_end ? SketchModifyEndSelector::End : SketchModifyEndSelector::Start}});
+    }
     std::optional<double> best;
     for (const auto& other : other_samplers(sketch, target)) {
       for (const auto candidate :
@@ -842,9 +872,6 @@ public:
     using namespace detail;
     if (!sketch_modify_finite(point))
       return fail(target.value(), "split point coordinates must be finite");
-    if (entity_in_profile(sketch, target))
-      return fail(target.value(),
-                  "splitting an entity used by a profile requires an explicit profile rewrite");
     if (const std::string reference = invalidated_reference(sketch, target); !reference.empty())
       return fail(target.value(), "split would invalidate " + reference);
 
@@ -855,7 +882,8 @@ public:
       auto halves = split_spline(*spline, *t, split_id(sketch, target));
       if (halves.has_error())
         return Result<SketchModifyResult>::failure(halves.error());
-      return build(sketch, {target.value()}, std::move(halves.value()), {target.value()});
+      auto result = build(sketch, {target.value()}, std::move(halves.value()), {target.value()});
+      return restore_edited_profiles(sketch, std::move(result), target, split_id(sketch, target));
     }
     auto sampler = curve_sampler_for(sketch, target);
     if (!sampler)
@@ -869,8 +897,9 @@ public:
     auto second = subcurve(sketch, target, *t, 1.0, split_id(sketch, target));
     if (second.has_error())
       return Result<SketchModifyResult>::failure(second.error());
-    return build(sketch, {target.value()}, {std::move(first.value()), std::move(second.value())},
-                 {target.value()});
+    auto result = build(sketch, {target.value()},
+                        {std::move(first.value()), std::move(second.value())}, {target.value()});
+    return restore_edited_profiles(sketch, std::move(result), target, split_id(sketch, target));
   }
 
   // Rounds the corner between two lines with a tangent arc of `radius`. When
@@ -1154,6 +1183,116 @@ private:
                                                 std::move(invalidated_endpoints)});
   }
 
+  // Split inserts a second curve after its source. Corner edits splice a
+  // connector between adjacent members and promote polygon profiles to curves.
+  // Profile ids stay stable so downstream feature bindings remain meaningful.
+  [[nodiscard]] static Result<SketchModifyResult>
+  restore_edited_profiles(const Sketch& source, Result<SketchModifyResult> result,
+                          const SketchEntityId& first, const SketchEntityId& inserted,
+                          std::optional<SketchEntityId> second = std::nullopt) {
+    if (!result) return result;
+    auto& edited = result.value();
+    const auto rewrite = [&](const std::vector<SketchEntityId>& contour)
+        -> Result<std::vector<SketchEntityId>> {
+      const bool has_first = std::find(contour.begin(), contour.end(), first) != contour.end();
+      const bool has_second = second && std::find(contour.begin(), contour.end(), *second) != contour.end();
+      if (!has_first && !has_second)
+        return Result<std::vector<SketchEntityId>>::success(contour);
+      if (second && (!has_first || !has_second))
+        return Result<std::vector<SketchEntityId>>::failure(Error::validation(
+            first.value(), "corner targets must be adjacent members of the same profile contour"));
+      std::vector<SketchEntityId> changed;
+      bool spliced = false;
+      for (std::size_t i = 0; i < contour.size(); ++i) {
+        changed.push_back(contour[i]);
+        const auto& next = contour[(i + 1U) % contour.size()];
+        const bool insert = second
+            ? ((contour[i] == first && next == *second) ||
+               (contour[i] == *second && next == first))
+            : contour[i] == first;
+        if (!insert) continue;
+        auto previous = detail::curve_sampler_for(edited.sketch, contour[i]);
+        auto connector = detail::curve_sampler_for(edited.sketch, inserted);
+        if (!previous || !connector)
+          return Result<std::vector<SketchEntityId>>::failure(
+              Error::validation(inserted.value(), "profile rewrite lost a source curve"));
+        const Point2 join = detail::sampler_point(*previous, 1.0);
+        if (detail::sketch_modify_distance(join, detail::sampler_point(*connector, 0.0)) >
+            detail::kSketchModifyPointTolerance) {
+          if (detail::sketch_modify_distance(join, detail::sampler_point(*connector, 1.0)) >
+              detail::kSketchModifyPointTolerance)
+            return Result<std::vector<SketchEntityId>>::failure(
+                Error::validation(inserted.value(), "profile connector does not meet its predecessor"));
+          auto reversed = subcurve(edited.sketch, inserted, 1.0, 0.0, inserted);
+          if (!reversed) return Result<std::vector<SketchEntityId>>::failure(reversed.error());
+          auto replacement = detail::rebuild_candidate(edited.sketch, {inserted.value()}, {reversed.value()});
+          if (!replacement) return Result<std::vector<SketchEntityId>>::failure(replacement.error());
+          edited.sketch = std::move(replacement.value());
+        }
+        changed.push_back(inserted);
+        spliced = true;
+      }
+      if (!spliced)
+        return Result<std::vector<SketchEntityId>>::failure(
+            Error::validation(first.value(), "corner targets are not adjacent in the profile"));
+      return Result<std::vector<SketchEntityId>>::success(std::move(changed));
+    };
+    const auto affected = [&](const ProfileId& id) {
+      return std::find(edited.invalidated_profile_ids.begin(), edited.invalidated_profile_ids.end(),
+                       id.value()) != edited.invalidated_profile_ids.end();
+    };
+    const auto restored = [&](const ProfileId& id) {
+      std::erase(edited.invalidated_profile_ids, id.value());
+    };
+    for (const auto& profile : source.closed_profiles()) {
+      if (!affected(profile.id())) continue;
+      auto contour = rewrite(profile.line_segments());
+      if (!contour) return Result<SketchModifyResult>::failure(contour.error());
+      const bool curved = std::any_of(contour.value().begin(), contour.value().end(),
+          [&](const auto& id) { return edited.sketch.find_line_segment(id) == nullptr; });
+      Result<std::size_t> added = [&]() {
+        if (curved) {
+          auto replacement = ArcClosedProfile::create(profile.id(), contour.value());
+          if (!replacement) return Result<std::size_t>::failure(replacement.error());
+          return edited.sketch.add_profile(replacement.value());
+        }
+        auto replacement = ClosedProfile::create(profile.id(), contour.value());
+        if (!replacement) return Result<std::size_t>::failure(replacement.error());
+        return edited.sketch.add_profile(replacement.value());
+      }();
+      if (!added) return Result<SketchModifyResult>::failure(added.error());
+      restored(profile.id());
+    }
+    for (const auto& profile : source.arc_closed_profiles()) {
+      if (!affected(profile.id())) continue;
+      auto contour = rewrite(profile.curve_segments());
+      if (!contour) return Result<SketchModifyResult>::failure(contour.error());
+      auto replacement = ArcClosedProfile::create(profile.id(), contour.value());
+      if (!replacement) return Result<SketchModifyResult>::failure(replacement.error());
+      auto added = edited.sketch.add_profile(replacement.value());
+      if (!added) return Result<SketchModifyResult>::failure(added.error());
+      restored(profile.id());
+    }
+    for (const auto& profile : source.composite_closed_profiles()) {
+      if (!affected(profile.id())) continue;
+      auto outer = rewrite(profile.outer_contour());
+      if (!outer) return Result<SketchModifyResult>::failure(outer.error());
+      std::vector<std::vector<SketchEntityId>> inner;
+      for (const auto& original : profile.inner_contours()) {
+        auto contour = rewrite(original);
+        if (!contour) return Result<SketchModifyResult>::failure(contour.error());
+        inner.push_back(std::move(contour.value()));
+      }
+      auto replacement = CompositeClosedProfile::create(profile.id(), std::move(outer.value()),
+                                                         std::move(inner));
+      if (!replacement) return Result<SketchModifyResult>::failure(replacement.error());
+      auto added = edited.sketch.add_profile(replacement.value());
+      if (!added) return Result<SketchModifyResult>::failure(added.error());
+      restored(profile.id());
+    }
+    return result;
+  }
+
   [[nodiscard]] static SketchEntityId split_id(const Sketch& sketch, const SketchEntityId& base) {
     for (std::size_t index = 1U;; ++index) {
       SketchEntityId candidate(base.value() + ".split." + std::to_string(index));
@@ -1319,30 +1458,17 @@ private:
       return Result<SketchModifyCurve>::success(std::move(result.value()));
     }
     if (const auto* spline = sketch.find_spline_segment(id)) {
-      using Controls = std::array<Point2, 4U>;
-      const auto lerp = [](Point2 first, Point2 second, double parameter) noexcept {
-        return Point2{first.x + (second.x - first.x) * parameter,
-                      first.y + (second.y - first.y) * parameter};
-      };
-      const auto split = [&lerp](const Controls& controls, double parameter) {
-        const Point2 a = lerp(controls[0], controls[1], parameter);
-        const Point2 b = lerp(controls[1], controls[2], parameter);
-        const Point2 c = lerp(controls[2], controls[3], parameter);
-        const Point2 d = lerp(a, b, parameter);
-        const Point2 e = lerp(b, c, parameter);
-        const Point2 f = lerp(d, e, parameter);
-        return std::pair<Controls, Controls>{{controls[0], a, d, f}, {f, e, c, controls[3]}};
-      };
-
-      const Controls controls{spline->start(), spline->control1(), spline->control2(),
-                              spline->end()};
-      const Controls right = split(controls, from).second;
-      const double local_to = std::clamp((to - from) / (1.0 - from), 0.0, 1.0);
-      const Controls segment = split(right, local_to).first;
-      auto result = SplineSegment::create_cubic_bezier(std::move(new_id), segment[0], segment[1],
-                                                       segment[2], segment[3]);
-      if (result.has_error())
-        return Result<SketchModifyCurve>::failure(result.error());
+      const CubicBezierGeometry curve{spline->start(), spline->control1(), spline->control2(),
+                                      spline->end()};
+      const Point2 start = bezier_point(curve, from);
+      const Point2 end = bezier_point(curve, to);
+      const Point2 start_tangent = bezier_derivative(curve, from);
+      const Point2 end_tangent = bezier_derivative(curve, to);
+      const double scale = (to - from) / 3.0;
+      auto result = SplineSegment::create_cubic_bezier(std::move(new_id), start,
+          {start.x + scale * start_tangent.x, start.y + scale * start_tangent.y},
+          {end.x - scale * end_tangent.x, end.y - scale * end_tangent.y}, end);
+      if (!result) return Result<SketchModifyCurve>::failure(result.error());
       return Result<SketchModifyCurve>::success(std::move(result.value()));
     }
     return Result<SketchModifyCurve>::failure(
@@ -1435,6 +1561,162 @@ private:
         {std::move(first.value()), std::move(second.value())});
   }
 
+  [[nodiscard]] static double curve_length(const detail::CurveSampler& curve, double from,
+                                           double to) {
+    const auto speed = [&](double t) {
+      const auto derivative = detail::sampler_derivative(curve, t);
+      return std::hypot(derivative.x, derivative.y);
+    };
+    if (from > to) std::swap(from, to);
+    const auto integrate = [&](auto&& self, double a, double b, double fa, double fm,
+                               double fb, double whole, double tolerance, int depth) -> double {
+      const double m = (a + b) * 0.5;
+      const double fl = speed((a + m) * 0.5);
+      const double fr = speed((m + b) * 0.5);
+      const double left = (m - a) * (fa + 4 * fl + fm) / 6;
+      const double right = (b - m) * (fm + 4 * fr + fb) / 6;
+      if (depth == 0 || std::abs(left + right - whole) <= 15 * tolerance)
+        return left + right + (left + right - whole) / 15;
+      return self(self, a, m, fa, fl, fm, left, tolerance * 0.5, depth - 1) +
+             self(self, m, b, fm, fr, fb, right, tolerance * 0.5, depth - 1);
+    };
+    const double fa = speed(from), fm = speed((from + to) * 0.5), fb = speed(to);
+    const double whole = (to - from) * (fa + 4 * fm + fb) / 6;
+    return integrate(integrate, from, to, fa, fm, fb, whole,
+                      1.0e-10 * std::max(1.0, whole), 16);
+  }
+
+  [[nodiscard]] static Result<SketchModifyResult>
+  curved_corner(const Sketch& sketch, SketchEntityId first_id, SketchEntityId second_id,
+                double size, CornerKind kind, bool keep_trim) {
+    using namespace detail;
+    const auto first = curve_sampler_for(sketch, first_id);
+    const auto second = curve_sampler_for(sketch, second_id);
+    if (!first || !second)
+      return fail(first_id.value(), "corner targets must be explicit line, arc or spline entities");
+    std::optional<std::pair<double, double>> ends;
+    for (double a : {0.0, 1.0})
+      for (double b : {0.0, 1.0})
+        if (sketch_modify_distance(sampler_point(*first, a), sampler_point(*second, b)) <=
+            kSketchModifyPointTolerance) {
+          if (ends) return fail(first_id.value(), "corner has more than one shared endpoint");
+          ends = {a, b};
+        }
+    if (!ends) return fail(first_id.value(), "curved corner targets must share one endpoint");
+    double first_t = 0, second_t = 0;
+    Point2 center{};
+    if (kind == CornerKind::Chamfer) {
+      const auto at_distance = [&](const CurveSampler& curve, double end) -> std::optional<double> {
+        if (size >= curve_length(curve, 0, 1) - kSketchModifyPointTolerance) return std::nullopt;
+        double lo = 0, hi = 1;
+        for (int iteration = 0; iteration < 60; ++iteration) {
+          const double fraction = (lo + hi) * 0.5;
+          const double t = end == 0 ? fraction : 1 - fraction;
+          if (curve_length(curve, end, t) < size) lo = fraction;
+          else hi = fraction;
+        }
+        const double fraction = (lo + hi) * 0.5;
+        return end == 0 ? fraction : 1 - fraction;
+      };
+      const auto a = at_distance(*first, ends->first), b = at_distance(*second, ends->second);
+      if (!a || !b) return fail(first_id.value(), "chamfer setback would consume a source curve");
+      first_t = *a; second_t = *b;
+    } else {
+      const auto offset = [size](const CurveSampler& curve, double t, double side)
+          -> std::optional<Point2> {
+        const auto point = sampler_point(curve, t);
+        const auto tangent = sampler_derivative(curve, t);
+        const double length = std::hypot(tangent.x, tangent.y);
+        if (length <= kSketchModifyIdentityTolerance) return std::nullopt;
+        return Point2{point.x - side * size * tangent.y / length,
+                      point.y + side * size * tangent.x / length};
+      };
+      double best = std::numeric_limits<double>::infinity();
+      for (double side_a : {-1.0, 1.0}) for (double side_b : {-1.0, 1.0})
+        for (double seed_a : {0.01, 0.08, 0.25, 0.6})
+          for (double seed_b : {0.01, 0.08, 0.25, 0.6}) {
+            double a = ends->first == 0 ? seed_a : 1 - seed_a;
+            double b = ends->second == 0 ? seed_b : 1 - seed_b;
+            for (int iteration = 0; iteration < 60; ++iteration) {
+              const auto ca = offset(*first, a, side_a), cb = offset(*second, b, side_b);
+              if (!ca || !cb) break;
+              const Point2 residual{ca->x - cb->x, ca->y - cb->y};
+              const double error = std::hypot(residual.x, residual.y);
+              if (error <= 1.0e-9 * std::max(1.0, size)) {
+                const double score = curve_length(*first, ends->first, a) +
+                                     curve_length(*second, ends->second, b);
+                if (score < best && std::abs(a - ends->first) > 1.0e-6 &&
+                    std::abs(b - ends->second) > 1.0e-6 &&
+                    sketch_modify_distance(sampler_point(*first, a), sampler_point(*second, b)) >
+                        kSketchModifyPointTolerance) {
+                  best = score; first_t = a; second_t = b; center = *ca;
+                }
+                break;
+              }
+              constexpr double h = 1.0e-6;
+              const auto ap = offset(*first, a + h, side_a), am = offset(*first, a - h, side_a);
+              const auto bp = offset(*second, b + h, side_b), bm = offset(*second, b - h, side_b);
+              if (!ap || !am || !bp || !bm) break;
+              const Point2 da{(ap->x - am->x) / (2*h), (ap->y - am->y) / (2*h)};
+              const Point2 db{-(bp->x - bm->x) / (2*h), -(bp->y - bm->y) / (2*h)};
+              const double determinant = da.x * db.y - da.y * db.x;
+              if (std::abs(determinant) <= 1.0e-12) break;
+              const double step_a = (residual.x * db.y - residual.y * db.x) / determinant;
+              const double step_b = (da.x * residual.y - da.y * residual.x) / determinant;
+              bool improved = false;
+              for (double scale = 1; scale >= 1.0/128; scale *= 0.5) {
+                const double next_a = std::clamp(a - scale * step_a, 1.0e-7, 1 - 1.0e-7);
+                const double next_b = std::clamp(b - scale * step_b, 1.0e-7, 1 - 1.0e-7);
+                const auto next_ca = offset(*first, next_a, side_a);
+                const auto next_cb = offset(*second, next_b, side_b);
+                if (next_ca && next_cb && sketch_modify_distance(*next_ca, *next_cb) < error) {
+                  a = next_a; b = next_b; improved = true; break;
+                }
+              }
+              if (!improved) break;
+            }
+          }
+      if (!std::isfinite(best))
+        return fail(first_id.value(), "no nondegenerate tangent fillet fits the connected curves");
+    }
+    const Point2 a = sampler_point(*first, first_t), b = sampler_point(*second, second_t);
+    const SketchEntityId connector = corner_id(sketch,
+        kind == CornerKind::Fillet ? "arc.fillet." : "line.chamfer.");
+    std::vector<SketchModifyCurve> replacements;
+    if (keep_trim) {
+      auto kept_a = subcurve(sketch, first_id, ends->first == 0 ? first_t : 0,
+                            ends->first == 0 ? 1 : first_t, first_id);
+      auto kept_b = subcurve(sketch, second_id, ends->second == 0 ? second_t : 0,
+                            ends->second == 0 ? 1 : second_t, second_id);
+      if (!kept_a) return Result<SketchModifyResult>::failure(kept_a.error());
+      if (!kept_b) return Result<SketchModifyResult>::failure(kept_b.error());
+      replacements.push_back(kept_a.value()); replacements.push_back(kept_b.value());
+    }
+    if (kind == CornerKind::Fillet) {
+      const Point2 direction{(a.x + b.x) * 0.5 - center.x, (a.y + b.y) * 0.5 - center.y};
+      const double length = std::hypot(direction.x, direction.y);
+      if (length <= kSketchModifyIdentityTolerance)
+        return fail(connector.value(), "fillet would have an ambiguous semicircular sweep");
+      const Point2 mid{center.x + size * direction.x / length,
+                       center.y + size * direction.y / length};
+      auto arc = ArcSegment::create_three_point(connector, a, mid, b);
+      if (!arc) return Result<SketchModifyResult>::failure(arc.error());
+      replacements.push_back(arc.value());
+    } else {
+      auto line = LineSegment::create(connector, a, b);
+      if (!line) return Result<SketchModifyResult>::failure(line.error());
+      replacements.push_back(line.value());
+    }
+    std::vector<SketchModifyInvalidatedEndpoint> moved;
+    if (keep_trim) moved = {{first_id, ends->first == 0 ? SketchModifyEndSelector::Start : SketchModifyEndSelector::End},
+                           {second_id, ends->second == 0 ? SketchModifyEndSelector::Start : SketchModifyEndSelector::End}};
+    auto result = build(sketch, keep_trim ? std::vector<std::string>{first_id.value(), second_id.value()}
+                                         : std::vector<std::string>{},
+                        std::move(replacements), {}, {}, {}, std::move(moved));
+    if (!keep_trim) return result;
+    return restore_edited_profiles(sketch, std::move(result), first_id, connector, second_id);
+  }
+
   [[nodiscard]] static Result<SketchModifyResult>
   corner(const Sketch& sketch, const SketchEntityId& first_id, const SketchEntityId& second_id,
          double size, CornerKind kind, bool keep_trim) {
@@ -1446,10 +1728,7 @@ private:
     const auto* first = sketch.find_line_segment(first_id);
     const auto* second = sketch.find_line_segment(second_id);
     if (first == nullptr || second == nullptr)
-      return fail(first_id.value(), "Block 116 fillet/chamfer requires two line entities");
-    if (entity_in_profile(sketch, first_id) || entity_in_profile(sketch, second_id))
-      return fail(first_id.value(),
-                  "fillet/chamfer on a profile edge requires an explicit profile rewrite");
+      return curved_corner(sketch, first_id, second_id, size, kind, keep_trim);
 
     const Point2 p = first->start();
     const Point2 r{first->end().x - p.x, first->end().y - p.y};
@@ -1491,6 +1770,13 @@ private:
       first_offset = setback;
       second_offset = setback;
     }
+    const double first_available = std::max(sketch_modify_distance(corner, first->start()),
+                                            sketch_modify_distance(corner, first->end()));
+    const double second_available = std::max(sketch_modify_distance(corner, second->start()),
+                                             sketch_modify_distance(corner, second->end()));
+    if (keep_trim && (first_offset >= first_available - kSketchModifyPointTolerance ||
+                      second_offset >= second_available - kSketchModifyPointTolerance))
+      return fail(first_id.value(), "corner size would consume or reverse a source curve");
     const Point2 first_point{corner.x + first_dir->x * first_offset,
                              corner.y + first_dir->y * first_offset};
     const Point2 second_point{corner.x + second_dir->x * second_offset,
@@ -1538,11 +1824,22 @@ private:
       replacements.push_back(std::move(trimmed_first.value()));
       replacements.push_back(std::move(trimmed_second.value()));
     }
+    const SketchEntityId connector = arc ? arc->id() : chamfer_line->id();
     if (arc)
       replacements.emplace_back(std::move(*arc));
     if (chamfer_line)
       replacements.emplace_back(std::move(*chamfer_line));
-    return build(sketch, std::move(originals), std::move(replacements), {});
+    std::vector<SketchModifyInvalidatedEndpoint> moved;
+    if (keep_trim) {
+      const auto endpoint = [&corner](const LineSegment& line) {
+        return sketch_modify_distance(line.start(), corner) <= sketch_modify_distance(line.end(), corner)
+            ? SketchModifyEndSelector::Start : SketchModifyEndSelector::End;
+      };
+      moved = {{first_id, endpoint(*first)}, {second_id, endpoint(*second)}};
+    }
+    auto result = build(sketch, std::move(originals), std::move(replacements), {}, {}, {}, std::move(moved));
+    if (!keep_trim) return result;
+    return restore_edited_profiles(sketch, std::move(result), first_id, connector, second_id);
   }
 
   [[nodiscard]] static Result<detail::SketchModifyCurve>

@@ -4,6 +4,7 @@
 #include "blcad/core/sketch_modify.hpp"
 #include "blcad/core/sketch_topology.hpp"
 #include "blcad/gui/gui_document_session.hpp"
+#include "blcad/gui/gui_sketch_corner_constraints.hpp"
 
 #include <algorithm>
 #include <cstddef>
@@ -81,20 +82,24 @@ public:
   }
   [[nodiscard]] Result<GuiSketchModifyPreview> fillet(SketchEntityId first, SketchEntityId second,
                                                       double radius, bool keep_trim = true) {
-    return set_operation("Fillet sketch corner", [first, second, radius, keep_trim](
+    auto preview = set_operation("Fillet sketch corner", [first, second, radius, keep_trim](
                                                      const PartDocument&, const Sketch& sketch) {
       return SketchModifyService::fillet(sketch, first, second, radius, keep_trim);
     });
+    if (preview && keep_trim) { corner_targets_ = std::pair{first, second}; corner_fillet_ = true; }
+    return preview;
   }
   [[nodiscard]] Result<GuiSketchModifyPreview> chamfer(SketchEntityId first, SketchEntityId second,
                                                        double distance, bool keep_trim = true) {
-    return set_operation("Chamfer sketch corner", [first, second, distance, keep_trim](
+    auto preview = set_operation("Chamfer sketch corner", [first, second, distance, keep_trim](
                                                       const PartDocument&, const Sketch& sketch) {
       return SketchModifyService::chamfer(sketch, first, second, distance, keep_trim);
     });
+    if (preview && keep_trim) { corner_targets_ = std::pair{first, second}; corner_fillet_ = false; }
+    return preview;
   }
 
-  [[nodiscard]] Result<std::size_t> commit(GuiDocumentSession& session) const {
+  [[nodiscard]] Result<std::size_t> commit(GuiDocumentSession& session, bool constrain_corner = false) const {
     if (!operation_)
       return Result<std::size_t>::failure(
           Error::validation(source_.id().value(), "no sketch modification is prepared to commit"));
@@ -103,9 +108,11 @@ public:
           source_.id().value(), "sketch modify requires an active Part document"));
     const SketchId sketch_id = source_.id();
     const Operation operation = operation_;
+    const auto corner_targets = constrain_corner ? corner_targets_ : std::nullopt;
+    const bool corner_fillet = corner_fillet_;
     return session.commit_part_sketch_intent_transaction(
         label_,
-        [sketch_id, operation](
+        [sketch_id, operation, corner_targets, corner_fillet](
             PartDocument& document, std::vector<SketchConstraintCatalog>& constraint_catalogs,
             std::vector<SketchDimensionCatalog>& dimension_catalogs) -> Result<std::size_t> {
           const Sketch* current = document.find_sketch(sketch_id);
@@ -146,6 +153,12 @@ public:
             if (constrained.has_error())
               return constrained;
             automatically_constrained = constrained.value();
+          }
+          if (corner_targets) {
+            auto authored = author_sketch_corner(document, before, corner_targets->first,
+                corner_targets->second, corner_fillet, constraint_catalogs, dimension_catalogs);
+            if (!authored) return authored;
+            automatically_constrained += authored.value();
           }
           return Result<std::size_t>::success(updated.value() + pruned.value() +
                                               automatically_constrained);
@@ -438,6 +451,7 @@ private:
 
   [[nodiscard]] Result<GuiSketchModifyPreview> set_operation(std::string label,
                                                              Operation operation) {
+    corner_targets_.reset();
     auto preview = operation(source_document_, source_);
     if (preview.has_error()) {
       operation_ = nullptr;
@@ -456,6 +470,8 @@ private:
   Sketch source_;
   Operation operation_;
   std::string label_;
+  std::optional<std::pair<SketchEntityId, SketchEntityId>> corner_targets_;
+  bool corner_fillet_{false};
 };
 
 } // namespace blcad::gui
