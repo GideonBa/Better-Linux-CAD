@@ -74,6 +74,8 @@ public:
       centroid.x += offset * 0.55;
       centroid.y += offset * 0.55;
     }
+    centroid.x += dimension.label_offset().x;
+    centroid.y += dimension.label_offset().y;
     std::vector<Point2> leader = leader_points(topology, dimension, measurement, anchors);
     return Result<SketchDimensionGlyph>::success(
         {"sketch/" + topology.sketch().value() + "/dimension/" + dimension.id().value(),

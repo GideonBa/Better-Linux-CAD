@@ -461,3 +461,14 @@ Headless GUI tests (59 TEST_CASEs across 20 files) must stay green through every
 shell-bound test files (73 TEST_CASEs) are deleted in Block 133 and replaced progressively by new
 shell tests in Blocks 133–136; Block 136 must end with equivalent-or-better coverage proven by the
 updated coverage manifest.
+
+## Dimension workflow hardening
+
+The replacement shell now authors an automatically provisioned dimension parameter and its solved
+Sketch/catalog in one history entry. Duplicate or rejected dimensions leave no orphan parameter.
+Dimension badges persist their user-authored plane-space offsets in the dimension sidecar; dragging
+is preview-only until release and Escape/capture loss restores the committed placement. Save/Open,
+Undo/Redo and topology remapping retain the layout. Values are edited at the canvas badge with
+Enter/Escape, optional matching units, and `=formula` conversion to an expression binding.
+
+Proof: `[sketch-dimension-workflow]` in `tests/gui/gui_shell_dimension_workflow_tests.cpp`.

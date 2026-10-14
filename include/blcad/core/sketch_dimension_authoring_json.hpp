@@ -42,6 +42,8 @@ sketch_dimension_intent_to_json(const SketchDimensionIntent& dimension) {
                             {"mode", std::string(to_string(dimension.mode()))},
                             {"targets", std::move(targets)}};
   if (dimension.parameter()) value["parameter"] = dimension.parameter()->value();
+  if (dimension.label_offset() != Point2{})
+    value["label_offset_mm"] = {dimension.label_offset().x, dimension.label_offset().y};
   return value;
 }
 
@@ -95,8 +97,17 @@ sketch_dimension_intent_from_json(const SketchDimensionJson& value) {
           Error::validation(id, "Sketch dimension parameter field must be a string"));
     parameter = ParameterId(value.at("parameter").get<std::string>());
   }
+  Point2 label_offset{};
+  if (value.contains("label_offset_mm")) {
+    const auto& offset = value.at("label_offset_mm");
+    if (!offset.is_array() || offset.size() != 2U || !offset[0].is_number() ||
+        !offset[1].is_number())
+      return Result<SketchDimensionIntent>::failure(
+          Error::validation(id, "dimension label offset must contain two finite millimetre values"));
+    label_offset = {offset[0].get<double>(), offset[1].get<double>()};
+  }
   return SketchDimensionIntent::create(SketchDimensionId(id), *kind, *mode,
-                                       std::move(targets), std::move(parameter));
+                                       std::move(targets), std::move(parameter), label_offset);
 }
 
 } // namespace detail

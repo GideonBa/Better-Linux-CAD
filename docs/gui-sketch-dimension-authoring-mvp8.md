@@ -2,12 +2,9 @@
 
 Status: implemented in Block 115.
 
-> **GUI Shell Reset MVP-9R:** Block 133 deleted the Qt shell this document names — `MainWindow` and
-> all seven self-installing binders — and replaced it with `ShellWindow` + `ShellRibbon`
-> (`src/gui/shell/`, contract: `docs/gui-shell-reset-sequence-mvp9r.md`). The headless authorities and
-> the Core/Geometry contracts below are unchanged and are consumed by the new shell; read every
-> "`MainWindow`" and "binder" below as the shell's Qt presentation layer, whose current form is
-> Block 135/136 work.
+The replacement shell uses `ShellSketchTools` and `GuiSketchDimensionController`. Dimension values
+are edited in a `QLineEdit` at the canvas annotation; Enter applies and Escape/focus loss cancels.
+Invalid edits leave the editor open and publish a diagnostic.
 
 This contract exposes typed driving and reference dimensions over stable Block-108 topology targets,
 reuses the Block-109 planar solver and Block-114 constraint catalog, binds driving values to the existing
@@ -43,6 +40,7 @@ SketchDimensionKind
 SketchDimensionMode = driving | reference
 ordered stable targets[]
 optional ParameterId
+label_offset_mm = [x, y] (optional, defaults to zero)
 ```
 
 A target is exactly one of:
@@ -52,8 +50,10 @@ point  -> SketchPointId
 entity -> SketchTopologyEntity id
 ```
 
-Screen positions, OCCT topology, sampled curves, mouse handles, formatted strings, glyph coordinates,
-and current solver variables are never persistent dimension identity.
+The optional label offset is authored presentation measured in the Sketch plane in millimetres.
+It is not a target or a solver variable. Screen positions, OCCT topology, sampled curves, formatted
+strings, derived glyph anchors, and solver variables are never persistent dimension identity.
+Mode changes, parameter rebinding and topology remapping preserve the offset.
 
 Driving dimensions require exactly one compatible `ParameterId`. Reference dimensions reject parameter
 bindings and derive their displayed value from the current topology.
@@ -118,12 +118,16 @@ The existing `PartDocument` parameter system remains authoritative:
 - converting a direct binding to an expression requires an explicit new `ParameterId` and formula;
 - dependency invalidation and expression evaluation use the existing Part parameter graph.
 
-The Qt creation command binds a driving dimension to an existing compatible parameter. It does not create
-an anonymous widget-owned value. Headless clients may create parameters first and then author the
-corresponding dimension intent.
+The shell creates an ordinary typed `dN` parameter at the current measured value when no existing
+parameter is supplied. `GuiSketchDimensionController::add` provisions the parameter, previews the
+combined solve, and publishes the solved Sketch and dimension catalog in one transaction. Rejection
+leaves no parameter behind; one Undo removes both the parameter and dimension.
 
-Literal edits are rejected for expression-backed parameters. Formula edits are rejected when a direct
-parameter is not accompanied by an explicit replacement expression parameter id.
+Literal input accepts a positive finite number with an optional family-matching `mm` or `deg`
+suffix. A direct dimension becomes expression-driven through `=formula`; the shell allocates a
+collision-free `d_expr_N` parameter and rebinds the dimension inside the same accepted transaction.
+An existing expression-backed dimension accepts its replacement formula with or without `=`.
+Unknown references, invalid formulas and incompatible units never publish partial edits.
 
 ## Solver composition
 
@@ -200,9 +204,15 @@ Annotations are published as `GuiSketchHitKind::Dimension`. `GuiSelection` carri
 distinguishable even when they originate from one persistent Sketch entity. Two endpoint roles of the
 same line may therefore participate in one point-to-point dimension selection.
 
-The Sketch menu exposes all nine families, a reference-creation toggle, literal/formula editing,
-parameter rebinding, and driving/reference mode switching. Action enablement derives from stable topology
-capabilities and the current semantic selection.
+The ribbon exposes all nine families, a reference-creation toggle and literal/formula editing.
+Parameter rebinding and driving/reference mode switching are available through the controller API;
+the ribbon does not yet expose separate actions for them. Enablement derives from stable topology
+capabilities and the current selection.
+
+Dragging a dimension badge previews a plane-space delta without mutating the document. Release
+includes the final pointer sample and commits exactly one `Move sketch dimension label` transaction.
+An unchanged placement creates no history entry. Escape, loss of mouse capture, switching tools or
+leaving the Sketch discards the preview. Annotation rendering and hit testing share the same anchor.
 
 ## Atomic commit, freshness, undo, and redo
 
@@ -257,7 +267,12 @@ family
 mode
 ordered targets
 optional ParameterId
+optional label_offset_mm
 ```
+
+Absent offsets in historical version-1 sidecars read as zero. Zero offsets are omitted on write;
+malformed arrays and non-finite values are rejected. Layout participates in dirty state, transactional
+Save/Open and Undo/Redo through the existing dimension catalog.
 
 It does not store measured values, solved coordinates, residuals, Jacobians, rank, DOF, diagnostics,
 formatted text, glyph anchors, or hit-test products. Historical `blcad.part_document.mvp1` remains
@@ -282,6 +297,7 @@ rejected rather than publishing a stale equivalent-radius approximation.
 ./build/dev/blcad_core_tests "[core][sketch-dimensions]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][sketch-dimensions]"
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][sketch-dimensions]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[sketch-dimension-workflow]"
 ./build/dev/blcad_core_tests "[integration][sketch-expression-edit]"
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][sketch-live-solve]"
 ```

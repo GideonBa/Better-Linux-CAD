@@ -23,6 +23,61 @@ struct GuiSketchDimensionPreview {
 
 class GuiSketchDimensionController {
 public:
+  // Provision an optional driving parameter only inside the accepted operation.
+  [[nodiscard]] static Result<std::size_t>
+  add(GuiDocumentSession& session, SketchId sketch, SketchDimensionIntent intent,
+      std::optional<Parameter> parameter = std::nullopt) {
+    return session.commit_part_sketch_intent_transaction(
+        "Add sketch dimension",
+        [sketch, intent = std::move(intent), parameter = std::move(parameter)](
+            PartDocument& part, std::vector<SketchConstraintCatalog>& constraints,
+            std::vector<SketchDimensionCatalog>& dimensions) -> Result<std::size_t> {
+          if (parameter) {
+            auto added = part.add_parameter(*parameter);
+            if (added.has_error()) return added;
+          }
+          auto preview = SketchDimensionAuthoringService{}.preview(
+              part, catalog_for(constraints, sketch, part.id()),
+              catalog_for(dimensions, sketch, part.id()), intent);
+          if (preview.has_error()) return Result<std::size_t>::failure(preview.error());
+          if (!preview.value().accepted || !preview.value().solved_sketch)
+            return Result<std::size_t>::failure(Error::validation(
+                intent.id().value(), "dimension preview is conflicting, redundant or invalid"));
+          auto updated = part.update_sketch(*preview.value().solved_sketch);
+          if (updated.has_error()) return updated;
+          replace_catalog(dimensions, preview.value().catalog_after);
+          return updated;
+        });
+  }
+
+  [[nodiscard]] static Result<std::size_t>
+  set_label_offset(GuiDocumentSession& session, SketchId sketch,
+                   SketchDimensionId dimension, Point2 offset) {
+    auto before = session.sketch_dimension_catalog(sketch);
+    if (before.has_error()) return Result<std::size_t>::failure(before.error());
+    const auto* current = before.value().find(dimension);
+    if (current == nullptr)
+      return Result<std::size_t>::failure(
+          Error::validation(dimension.value(), "dimension does not exist"));
+    auto moved = current->with_label_offset(offset);
+    if (moved.has_error()) return Result<std::size_t>::failure(moved.error());
+    if (*current == moved.value()) return Result<std::size_t>::success(0U);
+    return session.commit_part_sketch_intent_transaction(
+        "Move sketch dimension label",
+        [sketch, expected = before.value(), moved = std::move(moved.value())](
+            PartDocument& part, std::vector<SketchConstraintCatalog>&,
+            std::vector<SketchDimensionCatalog>& dimensions) -> Result<std::size_t> {
+          auto catalog = catalog_for(dimensions, sketch, part.id());
+          if (catalog != expected)
+            return Result<std::size_t>::failure(
+                Error::dependency(sketch.value(), "dimension changed during label placement"));
+          auto replaced = catalog.replace(moved);
+          if (replaced.has_error()) return replaced;
+          replace_catalog(dimensions, catalog);
+          return replaced;
+        });
+  }
+
   [[nodiscard]] static Result<GuiSketchDimensionController>
   create(const GuiDocumentSession& session, SketchId sketch,
          SketchDimensionIntent candidate) {

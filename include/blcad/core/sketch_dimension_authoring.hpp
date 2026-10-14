@@ -58,11 +58,15 @@ public:
   [[nodiscard]] static Result<SketchDimensionIntent>
   create(SketchDimensionId id, SketchDimensionKind kind, SketchDimensionMode mode,
          std::vector<SketchConstraintIntentTarget> targets,
-         std::optional<ParameterId> parameter = std::nullopt) {
+         std::optional<ParameterId> parameter = std::nullopt,
+         Point2 label_offset = {}) {
     const std::string object_id = id.empty() ? "sketch_dimension_intent" : id.value();
     if (id.empty())
       return Result<SketchDimensionIntent>::failure(
           Error::validation(object_id, "dimension id must not be empty"));
+    if (!std::isfinite(label_offset.x) || !std::isfinite(label_offset.y))
+      return Result<SketchDimensionIntent>::failure(
+          Error::validation(object_id, "dimension label offset must be finite"));
     if (targets.size() != expected_target_count(kind))
       return Result<SketchDimensionIntent>::failure(Error::validation(
           object_id, "dimension has the wrong number of semantic targets"));
@@ -81,7 +85,7 @@ public:
       return Result<SketchDimensionIntent>::failure(Error::validation(
           object_id, "reference dimension stores a derived measurement, not a parameter binding"));
     return Result<SketchDimensionIntent>::success(SketchDimensionIntent(
-        std::move(id), kind, mode, std::move(targets), std::move(parameter)));
+        std::move(id), kind, mode, std::move(targets), std::move(parameter), label_offset));
   }
 
   [[nodiscard]] const SketchDimensionId& id() const noexcept { return id_; }
@@ -92,14 +96,20 @@ public:
   }
   [[nodiscard]] const std::optional<ParameterId>& parameter() const noexcept { return parameter_; }
   [[nodiscard]] bool driving() const noexcept { return mode_ == SketchDimensionMode::Driving; }
+  // User-authored presentation in sketch millimetres; never a solver variable.
+  [[nodiscard]] Point2 label_offset() const noexcept { return label_offset_; }
+  [[nodiscard]] Result<SketchDimensionIntent> with_label_offset(Point2 offset) const {
+    return create(id_, kind_, mode_, targets_, parameter_, offset);
+  }
 
   [[nodiscard]] Result<SketchDimensionIntent> with_mode(
       SketchDimensionMode mode, std::optional<ParameterId> parameter = std::nullopt) const {
-    return create(id_, kind_, mode, targets_, std::move(parameter));
+    return create(id_, kind_, mode, targets_, std::move(parameter), label_offset_);
   }
 
   [[nodiscard]] Result<SketchDimensionIntent> with_parameter(ParameterId parameter) const {
-    return create(id_, kind_, SketchDimensionMode::Driving, targets_, std::move(parameter));
+    return create(id_, kind_, SketchDimensionMode::Driving, targets_, std::move(parameter),
+                  label_offset_);
   }
 
   friend bool operator==(const SketchDimensionIntent&, const SketchDimensionIntent&) = default;
@@ -108,9 +118,9 @@ private:
   SketchDimensionIntent(SketchDimensionId id, SketchDimensionKind kind,
                         SketchDimensionMode mode,
                         std::vector<SketchConstraintIntentTarget> targets,
-                        std::optional<ParameterId> parameter)
+                        std::optional<ParameterId> parameter, Point2 label_offset)
       : id_(std::move(id)), kind_(kind), mode_(mode), targets_(std::move(targets)),
-        parameter_(std::move(parameter)) {}
+        parameter_(std::move(parameter)), label_offset_(label_offset) {}
 
   [[nodiscard]] static std::size_t expected_target_count(SketchDimensionKind kind) noexcept {
     switch (kind) {
@@ -155,6 +165,7 @@ private:
   SketchDimensionMode mode_;
   std::vector<SketchConstraintIntentTarget> targets_;
   std::optional<ParameterId> parameter_;
+  Point2 label_offset_;
 };
 
 class SketchDimensionCatalog {

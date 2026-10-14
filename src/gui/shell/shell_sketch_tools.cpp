@@ -13,6 +13,7 @@
 #include <QEvent>
 #include <QInputDialog>
 #include <QKeyEvent>
+#include <QLineEdit>
 #include <QMouseEvent>
 #include <QStatusBar>
 #include <QTimer>
@@ -378,6 +379,25 @@ ShellSketchTools::ShellSketchTools(ShellWindow& window, GuiDocumentSession& sess
                                    OcctViewport& viewport, ShellRibbon& ribbon, int sketch_tab)
     : QObject(&window), window_(window), session_(session), workbench_(workbench),
       workspace_(workspace), viewport_(viewport), ribbon_(ribbon), sketch_tab_(sketch_tab) {
+  dimension_editor_ = new QLineEdit(&viewport_);
+  dimension_editor_->setObjectName(QStringLiteral("sketch.dimension.editor"));
+  dimension_editor_->setPlaceholderText(QStringLiteral("Wert oder =Formel"));
+  dimension_editor_->hide();
+  dimension_editor_->installEventFilter(this);
+  connect(dimension_editor_, &QLineEdit::returnPressed, this, [this] {
+    if (!dimension_editor_id_) return;
+    const auto edited = edit_dimension(*dimension_editor_id_,
+                                      dimension_editor_->text().trimmed().toStdString());
+    if (edited.has_error()) {
+      report(edited.error());
+      dimension_editor_->setToolTip(QString::fromStdString(edited.error().message()));
+      return;
+    }
+    dimension_editor_->hide();
+    dimension_editor_id_.reset();
+    viewport_.setFocus();
+    window_.refresh();
+  });
   build_ribbon_groups();
   wire_viewport_callbacks();
   viewport_.installEventFilter(this);
@@ -550,9 +570,8 @@ void ShellSketchTools::wire_viewport_callbacks() {
     }
     if (label_drag_) {
       // Dimension label drag: move the badge with the raw pointer.
-      auto& offset = dimension_label_offsets_[*label_drag_];
-      offset.x += raw.x - label_drag_last_.x;
-      offset.y += raw.y - label_drag_last_.y;
+      label_drag_delta_.x += raw.x - label_drag_last_.x;
+      label_drag_delta_.y += raw.y - label_drag_last_.y;
       label_drag_last_ = raw;
       if (!label_publish_scheduled_) {
         label_publish_scheduled_ = true;
@@ -618,6 +637,12 @@ void ShellSketchTools::wire_viewport_callbacks() {
             const auto marker = hit->semantic_id.rfind(kDimensionMarker);
             if (marker != std::string::npos) {
               label_drag_ = hit->semantic_id.substr(marker + kDimensionMarker.size());
+              auto catalog = session_.sketch_dimension_catalog(*window_.active_sketch());
+              const auto* dimension = catalog ? catalog.value().find(SketchDimensionId(*label_drag_))
+                                              : nullptr;
+              if (!dimension) { label_drag_.reset(); return; }
+              label_drag_delta_ = {};
+              label_drag_initial_offset_ = dimension->label_offset();
               label_drag_last_ = raw;
               viewport_.set_sketch_selection_enabled(false);
               return;
@@ -625,9 +650,13 @@ void ShellSketchTools::wire_viewport_callbacks() {
           }
           begin_drag(screen);
         } else if (label_drag_) {
-          label_drag_.reset();
-          viewport_.set_sketch_selection_enabled(true);
-          publish_scene();
+          const Point2 offset{label_drag_initial_offset_.x + label_drag_delta_.x + raw.x - label_drag_last_.x,
+                              label_drag_initial_offset_.y + label_drag_delta_.y + raw.y - label_drag_last_.y};
+          const auto moved = GuiSketchDimensionController::set_label_offset(
+              session_, *window_.active_sketch(), SketchDimensionId(*label_drag_), offset);
+          if (moved.has_error()) report(moved.error());
+          cancel_label_drag();
+          window_.refresh();
         } else {
           release_drag(snap.snapped_point);
         }
@@ -643,7 +672,8 @@ void ShellSketchTools::activate() {
 
 void ShellSketchTools::deactivate() {
   cancel_tool();
-  label_drag_.reset();
+  dimension_editor_->hide();
+  dimension_editor_id_.reset();
   if (drag_controller_ && drag_controller_->active())
     drag_controller_->cancel();
   drag_controller_.reset();
@@ -717,22 +747,14 @@ void ShellSketchTools::publish_scene_for(const Sketch& sketch, bool include_anno
                                      dimension_annotations.value().begin(),
                                      dimension_annotations.value().end());
   }
-  // Apply the user's dragged label placement (hit test and drawing both use
-  // the shifted anchor).
-  if (!dimension_label_offsets_.empty()) {
-    constexpr std::string_view kDimensionMarker = "/dimension/";
+  // Preview adds only the uncommitted delta to the persisted glyph offset.
+  if (label_drag_) {
     for (auto& annotation : scene.value().annotations) {
-      if (annotation.hit_kind != GuiSketchHitKind::Dimension)
-        continue;
-      const auto marker = annotation.semantic_id.rfind(kDimensionMarker);
-      if (marker == std::string::npos)
-        continue;
-      const auto offset = dimension_label_offsets_.find(
-          annotation.semantic_id.substr(marker + kDimensionMarker.size()));
-      if (offset == dimension_label_offsets_.end())
-        continue;
-      annotation.point.x += offset->second.x;
-      annotation.point.y += offset->second.y;
+      if (annotation.hit_kind == GuiSketchHitKind::Dimension &&
+          annotation.candidate_id == *label_drag_) {
+        annotation.point.x += label_drag_delta_.x;
+        annotation.point.y += label_drag_delta_.y;
+      }
     }
   }
 
@@ -1006,7 +1028,16 @@ bool ShellSketchTools::complete_tool() {
   return true;
 }
 
+void ShellSketchTools::cancel_label_drag() {
+  if (!label_drag_) return;
+  label_drag_.reset();
+  label_drag_delta_ = {};
+  viewport_.set_sketch_selection_enabled(true);
+  publish_scene();
+}
+
 void ShellSketchTools::cancel_tool() {
+  cancel_label_drag();
   chain_anchor_.reset();
   modify_tool_.reset(); // switching/cancelling any tool ends a modal modify tool
   cancel_trim_stroke();
@@ -1905,19 +1936,39 @@ Result<std::size_t> ShellSketchTools::delete_selection() {
 }
 
 bool ShellSketchTools::edit_selected_dimension_interactive() {
-  if (!selected_dimension())
-    return false;
-  bool accepted = false;
-  const QString text =
-      QInputDialog::getText(&window_, QStringLiteral("Bemaßung bearbeiten"),
-                            QStringLiteral("Wert oder Formel:"), QLineEdit::Normal, {}, &accepted);
-  if (!accepted || text.trimmed().isEmpty())
-    return false;
-  const auto edited = edit_selected_dimension(text.trimmed().toStdString());
-  if (edited.has_error())
-    report(edited.error());
-  window_.refresh();
-  return !edited.has_error();
+  const auto id = selected_dimension();
+  if (!id || !window_.active_sketch()) return false;
+  auto catalog = session_.sketch_dimension_catalog(*window_.active_sketch());
+  const auto* dimension = catalog ? catalog.value().find(*id) : nullptr;
+  if (!dimension || !dimension->driving() || !dimension->parameter()) return false;
+  const auto* parameter = session_.part_document()->find_parameter(*dimension->parameter());
+  if (!parameter) return false;
+  auto annotations = GuiSketchDimensionController::accepted_annotations(session_, *window_.active_sketch());
+  if (!annotations) return false;
+  for (const auto& annotation : annotations.value()) {
+    if (annotation.candidate_id != id->value()) continue;
+    auto screen = viewport_.sketch_plane_to_screen(annotation.point);
+    if (!screen) return false;
+    cancel_label_drag();
+    dimension_editor_id_ = *id;
+    dimension_editor_->setText(parameter->is_expression()
+        ? QString::fromStdString(*parameter->formula())
+        : QString::number(dimension->kind() == SketchDimensionKind::Angle
+                              ? parameter->value().degrees() : parameter->value().millimeters(), 'g', 12));
+    dimension_editor_->setToolTip({});
+    const int width = std::min(220, viewport_.width());
+    dimension_editor_->setFixedWidth(width);
+    dimension_editor_->move(std::clamp(static_cast<int>(screen.value().x) - width / 2, 0,
+                                      std::max(0, viewport_.width() - width)),
+                            std::clamp(static_cast<int>(screen.value().y) - 15, 0,
+                                      std::max(0, viewport_.height() - 30)));
+    dimension_editor_->show();
+    dimension_editor_->raise();
+    dimension_editor_->setFocus();
+    dimension_editor_->selectAll();
+    return true;
+  }
+  return false;
 }
 
 Result<std::size_t> ShellSketchTools::apply_dimension(SketchDimensionKind kind, bool reference,
@@ -1937,6 +1988,7 @@ Result<std::size_t> ShellSketchTools::apply_dimension(SketchDimensionKind kind, 
   auto catalog = session_.sketch_dimension_catalog(topology.value().sketch());
   if (catalog.has_error())
     return Result<std::size_t>::failure(catalog.error());
+  std::optional<Parameter> pending_parameter;
   if (!reference && !parameter) {
     // Inventor-style: auto-create a dN parameter carrying the CURRENT measured
     // value, so committing the driving dimension does not move geometry.
@@ -1956,18 +2008,11 @@ Result<std::size_t> ShellSketchTools::apply_dimension(SketchDimensionKind kind, 
       ++number;
     const ParameterId parameter_id("d" + std::to_string(number));
     const Quantity value = measured.value().value;
-    auto created = session_.commit_part_transaction(
-        "Bemaßungsparameter anlegen", [&parameter_id, &value, kind](PartDocument& part) {
-          auto created_parameter =
-              kind == SketchDimensionKind::Angle
-                  ? Parameter::create_angle(parameter_id, parameter_id.value(), value)
-                  : Parameter::create_length(parameter_id, parameter_id.value(), value);
-          if (created_parameter.has_error())
-            return Result<std::size_t>::failure(created_parameter.error());
-          return part.add_parameter(std::move(created_parameter.value()));
-        });
-    if (created.has_error())
-      return Result<std::size_t>::failure(created.error());
+    auto created = kind == SketchDimensionKind::Angle
+        ? Parameter::create_angle(parameter_id, parameter_id.value(), value)
+        : Parameter::create_length(parameter_id, parameter_id.value(), value);
+    if (created.has_error()) return Result<std::size_t>::failure(created.error());
+    pending_parameter = std::move(created.value());
     parameter = parameter_id;
   }
   auto intent = SketchDimensionIntent::create(next_dimension_id(catalog.value(), kind), kind,
@@ -1976,15 +2021,8 @@ Result<std::size_t> ShellSketchTools::apply_dimension(SketchDimensionKind kind, 
                                               std::move(targets.value()), parameter);
   if (intent.has_error())
     return Result<std::size_t>::failure(intent.error());
-  auto controller = GuiSketchDimensionController::create(session_, topology.value().sketch(),
-                                                         std::move(intent.value()));
-  if (controller.has_error())
-    return Result<std::size_t>::failure(controller.error());
-  if (!controller.value().preview().authoring.accepted)
-    return Result<std::size_t>::failure(
-        Error::validation(controller.value().preview().authoring.candidate.id().value(),
-                          "Bemaßungs-Vorschau wurde abgelehnt"));
-  auto committed = controller.value().commit(session_);
+  auto committed = GuiSketchDimensionController::add(
+      session_, topology.value().sketch(), std::move(intent.value()), std::move(pending_parameter));
   if (committed.has_error())
     return committed;
   session_.selection().clear();
@@ -1998,32 +2036,54 @@ Result<std::size_t> ShellSketchTools::edit_selected_dimension(const std::string&
   if (!id || session_.part_document() == nullptr)
     return Result<std::size_t>::failure(
         Error::validation("gui.shell.sketch", "genau eine Bemaßungs-Annotation auswählen"));
+  return edit_dimension(*id, text);
+}
+
+Result<std::size_t> ShellSketchTools::edit_dimension(SketchDimensionId id, const std::string& text) {
+  if (!sketch_context_ready())
+    return Result<std::size_t>::failure(Error::validation(id.value(), "keine aktive Skizze"));
   auto catalog = session_.sketch_dimension_catalog(*window_.active_sketch());
-  if (catalog.has_error())
-    return Result<std::size_t>::failure(catalog.error());
-  const auto* dimension = catalog.value().find(*id);
+  if (catalog.has_error()) return Result<std::size_t>::failure(catalog.error());
+  const auto* dimension = catalog.value().find(id);
   if (dimension == nullptr || !dimension->driving() || !dimension->parameter())
     return Result<std::size_t>::failure(
-        Error::validation(id->value(), "ausgewählte Bemaßung hat keinen treibenden Wert"));
+        Error::validation(id.value(), "ausgewählte Bemaßung hat keinen treibenden Wert"));
   const Parameter* parameter = session_.part_document()->find_parameter(*dimension->parameter());
   if (parameter == nullptr)
     return Result<std::size_t>::failure(
-        Error::validation(id->value(), "Bemaßungsparameter existiert nicht"));
+        Error::validation(id.value(), "Bemaßungsparameter existiert nicht"));
   Result<std::size_t> edited = [&] {
-    if (parameter->is_expression())
-      return GuiSketchDimensionController::edit_formula(session_, *window_.active_sketch(), *id,
-                                                        text);
-    char* end = nullptr;
-    const double value = std::strtod(text.c_str(), &end);
-    if (end != text.c_str() + text.size() || !std::isfinite(value) || value <= 0.0)
+    const QString input = QString::fromStdString(text).trimmed();
+    if (parameter->is_expression() || input.startsWith('=')) {
+      const std::string formula = (input.startsWith('=') ? input.mid(1) : input).toStdString();
+      if (parameter->is_expression())
+        return GuiSketchDimensionController::edit_formula(session_, *window_.active_sketch(), id,
+                                                          formula);
+      std::size_t number = 1U;
+      std::string name;
+      do { name = "d_expr_" + std::to_string(number++); }
+      while (session_.part_document()->find_parameter(ParameterId(name)) != nullptr ||
+             std::any_of(session_.part_document()->parameters().begin(),
+                         session_.part_document()->parameters().end(),
+                         [&name](const auto& item) { return item.name() == name; }));
+      return GuiSketchDimensionController::edit_formula(session_, *window_.active_sketch(), id,
+                                                        formula, ParameterId(name), name);
+    }
+    QString literal = input;
+    const QString unit = dimension->kind() == SketchDimensionKind::Angle
+                             ? QStringLiteral("deg") : QStringLiteral("mm");
+    if (literal.endsWith(unit)) literal.chop(unit.size());
+    bool valid = false;
+    const double value = literal.trimmed().toDouble(&valid);
+    if (!valid || !std::isfinite(value) || value <= 0.0)
       return Result<std::size_t>::failure(
-          Error::validation(id->value(), "Bemaßungswert muss positiv und endlich sein"));
+          Error::validation(id.value(), "Bemaßungswert muss positiv und endlich sein"));
     auto quantity = dimension->kind() == SketchDimensionKind::Angle
-                        ? Quantity::angle_deg(value, id->value())
-                        : Quantity::length_mm(value, id->value());
+                        ? Quantity::angle_deg(value, id.value())
+                        : Quantity::length_mm(value, id.value());
     if (quantity.has_error())
       return Result<std::size_t>::failure(quantity.error());
-    return GuiSketchDimensionController::edit_literal(session_, *window_.active_sketch(), *id,
+    return GuiSketchDimensionController::edit_literal(session_, *window_.active_sketch(), id,
                                                       quantity.value());
   }();
   if (!edited.has_error()) {
@@ -2197,6 +2257,23 @@ void ShellSketchTools::synchronize_sketch_selection(const std::vector<GuiSelecti
 }
 
 bool ShellSketchTools::eventFilter(QObject* watched, QEvent* event) {
+  if (watched == dimension_editor_) {
+    if (event->type() == QEvent::FocusOut ||
+        (event->type() == QEvent::KeyPress &&
+         static_cast<QKeyEvent*>(event)->key() == Qt::Key_Escape)) {
+      dimension_editor_->hide();
+      dimension_editor_id_.reset();
+      return event->type() == QEvent::KeyPress;
+    }
+    return QObject::eventFilter(watched, event);
+  }
+  if (label_drag_ && ((event->type() == QEvent::KeyPress &&
+                      static_cast<QKeyEvent*>(event)->key() == Qt::Key_Escape) ||
+                     event->type() == QEvent::UngrabMouse ||
+                     event->type() == QEvent::WindowDeactivate)) {
+    cancel_label_drag();
+    return event->type() == QEvent::KeyPress;
+  }
   if (watched == &viewport_ && tool_active()) {
     if (event->type() == QEvent::MouseButtonPress) {
       const auto* mouse = static_cast<QMouseEvent*>(event);

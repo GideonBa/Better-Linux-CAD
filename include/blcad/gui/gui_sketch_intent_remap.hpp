@@ -87,7 +87,7 @@ inline Result<std::size_t> remap_sketch_intent_catalogs(
       }
       auto remapped = SketchDimensionIntent::create(
           dimension.id(), dimension.kind(), dimension.mode(), std::move(targets),
-          dimension.parameter());
+          dimension.parameter(), dimension.label_offset());
       if (remapped.has_error())
         return Result<std::size_t>::failure(remapped.error());
       rebuilt.push_back(std::move(remapped.value()));

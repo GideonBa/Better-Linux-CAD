@@ -565,6 +565,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_part_foundation_workbench_tests.cpp
       tests/gui/gui_part_operations_workbench_tests.cpp
       tests/gui/gui_raw_profile_transaction_tests.cpp
+      tests/gui/gui_shell_dimension_workflow_tests.cpp
       tests/gui/gui_shell_feature_tools_tests.cpp
       tests/gui/gui_shell_window_tests.cpp
       tests/gui/gui_shell_sketch_tools_tests.cpp

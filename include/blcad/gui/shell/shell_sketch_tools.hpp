@@ -15,6 +15,7 @@
 #include <vector>
 
 class QAction;
+class QLineEdit;
 
 namespace blcad::gui {
 
@@ -123,6 +124,9 @@ private:
   void apply_numeric_buffer();
   void mirror_numeric_buffer();
   void clear_numeric_buffer();
+  void cancel_label_drag();
+  [[nodiscard]] Result<std::size_t> edit_dimension(SketchDimensionId id,
+                                                 const std::string& text);
   void synchronize_sketch_selection(const std::vector<GuiSelection>& selections);
   void handle_pointer(Point2 raw_point, const GuiSketchSnapResult& snap,
                       const std::optional<GuiSketchHit>& hit);
@@ -170,12 +174,15 @@ private:
   std::unordered_set<std::string> trim_stroke_visited_;
   std::size_t trim_stroke_generation_{0U};
   std::size_t trim_stroke_pending_{0U};
-  // Transient (session-local) dimension label placement: dimension id → plane
-  // offset from the resolver's default anchor; dragged with the mouse.
-  std::unordered_map<std::string, Point2> dimension_label_offsets_;
+  // Only the in-flight delta is transient. Release persists one plane-space
+  // offset in the dimension catalog, together with dirty state and history.
   std::optional<std::string> label_drag_;
+  Point2 label_drag_delta_{};
+  Point2 label_drag_initial_offset_{};
   Point2 label_drag_last_{};
   bool label_publish_scheduled_{false};
+  QLineEdit* dimension_editor_{nullptr};
+  std::optional<SketchDimensionId> dimension_editor_id_;
   // Inventor-style line chaining: end of the last committed segment; the next
   // segment starts here and the shared corner is coupled coincident.
   std::optional<Point2> chain_anchor_;
