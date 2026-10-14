@@ -811,18 +811,37 @@ void ShellSketchTools::refresh_enablement() {
   // exactly two selected curves.
   for (auto* action : modify_actions_)
     action->setEnabled(active);
-  const bool two_curves = active && selected_sketch_entity_ids().size() == 2U;
+  const auto corner_ids = selected_sketch_entity_ids();
+  const auto* selected_sketch = active ? session_.part_document()->find_sketch(*window_.active_sketch()) : nullptr;
+  const bool two_curves = selected_sketch && session_.selection().size() == 2U && corner_ids.size() == 2U &&
+      std::all_of(corner_ids.begin(), corner_ids.end(), [&](const auto& id) {
+        return selected_sketch->find_line_segment(id) || selected_sketch->find_arc_segment(id) ||
+               selected_sketch->find_spline_segment(id);
+      });
   if (fillet_action_ != nullptr)
     fillet_action_->setEnabled(two_curves);
   if (chamfer_action_ != nullptr)
     chamfer_action_->setEnabled(two_curves);
-  const bool operation_selection = active && !selected_operation_entities().empty();
-  for (auto* action : operation_actions_) action->setEnabled(operation_selection);
+  const auto operation_ids = selected_operation_entities();
+  const bool operation_selection = active && operation_ids && !operation_ids.value().empty();
+  const auto* operation_sketch =
+      active ? session_.part_document()->find_sketch(*window_.active_sketch()) : nullptr;
+  for (auto* action : operation_actions_) {
+    bool compatible = operation_selection;
+    if (compatible && action->objectName() == QStringLiteral("sketch.operation.offset")) {
+      compatible =
+          std::all_of(operation_ids.value().begin(), operation_ids.value().end(),
+                      [&](const auto& id) { return operation_sketch->find_line_segment(id); }) ||
+          (operation_ids.value().size() == 1U &&
+           operation_sketch->find_arc_segment(operation_ids.value().front()));
+    }
+    action->setEnabled(compatible);
+  }
   if (project_action_) project_action_->setEnabled(active);
   if (break_link_action_) {
     const auto ids = selected_sketch_entity_ids();
     const auto* sketch = active ? session_.part_document()->find_sketch(*window_.active_sketch()) : nullptr;
-    break_link_action_->setEnabled(sketch && ids.size() == 1U && sketch->find_projected_line(ids.front()));
+    break_link_action_->setEnabled(sketch && session_.selection().size() == 1U && ids.size() == 1U && sketch->find_projected_line(ids.front()));
   }
   if (delete_constraint_action_ != nullptr)
     delete_constraint_action_->setEnabled(active && (selected_accepted_constraint().has_value() ||
@@ -1407,23 +1426,49 @@ std::vector<SketchEntityId> ShellSketchTools::selected_sketch_entity_ids() const
   return ids;
 }
 
-std::vector<SketchEntityId> ShellSketchTools::selected_operation_entities() const {
-  auto ids = selected_sketch_entity_ids();
+Result<std::vector<SketchEntityId>> ShellSketchTools::selected_operation_entities() const {
+  std::vector<SketchEntityId> ids;
   auto topology = active_topology();
-  if (!topology) return ids;
+  if (!topology)
+    return Result<std::vector<SketchEntityId>>::failure(topology.error());
+  const auto reject = [](const std::string& id) {
+    return Result<std::vector<SketchEntityId>>::failure(
+        Error::validation(id, "Die gesamte Auswahl muss aus bearbeitbaren Linien, Bögen, Splines "
+                              "oder deren geschlossenen Profilen bestehen"));
+  };
+  const auto append = [&](const SketchTopologyEntity* entity) {
+    if (!entity ||
+        (entity->kind() != SketchTopologyEntityKind::Line &&
+         entity->kind() != SketchTopologyEntityKind::Arc &&
+         entity->kind() != SketchTopologyEntityKind::Spline) ||
+        !std::string_view(entity->id()).starts_with("entity/"))
+      return false;
+    SketchEntityId id(entity->id().substr(7));
+    if (std::find(ids.begin(), ids.end(), id) == ids.end())
+      ids.push_back(std::move(id));
+    return true;
+  };
   for (const auto& selection : session_.selection().entries()) {
-    if (selection.kind != GuiSelectionKind::SketchEntity) continue;
+    if (selection.kind != GuiSelectionKind::SketchEntity)
+      return reject(selection.semantic_id);
     auto target = selection_target(topology.value(), selection.semantic_id);
-    if (!target || target->kind() != SketchConstraintIntentTargetKind::Entity) continue;
+    if (!target || target->kind() != SketchConstraintIntentTargetKind::Entity)
+      return reject(selection.semantic_id);
     const auto* entity = topology.value().find_entity(target->id());
-    if (!entity) continue;
+    if (append(entity))
+      continue;
+    if (!entity ||
+        (entity->kind() != SketchTopologyEntityKind::ClosedProfile &&
+         entity->kind() != SketchTopologyEntityKind::ArcClosedProfile &&
+         entity->kind() != SketchTopologyEntityKind::CompositeClosedProfile) ||
+        entity->entity_dependencies().empty())
+      return reject(selection.semantic_id);
     for (const auto& dependency : entity->entity_dependencies()) {
-      if (!std::string_view(dependency).starts_with("entity/")) continue;
-      SketchEntityId id(dependency.substr(7));
-      if (std::find(ids.begin(), ids.end(), id) == ids.end()) ids.push_back(std::move(id));
+      if (!append(topology.value().find_entity(dependency)))
+        return reject(selection.semantic_id);
     }
   }
-  return ids;
+  return Result<std::vector<SketchEntityId>>::success(std::move(ids));
 }
 
 Result<std::size_t> ShellSketchTools::apply_modify_pick(SketchModifyKind kind,
@@ -1488,7 +1533,7 @@ Result<std::size_t> ShellSketchTools::apply_fillet(double radius) {
     return Result<std::size_t>::failure(
         Error::validation("gui.shell.sketch", "keine aktive Skizze"));
   const auto ids = selected_sketch_entity_ids();
-  if (ids.size() != 2U)
+  if (ids.size() != 2U || session_.selection().size() != 2U)
     return Result<std::size_t>::failure(Error::validation(
         "gui.shell.sketch", "genau zwei verbundene Kurven für die Verrundung wählen"));
   auto controller = GuiSketchModifyController::create(session_, *window_.active_sketch());
@@ -1511,7 +1556,7 @@ Result<std::size_t> ShellSketchTools::apply_chamfer(double distance) {
     return Result<std::size_t>::failure(
         Error::validation("gui.shell.sketch", "keine aktive Skizze"));
   const auto ids = selected_sketch_entity_ids();
-  if (ids.size() != 2U)
+  if (ids.size() != 2U || session_.selection().size() != 2U)
     return Result<std::size_t>::failure(
         Error::validation("gui.shell.sketch", "genau zwei verbundene Kurven für die Fase wählen"));
   auto controller = GuiSketchModifyController::create(session_, *window_.active_sketch());

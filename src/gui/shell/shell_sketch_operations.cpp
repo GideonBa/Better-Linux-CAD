@@ -79,8 +79,20 @@ ShellSketchTools::prepare_operation(GuiSketchOperationRequest request) const {
         Error::validation("sketch.operation", "keine aktive Skizze"));
   const auto& part = *session_.part_document();
   const auto& sketch = *part.find_sketch(*window_.active_sketch());
-  if (request.entities.empty())
-    request.entities = selected_operation_entities();
+  if (request.entities.empty() && request.kind != Kind::ProjectLine &&
+      request.kind != Kind::ProjectPoint) {
+    if (request.kind == Kind::BreakLinkLine) {
+      if (session_.selection().size() != 1U)
+        return Result<GuiSketchOperationRequest>::failure(
+            Error::validation("sketch.operation", "Genau eine projizierte Linie auswählen"));
+      request.entities = selected_sketch_entity_ids();
+    } else {
+      auto selected = selected_operation_entities();
+      if (!selected)
+        return Result<GuiSketchOperationRequest>::failure(selected.error());
+      request.entities = std::move(selected.value());
+    }
+  }
   geometry::SketchReferenceProjector projector;
   const auto* cache = session_.part_shape_cache();
   if (request.kind == Kind::ProjectPoint && request.projected_point) {
@@ -213,8 +225,23 @@ void ShellSketchTools::show_operation_dialog(Kind kind) {
   cancel_tool();
   GuiSketchOperationRequest base;
   base.kind = kind;
-  base.entities = selected_operation_entities();
   const bool projection = kind == Kind::ProjectLine || kind == Kind::ProjectPoint;
+  if (!projection) {
+    if (kind == Kind::BreakLinkLine) {
+      if (session_.selection().size() != 1U) {
+        report_message("Genau eine projizierte Linie auswählen");
+        return;
+      }
+      base.entities = selected_sketch_entity_ids();
+    } else {
+      auto selected = selected_operation_entities();
+      if (!selected) {
+        report(selected.error());
+        return;
+      }
+      base.entities = std::move(selected.value());
+    }
+  }
   if (!projection && base.entities.empty()) {
     report_message("Zuerst die gewünschte Skizzengeometrie auswählen.");
     return;
@@ -363,6 +390,7 @@ void ShellSketchTools::show_operation_dialog(Kind kind) {
   layout->addWidget(status);
   auto* controls = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
   controls->button(QDialogButtonBox::Ok)->setText(QStringLiteral("Übernehmen"));
+  controls->button(QDialogButtonBox::Cancel)->setText(QStringLiteral("Abbrechen"));
   layout->addWidget(controls);
   const auto request = [&] {
     auto r = base;

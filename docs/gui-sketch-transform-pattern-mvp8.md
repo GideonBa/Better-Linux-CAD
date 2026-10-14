@@ -16,6 +16,10 @@ signed total angle up to one revolution.
 
 Edits show separate dashed preview curves in the viewport without connecting unrelated instances.
 The committed geometry, dirty state, and undo history remain unchanged until **Übernehmen**.
+Unsupported or mixed selections disable the operation and reject it as a whole; selecting a line
+alongside a parameter-backed circle must never transform only the line. Free points and projected
+references are likewise excluded from ordinary curve transforms. Offset enablement distinguishes
+line chains and single circular arcs from unsupported spline/mixed curved offsets.
 Cancel/Escape clears the preview and restores selection and drag handles. An invalid candidate
 clears the previous preview, explains the error, and disables Apply. Apply re-evaluates the current
 document and publishes exactly one atomic transaction, including downstream feature recompute.
@@ -75,6 +79,17 @@ The suite exercises every transform and pattern through the shell command surfac
 editor Apply/Cancel, preview/history isolation, constraint and dimension conflict rollback,
 profile-selection expansion, rational conic preservation, copied profile boundaries, full-circle
 spacing in both directions, count/selection guards, exact Undo/Redo, and Save/Open.
+
+## Native UI regression
+
+`[gui][sketch-ui-review]` opens a real shell window, selects geometry through viewport pointer events,
+scrolls the ribbon to the actual tool button, and clicks through every numeric operation. It checks
+preview/cancel isolation, actual Escape handling, one-step main-window Undo/Redo, and removal of
+transient preview paths. The ribbon scrolls horizontally at ordinary desktop widths; labels retain
+their requested width. Optional `BLCAD_UI_CAPTURE_DIR` captures only the test application's widgets.
+
+The same cases run offscreen and with `QT_QPA_PLATFORM=xcb`, including 150% and 200% scaling.
+Offscreen assertions do not substitute for native OpenGL display and visual inspection.
 
 ## Remaining boundaries
 

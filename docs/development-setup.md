@@ -522,3 +522,17 @@ QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][sketch-transfor
 surface, history/persistence, source-point preservation, copied rational profiles, and atomic
 constraint/dimension conflict rejection. The remaining limits are recorded in the two operation
 contracts and the interactive Sketch coverage manifest.
+
+Sketch UI regressions for visible windows and native OpenGL (requires an authorized local X display):
+
+```bash
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][sketch-ui-review]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[gui][sketch-ui-review],[gui][viewport]"
+QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1.5 ./build/dev-gui/blcad_gui_tests "[gui][sketch-ui-review]"
+QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=2 ./build/dev-gui/blcad_gui_tests "[gui][sketch-ui-review]"
+```
+
+Set `BLCAD_UI_CAPTURE_DIR` to an optional writable directory to capture the test shell, previews and
+operation dialogs for visual inspection. Captures use the test application's own widgets. The suite
+checks 1280×800 layout, horizontal command reachability, supported/mixed selection gating, actual
+button and Escape events, preview cleanup, and main-window Undo/Redo.

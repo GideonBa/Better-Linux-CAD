@@ -91,7 +91,7 @@ private:
   void build_operation_group();
   void show_operation_dialog(GuiSketchOperationKind kind);
   [[nodiscard]] Result<GuiSketchOperationRequest> prepare_operation(GuiSketchOperationRequest request) const;
-  [[nodiscard]] std::vector<SketchEntityId> selected_operation_entities() const;
+  [[nodiscard]] Result<std::vector<SketchEntityId>> selected_operation_entities() const;
   void wire_viewport_callbacks();
   [[nodiscard]] GuiSketchGridConfig grid_config() const;
   void apply_grid_config();

@@ -6,10 +6,12 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QMenu>
+#include <QScrollArea>
 #include <QStackedWidget>
 #include <QTabBar>
 #include <QToolButton>
 #include <QVBoxLayout>
+#include <algorithm>
 
 namespace blcad::gui {
 namespace {
@@ -31,26 +33,37 @@ ShellRibbon::ShellRibbon(QWidget* parent) : QWidget(parent) {
   tabs_->setDocumentMode(true);
   tabs_->setExpanding(false);
   pages_ = new QStackedWidget(this);
-  pages_->setFixedHeight(96);
+  // Keep the command surface reachable when a tab contains more groups than
+  // fit beside the browser. Reserve room for the horizontal scrollbar as well
+  // as the full button/caption height; group widths must not size the window.
+  pages_->setFixedHeight(116);
   column->addWidget(tabs_);
   column->addWidget(pages_);
   connect(tabs_, &QTabBar::currentChanged, pages_, &QStackedWidget::setCurrentIndex);
 }
 
 int ShellRibbon::add_tab(const QString& title) {
-  auto* page = new QWidget(pages_);
+  auto* scroll = new QScrollArea(pages_);
+  scroll->setObjectName(QStringLiteral("ribbon.page.%1").arg(tabs_->count()));
+  scroll->setFrameShape(QFrame::NoFrame);
+  scroll->setWidgetResizable(true);
+  scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+  scroll->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+  auto* page = new QWidget(scroll);
   auto* row = new QHBoxLayout(page);
   row->setContentsMargins(8, 4, 8, 4);
   row->setSpacing(10);
   row->addStretch(1);
-  pages_->addWidget(page);
+  scroll->setWidget(page);
+  pages_->addWidget(scroll);
   return tabs_->addTab(title);
 }
 
 QWidget* ShellRibbon::add_group(int tab_index, const QString& title) {
-  auto* page = pages_->widget(tab_index);
-  if (page == nullptr)
+  auto* scroll = qobject_cast<QScrollArea*>(pages_->widget(tab_index));
+  if (scroll == nullptr)
     return nullptr;
+  auto* page = scroll->widget();
   auto* group = new QFrame(page);
   static_cast<QFrame*>(group)->setFrameShape(QFrame::StyledPanel);
   auto* column = new QVBoxLayout(group);
@@ -76,6 +89,7 @@ QToolButton* ShellRibbon::add_button(QWidget* group, QAction* action) {
   button->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
   button->setAutoRaise(true);
   button->setMinimumSize(56, 64);
+  button->setMinimumWidth(std::max(56, button->sizeHint().width()));
   button_row(group)->addWidget(button);
   return button;
 }
@@ -92,6 +106,7 @@ QToolButton* ShellRibbon::add_menu_button(QWidget* group, const QString& title,
   for (QAction* action : actions)
     menu->addAction(action);
   button->setMenu(menu);
+  button->setMinimumWidth(std::max(56, button->sizeHint().width()));
   button_row(group)->addWidget(button);
   return button;
 }

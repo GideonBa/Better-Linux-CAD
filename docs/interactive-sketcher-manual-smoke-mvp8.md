@@ -5,7 +5,8 @@ offscreen automation.
 
 1. Start `./build/dev-gui/blcad`, open `examples/triangle_prism.blcad.json`, enter its Sketch, and
    verify normal camera, dimmed surroundings, contextual command groups, cursor coordinates, solve
-   state, and remaining DOF.
+   state, and remaining DOF. Resize the shell to 1280×800, scroll the Sketch ribbon to both
+   ends, and verify every command and caption remains reachable without forcing a wider window.
 2. At 100%, 150%, and 200% desktop scale, select endpoints, curves, dimensions, and constraint
    glyphs. Verify hit priority, hover stability, box/crossing selection, grid spacing, snap glyphs,
    and that the model-space cursor position does not change with scale.
@@ -30,7 +31,9 @@ offscreen automation.
    including separate paths for disconnected copies. Cancel/Escape must restore the original view
    and history. Apply must be undoable in one step. Check a 360° pattern has no duplicate seed,
    mirrored ellipses retain their exact shape/profile, and fixed/driving geometry rejects conflicting
-   transforms. Copy reports identify relationships that are not copied to instances.
+   transforms. Select a line plus a parameter-backed circle and verify the whole transform is
+   unavailable/rejected with no partial move. Free points and projected references must not enable
+   ordinary curve transforms. Copy reports identify relationships that are not copied to instances.
    Use **Geometrie projizieren** to choose a construction source or semantic model edge/vertex.
    Select the projected line and **Verknüpfung lösen**, set its segment length, Apply, Undo, and reopen
    the file. Verify source identity before detachment and ordinary editable geometry afterward.

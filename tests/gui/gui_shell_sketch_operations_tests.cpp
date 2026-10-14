@@ -1,5 +1,6 @@
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/gui/shell/shell_feature_tools.hpp"
+#include "blcad/gui/shell/shell_ribbon.hpp"
 #include "blcad/gui/shell/shell_sketch_tools.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
 
@@ -8,10 +9,18 @@
 #include <QComboBox>
 #include <QDialog>
 #include <QDialogButtonBox>
+#include <QDir>
 #include <QDoubleSpinBox>
+#include <QEventLoop>
+#include <QKeyEvent>
+#include <QMouseEvent>
 #include <QPushButton>
+#include <QScreen>
+#include <QScrollArea>
+#include <QScrollBar>
 #include <QTemporaryDir>
 #include <QTimer>
+#include <QToolButton>
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <numbers>
@@ -471,4 +480,221 @@ TEST_CASE("Sketch rigid transforms preserve compatible driving intent and reject
   CHECK_FALSE(window.sketch_tools().preview_operation(move));
   CHECK_FALSE(window.sketch_tools().apply_operation(move));
   CHECK(json(window) == before);
+}
+
+namespace {
+void capture_ui(QWidget& widget, const QString& name) {
+  const auto directory = qEnvironmentVariable("BLCAD_UI_CAPTURE_DIR");
+  if (directory.isEmpty())
+    return;
+  QDir().mkpath(directory);
+  QEventLoop frame;
+  QTimer::singleShot(150, &frame, &QEventLoop::quit);
+  frame.exec();
+  const auto capture = widget.grab();
+  CHECK(capture.save(directory + '/' + name + ".png"));
+}
+} // namespace
+
+TEST_CASE("Sketch ribbon remains usable in a normal desktop window",
+          "[gui][sketch-ui-review][ribbon]") {
+  ShellWindow window;
+  enter(window);
+  window.resize(1280, 800);
+  window.show();
+  qApp->processEvents();
+  capture_ui(window, "sketch-ribbon");
+  CAPTURE(window.width(), window.minimumSizeHint().width(),
+          window.ribbon().minimumSizeHint().width());
+  CHECK(window.width() <= 1280);
+  CHECK(window.viewport().width() >= 600);
+  if (QApplication::platformName() == QStringLiteral("xcb"))
+    CHECK(window.viewport().native_viewer_available());
+  auto* page = window.ribbon().findChild<QScrollArea*>(QStringLiteral("ribbon.page.1"));
+  REQUIRE(page);
+  CHECK(page->horizontalScrollBar()->maximum() > 0);
+  page->horizontalScrollBar()->setValue(page->horizontalScrollBar()->maximum());
+  qApp->processEvents();
+  capture_ui(window, "sketch-ribbon-right");
+  for (auto* button : page->findChildren<QToolButton*>()) {
+    if (button->text() != QStringLiteral("Fang"))
+      continue;
+    CHECK(page->viewport()->rect().contains(
+        QRect(button->mapTo(page->viewport(), QPoint{}), button->size())));
+  }
+}
+
+TEST_CASE("Sketch operation buttons reject unsupported and mixed selections",
+          "[gui][sketch-ui-review][sketch-transform-pattern]") {
+  ShellWindow window;
+  enter(window);
+  auto* move = window.sketch_tools().findChild<QAction*>(QStringLiteral("sketch.operation.move"));
+  REQUIRE(move);
+  select_line(window, "point");
+  CHECK_FALSE(move->isEnabled());
+  const auto id = *window.active_sketch();
+  REQUIRE(window.session().commit_part_transaction(
+      "Unsupported circle selection", [id](PartDocument& part) -> Result<std::size_t> {
+        auto p = Parameter::create_length(ParameterId("diameter"), "Diameter",
+                                          Quantity::length_mm(20).value());
+        if (!p)
+          return Result<std::size_t>::failure(p.error());
+        auto added = part.add_parameter(p.value());
+        if (!added)
+          return added;
+        auto sketch = *part.find_sketch(id);
+        auto profile = CircleProfile::create(ProfileId("circle"), ParameterId("diameter"), {30, 0});
+        if (!profile)
+          return Result<std::size_t>::failure(profile.error());
+        added = sketch.add_profile(profile.value());
+        if (!added)
+          return added;
+        return part.update_sketch(std::move(sketch));
+      }));
+  select_line(window);
+  REQUIRE(window.session().selection().add({GuiSelectionKind::SketchEntity, "profile/circle"}));
+  window.sketch_tools().refresh_enablement();
+  CHECK_FALSE(move->isEnabled());
+  const auto before = json(window);
+  GuiSketchOperationRequest request;
+  request.kind = Kind::Move;
+  request.first = {5, 0};
+  CHECK_FALSE(window.sketch_tools().apply_operation(request));
+  CHECK(json(window) == before);
+}
+
+namespace {
+void click_widget(QWidget& widget, QPointF local) {
+  const QPointF global(widget.mapToGlobal(local.toPoint()));
+  QMouseEvent press(QEvent::MouseButtonPress, local, global, Qt::LeftButton, Qt::LeftButton,
+                    Qt::NoModifier);
+  QApplication::sendEvent(&widget, &press);
+  QMouseEvent release(QEvent::MouseButtonRelease, local, global, Qt::LeftButton, Qt::NoButton,
+                      Qt::NoModifier);
+  QApplication::sendEvent(&widget, &release);
+  qApp->processEvents();
+}
+void escape_dialog(QDialog& dialog) {
+  QKeyEvent escape(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier);
+  QApplication::sendEvent(&dialog, &escape);
+}
+} // namespace
+
+TEST_CASE("Visible Sketch ribbon buttons complete every numeric operation and restore the viewport",
+          "[gui][sketch-ui-review][sketch-transform-pattern][sketch-offset-project]") {
+  ShellWindow window;
+  enter(window);
+  window.resize(1280, 800);
+  window.show();
+  qApp->processEvents();
+  const auto sketch_id = *window.active_sketch();
+  auto point = window.viewport().sketch_plane_to_screen({5, 0});
+  REQUIRE(point);
+  click_widget(window.viewport(), {point.value().x, point.value().y});
+  REQUIRE_FALSE(window.session().selection().empty());
+  const char* command = "move";
+  bool cancel = false;
+  std::size_t expected_lines = 1;
+  SECTION("move") {}
+  SECTION("rotate") {
+    command = "rotate";
+  }
+  SECTION("scale") {
+    command = "scale";
+  }
+  SECTION("copy") {
+    command = "copy";
+    expected_lines = 2;
+  }
+  SECTION("mirror") {
+    command = "mirror";
+    expected_lines = 2;
+  }
+  SECTION("rectangular pattern") {
+    command = "rectangular_pattern";
+    expected_lines = 6;
+  }
+  SECTION("circular pattern") {
+    command = "circular_pattern";
+    expected_lines = 3;
+  }
+  SECTION("offset") {
+    command = "offset";
+    expected_lines = 2;
+  }
+  SECTION("escape cancels preview") {
+    cancel = true;
+  }
+  auto* action =
+      window.sketch_tools().findChild<QAction*>(QStringLiteral("sketch.operation.") + command);
+  REQUIRE(action);
+  REQUIRE(action->isEnabled());
+  QToolButton* button = nullptr;
+  for (auto* candidate : window.ribbon().findChildren<QToolButton*>())
+    if (candidate->defaultAction() == action)
+      button = candidate;
+  REQUIRE(button);
+  auto* page = window.ribbon().findChild<QScrollArea*>(QStringLiteral("ribbon.page.1"));
+  REQUIRE(page);
+  page->ensureWidgetVisible(button);
+  qApp->processEvents();
+  REQUIRE(page->viewport()->rect().contains(
+      QRect(button->mapTo(page->viewport(), QPoint{}), button->size())));
+  const auto before = json(window);
+  bool visited = false;
+  // Bound modal failures so a broken Apply button cannot hang the suite.
+  QTimer::singleShot(3000, &window, [&] {
+    if (auto* dialog = window.findChild<QDialog*>(QStringLiteral("sketch.operation.dialog"))) {
+      CHECK_FALSE("operation dialog failed to close");
+      dialog->reject();
+    }
+  });
+  QTimer::singleShot(50, &window, [&] {
+    auto* dialog = window.findChild<QDialog*>(QStringLiteral("sketch.operation.dialog"));
+    CHECK(dialog);
+    if (!dialog)
+      return;
+    auto* controls = dialog->findChild<QDialogButtonBox*>();
+    CHECK(controls);
+    if (!controls) {
+      dialog->reject();
+      return;
+    }
+    CHECK(controls->button(QDialogButtonBox::Ok)->isEnabled());
+    CHECK(window.viewport().sketch_operation_preview_count() > 0U);
+    CHECK(json(window) == before);
+    if (QApplication::platformName() == QStringLiteral("xcb"))
+      CHECK(dialog->screen()->availableGeometry().contains(dialog->frameGeometry()));
+    else {
+      // The offscreen backend reports an 800x800 virtual screen even when the
+      // synthetic parent is wider. Native xcb verifies actual placement.
+      CHECK(dialog->width() <= dialog->screen()->availableGeometry().width());
+      CHECK(dialog->height() <= dialog->screen()->availableGeometry().height());
+    }
+    capture_ui(window, QStringLiteral("preview-") + command);
+    capture_ui(*dialog, QStringLiteral("dialog-") + command);
+    visited = true;
+    if (cancel)
+      escape_dialog(*dialog);
+    else
+      click_widget(*controls->button(QDialogButtonBox::Ok),
+                   controls->button(QDialogButtonBox::Ok)->rect().center());
+  });
+  click_widget(*button, button->rect().center());
+  REQUIRE(visited);
+  CHECK_FALSE(window.session().task().active());
+  CHECK(window.viewport().sketch_selection_enabled());
+  CHECK(window.viewport().sketch_operation_preview_count() == 0U);
+  if (cancel)
+    CHECK(json(window) == before);
+  else {
+    CHECK(window.session().part_document()->find_sketch(sketch_id)->line_segments().size() ==
+          expected_lines);
+    const auto after = json(window);
+    REQUIRE(window.undo());
+    CHECK(json(window) == before);
+    REQUIRE(window.redo());
+    CHECK(json(window) == after);
+  }
+  capture_ui(window, QStringLiteral("finished-") + command);
 }
