@@ -506,6 +506,7 @@ public:
   [[nodiscard]] const ArcSegment* find_arc_segment(SketchEntityId id) const noexcept;
   [[nodiscard]] const SplineSegment* find_spline_segment(SketchEntityId id) const noexcept;
   [[nodiscard]] const SketchPoint* find_point(SketchEntityId id) const noexcept;
+  [[nodiscard]] bool has_profile_id(const ProfileId& id) const noexcept;
   [[nodiscard]] const ProjectedSketchPoint* find_projected_point(SketchEntityId id) const noexcept;
   [[nodiscard]] const ProjectedSketchLine* find_projected_line(SketchEntityId id) const noexcept;
   [[nodiscard]] const ReferenceGeneratedLine*
@@ -536,7 +537,6 @@ private:
   [[nodiscard]] bool has_entity_id(const SketchEntityId& id) const noexcept;
   [[nodiscard]] bool has_constraint_id(const SketchConstraintId& id) const noexcept;
   [[nodiscard]] bool has_dimension_id(const SketchDimensionId& id) const noexcept;
-  [[nodiscard]] bool has_profile_id(const ProfileId& id) const noexcept;
   [[nodiscard]] Result<std::size_t> validate_constraint_target(const SketchReferenceTarget& target,
                                                                const std::string& object_id) const;
   [[nodiscard]] Result<std::size_t> validate_point_target(const SketchReferenceTarget& target,

@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <numbers>
 #include <optional>
 #include <string>
 #include <type_traits>
@@ -99,6 +100,8 @@ public:
                       std::string intent_id = "sketch.pattern.rectangular") {
     if (!finite(first_step) || !finite(second_step) || first_count == 0U || second_count == 0U)
       return fail(intent_id, "rectangular pattern steps must be finite and counts positive");
+    if (first_count > 10000U / second_count || ids.size() > 10000U / (first_count * second_count))
+      return fail(intent_id, "pattern exceeds the limit of 10000 curve instances");
     auto candidate = clone(source);
     if (candidate.has_error()) return Result<SketchTransformPatternResult>::failure(candidate.error());
     auto curves = selected(source, ids);
@@ -109,9 +112,8 @@ public:
         if (i == 0U && j == 0U) continue;
         const Point2 d{first_step.x * static_cast<double>(i) + second_step.x * static_cast<double>(j),
                        first_step.y * static_cast<double>(i) + second_step.y * static_cast<double>(j)};
-        auto added = append_to(candidate.value(), curves.value(), ".rect.", [=](Point2 p) {
-          return Point2{p.x + d.x, p.y + d.y};
-        });
+        auto added = append_to(candidate.value(), source, curves.value(), ".rect.",
+                               [=](Point2 p) { return Point2{p.x + d.x, p.y + d.y}; });
         if (added.has_error()) return Result<SketchTransformPatternResult>::failure(added.error());
         created.insert(created.end(), added.value().begin(), added.value().end());
       }
@@ -131,18 +133,27 @@ public:
                    std::string intent_id = "sketch.pattern.circular") {
     if (!finite(center) || !std::isfinite(total_angle_rad) || count == 0U)
       return fail(intent_id, "circular pattern center/angle must be finite and count positive");
+    if (count > 10000U || ids.size() > 10000U / count)
+      return fail(intent_id, "pattern exceeds the limit of 10000 curve instances");
+    if (count > 1U && (std::abs(total_angle_rad) <= 1.0e-12 ||
+                       std::abs(total_angle_rad) > 2.0 * std::numbers::pi + 1.0e-12))
+      return fail(intent_id, "circular pattern angle must be non-zero and at most one revolution");
     auto candidate = clone(source);
     if (candidate.has_error()) return Result<SketchTransformPatternResult>::failure(candidate.error());
     auto curves = selected(source, ids);
     if (curves.has_error()) return Result<SketchTransformPatternResult>::failure(curves.error());
-    const double step = count > 1U ? total_angle_rad / static_cast<double>(count - 1U) : 0.0;
+    const bool full_circle =
+        std::abs(std::abs(total_angle_rad) - 2.0 * std::numbers::pi) <= 1.0e-12;
+    const double step =
+        count > 1U ? total_angle_rad / static_cast<double>(full_circle ? count : count - 1U) : 0.0;
     std::vector<SketchEntityId> created;
     for (std::size_t i = 1; i < count; ++i) {
       const double a = step * static_cast<double>(i), c = std::cos(a), s = std::sin(a);
-      auto added = append_to(candidate.value(), curves.value(), ".circular.", [=](Point2 p) {
-        const double x = p.x - center.x, y = p.y - center.y;
-        return Point2{center.x + c * x - s * y, center.y + s * x + c * y};
-      });
+      auto added =
+          append_to(candidate.value(), source, curves.value(), ".circular.", [=](Point2 p) {
+            const double x = p.x - center.x, y = p.y - center.y;
+            return Point2{center.x + c * x - s * y, center.y + s * x + c * y};
+          });
       if (added.has_error()) return Result<SketchTransformPatternResult>::failure(added.error());
       created.insert(created.end(), added.value().begin(), added.value().end());
     }
@@ -175,6 +186,10 @@ private:
       return Result<std::vector<Curve>>::failure(Error::validation("selection", "selection is empty"));
     std::vector<Curve> result;
     for (const auto& id : ids) {
+      if (std::any_of(result.begin(), result.end(),
+                      [&](const auto& curve) { return id_of(curve) == id; }))
+        return Result<std::vector<Curve>>::failure(
+            Error::validation(id.value(), "duplicate transform source"));
       if (const auto* v = source.find_line_segment(id)) result.emplace_back(*v);
       else if (const auto* v = source.find_arc_segment(id)) result.emplace_back(*v);
       else if (const auto* v = source.find_spline_segment(id)) result.emplace_back(*v);
@@ -211,12 +226,15 @@ private:
       SketchEntityId id(prefix + std::to_string(i));
       if (!sketch.find_line_segment(id) && !sketch.find_arc_segment(id) &&
           !sketch.find_spline_segment(id) && !sketch.find_projected_point(id) &&
-          !sketch.find_projected_line(id) && !sketch.find_reference_generated_line(id)) return id;
+          !sketch.find_projected_line(id) && !sketch.find_reference_generated_line(id) &&
+          !sketch.find_point(id))
+        return id;
     }
   }
   template <typename F>
-  [[nodiscard]] static Result<std::vector<SketchEntityId>> append_to(
-      Sketch& candidate, const std::vector<Curve>& curves, const std::string& suffix, F f) {
+  [[nodiscard]] static Result<std::vector<SketchEntityId>>
+  append_to(Sketch& candidate, const Sketch& source, const std::vector<Curve>& curves,
+            const std::string& suffix, F f) {
     std::vector<SketchEntityId> created;
     for (const auto& curve : curves) {
       const auto id = next_id(candidate, id_of(curve).value() + suffix);
@@ -225,6 +243,69 @@ private:
       auto added = add(candidate, copy.value());
       if (added.has_error()) return Result<std::vector<SketchEntityId>>::failure(added.error());
       created.push_back(id);
+    }
+    // A complete copied contour remains an immediately usable profile, including
+    // exact rational ellipses and holes. Partial selections produce curves only.
+    const auto remap = [&](const std::vector<SketchEntityId>& ids) {
+      std::vector<SketchEntityId> result;
+      for (const auto& id : ids) {
+        auto found = std::find_if(curves.begin(), curves.end(),
+                                  [&](const auto& c) { return id_of(c) == id; });
+        if (found == curves.end())
+          return std::vector<SketchEntityId>{};
+        result.push_back(created[static_cast<std::size_t>(found - curves.begin())]);
+      }
+      return result;
+    };
+    const auto profile_id = [&](const ProfileId& source_id) {
+      for (std::size_t i = 1;; ++i) {
+        ProfileId id(source_id.value() + suffix + std::to_string(i));
+        if (!candidate.has_profile_id(id))
+          return id;
+      }
+    };
+    for (const auto& p : source.closed_profiles()) {
+      auto ids = remap(p.line_segments());
+      if (ids.empty())
+        continue;
+      auto profile = ClosedProfile::create(profile_id(p.id()), std::move(ids));
+      if (!profile)
+        return Result<std::vector<SketchEntityId>>::failure(profile.error());
+      auto added = candidate.add_profile(std::move(profile.value()));
+      if (!added)
+        return Result<std::vector<SketchEntityId>>::failure(added.error());
+    }
+    for (const auto& p : source.arc_closed_profiles()) {
+      auto ids = remap(p.curve_segments());
+      if (ids.empty())
+        continue;
+      auto profile = ArcClosedProfile::create(profile_id(p.id()), std::move(ids));
+      if (!profile)
+        return Result<std::vector<SketchEntityId>>::failure(profile.error());
+      auto added = candidate.add_profile(std::move(profile.value()));
+      if (!added)
+        return Result<std::vector<SketchEntityId>>::failure(added.error());
+    }
+    for (const auto& p : source.composite_closed_profiles()) {
+      auto outer = remap(p.outer_contour());
+      if (outer.empty())
+        continue;
+      std::vector<std::vector<SketchEntityId>> inner;
+      for (const auto& contour : p.inner_contours()) {
+        auto mapped = remap(contour);
+        if (mapped.empty())
+          break;
+        inner.push_back(std::move(mapped));
+      }
+      if (inner.size() != p.inner_contours().size())
+        continue;
+      auto profile =
+          CompositeClosedProfile::create(profile_id(p.id()), std::move(outer), std::move(inner));
+      if (!profile)
+        return Result<std::vector<SketchEntityId>>::failure(profile.error());
+      auto added = candidate.add_profile(std::move(profile.value()));
+      if (!added)
+        return Result<std::vector<SketchEntityId>>::failure(added.error());
     }
     return Result<std::vector<SketchEntityId>>::success(std::move(created));
   }
@@ -235,7 +316,7 @@ private:
     if (candidate.has_error()) return Result<SketchTransformPatternResult>::failure(candidate.error());
     auto curves = selected(source, ids);
     if (curves.has_error()) return Result<SketchTransformPatternResult>::failure(curves.error());
-    auto created = append_to(candidate.value(), curves.value(), suffix, f);
+    auto created = append_to(candidate.value(), source, curves.value(), suffix, f);
     if (created.has_error()) return Result<SketchTransformPatternResult>::failure(created.error());
     return Result<SketchTransformPatternResult>::success(
         {std::move(candidate.value()), std::move(created.value()), std::nullopt,
@@ -297,6 +378,7 @@ private:
     auto candidate = Sketch::create(source.id(), source.name(), source.workplane());
     if (candidate.has_error()) return candidate;
 #define BLCAD_COPY(range, method) for (const auto& item : source.range()) { auto r = candidate.value().method(item); if (r.has_error()) return Result<Sketch>::failure(r.error()); }
+    BLCAD_COPY(points, add_entity)
     for (const auto& v : source.line_segments()) if (!omitted(omitted_ids, v.id())) { auto r = candidate.value().add_entity(v); if (r.has_error()) return Result<Sketch>::failure(r.error()); }
     for (const auto& v : source.arc_segments()) if (!omitted(omitted_ids, v.id())) { auto r = candidate.value().add_entity(v); if (r.has_error()) return Result<Sketch>::failure(r.error()); }
     for (const auto& v : source.spline_segments()) if (!omitted(omitted_ids, v.id())) { auto r = candidate.value().add_entity(v); if (r.has_error()) return Result<Sketch>::failure(r.error()); }

@@ -2,8 +2,10 @@
 #include "blcad/core/sketch_offset_project.hpp"
 #include "blcad/core/sketch_transform_pattern.hpp"
 
+#include <array>
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include <limits>
 
 using namespace blcad;
 
@@ -242,4 +244,130 @@ TEST_CASE("Block 118 copy and patterns report constraints that are not duplicate
   REQUIRE(pattern);
   CHECK(pattern.value().uncopied_references ==
         std::vector<std::string>{"horizontal.a"});
+}
+
+TEST_CASE("Sketch operation candidates preserve points and copied profile boundaries",
+          "[core][sketch-transform-pattern][sketch-offset-project]") {
+  auto sketch = make_offset_project_sketch();
+  REQUIRE(sketch.add_entity(SketchPoint::create(SketchEntityId("free.point"), {90, 80}).value()));
+  const std::array<Point2, 4> corners{{{0, 0}, {10, 0}, {10, 10}, {0, 10}}};
+  std::vector<SketchEntityId> ids;
+  for (std::size_t i = 0; i < corners.size(); ++i) {
+    ids.emplace_back("edge." + std::to_string(i));
+    REQUIRE(sketch.add_entity(
+        LineSegment::create(ids.back(), corners[i], corners[(i + 1) % 4]).value()));
+  }
+  REQUIRE(sketch.add_profile(ClosedProfile::create(ProfileId("square"), ids).value()));
+  auto moved = SketchTransformPatternService::move(sketch, ids, {1, 2});
+  REQUIRE(moved);
+  REQUIRE(moved.value().sketch.find_point(SketchEntityId("free.point")));
+  CHECK(moved.value().sketch.find_point(SketchEntityId("free.point"))->position() ==
+        Point2{90, 80});
+  REQUIRE(moved.value().sketch.find_closed_profile(ProfileId("square")));
+  auto copy = SketchTransformPatternService::copy(sketch, ids, {20, 0});
+  REQUIRE(copy);
+  REQUIRE(copy.value().sketch.find_closed_profile(ProfileId("square.copy.1")));
+  auto vertices = copy.value().sketch.closed_profile_vertices(
+      *copy.value().sketch.find_closed_profile(ProfileId("square.copy.1")));
+  REQUIRE(vertices);
+  CHECK(vertices.value().front() == Point2{20, 0});
+  auto offset =
+      SketchOffsetProjectService::offset_chain(sketch, {ids[2], ids[0], ids[3], ids[1]}, 1);
+  REQUIRE(offset);
+  CHECK(offset.value().sketch.closed_profiles().size() == 2U);
+  REQUIRE(offset.value().sketch.find_point(SketchEntityId("free.point")));
+  CHECK(offset.value().sketch.find_line_segment(ids[0])->start() == corners[0]);
+  auto projected = SketchOffsetProjectService::project_line(
+      sketch, ProjectedSketchLine::create_from_construction_line(SketchEntityId("ref"),
+                                                                 ConstructionLineId("axis"))
+                  .value());
+  REQUIRE(projected);
+  REQUIRE(projected.value().sketch.find_point(SketchEntityId("free.point")));
+  auto detached = SketchOffsetProjectService::break_link_line(
+      projected.value().sketch, SketchEntityId("ref"), {0, 0}, {100, 0});
+  REQUIRE(detached);
+  REQUIRE(detached.value().sketch.find_point(SketchEntityId("free.point")));
+}
+
+TEST_CASE("Full revolution sketch patterns do not overlap the seed and reject excessive counts",
+          "[core][sketch-transform-pattern]") {
+  auto sketch = make_offset_project_sketch();
+  add_offset_project_line(sketch, "radial", {10, 0}, {20, 0});
+  for (double sign : {-1.0, 1.0}) {
+    auto result = SketchTransformPatternService::circular_pattern(
+        sketch, {SketchEntityId("radial")}, {0, 0}, 4, sign * 2.0 * std::acos(-1.0),
+        SketchPatternMode::Associative);
+    REQUIRE(result);
+    CHECK(result.value().created_entities.size() == 3U);
+    REQUIRE(result.value().pattern_intent);
+    CHECK(result.value().pattern_intent->angle_step_rad ==
+          Catch::Approx(sign * std::acos(-1.0) / 2));
+    const auto* last =
+        result.value().sketch.find_line_segment(result.value().created_entities.back());
+    REQUIRE(last);
+    CHECK(last->start().x == Catch::Approx(0).margin(1e-10));
+    CHECK(last->start().y == Catch::Approx(-sign * 10));
+  }
+  CHECK_FALSE(SketchTransformPatternService::copy(
+      sketch, {SketchEntityId("radial"), SketchEntityId("radial")}, {1, 0}));
+  CHECK_FALSE(SketchTransformPatternService::rectangular_pattern(
+      sketch, {SketchEntityId("radial")}, {1, 0}, std::numeric_limits<std::size_t>::max(), {0, 1},
+      2, SketchPatternMode::Exploded));
+  CHECK_FALSE(SketchTransformPatternService::circular_pattern(
+      sketch, {SketchEntityId("radial")}, {}, 10001, 1, SketchPatternMode::Exploded));
+}
+
+TEST_CASE("Offset discovers reversed and collinear chains and rejects branches or collapsed loops",
+          "[core][sketch-offset-project]") {
+  auto sketch = make_offset_project_sketch();
+  add_offset_project_line(sketch, "a", {0, 0}, {10, 0});
+  add_offset_project_line(sketch, "b", {20, 0}, {10, 0});
+  add_offset_project_line(sketch, "c", {20, 10}, {20, 0});
+  auto result = SketchOffsetProjectService::offset_chain(
+      sketch, {SketchEntityId("c"), SketchEntityId("b"), SketchEntityId("a")}, 2);
+  REQUIRE(result);
+  CHECK(result.value().sketch.find_line_segment(SketchEntityId("a.offset.1"))->start() ==
+        Point2{0, 2});
+  CHECK(result.value().sketch.find_line_segment(SketchEntityId("b.offset.1"))->end() ==
+        Point2{18, 2});
+  CHECK(result.value().sketch.find_line_segment(SketchEntityId("c.offset.1"))->end() ==
+        Point2{18, 10});
+  CHECK(result.value().sketch.find_line_segment(SketchEntityId("b"))->start() == Point2{20, 0});
+  add_offset_project_line(sketch, "branch", {10, 0}, {10, 5});
+  CHECK_FALSE(SketchOffsetProjectService::offset_chain(
+      sketch, {SketchEntityId("a"), SketchEntityId("b"), SketchEntityId("branch")}, 1));
+  CHECK_FALSE(SketchOffsetProjectService::offset_chain(
+      sketch, {SketchEntityId("a"), SketchEntityId("c")}, 1));
+  auto square = make_offset_project_sketch();
+  add_offset_project_line(square, "a", {0, 0}, {10, 0});
+  add_offset_project_line(square, "b", {10, 0}, {10, 10});
+  add_offset_project_line(square, "c", {10, 10}, {0, 10});
+  add_offset_project_line(square, "d", {0, 10}, {0, 0});
+  CHECK_FALSE(SketchOffsetProjectService::offset_chain(
+      square, {SketchEntityId("a"), SketchEntityId("b"), SketchEntityId("c"), SketchEntityId("d")},
+      6));
+}
+
+TEST_CASE("Arc offset preserves exact circular geometry and signed traversal",
+          "[core][sketch-offset-project]") {
+  for (bool clockwise : {false, true}) {
+    auto sketch = make_offset_project_sketch();
+    REQUIRE(
+        sketch.add_entity(ArcSegment::create_three_point(SketchEntityId("arc"), {10, 0},
+                                                         {0, clockwise ? -10.0 : 10.0}, {-10, 0})
+                              .value()));
+    for (double distance : {-2.0, 2.0}) {
+      auto result =
+          SketchOffsetProjectService::offset_chain(sketch, {SketchEntityId("arc")}, distance);
+      REQUIRE(result);
+      const auto* arc =
+          result.value().sketch.find_arc_segment(result.value().created_entities.front());
+      REQUIRE(arc);
+      const double radius = 10 + (clockwise ? distance : -distance);
+      CHECK(std::hypot(arc->start().x, arc->start().y) == Catch::Approx(radius));
+      CHECK(std::hypot(arc->mid().x, arc->mid().y) == Catch::Approx(radius));
+    }
+    CHECK_FALSE(SketchOffsetProjectService::offset_chain(sketch, {SketchEntityId("arc")},
+                                                         clockwise ? -10 : 10));
+  }
 }
