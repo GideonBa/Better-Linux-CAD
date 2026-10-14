@@ -230,6 +230,31 @@ TEST_CASE("Block 106 Sketch command lifecycle backtracks one stage with Esc and 
   CHECK_FALSE(session.task().active());
 }
 
+TEST_CASE("Sketch workspace cancellation safely leaves an active command",
+          "[gui][sketch-workspace][gui][document-lifecycle]") {
+  GuiDocumentSession session;
+  GuiSketchWorkbench workbench;
+  GuiSketchWorkspace workspace;
+  REQUIRE(session.create_part(DocumentId("part.cancel_workspace"), "Cancel Workspace"));
+  REQUIRE(workbench.create_xy_datum(session, DatumPlaneId("datum.xy"), "XY"));
+  REQUIRE(workbench.create_sketch(
+      session, Sketch::create(SketchId("sketch.cancel_workspace"), "Cancel Workspace",
+                              DatumPlaneId("datum.xy")).value()));
+  REQUIRE(session.set_workspace(GuiWorkspace::Inspect));
+  REQUIRE(session.selection().add({GuiSelectionKind::Datum, "datum.xy"}));
+  REQUIRE(workspace.enter(session, workbench, SketchId("sketch.cancel_workspace")));
+  REQUIRE(workspace.begin_command(session, "sketch.line", "Pick line start"));
+  REQUIRE(session.task().active());
+
+  const auto restored = workspace.cancel(session);
+  REQUIRE(restored);
+  CHECK(restored.value() == GuiWorkspace::Inspect);
+  CHECK(session.workspace() == GuiWorkspace::Inspect);
+  CHECK(session.selection().contains(GuiSelectionKind::Datum, "datum.xy"));
+  CHECK_FALSE(session.task().active());
+  CHECK_FALSE(workspace.active());
+}
+
 TEST_CASE("Block 106 drag candidates remain transient until commit or cancel",
           "[gui][sketch-workspace][gui][sketch-command-lifecycle]") {
   GuiDocumentSession session;

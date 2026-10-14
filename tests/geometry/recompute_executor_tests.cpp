@@ -288,7 +288,7 @@ TEST_CASE("GeometryRecomputeExecutor rejects missing feature ids", "[geometry][r
   CHECK_FALSE(cache.has_final_shape());
 }
 
-TEST_CASE("GeometryRecomputeExecutor rejects unsupported additive sketches",
+TEST_CASE("GeometryRecomputeExecutor extrudes a circle profile",
           "[geometry][recompute]") {
   const PartDocument document = make_document_with_circle_only_additive_extrude();
   ShapeCache cache = make_shape_cache();
@@ -297,14 +297,11 @@ TEST_CASE("GeometryRecomputeExecutor rejects unsupported additive sketches",
   const auto executed =
       executor.execute_additive_extrude(document, FeatureId("feature.base_extrude"), cache);
 
-  REQUIRE(executed.has_error());
-  CHECK(executed.error().category() == ErrorCategory::Validation);
-  CHECK(executed.error().object_id() == "sketch.base");
-  CHECK(executed.error().message() ==
-        "additive extrude requires exactly one rectangle, closed profile, arc closed profile, "
-        "composite closed profile, or detected simple region");
-  CHECK(cache.feature_shape_count() == 0);
-  CHECK_FALSE(cache.has_final_shape());
+  REQUIRE(executed);
+  CHECK(cache.feature_shape_count() == 1U);
+  CHECK(cache.find_feature_shape(FeatureId("feature.base_extrude")) != nullptr);
+  CHECK(cache.has_final_shape());
+  CHECK(cache.final_feature_id() == FeatureId("feature.base_extrude"));
 }
 
 TEST_CASE("GeometryRecomputeExecutor cuts a central hole into a cached base body",

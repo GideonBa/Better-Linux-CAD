@@ -66,6 +66,11 @@ public:
   ~OcctViewport() override;
 
   [[nodiscard]] Result<std::size_t> set_scene(std::vector<geometry::ViewportSceneItem> items);
+  // Publish a disposable feature result above the persistent document scene.
+  // Preview geometry is deliberately not selectable and never replaces the
+  // authoritative scene or selection model.
+  [[nodiscard]] Result<std::size_t> set_feature_preview(geometry::GeometryShape shape);
+  void clear_feature_preview();
   void clear_scene();
   void set_display_mode(GuiViewportDisplayMode mode);
   void set_projection(GuiViewportProjection projection);
@@ -73,6 +78,11 @@ public:
   [[nodiscard]] bool set_plane_camera(Point3 target, Vector3 normal, Vector3 up);
   [[nodiscard]] GuiViewportCameraBookmark camera_bookmark() const noexcept;
   [[nodiscard]] bool restore_camera_bookmark(const GuiViewportCameraBookmark& bookmark) noexcept;
+  // Use the authoritative OCCT camera for feature overlays and native picking.
+  // Reconstructing this transform from a bookmark loses fitted view details.
+  [[nodiscard]] Result<GuiSketchViewRay>
+  screen_to_view_ray(GuiSketchScreenPoint point) const;
+  [[nodiscard]] Result<GuiSketchScreenPoint> model_to_screen(Point3 point) const;
   void set_sketch_focus(std::string sketch_id,
                         GuiSketchSurroundingsMode mode = GuiSketchSurroundingsMode::Dim);
   void clear_sketch_focus();
@@ -98,6 +108,7 @@ public:
   void clear_selection();
 
   [[nodiscard]] std::size_t presentation_count() const noexcept;
+  [[nodiscard]] bool feature_preview_active() const noexcept;
   [[nodiscard]] GuiViewportDisplayMode display_mode() const noexcept;
   [[nodiscard]] GuiViewportProjection projection() const noexcept;
   [[nodiscard]] std::uint32_t selection_filter_mask() const noexcept;
@@ -123,6 +134,9 @@ public:
           Error::validation("gui.occt_viewport", "Sketch interaction is not active"));
     return sketch_interaction_->mapping().plane_to_screen(point);
   }
+  [[nodiscard]] Result<std::vector<GuiSketchHit>>
+  sketch_curve_hits_along(GuiSketchScreenPoint start,
+                          GuiSketchScreenPoint end) const;
   [[nodiscard]] bool native_viewer_available() const noexcept;
   [[nodiscard]] const std::string& initialization_error() const noexcept;
 

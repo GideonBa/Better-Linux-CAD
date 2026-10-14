@@ -72,11 +72,22 @@ TEST_CASE("OCCT viewport owns transient display and navigation state",
   CHECK(viewport.sketch_focus_active());
   CHECK(viewport.sketch_focus_id() == "sketch.path");
   CHECK(viewport.sketch_surroundings_mode() == GuiSketchSurroundingsMode::Dim);
+  CHECK(viewport.projection() == GuiViewportProjection::Orthographic);
+  const auto sketch_plane_camera = viewport.plane_camera();
+  REQUIRE(sketch_plane_camera.has_value());
+  viewport.set_projection(GuiViewportProjection::Perspective);
+  CHECK(viewport.projection() == GuiViewportProjection::Orthographic);
+  viewport.set_standard_view(GuiStandardView::Isometric);
+  CHECK(viewport.plane_camera() == sketch_plane_camera);
   viewport.set_sketch_focus("sketch.path", GuiSketchSurroundingsMode::Isolate);
   CHECK(viewport.sketch_surroundings_mode() == GuiSketchSurroundingsMode::Isolate);
   viewport.clear_sketch_focus();
   CHECK_FALSE(viewport.sketch_focus_active());
   CHECK(viewport.sketch_focus_id().empty());
+  viewport.set_projection(GuiViewportProjection::Perspective);
+  CHECK(viewport.projection() == GuiViewportProjection::Perspective);
+  viewport.set_standard_view(GuiStandardView::Isometric);
+  CHECK_FALSE(viewport.plane_camera().has_value());
   viewport.fit_all();
 }
 

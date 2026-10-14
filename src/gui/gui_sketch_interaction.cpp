@@ -274,6 +274,125 @@ struct NearestScreenPoint {
   double distance{std::numeric_limits<double>::infinity()};
 };
 
+struct ScreenSegmentSweepHit {
+  double path_parameter{0.0};
+  double curve_parameter{0.0};
+  GuiSketchScreenPoint pointer_point;
+  GuiSketchScreenPoint curve_point;
+  double distance{std::numeric_limits<double>::infinity()};
+};
+
+double dot_screen(GuiSketchScreenPoint first, GuiSketchScreenPoint second) noexcept {
+  return first.x * second.x + first.y * second.y;
+}
+
+double cross_screen(GuiSketchScreenPoint first, GuiSketchScreenPoint second) noexcept {
+  return first.x * second.y - first.y * second.x;
+}
+
+GuiSketchScreenPoint screen_vector(GuiSketchScreenPoint from,
+                                   GuiSketchScreenPoint to) noexcept {
+  return {to.x - from.x, to.y - from.y};
+}
+
+ScreenSegmentSweepHit proximity_at_path_parameter(
+    GuiSketchScreenPoint path_start, GuiSketchScreenPoint path_end,
+    GuiSketchScreenPoint curve_start, GuiSketchScreenPoint curve_end,
+    double path_parameter) noexcept {
+  const auto pointer = interpolate(path_start, path_end, path_parameter);
+  const auto curve = screen_vector(curve_start, curve_end);
+  const double curve_length_squared = dot_screen(curve, curve);
+  double curve_parameter = 0.0;
+  if (curve_length_squared > kEpsilon) {
+    const auto from_curve_start = screen_vector(curve_start, pointer);
+    curve_parameter = std::clamp(dot_screen(from_curve_start, curve) /
+                                     curve_length_squared,
+                                 0.0, 1.0);
+  }
+  const auto curve_point = interpolate(curve_start, curve_end, curve_parameter);
+  return {path_parameter, curve_parameter, pointer, curve_point,
+          screen_distance(pointer, curve_point)};
+}
+
+void append_unit_parameter(std::vector<double>& parameters, double parameter) {
+  if (!finite(parameter) || parameter < -kEpsilon || parameter > 1.0 + kEpsilon)
+    return;
+  parameters.push_back(std::clamp(parameter, 0.0, 1.0));
+}
+
+void append_circle_crossings(std::vector<double>& parameters,
+                             GuiSketchScreenPoint path_start,
+                             GuiSketchScreenPoint path_end,
+                             GuiSketchScreenPoint center,
+                             double radius) {
+  const auto direction = screen_vector(path_start, path_end);
+  const auto offset = screen_vector(center, path_start);
+  const double a = dot_screen(direction, direction);
+  if (a <= kEpsilon)
+    return;
+  const double b = 2.0 * dot_screen(offset, direction);
+  const double c = dot_screen(offset, offset) - square(radius);
+  const double discriminant = b * b - 4.0 * a * c;
+  if (discriminant < -kEpsilon)
+    return;
+  const double root = std::sqrt(std::max(0.0, discriminant));
+  append_unit_parameter(parameters, (-b - root) / (2.0 * a));
+  append_unit_parameter(parameters, (-b + root) / (2.0 * a));
+}
+
+std::optional<ScreenSegmentSweepHit> first_near_screen_segment(
+    GuiSketchScreenPoint path_start, GuiSketchScreenPoint path_end,
+    GuiSketchScreenPoint curve_start, GuiSketchScreenPoint curve_end,
+    double tolerance) {
+  const double numeric_margin = 1.0e-7 * std::max(1.0, tolerance);
+  auto initial = proximity_at_path_parameter(path_start, path_end, curve_start,
+                                             curve_end, 0.0);
+  if (initial.distance <= tolerance + numeric_margin)
+    return initial;
+
+  // The tolerance area around a line segment is a capsule. Its boundary is
+  // made from two endpoint circles and two parallel offset lines. Intersecting
+  // the pointer path with all four parts yields the exact first entry, without
+  // relying on event sampling along a fast mouse movement.
+  std::vector<double> candidates;
+  candidates.reserve(7U);
+  append_circle_crossings(candidates, path_start, path_end, curve_start, tolerance);
+  append_circle_crossings(candidates, path_start, path_end, curve_end, tolerance);
+
+  const auto path_direction = screen_vector(path_start, path_end);
+  const auto curve_direction = screen_vector(curve_start, curve_end);
+  const double curve_length_squared = dot_screen(curve_direction, curve_direction);
+  if (curve_length_squared > kEpsilon) {
+    const double curve_length = std::sqrt(curve_length_squared);
+    const double start_cross =
+        cross_screen(curve_direction, screen_vector(curve_start, path_start));
+    const double cross_delta = cross_screen(curve_direction, path_direction);
+    if (std::abs(cross_delta) > kEpsilon) {
+      append_unit_parameter(candidates,
+                            (tolerance * curve_length - start_cross) / cross_delta);
+      append_unit_parameter(candidates,
+                            (-tolerance * curve_length - start_cross) / cross_delta);
+    }
+  }
+  // This also covers paths ending inside the capsule when round-off nudged a
+  // boundary root just outside the unit interval.
+  candidates.push_back(1.0);
+  std::sort(candidates.begin(), candidates.end());
+  candidates.erase(std::unique(candidates.begin(), candidates.end(), [](double first,
+                                                                         double second) {
+                     return std::abs(first - second) <= kEpsilon;
+                   }),
+                   candidates.end());
+
+  for (const double parameter : candidates) {
+    auto candidate = proximity_at_path_parameter(path_start, path_end, curve_start,
+                                                 curve_end, parameter);
+    if (candidate.distance <= tolerance + numeric_margin)
+      return candidate;
+  }
+  return std::nullopt;
+}
+
 NearestScreenPoint nearest_on_screen_polyline(
     GuiSketchScreenPoint query, const std::vector<GuiSketchScreenPoint>& screen,
     const std::vector<Point2>& plane) noexcept {
@@ -983,6 +1102,100 @@ GuiSketchInteractionController::hits_at(GuiSketchScreenPoint screen_point) const
   return Result<std::vector<GuiSketchHit>>::success(std::move(hits));
 }
 
+Result<std::vector<GuiSketchHit>> GuiSketchInteractionController::curve_hits_along(
+    GuiSketchScreenPoint start, GuiSketchScreenPoint end) const {
+  // Validate both endpoints even for an empty scene. This keeps the error
+  // contract aligned with hits_at instead of silently accepting NaN sweeps.
+  auto start_plane = mapping_.screen_to_plane(start);
+  if (start_plane.has_error())
+    return Result<std::vector<GuiSketchHit>>::failure(start_plane.error());
+  auto end_plane = mapping_.screen_to_plane(end);
+  if (end_plane.has_error())
+    return Result<std::vector<GuiSketchHit>>::failure(end_plane.error());
+
+  struct OrderedHit {
+    GuiSketchHit hit;
+    double path_parameter{0.0};
+  };
+  std::vector<OrderedHit> ordered;
+  std::unordered_map<std::string, std::size_t> candidate_indices;
+
+  for (const auto& curve : scene_.curves) {
+    // Projected reference geometry is a snap/constraint aid and cannot be
+    // trimmed. It therefore must not participate in a trim sweep.
+    if (curve.kind == GuiSketchCurveKind::ReferenceLine)
+      continue;
+    auto screen = screen_polyline(curve);
+    if (screen.has_error())
+      return Result<std::vector<GuiSketchHit>>::failure(screen.error());
+
+    std::optional<ScreenSegmentSweepHit> first_hit;
+    for (std::size_t index = 1U; index < screen.value().size(); ++index) {
+      auto candidate = first_near_screen_segment(
+          start, end, screen.value()[index - 1U], screen.value()[index],
+          config_.curve_hit_tolerance_dip);
+      if (!candidate)
+        continue;
+      if (!first_hit || candidate->path_parameter < first_hit->path_parameter - kEpsilon ||
+          (std::abs(candidate->path_parameter - first_hit->path_parameter) <= kEpsilon &&
+           candidate->distance < first_hit->distance)) {
+        candidate->curve_parameter += static_cast<double>(index - 1U);
+        first_hit = *candidate;
+      }
+    }
+    if (!first_hit)
+      continue;
+
+    const std::size_t segment_index = std::min(
+        static_cast<std::size_t>(std::floor(first_hit->curve_parameter)),
+        curve.polyline.size() - 2U);
+    const double segment_parameter =
+        std::clamp(first_hit->curve_parameter - static_cast<double>(segment_index), 0.0, 1.0);
+    const Point2 curve_plane_point = interpolate(curve.polyline[segment_index],
+                                                 curve.polyline[segment_index + 1U],
+                                                 segment_parameter);
+    auto pointer_plane = mapping_.screen_to_plane(first_hit->pointer_point);
+    if (pointer_plane.has_error())
+      return Result<std::vector<GuiSketchHit>>::failure(pointer_plane.error());
+
+    OrderedHit hit{{GuiSketchHitKind::Curve, curve.semantic_id, curve.candidate_id,
+                    curve_plane_point,
+                    distance(pointer_plane.value(), curve_plane_point), first_hit->distance},
+                   first_hit->path_parameter};
+    std::string key = curve.semantic_id;
+    key.push_back('\0');
+    key += curve.candidate_id;
+    const auto existing = candidate_indices.find(key);
+    if (existing == candidate_indices.end()) {
+      candidate_indices.emplace(std::move(key), ordered.size());
+      ordered.push_back(std::move(hit));
+    } else {
+      auto& previous = ordered[existing->second];
+      if (hit.path_parameter < previous.path_parameter - kEpsilon ||
+          (std::abs(hit.path_parameter - previous.path_parameter) <= kEpsilon &&
+           hit.hit.screen_distance_dip < previous.hit.screen_distance_dip))
+        previous = std::move(hit);
+    }
+  }
+
+  std::sort(ordered.begin(), ordered.end(), [](const OrderedHit& first,
+                                                const OrderedHit& second) {
+    if (std::abs(first.path_parameter - second.path_parameter) > kEpsilon)
+      return first.path_parameter < second.path_parameter;
+    if (std::abs(first.hit.screen_distance_dip - second.hit.screen_distance_dip) > kEpsilon)
+      return first.hit.screen_distance_dip < second.hit.screen_distance_dip;
+    if (first.hit.semantic_id != second.hit.semantic_id)
+      return first.hit.semantic_id < second.hit.semantic_id;
+    return first.hit.candidate_id < second.hit.candidate_id;
+  });
+
+  std::vector<GuiSketchHit> hits;
+  hits.reserve(ordered.size());
+  for (auto& item : ordered)
+    hits.push_back(std::move(item.hit));
+  return Result<std::vector<GuiSketchHit>>::success(std::move(hits));
+}
+
 Result<std::optional<GuiSketchHit>>
 GuiSketchInteractionController::cycle_hit(GuiSketchScreenPoint screen_point) {
   auto hits = hits_at(screen_point);
@@ -1029,9 +1242,11 @@ GuiSketchInteractionController::snap(GuiSketchScreenPoint screen_point,
     std::string id;
     double model_distance{0.0};
     double screen_distance{0.0};
+    bool curve_endpoint{false};
   };
   std::vector<Candidate> candidates;
-  const auto append_candidate = [&](Point2 point, GuiSketchSnapKind kind, std::string id) {
+  const auto append_candidate = [&](Point2 point, GuiSketchSnapKind kind, std::string id,
+                                    bool curve_endpoint = false) {
     auto screen = mapping_.plane_to_screen(point);
     if (screen.has_error())
       return;
@@ -1039,14 +1254,25 @@ GuiSketchInteractionController::snap(GuiSketchScreenPoint screen_point,
     if (screen_delta > config_.snap_tolerance_dip)
       return;
     candidates.push_back(
-        {point, kind, std::move(id), distance(raw.value(), point), screen_delta});
+        {point, kind, std::move(id), distance(raw.value(), point), screen_delta,
+         curve_endpoint});
   };
 
   append_candidate({0.0, 0.0}, GuiSketchSnapKind::Origin, "origin");
   append_candidate({raw.value().x, 0.0}, GuiSketchSnapKind::Axis, "axis/x");
   append_candidate({0.0, raw.value().y}, GuiSketchSnapKind::Axis, "axis/y");
-  for (const auto& point : scene_.points)
-    append_candidate(point.point, point.snap_kind, point.candidate_id);
+  for (const auto& point : scene_.points) {
+    std::string_view point_semantic = point.semantic_id;
+    if (const auto role = point_semantic.find(kGuiSketchHitRoleMarker);
+        role != std::string_view::npos)
+      point_semantic = point_semantic.substr(0U, role);
+    const bool curve_endpoint =
+        point.snap_kind == GuiSketchSnapKind::Endpoint &&
+        std::any_of(scene_.curves.begin(), scene_.curves.end(), [point_semantic](const auto& curve) {
+          return curve.semantic_id == point_semantic;
+        });
+    append_candidate(point.point, point.snap_kind, point.candidate_id, curve_endpoint);
+  }
   for (std::size_t index = 0; index < scene_.intersections.size(); ++index)
     append_candidate(scene_.intersections[index], GuiSketchSnapKind::Intersection,
                      "intersection/" + std::to_string(index));
@@ -1082,6 +1308,12 @@ GuiSketchInteractionController::snap(GuiSketchScreenPoint screen_point,
         {raw.value(), raw.value(), GuiSketchSnapKind::None, {}, {}, 0.0, 0.0});
 
   std::sort(candidates.begin(), candidates.end(), [](const Candidate& first, const Candidate& second) {
+    // An endpoint belonging to a real curve is a strong topological snap: it
+    // must beat the slightly nearer projection onto that same curve or a line
+    // chain that looks closed remains open. A free-standing Sketch point is
+    // deliberately not strong; proximity-based alignment must still win there.
+    if (first.curve_endpoint != second.curve_endpoint)
+      return first.curve_endpoint;
     if (std::abs(first.model_distance - second.model_distance) > kEpsilon)
       return first.model_distance < second.model_distance;
     if (std::abs(first.screen_distance - second.screen_distance) > kEpsilon)

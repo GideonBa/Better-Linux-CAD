@@ -103,6 +103,90 @@ TEST_CASE("Block 107 hit testing keeps point curve dimension glyph priority and 
   CHECK_FALSE(reset.value().has_value());
 }
 
+TEST_CASE("Curve sweep hit testing catches fast crossings in traversal order without duplicates",
+          "[gui][sketch-hit-test][trim-stroke]") {
+  GuiSketchInteractionScene scene;
+  scene.sketch = SketchId("sketch.sweep");
+  // One polyline is crossed twice. It must still produce one owned hit at its
+  // first encounter along the pointer path.
+  scene.curves.push_back({"sketch/sketch.sweep/entity/double", "double:curve",
+                          GuiSketchCurveKind::Line,
+                          {{-30.0, -20.0}, {-30.0, 20.0}, {30.0, 20.0},
+                           {30.0, -20.0}},
+                          false});
+  scene.curves.push_back({"sketch/sketch.sweep/entity/middle", "middle:curve",
+                          GuiSketchCurveKind::Line,
+                          {{0.0, -20.0}, {0.0, 20.0}}, false});
+  // A duplicate presentation of the same candidate must not result in a
+  // second trim attempt.
+  scene.curves.push_back({"sketch/sketch.sweep/entity/middle", "middle:curve",
+                          GuiSketchCurveKind::Line,
+                          {{0.0, -20.0}, {0.0, 20.0}}, false});
+  scene.curves.push_back({"sketch/sketch.sweep/entity/later", "later:curve",
+                          GuiSketchCurveKind::Line,
+                          {{45.0, -20.0}, {45.0, 20.0}}, false});
+  scene.curves.push_back({"sketch/sketch.sweep/entity/projected", "projected:line",
+                          GuiSketchCurveKind::ReferenceLine,
+                          {{-45.0, -20.0}, {-45.0, 20.0}}, false});
+  // These higher-priority point and annotation hits overlap the sweep but are
+  // intentionally outside the curve-only result.
+  scene.points.push_back({"sketch/sketch.sweep/entity/point", "point",
+                          {0.0, 0.0}, GuiSketchSnapKind::Endpoint});
+  scene.annotations.push_back({"sketch/sketch.sweep/dimension/dim", "dim",
+                               {45.0, 0.0}, GuiSketchHitKind::Dimension});
+
+  const auto controller =
+      GuiSketchInteractionController::create(mapping(), std::move(scene)).value();
+  const auto forward = controller.curve_hits_along({40.0, 100.0}, {160.0, 100.0});
+  REQUIRE(forward);
+  REQUIRE(forward.value().size() == 3U);
+  CHECK(forward.value()[0].candidate_id == "double:curve");
+  CHECK(forward.value()[1].candidate_id == "middle:curve");
+  CHECK(forward.value()[2].candidate_id == "later:curve");
+  CHECK(std::all_of(forward.value().begin(), forward.value().end(),
+                    [](const GuiSketchHit& hit) {
+                      return hit.kind == GuiSketchHitKind::Curve;
+                    }));
+
+  const auto reverse = controller.curve_hits_along({160.0, 100.0}, {40.0, 100.0});
+  REQUIRE(reverse);
+  REQUIRE(reverse.value().size() == 3U);
+  CHECK(reverse.value()[0].candidate_id == "later:curve");
+  CHECK(reverse.value()[1].candidate_id == "double:curve");
+  CHECK(reverse.value()[2].candidate_id == "middle:curve");
+}
+
+TEST_CASE("Curve sweep uses the configured DIP tolerance for clicks and near misses",
+          "[gui][sketch-hit-test][trim-stroke]") {
+  GuiSketchInteractionScene scene;
+  scene.sketch = SketchId("sketch.sweep_tolerance");
+  scene.curves.push_back({"sketch/sketch.sweep_tolerance/entity/line", "line:curve",
+                          GuiSketchCurveKind::Line,
+                          {{-20.0, 0.0}, {20.0, 0.0}}, false});
+  scene.points.push_back({"sketch/sketch.sweep_tolerance/entity/line", "line:midpoint",
+                          {0.0, 0.0}, GuiSketchSnapKind::Midpoint});
+
+  GuiSketchInteractionConfig config;
+  config.curve_hit_tolerance_dip = 6.0;
+  const auto controller = GuiSketchInteractionController::create(
+                              mapping(), std::move(scene), config)
+                              .value();
+
+  const auto direct = controller.curve_hits_along({100.0, 100.0}, {100.0, 100.0});
+  REQUIRE(direct);
+  REQUIRE(direct.value().size() == 1U);
+  CHECK(direct.value().front().kind == GuiSketchHitKind::Curve);
+
+  const auto within = controller.curve_hits_along({80.0, 95.0}, {120.0, 95.0});
+  REQUIRE(within);
+  REQUIRE(within.value().size() == 1U);
+  CHECK(within.value().front().screen_distance_dip == 5.0);
+
+  const auto outside = controller.curve_hits_along({80.0, 93.0}, {120.0, 93.0});
+  REQUIRE(outside);
+  CHECK(outside.value().empty());
+}
+
 TEST_CASE("Block 107 snapping covers origin axes geometry intersections nearest and inference",
           "[gui][sketch-snap]") {
   GuiSketchInteractionConfig config;
@@ -146,6 +230,30 @@ TEST_CASE("Block 107 snapping covers origin axes geometry intersections nearest 
   CHECK(alignment.value().kind == GuiSketchSnapKind::AlignmentX);
   CHECK(std::abs(alignment.value().snapped_point.x - 5.0) < 1.0e-12);
   CHECK(alignment.value().inference.find("Aligned X") != std::string::npos);
+}
+
+TEST_CASE("Endpoint snap wins over a geometrically nearer curve point inside its tolerance",
+          "[gui][sketch-snap][line-profile-regression]") {
+  GuiSketchInteractionScene scene;
+  scene.sketch = SketchId("sketch.endpoint_priority");
+  scene.curves.push_back({"sketch/sketch.endpoint_priority/entity/line.a", "line.a:curve",
+                          GuiSketchCurveKind::Line, {{-20.0, 30.0}, {20.0, 30.0}}, false});
+  scene.points.push_back({"sketch/sketch.endpoint_priority/entity/line.a", "line.a:start",
+                          {-20.0, 30.0}, GuiSketchSnapKind::Endpoint});
+  GuiSketchInteractionConfig config;
+  config.grid.snap_enabled = false;
+  auto controller =
+      GuiSketchInteractionController::create(mapping(), std::move(scene), config).value();
+
+  // The raw pointer is closer to the line interior (-17, 30) than to its
+  // endpoint (-20, 30), but both candidates are inside the 10-DIP snap radius.
+  // CAD intent requires the discrete endpoint to win so a visually closed
+  // line chain is also topologically closed.
+  const auto snap = controller.snap({83.0, 68.0});
+  REQUIRE(snap);
+  CHECK(snap.value().kind == GuiSketchSnapKind::Endpoint);
+  CHECK(snap.value().snapped_point == Point2{-20.0, 30.0});
+  CHECK(snap.value().candidate_id == "line.a:start");
 }
 
 TEST_CASE("Block 107 grid snap and display remain zoom stable in device-independent pixels",

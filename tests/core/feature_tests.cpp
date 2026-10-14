@@ -50,6 +50,29 @@ TEST_CASE("AdditiveExtrude feature rejects missing required references", "[core]
         "additive extrude length parameter id must not be empty");
 }
 
+TEST_CASE("Extrude feature retains an explicit materialized profile binding",
+          "[core][feature]") {
+  auto feature = Feature::create_additive_extrude(
+      FeatureId("feature.profiled"), "Profiled", SketchId("sketch.multi"),
+      ParameterId("part.depth"));
+  REQUIRE(feature);
+  CHECK_FALSE(feature.value().profile().has_value());
+
+  auto profiled = feature.value().with_profile(ProfileId("profile.second"));
+  REQUIRE(profiled);
+  REQUIRE(profiled.value().profile().has_value());
+  CHECK(*profiled.value().profile() == ProfileId("profile.second"));
+  CHECK(profiled.value().with_profile(ProfileId()).has_error());
+
+  auto context = FeatureBodyResultContext::create(
+      FeatureBodyOperationMode::NewBody, std::nullopt, BodyId("body.profiled"));
+  REQUIRE(context);
+  auto contextual = profiled.value().with_body_result_context(context.value());
+  REQUIRE(contextual);
+  REQUIRE(contextual.value().profile().has_value());
+  CHECK(*contextual.value().profile() == ProfileId("profile.second"));
+}
+
 TEST_CASE("SubtractiveExtrude feature stores sketch and target feature references",
           "[core][feature]") {
   const auto feature = Feature::create_subtractive_extrude(FeatureId("feature.center_hole_cut"),

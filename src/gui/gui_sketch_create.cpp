@@ -1,5 +1,8 @@
 #include "blcad/gui/gui_sketch_create.hpp"
 
+#include "blcad/core/sketch_constraint_catalog_system.hpp"
+#include "blcad/core/sketch_topology_part_document.hpp"
+
 #include <algorithm>
 #include <charconv>
 #include <cmath>
@@ -879,6 +882,35 @@ GuiSketchCreateController::expansion(const PartDocument& document) const {
     auto profile = ClosedProfile::create(next_profile_id(), std::move(ordered));
     if (profile.has_error()) return Result<GuiSketchCreateExpansion>::failure(profile.error());
     result.profile = std::move(profile.value());
+    if (tool_ == GuiSketchCreateTool::CornerRectangle ||
+        tool_ == GuiSketchCreateTool::CenterRectangle) {
+      // Four axis constraints are the minimal nonredundant representation for
+      // these four independently movable edges. They imply a right angle at
+      // every profile corner; adding four Perpendicular relations would only
+      // duplicate equations already supplied by Horizontal/Vertical.
+      result.constraint_recipes = {
+          {SketchSolverConstraintKind::Horizontal, {result.lines[0].id()}},
+          {SketchSolverConstraintKind::Vertical, {result.lines[1].id()}},
+          {SketchSolverConstraintKind::Horizontal, {result.lines[2].id()}},
+          {SketchSolverConstraintKind::Vertical, {result.lines[3].id()}},
+      };
+    } else if (tool_ == GuiSketchCreateTool::ThreePointRectangle) {
+      result.constraint_recipes = {
+          {SketchSolverConstraintKind::Perpendicular,
+           {result.lines[0].id(), result.lines[1].id()}},
+          {SketchSolverConstraintKind::Parallel,
+           {result.lines[0].id(), result.lines[2].id()}},
+          {SketchSolverConstraintKind::Parallel,
+           {result.lines[1].id(), result.lines[3].id()}},
+      };
+    } else if (tool_ == GuiSketchCreateTool::Parallelogram) {
+      result.constraint_recipes = {
+          {SketchSolverConstraintKind::Parallel,
+           {result.lines[0].id(), result.lines[2].id()}},
+          {SketchSolverConstraintKind::Parallel,
+           {result.lines[1].id(), result.lines[3].id()}},
+      };
+    }
     return Result<GuiSketchCreateExpansion>::success(std::move(result));
   }
   default: break;
@@ -987,6 +1019,18 @@ GuiSketchCreateController::expansion(const PartDocument& document) const {
     auto profile = ArcClosedProfile::create(next_profile_id(), std::move(ordered));
     if (profile.has_error()) return Result<GuiSketchCreateExpansion>::failure(profile.error());
     result.curve_profile = std::move(profile.value());
+    result.constraint_recipes = {
+        {SketchSolverConstraintKind::Parallel,
+         {result.lines[0].id(), result.lines[1].id()}},
+        {SketchSolverConstraintKind::Tangent,
+         {result.lines[0].id(), result.arcs[0].id()}},
+        {SketchSolverConstraintKind::Tangent,
+         {result.arcs[0].id(), result.lines[1].id()}},
+        {SketchSolverConstraintKind::Tangent,
+         {result.lines[1].id(), result.arcs[1].id()}},
+        {SketchSolverConstraintKind::Tangent,
+         {result.arcs[1].id(), result.lines[0].id()}},
+    };
     return Result<GuiSketchCreateExpansion>::success(std::move(result));
   }
 
@@ -1011,9 +1055,11 @@ Result<std::size_t> GuiSketchCreateController::commit(GuiDocumentSession& sessio
   const SketchId sketch_id = sketch_;
   GuiSketchCreateExpansion value = std::move(expanded.value());
   const std::string label = value.label;
-  return session.commit_part_transaction(
-      label, [sketch_id, value = std::move(value)](PartDocument& document) mutable
-                 -> Result<std::size_t> {
+  return session.commit_part_sketch_intent_transaction(
+      label, [sketch_id, value = std::move(value)](
+                 PartDocument& document,
+                 std::vector<SketchConstraintCatalog>& constraint_catalogs,
+                 std::vector<SketchDimensionCatalog>&) mutable -> Result<std::size_t> {
         if (value.parameter) {
           auto added = document.add_parameter(std::move(*value.parameter));
           if (added.has_error()) return added;
@@ -1061,6 +1107,74 @@ Result<std::size_t> GuiSketchCreateController::commit(GuiDocumentSession& sessio
         }
         auto updated = document.update_sketch(std::move(candidate));
         if (updated.has_error()) return updated;
+
+        if (!value.constraint_recipes.empty()) {
+          const auto catalog_entry = std::find_if(
+              constraint_catalogs.begin(), constraint_catalogs.end(),
+              [&sketch_id](const auto& catalog) { return catalog.sketch() == sketch_id; });
+          auto empty_catalog = SketchConstraintCatalog::create(document.id(), sketch_id);
+          if (empty_catalog.has_error())
+            return Result<std::size_t>::failure(empty_catalog.error());
+          SketchConstraintCatalog candidate_catalog =
+              catalog_entry == constraint_catalogs.end() ? std::move(empty_catalog.value())
+                                                         : *catalog_entry;
+
+          for (const auto& recipe : value.constraint_recipes) {
+            std::vector<SketchConstraintIntentTarget> targets;
+            targets.reserve(recipe.entity_targets.size());
+            for (const auto& entity : recipe.entity_targets) {
+              auto target =
+                  SketchConstraintIntentTarget::entity("entity/" + entity.value());
+              if (target.has_error())
+                return Result<std::size_t>::failure(target.error());
+              targets.push_back(std::move(target.value()));
+            }
+            const SketchConstraintId constraint_id(next_free_id(
+                "constraint.auto.shape.", [&candidate_catalog](const std::string& id) {
+                  return candidate_catalog.find(SketchConstraintId(id)) != nullptr;
+                }));
+            auto intent = SketchConstraintIntent::create(
+                constraint_id, recipe.kind, std::move(targets),
+                SketchConstraintIntentSource::Automatic);
+            if (intent.has_error())
+              return Result<std::size_t>::failure(intent.error());
+            auto added = candidate_catalog.add(std::move(intent.value()));
+            if (added.has_error()) return added;
+          }
+
+          const Sketch* inserted = document.find_sketch(sketch_id);
+          if (inserted == nullptr)
+            return Result<std::size_t>::failure(Error::validation(
+                sketch_id.value(), "Sketch creation target disappeared during transaction"));
+          auto topology = SketchTopology::migrate_legacy(*inserted);
+          if (topology.has_error())
+            return Result<std::size_t>::failure(topology.error());
+          auto system = SketchConstraintCatalogSystemBuilder::build(
+              document, topology.value(), candidate_catalog);
+          if (system.has_error())
+            return Result<std::size_t>::failure(system.error());
+          auto solved = SketchConstraintSolver{}.solve(topology.value(), system.value());
+          if (solved.has_error())
+            return Result<std::size_t>::failure(solved.error());
+          if (solved.value().status != SketchSolveStatus::UnderConstrained &&
+              solved.value().status != SketchSolveStatus::FullyConstrained)
+            return Result<std::size_t>::failure(Error::validation(
+                sketch_id.value(),
+                "automatic shape constraints were rejected by the Sketch solver: " +
+                    std::string(to_string(solved.value().status))));
+
+          auto materialized = SketchTopologyLegacyMaterializer{}.materialize(
+              *inserted, solved.value().topology);
+          if (materialized.has_error())
+            return Result<std::size_t>::failure(materialized.error());
+          auto solved_update = document.update_sketch(std::move(materialized.value()));
+          if (solved_update.has_error()) return solved_update;
+
+          if (catalog_entry == constraint_catalogs.end())
+            constraint_catalogs.push_back(std::move(candidate_catalog));
+          else
+            *catalog_entry = std::move(candidate_catalog);
+        }
         return Result<std::size_t>::success(added_count);
       });
 }

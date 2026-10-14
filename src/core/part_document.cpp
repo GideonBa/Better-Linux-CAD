@@ -1456,6 +1456,20 @@ Result<std::size_t> PartDocument::add_feature(Feature feature) {
   if (!has_sketch_id(feature.input_sketch()))
     return Result<std::size_t>::failure(Error::validation(
         feature.id().value(), "feature input sketch must exist in part document"));
+  if (feature.profile().has_value()) {
+    const Sketch* sketch = find_sketch(feature.input_sketch());
+    const ProfileId& profile = *feature.profile();
+    const bool exists = sketch != nullptr &&
+                        (sketch->find_rectangle_profile(profile) != nullptr ||
+                         sketch->find_circle_profile(profile) != nullptr ||
+                         sketch->find_closed_profile(profile) != nullptr ||
+                         sketch->find_arc_closed_profile(profile) != nullptr ||
+                         sketch->find_composite_closed_profile(profile) != nullptr ||
+                         sketch->find_circular_hole_pattern(profile) != nullptr);
+    if (!exists)
+      return Result<std::size_t>::failure(Error::validation(
+          feature.id().value(), "extrude profile must exist in its input sketch"));
+  }
   if (feature.type() == FeatureType::AdditiveExtrude &&
       feature.extrude_intent().is_historical_additive_default() &&
       !has_parameter_id(feature.length_parameter()))

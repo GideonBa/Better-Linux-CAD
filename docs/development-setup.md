@@ -243,7 +243,7 @@ manipulator overlay binder — and were removed with the Block-133 shell reset
 (`docs/gui-shell-reset-sequence-mvp9r.md`). The headless authorities they covered,
 `GuiModelingWorkspace` and `GuiViewportManipulatorLayer`, are unchanged and still exercised by the
 Block 124–130 controller proofs below. Block 135 re-establishes manipulator overlay coverage against
-`ShellWindow`, and Block 136 restores the workspace-level coverage.
+`ShellWindow`; Block 136 restores the remaining workspace-level coverage.
 
 The Block 124–130 proofs below are headless controller tests and are unaffected by the shell reset.
 
@@ -258,7 +258,8 @@ taper/thin/through-all modes with their offered handles, fail-closed rejection o
 full/angle/symmetric revolve authoring, and manipulator/typed document equivalence. The dedicated
 `[gui][interactive-extrude]`, `[gui][interactive-revolve]`, and
 `[integration][extrude-revolve-manipulator]` cases asserted against the deleted MainWindow shell and
-were removed with the Block-133 shell reset; Block 135 restores them against `ShellWindow`.
+were removed with the Block-133 shell reset; Block 135 restores their replacement-shell path through
+the focused `[gui][shell-features]` proof.
 
 Block 125 interactive Fillet, Chamfer, Shell, and Draft authoring:
 
@@ -484,9 +485,9 @@ rm -rf build/
 
 Interactive Sketcher MVP-8 (Blocks 106–121) and Interactive Part & Assembly Modeling MVP-9 (Blocks
 122–131) are implemented and accepted. GUI Shell Reset MVP-9R replaces the Qt shell those phases grew:
-Blocks 132 (QOpenGLWidget viewport), 133 (`ShellWindow` + `ShellRibbon`, origin seeding), and 134
-(`ShellSketchTools`) are implemented; Block 135 (Extrude/Revolve in the ribbon with a manipulator
-overlay) is next, and Block 136 restores full feature and acceptance coverage.
+Blocks 132 (QOpenGLWidget viewport), 133 (`ShellWindow` + `ShellRibbon`, origin seeding), 134
+(`ShellSketchTools`), and 135 (`ShellFeatureTools`, Extrude/Revolve, manipulator overlay) are
+implemented; Block 136 restores full feature and acceptance coverage.
 
 ## GUI Shell Reset focused proof
 
@@ -497,9 +498,12 @@ QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][ribbon]"
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][origin]"
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][sketch-entry]"
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][shell-sketch]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][shell-features]"
 ```
 
 Block 132 proves the QOpenGLWidget render surface and the single-repaint funnel; Block 133 proves the
 ribbon, model browser with its origin folder, document lifecycle, selection and revision-gated refresh,
 and origin seeding; Block 134 proves the shell-owned draw/constraint/dimension/modify tool surface and
-solver-backed dragging.
+solver-backed dragging. Block 135 proves persistent profile handoff/reselection, strict numeric
+units, pointer-drag numeric override and rollback, candidate-only auto-provisioning, mutation-free
+Cancel, recomputed Extrude/Revolve results, and atomic Undo.

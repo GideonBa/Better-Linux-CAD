@@ -21,11 +21,22 @@ PartDocument make_json_part() {
   auto parameter = Parameter::create_length(ParameterId("part.length"), "length", quantity.value());
   REQUIRE(parameter);
   REQUIRE(part.value().add_parameter(parameter.value()));
+  auto width = Parameter::create_length(
+      ParameterId("part.width"), "width", Quantity::length_mm(20.0, "part.width").value());
+  auto height = Parameter::create_length(
+      ParameterId("part.height"), "height", Quantity::length_mm(10.0, "part.height").value());
+  REQUIRE(width);
+  REQUIRE(height);
+  REQUIRE(part.value().add_parameter(width.value()));
+  REQUIRE(part.value().add_parameter(height.value()));
   auto plane = DatumPlane::xy();
   REQUIRE(plane);
   REQUIRE(part.value().add_datum_plane(plane.value()));
   auto sketch = Sketch::create(SketchId("sketch.base"), "Base", DatumPlaneId("datum.xy"));
   REQUIRE(sketch);
+  REQUIRE(sketch.value().add_profile(
+      RectangleProfile::create(ProfileId("profile.base"), ParameterId("part.width"),
+                               ParameterId("part.height"), {}).value()));
   REQUIRE(part.value().add_sketch(sketch.value()));
   REQUIRE(part.value().add_body(make_body("body.base")));
   REQUIRE(part.value().add_body(make_body("body.result")));
@@ -105,6 +116,26 @@ TEST_CASE("Historical Feature JSON restores the exact null Body context default"
   REQUIRE(restored);
   REQUIRE(restored.value().feature_count() == 1U);
   CHECK_FALSE(restored.value().features().front().body_result_context().has_value());
+}
+
+TEST_CASE("Explicit Extrude profile JSON roundtrips without changing legacy defaults",
+          "[core][feature-body-operation-json][profile-selection]") {
+  auto part = make_json_part();
+  auto feature = make_feature("feature.profiled", FeatureBodyOperationMode::NewBody,
+                              std::nullopt, BodyId("body.base"));
+  auto profiled = feature.with_profile(ProfileId("profile.base"));
+  REQUIRE(profiled);
+  REQUIRE(part.add_feature(std::move(profiled.value())));
+
+  const auto serialized = serialize_part_document_to_json(part);
+  REQUIRE(serialized);
+  const auto root = nlohmann::json::parse(serialized.value());
+  CHECK(root.at("features").at(0).at("profile") == "profile.base");
+
+  const auto restored = deserialize_part_document_from_json(root.dump());
+  REQUIRE(restored);
+  REQUIRE(restored.value().features().front().profile().has_value());
+  CHECK(*restored.value().features().front().profile() == ProfileId("profile.base"));
 }
 
 TEST_CASE("Feature Body operation JSON fails closed on malformed or missing references",

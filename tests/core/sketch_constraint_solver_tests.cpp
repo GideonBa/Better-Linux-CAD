@@ -192,6 +192,101 @@ TEST_CASE("Sketch solver evaluates every Block 109 initial residual family",
   }
 }
 
+TEST_CASE("Sketch solver constrains points to cubic splines with a signed distance residual",
+          "[core][sketch-solver][core][sketch-spline]") {
+  const auto make_spline_topology = [](Point2 candidate) {
+    std::vector<SketchTopologyPoint> points{
+        make_point("spline.p0", {0.0, 0.0}),
+        make_point("spline.p1", {0.0, 6.0}),
+        make_point("spline.p2", {10.0, 6.0}),
+        make_point("spline.p3", {10.0, 0.0}),
+        make_point("candidate", candidate),
+    };
+    std::vector<SketchTopologyEntity> entities{
+        make_entity("entity/spline", SketchTopologyEntityKind::Spline,
+                    {SketchPointId("spline.p0"), SketchPointId("spline.p1"),
+                     SketchPointId("spline.p2"), SketchPointId("spline.p3")}),
+    };
+    return SketchTopology::create(SketchId("sketch.spline.point-on"), std::move(points),
+                                  std::move(entities))
+        .value();
+  };
+
+  SECTION("a point already on the Bezier is accepted without arc fallthrough") {
+    // B(0.25) for the control polygon above. These three first controls also
+    // define a very different circumcircle, so the old implicit Arc fallback
+    // would produce a non-zero initial residual and move the geometry.
+    const Point2 on_curve{1.5625, 3.375};
+    const SketchTopology topology = make_spline_topology(on_curve);
+    auto system = SketchConstraintSystem::create(
+        topology.sketch(),
+        {make_constraint("point-on.spline", SketchSolverConstraintKind::PointOnObject,
+                         {point_target("candidate"), entity_target("entity/spline")})});
+    REQUIRE(system);
+
+    auto solved = SketchConstraintSolver{}.solve(topology, system.value());
+    REQUIRE(solved);
+    CHECK(solved.value().status == SketchSolveStatus::UnderConstrained);
+    CHECK(solved.value().iterations == 0U);
+    CHECK(solved.value().residuals.initial_rms <= 1.0e-12);
+    CHECK(solved.value().residuals.final_rms <= 1.0e-12);
+    const auto* candidate = solved.value().topology.find_point(SketchPointId("candidate"));
+    REQUIRE(candidate != nullptr);
+    CHECK(candidate->position().x == Catch::Approx(on_curve.x).margin(1.0e-10));
+    CHECK(candidate->position().y == Catch::Approx(on_curve.y).margin(1.0e-10));
+  }
+
+  SECTION("an offset point converges onto the fixed spline") {
+    const SketchTopology topology = make_spline_topology({5.0, 5.0});
+    auto system = SketchConstraintSystem::create(
+        topology.sketch(),
+        {make_constraint("fixed.spline", SketchSolverConstraintKind::Fixed,
+                         {entity_target("entity/spline")}),
+         make_constraint("point-on.spline", SketchSolverConstraintKind::PointOnObject,
+                         {point_target("candidate"), entity_target("entity/spline")})});
+    REQUIRE(system);
+
+    auto solved = SketchConstraintSolver{}.solve(topology, system.value());
+    REQUIRE(solved);
+    CHECK(solved.value().status == SketchSolveStatus::UnderConstrained);
+    CHECK(solved.value().residuals.final_rms <= 1.0e-9);
+    const auto* candidate = solved.value().topology.find_point(SketchPointId("candidate"));
+    REQUIRE(candidate != nullptr);
+    CHECK(candidate->position().x == Catch::Approx(5.0).margin(1.0e-6));
+    CHECK(candidate->position().y == Catch::Approx(4.5).margin(1.0e-6));
+  }
+}
+
+TEST_CASE("Sketch point-on-spline remains finite at a degenerate endpoint tangent",
+          "[core][sketch-solver][core][sketch-spline]") {
+  std::vector<SketchTopologyPoint> points{
+      make_point("spline.p0", {0.0, 0.0}), make_point("spline.p1", {0.0, 0.0}),
+      make_point("spline.p2", {5.0, 0.0}), make_point("spline.p3", {5.0, 5.0}),
+      make_point("candidate", {0.0, 0.0}),
+  };
+  std::vector<SketchTopologyEntity> entities{
+      make_entity("entity/spline", SketchTopologyEntityKind::Spline,
+                  {SketchPointId("spline.p0"), SketchPointId("spline.p1"),
+                   SketchPointId("spline.p2"), SketchPointId("spline.p3")}),
+  };
+  const SketchTopology topology =
+      SketchTopology::create(SketchId("sketch.spline.degenerate"), std::move(points),
+                             std::move(entities))
+          .value();
+  auto system = SketchConstraintSystem::create(
+      topology.sketch(),
+      {make_constraint("point-on.spline", SketchSolverConstraintKind::PointOnObject,
+                       {point_target("candidate"), entity_target("entity/spline")})});
+  REQUIRE(system);
+
+  auto solved = SketchConstraintSolver{}.solve(topology, system.value());
+  REQUIRE(solved);
+  CHECK(solved.value().status == SketchSolveStatus::UnderConstrained);
+  CHECK(std::isfinite(solved.value().residuals.initial_rms));
+  CHECK(std::isfinite(solved.value().residuals.final_rms));
+  CHECK(solved.value().residuals.final_rms <= 1.0e-12);
+}
+
 TEST_CASE("Sketch solver reports deterministic redundant constraints",
           "[core][sketch-dof][core][sketch-conflict-diagnostics]") {
   const SketchTopology topology = make_line_topology({0.0, 0.0}, {10.0, 0.0});

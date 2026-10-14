@@ -10,6 +10,9 @@
 #include "blcad/geometry/recompute_executor.hpp"
 
 #include <algorithm>
+#include <atomic>
+#include <chrono>
+#include <cstdint>
 #include <fstream>
 #include <iterator>
 #include <system_error>
@@ -43,26 +46,184 @@ Result<std::string> read_text_file(const std::filesystem::path& path) {
       std::string(std::istreambuf_iterator<char>(stream), std::istreambuf_iterator<char>()));
 }
 
-Result<std::uintmax_t> write_text_file(const std::filesystem::path& path,
-                                       std::string_view content) {
-  std::ofstream stream(path, std::ios::binary | std::ios::trunc);
-  if (!stream)
-    return Result<std::uintmax_t>::failure(
-        Error::validation(path.string(), "could not create Sketch sidecar"));
-  stream.write(content.data(), static_cast<std::streamsize>(content.size()));
-  if (!stream)
-    return Result<std::uintmax_t>::failure(
-        Error::validation(path.string(), "could not write Sketch sidecar"));
-  return Result<std::uintmax_t>::success(static_cast<std::uintmax_t>(content.size()));
+Error save_transaction_error(const std::filesystem::path& path, std::string message) {
+  return Error::validation(path.empty() ? "gui.document_session.save" : path.string(),
+                           std::move(message));
 }
 
-Result<std::uintmax_t> remove_sidecar(const std::filesystem::path& path) {
-  std::error_code error;
-  std::filesystem::remove(path, error);
-  if (error)
+struct SaveTransactionFile {
+  SaveTransactionFile(std::filesystem::path target_path,
+                      std::optional<std::string> file_content)
+      : target(std::move(target_path)), content(std::move(file_content)) {}
+
+  std::filesystem::path target;
+  std::optional<std::string> content;
+  std::filesystem::path staged;
+  std::filesystem::path backup;
+  std::optional<std::filesystem::perms> original_permissions;
+  bool backed_up{false};
+  bool installed{false};
+};
+
+std::filesystem::path transaction_path(const std::filesystem::path& target,
+                                       std::string_view role) {
+  static std::atomic<std::uint64_t> sequence{0U};
+  const auto timestamp = std::chrono::steady_clock::now().time_since_epoch().count();
+  const auto nonce = sequence.fetch_add(1U, std::memory_order_relaxed);
+  const auto directory = target.has_parent_path() ? target.parent_path()
+                                                   : std::filesystem::path(".");
+  return directory / (".blcad-save-" + std::string(role) + "-" +
+                      std::to_string(timestamp) + "-" + std::to_string(nonce));
+}
+
+void remove_if_present(const std::filesystem::path& path) noexcept {
+  if (path.empty()) return;
+  std::error_code ignored;
+  std::filesystem::remove(path, ignored);
+}
+
+std::string rollback_save_transaction(std::vector<SaveTransactionFile>& files) noexcept {
+  std::string failures;
+  for (auto& file : files) {
+    if (!file.installed) continue;
+    std::error_code error;
+    std::filesystem::remove(file.target, error);
+    if (error) {
+      if (!failures.empty()) failures += "; ";
+      failures += "could not remove replacement " + file.target.string() + ": " +
+                  error.message();
+    }
+    file.installed = false;
+  }
+  for (auto file = files.rbegin(); file != files.rend(); ++file) {
+    if (!file->backed_up) continue;
+    std::error_code error;
+    std::filesystem::rename(file->backup, file->target, error);
+    if (error) {
+      if (!failures.empty()) failures += "; ";
+      failures += "could not restore " + file->target.string() + ": " + error.message();
+    } else {
+      file->backed_up = false;
+    }
+  }
+  for (const auto& file : files) remove_if_present(file.staged);
+  return failures;
+}
+
+Result<std::uintmax_t>
+write_save_transaction(std::vector<SaveTransactionFile> files) {
+  if (files.empty())
     return Result<std::uintmax_t>::failure(
-        Error::validation(path.string(), "could not remove obsolete Sketch sidecar"));
-  return Result<std::uintmax_t>::success(0U);
+        save_transaction_error({}, "save transaction requires at least one file"));
+
+  std::uintmax_t total = 0U;
+  for (auto& file : files) {
+    if (file.target.empty())
+      return Result<std::uintmax_t>::failure(
+          save_transaction_error({}, "document path must not be empty"));
+
+    std::error_code error;
+    const auto status = std::filesystem::symlink_status(file.target, error);
+    if (error && status.type() != std::filesystem::file_type::not_found)
+      return Result<std::uintmax_t>::failure(save_transaction_error(
+          file.target, "could not inspect save target: " + error.message()));
+    if (status.type() != std::filesystem::file_type::not_found &&
+        status.type() != std::filesystem::file_type::regular)
+      return Result<std::uintmax_t>::failure(save_transaction_error(
+          file.target, "save target exists but is not a regular file"));
+    if (status.type() == std::filesystem::file_type::regular &&
+        status.permissions() != std::filesystem::perms::unknown)
+      file.original_permissions = status.permissions();
+
+    file.backup = transaction_path(file.target, "backup");
+    if (file.content) file.staged = transaction_path(file.target, "staged");
+  }
+
+  for (auto& file : files) {
+    if (!file.content) continue;
+    std::ofstream stream(file.staged, std::ios::binary | std::ios::trunc);
+    if (!stream) {
+      for (const auto& staged_file : files) remove_if_present(staged_file.staged);
+      return Result<std::uintmax_t>::failure(
+          save_transaction_error(file.target, "could not stage save transaction"));
+    }
+    stream.write(file.content->data(), static_cast<std::streamsize>(file.content->size()));
+    stream.flush();
+    if (!stream) {
+      stream.close();
+      for (const auto& staged_file : files) remove_if_present(staged_file.staged);
+      return Result<std::uintmax_t>::failure(
+          save_transaction_error(file.target, "could not write staged save transaction"));
+    }
+    stream.close();
+    if (!stream) {
+      for (const auto& staged_file : files) remove_if_present(staged_file.staged);
+      return Result<std::uintmax_t>::failure(
+          save_transaction_error(file.target, "could not close staged save transaction"));
+    }
+    if (file.original_permissions) {
+      std::error_code permission_error;
+      std::filesystem::permissions(file.staged, *file.original_permissions,
+                                   std::filesystem::perm_options::replace,
+                                   permission_error);
+      if (permission_error) {
+        for (const auto& staged_file : files) remove_if_present(staged_file.staged);
+        return Result<std::uintmax_t>::failure(save_transaction_error(
+            file.target, "could not preserve save-target permissions: " +
+                             permission_error.message()));
+      }
+    }
+    total += static_cast<std::uintmax_t>(file.content->size());
+  }
+
+  for (auto& file : files) {
+    std::error_code status_error;
+    const auto status = std::filesystem::symlink_status(file.target, status_error);
+    if (status_error && status.type() != std::filesystem::file_type::not_found) {
+      const auto rollback = rollback_save_transaction(files);
+      std::string message = "could not inspect save target before commit: " +
+                            status_error.message();
+      if (!rollback.empty()) message += "; rollback incomplete: " + rollback;
+      return Result<std::uintmax_t>::failure(
+          save_transaction_error(file.target, std::move(message)));
+    }
+    if (status.type() == std::filesystem::file_type::not_found) continue;
+    if (status.type() != std::filesystem::file_type::regular) {
+      const auto rollback = rollback_save_transaction(files);
+      std::string message = "save target changed to a non-regular file before commit";
+      if (!rollback.empty()) message += "; rollback incomplete: " + rollback;
+      return Result<std::uintmax_t>::failure(
+          save_transaction_error(file.target, std::move(message)));
+    }
+    std::error_code rename_error;
+    std::filesystem::rename(file.target, file.backup, rename_error);
+    if (rename_error) {
+      const auto rollback = rollback_save_transaction(files);
+      std::string message = "could not back up save target: " + rename_error.message();
+      if (!rollback.empty()) message += "; rollback incomplete: " + rollback;
+      return Result<std::uintmax_t>::failure(
+          save_transaction_error(file.target, std::move(message)));
+    }
+    file.backed_up = true;
+  }
+
+  for (auto& file : files) {
+    if (!file.content) continue;
+    std::error_code error;
+    std::filesystem::rename(file.staged, file.target, error);
+    if (error) {
+      const auto rollback = rollback_save_transaction(files);
+      std::string message = "could not commit staged save transaction: " + error.message();
+      if (!rollback.empty()) message += "; rollback incomplete: " + rollback;
+      return Result<std::uintmax_t>::failure(
+          save_transaction_error(file.target, std::move(message)));
+    }
+    file.installed = true;
+    file.staged.clear();
+  }
+
+  for (const auto& file : files) remove_if_present(file.backup);
+  return Result<std::uintmax_t>::success(total);
 }
 
 template <typename Catalog>
@@ -252,6 +413,11 @@ Result<std::uintmax_t> GuiDocumentSession::save_as(const std::filesystem::path& 
     record_error(error);
     return Result<std::uintmax_t>::failure(error);
   }
+  if (path.empty()) {
+    const auto error = session_error("document path must not be empty");
+    record_error(error);
+    return Result<std::uintmax_t>::failure(error);
+  }
 
   std::optional<std::string> constraint_json;
   std::optional<std::string> dimension_json;
@@ -286,57 +452,29 @@ Result<std::uintmax_t> GuiDocumentSession::save_as(const std::filesystem::path& 
     }
   }
 
-  Result<std::uintmax_t> written = part_document()
-                                       ? write_part_document_json_file(*part_document(), path)
-                                       : write_project_json_file(*project(), path);
+  auto main_json = serialize_current();
+  if (main_json.has_error()) {
+    record_error(main_json.error());
+    return Result<std::uintmax_t>::failure(main_json.error());
+  }
+
+  std::vector<SaveTransactionFile> files;
+  files.push_back({path, main_json.value()});
+  if (part_document()) {
+    files.push_back({constraint_sidecar_path(path), std::move(constraint_json)});
+    files.push_back({dimension_sidecar_path(path), std::move(dimension_json)});
+  }
+  auto written = write_save_transaction(std::move(files));
   if (written.has_error()) {
     record_error(written.error());
     return written;
   }
-
-  std::uintmax_t total = written.value();
-  if (part_document()) {
-    const auto constraint_path = constraint_sidecar_path(path);
-    if (constraint_json) {
-      auto sidecar_written = write_text_file(constraint_path, *constraint_json);
-      if (sidecar_written.has_error()) {
-        record_error(sidecar_written.error());
-        return sidecar_written;
-      }
-      total += sidecar_written.value();
-    } else {
-      auto removed = remove_sidecar(constraint_path);
-      if (removed.has_error()) {
-        record_error(removed.error());
-        return removed;
-      }
-    }
-
-    const auto dimension_path = dimension_sidecar_path(path);
-    if (dimension_json) {
-      auto sidecar_written = write_text_file(dimension_path, *dimension_json);
-      if (sidecar_written.has_error()) {
-        record_error(sidecar_written.error());
-        return sidecar_written;
-      }
-      total += sidecar_written.value();
-    } else {
-      auto removed = remove_sidecar(dimension_path);
-      if (removed.has_error()) {
-        record_error(removed.error());
-        return removed;
-      }
-    }
-  }
-
-  const auto json = serialize_current();
-  if (json.has_error()) return Result<std::uintmax_t>::failure(json.error());
   file_path_ = path;
-  saved_json_ = json.value();
+  saved_json_ = main_json.value();
   saved_sketch_constraint_catalogs_ = sketch_constraint_catalogs_;
   saved_sketch_dimension_catalogs_ = sketch_dimension_catalogs_;
   record_information(path.string(), "document saved");
-  return Result<std::uintmax_t>::success(total);
+  return written;
 }
 
 Result<std::size_t> GuiDocumentSession::recompute() {
@@ -526,7 +664,13 @@ void GuiDocumentSession::set_derived_results_fresh(bool fresh) noexcept {
   recompute_status_ = fresh ? GuiRecomputeStatus::Fresh : GuiRecomputeStatus::Stale;
 }
 
-void GuiDocumentSession::clear_diagnostics() noexcept { diagnostics_.clear(); }
+void GuiDocumentSession::report_error(const Error& error) { record_error(error); }
+
+void GuiDocumentSession::clear_diagnostics() noexcept {
+  if (diagnostics_.empty()) return;
+  diagnostics_.clear();
+  ++presentation_revision_;
+}
 
 GuiDocumentKind GuiDocumentSession::document_kind() const noexcept {
   if (std::holds_alternative<PartDocument>(document_)) return GuiDocumentKind::Part;
@@ -867,11 +1011,13 @@ void GuiDocumentSession::append_history(std::string json, std::string label) {
 void GuiDocumentSession::record_error(const Error& error) {
   diagnostics_.push_back(
       {GuiDiagnosticSeverity::Error, error.category(), error.object_id(), error.message()});
+  ++presentation_revision_;
 }
 
 void GuiDocumentSession::record_information(std::string object_id, std::string message) {
   diagnostics_.push_back({GuiDiagnosticSeverity::Information, ErrorCategory::Internal,
                           std::move(object_id), std::move(message)});
+  ++presentation_revision_;
 }
 
 void GuiDocumentSession::reset_document() noexcept {

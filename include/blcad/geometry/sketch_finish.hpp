@@ -84,6 +84,7 @@ public:
         kind = SketchRegionDiagnosticKind::SelfIntersection;
       else if (region.error().message().find("gap") != std::string::npos ||
                region.error().message().find("at least three") != std::string::npos ||
+               region.error().message().find("single-contour loop") != std::string::npos ||
                region.error().message().find("does not close") != std::string::npos)
         kind = SketchRegionDiagnosticKind::OpenContour;
       analysis.diagnostics.push_back({kind, std::move(ids), region.error().message()});
@@ -92,6 +93,73 @@ public:
     std::sort(analysis.regions.begin(), analysis.regions.end(),
               [](const auto& a, const auto& b) { return a.id.value() < b.id.value(); });
     return Result<SketchRegionAnalysis>::success(std::move(analysis));
+  }
+
+  // Detect bounded line regions that are not already owned by a persistent
+  // profile. This is the common identity boundary for transient viewport
+  // selection and later profile materialization: mixed legacy/current
+  // sketches produce the same collision-free generated ids in both paths.
+  [[nodiscard]] static Result<SketchRegionAnalysis>
+  analyze_unmaterialized(const PartDocument& document, const Sketch& sketch) {
+    std::vector<SketchEntityId> materialized_curves;
+    const auto append = [&materialized_curves](const auto& curves) {
+      materialized_curves.insert(materialized_curves.end(), curves.begin(), curves.end());
+    };
+    for (const auto& profile : sketch.closed_profiles())
+      append(profile.line_segments());
+    for (const auto& profile : sketch.arc_closed_profiles())
+      append(profile.curve_segments());
+    for (const auto& profile : sketch.composite_closed_profiles()) {
+      append(profile.outer_contour());
+      for (const auto& contour : profile.inner_contours())
+        append(contour);
+    }
+    std::sort(materialized_curves.begin(), materialized_curves.end(),
+              [](const auto& left, const auto& right) {
+                return left.value() < right.value();
+              });
+    materialized_curves.erase(
+        std::unique(materialized_curves.begin(), materialized_curves.end()),
+        materialized_curves.end());
+
+    auto raw = Sketch::create(sketch.id(), sketch.name(), sketch.workplane());
+    if (raw.has_error())
+      return Result<SketchRegionAnalysis>::failure(raw.error());
+    for (const auto& line : sketch.line_segments()) {
+      if (std::binary_search(materialized_curves.begin(), materialized_curves.end(), line.id(),
+                             [](const auto& left, const auto& right) {
+                               return left.value() < right.value();
+                             }))
+        continue;
+      auto added = raw.value().add_entity(line);
+      if (added.has_error())
+        return Result<SketchRegionAnalysis>::failure(added.error());
+    }
+
+    auto analysis = analyze(document, raw.value());
+    if (analysis.has_error())
+      return analysis;
+    const auto profile_exists = [&sketch](const ProfileId& id) {
+      return sketch.find_rectangle_profile(id) != nullptr ||
+             sketch.find_circle_profile(id) != nullptr ||
+             sketch.find_closed_profile(id) != nullptr ||
+             sketch.find_arc_closed_profile(id) != nullptr ||
+             sketch.find_composite_closed_profile(id) != nullptr ||
+             sketch.find_circular_hole_pattern(id) != nullptr;
+    };
+    std::vector<ProfileId> assigned;
+    std::size_t next_index = 0U;
+    for (auto& region : analysis.value().regions) {
+      ProfileId candidate("");
+      do {
+        candidate = ProfileId("generated.region." + sketch.id().value() + "." +
+                              std::to_string(next_index++));
+      } while (profile_exists(candidate) ||
+               std::find(assigned.begin(), assigned.end(), candidate) != assigned.end());
+      region.id = candidate;
+      assigned.push_back(std::move(candidate));
+    }
+    return analysis;
   }
 
   [[nodiscard]] static std::optional<ProfileId> select_region_at(const SketchRegionAnalysis& analysis,

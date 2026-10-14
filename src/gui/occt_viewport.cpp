@@ -1,6 +1,7 @@
 #include "blcad/gui/occt_viewport.hpp"
 
 #include "blcad/geometry/occt_shape_view.hpp"
+#include "blcad/gui/gui_viewport_manipulator.hpp"
 
 #include <AIS_InteractiveContext.hxx>
 #include <AIS_Shape.hxx>
@@ -13,7 +14,9 @@
 #include <Prs3d_Drawer.hxx>
 #include <Prs3d_LineAspect.hxx>
 #include <Quantity_Color.hxx>
+#include <SelectMgr_EntityOwner.hxx>
 #include <Standard_Failure.hxx>
+#include <TopAbs_ShapeEnum.hxx>
 #include <V3d_TypeOfOrientation.hxx>
 #include <V3d_View.hxx>
 #include <V3d_Viewer.hxx>
@@ -325,6 +328,42 @@ Quantity_Color presentation_color(geometry::ViewportSceneKind kind) {
   return Quantity_Color(0.72, 0.76, 0.82, Quantity_TOC_RGB);
 }
 
+Quantity_Color feature_preview_color() {
+  return Quantity_Color(0.25, 0.75, 1.0, Quantity_TOC_RGB);
+}
+
+bool sketch_profile_face(const geometry::ViewportSceneItem& item) {
+  if (item.kind != geometry::ViewportSceneKind::SketchEntity ||
+      item.semantic_id.find("/profile/") == std::string::npos)
+    return false;
+  const TopoDS_Shape* native = geometry::OcctShapeView::get(item.shape);
+  return native != nullptr && !native->IsNull() && native->ShapeType() == TopAbs_FACE;
+}
+
+void apply_sketch_profile_style(const geometry::ViewportSceneItem& item,
+                                const Handle(AIS_Shape)& interactive) {
+  if (interactive.IsNull() || !sketch_profile_face(item))
+    return;
+  // A faint fill provides an interior hit target without obscuring the
+  // authored curves or the solids behind the sketch. Its boundary stays
+  // visible in every shaded mode; source-curve presentations remain on top.
+  interactive->SetTransparency(0.88);
+  interactive->Attributes()->SetFaceBoundaryDraw(true);
+}
+
+void apply_selection_priority(const geometry::ViewportSceneItem& item,
+                              const Handle(AIS_Shape)& interactive) {
+  if (interactive.IsNull())
+    return;
+  const Handle(SelectMgr_EntityOwner) owner = interactive->GlobalSelOwner();
+  if (owner.IsNull())
+    return;
+  // Coplanar datum planes and axes commonly cross a Sketch at the origin.
+  // Prefer the bounded profile face there so an interior click selects the
+  // feature input instead of an unrelated construction datum.
+  owner->SetPriority(sketch_profile_face(item) ? 9 : 0);
+}
+
 V3d_TypeOfOrientation occt_orientation(GuiStandardView view) {
   switch (view) {
   case GuiStandardView::Front:
@@ -407,6 +446,7 @@ struct OcctViewport::Impl {
   // initializeGL) would invalidate Qt's freshly created GL context.
   Aspect_Drawable native_drawable{0};
   std::vector<Presentation> presentations;
+  std::optional<Presentation> feature_preview;
   std::unordered_map<const AIS_InteractiveObject*, std::size_t> owner_to_index;
   std::string initialization_error;
   bool initialization_attempted{false};
@@ -502,6 +542,7 @@ Result<std::size_t> OcctViewport::set_scene(std::vector<geometry::ViewportSceneI
         // flashing it grey.
         interactive->SetHilightMode(0);
       }
+      apply_sketch_profile_style(item, interactive);
       apply_construction_line_style(item, interactive);
     }
     candidate.push_back({std::move(item), std::move(interactive)});
@@ -516,7 +557,17 @@ Result<std::size_t> OcctViewport::set_scene(std::vector<geometry::ViewportSceneI
   if (!impl_->context.IsNull()) {
     impl_->context->RemoveAll(false);
     for (auto& presentation : candidate)
+    {
       impl_->context->Display(presentation.interactive, false);
+      apply_selection_priority(presentation.item, presentation.interactive);
+    }
+    if (impl_->feature_preview.has_value() &&
+        !impl_->feature_preview->interactive.IsNull()) {
+      impl_->context->Display(impl_->feature_preview->interactive, false);
+      impl_->context->SetSelectionModeActive(
+          impl_->feature_preview->interactive, 0, false,
+          AIS_SelectionModesConcurrency_Single, true);
+    }
   }
   impl_->presentations = std::move(candidate);
   impl_->owner_to_index.clear();
@@ -544,12 +595,60 @@ Result<std::size_t> OcctViewport::set_scene(std::vector<geometry::ViewportSceneI
   return Result<std::size_t>::success(impl_->presentations.size());
 }
 
+Result<std::size_t> OcctViewport::set_feature_preview(geometry::GeometryShape shape) {
+  if (shape.empty())
+    return Result<std::size_t>::failure(
+        viewport_error("feature preview requires a non-empty Geometry shape"));
+
+  Impl::Presentation candidate{{geometry::ViewportSceneKind::SolidBody,
+                                "preview/interactive-feature", std::move(shape)},
+                               {}};
+  if (!impl_->context.IsNull()) {
+    const TopoDS_Shape* native = geometry::OcctShapeView::get(candidate.item.shape);
+    if (native == nullptr || native->IsNull())
+      return Result<std::size_t>::failure(
+          viewport_error("OCCT feature preview shape is null"));
+    candidate.interactive = new AIS_Shape(*native);
+    candidate.interactive->SetColor(feature_preview_color());
+    candidate.interactive->SetTransparency(0.18);
+    candidate.interactive->Attributes()->SetFaceBoundaryDraw(true);
+  }
+
+  if (!impl_->context.IsNull() && impl_->feature_preview.has_value() &&
+      !impl_->feature_preview->interactive.IsNull())
+    impl_->context->Remove(impl_->feature_preview->interactive, false);
+  impl_->feature_preview = std::move(candidate);
+  if (!impl_->context.IsNull() && !impl_->feature_preview->interactive.IsNull()) {
+    const int mode = display_mode_ == GuiViewportDisplayMode::Wireframe ? 0 : 1;
+    impl_->context->Display(impl_->feature_preview->interactive, false);
+    impl_->context->SetDisplayMode(impl_->feature_preview->interactive, mode, false);
+    impl_->context->SetSelectionModeActive(
+        impl_->feature_preview->interactive, 0, false,
+        AIS_SelectionModesConcurrency_Single, true);
+    render_update();
+  }
+  update();
+  return Result<std::size_t>::success(1U);
+}
+
+void OcctViewport::clear_feature_preview() {
+  if (!impl_->feature_preview.has_value())
+    return;
+  if (!impl_->context.IsNull() && !impl_->feature_preview->interactive.IsNull()) {
+    impl_->context->Remove(impl_->feature_preview->interactive, false);
+    render_update();
+  }
+  impl_->feature_preview.reset();
+  update();
+}
+
 void OcctViewport::clear_scene() {
   if (!impl_->context.IsNull()) {
     impl_->context->RemoveAll(false);
     render_update();
   }
   impl_->presentations.clear();
+  impl_->feature_preview.reset();
   impl_->owner_to_index.clear();
   clear_sketch_interaction();
   publish_selection(std::nullopt);
@@ -562,6 +661,10 @@ void OcctViewport::set_display_mode(GuiViewportDisplayMode mode) {
 }
 
 void OcctViewport::set_projection(GuiViewportProjection projection) {
+  // An active planar Sketch owns the camera orientation and projection.  Keep
+  // it orthographic even when a global Perspective action is triggered.
+  if (sketch_focus_active() && projection == GuiViewportProjection::Perspective)
+    return;
   projection_ = projection;
   if (!impl_->view.IsNull()) {
     impl_->view->Camera()->SetProjectionType(projection == GuiViewportProjection::Perspective
@@ -573,6 +676,11 @@ void OcctViewport::set_projection(GuiViewportProjection projection) {
 }
 
 void OcctViewport::set_standard_view(GuiStandardView view) {
+  // Standard model views would discard the normal-to-plane Sketch camera and
+  // re-enable free rotation.  They become effective again after Sketch focus
+  // is cleared.
+  if (sketch_focus_active())
+    return;
   plane_camera_.reset();
   if (!impl_->view.IsNull()) {
     impl_->view->SetProj(occt_orientation(view));
@@ -649,9 +757,68 @@ bool OcctViewport::restore_camera_bookmark(const GuiViewportCameraBookmark& book
   }
 }
 
+Result<GuiSketchViewRay>
+OcctViewport::screen_to_view_ray(GuiSketchScreenPoint point) const {
+  if (!std::isfinite(point.x) || !std::isfinite(point.y))
+    return Result<GuiSketchViewRay>::failure(
+        Error::validation("gui.occt_viewport", "screen point must be finite"));
+  if (!impl_->view.IsNull() && !impl_->view->Window().IsNull()) {
+    try {
+      const qreal ratio =
+          gl_surface_ != nullptr ? gl_surface_->devicePixelRatioF() : devicePixelRatioF();
+      const int x = static_cast<int>(std::lround(point.x * ratio));
+      const int y = static_cast<int>(std::lround(point.y * ratio));
+      double px{}, py{}, pz{}, vx{}, vy{}, vz{};
+      impl_->view->ConvertWithProj(x, y, px, py, pz, vx, vy, vz);
+      return Result<GuiSketchViewRay>::success(
+          GuiSketchViewRay{{px, py, pz}, {vx, vy, vz}});
+    } catch (const Standard_Failure& failure) {
+      return Result<GuiSketchViewRay>::failure(
+          viewport_error(failure.GetMessageString() != nullptr
+                             ? failure.GetMessageString()
+                             : "could not convert viewport pixel to view ray"));
+    }
+  }
+  auto mapping = GuiViewportManipulatorMapping::create_camera(
+      camera_bookmark(), static_cast<double>(std::max(1, width())),
+      static_cast<double>(std::max(1, height())));
+  if (mapping.has_error())
+    return Result<GuiSketchViewRay>::failure(mapping.error());
+  return mapping.value().screen_to_ray(point);
+}
+
+Result<GuiSketchScreenPoint> OcctViewport::model_to_screen(Point3 point) const {
+  if (!std::isfinite(point.x) || !std::isfinite(point.y) || !std::isfinite(point.z))
+    return Result<GuiSketchScreenPoint>::failure(
+        Error::validation("gui.occt_viewport", "model point must be finite"));
+  if (!impl_->view.IsNull() && !impl_->view->Window().IsNull()) {
+    try {
+      int x{}, y{};
+      impl_->view->Convert(point.x, point.y, point.z, x, y);
+      const qreal ratio =
+          gl_surface_ != nullptr ? gl_surface_->devicePixelRatioF() : devicePixelRatioF();
+      return Result<GuiSketchScreenPoint>::success(
+          {static_cast<double>(x) / ratio, static_cast<double>(y) / ratio});
+    } catch (const Standard_Failure& failure) {
+      return Result<GuiSketchScreenPoint>::failure(
+          viewport_error(failure.GetMessageString() != nullptr
+                             ? failure.GetMessageString()
+                             : "could not convert model point to viewport pixel"));
+    }
+  }
+  auto mapping = GuiViewportManipulatorMapping::create_camera(
+      camera_bookmark(), static_cast<double>(std::max(1, width())),
+      static_cast<double>(std::max(1, height())));
+  if (mapping.has_error())
+    return Result<GuiSketchScreenPoint>::failure(mapping.error());
+  return mapping.value().model_to_screen(point);
+}
+
 void OcctViewport::set_sketch_focus(std::string sketch_id, GuiSketchSurroundingsMode mode) {
   sketch_focus_id_ = std::move(sketch_id);
   sketch_surroundings_mode_ = mode;
+  if (sketch_focus_active())
+    set_projection(GuiViewportProjection::Orthographic);
   apply_sketch_focus();
 }
 
@@ -666,38 +833,11 @@ OcctViewport::set_sketch_interaction(GuiSketchPlaneView plane,
                                      GuiSketchInteractionScene scene,
                                      GuiSketchInteractionConfig config) {
   Result<GuiSketchPlaneMapping> mapping = [&]() -> Result<GuiSketchPlaneMapping> {
-    if (!impl_->view.IsNull()) {
-      GuiSketchPlaneMapping::ScreenToRay screen_to_ray = [this](GuiSketchScreenPoint point) {
-        try {
-          const double ratio = devicePixelRatioF();
-          const int x = static_cast<int>(std::lround(point.x * ratio));
-          const int y = static_cast<int>(std::lround(point.y * ratio));
-          double px{}, py{}, pz{}, vx{}, vy{}, vz{};
-          impl_->view->ConvertWithProj(x, y, px, py, pz, vx, vy, vz);
-          return Result<GuiSketchViewRay>::success(
-              GuiSketchViewRay{{px, py, pz}, {vx, vy, vz}});
-        } catch (const Standard_Failure& failure) {
-          return Result<GuiSketchViewRay>::failure(
-              viewport_error(failure.GetMessageString() != nullptr
-                                 ? failure.GetMessageString()
-                                 : "could not convert Sketch pixel to view ray"));
-        }
-      };
-      GuiSketchPlaneMapping::ModelToScreen model_to_screen = [this](Point3 point) {
-        try {
-          int x{}, y{};
-          impl_->view->Convert(point.x, point.y, point.z, x, y);
-          const double ratio = devicePixelRatioF();
-          return Result<GuiSketchScreenPoint>::success(
-              GuiSketchScreenPoint{static_cast<double>(x) / ratio,
-                                   static_cast<double>(y) / ratio});
-        } catch (const Standard_Failure& failure) {
-          return Result<GuiSketchScreenPoint>::failure(
-              viewport_error(failure.GetMessageString() != nullptr
-                                 ? failure.GetMessageString()
-                                 : "could not convert Sketch model point to pixel"));
-        }
-      };
+    if (!impl_->view.IsNull() && !impl_->view->Window().IsNull()) {
+      GuiSketchPlaneMapping::ScreenToRay screen_to_ray =
+          [this](GuiSketchScreenPoint point) { return this->screen_to_view_ray(point); };
+      GuiSketchPlaneMapping::ModelToScreen model_to_screen =
+          [this](Point3 point) { return this->model_to_screen(point); };
       return GuiSketchPlaneMapping::create(std::move(plane), std::move(screen_to_ray),
                                            std::move(model_to_screen));
     }
@@ -883,6 +1023,19 @@ std::size_t OcctViewport::presentation_count() const noexcept {
   return impl_->presentations.size();
 }
 
+bool OcctViewport::feature_preview_active() const noexcept {
+  if (!impl_->feature_preview.has_value())
+    return false;
+  // In headless/offscreen mode the retained shape is the complete preview
+  // state.  With a native viewer, also verify that the AIS presentation is
+  // really displayed so a missing Display() call cannot masquerade as a
+  // visible preview in regression tests.
+  if (impl_->context.IsNull())
+    return true;
+  return !impl_->feature_preview->interactive.IsNull() &&
+         impl_->context->IsDisplayed(impl_->feature_preview->interactive);
+}
+
 GuiViewportDisplayMode OcctViewport::display_mode() const noexcept {
   return display_mode_;
 }
@@ -933,6 +1086,14 @@ const std::optional<GuiSketchSnapResult>& OcctViewport::sketch_snap_result() con
 
 const std::optional<GuiSketchHit>& OcctViewport::hovered_sketch_hit() const noexcept {
   return hovered_sketch_hit_;
+}
+
+Result<std::vector<GuiSketchHit>> OcctViewport::sketch_curve_hits_along(
+    GuiSketchScreenPoint start, GuiSketchScreenPoint end) const {
+  if (!sketch_interaction_)
+    return Result<std::vector<GuiSketchHit>>::failure(
+        Error::validation("gui.occt_viewport", "Sketch interaction is not active"));
+  return sketch_interaction_->curve_hits_along(start, end);
 }
 
 const std::optional<GuiSketchScreenRect>& OcctViewport::sketch_box_selection() const noexcept {
@@ -1101,8 +1262,42 @@ void OcctViewport::mouseReleaseEvent(QMouseEvent* event) {
     const QPoint current = to_render_point(event->position().toPoint());
     impl_->context->MoveTo(current.x(), current.y(), impl_->view, false);
     if (impl_->context->HasDetected()) {
-      impl_->context->SelectDetected(AIS_SelectionScheme_Replace);
-      publish_selection(detected_selection());
+      // OCCT may rank a datum plane/axis ahead of a coplanar translucent
+      // Sketch face, especially where all origin planes cross. Inspect the
+      // complete hit stack and prefer a bounded profile face whenever one is
+      // under the pointer; otherwise preserve OCCT's normal nearest-hit rule.
+      Handle(SelectMgr_EntityOwner) profile_owner;
+      std::optional<GuiSelection> profile_selection;
+      impl_->context->InitDetected();
+      for (; impl_->context->MoreDetected(); impl_->context->NextDetected()) {
+        const Handle(SelectMgr_EntityOwner) owner =
+            impl_->context->DetectedCurrentOwner();
+        if (owner.IsNull())
+          continue;
+        const Handle(AIS_InteractiveObject) interactive =
+            Handle(AIS_InteractiveObject)::DownCast(owner->Selectable());
+        if (interactive.IsNull())
+          continue;
+        const auto found = impl_->owner_to_index.find(interactive.get());
+        if (found == impl_->owner_to_index.end())
+          continue;
+        const auto& item = impl_->presentations[found->second].item;
+        if (!sketch_profile_face(item))
+          continue;
+        GuiSelection selection{selection_kind(item.kind), item.semantic_id};
+        if ((selection_filter_mask_ & selection_kind_bit(selection.kind)) == 0U)
+          continue;
+        profile_owner = owner;
+        profile_selection = std::move(selection);
+        break;
+      }
+      if (!profile_owner.IsNull()) {
+        impl_->context->SetSelected(profile_owner, false);
+        publish_selection(std::move(profile_selection));
+      } else {
+        impl_->context->SelectDetected(AIS_SelectionScheme_Replace);
+        publish_selection(detected_selection());
+      }
     } else {
       clear_selection();
     }
@@ -1167,9 +1362,25 @@ void OcctViewport::initialize_native_viewer() {
         presentation.interactive->SetTransparency(0.72);
         presentation.interactive->SetHilightMode(0);
       }
+      apply_sketch_profile_style(presentation.item, presentation.interactive);
       apply_construction_line_style(presentation.item, presentation.interactive);
       impl_->context->Display(presentation.interactive, false);
+      apply_selection_priority(presentation.item, presentation.interactive);
       impl_->owner_to_index.emplace(presentation.interactive.get(), index);
+    }
+    if (impl_->feature_preview.has_value()) {
+      const TopoDS_Shape* native =
+          geometry::OcctShapeView::get(impl_->feature_preview->item.shape);
+      if (native != nullptr && !native->IsNull()) {
+        impl_->feature_preview->interactive = new AIS_Shape(*native);
+        impl_->feature_preview->interactive->SetColor(feature_preview_color());
+        impl_->feature_preview->interactive->SetTransparency(0.18);
+        impl_->feature_preview->interactive->Attributes()->SetFaceBoundaryDraw(true);
+        impl_->context->Display(impl_->feature_preview->interactive, false);
+        impl_->context->SetSelectionModeActive(
+            impl_->feature_preview->interactive, 0, false,
+            AIS_SelectionModesConcurrency_Single, true);
+      }
     }
     set_projection(projection_);
     apply_display_mode();
@@ -1222,12 +1433,28 @@ void OcctViewport::initialize_gl() {
     const QPoint size = to_render_point({gl_surface_->width(), gl_surface_->height()});
     neutral_window->SetSize(size.x(), size.y());
     impl_->view->SetWindow(neutral_window, gl_context->RenderingContext());
+    // A Sketch may have been entered before the top-level window was shown
+    // (tests, restored sessions, or deferred docks). Apply the stored plane
+    // camera now that OCCT has a real window, then replace the temporary
+    // 1 mm/DIP mapping with callbacks backed by the authoritative view.
+    if (plane_camera_.has_value()) {
+      const GuiPlaneCamera camera = *plane_camera_;
+      (void)set_plane_camera(camera.target, camera.view_direction, camera.up_direction);
+    }
+    if (sketch_interaction_) {
+      const auto plane = sketch_interaction_->mapping().plane();
+      const auto scene = sketch_interaction_->scene();
+      const auto config = sketch_interaction_->config();
+      (void)set_sketch_interaction(plane, scene, config);
+    }
   } catch (const Standard_Failure& failure) {
     impl_->initialization_error = failure.GetMessageString() != nullptr
                                       ? failure.GetMessageString()
                                       : "OCCT viewport initialization failed";
     for (auto& presentation : impl_->presentations)
       presentation.interactive.Nullify();
+    if (impl_->feature_preview.has_value())
+      impl_->feature_preview->interactive.Nullify();
     impl_->owner_to_index.clear();
     impl_->view.Nullify();
     impl_->context.Nullify();
@@ -1275,9 +1502,16 @@ void OcctViewport::apply_display_mode() {
     // shaded face. A large shaded plane fills the whole viewport grey the moment
     // it is hovered or selected; a wireframe border highlights only its edges.
     const bool datum = presentation.item.kind == geometry::ViewportSceneKind::Datum;
+    const bool profile_face = sketch_profile_face(presentation.item);
     presentation.interactive->Attributes()->SetFaceBoundaryDraw(
-        display_mode_ == GuiViewportDisplayMode::ShadedWithEdges);
+        profile_face || display_mode_ == GuiViewportDisplayMode::ShadedWithEdges);
     impl_->context->SetDisplayMode(presentation.interactive, datum ? 0 : mode, false);
+  }
+  if (impl_->feature_preview.has_value() &&
+      !impl_->feature_preview->interactive.IsNull()) {
+    impl_->feature_preview->interactive->Attributes()->SetFaceBoundaryDraw(
+        display_mode_ == GuiViewportDisplayMode::ShadedWithEdges);
+    impl_->context->SetDisplayMode(impl_->feature_preview->interactive, mode, false);
   }
   render_update();
 }
@@ -1293,6 +1527,7 @@ void OcctViewport::apply_selection_filters() {
         presentation.interactive, 0,
         (selection_filter_mask_ & selection_kind_bit(kind)) != 0U,
         AIS_SelectionModesConcurrency_Single, true);
+    apply_selection_priority(presentation.item, presentation.interactive);
   }
   render_update();
 }
@@ -1303,25 +1538,37 @@ void OcctViewport::apply_sketch_focus() {
   for (auto& presentation : impl_->presentations) {
     if (presentation.interactive.IsNull())
       continue;
+    const bool profile_face = sketch_profile_face(presentation.item);
 
     if (!sketch_focus_active()) {
       impl_->context->Display(presentation.interactive, false);
       presentation.interactive->SetTransparency(
-          presentation.item.kind == geometry::ViewportSceneKind::Datum ? 0.72 : 0.0);
+          presentation.item.kind == geometry::ViewportSceneKind::Datum
+              ? 0.72
+              : profile_face ? 0.88 : 0.0);
       continue;
     }
 
     const bool active_sketch = belongs_to_sketch(presentation.item.semantic_id, sketch_focus_id_);
     if (active_sketch) {
       impl_->context->Display(presentation.interactive, false);
-      presentation.interactive->SetTransparency(0.0);
+      presentation.interactive->SetTransparency(profile_face ? 0.88 : 0.0);
     } else if (sketch_surroundings_mode_ == GuiSketchSurroundingsMode::Isolate) {
       impl_->context->Erase(presentation.interactive, false);
     } else {
       impl_->context->Display(presentation.interactive, false);
       presentation.interactive->SetTransparency(
-          presentation.item.kind == geometry::ViewportSceneKind::Datum ? 0.88 : 0.72);
+          presentation.item.kind == geometry::ViewportSceneKind::Datum
+              ? 0.88
+              : profile_face ? 0.96 : 0.72);
     }
+  }
+  if (impl_->feature_preview.has_value() &&
+      !impl_->feature_preview->interactive.IsNull()) {
+    if (sketch_focus_active())
+      impl_->context->Erase(impl_->feature_preview->interactive, false);
+    else
+      impl_->context->Display(impl_->feature_preview->interactive, false);
   }
   render_update();
 }

@@ -148,6 +148,40 @@ PartDocument operation_document(FeatureBodyOperationMode mode, ExtrudeExtentInte
 
 } // namespace
 
+TEST_CASE("Extrude executes the explicitly selected profile in a multi-profile Sketch",
+          "[geometry][extrude-extent][profile-selection]") {
+  auto document = PartDocument::create(DocumentId("part.multi_profile"), "Multi Profile");
+  REQUIRE(document);
+  REQUIRE(document.value().add_parameter(length_parameter("first.width", 4.0)));
+  REQUIRE(document.value().add_parameter(length_parameter("first.height", 3.0)));
+  REQUIRE(document.value().add_parameter(length_parameter("second.width", 9.0)));
+  REQUIRE(document.value().add_parameter(length_parameter("second.height", 7.0)));
+  REQUIRE(document.value().add_parameter(length_parameter("depth", 5.0)));
+  REQUIRE(document.value().add_datum_plane(DatumPlane::xy().value()));
+
+  auto sketch = Sketch::create(SketchId("sketch.multi"), "Multi", DatumPlaneId("datum.xy"));
+  REQUIRE(sketch);
+  REQUIRE(sketch.value().add_profile(RectangleProfile::create(
+      ProfileId("profile.first"), ParameterId("first.width"), ParameterId("first.height"),
+      {-10.0, 0.0}).value()));
+  REQUIRE(sketch.value().add_profile(RectangleProfile::create(
+      ProfileId("profile.second"), ParameterId("second.width"), ParameterId("second.height"),
+      {10.0, 0.0}).value()));
+  REQUIRE(document.value().add_sketch(std::move(sketch.value())));
+
+  auto feature = Feature::create_additive_extrude(
+      FeatureId("feature.selected"), "Selected", SketchId("sketch.multi"), ParameterId("depth"));
+  REQUIRE(feature);
+  auto profiled = feature.value().with_profile(ProfileId("profile.second"));
+  REQUIRE(profiled);
+  REQUIRE(document.value().add_feature(std::move(profiled.value())));
+
+  auto cache = shape_cache();
+  REQUIRE(GeometryRecomputeExecutor{}.execute_document(document.value(), cache));
+  REQUIRE(cache.final_shape() != nullptr);
+  CHECK(summary(*cache.final_shape()).volume_mm3 == Approx(315.0).margin(1.0e-6));
+}
+
 TEST_CASE("Block 60 executes symmetric and two-sided extrusion spans",
           "[geometry][extrude-extent]") {
   SECTION("symmetric total depth") {

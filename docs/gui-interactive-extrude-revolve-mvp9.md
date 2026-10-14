@@ -1,8 +1,9 @@
 # GUI Interactive Extrude, Path Extrude, and Revolve MVP-9
 
-Status: implemented in Block 124. The headless controllers below are unchanged; their Qt binding was
-deleted with the Block-133 shell reset (`docs/gui-shell-reset-sequence-mvp9r.md`) and Block 135
-re-establishes it on `ShellWindow`. Every sentence about `MainWindow` ownership is historical.
+Status: headless controllers implemented in Block 124; their replacement-shell binding is implemented
+in Block 135. The old Qt binding was deleted with Block 133
+(`docs/gui-shell-reset-sequence-mvp9r.md`); `ShellFeatureTools` now hosts this surface on
+`ShellWindow`. Every sentence about `MainWindow` ownership is historical.
 
 Block 124 upgrades the MVP-7 form-driven Extrude and Revolve validation commands
 (`docs/gui-part-foundation-workbench-mvp7.md`) into direct-manipulation authoring. It consumes the
@@ -27,11 +28,12 @@ profile-region preselection / Finish-Sketch handoff
 
 The controllers own no `PartDocument`, `ShapeCache`, or save-format field. They compose existing public
 Core operations (`set_parameter_value`, `add_feature`, `add_revolve_feature`, `create_recompute_plan`)
-on a throwaway clone for preview and inside one transaction for Apply. `GuiInteractiveFeatureCoordinator`
-is a Qt-free connector owned by `MainWindow`; it publishes a controller's handles to the shared
-`GuiViewportManipulatorLayer` and routes manipulator candidates back into the active controller. The
-manipulator shell (`MainWindow`) forwards its candidate callback into the coordinator, so a viewport
-drag folds into the candidate without any Core authority living in a widget.
+on a throwaway clone for preview and inside one transaction for Apply.
+`GuiInteractiveFeatureCoordinator` is a Qt-free connector owned by `ShellFeatureTools`; it publishes
+a controller's handles to the shared `GuiViewportManipulatorLayer` and routes manipulator candidates
+back into the active controller. The shell-owned overlay forwards its candidate callback into the
+coordinator, so a viewport drag folds into the candidate without any Core authority living in a
+widget.
 
 ## Extrude authoring
 
@@ -94,7 +96,14 @@ its manipulator overlay binder. They were removed with Block 133 and are restore
 The proof covers extent-parameter driving with one atomic transaction and exact undo, operation/taper/
 thin/through-all modes with their offered handles, fail-closed rejection of invalid inputs, full/angle/
 symmetric revolve authoring, manipulator/typed document equivalence for both features, and
-`MainWindow` ownership of the coordinator committing a viewport-style drag.
+`ShellWindow` ownership of the coordinator committing a viewport-style drag. The additional
+`[gui][shell-features]` proof covers Finish-Sketch handoff, auto-provisioned candidate inputs,
+recomputed geometry, mutation-free Cancel, and atomic Undo.
+
+The replacement-shell hardening proof also covers strict `mm`/`deg` parsing, preservation of the
+last valid value after rejected text, numeric-override precedence during a live pointer drag,
+drag-start rollback on `Esc`/deactivation, rejection of mismatched candidates, collision-safe
+generated inputs, default in-plane origin-axis choice, and atomic Revolve Undo.
 
 ## Scope and deferrals
 
@@ -106,10 +115,9 @@ Bounded here and not introduced implicitly by this block:
   **picking/highlighting** is the caller's selection responsibility;
 - continuous **shaded viewport preview** rendering is the existing recompute/presentation path after a
   validated candidate; the controllers publish the validated preview summary, not pixels;
-- mapping the Block-122 `part.extrude` / `part.revolve` / `part.path_extrude` command ids to a fully
-  auto-provisioned driving parameter, result body, and resolved profile-plane frame is a `MainWindow`
-  command-handler policy consuming `GuiInteractiveFeatureCoordinator::begin_extrude` /
-  `begin_revolve`.
+- path Extrude remains part of Block-136 full shell coverage. Block 135 maps `part.extrude` and
+  `part.revolve` to an auto-provisioned candidate Body/Length parameter and a resolved profile-plane
+  frame through `ShellFeatureTools`; those objects persist only with Apply.
 
 ## Next boundary
 

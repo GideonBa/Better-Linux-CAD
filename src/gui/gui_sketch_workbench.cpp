@@ -276,21 +276,63 @@ Result<GuiSketchPlaneView> GuiSketchWorkspace::enter(GuiDocumentSession& session
   return plane;
 }
 
-Result<GuiWorkspace> GuiSketchWorkspace::finish(GuiDocumentSession& session,
-                                                const GuiSketchWorkbench& workbench) {
+Result<std::size_t>
+GuiSketchWorkspace::validate_finish(const GuiDocumentSession& session,
+                                    const GuiSketchWorkbench& workbench) const {
   if (!active())
-    return Result<GuiWorkspace>::failure(workspace_error("Finish Sketch requires an active Sketch workspace"));
+    return Result<std::size_t>::failure(
+        workspace_error("Finish Sketch requires an active Sketch workspace"));
   if (session.task().active() || (stage_ != GuiSketchInteractionStage::Idle &&
                                   stage_ != GuiSketchInteractionStage::Hover))
-    return Result<GuiWorkspace>::failure(
+    return Result<std::size_t>::failure(
         workspace_error("active Sketch command must be committed or cancelled before Finish Sketch"));
 
   auto inspection = workbench.inspect(session, *active_sketch_);
   if (inspection.has_error())
-    return Result<GuiWorkspace>::failure(inspection.error());
+    return Result<std::size_t>::failure(inspection.error());
   if (inspection.value().diagnostics.has_errors())
-    return Result<GuiWorkspace>::failure(
+    return Result<std::size_t>::failure(
         workspace_error("Sketch diagnostics contain errors; repair them before Finish Sketch"));
+  return Result<std::size_t>::success(1U);
+}
+
+Result<GuiWorkspace> GuiSketchWorkspace::finish(GuiDocumentSession& session,
+                                                const GuiSketchWorkbench& workbench) {
+  auto valid = validate_finish(session, workbench);
+  if (valid.has_error())
+    return Result<GuiWorkspace>::failure(valid.error());
+
+  return complete_validated_finish(session);
+}
+
+Result<GuiWorkspace>
+GuiSketchWorkspace::complete_validated_finish(GuiDocumentSession& session) {
+  if (!active())
+    return Result<GuiWorkspace>::failure(
+        workspace_error("Finish Sketch requires an active Sketch workspace"));
+  if (session.task().active())
+    return Result<GuiWorkspace>::failure(
+        workspace_error("active Sketch command must be committed or cancelled before Finish Sketch"));
+
+  const GuiWorkspace restored_workspace = previous_workspace_;
+  const auto restored_selection = previous_selection_;
+  if (!session.set_workspace(restored_workspace))
+    return Result<GuiWorkspace>::failure(workspace_error("could not restore previous workspace"));
+
+  session.selection().clear();
+  for (const auto& selection : restored_selection)
+    (void)session.selection().add(selection);
+  leave_workspace();
+  return Result<GuiWorkspace>::success(restored_workspace);
+}
+
+Result<GuiWorkspace> GuiSketchWorkspace::cancel(GuiDocumentSession& session) {
+  if (!active())
+    return Result<GuiWorkspace>::failure(
+        workspace_error("Cancel Sketch requires an active Sketch workspace"));
+  if (session.task().active() && !session.task().cancel())
+    return Result<GuiWorkspace>::failure(
+        workspace_error("active Sketch command could not be cancelled"));
 
   const GuiWorkspace restored_workspace = previous_workspace_;
   const auto restored_selection = previous_selection_;

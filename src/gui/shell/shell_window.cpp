@@ -1,6 +1,10 @@
 #include "blcad/gui/shell/shell_window.hpp"
 
+#include "blcad/geometry/sketch_finish.hpp"
 #include "blcad/geometry/viewport_scene.hpp"
+#include "blcad/gui/gui_interactive_profile_materialization.hpp"
+#include "blcad/gui/gui_sketch_intent_remap.hpp"
+#include "blcad/gui/shell/shell_feature_tools.hpp"
 #include "blcad/gui/shell/shell_origin.hpp"
 #include "blcad/gui/shell/shell_ribbon.hpp"
 #include "blcad/gui/shell/shell_sketch_tools.hpp"
@@ -8,6 +12,7 @@
 #include <QAbstractItemView>
 #include <QAction>
 #include <QActionGroup>
+#include <QCloseEvent>
 #include <QDockWidget>
 #include <QFileDialog>
 #include <QHeaderView>
@@ -20,8 +25,10 @@
 #include <QTreeWidget>
 #include <QVBoxLayout>
 
+#include <algorithm>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace blcad::gui {
 namespace {
@@ -80,6 +87,135 @@ QTreeWidgetItem* find_item_by_semantic_id(QTreeWidgetItem* item, const QString& 
   return nullptr;
 }
 
+std::optional<ProfileId> unique_profile(const Sketch& sketch) {
+  std::optional<ProfileId> result;
+  std::size_t count = 0U;
+  const auto visit = [&result, &count](const auto& profiles) {
+    for (const auto& profile : profiles) {
+      result = profile.id();
+      ++count;
+    }
+  };
+  visit(sketch.rectangle_profiles());
+  visit(sketch.circle_profiles());
+  visit(sketch.closed_profiles());
+  visit(sketch.arc_closed_profiles());
+  visit(sketch.composite_closed_profiles());
+  return count == 1U ? result : std::nullopt;
+}
+
+std::optional<ProfileId>
+recoverable_profile(const PartDocument& part, const Sketch& sketch,
+                    std::optional<SketchEntityId> selected_entity = std::nullopt) {
+  // Analyze only curves that are not owned by an existing materialized
+  // profile. This lets a later raw contour coexist with older feature-ready
+  // geometry without ever duplicating the older profile.
+  auto analysis = analyze_interactive_raw_profiles(part, sketch);
+  if (analysis.has_error() || !analysis.value().diagnostics.empty())
+    return std::nullopt;
+  std::vector<ProfileId> matches;
+  for (const auto& region : analysis.value().regions) {
+    if (!selected_entity.has_value() ||
+        std::find(region.line_segments.begin(), region.line_segments.end(),
+                  *selected_entity) != region.line_segments.end())
+      matches.push_back(region.id);
+  }
+  return matches.size() == 1U ? std::optional(matches.front()) : std::nullopt;
+}
+
+std::optional<std::pair<SketchId, ProfileId>> browser_profile(std::string_view id) {
+  constexpr std::string_view prefix = "sketch/";
+  if (!id.starts_with(prefix))
+    return std::nullopt;
+  id.remove_prefix(prefix.size());
+  const auto sketch_end = id.find('/');
+  if (sketch_end == std::string_view::npos || sketch_end == 0U)
+    return std::nullopt;
+  const SketchId sketch(std::string(id.substr(0U, sketch_end)));
+  id.remove_prefix(sketch_end + 1U);
+  constexpr std::string_view families[]{"profile/", "rectangle-profile/", "circle-profile/",
+                                        "closed-profile/", "arc-profile/",
+                                        "composite-profile/", "circular-hole-pattern/"};
+  for (const auto family : families)
+    if (id.starts_with(family) && id.size() > family.size())
+      return std::pair{sketch, ProfileId(std::string(id.substr(family.size())))};
+  return std::nullopt;
+}
+
+std::optional<ProfileId> profile_containing_entity(const Sketch& sketch,
+                                                   const SketchEntityId& entity) {
+  std::vector<ProfileId> matches;
+  const auto contains = [&entity](const auto& entities) {
+    return std::find(entities.begin(), entities.end(), entity) != entities.end();
+  };
+  for (const auto& profile : sketch.closed_profiles())
+    if (contains(profile.line_segments()))
+      matches.push_back(profile.id());
+  for (const auto& profile : sketch.arc_closed_profiles())
+    if (contains(profile.curve_segments()))
+      matches.push_back(profile.id());
+  for (const auto& profile : sketch.composite_closed_profiles()) {
+    bool found = contains(profile.outer_contour());
+    for (const auto& contour : profile.inner_contours())
+      found = found || contains(contour);
+    if (found)
+      matches.push_back(profile.id());
+  }
+  std::sort(matches.begin(), matches.end(), [](const auto& left, const auto& right) {
+    return left.value() < right.value();
+  });
+  matches.erase(std::unique(matches.begin(), matches.end()), matches.end());
+  return matches.size() == 1U ? std::optional(matches.front()) : std::nullopt;
+}
+
+std::optional<std::pair<SketchId, ProfileId>>
+feature_profile_for_selection(const PartDocument& part, std::string_view semantic_id) {
+  if (const auto explicit_profile = browser_profile(semantic_id))
+    return explicit_profile;
+
+  const SketchId direct_sketch{std::string(semantic_id)};
+  if (const auto* sketch = part.find_sketch(direct_sketch)) {
+    if (const auto profile = unique_profile(*sketch))
+      return std::pair{direct_sketch, *profile};
+    if (const auto profile = recoverable_profile(part, *sketch))
+      return std::pair{direct_sketch, *profile};
+  }
+
+  constexpr std::string_view prefix = "sketch/";
+  if (!semantic_id.starts_with(prefix))
+    return std::nullopt;
+  semantic_id.remove_prefix(prefix.size());
+  const auto sketch_end = semantic_id.find('/');
+  if (sketch_end == std::string_view::npos || sketch_end == 0U)
+    return std::nullopt;
+  const SketchId sketch_id(std::string(semantic_id.substr(0U, sketch_end)));
+  const auto* sketch = part.find_sketch(sketch_id);
+  if (sketch == nullptr)
+    return std::nullopt;
+  semantic_id.remove_prefix(sketch_end + 1U);
+
+  constexpr std::string_view entity_families[]{"entity/", "line/", "arc/", "spline/"};
+  for (const auto family : entity_families) {
+    if (!semantic_id.starts_with(family) || semantic_id.size() <= family.size())
+      continue;
+    const SketchEntityId entity(std::string(semantic_id.substr(family.size())));
+    if (const auto profile = profile_containing_entity(*sketch, entity))
+      return std::pair{sketch_id, *profile};
+    if (const auto profile = recoverable_profile(part, *sketch, entity))
+      return std::pair{sketch_id, *profile};
+    // An explicitly selected entity must belong to the profile we hand to a
+    // feature. Do not reinterpret an unrelated raw entity as the Sketch's
+    // otherwise unique profile.
+    return std::nullopt;
+  }
+
+  if (const auto profile = unique_profile(*sketch))
+    return std::pair{sketch_id, *profile};
+  if (const auto profile = recoverable_profile(part, *sketch))
+    return std::pair{sketch_id, *profile};
+  return std::nullopt;
+}
+
 } // namespace
 
 ShellWindow::ShellWindow() {
@@ -102,6 +238,8 @@ ShellWindow::ShellWindow() {
   sketch_tools_ = std::make_unique<ShellSketchTools>(*this, session_, sketch_workbench_,
                                                      sketch_workspace_, *viewport_, *ribbon_,
                                                      tab_sketch_);
+  feature_tools_ = std::make_unique<ShellFeatureTools>(
+      *this, session_, sketch_workbench_, *viewport_, *ribbon_, tab_model_);
   statusBar()->showMessage(QStringLiteral("Bereit"));
   refresh();
 }
@@ -116,6 +254,8 @@ void ShellWindow::build_ribbon() {
   // 3D-Modell → Dokument
   auto* document_group = ribbon_->add_group(tab_model_, QStringLiteral("Dokument"));
   action_new_part_ = new QAction(QStringLiteral("Neu"), this);
+  action_new_part_->setShortcut(QKeySequence::New);
+  action_new_part_->setShortcutContext(Qt::WindowShortcut);
   connect(action_new_part_, &QAction::triggered, this, [this] {
     bool accepted = false;
     const QString name = QInputDialog::getText(this, QStringLiteral("Neues Bauteil"),
@@ -126,6 +266,8 @@ void ShellWindow::build_ribbon() {
       (void)new_part(name);
   });
   action_open_ = new QAction(QStringLiteral("Öffnen"), this);
+  action_open_->setShortcut(QKeySequence::Open);
+  action_open_->setShortcutContext(Qt::WindowShortcut);
   connect(action_open_, &QAction::triggered, this, [this] {
     const QString path = QFileDialog::getOpenFileName(
         this, QStringLiteral("BLCAD-Dokument öffnen"), {},
@@ -134,8 +276,12 @@ void ShellWindow::build_ribbon() {
       (void)open_path(path);
   });
   action_save_ = new QAction(QStringLiteral("Speichern"), this);
+  action_save_->setShortcut(QKeySequence::Save);
+  action_save_->setShortcutContext(Qt::WindowShortcut);
   connect(action_save_, &QAction::triggered, this, [this] { (void)save_to({}); });
   action_save_as_ = new QAction(QStringLiteral("Speichern unter"), this);
+  action_save_as_->setShortcut(QKeySequence::SaveAs);
+  action_save_as_->setShortcutContext(Qt::WindowShortcut);
   connect(action_save_as_, &QAction::triggered, this, [this] {
     const QString path = QFileDialog::getSaveFileName(
         this, QStringLiteral("BLCAD-Dokument speichern"), {},
@@ -149,6 +295,12 @@ void ShellWindow::build_ribbon() {
   ribbon_->add_button(document_group, action_open_);
   ribbon_->add_button(document_group, action_save_);
   ribbon_->add_button(document_group, action_save_as_);
+  // Keep the standard document shortcuts active regardless of the visible
+  // ribbon tab or the widget that currently owns keyboard focus.
+  addAction(action_new_part_);
+  addAction(action_open_);
+  addAction(action_save_);
+  addAction(action_save_as_);
 
   // 3D-Modell → Bearbeiten (undo/redo, always available via shortcut)
   auto* edit_group = ribbon_->add_group(tab_model_, QStringLiteral("Bearbeiten"));
@@ -186,7 +338,11 @@ void ShellWindow::build_ribbon() {
   // Ansicht → Navigation
   auto* navigate_group = ribbon_->add_group(tab_view_, QStringLiteral("Navigation"));
   action_fit_ = new QAction(QStringLiteral("Einpassen"), this);
-  connect(action_fit_, &QAction::triggered, this, [this] { viewport_->fit_all(); });
+  connect(action_fit_, &QAction::triggered, this, [this] {
+    viewport_->fit_all();
+    if (feature_tools_)
+      feature_tools_->refresh_presentation();
+  });
   ribbon_->add_button(navigate_group, action_fit_);
   const struct {
     const char* label;
@@ -198,7 +354,11 @@ void ShellWindow::build_ribbon() {
   for (const auto& definition : standard_views) {
     auto* action = new QAction(QString::fromUtf8(definition.label), this);
     const GuiStandardView view = definition.view;
-    connect(action, &QAction::triggered, this, [this, view] { viewport_->set_standard_view(view); });
+    connect(action, &QAction::triggered, this, [this, view] {
+      viewport_->set_standard_view(view);
+      if (feature_tools_)
+        feature_tools_->refresh_presentation();
+    });
     ribbon_->add_button(navigate_group, action);
   }
 
@@ -210,6 +370,8 @@ void ShellWindow::build_ribbon() {
   connect(action_perspective_, &QAction::toggled, this, [this](bool checked) {
     viewport_->set_projection(checked ? GuiViewportProjection::Perspective
                                       : GuiViewportProjection::Orthographic);
+    if (feature_tools_)
+      feature_tools_->refresh_presentation();
   });
   ribbon_->add_button(display_group, action_perspective_);
   auto* display_modes = new QActionGroup(this);
@@ -287,15 +449,9 @@ void ShellWindow::wire_viewport() {
 }
 
 bool ShellWindow::new_part(const QString& name) {
-  if (session_.dirty()) {
-    const auto answer = QMessageBox::question(
-        this, QStringLiteral("Ungespeicherte Änderungen"),
-        QStringLiteral("Änderungen in %1 verwerfen?")
-            .arg(QString::fromStdString(std::string(session_.display_name()))),
-        QMessageBox::Discard | QMessageBox::Cancel, QMessageBox::Cancel);
-    if (answer != QMessageBox::Discard)
-      return false;
-  }
+  if (!confirm_document_replacement())
+    return false;
+  reset_document_interaction();
   const QString id = sanitized_document_id(name, u"part.");
   const auto created = session_.create_part(DocumentId(id.toStdString()), name.toStdString(), true);
   if (created.has_error()) {
@@ -312,6 +468,9 @@ bool ShellWindow::new_part(const QString& name) {
 }
 
 bool ShellWindow::open_path(const QString& path) {
+  if (!confirm_document_replacement())
+    return false;
+  reset_document_interaction();
   const auto opened = session_.open_file(path.toStdString(), true);
   if (opened.has_error()) {
     show_error(opened.error());
@@ -324,8 +483,18 @@ bool ShellWindow::open_path(const QString& path) {
 }
 
 bool ShellWindow::save_to(const QString& path) {
-  const auto saved =
-      path.isEmpty() ? session_.save() : session_.save_as(path.toStdString());
+  QString target = path;
+  if (target.isEmpty() && session_.file_path().empty()) {
+    target = QFileDialog::getSaveFileName(
+        this, QStringLiteral("BLCAD-Dokument speichern"), {},
+        session_.document_kind() == GuiDocumentKind::Project
+            ? QStringLiteral("BLCAD-Projekt (*.blcad.project.json)")
+            : QStringLiteral("BLCAD-Bauteil (*.blcad.json)"));
+    if (target.isEmpty())
+      return false;
+  }
+  const auto saved = target.isEmpty() ? session_.save()
+                                      : session_.save_as(target.toStdString());
   if (saved.has_error()) {
     show_error(saved.error());
     refresh();
@@ -333,6 +502,77 @@ bool ShellWindow::save_to(const QString& path) {
   }
   refresh();
   return true;
+}
+
+bool ShellWindow::confirm_document_replacement() {
+  if (!session_.dirty())
+    return true;
+  const auto answer = QMessageBox::warning(
+      this, QStringLiteral("Ungespeicherte Änderungen"),
+      QStringLiteral("Änderungen in %1 vor dem Fortfahren speichern?")
+          .arg(QString::fromStdString(std::string(session_.display_name()))),
+      QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel,
+      QMessageBox::Save);
+  if (answer == QMessageBox::Save)
+    return save_to({});
+  return answer == QMessageBox::Discard;
+}
+
+void ShellWindow::reset_document_interaction() {
+  if (feature_tools_)
+    feature_tools_->reset();
+  if (sketch_tools_)
+    sketch_tools_->deactivate();
+  if (sketch_workspace_.active()) {
+    const auto cancelled = sketch_workspace_.cancel(session_);
+    if (cancelled.has_error() && session_.task().active())
+      (void)session_.task().cancel();
+  } else if (session_.task().active()) {
+    (void)session_.task().cancel();
+  }
+
+  viewport_->clear_sketch_interaction();
+  viewport_->clear_sketch_focus();
+  if (sketch_camera_bookmark_ && !viewport_->restore_camera_bookmark(*sketch_camera_bookmark_))
+    append_diagnostic(Error::geometry("gui.shell", "could not restore the pre-sketch camera"));
+  viewport_->set_selection_filter_mask(model_selection_filter_mask_);
+  viewport_->unsetCursor();
+  if (action_perspective_ != nullptr)
+    action_perspective_->setChecked(viewport_->projection() ==
+                                    GuiViewportProjection::Perspective);
+  active_sketch_.reset();
+  sketch_camera_bookmark_.reset();
+  selected_semantic_id_.clear();
+  property_semantic_id_.clear();
+  session_.selection().clear();
+  if (ribbon_ != nullptr) {
+    ribbon_->set_tab_enabled(tab_sketch_, false);
+    ribbon_->set_current_tab(tab_model_);
+  }
+}
+
+void ShellWindow::reconcile_active_sketch() {
+  if (!active_sketch_)
+    return;
+  const auto* part = session_.part_document();
+  if (part != nullptr && part->find_sketch(*active_sketch_) != nullptr) {
+    sketch_tools_->activate();
+    return;
+  }
+  reset_document_interaction();
+}
+
+void ShellWindow::closeEvent(QCloseEvent* event) {
+  if (!confirm_document_replacement()) {
+    event->ignore();
+    return;
+  }
+  reset_document_interaction();
+  if (!session_.close(true)) {
+    event->ignore();
+    return;
+  }
+  event->accept();
 }
 
 std::optional<DatumPlaneId> ShellWindow::selected_datum_plane() const {
@@ -381,7 +621,7 @@ bool ShellWindow::enter_sketch(SketchId sketch) {
   }
   if (!viewport_->set_plane_camera(plane.value().origin, plane.value().normal,
                                    plane.value().y_axis)) {
-    (void)sketch_workspace_.finish(session_, sketch_workbench_);
+    (void)sketch_workspace_.cancel(session_);
     sketch_camera_bookmark_.reset();
     show_error(Error::geometry(sketch.value(), "could not orient camera normal to sketch plane"));
     refresh();
@@ -404,12 +644,100 @@ bool ShellWindow::enter_sketch(SketchId sketch) {
 bool ShellWindow::finish_active_sketch() {
   if (!active_sketch_)
     return false;
-  const auto finished = sketch_workspace_.finish(session_, sketch_workbench_);
-  if (finished.has_error()) {
-    show_error(finished.error());
-    return false;
-  }
+  const SketchId finished_sketch = *active_sketch_;
+
+  // Creation tools such as Line and Point deliberately re-arm themselves
+  // after committing geometry. In that state the document already contains
+  // the completed contour, while the workspace owns an empty/incomplete next
+  // command. Finish Sketch is itself an explicit request to leave the editor,
+  // so discard that pending interaction (and any drag preview) before running
+  // the document validation. Otherwise a closed contour drawn with Line could
+  // never be finished until the user happened to press Escape first.
   sketch_tools_->deactivate();
+  while (session_.task().active() && sketch_workspace_.escape(session_)) {
+  }
+  const auto reject_finish = [this](const Error& error) {
+    sketch_tools_->activate();
+    show_error(error);
+    return false;
+  };
+
+  // Validate every workspace/diagnostic precondition before materializing a
+  // profile. This keeps a rejected Finish operation free of document edits.
+  const auto valid_finish = sketch_workspace_.validate_finish(session_, sketch_workbench_);
+  if (valid_finish.has_error())
+    return reject_finish(valid_finish.error());
+
+  // Freehand line chains do not carry a profile record while they are being
+  // authored. Persist every unambiguous bounded region before leaving the
+  // workspace. A single region is handed directly to the feature tools;
+  // multiple regions remain available for an explicit user selection.
+  if (const auto* part = session_.part_document()) {
+    const auto* sketch = part->find_sketch(finished_sketch);
+    if (sketch != nullptr) {
+      // Analyze only curves that are not already owned by a profile. This
+      // handles pure freehand contours as well as line regions drawn next to
+      // an existing circle/rectangle profile.
+      auto analysis = geometry::SketchFinishService::analyze_unmaterialized(*part, *sketch);
+      if (analysis.has_error())
+        return reject_finish(analysis.error());
+      if (!analysis.value().diagnostics.empty()) {
+        const auto kind = analysis.value().diagnostics.front().kind;
+        std::string message;
+        switch (kind) {
+        case geometry::SketchRegionDiagnosticKind::OpenContour:
+          message = "Keine geschlossene Fläche: Die Kontur ist offen. Endpunkte verbinden oder "
+                    "beim Schließen auf den ersten Endpunkt fangen.";
+          break;
+        case geometry::SketchRegionDiagnosticKind::SelfIntersection:
+          message = "Keine geschlossene Fläche: Die Kontur überschneidet sich selbst.";
+          break;
+        case geometry::SketchRegionDiagnosticKind::AmbiguousTopology:
+          message = "Keine geschlossene Fläche: Die Kontur ist verzweigt oder mehrdeutig.";
+          break;
+        }
+        return reject_finish(Error::validation(finished_sketch.value(), std::move(message)));
+      }
+      if (!analysis.value().regions.empty()) {
+        Sketch completed = *sketch;
+        geometry::SketchRegionFinder finder;
+        for (const auto& region : analysis.value().regions) {
+          auto profile = finder.make_closed_profile(region);
+          if (profile.has_error())
+            return reject_finish(profile.error());
+          auto added = completed.add_profile(std::move(profile.value()));
+          if (added.has_error())
+            return reject_finish(added.error());
+        }
+        SketchTopologyMigrationReport migration;
+        auto topology = SketchTopology::migrate_legacy(completed, &migration);
+        if (topology.has_error())
+          return reject_finish(topology.error());
+        auto committed = session_.commit_part_sketch_intent_transaction(
+            "Skizzenprofil materialisieren",
+            [completed = std::move(completed), finished_sketch,
+             migration = std::move(migration)](
+                PartDocument& document,
+                std::vector<SketchConstraintCatalog>& constraint_catalogs,
+                std::vector<SketchDimensionCatalog>& dimension_catalogs) mutable {
+              auto updated = document.update_sketch(std::move(completed));
+              if (updated.has_error())
+                return updated;
+              auto remapped = remap_sketch_intent_catalogs(
+                  document.id(), finished_sketch, migration, constraint_catalogs,
+                  dimension_catalogs);
+              if (remapped.has_error())
+                return remapped;
+              return Result<std::size_t>::success(updated.value() + remapped.value());
+            });
+        if (committed.has_error())
+          return reject_finish(committed.error());
+      }
+    }
+  }
+  const auto finished = sketch_workspace_.complete_validated_finish(session_);
+  if (finished.has_error())
+    return reject_finish(finished.error());
   viewport_->clear_sketch_interaction();
   viewport_->clear_sketch_focus();
   if (sketch_camera_bookmark_ && !viewport_->restore_camera_bookmark(*sketch_camera_bookmark_))
@@ -421,11 +749,32 @@ bool ShellWindow::finish_active_sketch() {
   sketch_camera_bookmark_.reset();
   ribbon_->set_tab_enabled(tab_sketch_, false);
   ribbon_->set_current_tab(tab_model_);
+  std::optional<ProfileId> finished_profile;
+  if (feature_tools_) {
+    const auto* part = session_.part_document();
+    const auto* sketch = part != nullptr ? part->find_sketch(finished_sketch) : nullptr;
+    if (sketch != nullptr)
+      finished_profile = unique_profile(*sketch);
+    feature_tools_->clear_profile_selection();
+  }
   refresh();
+  // A materializing Finish advances the presentation revision. Rebuilding the
+  // viewport can briefly replay its prior selection, so publish the feature
+  // handoff only after that synchronization has completed.
+  if (feature_tools_ && finished_profile.has_value() &&
+      feature_tools_->select_profile(finished_sketch, *finished_profile))
+    statusBar()->showMessage(QStringLiteral("Profil bereit — Extrusion oder Drehung wählen"));
   return true;
 }
 
 bool ShellWindow::undo() {
+  if (feature_tools_ && feature_tools_->active())
+    feature_tools_->cancel();
+  if (active_sketch_ && sketch_tools_) {
+    sketch_tools_->cancel_tool();
+    while (session_.task().active() && sketch_workspace_.escape(session_)) {
+    }
+  }
   if (!session_.can_undo())
     return false;
   const auto result = session_.undo();
@@ -433,15 +782,19 @@ bool ShellWindow::undo() {
     show_error(result.error());
     return false;
   }
-  // The document changed underneath any active sketch tools; resync the scene
-  // and drag handles.
-  if (active_sketch_ && sketch_tools_)
-    sketch_tools_->activate();
+  reconcile_active_sketch();
   refresh();
   return true;
 }
 
 bool ShellWindow::redo() {
+  if (feature_tools_ && feature_tools_->active())
+    feature_tools_->cancel();
+  if (active_sketch_ && sketch_tools_) {
+    sketch_tools_->cancel_tool();
+    while (session_.task().active() && sketch_workspace_.escape(session_)) {
+    }
+  }
   if (!session_.can_redo())
     return false;
   const auto result = session_.redo();
@@ -449,8 +802,7 @@ bool ShellWindow::redo() {
     show_error(result.error());
     return false;
   }
-  if (active_sketch_ && sketch_tools_)
-    sketch_tools_->activate();
+  reconcile_active_sketch();
   refresh();
   return true;
 }
@@ -460,10 +812,18 @@ void ShellWindow::apply_viewport_selection(const std::optional<GuiSelection>& se
     return;
   session_.selection().clear();
   selected_semantic_id_.clear();
+  bool selected_feature_profile = false;
   if (selection) {
     (void)session_.selection().add(*selection);
     selected_semantic_id_ = selection->semantic_id;
+    if (feature_tools_)
+      if (const auto* part = session_.part_document())
+        if (const auto profile = feature_profile_for_selection(*part, selection->semantic_id))
+          selected_feature_profile =
+              feature_tools_->select_profile(profile->first, profile->second);
   }
+  if (feature_tools_ && !selected_feature_profile)
+    feature_tools_->clear_profile_selection();
   synchronize_tree_selection(selected_semantic_id_);
   refresh();
 }
@@ -476,6 +836,7 @@ void ShellWindow::handle_tree_selection(QTreeWidgetItem* current) {
   property_semantic_id_ =
       current != nullptr ? current->data(0, kSemanticIdRole).toString().toStdString()
                          : std::string{};
+  bool selected_feature_profile = false;
   if (current != nullptr) {
     const std::string viewport_id = current->data(0, kViewportIdRole).toString().toStdString();
     selected_semantic_id_ = viewport_id;
@@ -485,11 +846,18 @@ void ShellWindow::handle_tree_selection(QTreeWidgetItem* current) {
     synchronizing_selection_ = false;
     if (const auto& selected = viewport_->selected_semantic())
       (void)session_.selection().add(*selected);
+    if (feature_tools_)
+      if (const auto* part = session_.part_document())
+        if (const auto profile = feature_profile_for_selection(*part, property_semantic_id_))
+          selected_feature_profile =
+              feature_tools_->select_profile(profile->first, profile->second);
   } else {
     synchronizing_selection_ = true;
     viewport_->clear_selection();
     synchronizing_selection_ = false;
   }
+  if (feature_tools_ && !selected_feature_profile)
+    feature_tools_->clear_profile_selection();
   refresh();
 }
 
@@ -567,6 +935,8 @@ void ShellWindow::synchronize_tree_selection(const std::string& viewport_semanti
     for (int index = 0; index < browser_tree_->topLevelItemCount() && found == nullptr; ++index)
       found = find_item_by_viewport_id(browser_tree_->topLevelItem(index), id);
   browser_tree_->setCurrentItem(found);
+  property_semantic_id_ =
+      found != nullptr ? found->data(0, kSemanticIdRole).toString().toStdString() : std::string{};
   synchronizing_selection_ = false;
 }
 
@@ -580,6 +950,7 @@ void ShellWindow::refresh() {
   action_create_sketch_->setEnabled(has_document && !sketch_active &&
                                     selected_datum_plane().has_value());
   action_finish_sketch_->setEnabled(sketch_active);
+  action_perspective_->setEnabled(!sketch_active);
 
   const QString name = has_document
                            ? QString::fromStdString(std::string(session_.display_name()))
@@ -602,6 +973,10 @@ void ShellWindow::refresh() {
   refresh_viewport_scene();
   if (sketch_tools_)
     sketch_tools_->refresh_enablement();
+  if (feature_tools_) {
+    feature_tools_->refresh_enablement();
+    feature_tools_->refresh_presentation();
+  }
 }
 
 void ShellWindow::report_error(const Error& error) {
@@ -667,6 +1042,13 @@ void ShellWindow::refresh_viewport_scene() {
 }
 
 void ShellWindow::append_diagnostic(const Error& error) {
+  const auto& diagnostics = session_.diagnostics();
+  const bool already_recorded =
+      !diagnostics.empty() && diagnostics.back().category == error.category() &&
+      diagnostics.back().object_id == error.object_id() &&
+      diagnostics.back().message == error.message();
+  if (!already_recorded)
+    session_.report_error(error);
   diagnostics_->appendPlainText(diagnostic_line(error));
 }
 

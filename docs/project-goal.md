@@ -81,8 +81,9 @@ the feature edit lifecycle and Core feature-update commands (`docs/gui-feature-e
 Block 130 adds interactive Assembly placement, compatibility-filtered relationships, oriented joint
 frames, and coordinate motion (`docs/gui-interactive-assembly-mvp9.md`). Block 131 adds read-only
 Measure, coverage manifest v2, and integrated acceptance
-(`docs/interactive-modeling-mvp9-acceptance.md`). GUI Shell Reset MVP-9R runs through Blocks 132–136
-(`docs/gui-shell-reset-sequence-mvp9r.md`); STEP Import MVP-10 starts at Block 137.
+(`docs/interactive-modeling-mvp9-acceptance.md`). GUI Shell Reset MVP-9R is implemented through
+Block 135 and runs through Block 136 (`docs/gui-shell-reset-sequence-mvp9r.md`); STEP Import MVP-10
+starts at Block 137.
 
 Development rule:
 
@@ -167,7 +168,8 @@ mini-toolbar, Repeat, ViewCube, Home, and camera-bookmark controls were rendered
 re-establishes them on `ShellWindow` (`docs/gui-shell-reset-sequence-mvp9r.md`).
 
 Block 123 adds `GuiViewportManipulatorLayer` and, until the Block-133 shell reset deleted it,
-`GuiViewportManipulatorShellBinder`; Block 135 replaces that overlay with a shell-owned one. Stable
+`GuiViewportManipulatorShellBinder`; Block 135 replaces that overlay with the shell-owned,
+notification-driven `ShellFeatureTools` component. Stable
 model-space handle frames map pointer rays to signed distances, radii, angles, triad coordinates, and
 pattern values. Presentation and hit tolerances remain fixed in DIP; ties use stable handle ids. Typed
 HUD values override dragging, and release evaluates the exact final pointer sample. The layer emits

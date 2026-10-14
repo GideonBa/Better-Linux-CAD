@@ -7,17 +7,24 @@
 #include "blcad/gui/gui_sketch_interaction.hpp"
 
 #include "blcad/core/sketch.hpp"
+#include "blcad/geometry/sketch_finish.hpp"
 #include "blcad/geometry/viewport_scene.hpp"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 #include <QApplication>
+#include <QKeyEvent>
 #include <QMouseEvent>
+#include <QStatusBar>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <iterator>
 #include <string>
+#include <string_view>
+#include <vector>
 
 using namespace blcad;
 using namespace blcad::gui;
@@ -33,8 +40,7 @@ void enter_sketch(ShellWindow& window) {
 }
 
 [[nodiscard]] SketchTopology topology_of(ShellWindow& window) {
-  const auto* sketch =
-      window.session().part_document()->find_sketch(*window.active_sketch());
+  const auto* sketch = window.session().part_document()->find_sketch(*window.active_sketch());
   REQUIRE(sketch != nullptr);
   auto topology = SketchTopology::migrate_legacy(*sketch);
   REQUIRE(topology);
@@ -76,6 +82,37 @@ bool near(Point2 point, Point2 expected) {
   return std::hypot(point.x - expected.x, point.y - expected.y) <= 1.0e-6;
 }
 
+std::size_t automatic_point_on_object_count(ShellWindow& window,
+                                            std::string_view trimmed_entity, Point2 endpoint,
+                                            std::string_view cutter_entity) {
+  const SketchId sketch_id = *window.active_sketch();
+  const Sketch* sketch = window.session().part_document()->find_sketch(sketch_id);
+  REQUIRE(sketch != nullptr);
+  auto topology = SketchTopology::migrate_legacy(*sketch);
+  REQUIRE(topology);
+  const SketchTopologyEntity* entity = topology.value().find_entity(trimmed_entity);
+  REQUIRE(entity != nullptr);
+  std::vector<std::string> points;
+  for (const auto& point_id : entity->points()) {
+    const SketchTopologyPoint* point = topology.value().find_point(point_id);
+    REQUIRE(point != nullptr);
+    if (near(point->position(), endpoint))
+      points.push_back(point_id.value());
+  }
+  REQUIRE(points.size() == 1U);
+
+  const auto catalog = window.session().sketch_constraint_catalog(sketch_id);
+  REQUIRE(catalog);
+  return static_cast<std::size_t>(std::count_if(
+      catalog.value().constraints().begin(), catalog.value().constraints().end(),
+      [&](const auto& intent) {
+        return intent.kind() == SketchSolverConstraintKind::PointOnObject &&
+               intent.source() == SketchConstraintIntentSource::Automatic &&
+               intent.targets().size() == 2U && intent.targets()[0].id() == points.front() &&
+               intent.targets()[1].id() == cutter_entity;
+      }));
+}
+
 // Circumradius of the arc's 3 defining points.
 double arc_radius(Point2 a, Point2 b, Point2 c) {
   const double ab = std::hypot(a.x - b.x, a.y - b.y);
@@ -83,6 +120,166 @@ double arc_radius(Point2 a, Point2 b, Point2 c) {
   const double ca = std::hypot(c.x - a.x, c.y - a.y);
   const double area = std::abs((b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)) * 0.5;
   return area <= 1.0e-12 ? 0.0 : (ab * bc * ca) / (4.0 * area);
+}
+
+void move_sketch_pointer(OcctViewport& viewport, GuiSketchScreenPoint point) {
+  const QPointF local(point.x, point.y);
+  const QPointF global(viewport.mapToGlobal(local.toPoint()));
+  QMouseEvent move(QEvent::MouseMove, local, global, Qt::NoButton, Qt::NoButton, Qt::NoModifier);
+  QApplication::sendEvent(&viewport, &move);
+  qApp->processEvents();
+}
+
+void click_sketch_pointer(OcctViewport& viewport, GuiSketchScreenPoint point) {
+  const QPointF local(point.x, point.y);
+  const QPointF global(viewport.mapToGlobal(local.toPoint()));
+  QMouseEvent press(QEvent::MouseButtonPress, local, global, Qt::LeftButton, Qt::LeftButton,
+                    Qt::NoModifier);
+  QApplication::sendEvent(&viewport, &press);
+  QMouseEvent release(QEvent::MouseButtonRelease, local, global, Qt::LeftButton, Qt::NoButton,
+                      Qt::NoModifier);
+  QApplication::sendEvent(&viewport, &release);
+  qApp->processEvents();
+}
+
+void press_sketch_pointer(OcctViewport& viewport, GuiSketchScreenPoint point) {
+  const QPointF local(point.x, point.y);
+  const QPointF global(viewport.mapToGlobal(local.toPoint()));
+  QMouseEvent press(QEvent::MouseButtonPress, local, global, Qt::LeftButton, Qt::LeftButton,
+                    Qt::NoModifier);
+  QApplication::sendEvent(&viewport, &press);
+  qApp->processEvents();
+}
+
+void drag_sketch_pointer(OcctViewport& viewport, GuiSketchScreenPoint point,
+                         Qt::MouseButtons buttons = Qt::LeftButton) {
+  const QPointF local(point.x, point.y);
+  const QPointF global(viewport.mapToGlobal(local.toPoint()));
+  QMouseEvent move(QEvent::MouseMove, local, global, Qt::NoButton, buttons, Qt::NoModifier);
+  QApplication::sendEvent(&viewport, &move);
+  qApp->processEvents();
+}
+
+void release_sketch_pointer(OcctViewport& viewport, GuiSketchScreenPoint point) {
+  const QPointF local(point.x, point.y);
+  const QPointF global(viewport.mapToGlobal(local.toPoint()));
+  QMouseEvent release(QEvent::MouseButtonRelease, local, global, Qt::LeftButton, Qt::NoButton,
+                      Qt::NoModifier);
+  QApplication::sendEvent(&viewport, &release);
+  qApp->processEvents();
+}
+
+void press_escape(ShellWindow& window) {
+  QKeyEvent escape(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier);
+  QApplication::sendEvent(&window, &escape);
+  qApp->processEvents();
+}
+
+struct SeedLine {
+  std::string id;
+  Point2 start;
+  Point2 end;
+};
+
+void seed_lines(ShellWindow& window, std::vector<SeedLine> lines) {
+  const SketchId id = *window.active_sketch();
+  REQUIRE(window.session().commit_part_transaction(
+      "Seed stroke lines",
+      [id, lines = std::move(lines)](PartDocument& part) mutable -> Result<std::size_t> {
+        const Sketch* source = part.find_sketch(id);
+        if (source == nullptr)
+          return Result<std::size_t>::failure(Error::validation(id.value(), "no sketch"));
+        Sketch sketch = *source;
+        for (const auto& line : lines) {
+          auto entity = LineSegment::create(SketchEntityId(line.id), line.start, line.end);
+          if (entity.has_error())
+            return Result<std::size_t>::failure(entity.error());
+          auto added = sketch.add_entity(std::move(entity.value()));
+          if (added.has_error())
+            return added;
+        }
+        return part.update_sketch(std::move(sketch));
+      }));
+  window.refresh();
+  window.sketch_tools().publish_scene();
+  qApp->processEvents();
+}
+
+void verify_pointer_drawn_line_region(double close_offset_dip) {
+  ShellWindow window;
+  window.show();
+  qApp->processEvents();
+  enter_sketch(window);
+  auto& viewport = window.viewport();
+  auto& tools = window.sketch_tools();
+
+  // Keep the contour well away from the origin axes so this regression
+  // isolates endpoint-vs-curve snapping rather than axis magnetism.
+  const std::array<Point2, 4U> corners{{{50.0, 50.0}, {100.0, 50.0}, {100.0, 90.0}, {50.0, 90.0}}};
+  REQUIRE(tools.begin_tool(GuiSketchCreateTool::Line));
+  // A committed segment republishes the scene and can change the view fit.
+  // Resolve each subsequent model point through the current mapping, just as
+  // a user follows the geometry at its freshly painted screen position.
+  for (const auto corner : corners) {
+    const auto mapped = viewport.sketch_plane_to_screen(corner);
+    REQUIRE(mapped);
+    click_sketch_pointer(viewport, mapped.value());
+  }
+
+  const auto first_screen = viewport.sketch_plane_to_screen(corners[0]);
+  const auto second_screen = viewport.sketch_plane_to_screen(corners[1]);
+  REQUIRE(first_screen);
+  REQUIRE(second_screen);
+
+  const double dx = second_screen.value().x - first_screen.value().x;
+  const double dy = second_screen.value().y - first_screen.value().y;
+  const double length = std::hypot(dx, dy);
+  REQUIRE(length > close_offset_dip);
+  const GuiSketchScreenPoint close{first_screen.value().x + close_offset_dip * dx / length,
+                                   first_screen.value().y + close_offset_dip * dy / length};
+  move_sketch_pointer(viewport, close);
+  REQUIRE(viewport.sketch_snap_result().has_value());
+  INFO("closure offset=" << close_offset_dip
+                         << " snap=" << to_string(viewport.sketch_snap_result()->kind)
+                         << " candidate=" << viewport.sketch_snap_result()->candidate_id
+                         << " screen-distance="
+                         << viewport.sketch_snap_result()->screen_distance_dip);
+  CHECK(viewport.sketch_snap_result()->kind == GuiSketchSnapKind::Endpoint);
+  click_sketch_pointer(viewport, close);
+
+  const SketchId sketch_id = *window.active_sketch();
+  const auto* raw = window.session().part_document()->find_sketch(sketch_id);
+  REQUIRE(raw != nullptr);
+  REQUIRE(raw->line_segments().size() == 4U);
+  const auto analysis =
+      geometry::SketchFinishService::analyze(*window.session().part_document(), *raw);
+  REQUIRE(analysis);
+  INFO("regions=" << analysis.value().regions.size()
+                  << " diagnostics=" << analysis.value().diagnostics.size());
+  REQUIRE(analysis.value().diagnostics.empty());
+  REQUIRE(analysis.value().regions.size() == 1U);
+  const ProfileId expected_profile = analysis.value().regions.front().id;
+
+  REQUIRE(window.finish_active_sketch());
+  const auto* finished = window.session().part_document()->find_sketch(sketch_id);
+  REQUIRE(finished != nullptr);
+  REQUIRE(finished->closed_profiles().size() == 1U);
+  CHECK(finished->closed_profiles().front().id() == expected_profile);
+
+  REQUIRE(window.session().part_shape_cache() != nullptr);
+  const auto scene = geometry::ViewportSceneBuilder{}.build_part(
+      *window.session().part_document(), *window.session().part_shape_cache());
+  REQUIRE(scene);
+  const std::string expected_semantic =
+      "sketch/" + sketch_id.value() + "/profile/" + expected_profile.value();
+  const auto profile_item = std::find_if(
+      scene.value().begin(), scene.value().end(),
+      [&expected_semantic](const auto& item) { return item.semantic_id == expected_semantic; });
+  REQUIRE(profile_item != scene.value().end());
+  CHECK(profile_item->kind == geometry::ViewportSceneKind::SketchEntity);
+  REQUIRE(viewport.select_semantic(expected_semantic));
+  REQUIRE(viewport.selected_semantic().has_value());
+  CHECK(viewport.selected_semantic()->semantic_id == expected_semantic);
 }
 
 } // namespace
@@ -114,6 +311,42 @@ TEST_CASE("Block 134 line tool commits an entity through the shell tool surface"
   tools.cancel_tool(); // Escape ends the chain
   CHECK_FALSE(tools.tool_active());
   CHECK(topology_of(window).entities().size() == 2U);
+}
+
+TEST_CASE("Line pointer clicks publish a selectable profile face when the loop closes exactly",
+          "[gui][shell-sketch][gui][line-region-regression]") {
+  verify_pointer_drawn_line_region(0.0);
+}
+
+TEST_CASE("Line pointer endpoint snap closes a visually closed loop",
+          "[gui][shell-sketch][gui][line-region-regression][snap]") {
+  // Four DIPs is visibly on the endpoint marker and inside the ten-DIP snap
+  // tolerance.  A curve-nearest candidate must not steal this closure.
+  verify_pointer_drawn_line_region(4.0);
+}
+
+TEST_CASE("Finish Sketch keeps a genuinely open line contour editable",
+          "[gui][shell-sketch][gui][line-region-regression][sketch-finish]") {
+  ShellWindow window;
+  enter_sketch(window);
+  const SketchId sketch_id = *window.active_sketch();
+  auto& tools = window.sketch_tools();
+  REQUIRE(tools.begin_tool(GuiSketchCreateTool::Line));
+  REQUIRE(tools.add_pick({50.0, 50.0}));
+  REQUIRE(tools.add_pick({100.0, 50.0}));
+  REQUIRE(tools.add_pick({100.0, 90.0}));
+  REQUIRE(tools.add_pick({50.0, 90.0}));
+  // Deliberately bypass pointer snapping to model a real remaining gap.
+  REQUIRE(tools.add_pick({50.5, 50.0}));
+
+  REQUIRE_FALSE(window.finish_active_sketch());
+  REQUIRE(window.active_sketch().has_value());
+  CHECK(*window.active_sketch() == sketch_id);
+  const auto* sketch = window.session().part_document()->find_sketch(sketch_id);
+  REQUIRE(sketch != nullptr);
+  CHECK(sketch->profile_count() == 0U);
+  CHECK(window.statusBar()->currentMessage().contains(QStringLiteral("Kontur ist offen")));
+  CHECK(window.viewport().sketch_interaction_active());
 }
 
 TEST_CASE("Block 134 constraints apply and remove end-to-end from the tool surface",
@@ -178,20 +411,19 @@ TEST_CASE("Block 134 dimensions apply reference and driving with edit",
   CHECK(catalog.value().dimensions().size() == 1U);
 
   // Driving dimension binds a Length parameter and edits to a new literal.
-  REQUIRE(window.session().commit_part_transaction(
-      "Parameter anlegen", [](PartDocument& part) {
-        auto quantity = Quantity::length_mm(25.0, "parameter.laenge");
-        if (quantity.has_error())
-          return Result<std::size_t>::failure(quantity.error());
-        auto parameter = Parameter::create_length(ParameterId("parameter.laenge"), "laenge",
-                                                  quantity.value());
-        if (parameter.has_error())
-          return Result<std::size_t>::failure(parameter.error());
-        return part.add_parameter(std::move(parameter.value()));
-      }));
+  REQUIRE(window.session().commit_part_transaction("Parameter anlegen", [](PartDocument& part) {
+    auto quantity = Quantity::length_mm(25.0, "parameter.laenge");
+    if (quantity.has_error())
+      return Result<std::size_t>::failure(quantity.error());
+    auto parameter =
+        Parameter::create_length(ParameterId("parameter.laenge"), "laenge", quantity.value());
+    if (parameter.has_error())
+      return Result<std::size_t>::failure(parameter.error());
+    return part.add_parameter(std::move(parameter.value()));
+  }));
   select_first_entity(window);
-  REQUIRE(tools.apply_dimension(SketchDimensionKind::Length, false,
-                                ParameterId("parameter.laenge")));
+  REQUIRE(
+      tools.apply_dimension(SketchDimensionKind::Length, false, ParameterId("parameter.laenge")));
   catalog = window.session().sketch_dimension_catalog(*window.active_sketch());
   REQUIRE(catalog);
   REQUIRE(catalog.value().dimensions().size() == 2U);
@@ -254,8 +486,7 @@ TEST_CASE("Block 134 dimensions work through the real viewport click path",
 
   INFO("selection count: " << window.session().selection().entries().size());
   REQUIRE_FALSE(window.session().selection().entries().empty());
-  INFO("selected: " << window.session().selection().entries().front().semantic_id
-                    << " candidate: "
+  INFO("selected: " << window.session().selection().entries().front().semantic_id << " candidate: "
                     << window.session().selection().entries().front().candidate_id);
   const auto applied = tools.apply_dimension(SketchDimensionKind::Length, false);
   if (applied.has_error())
@@ -285,19 +516,19 @@ TEST_CASE("Block 134 circle and rectangle tools commit visible scene items",
   const auto* sketch = part->find_sketch(*window.active_sketch());
   REQUIRE(sketch != nullptr);
   REQUIRE(sketch->circle_profiles().size() == 1U);
-  // Rectangles commit as four line entities (already visible).
+  // Rectangles commit as four line entities and one selectable ClosedProfile.
   CHECK(sketch->line_segments().size() == 4U);
+  REQUIRE(sketch->closed_profiles().size() == 1U);
 
-  // The viewport scene renders the circle profile (regression: circles used
-  // to commit invisibly).
+  // The viewport scene renders both materialized profiles under profile ids.
   REQUIRE(window.session().part_shape_cache() != nullptr);
-  auto scene = geometry::ViewportSceneBuilder{}.build_part(
-      *part, *window.session().part_shape_cache());
+  auto scene =
+      geometry::ViewportSceneBuilder{}.build_part(*part, *window.session().part_shape_cache());
   REQUIRE(scene);
   const std::string prefix = "sketch/" + window.active_sketch()->value() + "/profile/";
   CHECK(std::count_if(scene.value().begin(), scene.value().end(), [&prefix](const auto& item) {
           return item.semantic_id.rfind(prefix, 0U) == 0U;
-        }) == 1);
+        }) == 2);
 }
 
 TEST_CASE("Block 134 sketch ribbon exposes draw constraint dimension and grid groups",
@@ -325,8 +556,7 @@ TEST_CASE("Ändern: fillet on two selected curves inserts a tangent arc",
 
   const auto applied = tools.apply_fillet(2.0);
   REQUIRE(applied);
-  const auto* sketch =
-      window.session().part_document()->find_sketch(*window.active_sketch());
+  const auto* sketch = window.session().part_document()->find_sketch(*window.active_sketch());
   REQUIRE(sketch != nullptr);
   CHECK(sketch->arc_segments().size() == 1U);
   const auto* trimmed = sketch->find_line_segment(SketchEntityId("line.h"));
@@ -347,8 +577,7 @@ TEST_CASE("Ändern: chamfer on two selected curves inserts a connecting line",
 
   const auto applied = tools.apply_chamfer(3.0);
   REQUIRE(applied);
-  const auto* sketch =
-      window.session().part_document()->find_sketch(*window.active_sketch());
+  const auto* sketch = window.session().part_document()->find_sketch(*window.active_sketch());
   REQUIRE(sketch != nullptr);
   CHECK(sketch->line_segments().size() == 3U); // two trimmed lines + the chamfer
 
@@ -366,12 +595,244 @@ TEST_CASE("Ändern: trim shortens a line at the picked intersection",
 
   const auto applied = tools.apply_modify_pick(SketchModifyKind::Trim, "line.h", {8.0, 0.0});
   REQUIRE(applied);
-  const auto* sketch =
-      window.session().part_document()->find_sketch(*window.active_sketch());
+  const auto* sketch = window.session().part_document()->find_sketch(*window.active_sketch());
   REQUIRE(sketch != nullptr);
   const auto* trimmed = sketch->find_line_segment(SketchEntityId("line.h"));
   REQUIRE(trimmed != nullptr);
   CHECK(near(trimmed->end(), {4.0, 0.0}));
+}
+
+TEST_CASE("Ändern: trim accepts spline entities through the shell",
+          "[gui][shell-sketch][gui][sketch-modify]") {
+  ShellWindow window;
+  enter_sketch(window);
+  auto& tools = window.sketch_tools();
+  const SketchId sketch_id = *window.active_sketch();
+  REQUIRE(window.session().commit_part_transaction(
+      "Seed spline", [sketch_id](PartDocument& part) -> Result<std::size_t> {
+        const Sketch* source = part.find_sketch(sketch_id);
+        if (source == nullptr)
+          return Result<std::size_t>::failure(Error::validation(sketch_id.value(), "no sketch"));
+        Sketch candidate = *source;
+        auto spline = SplineSegment::create_cubic_bezier(
+            SketchEntityId("spline.trim"), {0.0, 0.0}, {3.0, 0.0}, {7.0, 0.0}, {10.0, 0.0});
+        if (spline.has_error()) return Result<std::size_t>::failure(spline.error());
+        auto added = candidate.add_entity(std::move(spline.value()));
+        if (added.has_error()) return added;
+        return part.update_sketch(std::move(candidate));
+      }));
+
+  REQUIRE(tools.apply_modify_pick(SketchModifyKind::Trim, "spline.trim", {5.0, 0.0}));
+  const Sketch* trimmed = window.session().part_document()->find_sketch(sketch_id);
+  REQUIRE(trimmed != nullptr);
+  CHECK(trimmed->spline_segments().empty());
+
+  REQUIRE(window.undo());
+  const Sketch* restored = window.session().part_document()->find_sketch(sketch_id);
+  REQUIRE(restored != nullptr);
+  CHECK(restored->spline_segments().size() == 1U);
+}
+
+TEST_CASE("Ändern: trim removes a generated rectangle edge and stale intents atomically",
+          "[gui][shell-sketch][gui][sketch-modify][profile-trim]") {
+  ShellWindow window;
+  enter_sketch(window);
+  auto& tools = window.sketch_tools();
+  const SketchId sketch_id = *window.active_sketch();
+
+  REQUIRE(tools.begin_tool(GuiSketchCreateTool::CornerRectangle));
+  REQUIRE(tools.add_pick({0.0, 0.0}));
+  REQUIRE(tools.add_pick({30.0, 20.0}));
+
+  const Sketch* rectangle = window.session().part_document()->find_sketch(sketch_id);
+  REQUIRE(rectangle != nullptr);
+  REQUIRE(rectangle->line_segments().size() == 4U);
+  REQUIRE(rectangle->closed_profiles().size() == 1U);
+  const SketchEntityId removed_line = rectangle->closed_profiles().front().line_segments()[0];
+  const SketchEntityId stable_line = rectangle->closed_profiles().front().line_segments()[2];
+  const auto removed_target =
+      SketchConstraintIntentTarget::entity("entity/" + removed_line.value());
+  const auto stable_target = SketchConstraintIntentTarget::entity("entity/" + stable_line.value());
+  REQUIRE(removed_target);
+  REQUIRE(stable_target);
+  auto removed_horizontal = SketchConstraintIntent::create(
+      SketchConstraintId("constraint.rectangle.removed"), SketchSolverConstraintKind::Horizontal,
+      {removed_target.value()});
+  auto stable_horizontal = SketchConstraintIntent::create(
+      SketchConstraintId("constraint.rectangle.stable"), SketchSolverConstraintKind::Horizontal,
+      {stable_target.value()});
+  auto removed_length = SketchDimensionIntent::create(
+      SketchDimensionId("dimension.rectangle.removed"), SketchDimensionKind::Length,
+      SketchDimensionMode::Reference, {removed_target.value()});
+  auto stable_length = SketchDimensionIntent::create(
+      SketchDimensionId("dimension.rectangle.stable"), SketchDimensionKind::Length,
+      SketchDimensionMode::Reference, {stable_target.value()});
+  REQUIRE(removed_horizontal);
+  REQUIRE(stable_horizontal);
+  REQUIRE(removed_length);
+  REQUIRE(stable_length);
+
+  const std::size_t generated_constraint_count =
+      window.session().sketch_constraint_catalog(sketch_id).value().constraints().size();
+  REQUIRE(window.session().commit_part_sketch_intent_transaction(
+      "Seed rectangle trim intents",
+      [removed_horizontal = std::move(removed_horizontal.value()),
+       stable_horizontal = std::move(stable_horizontal.value()),
+       removed_length = std::move(removed_length.value()),
+       stable_length = std::move(stable_length.value()), sketch_id](
+          PartDocument& part, std::vector<SketchConstraintCatalog>& constraint_catalogs,
+          std::vector<SketchDimensionCatalog>& dimension_catalogs) mutable
+          -> Result<std::size_t> {
+        auto constraint_entry = std::find_if(
+            constraint_catalogs.begin(), constraint_catalogs.end(),
+            [&sketch_id](const auto& catalog) { return catalog.sketch() == sketch_id; });
+        if (constraint_entry == constraint_catalogs.end()) {
+          auto catalog = SketchConstraintCatalog::create(part.id(), sketch_id);
+          if (catalog.has_error()) return Result<std::size_t>::failure(catalog.error());
+          constraint_catalogs.push_back(std::move(catalog.value()));
+          constraint_entry = std::prev(constraint_catalogs.end());
+        }
+        auto added = constraint_entry->add(std::move(removed_horizontal));
+        if (added.has_error()) return Result<std::size_t>::failure(added.error());
+        added = constraint_entry->add(std::move(stable_horizontal));
+        if (added.has_error()) return Result<std::size_t>::failure(added.error());
+
+        auto dimension_entry = std::find_if(
+            dimension_catalogs.begin(), dimension_catalogs.end(),
+            [&sketch_id](const auto& catalog) { return catalog.sketch() == sketch_id; });
+        if (dimension_entry == dimension_catalogs.end()) {
+          auto catalog = SketchDimensionCatalog::create(part.id(), sketch_id);
+          if (catalog.has_error()) return Result<std::size_t>::failure(catalog.error());
+          dimension_catalogs.push_back(std::move(catalog.value()));
+          dimension_entry = std::prev(dimension_catalogs.end());
+        }
+        added = dimension_entry->add(std::move(removed_length));
+        if (added.has_error()) return Result<std::size_t>::failure(added.error());
+        added = dimension_entry->add(std::move(stable_length));
+        if (added.has_error()) return Result<std::size_t>::failure(added.error());
+        return Result<std::size_t>::success(4U);
+      }));
+
+  rectangle = window.session().part_document()->find_sketch(sketch_id);
+  REQUIRE(rectangle != nullptr);
+  const LineSegment* target = rectangle->find_line_segment(removed_line);
+  REQUIRE(target != nullptr);
+  const Point2 pick{(target->start().x + target->end().x) * 0.5,
+                    (target->start().y + target->end().y) * 0.5};
+  REQUIRE(tools.apply_modify_pick(SketchModifyKind::Trim, removed_line.value(), pick));
+
+  const Sketch* trimmed = window.session().part_document()->find_sketch(sketch_id);
+  REQUIRE(trimmed != nullptr);
+  CHECK(trimmed->line_segments().size() == 3U);
+  CHECK(trimmed->closed_profiles().empty());
+  CHECK(trimmed->find_line_segment(stable_line) != nullptr);
+  const auto constraints_after = window.session().sketch_constraint_catalog(sketch_id);
+  const auto dimensions_after = window.session().sketch_dimension_catalog(sketch_id);
+  REQUIRE(constraints_after);
+  REQUIRE(dimensions_after);
+  CHECK(constraints_after.value().find(SketchConstraintId("constraint.rectangle.removed")) ==
+        nullptr);
+  CHECK(constraints_after.value().find(SketchConstraintId("constraint.rectangle.stable")) !=
+        nullptr);
+  CHECK(dimensions_after.value().find(SketchDimensionId("dimension.rectangle.removed")) == nullptr);
+  CHECK(dimensions_after.value().find(SketchDimensionId("dimension.rectangle.stable")) != nullptr);
+
+  // Geometry, profile removal, and both intent catalogs are one undo record.
+  REQUIRE(window.undo());
+  const Sketch* restored = window.session().part_document()->find_sketch(sketch_id);
+  REQUIRE(restored != nullptr);
+  CHECK(restored->line_segments().size() == 4U);
+  CHECK(restored->closed_profiles().size() == 1U);
+  CHECK(window.session().sketch_constraint_catalog(sketch_id).value().constraints().size() ==
+        generated_constraint_count + 2U);
+  CHECK(window.session().sketch_dimension_catalog(sketch_id).value().dimensions().size() == 2U);
+}
+
+TEST_CASE("Ändern: trim removes one generated slot arc and its profile container",
+          "[gui][shell-sketch][gui][sketch-modify][profile-trim]") {
+  ShellWindow window;
+  enter_sketch(window);
+  auto& tools = window.sketch_tools();
+  const SketchId sketch_id = *window.active_sketch();
+
+  REQUIRE(tools.begin_tool(GuiSketchCreateTool::CenterSlot));
+  REQUIRE(tools.add_pick({0.0, 0.0}));
+  REQUIRE(tools.add_pick({30.0, 0.0}));
+  REQUIRE(tools.add_pick({0.0, 5.0}));
+
+  const Sketch* slot = window.session().part_document()->find_sketch(sketch_id);
+  REQUIRE(slot != nullptr);
+  REQUIRE(slot->line_segments().size() == 2U);
+  REQUIRE(slot->arc_segments().size() == 2U);
+  REQUIRE(slot->arc_closed_profiles().size() == 1U);
+  const SketchEntityId target_id = slot->arc_segments().front().id();
+  const Point2 pick = slot->arc_segments().front().mid();
+  REQUIRE(tools.apply_modify_pick(SketchModifyKind::Trim, target_id.value(), pick));
+
+  const Sketch* trimmed = window.session().part_document()->find_sketch(sketch_id);
+  REQUIRE(trimmed != nullptr);
+  CHECK(trimmed->line_segments().size() == 2U);
+  CHECK(trimmed->arc_segments().size() == 1U);
+  CHECK(trimmed->arc_closed_profiles().empty());
+
+  REQUIRE(window.undo());
+  const Sketch* restored = window.session().part_document()->find_sketch(sketch_id);
+  REQUIRE(restored != nullptr);
+  CHECK(restored->line_segments().size() == 2U);
+  CHECK(restored->arc_segments().size() == 2U);
+  CHECK(restored->arc_closed_profiles().size() == 1U);
+}
+
+TEST_CASE("Ändern: trim turns a picked circle profile into its surviving arc",
+          "[gui][shell-sketch][gui][sketch-modify][profile-trim]") {
+  ShellWindow window;
+  enter_sketch(window);
+  auto& tools = window.sketch_tools();
+  const SketchId sketch_id = *window.active_sketch();
+
+  REQUIRE(tools.begin_tool(GuiSketchCreateTool::CenterRadiusCircle));
+  REQUIRE(tools.add_pick({0.0, 0.0}));
+  REQUIRE(tools.add_pick({10.0, 0.0}));
+  REQUIRE(tools.begin_tool(GuiSketchCreateTool::Line));
+  REQUIRE(tools.add_pick({0.0, -20.0}));
+  REQUIRE(tools.add_pick({0.0, 20.0}));
+
+  const Sketch* source = window.session().part_document()->find_sketch(sketch_id);
+  REQUIRE(source != nullptr);
+  REQUIRE(source->circle_profiles().size() == 1U);
+  REQUIRE(source->line_segments().size() == 1U);
+
+  // Exercise the modal viewport-hit path as a user would. Forty-five degrees
+  // lies on an exact interaction-scene sample but not on a quadrant point, so
+  // the hit resolves to the CircleProfile curve rather than a snap point.
+  tools.begin_modify_tool(SketchModifyKind::Trim);
+  const double diagonal = std::sqrt(50.0);
+  const auto screen = window.viewport().sketch_plane_to_screen({diagonal, diagonal});
+  REQUIRE(screen);
+  click_sketch_pointer(window.viewport(), screen.value());
+  REQUIRE(window.viewport().hovered_sketch_hit().has_value());
+  INFO("hover semantic: " << window.viewport().hovered_sketch_hit()->semantic_id);
+  INFO("hover kind: " << to_string(window.viewport().hovered_sketch_hit()->kind));
+
+  const Sketch* trimmed = window.session().part_document()->find_sketch(sketch_id);
+  REQUIRE(trimmed != nullptr);
+  INFO("modify status: " << window.statusBar()->currentMessage().toStdString());
+  CHECK(trimmed->circle_profiles().empty());
+  CHECK(trimmed->line_segments().size() == 1U);
+  REQUIRE(trimmed->arc_segments().size() == 1U);
+  const ArcSegment& remainder = trimmed->arc_segments().front();
+  const bool endpoints_ok =
+      (near(remainder.start(), {0.0, 10.0}) && near(remainder.end(), {0.0, -10.0})) ||
+      (near(remainder.start(), {0.0, -10.0}) && near(remainder.end(), {0.0, 10.0}));
+  CHECK(endpoints_ok);
+  CHECK(near(remainder.mid(), {-10.0, 0.0}));
+
+  REQUIRE(window.undo());
+  const Sketch* restored = window.session().part_document()->find_sketch(sketch_id);
+  REQUIRE(restored != nullptr);
+  CHECK(restored->circle_profiles().size() == 1U);
+  CHECK(restored->arc_segments().empty());
+  CHECK(restored->line_segments().size() == 1U);
 }
 
 TEST_CASE("Ändern: split divides a line and the modal tool arms then disarms",
@@ -388,12 +849,212 @@ TEST_CASE("Ändern: split divides a line and the modal tool arms then disarms",
 
   const auto applied = tools.apply_modify_pick(SketchModifyKind::Split, "line.h", {6.0, 0.0});
   REQUIRE(applied);
-  const auto* sketch =
-      window.session().part_document()->find_sketch(*window.active_sketch());
+  const auto* sketch = window.session().part_document()->find_sketch(*window.active_sketch());
   REQUIRE(sketch != nullptr);
   CHECK(sketch->line_segments().size() == 3U); // line.h split in two + untouched second line
 }
 
+TEST_CASE("Ändern: trim accepts clicks and an LMB stroke without retrimming a crossing",
+          "[gui][shell-sketch][sketch-modify][trim-stroke]") {
+  ShellWindow window;
+  window.show();
+  qApp->processEvents();
+  enter_sketch(window);
+  seed_lines(window, {{"stroke.low", {0.0, -10.0}, {16.0, -10.0}},
+                      {"stroke.middle", {0.0, 0.0}, {16.0, 0.0}},
+                      {"stroke.high", {0.0, 10.0}, {16.0, 10.0}},
+                      {"stroke.boundary", {8.0, -16.0}, {8.0, 16.0}}});
+  auto& tools = window.sketch_tools();
+  auto& viewport = window.viewport();
+
+  tools.begin_modify_tool(SketchModifyKind::Trim);
+  REQUIRE(tools.modify_tool_active());
+  CHECK_FALSE(viewport.sketch_selection_enabled());
+
+  // The paint gesture may begin in empty space. One coalesced move then crosses
+  // two thin curves; both must still be found along the travelled segment.
+  auto screen = viewport.sketch_plane_to_screen({15.0, -20.0});
+  REQUIRE(screen);
+  press_sketch_pointer(viewport, screen.value());
+
+  const SketchId sketch_id = *window.active_sketch();
+  const Sketch* sketch = window.session().part_document()->find_sketch(sketch_id);
+  REQUIRE(sketch != nullptr);
+  const LineSegment* low = sketch->find_line_segment(SketchEntityId("stroke.low"));
+  REQUIRE(low != nullptr);
+  CHECK(near(low->end(), {16.0, -10.0}));
+
+  // Crossing both curves while LMB remains held trims them immediately. A
+  // repeated move at the same place must not create another modification.
+  screen = viewport.sketch_plane_to_screen({15.0, 0.0});
+  REQUIRE(screen);
+  drag_sketch_pointer(viewport, screen.value());
+  drag_sketch_pointer(viewport, screen.value());
+
+  sketch = window.session().part_document()->find_sketch(sketch_id);
+  REQUIRE(sketch != nullptr);
+  low = sketch->find_line_segment(SketchEntityId("stroke.low"));
+  const LineSegment* middle = sketch->find_line_segment(SketchEntityId("stroke.middle"));
+  REQUIRE(low != nullptr);
+  REQUIRE(middle != nullptr);
+  CHECK(near(low->end(), {8.0, -10.0}));
+  CHECK(near(middle->end(), {8.0, 0.0}));
+  CHECK(sketch->line_segments().size() == 4U);
+  CHECK(window.session().sketch_constraint_catalog(sketch_id).value().constraints().size() == 2U);
+  CHECK(automatic_point_on_object_count(window, "entity/stroke.low", {8.0, -10.0},
+                                        "entity/stroke.boundary") == 1U);
+  CHECK(automatic_point_on_object_count(window, "entity/stroke.middle", {8.0, 0.0},
+                                        "entity/stroke.boundary") == 1U);
+
+  release_sketch_pointer(viewport, screen.value());
+  sketch = window.session().part_document()->find_sketch(sketch_id);
+  REQUIRE(sketch != nullptr);
+  middle = sketch->find_line_segment(SketchEntityId("stroke.middle"));
+  REQUIRE(middle != nullptr);
+  CHECK(near(middle->end(), {8.0, 0.0}));
+  CHECK(sketch->line_segments().size() == 4U);
+  CHECK_FALSE(viewport.sketch_selection_enabled());
+
+  // Release terminates only the stroke. Even a synthetic Move carrying the
+  // LMB flag cannot continue it without a fresh press, while the modal Trim
+  // tool stays armed and still accepts a normal click.
+  screen = viewport.sketch_plane_to_screen({15.0, 10.0});
+  REQUIRE(screen);
+  drag_sketch_pointer(viewport, screen.value());
+  sketch = window.session().part_document()->find_sketch(sketch_id);
+  REQUIRE(sketch != nullptr);
+  const LineSegment* high = sketch->find_line_segment(SketchEntityId("stroke.high"));
+  REQUIRE(high != nullptr);
+  CHECK(near(high->end(), {16.0, 10.0}));
+  REQUIRE(tools.modify_tool_active());
+
+  click_sketch_pointer(viewport, screen.value());
+  sketch = window.session().part_document()->find_sketch(sketch_id);
+  REQUIRE(sketch != nullptr);
+  high = sketch->find_line_segment(SketchEntityId("stroke.high"));
+  REQUIRE(high != nullptr);
+  CHECK(near(high->end(), {8.0, 10.0}));
+  CHECK(window.session().sketch_constraint_catalog(sketch_id).value().constraints().size() == 3U);
+  CHECK(automatic_point_on_object_count(window, "entity/stroke.high", {8.0, 10.0},
+                                        "entity/stroke.boundary") == 1U);
+  CHECK(tools.modify_tool_active());
+}
+
+TEST_CASE("Ändern: trim ignores hover moves and Escape cancels an active stroke",
+          "[gui][shell-sketch][sketch-modify][trim-stroke]") {
+  ShellWindow window;
+  window.show();
+  qApp->processEvents();
+  enter_sketch(window);
+  seed_lines(window, {{"escape.first", {0.0, -5.0}, {16.0, -5.0}},
+                      {"escape.second", {0.0, 5.0}, {16.0, 5.0}},
+                      {"escape.boundary", {8.0, -10.0}, {8.0, 10.0}}});
+  auto& tools = window.sketch_tools();
+  auto& viewport = window.viewport();
+  const SketchId sketch_id = *window.active_sketch();
+
+  REQUIRE(viewport.sketch_selection_enabled());
+  tools.begin_modify_tool(SketchModifyKind::Trim);
+  CHECK_FALSE(viewport.sketch_selection_enabled());
+  auto second_screen = viewport.sketch_plane_to_screen({13.0, 5.0});
+  REQUIRE(second_screen);
+  move_sketch_pointer(viewport, second_screen.value());
+
+  const Sketch* sketch = window.session().part_document()->find_sketch(sketch_id);
+  REQUIRE(sketch != nullptr);
+  const LineSegment* second = sketch->find_line_segment(SketchEntityId("escape.second"));
+  REQUIRE(second != nullptr);
+  CHECK(near(second->end(), {16.0, 5.0}));
+
+  auto first_screen = viewport.sketch_plane_to_screen({13.0, -5.0});
+  REQUIRE(first_screen);
+  press_sketch_pointer(viewport, first_screen.value());
+  press_escape(window);
+  CHECK_FALSE(tools.modify_tool_active());
+  CHECK(viewport.sketch_selection_enabled());
+
+  second_screen = viewport.sketch_plane_to_screen({13.0, 5.0});
+  REQUIRE(second_screen);
+  drag_sketch_pointer(viewport, second_screen.value());
+  release_sketch_pointer(viewport, second_screen.value());
+
+  sketch = window.session().part_document()->find_sketch(sketch_id);
+  REQUIRE(sketch != nullptr);
+  second = sketch->find_line_segment(SketchEntityId("escape.second"));
+  REQUIRE(second != nullptr);
+  CHECK(near(second->end(), {16.0, 5.0}));
+}
+
+TEST_CASE("Ändern: extend and split do not repeat while LMB is dragged",
+          "[gui][shell-sketch][sketch-modify][trim-stroke]") {
+  SECTION("Extend remains a single press operation") {
+    ShellWindow window;
+    window.show();
+    qApp->processEvents();
+    enter_sketch(window);
+    seed_lines(window, {{"extend.first", {0.0, -40.0}, {40.0, -40.0}},
+                        {"extend.second", {0.0, 40.0}, {40.0, 40.0}},
+                        {"extend.boundary", {80.0, -80.0}, {80.0, 80.0}}});
+    auto& tools = window.sketch_tools();
+    auto& viewport = window.viewport();
+
+    tools.begin_modify_tool(SketchModifyKind::Extend);
+    auto screen = viewport.sketch_plane_to_screen({30.0, -40.0});
+    REQUIRE(screen);
+    press_sketch_pointer(viewport, screen.value());
+    screen = viewport.sketch_plane_to_screen({30.0, 40.0});
+    REQUIRE(screen);
+    drag_sketch_pointer(viewport, screen.value());
+    release_sketch_pointer(viewport, screen.value());
+
+    const Sketch* sketch =
+        window.session().part_document()->find_sketch(*window.active_sketch());
+    REQUIRE(sketch != nullptr);
+    const LineSegment* first = sketch->find_line_segment(SketchEntityId("extend.first"));
+    const LineSegment* second = sketch->find_line_segment(SketchEntityId("extend.second"));
+    REQUIRE(first != nullptr);
+    REQUIRE(second != nullptr);
+    INFO("extended first=" << first->start().x << ',' << first->start().y << " -> "
+                           << first->end().x << ',' << first->end().y);
+    if (viewport.hovered_sketch_hit())
+      INFO("extend hit=" << viewport.hovered_sketch_hit()->semantic_id);
+    INFO("status=" << window.statusBar()->currentMessage().toStdString());
+    CHECK(near(first->end(), {80.0, -40.0}));
+    CHECK(near(second->end(), {40.0, 40.0}));
+  }
+
+  SECTION("Split remains a single press operation") {
+    ShellWindow window;
+    window.show();
+    qApp->processEvents();
+    enter_sketch(window);
+    seed_lines(window, {{"split.first", {0.0, -40.0}, {120.0, -40.0}},
+                        {"split.second", {0.0, 40.0}, {120.0, 40.0}}});
+    auto& tools = window.sketch_tools();
+    auto& viewport = window.viewport();
+
+    tools.begin_modify_tool(SketchModifyKind::Split);
+    auto screen = viewport.sketch_plane_to_screen({80.0, -40.0});
+    REQUIRE(screen);
+    press_sketch_pointer(viewport, screen.value());
+    screen = viewport.sketch_plane_to_screen({80.0, 40.0});
+    REQUIRE(screen);
+    drag_sketch_pointer(viewport, screen.value());
+    release_sketch_pointer(viewport, screen.value());
+
+    const Sketch* sketch =
+        window.session().part_document()->find_sketch(*window.active_sketch());
+    REQUIRE(sketch != nullptr);
+    if (viewport.hovered_sketch_hit())
+      INFO("split hit=" << viewport.hovered_sketch_hit()->semantic_id);
+    INFO("status=" << window.statusBar()->currentMessage().toStdString());
+    CHECK(sketch->line_segments().size() == 3U);
+    const LineSegment* second = sketch->find_line_segment(SketchEntityId("split.second"));
+    REQUIRE(second != nullptr);
+    CHECK(near(second->start(), {0.0, 40.0}));
+    CHECK(near(second->end(), {120.0, 40.0}));
+  }
+}
 
 TEST_CASE("Ändern: fillet auto-places coincidence and tangent constraints",
           "[gui][shell-sketch][gui][sketch-modify]") {
@@ -509,7 +1170,8 @@ TEST_CASE("Ändern: fillet on a chained corner stays attached when a line is dra
   double gap_end = 1.0e9;
   for (const auto& segment : dragged.line_segments())
     for (const Point2 point : {segment.start(), segment.end()}) {
-      gap_start = std::min(gap_start, std::hypot(point.x - moved.start().x, point.y - moved.start().y));
+      gap_start =
+          std::min(gap_start, std::hypot(point.x - moved.start().x, point.y - moved.start().y));
       gap_end = std::min(gap_end, std::hypot(point.x - moved.end().x, point.y - moved.end().y));
     }
   CHECK(gap_start <= 1.0e-6); // arc start still glued to a line endpoint
@@ -552,8 +1214,7 @@ TEST_CASE("Ändern: chamfer on a chained corner produces clean geometry",
     for (const auto& segment : source.line_segments())
       if (!near(segment.start(), {0.0, 0.0}) && !near(segment.end(), {0.0, 0.0}) &&
           !near(segment.start(), {10.0, 10.0}) && !near(segment.end(), {10.0, 10.0}))
-        return std::hypot(segment.start().x - segment.end().x,
-                          segment.start().y - segment.end().y);
+        return std::hypot(segment.start().x - segment.end().x, segment.start().y - segment.end().y);
     return -1.0;
   };
   const double length_before = chamfer_length(*sketch);

@@ -1,7 +1,7 @@
 # GUI Shell Reset Sequence MVP-9R
 
-Status: active after accepted Interactive Modeling MVP-9. Blocks 132–136; Block 132 is the current
-next technical step. STEP Import MVP-10 shifts to Blocks 137–143.
+Status: active after accepted Interactive Modeling MVP-9. Blocks 132–135 are implemented; Block 136
+is the current next technical step. STEP Import MVP-10 shifts to Blocks 137–143.
 
 This document is the canonical numbered implementation sequence for replacing the Qt shell layer.
 It governs what is deleted, what is kept byte-for-byte, and the contracts of the replacement shell.
@@ -395,12 +395,58 @@ Incremental shell polish requested during use, independent of the numbered featu
   points; drag one → it follows the pointer; coincident with a line → it lands on the line; and a
   JSON round-trip preserves it. DOF accounting confirms each point contributes two free DOF.
 
-### Block 135 — Interactive features minimal
+### Block 135 — Interactive features minimal — Implemented
 
 Extrude and Revolve reachable from the ribbon: selection-first flow through
 `GuiInteractiveFeatureCoordinator`, manipulator overlay (shell-owned replacement of the Block-123
 overlay binder, notification-driven instead of polled), numeric coupling, preview/apply/cancel.
 First fully usable end-to-end build: sketch → profile → extrude/revolve.
+
+Implemented by `ShellFeatureTools` (`shell/shell_feature_tools.*`), constructed by `ShellWindow` with
+explicit session/workbench/viewport/ribbon references:
+
+- the 3D-Modell ribbon exposes Extrusion and Drehung only for a verified materialized profile;
+  finishing a Sketch with exactly one profile hands it directly to this selection-first surface, a
+  single freehand bounded line region is materialized during Finish Sketch, and Sketch/profile/
+  contour selections from browser or viewport use the same path;
+- the right-side Feature task panel owns numeric distance/angle editing plus Apply/Cancel; every edit
+  revalidates through the existing controller's disposable preview;
+- one transparent viewport child paints linear/angular handles, performs fixed-DIP hit testing,
+  mouse capture, exact release, Escape cancellation, and camera remapping in response to events — no
+  polling timer or widget discovery;
+- a fresh Part's required result Body and Extrude Length parameter remain candidate-only and are
+  provisioned in the same `commit_part_transaction` as the feature. Cancel leaves no artifacts; one
+  Undo removes feature, Body, and parameter together;
+- Revolve chooses an in-plane explicit origin axis by default (callers/tests may provide one) and
+  starts with a 180-degree partial extent so the angle wheel and numeric field are immediately usable.
+
+The Block-135 hardening audit additionally freezes these shell-lifecycle details:
+
+- topology-authored `ClosedProfile`, `ArcClosedProfile`, `CompositeClosedProfile`, and circular-hole
+  pattern records receive persistent `sketch/<sid>/profile/<pid>` viewport presentations, so a
+  finished profile can be reselected after another object was picked;
+- an explicit non-profile selection invalidates the Finish-Sketch fallback instead of silently
+  reusing a stale profile, while Cancel preserves the exact semantic selection;
+- the numeric field uses the same locale-independent dot-decimal and handle-specific `mm`/`deg`
+  rules as the manipulator layer. Invalid text or an incompatible unit leaves the last valid
+  candidate unchanged;
+- typed input during a pointer drag becomes the layer's numeric override and remains authoritative
+  through release. `Esc`, invalid mapping, or window deactivation restores the value captured at
+  drag start; a second `Esc` cancels the command;
+- incompatible/non-finite candidates fail closed, initial preview failure tears the task down, and
+  generated ids/names skip existing user objects;
+- Fit, standard-view, and projection actions immediately remap the overlay; Apply is rejected while
+  a pointer drag still owns mouse capture.
+
+Focused proof:
+
+```bash
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][shell-features]"
+```
+
+The proof covers Sketch-Finish handoff and reselection, stale-selection invalidation, candidate-only
+auto-provisioning and name collisions, strict numeric units and drag override/rollback, incompatible
+candidate rejection, recomputed Extrude/Revolve geometry, mutation-free Cancel, and atomic Undo.
 
 ### Block 136 — Feature full coverage
 

@@ -3,19 +3,25 @@
 #include "assembly_posed_leaf_shapes.hpp"
 #include "geometry_shape_internal.hpp"
 
+#include "blcad/geometry/profile_region_classifier.hpp"
 #include "blcad/geometry/sketch_3d_geometry_adapter.hpp"
+#include "blcad/geometry/sketch_finish.hpp"
 #include "blcad/geometry/workplane_resolver.hpp"
 
-#include <BRep_Builder.hxx>
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepBuilderAPI_MakePolygon.hxx>
+#include <BRepBuilderAPI_MakeWire.hxx>
+#include <BRep_Builder.hxx>
 #include <GC_MakeArcOfCircle.hxx>
 #include <Geom_BezierCurve.hxx>
 #include <Standard_Failure.hxx>
 #include <TColgp_Array1OfPnt.hxx>
+#include <TopoDS.hxx>
 #include <TopoDS_Compound.hxx>
+#include <TopoDS_Edge.hxx>
 #include <TopoDS_Shape.hxx>
+#include <TopoDS_Wire.hxx>
 #include <gp_Circ.hxx>
 #include <gp_Dir.hxx>
 #include <gp_Pnt.hxx>
@@ -23,10 +29,13 @@
 
 #include <algorithm>
 #include <array>
-#include <optional>
+#include <cmath>
 #include <memory>
+#include <numbers>
+#include <optional>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace blcad::geometry {
 namespace {
@@ -72,6 +81,86 @@ std::string sketch_3d_entity_id(const Sketch3D& sketch, const SketchEntityId& en
 
 Error scene_error(std::string message) {
   return Error::geometry("geometry.viewport_scene", std::move(message));
+}
+
+template <typename PointRange> double signed_polygon_area_twice(const PointRange& points) noexcept {
+  double area_twice = 0.0;
+  for (std::size_t index = 0U; index < points.size(); ++index) {
+    const auto& current = points[index];
+    const auto& next = points[(index + 1U) % points.size()];
+    area_twice += current.x * next.y - next.x * current.y;
+  }
+  return area_twice;
+}
+
+template <typename PointMapper>
+Result<TopoDS_Wire> make_circle_wire(Point2 center, double radius, PointMapper map_point) {
+  const gp_Pnt center_3d = map_point(center);
+  const gp_Pnt x_3d = map_point({center.x + radius, center.y});
+  const gp_Pnt y_3d = map_point({center.x, center.y + radius});
+  const gp_Vec x_vec(center_3d, x_3d);
+  const gp_Vec y_vec(center_3d, y_3d);
+  const gp_Vec normal = x_vec.Crossed(y_vec);
+  if (x_vec.Magnitude() <= gp::Resolution() || normal.Magnitude() <= gp::Resolution()) {
+    return Result<TopoDS_Wire>::failure(
+        scene_error("circle profile presentation has a degenerate workplane"));
+  }
+  const gp_Ax2 axes(center_3d, gp_Dir(normal), gp_Dir(x_vec));
+  BRepBuilderAPI_MakeEdge edge(gp_Circ(axes, x_vec.Magnitude()));
+  if (!edge.IsDone()) {
+    return Result<TopoDS_Wire>::failure(
+        scene_error("could not build circle profile presentation edge"));
+  }
+  BRepBuilderAPI_MakeWire wire(edge.Edge());
+  if (!wire.IsDone()) {
+    return Result<TopoDS_Wire>::failure(
+        scene_error("could not build circle profile presentation wire"));
+  }
+  return Result<TopoDS_Wire>::success(wire.Wire());
+}
+
+template <typename PointRange, typename PointMapper>
+Result<TopoDS_Wire> make_polygon_wire(const PointRange& points, PointMapper map_point) {
+  if (points.size() < 3U)
+    return Result<TopoDS_Wire>::failure(
+        scene_error("closed profile presentation requires at least three points"));
+  BRepBuilderAPI_MakePolygon polygon;
+  for (const auto& point : points)
+    polygon.Add(map_point(point));
+  polygon.Close();
+  if (!polygon.IsDone())
+    return Result<TopoDS_Wire>::failure(
+        scene_error("could not build closed profile presentation wire"));
+  return Result<TopoDS_Wire>::success(polygon.Wire());
+}
+
+template <typename PointRange, typename PointMapper>
+Result<TopoDS_Shape> make_profile_face(const PointRange& points, PointMapper map_point,
+                                       const std::vector<ContainedProfileHole>& holes = {}) {
+  auto outer_wire = make_polygon_wire(points, map_point);
+  if (outer_wire.has_error())
+    return Result<TopoDS_Shape>::failure(outer_wire.error());
+  const double outer_area_twice = signed_polygon_area_twice(points);
+  BRepBuilderAPI_MakeFace face(outer_wire.value());
+  for (const ContainedProfileHole& hole : holes) {
+    Result<TopoDS_Wire> wire = hole.kind == ContainedProfileHoleKind::Circle
+                                   ? make_circle_wire(hole.center, hole.radius_mm, map_point)
+                                   : make_polygon_wire(hole.vertices, map_point);
+    if (wire.has_error())
+      return Result<TopoDS_Shape>::failure(wire.error());
+    TopoDS_Wire inner_wire = wire.value();
+    const bool same_orientation =
+        hole.kind == ContainedProfileHoleKind::Circle
+            ? outer_area_twice > 0.0
+            : outer_area_twice * signed_polygon_area_twice(hole.vertices) > 0.0;
+    if (same_orientation)
+      inner_wire.Reverse();
+    face.Add(inner_wire);
+  }
+  if (!face.IsDone())
+    return Result<TopoDS_Shape>::failure(
+        scene_error("could not build closed profile presentation face"));
+  return Result<TopoDS_Shape>::success(face.Shape());
 }
 
 } // namespace
@@ -179,34 +268,222 @@ ViewportSceneBuilder::build_part(const PartDocument& document,
                                              {center.x + half_width, center.y - half_height},
                                              {center.x + half_width, center.y + half_height},
                                              {center.x - half_width, center.y + half_height}}};
-        BRep_Builder compound_builder;
-        TopoDS_Compound compound;
-        compound_builder.MakeCompound(compound);
-        for (std::size_t index = 0; index < corners.size(); ++index)
-          compound_builder.Add(
-              compound, BRepBuilderAPI_MakeEdge(point(corners[index]),
-                                                point(corners[(index + 1U) % corners.size()]))
-                            .Shape());
-        items.push_back({ViewportSceneKind::SketchEntity,
-                         profile_prefix + profile.id().value(), wrap(compound)});
+        const std::vector<Point2> outer_vertices(corners.begin(), corners.end());
+        auto holes =
+            classify_contained_profile_holes(document, sketch, profile.id(), outer_vertices);
+        if (holes.has_error())
+          return Result<std::vector<ViewportSceneItem>>::failure(holes.error());
+        auto face = make_profile_face(corners, point, holes.value());
+        if (face.has_error())
+          return Result<std::vector<ViewportSceneItem>>::failure(face.error());
+        items.push_back({ViewportSceneKind::SketchEntity, profile_prefix + profile.id().value(),
+                         wrap(std::move(face.value()))});
       }
       for (const CircleProfile& profile : sketch.circle_profiles()) {
         const auto diameter = parameter_mm(profile.diameter_parameter());
         if (!diameter || *diameter <= 0.0)
           continue;
-        const Point2 center = profile.center();
-        const gp_Pnt center_3d = point(center);
-        const gp_Pnt x_3d = point({center.x + *diameter * 0.5, center.y});
-        const gp_Pnt y_3d = point({center.x, center.y + *diameter * 0.5});
-        const gp_Vec x_vec(center_3d, x_3d);
-        const gp_Vec y_vec(center_3d, y_3d);
-        const gp_Vec normal = x_vec.Crossed(y_vec);
-        if (x_vec.Magnitude() <= gp::Resolution() || normal.Magnitude() <= gp::Resolution())
-          continue;
-        const gp_Ax2 axes(center_3d, gp_Dir(normal), gp_Dir(x_vec));
+        auto wire = make_circle_wire(profile.center(), *diameter * 0.5, point);
+        if (wire.has_error())
+          return Result<std::vector<ViewportSceneItem>>::failure(wire.error());
+        BRepBuilderAPI_MakeFace face(wire.value());
+        if (!face.IsDone())
+          return Result<std::vector<ViewportSceneItem>>::failure(
+              scene_error("could not build circle profile presentation face"));
+        items.push_back({ViewportSceneKind::SketchEntity, profile_prefix + profile.id().value(),
+                         wrap(face.Shape())});
+      }
+
+      // Topology-authored closed profiles reuse their persistent source
+      // curves, but still need a dedicated compound presentation so the
+      // finished profile region can be selected as one feature input. The
+      // individual curves remain visible/selectable under their entity ids.
+      const auto curve_edge = [&sketch,
+                               &point](const SketchEntityId& entity) -> Result<TopoDS_Edge> {
+        if (const auto* line = sketch.find_line_segment(entity))
+          return Result<TopoDS_Edge>::success(
+              BRepBuilderAPI_MakeEdge(point(line->start()), point(line->end())).Edge());
+        if (const auto* arc = sketch.find_arc_segment(entity)) {
+          GC_MakeArcOfCircle curve(point(arc->start()), point(arc->mid()), point(arc->end()));
+          if (!curve.IsDone())
+            return Result<TopoDS_Edge>::failure(
+                scene_error("could not build closed-profile arc presentation"));
+          return Result<TopoDS_Edge>::success(BRepBuilderAPI_MakeEdge(curve.Value()).Edge());
+        }
+        if (const auto* spline = sketch.find_spline_segment(entity)) {
+          TColgp_Array1OfPnt poles(1, 4);
+          poles.SetValue(1, point(spline->start()));
+          poles.SetValue(2, point(spline->control1()));
+          poles.SetValue(3, point(spline->control2()));
+          poles.SetValue(4, point(spline->end()));
+          const Handle(Geom_BezierCurve) curve = new Geom_BezierCurve(poles);
+          return Result<TopoDS_Edge>::success(BRepBuilderAPI_MakeEdge(curve).Edge());
+        }
+        return Result<TopoDS_Edge>::failure(
+            scene_error("closed profile references an unavailable sketch curve"));
+      };
+      const auto contour_is_counter_clockwise =
+          [&sketch](const std::vector<SketchEntityId>& contour) -> std::optional<bool> {
+        std::vector<Point2> vertices;
+        vertices.reserve(contour.size());
+        for (const SketchEntityId& entity : contour) {
+          const LineSegment* line = sketch.find_line_segment(entity);
+          if (line == nullptr)
+            return std::nullopt;
+          vertices.push_back(line->start());
+        }
+        const double area_twice = signed_polygon_area_twice(vertices);
+        if (std::abs(area_twice) <= 1.0e-12)
+          return std::nullopt;
+        return area_twice > 0.0;
+      };
+      const std::vector<std::vector<SketchEntityId>> no_inner_contours;
+      const std::vector<ContainedProfileHole> no_profile_holes;
+      const auto append_curve_profile =
+          [&items, &profile_prefix, &wrap, &curve_edge, &contour_is_counter_clockwise,
+           &point](const ProfileId& id, const std::vector<SketchEntityId>& outer,
+                   const std::vector<std::vector<SketchEntityId>>& inner,
+                   const std::vector<ContainedProfileHole>& holes) -> Result<std::size_t> {
+        const auto make_wire =
+            [&curve_edge](const std::vector<SketchEntityId>& contour) -> Result<TopoDS_Wire> {
+          BRepBuilderAPI_MakeWire wire;
+          for (const auto& entity : contour) {
+            auto edge = curve_edge(entity);
+            if (edge.has_error())
+              return Result<TopoDS_Wire>::failure(edge.error());
+            wire.Add(edge.value());
+          }
+          if (!wire.IsDone())
+            return Result<TopoDS_Wire>::failure(
+                scene_error("could not build closed-profile presentation wire"));
+          return Result<TopoDS_Wire>::success(wire.Wire());
+        };
+
+        auto outer_wire = make_wire(outer);
+        if (outer_wire.has_error())
+          return Result<std::size_t>::failure(outer_wire.error());
+        const std::optional<bool> outer_is_counter_clockwise = contour_is_counter_clockwise(outer);
+        BRepBuilderAPI_MakeFace face(outer_wire.value());
+        for (const auto& contour : inner) {
+          auto inner_wire = make_wire(contour);
+          if (inner_wire.has_error())
+            return Result<std::size_t>::failure(inner_wire.error());
+          TopoDS_Wire oriented_inner = inner_wire.value();
+          const std::optional<bool> inner_is_counter_clockwise =
+              contour_is_counter_clockwise(contour);
+          if (!outer_is_counter_clockwise || !inner_is_counter_clockwise ||
+              *outer_is_counter_clockwise == *inner_is_counter_clockwise)
+            oriented_inner.Reverse();
+          face.Add(oriented_inner);
+        }
+        for (const ContainedProfileHole& hole : holes) {
+          Result<TopoDS_Wire> inner_wire =
+              hole.kind == ContainedProfileHoleKind::Circle
+                  ? make_circle_wire(hole.center, hole.radius_mm, point)
+                  : make_polygon_wire(hole.vertices, point);
+          if (inner_wire.has_error())
+            return Result<std::size_t>::failure(inner_wire.error());
+          TopoDS_Wire oriented_inner = inner_wire.value();
+          const std::optional<bool> hole_is_counter_clockwise =
+              hole.kind == ContainedProfileHoleKind::Circle ? std::optional<bool>(true)
+                                                            : [&hole]() -> std::optional<bool> {
+            const double area_twice = signed_polygon_area_twice(hole.vertices);
+            if (std::abs(area_twice) <= 1.0e-12)
+              return std::nullopt;
+            return area_twice > 0.0;
+          }();
+          if (!outer_is_counter_clockwise || !hole_is_counter_clockwise ||
+              *outer_is_counter_clockwise == *hole_is_counter_clockwise)
+            oriented_inner.Reverse();
+          face.Add(oriented_inner);
+        }
+        if (!face.IsDone())
+          return Result<std::size_t>::failure(
+              scene_error("could not build closed-profile presentation face"));
         items.push_back(
-            {ViewportSceneKind::SketchEntity, profile_prefix + profile.id().value(),
-             wrap(BRepBuilderAPI_MakeEdge(gp_Circ(axes, x_vec.Magnitude())).Shape())});
+            {ViewportSceneKind::SketchEntity, profile_prefix + id.value(), wrap(face.Shape())});
+        return Result<std::size_t>::success(1U + inner.size() + holes.size());
+      };
+      for (const ClosedProfile& profile : sketch.closed_profiles()) {
+        auto vertices = sketch.closed_profile_vertices(profile);
+        if (vertices.has_error())
+          return Result<std::vector<ViewportSceneItem>>::failure(vertices.error());
+        auto holes =
+            classify_contained_profile_holes(document, sketch, profile.id(), vertices.value());
+        if (holes.has_error())
+          return Result<std::vector<ViewportSceneItem>>::failure(holes.error());
+        auto appended = append_curve_profile(profile.id(), profile.line_segments(),
+                                             no_inner_contours, holes.value());
+        if (appended.has_error())
+          return Result<std::vector<ViewportSceneItem>>::failure(appended.error());
+      }
+      for (const ArcClosedProfile& profile : sketch.arc_closed_profiles()) {
+        auto appended = append_curve_profile(profile.id(), profile.curve_segments(),
+                                             no_inner_contours, no_profile_holes);
+        if (appended.has_error())
+          return Result<std::vector<ViewportSceneItem>>::failure(appended.error());
+      }
+      for (const CompositeClosedProfile& profile : sketch.composite_closed_profiles()) {
+        auto appended = append_curve_profile(profile.id(), profile.outer_contour(),
+                                             profile.inner_contours(), no_profile_holes);
+        if (appended.has_error())
+          return Result<std::vector<ViewportSceneItem>>::failure(appended.error());
+      }
+
+      // Legacy/raw line sketches have no persistent profile presentation yet,
+      // but a bounded region is still a valid selection-first feature input.
+      // Publish a transient face under the same deterministic generated id
+      // used by SketchFinishService and the interactive materialization path.
+      // Existing materialized contours are suppressed so their coplanar face
+      // does not compete with a duplicate generated presentation.
+      auto detected_regions = SketchFinishService::analyze_unmaterialized(document, sketch);
+      if (detected_regions) {
+        for (const auto& region : detected_regions.value().regions) {
+          auto holes =
+              classify_contained_profile_holes(document, sketch, region.id, region.vertices);
+          if (holes.has_error())
+            continue;
+          auto face = make_profile_face(region.vertices, point, holes.value());
+          if (face.has_error())
+            continue;
+          items.push_back({ViewportSceneKind::SketchEntity, profile_prefix + region.id.value(),
+                           wrap(std::move(face.value()))});
+        }
+      }
+
+      for (const CircularHolePattern& pattern : sketch.circular_hole_patterns()) {
+        const Parameter* radius = document.find_parameter(pattern.radius_parameter());
+        const Parameter* count = document.find_parameter(pattern.count_parameter());
+        const Parameter* diameter = document.find_parameter(pattern.hole_diameter_parameter());
+        if (radius == nullptr || radius->type() != ParameterType::Length || count == nullptr ||
+            count->type() != ParameterType::Count || diameter == nullptr ||
+            diameter->type() != ParameterType::Length || diameter->value().millimeters() <= 0.0)
+          continue;
+        BRep_Builder compound_builder;
+        TopoDS_Compound compound;
+        compound_builder.MakeCompound(compound);
+        const std::size_t hole_count = count->value().count_value();
+        for (std::size_t index = 0U; index < hole_count; ++index) {
+          const double angle =
+              pattern.angle_offset_deg() * std::numbers::pi / 180.0 +
+              2.0 * std::numbers::pi * static_cast<double>(index) / static_cast<double>(hole_count);
+          const Point2 center{pattern.center().x + radius->value().millimeters() * std::cos(angle),
+                              pattern.center().y + radius->value().millimeters() * std::sin(angle)};
+          const gp_Pnt center_3d = point(center);
+          const double hole_radius = diameter->value().millimeters() * 0.5;
+          const gp_Pnt x_3d = point({center.x + hole_radius, center.y});
+          const gp_Pnt y_3d = point({center.x, center.y + hole_radius});
+          const gp_Vec x_vec(center_3d, x_3d);
+          const gp_Vec y_vec(center_3d, y_3d);
+          const gp_Vec normal = x_vec.Crossed(y_vec);
+          if (x_vec.Magnitude() <= gp::Resolution() || normal.Magnitude() <= gp::Resolution())
+            continue;
+          const gp_Ax2 axes(center_3d, gp_Dir(normal), gp_Dir(x_vec));
+          compound_builder.Add(compound,
+                               BRepBuilderAPI_MakeEdge(gp_Circ(axes, x_vec.Magnitude())).Shape());
+        }
+        items.push_back({ViewportSceneKind::SketchEntity, profile_prefix + pattern.id().value(),
+                         wrap(compound)});
       }
     }
 

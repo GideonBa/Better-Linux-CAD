@@ -1381,6 +1381,15 @@ feature_body_result_context_from_json(const json& feature_json) {
           PathCurveId(feature_json.at("path_curve").get<std::string>()));
     if (feature.has_error())
       return feature;
+    if (feature_json.contains("profile")) {
+      if (!feature_json.at("profile").is_string())
+        return Result<Feature>::failure(
+            json_error("extrude profile must be a string in part document json"));
+      feature = feature.value().with_profile(
+          ProfileId(feature_json.at("profile").get<std::string>()));
+      if (feature.has_error())
+        return feature;
+    }
     auto context = feature_body_result_context_from_json(feature_json);
     if (context.has_error())
       return Result<Feature>::failure(context.error());
@@ -1425,6 +1434,15 @@ feature_body_result_context_from_json(const json& feature_json) {
   }
   if (feature.has_error())
     return feature;
+  if (feature_json.contains("profile")) {
+    if (!feature_json.at("profile").is_string())
+      return Result<Feature>::failure(
+          json_error("extrude profile must be a string in part document json"));
+    feature = feature.value().with_profile(
+        ProfileId(feature_json.at("profile").get<std::string>()));
+    if (feature.has_error())
+      return feature;
+  }
   auto context = feature_body_result_context_from_json(feature_json);
   if (context.has_error())
     return Result<Feature>::failure(context.error());
@@ -3791,6 +3809,8 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
                       {"direction", std::string(to_string(feature.direction()))}};
     if (feature.direction() == ExtrudeDirection::Path)
       feature_json["path_curve"] = feature.path_curve()->value();
+    if (feature.profile().has_value())
+      feature_json["profile"] = feature.profile()->value();
     if (feature.direction() != ExtrudeDirection::Path &&
         feature.type() == FeatureType::AdditiveExtrude &&
         feature.extrude_intent().is_historical_additive_default())

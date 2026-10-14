@@ -1,6 +1,7 @@
 #include "blcad/core/parameter.hpp"
 #include "blcad/gui/shell/shell_origin.hpp"
 #include "blcad/gui/shell/shell_ribbon.hpp"
+#include "blcad/gui/shell/shell_sketch_tools.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -8,6 +9,13 @@
 #include <QTableWidget>
 #include <QTableWidgetItem>
 #include <QTemporaryDir>
+#include <QApplication>
+#include <QAbstractButton>
+#include <QFileDialog>
+#include <QFileInfo>
+#include <QMessageBox>
+#include <QStatusBar>
+#include <QTimer>
 #include <QTreeWidget>
 #include <QTreeWidgetItem>
 
@@ -40,6 +48,23 @@ QTreeWidgetItem* find_tree_item(QTreeWidget& tree, const QString& semantic_id) {
     if (auto* found = find_tree_item(tree.topLevelItem(index), semantic_id))
       return found;
   return nullptr;
+}
+
+void answer_next_message_box(QMessageBox::StandardButton answer) {
+  QTimer::singleShot(0, [answer] {
+    if (auto* box = qobject_cast<QMessageBox*>(QApplication::activeModalWidget()))
+      if (auto* button = box->button(answer))
+        button->click();
+  });
+}
+
+void accept_next_file_dialog(const QString& path) {
+  QTimer::singleShot(0, [path] {
+    if (auto* dialog = qobject_cast<QFileDialog*>(QApplication::activeModalWidget())) {
+      dialog->selectFile(path);
+      QMetaObject::invokeMethod(dialog, "accept", Qt::DirectConnection);
+    }
+  });
 }
 
 } // namespace
@@ -92,9 +117,12 @@ TEST_CASE("Block 133 selection flows viewport to session to browser and back",
   REQUIRE(current != nullptr);
   CHECK(current->data(0, Qt::UserRole + 1).toString() ==
         QStringLiteral("datum-plane/datum.xy"));
+  REQUIRE(window.property_inspector().rowCount() > 0);
+  CHECK(window.property_inspector().item(0, 1)->text() == QStringLiteral("datum.xy"));
 
   window.viewport().clear_selection();
   CHECK(window.session().selection().entries().empty());
+  CHECK(window.property_inspector().rowCount() == 0);
 }
 
 TEST_CASE("Block 133 sketch entry creates a sketch on the selected origin plane",
@@ -151,6 +179,115 @@ TEST_CASE("Block 133 save and open round-trip preserves the seeded origin",
     CHECK(origin->children.size() == 6U);
     CHECK(window.viewport().presentation_count() == 6U);
   }
+}
+
+TEST_CASE("Save on a new document asks for a path and stores it",
+          "[gui][shell][gui][document-lifecycle][save]") {
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  const QString path = directory.filePath(QStringLiteral("erstes-speichern.blcad.json"));
+  ShellWindow window;
+  REQUIRE(window.new_part(QStringLiteral("Erstes Speichern")));
+  REQUIRE(window.session().file_path().empty());
+
+  accept_next_file_dialog(path);
+  REQUIRE(window.save_to({}));
+  CHECK(window.session().file_path() == path.toStdString());
+  CHECK_FALSE(window.session().dirty());
+  CHECK(QFileInfo::exists(path));
+}
+
+TEST_CASE("Opening another document protects dirty work and clears active Sketch state",
+          "[gui][shell][gui][document-lifecycle]") {
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  const QString path = directory.filePath(QStringLiteral("opened.blcad.json"));
+  {
+    GuiDocumentSession source;
+    REQUIRE(source.create_part(DocumentId("part.opened"), "Opened"));
+    REQUIRE(source.save_as(path.toStdString()));
+  }
+
+  ShellWindow window;
+  REQUIRE(window.new_part(QStringLiteral("Ungespeichert")));
+  REQUIRE(window.viewport().select_semantic("datum-plane/datum.xy"));
+  REQUIRE(window.create_sketch_on_selection());
+  REQUIRE(window.sketch_tools().begin_tool(GuiSketchCreateTool::Line));
+  REQUIRE(window.session().dirty());
+  REQUIRE(window.session().task().active());
+
+  answer_next_message_box(QMessageBox::Cancel);
+  CHECK_FALSE(window.open_path(path));
+  CHECK(window.session().display_name() == "Ungespeichert");
+  CHECK(window.active_sketch().has_value());
+  CHECK(window.session().task().active());
+
+  answer_next_message_box(QMessageBox::Discard);
+  REQUIRE(window.open_path(path));
+  CHECK(window.session().display_name() == "Opened");
+  CHECK_FALSE(window.active_sketch().has_value());
+  CHECK_FALSE(window.session().task().active());
+  CHECK_FALSE(window.viewport().sketch_focus_active());
+  CHECK_FALSE(window.ribbon().tab_enabled(1));
+}
+
+TEST_CASE("Closing the window protects dirty work",
+          "[gui][shell][gui][document-lifecycle]") {
+  ShellWindow window;
+  REQUIRE(window.new_part(QStringLiteral("Schliessen")));
+  window.show();
+  qApp->processEvents();
+
+  answer_next_message_box(QMessageBox::Cancel);
+  CHECK_FALSE(window.close());
+  CHECK(window.session().has_document());
+
+  answer_next_message_box(QMessageBox::Discard);
+  CHECK(window.close());
+  CHECK_FALSE(window.session().has_document());
+}
+
+TEST_CASE("Undoing Sketch creation leaves no stale Sketch workspace",
+          "[gui][shell][gui][document-lifecycle][undo]") {
+  ShellWindow window;
+  REQUIRE(window.new_part(QStringLiteral("Undo-Skizze")));
+  REQUIRE(window.viewport().select_semantic("datum-plane/datum.xy"));
+  REQUIRE(window.create_sketch_on_selection());
+  REQUIRE(window.sketch_tools().begin_tool(GuiSketchCreateTool::Line));
+  REQUIRE(window.session().task().active());
+
+  const bool undone = window.undo();
+  INFO(window.statusBar()->currentMessage().toStdString());
+  if (!window.session().diagnostics().empty())
+    INFO(window.session().diagnostics().back().message);
+  REQUIRE(undone);
+  CHECK_FALSE(window.active_sketch().has_value());
+  CHECK_FALSE(window.session().task().active());
+  CHECK_FALSE(window.viewport().sketch_focus_active());
+  CHECK_FALSE(window.viewport().sketch_interaction_active());
+  CHECK_FALSE(window.ribbon().tab_enabled(1));
+  REQUIRE(window.session().part_document() != nullptr);
+  CHECK(window.session().part_document()->find_sketch(SketchId("sketch.skizze1")) == nullptr);
+}
+
+TEST_CASE("Shell errors survive refresh and appear in browser diagnostics",
+          "[gui][shell][gui][diagnostics]") {
+  ShellWindow window;
+  REQUIRE(window.new_part(QStringLiteral("Diagnose")));
+  const auto revision = window.session().presentation_revision();
+  const auto diagnostic_count = window.session().diagnostics().size();
+
+  window.report_error(Error::validation("ui.test", "sichtbarer Fehler"));
+  window.refresh();
+
+  REQUIRE_FALSE(window.session().diagnostics().empty());
+  CHECK(window.session().diagnostics().size() == diagnostic_count + 1U);
+  CHECK(window.session().diagnostics().back().object_id == "ui.test");
+  CHECK(window.session().presentation_revision() > revision);
+  const auto* diagnostics = find_group(window.browser_model(), "Session diagnostics");
+  REQUIRE(diagnostics != nullptr);
+  REQUIRE_FALSE(diagnostics->children.empty());
+  CHECK(diagnostics->children.back().label == "ui.test");
 }
 
 TEST_CASE("Double-clicking a Sketch node re-enters it for editing",

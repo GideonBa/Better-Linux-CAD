@@ -169,6 +169,10 @@ public:
 
   [[nodiscard]] Result<Feature>
   with_body_result_context(FeatureBodyResultContext body_result_context) const;
+  // Binds a straight/path extrusion to one materialized profile in its input
+  // Sketch. Legacy files may omit this and retain their historical
+  // "exactly-one-profile" resolution semantics.
+  [[nodiscard]] Result<Feature> with_profile(ProfileId profile) const;
 
   [[nodiscard]] const FeatureId& id() const noexcept;
   [[nodiscard]] const std::string& name() const noexcept;
@@ -181,13 +185,15 @@ public:
   [[nodiscard]] const std::optional<FeatureBodyResultContext>& body_result_context() const noexcept;
   [[nodiscard]] const ExtrudeFeatureIntent& extrude_intent() const noexcept;
   [[nodiscard]] const std::optional<PathCurveId>& path_curve() const noexcept;
+  [[nodiscard]] const std::optional<ProfileId>& profile() const noexcept;
 
 private:
   Feature(FeatureId id, std::string name, FeatureType type, SketchId input_sketch,
           ParameterId length_parameter, FeatureId target_feature, ExtrudeDirection direction,
           SubtractiveExtrudeDepth subtractive_depth, ExtrudeFeatureIntent extrude_intent,
           std::optional<PathCurveId> path_curve = std::nullopt,
-          std::optional<FeatureBodyResultContext> body_result_context = std::nullopt);
+          std::optional<FeatureBodyResultContext> body_result_context = std::nullopt,
+          std::optional<ProfileId> profile = std::nullopt);
 
   FeatureId id_;
   std::string name_;
@@ -200,6 +206,7 @@ private:
   ExtrudeFeatureIntent extrude_intent_;
   std::optional<PathCurveId> path_curve_;
   std::optional<FeatureBodyResultContext> body_result_context_;
+  std::optional<ProfileId> profile_;
 };
 
 } // namespace blcad

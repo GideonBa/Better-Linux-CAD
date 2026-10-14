@@ -295,6 +295,7 @@ if(BLCAD_BUILD_GUI)
     src/gui/gui_spatial_surface_workbench.cpp
     src/gui/gui_task_state.cpp
     src/gui/occt_viewport.cpp
+    src/gui/shell/shell_feature_tools.cpp
     src/gui/shell/shell_origin.cpp
     src/gui/shell/shell_ribbon.cpp
     src/gui/shell/shell_sketch_tools.cpp
@@ -535,6 +536,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/sketch_region_finder_tests.cpp
       tests/geometry/spline_profile_pipeline_tests.cpp
       tests/geometry/step_exporter_tests.cpp
+      tests/geometry/viewport_scene_tests.cpp
       tests/geometry/workplane_resolver_tests.cpp
       tests/geometry/workplane_resolver_recovery_tests.cpp
     )
@@ -562,10 +564,13 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_occt_viewport_tests.cpp
       tests/gui/gui_part_foundation_workbench_tests.cpp
       tests/gui/gui_part_operations_workbench_tests.cpp
+      tests/gui/gui_raw_profile_transaction_tests.cpp
+      tests/gui/gui_shell_feature_tools_tests.cpp
       tests/gui/gui_shell_window_tests.cpp
       tests/gui/gui_shell_sketch_tools_tests.cpp
       tests/gui/gui_shell_sketch_interaction_tests.cpp
       tests/gui/gui_sketch_interaction_tests.cpp
+      tests/gui/gui_sketch_primitive_constraints_tests.cpp
       tests/gui/gui_sketch_workbench_tests.cpp
       tests/gui/gui_interactive_sketcher_acceptance_tests.cpp
       tests/gui/gui_spatial_surface_workbench_tests.cpp

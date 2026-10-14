@@ -1,6 +1,7 @@
 #include "blcad/core/sketch_constraint_solver.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <limits>
@@ -189,6 +190,7 @@ resolved_entity(const SolveContext& context, const SketchSolverTarget& target) n
   return entity != nullptr &&
          (entity->kind() == SketchTopologyEntityKind::Line ||
           entity->kind() == SketchTopologyEntityKind::Arc ||
+          entity->kind() == SketchTopologyEntityKind::Spline ||
           entity->kind() == SketchTopologyEntityKind::CircleProfile);
 }
 
@@ -285,7 +287,9 @@ validate_constraint_targets(const SolveContext& context, const SketchSolverConst
     break;
   case SketchSolverConstraintKind::PointOnObject:
     if (!require_point(0U) || !is_point_on_supported_object(require_entity(1U)))
-      return fail("point-on-object constraint requires one Sketch point and one line or arc entity");
+      return fail(
+          "point-on-object constraint requires one Sketch point and one line, arc, spline, or "
+          "circle entity");
     break;
   case SketchSolverConstraintKind::HorizontalDistance:
   case SketchSolverConstraintKind::VerticalDistance:
@@ -329,6 +333,157 @@ validate_constraint_targets(const SolveContext& context, const SketchSolverConst
 
 [[nodiscard]] double safe_magnitude(Point2 point, double length_scale) noexcept {
   return std::max(magnitude(point), 1.0e-12 * length_scale);
+}
+
+struct CubicBezierGeometry {
+  std::array<Point2, 4U> control;
+};
+
+[[nodiscard]] CubicBezierGeometry
+cubic_bezier_geometry(const SolveContext& context, const NumericVector& variables,
+                      const SketchTopologyEntity& entity) noexcept {
+  return CubicBezierGeometry{{
+      point_position(context, variables, entity.points()[0]),
+      point_position(context, variables, entity.points()[1]),
+      point_position(context, variables, entity.points()[2]),
+      point_position(context, variables, entity.points()[3]),
+  }};
+}
+
+[[nodiscard]] Point2 cubic_bezier_point(const CubicBezierGeometry& curve,
+                                        double parameter) noexcept {
+  const double t = std::clamp(parameter, 0.0, 1.0);
+  const double u = 1.0 - t;
+  return add(add(scale(curve.control[0], u * u * u),
+                 scale(curve.control[1], 3.0 * u * u * t)),
+             add(scale(curve.control[2], 3.0 * u * t * t),
+                 scale(curve.control[3], t * t * t)));
+}
+
+[[nodiscard]] Point2 cubic_bezier_tangent(const CubicBezierGeometry& curve,
+                                          double parameter) noexcept {
+  const double t = std::clamp(parameter, 0.0, 1.0);
+  const double u = 1.0 - t;
+  return scale(
+      add(add(scale(subtract(curve.control[1], curve.control[0]), u * u),
+              scale(subtract(curve.control[2], curve.control[1]), 2.0 * u * t)),
+          scale(subtract(curve.control[3], curve.control[2]), t * t)),
+      3.0);
+}
+
+[[nodiscard]] double squared_distance(Point2 first, Point2 second) noexcept {
+  const Point2 delta = subtract(first, second);
+  return dot(delta, delta);
+}
+
+struct CubicBezierClosestPoint {
+  Point2 position;
+  Point2 tangent;
+};
+
+// The point-on-spline equation needs the geometric distance, not squared
+// distance: the latter has a zero gradient at a valid solution and makes the
+// finite-difference Gauss-Newton step stall. Find the global closest branch by
+// sampling all local basins and then refining each basin deterministically.
+[[nodiscard]] CubicBezierClosestPoint
+closest_cubic_bezier_point(const CubicBezierGeometry& curve, Point2 candidate,
+                           double length_scale) noexcept {
+  constexpr std::size_t kSampleCount = 64U;
+  constexpr std::size_t kRefinementIterations = 48U;
+  constexpr double kGoldenSection = 0.6180339887498948482;
+
+  std::array<double, kSampleCount + 1U> sampled_squared_distances{};
+  double best_parameter = 0.0;
+  double best_squared_distance = std::numeric_limits<double>::infinity();
+  std::size_t best_sample = 0U;
+  const auto consider = [&](double parameter) {
+    const double clamped = std::clamp(parameter, 0.0, 1.0);
+    const double distance = squared_distance(cubic_bezier_point(curve, clamped), candidate);
+    if (distance < best_squared_distance) {
+      best_squared_distance = distance;
+      best_parameter = clamped;
+    }
+  };
+
+  for (std::size_t sample = 0U; sample <= kSampleCount; ++sample) {
+    const double parameter =
+        static_cast<double>(sample) / static_cast<double>(kSampleCount);
+    const double distance = squared_distance(cubic_bezier_point(curve, parameter), candidate);
+    sampled_squared_distances[sample] = distance;
+    if (distance < best_squared_distance) {
+      best_squared_distance = distance;
+      best_parameter = parameter;
+      best_sample = sample;
+    }
+  }
+
+  const auto refine = [&](std::size_t sample) {
+    double left = static_cast<double>(sample == 0U ? 0U : sample - 1U) /
+                  static_cast<double>(kSampleCount);
+    double right = static_cast<double>(std::min(kSampleCount, sample + 1U)) /
+                   static_cast<double>(kSampleCount);
+    double first = right - kGoldenSection * (right - left);
+    double second = left + kGoldenSection * (right - left);
+    double first_distance = squared_distance(cubic_bezier_point(curve, first), candidate);
+    double second_distance = squared_distance(cubic_bezier_point(curve, second), candidate);
+    for (std::size_t iteration = 0U; iteration < kRefinementIterations; ++iteration) {
+      if (first_distance <= second_distance) {
+        right = second;
+        second = first;
+        second_distance = first_distance;
+        first = right - kGoldenSection * (right - left);
+        first_distance = squared_distance(cubic_bezier_point(curve, first), candidate);
+      } else {
+        left = first;
+        first = second;
+        first_distance = second_distance;
+        second = left + kGoldenSection * (right - left);
+        second_distance = squared_distance(cubic_bezier_point(curve, second), candidate);
+      }
+    }
+    consider(0.5 * (left + right));
+  };
+
+  // Refine every sampled local minimum. Refining the best sample once more
+  // covers monotone endpoint basins and harmlessly duplicates one local basin.
+  for (std::size_t sample = 1U; sample < kSampleCount; ++sample) {
+    if (sampled_squared_distances[sample] <= sampled_squared_distances[sample - 1U] &&
+        sampled_squared_distances[sample] <= sampled_squared_distances[sample + 1U])
+      refine(sample);
+  }
+  refine(best_sample);
+  consider(0.0);
+  consider(1.0);
+
+  const Point2 closest = cubic_bezier_point(curve, best_parameter);
+  Point2 tangent = cubic_bezier_tangent(curve, best_parameter);
+  const double tangent_floor = 1.0e-12 * length_scale;
+  if (magnitude(tangent) <= tangent_floor) {
+    // Cusps and repeated end controls can have B'(t)=0. A symmetric secant
+    // still supplies the local direction in the common case.
+    constexpr double kProbe = 1.0e-4;
+    const double before = std::max(0.0, best_parameter - kProbe);
+    const double after = std::min(1.0, best_parameter + kProbe);
+    tangent =
+        subtract(cubic_bezier_point(curve, after), cubic_bezier_point(curve, before));
+  }
+  if (magnitude(tangent) <= tangent_floor) {
+    // Fully or nearly collapsed splines have no unique normal. Choose the
+    // longest available control chord, and finally a deterministic axis, so
+    // evaluation stays finite and the residual dimension stays stable.
+    const std::array<Point2, 6U> chords{
+        subtract(curve.control[1], curve.control[0]),
+        subtract(curve.control[2], curve.control[1]),
+        subtract(curve.control[3], curve.control[2]),
+        subtract(curve.control[2], curve.control[0]),
+        subtract(curve.control[3], curve.control[1]),
+        subtract(curve.control[3], curve.control[0]),
+    };
+    for (const Point2 chord : chords)
+      if (magnitude(chord) > magnitude(tangent)) tangent = chord;
+  }
+  if (magnitude(tangent) <= tangent_floor) tangent = Point2{1.0, 0.0};
+  return CubicBezierClosestPoint{closest, tangent};
 }
 
 struct ArcGeometry {
@@ -716,9 +871,22 @@ evaluate_constraint(const SolveContext& context, const NumericVector& variables,
       return Result<NumericVector>::success(
           {(magnitude(subtract(candidate, center)) - *constraint.value()) / length_scale});
     }
-    const ArcGeometry arc = arc_geometry(context, variables, entity(1U));
-    return Result<NumericVector>::success(
-        {(magnitude(subtract(candidate, arc.center)) - arc.radius) / length_scale});
+    if (entity(1U).kind() == SketchTopologyEntityKind::Arc) {
+      const ArcGeometry arc = arc_geometry(context, variables, entity(1U));
+      return Result<NumericVector>::success(
+          {(magnitude(subtract(candidate, arc.center)) - arc.radius) / length_scale});
+    }
+    if (entity(1U).kind() == SketchTopologyEntityKind::Spline) {
+      const CubicBezierGeometry spline =
+          cubic_bezier_geometry(context, variables, entity(1U));
+      const CubicBezierClosestPoint closest =
+          closest_cubic_bezier_point(spline, candidate, length_scale);
+      return Result<NumericVector>::success(
+          {cross(closest.tangent, subtract(candidate, closest.position)) /
+           (safe_magnitude(closest.tangent, length_scale) * length_scale)});
+    }
+    return Result<NumericVector>::failure(validation_error(
+        constraint.id(), "point-on-object target is not a supported curve entity"));
   }
   case SketchSolverConstraintKind::HorizontalDistance:
     return Result<NumericVector>::success(

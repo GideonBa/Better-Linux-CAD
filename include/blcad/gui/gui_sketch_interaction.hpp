@@ -252,6 +252,11 @@ public:
 
   [[nodiscard]] Result<std::vector<GuiSketchHit>>
   hits_at(GuiSketchScreenPoint screen_point) const;
+  // Returns every editable curve touched by the pointer sweep. Hits are
+  // ordered from start to end and each curve candidate appears at most once.
+  // Point and annotation primitives deliberately do not participate.
+  [[nodiscard]] Result<std::vector<GuiSketchHit>>
+  curve_hits_along(GuiSketchScreenPoint start, GuiSketchScreenPoint end) const;
   [[nodiscard]] Result<std::optional<GuiSketchHit>>
   cycle_hit(GuiSketchScreenPoint screen_point);
   void reset_hit_cycle() noexcept;

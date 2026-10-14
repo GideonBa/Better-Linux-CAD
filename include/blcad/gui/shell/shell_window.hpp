@@ -14,6 +14,7 @@
 #include <string>
 
 class QAction;
+class QCloseEvent;
 class QPlainTextEdit;
 class QTableWidget;
 class QTableWidgetItem;
@@ -23,6 +24,7 @@ class QTreeWidgetItem;
 namespace blcad::gui {
 
 class ShellRibbon;
+class ShellFeatureTools;
 class ShellSketchTools;
 
 // GUI Shell Reset MVP-9R Block 133: the single Qt shell window (replaces the
@@ -47,6 +49,7 @@ public:
     return active_sketch_;
   }
   [[nodiscard]] ShellSketchTools& sketch_tools() noexcept { return *sketch_tools_; }
+  [[nodiscard]] ShellFeatureTools& feature_tools() noexcept { return *feature_tools_; }
 
   // Appends to the diagnostics panel and the status bar (shell components
   // report through here).
@@ -66,10 +69,16 @@ public:
   // viewport rebuild only when session().presentation_revision() moved).
   void refresh();
 
+protected:
+  void closeEvent(QCloseEvent* event) override;
+
 private:
   void build_ribbon();
   void build_docks();
   void wire_viewport();
+  [[nodiscard]] bool confirm_document_replacement();
+  void reset_document_interaction();
+  void reconcile_active_sketch();
   [[nodiscard]] bool enter_sketch(SketchId sketch);
   void apply_viewport_selection(const std::optional<GuiSelection>& selection);
   void handle_tree_selection(QTreeWidgetItem* current);
@@ -91,6 +100,7 @@ private:
   GuiSketchWorkspace sketch_workspace_;
   GuiDocumentBrowser browser_model_;
   std::unique_ptr<ShellSketchTools> sketch_tools_;
+  std::unique_ptr<ShellFeatureTools> feature_tools_;
 
   OcctViewport* viewport_{nullptr};
   ShellRibbon* ribbon_{nullptr};

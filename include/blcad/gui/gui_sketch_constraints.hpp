@@ -370,6 +370,7 @@ public:
             const auto value = kind(target);
             return value && (*value == SketchTopologyEntityKind::Line ||
                              *value == SketchTopologyEntityKind::Arc ||
+                             *value == SketchTopologyEntityKind::Spline ||
                              *value == SketchTopologyEntityKind::CircleProfile);
           }))
         result.push_back(SketchSolverConstraintKind::PointOnObject);

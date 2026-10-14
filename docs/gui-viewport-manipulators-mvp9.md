@@ -2,8 +2,9 @@
 
 Status: implemented in Block 123. `GuiViewportManipulatorLayer` is unchanged, but
 `GuiViewportManipulatorShellBinder` — the transparent Qt overlay described here — was deleted with the
-Block-133 shell reset (`docs/gui-shell-reset-sequence-mvp9r.md`). Block 135 replaces it with a
-shell-owned, notification-driven overlay; the Qt overlay specifics below are historical until then.
+Block-133 shell reset (`docs/gui-shell-reset-sequence-mvp9r.md`). Block 135 replaces it with the
+shell-owned, notification-driven `ShellFeatureTools` overlay; the old binder specifics below are
+historical.
 
 Block 123 provides one reusable transient manipulation layer for the interactive Part, Surface, and
 Assembly commands sequenced in Blocks 124–130. The layer maps viewport pointer motion to candidate
@@ -149,6 +150,11 @@ blcad.viewport_manipulator_overlay
 blcad.manipulator_numeric_hud
 ```
 
+Block 135 uses those stable names again for the replacement overlay and task-panel numeric editor.
+The replacement path remaps on viewport gestures and ribbon camera/projection commands. If `Esc`,
+window deactivation, or an invalid mapping ends a live drag, `ShellFeatureTools` restores the
+controller value captured at drag start before republishing handles.
+
 The transparent overlay renders arrows, rings, endpoint markers, active values, and pattern-count
 markers. The binder owns mouse capture, exact release, `Esc`/deactivation cancellation, camera refresh,
 and HUD synchronization. A revision check updates presentation when later commands replace handles.
@@ -159,8 +165,8 @@ binder performs no Core/Geometry mutation and no preview transaction.
 ## Focused proof
 
 The `[gui][viewport-manipulators]` and `[gui][manipulator-numeric-coupling]` cases asserted against
-the deleted overlay binder and were removed with Block 133; Block 135 restores them against
-`ShellWindow`. The layer's model-space mapping and candidate contract are meanwhile exercised through
+the deleted overlay binder and were removed with Block 133; Block 135 restores the replacement path
+against `ShellWindow` under `[gui][shell-features]`. The layer's model-space mapping and candidate contract are meanwhile exercised through
 the Block 124–128 controller proofs, and its hit performance budget still has a focused case:
 
 ```bash

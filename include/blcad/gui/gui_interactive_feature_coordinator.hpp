@@ -29,7 +29,13 @@ public:
   [[nodiscard]] GuiInteractiveExtrudeController& extrude() noexcept {
     return extrude_;
   }
+  [[nodiscard]] const GuiInteractiveExtrudeController& extrude() const noexcept {
+    return extrude_;
+  }
   [[nodiscard]] GuiInteractiveRevolveController& revolve() noexcept {
+    return revolve_;
+  }
+  [[nodiscard]] const GuiInteractiveRevolveController& revolve() const noexcept {
     return revolve_;
   }
   [[nodiscard]] GuiInteractiveFinishingController& finishing() noexcept {
@@ -84,6 +90,24 @@ public:
     return begun;
   }
 
+  [[nodiscard]] Result<std::size_t>
+  begin_extrude_with_new_inputs(SketchId sketch, ProfileId profile, FeatureId feature,
+                                std::string name, Parameter distance_parameter,
+                                Body result_body,
+                                GuiFeatureManipulatorFrame frame = {}) {
+    cancel();
+    if (session_ == nullptr)
+      return no_session<std::size_t>();
+    auto begun = extrude_.begin_with_new_inputs(
+        *session_, std::move(sketch), std::move(profile), std::move(feature),
+        std::move(name), std::move(distance_parameter), std::move(result_body));
+    if (begun.has_error())
+      return begun;
+    extrude_.set_manipulator_frame(frame);
+    publish_handles();
+    return begun;
+  }
+
   [[nodiscard]] Result<std::size_t> begin_revolve(SketchId sketch, ProfileId profile,
                                                   FeatureId feature, std::string name,
                                                   AxisReference axis, BodyId result_body,
@@ -101,16 +125,34 @@ public:
     return begun;
   }
 
+  [[nodiscard]] Result<std::size_t>
+  begin_revolve_with_new_body(SketchId sketch, ProfileId profile, FeatureId feature,
+                              std::string name, AxisReference axis, Body result_body,
+                              GuiFeatureManipulatorFrame frame = {}) {
+    cancel();
+    if (session_ == nullptr)
+      return no_session<std::size_t>();
+    auto begun = revolve_.begin_with_new_body(
+        *session_, std::move(sketch), std::move(profile), std::move(feature),
+        std::move(name), std::move(axis), std::move(result_body));
+    if (begun.has_error())
+      return begun;
+    revolve_.set_manipulator_frame(frame);
+    publish_handles();
+    return begun;
+  }
+
   // Fold a manipulator candidate into the active controller. Handles are only
   // re-seeded once the drag has ended (empty active handle) so the layer is
   // never reset mid-drag.
-  void on_candidate(const GuiViewportManipulatorCandidate& candidate) {
+  bool on_candidate(const GuiViewportManipulatorCandidate& candidate) {
     bool changed = false;
     visit_active([&candidate, &changed](auto& controller) {
       changed = controller.apply_manipulator(candidate);
     });
     if (changed && layer_ != nullptr && layer_->active_handle_id().empty())
       publish_handles();
+    return changed;
   }
 
   [[nodiscard]] Result<GuiPartFeaturePreview> preview() const {

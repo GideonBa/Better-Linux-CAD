@@ -8,8 +8,9 @@ validation/failure policy, ordering, and focused proof. `docs/mvp-plan.md` is th
 > seven self-installing binders — and replaced it with `ShellWindow` + `ShellRibbon` (`src/gui/shell/`,
 > contract: `docs/gui-shell-reset-sequence-mvp9r.md`). Nothing below the shell moved: Core, Geometry,
 > `GuiDocumentSession`, `GuiCommandRegistry`, the selection/browser models, the workbenches, and the
-> Qt-free interactive controllers are unchanged. Passages below that name a binder describe the Qt
-> presentation layer, whose current form is Blocks 135–136 work.
+> Qt-free interactive controllers remain the authority. Passages below that name a binder describe
+> the historical Qt presentation layer; Block 135 rehosts Extrude/Revolve and manipulators in
+> `ShellFeatureTools`, while Block 136 owns the remaining surface.
 
 ## Goal and authority model
 
@@ -270,8 +271,9 @@ processes the exact final pointer sample, and valid typed HUD values override su
 
 The transparent Qt overlay, mouse capture, cancellation, camera refresh, and numeric-HUD
 synchronization belong to the shell. `GuiViewportManipulatorShellBinder` held them until Block 133
-deleted it; Block 135 re-establishes them as a shell-owned, notification-driven overlay. Neither the
-controller nor that presentation layer receives document mutation or Geometry-preview authority. The emitted candidate becomes input to an owning Block-124–130 command,
+deleted it; Block 135 re-establishes them in the shell-owned, notification-driven
+`ShellFeatureTools` overlay. Neither the controller nor that presentation layer receives document
+mutation or Geometry-preview authority. The emitted candidate becomes input to an owning Block-124–130 command,
 which remains responsible for validation, preview, Apply, and one undoable transaction.
 
 Canonical contract: `docs/gui-viewport-manipulators-mvp9.md`.

@@ -11,6 +11,7 @@
 #include <optional>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 class QAction;
@@ -61,6 +62,8 @@ public:
   // a radius/distance. Each previews once and commits one atomic transaction.
   [[nodiscard]] Result<std::size_t>
   apply_modify_pick(SketchModifyKind kind, const std::string& entity_id, Point2 pick);
+  [[nodiscard]] Result<std::size_t>
+  apply_modify_profile_pick(SketchModifyKind kind, const ProfileId& profile_id, Point2 pick);
   [[nodiscard]] Result<std::size_t> apply_fillet(double radius);
   [[nodiscard]] Result<std::size_t> apply_chamfer(double distance);
   // Arms a modal Trim/Extend/Split tool; the next curve click runs the op.
@@ -93,6 +96,12 @@ private:
   // prefix) for the modify service, which addresses core entity ids directly.
   [[nodiscard]] std::vector<SketchEntityId> selected_sketch_entity_ids() const;
   void handle_modify_press(SketchModifyKind kind, const std::optional<GuiSketchHit>& hit);
+  void begin_trim_stroke(GuiSketchScreenPoint screen);
+  void continue_trim_stroke(GuiSketchScreenPoint screen);
+  void queue_trim_stroke_hits(std::vector<GuiSketchHit> hits);
+  void handle_trim_stroke_hit(const std::optional<GuiSketchHit>& hit, bool report_miss);
+  void end_trim_stroke() noexcept;
+  void cancel_trim_stroke() noexcept;
   // Authors one catalog constraint (preview → accept → commit); returns false
   // and stays silent when the preview is not accepted (e.g. already implied).
   [[nodiscard]] bool author_catalog_constraint(SketchSolverConstraintKind kind,
@@ -153,6 +162,14 @@ private:
   std::optional<GuiSketchDragController> drag_controller_;
   // Armed Trim/Extend/Split modal tool; the next curve press runs the op.
   std::optional<SketchModifyKind> modify_tool_;
+  // Inventor-style Trim painting. The screen guard prevents the pointer update
+  // preceding Release from trimming a newly exposed, overlapping curve at the
+  // same position after publish_scene rebuilt the interaction scene.
+  bool trim_stroke_active_{false};
+  std::optional<GuiSketchScreenPoint> trim_stroke_last_screen_;
+  std::unordered_set<std::string> trim_stroke_visited_;
+  std::size_t trim_stroke_generation_{0U};
+  std::size_t trim_stroke_pending_{0U};
   // Transient (session-local) dimension label placement: dimension id → plane
   // offset from the resolver's default anchor; dragged with the mouse.
   std::unordered_map<std::string, Point2> dimension_label_offsets_;

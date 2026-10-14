@@ -4,10 +4,10 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 134
-current_block: 135
-current_boundary: Interactive features minimal — Extrude/Revolve with manipulators in the shell
-current_tag: "[gui][shell-features]"
+implemented_through: Block 135
+current_block: 136
+current_boundary: Feature full coverage in the replacement shell
+current_tag: "[gui][shell-coverage]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -18,7 +18,7 @@ phase_status:
   mvp_7: "GUI Feature Validation — Blocks 95–105 implemented; MVP complete"
   mvp_8: "Interactive Sketcher — Blocks 106–121 implemented; MVP complete"
   mvp_9: "Interactive Part & Assembly Modeling — Blocks 122–131 implemented; MVP complete"
-  mvp_9r: "GUI Shell Reset — Blocks 132–134 implemented; Blocks 135–136 planned"
+  mvp_9r: "GUI Shell Reset — Blocks 132–135 implemented; Block 136 planned"
   mvp_10: "STEP Import — Blocks 137–143 planned"
 ---
 
@@ -31,10 +31,10 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 ## Current status
 
 ```text
-implemented through  Block 134
-current block        Block 135
+implemented through  Block 135
+current block        Block 136
 current phase        GUI Shell Reset MVP-9R
-current boundary     Interactive features minimal — Extrude/Revolve with manipulators
+current boundary     Feature full coverage in the replacement shell
 ```
 
 Interactive Sketcher MVP-8 is complete and accepted. Blocks 122–123 establish the selection-first
@@ -59,7 +59,7 @@ MVP-6   Part Construction                              Blocks 48–94 implemente
 MVP-7   GUI Feature Validation                        Blocks 95–105 implemented
 MVP-8   Interactive Sketcher                          Blocks 106–121 implemented
 MVP-9   Interactive Part & Assembly Modeling          Blocks 122–131 implemented
-MVP-9R  GUI Shell Reset                 Blocks 132–134 implemented; Blocks 135–136 planned
+MVP-9R  GUI Shell Reset                       Blocks 132–135 implemented; Block 136 planned
 MVP-10  STEP Import                                            Blocks 137–143 planned
 ```
 
@@ -529,24 +529,25 @@ Sequence contract: `docs/gui-shell-reset-sequence-mvp9r.md`.
   as the default tool. The `Ändern` group (Modify) was initially deferred to Block 136 but is wired in
   Block 134: Trim/Extend/Split as modal pick tools, two-curve Fillet/Chamfer with auto-constraints and
   a driving size dimension (`docs/gui-shell-reset-sequence-mvp9r.md`, "Ändern group").
-- Block 135 — Interactive features minimal: Extrude and Revolve in the ribbon with manipulator
-  overlay and numeric coupling — the first fully usable end-to-end shell (sketch → extrude).
+- Block 135 — Interactive features minimal — Implemented: `ShellFeatureTools` makes Extrude and
+  Revolve reachable from the ribbon through `GuiInteractiveFeatureCoordinator`, owns the
+  notification-driven manipulator overlay and right-side numeric task panel, and provides validated
+  preview/apply/cancel. Finish Sketch hands off one materialized profile. Fresh Parts provision the
+  driving Length parameter and result Body only inside the final feature transaction, so Cancel is
+  mutation-free and one Undo removes the complete operation. This is the first fully usable
+  end-to-end replacement shell (sketch → profile → extrude/revolve). The follow-up hardening audit
+  adds persistent viewport selection for topology-authored profiles, stale-selection invalidation,
+  strict unit parsing, numeric drag override and rollback, collision-safe generated inputs,
+  immediate camera remapping, and expanded negative/atomic proofs.
 - Block 136 — Feature full coverage: remaining feature commands (Fillet, Chamfer, Shell, Draft,
   Pattern, Mirror, Boolean, Transform, Sweep, Loft, Surface, Measure, Assembly), feature edit via
   browser double-click, acceptance coverage.
 
-## Current next technical step — Block 135
+## Current next technical step — Block 136
 
-Make Extrude and Revolve reachable from the ribbon: selection-first flow through
-`GuiInteractiveFeatureCoordinator`, a shell-owned manipulator overlay (notification-driven
-replacement of the deleted Block-123 overlay binder), numeric coupling, and preview/apply/cancel,
-as defined in `docs/gui-shell-reset-sequence-mvp9r.md`.
-
-The coordinator now lives in `include/blcad/gui/gui_interactive_feature_coordinator.hpp` (renamed from
-`gui_interactive_extrude_revolve_binder.hpp`: it never was a binder, and it coordinates all nine Block
-124–128 controllers). It dispatches over one ordered controller list, and every controller — Extrude
-and Revolve included — now exposes `handles()`, so the shell overlay publishes handles without knowing
-which family is active.
+Restore the remaining feature commands (Fillet, Chamfer, Shell, Draft, Pattern, Mirror, Boolean,
+Transform, Sweep, Loft, Surface, Measure, and Assembly), browser-double-click feature editing, and
+replacement-shell acceptance/coverage as defined in `docs/gui-shell-reset-sequence-mvp9r.md`.
 
 ## Later phases
 

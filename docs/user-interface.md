@@ -22,8 +22,9 @@ authoring; Block 127 implements interactive PathCurve, Sweep, and Loft authoring
 interactive Surface authoring and surface-to-solid conversion; Block 129 adds the feature edit
 lifecycle and Core feature-update commands; and Block 130 implements direct Assembly placement,
 compatibility-filtered relationships, joint-frame preview, and coordinate motion. Block 131 adds
-transient Measure and completes integrated MVP-9 acceptance. Blocks 132–136 are GUI Shell Reset
-MVP-9R; STEP Import MVP-10 begins with Block 137.
+transient Measure and completes integrated MVP-9 acceptance. GUI Shell Reset MVP-9R is implemented
+through Block 135; Block 136 completes the replacement surface. STEP Import MVP-10 begins with
+Block 137.
 
 The UI is deliberately not built like FreeCAD. The goal is a modern, consistent, reduced interface
 with clear separation between model, parameters, features, Sketch topology, solver results, and
@@ -80,9 +81,9 @@ the selected object on command start, and exposes Cancel while the existing task
 same command id without replaying hidden parameter or selection state.
 
 Finish Sketch keeps the existing camera, cursor, workspace, and selection-filter restoration. A
-feature handoff is emitted only when the inspected region resolves to a profile already materialized
-in the persistent Sketch. Detected but non-materialized regions fail closed and do not become feature
-inputs.
+single unambiguous bounded line region is materialized into the persistent Sketch before the feature
+handoff; an already materialized profile is handed off unchanged. Multiple or ambiguous detected
+regions still require an explicit contour/profile selection.
 
 The selection-filter combo publishes one mask to both `GuiSelectionModel` and `OcctViewport`. The
 ViewCube reuses viewport standard-camera authority; Home and named bookmarks store complete transient
@@ -112,8 +113,8 @@ families use an explicit model plane. Overlapping handle hits sort by screen dis
 id. Drag start freezes the initial measurement, avoiding a value jump to the visual endpoint, and
 release evaluates the exact final pointer sample.
 
-The deleted Qt overlay binder exposed the object names below; Block 135 re-establishes an equivalent
-shell-owned overlay:
+The deleted Qt overlay binder exposed the historical object names below; Block 135 re-establishes the
+equivalent shell-owned `ShellFeatureTools` overlay without cross-component discovery:
 
 ```text
 blcad.viewport_manipulator_overlay
@@ -123,6 +124,10 @@ blcad.manipulator_numeric_hud
 Dragging updates the HUD. Valid typed `mm`, `deg`, or unitless count input updates the same candidate
 and overrides later pointer motion until explicitly cleared. `Esc`, window deactivation, invalid
 mapping, or invalid release clears transient interaction without a compensating document transaction.
+In the Block-135 Extrude/Revolve shell, rejected text or an incompatible unit restores the last valid
+displayed value. Cancelling only the active drag restores its drag-start value and keeps the feature
+task open; a second `Esc` cancels the complete task. Selecting a non-profile object clears any prior
+Finish-Sketch handoff, so commands never start from a stale hidden profile.
 
 Canonical contract: `docs/gui-viewport-manipulators-mvp9.md`.
 
@@ -165,8 +170,8 @@ Block 109 provides the headless producer and Block 110 continuously publishes ba
 selection filter. It resolves workplane, enters normal orthographic view, restricts picking to
 SketchEntity/Edge/Vertex, and uses a crosshair. `Finish Sketch` rejects active commands or current
 Finish diagnostics and restores workspace, selection, camera, and selection filtering. It does not
-invent an Extrude or another downstream feature; the Block-122 handoff only publishes an existing
-materialized profile as transient preselection.
+invent an Extrude or another downstream feature; the handoff publishes an existing profile or the
+single bounded line region materialized as part of finishing the Sketch.
 
 The command lifecycle is canonical in `docs/gui-interactive-sketch-workspace-mvp8.md`.
 
@@ -384,13 +389,16 @@ input only and do not claim a valid feature preview until the owning later comma
     navigation aids. Implemented in Block 122.
 11. Add reusable transient viewport manipulators and numeric coupling. Implemented in Block 123.
 12. Add family-specific interactive Part/Surface/Assembly authoring through Blocks 124–131.
-13. Add STEP Reference/EditableBody import through Blocks 137–143.
+13. Rehost Extrude/Revolve with shell-owned manipulators. Implemented in Block 135.
+14. Restore full replacement-shell feature and acceptance coverage in Block 136.
+15. Add STEP Reference/EditableBody import through Blocks 137–143.
 
 ## Current boundary
 
-Blocks 106–121 are implemented and Interactive Sketcher MVP-8 is accepted. Blocks 122–123 implement
-the selection-first modeling shell and reusable candidate-only manipulators. Block 124 interactive
-Extrude, path Extrude, and Revolve authoring is next.
+Blocks 106–121 are implemented and Interactive Sketcher MVP-8 is accepted. Interactive Modeling
+MVP-9 is accepted through Block 131. Replacement-shell Blocks 132–135 are implemented, including
+Sketch authoring and shell-owned interactive Extrude/Revolve. Block 136 full feature/acceptance
+coverage is next.
 
 No widget may implement substitute constraint mathematics. Sketch and modeling interactions map
 transient picks to explicit semantic capabilities and public Core/application commands, use existing

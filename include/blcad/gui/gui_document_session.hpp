@@ -70,6 +70,7 @@ public:
   [[nodiscard]] bool close(bool discard_dirty = false) noexcept;
   [[nodiscard]] bool set_workspace(GuiWorkspace workspace) noexcept;
   void set_derived_results_fresh(bool fresh) noexcept;
+  void report_error(const Error& error);
   void clear_diagnostics() noexcept;
 
   [[nodiscard]] GuiDocumentKind document_kind() const noexcept;

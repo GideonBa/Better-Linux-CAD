@@ -1,6 +1,7 @@
 #pragma once
 
 #include "blcad/gui/gui_document_session.hpp"
+#include "blcad/gui/gui_interactive_profile_materialization.hpp"
 #include "blcad/gui/gui_modeling_workspace.hpp"
 #include "blcad/gui/gui_part_foundation_workbench.hpp"
 #include "blcad/gui/gui_viewport_manipulator.hpp"
@@ -10,7 +11,10 @@
 #include "blcad/core/part_feature_input_reference.hpp"
 #include "blcad/core/quantity.hpp"
 #include "blcad/core/revolve_feature.hpp"
+#include "blcad/geometry/recompute_executor.hpp"
 
+#include <cmath>
+#include <limits>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -54,23 +58,87 @@ public:
     const auto* part = session.part_document();
     if (part == nullptr)
       return fail("interactive extrude requires an active Part document");
-    const Sketch* source = part->find_sketch(sketch);
-    if (source == nullptr ||
-        !GuiModelingWorkspace::has_materialized_profile(*source, profile))
-      return fail("interactive extrude requires a materialized profile region");
+    auto pending_profile = prepare_interactive_profile(*part, sketch, profile);
+    if (pending_profile.has_error())
+      return Result<std::size_t>::failure(pending_profile.error());
     const Parameter* driver = part->find_parameter(distance_parameter);
     if (driver == nullptr || driver->type() != ParameterType::Length)
       return fail("interactive extrude requires an existing Length distance parameter");
     if (part->find_body(result_body) == nullptr)
       return fail("interactive extrude requires an existing result Body");
 
+    pending_distance_parameter_.reset();
+    pending_result_body_.reset();
+    pending_profile_materialization_ = std::move(pending_profile.value());
+    initialize(std::move(sketch), std::move(profile), std::move(feature), std::move(name),
+               std::move(distance_parameter), std::move(result_body),
+               driver->value().millimeters());
+    return Result<std::size_t>::success(1);
+  }
+
+  // Shell-reset Block 135 auto-provisioning boundary. A freshly created Part
+  // has no Body or feature-distance parameter yet. Keep those objects in the
+  // disposable candidate and add them in the same Apply transaction as the
+  // feature, so Cancel is mutation-free and one Undo removes the complete
+  // operation. The established begin(...) path for existing inputs is
+  // unchanged.
+  [[nodiscard]] Result<std::size_t>
+  begin_with_new_inputs(const GuiDocumentSession& session, SketchId sketch, ProfileId profile,
+                        FeatureId feature, std::string name, Parameter distance_parameter,
+                        Body result_body) {
+    const auto* part = session.part_document();
+    if (part == nullptr)
+      return fail("interactive extrude requires an active Part document");
+    auto pending_profile = prepare_interactive_profile(*part, sketch, profile);
+    if (pending_profile.has_error())
+      return Result<std::size_t>::failure(pending_profile.error());
+    if (distance_parameter.type() != ParameterType::Length)
+      return fail("interactive extrude requires a Length distance parameter");
+    if (part->find_parameter(distance_parameter.id()) != nullptr)
+      return fail("auto-provisioned extrude distance parameter must be new");
+    if (part->find_body(result_body.id()) != nullptr)
+      return fail("auto-provisioned extrude result Body must be new");
+
+    PartDocument candidate = *part;
+    if (pending_profile.value().has_value()) {
+      auto updated = candidate.update_sketch(pending_profile.value()->completed_sketch);
+      if (updated.has_error())
+        return Result<std::size_t>::failure(updated.error());
+    }
+    auto added_parameter = candidate.add_parameter(distance_parameter);
+    if (added_parameter.has_error())
+      return Result<std::size_t>::failure(added_parameter.error());
+    auto added_body = candidate.add_body(result_body);
+    if (added_body.has_error())
+      return Result<std::size_t>::failure(added_body.error());
+
+    const ParameterId parameter_id = distance_parameter.id();
+    const BodyId body_id = result_body.id();
+    const double distance = distance_parameter.value().millimeters();
+    pending_distance_parameter_ = std::move(distance_parameter);
+    pending_result_body_ = std::move(result_body);
+    pending_profile_materialization_ = std::move(pending_profile.value());
+    initialize(std::move(sketch), std::move(profile), std::move(feature), std::move(name),
+               parameter_id, body_id, distance);
+    return Result<std::size_t>::success(1);
+  }
+
+  [[nodiscard]] const FeatureId& feature_id() const noexcept { return feature_; }
+  [[nodiscard]] const ParameterId& distance_parameter_id() const noexcept {
+    return distance_parameter_;
+  }
+  [[nodiscard]] const BodyId& result_body_id() const noexcept { return result_body_; }
+
+private:
+  void initialize(SketchId sketch, ProfileId profile, FeatureId feature, std::string name,
+                  ParameterId distance_parameter, BodyId result_body, double distance) {
     sketch_ = std::move(sketch);
     profile_ = std::move(profile);
     feature_ = std::move(feature);
     name_ = std::move(name);
     distance_parameter_ = std::move(distance_parameter);
     result_body_ = std::move(result_body);
-    distance_ = driver->value().millimeters();
+    distance_ = distance;
     extent_mode_ = ExtrudeExtentMode::Distance;
     operation_ = FeatureBodyOperationMode::NewBody;
     direction_ = ExtrudeDirection::SketchNormal;
@@ -81,14 +149,16 @@ public:
     second_face_.reset();
     second_distance_parameter_.reset();
     active_ = true;
-    return Result<std::size_t>::success(1);
   }
 
+public:
   [[nodiscard]] bool active() const noexcept { return active_; }
 
   void set_operation(FeatureBodyOperationMode operation, std::optional<BodyId> target = std::nullopt) {
     operation_ = operation;
-    if (operation != FeatureBodyOperationMode::NewBody && target.has_value())
+    if (operation == FeatureBodyOperationMode::NewBody && pending_result_body_.has_value())
+      result_body_ = pending_result_body_->id();
+    else if (operation != FeatureBodyOperationMode::NewBody && target.has_value())
       result_body_ = std::move(*target);
   }
   void set_extent_mode(ExtrudeExtentMode mode) noexcept { extent_mode_ = mode; }
@@ -129,6 +199,9 @@ public:
     handle.origin = frame_.origin;
     handle.axis = frame_.axis;
     handle.reference_value = distance_;
+    // A zero-length prism is not a valid preview. Keep drag candidates inside
+    // the same strictly-positive domain as Length parameters.
+    handle.minimum_value = std::numeric_limits<double>::epsilon();
     return handle;
   }
   [[nodiscard]] std::optional<GuiViewportManipulatorHandle> taper_handle() const {
@@ -140,6 +213,8 @@ public:
     handle.plane_normal = frame_.plane_normal;
     handle.reference_direction = frame_.reference_direction;
     handle.reference_value = *taper_deg_;
+    handle.minimum_value = std::nextafter(-90.0, 0.0);
+    handle.maximum_value = std::nextafter(90.0, 0.0);
     return handle;
   }
   [[nodiscard]] std::optional<GuiViewportManipulatorHandle> thin_handle() const {
@@ -150,7 +225,7 @@ public:
     handle.origin = frame_.origin;
     handle.axis = frame_.axis;
     handle.reference_value = thin_->thickness_mm;
-    handle.minimum_value = 0.0;
+    handle.minimum_value = std::numeric_limits<double>::epsilon();
     return handle;
   }
 
@@ -168,17 +243,21 @@ public:
   // field changed so the caller re-previews.
   [[nodiscard]] bool apply_manipulator(const GuiViewportManipulatorCandidate& candidate) {
     if (candidate.handle_id == kExtrudeExtentHandleId &&
-        candidate.value_kind == GuiViewportManipulatorValueKind::Distance) {
+        candidate.value_kind == GuiViewportManipulatorValueKind::Distance &&
+        std::isfinite(candidate.scalar_value) && candidate.scalar_value > 0.0) {
       distance_ = candidate.scalar_value;
       return true;
     }
     if (candidate.handle_id == kExtrudeTaperHandleId &&
-        candidate.value_kind == GuiViewportManipulatorValueKind::Angle) {
+        candidate.value_kind == GuiViewportManipulatorValueKind::Angle &&
+        std::isfinite(candidate.scalar_value) && candidate.scalar_value > -90.0 &&
+        candidate.scalar_value < 90.0) {
       taper_deg_ = candidate.scalar_value;
       return true;
     }
     if (candidate.handle_id == kExtrudeThinHandleId && thin_.has_value() &&
-        candidate.value_kind == GuiViewportManipulatorValueKind::Distance) {
+        candidate.value_kind == GuiViewportManipulatorValueKind::Distance &&
+        std::isfinite(candidate.scalar_value) && candidate.scalar_value > 0.0) {
       thin_->thickness_mm = candidate.scalar_value;
       return true;
     }
@@ -192,6 +271,8 @@ public:
     auto feature = build_feature();
     if (feature.has_error()) return Result<GuiPartFeaturePreview>::failure(feature.error());
     PartDocument candidate = *part;
+    if (auto provisioned = provision_pending_inputs(candidate); provisioned.has_error())
+      return Result<GuiPartFeaturePreview>::failure(provisioned.error());
     if (auto seeded = seed_parameters(candidate); seeded.has_error())
       return Result<GuiPartFeaturePreview>::failure(seeded.error());
     auto added = candidate.add_feature(feature.value());
@@ -202,23 +283,92 @@ public:
         {feature_, summary(), plan.value().step_count()});
   }
 
+  // Build the real disposable OCCT result used by the shell's visual preview.
+  // This follows the same candidate path as Apply without mutating the session.
+  [[nodiscard]] Result<geometry::GeometryShape>
+  preview_shape(const GuiDocumentSession& session) const {
+    if (!active_)
+      return shape_preview_fail("no interactive extrude is active");
+    const auto* part = session.part_document();
+    if (part == nullptr)
+      return shape_preview_fail("preview requires an active Part document");
+    auto feature = build_feature();
+    if (feature.has_error())
+      return Result<geometry::GeometryShape>::failure(feature.error());
+    PartDocument candidate = *part;
+    if (auto provisioned = provision_pending_inputs(candidate); provisioned.has_error())
+      return Result<geometry::GeometryShape>::failure(provisioned.error());
+    if (auto seeded = seed_parameters(candidate); seeded.has_error())
+      return Result<geometry::GeometryShape>::failure(seeded.error());
+    if (auto added = candidate.add_feature(std::move(feature.value())); added.has_error())
+      return Result<geometry::GeometryShape>::failure(added.error());
+    auto cache = geometry::ShapeCache::create(
+        ShapeCacheId(feature_.value() + ".interactive_preview"));
+    if (cache.has_error())
+      return Result<geometry::GeometryShape>::failure(cache.error());
+    auto recomputed =
+        geometry::GeometryRecomputeExecutor{}.execute_document(candidate, cache.value());
+    if (recomputed.has_error())
+      return Result<geometry::GeometryShape>::failure(recomputed.error());
+    const auto* shape = cache.value().find_body_shape(result_body_);
+    if (shape == nullptr || shape->empty())
+      return shape_preview_fail("extrude preview produced no visible Body shape");
+    return Result<geometry::GeometryShape>::success(*shape);
+  }
+
   [[nodiscard]] Result<std::size_t> apply(GuiDocumentSession& session) {
     auto checked = preview(session);
     if (checked.has_error()) return Result<std::size_t>::failure(checked.error());
     auto feature = build_feature();
     if (feature.has_error()) return Result<std::size_t>::failure(feature.error());
-    auto committed = session.commit_part_transaction(
-        std::string(direction_ == ExtrudeDirection::Path ? "Apply Path Extrude" : "Apply Extrude"),
-        [this, feature = std::move(feature.value())](PartDocument& part) mutable -> Result<std::size_t> {
-          if (auto seeded = seed_parameters(part); seeded.has_error()) return seeded;
-          return part.add_feature(std::move(feature));
-        });
+    const std::string label =
+        direction_ == ExtrudeDirection::Path ? "Apply Path Extrude" : "Apply Extrude";
+    Result<std::size_t> committed = [&]() {
+      if (pending_profile_materialization_.has_value()) {
+        return session.commit_part_sketch_intent_transaction(
+            label,
+            [this, feature = std::move(feature.value())](
+                PartDocument& part,
+                std::vector<SketchConstraintCatalog>& constraint_catalogs,
+                std::vector<SketchDimensionCatalog>& dimension_catalogs) mutable
+                -> Result<std::size_t> {
+              auto profile = publish_interactive_profile(
+                  part, *pending_profile_materialization_, constraint_catalogs,
+                  dimension_catalogs);
+              if (profile.has_error()) return profile;
+              auto objects = provision_pending_objects(part);
+              if (objects.has_error()) return objects;
+              if (auto seeded = seed_parameters(part); seeded.has_error()) return seeded;
+              auto added = part.add_feature(std::move(feature));
+              if (added.has_error()) return added;
+              return Result<std::size_t>::success(profile.value() + objects.value() +
+                                                  added.value());
+            });
+      }
+      return session.commit_part_transaction(
+          label,
+          [this, feature = std::move(feature.value())](PartDocument& part) mutable
+              -> Result<std::size_t> {
+            auto objects = provision_pending_objects(part);
+            if (objects.has_error()) return objects;
+            if (auto seeded = seed_parameters(part); seeded.has_error()) return seeded;
+            return part.add_feature(std::move(feature));
+          });
+    }();
     if (committed.has_error()) return committed;
     active_ = false;
+    pending_distance_parameter_.reset();
+    pending_result_body_.reset();
+    pending_profile_materialization_.reset();
     return committed;
   }
 
-  void cancel() noexcept { active_ = false; }
+  void cancel() noexcept {
+    active_ = false;
+    pending_distance_parameter_.reset();
+    pending_result_body_.reset();
+    pending_profile_materialization_.reset();
+  }
 
 private:
   struct ThinState {
@@ -248,6 +398,35 @@ private:
       if (changed.has_error()) return Result<std::size_t>::failure(changed.error());
     }
     return Result<std::size_t>::success(1);
+  }
+
+  [[nodiscard]] Result<std::size_t> provision_pending_profile(PartDocument& part) const {
+    if (!pending_profile_materialization_.has_value())
+      return Result<std::size_t>::success(0U);
+    return part.update_sketch(pending_profile_materialization_->completed_sketch);
+  }
+
+  [[nodiscard]] Result<std::size_t> provision_pending_objects(PartDocument& part) const {
+    std::size_t changed = 0U;
+    if (pending_distance_parameter_.has_value()) {
+      auto added = part.add_parameter(*pending_distance_parameter_);
+      if (added.has_error()) return added;
+      changed += added.value();
+    }
+    if (operation_ == FeatureBodyOperationMode::NewBody && pending_result_body_.has_value()) {
+      auto added = part.add_body(*pending_result_body_);
+      if (added.has_error()) return added;
+      changed += added.value();
+    }
+    return Result<std::size_t>::success(changed);
+  }
+
+  [[nodiscard]] Result<std::size_t> provision_pending_inputs(PartDocument& part) const {
+    auto profile = provision_pending_profile(part);
+    if (profile.has_error()) return profile;
+    auto objects = provision_pending_objects(part);
+    if (objects.has_error()) return objects;
+    return Result<std::size_t>::success(profile.value() + objects.value());
   }
 
   [[nodiscard]] Result<ExtrudeExtentIntent> build_extent() const {
@@ -295,7 +474,9 @@ private:
       auto feature =
           Feature::create_additive_path_extrude(feature_, name_, sketch_, *path_curve_);
       if (feature.has_error()) return feature;
-      return feature.value().with_body_result_context(context.value());
+      auto profiled = feature.value().with_profile(profile_);
+      if (profiled.has_error()) return profiled;
+      return profiled.value().with_body_result_context(context.value());
     }
 
     auto extent = build_extent();
@@ -312,7 +493,9 @@ private:
     auto feature =
         Feature::create_additive_extrude(feature_, name_, sketch_, std::move(intent.value()), direction_);
     if (feature.has_error()) return feature;
-    return feature.value().with_body_result_context(context.value());
+    auto profiled = feature.value().with_profile(profile_);
+    if (profiled.has_error()) return profiled;
+    return profiled.value().with_body_result_context(context.value());
   }
 
   [[nodiscard]] std::string summary() const {
@@ -327,6 +510,11 @@ private:
   }
   [[nodiscard]] static Result<GuiPartFeaturePreview> preview_fail(std::string message) {
     return Result<GuiPartFeaturePreview>::failure(
+        Error::validation("gui.interactive_extrude", std::move(message)));
+  }
+  [[nodiscard]] static Result<geometry::GeometryShape>
+  shape_preview_fail(std::string message) {
+    return Result<geometry::GeometryShape>::failure(
         Error::validation("gui.interactive_extrude", std::move(message)));
   }
 
@@ -347,6 +535,9 @@ private:
   std::optional<PathCurveId> path_curve_;
   std::optional<FaceReference> first_face_;
   std::optional<FaceReference> second_face_;
+  std::optional<Parameter> pending_distance_parameter_;
+  std::optional<Body> pending_result_body_;
+  std::optional<GuiPendingProfileMaterialization> pending_profile_materialization_;
   GuiFeatureManipulatorFrame frame_;
 };
 
@@ -358,13 +549,54 @@ public:
     const auto* part = session.part_document();
     if (part == nullptr)
       return fail("interactive revolve requires an active Part document");
-    const Sketch* source = part->find_sketch(sketch);
-    if (source == nullptr ||
-        !GuiModelingWorkspace::has_materialized_profile(*source, profile))
-      return fail("interactive revolve requires a materialized profile region");
+    auto pending_profile = prepare_interactive_profile(*part, sketch, profile);
+    if (pending_profile.has_error())
+      return Result<std::size_t>::failure(pending_profile.error());
     if (part->find_body(result_body) == nullptr)
       return fail("interactive revolve requires an existing result Body");
 
+    pending_result_body_.reset();
+    pending_profile_materialization_ = std::move(pending_profile.value());
+    initialize(std::move(sketch), std::move(profile), std::move(feature), std::move(name),
+               std::move(axis), std::move(result_body));
+    return Result<std::size_t>::success(1);
+  }
+
+  [[nodiscard]] Result<std::size_t>
+  begin_with_new_body(const GuiDocumentSession& session, SketchId sketch, ProfileId profile,
+                      FeatureId feature, std::string name, AxisReference axis,
+                      Body result_body) {
+    const auto* part = session.part_document();
+    if (part == nullptr)
+      return fail("interactive revolve requires an active Part document");
+    auto pending_profile = prepare_interactive_profile(*part, sketch, profile);
+    if (pending_profile.has_error())
+      return Result<std::size_t>::failure(pending_profile.error());
+    if (part->find_body(result_body.id()) != nullptr)
+      return fail("auto-provisioned revolve result Body must be new");
+    PartDocument candidate = *part;
+    if (pending_profile.value().has_value()) {
+      auto updated = candidate.update_sketch(pending_profile.value()->completed_sketch);
+      if (updated.has_error())
+        return Result<std::size_t>::failure(updated.error());
+    }
+    auto added = candidate.add_body(result_body);
+    if (added.has_error()) return Result<std::size_t>::failure(added.error());
+
+    const BodyId body_id = result_body.id();
+    pending_result_body_ = std::move(result_body);
+    pending_profile_materialization_ = std::move(pending_profile.value());
+    initialize(std::move(sketch), std::move(profile), std::move(feature), std::move(name),
+               std::move(axis), body_id);
+    return Result<std::size_t>::success(1);
+  }
+
+  [[nodiscard]] const FeatureId& feature_id() const noexcept { return feature_; }
+  [[nodiscard]] const BodyId& result_body_id() const noexcept { return result_body_; }
+
+private:
+  void initialize(SketchId sketch, ProfileId profile, FeatureId feature, std::string name,
+                  AxisReference axis, BodyId result_body) {
     sketch_ = std::move(sketch);
     profile_ = std::move(profile);
     feature_ = std::move(feature);
@@ -377,16 +609,18 @@ public:
     side_ = RevolveSide::Positive;
     operation_ = FeatureBodyOperationMode::NewBody;
     active_ = true;
-    return Result<std::size_t>::success(1);
   }
 
+public:
   [[nodiscard]] bool active() const noexcept { return active_; }
 
   void set_kind(RevolveFeatureKind kind) noexcept { kind_ = kind; }
   void set_operation(FeatureBodyOperationMode operation,
                      std::optional<BodyId> target = std::nullopt) {
     operation_ = operation;
-    if (operation != FeatureBodyOperationMode::NewBody && target.has_value())
+    if (operation == FeatureBodyOperationMode::NewBody && pending_result_body_.has_value())
+      result_body_ = pending_result_body_->id();
+    else if (operation != FeatureBodyOperationMode::NewBody && target.has_value())
       result_body_ = std::move(*target);
   }
   void set_full() noexcept { extent_mode_ = RevolveExtentMode::Full; }
@@ -414,6 +648,8 @@ public:
     handle.plane_normal = frame_.plane_normal;
     handle.reference_direction = frame_.reference_direction;
     handle.reference_value = angle_deg_;
+    handle.minimum_value = std::numeric_limits<double>::epsilon();
+    handle.maximum_value = std::nextafter(360.0, 0.0);
     return handle;
   }
 
@@ -426,7 +662,8 @@ public:
   [[nodiscard]] bool apply_manipulator(const GuiViewportManipulatorCandidate& candidate) {
     if (candidate.handle_id == kRevolveAngleHandleId &&
         candidate.value_kind == GuiViewportManipulatorValueKind::Angle &&
-        extent_mode_ != RevolveExtentMode::Full) {
+        extent_mode_ != RevolveExtentMode::Full && std::isfinite(candidate.scalar_value) &&
+        candidate.scalar_value > 0.0 && candidate.scalar_value < 360.0) {
       angle_deg_ = candidate.scalar_value;
       return true;
     }
@@ -440,6 +677,12 @@ public:
     auto feature = build_feature();
     if (feature.has_error()) return Result<GuiPartFeaturePreview>::failure(feature.error());
     PartDocument candidate = *part;
+    if (auto profile = provision_pending_profile(candidate); profile.has_error())
+      return Result<GuiPartFeaturePreview>::failure(profile.error());
+    if (operation_ == FeatureBodyOperationMode::NewBody && pending_result_body_.has_value()) {
+      auto body = candidate.add_body(*pending_result_body_);
+      if (body.has_error()) return Result<GuiPartFeaturePreview>::failure(body.error());
+    }
     auto added = candidate.add_revolve_feature(feature.value());
     if (added.has_error()) return Result<GuiPartFeaturePreview>::failure(added.error());
     auto plan = candidate.create_recompute_plan();
@@ -448,24 +691,102 @@ public:
         {feature_, summary(), plan.value().step_count()});
   }
 
+  [[nodiscard]] Result<geometry::GeometryShape>
+  preview_shape(const GuiDocumentSession& session) const {
+    if (!active_)
+      return shape_preview_fail("no interactive revolve is active");
+    const auto* part = session.part_document();
+    if (part == nullptr)
+      return shape_preview_fail("preview requires an active Part document");
+    auto feature = build_feature();
+    if (feature.has_error())
+      return Result<geometry::GeometryShape>::failure(feature.error());
+    PartDocument candidate = *part;
+    if (auto profile = provision_pending_profile(candidate); profile.has_error())
+      return Result<geometry::GeometryShape>::failure(profile.error());
+    if (operation_ == FeatureBodyOperationMode::NewBody && pending_result_body_.has_value()) {
+      auto body = candidate.add_body(*pending_result_body_);
+      if (body.has_error())
+        return Result<geometry::GeometryShape>::failure(body.error());
+    }
+    if (auto added = candidate.add_revolve_feature(std::move(feature.value()));
+        added.has_error())
+      return Result<geometry::GeometryShape>::failure(added.error());
+    auto cache = geometry::ShapeCache::create(
+        ShapeCacheId(feature_.value() + ".interactive_preview"));
+    if (cache.has_error())
+      return Result<geometry::GeometryShape>::failure(cache.error());
+    auto recomputed =
+        geometry::GeometryRecomputeExecutor{}.execute_document(candidate, cache.value());
+    if (recomputed.has_error())
+      return Result<geometry::GeometryShape>::failure(recomputed.error());
+    const auto* shape = cache.value().find_body_shape(result_body_);
+    if (shape == nullptr || shape->empty())
+      return shape_preview_fail("revolve preview produced no visible Body shape");
+    return Result<geometry::GeometryShape>::success(*shape);
+  }
+
   [[nodiscard]] Result<std::size_t> apply(GuiDocumentSession& session) {
     auto checked = preview(session);
     if (checked.has_error()) return Result<std::size_t>::failure(checked.error());
     auto feature = build_feature();
     if (feature.has_error()) return Result<std::size_t>::failure(feature.error());
-    auto committed = session.commit_part_transaction(
-        std::string(kind_ == RevolveFeatureKind::RevolveCut ? "Apply Revolve Cut" : "Apply Revolve"),
-        [feature = std::move(feature.value())](PartDocument& part) mutable {
-          return part.add_revolve_feature(std::move(feature));
-        });
+    const std::string label =
+        kind_ == RevolveFeatureKind::RevolveCut ? "Apply Revolve Cut" : "Apply Revolve";
+    Result<std::size_t> committed = [&]() {
+      if (pending_profile_materialization_.has_value()) {
+        return session.commit_part_sketch_intent_transaction(
+            label,
+            [this, feature = std::move(feature.value())](
+                PartDocument& part,
+                std::vector<SketchConstraintCatalog>& constraint_catalogs,
+                std::vector<SketchDimensionCatalog>& dimension_catalogs) mutable
+                -> Result<std::size_t> {
+              auto profile = publish_interactive_profile(
+                  part, *pending_profile_materialization_, constraint_catalogs,
+                  dimension_catalogs);
+              if (profile.has_error()) return profile;
+              auto body = provision_pending_body(part);
+              if (body.has_error()) return body;
+              auto added = part.add_revolve_feature(std::move(feature));
+              if (added.has_error()) return added;
+              return Result<std::size_t>::success(profile.value() + body.value() +
+                                                  added.value());
+            });
+      }
+      return session.commit_part_transaction(
+          label, [this, feature = std::move(feature.value())](PartDocument& part) mutable {
+            auto body = provision_pending_body(part);
+            if (body.has_error()) return body;
+            return part.add_revolve_feature(std::move(feature));
+          });
+    }();
     if (committed.has_error()) return committed;
     active_ = false;
+    pending_result_body_.reset();
+    pending_profile_materialization_.reset();
     return committed;
   }
 
-  void cancel() noexcept { active_ = false; }
+  void cancel() noexcept {
+    active_ = false;
+    pending_result_body_.reset();
+    pending_profile_materialization_.reset();
+  }
 
 private:
+  [[nodiscard]] Result<std::size_t> provision_pending_profile(PartDocument& part) const {
+    if (!pending_profile_materialization_.has_value())
+      return Result<std::size_t>::success(0U);
+    return part.update_sketch(pending_profile_materialization_->completed_sketch);
+  }
+
+  [[nodiscard]] Result<std::size_t> provision_pending_body(PartDocument& part) const {
+    if (operation_ != FeatureBodyOperationMode::NewBody || !pending_result_body_.has_value())
+      return Result<std::size_t>::success(0U);
+    return part.add_body(*pending_result_body_);
+  }
+
   [[nodiscard]] Result<RevolveAngleExtent> build_extent() const {
     switch (extent_mode_) {
     case RevolveExtentMode::Full:
@@ -512,6 +833,11 @@ private:
     return Result<GuiPartFeaturePreview>::failure(
         Error::validation("gui.interactive_revolve", std::move(message)));
   }
+  [[nodiscard]] static Result<geometry::GeometryShape>
+  shape_preview_fail(std::string message) {
+    return Result<geometry::GeometryShape>::failure(
+        Error::validation("gui.interactive_revolve", std::move(message)));
+  }
 
   bool active_{false};
   SketchId sketch_{""};
@@ -525,6 +851,8 @@ private:
   double angle_deg_{360.0};
   RevolveSide side_{RevolveSide::Positive};
   FeatureBodyOperationMode operation_{FeatureBodyOperationMode::NewBody};
+  std::optional<Body> pending_result_body_;
+  std::optional<GuiPendingProfileMaterialization> pending_profile_materialization_;
   GuiFeatureManipulatorFrame frame_;
 };
 

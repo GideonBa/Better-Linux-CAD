@@ -65,6 +65,18 @@ struct GuiSketchCreatePreview {
   std::vector<GuiSketchAutoConstraintPreview> constraints;
 };
 
+// A semantic constraint emitted together with a compound Sketch shape. The
+// entity ids are converted to canonical topology targets only after all
+// primitives and the owning profile have been inserted into the transaction
+// candidate.
+struct GuiSketchCreateConstraintRecipe {
+  SketchSolverConstraintKind kind;
+  std::vector<SketchEntityId> entity_targets;
+
+  friend bool operator==(const GuiSketchCreateConstraintRecipe&,
+                         const GuiSketchCreateConstraintRecipe&) = default;
+};
+
 struct GuiSketchCreateExpansion {
   std::vector<LineSegment> lines;
   std::vector<ArcSegment> arcs;
@@ -76,6 +88,7 @@ struct GuiSketchCreateExpansion {
   std::optional<Parameter> parameter;
   std::optional<ConstructionPoint> construction_point;
   std::optional<ConstructionLine> construction_line;
+  std::vector<GuiSketchCreateConstraintRecipe> constraint_recipes;
   std::string label;
 };
 

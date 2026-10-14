@@ -446,7 +446,18 @@ Result<Feature>
 Feature::with_body_result_context(FeatureBodyResultContext body_result_context) const {
   return Result<Feature>::success(
       Feature(id_, name_, type_, input_sketch_, length_parameter_, target_feature_, direction_,
-              subtractive_depth_, extrude_intent_, path_curve_, std::move(body_result_context)));
+              subtractive_depth_, extrude_intent_, path_curve_, std::move(body_result_context),
+              profile_));
+}
+
+Result<Feature> Feature::with_profile(ProfileId profile) const {
+  if (profile.empty())
+    return Result<Feature>::failure(
+        Error::validation(id_.value(), "extrude profile id must not be empty"));
+  return Result<Feature>::success(
+      Feature(id_, name_, type_, input_sketch_, length_parameter_, target_feature_, direction_,
+              subtractive_depth_, extrude_intent_, path_curve_, body_result_context_,
+              std::move(profile)));
 }
 
 const FeatureId& Feature::id() const noexcept {
@@ -486,15 +497,21 @@ const std::optional<PathCurveId>& Feature::path_curve() const noexcept {
   return path_curve_;
 }
 
+const std::optional<ProfileId>& Feature::profile() const noexcept {
+  return profile_;
+}
+
 Feature::Feature(FeatureId id, std::string name, FeatureType type, SketchId input_sketch,
                  ParameterId length_parameter, FeatureId target_feature, ExtrudeDirection direction,
                  SubtractiveExtrudeDepth subtractive_depth, ExtrudeFeatureIntent extrude_intent,
                  std::optional<PathCurveId> path_curve,
-                 std::optional<FeatureBodyResultContext> body_result_context)
+                 std::optional<FeatureBodyResultContext> body_result_context,
+                 std::optional<ProfileId> profile)
     : id_(std::move(id)), name_(std::move(name)), type_(type),
       input_sketch_(std::move(input_sketch)), length_parameter_(std::move(length_parameter)),
       target_feature_(std::move(target_feature)), direction_(direction),
       subtractive_depth_(subtractive_depth), extrude_intent_(std::move(extrude_intent)),
-      path_curve_(std::move(path_curve)), body_result_context_(std::move(body_result_context)) {}
+      path_curve_(std::move(path_curve)), body_result_context_(std::move(body_result_context)),
+      profile_(std::move(profile)) {}
 
 } // namespace blcad

@@ -167,8 +167,18 @@ public:
   [[nodiscard]] Result<GuiSketchPlaneView> enter(GuiDocumentSession& session,
                                                   const GuiSketchWorkbench& workbench,
                                                   SketchId sketch);
+  [[nodiscard]] Result<std::size_t>
+  validate_finish(const GuiDocumentSession& session,
+                  const GuiSketchWorkbench& workbench) const;
   [[nodiscard]] Result<GuiWorkspace> finish(GuiDocumentSession& session,
                                             const GuiSketchWorkbench& workbench);
+  // Completes the state transition after validate_finish() and any atomic
+  // document-side materialization performed by the shell.
+  [[nodiscard]] Result<GuiWorkspace>
+  complete_validated_finish(GuiDocumentSession& session);
+  // Leaves Sketch mode without running diagnostics. Any active Sketch task is
+  // cancelled first, making this suitable for document replacement and Undo.
+  [[nodiscard]] Result<GuiWorkspace> cancel(GuiDocumentSession& session);
 
   [[nodiscard]] bool set_hover(bool hovered) noexcept;
   [[nodiscard]] bool begin_command(GuiDocumentSession& session, std::string command_id,

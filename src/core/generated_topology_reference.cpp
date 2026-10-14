@@ -204,14 +204,21 @@ parse_circular_edge_role(std::string_view role) noexcept {
   if (feature.type() != FeatureType::AdditiveExtrude)
     return false;
   const Sketch* sketch = document.find_sketch(feature.input_sketch());
-  return sketch != nullptr && sketch->rectangle_profiles().size() == 1U &&
-         sketch->profile_count() == 1U;
+  if (sketch == nullptr)
+    return false;
+  if (feature.profile().has_value())
+    return sketch->find_rectangle_profile(*feature.profile()) != nullptr;
+  return sketch->rectangle_profiles().size() == 1U && sketch->profile_count() == 1U;
 }
 
 [[nodiscard]] const CircleProfile*
 single_circle_profile(const PartDocument& document, const Feature& feature) noexcept {
   const Sketch* sketch = document.find_sketch(feature.input_sketch());
-  if (sketch == nullptr || sketch->circle_profiles().size() != 1U || sketch->profile_count() != 1U)
+  if (sketch == nullptr)
+    return nullptr;
+  if (feature.profile().has_value())
+    return sketch->find_circle_profile(*feature.profile());
+  if (sketch->circle_profiles().size() != 1U || sketch->profile_count() != 1U)
     return nullptr;
   return &sketch->circle_profiles().front();
 }
@@ -474,15 +481,15 @@ classify_generated_topology_producer(const PartDocument& document, FeatureId sou
         object_id,
         "patterned generated topology is unavailable until stable per-instance semantic identity exists"));
   }
-  if (sketch->circle_profiles().size() != 1U || sketch->profile_count() != 1U) {
+  if (single_circle_profile(document, *feature) == nullptr) {
     const bool ambiguous = sketch->circle_profiles().size() > 1U ||
                            (sketch->circle_profiles().size() == 1U &&
                             sketch->profile_count() != 1U);
     return Result<GeneratedTopologyProducerKind>::failure(validation_error(
         object_id,
         ambiguous
-            ? "subtractive-extrude generated topology is ambiguous unless the source sketch contains exactly one CircleProfile and no other profile"
-            : "subtractive-extrude generated topology is supported only for exactly one CircleProfile and no other profile"));
+            ? "subtractive-extrude generated topology is ambiguous without an explicit CircleProfile"
+            : "subtractive-extrude generated topology requires a CircleProfile"));
   }
 
   const Feature* target = document.find_feature(feature->target_feature());
