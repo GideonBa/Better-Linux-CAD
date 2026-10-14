@@ -1206,7 +1206,7 @@ evaluate_arc_curve_segment(const WorkplaneResolver& resolver, const ResolvedWork
                                   resolver.evaluate_point(workplane, spline->start()),
                                   resolver.evaluate_point(workplane, spline->control1()),
                                   resolver.evaluate_point(workplane, spline->end()),
-                                  resolver.evaluate_point(workplane, spline->control2())});
+                                  resolver.evaluate_point(workplane, spline->control2()), spline->weights()});
   }
 
   return Result<ClosedProfileCurveSegment>::failure(
@@ -1404,18 +1404,26 @@ evaluate_composite_local_vertices(const PartDocument& document, const Sketch& sk
 }
 
 [[nodiscard]] std::vector<SweepPathSegment> sampled_path(const std::vector<Point3>& controls,
-                                                         std::size_t samples = 32U) {
+                                                         std::size_t samples = 32U,
+                                                         std::vector<double> weights = {}) {
+  if (weights.empty()) weights.assign(controls.size(), 1.0);
   std::vector<Point3> points;
   points.reserve(samples + 1U);
   for (std::size_t sample = 0U; sample <= samples; ++sample) {
     std::vector<Point3> work = controls;
+    auto work_weights = weights;
+    for (std::size_t i = 0; i < work.size(); ++i)
+      work[i] = {work[i].x * weights[i], work[i].y * weights[i], work[i].z * weights[i]};
     const double t = static_cast<double>(sample) / static_cast<double>(samples);
     for (std::size_t level = work.size() - 1U; level > 0U; --level)
-      for (std::size_t index = 0U; index < level; ++index)
+      for (std::size_t index = 0U; index < level; ++index) {
+        work_weights[index] = (1.0-t)*work_weights[index] + t*work_weights[index+1];
         work[index] = {(1.0 - t) * work[index].x + t * work[index + 1U].x,
                        (1.0 - t) * work[index].y + t * work[index + 1U].y,
                        (1.0 - t) * work[index].z + t * work[index + 1U].z};
-    points.push_back(work.front());
+      }
+    const auto p = work.front();
+    points.push_back({p.x/work_weights[0], p.y/work_weights[0], p.z/work_weights[0]});
   }
   std::vector<SweepPathSegment> segments;
   segments.reserve(samples);
@@ -1492,7 +1500,7 @@ resolve_basic_sweep_path(const PartDocument& document, const PathCurve& path,
                                      resolver.evaluate_point(workplane.value(), spline->control1()),
                                      resolver.evaluate_point(workplane.value(), spline->control2()),
                                      resolver.evaluate_point(workplane.value(), spline->end())};
-        auto sampled = sampled_path(controls);
+        auto sampled = sampled_path(controls, 32U, {spline->weights().begin(), spline->weights().end()});
         if (reference.reversed()) {
           std::reverse(sampled.begin(), sampled.end());
           for (auto& item : sampled)
@@ -1803,7 +1811,8 @@ reversed_loft_curve(const ClosedProfileCurveSegment& segment) {
     return {segment.kind, segment.end, {}, segment.start};
   if (segment.kind == ClosedProfileCurveKind::CircularArc)
     return {segment.kind, segment.end, segment.mid, segment.start};
-  return {segment.kind, segment.end, segment.control2, segment.start, segment.mid};
+  return {segment.kind, segment.end, segment.control2, segment.start, segment.mid,
+          {segment.weights[3], segment.weights[2], segment.weights[1], segment.weights[0]}};
 }
 
 [[nodiscard]] Point3 rotate_about_axis(Point3 point, Point3 center, Vector3 axis,
@@ -1944,7 +1953,8 @@ surface_path_from_closed_curves(const std::vector<ClosedProfileCurveSegment>& cu
     } else if (curve.kind == ClosedProfileCurveKind::CircularArc) {
       result.push_back({SweepPathSegmentKind::CircularArc, curve.start, curve.mid, curve.end});
     } else {
-      auto sampled = sampled_path({curve.start, curve.mid, curve.control2, curve.end});
+      auto sampled = sampled_path({curve.start, curve.mid, curve.control2, curve.end},
+                                  32U, {curve.weights.begin(), curve.weights.end()});
       result.insert(result.end(), sampled.begin(), sampled.end());
     }
   }

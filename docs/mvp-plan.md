@@ -149,8 +149,12 @@ Canonical contracts:
 ### Blocks 111–112 — Sketch creation — Implemented
 
 Block 111 creates points, lines, polylines, rectangle families, polygons, centerlines, and construction
-geometry. Block 112 adds exact full circles, circular arcs, deterministic cubic ellipses/elliptical arcs,
-and line/arc slot profiles through the same interaction and transaction boundary.
+geometry. Block 112 adds exact full circles, circular arcs, exact rational ellipses/elliptical arcs,
+and line/arc slot profiles through the same interaction and transaction boundary. Shell hardening
+adds reference-based tangent construction, persistent dimension placement and inline editing, open
+Sketch completion, profile-aware splitting/corners and spline continuation. These changes and their
+focused proofs are recorded in the respective contracts; Block 136 remains planned for the remaining
+feature command surface.
 
 Canonical contracts:
 

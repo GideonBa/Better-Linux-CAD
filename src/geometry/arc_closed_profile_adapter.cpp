@@ -14,6 +14,7 @@
 #include <Geom_BezierCurve.hxx>
 #include <Standard_Failure.hxx>
 #include <TColgp_Array1OfPnt.hxx>
+#include <TColStd_Array1OfReal.hxx>
 #include <TopoDS_Edge.hxx>
 #include <TopoDS_Shape.hxx>
 #include <TopoDS_Wire.hxx>
@@ -130,7 +131,9 @@ translate_curve_along_axis(ClosedProfileCurveSegment curve, Vector3 axis, double
     poles.SetValue(2, to_gp_point(curve.mid));
     poles.SetValue(3, to_gp_point(curve.control2));
     poles.SetValue(4, to_gp_point(curve.end));
-    Handle(Geom_BezierCurve) bezier = new Geom_BezierCurve(poles);
+    TColStd_Array1OfReal weights(1, 4);
+    for (int i = 1; i <= 4; ++i) weights.SetValue(i, curve.weights[i-1]);
+    Handle(Geom_BezierCurve) bezier = new Geom_BezierCurve(poles, weights);
     BRepBuilderAPI_MakeEdge edge_builder(bezier);
     if (!edge_builder.IsDone()) {
       return Result<TopoDS_Edge>::failure(make_geometry_error("could not build spline curve edge"));

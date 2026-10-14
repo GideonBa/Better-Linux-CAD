@@ -32,11 +32,11 @@ profile: the obsolete profile container is removed while remaining explicit curv
 
 Line and circular-arc extension use their supporting line/circle. Cubic extension continues the
 original polynomial, rather than adding a straight tangent. It searches successively larger intervals
-up to 64 original parameter lengths and chooses the first reachable intersection with another explicit
+up to 64 original parameter lengths (stopping before a singular rational interval) and chooses the first reachable intersection with another explicit
 curve. An unreachable cutter produces a diagnostic. An extended cubic retains its exact original
 subcurve through parameter rescaling. Extend can open a profile and therefore invalidate its container.
 
-Split uses exact curve subdivision, splices both halves into each affected ordered contour, and
+Split uses exact polynomial/rational curve subdivision, splices both halves into each affected ordered contour, and
 preserves the profile id. The second half receives `<source>.split.N`.
 
 Two-line corners use the line intersection. Curved pairs must meet at one unambiguous endpoint.

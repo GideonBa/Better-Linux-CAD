@@ -1,6 +1,6 @@
 #include "blcad/gui/gui_sketch_create.hpp"
 
-#include "blcad/core/sketch_constraint_catalog_system.hpp"
+#include "blcad/core/sketch_dimension_catalog_system.hpp"
 #include "blcad/core/sketch_topology_part_document.hpp"
 
 #include <algorithm>
@@ -106,14 +106,14 @@ struct SlotGeometry {
   case GuiSketchCreateTool::Centerline:
   case GuiSketchCreateTool::CenterRadiusCircle:
   case GuiSketchCreateTool::CenterDiameterCircle:
-  case GuiSketchCreateTool::TwoPointCircle: return 2U;
+  case GuiSketchCreateTool::TwoPointCircle:
+  case GuiSketchCreateTool::TangentCircle:
+  case GuiSketchCreateTool::TangentArc: return 2U;
   case GuiSketchCreateTool::ThreePointRectangle:
   case GuiSketchCreateTool::Parallelogram:
   case GuiSketchCreateTool::ThreePointCircle:
-  case GuiSketchCreateTool::TangentCircle:
   case GuiSketchCreateTool::CenterStartEndArc:
   case GuiSketchCreateTool::ThreePointArc:
-  case GuiSketchCreateTool::TangentArc:
   case GuiSketchCreateTool::Ellipse:
   case GuiSketchCreateTool::CenterSlot:
   case GuiSketchCreateTool::OverallSlot: return 3U;
@@ -253,12 +253,6 @@ ellipse_geometry(Point2 center, Point2 major_reference, Point2 minor_reference) 
   return add(ellipse.center,
              add(scale(ellipse.major_unit, ellipse.major_radius * std::cos(parameter)),
                  scale(ellipse.minor_unit, ellipse.minor_radius * std::sin(parameter))));
-}
-
-[[nodiscard]] Point2 ellipse_derivative(const EllipseGeometry& ellipse,
-                                        double parameter) noexcept {
-  return add(scale(ellipse.major_unit, -ellipse.major_radius * std::sin(parameter)),
-             scale(ellipse.minor_unit, ellipse.minor_radius * std::cos(parameter)));
 }
 
 [[nodiscard]] double ellipse_parameter(const EllipseGeometry& ellipse, Point2 reference) noexcept {
@@ -453,7 +447,22 @@ bool GuiSketchCreateController::complete_ready() const noexcept {
   return picks_.size() >= required_picks();
 }
 
+Result<std::size_t> GuiSketchCreateController::add_tangent_reference(
+    const PartDocument& document, SketchEntityId source, Point2 contact) {
+  if (!is_tangent_tool(tool_) || !picks_.empty())
+    return Result<std::size_t>::failure(create_error("select the tangent reference as the first pick"));
+  const Sketch* sketch = document.find_sketch(sketch_);
+  if (!sketch) return Result<std::size_t>::failure(create_error("tangent Sketch is missing"));
+  auto anchor = SketchTangentCreation::anchor(*sketch, std::move(source), contact,
+                                             tool_ == GuiSketchCreateTool::TangentArc);
+  if (!anchor) return Result<std::size_t>::failure(anchor.error());
+  tangent_anchor_ = std::move(anchor.value());
+  return add_pick({tangent_anchor_->point, GuiSketchSnapKind::Endpoint});
+}
+
 Result<std::size_t> GuiSketchCreateController::add_pick(GuiSketchCreatePick pick) {
+  if (is_tangent_tool(tool_) && picks_.empty() && !tangent_anchor_)
+    return Result<std::size_t>::failure(create_error("select a source curve for tangent creation"));
   if (!finite(pick.point))
     return Result<std::size_t>::failure(create_error("Sketch pick coordinates must be finite"));
   if (!accepts_more_picks())
@@ -468,6 +477,7 @@ Result<std::size_t> GuiSketchCreateController::pop_pick() {
     return Result<std::size_t>::failure(
         create_error("the active Sketch creation tool has no pick to remove"));
   picks_.pop_back();
+  if (picks_.empty()) tangent_anchor_.reset();
   return Result<std::size_t>::success(picks_.size());
 }
 
@@ -639,6 +649,19 @@ GuiSketchCreateController::conic_preview(std::optional<Point2> hover, bool& clos
     return Result<std::vector<Point2>>::failure(
         create_error("the Sketch creation tool does not have enough picks yet"));
 
+  if (is_tangent_tool(tool_)) {
+    if (!tangent_anchor_) return Result<std::vector<Point2>>::failure(create_error("tangent reference is missing"));
+    if (tool_ == GuiSketchCreateTool::TangentCircle) {
+      auto circle = SketchTangentCreation::circle(*tangent_anchor_, anchors[1].point);
+      if (!circle) return Result<std::vector<Point2>>::failure(circle.error());
+      closed = true;
+      return Result<std::vector<Point2>>::success(sample_circle({circle.value().center, circle.value().radius}));
+    }
+    auto arc = SketchTangentCreation::arc(SketchEntityId("preview"), *tangent_anchor_, anchors[1].point);
+    if (!arc) return Result<std::vector<Point2>>::failure(arc.error());
+    closed = false;
+    return sample_three_point_arc(arc.value().start(), arc.value().mid(), arc.value().end());
+  }
   if (is_circle_tool(tool_)) {
     auto circle = circle_geometry(tool_, anchors);
     if (circle.has_error()) return Result<std::vector<Point2>>::failure(circle.error());
@@ -649,8 +672,7 @@ GuiSketchCreateController::conic_preview(std::optional<Point2> hover, bool& clos
     closed = false;
     return sample_center_arc(anchors[0].point, anchors[1].point, anchors[2].point);
   }
-  if (tool_ == GuiSketchCreateTool::ThreePointArc ||
-      tool_ == GuiSketchCreateTool::TangentArc) {
+  if (tool_ == GuiSketchCreateTool::ThreePointArc) {
     closed = false;
     return sample_three_point_arc(anchors[0].point, anchors[1].point, anchors[2].point);
   }
@@ -738,10 +760,8 @@ GuiSketchCreateController::preview(std::optional<GuiSketchCreatePick> hover) con
   };
   for (const auto& pick : picks_) append_constraint(pick);
   if (hover) append_constraint(*hover);
-  if (is_tangent_tool(tool_)) {
-    for (const auto& pick : picks_) result.constraints.push_back({"tangent", pick.point});
-    if (hover) result.constraints.push_back({"tangent", hover->point});
-  }
+  if (is_tangent_tool(tool_) && tangent_anchor_)
+    result.constraints.push_back({"tangent", tangent_anchor_->point});
   return result;
 }
 
@@ -794,21 +814,11 @@ GuiSketchCreateController::expansion(const PartDocument& document) const {
     const std::size_t segment_count = std::max<std::size_t>(
         1U, static_cast<std::size_t>(std::ceil(std::abs(sweep) / (kPi * 0.5))));
     const double step = sweep / static_cast<double>(segment_count);
-    Point2 first_start{};
     for (std::size_t index = 0U; index < segment_count; ++index) {
-      const double first_parameter = start + step * static_cast<double>(index);
-      const double second_parameter = start + step * static_cast<double>(index + 1U);
-      Point2 first = ellipse_point(ellipse, first_parameter);
-      Point2 second = ellipse_point(ellipse, second_parameter);
-      if (index == 0U) first_start = first;
-      if (index + 1U == segment_count && std::abs(std::abs(sweep) - kTwoPi) <= kEpsilon)
-        second = first_start;
-      const double alpha = (4.0 / 3.0) * std::tan(step * 0.25);
-      const Point2 control1 = add(first, scale(ellipse_derivative(ellipse, first_parameter), alpha));
-      const Point2 control2 =
-          add(second, scale(ellipse_derivative(ellipse, second_parameter), -alpha));
-      auto spline = SplineSegment::create_cubic_bezier(
-          next_entity_id("spline.create."), first, control1, control2, second);
+      auto spline = SplineSegment::create_elliptical_arc(
+          next_entity_id("spline.create."), ellipse.center,
+          scale(ellipse.major_unit, ellipse.major_radius), ellipse.minor_radius,
+          start + step * static_cast<double>(index), step);
       if (spline.has_error()) return Result<std::size_t>::failure(spline.error());
       result.splines.push_back(std::move(spline.value()));
     }
@@ -916,8 +926,34 @@ GuiSketchCreateController::expansion(const PartDocument& document) const {
   default: break;
   }
 
+  std::optional<SketchTangentAnchor> contact;
+  if (is_tangent_tool(tool_)) {
+    if (!tangent_anchor_) return Result<GuiSketchCreateExpansion>::failure(create_error("tangent reference is missing"));
+    auto anchor = SketchTangentCreation::anchor(*sketch, tangent_anchor_->entity, picks_[0].point,
+                                               tool_ == GuiSketchCreateTool::TangentArc);
+    if (!anchor) return Result<GuiSketchCreateExpansion>::failure(anchor.error());
+    contact = std::move(anchor.value());
+  }
+  const auto tangent_relations = [&](std::string target, std::optional<SketchPointId> new_start) {
+    if (contact->endpoint) {
+      const auto first = SketchConstraintIntentTarget::point(*contact->endpoint).value();
+      const auto second = new_start ? SketchConstraintIntentTarget::point(*new_start).value()
+                                    : SketchConstraintIntentTarget::entity(target).value();
+      result.constraint_recipes.push_back({new_start ? SketchSolverConstraintKind::Coincident
+                                                     : SketchSolverConstraintKind::PointOnObject,
+                                           {}, {first, second}});
+    }
+    result.constraint_recipes.push_back({SketchSolverConstraintKind::Tangent, {},
+        {SketchConstraintIntentTarget::entity("entity/" + contact->entity.value()).value(),
+         SketchConstraintIntentTarget::entity(std::move(target)).value()}});
+  };
   if (is_circle_tool(tool_)) {
-    auto circle = circle_geometry(tool_, picks_);
+    auto circle = [&]() -> Result<CircleGeometry> {
+      if (!contact) return circle_geometry(tool_, picks_);
+      auto tangent = SketchTangentCreation::circle(*contact, picks_[1].point);
+      if (!tangent) return Result<CircleGeometry>::failure(tangent.error());
+      return Result<CircleGeometry>::success({tangent.value().center, tangent.value().radius});
+    }();
     if (circle.has_error()) return Result<GuiSketchCreateExpansion>::failure(circle.error());
     const ParameterId diameter_id(next_free_id(
         "parameter.sketch.circle_diameter.", [&document](const std::string& candidate) {
@@ -931,6 +967,7 @@ GuiSketchCreateController::expansion(const PartDocument& document) const {
     if (profile.has_error()) return Result<GuiSketchCreateExpansion>::failure(profile.error());
     result.parameter = std::move(parameter.value());
     result.circle_profile = std::move(profile.value());
+    if (contact) tangent_relations("profile/" + result.circle_profile->id().value(), std::nullopt);
     return Result<GuiSketchCreateExpansion>::success(std::move(result));
   }
 
@@ -938,7 +975,11 @@ GuiSketchCreateController::expansion(const PartDocument& document) const {
     Point2 start{};
     Point2 mid{};
     Point2 end{};
-    if (tool_ == GuiSketchCreateTool::CenterStartEndArc) {
+    if (contact) {
+      auto tangent = SketchTangentCreation::arc(SketchEntityId("candidate"), *contact, picks_[1].point);
+      if (!tangent) return Result<GuiSketchCreateExpansion>::failure(tangent.error());
+      start = tangent.value().start(); mid = tangent.value().mid(); end = tangent.value().end();
+    } else if (tool_ == GuiSketchCreateTool::CenterStartEndArc) {
       auto samples = sample_center_arc(picks_[0].point, picks_[1].point, picks_[2].point);
       if (samples.has_error()) return Result<GuiSketchCreateExpansion>::failure(samples.error());
       start = samples.value().front();
@@ -952,6 +993,10 @@ GuiSketchCreateController::expansion(const PartDocument& document) const {
     auto arc = ArcSegment::create_three_point(next_entity_id("arc.create."), start, mid, end);
     if (arc.has_error()) return Result<GuiSketchCreateExpansion>::failure(arc.error());
     result.arcs.push_back(std::move(arc.value()));
+    if (contact) {
+      const std::string target = "entity/" + result.arcs.back().id().value();
+      tangent_relations(target, SketchPointId(target + "/start"));
+    }
     return Result<GuiSketchCreateExpansion>::success(std::move(result));
   }
 
@@ -1059,7 +1104,7 @@ Result<std::size_t> GuiSketchCreateController::commit(GuiDocumentSession& sessio
       label, [sketch_id, value = std::move(value)](
                  PartDocument& document,
                  std::vector<SketchConstraintCatalog>& constraint_catalogs,
-                 std::vector<SketchDimensionCatalog>&) mutable -> Result<std::size_t> {
+                 std::vector<SketchDimensionCatalog>& dimension_catalogs) mutable -> Result<std::size_t> {
         if (value.parameter) {
           auto added = document.add_parameter(std::move(*value.parameter));
           if (added.has_error()) return added;
@@ -1120,7 +1165,7 @@ Result<std::size_t> GuiSketchCreateController::commit(GuiDocumentSession& sessio
                                                          : *catalog_entry;
 
           for (const auto& recipe : value.constraint_recipes) {
-            std::vector<SketchConstraintIntentTarget> targets;
+            std::vector<SketchConstraintIntentTarget> targets = recipe.targets;
             targets.reserve(recipe.entity_targets.size());
             for (const auto& entity : recipe.entity_targets) {
               auto target =
@@ -1146,29 +1191,17 @@ Result<std::size_t> GuiSketchCreateController::commit(GuiDocumentSession& sessio
           if (inserted == nullptr)
             return Result<std::size_t>::failure(Error::validation(
                 sketch_id.value(), "Sketch creation target disappeared during transaction"));
-          auto topology = SketchTopology::migrate_legacy(*inserted);
-          if (topology.has_error())
-            return Result<std::size_t>::failure(topology.error());
-          auto system = SketchConstraintCatalogSystemBuilder::build(
-              document, topology.value(), candidate_catalog);
-          if (system.has_error())
-            return Result<std::size_t>::failure(system.error());
-          auto solved = SketchConstraintSolver{}.solve(topology.value(), system.value());
-          if (solved.has_error())
-            return Result<std::size_t>::failure(solved.error());
-          if (solved.value().status != SketchSolveStatus::UnderConstrained &&
-              solved.value().status != SketchSolveStatus::FullyConstrained)
-            return Result<std::size_t>::failure(Error::validation(
-                sketch_id.value(),
-                "automatic shape constraints were rejected by the Sketch solver: " +
-                    std::string(to_string(solved.value().status))));
-
-          auto materialized = SketchTopologyLegacyMaterializer{}.materialize(
-              *inserted, solved.value().topology);
-          if (materialized.has_error())
-            return Result<std::size_t>::failure(materialized.error());
-          auto solved_update = document.update_sketch(std::move(materialized.value()));
-          if (solved_update.has_error()) return solved_update;
+          const auto dimensions = std::find_if(dimension_catalogs.begin(), dimension_catalogs.end(),
+              [&](const auto& entry) { return entry.sketch() == sketch_id; });
+          const auto dimension_catalog = dimensions == dimension_catalogs.end()
+              ? SketchDimensionCatalog::create(document.id(), sketch_id).value() : *dimensions;
+          auto solved = SketchDimensionCatalogSystemBuilder::solve(document, candidate_catalog, dimension_catalog);
+          if (!solved) return Result<std::size_t>::failure(solved.error());
+          if (!solved.value().accepted || !solved.value().solved_sketch)
+            return Result<std::size_t>::failure(Error::validation(sketch_id.value(),
+                "automatic shape constraints conflict with existing Sketch intent"));
+          auto solved_update = document.update_sketch(std::move(*solved.value().solved_sketch));
+          if (!solved_update) return solved_update;
 
           if (catalog_entry == constraint_catalogs.end())
             constraint_catalogs.push_back(std::move(candidate_catalog));

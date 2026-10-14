@@ -13,6 +13,7 @@
 #include <Geom_BezierCurve.hxx>
 #include <Standard_Failure.hxx>
 #include <TColgp_Array1OfPnt.hxx>
+#include <TColStd_Array1OfReal.hxx>
 #include <TopAbs_ShapeEnum.hxx>
 #include <TopExp_Explorer.hxx>
 #include <TopoDS_Edge.hxx>
@@ -145,7 +146,9 @@ make_twist_guide(const std::vector<SweepPathSegment>& path, double twist_angle_d
   poles.SetValue(2, point(segment.mid));
   poles.SetValue(3, point(segment.control2));
   poles.SetValue(4, point(segment.end));
-  Handle(Geom_BezierCurve) bezier = new Geom_BezierCurve(poles);
+  TColStd_Array1OfReal weights(1, 4);
+  for (int i = 1; i <= 4; ++i) weights.SetValue(i, segment.weights[i-1]);
+  Handle(Geom_BezierCurve) bezier = new Geom_BezierCurve(poles, weights);
   BRepBuilderAPI_MakeEdge edge(bezier);
   if (!edge.IsDone())
     return Result<TopoDS_Edge>::failure(sweep_error(id, "could not build profile spline"));

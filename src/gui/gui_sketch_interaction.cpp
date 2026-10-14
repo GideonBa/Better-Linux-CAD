@@ -183,15 +183,7 @@ std::vector<Point2> sample_spline(const SplineSegment& spline) {
   points.reserve(kSplineSamples + 1U);
   for (std::size_t index = 0; index <= kSplineSamples; ++index) {
     const double t = static_cast<double>(index) / static_cast<double>(kSplineSamples);
-    const double u = 1.0 - t;
-    const Point2 p0 = spline.start();
-    const Point2 p1 = spline.control1();
-    const Point2 p2 = spline.control2();
-    const Point2 p3 = spline.end();
-    points.push_back({u * u * u * p0.x + 3.0 * u * u * t * p1.x +
-                          3.0 * u * t * t * p2.x + t * t * t * p3.x,
-                      u * u * u * p0.y + 3.0 * u * u * t * p1.y +
-                          3.0 * u * t * t * p2.y + t * t * t * p3.y});
+    points.push_back(spline.curve().point(t));
   }
   return points;
 }

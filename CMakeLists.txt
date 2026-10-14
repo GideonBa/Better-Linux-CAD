@@ -425,6 +425,8 @@ if(BLCAD_BUILD_TESTS)
     tests/core/sketch_diagnostics_tests.cpp
     tests/core/sketch_constraint_solver_tests.cpp
     tests/core/sketch_dimension_tests.cpp
+    tests/core/sketch_tangent_creation_tests.cpp
+    tests/core/sketch_conic_tests.cpp
     tests/core/sketch_modify_tests.cpp
     tests/core/sketch_repair_command_labels_tests.cpp
     tests/core/sketch_repair_commands_tests.cpp
@@ -565,6 +567,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_part_foundation_workbench_tests.cpp
       tests/gui/gui_part_operations_workbench_tests.cpp
       tests/gui/gui_raw_profile_transaction_tests.cpp
+      tests/gui/gui_sketch_conic_workflow_tests.cpp
       tests/gui/gui_shell_dimension_workflow_tests.cpp
       tests/gui/gui_shell_feature_tools_tests.cpp
       tests/gui/gui_shell_window_tests.cpp

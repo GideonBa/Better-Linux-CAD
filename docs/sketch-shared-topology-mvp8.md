@@ -276,7 +276,10 @@ The loader applies the same Core invariants as direct construction. Distinct poi
 coordinates are valid and round-trip exactly.
 
 `serialize_sketch_topology_to_json(...)` and `deserialize_sketch_topology_from_json(...)` round-trip
-one canonical topology structurally exactly.
+one canonical topology structurally exactly. Rational spline entities carry four positive weights and
+serialize as `kind: "rational_spline"` with `weights`; ordinary splines retain `kind: "spline"` and
+implicit unit weights. The explicit new kind makes older readers reject unsupported rational curves.
+Migration, solver output and legacy materialization preserve the weights.
 
 Blocks 109–110 add no topology-schema fields for solver variables, residuals, Jacobians, rank, DOF,
 convergence, drag handles, pointer samples, temporary drag point/entity ids, or live previews. Those
@@ -326,7 +329,7 @@ Persist in `blcad.sketch_topology.mvp8`:
 ```text
 SketchPointId
 point coordinates and flags
-entity id/kind/ordered point references/ordered entity dependencies/flags
+entity id/kind/ordered point references/ordered entity dependencies/flags/rational weights
 canonical dependency records
 ```
 

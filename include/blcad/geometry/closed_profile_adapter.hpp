@@ -5,6 +5,7 @@
 #include "blcad/core/spatial.hpp"
 #include "blcad/geometry/rectangle_extrusion_adapter.hpp"
 
+#include <array>
 #include <optional>
 #include <string_view>
 #include <vector>
@@ -23,6 +24,7 @@ struct ClosedProfileCurveSegment {
   Point3 mid;
   Point3 end;
   Point3 control2{};
+  std::array<double, 4> weights{1, 1, 1, 1};
 };
 
 struct AxisProjectionSpan {

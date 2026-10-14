@@ -87,41 +87,13 @@ public:
   }
 
   [[nodiscard]] static Point2 evaluate_point(const SplineSegment& segment, double parameter) noexcept {
-    const double t = std::clamp(parameter, 0.0, 1.0);
-    const double u = 1.0 - t;
-    const double b0 = u * u * u;
-    const double b1 = 3.0 * u * u * t;
-    const double b2 = 3.0 * u * t * t;
-    const double b3 = t * t * t;
-    return {b0 * segment.start().x + b1 * segment.control1().x +
-                b2 * segment.control2().x + b3 * segment.end().x,
-            b0 * segment.start().y + b1 * segment.control1().y +
-                b2 * segment.control2().y + b3 * segment.end().y};
+    return segment.curve().point(std::clamp(parameter, 0.0, 1.0));
   }
-
   [[nodiscard]] static Point2 derivative(const SplineSegment& segment, double parameter) noexcept {
-    const double t = std::clamp(parameter, 0.0, 1.0);
-    const double u = 1.0 - t;
-    return {3.0 * u * u * (segment.control1().x - segment.start().x) +
-                6.0 * u * t * (segment.control2().x - segment.control1().x) +
-                3.0 * t * t * (segment.end().x - segment.control2().x),
-            3.0 * u * u * (segment.control1().y - segment.start().y) +
-                6.0 * u * t * (segment.control2().y - segment.control1().y) +
-                3.0 * t * t * (segment.end().y - segment.control2().y)};
+    return segment.curve().derivative(std::clamp(parameter, 0.0, 1.0));
   }
-
-  [[nodiscard]] static Point2 second_derivative(const SplineSegment& segment,
-                                                double parameter) noexcept {
-    const double t = std::clamp(parameter, 0.0, 1.0);
-    const double u = 1.0 - t;
-    return {6.0 * u * (segment.control2().x - 2.0 * segment.control1().x +
-                      segment.start().x) +
-                6.0 * t * (segment.end().x - 2.0 * segment.control2().x +
-                           segment.control1().x),
-            6.0 * u * (segment.control2().y - 2.0 * segment.control1().y +
-                      segment.start().y) +
-                6.0 * t * (segment.end().y - 2.0 * segment.control2().y +
-                           segment.control1().y)};
+  [[nodiscard]] static Point2 second_derivative(const SplineSegment& segment, double parameter) noexcept {
+    return segment.curve().second_derivative(std::clamp(parameter, 0.0, 1.0));
   }
 
 private:

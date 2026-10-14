@@ -269,13 +269,46 @@ Point2 ArcSegment::end() const noexcept {
 ArcSegment::ArcSegment(SketchEntityId id, Point2 start, Point2 mid, Point2 end)
     : id_(std::move(id)), start_(start), mid_(mid), end_(end) {}
 
+Result<SplineSegment> SplineSegment::create_elliptical_arc(
+    SketchEntityId id, Point2 center, Point2 major_axis, double minor_radius,
+    double start_angle, double sweep) {
+  const double a = std::hypot(major_axis.x, major_axis.y);
+  if (!std::isfinite(a) || a <= 0 || !std::isfinite(minor_radius) || minor_radius <= 0 ||
+      !std::isfinite(start_angle) || !std::isfinite(sweep) || std::abs(sweep) <= 1e-12 ||
+      std::abs(sweep) > std::acos(-1.0) * 0.5 + 1e-12)
+    return Result<SplineSegment>::failure(validation_error(id.value(),
+        "ellipse requires positive axes and a nonzero sweep no greater than a quarter turn"));
+  const Point2 minor_axis{-major_axis.y / a * minor_radius, major_axis.x / a * minor_radius};
+  const auto at = [&](double angle) -> Point2 {
+    return {center.x + major_axis.x * std::cos(angle) + minor_axis.x * std::sin(angle),
+            center.y + major_axis.y * std::cos(angle) + minor_axis.y * std::sin(angle)};
+  };
+  const Point2 first = at(start_angle), last = at(start_angle + sweep);
+  const Point2 mid = at(start_angle + sweep * 0.5);
+  const double w = std::cos(sweep * 0.5), elevated = (1 + 2*w)/3;
+  const Point2 q{center.x + (mid.x-center.x)/w, center.y + (mid.y-center.y)/w};
+  const Point2 c1{(first.x+2*w*q.x)/(3*elevated), (first.y+2*w*q.y)/(3*elevated)};
+  const Point2 c2{(last.x+2*w*q.x)/(3*elevated), (last.y+2*w*q.y)/(3*elevated)};
+  return create_cubic_bezier(std::move(id), first, c1, c2, last, {1, elevated, elevated, 1});
+}
+
 Result<SplineSegment> SplineSegment::create_cubic_bezier(SketchEntityId id, Point2 start,
                                                          Point2 control1, Point2 control2,
-                                                         Point2 end) {
+                                                         Point2 end, std::array<double, 4> weights) {
   const auto object_id = id.empty() ? std::string("spline_segment") : id.value();
   if (id.empty())
     return Result<SplineSegment>::failure(
         validation_error(object_id, "spline segment id must not be empty"));
+  if (!RationalBezier{{start, control1, control2, end}, weights}.valid())
+    return Result<SplineSegment>::failure(
+        validation_error(object_id, "spline poles must be finite and weights finite and positive"));
+  const double maximum_weight = *std::max_element(weights.begin(), weights.end());
+  for (double& weight : weights) {
+    weight /= maximum_weight;
+    if (weight == 0)
+      return Result<SplineSegment>::failure(validation_error(object_id,
+          "spline weight dynamic range exceeds floating-point precision"));
+  }
   if (same_point(start, end))
     return Result<SplineSegment>::failure(
         validation_error(object_id, "spline segment endpoints must not be identical"));
@@ -283,7 +316,7 @@ Result<SplineSegment> SplineSegment::create_cubic_bezier(SketchEntityId id, Poin
     return Result<SplineSegment>::failure(
         validation_error(object_id, "spline segment control polygon must not be degenerate"));
   return Result<SplineSegment>::success(
-      SplineSegment(std::move(id), start, control1, control2, end));
+      SplineSegment(std::move(id), start, control1, control2, end, weights));
 }
 const SketchEntityId& SplineSegment::id() const noexcept {
   return id_;
@@ -301,8 +334,9 @@ Point2 SplineSegment::end() const noexcept {
   return end_;
 }
 SplineSegment::SplineSegment(SketchEntityId id, Point2 start, Point2 control1, Point2 control2,
-                             Point2 end)
-    : id_(std::move(id)), start_(start), control1_(control1), control2_(control2), end_(end) {}
+                             Point2 end, std::array<double, 4> weights)
+    : id_(std::move(id)), start_(start), control1_(control1), control2_(control2), end_(end),
+      weights_(weights) {}
 
 Result<SketchTrimExtendOperation>
 SketchTrimExtendOperation::create_trim(SketchTrimOperationId id, SketchEntityId target_entity,

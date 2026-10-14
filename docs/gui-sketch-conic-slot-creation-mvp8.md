@@ -1,10 +1,8 @@
 # GUI Sketch Conic and Slot Creation MVP-8
 
-Status: implemented in Block 112 in the GUI layer only; Block-114 constraint acceptance is
-implemented. There is no Core or Geometry conic intent, and no focused proof exists: the
-`[gui][sketch-create-conics]` cases were deleted with the Block-133 shell reset, and
-`[core][sketch-conics]`/`[geometry][sketch-conics]` were never implemented. Block 136 owns closing this
-gap (`docs/gui-shell-reset-sequence-mvp9r.md`).
+Status: conic and slot creation is implemented in the current shell. Exact rational ellipse intent
+and focused Core, Geometry and GUI regression coverage replace the original Block-112 cubic
+approximation. Tangent tools construct and persist actual contact/tangent relations.
 
 This contract extends the Block-111 multi-click creation authority with circles, circular arcs,
 ellipses, elliptical arcs, and mechanical slots. It keeps all screen-space interaction transient and
@@ -31,12 +29,12 @@ solve/conflict preview, and persist only an accepted candidate.
 | Center/diameter circle | center, rim | `CircleProfile` + diameter `Parameter` |
 | Two-point circle | diameter endpoint, diameter endpoint | `CircleProfile` + diameter `Parameter` |
 | Three-point circle | three non-collinear rim points | `CircleProfile` + diameter `Parameter` |
-| Tangent circle | three candidate points | three-point `CircleProfile`; tangency is a separate Block-114 candidate |
+| Tangent circle | source contact, rim point | exact `CircleProfile` + diameter parameter + tangent relation |
 | Center/start/end arc | center, start, end direction | one three-point `ArcSegment` |
 | Three-point arc | start, through-point, end | one `ArcSegment` |
-| Tangent arc | start, through-point, end | one `ArcSegment`; tangency is a separate Block-114 candidate |
-| Ellipse | center, major-axis point, minor-radius point | four cubic `SplineSegment` entities + `ArcClosedProfile` |
-| Elliptical arc | center, major-axis point, minor-radius point, start, end | one or more cubic `SplineSegment` entities |
+| Tangent arc | source endpoint, end | one `ArcSegment` + coincidence and tangent relations |
+| Ellipse | center, major-axis point, minor-radius point | four exact rational `SplineSegment` entities + `ArcClosedProfile` |
+| Elliptical arc | center, major-axis point, minor-radius point, start, end | one or more exact rational `SplineSegment` entities |
 | Center-to-center slot | first cap center, second cap center, half-width point | two lines + two semicircular arcs + `ArcClosedProfile` |
 | Overall-length slot | first outer endpoint, second outer endpoint, half-width point | inset cap centers, two lines + two semicircular arcs + `ArcClosedProfile` |
 
@@ -71,26 +69,56 @@ coordinate in GUI state.
 
 `ArcSegment::create_three_point(...)` remains the sole persistent circular-arc representation.
 Center/start/end input is converted deterministically to start, mid-sweep, and end points on the start
-radius. Three-point and tangent-arc input use the selected through-point directly.
+radius. Three-point input uses the selected through-point directly. Tangent input derives the center and sweep
+from the source tangent and chosen endpoint.
 
 Duplicate points, zero radius, zero sweep, or collinear three-point input fail closed before the
 transaction begins. No fallback line or partial entity is emitted.
 
+## Tangent construction and persistent contact
+
+`SketchTangentCreation` is the Core construction authority. The first pick must identify an editable
+line, arc or spline. Tangent arcs continue an endpoint in the source curve's outgoing direction;
+tangent circles accept a line contact anywhere on the segment and arc/spline contacts at endpoints.
+The second pick is the desired new arc endpoint or another point on the new circle. The center lies
+on the source normal and is solved analytically from the second point. Coincident picks, a second
+point on the tangent line, a missing source and an irregular zero-derivative contact are rejected.
+
+The shell resolves an actual curve hit for the first pick. The controller stores its stable source id,
+previews the real tangent construction, and re-resolves the source against the current Sketch before
+commit. A coordinate-only first pick cannot masquerade as a tangent reference.
+
+Arc creation persists endpoint coincidence and entity tangency. Circle creation persists tangency
+and, for endpoint contacts, a point-on-circle relation. The solver supports circle tangency to a line,
+or to an arc/spline whose endpoint is constrained onto that circle. Circle-circle tangency and arbitrary
+interior contacts on curved sources are outside this pick contract. All creation recipes solve with
+existing dimensions as well as constraints; a conflict rolls back the curve, parameter and relations
+as one transaction. Save/Open and Undo/Redo preserve the complete intent.
+
 ## Ellipse representation
 
-The Core model has exact circle and three-point arc intent but no independent analytic ellipse record.
-Block 112 therefore uses a deterministic persistent cubic-Bezier representation rather than a sampled
-polyline:
+`SplineSegment::create_elliptical_arc` is the Core authority for exact ellipse spans. It accepts a
+center, major-axis vector, positive minor radius, start angle and signed sweep up to a quarter turn.
+The construction uses an exact rational quadratic conic, elevated in homogeneous coordinates to a
+rational cubic. The full ellipse consists of four spans in an ordered `ArcClosedProfile`; open
+elliptical arcs use the minimum number of spans up to 90 degrees and add no profile.
 
-- a full ellipse is split into four 90-degree cubic `SplineSegment` spans;
-- an elliptical arc is split into the minimum number of spans whose absolute sweep is at most 90
-  degrees;
-- control points use `4/3 * tan(delta_parameter / 4)`;
-- a full ellipse adds one ordered `ArcClosedProfile`; an open elliptical arc adds no profile.
+The persistent curve stores four poles and four finite positive weights. Its evaluation is the
+weighted Bernstein sum divided by the weighted basis sum. This is mathematically an exact conic;
+there is no polynomial fitting tolerance. Ordinary cubic splines retain unit weights and their
+existing JSON spelling. Rational spans use `kind: "rational_cubic_bezier"` with a required four-value
+`weights` array in Part JSON. Topology JSON uses `kind: "rational_spline"` with the same weights, and materialization preserves
+them. Both formats use explicit new kind spellings so older readers reject rather than flatten the curve. Old polynomial documents continue to load unchanged; older readers reject the new kind.
 
-This representation survives JSON, topology migration, Geometry materialization, and exact undo/redo.
-Block 113 edits these ordinary spline spans through the same cubic representation, with control/fit
-handles and complete candidate validation; no hidden ellipse-specific GUI curve is introduced.
+`RationalBezier` centralizes evaluation, first/second derivatives and exact interval subdivision.
+Split, trim, transform, topology solve, control-point editing, interaction sampling, OCCT viewport
+edges and feature adapters retain weights. Extrude, Revolve, Sweep and Loft profiles construct weighted
+OCCT Bezier curves. Surface path workflows retain their existing sampled-path contract but sample the
+rational curve. Extension rejects a rational continuation crossing a singular interval.
+
+Control-point editing intentionally allows the user to deform a conic into a general rational curve.
+Converting rational spans to the polynomial fit-point editor is rejected because that conversion
+would change the curve. There is no separate center/axis handle editor for an already-created ellipse.
 
 ## Slot representation
 
@@ -119,15 +147,15 @@ Preview samples are transient and never serialized:
 - arcs and elliptical arcs publish open sampled rubber bands;
 - slots publish a closed line/arc-shaped rubber band;
 - center, endpoint, quadrant, nearest, and inference snaps publish automatic-constraint previews;
-- tangent tools additionally publish explicit tangent preview records.
+- tangent tools publish their resolved contact and exact tangent geometry.
 
-After geometry commit, a supported preview becomes persistent only when Block 114 receives stable
+For optional snap inference, a supported preview becomes persistent only when Block 114 receives stable
 point/entity targets, produces a valid automatic candidate, and the disposable Block-109 solve returns
 `under_constrained` or `fully_constrained`. Conflicting, redundant, invalid, or non-convergent inference
 remains preview-only.
 
 After commit, arcs expose endpoint, through-point, center, and radius handles through Block 110.
-Ellipse splines expose Block-113 control/fit/continuity handles. Slot lines and arcs expose ordinary
+Ellipse spans expose control/continuity handles with their rational weights preserved. Slot lines and arcs expose ordinary
 line/arc handles. Exact full-circle diameter editing remains parameter-owned and is surfaced by
 Block 115.
 
@@ -147,16 +175,17 @@ Block 115.
 
 ## Verification
 
-No focused proof exists for this contract — see the status note above. The shell tool surface that
-replaced the deleted creation binder currently covers line, circle, and rectangle:
-
 ```bash
-QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][sketch-create]"
+./build/dev-gui/blcad_core_tests '[core][sketch-conics]'
+./build/dev-gui/blcad_geometry_tests '[geometry][sketch-conics]'
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests '[gui][sketch-create-conics]'
 ```
 
-Acceptance covers exact CircleProfile/Parameter persistence, JSON roundtrip, atomic undo/redo,
-degenerate three-point rejection, tangent preview, cubic ellipse expansion, ordered slot contours, and
-action registration in the Sketch command lifecycle.
+Core tests verify analytic ellipse residuals, rotated axes, derivatives, reversal, exact subdivision,
+JSON/topology roundtrips, materialization and invalid weights. Geometry verifies analytic extrusion
+volume before and after splitting a profile span. GUI tests exercise circle, arc, ellipse and both slot
+families, preview cancellation, degenerate picks, shape/profile counts, Save/Open and one-step undo/redo. Tangent cases additionally verify reference validation, exact contact/radius,
+persistent relationships and rollback of degenerate requests.
 
 ## Following boundaries
 

@@ -752,23 +752,33 @@ reference_generated_line_from_json(const json& line_json) {
 }
 
 [[nodiscard]] Result<SplineSegment> spline_segment_from_json(const json& spline_json) {
-  if (spline_json.value("kind", std::string("cubic_bezier")) != "cubic_bezier") {
+  const auto kind = spline_json.value("kind", std::string("cubic_bezier"));
+  if (kind != "cubic_bezier" && kind != "rational_cubic_bezier") {
     return Result<SplineSegment>::failure(
-        json_error("only cubic_bezier spline segments are supported"));
+        json_error("unsupported spline representation"));
   }
+  if ((kind == "rational_cubic_bezier" &&
+       (!spline_json.contains("weights") || !spline_json.at("weights").is_array() ||
+        spline_json.at("weights").size() != 4U)) ||
+      (kind == "cubic_bezier" && spline_json.contains("weights")))
+    return Result<SplineSegment>::failure(json_error("rational cubic requires exactly four weights"));
   return SplineSegment::create_cubic_bezier(
       SketchEntityId(spline_json.at("id").get<std::string>()),
       point2_from_json(spline_json.at("start")), point2_from_json(spline_json.at("control1")),
-      point2_from_json(spline_json.at("control2")), point2_from_json(spline_json.at("end")));
+      point2_from_json(spline_json.at("control2")), point2_from_json(spline_json.at("end")),
+      kind == "rational_cubic_bezier" ? spline_json.at("weights").get<std::array<double, 4>>()
+                                      : std::array<double, 4>{1, 1, 1, 1});
 }
 
 [[nodiscard]] json spline_segment_to_json(const SplineSegment& spline) {
-  return json{{"id", spline.id().value()},
-              {"kind", "cubic_bezier"},
+  json value{{"id", spline.id().value()},
+              {"kind", spline.rational() ? "rational_cubic_bezier" : "cubic_bezier"},
               {"start", point2_to_json(spline.start())},
               {"control1", point2_to_json(spline.control1())},
               {"control2", point2_to_json(spline.control2())},
               {"end", point2_to_json(spline.end())}};
+  if (spline.rational()) value["weights"] = spline.weights();
+  return value;
 }
 
 [[nodiscard]] Result<SketchTrimExtendOperation>

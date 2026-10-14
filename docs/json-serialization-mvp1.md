@@ -33,7 +33,7 @@ The current JSON format stores:
 - derived workplanes with `top`, `bottom`, `right`, `left`, `front`, or `back` semantic face references
 - line-segment sketch entities
 - three-point arc sketch entities
-- cubic Bezier spline sketch entities
+- polynomial and rational cubic Bezier spline sketch entities
 - trim/extend metadata records
 - tangent-continuity metadata records
 - projected sketch point references
@@ -303,3 +303,13 @@ Supported reference status values are:
 resolved
 lost
 ```
+
+## Exact rational Sketch curves
+
+Ordinary spline records retain `kind: "cubic_bezier"` and implicit unit weights. Exact ellipse spans
+use `kind: "rational_cubic_bezier"` with the existing four pole fields and a required `weights` array
+of exactly four finite positive numbers. Weights are normalized by a common factor without changing
+the curve. Invalid lengths, nonpositive weights and unsupported kinds fail validation. This additive
+representation retains existing polynomial documents and causes older readers to reject unsupported
+exact conics rather than reinterpret them as polynomial curves. Topology JSON uses the corresponding
+explicit `rational_spline` kind. No sampled preview or OCCT object is persisted.

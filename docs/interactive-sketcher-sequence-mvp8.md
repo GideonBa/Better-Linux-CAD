@@ -349,10 +349,10 @@ Scope narrowed against the original per-block planning; each item needs its own 
 boundary instead of silent inclusion:
 
 - a curved/three-point **arc slot** family (Block 112 implements the two straight slot families);
-- an analytic persistent **ellipse entity** — ellipses persist as deterministic cubic
-  `SplineSegment` spans per `docs/gui-sketch-conic-slot-creation-mvp8.md`;
-- geometrically solved tangent circle/arc **construction**; tangency is authored as an explicit
-  accepted Block-114 constraint, never inferred from coordinates;
+- a separate parametric **ellipse entity with center/axis edit handles** — current shell hardening
+  represents exact conics as rational `SplineSegment` spans, with Core construction and persistent
+  weights, per `docs/gui-sketch-conic-slot-creation-mvp8.md`; tangent circle/arc construction is now
+  implemented against explicit source contacts and persists accepted contact/tangent intent;
 - spline **open/closed-state toggling** and explicit **self-intersection diagnostics** (Block 113
   edits open chains; degenerate/stale candidates fail closed);
 - Sketch text **alignment, multiline layout, letter spacing, and baseline/path placement**, and
@@ -360,8 +360,8 @@ boundary instead of silent inclusion:
   anchor, height/rotation parameters, and stroke-vector layout;
 - constraint **suppression** (no Core suppression intent exists for planar constraints) —
   Block 114 offers add, inspect, locate, and delete;
-- dimension **extension lines, arrows, text-collision avoidance, and draggable annotation
-  positions**; Block 115 publishes one semantic anchor annotation per dimension;
+- dimension **extension lines, arrows and text-collision avoidance**; annotation positions are now
+  draggable and persisted, and values use an in-canvas editor;
 - dimensions targeting full **CircleProfile** records; radius/diameter/arc-length target
   three-point arcs until shared topology covers circle-profile entities;
 - **Qt binder wiring for Blocks 117 and 118** — the planned `[geometry][sketch-offset-project]`,

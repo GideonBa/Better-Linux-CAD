@@ -326,3 +326,44 @@ TEST_CASE("Block 116 chamfer output resolves through the Geometry region pipelin
   auto profile = finder.make_closed_profile(region.value());
   REQUIRE(profile);
 }
+
+TEST_CASE("Exact rational ellipse profiles retain analytic area through extrusion and splitting",
+          "[geometry][sketch-conics]") {
+  const double pi = std::acos(-1.0);
+  auto part = PartDocument::create(DocumentId("part.ellipse"), "Ellipse").value();
+  REQUIRE(part.add_datum_plane(DatumPlane::xy().value()));
+  REQUIRE(part.add_parameter(make_length_parameter("depth", "depth", 6)));
+  auto sketch = Sketch::create(SketchId("ellipse"), "Ellipse", DatumPlaneId("datum.xy")).value();
+  std::vector<SketchEntityId> ids;
+  for (int i = 0; i < 4; ++i) {
+    ids.emplace_back("ellipse." + std::to_string(i));
+    auto span = SplineSegment::create_elliptical_arc(ids.back(), {0, 0}, {20, 0}, 10,
+                                                     i*pi/2, pi/2);
+    REQUIRE(span);
+    REQUIRE(sketch.add_entity(span.value()));
+  }
+  REQUIRE(sketch.add_profile(ArcClosedProfile::create(ProfileId("profile.ellipse"), ids).value()));
+  SECTION("original profile") {}
+  SECTION("split profile") {
+    auto split = SketchModifyService::split(sketch, ids.front(),
+        sketch.spline_segments().front().curve().point(.31));
+    REQUIRE(split);
+    sketch = split.value().sketch;
+  }
+  REQUIRE(part.add_sketch(sketch));
+  REQUIRE(part.add_feature(Feature::create_additive_extrude(FeatureId("extrude"), "Extrude",
+      sketch.id(), ParameterId("depth")).value()));
+  auto cache = ShapeCache::create(ShapeCacheId("ellipse.cache")).value();
+  const auto result = GeometryRecomputeExecutor{}.execute_document(part, cache);
+  REQUIRE(result);
+  REQUIRE(cache.final_shape());
+  const auto shape = RectangleExtrusionAdapter{}.summarize(*cache.final_shape());
+  CHECK(shape.solid_count == 1);
+  CHECK(shape.volume_mm3 == Catch::Approx(pi * 20 * 10 * 6).epsilon(1e-7));
+  auto samples = SketchSplineGeometryEvaluator{}.evaluate(sketch.spline_segments());
+  REQUIRE(samples);
+  for (const auto& span : samples.value().sampled_segments)
+    for (const auto& sample : span)
+      CHECK(sample.position.x*sample.position.x/400 + sample.position.y*sample.position.y/100 ==
+            Catch::Approx(1).margin(1e-12));
+}

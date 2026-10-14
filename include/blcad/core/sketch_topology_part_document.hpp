@@ -116,7 +116,7 @@ public:
         if (control2.has_error()) return Result<Sketch>::failure(control2.error());
         if (end.has_error()) return Result<Sketch>::failure(end.error());
         auto spline = SplineSegment::create_cubic_bezier(
-            id.value(), start.value(), control1.value(), control2.value(), end.value());
+            id.value(), start.value(), control1.value(), control2.value(), end.value(), current.weights());
         if (spline.has_error()) return Result<Sketch>::failure(spline.error());
         auto added = result.value().add_entity(std::move(spline.value()));
         if (added.has_error()) return Result<Sketch>::failure(added.error());

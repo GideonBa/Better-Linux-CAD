@@ -15,6 +15,7 @@
 #include <Geom_Surface.hxx>
 #include <Standard_Failure.hxx>
 #include <TColgp_Array1OfPnt.hxx>
+#include <TColStd_Array1OfReal.hxx>
 #include <TopAbs_ShapeEnum.hxx>
 #include <TopExp_Explorer.hxx>
 #include <TopoDS.hxx>
@@ -164,7 +165,11 @@ interpolate_closed_section(const FeatureId& id, const std::vector<ClosedProfileC
                       interpolate(first[index].start, second[index].start, ratio),
                       interpolate(first[index].mid, second[index].mid, ratio),
                       interpolate(first[index].end, second[index].end, ratio),
-                      interpolate(first[index].control2, second[index].control2, ratio)});
+                      interpolate(first[index].control2, second[index].control2, ratio),
+                      {std::lerp(first[index].weights[0], second[index].weights[0], ratio),
+                       std::lerp(first[index].weights[1], second[index].weights[1], ratio),
+                       std::lerp(first[index].weights[2], second[index].weights[2], ratio),
+                       std::lerp(first[index].weights[3], second[index].weights[3], ratio)}});
   }
   return Result<std::vector<ClosedProfileCurveSegment>>::success(std::move(result));
 }
@@ -384,7 +389,9 @@ controlled_open_sections(const FeatureId& id,
   poles.SetValue(2, point(segment.mid));
   poles.SetValue(3, point(segment.control2));
   poles.SetValue(4, point(segment.end));
-  Handle(Geom_BezierCurve) curve = new Geom_BezierCurve(poles);
+  TColStd_Array1OfReal weights(1, 4);
+  for (int i = 1; i <= 4; ++i) weights.SetValue(i, segment.weights[i-1]);
+  Handle(Geom_BezierCurve) curve = new Geom_BezierCurve(poles, weights);
   BRepBuilderAPI_MakeEdge edge(curve);
   if (!edge.IsDone())
     return Result<TopoDS_Edge>::failure(loft_error(id, "could not build loft spline edge"));

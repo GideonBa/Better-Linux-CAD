@@ -48,7 +48,8 @@ public:
   // Dialog-free command surface (ribbon slots and tests call these).
   [[nodiscard]] bool begin_tool(GuiSketchCreateTool tool);
   [[nodiscard]] bool add_pick(Point2 point,
-                              GuiSketchSnapKind kind = GuiSketchSnapKind::None);
+                              GuiSketchSnapKind kind = GuiSketchSnapKind::None,
+                              std::optional<SketchEntityId> tangent_reference = std::nullopt);
   [[nodiscard]] bool complete_tool();
   void cancel_tool();
   [[nodiscard]] bool tool_active() const;

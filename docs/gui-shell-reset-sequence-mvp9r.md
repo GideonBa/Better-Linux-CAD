@@ -472,3 +472,17 @@ Undo/Redo and topology remapping retain the layout. Values are edited at the can
 Enter/Escape, optional matching units, and `=formula` conversion to an expression binding.
 
 Proof: `[sketch-dimension-workflow]` in `tests/gui/gui_shell_dimension_workflow_tests.cpp`.
+
+## Sketch tool hardening after the shell reset
+
+Open contours may finish as editable sketches; closed profile extraction and downstream feature
+validation remain explicit. Split and corner edits preserve ordered profile ids, with polygon-to-curve
+promotion for fillets. Connected line/arc/spline corners and exact cubic continuation expand Modify.
+Corner geometry, automatic relationships and driving size now share one transaction.
+
+Ellipse and elliptical-arc tools create exact rational conic spans. Weighted curves survive JSON,
+topology/solver materialization, editing, sampling and OCCT feature adapters. Tangent tools require a
+real source curve and persist contact/tangency together with the new shape. Conic and slot coverage
+has been restored with `[core][sketch-conics]`, `[geometry][sketch-conics]` and
+`[gui][sketch-create-conics]`; see the creation and modify contracts for remaining bounded cases.
+This hardening does not mark the outstanding Block-136 feature command surface complete.

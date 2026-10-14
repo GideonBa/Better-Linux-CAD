@@ -108,7 +108,7 @@ private:
   [[nodiscard]] static bool same_segment(const SplineSegment& first,
                                          const SplineSegment& second) noexcept {
     return first.id() == second.id() && same_point(first.start(), second.start()) &&
-           same_point(first.control1(), second.control1()) &&
+           first.weights() == second.weights() && same_point(first.control1(), second.control1()) &&
            same_point(first.control2(), second.control2()) && same_point(first.end(), second.end());
   }
 

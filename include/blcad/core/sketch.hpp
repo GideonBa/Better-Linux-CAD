@@ -4,6 +4,7 @@
 #include "blcad/core/id.hpp"
 #include "blcad/core/result.hpp"
 #include "blcad/core/spatial.hpp"
+#include "blcad/core/rational_bezier.hpp"
 
 #include <cstddef>
 #include <optional>
@@ -283,22 +284,35 @@ private:
 
 class SplineSegment {
 public:
+  // Exact ellipse span; each span is at most a quarter turn.
+  [[nodiscard]] static Result<SplineSegment> create_elliptical_arc(
+      SketchEntityId id, Point2 center, Point2 major_axis, double minor_radius,
+      double start_angle, double sweep);
   [[nodiscard]] static Result<SplineSegment> create_cubic_bezier(SketchEntityId id, Point2 start,
                                                                  Point2 control1, Point2 control2,
-                                                                 Point2 end);
+                                                                 Point2 end, std::array<double, 4> weights = {1, 1, 1, 1});
   [[nodiscard]] const SketchEntityId& id() const noexcept;
   [[nodiscard]] Point2 start() const noexcept;
   [[nodiscard]] Point2 control1() const noexcept;
   [[nodiscard]] Point2 control2() const noexcept;
   [[nodiscard]] Point2 end() const noexcept;
+  [[nodiscard]] const std::array<double, 4>& weights() const noexcept { return weights_; }
+  [[nodiscard]] RationalBezier curve() const noexcept {
+    return {{start_, control1_, control2_, end_}, weights_};
+  }
+  [[nodiscard]] bool rational() const noexcept {
+    return weights_ != std::array<double, 4>{1, 1, 1, 1};
+  }
 
 private:
-  SplineSegment(SketchEntityId id, Point2 start, Point2 control1, Point2 control2, Point2 end);
+  SplineSegment(SketchEntityId id, Point2 start, Point2 control1, Point2 control2, Point2 end,
+                std::array<double, 4> weights);
   SketchEntityId id_;
   Point2 start_;
   Point2 control1_;
   Point2 control2_;
   Point2 end_;
+  std::array<double, 4> weights_;
 };
 
 class SketchTrimExtendOperation {

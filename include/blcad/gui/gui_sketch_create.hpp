@@ -1,6 +1,7 @@
 #pragma once
 
 #include "blcad/gui/gui_sketch_interaction.hpp"
+#include "blcad/core/sketch_tangent_creation.hpp"
 #include "blcad/gui/gui_sketch_workbench.hpp"
 
 #include <cstddef>
@@ -72,6 +73,7 @@ struct GuiSketchCreatePreview {
 struct GuiSketchCreateConstraintRecipe {
   SketchSolverConstraintKind kind;
   std::vector<SketchEntityId> entity_targets;
+  std::vector<SketchConstraintIntentTarget> targets{};
 
   friend bool operator==(const GuiSketchCreateConstraintRecipe&,
                          const GuiSketchCreateConstraintRecipe&) = default;
@@ -96,7 +98,7 @@ struct GuiSketchCreateExpansion {
 // snapped plane coordinates supplied by the Block-107 interaction layer.
 // Block 112 deliberately expands conics and slots into the existing persistent
 // Core authorities: CircleProfile + diameter Parameter for exact full circles,
-// ArcSegment for circular arcs, cubic SplineSegment chains for ellipses and
+// ArcSegment for circular arcs, exact rational SplineSegment chains for ellipses and
 // elliptical arcs, and line/arc ArcClosedProfile contours for slots. Commit
 // publishes exactly one document transaction per completed tool.
 class GuiSketchCreateController {
@@ -114,6 +116,8 @@ public:
   [[nodiscard]] bool complete_ready() const noexcept;
 
   [[nodiscard]] Result<std::size_t> add_pick(GuiSketchCreatePick pick);
+  [[nodiscard]] Result<std::size_t> add_tangent_reference(
+      const PartDocument& document, SketchEntityId source, Point2 contact);
   [[nodiscard]] Result<std::size_t> pop_pick();
 
   // Applies one numeric HUD entry. For RegularPolygon before the first pick a
@@ -146,6 +150,7 @@ private:
   GuiSketchPlaneView plane_;
   GuiSketchCreateOptions options_;
   std::vector<GuiSketchCreatePick> picks_;
+  std::optional<SketchTangentAnchor> tangent_anchor_;
 };
 
 } // namespace blcad::gui

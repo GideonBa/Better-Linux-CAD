@@ -15,6 +15,7 @@
 #include <Geom_BezierCurve.hxx>
 #include <Standard_Failure.hxx>
 #include <TColgp_Array1OfPnt.hxx>
+#include <TColStd_Array1OfReal.hxx>
 #include <TopAbs_ShapeEnum.hxx>
 #include <TopExp_Explorer.hxx>
 #include <TopoDS.hxx>
@@ -114,7 +115,9 @@ polygon_wire(const FeatureId& id, const std::vector<Point3>& vertices, std::stri
     poles.SetValue(2, point(curve.mid));
     poles.SetValue(3, point(curve.control2));
     poles.SetValue(4, point(curve.end));
-    Handle(Geom_BezierCurve) bezier = new Geom_BezierCurve(poles);
+    TColStd_Array1OfReal weights(1, 4);
+    for (int i = 1; i <= 4; ++i) weights.SetValue(i, curve.weights[i-1]);
+    Handle(Geom_BezierCurve) bezier = new Geom_BezierCurve(poles, weights);
     BRepBuilderAPI_MakeEdge builder(bezier);
     if (!builder.IsDone())
       return Result<TopoDS_Edge>::failure(revolve_error(id, "could not build revolve spline"));

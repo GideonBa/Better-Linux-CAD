@@ -117,11 +117,17 @@ class SketchTopologyEntity {
 public:
   [[nodiscard]] static Result<SketchTopologyEntity>
   create(std::string id, SketchTopologyEntityKind kind, std::vector<SketchPointId> points,
-         std::vector<std::string> entity_dependencies = {}, SketchTopologyFlags flags = {}) {
+         std::vector<std::string> entity_dependencies = {}, SketchTopologyFlags flags = {},
+         std::array<double, 4> weights = {1, 1, 1, 1}) {
     const std::string object_id = id.empty() ? "sketch_topology_entity" : id;
     if (id.empty())
       return Result<SketchTopologyEntity>::failure(
           Error::validation(object_id, "sketch topology entity id must not be empty"));
+    for (double w : weights)
+      if (!std::isfinite(w) || w <= 0 ||
+          (kind != SketchTopologyEntityKind::Spline && w != 1))
+        return Result<SketchTopologyEntity>::failure(
+            Error::validation(object_id, "invalid rational spline weights"));
     if (flags.reference && flags.construction)
       return Result<SketchTopologyEntity>::failure(Error::validation(
           object_id, "reference sketch entities cannot also be construction entities"));
@@ -170,11 +176,12 @@ public:
           object_id, "sketch topology entity requires distinct defining point identities"));
 
     return Result<SketchTopologyEntity>::success(SketchTopologyEntity(
-        std::move(id), kind, std::move(points), std::move(entity_dependencies), flags));
+        std::move(id), kind, std::move(points), std::move(entity_dependencies), flags, weights));
   }
 
   [[nodiscard]] const std::string& id() const noexcept { return id_; }
   [[nodiscard]] SketchTopologyEntityKind kind() const noexcept { return kind_; }
+  [[nodiscard]] const std::array<double, 4>& weights() const noexcept { return weights_; }
   [[nodiscard]] const std::vector<SketchPointId>& points() const noexcept { return points_; }
   [[nodiscard]] const std::vector<std::string>& entity_dependencies() const noexcept {
     return entity_dependencies_;
@@ -189,15 +196,16 @@ private:
   SketchTopologyEntity(std::string id, SketchTopologyEntityKind kind,
                        std::vector<SketchPointId> points,
                        std::vector<std::string> entity_dependencies,
-                       SketchTopologyFlags flags)
+                       SketchTopologyFlags flags, std::array<double, 4> weights)
       : id_(std::move(id)), kind_(kind), points_(std::move(points)),
-        entity_dependencies_(std::move(entity_dependencies)), flags_(flags) {}
+        entity_dependencies_(std::move(entity_dependencies)), flags_(flags), weights_(weights) {}
 
   std::string id_;
   SketchTopologyEntityKind kind_;
   std::vector<SketchPointId> points_;
   std::vector<std::string> entity_dependencies_;
   SketchTopologyFlags flags_;
+  std::array<double, 4> weights_;
 };
 
 struct SketchTopologyDependency {
@@ -317,6 +325,7 @@ public:
       std::vector<std::pair<std::string, Point2>> point_usages;
       std::vector<std::string> dependencies;
       SketchTopologyFlags flags;
+      std::array<double, 4> weights{1, 1, 1, 1};
     };
     struct PointUsage {
       std::string proposed_id;
@@ -341,7 +350,7 @@ public:
     for (const auto& spline : sketch.spline_segments())
       candidates.push_back({entity_id(spline.id()), SketchTopologyEntityKind::Spline,
                             {{"start", spline.start()}, {"control1", spline.control1()},
-                             {"control2", spline.control2()}, {"end", spline.end()}}, {}, {}});
+                             {"control2", spline.control2()}, {"end", spline.end()}}, {}, {}, spline.weights()});
     for (const auto& profile : sketch.rectangle_profiles())
       candidates.push_back({profile_id(profile.id()), SketchTopologyEntityKind::RectangleProfile,
                             {{"center", profile.center()}}, {}, {}});
@@ -500,7 +509,7 @@ public:
         point_ids.push_back(found->second);
       }
       auto entity = SketchTopologyEntity::create(candidate.id, candidate.kind, std::move(point_ids),
-                                                 candidate.dependencies, candidate.flags);
+                                                 candidate.dependencies, candidate.flags, candidate.weights);
       if (entity.has_error()) return Result<SketchTopology>::failure(entity.error());
       entities.push_back(std::move(entity.value()));
     }

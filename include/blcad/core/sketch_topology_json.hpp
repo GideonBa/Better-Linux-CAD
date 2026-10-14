@@ -44,11 +44,14 @@ serialize_sketch_topology_to_json(const SketchTopology& topology) {
       dependencies.push_back(dependency);
     root["entities"].push_back(
         {{"id", entity.id()},
-         {"kind", std::string(to_string(entity.kind()))},
+         {"kind", entity.weights() != std::array<double, 4>{1, 1, 1, 1}
+                      ? "rational_spline" : std::string(to_string(entity.kind()))},
          {"points", std::move(points)},
          {"entity_dependencies", std::move(dependencies)},
          {"construction", entity.construction()},
          {"reference", entity.reference()}});
+    if (entity.weights() != std::array<double, 4>{1, 1, 1, 1})
+      root["entities"].back()["weights"] = entity.weights();
   }
 
   for (const auto& dependency : topology.dependencies())
@@ -102,8 +105,12 @@ deserialize_sketch_topology_from_json(std::string_view content) {
           !value.contains("reference") || !value.at("reference").is_boolean())
         return Result<SketchTopology>::failure(Error::validation(
             "sketch_topology_json", "malformed Sketch topology entity record"));
+      const auto kind_name = value.at("kind").get<std::string>();
       const auto kind = sketch_topology_entity_kind_from_string(
-          value.at("kind").get<std::string>());
+          kind_name == "rational_spline" ? "spline" : kind_name);
+      if ((kind_name == "rational_spline") != value.contains("weights"))
+        return Result<SketchTopology>::failure(Error::validation(
+            value.at("id").get<std::string>(), "rational spline kind and weights must occur together"));
       if (!kind)
         return Result<SketchTopology>::failure(Error::validation(
             value.at("id").get<std::string>(), "unsupported Sketch topology entity kind"));
@@ -121,11 +128,15 @@ deserialize_sketch_topology_from_json(std::string_view content) {
               value.at("id").get<std::string>(), "Sketch topology dependency must be a string"));
         entity_dependencies.push_back(dependency.get<std::string>());
       }
+      if (value.contains("weights") && (!value.at("weights").is_array() || value.at("weights").size() != 4U))
+        return Result<SketchTopology>::failure(Error::validation(
+            value.at("id").get<std::string>(), "rational spline requires exactly four weights"));
       auto entity = SketchTopologyEntity::create(
           value.at("id").get<std::string>(), *kind, std::move(point_ids),
           std::move(entity_dependencies),
           {.construction = value.at("construction").get<bool>(),
-           .reference = value.at("reference").get<bool>()});
+           .reference = value.at("reference").get<bool>()},
+          value.value("weights", std::array<double, 4>{1, 1, 1, 1}));
       if (entity.has_error()) return Result<SketchTopology>::failure(entity.error());
       entities.push_back(std::move(entity.value()));
     }

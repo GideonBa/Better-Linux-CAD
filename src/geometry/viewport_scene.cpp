@@ -17,6 +17,7 @@
 #include <Geom_BezierCurve.hxx>
 #include <Standard_Failure.hxx>
 #include <TColgp_Array1OfPnt.hxx>
+#include <TColStd_Array1OfReal.hxx>
 #include <TopoDS.hxx>
 #include <TopoDS_Compound.hxx>
 #include <TopoDS_Edge.hxx>
@@ -241,7 +242,9 @@ ViewportSceneBuilder::build_part(const PartDocument& document,
         poles.SetValue(2, point(spline.control1()));
         poles.SetValue(3, point(spline.control2()));
         poles.SetValue(4, point(spline.end()));
-        const Handle(Geom_BezierCurve) curve = new Geom_BezierCurve(poles);
+        TColStd_Array1OfReal weights(1, 4);
+        for (int i = 1; i <= 4; ++i) weights.SetValue(i, spline.weights()[i-1]);
+        const Handle(Geom_BezierCurve) curve = new Geom_BezierCurve(poles, weights);
         items.push_back({ViewportSceneKind::SketchEntity, sketch_entity_id(sketch, spline.id()),
                          wrap(BRepBuilderAPI_MakeEdge(curve).Shape())});
       }
@@ -316,7 +319,9 @@ ViewportSceneBuilder::build_part(const PartDocument& document,
           poles.SetValue(2, point(spline->control1()));
           poles.SetValue(3, point(spline->control2()));
           poles.SetValue(4, point(spline->end()));
-          const Handle(Geom_BezierCurve) curve = new Geom_BezierCurve(poles);
+          TColStd_Array1OfReal weights(1, 4);
+          for (int i = 1; i <= 4; ++i) weights.SetValue(i, spline->weights()[i-1]);
+          const Handle(Geom_BezierCurve) curve = new Geom_BezierCurve(poles, weights);
           return Result<TopoDS_Edge>::success(BRepBuilderAPI_MakeEdge(curve).Edge());
         }
         return Result<TopoDS_Edge>::failure(

@@ -2,14 +2,16 @@
 
 This document describes the original spline-profile seed and its Block-113 interactive extension.
 
-The persistent spline representation remains one deterministic cubic Bezier curve:
+The persistent spline representation is a polynomial or rational cubic Bezier curve:
 
 ```text
 start -> control1 -> control2 -> end
 ```
 
 A spline segment is explicit model intent. It stores its own control points and is not computed from
-screen state or an opaque solver cache.
+screen state or an opaque solver cache. Rational spans additionally carry four finite positive weights.
+The Core ellipse factory constructs exact rational conics, and editing/materialization retain the
+weights. See `gui-sketch-conic-slot-creation-mvp8.md` for the current construction contract.
 
 ## Original implemented scope
 
@@ -48,12 +50,16 @@ Historical Part Sketch JSON supports:
 }
 ```
 
+Exact conic spans use `kind: "rational_cubic_bezier"` and a required four-value `weights` array.
+Ordinary cubic records above retain their historical spelling and implicit unit weights. Unknown or
+malformed rational representations fail validation; older readers reject the new kind.
+
 Existing `arc_closed_profiles` can reference spline ids in their ordered `curve_segments` list.
 
 ## Geometry behavior
 
 The optional Geometry layer maps spline control points through the resolved Sketch workplane and
-builds an OCCT Bezier edge from four poles. Spline profiles support additive extrude and subtractive
+builds an OCCT Bezier edge from four poles and their weights. Spline profiles support additive extrude and subtractive
 through-all cut. Through-all cuts use the resolved Sketch-normal axis and are not restricted to
 principal axes.
 

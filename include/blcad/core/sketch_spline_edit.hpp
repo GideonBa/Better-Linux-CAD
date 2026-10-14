@@ -141,6 +141,10 @@ public:
   [[nodiscard]] Result<std::size_t> convert_to_fit_points() {
     if (representation_ == SketchSplineRepresentation::FitPoints)
       return Result<std::size_t>::success(fit_points_.size());
+    for (const auto& segment : segments_)
+      if (segment.rational())
+        return Result<std::size_t>::failure(Error::validation(
+            sketch_.value(), "rational curves require control-point editing to preserve exact geometry"));
     fit_points_.clear();
     fit_points_.reserve(segments_.size() * 2U + 1U);
     fit_points_.push_back(segments_.front().start());
@@ -174,7 +178,8 @@ public:
     auto points = control_points(segments_[segment_index]);
     points[point_index] = position;
     auto replacement = SplineSegment::create_cubic_bezier(
-        segments_[segment_index].id(), points[0], points[1], points[2], points[3]);
+        segments_[segment_index].id(), points[0], points[1], points[2], points[3],
+        segments_[segment_index].weights());
     if (replacement.has_error()) return Result<std::size_t>::failure(replacement.error());
     segments_[segment_index] = std::move(replacement.value());
 
@@ -183,7 +188,8 @@ public:
       auto previous = control_points(segments_[segment_index - 1U]);
       previous[3] = position;
       auto updated = SplineSegment::create_cubic_bezier(
-          segments_[segment_index - 1U].id(), previous[0], previous[1], previous[2], previous[3]);
+          segments_[segment_index - 1U].id(), previous[0], previous[1], previous[2], previous[3],
+          segments_[segment_index - 1U].weights());
       if (updated.has_error()) return Result<std::size_t>::failure(updated.error());
       segments_[segment_index - 1U] = std::move(updated.value());
     }
@@ -191,7 +197,8 @@ public:
       auto next = control_points(segments_[segment_index + 1U]);
       next[0] = position;
       auto updated = SplineSegment::create_cubic_bezier(
-          segments_[segment_index + 1U].id(), next[0], next[1], next[2], next[3]);
+          segments_[segment_index + 1U].id(), next[0], next[1], next[2], next[3],
+          segments_[segment_index + 1U].weights());
       if (updated.has_error()) return Result<std::size_t>::failure(updated.error());
       segments_[segment_index + 1U] = std::move(updated.value());
     }
@@ -271,9 +278,11 @@ public:
     second[1] = {junction.x + direction.x * outgoing_length,
                  junction.y + direction.y * outgoing_length};
     auto first_segment = SplineSegment::create_cubic_bezier(
-        segments_[junction_index].id(), first[0], first[1], first[2], first[3]);
+        segments_[junction_index].id(), first[0], first[1], first[2], first[3],
+        segments_[junction_index].weights());
     auto second_segment = SplineSegment::create_cubic_bezier(
-        segments_[junction_index + 1U].id(), second[0], second[1], second[2], second[3]);
+        segments_[junction_index + 1U].id(), second[0], second[1], second[2], second[3],
+        segments_[junction_index + 1U].weights());
     if (first_segment.has_error()) return Result<std::size_t>::failure(first_segment.error());
     if (second_segment.has_error()) return Result<std::size_t>::failure(second_segment.error());
     segments_[junction_index] = std::move(first_segment.value());
@@ -485,16 +494,9 @@ private:
     return distance(first, second) <= kTolerance;
   }
   [[nodiscard]] static Point2 evaluate(const SplineSegment& segment, double t) noexcept {
-    const double u = 1.0 - t;
-    const double b0 = u * u * u;
-    const double b1 = 3.0 * u * u * t;
-    const double b2 = 3.0 * u * t * t;
-    const double b3 = t * t * t;
-    return {b0 * segment.start().x + b1 * segment.control1().x +
-                b2 * segment.control2().x + b3 * segment.end().x,
-            b0 * segment.start().y + b1 * segment.control1().y +
-                b2 * segment.control2().y + b3 * segment.end().y};
+    return segment.curve().point(t);
   }
+
   [[nodiscard]] static std::vector<Point2> control_points(const SplineSegment& segment) {
     return {segment.start(), segment.control1(), segment.control2(), segment.end()};
   }

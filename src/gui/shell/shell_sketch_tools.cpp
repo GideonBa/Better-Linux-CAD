@@ -71,7 +71,7 @@ constexpr std::array<ToolDescriptor, 6> kCircleTools{{
     {"sketch.create.three_point_circle", "Kreis (3 Punkte)",
      GuiSketchCreateTool::ThreePointCircle, "Drei Kreispunkte wählen"},
     {"sketch.create.tangent_circle", "Kreis (tangential)", GuiSketchCreateTool::TangentCircle,
-     "Drei Tangentenkandidaten wählen"},
+     "Berührpunkt auf Kurve, dann Kreispunkt wählen"},
     {"sketch.create.ellipse", "Ellipse", GuiSketchCreateTool::Ellipse,
      "Mitte, Hauptachse und Nebenradius wählen"},
 }};
@@ -81,7 +81,7 @@ constexpr std::array<ToolDescriptor, 4> kArcTools{{
     {"sketch.create.three_point_arc", "Bogen (3 Punkte)", GuiSketchCreateTool::ThreePointArc,
      "Start, Zwischenpunkt und Ende wählen"},
     {"sketch.create.tangent_arc", "Bogen (tangential)", GuiSketchCreateTool::TangentArc,
-     "Start, Zwischenpunkt und Ende wählen"},
+     "Endpunkt einer Kurve, dann Bogenende wählen"},
     {"sketch.create.elliptical_arc", "Elliptischer Bogen", GuiSketchCreateTool::EllipticalArc,
      "Mitte, Hauptachse, Nebenradius, Start und Ende wählen"},
 }};
@@ -963,10 +963,33 @@ bool ShellSketchTools::begin_tool(GuiSketchCreateTool tool) {
   return true;
 }
 
-bool ShellSketchTools::add_pick(Point2 point, GuiSketchSnapKind kind) {
+bool ShellSketchTools::add_pick(Point2 point, GuiSketchSnapKind kind,
+                                std::optional<SketchEntityId> tangent_reference) {
   if (!tool_active())
     return false;
-  auto added = create_controller_->add_pick({point, kind});
+  const bool tangent = create_controller_->tool() == GuiSketchCreateTool::TangentArc ||
+                       create_controller_->tool() == GuiSketchCreateTool::TangentCircle;
+  auto added = [&]() -> Result<std::size_t> {
+    if (!tangent || !create_controller_->picks().empty()) return create_controller_->add_pick({point, kind});
+    if (!tangent_reference) {
+      auto screen = viewport_.sketch_plane_to_screen(point);
+      auto topology = active_topology();
+      if (screen && topology) {
+        auto hits = viewport_.sketch_curve_hits_along(screen.value(), screen.value());
+        if (hits) for (const auto& hit : hits.value()) {
+          auto target = selection_target(topology.value(), hit.semantic_id);
+          if (target && target->kind() == SketchConstraintIntentTargetKind::Entity &&
+              target->id().starts_with("entity/")) {
+            tangent_reference = SketchEntityId(target->id().substr(7));
+            break;
+          }
+        }
+      }
+    }
+    if (!tangent_reference) return Result<std::size_t>::failure(
+        Error::validation("tangent", "Bitte eine Ausgangskurve am Berührpunkt wählen"));
+    return create_controller_->add_tangent_reference(*session_.part_document(), *tangent_reference, point);
+  }();
   if (added.has_error()) {
     report(added.error());
     return false;

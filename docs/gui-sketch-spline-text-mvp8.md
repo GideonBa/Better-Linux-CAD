@@ -20,11 +20,16 @@ selected persistent SplineSegment chain
      -> PartDocument::update_sketch(...)
 ```
 
-The only persistent planar spline curve remains the existing cubic `SplineSegment`:
+The persistent planar spline curve is a polynomial or rational cubic `SplineSegment`:
 
 ```text
 start -> control1 -> control2 -> end
 ```
+
+Each segment also carries four positive weights; unit weights retain ordinary polynomial behavior.
+Control-point edits, connected endpoint edits, tangent alignment and freshness checks preserve these
+weights. Exact ellipse creation uses rational spans as documented in
+`docs/gui-sketch-conic-slot-creation-mvp8.md`.
 
 Fit points, selected handles, hover state, control polygons, sampled display curves, curvature samples,
 and continuity glyph positions are transient authoring or Geometry products. They are not an
@@ -43,7 +48,8 @@ fails before persistent mutation.
 
 ## Fit-point editing and deterministic conversion
 
-Control-to-fit conversion samples each source segment at its midpoint while preserving the ordered
+Rational spans reject conversion to the polynomial fit-point representation because it would alter
+the exact curve. Control-to-fit conversion for ordinary polynomial spans samples each source segment at its midpoint while preserving the ordered
 endpoints. Fit-to-control conversion uses a uniform Catmull-Rom-to-cubic-Bezier expansion. For the
 ordered fit points `P0 ... Pn`, segment `Pi -> P(i+1)` uses:
 

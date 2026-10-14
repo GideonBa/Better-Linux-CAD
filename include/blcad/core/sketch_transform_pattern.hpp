@@ -197,7 +197,7 @@ private:
         return Result<Curve>::success(Curve(std::move(r.value())));
       } else {
         auto r = SplineSegment::create_cubic_bezier(std::move(id), f(v.start()), f(v.control1()),
-                                                    f(v.control2()), f(v.end()));
+                                                    f(v.control2()), f(v.end()), v.weights());
         if (r.has_error()) return Result<Curve>::failure(r.error());
         return Result<Curve>::success(Curve(std::move(r.value())));
       }

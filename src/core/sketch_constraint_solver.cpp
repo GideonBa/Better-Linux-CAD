@@ -266,11 +266,11 @@ validate_constraint_targets(const SolveContext& context, const SketchSolverConst
     };
     // Line↔circle tangency: the circle's radius is dimension-driven and baked
     // into the constraint value by the catalog system builder.
-    const bool circle_line = constraint.value().has_value() &&
-                             ((is_line(first_entity) && is_circle_profile(second_entity)) ||
-                              (is_circle_profile(first_entity) && is_line(second_entity)));
-    if (!curve_pair && !circle_line)
-      return fail("tangent constraint requires two curves or a line and a circle with radius");
+    const bool circle_curve = constraint.value().has_value() &&
+                             ((is_curve(first_entity) && is_circle_profile(second_entity)) ||
+                              (is_circle_profile(first_entity) && is_curve(second_entity)));
+    if (!curve_pair && !circle_curve)
+      return fail("tangent constraint requires two curves or a curve and a circle with radius");
     break;
   }
   case SketchSolverConstraintKind::Concentric:
@@ -335,40 +335,21 @@ validate_constraint_targets(const SolveContext& context, const SketchSolverConst
   return std::max(magnitude(point), 1.0e-12 * length_scale);
 }
 
-struct CubicBezierGeometry {
-  std::array<Point2, 4U> control;
-};
+using CubicBezierGeometry = RationalBezier;
 
 [[nodiscard]] CubicBezierGeometry
 cubic_bezier_geometry(const SolveContext& context, const NumericVector& variables,
                       const SketchTopologyEntity& entity) noexcept {
-  return CubicBezierGeometry{{
-      point_position(context, variables, entity.points()[0]),
-      point_position(context, variables, entity.points()[1]),
-      point_position(context, variables, entity.points()[2]),
-      point_position(context, variables, entity.points()[3]),
-  }};
+  return {{{point_position(context, variables, entity.points()[0]),
+            point_position(context, variables, entity.points()[1]),
+            point_position(context, variables, entity.points()[2]),
+            point_position(context, variables, entity.points()[3])}}, entity.weights()};
 }
-
-[[nodiscard]] Point2 cubic_bezier_point(const CubicBezierGeometry& curve,
-                                        double parameter) noexcept {
-  const double t = std::clamp(parameter, 0.0, 1.0);
-  const double u = 1.0 - t;
-  return add(add(scale(curve.control[0], u * u * u),
-                 scale(curve.control[1], 3.0 * u * u * t)),
-             add(scale(curve.control[2], 3.0 * u * t * t),
-                 scale(curve.control[3], t * t * t)));
+[[nodiscard]] Point2 cubic_bezier_point(const CubicBezierGeometry& curve, double t) noexcept {
+  return curve.point(std::clamp(t, 0.0, 1.0));
 }
-
-[[nodiscard]] Point2 cubic_bezier_tangent(const CubicBezierGeometry& curve,
-                                          double parameter) noexcept {
-  const double t = std::clamp(parameter, 0.0, 1.0);
-  const double u = 1.0 - t;
-  return scale(
-      add(add(scale(subtract(curve.control[1], curve.control[0]), u * u),
-              scale(subtract(curve.control[2], curve.control[1]), 2.0 * u * t)),
-          scale(subtract(curve.control[3], curve.control[2]), t * t)),
-      3.0);
+[[nodiscard]] Point2 cubic_bezier_tangent(const CubicBezierGeometry& curve, double t) noexcept {
+  return curve.derivative(std::clamp(t, 0.0, 1.0));
 }
 
 [[nodiscard]] double squared_distance(Point2 first, Point2 second) noexcept {
@@ -472,12 +453,12 @@ closest_cubic_bezier_point(const CubicBezierGeometry& curve, Point2 candidate,
     // longest available control chord, and finally a deterministic axis, so
     // evaluation stays finite and the residual dimension stays stable.
     const std::array<Point2, 6U> chords{
-        subtract(curve.control[1], curve.control[0]),
-        subtract(curve.control[2], curve.control[1]),
-        subtract(curve.control[3], curve.control[2]),
-        subtract(curve.control[2], curve.control[0]),
-        subtract(curve.control[3], curve.control[1]),
-        subtract(curve.control[3], curve.control[0]),
+        subtract(curve.poles[1], curve.poles[0]),
+        subtract(curve.poles[2], curve.poles[1]),
+        subtract(curve.poles[3], curve.poles[2]),
+        subtract(curve.poles[2], curve.poles[0]),
+        subtract(curve.poles[3], curve.poles[1]),
+        subtract(curve.poles[3], curve.poles[0]),
     };
     for (const Point2 chord : chords)
       if (magnitude(chord) > magnitude(tangent)) tangent = chord;
@@ -768,7 +749,7 @@ evaluate_constraint(const SolveContext& context, const NumericVector& variables,
       const auto& circle = first_is_circle ? entity(0U) : entity(1U);
       const auto& line = first_is_circle ? entity(1U) : entity(0U);
       const Point2 center = entity_center(context, variables, circle);
-      const Point2 direction = line_vector(context, variables, line);
+      const Point2 direction = is_line(&line) ? line_vector(context, variables, line) : Point2{};
       const double length = std::sqrt(std::max(dot(direction, direction), 1.0e-12));
       const double radius = *constraint.value();
       // If a line endpoint is held on this circle by a coincidence
@@ -800,7 +781,7 @@ evaluate_constraint(const SolveContext& context, const NumericVector& variables,
             if (target.kind() != SketchSolverTargetKind::Point)
               continue;
             const SketchPointId held(target.id());
-            if (held == line.points()[0] || held == line.points()[1])
+            if (held == line.points().front() || held == line.points().back())
               return held;
           }
         }
@@ -808,9 +789,14 @@ evaluate_constraint(const SolveContext& context, const NumericVector& variables,
       }();
       if (endpoint_on_circle) {
         const Point2 contact = point_position(context, variables, *endpoint_on_circle);
+        const Point2 tangent = curve_tangent(context, variables, line, *endpoint_on_circle);
         return Result<NumericVector>::success(
-            {dot(direction, subtract(contact, center)) / (length * length_scale)});
+            {dot(tangent, subtract(contact, center)) /
+             (safe_magnitude(tangent, length_scale) * length_scale)});
       }
+      if (!is_line(&line))
+        return Result<NumericVector>::failure(validation_error(constraint.id(),
+            "circle tangency to an arc or spline requires its endpoint on the circle"));
       const Point2 start = point_position(context, variables, line.points()[0]);
       const double crossed = cross(direction, subtract(center, start));
       return Result<NumericVector>::success(

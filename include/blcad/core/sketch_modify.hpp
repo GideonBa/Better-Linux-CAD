@@ -169,6 +169,10 @@ struct CubicBezierGeometry {
   Point2 control1;
   Point2 control2;
   Point2 end;
+  std::array<double, 4> weights{1, 1, 1, 1};
+  [[nodiscard]] RationalBezier curve() const noexcept {
+    return {{start, control1, control2, end}, weights};
+  }
 };
 
 struct CurveSampler {
@@ -196,38 +200,17 @@ spline_sampler(const SplineSegment& spline) noexcept {
                       {},
                       {},
                       {},
-                      {spline.start(), spline.control1(), spline.control2(), spline.end()}};
+                      {spline.start(), spline.control1(), spline.control2(), spline.end(), spline.weights()}};
 }
 
 [[nodiscard]] inline Point2 bezier_point(const CubicBezierGeometry& spline, double t) noexcept {
-  const double u = 1.0 - t;
-  const double b0 = u * u * u;
-  const double b1 = 3.0 * u * u * t;
-  const double b2 = 3.0 * u * t * t;
-  const double b3 = t * t * t;
-  return {b0 * spline.start.x + b1 * spline.control1.x + b2 * spline.control2.x + b3 * spline.end.x,
-          b0 * spline.start.y + b1 * spline.control1.y + b2 * spline.control2.y +
-              b3 * spline.end.y};
+  return spline.curve().point(t);
 }
-
-[[nodiscard]] inline Point2 bezier_derivative(const CubicBezierGeometry& spline,
-                                              double t) noexcept {
-  const double u = 1.0 - t;
-  return {3.0 * u * u * (spline.control1.x - spline.start.x) +
-              6.0 * u * t * (spline.control2.x - spline.control1.x) +
-              3.0 * t * t * (spline.end.x - spline.control2.x),
-          3.0 * u * u * (spline.control1.y - spline.start.y) +
-              6.0 * u * t * (spline.control2.y - spline.control1.y) +
-              3.0 * t * t * (spline.end.y - spline.control2.y)};
+[[nodiscard]] inline Point2 bezier_derivative(const CubicBezierGeometry& spline, double t) noexcept {
+  return spline.curve().derivative(t);
 }
-
-[[nodiscard]] inline Point2 bezier_second_derivative(const CubicBezierGeometry& spline,
-                                                     double t) noexcept {
-  const double u = 1.0 - t;
-  return {6.0 * u * (spline.control2.x - 2.0 * spline.control1.x + spline.start.x) +
-              6.0 * t * (spline.end.x - 2.0 * spline.control2.x + spline.control1.x),
-          6.0 * u * (spline.control2.y - 2.0 * spline.control1.y + spline.start.y) +
-              6.0 * t * (spline.end.y - 2.0 * spline.control2.y + spline.control1.y)};
+[[nodiscard]] inline Point2 bezier_second_derivative(const CubicBezierGeometry& spline, double t) noexcept {
+  return spline.curve().second_derivative(t);
 }
 
 [[nodiscard]] inline Point2 sampler_point(const CurveSampler& sampler, double t) noexcept {
@@ -813,14 +796,11 @@ public:
       for (double reach = 1.0; reach <= 64.0 && !closest; reach *= 2.0) {
         const double from = extend_end ? 1.0 : -reach;
         const double to = extend_end ? 1.0 + reach : 0.0;
-        const Point2 a = bezier_point(sampler->spline, from);
-        const Point2 b = bezier_point(sampler->spline, to);
-        const Point2 da = bezier_derivative(sampler->spline, from);
-        const Point2 db = bezier_derivative(sampler->spline, to);
-        const double scale = (to - from) / 3.0;
+        const auto continued = sampler->spline.curve().interval(from, to);
+        if (!continued.valid()) break; // rational continuation cannot cross a pole
         const CurveSampler continuation{CurveSampler::Kind::Spline, {}, {}, {},
-            {a, {a.x + scale * da.x, a.y + scale * da.y},
-                {b.x - scale * db.x, b.y - scale * db.y}, b}};
+            {continued.poles[0], continued.poles[1], continued.poles[2], continued.poles[3],
+             continued.weights}};
         for (const auto& other : other_samplers(sketch, target)) {
           for (const auto point : curve_intersections(continuation, other.sampler)) {
             auto local = sampler_project(continuation, point);
@@ -1458,16 +1438,9 @@ private:
       return Result<SketchModifyCurve>::success(std::move(result.value()));
     }
     if (const auto* spline = sketch.find_spline_segment(id)) {
-      const CubicBezierGeometry curve{spline->start(), spline->control1(), spline->control2(),
-                                      spline->end()};
-      const Point2 start = bezier_point(curve, from);
-      const Point2 end = bezier_point(curve, to);
-      const Point2 start_tangent = bezier_derivative(curve, from);
-      const Point2 end_tangent = bezier_derivative(curve, to);
-      const double scale = (to - from) / 3.0;
-      auto result = SplineSegment::create_cubic_bezier(std::move(new_id), start,
-          {start.x + scale * start_tangent.x, start.y + scale * start_tangent.y},
-          {end.x - scale * end_tangent.x, end.y - scale * end_tangent.y}, end);
+      const auto curve = spline->curve().interval(from, to);
+      auto result = SplineSegment::create_cubic_bezier(std::move(new_id), curve.poles[0],
+          curve.poles[1], curve.poles[2], curve.poles[3], curve.weights);
       if (!result) return Result<SketchModifyCurve>::failure(result.error());
       return Result<SketchModifyCurve>::success(std::move(result.value()));
     }
@@ -1507,58 +1480,24 @@ private:
 
   [[nodiscard]] static std::optional<double> spline_param(const SplineSegment& spline,
                                                           Point2 point) {
-    double best_t = 0.0;
-    double best_distance = std::numeric_limits<double>::infinity();
-    constexpr std::size_t samples = 256U;
-    for (std::size_t index = 0U; index <= samples; ++index) {
-      const double t = static_cast<double>(index) / static_cast<double>(samples);
-      const double distance = detail::sketch_modify_distance(evaluate_spline(spline, t), point);
-      if (distance < best_distance) {
-        best_distance = distance;
-        best_t = t;
-      }
-    }
-    if (best_t <= detail::kSketchModifyParamTolerance ||
-        best_t >= 1.0 - detail::kSketchModifyParamTolerance)
-      return std::nullopt;
-    return best_t;
-  }
-
-  [[nodiscard]] static Point2 evaluate_spline(const SplineSegment& spline, double t) noexcept {
-    const double u = 1.0 - t;
-    const double b0 = u * u * u;
-    const double b1 = 3.0 * u * u * t;
-    const double b2 = 3.0 * u * t * t;
-    const double b3 = t * t * t;
-    return {b0 * spline.start().x + b1 * spline.control1().x + b2 * spline.control2().x +
-                b3 * spline.end().x,
-            b0 * spline.start().y + b1 * spline.control1().y + b2 * spline.control2().y +
-                b3 * spline.end().y};
+    const auto sampler = detail::spline_sampler(spline);
+    const auto t = detail::sampler_project(*sampler, point);
+    if (!t || *t <= detail::kSketchModifyParamTolerance ||
+        *t >= 1.0 - detail::kSketchModifyParamTolerance) return std::nullopt;
+    return t;
   }
 
   [[nodiscard]] static Result<std::vector<detail::SketchModifyCurve>>
   split_spline(const SplineSegment& spline, double t, SketchEntityId second_id) {
-    const auto lerp = [](Point2 a, Point2 b, double factor) {
-      return Point2{a.x + (b.x - a.x) * factor, a.y + (b.y - a.y) * factor};
-    };
-    const Point2 p0 = spline.start();
-    const Point2 p1 = spline.control1();
-    const Point2 p2 = spline.control2();
-    const Point2 p3 = spline.end();
-    const Point2 a = lerp(p0, p1, t);
-    const Point2 b = lerp(p1, p2, t);
-    const Point2 c = lerp(p2, p3, t);
-    const Point2 d = lerp(a, b, t);
-    const Point2 e = lerp(b, c, t);
-    const Point2 f = lerp(d, e, t);
-    auto first = SplineSegment::create_cubic_bezier(spline.id(), p0, a, d, f);
-    if (first.has_error())
-      return Result<std::vector<detail::SketchModifyCurve>>::failure(first.error());
-    auto second = SplineSegment::create_cubic_bezier(std::move(second_id), f, e, c, p3);
-    if (second.has_error())
-      return Result<std::vector<detail::SketchModifyCurve>>::failure(second.error());
-    return Result<std::vector<detail::SketchModifyCurve>>::success(
-        {std::move(first.value()), std::move(second.value())});
+    const auto a = spline.curve().interval(0, t);
+    const auto b = spline.curve().interval(t, 1);
+    auto first = SplineSegment::create_cubic_bezier(spline.id(), a.poles[0], a.poles[1],
+                                                   a.poles[2], a.poles[3], a.weights);
+    if (!first) return Result<std::vector<detail::SketchModifyCurve>>::failure(first.error());
+    auto second = SplineSegment::create_cubic_bezier(std::move(second_id), b.poles[0], b.poles[1],
+                                                    b.poles[2], b.poles[3], b.weights);
+    if (!second) return Result<std::vector<detail::SketchModifyCurve>>::failure(second.error());
+    return Result<std::vector<detail::SketchModifyCurve>>::success({first.value(), second.value()});
   }
 
   [[nodiscard]] static double curve_length(const detail::CurveSampler& curve, double from,

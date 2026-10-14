@@ -144,13 +144,16 @@ final driving measurement. Arc-length changes that no longer match their paramet
 
 Block 111 creates lines and line-based profiles plus construction points/centerlines through one
 transaction. Block 112 creates exact full circles as `CircleProfile` plus diameter `Parameter`, arcs as
-`ArcSegment`, ellipses as deterministic cubic `SplineSegment` spans, and slots as ordered line/arc
-profiles. Rubber bands and sampled previews remain transient. Snap/tangent inference becomes persistent
-only when Block 114 receives explicit stable targets and accepts the candidate solve.
+`ArcSegment`, ellipses as exact rational `SplineSegment` spans, and slots as ordered line/arc
+profiles. Rubber bands and sampled previews remain transient. Tangent creation resolves an explicit
+source contact through `SketchTangentCreation` and commits contact/tangency with the new shape. Shape
+recipes solve against both current constraint and dimension catalogs; optional snap inference still
+requires stable targets and an accepted solve. Rational weights survive persistence, topology, editing
+and OCCT feature adapters.
 
 ### Spline editing
 
-Block 113 preserves cubic `SplineSegment` as the sole persistent planar spline curve. The Core
+Block 113 preserves polynomial or rational cubic `SplineSegment` as the persistent planar spline curve. The Core
 `SketchSplineEditModel` owns disposable control- or fit-point authoring state, deterministic
 Catmull-Rom-to-Bezier conversion, insertion/removal, connected endpoint handling, and C0/G1 continuity
 handles. `SketchSplineGeometryEvaluator` derives samples, derivatives, curvature, control polygons,
