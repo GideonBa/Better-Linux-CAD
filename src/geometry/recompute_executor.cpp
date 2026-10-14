@@ -1,4 +1,5 @@
 #include "blcad/geometry/recompute_executor.hpp"
+#include "blcad/core/sketch_contour.hpp"
 
 #include "blcad/geometry/construction_line_resolver.hpp"
 #include "blcad/geometry/construction_point_resolver.hpp"
@@ -1223,10 +1224,20 @@ evaluate_bounded_arc_profile_curves(const WorkplaneResolver& resolver,
 
   std::vector<ClosedProfileCurveSegment> curves;
   curves.reserve(profile.curve_segments().size());
-  for (const auto& id : profile.curve_segments()) {
-    auto curve = evaluate_arc_curve_segment(resolver, workplane, sketch, profile.id().value(), id);
+  auto traversal = resolve_sketch_contour(sketch, profile.curve_segments());
+  if (!traversal)
+    return Result<std::vector<ClosedProfileCurveSegment>>::failure(traversal.error());
+  for (const auto& entry : traversal.value()) {
+    auto curve = evaluate_arc_curve_segment(resolver, workplane, sketch, profile.id().value(), entry.id);
     if (curve.has_error())
       return Result<std::vector<ClosedProfileCurveSegment>>::failure(curve.error());
+    if (entry.reversed) {
+      std::swap(curve.value().start, curve.value().end);
+      if (curve.value().kind == ClosedProfileCurveKind::CubicBezierSpline) {
+        std::swap(curve.value().mid, curve.value().control2);
+        std::reverse(curve.value().weights.begin(), curve.value().weights.end());
+      }
+    }
     curves.push_back(curve.value());
   }
 

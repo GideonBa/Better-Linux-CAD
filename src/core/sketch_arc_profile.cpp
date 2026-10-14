@@ -1,4 +1,5 @@
 #include "blcad/core/sketch.hpp"
+#include "blcad/core/sketch_contour.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -208,7 +209,19 @@ struct CurveGeometry {
     intersections = line_arc_intersections(first.start, first.end, second.arc);
   else if (first.is_arc && !second.is_arc)
     intersections = line_arc_intersections(second.start, second.end, first.arc);
-  else
+  else if (distance(first.arc.center, second.arc.center) <= k_tolerance &&
+           std::abs(first.arc.radius - second.arc.radius) <= k_tolerance) {
+    // Coincident supporting circles need an angular overlap check. Their
+    // ordinary circle-circle intersection has no isolated solutions.
+    for (const auto point : {first.arc.start, first.arc.mid, first.arc.end})
+      if (arc_contains_point(second.arc, point) &&
+          !is_allowed_shared_endpoint(first, second, point, adjacent))
+        return true;
+    for (const auto point : {second.arc.start, second.arc.mid, second.arc.end})
+      if (arc_contains_point(first.arc, point) &&
+          !is_allowed_shared_endpoint(first, second, point, adjacent))
+        return true;
+  } else
     intersections = arc_arc_intersections(first.arc, second.arc);
   for (const Point2 point : intersections)
     if (!is_allowed_shared_endpoint(first, second, point, adjacent))
@@ -427,9 +440,9 @@ Result<ArcClosedProfile> ArcClosedProfile::create(ProfileId id,
   if (id.empty())
     return Result<ArcClosedProfile>::failure(
         validation_error(object_id, "arc closed profile id must not be empty"));
-  if (curve_segments.size() < 3U)
+  if (curve_segments.size() < 2U)
     return Result<ArcClosedProfile>::failure(
-        validation_error(object_id, "arc closed profile requires at least three curve segments"));
+        validation_error(object_id, "arc closed profile requires at least two curve segments"));
   for (const auto& segment : curve_segments)
     if (segment.empty())
       return Result<ArcClosedProfile>::failure(
@@ -563,28 +576,41 @@ Sketch::arc_closed_profile_vertices(const ArcClosedProfile& profile) const {
 
 Result<std::vector<Point2>>
 Sketch::validate_arc_closed_profile(const ArcClosedProfile& profile) const {
+  auto traversal = resolve_sketch_contour(*this, profile.curve_segments());
+  if (!traversal)
+    return Result<std::vector<Point2>>::failure(traversal.error());
   std::vector<CurveGeometry> curves;
   curves.reserve(profile.curve_segments().size());
-  for (const auto& curve_id : profile.curve_segments()) {
-    if (const LineSegment* line = find_line_segment(curve_id)) {
-      curves.push_back(CurveGeometry{curve_id, line->start(), line->end(), false, false, {}});
+  for (const auto& entry : traversal.value()) {
+    const auto& curve_id = entry.id;
+    if (find_line_segment(curve_id)) {
+      curves.push_back(CurveGeometry{curve_id, entry.start, entry.end, false, false, {}});
       continue;
     }
     if (const ArcSegment* arc = find_arc_segment(curve_id)) {
       auto arc_geometry = make_arc_geometry(*arc);
       if (arc_geometry.has_error())
         return Result<std::vector<Point2>>::failure(arc_geometry.error());
+      if (entry.reversed) {
+        std::swap(arc_geometry.value().start, arc_geometry.value().end);
+        arc_geometry.value().counter_clockwise = !arc_geometry.value().counter_clockwise;
+      }
       curves.push_back(
-          CurveGeometry{curve_id, arc->start(), arc->end(), true, false, arc_geometry.value()});
+          CurveGeometry{curve_id, entry.start, entry.end, true, false, arc_geometry.value()});
       continue;
     }
-    if (const SplineSegment* spline = find_spline_segment(curve_id)) {
-      curves.push_back(CurveGeometry{curve_id, spline->start(), spline->end(), false, true, {}});
+    if (find_spline_segment(curve_id)) {
+      curves.push_back(CurveGeometry{curve_id, entry.start, entry.end, false, true, {}});
       continue;
     }
     return Result<std::vector<Point2>>::failure(validation_error(
         profile.id().value(), "arc closed profile curve segment must exist in sketch"));
   }
+  if (curves.size() < 3U && std::none_of(curves.begin(), curves.end(), [](const auto& curve) {
+        return curve.is_arc || curve.is_spline;
+      }))
+    return Result<std::vector<Point2>>::failure(validation_error(
+        profile.id().value(), "a two-edge profile requires a curved segment"));
   for (std::size_t index = 0; index < curves.size(); ++index) {
     const auto& current = curves[index];
     const auto& next = curves[(index + 1U) % curves.size()];

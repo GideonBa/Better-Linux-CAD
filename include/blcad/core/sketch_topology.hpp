@@ -1,6 +1,7 @@
 #pragma once
 
 #include "blcad/core/sketch.hpp"
+#include "blcad/core/sketch_contour.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -403,9 +404,17 @@ public:
     };
     const auto connect_contour = [&](const std::vector<SketchEntityId>& contour) {
       if (contour.empty()) return;
+      auto traversal = resolve_sketch_contour(sketch, contour);
       for (std::size_t index = 0; index < contour.size(); ++index) {
-        const auto current = endpoint_usages(contour[index]);
-        const auto next = endpoint_usages(contour[(index + 1U) % contour.size()]);
+        auto current = endpoint_usages(contour[index]);
+        const auto next_index = (index + 1U) % contour.size();
+        auto next = endpoint_usages(contour[next_index]);
+        if (traversal) {
+          if (current && traversal.value()[index].reversed)
+            std::swap(current->first, current->second);
+          if (next && traversal.value()[next_index].reversed)
+            std::swap(next->first, next->second);
+        }
         if (current && next) shared_usage_pairs.emplace_back(current->second, next->first);
       }
     };

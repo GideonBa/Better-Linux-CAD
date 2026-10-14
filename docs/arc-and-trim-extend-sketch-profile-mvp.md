@@ -21,7 +21,9 @@ The core model has:
 
 The three points must be distinct and non-collinear.
 
-`ArcClosedProfile` stores an ordered list of curve entity IDs. Each referenced entity must be an explicit `LineSegment` or explicit `ArcSegment`. The first seed keeps this separate from the existing line-only `ClosedProfile` so old line-profile behavior stays stable.
+`ArcClosedProfile` stores an ordered list of curve entity IDs. Current profiles may reference explicit
+lines, circular arcs and polynomial or rational cubic splines. This remains separate from the existing
+line-only `ClosedProfile`.
 
 `SketchTrimExtendOperation` stores explicit trim/extend metadata:
 
@@ -41,9 +43,10 @@ The validation seed checks:
 - arc points are non-collinear
 - trim/extend operation IDs are non-empty
 - trim/extend targets are explicit line or arc entities
-- arc closed profiles contain at least three curve segments
-- arc closed profiles reference existing explicit line or arc entities
-- ordered line/arc profile segments are connected end-to-start and close back to the first segment
+- arc closed profiles contain at least two curve segments; a two-edge contour needs a curved segment
+- arc closed profiles reference existing explicit line, arc or spline entities
+- ordered profile segments form one closed contour; connectivity determines whether each source
+  curve is traversed forwards or backwards
 - line/line, line/arc, and arc/arc intersections are rejected when they are not the expected adjacent shared endpoint
 
 This is still not a full sketch solver. It does not infer tangent continuity, solve constraints, trim curves automatically, or prove all advanced curve-topology cases.
@@ -96,6 +99,17 @@ Arc sketch entities, trim/extend metadata, and arc closed profiles now roundtrip
 ```
 
 The JSON stores model intent only. It does not store tessellated arc caches, resolved OCCT edges, or trim-solver state.
+
+## Curved-contour follow-up (October 2026)
+
+Two semicircular arcs can bound a circle, and one line plus one arc can bound a semicircle.
+`resolve_sketch_contour` derives traversal directions from the existing ordered ids. Source coordinates,
+curve ids and authored start/end roles are preserved. No extra JSON orientation flag is required.
+Shared topology joins the actual traversal endpoints, including start-to-start or end-to-end contacts.
+Geometry reverses only its derived edge representation, retaining rational weights and pole order.
+
+Proof: `[sketch-curved-regions]` checks two-edge profiles, mixed authored directions, canonical point
+sharing, topology materialization and analytic circle/semicircle extrusion volume.
 
 A checked-in example model is available at `examples/arc_profile_prism.blcad.json`.
 

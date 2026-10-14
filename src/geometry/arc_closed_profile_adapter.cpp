@@ -160,9 +160,9 @@ translate_curve_along_axis(ClosedProfileCurveSegment curve, Vector3 axis, double
 
 [[nodiscard]] Result<TopoDS_Wire>
 make_curve_wire(const std::vector<ClosedProfileCurveSegment>& curves) {
-  if (curves.size() < 3U) {
+  if (curves.size() < 2U) {
     return Result<TopoDS_Wire>::failure(
-        make_geometry_error("arc closed profile requires at least three curve segments"));
+        make_geometry_error("arc closed profile requires at least two curve segments"));
   }
   BRepBuilderAPI_MakeWire wire_builder;
   for (const auto& curve : curves) {

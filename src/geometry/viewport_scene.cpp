@@ -1,4 +1,5 @@
 #include "blcad/geometry/viewport_scene.hpp"
+#include "blcad/core/sketch_contour.hpp"
 
 #include "assembly_posed_leaf_shapes.hpp"
 #include "geometry_shape_internal.hpp"
@@ -346,16 +347,20 @@ ViewportSceneBuilder::build_part(const PartDocument& document,
       const std::vector<ContainedProfileHole> no_profile_holes;
       const auto append_curve_profile =
           [&items, &profile_prefix, &wrap, &curve_edge, &contour_is_counter_clockwise,
-           &point](const ProfileId& id, const std::vector<SketchEntityId>& outer,
+           &point, &sketch](const ProfileId& id, const std::vector<SketchEntityId>& outer,
                    const std::vector<std::vector<SketchEntityId>>& inner,
                    const std::vector<ContainedProfileHole>& holes) -> Result<std::size_t> {
         const auto make_wire =
-            [&curve_edge](const std::vector<SketchEntityId>& contour) -> Result<TopoDS_Wire> {
+            [&curve_edge, &sketch](const std::vector<SketchEntityId>& contour) -> Result<TopoDS_Wire> {
           BRepBuilderAPI_MakeWire wire;
-          for (const auto& entity : contour) {
+          auto traversal = resolve_sketch_contour(sketch, contour);
+          for (std::size_t index = 0; index < contour.size(); ++index) {
+            const auto& entity = contour[index];
             auto edge = curve_edge(entity);
             if (edge.has_error())
               return Result<TopoDS_Wire>::failure(edge.error());
+            if (traversal && traversal.value()[index].reversed)
+              edge.value().Reverse();
             wire.Add(edge.value());
           }
           if (!wire.IsDone())

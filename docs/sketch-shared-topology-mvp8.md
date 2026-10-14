@@ -162,8 +162,10 @@ CompositeClosedProfile outer contour
 CompositeClosedProfile each inner contour
 ```
 
-For each supported editable curve in an ordered contour, current curve end is paired with next curve
-start, including last-to-first closure. Coordinates must agree within `1e-9` Sketch units and flags
+For each supported editable curve in an ordered contour, current traversal end is paired with next
+traversal start, including last-to-first closure. `resolve_sketch_contour` derives traversal direction
+from connectivity; a reversed source curve retains its authored start/end point roles. This includes
+two-edge arc profiles and start-to-start/end-to-end sharing. Coordinates must agree within `1e-9` Sketch units and flags
 must be compatible. Inconsistent explicit connectivity fails closed.
 
 The canonical id of a connected usage group is the lexicographically smallest proposed usage id in

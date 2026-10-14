@@ -367,3 +367,58 @@ TEST_CASE("Exact rational ellipse profiles retain analytic area through extrusio
       CHECK(sample.position.x*sample.position.x/400 + sample.position.y*sample.position.y/100 ==
             Catch::Approx(1).margin(1e-12));
 }
+
+TEST_CASE("Two-edge curved profiles extrude with reversed authored directions",
+          "[geometry][sketch-curved-regions]") {
+  auto part = PartDocument::create(DocumentId("curved"), "Curved").value();
+  REQUIRE(part.add_datum_plane(DatumPlane::xy().value()));
+  REQUIRE(part.add_parameter(make_length_parameter("depth", "Depth", 5)));
+  auto sketch = Sketch::create(SketchId("curved"), "Curved", DatumPlaneId("datum.xy")).value();
+  REQUIRE(sketch.add_entity(ArcSegment::create_three_point(SketchEntityId("top"), {-10, 0}, {0, 10}, {10, 0}).value()));
+  double expected_area = std::acos(-1.0) * 100 / 2;
+  SECTION("semicircle") {
+    REQUIRE(sketch.add_entity(LineSegment::create(SketchEntityId("bottom"), {-10, 0}, {10, 0}).value()));
+  }
+  SECTION("circle") {
+    REQUIRE(sketch.add_entity(ArcSegment::create_three_point(SketchEntityId("bottom"), {-10, 0}, {0, -10}, {10, 0}).value()));
+    expected_area *= 2;
+  }
+  REQUIRE(sketch.add_profile(ArcClosedProfile::create(ProfileId("profile"), {SketchEntityId("top"), SketchEntityId("bottom")}).value()));
+  REQUIRE(part.add_sketch(sketch));
+  REQUIRE(part.add_feature(Feature::create_additive_extrude(FeatureId("extrude"), "Extrude", sketch.id(), ParameterId("depth")).value()));
+  auto cache = ShapeCache::create(ShapeCacheId("curved.cache")).value();
+  REQUIRE(GeometryRecomputeExecutor{}.execute_document(part, cache));
+  REQUIRE(cache.final_shape());
+  const auto shape = RectangleExtrusionAdapter{}.summarize(*cache.final_shape());
+  CHECK(shape.solid_count == 1);
+  CHECK(shape.volume_mm3 == Catch::Approx(expected_area * 5).epsilon(1e-8));
+}
+
+TEST_CASE("Profile traversal reverses rational poles and weights without changing exact ellipse area",
+          "[geometry][sketch-curved-regions]") {
+  auto part = PartDocument::create(DocumentId("reverse.ellipse"), "Ellipse").value();
+  REQUIRE(part.add_datum_plane(DatumPlane::xy().value()));
+  REQUIRE(part.add_parameter(make_length_parameter("depth", "Depth", 3)));
+  auto sketch = Sketch::create(SketchId("ellipse"), "Ellipse", DatumPlaneId("datum.xy")).value();
+  std::vector<SketchEntityId> ids;
+  for (int i = 0; i < 4; ++i) {
+    ids.emplace_back("span." + std::to_string(i));
+    auto span = SplineSegment::create_elliptical_arc(ids.back(), {0, 0}, {20, 0}, 10,
+                                                   i * std::acos(-1.0) / 2, std::acos(-1.0) / 2).value();
+    if (i % 2 != 0) {
+      auto weights = span.weights();
+      std::reverse(weights.begin(), weights.end());
+      span = SplineSegment::create_cubic_bezier(span.id(), span.end(), span.control2(),
+                                                        span.control1(), span.start(), weights).value();
+    }
+    REQUIRE(sketch.add_entity(span));
+  }
+  REQUIRE(sketch.add_profile(ArcClosedProfile::create(ProfileId("profile"), ids).value()));
+  REQUIRE(part.add_sketch(sketch));
+  REQUIRE(part.add_feature(Feature::create_additive_extrude(FeatureId("extrude"), "Extrude", sketch.id(), ParameterId("depth")).value()));
+  auto cache = ShapeCache::create(ShapeCacheId("ellipse.cache")).value();
+  REQUIRE(GeometryRecomputeExecutor{}.execute_document(part, cache));
+  REQUIRE(cache.final_shape());
+  CHECK(RectangleExtrusionAdapter{}.summarize(*cache.final_shape()).volume_mm3 ==
+        Catch::Approx(std::acos(-1.0) * 20 * 10 * 3).epsilon(1e-8));
+}
