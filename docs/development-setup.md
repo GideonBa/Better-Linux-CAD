@@ -507,3 +507,18 @@ and origin seeding; Block 134 proves the shell-owned draw/constraint/dimension/m
 solver-backed dragging. Block 135 proves persistent profile handoff/reselection, strict numeric
 units, pointer-drag numeric override and rollback, candidate-only auto-provisioning, mutation-free
 Cancel, recomputed Extrude/Revolve results, and atomic Undo.
+
+### Sketch operation follow-up
+
+The shell now wires numeric preview/Apply/Cancel for transforms, independent patterns, offsets,
+associative projection and projected-line detachment. Focused regressions:
+
+```bash
+./build/dev-gui/blcad_core_tests "[core][sketch-transform-pattern],[core][sketch-offset-project]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][sketch-transform-pattern],[gui][sketch-offset-project],[gui][sketch-project]"
+```
+
+`gui_shell_sketch_operations_tests.cpp` covers the real ribbon editor as well as the dialog-free
+surface, history/persistence, source-point preservation, copied rational profiles, and atomic
+constraint/dimension conflict rejection. The remaining limits are recorded in the two operation
+contracts and the interactive Sketch coverage manifest.

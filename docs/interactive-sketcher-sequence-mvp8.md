@@ -263,9 +263,9 @@ with the same stable id via explicit break-link. Break-link fails closed while e
 constraints depend on the projected entity. Canonical contract:
 `docs/gui-sketch-offset-project-mvp8.md`.
 
-Focused tags: `[core][sketch-offset-project]`. The planned `[geometry][sketch-offset-project]` and
-`[gui][sketch-project]` tags were narrowed away with the Core-only implementation; see Explicit
-deferrals.
+Focused tags: `[core][sketch-offset-project]`, `[gui][sketch-offset-project]`, and
+`[gui][sketch-project]`. The October 2026 follow-up supplies shell previews, projection and detachment,
+automatic line-chain discovery, and exact individual arc offsets. Mixed curved offsets remain deferred.
 
 ## Block 118 — Transform, mirror, and Sketch patterns — Implemented
 
@@ -276,8 +276,9 @@ deterministic `.copy.N`/`.mirror.N` ids; and rectangular/circular patterns with 
 entities. Non-duplicated referencing intent is reported through `uncopied_references`, never
 silently discarded. Canonical contract: `docs/gui-sketch-transform-pattern-mvp8.md`.
 
-Focused tags: `[core][sketch-transform-pattern]`. The planned `[gui][sketch-transform-pattern]` tag
-was narrowed away with the Core-only implementation; see Explicit deferrals.
+Focused tags: `[core][sketch-transform-pattern]` and `[gui][sketch-transform-pattern]`. The October 2026
+follow-up supplies shell previews, atomic Apply/Cancel and intent validation. Shell patterns create
+independent instances; persistent associative pattern editing remains deferred.
 
 ## Block 119 — Regions, profiles, diagnostics, and Finish Sketch — Implemented
 
@@ -364,14 +365,12 @@ boundary instead of silent inclusion:
   draggable and persisted, and values use an in-canvas editor;
 - dimensions targeting full **CircleProfile** records; radius/diameter/arc-length target
   three-point arcs until shared topology covers circle-profile entities;
-- **Qt binder wiring for Blocks 117 and 118** — the planned `[geometry][sketch-offset-project]`,
-  `[gui][sketch-project]`, and `[gui][sketch-transform-pattern]` proofs were not registered; both
-  blocks are Core-only headless authorities (`SketchOffsetProjectService`,
-  `SketchTransformPatternService`), and interactive command/preview wiring needs its own explicit
-  boundary (at latest justified against the Block-121 coverage manifest);
-- **arc/spline offset**, automatic chain discovery, bevel/round offset joins, variable-distance
-  offset, and automatic rewriting of dependent references on break-link (Block 117 offsets ordered
-  line chains with miter joints only);
+- persistent **associative Sketch pattern editing** — the shell now wires Blocks 117/118 through
+  `GuiSketchOperationController` with preview/Apply/Cancel and atomic history; rectangular/circular
+  patterns create independent copies, while the Core associative intent has no persistent shell owner;
+- **mixed line/arc chain and spline offset**, bevel/round offset joins, variable-distance offset,
+  and automatic rewriting of dependent references on break-link — unordered line chains/loops and
+  individual circular arcs now have interactive offsets, including automatic chain discovery;
 - **region recognition over arcs and splines** — Block 119 partitions explicit line entities only;
   curved-boundary regions need their own boundary;
 - Block-120 **arc/spline/helix parameter handles** and interactive creation of curved 3D geometry —

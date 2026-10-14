@@ -23,9 +23,17 @@ offscreen automation.
 6. Exercise trim, extend, split, fillet, and chamfer on loose curves and ordered profiles. Include
    line/arc and spline corners, reversed edge selection, oversized corner rejection, and cubic
    continuation. Verify one undo removes a corner together with its constraints and size.
-   Run the Core-backed offset/project/break-link
-   and transform/pattern commands through their current headless harness; GUI wiring for Blocks 117
-   and 118 is explicitly deferred and must not appear as a non-functional button.
+   Select an unordered/reversed line chain and run **Versatz** with positive and negative distances;
+   include collinear joins, a closed loop, one arc, and a rejected branched selection.
+   Run **Verschieben**, **Drehen**, **Skalieren**, **Kopieren**, **Spiegeln**, **Rechteckmuster**,
+   and **Kreismuster** from **Transformieren**. Change numeric fields and check the dashed preview,
+   including separate paths for disconnected copies. Cancel/Escape must restore the original view
+   and history. Apply must be undoable in one step. Check a 360° pattern has no duplicate seed,
+   mirrored ellipses retain their exact shape/profile, and fixed/driving geometry rejects conflicting
+   transforms. Copy reports identify relationships that are not copied to instances.
+   Use **Geometrie projizieren** to choose a construction source or semantic model edge/vertex.
+   Select the projected line and **Verknüpfung lösen**, set its segment length, Apply, Undo, and reopen
+   the file. Verify source identity before detachment and ordinary editable geometry afterward.
 7. Open `examples/projected_sketch_references.blcad.json`, invalidate a reference, and verify lost or
    ambiguous state is presented before repair; cancelling repair must retain the original intent.
 8. Select and finish a bounded line region, then Undo/Redo. Finish an open contour and re-enter its

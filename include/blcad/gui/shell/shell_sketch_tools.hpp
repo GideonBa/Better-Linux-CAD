@@ -3,6 +3,7 @@
 #include "blcad/gui/gui_document_session.hpp"
 #include "blcad/gui/gui_sketch_create.hpp"
 #include "blcad/gui/gui_sketch_drag.hpp"
+#include "blcad/gui/gui_sketch_operations.hpp"
 #include "blcad/gui/gui_sketch_workbench.hpp"
 #include "blcad/gui/occt_viewport.hpp"
 
@@ -68,6 +69,9 @@ public:
   apply_modify_profile_pick(SketchModifyKind kind, const ProfileId& profile_id, Point2 pick);
   [[nodiscard]] Result<std::size_t> apply_fillet(double radius);
   [[nodiscard]] Result<std::size_t> apply_chamfer(double distance);
+  [[nodiscard]] Result<GuiSketchOperationPreview> preview_operation(GuiSketchOperationRequest request);
+  [[nodiscard]] Result<std::size_t> apply_operation(GuiSketchOperationRequest request);
+  void cancel_operation_preview();
   // Arms a modal Trim/Extend/Split tool; the next curve click runs the op.
   void begin_modify_tool(SketchModifyKind kind);
   [[nodiscard]] bool modify_tool_active() const { return modify_tool_.has_value(); }
@@ -84,6 +88,10 @@ protected:
 
 private:
   void build_ribbon_groups();
+  void build_operation_group();
+  void show_operation_dialog(GuiSketchOperationKind kind);
+  [[nodiscard]] Result<GuiSketchOperationRequest> prepare_operation(GuiSketchOperationRequest request) const;
+  [[nodiscard]] std::vector<SketchEntityId> selected_operation_entities() const;
   void wire_viewport_callbacks();
   [[nodiscard]] GuiSketchGridConfig grid_config() const;
   void apply_grid_config();
@@ -147,6 +155,10 @@ private:
   std::vector<QAction*> dimension_actions_;
   std::vector<QAction*> tool_actions_;
   std::vector<QAction*> modify_actions_;
+  std::vector<QAction*> operation_actions_;
+  QAction* project_action_{nullptr};
+  QAction* break_link_action_{nullptr};
+  bool operation_preview_active_{false};
 
   std::optional<GuiSketchCreateController> create_controller_;
   std::optional<GuiSketchDragController> drag_controller_;

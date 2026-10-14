@@ -95,6 +95,10 @@ public:
   void set_sketch_grid_config(GuiSketchGridConfig config);
   void set_sketch_drag_handles(std::vector<Point2> handles);
   void set_sketch_preview_polyline(std::vector<Point2> polyline, bool closed);
+  void set_sketch_operation_preview(std::vector<std::vector<Point2>> curves);
+  [[nodiscard]] std::size_t sketch_operation_preview_count() const noexcept {
+    return sketch_operation_preview_.size();
+  }
   void set_sketch_pointer_callback(SketchPointerCallback callback);
   void set_sketch_drag_pointer_callback(SketchDragPointerCallback callback);
   void set_sketch_pointer_phase_callback(SketchPointerPhaseCallback callback);
@@ -196,6 +200,7 @@ private:
   std::optional<GuiSketchScreenRect> sketch_box_selection_;
   std::vector<Point2> sketch_drag_handles_;
   std::vector<Point2> sketch_preview_polyline_;
+  std::vector<std::vector<Point2>> sketch_operation_preview_;
   bool sketch_preview_closed_{false};
   GuiViewportDisplayMode display_mode_{GuiViewportDisplayMode::ShadedWithEdges};
   GuiViewportProjection projection_{GuiViewportProjection::Perspective};

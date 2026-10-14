@@ -510,6 +510,7 @@ void ShellSketchTools::build_ribbon_groups() {
     window_.refresh();
   });
   ribbon_.add_small_button(modify_group, chamfer_action_);
+  build_operation_group();
 
   auto* dimension_group = ribbon_.add_group(sketch_tab_, QStringLiteral("Bemaßung"));
   QList<QAction*> dimension_menu;
@@ -815,6 +816,14 @@ void ShellSketchTools::refresh_enablement() {
     fillet_action_->setEnabled(two_curves);
   if (chamfer_action_ != nullptr)
     chamfer_action_->setEnabled(two_curves);
+  const bool operation_selection = active && !selected_operation_entities().empty();
+  for (auto* action : operation_actions_) action->setEnabled(operation_selection);
+  if (project_action_) project_action_->setEnabled(active);
+  if (break_link_action_) {
+    const auto ids = selected_sketch_entity_ids();
+    const auto* sketch = active ? session_.part_document()->find_sketch(*window_.active_sketch()) : nullptr;
+    break_link_action_->setEnabled(sketch && ids.size() == 1U && sketch->find_projected_line(ids.front()));
+  }
   if (delete_constraint_action_ != nullptr)
     delete_constraint_action_->setEnabled(active && (selected_accepted_constraint().has_value() ||
                                                      selected_dimension().has_value() ||
@@ -1060,6 +1069,7 @@ void ShellSketchTools::cancel_label_drag() {
 }
 
 void ShellSketchTools::cancel_tool() {
+  cancel_operation_preview();
   cancel_label_drag();
   chain_anchor_.reset();
   modify_tool_.reset(); // switching/cancelling any tool ends a modal modify tool
@@ -1393,6 +1403,25 @@ std::vector<SketchEntityId> ShellSketchTools::selected_sketch_entity_ids() const
     auto id = raw_entity_id(topology.value(), selection.semantic_id);
     if (id && std::find(ids.begin(), ids.end(), *id) == ids.end())
       ids.push_back(std::move(*id));
+  }
+  return ids;
+}
+
+std::vector<SketchEntityId> ShellSketchTools::selected_operation_entities() const {
+  auto ids = selected_sketch_entity_ids();
+  auto topology = active_topology();
+  if (!topology) return ids;
+  for (const auto& selection : session_.selection().entries()) {
+    if (selection.kind != GuiSelectionKind::SketchEntity) continue;
+    auto target = selection_target(topology.value(), selection.semantic_id);
+    if (!target || target->kind() != SketchConstraintIntentTargetKind::Entity) continue;
+    const auto* entity = topology.value().find_entity(target->id());
+    if (!entity) continue;
+    for (const auto& dependency : entity->entity_dependencies()) {
+      if (!std::string_view(dependency).starts_with("entity/")) continue;
+      SketchEntityId id(dependency.substr(7));
+      if (std::find(ids.begin(), ids.end(), id) == ids.end()) ids.push_back(std::move(id));
+    }
   }
   return ids;
 }

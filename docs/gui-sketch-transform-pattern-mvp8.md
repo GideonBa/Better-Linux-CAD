@@ -1,68 +1,83 @@
 # GUI Sketch Transform, Mirror, and Pattern MVP-8
 
-Status: implemented in Block 118.
+Status: Core authority implemented in Block 118; interactive shell commands completed in the October 2026 Sketch follow-up.
 
-Block 118 adds a headless Core authority for moving, rotating, scaling, copying, mirroring, and patterning selected ordinary planar Sketch curves. Qt remains a command and preview client; all accepted geometry is produced as a complete disposable `Sketch` candidate.
+## Command workflow
+
+In an active planar Sketch, select ordinary lines, arcs, spline spans, or an explicit closed profile.
+The **Transformieren** ribbon group provides **Verschieben**, **Drehen**, **Skalieren**, **Kopieren**,
+**Spiegeln**, **Rechteckmuster**, and **Kreismuster**. Profile selections expand to their member curves.
+
+Each command opens one numeric editor. Translation and centers use Sketch-plane millimeters;
+rotation uses degrees; scale is a non-zero signed uniform factor. Mirror takes two distinct axis
+points and creates a reflected copy. Pattern counts include the seed. Rectangular patterns accept
+independent X/Y step vectors for both directions. Circular patterns accept a center, count, and
+signed total angle up to one revolution.
+
+Edits show separate dashed preview curves in the viewport without connecting unrelated instances.
+The committed geometry, dirty state, and undo history remain unchanged until **Übernehmen**.
+Cancel/Escape clears the preview and restores selection and drag handles. An invalid candidate
+clears the previous preview, explains the error, and disables Apply. Apply re-evaluates the current
+document and publishes exactly one atomic transaction, including downstream feature recompute.
+Undo/Redo and Save/Open use the existing document and intent persistence.
 
 ## Authority boundary
 
 ```text
-selection + typed transform/pattern parameters
-  -> SketchTransformPatternService (Core)
-  -> complete candidate Sketch
-  -> optional explicit SketchPatternIntent
-  -> one later document transaction
+ShellSketchTools: selection + numeric editor + viewport preview
+  -> GuiSketchOperationController: disposable candidate and intent validation
+  -> SketchTransformPatternService: exact Core geometry
+  -> GuiDocumentSession: one transaction and downstream recompute
 ```
 
-`SketchTransformPatternService` is declared in `include/blcad/core/sketch_transform_pattern.hpp`. It supports `LineSegment`, `ArcSegment`, and cubic `SplineSegment` geometry. Projected/reference-generated entities remain read-only and are rejected as transform sources.
+The dialog-free `preview_operation`, `apply_operation`, and `cancel_operation_preview` surface uses
+the same implementation as the ribbon. Explicit curve ids address `LineSegment`, `ArcSegment`, and
+polynomial/rational cubic `SplineSegment`. Rational weights survive every transform. Free-standing
+Sketch points and unrelated profiles/references survive candidate cloning.
 
-## Implemented transforms
+## Identity, profiles, and constraints
 
-- `move(...)` translates every selected curve and preserves its entity id.
-- `rotate(...)` rotates every defining point around a finite center and preserves ids.
-- `scale(...)` applies a non-zero uniform factor around a finite center and preserves ids.
-- `copy(...)` creates ordinary detached copies using deterministic `<source>.copy.N` ids.
-- `mirror(...)` reflects every defining point across a non-degenerate line and creates deterministic `<source>.mirror.N` ordinary curves.
+Move, rotate, and scale preserve curve and profile ids. Moving only part of a closed contour must
+still produce a valid closed profile. Copy and mirror create deterministic `<source>.copy.N` and
+`<source>.mirror.N` ids. A fully selected closed, arc-closed, or composite profile is also copied with
+its mapped outer/inner contours; a partial selection creates ordinary curves only.
 
-Preserving ids for move/rotate/scale keeps stable entity identity. The transformed replacement
-curves are woven into the candidate before any embedded intent is copied, so constraints, geometric
-constraints, driving dimensions, and tangent continuity that reference a selected entity are
-preserved in place and keep resolving against the same ids. Copy and mirror intentionally create
-independent ordinary entities; no hidden transform relationship is introduced.
+The controller checks existing embedded and catalog constraints and driving dimensions against the
+requested geometry. Fixed targets retain their pre-command coordinates. A transform that violates
+these relationships is rejected atomically; the solver does not silently change the requested result.
 
-## Non-duplicated intent report
+Copy, mirror, and patterns keep source intent intact and create independent instances. Both embedded
+and catalog constraint/dimension ids that are not duplicated are shown in the editor and completion
+message. This report is also available as `uncopied_references` to headless callers.
 
-Copy, mirror, and both pattern families never duplicate embedded intent onto the generated
-instances. Instead, `SketchTransformPatternResult::uncopied_references` lists the sorted, deduplicated
-ids of every constraint, geometric constraint, driving dimension, and tangent-continuity record that
-references a selected source entity. The caller must surface this report to the user; the
-relationship is reported, never silently discarded. Id-preserving transforms return an empty report.
+## Pattern semantics
 
-## Rectangular and circular patterns
+Rectangular patterns emit every cell except seed `(0,0)` as ordinary geometry with `.rect.N` ids.
+Circular patterns use `.circular.N` ids. For a full ±360° revolution, angular spacing is
+`total_angle / count`, so the final instance does not overlap the seed. For a partial sweep, spacing
+is `total_angle / (count - 1)`, including the last endpoint. A one-instance pattern contains only its
+seed. Duplicate selections, zero counts, nonfinite values, multi-revolution sweeps, and more than
+10,000 source-curve instances are rejected before generating geometry.
 
-Rectangular patterns accept two finite step vectors and positive counts. The seed occupies index `(0,0)` and is not duplicated. Every remaining instance is emitted as ordinary Sketch geometry with deterministic `<source>.rect.N` ids.
-
-Circular patterns accept a finite center, a positive count, and a finite total angle. The seed is the first instance. Remaining instances rotate by a deterministic step of `total_angle / (count - 1)` and use `<source>.circular.N` ids.
-
-`SketchPatternMode` is explicit:
-
-- `Associative` returns a `SketchPatternIntent` describing stable source ids, pattern family, counts, vectors or center, and angular step.
-- `Exploded` returns no pattern intent; generated curves are independent ordinary entities.
-
-The generated candidate geometry is never opaque. A caller that owns persistent editing state can store the returned associative intent; exploded mode requires no additional persistent record.
-
-## Failure policy
-
-The service fails closed for empty selections, unknown or reference-only entities, non-finite parameters, zero scale, degenerate mirror axes, and zero pattern counts. Source Sketch state is never partially modified.
+The shell explicitly creates independently editable copies (`SketchPatternMode::Exploded`). The Core
+also offers `Associative`, returning a `SketchPatternIntent` with source ids, counts, steps and center.
+That returned intent has no persistent shell catalog or downstream regeneration authority yet;
+associative pattern editing is a remaining extension.
 
 ## Focused proof
 
 ```bash
-./build/dev/blcad_core_tests "[core][sketch-transform-pattern]"
+./build/dev-gui/blcad_core_tests "[core][sketch-transform-pattern]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][sketch-transform-pattern]"
 ```
 
-The registered Core proof covers stable-id move, ordinary copy and mirror, rectangular associative intent, circular exploded output, deterministic created ids, rejection of invalid selections and degenerate parameters, constraint- and dimension-preserving move on referenced geometry, and the `uncopied_references` report for copy and pattern output.
+The suite exercises every transform and pattern through the shell command surface, actual ribbon
+editor Apply/Cancel, preview/history isolation, constraint and dimension conflict rollback,
+profile-selection expansion, rational conic preservation, copied profile boundaries, full-circle
+spacing in both directions, count/selection guards, exact Undo/Redo, and Save/Open.
 
-## Next boundary
+## Remaining boundaries
 
-Block 119 owns continuous region recognition, profile selection, open/self-crossing diagnostics, repair integration, and the solver-aware Finish Sketch workflow.
+Projected/reference entities remain read-only transform sources. Parameter-backed full circle and
+rectangle profiles, free-standing point transforms, persistent associative pattern editing, and
+arbitrary non-uniform scale are not implemented by this command family.

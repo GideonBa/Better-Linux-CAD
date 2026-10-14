@@ -112,19 +112,19 @@
       "family": "offset-project-break-link",
       "owner": 117,
       "contract": "docs/gui-sketch-offset-project-mvp8.md",
-      "implementation": "SketchOffsetProjectService",
-      "interaction": "ordered line offset, associative projection and explicit break-link",
-      "proof": "[core][sketch-offset-project]",
-      "disposition": "headless_authority_gui_deferred"
+      "implementation": "SketchOffsetProjectService, GuiSketchOperationController and ShellSketchTools",
+      "interaction": "interactive chain/arc offset, associative projection and line detachment with preview and atomic history",
+      "proof": "[core][sketch-offset-project],[gui][sketch-offset-project],[gui][sketch-project]",
+      "disposition": "interactive_with_documented_narrowing"
     },
     {
       "family": "transform-mirror-pattern",
       "owner": 118,
       "contract": "docs/gui-sketch-transform-pattern-mvp8.md",
-      "implementation": "SketchTransformPatternService",
-      "interaction": "move/rotate/scale/copy/mirror and rectangular/circular pattern intent",
-      "proof": "[core][sketch-transform-pattern]",
-      "disposition": "headless_authority_gui_deferred"
+      "implementation": "SketchTransformPatternService, GuiSketchOperationController and ShellSketchTools",
+      "interaction": "interactive move/rotate/scale/copy/mirror and independent rectangular/circular patterns",
+      "proof": "[core][sketch-transform-pattern],[gui][sketch-transform-pattern]",
+      "disposition": "interactive_with_documented_narrowing"
     },
     {
       "family": "regions-profiles-finish",
