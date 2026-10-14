@@ -20,11 +20,29 @@
 #include <QTreeWidgetItem>
 
 #include <algorithm>
+#include <iostream>
+#include <sstream>
 
 using namespace blcad;
 using namespace blcad::gui;
 
 namespace {
+
+class NativeViewerLogCapture {
+public:
+  NativeViewerLogCapture()
+      : previous_out_(std::cout.rdbuf(output.rdbuf())),
+        previous_error_(std::cerr.rdbuf(output.rdbuf())) {}
+  ~NativeViewerLogCapture() {
+    std::cout.rdbuf(previous_out_);
+    std::cerr.rdbuf(previous_error_);
+  }
+  std::ostringstream output;
+
+private:
+  std::streambuf* previous_out_;
+  std::streambuf* previous_error_;
+};
 
 const GuiBrowserNode* find_group(const GuiDocumentBrowser& browser, std::string_view label) {
   for (const auto& root : browser.roots())
@@ -68,6 +86,37 @@ void accept_next_file_dialog(const QString& path) {
 }
 
 } // namespace
+
+TEST_CASE("Shell releases native viewer resources before destroying its top-level drawable",
+          "[gui][shell][viewport][native-viewer-lifecycle]") {
+  if (QApplication::platformName() != QStringLiteral("xcb")) {
+    SKIP("Native viewer teardown requires the xcb display backend");
+  }
+  bool all_initialized = true;
+  std::string messages;
+  {
+    NativeViewerLogCapture capture;
+    for (int i = 0; i < 3; ++i) {
+      {
+        ShellWindow window;
+        all_initialized = window.new_part(QStringLiteral("Viewer-Lebensdauer")) && all_initialized;
+        window.resize(1280, 800);
+        window.show();
+        qApp->processEvents();
+        all_initialized = window.viewport().native_viewer_available() && all_initialized;
+        // Complete a real framebuffer paint before destruction. The failure
+        // was emitted during resource release, after ordinary GUI assertions.
+        (void)window.viewport().grab();
+      }
+      qApp->processEvents();
+    }
+    messages = capture.output.str();
+  }
+  INFO(messages);
+  REQUIRE(all_initialized);
+  CHECK(messages.find("glXMakeCurrent() has failed") == std::string::npos);
+  CHECK(messages.find("Severity: High") == std::string::npos);
+}
 
 TEST_CASE("Block 133 shell window builds ribbon browser and diagnostics",
           "[gui][shell][gui][ribbon]") {

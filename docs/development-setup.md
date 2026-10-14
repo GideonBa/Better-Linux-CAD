@@ -533,9 +533,14 @@ QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][sketch-ui-revie
 QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[gui][sketch-ui-review],[gui][viewport]"
 QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1.5 ./build/dev-gui/blcad_gui_tests "[gui][sketch-ui-review]"
 QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=2 ./build/dev-gui/blcad_gui_tests "[gui][sketch-ui-review]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[native-viewer-lifecycle]"
 ```
 
 Set `BLCAD_UI_CAPTURE_DIR` to an optional writable directory to capture the test shell, previews and
 operation dialogs for visual inspection. Captures use the test application's own widgets. The suite
 checks 1280×800 layout, horizontal command reachability, supported/mixed selection gating, actual
 button and Escape events, preview cleanup, and main-window Undo/Redo.
+`[native-viewer-lifecycle]` additionally creates, paints and destroys three native shell windows.
+It rejects high-severity OCCT teardown messages, including attempts to make a GLX context current
+after its top-level drawable has already been destroyed. The shell releases its central viewer while
+that drawable and the document session still exist. This case is skipped on the offscreen backend.

@@ -244,7 +244,16 @@ ShellWindow::ShellWindow() {
   refresh();
 }
 
-ShellWindow::~ShellWindow() = default;
+ShellWindow::~ShellWindow() {
+  // Release the viewer while its native top-level drawable and the session
+  // still exist. QMainWindow/QWidget teardown otherwise destroys that drawable
+  // before deleting the central viewport and its OCCT GL resources.
+  feature_tools_.reset();
+  sketch_tools_.reset();
+  delete centralWidget();
+  viewport_ = nullptr;
+  ribbon_ = nullptr;
+}
 
 void ShellWindow::build_ribbon() {
   tab_model_ = ribbon_->add_tab(QStringLiteral("3D-Modell"));

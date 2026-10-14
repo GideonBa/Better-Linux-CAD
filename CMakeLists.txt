@@ -600,7 +600,7 @@ if(BLCAD_BUILD_TESTS)
     catch_discover_tests(
       blcad_gui_tests
       TEST_PREFIX "gui."
-      PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+      PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" SKIP_RETURN_CODE 4
     )
   endif()
 endif()
