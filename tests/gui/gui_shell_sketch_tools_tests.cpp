@@ -19,6 +19,7 @@
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QStatusBar>
+#include <QTemporaryDir>
 #include <QTreeWidget>
 #include <QTreeWidgetItemIterator>
 
@@ -1416,6 +1417,98 @@ TEST_CASE("Finish Sketch still rejects branched and self-intersecting profile to
   CHECK_FALSE(window.finish_active_sketch());
   CHECK(window.active_sketch() == sketch_id);
   CHECK(serialize_part_document_to_json(*window.session().part_document()).value() == before);
+}
+
+TEST_CASE("Finish Sketch materializes a mouse-ready curved region with dimensions and atomic history",
+          "[gui][shell-sketch][sketch-finish][sketch-curved-regions]") {
+  ShellWindow window;
+  enter_sketch(window);
+  window.resize(1280, 800);
+  window.show();
+  qApp->processEvents();
+  if (QApplication::platformName() == QStringLiteral("xcb"))
+    REQUIRE(window.viewport().native_viewer_available());
+  const auto id = *window.active_sketch();
+  auto& tools = window.sketch_tools();
+  REQUIRE(tools.begin_tool(GuiSketchCreateTool::ThreePointArc));
+  REQUIRE(tools.add_pick({-10, 0}));
+  REQUIRE(tools.add_pick({0, 10}));
+  REQUIRE(tools.add_pick({10, 0}));
+  REQUIRE(tools.begin_tool(GuiSketchCreateTool::Line));
+  REQUIRE(tools.add_pick({-10, 0}));
+  REQUIRE(tools.add_pick({10, 0}));
+  tools.cancel_tool();
+  const auto arc_id = window.session().part_document()->find_sketch(id)->arc_segments().front().id();
+  window.session().selection().clear();
+  REQUIRE(window.session().selection().add({GuiSelectionKind::SketchEntity, "entity/" + arc_id.value()}));
+  REQUIRE(tools.apply_dimension(SketchDimensionKind::Radius, true));
+  const auto dimensions = window.session().sketch_dimension_catalog(id).value();
+  const auto before = serialize_part_document_to_json(*window.session().part_document()).value();
+  const auto* source = window.session().part_document()->find_sketch(id);
+  auto analysis = geometry::SketchFinishService::analyze_unmaterialized(*window.session().part_document(), *source);
+  REQUIRE(analysis);
+  INFO((analysis.value().diagnostics.empty() ? "No diagnostics" : analysis.value().diagnostics.front().message));
+  REQUIRE(analysis.value().regions.size() == 1);
+  const auto profile = analysis.value().regions.front().id;
+  auto scene = geometry::ViewportSceneBuilder{}.build_part(*window.session().part_document(), *window.session().part_shape_cache());
+  REQUIRE(scene);
+  const auto semantic = "sketch/" + id.value() + "/profile/" + profile.value();
+  REQUIRE(std::any_of(scene.value().begin(), scene.value().end(), [&](const auto& item) {
+    return item.semantic_id == semantic;
+  }));
+  REQUIRE(window.finish_active_sketch());
+  const auto* completed = window.session().part_document()->find_sketch(id);
+  REQUIRE(completed->arc_closed_profiles().size() == 1);
+  CHECK(completed->arc_closed_profiles().front().id() == profile);
+  CHECK(completed->find_arc_segment(arc_id)->start().x == -10);
+  CHECK(window.session().sketch_dimension_catalog(id).value() == dimensions);
+  const auto after = serialize_part_document_to_json(*window.session().part_document()).value();
+  REQUIRE(window.undo());
+  CHECK(serialize_part_document_to_json(*window.session().part_document()).value() == before);
+  REQUIRE(window.redo());
+  CHECK(serialize_part_document_to_json(*window.session().part_document()).value() == after);
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  const auto path = directory.filePath("curved.blcad.json").toStdString();
+  REQUIRE(window.save_to(QString::fromStdString(path)));
+  GuiDocumentSession reopened;
+  REQUIRE(reopened.open_file(path));
+  CHECK(serialize_part_document_to_json(*reopened.part_document()).value() == after);
+  CHECK(reopened.sketch_dimension_catalog(id).value() == dimensions);
+  if (window.active_sketch())
+    REQUIRE(window.finish_active_sketch());
+  REQUIRE(window.viewport().select_semantic(semantic));
+  const auto begun = window.feature_tools().begin_extrude();
+  INFO((begun ? std::string("Extrude started") : begun.error().message()));
+  REQUIRE(begun);
+  window.feature_tools().cancel();
+}
+
+TEST_CASE("Finish Sketch rejects a hidden spline crossing while preserving all intent",
+          "[gui][shell-sketch][sketch-finish][sketch-curved-regions]") {
+  ShellWindow window;
+  enter_sketch(window);
+  const auto id = *window.active_sketch();
+  REQUIRE(window.session().commit_part_transaction("Seed crossing spline", [id](PartDocument& part) {
+    auto sketch = *part.find_sketch(id);
+    for (const auto& line : {
+           LineSegment::create(SketchEntityId("base"), {0, 0}, {10, 0}).value(),
+           LineSegment::create(SketchEntityId("left"), {0, 10}, {0, 0}).value(),
+           LineSegment::create(SketchEntityId("right"), {10, 0}, {10, 10}).value()}) {
+      auto added = sketch.add_entity(line);
+      if (!added) return added;
+    }
+    auto added = sketch.add_entity(SplineSegment::create_cubic_bezier(SketchEntityId("spline"),
+        {10, 10}, {10, -20}, {0, -20}, {0, 10}).value());
+    if (!added) return added;
+    return part.update_sketch(std::move(sketch));
+  }));
+  const auto before = serialize_part_document_to_json(*window.session().part_document()).value();
+  const auto history = std::string(window.session().undo_label());
+  CHECK_FALSE(window.finish_active_sketch());
+  CHECK(window.active_sketch() == id);
+  CHECK(serialize_part_document_to_json(*window.session().part_document()).value() == before);
+  CHECK(window.session().undo_label() == history);
 }
 
 TEST_CASE("Corner geometry, relations and size share one undo transaction",

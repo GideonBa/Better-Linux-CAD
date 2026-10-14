@@ -1,6 +1,12 @@
 #include "blcad/geometry/recompute_executor.hpp"
 #include "blcad/geometry/sketch_finish.hpp"
 #include "blcad/geometry/sketch_region_finder.hpp"
+#include "blcad/core/part_document_json.hpp"
+#include "blcad/geometry/occt_shape_view.hpp"
+#include "blcad/geometry/viewport_scene.hpp"
+
+#include <BRepGProp.hxx>
+#include <GProp_GProps.hxx>
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -218,4 +224,198 @@ TEST_CASE("Block 119 Finish Sketch materializes the selected region in one docum
   REQUIRE(completed != nullptr);
   CHECK(completed->closed_profiles().size() == 1U);
   CHECK(document.value().find_sketch(SketchId("sketch.region"))->closed_profiles().empty());
+}
+
+TEST_CASE("Curved region extraction materializes exact two-edge circle and semicircle profiles",
+          "[geometry][sketch-regions][sketch-curved-regions][integration][sketch-finish]") {
+  auto part = PartDocument::create(DocumentId("curved.regions"), "Curved regions").value();
+  REQUIRE(part.add_datum_plane(DatumPlane::xy().value()));
+  REQUIRE(part.add_parameter(make_length_parameter("depth", "Depth", 4)));
+  auto sketch = Sketch::create(SketchId("curved"), "Curved", DatumPlaneId("datum.xy")).value();
+  REQUIRE(sketch.add_entity(ArcSegment::create_three_point(SketchEntityId("top"), {-10, 0}, {0, 10}, {10, 0}).value()));
+  double area = std::acos(-1.0) * 50;
+  SECTION("semicircle") {
+    add_line(sketch, "base", {-10, 0}, {10, 0});
+  }
+  SECTION("circle") {
+    REQUIRE(sketch.add_entity(ArcSegment::create_three_point(SketchEntityId("bottom"), {-10, 0}, {0, -10}, {10, 0}).value()));
+    area *= 2;
+  }
+  REQUIRE(part.add_sketch(sketch));
+  const auto before = serialize_part_document_to_json(part).value();
+  auto analysis = SketchFinishService::analyze(part, sketch);
+  REQUIRE(analysis);
+  INFO((analysis.value().diagnostics.empty() ? "No diagnostics" : analysis.value().diagnostics.front().message));
+  REQUIRE(analysis.value().diagnostics.empty());
+  REQUIRE(analysis.value().regions.size() == 1);
+  const auto& region = analysis.value().regions.front();
+  CHECK(region.curve_segments.size() == 2);
+  CHECK(region.vertices.size() > 10);
+  CHECK(SketchFinishService::select_region_at(analysis.value(), {0, 5}) == region.id);
+  CHECK_FALSE(SketchFinishService::select_region_at(analysis.value(), {20, 0}));
+  CHECK_FALSE(SketchRegionFinder{}.make_closed_profile(region));
+  auto finished = SketchFinishService::finish(part, sketch.id());
+  REQUIRE(finished);
+  CHECK(serialize_part_document_to_json(part).value() == before);
+  const auto* completed = finished.value().document.find_sketch(sketch.id());
+  REQUIRE(completed);
+  CHECK(completed->closed_profiles().empty());
+  REQUIRE(completed->arc_closed_profiles().size() == 1);
+  CHECK(completed->arc_closed_profiles().front().curve_segments().size() == 2);
+  auto serialized = serialize_part_document_to_json(finished.value().document).value();
+  auto restored = deserialize_part_document_from_json(serialized);
+  REQUIRE(restored);
+  CHECK(serialize_part_document_to_json(restored.value()).value() == serialized);
+  REQUIRE(restored.value().add_feature(Feature::create_additive_extrude(
+      FeatureId("extrude"), "Extrude", sketch.id(), ParameterId("depth")).value()));
+  auto cache = ShapeCache::create(ShapeCacheId("curved.cache")).value();
+  REQUIRE(GeometryRecomputeExecutor{}.execute_document(restored.value(), cache));
+  REQUIRE(cache.final_shape());
+  CHECK(RectangleExtrusionAdapter{}.summarize(*cache.final_shape()).volume_mm3 ==
+        Catch::Approx(area * 4).epsilon(1e-8));
+}
+
+TEST_CASE("Raw rational ellipse regions present exact selectable faces and preserve source weights",
+          "[geometry][sketch-regions][sketch-curved-regions][viewport-scene]") {
+  auto part = PartDocument::create(DocumentId("ellipse.regions"), "Ellipse").value();
+  REQUIRE(part.add_datum_plane(DatumPlane::xy().value()));
+  auto sketch = Sketch::create(SketchId("ellipse"), "Ellipse", DatumPlaneId("datum.xy")).value();
+  for (int i = 3; i >= 0; --i) {
+    auto span = SplineSegment::create_elliptical_arc(SketchEntityId("span." + std::to_string(i)),
+        {20, 0}, {10, 0}, 5, i * std::acos(-1.0) / 2, std::acos(-1.0) / 2).value();
+    if (i % 2) {
+      auto weights = span.weights();
+      std::reverse(weights.begin(), weights.end());
+      span = SplineSegment::create_cubic_bezier(span.id(), span.end(), span.control2(),
+                                               span.control1(), span.start(), weights).value();
+    }
+    REQUIRE(sketch.add_entity(span));
+  }
+  REQUIRE(part.add_sketch(sketch));
+  auto analysis = SketchFinishService::analyze_unmaterialized(part, sketch);
+  REQUIRE(analysis);
+  INFO((analysis.value().diagnostics.empty() ? "No diagnostics" : analysis.value().diagnostics.front().message));
+  REQUIRE(analysis.value().diagnostics.empty());
+  REQUIRE(analysis.value().regions.size() == 1);
+  CHECK(SketchFinishService::select_region_at(analysis.value(), {20, 0}));
+  auto cache = ShapeCache::create(ShapeCacheId("cache")).value();
+  auto scene = ViewportSceneBuilder{}.build_part(part, cache);
+  REQUIRE(scene);
+  const auto semantic = "sketch/ellipse/profile/" + analysis.value().regions.front().id.value();
+  auto found = std::find_if(scene.value().begin(), scene.value().end(), [&](const auto& item) {
+    return item.semantic_id == semantic;
+  });
+  REQUIRE(found != scene.value().end());
+  const auto* shape = OcctShapeView::get(found->shape);
+  REQUIRE(shape);
+  GProp_GProps properties;
+  BRepGProp::SurfaceProperties(*shape, properties);
+  CHECK(properties.Mass() == Catch::Approx(std::acos(-1.0) * 10 * 5).epsilon(1e-8));
+  auto finished = SketchFinishService::finish(part, sketch.id());
+  REQUIRE(finished);
+  const auto* completed = finished.value().document.find_sketch(sketch.id());
+  for (const auto& source : sketch.spline_segments()) {
+    const auto* span = completed->find_spline_segment(source.id());
+    REQUIRE(span);
+    CHECK(span->weights() == source.weights());
+    CHECK(span->start().x == source.start().x);
+    CHECK(span->end().x == source.end().x);
+  }
+  auto repeated = SketchFinishService::analyze_unmaterialized(finished.value().document, *completed);
+  REQUIRE(repeated);
+  CHECK(repeated.value().regions.empty());
+  CHECK(repeated.value().diagnostics.empty());
+}
+
+TEST_CASE("Mixed curve analysis distinguishes disjoint regions from open and branched components",
+          "[geometry][sketch-regions][sketch-curved-regions]") {
+  auto part = PartDocument::create(DocumentId("mixed.regions"), "Mixed").value();
+  REQUIRE(part.add_datum_plane(DatumPlane::xy().value()));
+  auto sketch = Sketch::create(SketchId("mixed"), "Mixed", DatumPlaneId("datum.xy")).value();
+  for (int i = 0; i < 2; ++i) {
+    const double x = i * 30;
+    REQUIRE(sketch.add_entity(ArcSegment::create_three_point(SketchEntityId("top." + std::to_string(i)),
+        {x - 5, 0}, {x, 5}, {x + 5, 0}).value()));
+    REQUIRE(sketch.add_entity(LineSegment::create(SketchEntityId("base." + std::to_string(i)),
+        {x - 5, 0}, {x + 5, 0}).value()));
+  }
+  SECTION("two regions require explicit selection") {
+    REQUIRE(part.add_sketch(sketch));
+    auto analysis = SketchFinishService::analyze(part, sketch).value();
+    REQUIRE(analysis.regions.size() == 2);
+    CHECK(analysis.diagnostics.empty());
+    CHECK_FALSE(SketchFinishService::finish(part, sketch.id()));
+    auto selected = SketchFinishService::select_region_at(analysis, {30, 2});
+    REQUIRE(selected);
+    auto finished = SketchFinishService::finish(part, sketch.id(), selected);
+    REQUIRE(finished);
+    CHECK(finished.value().document.find_sketch(sketch.id())->arc_closed_profiles().size() == 1);
+  }
+  SECTION("open arc remains an open diagnostic") {
+    REQUIRE(sketch.add_entity(ArcSegment::create_three_point(SketchEntityId("open"), {50, 0}, {55, 5}, {60, 0}).value()));
+    auto analysis = SketchFinishService::analyze(part, sketch).value();
+    CHECK(analysis.regions.size() == 2);
+    REQUIRE(analysis.diagnostics.size() == 1);
+    CHECK(analysis.diagnostics.front().kind == SketchRegionDiagnosticKind::OpenContour);
+  }
+  SECTION("branch cannot masquerade as an open end") {
+    add_line(sketch, "branch", {-5, 0}, {-10, 10});
+    auto analysis = SketchFinishService::analyze(part, sketch).value();
+    CHECK(analysis.regions.size() == 1);
+    REQUIRE(analysis.diagnostics.size() == 1);
+    CHECK(analysis.diagnostics.front().kind == SketchRegionDiagnosticKind::AmbiguousTopology);
+  }
+}
+
+TEST_CASE("Curved region validation rejects crossings inside splines and overlapping arcs",
+          "[geometry][sketch-regions][sketch-curved-regions]") {
+  auto part = PartDocument::create(DocumentId("invalid.curves"), "Invalid").value();
+  REQUIRE(part.add_datum_plane(DatumPlane::xy().value()));
+  auto sketch = Sketch::create(SketchId("invalid"), "Invalid", DatumPlaneId("datum.xy")).value();
+  SECTION("spline crosses another edge away from its chord") {
+    add_line(sketch, "base", {0, 0}, {10, 0});
+    add_line(sketch, "right", {10, 0}, {10, 10});
+    add_line(sketch, "left", {0, 10}, {0, 0});
+    REQUIRE(sketch.add_entity(SplineSegment::create_cubic_bezier(SketchEntityId("spline"),
+        {10, 10}, {10, -20}, {0, -20}, {0, 10}).value()));
+  }
+  SECTION("a spline intersects itself") {
+    add_line(sketch, "base", {1, 0}, {0, 0});
+    REQUIRE(sketch.add_entity(SplineSegment::create_cubic_bezier(SketchEntityId("spline"),
+        {0, 0}, {3, 3}, {-3, 3}, {1, 0}).value()));
+  }
+  SECTION("arcs overlap on the same supporting circle") {
+    REQUIRE(sketch.add_entity(ArcSegment::create_three_point(SketchEntityId("a"), {-10, 0}, {0, 10}, {10, 0}).value()));
+    REQUIRE(sketch.add_entity(ArcSegment::create_three_point(SketchEntityId("b"), {10, 0}, {0, 10}, {-10, 0}).value()));
+  }
+  REQUIRE(part.add_sketch(sketch));
+  const auto before = serialize_part_document_to_json(part).value();
+  auto analysis = SketchFinishService::analyze(part, sketch).value();
+  CHECK(analysis.regions.empty());
+  REQUIRE(analysis.diagnostics.size() == 1);
+  INFO(analysis.diagnostics.front().message);
+  CHECK(analysis.diagnostics.front().kind == SketchRegionDiagnosticKind::SelfIntersection);
+  CHECK_FALSE(SketchFinishService::finish(part, sketch.id()));
+  CHECK(serialize_part_document_to_json(part).value() == before);
+}
+
+TEST_CASE("A valid spline region is not rejected by intersections of its endpoint chord",
+          "[geometry][sketch-regions][sketch-curved-regions]") {
+  auto part = PartDocument::create(DocumentId("spline.notch"), "Spline notch").value();
+  REQUIRE(part.add_datum_plane(DatumPlane::xy().value()));
+  auto sketch = Sketch::create(SketchId("notch"), "Notch", DatumPlaneId("datum.xy")).value();
+  REQUIRE(sketch.add_entity(SplineSegment::create_cubic_bezier(SketchEntityId("top"),
+      {-10, 0}, {-10, 20}, {10, 20}, {10, 0}).value()));
+  add_line(sketch, "right", {10, 0}, {10, -10});
+  add_line(sketch, "notch.right", {10, -10}, {0, 5});
+  add_line(sketch, "notch.left", {0, 5}, {-10, -10});
+  add_line(sketch, "left", {-10, -10}, {-10, 0});
+  REQUIRE(part.add_sketch(sketch));
+  auto analysis = SketchFinishService::analyze(part, sketch).value();
+  REQUIRE(analysis.diagnostics.empty());
+  REQUIRE(analysis.regions.size() == 1);
+  auto finished = SketchFinishService::finish(part, sketch.id());
+  INFO((finished ? std::string("Profile materialized") : finished.error().message()));
+  REQUIRE(finished);
+  CHECK(finished.value().document.find_sketch(sketch.id())->arc_closed_profiles().size() == 1);
 }

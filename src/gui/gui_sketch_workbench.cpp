@@ -188,8 +188,8 @@ Result<GuiSketchInspection> GuiSketchWorkbench::inspect(const GuiDocumentSession
   auto repairs = suggester.suggest(diagnostics);
   std::optional<ProfileId> detected_region;
   std::string region_message = "no explicit closed region requested";
-  if (target->line_segments().size() >= 3U) {
-    auto region = geometry::SketchRegionFinder{}.find_single_region(*active_part(session), *target);
+  if (target->line_segments().size() + target->arc_segments().size() + target->spline_segments().size() >= 2U) {
+    auto region = geometry::SketchRegionFinder{}.find_single_curve_region(*active_part(session), *target);
     if (region.has_error())
       region_message = region.error().message();
     else {

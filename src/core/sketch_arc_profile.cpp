@@ -1,5 +1,6 @@
 #include "blcad/core/sketch.hpp"
 #include "blcad/core/sketch_contour.hpp"
+#include "blcad/core/sketch_modify.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -199,9 +200,24 @@ struct CurveGeometry {
 }
 
 [[nodiscard]] bool curves_intersect_invalidly(const CurveGeometry& first,
-                                              const CurveGeometry& second, bool adjacent) {
-  if (first.is_spline || second.is_spline)
-    return !adjacent && line_line_intersects(first.start, first.end, second.start, second.end);
+                                              const CurveGeometry& second, bool adjacent,
+                                              const Sketch& sketch) {
+  if (first.is_spline || second.is_spline) {
+    const auto a = detail::curve_sampler_for(sketch, first.id);
+    const auto b = detail::curve_sampler_for(sketch, second.id);
+    if (!a || !b) return true;
+    for (const auto p : detail::curve_intersections(*a, *b)) {
+      // The Core curve intersector refines sampled candidates. Keep its
+      // contact tolerance here; Geometry validates automatic regions using
+      // exact OCCT curves with a tighter intersection tolerance.
+      const auto near = [p](Point2 q) { return distance(p, q) <= 1e-5; };
+      const bool joint = adjacent &&
+          ((same_point(first.end, second.start) && near(first.end)) ||
+           (same_point(first.start, second.end) && near(first.start)));
+      if (!joint) return true;
+    }
+    return false;
+  }
   if (!first.is_arc && !second.is_arc)
     return !adjacent && line_line_intersects(first.start, first.end, second.start, second.end);
   std::vector<Point2> intersections;
@@ -620,7 +636,7 @@ Sketch::validate_arc_closed_profile(const ArcClosedProfile& profile) const {
   }
   for (std::size_t i = 0; i < curves.size(); ++i)
     for (std::size_t j = i + 1U; j < curves.size(); ++j)
-      if (curves_intersect_invalidly(curves[i], curves[j], is_adjacent(i, j, curves.size())))
+      if (curves_intersect_invalidly(curves[i], curves[j], is_adjacent(i, j, curves.size()), *this))
         return Result<std::vector<Point2>>::failure(validation_error(
             profile.id().value(), "arc closed profile curve segments must not self-intersect"));
   std::vector<Point2> vertices;

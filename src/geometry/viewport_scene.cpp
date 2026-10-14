@@ -440,7 +440,7 @@ ViewportSceneBuilder::build_part(const PartDocument& document,
           return Result<std::vector<ViewportSceneItem>>::failure(appended.error());
       }
 
-      // Legacy/raw line sketches have no persistent profile presentation yet,
+      // Legacy/raw curve sketches have no persistent profile presentation yet,
       // but a bounded region is still a valid selection-first feature input.
       // Publish a transient face under the same deterministic generated id
       // used by SketchFinishService and the interactive materialization path.
@@ -449,6 +449,13 @@ ViewportSceneBuilder::build_part(const PartDocument& document,
       auto detected_regions = SketchFinishService::analyze_unmaterialized(document, sketch);
       if (detected_regions) {
         for (const auto& region : detected_regions.value().regions) {
+          if (!region.curve_segments.empty()) {
+            auto appended = append_curve_profile(region.id, region.curve_segments,
+                                                no_inner_contours, no_profile_holes);
+            if (appended.has_error())
+              continue;
+            continue;
+          }
           auto holes =
               classify_contained_profile_holes(document, sketch, region.id, region.vertices);
           if (holes.has_error())

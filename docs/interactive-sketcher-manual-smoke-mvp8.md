@@ -7,6 +7,11 @@ offscreen automation.
    verify normal camera, dimmed surroundings, contextual command groups, cursor coordinates, solve
    state, and remaining DOF. Resize the shell to 1280×800, scroll the Sketch ribbon to both
    ends, and verify every command and caption remains reachable without forcing a wider window.
+   Draw a three-point semicircle and a closing line with the same authored start/end direction.
+   Verify its interior is a selectable exact region, Finish creates a curved profile, and Extrude
+   previews it. Check Cancel, one-step Undo/Redo and Save/Open. Repeat with two semicircles and a
+   raw four-span rational ellipse. A spline crossing another edge or itself must reject Finish
+   without changing the document or history.
 2. At 100%, 150%, and 200% desktop scale, select endpoints, curves, dimensions, and constraint
    glyphs. Verify hit priority, hover stability, box/crossing selection, grid spacing, snap glyphs,
    and that the model-space cursor position does not change with scale.

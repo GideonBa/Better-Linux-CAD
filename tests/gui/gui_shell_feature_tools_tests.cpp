@@ -1,12 +1,16 @@
 #include "blcad/gui/shell/shell_feature_tools.hpp"
 #include "blcad/gui/shell/shell_sketch_tools.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
+#include "blcad/core/part_document_json.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_approx.hpp>
 
 #include <QAction>
 #include <QApplication>
 #include <QDialogButtonBox>
+#include <QDir>
+#include <QEventLoop>
 #include <QInputDialog>
 #include <QKeyEvent>
 #include <QLineEdit>
@@ -1242,6 +1246,64 @@ TEST_CASE("A raw closed Sketch extrudes from a real tree click atomically",
   CHECK(part->find_feature(feature) == nullptr);
   CHECK(part->find_parameter(parameter) == nullptr);
   CHECK(part->find_body(body) == nullptr);
+}
+
+TEST_CASE("A raw curved Sketch extrudes from a browser click with exact preview and one transaction",
+          "[gui][shell-features][raw-profile-regression][sketch-curved-regions]") {
+  ShellWindow window;
+  REQUIRE(window.new_part(QStringLiteral("Gekrümmtes Rohprofil")));
+  window.resize(1280, 800);
+  window.show();
+  qApp->processEvents();
+  if (QApplication::platformName() == QStringLiteral("xcb"))
+    REQUIRE(window.viewport().native_viewer_available());
+  const auto capture = [&](const QString& name) {
+    const auto directory = qEnvironmentVariable("BLCAD_UI_CAPTURE_DIR");
+    if (directory.isEmpty()) return;
+    QDir().mkpath(directory);
+    QEventLoop frame;
+    QTimer::singleShot(150, &frame, &QEventLoop::quit);
+    frame.exec();
+    CHECK(window.grab().save(directory + '/' + name + ".png"));
+  };
+  auto sketch = Sketch::create(SketchId("raw.curved"), "Halbkreis", DatumPlaneId("datum.xy")).value();
+  REQUIRE(sketch.add_entity(ArcSegment::create_three_point(SketchEntityId("top"), {-10, 0}, {0, 10}, {10, 0}).value()));
+  REQUIRE(sketch.add_entity(LineSegment::create(SketchEntityId("base"), {-10, 0}, {10, 0}).value()));
+  REQUIRE(window.session().commit_part_transaction("Load curved sketch", [sketch](PartDocument& part) {
+    return part.add_sketch(sketch);
+  }));
+  window.refresh();
+  qApp->processEvents();
+  auto& tree = window.model_browser();
+  auto* item = find_tree_item(tree, QStringLiteral("raw.curved"));
+  REQUIRE(item);
+  tree.scrollToItem(item);
+  qApp->processEvents();
+  click_widget(*tree.viewport(), tree.visualItemRect(item).center());
+  REQUIRE(window.feature_tools().selected_profile());
+  capture(QStringLiteral("raw-curved-profile"));
+  const auto before = serialize_part_document_to_json(*window.session().part_document()).value();
+  REQUIRE(window.feature_tools().begin_extrude());
+  REQUIRE(window.feature_tools().set_numeric_value(5));
+  CHECK(window.viewport().feature_preview_active());
+  capture(QStringLiteral("curved-extrude-preview"));
+  CHECK(serialize_part_document_to_json(*window.session().part_document()).value() == before);
+  window.feature_tools().cancel();
+  CHECK(serialize_part_document_to_json(*window.session().part_document()).value() == before);
+  REQUIRE(window.feature_tools().begin_extrude());
+  REQUIRE(window.feature_tools().set_numeric_value(5));
+  REQUIRE(window.feature_tools().apply());
+  const auto* part = window.session().part_document();
+  REQUIRE(part->find_sketch(sketch.id())->arc_closed_profiles().size() == 1);
+  REQUIRE(window.session().part_shape_cache()->final_shape());
+  CHECK(geometry::RectangleExtrusionAdapter{}.summarize(*window.session().part_shape_cache()->final_shape()).volume_mm3 ==
+        Catch::Approx(std::acos(-1.0) * 50 * 5).epsilon(1e-8));
+  capture(QStringLiteral("curved-extrude-applied"));
+  const auto after = serialize_part_document_to_json(*part).value();
+  REQUIRE(window.undo());
+  CHECK(serialize_part_document_to_json(*window.session().part_document()).value() == before);
+  REQUIRE(window.redo());
+  CHECK(serialize_part_document_to_json(*window.session().part_document()).value() == after);
 }
 
 TEST_CASE("Extrusion starts from a native 3D sketch click",

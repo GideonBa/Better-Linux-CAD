@@ -295,7 +295,33 @@ SketchRegionFinder::find_single_region(const PartDocument& document, const Sketc
 
 Result<ClosedProfile>
 SketchRegionFinder::make_closed_profile(const GeneratedClosedProfileCandidate& candidate) const {
+  if (!candidate.curve_segments.empty())
+    return Result<ClosedProfile>::failure(Error::validation(
+        candidate.id.value(), "curved region requires an exact curve profile"));
   return ClosedProfile::create(candidate.id, candidate.line_segments);
+}
+
+Result<std::size_t>
+SketchRegionFinder::materialize_profile(Sketch& sketch,
+                                       const GeneratedClosedProfileCandidate& candidate) const {
+  if (!candidate.curve_segments.empty()) {
+    auto profile = ArcClosedProfile::create(candidate.id, candidate.curve_segments);
+    if (!profile) return Result<std::size_t>::failure(profile.error());
+    return sketch.add_profile(std::move(profile.value()));
+  }
+  auto profile = make_closed_profile(candidate);
+  if (!profile) return Result<std::size_t>::failure(profile.error());
+  return sketch.add_profile(std::move(profile.value()));
+}
+
+Result<std::vector<ResolvedSketchRegionLine>>
+SketchRegionFinder::resolved_lines(const PartDocument& document, const Sketch& sketch) {
+  auto lines = collect_local_lines(document, sketch);
+  if (!lines) return Result<std::vector<ResolvedSketchRegionLine>>::failure(lines.error());
+  std::vector<ResolvedSketchRegionLine> result;
+  for (const auto& line : lines.value())
+    result.push_back({line.id, line.start, line.end});
+  return Result<std::vector<ResolvedSketchRegionLine>>::success(std::move(result));
 }
 
 } // namespace blcad::geometry

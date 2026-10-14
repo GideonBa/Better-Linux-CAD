@@ -5,8 +5,9 @@ Status: accepted through Block 121. Interactive Sketcher MVP-8 is complete.
 The machine-readable coverage authority is
 `docs/interactive-sketcher-coverage-manifest-mvp8.json`. It maps every Block-106–121 capability to
 its canonical contract, implementation authority, user interaction, focused proof, and honest GUI
-disposition. In particular, the remaining pattern/offset and Geometry-only narrowings of Blocks 117–120 remain visible and
-are not presented as finished Qt tools.
+disposition. Pattern/offset limits, nested curved regions and the remaining Sketch3D GUI work stay
+explicit. The October 2026 follow-up adds interactive line/arc/spline region recognition, exact
+profile/feature materialization and native UI proof; it does not claim a planar arrangement solver.
 
 The designated deterministic tutorial documents are:
 

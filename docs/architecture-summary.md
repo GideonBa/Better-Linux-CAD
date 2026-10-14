@@ -241,6 +241,17 @@ remain derived.
 
 Canonical contract: `docs/gui-sketch-dimension-authoring-mvp8.md`.
 
+`SketchFinishService` now recognizes endpoint-connected line/arc/spline contours, including two-edge
+circular loops and exact rational ellipses. `SketchRegionFinder` validates curved intersections with
+OCCT, keeps exact source ids and derives only a transient polygon for point selection. The viewport
+publishes exact curve faces under the same generated ids used by browser selection and feature
+preview. Finish and selection-first feature Apply materialize ordinary line or curved profiles in one
+transaction, with existing catalog remapping and history. Source directions and rational weights
+remain intact. Nested curved hole classification and crossing-contour cell subdivision remain
+outside this component-recognition authority.
+
+Canonical contract: `docs/gui-sketch-regions-finish-mvp8.md`.
+
 ## Selection-first modeling workspace
 
 Block 122 adds `GuiModelingWorkspace` as a shell-owned transient application boundary over the existing

@@ -116,8 +116,8 @@ recoverable_profile(const PartDocument& part, const Sketch& sketch,
   std::vector<ProfileId> matches;
   for (const auto& region : analysis.value().regions) {
     if (!selected_entity.has_value() ||
-        std::find(region.line_segments.begin(), region.line_segments.end(),
-                  *selected_entity) != region.line_segments.end())
+        std::find(region.source_entities().begin(), region.source_entities().end(),
+                  *selected_entity) != region.source_entities().end())
       matches.push_back(region.id);
   }
   return matches.size() == 1U ? std::optional(matches.front()) : std::nullopt;
@@ -669,7 +669,7 @@ bool ShellWindow::finish_active_sketch() {
   if (valid_finish.has_error())
     return reject_finish(valid_finish.error());
 
-  // Freehand line chains do not carry a profile record while they are being
+  // Freehand curve chains do not carry a profile record while they are being
   // authored. Persist every unambiguous bounded region before leaving the
   // workspace. A single region is handed directly to the feature tools;
   // multiple regions remain available for an explicit user selection.
@@ -705,10 +705,7 @@ bool ShellWindow::finish_active_sketch() {
         Sketch completed = *sketch;
         geometry::SketchRegionFinder finder;
         for (const auto& region : analysis.value().regions) {
-          auto profile = finder.make_closed_profile(region);
-          if (profile.has_error())
-            return reject_finish(profile.error());
-          auto added = completed.add_profile(std::move(profile.value()));
+          auto added = finder.materialize_profile(completed, region);
           if (added.has_error())
             return reject_finish(added.error());
         }

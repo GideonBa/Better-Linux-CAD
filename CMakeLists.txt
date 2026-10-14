@@ -202,6 +202,7 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/semantic_reference_evaluator.cpp
     src/geometry/shape_cache.cpp
     src/geometry/sketch_3d_geometry_adapter.cpp
+    src/geometry/sketch_curved_region_finder.cpp
     src/geometry/sketch_reference_projector.cpp
     src/geometry/sketch_region_finder.cpp
     src/geometry/step_exporter.cpp

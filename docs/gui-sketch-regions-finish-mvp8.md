@@ -1,20 +1,24 @@
 # GUI Sketch Regions, Profiles, Diagnostics, and Finish Sketch MVP-8
 
-Status: Block-119 profile extraction plus open-Sketch completion in the replacement shell.
+Status: Block-119 profile extraction, exact curved-region recognition and open-Sketch completion in
+the replacement shell.
 
-Block 119 turns solved visible planar line geometry into selectable bounded-region products and adds a fail-closed Finish Sketch candidate. Region recognition remains a derived Geometry service; the persistent result of finishing is an ordinary `ClosedProfile` added through `PartDocument::update_sketch(...)`.
+Block 119 turns solved planar lines, circular arcs and polynomial/rational cubic splines into selectable
+bounded regions. Recognition remains a derived Geometry service. Finishing materializes an ordinary
+`ClosedProfile` for line-only contours or an exact `ArcClosedProfile` for curved contours through the
+existing Part transaction authority.
 
 ## Authority boundary
 
 ```text
-solved visible non-reference Sketch lines
+solved explicit Sketch lines/arcs/splines
   -> SketchFinishService::analyze(...)
      connected-component partition
-     -> existing SketchRegionFinder single-loop validation per component
+     -> SketchRegionFinder single-loop validation per component
      -> deterministic region candidates + stable diagnostics
   -> point-based profile selection
   -> SketchFinishService::finish(...)
-     complete copied Sketch + selected ClosedProfile
+     complete copied Sketch + selected exact profile
      -> one copied PartDocument candidate / update_sketch(...)
 ```
 
@@ -22,7 +26,20 @@ Qt may render fills, hover state, selected-region highlights, repair affordances
 
 ## Region recognition
 
-`SketchFinishService::analyze(...)` partitions explicit line entities into endpoint-connected components. Each component is validated by the existing `SketchRegionFinder`, so duplicate edges, gaps, branches, degenerate edges, ambiguous topology, and self-intersection reuse the established deterministic failure policy.
+`SketchFinishService::analyze(...)` partitions explicit line, arc and spline entities into
+endpoint-connected components in lexicographic source-id order. Line-only components retain the
+existing line finder. Curved components use `find_single_curve_region`: endpoint degree must be two,
+then connectivity determines contour order and direction. Two-edge contours are supported, including
+a line plus a semicircle or two circular arcs. Gaps, branches, overlaps, degenerate edges and
+self-intersections fail closed.
+
+Curved intersection validation uses OCCT's planar curve intersector against exact circular and
+weighted Bezier curves, including self-intersection within a single spline. Only intended shared
+endpoints are accepted. Failed intersection convergence is a diagnostic, not an accepted profile.
+Source curve coordinates, ids, directions and rational weights remain unchanged.
+Core profile validation uses the existing refined curve intersector for spline pairs, replacing the
+old straight-endpoint-chord check. Thus a valid bulging spline is not rejected merely because its
+chord crosses another contour edge. Automatic region validation additionally uses exact OCCT curves.
 
 Every valid component produces a `GeneratedClosedProfileCandidate` with a stable id:
 
@@ -30,7 +47,12 @@ Every valid component produces a `GeneratedClosedProfileCandidate` with a stable
 generated.region.<sketch-id>.<zero-based-index>
 ```
 
-Regions are returned in lexicographic id order. Derived polygon vertices and region fills are never persisted.
+Regions are returned in lexicographic id order. `curve_segments` retains exact source ids for curved
+candidates; `line_segments` retains the line-only contract. `source_entities()` serves selection and
+profile recovery for both families. Derived polygon vertices and region fills are never persisted.
+The curved pick polygon uses `1e-3 mm` deflection sampling with supplementary spline samples and a
+bounded point budget. Viewport faces use exact OCCT edges; feature materialization never consumes the
+pick polygon as its persistent contour.
 
 ## Diagnostics
 
@@ -51,12 +73,18 @@ Diagnostics do not mutate the Sketch and can be mapped directly to repair select
 `finish(...)` fails closed when the target Sketch is missing, no bounded region exists, any component has a diagnostic, a multi-region Sketch has no explicit selection, or the requested region is stale. On success it:
 
 1. copies the current Sketch;
-2. materializes only the selected candidate as an ordinary `ClosedProfile`;
+2. materializes only the selected candidate as a line-only or exact curved profile;
 3. copies the `PartDocument`;
 4. applies one `update_sketch(...)` operation to the copied document;
 5. returns the complete candidate document and available region set.
 
 The source document is unchanged on success or failure. GUI transaction/history authority can therefore commit the returned candidate as one Finish Sketch operation with exact undo/redo.
+
+`analyze_unmaterialized` excludes curves already consumed by line, arc or composite profiles and
+allocates collision-free generated ids. Viewport presentation, browser/curve selection, feature
+preview and shell Finish use this same identity boundary. The shell materializes every recognized
+independent closed component together. Selection-first Extrude materializes its raw profile together
+with the feature in one transaction; cancel leaves raw geometry and history unchanged.
 
 ## Focused proof
 
@@ -64,18 +92,28 @@ The source document is unchanged on success or failure. GUI transaction/history 
 ./build/dev-geometry/blcad_geometry_tests "[geometry][sketch-regions]"
 ./build/dev-geometry/blcad_geometry_tests "[gui][sketch-profile-selection]"
 ./build/dev-geometry/blcad_geometry_tests "[integration][sketch-finish]"
+./build/dev-gui/blcad_geometry_tests "[sketch-curved-regions]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[sketch-curved-regions]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[sketch-curved-regions]"
 ```
 
-The proof covers two disjoint selectable regions, stable point selection, open-contour diagnostics, fail-closed Finish Sketch, automatic selection of one region, profile materialization, and source-document immutability.
+The proof covers disjoint selectable regions, reversed source directions, two-edge circular contours,
+exact rational ellipse presentation, source-weight preservation, curve/self intersections and
+overlaps, open/branch diagnostics, profile materialization, analytic extrusion volumes, browser
+selection, cancel isolation, dimension preservation, one-step Undo/Redo and Save/Open.
 
 ## Next boundary
 
-Block 120 owns interactive Sketch3D creation and direct manipulation. Curved multi-region recognition, nested contour/hole classification, and automatic geometric repair beyond deterministic diagnostics remain explicit later extensions.
+Block 120 owns interactive Sketch3D creation and direct manipulation. Automatic nested curved
+contour/hole classification, splitting intersecting components into multiple cells, and geometric
+repair beyond deterministic diagnostics remain extensions. Component recognition is not a planar
+arrangement solver. Parameter-backed Circle/Rectangle profiles remain existing materialized profiles;
+projected/reference curves do not enter automatic raw-region recognition.
 
 ## Open-Sketch completion
 
 `ShellWindow::finish_active_sketch` also completes an open planar Sketch. It cancels unfinished tool
-previews, validates document diagnostics and materializes any independent closed line regions, then
+previews, validates document diagnostics and materializes independent closed line/arc/spline regions, then
 restores the model workspace and camera. Open components remain ordinary editable curves; they do
 not gain a fabricated profile. Completing a purely open Sketch changes no document intent or history.
 The status bar explains that its open contours remain available for later editing, including browser

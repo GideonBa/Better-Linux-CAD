@@ -130,10 +130,10 @@
       "family": "regions-profiles-finish",
       "owner": 119,
       "contract": "docs/gui-sketch-regions-finish-mvp8.md",
-      "implementation": "SketchFinishService",
-      "interaction": "line-region diagnostics, point selection and fail-closed Finish Sketch",
-      "proof": "[geometry][sketch-regions],[gui][sketch-profile-selection],[integration][sketch-finish]",
-      "disposition": "headless_geometry_gui_presentation_deferred"
+      "implementation": "SketchRegionFinder, SketchFinishService and shell profile materialization",
+      "interaction": "exact line/arc/spline region selection, diagnostics, open completion and atomic profile/feature materialization",
+      "proof": "[geometry][sketch-regions],[gui][sketch-profile-selection],[integration][sketch-finish],[sketch-curved-regions]",
+      "disposition": "interactive_with_documented_narrowing"
     },
     {
       "family": "interactive-sketch3d",

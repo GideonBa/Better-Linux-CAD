@@ -226,6 +226,9 @@ Block 119 region recognition, profile selection, diagnostics, and Finish Sketch:
 ```bash
 ./build/dev-geometry/blcad_geometry_tests "[geometry][sketch-regions]"
 ./build/dev-geometry/blcad_geometry_tests "[integration][sketch-finish]"
+./build/dev-gui/blcad_geometry_tests "[sketch-curved-regions]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[sketch-curved-regions]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[sketch-curved-regions]"
 ```
 
 Block 120 Interactive Sketch3D (headless Core proof):

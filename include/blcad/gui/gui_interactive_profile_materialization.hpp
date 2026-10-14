@@ -58,10 +58,7 @@ prepare_interactive_profile(const PartDocument& part, const SketchId& sketch_id,
   Sketch completed = *source;
   geometry::SketchRegionFinder finder;
   for (const auto& region : analysis.value().regions) {
-    auto profile = finder.make_closed_profile(region);
-    if (profile.has_error())
-      return Result<std::optional<GuiPendingProfileMaterialization>>::failure(profile.error());
-    auto added = completed.add_profile(std::move(profile.value()));
+    auto added = finder.materialize_profile(completed, region);
     if (added.has_error())
       return Result<std::optional<GuiPendingProfileMaterialization>>::failure(added.error());
   }

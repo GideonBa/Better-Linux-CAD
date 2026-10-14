@@ -371,8 +371,9 @@ boundary instead of silent inclusion:
 - **mixed line/arc chain and spline offset**, bevel/round offset joins, variable-distance offset,
   and automatic rewriting of dependent references on break-link — unordered line chains/loops and
   individual circular arcs now have interactive offsets, including automatic chain discovery;
-- **region recognition over arcs and splines** — Block 119 partitions explicit line entities only;
-  curved-boundary regions need their own boundary;
+- automatic **nested curved contours/holes** and subdivision of crossing contours into cells —
+  Block 119 now recognizes endpoint-connected line/arc/spline loops, including exact rational
+  ellipses and two-edge circular contours, per `docs/gui-sketch-regions-finish-mvp8.md`;
 - Block-120 **arc/spline/helix parameter handles** and interactive creation of curved 3D geometry —
   the interaction service covers point/line placement, point-handle moves, and planar-point
   projection; curved Sketch3D records remain script/document-authored.

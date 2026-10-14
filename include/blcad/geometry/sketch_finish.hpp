@@ -39,23 +39,33 @@ public:
       return std::abs(a.x - b.x) <= tolerance && std::abs(a.y - b.y) <= tolerance;
     };
 
-    const auto& lines = sketch.line_segments();
-    std::vector<bool> visited(lines.size(), false);
+    std::vector<ResolvedSketchRegionLine> curves;
+    const auto collect = [&curves](const auto& entities) {
+      for (const auto& entity : entities)
+        curves.push_back({entity.id(), entity.start(), entity.end()});
+    };
+    collect(sketch.line_segments());
+    collect(sketch.arc_segments());
+    collect(sketch.spline_segments());
+    std::sort(curves.begin(), curves.end(), [](const auto& a, const auto& b) {
+      return a.id.value() < b.id.value();
+    });
+    std::vector<bool> visited(curves.size(), false);
     SketchRegionAnalysis analysis;
     SketchRegionFinder finder;
     std::size_t region_index = 0;
 
-    for (std::size_t seed = 0; seed < lines.size(); ++seed) {
+    for (std::size_t seed = 0; seed < curves.size(); ++seed) {
       if (visited[seed]) continue;
       std::vector<std::size_t> component{seed};
       visited[seed] = true;
       for (std::size_t cursor = 0; cursor < component.size(); ++cursor) {
-        const auto& current = lines[component[cursor]];
-        for (std::size_t index = 0; index < lines.size(); ++index) {
+        const auto& current = curves[component[cursor]];
+        for (std::size_t index = 0; index < curves.size(); ++index) {
           if (visited[index]) continue;
-          const auto& candidate = lines[index];
-          if (same(current.start(), candidate.start()) || same(current.start(), candidate.end()) ||
-              same(current.end(), candidate.start()) || same(current.end(), candidate.end())) {
+          const auto& candidate = curves[index];
+          if (same(current.start, candidate.start) || same(current.start, candidate.end) ||
+              same(current.end, candidate.start) || same(current.end, candidate.end)) {
             visited[index] = true;
             component.push_back(index);
           }
@@ -66,12 +76,19 @@ public:
       if (subset.has_error()) return Result<SketchRegionAnalysis>::failure(subset.error());
       std::vector<SketchEntityId> ids;
       for (const auto index : component) {
-        ids.push_back(lines[index].id());
-        auto added = subset.value().add_entity(lines[index]);
+        const auto& id = curves[index].id;
+        ids.push_back(id);
+        auto added = [&] {
+          if (const auto* line = sketch.find_line_segment(id))
+            return subset.value().add_entity(*line);
+          if (const auto* arc = sketch.find_arc_segment(id))
+            return subset.value().add_entity(*arc);
+          return subset.value().add_entity(*sketch.find_spline_segment(id));
+        }();
         if (added.has_error()) return Result<SketchRegionAnalysis>::failure(added.error());
       }
 
-      auto region = finder.find_single_region(document, subset.value());
+      auto region = finder.find_single_curve_region(document, subset.value());
       if (region) {
         region.value().id = ProfileId("generated.region." + sketch.id().value() + "." +
                                       std::to_string(region_index++));
@@ -82,11 +99,11 @@ public:
       SketchRegionDiagnosticKind kind = SketchRegionDiagnosticKind::AmbiguousTopology;
       bool branched = false;
       for (const auto index : component) {
-        for (const Point2 endpoint : {lines[index].start(), lines[index].end()}) {
+        for (const Point2 endpoint : {curves[index].start, curves[index].end}) {
           std::size_t degree = 0U;
           for (const auto other : component) {
-            degree += same(endpoint, lines[other].start()) ? 1U : 0U;
-            degree += same(endpoint, lines[other].end()) ? 1U : 0U;
+            degree += same(endpoint, curves[other].start) ? 1U : 0U;
+            degree += same(endpoint, curves[other].end) ? 1U : 0U;
           }
           branched = branched || degree > 2U;
         }
@@ -97,6 +114,7 @@ public:
         kind = SketchRegionDiagnosticKind::SelfIntersection;
       else if (region.error().message().find("gap") != std::string::npos ||
                region.error().message().find("at least three") != std::string::npos ||
+               region.error().message().find("at least two") != std::string::npos ||
                region.error().message().find("single-contour loop") != std::string::npos ||
                region.error().message().find("does not close") != std::string::npos)
         kind = SketchRegionDiagnosticKind::OpenContour;
@@ -108,7 +126,7 @@ public:
     return Result<SketchRegionAnalysis>::success(std::move(analysis));
   }
 
-  // Detect bounded line regions that are not already owned by a persistent
+  // Detect bounded curve regions that are not already owned by a persistent
   // profile. This is the common identity boundary for transient viewport
   // selection and later profile materialization: mixed legacy/current
   // sketches produce the same collision-free generated ids in both paths.
@@ -138,16 +156,22 @@ public:
     auto raw = Sketch::create(sketch.id(), sketch.name(), sketch.workplane());
     if (raw.has_error())
       return Result<SketchRegionAnalysis>::failure(raw.error());
-    for (const auto& line : sketch.line_segments()) {
-      if (std::binary_search(materialized_curves.begin(), materialized_curves.end(), line.id(),
+    const auto copy_unowned = [&](const auto& entities) -> Result<std::size_t> {
+      for (const auto& curve : entities) {
+        if (std::binary_search(materialized_curves.begin(), materialized_curves.end(), curve.id(),
                              [](const auto& left, const auto& right) {
                                return left.value() < right.value();
                              }))
-        continue;
-      auto added = raw.value().add_entity(line);
-      if (added.has_error())
-        return Result<SketchRegionAnalysis>::failure(added.error());
-    }
+          continue;
+        auto added = raw.value().add_entity(curve);
+        if (added.has_error()) return added;
+      }
+      return Result<std::size_t>::success(entities.size());
+    };
+    for (const auto& copied : {copy_unowned(sketch.line_segments()),
+                              copy_unowned(sketch.arc_segments()),
+                              copy_unowned(sketch.spline_segments())})
+      if (!copied) return Result<SketchRegionAnalysis>::failure(copied.error());
 
     auto analysis = analyze(document, raw.value());
     if (analysis.has_error())
@@ -225,9 +249,7 @@ public:
 
     Sketch completed = *sketch;
     SketchRegionFinder finder;
-    auto profile = finder.make_closed_profile(*found);
-    if (profile.has_error()) return Result<SketchFinishResult>::failure(profile.error());
-    auto added = completed.add_profile(std::move(profile.value()));
+    auto added = finder.materialize_profile(completed, *found);
     if (added.has_error()) return Result<SketchFinishResult>::failure(added.error());
 
     PartDocument document = source;
