@@ -13,12 +13,23 @@ segments. It also accepts connected paths that mix those segments with bounded C
 and planar line/arc segments. Authored order and reversal remain authoritative.
 
 Line, polyline, and three-point arc segments remain exact. Spline and helix sources are converted
-to deterministic piecewise-linear spines before the pipe-shell operation: 32 samples for a spline
-and 48 per helix turn. A helix resolves its axis, Length radius and pitch, Count turns, and
+to deterministic piecewise-linear spines before the pipe-shell operation: 32 spans for a spline
+and 48 per helix turn. The Block-136 shell follow-up also accepts existing planar rational spline
+segments through that 32-span resolver, preserving their weights; preview and execution share the
+same resolved path. A helix resolves its axis, Length radius and pitch, Count turns, and
 handedness on every recompute. Invalid entities, parameters, axes, disconnected paths,
 self-intersection, and invalid OCCT output fail closed.
 
 Semantic generated-edge path execution is still deferred.
+
+## Path preview follow-up (Block 136)
+
+`GeometryRecomputeExecutor::resolve_path_segments` exposes the existing bounded path resolution
+without mutating a document or cache. `preview_path_curve` builds a complete checked wire through
+`SweepAdapter::path_shape`, so connectivity, closure and self-intersection use the same Geometry
+checks. The viewport publishes a canonical `path/<id>` presentation, including bounded construction
+paths that previously had no selectable path shape. Unbounded paths fail preview instead of receiving
+an invented extent; unsupported historical sources retain available legacy source presentations.
 
 ## Orientation, twist, and guide
 

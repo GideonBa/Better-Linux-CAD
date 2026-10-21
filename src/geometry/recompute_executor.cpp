@@ -1499,10 +1499,6 @@ resolve_basic_sweep_path(const PartDocument& document, const PathCurve& path,
                    resolver.evaluate_point(workplane.value(), arc->mid()),
                    resolver.evaluate_point(workplane.value(), arc->end())};
       } else if (*reference.planar_curve_kind() == PlanarPathCurveKind::Spline) {
-        if (!allow_surface_boundary_sources)
-          return Result<std::vector<SweepPathSegment>>::failure(
-              geometry_error(reference.entity()->value(),
-                             "Block 81 supports only direct planar line and arc path segments"));
         const SplineSegment* spline = sketch->find_spline_segment(*reference.entity());
         if (spline == nullptr)
           return Result<std::vector<SweepPathSegment>>::failure(
@@ -2083,6 +2079,27 @@ extrude_composite_profile(const Sketch& sketch, const Feature& feature) noexcept
 }
 
 } // namespace
+
+Result<std::vector<SweepPathSegment>>
+GeometryRecomputeExecutor::resolve_path_segments(const PartDocument& document, PathCurveId id,
+                                                 const ShapeCache& cache) const {
+  const auto* path = document.find_path_curve(id);
+  if (!path)
+    return Result<std::vector<SweepPathSegment>>::failure(
+        geometry_error(id.value(), "PathCurve must exist"));
+  return resolve_basic_sweep_path(document, *path, cache, workplane_resolver_, "path preview",
+                                  path->closure(), true);
+}
+
+Result<GeometryShape> GeometryRecomputeExecutor::preview_path_curve(const PartDocument& document,
+                                                                    PathCurveId id,
+                                                                    const ShapeCache& cache) const {
+  auto segments = resolve_path_segments(document, id, cache);
+  if (!segments)
+    return Result<GeometryShape>::failure(segments.error());
+  return sweep_adapter_.path_shape(id, segments.value(),
+                                   document.find_path_curve(id)->closure() == PathClosure::Closed);
+}
 
 Result<std::size_t> GeometryRecomputeExecutor::execute_path_extrude(const PartDocument& document,
                                                                     const Feature& feature,

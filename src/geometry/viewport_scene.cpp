@@ -5,6 +5,7 @@
 #include "geometry_shape_internal.hpp"
 
 #include "blcad/geometry/profile_region_classifier.hpp"
+#include "blcad/geometry/recompute_executor.hpp"
 #include "blcad/geometry/sketch_3d_geometry_adapter.hpp"
 #include "blcad/geometry/sketch_finish.hpp"
 #include "blcad/geometry/sketch_reference_projector.hpp"
@@ -542,6 +543,14 @@ ViewportSceneBuilder::build_part(const PartDocument& document,
     }
 
     for (const PathCurve& path : document.path_curves()) {
+      auto preview =
+          GeometryRecomputeExecutor{}.preview_path_curve(document, path.id(), shape_cache);
+      if (preview) {
+        items.push_back(
+            {ViewportSceneKind::Path, "path/" + path.id().value(), std::move(preview.value())});
+        continue;
+      }
+      // Retain source presentations for persisted paths unsupported by the current resolver.
       for (std::size_t index = 0; index < path.segments().size(); ++index) {
         const PathSegmentReference& segment = path.segments()[index];
         if (!segment.entity().has_value())

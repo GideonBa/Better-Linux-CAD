@@ -21,6 +21,8 @@ struct SweepPathSegment {
 
 class SweepAdapter {
 public:
+  [[nodiscard]] Result<GeometryShape>
+  path_shape(PathCurveId path, const std::vector<SweepPathSegment>& segments, bool closed) const;
   [[nodiscard]] Result<GeometryShape> sweep_closed_profile(
       FeatureId feature_id, const std::vector<ClosedProfileCurveSegment>& profile,
       const std::vector<SweepPathSegment>& path, PathOrientationRule orientation_rule,
