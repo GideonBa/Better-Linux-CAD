@@ -72,6 +72,10 @@ public:
   [[nodiscard]] Result<std::size_t>
   set_feature_preview(geometry::GeometryShape shape,
                       std::optional<std::string> replaced_body = std::nullopt);
+  [[nodiscard]] Result<std::size_t>
+  set_feature_previews(std::vector<geometry::GeometryShape> shapes,
+                       std::vector<std::string> replaced_bodies = {});
+  [[nodiscard]] std::size_t feature_preview_count() const noexcept;
   void clear_feature_preview();
   [[nodiscard]] bool feature_preview_replaces(std::string_view semantic_id) const noexcept;
   void clear_scene();

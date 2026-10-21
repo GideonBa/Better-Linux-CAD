@@ -455,3 +455,18 @@ placement. Spacing, angle and integer count have numeric editors and separate vi
 
 Previews use the actual computed result. Apply creates a new result Body and any driving parameters
 in the same undo step; source Bodies remain unchanged. Cancel/Escape discards all pending inputs.
+
+## Body Boolean and Transform
+
+The 3D-Modell **Körper** group provides **Kombinieren**, **Verschieben**, **Drehen** and **Skalieren**.
+For Boolean, choose the target separately and toggle one or more tool Bodies in the model or source
+list. **Zielkörper im Modell wählen** changes the role of the next Body pick. Choose Vereinen,
+Abziehen or Schnittmenge, modify the target or create a new result Body, and choose whether to keep
+the tools. An empty/invalid result disables Apply.
+
+For transforms, select multiple Bodies, then drag the handles or enter X/Y/Z distances, a rotation
+angle about a chosen axis, or a unitless scale factor about an explicit center. Both ownership
+checkboxes start off and only affect geometry with existing associations. The source list remains
+available while original Bodies are hidden by the live preview. Escape during a drag restores its
+start value; Cancel discards the task. Apply records the entire multi-Body operation in one Undo
+step and preserves the ordered transform stack.

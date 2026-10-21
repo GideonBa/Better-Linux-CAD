@@ -4,7 +4,8 @@ Status: implemented in Block 126.
 
 The replacement `ShellWindow` owns Pattern and Mirror through `ShellFeatureTools`, the shared task
 panel and the existing `GuiInteractiveFeatureCoordinator`. The Block-136 pattern slice restores
-these commands; Body Boolean and Body Transform remain later shell work.
+these commands. The following Body-operation slice restores Boolean and Transform through the
+same task, preview and transaction authorities.
 
 Block 126 upgrades the MVP-7 form-driven pattern/mirror/body commands
 (`docs/gui-part-operations-workbench-mvp7.md`) into direct-manipulation authoring over the frozen
@@ -100,13 +101,60 @@ through an active ghost preview, and couples spacing/angle/count dragging with n
 
 - **Body Boolean** — an `Add`/`Subtract`/`Intersect` operation with a target Body and an ordered set
   of tool Bodies (the target can never also be a tool, and duplicates are rejected), a
-  `ModifyTarget`/`NewBody` result mode (NewBody requires an existing produced Body), and a keep/consume
+  `ModifyTarget`/`NewBody` result mode (NewBody accepts an existing or candidate-only produced Body), and a keep/consume
   tools toggle. Boolean exposes no scalar handle.
-- **Body Transform** — one `Translate`, `Rotate`, or `UniformScale` record appended to the persistent
+- **Body Transform** — `Translate`, `Rotate`, or `UniformScale` records appended to the persistent
   ordered transform stack. Translate shows the `transform.translate` triad and folds each axis into
   the translation vector; Rotate drags `transform.angle` about a typed rotation axis; UniformScale
-  drags the non-negative `transform.scale` factor. Each Apply appends exactly one record and never
-  collapses the stack; owned-Sketch/construction movement is an explicit per-record flag.
+  drags the positive, dimensionless `transform.scale` factor. Each Apply appends one record per
+  selected Body in one transaction and never collapses the stack; owned-Sketch/construction movement
+  is an explicit per-record flag. A single-Body command retains the original one-record behavior.
+
+## Replacement-shell Body operations (Block 136)
+
+The 3D-Modell **Körper** group exposes **Kombinieren**, **Verschieben**, **Drehen** and **Skalieren**.
+Commands offer visible Bodies with current cached shapes; Boolean requires at least two solids.
+Transforms accept solid and surface Bodies. The existing World-coordinate transform contract is
+used, with independent X/Y/Z translation, datum/construction rotation axes, and an explicit scale
+center. Other coordinate spaces and semantic rotation edges remain headless capabilities.
+
+Boolean separates the target chooser from a multi-select tool list. **Zielkörper im Modell wählen**
+temporarily routes Body picks to the target; normal picks toggle tools. The target is unavailable as
+a tool. Operation, result mode and tool retention rebuild the same disposable candidate. NewBody
+provisions the result only in that candidate and in the final Apply transaction. A failed or empty
+intersection clears the preview and blocks Apply without adding Bodies or history.
+
+Transforms collect multiple Body picks in the model/list and share one set of transform inputs.
+Translation uses three independent handles and fields; the handles start from the current X/Y/Z
+values, including repeated drags. Rotation has a reference chooser and model axis-pick mode. Uniform
+scale has a unitless factor and center X/Y/Z fields in millimeters. Its linear grip changes the factor
+by one for 25 model millimeters of travel. Numeric refinement remains authoritative through release;
+wrong units, invalid factors and failed Geometry candidates restore the prior valid value and preview.
+Escape during a drag restores its start value; task cancellation discards all pending intent.
+
+Owned Sketch and associated construction movement are separate, explicit checkboxes. They derive
+transformed frames through the existing ownership/cache authority, without changing local Sketch
+coordinates or inferring new ownership. Both default to off for every command.
+
+All affected result shapes are recomputed together in a disposable cache. The viewport can show
+multiple nonselectable preview presentations and hide multiple replaced/consumed Bodies. Boolean
+NewBody retains the target; retained tools stay visible. Transform previews replace all selected
+Bodies. The source list remains available to remove picks whose original presentation is hidden.
+Cancel or failure restores the original scene. Apply appends the per-Body transform records in
+selection-list order in a single transaction. One Undo reverses the entire batch; Undo/Redo and
+Save/Open preserve the ordered stack and existing schema.
+
+Focused shell proof:
+
+```bash
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[block136-body]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-body]"
+```
+
+The native-only cases use actual model target/tool picks for a cut, multi-Body mouse selection,
+drag/numeric refinement for translation, rotation and unitless scale, and Escape rollback. They skip
+explicitly offscreen. Optional
+`BLCAD_UI_CAPTURE_DIR` records preview windows.
 
 ## Manipulator coupling
 
@@ -148,7 +196,7 @@ Bounded here and not introduced implicitly by this block:
 - mapping the Block-122 `part.linear_pattern` / `part.circular_pattern` / `part.mirror` /
   `part.body_boolean` / `part.body_transform` command ids to resolved inputs and a manipulator frame is
   a shell command-handler policy consuming the coordinator's pattern/mirror and body-operation
-  controllers. Pattern/Mirror is wired through `ShellFeatureTools`; Boolean/Transform remains open.
+  controllers. Pattern/Mirror and Boolean/Transform are wired through `ShellFeatureTools`.
 
 ## Next boundary
 

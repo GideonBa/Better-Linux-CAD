@@ -59,6 +59,9 @@ public:
   [[nodiscard]] GuiInteractiveBodyOperationController& body_operation() noexcept {
     return body_operation_;
   }
+  [[nodiscard]] const GuiInteractiveBodyOperationController& body_operation() const noexcept {
+    return body_operation_;
+  }
   [[nodiscard]] GuiInteractivePathSweepController& path_sweep() noexcept {
     return path_sweep_;
   }

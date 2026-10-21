@@ -581,14 +581,25 @@ handles. Candidate-only parameters and the result Body commit atomically with th
 Undo/Redo and Save/Open preserve the existing authorities. Contract and proof:
 `docs/gui-interactive-pattern-body-mvp9.md`, tag `[block136-patterns]`.
 
-Body Boolean, Body Transform, Sweep, Loft, Surface, Measure, Assembly, browser feature editing and
-whole-block acceptance remain open.
+The remaining Block-136 work is tracked by the follow-up slices and current next step below.
+
+### Block 136 — Body Boolean and Transform slice
+
+The replacement shell restores Body Add/Subtract/Intersect with explicit target/tool roles, both
+result modes, tool retention, and candidate-only NewBody provisioning. Translate/Rotate/UniformScale
+share multiple Body sources, World-coordinate numeric controls and live drag handles, including a
+dimensionless scale factor and explicit center. Actual multi-Body previews hide replaced/consumed
+sources and remain disposable. Apply appends one transform record per selected Body in one atomic
+transaction; Cancel, Undo/Redo, Save/Open and explicit ownership flags preserve existing authorities.
+Contract and proof: `docs/gui-interactive-pattern-body-mvp9.md`, tag `[block136-body]`.
+
+Sweep, Loft, Surface, Measure, Assembly, browser feature editing and whole-block acceptance remain open.
 
 ## Current next technical step — Block 136
 
-Restore the remaining feature commands (Body Boolean, Body Transform, Sweep, Loft, Surface, Measure,
-and Assembly), browser-double-click feature editing, and
-replacement-shell acceptance/coverage as defined in `docs/gui-shell-reset-sequence-mvp9r.md`.
+Restore the remaining feature commands (Sweep, Loft, Surface, Measure, and Assembly),
+browser-double-click feature editing, and replacement-shell acceptance/coverage as defined in
+`docs/gui-shell-reset-sequence-mvp9r.md`.
 
 ## Later phases
 
