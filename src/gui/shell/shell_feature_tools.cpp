@@ -310,6 +310,25 @@ ShellFeatureTools::ShellFeatureTools(ShellWindow& window, GuiDocumentSession& se
     spatial_actions_.emplace_back(command, action);
   }
 
+  auto* surface_group = ribbon.add_group(model_tab, QStringLiteral("Flächen"));
+  for (const auto& [command, label, id] :
+       {std::tuple{Command::BoundarySurface, "Begrenzungsfläche", "surface_boundary"},
+        std::tuple{Command::FillSurface, "Füllfläche", "surface_fill"},
+        std::tuple{Command::TrimSurface, "Fläche trimmen", "surface_trim"},
+        std::tuple{Command::ExtendSurface, "Fläche erweitern", "surface_extend"},
+        std::tuple{Command::SurfaceStitch, "Flächen vernähen", "surface_stitch"},
+        std::tuple{Command::ClosedShellToSolid, "Hülle zu Volumen", "surface_to_solid"}}) {
+    auto* action = new QAction(QString::fromUtf8(label), this);
+    action->setObjectName(QStringLiteral("blcad.action.") + QString::fromUtf8(id));
+    connect(action, &QAction::triggered, this, [this, command] {
+      auto begun = begin_surface(command);
+      if (!begun)
+        report(begun.error());
+    });
+    ribbon.add_small_button(surface_group, action);
+    surface_actions_.emplace_back(command, action);
+  }
+
   overlay_ = new ShellManipulatorOverlay(&viewport_, layer_);
   overlay_->setGeometry(viewport_.rect());
   viewport_.installEventFilter(this);
@@ -335,6 +354,7 @@ ShellFeatureTools::ShellFeatureTools(ShellWindow& window, GuiDocumentSession& se
   build_pattern_controls(panel);
   build_body_controls(panel);
   build_spatial_controls(panel);
+  build_surface_controls(panel);
   auto* buttons = new QHBoxLayout();
   apply_button_ = new QPushButton(QStringLiteral("Anwenden"), dock_contents);
   apply_button_->setObjectName(QStringLiteral("blcad.feature.apply"));
@@ -390,8 +410,8 @@ ShellFeatureTools::ShellFeatureTools(ShellWindow& window, GuiDocumentSession& se
 ShellFeatureTools::~ShellFeatureTools() = default;
 
 bool ShellFeatureTools::active() const noexcept {
-  return command_ != Command::None &&
-         (finishing() || pattern() || body_operation() || spatial() || coordinator_.active());
+  return command_ != Command::None && (finishing() || pattern() || body_operation() || spatial() ||
+                                       surface() || coordinator_.active());
 }
 
 bool ShellFeatureTools::select_profile(SketchId sketch, ProfileId profile) {
@@ -722,6 +742,13 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::set_numeric_value(double value)
           Error::validation("gui.shell.feature", "Drehwinkel muss zwischen 0 und 360 Grad liegen"));
     candidate.handle_id = std::string(kRevolveAngleHandleId);
     candidate.value_kind = GuiViewportManipulatorValueKind::Angle;
+  } else if (surface()) {
+    if (!surface_scalar() || !coordinator_.surface().active())
+      return Result<GuiPartFeaturePreview>::failure(
+          Error::validation("surface", "Zuerst gültige Flächeneingaben auswählen"));
+    candidate.handle_id = std::string(
+        command_ == Command::ExtendSurface ? kSurfaceExtendHandleId : kSurfaceToleranceValueId);
+    candidate.value_kind = GuiViewportManipulatorValueKind::Distance;
   } else if (spatial()) {
     if (!spatial_scalar())
       return Result<GuiPartFeaturePreview>::failure(Error::validation(
@@ -845,7 +872,8 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::preview_and_publish() {
   if (body_operation())
     shapes = coordinator_.body_operation().preview_shapes(session_);
   else {
-    auto shape = command_ == Command::PathCurve || command_ == Command::Sweep
+    auto shape = surface() ? coordinator_.surface().preview_shape(session_)
+                 : command_ == Command::PathCurve || command_ == Command::Sweep
                      ? coordinator_.path_sweep().preview_shape(session_)
                  : command_ == Command::Loft    ? coordinator_.loft().preview_shape(session_)
                  : command_ == Command::Extrude ? coordinator_.extrude().preview_shape(session_)
@@ -881,7 +909,9 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::preview_and_publish() {
     synchronize_overlay();
     return Result<GuiPartFeaturePreview>::failure(published.error());
   }
-  task_summary_->setText(spatial()          ? spatial_summary()
+  task_summary_->setText(surface()
+                             ? task_dock_->windowTitle() + QStringLiteral(": Vorschau gültig.")
+                         : spatial()        ? spatial_summary()
                          : body_operation() ? body_summary()
                          : finishing()      ? finishing_summary()
                          : pattern()        ? pattern_summary()
@@ -890,7 +920,8 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::preview_and_publish() {
   refresh_enablement();
   window_.statusBar()->showMessage(
       QStringLiteral("Vorschau: %1")
-          .arg(spatial()          ? spatial_summary()
+          .arg(surface()   ? task_dock_->windowTitle() + QStringLiteral(": Vorschau gültig.")
+               : spatial() ? spatial_summary()
                : body_operation() ? body_summary()
                : finishing()      ? finishing_summary()
                : pattern()        ? pattern_summary()
@@ -928,8 +959,8 @@ Result<std::size_t> ShellFeatureTools::apply() {
   if (!task_applied && session_.task().active())
     (void)session_.task().cancel();
   const bool was_finishing = finishing();
-  const bool restore_selection = pattern() || body_operation() || spatial();
-  const bool restore_scope = spatial();
+  const bool restore_selection = pattern() || body_operation() || spatial() || surface();
+  const bool restore_scope = spatial() || surface();
   command_ = Command::None;
   if (restore_scope)
     viewport_.set_selection_semantic_scope(previous_semantic_scope_);
@@ -943,6 +974,7 @@ Result<std::size_t> ShellFeatureTools::apply() {
     viewport_.set_selection_filter_mask(previous_selection_mask_);
     window_.refresh_feature_selection_scene();
   }
+  surface_targets_.clear();
   preview_valid_ = false;
   drag_start_value_.reset();
   selected_profile_.reset();
@@ -966,8 +998,8 @@ void ShellFeatureTools::cancel() noexcept {
   if (command_ != Command::None && session_.task().active())
     (void)session_.task().cancel();
   const bool was_finishing = finishing();
-  const bool restore_selection = pattern() || body_operation() || spatial();
-  const bool restore_scope = spatial();
+  const bool restore_selection = pattern() || body_operation() || spatial() || surface();
+  const bool restore_scope = spatial() || surface();
   command_ = Command::None;
   if (restore_scope)
     viewport_.set_selection_semantic_scope(previous_semantic_scope_);
@@ -981,6 +1013,7 @@ void ShellFeatureTools::cancel() noexcept {
     viewport_.set_selection_filter_mask(previous_selection_mask_);
     window_.refresh_feature_selection_scene();
   }
+  surface_targets_.clear();
   preview_valid_ = false;
   hide_task_panel();
   synchronize_overlay();
@@ -1044,6 +1077,7 @@ void ShellFeatureTools::refresh_enablement() {
   }
   refresh_body_enablement(idle_part);
   refresh_spatial_enablement(idle_part);
+  refresh_surface_enablement(idle_part);
   action_escape_->setEnabled(active());
   const std::string_view expected_command = command_id();
   const bool task_ready = session_.task().stage() == GuiTaskStage::Preview &&
@@ -1066,6 +1100,11 @@ double ShellFeatureTools::current_value() const noexcept {
     return coordinator_.shell_draft().angle();
   if (command_ == Command::Sweep)
     return coordinator_.path_sweep().active() ? coordinator_.path_sweep().twist() : spatial_twist_;
+  if (surface_scalar())
+    return coordinator_.surface().active()
+               ? (command_ == Command::ExtendSurface ? coordinator_.surface().distance()
+                                                     : coordinator_.surface().tolerance())
+               : surface_value_;
   if (body_transform()) {
     if (!coordinator_.body_operation().active())
       return command_ == Command::BodyTranslate ? body_translation_.x : body_value_;
@@ -1118,6 +1157,8 @@ void ShellFeatureTools::synchronize_numeric_editor(double value) {
     synchronize_body_editors();
   if (command_ == Command::Sweep && coordinator_.path_sweep().active())
     spatial_twist_ = coordinator_.path_sweep().twist();
+  if (surface_scalar() && coordinator_.surface().active())
+    surface_value_ = current_value();
   synchronizing_numeric_ = false;
 }
 
@@ -1181,12 +1222,15 @@ void ShellFeatureTools::show_task_panel(QString title, QString unit, double valu
   pattern_controls_->setVisible(pattern());
   body_controls_->setVisible(body_operation());
   spatial_controls_->setVisible(spatial());
+  surface_controls_->setVisible(surface());
   value_label_->setVisible(command_ != Command::BodyMirror && command_ != Command::BodyBoolean &&
-                           (!spatial() || spatial_scalar()));
+                           (!spatial() || spatial_scalar()) && (!surface() || surface_scalar()));
   numeric_editor_->setVisible(command_ != Command::BodyMirror && command_ != Command::BodyBoolean &&
-                              (!spatial() || spatial_scalar()));
+                              (!spatial() || spatial_scalar()) && (!surface() || surface_scalar()));
   task_dock_->setWindowTitle(std::move(title));
-  const QString label = command_ == Command::Sweep           ? QStringLiteral("Verdrehung")
+  const QString label = command_ == Command::SurfaceStitch   ? QStringLiteral("Toleranz")
+                        : command_ == Command::ExtendSurface ? QStringLiteral("Abstand")
+                        : command_ == Command::Sweep         ? QStringLiteral("Verdrehung")
                         : command_ == Command::BodyTranslate ? QStringLiteral("X")
                         : command_ == Command::BodyScale     ? QStringLiteral("Faktor")
                         : command_ == Command::Fillet        ? QStringLiteral("Radius")

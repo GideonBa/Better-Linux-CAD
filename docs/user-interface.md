@@ -486,3 +486,20 @@ visible solid target; unsupported or invalid results disable Apply.
 
 The scrollable task panel shares actual live previews and Apply/Cancel with the other features.
 New Bodies and twist parameters appear only on Apply and are removed together by one Undo.
+
+## Surface tools
+
+In **3D-Modell → Flächen**, **Begrenzungsfläche** connects two curves or closes three/four ordered
+boundary curves; **Füllfläche** closes an ordered contour. Add inputs to the task list, drag them to
+reorder, or use Hoch/Runter and Entfernen. Open Sketch chains first become paths using **Pfad erstellen**.
+
+For **Fläche trimmen** and **Fläche erweitern**, use **Modellklick wählt** to select the target and
+then the contour/boundary. The same inputs are available in the task choosers. Trim keeps the region
+inside a closed path or Sketch profile. Extend requires a matching linear outer edge: drag its arrow
+for live preview and refine the distance in millimeters. Escape restores the drag's initial value;
+a further Escape cancels the command.
+
+**Flächen vernähen** collects adjacent surfaces with an explicit gap tolerance. A successfully
+stitched closed shell can become a solid through **Hülle zu Volumen**. Incompatible/open inputs show
+an error before Apply. A valid preview enables **Anwenden**, which creates the new result Body and
+its feature in one undoable step; **Abbrechen** discards the candidate. Source Bodies remain available.

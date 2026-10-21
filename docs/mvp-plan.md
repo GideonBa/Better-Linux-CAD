@@ -607,11 +607,19 @@ profiles remain usable, and planar rational spline trajectories reuse determinis
 Cancel, Undo/Redo and Save/Open preserve the existing authorities. Contract and proof:
 `docs/gui-interactive-path-sweep-loft-mvp9.md`, tag `[block136-spatial]`.
 
-Surface, Measure, Assembly, browser feature editing and whole-block acceptance remain open.
+The replacement shell restores Boundary/Fill, Trim/Extend, Stitch (Knit/Sew) and closed-shell-to-solid
+through the shared task panel and real Geometry previews. Ordered input lists, separate target/contour
+pick roles, an outward extension drag with numeric refinement and a typed stitch tolerance consume
+the existing Surface contracts. New result Bodies and parameters remain candidate-only until one
+Apply; Cancel, Undo/Redo and Save/Open preserve the existing authorities. Planar Fill stays an exact
+plane for reliable downstream Trim. Contract/proof: `docs/gui-interactive-surface-mvp9.md`,
+`[block136-surface]`.
+
+Measure, Assembly, browser feature editing and whole-block acceptance remain open.
 
 ## Current next technical step — Block 136
 
-Restore the remaining feature commands (Surface, Measure, and Assembly),
+Restore the remaining feature commands (Measure and Assembly),
 browser-double-click feature editing, and replacement-shell acceptance/coverage as defined in
 `docs/gui-shell-reset-sequence-mvp9r.md`.
 

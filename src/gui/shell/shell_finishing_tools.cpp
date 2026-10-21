@@ -107,6 +107,16 @@ std::string_view ShellFeatureTools::command_id() const noexcept {
     return "part.sweep";
   case Command::Loft:
     return "part.loft";
+  case Command::BoundarySurface:
+  case Command::FillSurface:
+    return "surface.boundary_fill";
+  case Command::TrimSurface:
+  case Command::ExtendSurface:
+    return "surface.trim_extend";
+  case Command::SurfaceStitch:
+    return "surface.stitch";
+  case Command::ClosedShellToSolid:
+    return "surface.closed_shell_to_solid";
   case Command::None:
     return {};
   }
@@ -451,6 +461,12 @@ std::vector<geometry::ViewportSceneItem> ShellFeatureTools::finishing_selection_
   std::vector<geometry::ViewportSceneItem> items;
   if (finishing())
     for (const auto& target : finishing_targets_)
+      items.push_back({std::holds_alternative<EdgeReference>(target.reference)
+                           ? geometry::ViewportSceneKind::Edge
+                           : geometry::ViewportSceneKind::Face,
+                       target.semantic_id, target.shape});
+  if (surface())
+    for (const auto& target : surface_targets_)
       items.push_back({std::holds_alternative<EdgeReference>(target.reference)
                            ? geometry::ViewportSceneKind::Edge
                            : geometry::ViewportSceneKind::Face,

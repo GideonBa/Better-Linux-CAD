@@ -57,7 +57,13 @@ public:
     BodyScale,
     PathCurve,
     Sweep,
-    Loft
+    Loft,
+    BoundarySurface,
+    FillSurface,
+    TrimSurface,
+    ExtendSurface,
+    SurfaceStitch,
+    ClosedShellToSolid
   };
 
   ShellFeatureTools(ShellWindow& window, GuiDocumentSession& session,
@@ -139,6 +145,21 @@ public:
   [[nodiscard]] Result<GuiPartFeaturePreview> set_scale_center_text(std::size_t component,
                                                                     const QString& text);
   [[nodiscard]] Result<std::size_t> begin_spatial(Command command);
+  [[nodiscard]] Result<std::size_t> begin_surface(Command command);
+  [[nodiscard]] bool accept_surface_selection(const GuiSelection& selection);
+  [[nodiscard]] Result<std::size_t> append_surface_input(int choice);
+  [[nodiscard]] QComboBox& surface_source_editor() noexcept {
+    return *surface_source_;
+  }
+  [[nodiscard]] QComboBox& surface_target_editor() noexcept {
+    return *surface_target_;
+  }
+  [[nodiscard]] QComboBox& surface_pick_editor() noexcept {
+    return *surface_pick_;
+  }
+  [[nodiscard]] QListWidget& surface_order_editor() noexcept {
+    return *surface_order_;
+  }
   [[nodiscard]] bool accept_spatial_selection(const GuiSelection& selection);
   [[nodiscard]] Result<std::size_t> append_spatial_input(int choice);
   [[nodiscard]] Result<std::size_t> move_spatial_input(int from, int to);
@@ -237,6 +258,22 @@ protected:
 private:
   [[nodiscard]] bool finishing() const noexcept;
   [[nodiscard]] bool pattern() const noexcept;
+  [[nodiscard]] bool surface() const noexcept;
+  [[nodiscard]] bool surface_scalar() const noexcept;
+  void build_surface_controls(QWidget* panel);
+  void refresh_surface_preview();
+  [[nodiscard]] Result<std::size_t> rebuild_surface_controller();
+  void refresh_surface_enablement(bool idle_part);
+  void update_surface_pick_scope();
+  struct SurfaceInput {
+    std::string label;
+    std::string semantic_id;
+    std::optional<BoundaryCurveReference> boundary;
+    std::optional<SurfaceReference> surface;
+    std::optional<TrimmingReference> trimming;
+  };
+  [[nodiscard]] std::vector<SurfaceInput>
+  surface_inputs(std::vector<geometry::FinishingSelectionTarget>* targets = nullptr) const;
   [[nodiscard]] bool spatial() const noexcept;
   [[nodiscard]] QString spatial_summary() const;
   void build_spatial_controls(QWidget* panel);
@@ -412,6 +449,23 @@ private:
   std::string spatial_name_;
   double spatial_twist_{0};
   std::optional<std::vector<std::string>> previous_semantic_scope_;
+
+  std::vector<SurfaceInput> surface_inputs_;
+  std::vector<geometry::FinishingSelectionTarget> surface_targets_;
+  std::vector<std::pair<Command, QAction*>> surface_actions_;
+  QWidget* surface_controls_{nullptr};
+  QComboBox* surface_source_{nullptr};
+  QComboBox* surface_target_{nullptr};
+  QComboBox* surface_pick_{nullptr};
+  QListWidget* surface_order_{nullptr};
+  QPushButton* surface_add_{nullptr};
+  QWidget* surface_order_buttons_{nullptr};
+  QLabel* surface_hint_{nullptr};
+  FeatureId surface_feature_{""};
+  BodyId surface_result_{""};
+  ParameterId surface_parameter_{""};
+  std::string surface_name_;
+  double surface_value_{5};
 
   std::optional<std::pair<SketchId, ProfileId>> selected_profile_;
   std::optional<double> drag_start_value_;

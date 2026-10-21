@@ -78,6 +78,10 @@ public:
     return surface_;
   }
 
+  [[nodiscard]] const GuiInteractiveSurfaceController& surface() const noexcept {
+    return surface_;
+  }
+
   [[nodiscard]] bool active() const noexcept {
     return std::apply([](const auto&... controller) { return (controller.active() || ...); },
                       controllers());

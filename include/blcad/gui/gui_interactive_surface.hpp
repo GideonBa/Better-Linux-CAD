@@ -3,6 +3,7 @@
 #include "blcad/gui/gui_document_session.hpp"
 #include "blcad/gui/gui_interactive_extrude_revolve.hpp"
 #include "blcad/gui/gui_part_foundation_workbench.hpp"
+#include "blcad/gui/gui_pending_feature_inputs.hpp"
 #include "blcad/gui/gui_viewport_manipulator.hpp"
 
 #include "blcad/core/parameter.hpp"
@@ -30,27 +31,30 @@ namespace blcad::gui {
 // geometric, preview runs the real recompute on a throwaway clone so the
 // authoritative diagnostic is surfaced before commit. Apply commits one
 // transaction that seeds any driving parameter and adds the record.
+inline constexpr std::string_view kSurfaceToleranceValueId = "surface.stitch_tolerance";
 inline constexpr std::string_view kSurfaceExtendHandleId = "surface.extend";
 
 class GuiInteractiveSurfaceController {
 public:
   [[nodiscard]] Result<std::size_t>
   begin_boundary(const GuiDocumentSession& session, FeatureId feature, std::string name,
-                 BodyId result_body) {
+                 BodyId result_body, std::optional<Body> pending_body = std::nullopt) {
     return begin_curve_surface(session, SurfaceFeatureKind::BoundarySurface, std::move(feature),
-                               std::move(name), std::move(result_body));
+                               std::move(name), std::move(result_body), std::move(pending_body));
   }
-  [[nodiscard]] Result<std::size_t>
-  begin_fill(const GuiDocumentSession& session, FeatureId feature, std::string name,
-             BodyId result_body) {
+  [[nodiscard]] Result<std::size_t> begin_fill(const GuiDocumentSession& session, FeatureId feature,
+                                               std::string name, BodyId result_body,
+                                               std::optional<Body> pending_body = std::nullopt) {
     return begin_curve_surface(session, SurfaceFeatureKind::FillSurface, std::move(feature),
-                               std::move(name), std::move(result_body));
+                               std::move(name), std::move(result_body), std::move(pending_body));
   }
 
-  [[nodiscard]] Result<std::size_t>
-  begin_trim(const GuiDocumentSession& session, FeatureId feature, std::string name,
-             SurfaceReference target, TrimmingReference trimming, BodyId result_body) {
-    if (auto ok = begin_common(session, std::move(feature), std::move(name), result_body);
+  [[nodiscard]] Result<std::size_t> begin_trim(const GuiDocumentSession& session, FeatureId feature,
+                                               std::string name, SurfaceReference target,
+                                               TrimmingReference trimming, BodyId result_body,
+                                               std::optional<Body> pending_body = std::nullopt) {
+    if (auto ok = begin_common(session, std::move(feature), std::move(name), result_body,
+                               std::move(pending_body));
         ok.has_error())
       return ok;
     kind_ = SurfaceFeatureKind::TrimSurface;
@@ -59,16 +63,27 @@ public:
     return Result<std::size_t>::success(1);
   }
 
-  [[nodiscard]] Result<std::size_t>
-  begin_extend(const GuiDocumentSession& session, FeatureId feature, std::string name,
-               SurfaceReference target, BoundaryCurveReference boundary,
-               ParameterId distance_parameter, BodyId result_body) {
+  [[nodiscard]] Result<std::size_t> begin_extend(const GuiDocumentSession& session,
+                                                 FeatureId feature, std::string name,
+                                                 SurfaceReference target,
+                                                 BoundaryCurveReference boundary,
+                                                 ParameterId distance_parameter, BodyId result_body,
+                                                 std::optional<Body> pending_body = std::nullopt,
+                                                 std::vector<Parameter> pending_parameters = {}) {
     const auto* part = session.part_document();
     if (part == nullptr) return fail("interactive extend requires an active Part document");
+    if (auto valid = detail::validate_new_feature_parameters(
+            session, pending_parameters, {{distance_parameter, ParameterType::Length}});
+        !valid)
+      return valid;
     const Parameter* distance = part->find_parameter(distance_parameter);
+    for (const auto& parameter : pending_parameters)
+      if (parameter.id() == distance_parameter)
+        distance = &parameter;
     if (distance == nullptr || distance->type() != ParameterType::Length)
       return fail("surface extend requires an existing Length distance parameter");
-    if (auto ok = begin_common(session, std::move(feature), std::move(name), result_body);
+    if (auto ok = begin_common(session, std::move(feature), std::move(name), result_body,
+                               std::move(pending_body));
         ok.has_error())
       return ok;
     kind_ = SurfaceFeatureKind::ExtendSurface;
@@ -76,35 +91,58 @@ public:
     extend_boundary_ = std::move(boundary);
     distance_parameter_ = std::move(distance_parameter);
     distance_ = distance->value().millimeters();
+    pending_parameters_ = std::move(pending_parameters);
     return Result<std::size_t>::success(1);
   }
 
-  [[nodiscard]] Result<std::size_t>
-  begin_stitch(const GuiDocumentSession& session, FeatureId feature, std::string name,
-               ParameterId tolerance_parameter, BodyId result_body) {
+  [[nodiscard]] Result<std::size_t> begin_stitch(const GuiDocumentSession& session,
+                                                 FeatureId feature, std::string name,
+                                                 ParameterId tolerance_parameter,
+                                                 BodyId result_body,
+                                                 std::optional<Body> pending_body = std::nullopt,
+                                                 std::vector<Parameter> pending_parameters = {}) {
     const auto* part = session.part_document();
     if (part == nullptr) return fail("interactive stitch requires an active Part document");
+    if (auto valid = detail::validate_new_feature_parameters(
+            session, pending_parameters, {{tolerance_parameter, ParameterType::Length}});
+        !valid)
+      return valid;
     const Parameter* tolerance = part->find_parameter(tolerance_parameter);
+    for (const auto& parameter : pending_parameters)
+      if (parameter.id() == tolerance_parameter)
+        tolerance = &parameter;
     if (tolerance == nullptr || tolerance->type() != ParameterType::Length)
       return fail("surface stitch requires an existing Length tolerance parameter");
-    if (auto ok = begin_common(session, std::move(feature), std::move(name), result_body);
+    if (auto ok = begin_common(session, std::move(feature), std::move(name), result_body,
+                               std::move(pending_body));
         ok.has_error())
       return ok;
     kind_ = SurfaceFeatureKind::SurfaceStitch;
     tolerance_parameter_ = std::move(tolerance_parameter);
     tolerance_ = tolerance->value().millimeters();
+    pending_parameters_ = std::move(pending_parameters);
     return Result<std::size_t>::success(1);
   }
 
   [[nodiscard]] Result<std::size_t>
-  begin_closed_shell_to_solid(const GuiDocumentSession& session, FeatureId feature, std::string name,
-                              SurfaceReference shell, BodyId result_body) {
-    if (auto ok = begin_common(session, std::move(feature), std::move(name), result_body);
+  begin_closed_shell_to_solid(const GuiDocumentSession& session, FeatureId feature,
+                              std::string name, SurfaceReference shell, BodyId result_body,
+                              std::optional<Body> pending_body = std::nullopt) {
+    if (auto ok = begin_common(session, std::move(feature), std::move(name), result_body,
+                               std::move(pending_body));
         ok.has_error())
       return ok;
     kind_ = SurfaceFeatureKind::ClosedShellToSolid;
     target_ = std::move(shell);
     return Result<std::size_t>::success(1);
+  }
+
+  [[nodiscard]] Result<geometry::GeometryShape>
+  preview_shape(const GuiDocumentSession& session) const {
+    auto candidate = candidate_document(session);
+    if (!candidate)
+      return Result<geometry::GeometryShape>::failure(candidate.error());
+    return detail::preview_feature_body(candidate.value(), feature_, result_body_);
   }
 
   [[nodiscard]] bool active() const noexcept { return active_; }
@@ -153,7 +191,16 @@ public:
   }
 
   [[nodiscard]] bool apply_manipulator(const GuiViewportManipulatorCandidate& candidate) {
-    if (candidate.handle_id == kSurfaceExtendHandleId &&
+    if (!active_)
+      return false;
+    if (kind_ == SurfaceFeatureKind::SurfaceStitch &&
+        candidate.handle_id == kSurfaceToleranceValueId &&
+        candidate.value_kind == GuiViewportManipulatorValueKind::Distance) {
+      tolerance_ = candidate.scalar_value;
+      return true;
+    }
+    if (kind_ == SurfaceFeatureKind::ExtendSurface &&
+        candidate.handle_id == kSurfaceExtendHandleId &&
         candidate.value_kind == GuiViewportManipulatorValueKind::Distance) {
       distance_ = candidate.scalar_value;
       return true;
@@ -164,22 +211,13 @@ public:
   // Preview runs the real recompute on a clone so geometric diagnostics
   // (free edges, gaps, non-manifold, non-closed shell) surface before commit.
   [[nodiscard]] Result<GuiPartFeaturePreview> preview(const GuiDocumentSession& session) const {
-    if (!active_) return preview_fail("no surface command is active");
-    const auto* part = session.part_document();
-    if (part == nullptr) return preview_fail("preview requires an active Part document");
-    if (auto ready = ready_to_build(); ready.has_error())
-      return Result<GuiPartFeaturePreview>::failure(ready.error());
-    PartDocument candidate = *part;
-    if (auto seeded = seed_parameters(candidate); seeded.has_error())
-      return Result<GuiPartFeaturePreview>::failure(seeded.error());
-    auto feature = build_feature();
-    if (feature.has_error()) return Result<GuiPartFeaturePreview>::failure(feature.error());
-    if (auto added = candidate.add_surface_feature(std::move(feature.value())); added.has_error())
-      return Result<GuiPartFeaturePreview>::failure(added.error());
+    auto candidate = candidate_document(session);
+    if (!candidate)
+      return Result<GuiPartFeaturePreview>::failure(candidate.error());
     auto cache = geometry::ShapeCache::create(ShapeCacheId(feature_.value() + ".surface_preview"));
     if (cache.has_error()) return Result<GuiPartFeaturePreview>::failure(cache.error());
     auto executed =
-        geometry::GeometryRecomputeExecutor{}.execute_document(candidate, cache.value());
+        geometry::GeometryRecomputeExecutor{}.execute_document(candidate.value(), cache.value());
     if (executed.has_error()) return Result<GuiPartFeaturePreview>::failure(executed.error());
     return Result<GuiPartFeaturePreview>::success(
         {feature_, summary(), cache.value().body_shape_count()});
@@ -190,9 +228,13 @@ public:
     if (checked.has_error()) return Result<std::size_t>::failure(checked.error());
     auto committed = session.commit_part_transaction(
         std::string(apply_label()), [this](PartDocument& part) -> Result<std::size_t> {
-          if (auto seeded = seed_parameters(part); seeded.has_error()) return seeded;
+          if (auto provisioned = provision_inputs(part); !provisioned)
+            return provisioned;
+          if (auto seeded = seed_parameters(part); seeded.has_error())
+            return seeded;
           auto feature = build_feature();
-          if (feature.has_error()) return Result<std::size_t>::failure(feature.error());
+          if (feature.has_error())
+            return Result<std::size_t>::failure(feature.error());
           return part.add_surface_feature(std::move(feature.value()));
         });
     if (committed.has_error()) return committed;
@@ -203,13 +245,46 @@ public:
   void cancel() noexcept { active_ = false; }
 
 private:
-  [[nodiscard]] Result<std::size_t>
-  begin_common(const GuiDocumentSession& session, FeatureId feature, std::string name,
-               BodyId result_body) {
+  [[nodiscard]] Result<std::size_t> provision_inputs(PartDocument& part) const {
+    if (pending_body_) {
+      auto added = part.add_body(*pending_body_);
+      if (!added)
+        return added;
+    }
+    return detail::provision_new_feature_parameters(part, pending_parameters_);
+  }
+  [[nodiscard]] Result<PartDocument> candidate_document(const GuiDocumentSession& session) const {
+    if (!active_ || !session.part_document())
+      return Result<PartDocument>::failure(
+          Error::validation("surface", "no active surface command"));
+    auto ready = ready_to_build();
+    if (!ready)
+      return Result<PartDocument>::failure(ready.error());
+    PartDocument candidate = *session.part_document();
+    auto provisioned = provision_inputs(candidate);
+    if (!provisioned)
+      return Result<PartDocument>::failure(provisioned.error());
+    auto seeded = seed_parameters(candidate);
+    if (!seeded)
+      return Result<PartDocument>::failure(seeded.error());
+    auto feature = build_feature();
+    if (!feature)
+      return Result<PartDocument>::failure(feature.error());
+    auto added = candidate.add_surface_feature(std::move(feature.value()));
+    if (!added)
+      return Result<PartDocument>::failure(added.error());
+    return Result<PartDocument>::success(std::move(candidate));
+  }
+  [[nodiscard]] Result<std::size_t> begin_common(const GuiDocumentSession& session,
+                                                 FeatureId feature, std::string name,
+                                                 BodyId result_body,
+                                                 std::optional<Body> pending_body) {
     const auto* part = session.part_document();
     if (part == nullptr) return fail("interactive surface requires an active Part document");
-    if (part->find_body(result_body) == nullptr)
-      return fail("interactive surface requires an existing result Body");
+    if (auto valid = detail::validate_new_feature_body(session, result_body, pending_body); !valid)
+      return valid;
+    pending_body_ = std::move(pending_body);
+    pending_parameters_.clear();
     feature_ = std::move(feature);
     name_ = std::move(name);
     result_body_ = std::move(result_body);
@@ -221,10 +296,12 @@ private:
     active_ = true;
     return Result<std::size_t>::success(1);
   }
-  [[nodiscard]] Result<std::size_t>
-  begin_curve_surface(const GuiDocumentSession& session, SurfaceFeatureKind kind, FeatureId feature,
-                      std::string name, BodyId result_body) {
-    if (auto ok = begin_common(session, std::move(feature), std::move(name), std::move(result_body));
+  [[nodiscard]] Result<std::size_t> begin_curve_surface(const GuiDocumentSession& session,
+                                                        SurfaceFeatureKind kind, FeatureId feature,
+                                                        std::string name, BodyId result_body,
+                                                        std::optional<Body> pending_body) {
+    if (auto ok = begin_common(session, std::move(feature), std::move(name), std::move(result_body),
+                               std::move(pending_body));
         ok.has_error())
       return ok;
     kind_ = kind;
@@ -326,11 +403,9 @@ private:
     return Result<std::size_t>::failure(
         Error::validation("gui.interactive_surface", std::move(message)));
   }
-  [[nodiscard]] static Result<GuiPartFeaturePreview> preview_fail(std::string message) {
-    return Result<GuiPartFeaturePreview>::failure(
-        Error::validation("gui.interactive_surface", std::move(message)));
-  }
 
+  std::optional<Body> pending_body_;
+  std::vector<Parameter> pending_parameters_;
   bool active_{false};
   SurfaceFeatureKind kind_{SurfaceFeatureKind::BoundarySurface};
   FeatureId feature_{""};
