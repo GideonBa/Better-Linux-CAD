@@ -96,9 +96,15 @@ Producer definition:
 
 ```text
 FeatureType::AdditiveExtrude
-input Sketch contains exactly one RectangleProfile
-input Sketch contains no other profile
+one selected RectangleProfile or an axis-aligned four-line ClosedProfile rectangle
+without explicit selection, the input Sketch contains exactly one profile
+normal, untapered, non-thin distance extrusion
 ```
+
+The Block-136 shell follow-up uses `resolve_rectangular_extrude_profile` for this recognition.
+Four-line rectangles keep the same feature-based edge/vertex role identities as parameter-backed
+rectangles; traversal order and OCCT topology order do not define the roles. Geometry derives their
+coordinates and generated face frames from the actual source Sketch workplane and origin.
 
 Supported generated linear-edge roles, expected cardinality `1` each:
 

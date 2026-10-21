@@ -4,6 +4,7 @@
 #include "blcad/core/generated_topology_reference.hpp"
 #include "blcad/core/part_document.hpp"
 #include "blcad/core/part_document_json.hpp"
+#include "blcad/core/rectangular_extrude_profile.hpp"
 #include "blcad/core/reference_recovery.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -342,7 +343,7 @@ TEST_CASE("Unsupported ambiguous and patterned producers fail closed",
   auto unsupported_producer =
       classify_generated_topology_producer(unsupported, FeatureId("feature.round"));
   REQUIRE(unsupported_producer.has_error());
-  CHECK(unsupported_producer.error().message().find("RectangleProfile") != std::string::npos);
+  CHECK(unsupported_producer.error().message().find("rectangular") != std::string::npos);
 
   const PartDocument ambiguous = make_ambiguous_circle_document();
   auto ambiguous_producer =
@@ -422,4 +423,54 @@ TEST_CASE("Assembly JSON preserves generated topology semantic spellings byte-fo
   CHECK(roundtripped->target_b().semantic_reference() == vertex);
   REQUIRE(parse_generated_topology_target_spelling(roundtripped->target_a().semantic_reference()));
   REQUIRE(parse_generated_topology_target_spelling(roundtripped->target_b().semantic_reference()));
+}
+
+TEST_CASE("Authored rectangular contours expose stable box roles without kernel topology ids",
+          "[core][generated-topology][rectangular-finishing]") {
+  auto document =
+      PartDocument::create(DocumentId("part.drawn_rectangle"), "Drawn rectangle").value();
+  add_common_parameters_and_datum(document);
+  auto sketch = Sketch::create(SketchId("drawn"), "Drawn", DatumPlaneId("datum.xy")).value();
+  std::vector<Point2> corners{{-30, -20}, {-10, -20}, {-10, -8}, {-30, -8}};
+  bool accepted = true, helper = false;
+  SECTION("counterclockwise") {}
+  SECTION("clockwise") {
+    std::reverse(corners.begin(), corners.end());
+  }
+  SECTION("parallelogram has no box roles") {
+    corners[2].x += 3;
+    accepted = false;
+  }
+  SECTION("helper line cannot bound a box") {
+    helper = true;
+    accepted = false;
+  }
+  std::vector<SketchEntityId> ids;
+  for (std::size_t i = 0; i < corners.size(); ++i) {
+    ids.emplace_back("edge." + std::to_string(i));
+    REQUIRE(sketch.add_entity(LineSegment::create(ids.back(), corners[i],
+                                                  corners[(i + 1) % corners.size()],
+                                                  helper && i == 0 ? SketchLineRole::Construction
+                                                                   : SketchLineRole::Geometry)
+                                  .value()));
+  }
+  REQUIRE(sketch.add_profile(ClosedProfile::create(ProfileId("contour"), ids).value()));
+  REQUIRE(document.add_sketch(sketch));
+  auto feature = Feature::create_additive_extrude(FeatureId("drawn.extrude"), "Extrude",
+                                                  sketch.id(), ParameterId("part.depth"))
+                     .value()
+                     .with_profile(ProfileId("contour"))
+                     .value();
+  REQUIRE(document.add_feature(feature));
+  auto rectangle = resolve_rectangular_extrude_profile(document, feature);
+  CHECK(rectangle.has_value() == accepted);
+  auto producer = classify_generated_topology_producer(document, feature.id());
+  CHECK(producer.has_value() == accepted);
+  if (accepted) {
+    CHECK(rectangle.value().center == Point2{-20, -14});
+    CHECK(rectangle.value().width == 20);
+    CHECK(rectangle.value().height == 12);
+    REQUIRE(validate_generated_topology_reference(
+        document, SemanticEdgeReference::create(feature.id(), SemanticEdge::TopFront).value()));
+  }
 }

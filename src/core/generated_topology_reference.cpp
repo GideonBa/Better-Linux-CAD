@@ -3,6 +3,7 @@
 #include "blcad/core/error.hpp"
 #include "blcad/core/feature.hpp"
 #include "blcad/core/part_document.hpp"
+#include "blcad/core/rectangular_extrude_profile.hpp"
 #include "blcad/core/sketch.hpp"
 
 #include <algorithm>
@@ -200,15 +201,8 @@ parse_circular_edge_role(std::string_view role) noexcept {
 }
 
 [[nodiscard]] bool is_rectangular_additive_extrude(const PartDocument& document,
-                                                   const Feature& feature) noexcept {
-  if (feature.type() != FeatureType::AdditiveExtrude)
-    return false;
-  const Sketch* sketch = document.find_sketch(feature.input_sketch());
-  if (sketch == nullptr)
-    return false;
-  if (feature.profile().has_value())
-    return sketch->find_rectangle_profile(*feature.profile()) != nullptr;
-  return sketch->rectangle_profiles().size() == 1U && sketch->profile_count() == 1U;
+                                                   const Feature& feature) {
+  return resolve_rectangular_extrude_profile(document, feature).has_value();
 }
 
 [[nodiscard]] const CircleProfile*
@@ -471,9 +465,9 @@ classify_generated_topology_producer(const PartDocument& document, FeatureId sou
       return Result<GeneratedTopologyProducerKind>::success(
           GeneratedTopologyProducerKind::RectangularAdditiveExtrude);
     }
-    return Result<GeneratedTopologyProducerKind>::failure(validation_error(
-        object_id,
-        "additive-extrude generated topology is supported only for exactly one RectangleProfile and no other profile"));
+    return Result<GeneratedTopologyProducerKind>::failure(
+        validation_error(object_id, "additive-extrude generated topology is supported only for one "
+                                    "axis-aligned rectangular distance-extrusion profile"));
   }
 
   if (!sketch->circular_hole_patterns().empty()) {
