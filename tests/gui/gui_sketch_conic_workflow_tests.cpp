@@ -63,11 +63,7 @@ TEST_CASE("Shell conic and slot tools commit one complete persistent shape",
     splines = 4;
     profiles = 1;
   }
-  SECTION("elliptical arc") {
-    tool = GuiSketchCreateTool::EllipticalArc;
-    picks = {{0, 0}, {20, 0}, {0, 10}, {20, 0}, {-10, 8}};
-    splines = 2;
-  }
+
   SECTION("center slot") {
     tool = GuiSketchCreateTool::CenterSlot;
     picks = {{0, 0}, {30, 0}, {0, 5}};
@@ -138,10 +134,7 @@ TEST_CASE("Degenerate conic and slot creation leaves geometry and history unchan
   SECTION("collapsed ellipse") {
     picks = {{0, 0}, {20, 0}, {10, 0}};
   }
-  SECTION("zero ellipse sweep") {
-    tool = GuiSketchCreateTool::EllipticalArc;
-    picks = {{0, 0}, {20, 0}, {0, 10}, {20, 0}, {20, 0}};
-  }
+
   SECTION("oversized slot") {
     tool = GuiSketchCreateTool::OverallSlot;
     picks = {{0, 0}, {10, 0}, {0, 10}};

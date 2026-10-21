@@ -5,6 +5,8 @@
 #include "blcad/core/spatial.hpp"
 #include "blcad/geometry/workplane_resolver.hpp"
 
+#include <optional>
+
 namespace blcad::geometry {
 
 class ShapeCache;
@@ -18,6 +20,7 @@ struct ResolvedSketchLineReference {
   SketchEntityId id;
   Point2 point;
   Vector2 direction;
+  std::optional<Point2> end; // Finite projected endpoint for semantic model edges.
 };
 
 class SketchReferenceProjector {

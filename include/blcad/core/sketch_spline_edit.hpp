@@ -514,11 +514,16 @@ private:
           Error::validation(sketch_.value(), "fit spline requires at least two points"));
     std::vector<SplineSegment> rebuilt;
     rebuilt.reserve(fit_points_.size() - 1U);
+    const bool closed =
+        fit_points_.size() >= 4U && same_point(fit_points_.front(), fit_points_.back());
     for (std::size_t index = 0U; index + 1U < fit_points_.size(); ++index) {
-      const Point2 p0 = index == 0U ? fit_points_[index] : fit_points_[index - 1U];
+      const Point2 p0 = index == 0U
+                            ? (closed ? fit_points_[fit_points_.size() - 2U] : fit_points_[index])
+                            : fit_points_[index - 1U];
       const Point2 p1 = fit_points_[index];
       const Point2 p2 = fit_points_[index + 1U];
-      const Point2 p3 = index + 2U < fit_points_.size() ? fit_points_[index + 2U] : p2;
+      const Point2 p3 = index + 2U < fit_points_.size() ? fit_points_[index + 2U]
+                                                        : (closed ? fit_points_[1] : p2);
       const Point2 control1{p1.x + (p2.x - p0.x) / 6.0,
                             p1.y + (p2.y - p0.y) / 6.0};
       const Point2 control2{p2.x - (p3.x - p1.x) / 6.0,

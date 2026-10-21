@@ -838,10 +838,19 @@ GuiSketchInteractionSceneBuilder::build_impl(const PartDocument& document, const
       continue;
     }
     projected_lines.emplace(reference.id().value(), resolved.value().point);
-    add_curve(scene, entity_semantic(sketch, reference.id()), reference.id().value() + ":projected-line",
-              GuiSketchCurveKind::ReferenceLine,
-              {point_plus(resolved.value().point, *direction, -kReferenceLineExtent),
-               point_plus(resolved.value().point, *direction, kReferenceLineExtent)});
+    add_curve(scene, entity_semantic(sketch, reference.id()),
+              reference.id().value() + ":projected-line", GuiSketchCurveKind::ReferenceLine,
+              {resolved.value().end
+                   ? resolved.value().point
+                   : point_plus(resolved.value().point, *direction, -kReferenceLineExtent),
+               resolved.value().end.value_or(
+                   point_plus(resolved.value().point, *direction, kReferenceLineExtent))});
+    if (resolved.value().end) {
+      add_point(scene, entity_semantic(sketch, reference.id()), reference.id().value() + ":start",
+                resolved.value().point, GuiSketchSnapKind::Endpoint);
+      add_point(scene, entity_semantic(sketch, reference.id()), reference.id().value() + ":end",
+                *resolved.value().end, GuiSketchSnapKind::Endpoint);
+    }
   }
 
   geometry::ReferenceDrivenSketchHelper reference_helper;

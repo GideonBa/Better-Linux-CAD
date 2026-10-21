@@ -399,7 +399,8 @@ ProjectedSketchLine::ProjectedSketchLine(SketchEntityId id, ProjectedSketchLineS
     : id_(std::move(id)), source_(source), construction_line_(std::move(construction_line)),
       semantic_edge_(std::move(semantic_edge)) {}
 
-Result<LineSegment> LineSegment::create(SketchEntityId id, Point2 start, Point2 end) {
+Result<LineSegment> LineSegment::create(SketchEntityId id, Point2 start, Point2 end,
+                                        SketchLineRole role) {
   const auto object_id = id.empty() ? std::string("line_segment") : id.value();
 
   if (id.empty()) {
@@ -412,7 +413,7 @@ Result<LineSegment> LineSegment::create(SketchEntityId id, Point2 start, Point2 
         Error::validation(object_id, "line segment endpoints must not be identical"));
   }
 
-  return Result<LineSegment>::success(LineSegment(std::move(id), start, end));
+  return Result<LineSegment>::success(LineSegment(std::move(id), start, end, role));
 }
 
 const SketchEntityId& LineSegment::id() const noexcept {
@@ -427,8 +428,8 @@ Point2 LineSegment::end() const noexcept {
   return end_;
 }
 
-LineSegment::LineSegment(SketchEntityId id, Point2 start, Point2 end)
-    : id_(std::move(id)), start_(start), end_(end) {}
+LineSegment::LineSegment(SketchEntityId id, Point2 start, Point2 end, SketchLineRole role)
+    : role_(role), id_(std::move(id)), start_(start), end_(end) {}
 
 Result<RectangleProfile> RectangleProfile::create(ProfileId id, ParameterId width_parameter,
                                                   ParameterId height_parameter, Point2 center) {

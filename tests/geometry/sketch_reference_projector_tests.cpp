@@ -113,6 +113,8 @@ TEST_CASE("SketchReferenceProjector projects semantic generated refs into sketch
   CHECK(resolved_line.value().point.y == Catch::Approx(30.0));
   CHECK(resolved_line.value().direction.x == Catch::Approx(1.0));
   CHECK(resolved_line.value().direction.y == Catch::Approx(0.0));
+  REQUIRE(resolved_line.value().end);
+  CHECK(*resolved_line.value().end == Point2{50, 30});
 }
 
 TEST_CASE("SketchReferenceProjector projects construction references into sketch space",
@@ -140,9 +142,10 @@ TEST_CASE("SketchReferenceProjector projects construction references into sketch
   CHECK(resolved_line.value().point.y == Catch::Approx(30.0));
   CHECK(resolved_line.value().direction.x == Catch::Approx(1.0));
   CHECK(resolved_line.value().direction.y == Catch::Approx(0.0));
+  CHECK_FALSE(resolved_line.value().end);
 }
 
-TEST_CASE("SketchReferenceProjector rejects out-of-plane projected points",
+TEST_CASE("SketchReferenceProjector orthogonally projects out-of-plane points",
           "[geometry][sketch-reference]") {
   PartDocument document = make_rectangular_additive_document();
   Sketch sketch = make_top_reference_sketch();
@@ -156,7 +159,35 @@ TEST_CASE("SketchReferenceProjector rejects out-of-plane projected points",
 
   const SketchReferenceProjector projector;
   auto resolved = projector.resolve_point(document, sketch, projected_vertex.value());
-  REQUIRE(resolved.has_error());
-  CHECK(resolved.error().message() ==
-        "projected sketch reference must lie on the sketch workplane");
+  REQUIRE(resolved);
+  CHECK(resolved.value().position.x == Catch::Approx(50.0));
+  CHECK(resolved.value().position.y == Catch::Approx(30.0));
+}
+
+TEST_CASE("SketchReferenceProjector projects oblique lines and rejects collapsed directions",
+          "[geometry][sketch-reference]") {
+  PartDocument document = make_rectangular_additive_document();
+  Sketch sketch = make_top_reference_sketch();
+  bool collapsed = false;
+  SECTION("oblique") {}
+  SECTION("normal to sketch") {
+    collapsed = true;
+  }
+  REQUIRE(document.add_construction_line(
+      ConstructionLine::create_explicit(ConstructionLineId("oblique"), "Oblique", {2, 3, -10},
+                                        collapsed ? Vector3{0, 0, 1}
+                                                  : Vector3{std::sqrt(0.5), 0, std::sqrt(0.5)})
+          .value()));
+  auto reference = ProjectedSketchLine::create_from_construction_line(
+      SketchEntityId("projection"), ConstructionLineId("oblique"));
+  REQUIRE(reference);
+  auto projected = SketchReferenceProjector{}.resolve_line(document, sketch, reference.value());
+  if (collapsed)
+    CHECK_FALSE(projected);
+  else {
+    REQUIRE(projected);
+    CHECK(projected.value().point == Point2{2, 3});
+    CHECK(projected.value().direction.x == Catch::Approx(1));
+    CHECK(projected.value().direction.y == Catch::Approx(0));
+  }
 }

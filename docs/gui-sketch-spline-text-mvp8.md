@@ -35,6 +35,25 @@ Fit points, selected handles, hover state, control polygons, sampled display cur
 and continuity glyph positions are transient authoring or Geometry products. They are not an
 alternative model format.
 
+## Shell creation and extrusion (October 2026)
+
+The Spline tool collects an unlimited sequence of fit points. Every click extends a disposable
+Catmull-Rom/Bezier chain through those points; it does not finish after four clicks. Right-click
+or Enter completes the curve as one document transaction. Escape/cancellation discards pending
+points. A one-point spline finishes without geometry. Finish Sketch also commits a pending curve.
+The complete right-button gesture belongs to the tool and does not open the canvas context menu.
+
+The pending first fit point participates in closure snapping in screen space, even though it is
+not yet persisted in the interaction scene. Clicking it closes the chain exactly; periodic neighbor
+selection supplies a smooth last/first tangent. Picks, fitted authoring state and preview samples
+remain transient. The resulting polynomial cubic segments and their deterministic ids use the
+existing Sketch JSON and preserve Undo/Redo and Save/Open.
+
+Closed spline chains and mixed spline/line contours are detected through the shared region/profile
+materialization path, including extrusion preview and Apply. Construction and center lines are
+excluded before connected-component discovery. Open fitted chains remain editable curves and never
+produce an invented closing edge or extrusion face.
+
 ## Control-point editing
 
 `SketchSplineEditModel::from_segments(...)` accepts one or more ordered, connected spline entities.
@@ -58,7 +77,9 @@ C1 = Pi     + (P(i+1) - P(i-1)) / 6
 C2 = P(i+1) - (P(i+2) - Pi)     / 6
 ```
 
-At the chain boundaries the missing neighbour equals the endpoint. The expansion is deterministic,
+At open chain boundaries the missing neighbour equals the endpoint. When at least three distinct
+fit points form a closed chain by repeating the first point, boundary neighbors wrap periodically,
+so the closing seam uses the same tangent rule as internal joints. The expansion is deterministic,
 uses the first existing spline id first, then stable `<base>.fit.N` ids, and produces exact shared
 segment endpoints.
 
@@ -173,6 +194,8 @@ The following publish no partial mutation:
 ./build/dev-geometry/blcad_geometry_tests "[geometry][sketch-spline-edit]"
 ./build/dev-geometry/blcad_geometry_tests "[geometry][sketch-text]"
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][sketch-spline]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[spline-create-workflow]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[spline-create-workflow]"
 ```
 
 The proof covers control- and fit-point editing, insertion/removal, deterministic conversion and ids,

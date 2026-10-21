@@ -395,15 +395,16 @@ V3d_TypeOfOrientation occt_orientation(GuiStandardView view) {
   return V3d_TypeOfOrientation_Zup_AxoRight;
 }
 
-// Construction lines / centerlines render dash-dot (technical-drawing look).
+// Sketch helper roles keep their dashed/dash-dot technical drawing style.
 void apply_construction_line_style(const geometry::ViewportSceneItem& item,
                                    const Handle(AIS_Shape)& interactive) {
-  if (interactive.IsNull() ||
-      item.semantic_id.rfind("construction-line/", 0U) != 0U)
+  if (interactive.IsNull() || (item.semantic_id.rfind("construction-line/", 0U) != 0U &&
+                               item.line_role == SketchLineRole::Geometry))
     return;
   const Quantity_Color color = presentation_color(item.kind);
-  Handle(Prs3d_LineAspect) aspect =
-      new Prs3d_LineAspect(color, Aspect_TOL_DOTDASH, 1.2);
+  Handle(Prs3d_LineAspect) aspect = new Prs3d_LineAspect(
+      color, item.line_role == SketchLineRole::Construction ? Aspect_TOL_DASH : Aspect_TOL_DOTDASH,
+      1.2);
   interactive->Attributes()->SetLineAspect(aspect);
   interactive->Attributes()->SetWireAspect(aspect);
 }
@@ -1250,7 +1251,9 @@ void OcctViewport::mouseReleaseEvent(QMouseEvent* event) {
                               : GuiSketchBoxSelectionMode::Crossing;
         auto selections = sketch_interaction_->box_select(*sketch_box_selection_, mode);
         if (selections)
-          apply_selection_set(sketch_selections_, selections.value(), event->modifiers());
+          apply_selection_set(sketch_selections_, selections.value(),
+                              event->modifiers() | (sketch_additive_selection_ ? Qt::ControlModifier
+                                                                               : Qt::NoModifier));
       } else if (!sketch_box_active_) {
         auto hit = sketch_interaction_->cycle_hit(current);
         if (hit && hit.value()) {
@@ -1260,7 +1263,8 @@ void OcctViewport::mouseReleaseEvent(QMouseEvent* event) {
           // suppress that split and leave the marker embedded.)
           apply_selection_set(sketch_selections_,
                               {{GuiSelectionKind::SketchEntity, hit.value()->semantic_id}},
-                              event->modifiers());
+                              event->modifiers() | (sketch_additive_selection_ ? Qt::ControlModifier
+                                                                               : Qt::NoModifier));
         } else if (!(event->modifiers() & Qt::ShiftModifier) &&
                    !(event->modifiers() & Qt::ControlModifier)) {
           sketch_selections_.clear();

@@ -155,10 +155,15 @@ QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][sketch-create]"
 ./build/dev-geometry/blcad_geometry_tests "[gui][sketch-profile-selection]"
 ```
 
-Block 112 conic and slot creation has no focused proof. Ellipse/slot creation lives in the GUI layer
-only (`gui_sketch_create`, `shell/shell_sketch_tools`); there is no Core or Geometry conic intent, and
-the shell tool tests cover line/circle/rectangle. Closing this gap belongs to Block 136 (feature full
-coverage, `docs/gui-shell-reset-sequence-mvp9r.md`).
+Block 112 conic and slot creation uses the shell tool surface and exact spline spans:
+
+```bash
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][sketch-create-conics]"
+```
+
+These focused cases cover persistent creation, degenerate-input rejection and tangent references.
+They do not close the remaining Block-136 feature coverage work recorded in
+`docs/gui-shell-reset-sequence-mvp9r.md`.
 
 Block 113 spline editing and Sketch text:
 
@@ -513,18 +518,24 @@ Cancel, recomputed Extrude/Revolve results, and atomic Undo.
 
 ### Sketch operation follow-up
 
-The shell now wires numeric preview/Apply/Cancel for transforms, independent patterns, offsets,
-associative projection and projected-line detachment. Focused regressions:
+The shell wires pointer dragging, live previews, numeric refinement and Apply/Cancel for transforms,
+independent patterns and offsets. Mirror and Symmetric have separate axis and element pick modes.
+Projection supports associative references and explicitly unlinked snapshots of other Sketch curves.
+Focused regressions:
 
 ```bash
 ./build/dev-gui/blcad_core_tests "[core][sketch-transform-pattern],[core][sketch-offset-project]"
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][sketch-transform-pattern],[gui][sketch-offset-project],[gui][sketch-project]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[sketch-mouse-operations],[spline-create-workflow],[sketch-delivery-review]"
+./build/dev-gui/blcad_geometry_tests "[sketch-reference]"
 ```
 
 `gui_shell_sketch_operations_tests.cpp` covers the real ribbon editor as well as the dialog-free
 surface, history/persistence, source-point preservation, copied rational profiles, and atomic
-constraint/dimension conflict rejection. The remaining limits are recorded in the two operation
-contracts and the interactive Sketch coverage manifest.
+constraint/dimension conflict rejection. The spline workflow covers unlimited fit points, right-click
+and Enter completion, exact smooth closure, Finish Sketch handoff, helper-line exclusion, region
+selection and actual extrusion. The remaining limits are recorded in the operation contracts and
+the interactive Sketch coverage manifest.
 
 Sketch UI regressions for visible windows and native OpenGL (requires an authorized local X display):
 
@@ -534,6 +545,7 @@ QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[gui][sketch-ui-review],[gu
 QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1.5 ./build/dev-gui/blcad_gui_tests "[gui][sketch-ui-review]"
 QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=2 ./build/dev-gui/blcad_gui_tests "[gui][sketch-ui-review]"
 QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[native-viewer-lifecycle]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[sketch-mouse-operations],[spline-create-workflow],[sketch-delivery-review]"
 ```
 
 Set `BLCAD_UI_CAPTURE_DIR` to an optional writable directory to capture the test shell, previews and

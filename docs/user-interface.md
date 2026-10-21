@@ -176,6 +176,31 @@ single bounded line region materialized as part of finishing the Sketch.
 
 The command lifecycle is canonical in `docs/gui-interactive-sketch-workspace-mvp8.md`.
 
+## Sketch transformations and helper geometry
+
+The Transformieren editor is nonmodal. Select several curves by repeated clicks or a selection
+rectangle, then drag in the canvas or enter numeric values. Move/Copy use a translation drag;
+Rotate/Scale and circular patterns allow picking the center; rectangular patterns retain numeric
+counts and the second direction. Offset accepts multiple disconnected line chains. Numeric values
+and the live preview share one operation request; Apply creates one undo step, and Escape cancels.
+
+Mirror and Symmetric expose separate Symmetrieachse and Elemente pick controls. Mirror copies the
+selected curves across the picked line. Symmetric constrains existing curves in nearest reflected
+pairs, including their endpoints and spline control points, while keeping the picked axis stationary
+during authoring. A single selected line constrains its endpoints symmetrically. Existing dimensions
+and constraints participate in the solve; conflicting edits cannot be applied.
+
+Linie offers ordinary, dashed construction and dash-dot center lines in the sketch itself. Helper
+lines can serve as axes and do not contribute to automatic profiles. The Spline tool collects any
+number of fit points until right-click or Enter. Every click extends a smooth cubic Bezier chain
+through the picked points; the preview remains transient until completion, which creates one undo
+step. Clicking near the first point closes the chain exactly,
+with a continuous tangent at the seam. Finish Sketch also commits a pending spline before leaving
+the editor. Closed spline chains and mixed spline/line contours become selectable extrusion
+profiles; construction and center lines do not participate in region discovery. The elliptical-arc
+creation command is removed; exact rational ellipse spans remain available internally for ellipses
+and projected curves.
+
 ## Sketch canvas interaction
 
 Block 107 provides one mapping between Qt DIP, OCCT view rays, active-plane coordinates, and model

@@ -203,7 +203,7 @@ private:
     return std::visit([&](const auto& v) -> Result<Curve> {
       using T = std::decay_t<decltype(v)>;
       if constexpr (std::is_same_v<T, LineSegment>) {
-        auto r = LineSegment::create(std::move(id), f(v.start()), f(v.end()));
+        auto r = LineSegment::create(std::move(id), f(v.start()), f(v.end()), v.role());
         if (r.has_error()) return Result<Curve>::failure(r.error());
         return Result<Curve>::success(Curve(std::move(r.value())));
       } else if constexpr (std::is_same_v<T, ArcSegment>) {

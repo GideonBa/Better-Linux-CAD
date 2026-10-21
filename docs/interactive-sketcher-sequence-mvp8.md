@@ -38,7 +38,9 @@ Core/Geometry consumers.
 6. Fixed, reference, stale, ambiguous, conflicting, redundant, invalid, measurement-mismatched, or
    non-convergent candidates fail closed.
 7. Automatic constraints remain transient inference until Block-114 disposable solve accepts them.
-8. Projected geometry remains associative/read-only until explicit conversion.
+8. Associative construction/model projected references remain read-only until explicit conversion.
+   Explicit unlinked projections from another Sketch persist as ordinary editable curves; their
+   snapshot semantics are shown before Apply (`docs/gui-sketch-offset-project-mvp8.md`).
 9. Historical persistence is never silently reinterpreted; new schemas are explicit and versioned.
 10. Derived solve, Geometry, font, layout, glyph, measurement, and interaction products are never opaque
     persistent caches.

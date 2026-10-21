@@ -133,9 +133,9 @@ It resolves the sketch workplane through `WorkplaneResolver`, then resolves the 
 
 A resolved 3D point is projected into the sketch-local workplane frame as a 2D point.
 
-A resolved 3D line is projected as a local point plus a normalized 2D direction. The line is accepted only if its anchor point lies on the sketch workplane and its 3D direction is parallel to the sketch workplane.
+A resolved 3D line is orthogonally projected as a local point plus a normalized 2D direction. Its anchor may lie off the sketch plane and its direction may be oblique to it. A direction perpendicular to the sketch plane is rejected because its projection collapses to a point.
 
-A semantic generated edge is accepted only if its evaluated edge direction lies in the sketch workplane. Its projected local line uses the evaluated edge start point as the local line anchor and the edge vector as the local direction seed.
+A semantic generated edge uses its evaluated start point as the projected local anchor and its edge vector as the projected direction seed. Source references remain associative. Semantic edges retain finite projected endpoints for drawing and endpoint snapping; construction-line references remain axes. Committed projected references have native viewport presentations and stay visible after the preview is dismissed.
 
 ## Dependency and invalidation behavior
 
@@ -155,21 +155,11 @@ source feature -> semantic edge/vertex node -> sketch -> dependent feature
 
 Relation-driven construction points also add dependencies from their relation sources, so a projected construction point that itself depends on a generated edge is invalidated when the source feature changes.
 
-## Out-of-plane validation
+## Orthographic projection
 
-Projection is intentionally strict. A point that is not on the sketch workplane returns a validation error:
+Projection drops the component normal to the target workplane. Off-plane vertices and edges are valid sources. Nonfinite coordinates and directions whose plane projection collapses are rejected.
 
-```text
-projected sketch reference must lie on the sketch workplane
-```
-
-A line that is not fully contained in the sketch workplane returns a validation error:
-
-```text
-projected sketch line must lie on the sketch workplane
-```
-
-This avoids silently dropping dimensions or projecting arbitrary 3D geometry into an unrelated 2D sketch.
+The shell source chooser also offers lines, arcs, circles and rational cubic splines from other sketches. These are projected as finite, editable snapshots, explicitly marked as unlinked in the editor. Arcs and circles use exact rational cubic spans, including ellipses when projected obliquely. Existing construction and semantic model references keep their source identity and dependency behavior.
 
 ## Tests
 
@@ -180,10 +170,10 @@ The implemented test coverage includes:
 - JSON roundtrip tests for construction-point, construction-line, semantic-vertex, semantic-edge, and constraint records
 - dependency graph tests proving source feature and construction-relation changes invalidate projected-reference sketches and dependent features
 - geometry projection tests for semantic generated vertices and edges on a top-face sketch
-- geometry projection tests for construction points and construction lines on a top-face sketch
+- geometry projection tests for construction points and construction lines on a top-face sketch, including orthographic off-plane projection
 - geometry tests for resolving coincident and parallel projected-reference constraints
 - geometry tests for deterministic profile-helper line generation from two projected point endpoint constraints
-- out-of-plane rejection tests
+- collapsed-direction rejection tests for projection normal to the sketch plane
 
 ## Deliberate limitations
 
@@ -191,7 +181,9 @@ This block does not implement a full sketch solver. Reference-driven constraints
 
 The currently implemented semantic generated edge and vertex evaluation still supports only the controlled rectangular additive extrude topology. Arbitrary generated topology remains deferred.
 
-Projected line references are represented as local point-plus-direction helper geometry, not as bounded profile curves. The helper path can produce a deterministic `LineSegment` only when two projected endpoint constraints are available and fully resolved.
+Projected line references remain helper geometry for profile inference. Semantic edges also carry
+finite derived endpoints for display and snapping. The helper path can produce a deterministic
+profile `LineSegment` only when two projected endpoint constraints are available and fully resolved.
 
 Interactive reference repair is not implemented yet. If a referenced generated face, edge, or vertex disappears after topology changes, the intended future behavior is explicit lost-reference reporting and user-controlled remapping, not silent reassignment.
 

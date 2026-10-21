@@ -8,11 +8,18 @@ In an active planar Sketch, select ordinary lines, arcs, spline spans, or an exp
 The **Transformieren** ribbon group provides **Verschieben**, **Drehen**, **Skalieren**, **Kopieren**,
 **Spiegeln**, **Rechteckmuster**, and **Kreismuster**. Profile selections expand to their member curves.
 
-Each command opens one numeric editor. Translation and centers use Sketch-plane millimeters;
+Commands can start with an existing compatible selection or an empty selection. Each opens a
+nonmodal editor: **Elemente auswählen** collects multiple curve picks or a selection rectangle,
+then **Mit der Maus ziehen** updates the same request as the numeric fields. Rotate, scale and
+circular pattern also expose a center pick. Pointer motion and gesture start use the same snap
+result; mouse release stops the gesture without committing. Numeric refinement remains available.
+
+Each command retains its numeric editor. Translation and centers use Sketch-plane millimeters;
 rotation uses degrees; scale is a non-zero signed uniform factor. Mirror takes two distinct axis
-points and creates a reflected copy. Pattern counts include the seed. Rectangular patterns accept
-independent X/Y step vectors for both directions. Circular patterns accept a center, count, and
-signed total angle up to one revolution.
+points or a picked sketch line and creates a reflected copy. The axis and element pick controls
+are separate, so changing the element selection does not replace the chosen axis. Pattern counts
+include the seed. Rectangular patterns accept independent X/Y step vectors for both directions.
+Circular patterns accept a center, count, and signed total angle up to one revolution.
 
 Edits show separate dashed preview curves in the viewport without connecting unrelated instances.
 The committed geometry, dirty state, and undo history remain unchanged until **Übernehmen**.
@@ -28,7 +35,7 @@ Undo/Redo and Save/Open use the existing document and intent persistence.
 ## Authority boundary
 
 ```text
-ShellSketchTools: selection + numeric editor + viewport preview
+ShellSketchTools: selection + nonmodal pointer/numeric editor + viewport preview
   -> GuiSketchOperationController: disposable candidate and intent validation
   -> SketchTransformPatternService: exact Core geometry
   -> GuiDocumentSession: one transaction and downstream recompute
@@ -54,6 +61,16 @@ Copy, mirror, and patterns keep source intent intact and create independent inst
 and catalog constraint/dimension ids that are not duplicated are shown in the editor and completion
 message. This report is also available as `uncopied_references` to headless callers.
 
+## Symmetric constraint workflow
+
+**Symmetrisch** opens the same axis/element selection workflow, with an ordinary line, dashed
+construction line or dash-dot centerline as its axis. It constrains existing curves rather than
+creating copies. Matching curve types are paired by reflected proximity; endpoint and spline control
+point correspondence may reverse orientation. One selected line constrains its own endpoints.
+Shared point pairs are deduplicated. All authored constraints and driving dimensions participate in
+one solve, with the axis fixed during authoring. Conflicting candidates publish no geometry or
+partial constraint catalog; a successful Apply stores the entire batch in one undo step.
+
 ## Pattern semantics
 
 Rectangular patterns emit every cell except seed `(0,0)` as ordinary geometry with `.rect.N` ids.
@@ -73,6 +90,8 @@ associative pattern editing is a remaining extension.
 ```bash
 ./build/dev-gui/blcad_core_tests "[core][sketch-transform-pattern]"
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][sketch-transform-pattern]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[sketch-mouse-operations],[sketch-delivery-review]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[sketch-mouse-operations],[sketch-delivery-review]"
 ```
 
 The suite exercises every transform and pattern through the shell command surface, actual ribbon

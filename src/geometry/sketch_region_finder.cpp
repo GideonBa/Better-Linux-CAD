@@ -133,6 +133,8 @@ find_dimension_for_segment(const Sketch& sketch, const SketchEntityId& line_id) 
   lines.reserve(sketch.line_segments().size() + sketch.reference_generated_lines().size());
 
   for (const auto& line : sketch.line_segments()) {
+    if (line.construction())
+      continue;
     auto resolved = resolve_dimension_line(document, sketch, line);
     if (resolved.has_error())
       return Result<std::vector<LocalLine>>::failure(resolved.error());

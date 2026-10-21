@@ -32,7 +32,8 @@ enum class GuiSketchCreateTool {
   ThreePointArc,
   TangentArc,
   Ellipse,
-  EllipticalArc,
+  Spline,
+  ConstructionLine,
   CenterSlot,
   OverallSlot,
 };
@@ -99,7 +100,7 @@ struct GuiSketchCreateExpansion {
 // Block 112 deliberately expands conics and slots into the existing persistent
 // Core authorities: CircleProfile + diameter Parameter for exact full circles,
 // ArcSegment for circular arcs, exact rational SplineSegment chains for ellipses and
-// elliptical arcs, and line/arc ArcClosedProfile contours for slots. Commit
+// ordinary cubic splines, and line/arc ArcClosedProfile contours for slots. Commit
 // publishes exactly one document transaction per completed tool.
 class GuiSketchCreateController {
 public:

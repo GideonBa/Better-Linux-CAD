@@ -27,6 +27,7 @@ struct ViewportSceneItem {
   ViewportSceneKind kind{ViewportSceneKind::SolidBody};
   std::string semantic_id;
   GeometryShape shape;
+  SketchLineRole line_role{SketchLineRole::Geometry};
 };
 
 // Builds transient viewer input from authoritative Core intent and Geometry

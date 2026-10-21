@@ -343,8 +343,11 @@ public:
     };
 
     for (const auto& line : sketch.line_segments())
-      candidates.push_back({entity_id(line.id()), SketchTopologyEntityKind::Line,
-                            {{"start", line.start()}, {"end", line.end()}}, {}, {}});
+      candidates.push_back({entity_id(line.id()),
+                            SketchTopologyEntityKind::Line,
+                            {{"start", line.start()}, {"end", line.end()}},
+                            {},
+                            {.construction = line.construction()}});
     for (const auto& arc : sketch.arc_segments())
       candidates.push_back({entity_id(arc.id()), SketchTopologyEntityKind::Arc,
                             {{"start", arc.start()}, {"mid", arc.mid()}, {"end", arc.end()}}, {}, {}});

@@ -38,16 +38,35 @@ struct ToolDescriptor {
   const char* hint;
 };
 
+// Pending spline points are not yet in the document's hit scene. Snap closure to
+// the first fit point in screen space, using the same tolerance at every zoom.
+GuiSketchCreatePick create_pointer_pick(const GuiSketchCreateController& controller,
+                                        const OcctViewport& viewport,
+                                        const GuiSketchSnapResult& snap) {
+  if (controller.tool() == GuiSketchCreateTool::Spline && controller.picks().size() >= 3U) {
+    const auto first = controller.picks().front().point;
+    auto a = viewport.sketch_plane_to_screen(first);
+    auto b = viewport.sketch_plane_to_screen(snap.raw_point);
+    if (a && b &&
+        std::hypot(a.value().x - b.value().x, a.value().y - b.value().y) <=
+            GuiSketchInteractionConfig{}.snap_tolerance_dip)
+      return {first, GuiSketchSnapKind::Endpoint};
+  }
+  return {snap.snapped_point, snap.kind};
+}
+
 // Tool families as Inventor-style menu buttons; covers every MVP-8 create tool.
 // Inventor-style: ONE line tool that chains segments (each click continues at
 // the previous end, corners are coupled coincident); Escape ends the chain.
 // The headless Polyline tool stays available programmatically but has no
 // separate ribbon entry.
-constexpr std::array<ToolDescriptor, 2> kLineTools{{
+constexpr std::array<ToolDescriptor, 3> kLineTools{{
     {"sketch.create.line", "Linie", GuiSketchCreateTool::Line,
      "Punkte wählen; jede weitere Linie setzt am Ende an, Esc beendet"},
     {"sketch.create.centerline", "Mittellinie", GuiSketchCreateTool::Centerline,
-     "Start- und Endpunkt der Mittellinie wählen"},
+     "Strichpunktlinie: Start und Ende wählen"},
+    {"sketch.create.construction_line", "Konstruktionslinie", GuiSketchCreateTool::ConstructionLine,
+     "Gestrichelte Hilfslinie: Start und Ende wählen"},
 }};
 constexpr std::array<ToolDescriptor, 5> kRectangleTools{{
     {"sketch.create.corner_rectangle", "Rechteck (2 Punkte)",
@@ -82,8 +101,8 @@ constexpr std::array<ToolDescriptor, 4> kArcTools{{
      "Start, Zwischenpunkt und Ende wählen"},
     {"sketch.create.tangent_arc", "Bogen (tangential)", GuiSketchCreateTool::TangentArc,
      "Endpunkt einer Kurve, dann Bogenende wählen"},
-    {"sketch.create.elliptical_arc", "Elliptischer Bogen", GuiSketchCreateTool::EllipticalArc,
-     "Mitte, Hauptachse, Nebenradius, Start und Ende wählen"},
+    {"sketch.create.spline", "Spline", GuiSketchCreateTool::Spline,
+     "Stützpunkte fortlaufend anklicken; Rechtsklick beendet die Spline"},
 }};
 constexpr std::array<ToolDescriptor, 2> kSlotTools{{
     {"sketch.create.center_slot", "Langloch (Mitte–Mitte)", GuiSketchCreateTool::CenterSlot,
@@ -116,7 +135,7 @@ constexpr std::array<ConstraintDescriptor, 11> kConstraints{{
     {SketchSolverConstraintKind::Tangent, "Tangential", "Zwei verbundene Kurven tangential"},
     {SketchSolverConstraintKind::Concentric, "Konzentrisch", "Zwei Mittelpunkte vereinen"},
     {SketchSolverConstraintKind::Symmetric, "Symmetrisch",
-     "Zwei Punkte symmetrisch zu einer Linie"},
+     "Symmetrieachse wählen, dann die symmetrischen Elemente auswählen"},
 }};
 
 struct DimensionDescriptor {
@@ -407,6 +426,7 @@ ShellSketchTools::ShellSketchTools(ShellWindow& window, GuiDocumentSession& sess
 void ShellSketchTools::build_ribbon_groups() {
   const auto make_tool_action = [this](const ToolDescriptor& descriptor) {
     auto* action = new QAction(QString::fromUtf8(descriptor.label), this);
+    action->setObjectName(QString::fromUtf8(descriptor.command));
     action->setToolTip(QString::fromUtf8(descriptor.hint));
     connect(action, &QAction::triggered, this,
             [this, tool = descriptor.tool] { (void)begin_tool(tool); });
@@ -434,6 +454,10 @@ void ShellSketchTools::build_ribbon_groups() {
     auto* action = new QAction(QString::fromUtf8(descriptor.label), this);
     action->setToolTip(QString::fromUtf8(descriptor.description));
     connect(action, &QAction::triggered, this, [this, kind = descriptor.kind] {
+      if (kind == SketchSolverConstraintKind::Symmetric) {
+        show_operation_dialog(GuiSketchOperationKind::Symmetric);
+        return;
+      }
       const auto applied = apply_constraint(kind);
       if (applied.has_error())
         report(applied.error());
@@ -565,6 +589,10 @@ void ShellSketchTools::wire_viewport_callbacks() {
   viewport_.set_sketch_drag_pointer_callback([this](GuiSketchScreenPoint screen, Point2 raw,
                                                     const GuiSketchSnapResult& snap,
                                                     const std::optional<GuiSketchHit>&) {
+    if (operation_pointer_) {
+      operation_pointer_(snap.snapped_point);
+      return;
+    }
     if (trim_stroke_active_) {
       continue_trim_stroke(screen);
       return;
@@ -615,6 +643,10 @@ void ShellSketchTools::wire_viewport_callbacks() {
   viewport_.set_sketch_pointer_phase_callback(
       [this](GuiSketchPointerPhase phase, GuiSketchScreenPoint screen, Point2 raw,
              const GuiSketchSnapResult& snap, const std::optional<GuiSketchHit>& hit) {
+        if (operation_phase_) {
+          operation_phase_(phase, snap.snapped_point, hit);
+          return;
+        }
         if (tool_active())
           return; // create tools capture picks via the viewport event filter
         if (modify_tool_) {
@@ -641,7 +673,10 @@ void ShellSketchTools::wire_viewport_callbacks() {
               auto catalog = session_.sketch_dimension_catalog(*window_.active_sketch());
               const auto* dimension = catalog ? catalog.value().find(SketchDimensionId(*label_drag_))
                                               : nullptr;
-              if (!dimension) { label_drag_.reset(); return; }
+              if (!dimension) {
+                label_drag_.reset();
+                return;
+              }
               label_drag_delta_ = {};
               label_drag_initial_offset_ = dimension->label_offset();
               label_drag_last_ = raw;
@@ -655,7 +690,8 @@ void ShellSketchTools::wire_viewport_callbacks() {
                               label_drag_initial_offset_.y + label_drag_delta_.y + raw.y - label_drag_last_.y};
           const auto moved = GuiSketchDimensionController::set_label_offset(
               session_, *window_.active_sketch(), SketchDimensionId(*label_drag_), offset);
-          if (moved.has_error()) report(moved.error());
+          if (moved.has_error())
+            report(moved.error());
           cancel_label_drag();
           window_.refresh();
         } else {
@@ -672,6 +708,8 @@ void ShellSketchTools::activate() {
 }
 
 void ShellSketchTools::deactivate() {
+  if (close_operation_)
+    close_operation_();
   cancel_tool();
   dimension_editor_->hide();
   dimension_editor_id_.reset();
@@ -799,6 +837,8 @@ void ShellSketchTools::refresh_enablement() {
       enabled =
           std::find(compatible_constraints.begin(), compatible_constraints.end(),
                     SketchSolverConstraintKind::PointOnObject) != compatible_constraints.end();
+    if (kConstraints[index].kind == SketchSolverConstraintKind::Symmetric)
+      enabled = active;
     constraint_actions_[index]->setEnabled(enabled);
   }
   for (std::size_t index = 0; index < dimension_actions_.size(); ++index)
@@ -835,7 +875,7 @@ void ShellSketchTools::refresh_enablement() {
           (operation_ids.value().size() == 1U &&
            operation_sketch->find_arc_segment(operation_ids.value().front()));
     }
-    action->setEnabled(compatible);
+    action->setEnabled(active && (session_.selection().empty() || compatible));
   }
   if (project_action_) project_action_->setEnabled(active);
   if (break_link_action_) {
@@ -973,7 +1013,11 @@ bool ShellSketchTools::begin_tool(GuiSketchCreateTool tool) {
     report(plane.error());
     return false;
   }
-  if (!workspace_.begin_command(session_, "sketch.create", "Punkte im Viewport wählen")) {
+  const char* hint = tool == GuiSketchCreateTool::Spline
+                         ? "Spline: Stützpunkte wählen, zum Schließen den Startpunkt anklicken; "
+                           "Rechtsklick beendet"
+                         : "Punkte im Viewport wählen";
+  if (!workspace_.begin_command(session_, "sketch.create", hint)) {
     report_message("Skizzenwerkzeug konnte den Workspace-Lebenszyklus nicht starten");
     return false;
   }
@@ -1087,6 +1131,14 @@ void ShellSketchTools::cancel_label_drag() {
   publish_scene();
 }
 
+bool ShellSketchTools::finish_tool() {
+  if (tool_active() && create_controller_->tool() == GuiSketchCreateTool::Spline &&
+      create_controller_->complete_ready())
+    return complete_tool();
+  cancel_tool();
+  return true;
+}
+
 void ShellSketchTools::cancel_tool() {
   cancel_operation_preview();
   cancel_label_drag();
@@ -1162,7 +1214,7 @@ void ShellSketchTools::update_preview() {
     return;
   std::optional<GuiSketchCreatePick> hover;
   if (const auto& snap = viewport_.sketch_snap_result())
-    hover = GuiSketchCreatePick{snap->snapped_point, snap->kind};
+    hover = create_pointer_pick(*create_controller_, viewport_, *snap);
   const auto preview = create_controller_->preview(hover);
   viewport_.set_sketch_preview_polyline(preview.rubber_band, preview.closed);
   if (!preview.constraints.empty())
@@ -1394,9 +1446,10 @@ resolve_modify_hit(const SketchTopology& topology, SketchModifyKind kind,
   result.pick = hit->plane_point;
   // Curve points belong to the same editable entity. Accepting them for Trim
   // makes painting across endpoints/quadrants behave like painting the curve;
-  // Extend and Split retain their existing curve-only press semantics.
+  // Split also accepts midpoint hits; an endpoint is rejected by the split service.
   if (hit->kind == GuiSketchHitKind::Curve ||
-      (kind == SketchModifyKind::Trim && hit->kind == GuiSketchHitKind::Point))
+      ((kind == SketchModifyKind::Trim || kind == SketchModifyKind::Split) &&
+       hit->kind == GuiSketchHitKind::Point))
     result.entity = raw_entity_id(topology, hit->semantic_id);
   if (kind == SketchModifyKind::Trim &&
       (hit->kind == GuiSketchHitKind::Curve || hit->kind == GuiSketchHitKind::Point) &&
@@ -2183,6 +2236,8 @@ void ShellSketchTools::synchronize_sketch_selection(const std::vector<GuiSelecti
     (void)session_.selection().add(std::move(selection));
   }
   synchronizing_selection_ = false;
+  if (operation_selection_)
+    operation_selection_();
   refresh_enablement();
 }
 
@@ -2197,6 +2252,22 @@ bool ShellSketchTools::eventFilter(QObject* watched, QEvent* event) {
     }
     return QObject::eventFilter(watched, event);
   }
+  if (watched == &viewport_ && event->type() == QEvent::MouseButtonPress &&
+      static_cast<QMouseEvent*>(event)->button() == Qt::RightButton)
+    suppress_tool_right_release_ = tool_active();
+  if (watched == &viewport_ && event->type() == QEvent::MouseButtonRelease &&
+      static_cast<QMouseEvent*>(event)->button() == Qt::RightButton &&
+      suppress_tool_right_release_) {
+    // The drawing tool owns the whole gesture even when its press finishes the tool.
+    suppress_tool_right_release_ = false;
+    return true;
+  }
+  if (close_operation_ && (watched == &viewport_ || watched == &window_) &&
+      event->type() == QEvent::KeyPress &&
+      static_cast<QKeyEvent*>(event)->key() == Qt::Key_Escape) {
+    close_operation_();
+    return true;
+  }
   if (label_drag_ && ((event->type() == QEvent::KeyPress &&
                       static_cast<QKeyEvent*>(event)->key() == Qt::Key_Escape) ||
                      event->type() == QEvent::UngrabMouse ||
@@ -2208,8 +2279,8 @@ bool ShellSketchTools::eventFilter(QObject* watched, QEvent* event) {
     if (event->type() == QEvent::MouseButtonPress) {
       const auto* mouse = static_cast<QMouseEvent*>(event);
       if (mouse->button() == Qt::RightButton) {
-        // Inventor-style: right-click finishes the active tool/chain.
-        cancel_tool();
+        // A spline collects any number of fit points and commits on right-click.
+        (void)finish_tool();
         return true;
       }
       if (mouse->button() == Qt::LeftButton) {
@@ -2219,8 +2290,10 @@ bool ShellSketchTools::eventFilter(QObject* watched, QEvent* event) {
           if (!tool_active())
             return;
           const auto& snap = viewport_.sketch_snap_result();
-          if (snap)
-            (void)add_pick(snap->snapped_point, snap->kind);
+          if (snap) {
+            const auto pick = create_pointer_pick(*create_controller_, viewport_, *snap);
+            (void)add_pick(pick.point, pick.snap);
+          }
         });
       }
     } else if (event->type() == QEvent::MouseButtonDblClick) {
@@ -2256,6 +2329,8 @@ bool ShellSketchTools::eventFilter(QObject* watched, QEvent* event) {
              (event->type() == QEvent::UngrabMouse || event->type() == QEvent::WindowDeactivate)) {
     // Losing capture ends only the current paint gesture. The modal Trim tool
     // remains armed, just as after an ordinary left-button release.
+    if (operation_phase_)
+      operation_phase_(GuiSketchPointerPhase::Release, {}, std::nullopt);
     if (trim_stroke_active_ || trim_stroke_pending_ > 0U)
       cancel_trim_stroke();
     if (drag_controller_ && drag_controller_->active() && drag_stage(workspace_.stage()))
@@ -2281,7 +2356,8 @@ bool ShellSketchTools::eventFilter(QObject* watched, QEvent* event) {
           apply_numeric_buffer();
           return true;
         }
-        if (create_controller_->tool() == GuiSketchCreateTool::Polyline &&
+        if ((create_controller_->tool() == GuiSketchCreateTool::Polyline ||
+             create_controller_->tool() == GuiSketchCreateTool::Spline) &&
             create_controller_->complete_ready()) {
           (void)complete_tool();
           return true;

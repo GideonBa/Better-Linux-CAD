@@ -455,12 +455,30 @@ Boolean, Body Transform, Sweep, Loft, Surface family, Measure, Assembly tab), fe
 browser double-click (`GuiFeatureEditController`), and acceptance coverage replacing the deleted
 shell acceptance tests (coverage manifest updated).
 
+### Sketch interaction follow-up — 21 October 2026
+
+The shell uses a nonmodal editor for snapped mouse/numeric transformations and multiple curve
+selection. Mirror and Symmetric separate axis selection from element selection. Helper-line roles
+are persistent Sketch intent and are filtered before region discovery. Projection supports off-plane
+sources and visible finite semantic edges, plus explicitly unlinked snapshots from other sketches.
+Spline creation continues through fit points until right-click/Enter; closed fitted curves and mixed
+spline/line contours support profile selection, extrusion, Undo/Redo and Save/Open. Creation consumes
+the full right-click gesture. Copy previews report relationships that are not duplicated before Apply.
+
+Focused tags: `[sketch-mouse-operations]`, `[spline-create-workflow]`, `[sketch-delivery-review]`.
+These changes retain the Block-135/136 boundary above; see the feature-specific contracts for details.
+
 ## Test accounting
 
-Headless GUI tests (59 TEST_CASEs across 20 files) must stay green through every block. The 12
-shell-bound test files (73 TEST_CASEs) are deleted in Block 133 and replaced progressively by new
-shell tests in Blocks 133–136; Block 136 must end with equivalent-or-better coverage proven by the
-updated coverage manifest.
+At the start of the reset, 59 headless GUI cases across 20 files were retained. The 12 shell-bound
+test files (73 cases) were deleted in Block 133 and are replaced progressively by shell tests in
+Blocks 133–136; Block 136 must end with equivalent-or-better coverage proven by the updated coverage
+manifest.
+
+The 21 October 2026 Sketch follow-up passes 512 Core cases and 419 Geometry cases. The complete
+offscreen GUI run passes 225 cases; its single native-viewer lifecycle case is skipped on that backend.
+The native xcb run passes all 17 selected interaction, spline, delivery-regression and viewer-lifecycle
+cases. Repeatable commands are recorded in `docs/development-setup.md`.
 
 ## Dimension workflow hardening
 
@@ -480,7 +498,8 @@ validation remain explicit. Split and corner edits preserve ordered profile ids,
 promotion for fillets. Connected line/arc/spline corners and exact cubic continuation expand Modify.
 Corner geometry, automatic relationships and driving size now share one transaction.
 
-Ellipse and elliptical-arc tools create exact rational conic spans. Weighted curves survive JSON,
+Ellipse creation and internal elliptical-arc operations use exact rational conic spans; the standalone
+elliptical-arc tool has been removed. Weighted curves survive JSON,
 topology/solver materialization, editing, sampling and OCCT feature adapters. Tangent tools require a
 real source curve and persist contact/tangency together with the new shape. Conic and slot coverage
 has been restored with `[core][sketch-conics]`, `[geometry][sketch-conics]` and

@@ -1,4 +1,7 @@
 #include "blcad/core/part_document_json.hpp"
+#include "blcad/geometry/sketch_region_finder.hpp"
+#include "blcad/geometry/viewport_scene.hpp"
+#include "blcad/gui/gui_interactive_profile_materialization.hpp"
 #include "blcad/gui/shell/shell_feature_tools.hpp"
 #include "blcad/gui/shell/shell_ribbon.hpp"
 #include "blcad/gui/shell/shell_sketch_tools.hpp"
@@ -13,6 +16,7 @@
 #include <QDoubleSpinBox>
 #include <QEventLoop>
 #include <QKeyEvent>
+#include <QLabel>
 #include <QMouseEvent>
 #include <QPushButton>
 #include <QScreen>
@@ -269,6 +273,13 @@ TEST_CASE("Associative projection and break link are previewed persisted and und
   CHECK(json(window) == before);
   REQUIRE(window.sketch_tools().apply_operation(project));
   const auto projected = json(window);
+  auto committed_scene = geometry::ViewportSceneBuilder{}.build_part(
+      *window.session().part_document(), *window.session().part_shape_cache());
+  REQUIRE(committed_scene);
+  CHECK(std::any_of(committed_scene.value().begin(), committed_scene.value().end(),
+                    [&](const auto& item) {
+                      return item.semantic_id == "sketch/" + id.value() + "/entity/reference";
+                    }));
   auto point = project;
   point.kind = Kind::ProjectPoint;
   point.projected_line.reset();
@@ -697,4 +708,721 @@ TEST_CASE("Visible Sketch ribbon buttons complete every numeric operation and re
     CHECK(json(window) == after);
   }
   capture_ui(window, QStringLiteral("finished-") + command);
+}
+
+namespace {
+void pointer_at(ShellWindow& window, Point2 point, QEvent::Type type) {
+  auto screen = window.viewport().sketch_plane_to_screen(point);
+  REQUIRE(screen);
+  QPointF local(screen.value().x, screen.value().y);
+  QMouseEvent event(type, local, QPointF(window.viewport().mapToGlobal(local.toPoint())),
+                    type == QEvent::MouseMove ? Qt::NoButton : Qt::LeftButton,
+                    type == QEvent::MouseButtonRelease ? Qt::NoButton : Qt::LeftButton,
+                    Qt::NoModifier);
+  QApplication::sendEvent(&window.viewport(), &event);
+}
+void pick_at(ShellWindow& window, Point2 point) {
+  pointer_at(window, point, QEvent::MouseButtonPress);
+  pointer_at(window, point, QEvent::MouseButtonRelease);
+}
+void seed_pair_and_axis(ShellWindow& window) {
+  const auto id = *window.active_sketch();
+  REQUIRE(window.session().commit_part_transaction("Symmetry sources", [id](PartDocument& part) {
+    auto sketch = *part.find_sketch(id);
+    for (auto line : {LineSegment::create(SketchEntityId("axis"), {20, -30}, {20, 30},
+                                          SketchLineRole::Centerline)
+                          .value(),
+                      LineSegment::create(SketchEntityId("left"), {10, 5}, {10, 15}).value(),
+                      LineSegment::create(SketchEntityId("right"), {31, 5}, {32, 15}).value()}) {
+      auto added = sketch.add_entity(line);
+      if (!added)
+        return added;
+    }
+    return part.update_sketch(std::move(sketch));
+  }));
+  window.sketch_tools().publish_scene();
+}
+} // namespace
+
+TEST_CASE(
+    "Transform editor accepts multiple picks and mouse drag without changing history until Apply",
+    "[gui][sketch-transform-pattern][sketch-mouse-operations]") {
+  ShellWindow window;
+  enter(window);
+  seed_pair_and_axis(window);
+  window.resize(1280, 800);
+  window.show();
+  qApp->processEvents();
+  window.session().selection().clear();
+  window.sketch_tools().refresh_enablement();
+  const auto before = json(window);
+  auto* action = window.sketch_tools().findChild<QAction*>("sketch.operation.move");
+  REQUIRE(action);
+  REQUIRE(action->isEnabled());
+  bool visited = false;
+  QTimer::singleShot(0, &window, [&] {
+    auto* dialog = window.findChild<QDialog*>("sketch.operation.dialog");
+    REQUIRE(dialog);
+    CHECK_FALSE(dialog->isModal());
+    pick_at(window, {10, 10});
+    pick_at(window, {31.5, 10});
+    auto* drag = dialog->findChild<QPushButton*>("sketch.operation.drag");
+    REQUIRE(drag);
+    drag->click();
+    pointer_at(window, {40, 40}, QEvent::MouseButtonPress);
+    REQUIRE(window.viewport().sketch_snap_result());
+    const auto start = window.viewport().sketch_snap_result()->snapped_point;
+    pointer_at(window, {50, 50}, QEvent::MouseMove);
+    pointer_at(window, {50, 50}, QEvent::MouseButtonRelease);
+    REQUIRE(window.viewport().sketch_snap_result());
+    const auto end = window.viewport().sketch_snap_result()->snapped_point;
+    CHECK(json(window) == before);
+    CHECK(window.viewport().sketch_operation_preview_count() == 2U);
+    auto* x = dialog->findChild<QDoubleSpinBox*>("sketch.operation.x");
+    auto* y = dialog->findChild<QDoubleSpinBox*>("sketch.operation.y");
+    REQUIRE(x);
+    REQUIRE(y);
+    CHECK(x->value() == Catch::Approx(end.x - start.x).margin(1e-5));
+    CHECK(y->value() == Catch::Approx(end.y - start.y).margin(1e-5));
+    // Native rays are pixel-quantized. Refine the mouse placement with exact numeric input.
+    x->setValue(10);
+    y->setValue(10);
+    CHECK(json(window) == before);
+    CHECK(window.viewport().sketch_operation_preview_count() == 2U);
+    auto* controls = dialog->findChild<QDialogButtonBox*>();
+    REQUIRE(controls);
+    REQUIRE(controls->button(QDialogButtonBox::Ok)->isEnabled());
+    visited = true;
+    controls->button(QDialogButtonBox::Ok)->click();
+  });
+  action->trigger();
+  REQUIRE(visited);
+  const auto* sketch = window.session().part_document()->find_sketch(*window.active_sketch());
+  CHECK(sketch->find_line_segment(SketchEntityId("left"))->start() == Point2{20, 15});
+  CHECK(sketch->find_line_segment(SketchEntityId("right"))->end() == Point2{42, 25});
+  REQUIRE(window.session().undo());
+  CHECK(json(window) == before);
+}
+
+TEST_CASE("Mirror and symmetry editors pick a centerline then multiple elements",
+          "[gui][sketch-transform-pattern][sketch-mouse-operations]") {
+  ShellWindow window;
+  enter(window);
+  seed_pair_and_axis(window);
+  window.resize(1280, 800);
+  window.show();
+  qApp->processEvents();
+  bool symmetric = false;
+  SECTION("mirror creates copies") {}
+  SECTION("symmetry constrains existing elements") {
+    symmetric = true;
+  }
+  QAction* action = nullptr;
+  for (auto* candidate : window.sketch_tools().findChildren<QAction*>())
+    if (symmetric ? candidate->text() == QStringLiteral("Symmetrisch")
+                  : candidate->objectName() == QStringLiteral("sketch.operation.mirror"))
+      action = candidate;
+  REQUIRE(action);
+  REQUIRE(action->isEnabled());
+  const auto before = json(window);
+  bool visited = false;
+  QTimer::singleShot(0, &window, [&] {
+    auto* dialog = window.findChild<QDialog*>("sketch.operation.dialog");
+    REQUIRE(dialog);
+    pick_at(window, {20, 20});
+    pick_at(window, {10, 10});
+    pick_at(window, {31.5, 10});
+    CHECK(json(window) == before);
+    auto* controls = dialog->findChild<QDialogButtonBox*>();
+    REQUIRE(controls);
+    CHECK(controls->button(QDialogButtonBox::Ok)->isEnabled());
+    visited = true;
+    if (controls->button(QDialogButtonBox::Ok)->isEnabled())
+      controls->button(QDialogButtonBox::Ok)->click();
+    else
+      dialog->reject();
+  });
+  action->trigger();
+  REQUIRE(visited);
+  const auto id = *window.active_sketch();
+  const auto* sketch = window.session().part_document()->find_sketch(id);
+  CHECK(sketch->find_line_segment(SketchEntityId("axis"))->role() == SketchLineRole::Centerline);
+  if (symmetric) {
+    auto catalog = window.session().sketch_constraint_catalog(id);
+    REQUIRE(catalog);
+    REQUIRE(catalog.value().constraints().size() == 2U);
+    const auto* a = sketch->find_line_segment(SketchEntityId("left"));
+    const auto* b = sketch->find_line_segment(SketchEntityId("right"));
+    CHECK(a->start().x + b->start().x == Catch::Approx(40).margin(1e-7));
+    CHECK(a->end().x + b->end().x == Catch::Approx(40).margin(1e-7));
+  } else
+    CHECK(sketch->line_segments().size() == 6U);
+  REQUIRE(window.session().undo());
+  CHECK(json(window) == before);
+  if (symmetric)
+    CHECK(window.session().sketch_constraint_catalog(id).value().constraints().empty());
+}
+
+TEST_CASE(
+    "Sketch helper line roles and splines persist while helper geometry stays out of profiles",
+    "[gui][sketch-create][sketch-mouse-operations]") {
+  ShellWindow window;
+  enter(window);
+  const auto id = *window.active_sketch();
+  auto& tools = window.sketch_tools();
+  for (auto tool : {GuiSketchCreateTool::Centerline, GuiSketchCreateTool::ConstructionLine}) {
+    REQUIRE(tools.begin_tool(tool));
+    const bool center = tool == GuiSketchCreateTool::Centerline;
+    REQUIRE(tools.add_pick({-10, center ? -10.0 : -20.0}));
+    REQUIRE(tools.add_pick({10, center ? 10.0 : -20.0}));
+    tools.cancel_tool();
+  }
+  REQUIRE(tools.begin_tool(GuiSketchCreateTool::Spline));
+  for (Point2 p : {Point2{0, 10}, Point2{10, 20}, Point2{20, -10}, Point2{30, 10}})
+    REQUIRE(tools.add_pick(p));
+  REQUIRE(tools.finish_tool());
+  const auto* sketch = window.session().part_document()->find_sketch(id);
+  REQUIRE(sketch->spline_segments().size() == 3U);
+  CHECK_FALSE(sketch->spline_segments().front().rational());
+  CHECK(sketch->line_segments().back().role() == SketchLineRole::Construction);
+  auto topology = SketchTopology::migrate_legacy(*sketch);
+  REQUIRE(topology);
+  CHECK(topology.value()
+            .find_entity("entity/" + sketch->line_segments().back().id().value())
+            ->construction());
+  auto scene = geometry::ViewportSceneBuilder{}.build_part(*window.session().part_document(),
+                                                           *window.session().part_shape_cache());
+  REQUIRE(scene);
+  CHECK(std::count_if(scene.value().begin(), scene.value().end(), [](const auto& i) {
+          return i.line_role == SketchLineRole::Centerline ||
+                 i.line_role == SketchLineRole::Construction;
+        }) == 2);
+  CHECK_FALSE(tools.findChild<QAction*>("sketch.create.elliptical_arc"));
+  window.resize(1280, 800);
+  window.show();
+  qApp->processEvents();
+  capture_ui(window, "helper-line-styles");
+  auto closed = *sketch;
+  REQUIRE(
+      closed.add_entity(LineSegment::create(SketchEntityId("close.1"), {10, 0}, {10, 20}).value()));
+  REQUIRE(
+      closed.add_entity(LineSegment::create(SketchEntityId("close.2"), {10, 20}, {0, 20}).value()));
+  REQUIRE(
+      closed.add_entity(LineSegment::create(SketchEntityId("close.3"), {0, 20}, {0, 0}).value()));
+  auto region =
+      geometry::SketchRegionFinder{}.find_single_region(*window.session().part_document(), closed);
+  REQUIRE(region);
+  CHECK(region.value().line_segments.size() == 4U);
+  const auto helper_id = sketch->line_segments().back().id();
+  select_line(window, helper_id.value());
+  REQUIRE(tools.apply_constraint(SketchSolverConstraintKind::Fixed));
+  CHECK(window.session()
+            .part_document()
+            ->find_sketch(id)
+            ->find_line_segment(helper_id)
+            ->construction());
+  const auto saved = json(window);
+  QTemporaryDir dir;
+  REQUIRE(dir.isValid());
+  REQUIRE(window.session().save_as(dir.filePath("helpers.blcad.json").toStdString()));
+  GuiDocumentSession reopened;
+  REQUIRE(reopened.open_file(dir.filePath("helpers.blcad.json").toStdString()));
+  CHECK(serialize_part_document_to_json(*reopened.part_document()).value() == saved);
+}
+
+TEST_CASE("Split accepts line midpoint hits through the actual viewport",
+          "[gui][sketch-mouse-operations]") {
+  ShellWindow window;
+  enter(window);
+  const auto before = json(window);
+  window.sketch_tools().begin_modify_tool(SketchModifyKind::Split);
+  pick_at(window, {5, 0});
+  window.sketch_tools().cancel_tool();
+  const auto* sketch = window.session().part_document()->find_sketch(*window.active_sketch());
+  REQUIRE(sketch->line_segments().size() == 2U);
+  CHECK(sketch->find_line_segment(SketchEntityId("line"))->end() == Point2{5, 0});
+  REQUIRE(window.session().undo());
+  CHECK(json(window) == before);
+}
+
+TEST_CASE(
+    "Projection chooser includes other sketches and projects finite curves in plane coordinates",
+    "[gui][sketch-project][sketch-mouse-operations]") {
+  ShellWindow window;
+  enter(window);
+  REQUIRE(window.session().commit_part_transaction("Projection source", [](PartDocument& part) {
+    auto source = Sketch::create(SketchId("source"), "Source", DatumPlaneId("datum.xy"));
+    if (!source)
+      return Result<std::size_t>::failure(source.error());
+    auto added = source.value().add_entity(
+        LineSegment::create(SketchEntityId("edge"), {3, 7}, {13, 7}).value());
+    if (!added)
+      return added;
+    return part.add_sketch(std::move(source.value()));
+  }));
+  const auto before = json(window);
+  bool visited = false;
+  QTimer::singleShot(0, &window, [&] {
+    auto* dialog = window.findChild<QDialog*>("sketch.operation.dialog");
+    REQUIRE(dialog);
+    auto* source = dialog->findChild<QComboBox*>("sketch.operation.source");
+    REQUIRE(source);
+    REQUIRE(source->count() == 1);
+    CHECK(window.viewport().sketch_operation_preview_count() == 1U);
+    CHECK(json(window) == before);
+    auto* controls = dialog->findChild<QDialogButtonBox*>();
+    REQUIRE(controls);
+    visited = true;
+    controls->button(QDialogButtonBox::Ok)->click();
+  });
+  auto* action = window.sketch_tools().findChild<QAction*>("sketch.operation.project");
+  REQUIRE(action);
+  action->trigger();
+  REQUIRE(visited);
+  const auto* result = window.session().part_document()->find_sketch(*window.active_sketch());
+  REQUIRE(result->line_segments().size() == 2U);
+  CHECK(result->line_segments().back().start() == Point2{3, 7});
+  CHECK(result->line_segments().back().end() == Point2{13, 7});
+  REQUIRE(window.session().undo());
+  CHECK(json(window) == before);
+}
+
+TEST_CASE("Every numeric transform receives a live drag through the modeless editor",
+          "[gui][sketch-mouse-operations]") {
+  ShellWindow window;
+  enter(window);
+  select_line(window);
+  const char* command = "copy";
+  Point2 anchor{40, 40}, destination{50, 50};
+  const char* field = "x";
+  double expected = 10;
+  SECTION("copy") {}
+  SECTION("rotate") {
+    command = "rotate";
+    anchor = {40, 40};
+    destination = {-40, 40};
+    field = "value";
+    expected = 90;
+  }
+  SECTION("scale") {
+    command = "scale";
+    anchor = {20, 20};
+    destination = {40, 40};
+    field = "value";
+    expected = 2;
+  }
+  SECTION("rectangular pattern") {
+    command = "rectangular_pattern";
+  }
+  SECTION("circular pattern") {
+    command = "circular_pattern";
+    anchor = {40, 40};
+    destination = {-40, 40};
+    field = "value";
+    expected = 90;
+  }
+  SECTION("offset") {
+    command = "offset";
+    destination = {40, 50};
+    field = "value";
+    expected = 10;
+  }
+  auto* action =
+      window.sketch_tools().findChild<QAction*>(QStringLiteral("sketch.operation.") + command);
+  REQUIRE(action);
+  REQUIRE(action->isEnabled());
+  const auto before = json(window);
+  bool visited = false;
+  QTimer::singleShot(0, &window, [&] {
+    auto* dialog = window.findChild<QDialog*>("sketch.operation.dialog");
+    REQUIRE(dialog);
+    pointer_at(window, anchor, QEvent::MouseButtonPress);
+    pointer_at(window, destination, QEvent::MouseMove);
+    pointer_at(window, destination, QEvent::MouseButtonRelease);
+    auto* input = dialog->findChild<QDoubleSpinBox*>(QStringLiteral("sketch.operation.") + field);
+    REQUIRE(input);
+    CHECK(input->value() == Catch::Approx(expected).margin(1e-5));
+    CHECK(window.viewport().sketch_operation_preview_count() > 0U);
+    CHECK(json(window) == before);
+    pointer_at(window, {45, 50}, QEvent::MouseMove);
+    CHECK(input->value() == Catch::Approx(expected).margin(1e-5));
+    visited = true;
+    dialog->reject();
+  });
+  action->trigger();
+  REQUIRE(visited);
+  CHECK(json(window) == before);
+  CHECK_FALSE(window.session().task().active());
+  CHECK(window.viewport().sketch_operation_preview_count() == 0U);
+}
+
+TEST_CASE("Disconnected line offsets commit together and preserve helper roles",
+          "[gui][sketch-offset-project][sketch-mouse-operations]") {
+  ShellWindow window;
+  enter(window);
+  seed_pair_and_axis(window);
+  const auto before = json(window);
+  GuiSketchOperationRequest offset;
+  offset.kind = Kind::Offset;
+  offset.entities = {SketchEntityId("line"), SketchEntityId("axis")};
+  offset.value = 3;
+  auto preview = window.sketch_tools().preview_operation(offset);
+  REQUIRE(preview);
+  CHECK(preview.value().created_entities.size() == 2U);
+  CHECK(json(window) == before);
+  REQUIRE(window.sketch_tools().apply_operation(offset));
+  const auto* sketch = window.session().part_document()->find_sketch(*window.active_sketch());
+  CHECK(sketch->line_segments().size() == 6U);
+  CHECK(sketch->line_segments().back().role() == SketchLineRole::Centerline);
+  REQUIRE(window.session().undo());
+  CHECK(json(window) == before);
+}
+
+TEST_CASE("Symmetry respects fixed geometry and never leaves a partial constraint batch",
+          "[gui][sketch-mouse-operations]") {
+  ShellWindow window;
+  enter(window);
+  seed_pair_and_axis(window);
+  for (const auto* id : {"left", "right"}) {
+    select_line(window, id);
+    REQUIRE(window.sketch_tools().apply_constraint(SketchSolverConstraintKind::Fixed));
+  }
+  const auto before = json(window);
+  const auto old_history = std::string(window.session().undo_label());
+  const auto id = *window.active_sketch();
+  const auto catalog = window.session().sketch_constraint_catalog(id).value();
+  GuiSketchOperationRequest symmetry;
+  symmetry.kind = Kind::Symmetric;
+  symmetry.axis = SketchEntityId("axis");
+  symmetry.entities = {SketchEntityId("left"), SketchEntityId("right")};
+  CHECK_FALSE(window.sketch_tools().preview_operation(symmetry));
+  CHECK_FALSE(window.sketch_tools().apply_operation(symmetry));
+  CHECK(json(window) == before);
+  CHECK(window.session().undo_label() == old_history);
+  CHECK(window.session().sketch_constraint_catalog(id).value() == catalog);
+}
+
+TEST_CASE("Oblique circle projection preserves exact rational conics away from the origin",
+          "[gui][sketch-project][sketch-mouse-operations]") {
+  ShellWindow window;
+  enter(window);
+  REQUIRE(window.session().commit_part_transaction("Oblique circle source", [](PartDocument& part) {
+    const double a = std::sqrt(.5);
+    auto plane = ConstructionPlane::create_explicit(ConstructionPlaneId("tilted"), "Tilted",
+                                                    {4, 6, 10}, {1, 0, 0}, {0, a, a}, {0, -a, a});
+    if (!plane)
+      return Result<std::size_t>::failure(plane.error());
+    auto added = part.add_construction_plane(plane.value());
+    if (!added)
+      return added;
+    auto parameter = Parameter::create_length(ParameterId("circle.diameter"), "Diameter",
+                                              Quantity::length_mm(20).value());
+    if (!parameter)
+      return Result<std::size_t>::failure(parameter.error());
+    added = part.add_parameter(parameter.value());
+    if (!added)
+      return added;
+    auto source = Sketch::create(SketchId("source.circle"), "Source", DatumPlaneId("tilted"));
+    if (!source)
+      return Result<std::size_t>::failure(source.error());
+    added = source.value().add_profile(
+        CircleProfile::create(ProfileId("circle"), ParameterId("circle.diameter"), {5, 7}).value());
+    if (!added)
+      return added;
+    return part.add_sketch(source.value());
+  }));
+  GuiSketchOperationRequest project;
+  project.kind = Kind::ProjectGeometry;
+  project.source_sketch = SketchId("source.circle");
+  project.source_entity = SketchEntityId("circle");
+  const auto before = json(window);
+  auto preview = window.sketch_tools().preview_operation(project);
+  REQUIRE(preview);
+  REQUIRE(preview.value().candidate.spline_segments().size() == 4U);
+  for (const auto& spline : preview.value().candidate.spline_segments()) {
+    CHECK(spline.rational());
+    for (double t : {.1, .4, .8}) {
+      const auto p = spline.curve().point(t);
+      const double dx = p.x - 9, dy = p.y - (6 + 7 * std::sqrt(.5));
+      CHECK(dx * dx / 100 + dy * dy / 50 == Catch::Approx(1).margin(1e-12));
+    }
+  }
+  CHECK(json(window) == before);
+  REQUIRE(window.sketch_tools().apply_operation(project));
+  REQUIRE(window.session().undo());
+  CHECK(json(window) == before);
+}
+
+namespace {
+void finish_spline_by_right_click(ShellWindow& window) {
+  QPointF local(window.viewport().rect().center());
+  QMouseEvent press(QEvent::MouseButtonPress, local,
+                    QPointF(window.viewport().mapToGlobal(local.toPoint())), Qt::RightButton,
+                    Qt::RightButton, Qt::NoModifier);
+  QApplication::sendEvent(&window.viewport(), &press);
+  QMouseEvent release(QEvent::MouseButtonRelease, local,
+                      QPointF(window.viewport().mapToGlobal(local.toPoint())), Qt::RightButton,
+                      Qt::NoButton, Qt::NoModifier);
+  QApplication::sendEvent(&window.viewport(), &release);
+  qApp->processEvents();
+}
+void enter_empty_spline_sketch(ShellWindow& window) {
+  REQUIRE(window.new_part(QStringLiteral("Spline")));
+  REQUIRE(window.viewport().select_semantic("datum-plane/datum.xy"));
+  REQUIRE(window.create_sketch_on_selection());
+}
+} // namespace
+
+TEST_CASE("Spline accepts unlimited fit points and right-click commits the complete curve once",
+          "[gui][spline-create-workflow][sketch-create]") {
+  ShellWindow window;
+  enter_empty_spline_sketch(window);
+  const auto id = *window.active_sketch();
+  const auto before = json(window);
+  auto& tools = window.sketch_tools();
+  REQUIRE(tools.begin_tool(GuiSketchCreateTool::Spline));
+  const std::vector<Point2> points{{0, 0}, {30, 0}, {50, 20}, {30, 40}, {0, 40}, {-20, 20}, {0, 0}};
+  for (Point2 point : points) {
+    REQUIRE(tools.add_pick(point));
+    CHECK(tools.tool_active());
+    CHECK(json(window) == before);
+  }
+  finish_spline_by_right_click(window);
+  CHECK_FALSE(tools.tool_active());
+  const auto* sketch = window.session().part_document()->find_sketch(id);
+  REQUIRE(sketch->spline_segments().size() == points.size() - 1);
+  for (std::size_t i = 0; i < sketch->spline_segments().size(); ++i) {
+    const auto& segment = sketch->spline_segments()[i];
+    CHECK(segment.start() == points[i]);
+    CHECK(segment.end() == points[i + 1]);
+    const auto& next = sketch->spline_segments()[(i + 1) % sketch->spline_segments().size()];
+    const auto incoming = segment.curve().derivative(1);
+    const auto outgoing = next.curve().derivative(0);
+    CHECK(incoming.x == Catch::Approx(outgoing.x).margin(1e-8));
+    CHECK(incoming.y == Catch::Approx(outgoing.y).margin(1e-8));
+  }
+  const auto after = json(window);
+  REQUIRE(window.session().undo());
+  CHECK(json(window) == before);
+  REQUIRE(window.session().redo());
+  CHECK(json(window) == after);
+  QTemporaryDir dir;
+  REQUIRE(dir.isValid());
+  REQUIRE(window.session().save_as(dir.filePath("fit-spline.blcad.json").toStdString()));
+  GuiDocumentSession reopened;
+  REQUIRE(reopened.open_file(dir.filePath("fit-spline.blcad.json").toStdString()));
+  CHECK(serialize_part_document_to_json(*reopened.part_document()).value() == after);
+}
+
+TEST_CASE("Closed fitted spline contours are selectable extrusion inputs with helper geometry",
+          "[gui][spline-create-workflow][extrude-revolve]") {
+  ShellWindow window;
+  enter_empty_spline_sketch(window);
+  const auto id = *window.active_sketch();
+  auto& tools = window.sketch_tools();
+  bool close_with_line = false, helpers = false, finish_pending = false;
+  SECTION("closed spline") {}
+  SECTION("spline and closing line") {
+    close_with_line = true;
+  }
+  SECTION("closed spline with crossing helper lines") {
+    helpers = true;
+  }
+  SECTION("Finish Sketch completes pending spline") {
+    finish_pending = true;
+  }
+  REQUIRE(tools.begin_tool(GuiSketchCreateTool::Spline));
+  for (Point2 p : {Point2{0, 0}, Point2{40, 0}, Point2{40, 30}, Point2{0, 30}})
+    REQUIRE(tools.add_pick(p));
+  if (!close_with_line)
+    REQUIRE(tools.add_pick({0, 0}));
+  if (!finish_pending)
+    finish_spline_by_right_click(window);
+  if (close_with_line) {
+    REQUIRE(tools.begin_tool(GuiSketchCreateTool::Line));
+    REQUIRE(tools.add_pick({0, 30}));
+    REQUIRE(tools.add_pick({0, 0}));
+    tools.cancel_tool();
+  }
+  if (helpers) {
+    for (auto tool : {GuiSketchCreateTool::Centerline, GuiSketchCreateTool::ConstructionLine}) {
+      REQUIRE(tools.begin_tool(tool));
+      REQUIRE(tools.add_pick({20, -10}));
+      REQUIRE(tools.add_pick({20, 40}));
+      tools.cancel_tool();
+    }
+  }
+  if (!finish_pending) {
+    auto analysis = geometry::SketchFinishService::analyze_unmaterialized(
+        *window.session().part_document(), *window.session().part_document()->find_sketch(id));
+    REQUIRE(analysis);
+    REQUIRE(analysis.value().diagnostics.empty());
+    REQUIRE(analysis.value().regions.size() == 1U);
+    auto raw_profile = prepare_interactive_profile(*window.session().part_document(), id,
+                                                   analysis.value().regions.front().id);
+    REQUIRE(raw_profile);
+  }
+  REQUIRE(window.finish_active_sketch());
+  const auto* sketch = window.session().part_document()->find_sketch(id);
+  REQUIRE(sketch->arc_closed_profiles().size() == 1U);
+  REQUIRE(sketch->spline_segments().size() == (close_with_line ? 3U : 4U));
+  const auto profile = sketch->arc_closed_profiles().front().id();
+  auto scene = geometry::ViewportSceneBuilder{}.build_part(*window.session().part_document(),
+                                                           *window.session().part_shape_cache());
+  REQUIRE(scene);
+  CHECK(std::any_of(scene.value().begin(), scene.value().end(), [&](const auto& item) {
+    return item.semantic_id == "sketch/" + id.value() + "/profile/" + profile.value();
+  }));
+  const auto before = json(window);
+  REQUIRE(window.feature_tools().select_profile(id, profile));
+  REQUIRE(window.feature_tools().begin_extrude());
+  REQUIRE(window.feature_tools().set_numeric_value(10));
+  CHECK(json(window) == before);
+  REQUIRE(window.feature_tools().apply());
+  REQUIRE(window.session().part_shape_cache()->final_shape());
+  const auto summary = geometry::RectangleExtrusionAdapter{}.summarize(
+      *window.session().part_shape_cache()->final_shape());
+  CHECK(summary.solid_count == 1U);
+  CHECK(std::isfinite(summary.volume_mm3));
+  CHECK(summary.volume_mm3 > 0);
+
+  REQUIRE(window.session().undo());
+  CHECK(json(window) == before);
+  REQUIRE(window.session().redo());
+  QTemporaryDir dir;
+  REQUIRE(dir.isValid());
+  REQUIRE(window.session().save_as(dir.filePath("spline-extrusion.blcad.json").toStdString()));
+  GuiDocumentSession reopened;
+  REQUIRE(reopened.open_file(dir.filePath("spline-extrusion.blcad.json").toStdString()));
+  CHECK(serialize_part_document_to_json(*reopened.part_document()).value() == json(window));
+}
+
+TEST_CASE("Mouse picks close a pending spline exactly at its first fit point before extrusion",
+          "[gui][spline-create-workflow][sketch-ui-review]") {
+  ShellWindow window;
+  enter_empty_spline_sketch(window);
+  window.resize(1280, 800);
+  window.show();
+  qApp->processEvents();
+  auto& tools = window.sketch_tools();
+  REQUIRE(tools.begin_tool(GuiSketchCreateTool::Spline));
+  for (Point2 p : {Point2{0, 0}, Point2{30, 0}, Point2{50, 20}, Point2{30, 40}, Point2{0, 40},
+                   Point2{-20, 20}, Point2{.5, .5}}) {
+    pick_at(window, p);
+    qApp->processEvents();
+    REQUIRE(tools.tool_active());
+  }
+  const auto id = *window.active_sketch();
+  finish_spline_by_right_click(window);
+  REQUIRE_FALSE(tools.tool_active());
+  const auto* sketch = window.session().part_document()->find_sketch(id);
+  REQUIRE(sketch->spline_segments().size() == 6U);
+  CHECK(sketch->spline_segments().front().start() == sketch->spline_segments().back().end());
+  capture_ui(window, "closed-fit-spline");
+  REQUIRE(window.finish_active_sketch());
+  REQUIRE(window.feature_tools().begin_extrude());
+  REQUIRE(window.feature_tools().set_numeric_value(10));
+  REQUIRE(window.feature_tools().apply());
+  window.viewport().fit_all();
+  qApp->processEvents();
+  capture_ui(window, "fit-spline-extrusion");
+}
+
+TEST_CASE("Cancelling a pending spline and finishing a one-point spline leave no geometry",
+          "[gui][spline-create-workflow][sketch-create]") {
+  ShellWindow window;
+  enter_empty_spline_sketch(window);
+  const auto before = json(window);
+  auto& tools = window.sketch_tools();
+  REQUIRE(tools.begin_tool(GuiSketchCreateTool::Spline));
+  REQUIRE(tools.add_pick({0, 0}));
+  REQUIRE(tools.add_pick({20, 10}));
+  REQUIRE(tools.add_pick({40, 0}));
+  tools.cancel_tool();
+  CHECK(json(window) == before);
+  REQUIRE(tools.begin_tool(GuiSketchCreateTool::Spline));
+  REQUIRE(tools.add_pick({0, 0}));
+  finish_spline_by_right_click(window);
+  CHECK_FALSE(tools.tool_active());
+  CHECK(json(window) == before);
+}
+
+TEST_CASE(
+    "Completing an open fitted spline preserves the curve without inventing an extrusion face",
+    "[gui][spline-create-workflow][sketch-create]") {
+  ShellWindow window;
+  enter_empty_spline_sketch(window);
+  const auto id = *window.active_sketch();
+  auto& tools = window.sketch_tools();
+  REQUIRE(tools.begin_tool(GuiSketchCreateTool::Spline));
+  REQUIRE(tools.add_pick({0, 0}));
+  REQUIRE(tools.add_pick({20, 20}));
+  REQUIRE(tools.add_pick({40, 0}));
+  SECTION("right-click") {
+    finish_spline_by_right_click(window);
+  }
+  SECTION("Enter") {
+    QKeyEvent enter(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier);
+    QApplication::sendEvent(&window, &enter);
+  }
+  CHECK_FALSE(tools.tool_active());
+  REQUIRE(window.session().part_document()->find_sketch(id)->spline_segments().size() == 2U);
+  REQUIRE(window.finish_active_sketch());
+  CHECK(window.session().part_document()->find_sketch(id)->profile_count() == 0U);
+  CHECK_FALSE(window.feature_tools().begin_extrude());
+}
+
+TEST_CASE("Right-click completes a spline without opening the canvas context menu",
+          "[gui][spline-create-workflow][sketch-delivery-review]") {
+  ShellWindow window;
+  enter_empty_spline_sketch(window);
+  int context_menus = 0;
+  window.viewport().set_context_menu_callback([&](QPoint) { ++context_menus; });
+  finish_spline_by_right_click(window);
+  REQUIRE(context_menus == 1);
+  auto& tools = window.sketch_tools();
+  REQUIRE(tools.begin_tool(GuiSketchCreateTool::Spline));
+  REQUIRE(tools.add_pick({0, 0}));
+  REQUIRE(tools.add_pick({20, 20}));
+  REQUIRE(tools.add_pick({40, 0}));
+  finish_spline_by_right_click(window);
+  CHECK_FALSE(tools.tool_active());
+  CHECK(context_menus == 1);
+  REQUIRE(window.session()
+              .part_document()
+              ->find_sketch(*window.active_sketch())
+              ->spline_segments()
+              .size() == 2U);
+  finish_spline_by_right_click(window);
+  CHECK(context_menus == 2);
+}
+
+TEST_CASE("Copy preview reports dimensions that remain on the original geometry before Apply",
+          "[gui][sketch-transform-pattern][sketch-delivery-review]") {
+  ShellWindow window;
+  enter(window);
+  select_line(window);
+  REQUIRE(window.sketch_tools().apply_dimension(SketchDimensionKind::Length, false));
+  const auto catalog = window.session().sketch_dimension_catalog(*window.active_sketch()).value();
+  REQUIRE(catalog.dimensions().size() == 1U);
+  const auto dimension_id = QString::fromStdString(catalog.dimensions().front().id().value());
+  select_line(window);
+  const auto before = json(window);
+  auto* action = window.sketch_tools().findChild<QAction*>("sketch.operation.copy");
+  REQUIRE(action);
+  REQUIRE(action->isEnabled());
+  bool visited = false;
+  QTimer::singleShot(0, &window, [&] {
+    auto* dialog = window.findChild<QDialog*>("sketch.operation.dialog");
+    REQUIRE(dialog);
+    auto* status = dialog->findChild<QLabel*>("sketch.operation.status");
+    REQUIRE(status);
+    CHECK(status->text().contains(dimension_id));
+    CHECK(json(window) == before);
+    visited = true;
+    dialog->reject();
+  });
+  action->trigger();
+  REQUIRE(visited);
+  CHECK(json(window) == before);
 }

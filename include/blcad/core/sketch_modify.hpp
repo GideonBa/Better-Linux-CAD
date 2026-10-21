@@ -1419,8 +1419,8 @@ private:
     using namespace detail;
     if (const auto* line = sketch.find_line_segment(id)) {
       auto sampler = line_sampler(*line);
-      auto result =
-          LineSegment::create(new_id, sampler_point(*sampler, from), sampler_point(*sampler, to));
+      auto result = LineSegment::create(new_id, sampler_point(*sampler, from),
+                                        sampler_point(*sampler, to), line->role());
       if (result.has_error())
         return Result<SketchModifyCurve>::failure(result.error());
       return Result<SketchModifyCurve>::success(std::move(result.value()));
@@ -1453,7 +1453,7 @@ private:
     using namespace detail;
     if (const auto* line = sketch.find_line_segment(id)) {
       auto result = LineSegment::create(id, replace_end ? line->start() : moved,
-                                        replace_end ? moved : line->end());
+                                        replace_end ? moved : line->end(), line->role());
       if (result.has_error())
         return Result<SketchModifyCurve>::failure(result.error());
       return Result<SketchModifyCurve>::success(std::move(result.value()));
@@ -1787,7 +1787,7 @@ private:
     const bool start_is_corner =
         sketch_modify_distance(line.start(), corner) <= sketch_modify_distance(line.end(), corner);
     auto result = LineSegment::create(line.id(), start_is_corner ? tangent : line.start(),
-                                      start_is_corner ? line.end() : tangent);
+                                      start_is_corner ? line.end() : tangent, line.role());
     if (result.has_error())
       return Result<SketchModifyCurve>::failure(result.error());
     return Result<SketchModifyCurve>::success(std::move(result.value()));

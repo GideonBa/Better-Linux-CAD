@@ -7,6 +7,11 @@ previews, and automatic-constraint previews are likewise transient; Block 111 ad
 field — created lines, closed profiles, and construction geometry persist through the existing
 Sketch and PartDocument authorities.
 
+Sketch `line_segments[]` optionally stores `role`: `geometry` (default when missing),
+`construction` (dashed), or `centerline` (dash-dot). Both helper roles remain ordinary selectable
+sketch entities for constraints and transformations, and are excluded from automatic profile
+inference. The role survives save/open, solver materialization, splitting and copying.
+
 ## Project structure
 
 ```text

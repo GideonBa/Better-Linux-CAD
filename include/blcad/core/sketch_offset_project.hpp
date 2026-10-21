@@ -20,6 +20,58 @@ struct SketchOffsetProjectResult {
 
 class SketchOffsetProjectService {
 public:
+  // Offset each connected chain independently; a disconnected multiselection is one transaction.
+  [[nodiscard]] static Result<SketchOffsetProjectResult>
+  offset_selection(const Sketch& source, const std::vector<SketchEntityId>& ids, double distance) {
+    if (ids.empty())
+      return fail("offset", "offset selection is empty");
+    std::vector<std::vector<SketchEntityId>> groups;
+    std::vector<bool> used(ids.size());
+    for (std::size_t i = 0; i < ids.size(); ++i) {
+      if (!source.find_line_segment(ids[i]) && !source.find_arc_segment(ids[i]))
+        return fail(ids[i].value(), "offset requires lines or circular arcs");
+      if (std::find(ids.begin(), ids.begin() + i, ids[i]) != ids.begin() + i)
+        return fail(ids[i].value(), "duplicate offset source");
+    }
+    const auto connected = [&](const SketchEntityId& a, const SketchEntityId& b) {
+      const auto* x = source.find_line_segment(a);
+      const auto* y = source.find_line_segment(b);
+      if (!x || !y)
+        return false;
+      for (Point2 p : {x->start(), x->end()})
+        for (Point2 q : {y->start(), y->end()})
+          if (detail::sketch_modify_distance(p, q) <= detail::kSketchModifyPointTolerance)
+            return true;
+      return false;
+    };
+    for (std::size_t i = 0; i < ids.size(); ++i) {
+      if (used[i])
+        continue;
+      used[i] = true;
+      std::vector<SketchEntityId> group{ids[i]};
+      for (std::size_t k = 0; k < group.size(); ++k)
+        for (std::size_t j = 0; j < ids.size(); ++j)
+          if (!used[j] && connected(group[k], ids[j])) {
+            used[j] = true;
+            group.push_back(ids[j]);
+          }
+      groups.push_back(std::move(group));
+    }
+    Sketch candidate = source;
+    std::vector<SketchEntityId> created;
+    for (const auto& group : groups) {
+      auto offset = group.size() == 1U && source.find_line_segment(group.front())
+                        ? offset_lines(candidate, group, distance)
+                        : offset_chain(candidate, group, distance);
+      if (!offset)
+        return offset;
+      candidate = std::move(offset.value().sketch);
+      created.insert(created.end(), offset.value().created_entities.begin(),
+                     offset.value().created_entities.end());
+    }
+    return Result<SketchOffsetProjectResult>::success({std::move(candidate), std::move(created)});
+  }
+
   // Orders an unordered connected selection and reverses local traversal where
   // needed. Original entities and their orientation are never changed.
   [[nodiscard]] static Result<SketchOffsetProjectResult>
@@ -105,8 +157,9 @@ public:
         return fail("offset", "offset selection is disconnected");
       const auto i = *found;
       const bool forward = ends[i].first == current;
-      auto line = LineSegment::create(lines[i]->id(), forward ? lines[i]->start() : lines[i]->end(),
-                                      forward ? lines[i]->end() : lines[i]->start());
+      auto line =
+          LineSegment::create(lines[i]->id(), forward ? lines[i]->start() : lines[i]->end(),
+                              forward ? lines[i]->end() : lines[i]->start(), lines[i]->role());
       if (!line)
         return Result<SketchOffsetProjectResult>::failure(line.error());
       oriented.emplace_back(std::move(line.value()));
@@ -129,7 +182,8 @@ public:
       if (!added)
         return Result<SketchOffsetProjectResult>::failure(added.error());
     }
-    if (closed) {
+    if (closed && std::none_of(lines.begin(), lines.end(),
+                               [](const auto* line) { return line->construction(); })) {
       std::size_t n = 1;
       while (candidate.has_profile_id(ProfileId("profile.offset." + std::to_string(n))))
         ++n;
@@ -215,7 +269,7 @@ public:
     std::vector<SketchEntityId> created;
     for (std::size_t i = 0; i < lines.size(); ++i) {
       const auto id = next_id(source, lines[i]->id().value() + ".offset.");
-      auto line = LineSegment::create(id, shifted[i].a, shifted[i].b);
+      auto line = LineSegment::create(id, shifted[i].a, shifted[i].b, lines[i]->role());
       if (line.has_error()) return Result<SketchOffsetProjectResult>::failure(line.error());
       const Point2 d{lines[i]->end().x - lines[i]->start().x,
                      lines[i]->end().y - lines[i]->start().y};

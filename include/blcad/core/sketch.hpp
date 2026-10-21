@@ -251,15 +251,25 @@ private:
   std::optional<SketchConstraintId> direction_constraint_;
 };
 
+enum class SketchLineRole { Geometry, Construction, Centerline };
+
 class LineSegment {
 public:
-  [[nodiscard]] static Result<LineSegment> create(SketchEntityId id, Point2 start, Point2 end);
+  [[nodiscard]] static Result<LineSegment> create(SketchEntityId id, Point2 start, Point2 end,
+                                                  SketchLineRole role = SketchLineRole::Geometry);
+  [[nodiscard]] SketchLineRole role() const noexcept {
+    return role_;
+  }
+  [[nodiscard]] bool construction() const noexcept {
+    return role_ != SketchLineRole::Geometry;
+  }
   [[nodiscard]] const SketchEntityId& id() const noexcept;
   [[nodiscard]] Point2 start() const noexcept;
   [[nodiscard]] Point2 end() const noexcept;
 
 private:
-  LineSegment(SketchEntityId id, Point2 start, Point2 end);
+  LineSegment(SketchEntityId id, Point2 start, Point2 end, SketchLineRole role);
+  SketchLineRole role_{SketchLineRole::Geometry};
   SketchEntityId id_;
   Point2 start_;
   Point2 end_;

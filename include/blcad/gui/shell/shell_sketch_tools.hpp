@@ -9,6 +9,7 @@
 
 #include <QObject>
 
+#include <functional>
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -52,6 +53,7 @@ public:
                               GuiSketchSnapKind kind = GuiSketchSnapKind::None,
                               std::optional<SketchEntityId> tangent_reference = std::nullopt);
   [[nodiscard]] bool complete_tool();
+  [[nodiscard]] bool finish_tool(); // Commit an active fitted spline; discard incomplete picks.
   void cancel_tool();
   [[nodiscard]] bool tool_active() const;
   [[nodiscard]] Result<std::size_t> apply_constraint(SketchSolverConstraintKind kind);
@@ -159,8 +161,14 @@ private:
   QAction* project_action_{nullptr};
   QAction* break_link_action_{nullptr};
   bool operation_preview_active_{false};
+  std::function<void(GuiSketchPointerPhase, Point2, const std::optional<GuiSketchHit>&)>
+      operation_phase_;
+  std::function<void(Point2)> operation_pointer_;
+  std::function<void()> operation_selection_;
+  std::function<void()> close_operation_;
 
   std::optional<GuiSketchCreateController> create_controller_;
+  bool suppress_tool_right_release_{false};
   std::optional<GuiSketchDragController> drag_controller_;
   // Armed Trim/Extend/Split modal tool; the next curve press runs the op.
   std::optional<SketchModifyKind> modify_tool_;

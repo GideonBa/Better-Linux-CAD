@@ -149,7 +149,7 @@ Canonical contracts:
 ### Blocks 111–112 — Sketch creation — Implemented
 
 Block 111 creates points, lines, polylines, rectangle families, polygons, centerlines, and construction
-geometry. Block 112 adds exact full circles, circular arcs, exact rational ellipses/elliptical arcs,
+geometry. Block 112 adds exact full circles, circular arcs and exact rational ellipses,
 and line/arc slot profiles through the same interaction and transaction boundary. Shell hardening
 adds reference-based tangent construction, persistent dimension placement and inline editing, open
 Sketch completion, profile-aware splitting/corners and spline continuation. These changes and their
@@ -546,6 +546,20 @@ Sequence contract: `docs/gui-shell-reset-sequence-mvp9r.md`.
 - Block 136 — Feature full coverage: remaining feature commands (Fillet, Chamfer, Shell, Draft,
   Pattern, Mirror, Boolean, Transform, Sweep, Loft, Surface, Measure, Assembly), feature edit via
   browser double-click, acceptance coverage.
+
+### Sketch workflow follow-up — 21 October 2026
+
+The replacement shell now supports nonmodal transforms with multiple curve picks, box selection,
+snapped dragging and numeric refinement; separate axis/element picking for Mirror and Symmetric;
+persistent dashed construction and dash-dot center lines; orthographic projection with visible
+committed references; and fitted spline creation until right-click, including closure and extrusion.
+Closed spline and mixed spline/line contours remain usable alongside helper geometry. The
+elliptical-arc GUI command is removed; exact conic spans remain available internally. These are
+implemented usability improvements, not acceptance of the remaining Block-136 feature surface.
+
+Contracts and repeatable proof: `docs/gui-sketch-transform-pattern-mvp8.md`,
+`docs/gui-sketch-offset-project-mvp8.md`, `docs/gui-sketch-spline-text-mvp8.md`, and
+`docs/development-setup.md`.
 
 ## Current next technical step — Block 136
 

@@ -79,7 +79,7 @@ public:
       if (current.reference())
         return Result<Sketch>::failure(Error::validation(
             current.id(), "authored legacy curves cannot materialize as reference geometry"));
-      if (current.construction())
+      if (current.construction() && current.kind() != SketchTopologyEntityKind::Line)
         return Result<Sketch>::failure(Error::validation(
             current.id(),
             "construction curve flags require canonical Sketch topology JSON persistence"));
@@ -91,7 +91,12 @@ public:
         auto end = point(current, 1U);
         if (start.has_error()) return Result<Sketch>::failure(start.error());
         if (end.has_error()) return Result<Sketch>::failure(end.error());
-        auto line = LineSegment::create(id.value(), start.value(), end.value());
+        const auto* original = source.find_line_segment(id.value());
+        const auto role = current.construction() ? (original && original->construction()
+                                                        ? original->role()
+                                                        : SketchLineRole::Construction)
+                                                 : SketchLineRole::Geometry;
+        auto line = LineSegment::create(id.value(), start.value(), end.value(), role);
         if (line.has_error()) return Result<Sketch>::failure(line.error());
         auto added = result.value().add_entity(std::move(line.value()));
         if (added.has_error()) return Result<Sketch>::failure(added.error());

@@ -969,9 +969,16 @@ driving_dimension_from_json(const json& dimension_json) {
     return sketch;
 
   for (const auto& line_json : sketch_json.value("line_segments", json::array())) {
+    const auto spelling = line_json.value("role", std::string("geometry"));
+    if (spelling != "geometry" && spelling != "construction" && spelling != "centerline")
+      return Result<Sketch>::failure(
+          Error::validation("sketch.line.role", "unknown sketch line role"));
+    const auto role = spelling == "construction" ? SketchLineRole::Construction
+                      : spelling == "centerline" ? SketchLineRole::Centerline
+                                                 : SketchLineRole::Geometry;
     auto line = LineSegment::create(SketchEntityId(line_json.at("id").get<std::string>()),
                                     point2_from_json(line_json.at("start")),
-                                    point2_from_json(line_json.at("end")));
+                                    point2_from_json(line_json.at("end")), role);
     if (line.has_error())
       return Result<Sketch>::failure(line.error());
     auto added = sketch.value().add_entity(line.value());
@@ -3744,9 +3751,13 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
                      {"composite_closed_profiles", json::array()},
                      {"circular_hole_patterns", json::array()}};
     for (const auto& line : sketch.line_segments())
-      sketch_json["line_segments"].push_back(json{{"id", line.id().value()},
-                                                  {"start", point2_to_json(line.start())},
-                                                  {"end", point2_to_json(line.end())}});
+      sketch_json["line_segments"].push_back(
+          json{{"id", line.id().value()},
+               {"start", point2_to_json(line.start())},
+               {"end", point2_to_json(line.end())},
+               {"role", line.role() == SketchLineRole::Centerline ? "centerline"
+                        : line.construction()                     ? "construction"
+                                                                  : "geometry"}});
     for (const auto& arc : sketch.arc_segments())
       sketch_json["arc_segments"].push_back(arc_segment_to_json(arc));
     for (const auto& spline : sketch.spline_segments())

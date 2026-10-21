@@ -91,6 +91,9 @@ public:
                          GuiSketchInteractionConfig config = {});
   void clear_sketch_interaction();
   void set_sketch_selection_enabled(bool enabled) noexcept;
+  void set_sketch_additive_selection(bool enabled) noexcept {
+    sketch_additive_selection_ = enabled;
+  }
   void set_sketch_inference_anchor(std::optional<Point2> anchor) noexcept;
   void set_sketch_grid_config(GuiSketchGridConfig config);
   void set_sketch_drag_handles(std::vector<Point2> handles);
@@ -216,6 +219,7 @@ private:
   bool rotating_{false};
   bool sketch_box_active_{false};
   bool sketch_selection_enabled_{true};
+  bool sketch_additive_selection_{false};
 };
 
 } // namespace blcad::gui

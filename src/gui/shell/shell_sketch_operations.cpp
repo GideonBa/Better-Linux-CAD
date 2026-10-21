@@ -8,9 +8,12 @@
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QDoubleSpinBox>
+#include <QEventLoop>
 #include <QFormLayout>
+#include <QHBoxLayout>
 #include <QLabel>
 #include <QPushButton>
+#include <QSignalBlocker>
 #include <QSpinBox>
 #include <QVBoxLayout>
 
@@ -52,8 +55,8 @@ void ShellSketchTools::build_operation_group() {
   for (const auto& button : buttons) {
     auto* action = new QAction(QString::fromUtf8(button.label), this);
     action->setObjectName(QStringLiteral("sketch.operation.") + QString::fromUtf8(button.id));
-    action->setToolTip(
-        QStringLiteral("Geometrie auswählen, Werte eingeben und Vorschau übernehmen"));
+    action->setToolTip(QStringLiteral("Mehrere Elemente auswählen, mit der Maus ziehen oder Werte "
+                                      "eingeben und Vorschau übernehmen"));
     connect(action, &QAction::triggered, this,
             [this, kind = button.kind] { show_operation_dialog(kind); });
     ribbon_.add_small_button(group, action);
@@ -79,6 +82,92 @@ ShellSketchTools::prepare_operation(GuiSketchOperationRequest request) const {
         Error::validation("sketch.operation", "keine aktive Skizze"));
   const auto& part = *session_.part_document();
   const auto& sketch = *part.find_sketch(*window_.active_sketch());
+  if (request.axis) {
+    const auto* axis = sketch.find_line_segment(*request.axis);
+    if (!axis)
+      return Result<GuiSketchOperationRequest>::failure(
+          Error::validation("sketch.operation.axis", "Eine Linie als Symmetrieachse auswählen"));
+    request.first = axis->start();
+    request.second = axis->end();
+  }
+  if (request.kind == Kind::ProjectGeometry) {
+    if (!request.source_sketch || !request.source_entity || *request.source_sketch == sketch.id())
+      return Result<GuiSketchOperationRequest>::failure(
+          Error::validation("sketch.operation.source", "Geometrie einer anderen Skizze auswählen"));
+    const auto* source = part.find_sketch(*request.source_sketch);
+    if (!source)
+      return Result<GuiSketchOperationRequest>::failure(
+          Error::validation("sketch.operation.source", "Quellskizze existiert nicht mehr"));
+    auto from = workbench_.plane_view(session_, source->id());
+    auto to = workbench_.plane_view(session_, sketch.id());
+    if (!from)
+      return Result<GuiSketchOperationRequest>::failure(from.error());
+    if (!to)
+      return Result<GuiSketchOperationRequest>::failure(to.error());
+    const auto project = [&](Point2 p) {
+      return to.value().model_to_plane(from.value().plane_to_model(p));
+    };
+    request.projected_curves.clear();
+    request.projected_splines.clear();
+    std::size_t number = 1;
+    const auto next_id = [&]() {
+      for (;;) {
+        SketchEntityId id("projected.curve." + std::to_string(number++));
+        if (!sketch.find_line_segment(id) && !sketch.find_arc_segment(id) &&
+            !sketch.find_spline_segment(id) && !sketch.find_projected_line(id) &&
+            !sketch.find_projected_point(id) && !sketch.find_point(id) &&
+            !sketch.find_reference_generated_line(id))
+          return id;
+      }
+    };
+    const auto append = [&](const SplineSegment& s) -> Result<std::size_t> {
+      auto curve =
+          SplineSegment::create_cubic_bezier(next_id(), project(s.start()), project(s.control1()),
+                                             project(s.control2()), project(s.end()), s.weights());
+      if (!curve)
+        return Result<std::size_t>::failure(curve.error());
+      request.projected_splines.push_back(std::move(curve.value()));
+      return Result<std::size_t>::success(1);
+    };
+    if (const auto* line = source->find_line_segment(*request.source_entity)) {
+      auto curve = LineSegment::create(next_id(), project(line->start()), project(line->end()),
+                                       line->role());
+      if (!curve)
+        return Result<GuiSketchOperationRequest>::failure(curve.error());
+      request.projected_curves.push_back(std::move(curve.value()));
+    } else if (const auto* spline = source->find_spline_segment(*request.source_entity)) {
+      auto added = append(*spline);
+      if (!added)
+        return Result<GuiSketchOperationRequest>::failure(added.error());
+    } else {
+      std::optional<detail::ArcGeometry> arc;
+      if (const auto* curve = source->find_arc_segment(*request.source_entity))
+        arc = detail::arc_geometry(curve->start(), curve->mid(), curve->end());
+      else if (const auto* circle =
+                   source->find_circle_profile(ProfileId(request.source_entity->value()))) {
+        const auto* diameter = part.find_parameter(circle->diameter_parameter());
+        if (diameter)
+          arc = detail::ArcGeometry{circle->center(), diameter->value().millimeters() / 2, 0,
+                                    2 * std::numbers::pi};
+      }
+      if (!arc)
+        return Result<GuiSketchOperationRequest>::failure(
+            Error::validation("sketch.operation.source", "Quelle ist keine projizierbare Kurve"));
+      const int spans =
+          std::max(1, static_cast<int>(std::ceil(std::abs(arc->sweep) / (std::numbers::pi / 2))));
+      for (int i = 0; i < spans; ++i) {
+        auto span = SplineSegment::create_elliptical_arc(
+            SketchEntityId("span"), arc->center, {arc->radius, 0}, arc->radius,
+            arc->start_angle + arc->sweep * i / spans, arc->sweep / spans);
+        if (!span)
+          return Result<GuiSketchOperationRequest>::failure(span.error());
+        auto added = append(span.value());
+        if (!added)
+          return Result<GuiSketchOperationRequest>::failure(added.error());
+      }
+    }
+    return Result<GuiSketchOperationRequest>::success(std::move(request));
+  }
   if (request.entities.empty() && request.kind != Kind::ProjectLine &&
       request.kind != Kind::ProjectPoint) {
     if (request.kind == Kind::BreakLinkLine) {
@@ -236,16 +325,17 @@ void ShellSketchTools::show_operation_dialog(Kind kind) {
     } else {
       auto selected = selected_operation_entities();
       if (!selected) {
-        report(selected.error());
-        return;
-      }
-      base.entities = std::move(selected.value());
+        if (kind != Kind::Symmetric) {
+          report(selected.error());
+          return;
+        }
+        session_.selection().clear();
+        viewport_.clear_selection();
+      } else
+        base.entities = std::move(selected.value());
     }
   }
-  if (!projection && base.entities.empty()) {
-    report_message("Zuerst die gewünschte Skizzengeometrie auswählen.");
-    return;
-  }
+
   QDialog dialog(&window_);
   dialog.setObjectName(QStringLiteral("sketch.operation.dialog"));
   QString title =
@@ -253,10 +343,48 @@ void ShellSketchTools::show_operation_dialog(Kind kind) {
   for (const auto& b : buttons)
     if (kind == b.kind)
       title = QString::fromUtf8(b.label);
+  if (kind == Kind::Symmetric)
+    title = QStringLiteral("Symmetrisch");
   dialog.setWindowTitle(title);
+  dialog.setWindowModality(Qt::NonModal);
   auto* layout = new QVBoxLayout(&dialog);
   auto* form = new QFormLayout();
   layout->addLayout(form);
+  enum class PickMode { Elements, Axis, Center, Drag };
+  const bool has_axis = kind == Kind::Mirror || kind == Kind::Symmetric;
+  PickMode mode =
+      has_axis ? PickMode::Axis : (base.entities.empty() ? PickMode::Elements : PickMode::Drag);
+  QPushButton *elements_button = nullptr, *axis_button = nullptr, *center_button = nullptr,
+              *drag_button = nullptr;
+  if (!projection && kind != Kind::BreakLinkLine) {
+    elements_button = new QPushButton(QStringLiteral("Elemente auswählen"), &dialog);
+    elements_button->setObjectName(QStringLiteral("sketch.operation.elements"));
+    layout->addWidget(elements_button);
+    if (has_axis) {
+      axis_button = new QPushButton(QStringLiteral("Symmetrieachse auswählen"), &dialog);
+      axis_button->setObjectName(QStringLiteral("sketch.operation.axis"));
+      layout->insertWidget(0, axis_button);
+      auto* note = new QLabel(
+          kind == Kind::Symmetric
+              ? QStringLiteral(
+                    "Achse anklicken, dann Elemente auswählen. Kurven werden mit ihrem nächsten "
+                    "Gegenstück gepaart; eine einzelne Linie wird um ihre Mitte symmetrisch.")
+              : QStringLiteral("Achse anklicken, dann alle zu spiegelnden Elemente auswählen."),
+          &dialog);
+      note->setWordWrap(true);
+      layout->addWidget(note);
+    } else {
+      if (kind == Kind::Rotate || kind == Kind::Scale || kind == Kind::CircularPattern) {
+        center_button =
+            new QPushButton(QStringLiteral("Zentrum im Zeichenbereich wählen"), &dialog);
+        center_button->setObjectName(QStringLiteral("sketch.operation.center"));
+        layout->addWidget(center_button);
+      }
+      drag_button = new QPushButton(QStringLiteral("Mit der Maus ziehen"), &dialog);
+      drag_button->setObjectName(QStringLiteral("sketch.operation.drag"));
+      layout->addWidget(drag_button);
+    }
+  }
   std::vector<GuiSketchOperationRequest> sources;
   QComboBox* source_combo = nullptr;
   if (projection) {
@@ -298,6 +426,25 @@ void ShellSketchTools::show_operation_dialog(Kind kind) {
         continue;
       r.projected_line = std::move(reference.value());
       add(std::move(r), QStringLiteral("Linie: ") + QString::fromStdString(line.name()));
+    }
+    for (const auto& source : part.sketches()) {
+      if (source.id() == sketch.id())
+        continue;
+      const auto add_curve_source = [&](const auto& curve) {
+        GuiSketchOperationRequest r;
+        r.kind = Kind::ProjectGeometry;
+        r.source_sketch = source.id();
+        r.source_entity = SketchEntityId(curve.id().value());
+        add(std::move(r), QString::fromStdString(source.name() + " / " + curve.id().value()));
+      };
+      for (const auto& curve : source.line_segments())
+        add_curve_source(curve);
+      for (const auto& curve : source.arc_segments())
+        add_curve_source(curve);
+      for (const auto& curve : source.spline_segments())
+        add_curve_source(curve);
+      for (const auto& curve : source.circle_profiles())
+        add_curve_source(curve);
     }
     // Semantic references remain stable across recompute; only currently
     // resolvable feature edges/vertices are offered by the source chooser.
@@ -351,7 +498,8 @@ void ShellSketchTools::show_operation_dialog(Kind kind) {
   };
   QDoubleSpinBox *x = nullptr, *y = nullptr, *x2 = nullptr, *y2 = nullptr, *value = nullptr;
   QSpinBox *n1 = nullptr, *n2 = nullptr;
-  if (!projection && kind != Kind::Offset && kind != Kind::BreakLinkLine) {
+  if (!projection && kind != Kind::Offset && kind != Kind::BreakLinkLine &&
+      kind != Kind::Symmetric) {
     const bool delta = kind == Kind::Move || kind == Kind::Copy || kind == Kind::RectangularPattern;
     const QString prefix = delta                  ? QStringLiteral("Versatz")
                            : kind == Kind::Mirror ? QStringLiteral("Achsenstart")
@@ -411,15 +559,73 @@ void ShellSketchTools::show_operation_dialog(Kind kind) {
     return r;
   };
   const auto update = [&] {
+    if (!projection && kind != Kind::BreakLinkLine &&
+        (base.entities.empty() || (kind == Kind::Symmetric && !base.axis))) {
+      cancel_operation_preview();
+      viewport_.set_sketch_selection_enabled(mode == PickMode::Elements);
+      controls->button(QDialogButtonBox::Ok)->setEnabled(false);
+      status->setText(
+          has_axis && !base.axis
+              ? QStringLiteral("Symmetrieachse im Zeichenbereich anklicken.")
+              : QStringLiteral("Elemente einzeln anklicken oder mit einem Auswahlrahmen wählen."));
+      return;
+    }
+    if (!projection && kind != Kind::BreakLinkLine) {
+      // Still validate the numeric candidate while leaving the source hit scene intact.
+      auto prepared = prepare_operation(request());
+      auto preview = prepared ? GuiSketchOperationController::preview(
+                                    session_, *window_.active_sketch(), prepared.value())
+                              : Result<GuiSketchOperationPreview>::failure(prepared.error());
+      cancel_operation_preview();
+      viewport_.set_sketch_selection_enabled(mode == PickMode::Elements);
+      if (preview) {
+        // Publish only the result polylines as an overlay; preserve original picks and selection
+        // box.
+        auto scene = GuiSketchInteractionSceneBuilder{}.build(*session_.part_document(),
+                                                              preview.value().candidate);
+        std::vector<std::vector<Point2>> curves;
+        const auto& changed = preview.value().created_entities.empty()
+                                  ? base.entities
+                                  : preview.value().created_entities;
+        if (scene)
+          for (const auto& curve : scene.value().curves) {
+            for (const auto& id : changed)
+              if (curve.semantic_id ==
+                  "sketch/" + preview.value().candidate.id().value() + "/entity/" + id.value()) {
+                auto points = curve.polyline;
+                if (curve.closed && !points.empty())
+                  points.push_back(points.front());
+                curves.push_back(std::move(points));
+                break;
+              }
+          }
+        viewport_.set_sketch_operation_preview(std::move(curves));
+      } else
+        viewport_.set_sketch_operation_preview({});
+      controls->button(QDialogButtonBox::Ok)->setEnabled(preview.has_value());
+      if (preview) {
+        auto message = QStringLiteral("%1 Elemente ausgewählt. Ziehen oder Werte "
+                                      "eingeben; Übernehmen bestätigt die Vorschau.")
+                           .arg(base.entities.size());
+        if (!preview.value().uncopied_references.empty())
+          message += QStringLiteral("\n") + copy_report(preview.value().uncopied_references);
+        status->setText(message);
+      } else
+        status->setText(QString::fromStdString(preview.error().message()));
+      return;
+    }
     if (projection && sources.empty()) {
       controls->button(QDialogButtonBox::Ok)->setEnabled(false);
-      status->setText(QStringLiteral(
-          "Keine projizierbaren Konstruktionspunkte, Linien oder Modellkanten vorhanden."));
+      status->setText(QStringLiteral("Keine Quellen vorhanden. Zuerst eine andere Skizze, "
+                                     "Hilfsgeometrie oder einen Modellkörper erstellen."));
       return;
     }
     auto preview = preview_operation(request());
     controls->button(QDialogButtonBox::Ok)->setEnabled(preview.has_value());
-    status->setText(preview ? copy_report(preview.value().uncopied_references)
+    status->setText(preview ? (projection && request().kind == Kind::ProjectGeometry
+                                   ? QStringLiteral("Skizzenkurve wird als bearbeitbare Projektion "
+                                                    "übernommen (ohne Verknüpfung).")
+                                   : copy_report(preview.value().uncopied_references))
                             : QString::fromStdString(preview.error().message()));
   };
   if (!session_.task().begin("sketch.operation"))
@@ -429,7 +635,13 @@ void ShellSketchTools::show_operation_dialog(Kind kind) {
   refresh_enablement();
   for (auto* input : {x, y, x2, y2, value})
     if (input)
-      connect(input, &QDoubleSpinBox::valueChanged, &dialog, update);
+      connect(input, &QDoubleSpinBox::valueChanged, &dialog, [&] {
+        if (kind == Kind::Mirror) {
+          base.axis.reset();
+          mode = PickMode::Drag;
+        }
+        update();
+      });
   for (auto* input : {n1, n2})
     if (input)
       connect(input, &QSpinBox::valueChanged, &dialog, update);
@@ -445,8 +657,152 @@ void ShellSketchTools::show_operation_dialog(Kind kind) {
     (void)session_.task().apply();
     dialog.accept();
   });
+  std::optional<Point2> anchor;
+  bool updating_pointer = false;
+  close_operation_ = [&] { dialog.reject(); };
+  const auto pick_mode = [&](PickMode next) {
+    mode = next;
+    anchor.reset();
+    cancel_operation_preview();
+    viewport_.set_sketch_operation_preview({});
+    viewport_.set_sketch_selection_enabled(mode == PickMode::Elements);
+    viewport_.set_sketch_additive_selection(mode == PickMode::Elements);
+    viewport_.set_sketch_drag_handles({});
+    if (elements_button)
+      elements_button->setText(QStringLiteral("Elemente auswählen (%1)").arg(base.entities.size()));
+    update();
+    if (next == PickMode::Center)
+      status->setText(QStringLiteral("Zentrum im Zeichenbereich anklicken."));
+    if (next == PickMode::Axis)
+      status->setText(QStringLiteral("Symmetrieachse im Zeichenbereich anklicken."));
+    viewport_.setFocus();
+  };
+  if (elements_button)
+    connect(elements_button, &QPushButton::clicked, &dialog,
+            [&] { pick_mode(PickMode::Elements); });
+  if (axis_button)
+    connect(axis_button, &QPushButton::clicked, &dialog, [&] { pick_mode(PickMode::Axis); });
+  if (center_button)
+    connect(center_button, &QPushButton::clicked, &dialog, [&] { pick_mode(PickMode::Center); });
+  if (drag_button)
+    connect(drag_button, &QPushButton::clicked, &dialog, [&] { pick_mode(PickMode::Drag); });
+  operation_selection_ = [&] {
+    if (mode != PickMode::Elements)
+      return;
+    auto selected = selected_operation_entities();
+    if (!selected) {
+      base.entities.clear();
+      viewport_.set_sketch_operation_preview({});
+      controls->button(QDialogButtonBox::Ok)->setEnabled(false);
+      status->setText(QString::fromStdString(selected.error().message()));
+      return;
+    }
+    base.entities = std::move(selected.value());
+    if (base.axis)
+      std::erase(base.entities, *base.axis);
+    if (elements_button)
+      elements_button->setText(QStringLiteral("Elemente auswählen (%1)").arg(base.entities.size()));
+    update();
+  };
+  operation_phase_ = [&](GuiSketchPointerPhase phase, Point2 point,
+                         const std::optional<GuiSketchHit>& hit) {
+    if (projection || kind == Kind::BreakLinkLine)
+      return;
+    if (phase == GuiSketchPointerPhase::Release) {
+      anchor.reset();
+      return;
+    }
+    if (mode == PickMode::Axis) {
+      if (!hit)
+        return;
+      const GuiSelection selection(GuiSelectionKind::SketchEntity, hit->semantic_id);
+      const auto marker = selection.semantic_id.rfind("entity/");
+      if (marker == std::string::npos)
+        return;
+      const SketchEntityId id(selection.semantic_id.substr(marker + 7));
+      const auto* axis =
+          session_.part_document()->find_sketch(*window_.active_sketch())->find_line_segment(id);
+      if (!axis) {
+        status->setText(QStringLiteral("Eine Skizzenlinie als Achse auswählen."));
+        return;
+      }
+      base.axis = id;
+      base.first = axis->start();
+      base.second = axis->end();
+      std::erase(base.entities, id);
+      if (x) {
+        const QSignalBlocker bx(x), by(y), bx2(x2), by2(y2);
+        x->setValue(base.first.x);
+        y->setValue(base.first.y);
+        x2->setValue(base.second.x);
+        y2->setValue(base.second.y);
+      }
+      axis_button->setText(QStringLiteral("Symmetrieachse: ") + QString::fromStdString(id.value()));
+      pick_mode(PickMode::Elements);
+    } else if (mode == PickMode::Center && x && y) {
+      {
+        const QSignalBlocker bx(x), by(y);
+        x->setValue(point.x);
+        y->setValue(point.y);
+      }
+      pick_mode(PickMode::Drag);
+    } else if (mode == PickMode::Drag)
+      anchor = point;
+  };
+  operation_pointer_ = [&](Point2 point) {
+    if (!anchor || mode != PickMode::Drag || updating_pointer)
+      return;
+    updating_pointer = true;
+    const Point2 delta{point.x - anchor->x, point.y - anchor->y};
+    if (kind == Kind::Move || kind == Kind::Copy || kind == Kind::RectangularPattern) {
+      {
+        const QSignalBlocker bx(x), by(y);
+        x->setValue(delta.x);
+        y->setValue(delta.y);
+      }
+    } else if ((kind == Kind::Rotate || kind == Kind::CircularPattern) && value) {
+      const double a = std::atan2(anchor->y - y->value(), anchor->x - x->value());
+      const double b = std::atan2(point.y - y->value(), point.x - x->value());
+      const QSignalBlocker block(value);
+      value->setValue(std::remainder(b - a, 2 * std::numbers::pi) * 180 / std::numbers::pi);
+    } else if (kind == Kind::Scale && value) {
+      const double before = std::hypot(anchor->x - x->value(), anchor->y - y->value());
+      const QSignalBlocker block(value);
+      if (before > 1e-9)
+        value->setValue(std::hypot(point.x - x->value(), point.y - y->value()) / before);
+    } else if (kind == Kind::Offset && value && !base.entities.empty()) {
+      const auto* sketch = session_.part_document()->find_sketch(*window_.active_sketch());
+      const QSignalBlocker block(value);
+      if (const auto* line = sketch->find_line_segment(base.entities.front())) {
+        const Point2 d{line->end().x - line->start().x, line->end().y - line->start().y};
+        value->setValue((d.x * delta.y - d.y * delta.x) / std::hypot(d.x, d.y));
+      } else if (const auto* arc = sketch->find_arc_segment(base.entities.front())) {
+        auto circle = detail::arc_geometry(arc->start(), arc->mid(), arc->end());
+        if (circle)
+          value->setValue((std::hypot(point.x - circle->center.x, point.y - circle->center.y) -
+                           circle->radius) *
+                          (circle->sweep > 0 ? -1 : 1));
+      }
+    }
+    update();
+    updating_pointer = false;
+  };
+  viewport_.set_sketch_additive_selection(mode == PickMode::Elements);
+  viewport_.set_sketch_selection_enabled(mode == PickMode::Elements);
   update();
-  (void)dialog.exec();
+  // A local event loop preserves the synchronous command/test surface while the dialog
+  // remains nonmodal: the viewport continues to receive mouse and keyboard events.
+  QEventLoop loop;
+  connect(&dialog, &QDialog::finished, &loop, &QEventLoop::quit);
+  dialog.show();
+  loop.exec();
+  operation_phase_ = {};
+  operation_pointer_ = {};
+  operation_selection_ = {};
+  close_operation_ = {};
+  viewport_.set_sketch_additive_selection(false);
+  viewport_.set_sketch_operation_preview({});
+  viewport_.set_sketch_selection_enabled(true);
   if (session_.task().active())
     (void)session_.task().cancel();
   cancel_operation_preview();

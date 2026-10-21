@@ -44,7 +44,9 @@ public:
       for (const auto& entity : entities)
         curves.push_back({entity.id(), entity.start(), entity.end()});
     };
-    collect(sketch.line_segments());
+    for (const auto& line : sketch.line_segments())
+      if (!line.construction())
+        curves.push_back({line.id(), line.start(), line.end()});
     collect(sketch.arc_segments());
     collect(sketch.spline_segments());
     std::sort(curves.begin(), curves.end(), [](const auto& a, const auto& b) {

@@ -4,6 +4,7 @@
 #include "blcad/core/sketch_offset_project.hpp"
 #include "blcad/core/sketch_transform_pattern.hpp"
 #include "blcad/gui/gui_document_session.hpp"
+#include <limits>
 
 namespace blcad::gui {
 
@@ -13,6 +14,8 @@ enum class GuiSketchOperationKind {
   Scale,
   Copy,
   Mirror,
+  Symmetric,
+  ProjectGeometry,
   RectangularPattern,
   CircularPattern,
   Offset,
@@ -29,6 +32,12 @@ struct GuiSketchOperationRequest {
   double value{0.0}; // angle in radians, scale factor, or signed offset in mm
   std::size_t first_count{1U};
   std::size_t second_count{1U};
+  std::optional<SketchEntityId> axis;
+  std::optional<SketchId> source_sketch;
+  std::optional<SketchEntityId> source_entity;
+  // Plane-projected snapshots, derived by the shell from the current source.
+  std::vector<LineSegment> projected_curves;
+  std::vector<SplineSegment> projected_splines;
   std::optional<ProjectedSketchPoint> projected_point;
   std::optional<ProjectedSketchLine> projected_line;
 };
@@ -37,6 +46,7 @@ struct GuiSketchOperationPreview {
   Sketch candidate;
   std::vector<SketchEntityId> created_entities;
   std::vector<std::string> uncopied_references;
+  std::optional<SketchConstraintCatalog> constraints_after;
 };
 
 // One authority shared by numeric previews and Apply. No preview mutates the
@@ -53,6 +63,10 @@ public:
       return "Scale sketch geometry";
     case GuiSketchOperationKind::Copy:
       return "Copy sketch geometry";
+    case GuiSketchOperationKind::Symmetric:
+      return "Constrain sketch symmetry";
+    case GuiSketchOperationKind::ProjectGeometry:
+      return "Project sketch geometry";
     case GuiSketchOperationKind::Mirror:
       return "Mirror sketch geometry";
     case GuiSketchOperationKind::RectangularPattern:
@@ -107,6 +121,14 @@ public:
           auto result = evaluate(document, id, request, cc.value(), dc.value());
           if (!result)
             return Result<std::size_t>::failure(result.error());
+          if (result.value().constraints_after) {
+            auto found = std::find_if(constraints.begin(), constraints.end(),
+                                      [&](const auto& c) { return c.sketch() == id; });
+            if (found == constraints.end())
+              constraints.push_back(*result.value().constraints_after);
+            else
+              *found = *result.value().constraints_after;
+          }
           return document.update_sketch(std::move(result.value().candidate));
         });
   }
@@ -118,11 +140,177 @@ private:
   }
 
   [[nodiscard]] static Result<GuiSketchOperationPreview>
+  symmetry(const PartDocument& document, const Sketch& source, const GuiSketchOperationRequest& r,
+           const SketchConstraintCatalog& constraints, const SketchDimensionCatalog& dimensions) {
+    if (!r.axis || r.entities.empty())
+      return fail(source.id().value(), "Symmetrieachse und Elemente auswählen");
+    const auto* axis = source.find_line_segment(*r.axis);
+    if (!axis)
+      return fail(r.axis->value(), "Symmetrieachse muss eine Skizzenlinie sein");
+    auto topology = SketchTopology::migrate_legacy(source);
+    if (!topology)
+      return Result<GuiSketchOperationPreview>::failure(topology.error());
+    std::vector<const SketchTopologyEntity*> entities;
+    for (const auto& id : r.entities) {
+      const auto* e = topology.value().find_entity("entity/" + id.value());
+      if (!e || id == *r.axis ||
+          (e->kind() != SketchTopologyEntityKind::Line &&
+           e->kind() != SketchTopologyEntityKind::Arc &&
+           e->kind() != SketchTopologyEntityKind::Spline))
+        return fail(id.value(), "Bearbeitbare Linien, Bögen oder Splines auswählen");
+      if (std::find(entities.begin(), entities.end(), e) == entities.end())
+        entities.push_back(e);
+    }
+    if (entities.size() != 1U && entities.size() % 2U != 0U)
+      return fail(source.id().value(),
+                  "Eine einzelne Linie oder eine gerade Anzahl von Kurven auswählen");
+    auto authored = constraints.constraints();
+    std::vector<std::pair<SketchPointId, SketchPointId>> pairs;
+    const auto append = [&](SketchPointId a, SketchPointId b) {
+      if (b.value() < a.value())
+        std::swap(a, b);
+      if (std::find(pairs.begin(), pairs.end(), std::pair{a, b}) == pairs.end())
+        pairs.emplace_back(a, b);
+    };
+    if (entities.size() == 1U) {
+      if (entities.front()->kind() != SketchTopologyEntityKind::Line)
+        return fail(source.id().value(), "Einzelsymmetrie benötigt eine Linie");
+      append(entities.front()->points().front(), entities.front()->points().back());
+    } else {
+      const Point2 d{axis->end().x - axis->start().x, axis->end().y - axis->start().y};
+      const double n = d.x * d.x + d.y * d.y;
+      const auto reflected = [&](Point2 p) {
+        const double t = ((p.x - axis->start().x) * d.x + (p.y - axis->start().y) * d.y) / n;
+        return Point2{2 * (axis->start().x + t * d.x) - p.x, 2 * (axis->start().y + t * d.y) - p.y};
+      };
+      const auto position = [&](SketchPointId p) {
+        return topology.value().find_point(p)->position();
+      };
+      const auto cost = [&](const auto* a, const auto* b, bool reverse) {
+        double sum = 0;
+        for (std::size_t k = 0; k < a->points().size(); ++k) {
+          const auto p = reflected(position(a->points()[k]));
+          const auto q = position(b->points()[reverse ? b->points().size() - 1 - k : k]);
+          sum += (p.x - q.x) * (p.x - q.x) + (p.y - q.y) * (p.y - q.y);
+        }
+        return sum;
+      };
+      // Pair each curve with its nearest reflected counterpart, independent of click order.
+      while (!entities.empty()) {
+        const auto* a = entities.front();
+        std::size_t best = 0;
+        double best_cost = std::numeric_limits<double>::infinity();
+        bool reverse = false;
+        for (std::size_t j = 1; j < entities.size(); ++j) {
+          if (entities[j]->kind() != a->kind() || entities[j]->weights() != a->weights())
+            continue;
+          for (bool rev : {false, true}) {
+            const auto value = cost(a, entities[j], rev);
+            if (value < best_cost) {
+              best_cost = value;
+              best = j;
+              reverse = rev;
+            }
+          }
+        }
+        if (best == 0)
+          return fail(a->id(), "Passende Kurvenpaare gleichen Typs auswählen");
+        const auto* b = entities[best];
+        for (std::size_t k = 0; k < a->points().size(); ++k)
+          append(a->points()[k], b->points()[reverse ? b->points().size() - 1 - k : k]);
+        entities.erase(entities.begin() + best);
+        entities.erase(entities.begin());
+      }
+    }
+    for (const auto& [a, b] : pairs) {
+      const auto axis_target =
+          SketchConstraintIntentTarget::entity("entity/" + r.axis->value()).value();
+      std::vector<SketchConstraintIntentTarget> targets{
+          SketchConstraintIntentTarget::point(a).value()};
+      auto kind = SketchSolverConstraintKind::PointOnObject;
+      if (a != b) {
+        kind = SketchSolverConstraintKind::Symmetric;
+        targets.push_back(SketchConstraintIntentTarget::point(b).value());
+      }
+      targets.push_back(axis_target);
+      if (std::any_of(authored.begin(), authored.end(),
+                      [&](const auto& c) { return c.kind() == kind && c.targets() == targets; }))
+        continue;
+      std::size_t number = 1;
+      while (std::any_of(authored.begin(), authored.end(), [&](const auto& c) {
+        return c.id().value() == "symmetry." + std::to_string(number);
+      }))
+        ++number;
+      auto intent = SketchConstraintIntent::create(
+          SketchConstraintId("symmetry." + std::to_string(number)), kind, std::move(targets));
+      if (!intent)
+        return Result<GuiSketchOperationPreview>::failure(intent.error());
+      authored.push_back(std::move(intent.value()));
+    }
+    auto after = SketchConstraintCatalog::create(document.id(), source.id(), std::move(authored));
+    if (!after)
+      return Result<GuiSketchOperationPreview>::failure(after.error());
+    auto system = SketchDimensionCatalogSystemBuilder::build(document, topology.value(),
+                                                             after.value(), dimensions);
+    if (!system)
+      return Result<GuiSketchOperationPreview>::failure(system.error());
+    auto equations = system.value().constraints();
+    // The chosen axis stays where the user placed it during this solve.
+    auto fixed = SketchSolverConstraint::create(
+        "symmetry.axis", SketchSolverConstraintKind::Fixed,
+        {SketchSolverTarget::entity("entity/" + r.axis->value()).value()});
+    if (!fixed)
+      return Result<GuiSketchOperationPreview>::failure(fixed.error());
+    equations.push_back(std::move(fixed.value()));
+    auto combined = SketchConstraintSystem::create(source.id(), std::move(equations));
+    if (!combined)
+      return Result<GuiSketchOperationPreview>::failure(combined.error());
+    auto solve = SketchConstraintSolver{}.solve(topology.value(), combined.value());
+    if (!solve)
+      return Result<GuiSketchOperationPreview>::failure(solve.error());
+    if (solve.value().status == SketchSolveStatus::InvalidReference ||
+        solve.value().status == SketchSolveStatus::Conflicting ||
+        solve.value().status == SketchSolveStatus::NonConvergent ||
+        !std::isfinite(solve.value().residuals.final_rms) ||
+        solve.value().residuals.final_rms > 1e-8)
+      return fail(source.id().value(),
+                  "Symmetrie widerspricht vorhandenen Abhängigkeiten oder Bemaßungen");
+    auto materialized =
+        SketchTopologyLegacyMaterializer{}.materialize(source, solve.value().topology);
+    if (!materialized)
+      return Result<GuiSketchOperationPreview>::failure(materialized.error());
+    return Result<GuiSketchOperationPreview>::success(
+        {std::move(materialized.value()), {}, {}, after.value()});
+  }
+
+  [[nodiscard]] static Result<GuiSketchOperationPreview>
   evaluate(const PartDocument& document, SketchId id, const GuiSketchOperationRequest& r,
            const SketchConstraintCatalog& constraints, const SketchDimensionCatalog& dimensions) {
     const auto* source = document.find_sketch(id);
     if (!source)
       return fail(id.value(), "operation target Sketch no longer exists");
+    if (r.kind == GuiSketchOperationKind::Symmetric)
+      return symmetry(document, *source, r, constraints, dimensions);
+    if (r.kind == GuiSketchOperationKind::ProjectGeometry) {
+      if (r.projected_curves.empty() && r.projected_splines.empty())
+        return fail(id.value(), "Keine projizierbare Skizzengeometrie ausgewählt");
+      Sketch candidate = *source;
+      std::vector<SketchEntityId> created;
+      for (const auto& curve : r.projected_curves) {
+        auto added = candidate.add_entity(curve);
+        if (!added)
+          return Result<GuiSketchOperationPreview>::failure(added.error());
+        created.push_back(curve.id());
+      }
+      for (const auto& curve : r.projected_splines) {
+        auto added = candidate.add_entity(curve);
+        if (!added)
+          return Result<GuiSketchOperationPreview>::failure(added.error());
+        created.push_back(curve.id());
+      }
+      return Result<GuiSketchOperationPreview>::success(
+          {std::move(candidate), std::move(created), {}, {}});
+    }
     auto transformed = [&]() -> Result<SketchTransformPatternResult> {
       using S = SketchTransformPatternService;
       switch (r.kind) {
@@ -148,7 +336,7 @@ private:
       auto offset = [&]() -> Result<SketchOffsetProjectResult> {
         using S = SketchOffsetProjectService;
         if (r.kind == GuiSketchOperationKind::Offset)
-          return S::offset_chain(*source, r.entities, r.value);
+          return S::offset_selection(*source, r.entities, r.value);
         if (r.kind == GuiSketchOperationKind::ProjectPoint && r.projected_point)
           return S::project_point(*source, *r.projected_point);
         if (r.kind == GuiSketchOperationKind::ProjectLine && r.projected_line)
@@ -250,8 +438,10 @@ private:
       report.erase(std::unique(report.begin(), report.end()), report.end());
     }
     return Result<GuiSketchOperationPreview>::success(
-        {std::move(transformed.value().sketch), std::move(transformed.value().created_entities),
-         std::move(report)});
+        {std::move(transformed.value().sketch),
+         std::move(transformed.value().created_entities),
+         std::move(report),
+         {}});
   }
 };
 

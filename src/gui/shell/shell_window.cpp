@@ -653,6 +653,8 @@ bool ShellWindow::enter_sketch(SketchId sketch) {
 bool ShellWindow::finish_active_sketch() {
   if (!active_sketch_)
     return false;
+  if (!sketch_tools_->finish_tool())
+    return false;
   const SketchId finished_sketch = *active_sketch_;
   bool has_open_contours = false;
 

@@ -1,6 +1,7 @@
 #include "blcad/gui/gui_sketch_create.hpp"
 
 #include "blcad/core/sketch_dimension_catalog_system.hpp"
+#include "blcad/core/sketch_spline_edit.hpp"
 #include "blcad/core/sketch_topology_part_document.hpp"
 
 #include <algorithm>
@@ -117,7 +118,10 @@ struct SlotGeometry {
   case GuiSketchCreateTool::Ellipse:
   case GuiSketchCreateTool::CenterSlot:
   case GuiSketchCreateTool::OverallSlot: return 3U;
-  case GuiSketchCreateTool::EllipticalArc: return 5U;
+  case GuiSketchCreateTool::Spline:
+    return 2U;
+  case GuiSketchCreateTool::ConstructionLine:
+    return 2U;
   }
   return 2U;
 }
@@ -253,12 +257,6 @@ ellipse_geometry(Point2 center, Point2 major_reference, Point2 minor_reference) 
   return add(ellipse.center,
              add(scale(ellipse.major_unit, ellipse.major_radius * std::cos(parameter)),
                  scale(ellipse.minor_unit, ellipse.minor_radius * std::sin(parameter))));
-}
-
-[[nodiscard]] double ellipse_parameter(const EllipseGeometry& ellipse, Point2 reference) noexcept {
-  const Point2 delta = subtract(reference, ellipse.center);
-  return std::atan2(dot(delta, ellipse.minor_unit) / ellipse.minor_radius,
-                    dot(delta, ellipse.major_unit) / ellipse.major_radius);
 }
 
 [[nodiscard]] Result<SlotGeometry> slot_geometry(GuiSketchCreateTool tool, Point2 first,
@@ -399,7 +397,10 @@ std::string_view to_string(GuiSketchCreateTool tool) noexcept {
   case GuiSketchCreateTool::ThreePointArc: return "three_point_arc";
   case GuiSketchCreateTool::TangentArc: return "tangent_arc";
   case GuiSketchCreateTool::Ellipse: return "ellipse";
-  case GuiSketchCreateTool::EllipticalArc: return "elliptical_arc";
+  case GuiSketchCreateTool::Spline:
+    return "spline";
+  case GuiSketchCreateTool::ConstructionLine:
+    return "construction_line";
   case GuiSketchCreateTool::CenterSlot: return "center_slot";
   case GuiSketchCreateTool::OverallSlot: return "overall_slot";
   }
@@ -439,7 +440,8 @@ std::size_t GuiSketchCreateController::required_picks() const noexcept {
 }
 
 bool GuiSketchCreateController::accepts_more_picks() const noexcept {
-  if (tool_ == GuiSketchCreateTool::Polyline) return true;
+  if (tool_ == GuiSketchCreateTool::Polyline || tool_ == GuiSketchCreateTool::Spline)
+    return true;
   return picks_.size() < required_picks();
 }
 
@@ -468,6 +470,10 @@ Result<std::size_t> GuiSketchCreateController::add_pick(GuiSketchCreatePick pick
   if (!accepts_more_picks())
     return Result<std::size_t>::failure(
         create_error("the active Sketch creation tool already has all required picks"));
+  if (tool_ == GuiSketchCreateTool::Spline && !picks_.empty() &&
+      distance(picks_.back().point, pick.point) <= kEpsilon)
+    return Result<std::size_t>::failure(
+        create_error("Aufeinanderfolgende Spline-Punkte müssen verschieden sein"));
   picks_.push_back(pick);
   return Result<std::size_t>::success(picks_.size());
 }
@@ -642,6 +648,28 @@ GuiSketchCreateController::corner_ring(std::optional<Point2> hover) const {
 
 Result<std::vector<Point2>>
 GuiSketchCreateController::conic_preview(std::optional<Point2> hover, bool& closed) const {
+  if (tool_ == GuiSketchCreateTool::Spline) {
+    std::vector<Point2> fit_points;
+    for (const auto& pick : picks_)
+      fit_points.push_back(pick.point);
+    const bool already_closed =
+        fit_points.size() >= 4U && distance(fit_points.front(), fit_points.back()) <= kEpsilon;
+    if (!already_closed && hover &&
+        (fit_points.empty() || distance(fit_points.back(), *hover) > kEpsilon))
+      fit_points.push_back(*hover);
+    auto model = SketchSplineEditModel::from_fit_points(sketch_, SketchEntityId("preview.spline"),
+                                                        fit_points);
+    if (!model)
+      return Result<std::vector<Point2>>::failure(model.error());
+    std::vector<Point2> points;
+    for (const auto& segment : model.value().segments())
+      for (int i = 0; i < 32; ++i)
+        points.push_back(segment.curve().point(i / 32.0));
+    closed = distance(fit_points.front(), fit_points.back()) <= kEpsilon;
+    if (!closed)
+      points.push_back(model.value().segments().back().end());
+    return Result<std::vector<Point2>>::success(std::move(points));
+  }
   std::vector<GuiSketchCreatePick> anchors = picks_;
   if (anchors.size() < required_picks() && hover)
     anchors.push_back({*hover, GuiSketchSnapKind::None});
@@ -676,25 +704,14 @@ GuiSketchCreateController::conic_preview(std::optional<Point2> hover, bool& clos
     closed = false;
     return sample_three_point_arc(anchors[0].point, anchors[1].point, anchors[2].point);
   }
-  if (tool_ == GuiSketchCreateTool::Ellipse ||
-      tool_ == GuiSketchCreateTool::EllipticalArc) {
+  if (tool_ == GuiSketchCreateTool::Ellipse) {
     auto ellipse = ellipse_geometry(anchors[0].point, anchors[1].point, anchors[2].point);
-    if (ellipse.has_error()) return Result<std::vector<Point2>>::failure(ellipse.error());
-    if (tool_ == GuiSketchCreateTool::Ellipse) {
-      closed = true;
-      auto points = sample_ellipse(ellipse.value(), 0.0, kTwoPi);
-      points.pop_back();
-      return Result<std::vector<Point2>>::success(std::move(points));
-    }
-    const double start = ellipse_parameter(ellipse.value(), anchors[3].point);
-    const double sweep = normalize_signed_angle(
-        ellipse_parameter(ellipse.value(), anchors[4].point) - start);
-    if (std::abs(sweep) <= kEpsilon)
-      return Result<std::vector<Point2>>::failure(
-          create_error("elliptical arc sweep must be non-zero"));
-    closed = false;
-    return Result<std::vector<Point2>>::success(
-        sample_ellipse(ellipse.value(), start, sweep, 32U));
+    if (!ellipse)
+      return Result<std::vector<Point2>>::failure(ellipse.error());
+    closed = true;
+    auto points = sample_ellipse(ellipse.value(), 0.0, kTwoPi);
+    points.pop_back();
+    return Result<std::vector<Point2>>::success(std::move(points));
   }
   if (tool_ == GuiSketchCreateTool::CenterSlot ||
       tool_ == GuiSketchCreateTool::OverallSlot) {
@@ -722,6 +739,7 @@ GuiSketchCreateController::preview(std::optional<GuiSketchCreatePick> hover) con
   case GuiSketchCreateTool::Line:
   case GuiSketchCreateTool::Polyline:
   case GuiSketchCreateTool::Centerline:
+  case GuiSketchCreateTool::ConstructionLine:
     for (const auto& pick : picks_) result.rubber_band.push_back(pick.point);
     if (hover_point && accepts_more_picks()) result.rubber_band.push_back(*hover_point);
     break;
@@ -841,25 +859,16 @@ GuiSketchCreateController::expansion(const PartDocument& document) const {
     result.label = "Create sketch point";
     return Result<GuiSketchCreateExpansion>::success(std::move(result));
   }
-  case GuiSketchCreateTool::Centerline: {
-    const Point3 start = plane_.plane_to_model(picks_[0].point);
-    const Point3 end = plane_.plane_to_model(picks_[1].point);
-    const Vector3 delta{end.x - start.x, end.y - start.y, end.z - start.z};
-    const double magnitude = std::sqrt(delta.x * delta.x + delta.y * delta.y + delta.z * delta.z);
-    if (magnitude <= kEpsilon)
-      return Result<GuiSketchCreateExpansion>::failure(
-          create_error("centerline picks must be distinct"));
-    const Vector3 direction{delta.x / magnitude, delta.y / magnitude, delta.z / magnitude};
-    auto line = ConstructionLine::create_explicit(
-        ConstructionLineId(next_free_id(
-            "construction.line.create.",
-            [&document](const std::string& candidate) {
-              return document.find_construction_line(ConstructionLineId(candidate)) != nullptr;
-            })),
-        "Sketch centerline", start, direction);
-    if (line.has_error()) return Result<GuiSketchCreateExpansion>::failure(line.error());
-    result.construction_line = std::move(line.value());
-    result.label = "Create construction centerline";
+  case GuiSketchCreateTool::Centerline:
+  case GuiSketchCreateTool::ConstructionLine: {
+    auto line = LineSegment::create(
+        next_entity_id("line.helper."), picks_[0].point, picks_[1].point,
+        tool_ == GuiSketchCreateTool::Centerline ? SketchLineRole::Centerline
+                                                 : SketchLineRole::Construction);
+    if (!line)
+      return Result<GuiSketchCreateExpansion>::failure(line.error());
+    result.lines.push_back(std::move(line.value()));
+    result.label = "Create sketch helper line";
     return Result<GuiSketchCreateExpansion>::success(std::move(result));
   }
   case GuiSketchCreateTool::Line:
@@ -1000,33 +1009,42 @@ GuiSketchCreateController::expansion(const PartDocument& document) const {
     return Result<GuiSketchCreateExpansion>::success(std::move(result));
   }
 
-  if (tool_ == GuiSketchCreateTool::Ellipse ||
-      tool_ == GuiSketchCreateTool::EllipticalArc) {
-    auto ellipse = ellipse_geometry(picks_[0].point, picks_[1].point, picks_[2].point);
-    if (ellipse.has_error()) return Result<GuiSketchCreateExpansion>::failure(ellipse.error());
-    double start = 0.0;
-    double sweep = kTwoPi;
-    if (tool_ == GuiSketchCreateTool::EllipticalArc) {
-      start = ellipse_parameter(ellipse.value(), picks_[3].point);
-      sweep = normalize_signed_angle(ellipse_parameter(ellipse.value(), picks_[4].point) - start);
-      if (std::abs(sweep) <= kEpsilon)
-        return Result<GuiSketchCreateExpansion>::failure(
-            create_error("elliptical arc sweep must be non-zero"));
-    }
-    auto appended = append_ellipse(ellipse.value(), start, sweep);
-    if (appended.has_error())
-      return Result<GuiSketchCreateExpansion>::failure(appended.error());
-    if (tool_ == GuiSketchCreateTool::Ellipse) {
-      std::vector<SketchEntityId> ordered;
-      ordered.reserve(result.splines.size());
-      for (const auto& spline : result.splines) ordered.push_back(spline.id());
-      auto profile = ArcClosedProfile::create(next_profile_id(), std::move(ordered));
-      if (profile.has_error()) return Result<GuiSketchCreateExpansion>::failure(profile.error());
-      result.curve_profile = std::move(profile.value());
-    }
+  if (tool_ == GuiSketchCreateTool::Spline) {
+    std::vector<Point2> fit_points;
+    for (const auto& pick : picks_)
+      fit_points.push_back(pick.point);
+    const std::string base = next_free_id("spline.create.", [&](const std::string& candidate) {
+      if (sketch_entity_id_taken(*sketch, SketchEntityId(candidate)))
+        return true;
+      for (std::size_t i = 2; i < fit_points.size(); ++i)
+        if (sketch_entity_id_taken(*sketch,
+                                   SketchEntityId(candidate + ".fit." + std::to_string(i))))
+          return true;
+      return false;
+    });
+    auto model = SketchSplineEditModel::from_fit_points(sketch_, SketchEntityId(base),
+                                                        std::move(fit_points));
+    if (!model)
+      return Result<GuiSketchCreateExpansion>::failure(model.error());
+    result.splines = model.value().segments();
     return Result<GuiSketchCreateExpansion>::success(std::move(result));
   }
-
+  if (tool_ == GuiSketchCreateTool::Ellipse) {
+    auto ellipse = ellipse_geometry(picks_[0].point, picks_[1].point, picks_[2].point);
+    if (!ellipse)
+      return Result<GuiSketchCreateExpansion>::failure(ellipse.error());
+    auto appended = append_ellipse(ellipse.value(), 0.0, kTwoPi);
+    if (!appended)
+      return Result<GuiSketchCreateExpansion>::failure(appended.error());
+    std::vector<SketchEntityId> ordered;
+    for (const auto& spline : result.splines)
+      ordered.push_back(spline.id());
+    auto profile = ArcClosedProfile::create(next_profile_id(), std::move(ordered));
+    if (!profile)
+      return Result<GuiSketchCreateExpansion>::failure(profile.error());
+    result.curve_profile = std::move(profile.value());
+    return Result<GuiSketchCreateExpansion>::success(std::move(result));
+  }
   if (tool_ == GuiSketchCreateTool::CenterSlot ||
       tool_ == GuiSketchCreateTool::OverallSlot) {
     auto slot = slot_geometry(tool_, picks_[0].point, picks_[1].point, picks_[2].point);

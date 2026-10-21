@@ -7,18 +7,20 @@
 #include "blcad/geometry/profile_region_classifier.hpp"
 #include "blcad/geometry/sketch_3d_geometry_adapter.hpp"
 #include "blcad/geometry/sketch_finish.hpp"
+#include "blcad/geometry/sketch_reference_projector.hpp"
 #include "blcad/geometry/workplane_resolver.hpp"
 
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepBuilderAPI_MakePolygon.hxx>
+#include <BRepBuilderAPI_MakeVertex.hxx>
 #include <BRepBuilderAPI_MakeWire.hxx>
 #include <BRep_Builder.hxx>
 #include <GC_MakeArcOfCircle.hxx>
 #include <Geom_BezierCurve.hxx>
 #include <Standard_Failure.hxx>
-#include <TColgp_Array1OfPnt.hxx>
 #include <TColStd_Array1OfReal.hxx>
+#include <TColgp_Array1OfPnt.hxx>
 #include <TopoDS.hxx>
 #include <TopoDS_Compound.hxx>
 #include <TopoDS_Edge.hxx>
@@ -227,7 +229,8 @@ ViewportSceneBuilder::build_part(const PartDocument& document,
       for (const LineSegment& line : sketch.line_segments()) {
         items.push_back(
             {ViewportSceneKind::SketchEntity, sketch_entity_id(sketch, line.id()),
-             wrap(BRepBuilderAPI_MakeEdge(point(line.start()), point(line.end())).Shape())});
+             wrap(BRepBuilderAPI_MakeEdge(point(line.start()), point(line.end())).Shape()),
+             line.role()});
       }
       for (const ArcSegment& arc : sketch.arc_segments()) {
         GC_MakeArcOfCircle curve(point(arc.start()), point(arc.mid()), point(arc.end()));
@@ -248,6 +251,27 @@ ViewportSceneBuilder::build_part(const PartDocument& document,
         const Handle(Geom_BezierCurve) curve = new Geom_BezierCurve(poles, weights);
         items.push_back({ViewportSceneKind::SketchEntity, sketch_entity_id(sketch, spline.id()),
                          wrap(BRepBuilderAPI_MakeEdge(curve).Shape())});
+      }
+
+      const SketchReferenceProjector projector;
+      for (const auto& reference : sketch.projected_lines()) {
+        auto resolved = projector.resolve_line(document, sketch, reference, shape_cache);
+        if (!resolved)
+          continue; // Unresolved references remain available to diagnostics.
+        const auto p = resolved.value().point;
+        const auto d = resolved.value().direction;
+        const Point2 a = resolved.value().end ? p : Point2{p.x - 60 * d.x, p.y - 60 * d.y};
+        const Point2 b = resolved.value().end.value_or(Point2{p.x + 60 * d.x, p.y + 60 * d.y});
+        items.push_back({ViewportSceneKind::SketchEntity, sketch_entity_id(sketch, reference.id()),
+                         wrap(BRepBuilderAPI_MakeEdge(point(a), point(b)).Shape()),
+                         SketchLineRole::Construction});
+      }
+      for (const auto& reference : sketch.projected_points()) {
+        auto resolved = projector.resolve_point(document, sketch, reference, shape_cache);
+        if (resolved)
+          items.push_back(
+              {ViewportSceneKind::SketchEntity, sketch_entity_id(sketch, reference.id()),
+               wrap(BRepBuilderAPI_MakeVertex(point(resolved.value().position)).Shape())});
       }
 
       // Dimension-driven sketch profiles (rectangle/circle) are authored

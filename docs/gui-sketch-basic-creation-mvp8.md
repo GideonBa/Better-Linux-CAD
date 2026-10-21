@@ -44,7 +44,8 @@ Center rectangle       2 picks  -> 4 LineSegments + ClosedProfile
 Three-point rectangle  3 picks  -> 4 LineSegments + ClosedProfile
 Parallelogram          3 picks  -> 4 LineSegments + ClosedProfile
 Regular polygon        2 picks  -> N LineSegments + ClosedProfile (N typed before the first pick)
-Centerline             2 picks  -> ConstructionLine (PartDocument construction geometry)
+Centerline             2 picks  -> LineSegment(role=centerline), selectable in its Sketch
+ConstructionLine       2 picks  -> LineSegment(role=construction), selectable in its Sketch
 ```
 
 Composite tools expand into ordinary shared-corner lines plus one explicit `ClosedProfile`; no
@@ -116,7 +117,7 @@ walks `NumericInput -> Preview -> commit_command` and publishes exactly one work
 
 ```text
 curves/profiles      GuiSketchWorkbench::edit_sketch("Create sketch <tool>", ...)
-point / centerline   create_construction_point / create_construction_line
+point / helper lines  Sketch point / LineSegment with an explicit helper role
 ```
 
 `Esc` backs out one stage at a time: numeric entry first, then the newest pick, then the command.
@@ -136,8 +137,11 @@ polygon side counts outside 3..64.
 
 ## Persistence
 
-Block 111 adds no JSON field or schema. Created lines, closed profiles, construction points, and
-construction lines persist through the existing Sketch and PartDocument JSON authorities. Picks,
+The shell follow-up adds an optional `line_segments[].role`: `geometry` (default when missing),
+`construction` (dashed), or `centerline` (dash-dot). Helper lines remain selectable Sketch entities
+for axes, constraints and transformations, survive solver materialization and geometry edits, and
+do not contribute to inferred profile regions. Existing Part construction datums retain their
+separate authority. See `docs/file-format.md` for persistence. Picks,
 snap kinds, rubber bands, numeric buffers, and constraint previews are transient GUI state.
 
 ## Focused proof
@@ -156,7 +160,7 @@ undo/redo.
 
 ## Extension and next boundary
 
-Block 112 reuses this command lifecycle for circles, arcs, ellipses, elliptical arcs, and slots. Its
+Block 112 reuses this command lifecycle for circles, arcs, ellipses and slots. Its
 persistent expansion, exact full-circle parameter contract, transient conic preview, and failure rules
 are canonical in `docs/gui-sketch-conic-slot-creation-mvp8.md`.
 

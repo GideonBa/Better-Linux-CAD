@@ -5,7 +5,7 @@ and focused Core, Geometry and GUI regression coverage replace the original Bloc
 approximation. Tangent tools construct and persist actual contact/tangent relations.
 
 This contract extends the Block-111 multi-click creation authority with circles, circular arcs,
-ellipses, elliptical arcs, and mechanical slots. It keeps all screen-space interaction transient and
+ellipses and mechanical slots. It keeps all screen-space interaction transient and
 commits only existing Core intent through one `GuiDocumentSession` Part transaction.
 
 ## Authority boundary
@@ -34,7 +34,6 @@ solve/conflict preview, and persist only an accepted candidate.
 | Three-point arc | start, through-point, end | one `ArcSegment` |
 | Tangent arc | source endpoint, end | one `ArcSegment` + coincidence and tangent relations |
 | Ellipse | center, major-axis point, minor-radius point | four exact rational `SplineSegment` entities + `ArcClosedProfile` |
-| Elliptical arc | center, major-axis point, minor-radius point, start, end | one or more exact rational `SplineSegment` entities |
 | Center-to-center slot | first cap center, second cap center, half-width point | two lines + two semicircular arcs + `ArcClosedProfile` |
 | Overall-length slot | first outer endpoint, second outer endpoint, half-width point | inset cap centers, two lines + two semicircular arcs + `ArcClosedProfile` |
 
@@ -101,7 +100,9 @@ as one transaction. Save/Open and Undo/Redo preserve the complete intent.
 center, major-axis vector, positive minor radius, start angle and signed sweep up to a quarter turn.
 The construction uses an exact rational quadratic conic, elevated in homogeneous coordinates to a
 rational cubic. The full ellipse consists of four spans in an ordered `ArcClosedProfile`; open
-elliptical arcs use the minimum number of spans up to 90 degrees and add no profile.
+ellipse spans remain available for internal conic operations and projections. The standalone
+elliptical-arc GUI command has been removed; the ribbon offers the fitted Spline tool described in
+`docs/gui-sketch-spline-text-mvp8.md`.
 
 The persistent curve stores four poles and four finite positive weights. Its evaluation is the
 weighted Bernstein sum divided by the weighted basis sum. This is mathematically an exact conic;
@@ -144,7 +145,7 @@ Geometry paths consume it without a slot-specific persistence type.
 Preview samples are transient and never serialized:
 
 - circles and ellipses publish closed sampled rubber bands;
-- arcs and elliptical arcs publish open sampled rubber bands;
+- circular arcs publish open sampled rubber bands;
 - slots publish a closed line/arc-shaped rubber band;
 - center, endpoint, quadrant, nearest, and inference snaps publish automatic-constraint previews;
 - tangent tools publish their resolved contact and exact tangent geometry.
@@ -167,7 +168,7 @@ Block 115.
 - zero or negative effective radii fail validation;
 - collinear three-point circle/arc input fails validation;
 - ellipse major and minor radii must be non-zero;
-- elliptical-arc sweep must be non-zero;
+- internal rational conic-span sweeps must be non-zero;
 - slot axis and width must be non-zero;
 - overall slot length must exceed slot width;
 - no command mutates the document during preview;

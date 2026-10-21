@@ -82,7 +82,8 @@ projection, and projected-line break-link conversion.
 ## Next boundary
 
 Block 118 owns move, rotate, scale, copy, mirror, rectangular Sketch pattern, and circular Sketch
-pattern. Automatic chain discovery and individual circular-arc offsets are implemented by the follow-up below.
+pattern. Automatic chain discovery and individual circular-arc offsets are implemented by the
+follow-up below.
 Mixed curved chains, spline offsets, bevel/round joins, variable-distance offset, and automatic
 dependent-reference rewriting remain later extensions.
 
@@ -93,13 +94,20 @@ preview, Apply/Cancel, one atomic undo entry, and existing Save/Open persistence
 `GuiSketchOperationController` and `ShellSketchTools` dialog-free command surface are also exercised
 by the registered `[gui][sketch-offset-project]` and `[gui][sketch-project]` proofs.
 
-**Versatz** accepts an unordered selected line chain or loop. `offset_chain` discovers endpoint
-connectivity and locally reverses traversal without changing the source entities or their direction.
-Branches and disconnected selections are rejected. Open chains start at the lexicographically smaller
-endpoint; closed loops start with the lexicographically smallest entity id in its stored direction.
+**Versatz** uses the nonmodal pointer/numeric editor shared with Transformieren. It accepts multiple
+selected chains or loops. `offset_selection` partitions disconnected selections and offsets every
+component into one candidate, retaining helper-line roles. An isolated line follows its stored
+left-hand normal. Connected chains use the deterministic traversal below.
+
+For each connected component, `offset_chain` discovers endpoint connectivity and locally reverses
+traversal without changing the source entities or their direction. Branches are rejected;
+disconnected components are handled independently by `offset_selection`. Open chains start at the
+lexicographically smaller endpoint; closed loops start with the lexicographically smallest entity id
+in its stored direction.
 The sign of the distance is relative to that traversal (positive = left). Consecutive collinear
 segments share a joint; reversed/consumed edges are rejected. Closed line offsets immediately create
-an ordinary `ClosedProfile` in addition to their new edges. Existing source profiles are preserved.
+an ordinary `ClosedProfile` in addition to their new edges when none of the edges is helper geometry.
+Existing source profiles are preserved.
 
 A single circular arc supports exact signed radial offset, preserving its angular extent and
 orientation. Inward offsets that consume the radius are rejected. Mixed line/arc chains, spline
@@ -107,7 +115,15 @@ offsets, bevel/round joins, and variable distance remain extensions.
 
 **Geometrie projizieren** offers currently resolvable construction points/lines and semantic
 feature vertices/edges in a source chooser. The preview resolves through `SketchReferenceProjector`
-and the current shape cache. Apply persists the original associative reference identity. Missing
+and the current shape cache. Off-plane points and edges are orthogonally projected; only a line
+whose plane direction collapses is rejected. Semantic edges retain finite endpoints for drawing
+and snapping. Committed point and line references have native presentations and remain visible
+after preview completion. Apply persists the original associative reference identity.
+
+The chooser also offers finite lines, arcs, circles and cubic splines from other sketches. These
+are explicitly labelled as **unlinked editable projections**: they persist as ordinary line or exact
+rational spline entities. Circular curves projected obliquely retain conic geometry through rational
+spans. This snapshot workflow does not create a parallel associative reference graph. Missing
 sources and cyclic document dependencies reject the operation; there is no screen-coordinate fallback.
 
 **Verknüpfung lösen** accepts one selected projected line. The user specifies a positive finite
@@ -125,4 +141,6 @@ and collapsed geometry, projection, detachment, and atomic history.
 ```bash
 ./build/dev-gui/blcad_core_tests "[core][sketch-offset-project]"
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][sketch-offset-project]"
+./build/dev-gui/blcad_geometry_tests "[sketch-reference]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[sketch-project]"
 ```

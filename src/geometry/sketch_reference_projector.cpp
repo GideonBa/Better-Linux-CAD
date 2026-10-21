@@ -31,20 +31,14 @@ constexpr double k_tolerance = 1.0e-9;
   return Vector2{vector.x / vector_length, vector.y / vector_length};
 }
 
-[[nodiscard]] double signed_distance_to_workplane(const ResolvedWorkplane& workplane,
-                                                  Point3 point) noexcept {
-  return dot(vector_between(workplane.origin, point), workplane.normal);
-}
-
 [[nodiscard]] Result<Point2> project_point_to_workplane(const ResolvedWorkplane& workplane,
                                                         Point3 point,
                                                         const std::string& object_id) {
   const Vector3 relative = vector_between(workplane.origin, point);
-  const double distance = dot(relative, workplane.normal);
-  if (std::abs(distance) > k_tolerance) {
+  if (!std::isfinite(relative.x) || !std::isfinite(relative.y) || !std::isfinite(relative.z))
     return Result<Point2>::failure(
-        validation_error(object_id, "projected sketch reference must lie on the sketch workplane"));
-  }
+        validation_error(object_id, "projection coordinates must be finite"));
+  // Orthographic projection discards the component normal to the sketch plane.
 
   return Result<Point2>::success(
       Point2{dot(relative, workplane.x_axis), dot(relative, workplane.y_axis)});
@@ -52,13 +46,8 @@ constexpr double k_tolerance = 1.0e-9;
 
 [[nodiscard]] Result<ResolvedSketchLineReference>
 make_projected_line(SketchEntityId id, const ResolvedWorkplane& workplane, Point3 point,
-                    Vector3 direction) {
+                    Vector3 direction, bool finite_edge = false) {
   const std::string object_id = id.value();
-  if (std::abs(signed_distance_to_workplane(workplane, point)) > k_tolerance ||
-      std::abs(dot(direction, workplane.normal)) > k_tolerance) {
-    return Result<ResolvedSketchLineReference>::failure(
-        validation_error(object_id, "projected sketch line must lie on the sketch workplane"));
-  }
 
   auto local_point = project_point_to_workplane(workplane, point, object_id);
   if (local_point.has_error()) {
@@ -78,8 +67,9 @@ make_projected_line(SketchEntityId id, const ResolvedWorkplane& workplane, Point
         validation_error(object_id, "projected sketch line direction must not collapse"));
   }
 
-  return Result<ResolvedSketchLineReference>::success(
-      ResolvedSketchLineReference{std::move(id), local_point.value(), normalize(local_direction)});
+  return Result<ResolvedSketchLineReference>::success(ResolvedSketchLineReference{
+      std::move(id), local_point.value(), normalize(local_direction),
+      finite_edge ? std::optional<Point2>{local_second_point.value()} : std::nullopt});
 }
 
 } // namespace
@@ -146,7 +136,8 @@ SketchReferenceProjector::resolve_line(const PartDocument& document, const Sketc
   }
 
   const Vector3 direction = vector_between(resolved.value().start, resolved.value().end);
-  return make_projected_line(reference.id(), workplane.value(), resolved.value().start, direction);
+  return make_projected_line(reference.id(), workplane.value(), resolved.value().start, direction,
+                             true);
 }
 
 Result<ResolvedSketchPointReference>
@@ -205,7 +196,7 @@ SketchReferenceProjector::resolve_line(const PartDocument& document, const Sketc
   if (resolved.has_error())
     return Result<ResolvedSketchLineReference>::failure(resolved.error());
   return make_projected_line(reference.id(), workplane.value(), resolved.value().start,
-                             vector_between(resolved.value().start, resolved.value().end));
+                             vector_between(resolved.value().start, resolved.value().end), true);
 }
 
 } // namespace blcad::geometry
