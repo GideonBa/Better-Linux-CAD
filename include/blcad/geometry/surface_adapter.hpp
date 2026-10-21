@@ -9,8 +9,17 @@
 
 namespace blcad::geometry {
 
+struct SurfaceExtensionFrame {
+  Point3 origin;
+  Vector3 direction;
+};
+
 class SurfaceAdapter {
 public:
+  [[nodiscard]] Result<SurfaceExtensionFrame>
+  extension_frame(FeatureId feature, const GeometryShape& target,
+                  const std::vector<SweepPathSegment>& boundary) const;
+
   [[nodiscard]] Result<GeometryShape>
   make_boundary_surface(FeatureId feature_id,
                         const std::vector<std::vector<SweepPathSegment>>& boundaries) const;

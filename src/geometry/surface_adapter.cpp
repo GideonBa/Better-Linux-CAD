@@ -255,6 +255,16 @@ fill(const FeatureId& id, const std::vector<std::vector<SweepPathSegment>>& boun
   if (edges.has_error())
     return Result<TopoDS_Shape>::failure(edges.error());
   try {
+    BRepBuilderAPI_MakeWire wire;
+    for (const auto& edge : edges.value())
+      wire.Add(edge);
+    if (wire.IsDone()) {
+      // Keep analytic planes exact. Approximating coplanar boundaries as a
+      // BSpline makes downstream intersections unnecessarily expensive.
+      BRepBuilderAPI_MakeFace planar(wire.Wire(), Standard_True);
+      if (planar.IsDone())
+        return checked_shape(id, planar.Face());
+    }
     BRepFill_Filling filling;
     for (const auto& edge : edges.value())
       filling.Add(edge, GeomAbs_C0, Standard_True);
@@ -441,6 +451,43 @@ SurfaceAdapter::trim_surface(FeatureId feature_id, const GeometryShape& target,
   }
 }
 
+Result<SurfaceExtensionFrame>
+SurfaceAdapter::extension_frame(FeatureId feature_id, const GeometryShape& target,
+                                const std::vector<SweepPathSegment>& boundary) const {
+  if (target.empty() || boundary.size() != 1 ||
+      boundary.front().kind != SweepPathSegmentKind::Line ||
+      same_point(boundary.front().start, boundary.front().end))
+    return Result<SurfaceExtensionFrame>::failure(
+        surface_error(feature_id, "extension frame requires one linear edge"));
+  auto target_face = single_surface_face(feature_id, target.impl_->shape, "extend target");
+  if (!target_face)
+    return Result<SurfaceExtensionFrame>::failure(target_face.error());
+  try {
+    const Point3 start = boundary.front().start, end = boundary.front().end;
+    const Vector3 edge_direction = normalized({end.x - start.x, end.y - start.y, end.z - start.z});
+    GProp_GProps properties;
+    BRepGProp::SurfaceProperties(target_face.value(), properties);
+    const Point3 center = point3(properties.CentreOfMass());
+    const Point3 middle{(start.x + end.x) / 2.0, (start.y + end.y) / 2.0, (start.z + end.z) / 2.0};
+    const Vector3 toward_center{center.x - middle.x, center.y - middle.y, center.z - middle.z};
+    const double along_edge = dot(toward_center, edge_direction);
+    const Vector3 inward{toward_center.x - edge_direction.x * along_edge,
+                         toward_center.y - edge_direction.y * along_edge,
+                         toward_center.z - edge_direction.z * along_edge};
+    if (dot(inward, inward) <= kTolerance * kTolerance)
+      return Result<SurfaceExtensionFrame>::failure(
+          surface_error(feature_id, "extension boundary has no unique outward direction"));
+    const Vector3 inward_direction = normalized(inward);
+    const Vector3 outward{-inward_direction.x, -inward_direction.y, -inward_direction.z};
+    return Result<SurfaceExtensionFrame>::success({middle, outward});
+  } catch (const Standard_Failure& failure) {
+    return Result<SurfaceExtensionFrame>::failure(
+        surface_error(feature_id, failure_message(failure)));
+  } catch (const std::exception& exception) {
+    return Result<SurfaceExtensionFrame>::failure(surface_error(feature_id, exception.what()));
+  }
+}
+
 Result<GeometryShape> SurfaceAdapter::extend_surface(FeatureId feature_id,
                                                      const GeometryShape& target,
                                                      const std::vector<SweepPathSegment>& boundary,
@@ -481,21 +528,11 @@ Result<GeometryShape> SurfaceAdapter::extend_surface(FeatureId feature_id,
 
     const Point3 start = boundary.front().start;
     const Point3 end = boundary.front().end;
+    auto frame = extension_frame(feature_id, target, boundary);
+    if (!frame)
+      return Result<GeometryShape>::failure(frame.error());
     const Vector3 edge_direction = normalized({end.x - start.x, end.y - start.y, end.z - start.z});
-    GProp_GProps properties;
-    BRepGProp::SurfaceProperties(target_face.value(), properties);
-    const Point3 center = point3(properties.CentreOfMass());
-    const Point3 middle{(start.x + end.x) / 2.0, (start.y + end.y) / 2.0, (start.z + end.z) / 2.0};
-    const Vector3 toward_center{center.x - middle.x, center.y - middle.y, center.z - middle.z};
-    const double along_edge = dot(toward_center, edge_direction);
-    const Vector3 inward{toward_center.x - edge_direction.x * along_edge,
-                         toward_center.y - edge_direction.y * along_edge,
-                         toward_center.z - edge_direction.z * along_edge};
-    if (dot(inward, inward) <= kTolerance * kTolerance)
-      return Result<GeometryShape>::failure(
-          surface_error(feature_id, "extension boundary has no unique outward direction"));
-    const Vector3 inward_direction = normalized(inward);
-    const Vector3 outward{-inward_direction.x, -inward_direction.y, -inward_direction.z};
+    const Vector3 outward = frame.value().direction;
     const Vector3 plane_normal = normalized(cross(edge_direction, outward));
     for (TopExp_Explorer explorer(target_face.value(), TopAbs_VERTEX); explorer.More();
          explorer.Next()) {

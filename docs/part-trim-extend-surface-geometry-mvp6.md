@@ -56,3 +56,13 @@ ambiguous multi-face target.
 Blocks 48–94 are implemented. Stitch/Knit/Sew shell and Closed-shell-to-solid execution are
 canonical in `docs/part-surface-stitch-geometry-mvp6.md` and
 `docs/part-closed-shell-to-solid-geometry-mvp6.md`. Block 93 multi-body STEP export and deterministic body naming is implemented; Block 94 integrated Part Construction MVP acceptance is implemented; Block 95 Qt application shell, GUI document session, and command architecture is implemented; Block 96 document lifecycle, transactions, recompute, and diagnostics is implemented; Block 97 OCCT viewport, navigation, display, and semantic picking is implemented; Block 98 browser, property editor, and selection synchronization is the current next technical step.
+
+## Block-136 manipulator frame
+
+`GeometryRecomputeExecutor::surface_extension_frame` resolves the same target and boundary references
+as actual Extend. `SurfaceAdapter::extension_frame` computes their boundary midpoint and outward
+perpendicular from the target face's center of mass. Actual extension reuses that calculation, so
+native drag direction and numeric distance share one Geometry authority. Preview still validates
+boundary membership, planarity and topology before exposing an applicable result. The frame is
+transient, follows reversed boundary orientation and source-parameter recompute, and adds no persisted
+intent. Focused proof: `[geometry][surface-trim-extend][block136-surface]`.

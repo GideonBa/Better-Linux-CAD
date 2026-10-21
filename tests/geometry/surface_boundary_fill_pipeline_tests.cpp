@@ -1,4 +1,9 @@
+#include "blcad/geometry/occt_shape_view.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
+
+#include <BRepAdaptor_Surface.hxx>
+#include <TopExp_Explorer.hxx>
+#include <TopoDS.hxx>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -148,7 +153,7 @@ TEST_CASE("Block 89 builds a surface from four spatial boundaries",
 }
 
 TEST_CASE("Block 89 fills one supported closed planar boundary",
-          "[geometry][surface-boundary-fill]") {
+          "[geometry][surface-boundary-fill][block136-surface]") {
   PartDocument document = empty_surface_document("part.surface.fill");
   const PathCurveId fill_path = add_planar_rectangle(document);
   add_surface_body(document, "body.fill");
@@ -164,6 +169,11 @@ TEST_CASE("Block 89 fills one supported closed planar boundary",
   REQUIRE(body_shape != nullptr);
   CHECK_FALSE(body_shape->empty());
   CHECK(RectangleExtrusionAdapter{}.summarize(*body_shape).solid_count == 0U);
+  const auto* native = OcctShapeView::get(*body_shape);
+  REQUIRE(native);
+  TopExp_Explorer face(*native, TopAbs_FACE);
+  REQUIRE(face.More());
+  CHECK(BRepAdaptor_Surface(TopoDS::Face(face.Current())).GetType() == GeomAbs_Plane);
 }
 
 TEST_CASE("Block 89 rejects an open fill contour transactionally",
