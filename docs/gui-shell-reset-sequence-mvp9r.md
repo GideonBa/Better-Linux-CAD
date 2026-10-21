@@ -506,7 +506,8 @@ flags remain explicit. Actual multi-Body previews hide all replaced/consumed sou
 failed candidates restore the prior scene. One Apply commits the ordered per-Body transform batch
 and one Undo reverses it. Contract/proof: `docs/gui-interactive-pattern-body-mvp9.md`, `[block136-body]`.
 
-Sweep/Loft, Surface, Measure, Assembly, browser feature editing and whole-block acceptance remain open.
+The spatial follow-up below restores Sweep/Loft. Surface, Measure, Assembly, browser feature editing
+and whole-block acceptance remain open.
 
 Validation for the Body-operation slice on 21 October 2026: full Core (513 cases, 15124 assertions),
 Geometry (421 cases, 28002 assertions), and offscreen GUI (246 passed, five explicit native skips,
@@ -517,6 +518,34 @@ also checks repeated translation drags, unitless scale input, owned Sketch frame
 collisions and rollback when the second batch target has no producer. Native captures were inspected
 and desktop startup passed (intentional six-second timeout). Commands: `docs/development-setup.md`.
 These results validate the slice without advancing whole-block acceptance.
+
+#### Block 136 next slice — PathCurve, Sweep and Loft
+
+`ShellFeatureTools` adds Pfad erstellen, Sweep and Loft through the shared task panel and coordinator.
+Ordered path segments and Loft sections support list dragging, task buttons and explicit direction/
+normal reversal. Sweep exposes profile/trajectory/guide roles and coupled twist drag/numeric input;
+Loft retains center paths, ordered guides and continuity. Solid, cut and surface output use correctly
+typed pending Bodies or an existing cut target. Real Geometry previews remain disposable, and one
+Apply commits all new inputs with the feature. Cancel, Undo/Redo and Save/Open retain their authorities.
+
+The viewport scopes native detection to the selected input role and restores the prior capability and
+semantic filters on completion. Bounded paths have a complete canonical presentation, including
+construction paths. Existing planar rational spline intent now resolves through 32 deterministic
+spans for preview and execution. The task inputs scroll while Apply/Cancel remains visible.
+Contract/proof: `docs/gui-interactive-path-sweep-loft-mvp9.md`, `[block136-spatial]`.
+
+Surface, Measure, Assembly, browser feature editing and whole-block acceptance remain open.
+
+Validation for the spatial slice on 21 October 2026: full Core (513 cases, 15124 assertions),
+Geometry (423 cases, 28106 assertions), and offscreen GUI (254 passed, six explicit native skips,
+11134 assertions) pass. The combined native spatial/Body/pattern/finishing/Sketch UI/viewport/lifecycle
+run passes all 43 cases and 3870 assertions, including the offscreen skips. It verifies actual
+profile/path selection changes, ordered Loft picks, twist drag/numeric refinement and a visible,
+reachable Apply button and task inputs without horizontal clipping. Focused proof also covers solid/cut/surface results, reversed connected paths,
+list-model section moves, G1 guides, rejected G2 and twist/guide conflicts, fitted spline profiles,
+pending-input isolation, selection-scope restoration, exact Undo/Redo and Save/Open. Native captures
+were inspected and desktop startup passed (intentional six-second timeout). Commands:
+`docs/development-setup.md`. These checks do not close whole-block acceptance.
 
 ### Sketch interaction follow-up — 21 October 2026
 

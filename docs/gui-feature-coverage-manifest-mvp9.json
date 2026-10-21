@@ -194,8 +194,6 @@
       "selection_scope": "Unambiguous current-body semantic box edges and planar faces, including four-line Sketch rectangles."
     },
     "remaining": [
-      "Sweep",
-      "Loft",
       "Surface",
       "Measure",
       "Assembly",
@@ -224,6 +222,21 @@
         "Body Uniform Scale"
       ],
       "selection_scope": "Visible recomputed Bodies; Boolean solid target/tools, batch World transforms, datum/construction rotation axes and explicit scale center."
+    },
+    "spatial_slice": {
+      "status": "implemented",
+      "contract": "docs/gui-interactive-path-sweep-loft-mvp9.md",
+      "proof": "[block136-spatial]",
+      "commands": [
+        "PathCurve",
+        "Sweep",
+        "Sweep Cut",
+        "Sweep Surface",
+        "Loft",
+        "Loft Cut",
+        "Loft Surface"
+      ],
+      "selection_scope": "Materialized Sketch profiles, bounded ordered path sources and existing open paths; explicit cut targets, twist, guides and section order."
     }
   }
 }

@@ -14,6 +14,7 @@
 class QAction;
 class QCheckBox;
 class QComboBox;
+class QDoubleSpinBox;
 class QListWidget;
 class QDockWidget;
 class QEvent;
@@ -53,7 +54,10 @@ public:
     BodyBoolean,
     BodyTranslate,
     BodyRotate,
-    BodyScale
+    BodyScale,
+    PathCurve,
+    Sweep,
+    Loft
   };
 
   ShellFeatureTools(ShellWindow& window, GuiDocumentSession& session,
@@ -134,6 +138,52 @@ public:
                                                                    const QString& text);
   [[nodiscard]] Result<GuiPartFeaturePreview> set_scale_center_text(std::size_t component,
                                                                     const QString& text);
+  [[nodiscard]] Result<std::size_t> begin_spatial(Command command);
+  [[nodiscard]] bool accept_spatial_selection(const GuiSelection& selection);
+  [[nodiscard]] Result<std::size_t> append_spatial_input(int choice);
+  [[nodiscard]] Result<std::size_t> move_spatial_input(int from, int to);
+  [[nodiscard]] QComboBox& spatial_source_editor() noexcept {
+    return *spatial_source_;
+  }
+  [[nodiscard]] QListWidget& spatial_order_editor() noexcept {
+    return *spatial_order_;
+  }
+  [[nodiscard]] QComboBox& spatial_mode_editor() noexcept {
+    return *spatial_mode_;
+  }
+  [[nodiscard]] QComboBox& spatial_target_editor() noexcept {
+    return *spatial_target_;
+  }
+  [[nodiscard]] QComboBox& spatial_path_editor() noexcept {
+    return *spatial_path_;
+  }
+  [[nodiscard]] QComboBox& spatial_guide_editor() noexcept {
+    return *spatial_guide_;
+  }
+  [[nodiscard]] QListWidget& spatial_guides_editor() noexcept {
+    return *spatial_guides_;
+  }
+  [[nodiscard]] QComboBox& spatial_pick_editor() noexcept {
+    return *spatial_pick_;
+  }
+  [[nodiscard]] QComboBox& spatial_orientation_editor() noexcept {
+    return *spatial_orientation_;
+  }
+  [[nodiscard]] QComboBox& spatial_continuity_editor() noexcept {
+    return *spatial_continuity_;
+  }
+  [[nodiscard]] QCheckBox& spatial_closed_editor() noexcept {
+    return *spatial_closed_;
+  }
+  [[nodiscard]] QCheckBox& sweep_twist_editor() noexcept {
+    return *sweep_twist_;
+  }
+  [[nodiscard]] QPushButton& spatial_add_button() noexcept {
+    return *spatial_add_;
+  }
+  [[nodiscard]] QPushButton& spatial_add_guide_button() noexcept {
+    return *spatial_add_guide_;
+  }
   [[nodiscard]] bool accept_pattern_selection(const GuiSelection& selection);
   [[nodiscard]] QListWidget& pattern_source_editor() noexcept {
     return *pattern_sources_;
@@ -187,6 +237,23 @@ protected:
 private:
   [[nodiscard]] bool finishing() const noexcept;
   [[nodiscard]] bool pattern() const noexcept;
+  [[nodiscard]] bool spatial() const noexcept;
+  [[nodiscard]] QString spatial_summary() const;
+  void build_spatial_controls(QWidget* panel);
+  void refresh_spatial_preview();
+  [[nodiscard]] Result<std::size_t> rebuild_spatial_controller();
+  void refresh_spatial_enablement(bool idle_part);
+  void update_spatial_controls();
+  void update_spatial_pick_scope();
+  [[nodiscard]] bool spatial_scalar() const noexcept;
+  struct SpatialInput {
+    std::string label;
+    std::string semantic_id;
+    std::optional<PathSegmentReference> segment;
+    std::optional<std::pair<SketchId, ProfileId>> profile;
+    std::optional<PathCurveId> path;
+  };
+  [[nodiscard]] std::vector<SpatialInput> spatial_inputs_for(Command command) const;
   [[nodiscard]] bool body_operation() const noexcept;
   [[nodiscard]] bool body_transform() const noexcept;
   [[nodiscard]] QString body_summary() const;
@@ -316,6 +383,35 @@ private:
   Point3 body_scale_center_{};
   double body_value_{0};
   bool body_reference_picking_{false};
+
+  std::vector<SpatialInput> spatial_inputs_;
+  std::vector<std::pair<Command, QAction*>> spatial_actions_;
+  QWidget* spatial_controls_{nullptr};
+  QComboBox* spatial_source_{nullptr};
+  QListWidget* spatial_order_{nullptr};
+  QComboBox* spatial_mode_{nullptr};
+  QComboBox* spatial_target_{nullptr};
+  QComboBox* spatial_path_{nullptr};
+  QComboBox* spatial_guide_{nullptr};
+  QListWidget* spatial_guides_{nullptr};
+  QComboBox* spatial_pick_{nullptr};
+  QComboBox* spatial_orientation_{nullptr};
+  QComboBox* spatial_continuity_{nullptr};
+  QCheckBox* spatial_closed_{nullptr};
+  QCheckBox* sweep_twist_{nullptr};
+  std::array<QDoubleSpinBox*, 3> spatial_up_{};
+  QPushButton* spatial_add_{nullptr};
+  QPushButton* spatial_add_guide_{nullptr};
+  QWidget* spatial_order_buttons_{nullptr};
+  QLabel* spatial_order_hint_{nullptr};
+  QPushButton* spatial_remove_guide_{nullptr};
+  FeatureId spatial_feature_{""};
+  PathCurveId spatial_path_id_{""};
+  BodyId spatial_result_{""};
+  ParameterId spatial_twist_parameter_{""};
+  std::string spatial_name_;
+  double spatial_twist_{0};
+  std::optional<std::vector<std::string>> previous_semantic_scope_;
 
   std::optional<std::pair<SketchId, ProfileId>> selected_profile_;
   std::optional<double> drag_start_value_;

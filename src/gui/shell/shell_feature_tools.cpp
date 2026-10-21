@@ -23,6 +23,7 @@
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPushButton>
+#include <QScrollArea>
 #include <QSignalBlocker>
 #include <QSpinBox>
 #include <QStatusBar>
@@ -294,6 +295,21 @@ ShellFeatureTools::ShellFeatureTools(ShellWindow& window, GuiDocumentSession& se
     body_actions_.emplace_back(command, action);
   }
 
+  auto* spatial_group = ribbon.add_group(model_tab, QStringLiteral("Sweep / Loft"));
+  for (const auto& [command, label, id] :
+       {std::tuple{Command::PathCurve, "Pfad erstellen", "path_curve"},
+        std::tuple{Command::Sweep, "Sweep", "sweep"}, std::tuple{Command::Loft, "Loft", "loft"}}) {
+    auto* action = new QAction(QString::fromUtf8(label), this);
+    action->setObjectName(QStringLiteral("blcad.action.") + QString::fromUtf8(id));
+    connect(action, &QAction::triggered, this, [this, command] {
+      auto begun = begin_spatial(command);
+      if (!begun)
+        report(begun.error());
+    });
+    ribbon.add_small_button(spatial_group, action);
+    spatial_actions_.emplace_back(command, action);
+  }
+
   overlay_ = new ShellManipulatorOverlay(&viewport_, layer_);
   overlay_->setGeometry(viewport_.rect());
   viewport_.installEventFilter(this);
@@ -302,7 +318,9 @@ ShellFeatureTools::ShellFeatureTools(ShellWindow& window, GuiDocumentSession& se
   task_dock_ = new QDockWidget(QStringLiteral("Feature"), &window_);
   task_dock_->setObjectName(QStringLiteral("blcad.shell.feature_task"));
   task_dock_->setFeatures(QDockWidget::DockWidgetMovable);
-  auto* panel = new QWidget(task_dock_);
+  auto* dock_contents = new QWidget(task_dock_);
+  auto* dock_column = new QVBoxLayout(dock_contents);
+  auto* panel = new QWidget(dock_contents);
   auto* column = new QVBoxLayout(panel);
   task_summary_ = new QLabel(panel);
   task_summary_->setWordWrap(true);
@@ -316,16 +334,24 @@ ShellFeatureTools::ShellFeatureTools(ShellWindow& window, GuiDocumentSession& se
   build_finishing_controls(panel, *form);
   build_pattern_controls(panel);
   build_body_controls(panel);
+  build_spatial_controls(panel);
   auto* buttons = new QHBoxLayout();
-  apply_button_ = new QPushButton(QStringLiteral("Anwenden"), panel);
+  apply_button_ = new QPushButton(QStringLiteral("Anwenden"), dock_contents);
   apply_button_->setObjectName(QStringLiteral("blcad.feature.apply"));
-  cancel_button_ = new QPushButton(QStringLiteral("Abbrechen"), panel);
+  cancel_button_ = new QPushButton(QStringLiteral("Abbrechen"), dock_contents);
   cancel_button_->setObjectName(QStringLiteral("blcad.feature.cancel"));
   buttons->addWidget(apply_button_);
   buttons->addWidget(cancel_button_);
-  column->addLayout(buttons);
   column->addStretch(1);
-  task_dock_->setWidget(panel);
+  auto* scroll = new QScrollArea(dock_contents);
+  scroll->setObjectName(QStringLiteral("blcad.feature.inputs_scroll"));
+  scroll->setMinimumWidth(380);
+  scroll->setWidgetResizable(true);
+  scroll->setFrameShape(QFrame::NoFrame);
+  scroll->setWidget(panel);
+  dock_column->addWidget(scroll, 1);
+  dock_column->addLayout(buttons);
+  task_dock_->setWidget(dock_contents);
   window_.addDockWidget(Qt::RightDockWidgetArea, task_dock_);
   task_dock_->hide();
 
@@ -365,7 +391,7 @@ ShellFeatureTools::~ShellFeatureTools() = default;
 
 bool ShellFeatureTools::active() const noexcept {
   return command_ != Command::None &&
-         (finishing() || pattern() || body_operation() || coordinator_.active());
+         (finishing() || pattern() || body_operation() || spatial() || coordinator_.active());
 }
 
 bool ShellFeatureTools::select_profile(SketchId sketch, ProfileId profile) {
@@ -696,6 +722,12 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::set_numeric_value(double value)
           Error::validation("gui.shell.feature", "Drehwinkel muss zwischen 0 und 360 Grad liegen"));
     candidate.handle_id = std::string(kRevolveAngleHandleId);
     candidate.value_kind = GuiViewportManipulatorValueKind::Angle;
+  } else if (spatial()) {
+    if (!spatial_scalar())
+      return Result<GuiPartFeaturePreview>::failure(Error::validation(
+          "spatial", "nur die aktive Sweep-Verdrehung besitzt einen numerischen Winkel"));
+    candidate.handle_id = std::string(kSweepTwistHandleId);
+    candidate.value_kind = GuiViewportManipulatorValueKind::Angle;
   } else if (body_operation()) {
     if (command_ == Command::BodyBoolean)
       return Result<GuiPartFeaturePreview>::failure(
@@ -813,7 +845,10 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::preview_and_publish() {
   if (body_operation())
     shapes = coordinator_.body_operation().preview_shapes(session_);
   else {
-    auto shape = command_ == Command::Extrude   ? coordinator_.extrude().preview_shape(session_)
+    auto shape = command_ == Command::PathCurve || command_ == Command::Sweep
+                     ? coordinator_.path_sweep().preview_shape(session_)
+                 : command_ == Command::Loft    ? coordinator_.loft().preview_shape(session_)
+                 : command_ == Command::Extrude ? coordinator_.extrude().preview_shape(session_)
                  : command_ == Command::Revolve ? coordinator_.revolve().preview_shape(session_)
                  : pattern() ? coordinator_.pattern_mirror().preview_shape(session_)
                  : command_ == Command::Fillet || command_ == Command::Chamfer
@@ -833,6 +868,8 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::preview_and_publish() {
   std::vector<std::string> replacements;
   if (body_operation())
     replacements = body_preview_replacements();
+  else if (spatial() && command_ != Command::PathCurve && spatial_mode_->currentIndex() == 1)
+    replacements.push_back("body/" + spatial_target_->currentData().toString().toStdString());
   else if (finishing())
     replacements.push_back("body/" + finishing_body_->currentData().toString().toStdString());
   auto published =
@@ -844,18 +881,20 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::preview_and_publish() {
     synchronize_overlay();
     return Result<GuiPartFeaturePreview>::failure(published.error());
   }
-  task_summary_->setText(body_operation() ? body_summary()
-                         : finishing()    ? finishing_summary()
-                         : pattern()      ? pattern_summary()
+  task_summary_->setText(spatial()          ? spatial_summary()
+                         : body_operation() ? body_summary()
+                         : finishing()      ? finishing_summary()
+                         : pattern()        ? pattern_summary()
                                      : QString::fromStdString(preview.value().semantic_summary));
   preview_valid_ = true;
   refresh_enablement();
   window_.statusBar()->showMessage(
       QStringLiteral("Vorschau: %1")
-          .arg(body_operation() ? body_summary()
-               : finishing()    ? finishing_summary()
-               : pattern()      ? pattern_summary()
-                                : QString::fromStdString(preview.value().semantic_summary)));
+          .arg(spatial()          ? spatial_summary()
+               : body_operation() ? body_summary()
+               : finishing()      ? finishing_summary()
+               : pattern()        ? pattern_summary()
+                                  : QString::fromStdString(preview.value().semantic_summary)));
   synchronize_overlay();
   return preview;
 }
@@ -889,8 +928,11 @@ Result<std::size_t> ShellFeatureTools::apply() {
   if (!task_applied && session_.task().active())
     (void)session_.task().cancel();
   const bool was_finishing = finishing();
-  const bool restore_selection = pattern() || body_operation();
+  const bool restore_selection = pattern() || body_operation() || spatial();
+  const bool restore_scope = spatial();
   command_ = Command::None;
+  if (restore_scope)
+    viewport_.set_selection_semantic_scope(previous_semantic_scope_);
   if (restore_selection) {
     pattern_reference_picking_ = false;
     body_reference_picking_ = false;
@@ -924,8 +966,11 @@ void ShellFeatureTools::cancel() noexcept {
   if (command_ != Command::None && session_.task().active())
     (void)session_.task().cancel();
   const bool was_finishing = finishing();
-  const bool restore_selection = pattern() || body_operation();
+  const bool restore_selection = pattern() || body_operation() || spatial();
+  const bool restore_scope = spatial();
   command_ = Command::None;
+  if (restore_scope)
+    viewport_.set_selection_semantic_scope(previous_semantic_scope_);
   if (restore_selection) {
     pattern_reference_picking_ = false;
     body_reference_picking_ = false;
@@ -998,6 +1043,7 @@ void ShellFeatureTools::refresh_enablement() {
     action->setEnabled(source_available && reference_available);
   }
   refresh_body_enablement(idle_part);
+  refresh_spatial_enablement(idle_part);
   action_escape_->setEnabled(active());
   const std::string_view expected_command = command_id();
   const bool task_ready = session_.task().stage() == GuiTaskStage::Preview &&
@@ -1018,6 +1064,8 @@ double ShellFeatureTools::current_value() const noexcept {
     return coordinator_.shell_draft().thickness();
   if (command_ == Command::Draft)
     return coordinator_.shell_draft().angle();
+  if (command_ == Command::Sweep)
+    return coordinator_.path_sweep().active() ? coordinator_.path_sweep().twist() : spatial_twist_;
   if (body_transform()) {
     if (!coordinator_.body_operation().active())
       return command_ == Command::BodyTranslate ? body_translation_.x : body_value_;
@@ -1068,6 +1116,8 @@ void ShellFeatureTools::synchronize_numeric_editor(double value) {
     synchronize_pattern_editors();
   if (body_operation())
     synchronize_body_editors();
+  if (command_ == Command::Sweep && coordinator_.path_sweep().active())
+    spatial_twist_ = coordinator_.path_sweep().twist();
   synchronizing_numeric_ = false;
 }
 
@@ -1130,10 +1180,14 @@ void ShellFeatureTools::show_task_panel(QString title, QString unit, double valu
   finishing_controls_->setVisible(finishing());
   pattern_controls_->setVisible(pattern());
   body_controls_->setVisible(body_operation());
-  value_label_->setVisible(command_ != Command::BodyMirror && command_ != Command::BodyBoolean);
-  numeric_editor_->setVisible(command_ != Command::BodyMirror && command_ != Command::BodyBoolean);
+  spatial_controls_->setVisible(spatial());
+  value_label_->setVisible(command_ != Command::BodyMirror && command_ != Command::BodyBoolean &&
+                           (!spatial() || spatial_scalar()));
+  numeric_editor_->setVisible(command_ != Command::BodyMirror && command_ != Command::BodyBoolean &&
+                              (!spatial() || spatial_scalar()));
   task_dock_->setWindowTitle(std::move(title));
-  const QString label = command_ == Command::BodyTranslate   ? QStringLiteral("X")
+  const QString label = command_ == Command::Sweep           ? QStringLiteral("Verdrehung")
+                        : command_ == Command::BodyTranslate ? QStringLiteral("X")
                         : command_ == Command::BodyScale     ? QStringLiteral("Faktor")
                         : command_ == Command::Fillet        ? QStringLiteral("Radius")
                         : command_ == Command::Chamfer       ? QStringLiteral("Abstand")

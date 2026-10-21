@@ -470,3 +470,19 @@ checkboxes start off and only affect geometry with existing associations. The so
 available while original Bodies are hidden by the live preview. Escape during a drag restores its
 start value; Cancel discards the task. Apply records the entire multi-Body operation in one Undo
 step and preserves the ordered transform stack.
+
+## PathCurve, Sweep and Loft
+
+The 3D-Modell **Sweep / Loft** group provides **Pfad erstellen**, **Sweep** and **Loft**. Build a path
+from connected segments, reorder them in the list, and check a row to reverse its direction. Closure,
+orientation and a fixed up-vector are explicit. Sources remain references to their original curves.
+
+Sweep follows a selected path with a closed Sketch profile or an open path profile for a surface.
+**Modellklick wählt** separates profile, trajectory and guide selection. Twist has an angle grip and a
+numeric field. A guide and nonzero twist cannot be combined. Loft uses an ordered section list:
+drag rows or use Hoch/Runter, check normals to flip them, and optionally choose a center path,
+ordered guides and continuity. Both commands provide solid, cut and surface modes. Cut requires a
+visible solid target; unsupported or invalid results disable Apply.
+
+The scrollable task panel shares actual live previews and Apply/Cancel with the other features.
+New Bodies and twist parameters appear only on Apply and are removed together by one Undo.
