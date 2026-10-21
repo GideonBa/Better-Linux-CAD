@@ -177,5 +177,34 @@
         "justification": "Flattened and structured STEP export are explicit file consumers with no direct-manipulation authoring semantics."
       }
     }
-  ]
+  ],
+  "shell_reset_progress": {
+    "completed_through": 135,
+    "current_block": 136,
+    "finishing_slice": {
+      "status": "implemented",
+      "contract": "docs/gui-interactive-finishing-mvp9.md",
+      "proof": "[block136-finishing]",
+      "commands": [
+        "Fillet",
+        "Chamfer",
+        "Shell",
+        "Draft"
+      ],
+      "selection_scope": "Unambiguous current-body semantic box edges and planar faces, including four-line Sketch rectangles."
+    },
+    "remaining": [
+      "Pattern",
+      "Mirror",
+      "Body Boolean",
+      "Body Transform",
+      "Sweep",
+      "Loft",
+      "Surface",
+      "Measure",
+      "Assembly",
+      "Browser feature edit",
+      "Full shell acceptance and manifest validation"
+    ]
+  }
 }

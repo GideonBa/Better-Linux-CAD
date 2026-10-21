@@ -298,6 +298,7 @@ if(BLCAD_BUILD_GUI)
     src/gui/gui_task_state.cpp
     src/gui/occt_viewport.cpp
     src/gui/shell/shell_feature_tools.cpp
+    src/gui/shell/shell_finishing_tools.cpp
     src/gui/shell/shell_origin.cpp
     src/gui/shell/shell_ribbon.cpp
     src/gui/shell/shell_sketch_tools.cpp
@@ -574,6 +575,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_sketch_conic_workflow_tests.cpp
       tests/gui/gui_shell_dimension_workflow_tests.cpp
       tests/gui/gui_shell_feature_tools_tests.cpp
+      tests/gui/gui_shell_finishing_tools_tests.cpp
       tests/gui/gui_shell_window_tests.cpp
       tests/gui/gui_shell_sketch_tools_tests.cpp
       tests/gui/gui_shell_sketch_operations_tests.cpp

@@ -829,6 +829,8 @@ void ShellWindow::apply_viewport_selection(const std::optional<GuiSelection>& se
   bool selected_feature_profile = false;
   if (selection) {
     (void)session_.selection().add(*selection);
+    if (feature_tools_)
+      (void)feature_tools_->accept_finishing_selection(*selection);
     selected_semantic_id_ = selection->semantic_id;
     if (feature_tools_)
       if (const auto* part = session_.part_document())
@@ -1032,6 +1034,11 @@ void ShellWindow::refresh_browser() {
   }
 }
 
+void ShellWindow::refresh_feature_selection_scene() {
+  viewport_revision_ = std::numeric_limits<std::uint64_t>::max();
+  refresh_viewport_scene();
+}
+
 void ShellWindow::refresh_viewport_scene() {
   if (viewport_revision_ == session_.presentation_revision())
     return;
@@ -1049,6 +1056,10 @@ void ShellWindow::refresh_viewport_scene() {
   if (scene.has_error()) {
     append_diagnostic(scene.error());
     return;
+  }
+  if (feature_tools_) {
+    auto targets = feature_tools_->finishing_selection_items();
+    scene.value().insert(scene.value().end(), targets.begin(), targets.end());
   }
   const auto published = viewport_->set_scene(std::move(scene.value()));
   if (published.has_error())

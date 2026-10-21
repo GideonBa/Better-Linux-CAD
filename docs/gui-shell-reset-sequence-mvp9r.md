@@ -455,6 +455,24 @@ Boolean, Body Transform, Sweep, Loft, Surface family, Measure, Assembly tab), fe
 browser double-click (`GuiFeatureEditController`), and acceptance coverage replacing the deleted
 shell acceptance tests (coverage manifest updated).
 
+#### Block 136 first slice — finishing commands
+
+`ShellFeatureTools` restores Verrunden, Fase, Aushöhlen and Formschräge in the Bearbeiten ribbon
+section with explicit ownership, current-body semantic picking, real disposable Geometry previews,
+shared manipulators and numeric refinement. Driving parameters are provisioned only on Apply in the
+same history entry as the feature. Four-line Sketch rectangles share the existing stable box-role
+contract. Focused shell and native proof: `[block136-finishing]`, with the detailed contract in
+`docs/gui-interactive-finishing-mvp9.md`.
+
+The remaining commands listed above, browser feature editing and whole-block acceptance are still
+open. This slice does not advance the numbered completed-block boundary.
+
+Validation for this slice: 513 Core cases, 421 Geometry cases and 231 offscreen GUI cases pass.
+Two native-only GUI cases skip offscreen; both pass in the selected native run (16 cases, 807
+assertions), alongside existing viewport and Sketch UI regressions. Native preview captures and
+application startup are checked separately. Commands: `docs/development-setup.md`.
+
+
 ### Sketch interaction follow-up — 21 October 2026
 
 The shell uses a nonmodal editor for snapped mouse/numeric transformations and multiple curve

@@ -2,12 +2,9 @@
 
 Status: implemented in Block 125.
 
-> **GUI Shell Reset MVP-9R:** Block 133 deleted the Qt shell this document names — `MainWindow` and
-> all seven self-installing binders — and replaced it with `ShellWindow` + `ShellRibbon`
-> (`src/gui/shell/`, contract: `docs/gui-shell-reset-sequence-mvp9r.md`). The headless authorities and
-> the Core/Geometry contracts below are unchanged and are consumed by the new shell; read every
-> "`MainWindow`" and "binder" below as the shell's Qt presentation layer, whose current form is
-> Block 135/136 work.
+The replacement `ShellWindow` owns these tools through `ShellFeatureTools` and its existing
+`GuiInteractiveFeatureCoordinator`. The Block-136 finishing slice restores the four commands in the
+**Bearbeiten** ribbon group; other Block-136 feature families remain open.
 
 Block 125 upgrades the MVP-7 form-driven finishing commands
 (`docs/gui-part-operations-workbench-mvp7.md`) into direct-manipulation authoring over the frozen
@@ -75,6 +72,48 @@ a dragged fillet radius and a dragged shell thickness — the latter routed thro
 committing a byte-identical document to the equivalent typed edit, establishing GUI/headless
 equivalence.
 
+## Replacement-shell workflow (Block 136, first slice)
+
+**Verrunden**, **Fase**, **Aushöhlen** and **Formschräge** open the existing nonmodal Feature task
+panel. Choose the target solid Body, then toggle one or more edges/faces in the viewport or target
+list. Only stable references matching exactly one subshape of the current Body are offered; lost or
+ambiguous roles are omitted. An empty selection keeps Apply disabled. Changing the Body clears the
+old subshape selection. Ordinary commands remain unavailable while a feature or Sketch owns the task.
+
+The primary value supports the shared drag handle and numeric editor with `mm` or `deg`. Fase
+supports equal distance, two distances, and distance/angle, including the secondary numeric field
+and corresponding controller handle. Aushöhlen exposes inward/outward direction. Formschräge exposes
+existing explicit datum axes as pull directions and datum planes as neutral planes. These controls
+all rebuild the same disposable candidate; no dialog owns a second document or feature authority.
+
+Both controller families accept candidate-only driving parameters and produce actual recomputed
+Body shapes for the viewport. The replaced Body is hidden during a valid preview, so removed material
+is visible; selection presentations stay transient. Invalid edits restore the previous valid numeric
+candidate. Clearing the selection removes the preview and disables Apply. Escape/Cancel removes
+handles, selection presentations and pending parameters, restores the previous selection filter, and
+leaves history and serialization unchanged. Apply recomputes again and commits parameters plus the
+feature atomically; one Undo removes the whole operation. Save/Open retains the existing schema.
+
+Stable box roles now also accept a four-line `ClosedProfile` rectangle produced by the shell, in
+either traversal direction and with the source Sketch workplane/origin. The same Core rectangular
+profile authority feeds producer classification, semantic edge/vertex evaluation and generated face
+workplanes. Rectangles must align with their Sketch axes and use a normal, untapered, non-thin distance
+extrusion. Other source shapes and missing current-body matches are unavailable rather than being
+assigned a transient OCCT index. General curved topology selection and additional Draft reference
+families remain later extensions.
+
+Focused shell proof:
+
+```bash
+./build/dev-gui/blcad_core_tests "[rectangular-finishing]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[block136-finishing]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-finishing]"
+```
+
+The native case detects actual OCCT edges/faces from mouse events and drives their handles with a
+numeric override. `BLCAD_UI_CAPTURE_DIR` optionally records preview windows for visual inspection.
+Offscreen skips that native-only case explicitly.
+
 ## Failure policy
 
 Every controller fails closed before any document mutation: a missing target Body, a missing or
@@ -105,9 +144,8 @@ Bounded here and not introduced implicitly by this block:
   candidate parameter set and validated preview, not pixels;
 - the pull-direction and neutral-plane **picking** for Draft resolve to already-built `AxisReference`
   / `PlaneReference` inputs; their interactive selection is the caller's selection responsibility;
-- mapping the Block-122 `part.fillet` / `part.chamfer` / `part.shell` / `part.draft` command ids to a
-  resolved target Body, driving parameters, and edge/face manipulator frame is a `MainWindow`
-  command-handler policy consuming the coordinator's finishing/shell-draft controllers.
+- mapping `part.fillet` / `part.chamfer` / `part.shell` / `part.draft` to a target Body, candidate-only
+  parameters and an edge/face manipulator frame belongs to the shell-owned `ShellFeatureTools`.
 
 ## Next boundary
 

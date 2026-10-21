@@ -12,6 +12,8 @@
 #include "blcad/core/quantity.hpp"
 #include "blcad/core/shell_feature.hpp"
 
+#include <algorithm>
+#include <cmath>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -65,16 +67,77 @@ inline constexpr std::string_view kChamferAngleHandleId = "chamfer.angle";
 inline constexpr std::string_view kShellThicknessHandleId = "shell.thickness";
 inline constexpr std::string_view kDraftAngleHandleId = "draft.angle";
 
+namespace detail {
+inline Result<std::size_t>
+validate_finishing_parameters(const GuiDocumentSession& session,
+                              const std::vector<Parameter>& pending,
+                              const std::vector<std::pair<ParameterId, ParameterType>>& expected) {
+  const auto* part = session.part_document();
+  if (!part)
+    return Result<std::size_t>::failure(Error::validation("finishing", "no active Part"));
+  std::vector<ParameterId> seen;
+  std::vector<std::string> names;
+  for (const auto& parameter : pending) {
+    const bool accepted = std::any_of(expected.begin(), expected.end(), [&](const auto& value) {
+      return value.first == parameter.id() && value.second == parameter.type();
+    });
+    if (!accepted || part->find_parameter(parameter.id()) ||
+        std::find(seen.begin(), seen.end(), parameter.id()) != seen.end() ||
+        std::find(names.begin(), names.end(), parameter.name()) != names.end() ||
+        std::any_of(part->parameters().begin(), part->parameters().end(),
+                    [&](const auto& existing) { return existing.name() == parameter.name(); }))
+      return Result<std::size_t>::failure(Error::validation(
+          parameter.id().value(),
+          "new finishing parameter has an incompatible type or colliding identity/name"));
+    seen.push_back(parameter.id());
+    names.push_back(parameter.name());
+  }
+  return Result<std::size_t>::success(pending.size());
+}
+inline Result<std::size_t> provision_finishing_parameters(PartDocument& part,
+                                                          const std::vector<Parameter>& pending) {
+  for (const auto& parameter : pending) {
+    auto added = part.add_parameter(parameter);
+    if (!added)
+      return added;
+  }
+  return Result<std::size_t>::success(pending.size());
+}
+inline Result<geometry::GeometryShape> finishing_preview_shape(const PartDocument& candidate,
+                                                               const FeatureId& feature,
+                                                               const BodyId& body) {
+  auto cache = geometry::ShapeCache::create(ShapeCacheId(feature.value() + ".interactive_preview"));
+  if (!cache)
+    return Result<geometry::GeometryShape>::failure(cache.error());
+  auto recomputed =
+      geometry::GeometryRecomputeExecutor{}.execute_document(candidate, cache.value());
+  if (!recomputed)
+    return Result<geometry::GeometryShape>::failure(recomputed.error());
+  const auto* shape = cache.value().find_body_shape(body);
+  if (!shape || shape->empty())
+    return Result<geometry::GeometryShape>::failure(
+        Error::geometry(feature.value(), "finishing preview produced no Body shape"));
+  return Result<geometry::GeometryShape>::success(*shape);
+}
+} // namespace detail
+
 enum class GuiFinishingKind { Fillet, Chamfer };
 
 class GuiInteractiveFinishingController {
 public:
-  [[nodiscard]] Result<std::size_t>
-  begin_fillet(const GuiDocumentSession& session, BodyId target_body, FeatureId feature,
-               std::string name, ParameterId radius_parameter) {
-    auto seeded = begin_common(session, target_body, radius_parameter, ParameterType::Length);
+  [[nodiscard]] Result<std::size_t> begin_fillet(const GuiDocumentSession& session,
+                                                 BodyId target_body, FeatureId feature,
+                                                 std::string name, ParameterId radius_parameter,
+                                                 std::vector<Parameter> pending_parameters = {}) {
+    auto valid = detail::validate_finishing_parameters(session, pending_parameters,
+                                                       {{radius_parameter, ParameterType::Length}});
+    if (!valid)
+      return valid;
+    auto seeded = begin_common(session, target_body, radius_parameter, ParameterType::Length,
+                               pending_parameters);
     if (seeded.has_error()) return Result<std::size_t>::failure(seeded.error());
     reset(std::move(target_body), std::move(feature), std::move(name));
+    pending_parameters_ = std::move(pending_parameters);
     kind_ = GuiFinishingKind::Fillet;
     first_parameter_ = std::move(radius_parameter);
     first_value_ = seeded.value_as_double();
@@ -83,10 +146,17 @@ public:
 
   [[nodiscard]] Result<std::size_t>
   begin_chamfer_equal(const GuiDocumentSession& session, BodyId target_body, FeatureId feature,
-                      std::string name, ParameterId distance_parameter) {
-    auto seeded = begin_common(session, target_body, distance_parameter, ParameterType::Length);
+                      std::string name, ParameterId distance_parameter,
+                      std::vector<Parameter> pending_parameters = {}) {
+    auto valid = detail::validate_finishing_parameters(
+        session, pending_parameters, {{distance_parameter, ParameterType::Length}});
+    if (!valid)
+      return valid;
+    auto seeded = begin_common(session, target_body, distance_parameter, ParameterType::Length,
+                               pending_parameters);
     if (seeded.has_error()) return Result<std::size_t>::failure(seeded.error());
     reset(std::move(target_body), std::move(feature), std::move(name));
+    pending_parameters_ = std::move(pending_parameters);
     kind_ = GuiFinishingKind::Chamfer;
     chamfer_mode_ = ChamferMode::EqualDistance;
     first_parameter_ = std::move(distance_parameter);
@@ -97,12 +167,21 @@ public:
   [[nodiscard]] Result<std::size_t>
   begin_chamfer_two_distance(const GuiDocumentSession& session, BodyId target_body,
                              FeatureId feature, std::string name, ParameterId first_distance,
-                             ParameterId second_distance) {
-    auto first = begin_common(session, target_body, first_distance, ParameterType::Length);
+                             ParameterId second_distance,
+                             std::vector<Parameter> pending_parameters = {}) {
+    auto valid = detail::validate_finishing_parameters(
+        session, pending_parameters,
+        {{first_distance, ParameterType::Length}, {second_distance, ParameterType::Length}});
+    if (!valid)
+      return valid;
+    auto first = begin_common(session, target_body, first_distance, ParameterType::Length,
+                              pending_parameters);
     if (first.has_error()) return Result<std::size_t>::failure(first.error());
-    auto second = require_parameter(session, second_distance, ParameterType::Length);
+    auto second =
+        require_parameter(session, second_distance, ParameterType::Length, pending_parameters);
     if (second.has_error()) return Result<std::size_t>::failure(second.error());
     reset(std::move(target_body), std::move(feature), std::move(name));
+    pending_parameters_ = std::move(pending_parameters);
     kind_ = GuiFinishingKind::Chamfer;
     chamfer_mode_ = ChamferMode::TwoDistance;
     first_parameter_ = std::move(first_distance);
@@ -115,12 +194,19 @@ public:
   [[nodiscard]] Result<std::size_t>
   begin_chamfer_distance_angle(const GuiDocumentSession& session, BodyId target_body,
                                FeatureId feature, std::string name, ParameterId distance,
-                               ParameterId angle) {
-    auto first = begin_common(session, target_body, distance, ParameterType::Length);
+                               ParameterId angle, std::vector<Parameter> pending_parameters = {}) {
+    auto valid = detail::validate_finishing_parameters(
+        session, pending_parameters,
+        {{distance, ParameterType::Length}, {angle, ParameterType::Angle}});
+    if (!valid)
+      return valid;
+    auto first =
+        begin_common(session, target_body, distance, ParameterType::Length, pending_parameters);
     if (first.has_error()) return Result<std::size_t>::failure(first.error());
-    auto second = require_parameter(session, angle, ParameterType::Angle);
+    auto second = require_parameter(session, angle, ParameterType::Angle, pending_parameters);
     if (second.has_error()) return Result<std::size_t>::failure(second.error());
     reset(std::move(target_body), std::move(feature), std::move(name));
+    pending_parameters_ = std::move(pending_parameters);
     kind_ = GuiFinishingKind::Chamfer;
     chamfer_mode_ = ChamferMode::DistanceAngle;
     first_parameter_ = std::move(distance);
@@ -165,9 +251,15 @@ public:
       handles.push_back(linear_handle(kFilletRadiusHandleId, first_value_));
     } else {
       handles.push_back(linear_handle(kChamferDistanceHandleId, first_value_));
-      if (chamfer_mode_ == ChamferMode::TwoDistance)
-        handles.push_back(linear_handle(kChamferDistance2HandleId, second_value_));
-      else if (chamfer_mode_ == ChamferMode::DistanceAngle)
+      if (chamfer_mode_ == ChamferMode::TwoDistance) {
+        auto second = linear_handle(kChamferDistance2HandleId, second_value_);
+        auto direction = cross(frame_.plane_normal, frame_.axis);
+        if (length(direction) <= 1e-9)
+          direction = cross(std::abs(frame_.axis.x) < 0.9 ? Vector3{1, 0, 0} : Vector3{0, 1, 0},
+                            frame_.axis);
+        second.axis = normalized(direction);
+        handles.push_back(std::move(second));
+      } else if (chamfer_mode_ == ChamferMode::DistanceAngle)
         handles.push_back(angular_handle(kChamferAngleHandleId, second_value_));
     }
     return handles;
@@ -213,6 +305,21 @@ public:
     return Result<GuiPartFeaturePreview>::success({feature_, summary(), plan.value().step_count()});
   }
 
+  [[nodiscard]] Result<geometry::GeometryShape>
+  preview_shape(const GuiDocumentSession& session) const {
+    auto checked = preview(session);
+    if (!checked)
+      return Result<geometry::GeometryShape>::failure(checked.error());
+    PartDocument candidate = *session.part_document();
+    auto seeded = seed_parameters(candidate);
+    if (!seeded)
+      return Result<geometry::GeometryShape>::failure(seeded.error());
+    auto added = add_feature(candidate);
+    if (!added)
+      return Result<geometry::GeometryShape>::failure(added.error());
+    return detail::finishing_preview_shape(candidate, feature_, target_body_);
+  }
+
   [[nodiscard]] Result<std::size_t> apply(GuiDocumentSession& session) {
     auto checked = preview(session);
     if (checked.has_error()) return Result<std::size_t>::failure(checked.error());
@@ -240,11 +347,16 @@ private:
   };
 
   [[nodiscard]] SeededParameter require_parameter(const GuiDocumentSession& session,
-                                                  const ParameterId& id, ParameterType type) const {
+                                                  const ParameterId& id, ParameterType type,
+                                                  const std::vector<Parameter>& pending) const {
     const auto* part = session.part_document();
     if (part == nullptr)
       return {0.0, true, Error::validation("gui.interactive_finishing", "no active Part document")};
     const Parameter* parameter = part->find_parameter(id);
+    if (!parameter)
+      for (const auto& value : pending)
+        if (value.id() == id)
+          parameter = &value;
     if (parameter == nullptr || parameter->type() != type)
       return {0.0, true, Error::validation(id.value(), "finishing requires the named driving parameter")};
     const double value = type == ParameterType::Angle ? parameter->value().degrees()
@@ -253,15 +365,16 @@ private:
   }
 
   [[nodiscard]] SeededParameter begin_common(const GuiDocumentSession& session,
-                                             const BodyId& target_body, const ParameterId& parameter,
-                                             ParameterType type) const {
+                                             const BodyId& target_body,
+                                             const ParameterId& parameter, ParameterType type,
+                                             const std::vector<Parameter>& pending) const {
     const auto* part = session.part_document();
     if (part == nullptr)
       return {0.0, true, Error::validation("gui.interactive_finishing", "no active Part document")};
     if (part->find_body(target_body) == nullptr)
       return {0.0, true,
               Error::validation(target_body.value(), "finishing requires an existing target Body")};
-    return require_parameter(session, parameter, type);
+    return require_parameter(session, parameter, type, pending);
   }
 
   void reset(BodyId target_body, FeatureId feature, std::string name) {
@@ -269,6 +382,7 @@ private:
     feature_ = std::move(feature);
     name_ = std::move(name);
     edges_.clear();
+    pending_parameters_.clear();
     second_parameter_.reset();
     second_value_ = 0.0;
     active_ = true;
@@ -298,6 +412,9 @@ private:
   }
 
   [[nodiscard]] Result<std::size_t> seed_parameters(PartDocument& part) const {
+    auto provisioned = detail::provision_finishing_parameters(part, pending_parameters_);
+    if (!provisioned)
+      return provisioned;
     if (auto seeded = seed_length(part, first_parameter_, first_value_); seeded.has_error())
       return seeded;
     if (kind_ == GuiFinishingKind::Chamfer && second_parameter_.has_value()) {
@@ -375,27 +492,40 @@ private:
   std::optional<ParameterId> second_parameter_;
   double second_value_{0.0};
   GuiFeatureManipulatorFrame frame_;
+  std::vector<Parameter> pending_parameters_;
 };
 
 enum class GuiShellDraftKind { Shell, Draft };
 
 class GuiInteractiveShellDraftController {
 public:
-  [[nodiscard]] Result<std::size_t>
-  begin_shell(const GuiDocumentSession& session, BodyId target_body, FeatureId feature,
-              std::string name, ParameterId thickness_parameter,
-              ShellDirection direction = ShellDirection::Inward) {
+  [[nodiscard]] Result<std::size_t> begin_shell(const GuiDocumentSession& session,
+                                                BodyId target_body, FeatureId feature,
+                                                std::string name, ParameterId thickness_parameter,
+                                                ShellDirection direction = ShellDirection::Inward,
+                                                std::vector<Parameter> pending_parameters = {}) {
     const auto* part = session.part_document();
     if (part == nullptr) return fail("interactive shell requires an active Part document");
     if (part->find_body(target_body) == nullptr)
       return fail("interactive shell requires an existing target Body");
+    auto valid = detail::validate_finishing_parameters(
+        session, pending_parameters, {{thickness_parameter, ParameterType::Length}});
+    if (!valid)
+      return valid;
     const Parameter* thickness = part->find_parameter(thickness_parameter);
+    if (!thickness)
+      for (const auto& value : pending_parameters)
+        if (value.id() == thickness_parameter)
+          thickness = &value;
+
     if (thickness == nullptr || thickness->type() != ParameterType::Length)
       return fail("interactive shell requires an existing Length thickness parameter");
+    const double initial_value = thickness->value().millimeters();
     reset(std::move(target_body), std::move(feature), std::move(name));
+    pending_parameters_ = std::move(pending_parameters);
     kind_ = GuiShellDraftKind::Shell;
     thickness_parameter_ = std::move(thickness_parameter);
-    thickness_ = thickness->value().millimeters();
+    thickness_ = initial_value;
     direction_ = direction;
     return Result<std::size_t>::success(1);
   }
@@ -403,20 +533,31 @@ public:
   [[nodiscard]] Result<std::size_t>
   begin_draft(const GuiDocumentSession& session, BodyId target_body, FeatureId feature,
               std::string name, AxisReference pull_direction, PlaneReference neutral_plane,
-              ParameterId angle_parameter) {
+              ParameterId angle_parameter, std::vector<Parameter> pending_parameters = {}) {
     const auto* part = session.part_document();
     if (part == nullptr) return fail("interactive draft requires an active Part document");
     if (part->find_body(target_body) == nullptr)
       return fail("interactive draft requires an existing target Body");
+    auto valid = detail::validate_finishing_parameters(session, pending_parameters,
+                                                       {{angle_parameter, ParameterType::Angle}});
+    if (!valid)
+      return valid;
     const Parameter* angle = part->find_parameter(angle_parameter);
+    if (!angle)
+      for (const auto& value : pending_parameters)
+        if (value.id() == angle_parameter)
+          angle = &value;
+
     if (angle == nullptr || angle->type() != ParameterType::Angle)
       return fail("interactive draft requires an existing Angle parameter");
+    const double initial_value = angle->value().degrees();
     reset(std::move(target_body), std::move(feature), std::move(name));
+    pending_parameters_ = std::move(pending_parameters);
     kind_ = GuiShellDraftKind::Draft;
     pull_direction_ = std::move(pull_direction);
     neutral_plane_ = std::move(neutral_plane);
     angle_parameter_ = std::move(angle_parameter);
-    angle_ = angle->value().degrees();
+    angle_ = initial_value;
     return Result<std::size_t>::success(1);
   }
 
@@ -499,6 +640,21 @@ public:
     return Result<GuiPartFeaturePreview>::success({feature_, summary(), plan.value().step_count()});
   }
 
+  [[nodiscard]] Result<geometry::GeometryShape>
+  preview_shape(const GuiDocumentSession& session) const {
+    auto checked = preview(session);
+    if (!checked)
+      return Result<geometry::GeometryShape>::failure(checked.error());
+    PartDocument candidate = *session.part_document();
+    auto seeded = seed_parameters(candidate);
+    if (!seeded)
+      return Result<geometry::GeometryShape>::failure(seeded.error());
+    auto added = add_feature(candidate);
+    if (!added)
+      return Result<geometry::GeometryShape>::failure(added.error());
+    return detail::finishing_preview_shape(candidate, feature_, target_body_);
+  }
+
   [[nodiscard]] Result<std::size_t> apply(GuiDocumentSession& session) {
     auto checked = preview(session);
     if (checked.has_error()) return Result<std::size_t>::failure(checked.error());
@@ -521,10 +677,14 @@ private:
     feature_ = std::move(feature);
     name_ = std::move(name);
     faces_.clear();
+    pending_parameters_.clear();
     active_ = true;
   }
 
   [[nodiscard]] Result<std::size_t> seed_parameters(PartDocument& part) const {
+    auto provisioned = detail::provision_finishing_parameters(part, pending_parameters_);
+    if (!provisioned)
+      return provisioned;
     if (kind_ == GuiShellDraftKind::Shell) {
       auto quantity = Quantity::length_mm(thickness_, thickness_parameter_.value());
       if (quantity.has_error()) return Result<std::size_t>::failure(quantity.error());
@@ -585,6 +745,7 @@ private:
   ParameterId angle_parameter_{""};
   double angle_{0.0};
   GuiFeatureManipulatorFrame frame_;
+  std::vector<Parameter> pending_parameters_;
 };
 
 } // namespace blcad::gui

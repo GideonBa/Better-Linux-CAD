@@ -561,10 +561,21 @@ Contracts and repeatable proof: `docs/gui-sketch-transform-pattern-mvp8.md`,
 `docs/gui-sketch-offset-project-mvp8.md`, `docs/gui-sketch-spline-text-mvp8.md`, and
 `docs/development-setup.md`.
 
+### Block 136 — Finishing command slice
+
+The replacement shell restores Fillet, all three Chamfer modes, Shell and Draft through the shared
+Feature task panel, real Body previews, numeric/drag input and atomic parameter-plus-feature Apply.
+The target picker supports current, unambiguous semantic box edges/faces, including rectangles drawn
+as four Sketch lines. Cancel, Undo/Redo and Save/Open use the existing authorities. Contract and proof:
+`docs/gui-interactive-finishing-mvp9.md`, tag `[block136-finishing]`.
+
+This slice leaves the rest of Block 136 open: Pattern, Mirror, Boolean, Body Transform, Sweep, Loft,
+Surface, Measure, Assembly, browser feature editing and complete replacement-shell acceptance.
+
 ## Current next technical step — Block 136
 
-Restore the remaining feature commands (Fillet, Chamfer, Shell, Draft, Pattern, Mirror, Boolean,
-Transform, Sweep, Loft, Surface, Measure, and Assembly), browser-double-click feature editing, and
+Restore the remaining feature commands (Pattern, Mirror, Boolean, Body Transform, Sweep, Loft,
+Surface, Measure, and Assembly), browser-double-click feature editing, and
 replacement-shell acceptance/coverage as defined in `docs/gui-shell-reset-sequence-mvp9r.md`.
 
 ## Later phases
