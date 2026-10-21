@@ -71,7 +71,8 @@ bool ShellFeatureTools::finishing() const noexcept {
          command_ == Command::Shell || command_ == Command::Draft;
 }
 bool ShellFeatureTools::angular_value() const noexcept {
-  return command_ == Command::Revolve || command_ == Command::Draft;
+  return command_ == Command::Revolve || command_ == Command::Draft ||
+         command_ == Command::CircularPattern;
 }
 std::string_view ShellFeatureTools::command_id() const noexcept {
   switch (command_) {
@@ -87,6 +88,12 @@ std::string_view ShellFeatureTools::command_id() const noexcept {
     return "part.shell";
   case Command::Draft:
     return "part.draft";
+  case Command::LinearPattern:
+    return "part.linear_pattern";
+  case Command::CircularPattern:
+    return "part.circular_pattern";
+  case Command::BodyMirror:
+    return "part.mirror";
   case Command::None:
     return {};
   }

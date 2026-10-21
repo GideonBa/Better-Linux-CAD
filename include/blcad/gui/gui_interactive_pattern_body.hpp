@@ -3,6 +3,7 @@
 #include "blcad/gui/gui_document_session.hpp"
 #include "blcad/gui/gui_interactive_extrude_revolve.hpp"
 #include "blcad/gui/gui_part_foundation_workbench.hpp"
+#include "blcad/gui/gui_pending_feature_inputs.hpp"
 #include "blcad/gui/gui_viewport_manipulator.hpp"
 
 #include "blcad/core/body_boolean_feature.hpp"
@@ -14,6 +15,7 @@
 #include "blcad/core/quantity.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -44,57 +46,96 @@ public:
   begin_linear_pattern(const GuiDocumentSession& session, FeatureId feature, std::string name,
                        AxisReference direction, ParameterId count_parameter,
                        LinearPatternExtentMode extent_mode, ParameterId extent_parameter,
-                       BodyId result_body) {
+                       BodyId result_body, std::vector<Parameter> pending_parameters = {},
+                       std::optional<Body> pending_result_body = std::nullopt) {
     const auto* part = session.part_document();
     if (part == nullptr) return fail("interactive pattern requires an active Part document");
-    if (part->find_body(result_body) == nullptr)
-      return fail("interactive pattern requires an existing result Body");
+    auto body_valid = detail::validate_new_feature_body(session, result_body, pending_result_body);
+    if (!body_valid)
+      return body_valid;
+    auto parameters_valid = detail::validate_new_feature_parameters(
+        session, pending_parameters,
+        {{count_parameter, ParameterType::Count}, {extent_parameter, ParameterType::Length}});
+    if (!parameters_valid)
+      return parameters_valid;
     const Parameter* count = part->find_parameter(count_parameter);
+    if (!count)
+      for (const auto& value : pending_parameters)
+        if (value.id() == count_parameter)
+          count = &value;
     if (count == nullptr || count->type() != ParameterType::Count)
       return fail("linear pattern requires an existing Count parameter");
     const Parameter* extent = part->find_parameter(extent_parameter);
+    if (!extent)
+      for (const auto& value : pending_parameters)
+        if (value.id() == extent_parameter)
+          extent = &value;
     if (extent == nullptr || extent->type() != ParameterType::Length)
       return fail("linear pattern requires an existing Length spacing/extent parameter");
+    if (count->value().count_value() > 1000U)
+      return fail("interactive patterns support at most 1000 instances");
+    const int initial_count = static_cast<int>(count->value().count_value());
+    const double initial_extent = extent->value().millimeters();
     reset(std::move(feature), std::move(name), std::move(result_body));
+    pending_parameters_ = std::move(pending_parameters);
+    pending_result_body_ = std::move(pending_result_body);
     kind_ = GuiPatternMirrorKind::LinearPattern;
     direction_ = std::move(direction);
     count_parameter_ = std::move(count_parameter);
     extent_parameter_ = std::move(extent_parameter);
     extent_mode_ = extent_mode;
-    count_ = static_cast<int>(count->value().count_value());
-    spacing_ = extent->value().millimeters();
+    count_ = initial_count;
+    spacing_ = initial_extent;
     return Result<std::size_t>::success(1);
   }
 
   [[nodiscard]] Result<std::size_t>
   begin_circular_pattern(const GuiDocumentSession& session, FeatureId feature, std::string name,
                          AxisReference axis, ParameterId count_parameter, BodyId result_body,
-                         bool equal_spacing = true) {
+                         bool equal_spacing = true, std::vector<Parameter> pending_parameters = {},
+                         std::optional<Body> pending_result_body = std::nullopt) {
     const auto* part = session.part_document();
     if (part == nullptr) return fail("interactive pattern requires an active Part document");
-    if (part->find_body(result_body) == nullptr)
-      return fail("interactive pattern requires an existing result Body");
+    auto body_valid = detail::validate_new_feature_body(session, result_body, pending_result_body);
+    if (!body_valid)
+      return body_valid;
+    auto parameters_valid = detail::validate_new_feature_parameters(
+        session, pending_parameters, {{count_parameter, ParameterType::Count}});
+    if (!parameters_valid)
+      return parameters_valid;
     const Parameter* count = part->find_parameter(count_parameter);
+    if (!count)
+      for (const auto& value : pending_parameters)
+        if (value.id() == count_parameter)
+          count = &value;
     if (count == nullptr || count->type() != ParameterType::Count)
       return fail("circular pattern requires an existing Count parameter");
+    if (count->value().count_value() > 1000U)
+      return fail("interactive patterns support at most 1000 instances");
+    const int initial_count = static_cast<int>(count->value().count_value());
     reset(std::move(feature), std::move(name), std::move(result_body));
+    pending_parameters_ = std::move(pending_parameters);
+    pending_result_body_ = std::move(pending_result_body);
     kind_ = GuiPatternMirrorKind::CircularPattern;
     direction_ = std::move(axis);
     count_parameter_ = std::move(count_parameter);
     equal_spacing_ = equal_spacing;
-    count_ = static_cast<int>(count->value().count_value());
+    count_ = initial_count;
     angle_ = 360.0;
     return Result<std::size_t>::success(1);
   }
 
   [[nodiscard]] Result<std::size_t>
   begin_mirror(const GuiDocumentSession& session, FeatureId feature, std::string name,
-               PlaneReference mirror_plane, BodyId result_body) {
+               PlaneReference mirror_plane, BodyId result_body,
+               std::optional<Body> pending_result_body = std::nullopt) {
     const auto* part = session.part_document();
     if (part == nullptr) return fail("interactive mirror requires an active Part document");
-    if (part->find_body(result_body) == nullptr)
-      return fail("interactive mirror requires an existing result Body");
+    auto body_valid = detail::validate_new_feature_body(session, result_body, pending_result_body);
+    if (!body_valid)
+      return body_valid;
     reset(std::move(feature), std::move(name), std::move(result_body));
+    pending_result_body_ = std::move(pending_result_body);
     kind_ = GuiPatternMirrorKind::Mirror;
     mirror_plane_ = std::move(mirror_plane);
     return Result<std::size_t>::success(1);
@@ -158,6 +199,11 @@ public:
     const auto* part = session.part_document();
     if (part == nullptr) return preview_fail("preview requires an active Part document");
     if (sources_.empty()) return preview_fail("pattern/mirror requires at least one source");
+    if (kind_ != GuiPatternMirrorKind::Mirror &&
+        (count_ < 2 || count_ > 1000 ||
+         sources_.size() > 10000U / static_cast<std::size_t>(count_)))
+      return preview_fail(
+          "interactive pattern requires 2..1000 instances and at most 10000 source instances");
     PartDocument candidate = *part;
     if (auto seeded = seed_parameters(candidate); seeded.has_error())
       return Result<GuiPartFeaturePreview>::failure(seeded.error());
@@ -166,6 +212,21 @@ public:
     auto plan = candidate.create_recompute_plan();
     if (plan.has_error()) return Result<GuiPartFeaturePreview>::failure(plan.error());
     return Result<GuiPartFeaturePreview>::success({feature_, summary(), plan.value().step_count()});
+  }
+
+  [[nodiscard]] Result<geometry::GeometryShape>
+  preview_shape(const GuiDocumentSession& session) const {
+    auto checked = preview(session);
+    if (!checked)
+      return Result<geometry::GeometryShape>::failure(checked.error());
+    PartDocument candidate = *session.part_document();
+    auto seeded = seed_parameters(candidate);
+    if (!seeded)
+      return Result<geometry::GeometryShape>::failure(seeded.error());
+    auto added = add_feature(candidate);
+    if (!added)
+      return Result<geometry::GeometryShape>::failure(added.error());
+    return detail::preview_feature_body(candidate, feature_, result_body_);
   }
 
   [[nodiscard]] Result<std::size_t> apply(GuiDocumentSession& session) {
@@ -190,6 +251,8 @@ private:
     name_ = std::move(name);
     result_body_ = std::move(result_body);
     sources_.clear();
+    pending_parameters_.clear();
+    pending_result_body_.reset();
     count_ = 1;
     spacing_ = 0.0;
     angle_ = 360.0;
@@ -237,13 +300,26 @@ private:
     handle.id = std::string(kPatternCountHandleId);
     handle.kind = GuiViewportManipulatorKind::PatternCount;
     handle.origin = frame_.origin;
-    handle.axis = frame_.axis;
+    auto perpendicular = cross(frame_.plane_normal, frame_.axis);
+    if (length(perpendicular) <= 1e-9)
+      perpendicular =
+          cross(std::abs(frame_.axis.x) < 0.9 ? Vector3{1, 0, 0} : Vector3{0, 1, 0}, frame_.axis);
+    handle.axis = normalized(perpendicular);
     handle.reference_value = static_cast<double>(count_);
-    handle.minimum_value = 1.0;
+    handle.minimum_value = 2.0;
+    handle.maximum_value = 1000.0;
     return handle;
   }
 
   [[nodiscard]] Result<std::size_t> seed_parameters(PartDocument& part) const {
+    if (pending_result_body_) {
+      auto added = part.add_body(*pending_result_body_);
+      if (!added)
+        return added;
+    }
+    auto added = detail::provision_new_feature_parameters(part, pending_parameters_);
+    if (!added)
+      return added;
     if (kind_ == GuiPatternMirrorKind::Mirror) return Result<std::size_t>::success(0);
     auto count = Quantity::count(static_cast<double>(count_), count_parameter_.value());
     if (count.has_error()) return Result<std::size_t>::failure(count.error());
@@ -358,6 +434,8 @@ private:
   double spacing_{0.0};
   double angle_{360.0};
   GuiFeatureManipulatorFrame frame_;
+  std::vector<Parameter> pending_parameters_;
+  std::optional<Body> pending_result_body_;
 };
 
 enum class GuiBodyOperationKind { Boolean, Transform };

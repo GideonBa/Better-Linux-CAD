@@ -473,6 +473,27 @@ assertions), alongside existing viewport and Sketch UI regressions. Native previ
 application startup are checked separately. Commands: `docs/development-setup.md`.
 
 
+#### Block 136 next slice — Body patterns and Mirror
+
+`ShellFeatureTools` adds Lineares Muster, Kreismuster and Körper spiegeln in the Muster group with
+multiple Body source picks, datum/construction reference selection, actual recomputed ghost previews,
+shared scalar/count manipulators and numeric refinement. Result Body and driving parameters remain
+candidate-only until one atomic Apply. Source Bodies remain unchanged. The focused shell and native
+proof is `[block136-patterns]`; see `docs/gui-interactive-pattern-body-mvp9.md`.
+
+The finishing and pattern slices are implemented. Body Boolean/Transform, Sweep/Loft, Surface,
+Measure, Assembly, browser feature editing and whole-block acceptance remain open.
+
+Validation for the pattern slice on 21 October 2026: full Core (513 cases, 15124 assertions),
+Geometry (421 cases, 28002 assertions), and offscreen GUI (238 passed, three explicitly skipped
+native cases, 8882 assertions) pass. The combined native pattern/finishing/Sketch UI/viewport
+regression passes all 24 cases (1245 assertions), including the three offscreen skips. Actual mouse
+picks toggle source Bodies through a live preview; spacing, angle and count handles retain numeric
+refinement through release. Closed fitted-spline extrusions are also valid pattern sources. Preview
+visibility updates preserve nonselectability, and invalid previews expose no active drag grips.
+Native captures were inspected and the desktop startup smoke passed (intentional six-second timeout).
+These checks validate this slice without closing whole-block coverage.
+
 ### Sketch interaction follow-up — 21 October 2026
 
 The shell uses a nonmodal editor for snapped mouse/numeric transformations and multiple curve

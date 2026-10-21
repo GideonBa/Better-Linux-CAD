@@ -194,8 +194,6 @@
       "selection_scope": "Unambiguous current-body semantic box edges and planar faces, including four-line Sketch rectangles."
     },
     "remaining": [
-      "Pattern",
-      "Mirror",
       "Body Boolean",
       "Body Transform",
       "Sweep",
@@ -205,6 +203,17 @@
       "Assembly",
       "Browser feature edit",
       "Full shell acceptance and manifest validation"
-    ]
+    ],
+    "pattern_mirror_slice": {
+      "status": "implemented",
+      "contract": "docs/gui-interactive-pattern-body-mvp9.md",
+      "proof": "[block136-patterns]",
+      "commands": [
+        "Linear Pattern",
+        "Circular Pattern",
+        "Body Mirror"
+      ],
+      "selection_scope": "Visible recomputed solid Bodies; existing datum/construction axes and planes."
+    }
   }
 }

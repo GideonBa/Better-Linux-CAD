@@ -2,12 +2,9 @@
 
 Status: implemented in Block 126.
 
-> **GUI Shell Reset MVP-9R:** Block 133 deleted the Qt shell this document names — `MainWindow` and
-> all seven self-installing binders — and replaced it with `ShellWindow` + `ShellRibbon`
-> (`src/gui/shell/`, contract: `docs/gui-shell-reset-sequence-mvp9r.md`). The headless authorities and
-> the Core/Geometry contracts below are unchanged and are consumed by the new shell; read every
-> "`MainWindow`" and "binder" below as the shell's Qt presentation layer, whose current form is
-> Block 135/136 work.
+The replacement `ShellWindow` owns Pattern and Mirror through `ShellFeatureTools`, the shared task
+panel and the existing `GuiInteractiveFeatureCoordinator`. The Block-136 pattern slice restores
+these commands; Body Boolean and Body Transform remain later shell work.
 
 Block 126 upgrades the MVP-7 form-driven pattern/mirror/body commands
 (`docs/gui-part-operations-workbench-mvp7.md`) into direct-manipulation authoring over the frozen
@@ -39,18 +36,63 @@ command is active at a time.
 `GuiInteractivePatternMirrorController` collects an ordered, duplicate-free set of Feature/Body
 sources and authors one of:
 
-- **Linear pattern** — a typed direction axis, an existing `Count` count parameter, `Spacing` or
-  `TotalExtent` mode with an existing `Length` extent parameter, and a direction sign. The
+- **Linear pattern** — a typed direction axis, a `Count` count parameter, `Spacing` or
+  `TotalExtent` mode with a `Length` extent parameter, and a direction sign. The
   `pattern.spacing` linear handle drags the extent and the `pattern.count` handle edits the integer
   count.
-- **Circular pattern** — a typed axis, an existing `Count` count parameter, an equal-spacing flag, and
+- **Circular pattern** — a typed axis, a `Count` count parameter, an equal-spacing flag, and
   a literal total angle. The `pattern.angle` angle-wheel handle drags the total angle and
   `pattern.count` edits the count.
 - **Mirror** — a Datum/Construction/semantic plane with a ghost preview and no scalar handle.
 
-Count and spacing seed their existing parameters on Apply; the circular total angle is a literal Core
-value. Every family produces a NewBody result; instance ghosts are a transient presentation of the
-validated candidate.
+Count and spacing seed their driving parameters on Apply; these can be existing parameters or
+candidate-only new inputs. The circular total angle is a literal Core value. Every family produces
+a NewBody result; instance ghosts are a transient presentation of the validated candidate.
+
+## Replacement-shell Body patterns (Block 136)
+
+The 3D-Modell **Muster** group exposes **Lineares Muster**, **Kreismuster** and **Körper spiegeln**.
+Start with selected Bodies or collect them by clicking the model or the source list. Each click
+toggles one source without replacing the other picks. Only visible, recomputed solid Bodies are
+listed. An empty source set removes the preview and disables Apply. Body selection works for curved
+solids as well as boxes; it does not depend on the finishing tools' rectangular topology roles.
+
+The reference chooser offers existing explicit datum axes and resolvable construction lines for
+patterns, and datum/construction planes for Mirror. **Referenz im Modell wählen** switches the
+viewport to datum selection; a valid pick updates the chooser and restores Body picking without
+losing the source set. The same chooser remains available for precise reference selection.
+
+Linear patterns support spacing per instance or total extent, positive/negative direction, and an
+integer count including the starting placement. Circular patterns use equal angular spacing over a
+positive total angle up to 360 degrees; a full circle omits the duplicated final position. Counts
+range from 2 to 1000, with at most 10000 selected-Body instances per interactive operation. This is
+a GUI authoring bound; the persisted feature authority is unchanged. Mirror reflects the source
+Bodies across the chosen plane and exposes no scalar handle.
+
+Spacing and circular angle use the shared numeric editor with `mm`/`deg` and viewport handles.
+Count has its own integer editor and a separate, perpendicular handle. Numeric refinement during a
+drag remains authoritative through release. Rejected edits restore the last valid count/value and
+preview. Escape during a drag restores its start value; another Escape cancels the task.
+Handles appear only with a valid preview and are suspended while choosing a reference. The ghost
+remains nonselectable after visibility updates, so it cannot intercept clicks on source Bodies.
+
+The controller accepts candidate-only count/extent parameters and a candidate-only result Body.
+Preview recomputes the actual result through the same feature path as Apply. The original Bodies
+remain intact; patterns include the original placement in their new result, and Mirror creates only
+the reflected result. No result Body, parameters, features or history entry are persisted until Apply.
+A successful Apply creates all of them atomically; one Undo removes the whole operation. Cancel,
+Undo/Redo and Save/Open use the existing authorities and schema.
+
+Focused shell proof:
+
+```bash
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[block136-patterns]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-patterns]"
+```
+
+The native-only case detects source Bodies through actual mouse events, toggles a selected source
+through an active ghost preview, and couples spacing/angle/count dragging with numeric refinement.
+`BLCAD_UI_CAPTURE_DIR` optionally records preview windows. Offscreen skips the native case explicitly.
 
 ## Body Boolean and Body Transform authoring
 
@@ -75,7 +117,8 @@ byte-identical document to the equivalent typed edit, establishing GUI/headless 
 
 ## Failure policy
 
-Every controller fails closed before any document mutation: a missing result/target/produced Body, a
+Every controller fails closed before any document mutation: a missing result/target/produced Body
+without valid candidate-only replacement inputs, a
 missing or wrong-typed driving parameter (`Count`/`Length`), an empty source set, a tool that is also
 the target, and any value rejected by the Core/Geometry contract. Preview never publishes a partial
 `ShapeCache`; Apply keeps the last valid result and surfaces the authoritative diagnostic.
@@ -98,14 +141,14 @@ coordinator-routed transform translation.
 Bounded here and not introduced implicitly by this block:
 
 - **role color-coding**, instance/mirror **ghost rendering**, and the browser transform-stack display
-  are transient viewport/browser presentation the binder renders; the controllers own the candidate
+  are transient viewport/browser presentation owned by the shell; the controllers own the candidate
   parameter set and validated preview, not pixels;
 - direction/axis/plane and source/tool **picking** resolve to already-built references and Body ids;
   their interactive selection is the caller's selection responsibility;
 - mapping the Block-122 `part.linear_pattern` / `part.circular_pattern` / `part.mirror` /
   `part.body_boolean` / `part.body_transform` command ids to resolved inputs and a manipulator frame is
-  a `MainWindow` command-handler policy consuming the coordinator's pattern/mirror and body-operation
-  controllers.
+  a shell command-handler policy consuming the coordinator's pattern/mirror and body-operation
+  controllers. Pattern/Mirror is wired through `ShellFeatureTools`; Boolean/Transform remains open.
 
 ## Next boundary
 

@@ -86,8 +86,9 @@ and corresponding controller handle. Aushöhlen exposes inward/outward direction
 existing explicit datum axes as pull directions and datum planes as neutral planes. These controls
 all rebuild the same disposable candidate; no dialog owns a second document or feature authority.
 
-Both controller families accept candidate-only driving parameters and produce actual recomputed
-Body shapes for the viewport. The replaced Body is hidden during a valid preview, so removed material
+Both controller families use the shared `gui_pending_feature_inputs` validation/provisioning helpers
+for candidate-only driving parameters and produce actual recomputed Body shapes for the viewport.
+The replaced Body is hidden during a valid preview, so removed material
 is visible; selection presentations stay transient. Invalid edits restore the previous valid numeric
 candidate. Clearing the selection removes the preview and disables Apply. Escape/Cancel removes
 handles, selection presentations and pending parameters, restores the previous selection filter, and
