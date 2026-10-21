@@ -12,3 +12,5 @@
 - After completing and verifying each coherent change, commit it and push to the configured
   upstream. The user has explicitly authorized this workflow. Use normal pushes; do not overwrite
   remote history. Honor any later instruction that limits or postpones committing or publishing.
+- Respect protected-branch rules. Push implementation branches and open pull requests when the
+  upstream requires them; do not rely on available bypass permissions.
