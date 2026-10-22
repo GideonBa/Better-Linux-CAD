@@ -307,6 +307,7 @@ if(BLCAD_BUILD_GUI)
     src/gui/shell/shell_surface_tools.cpp
     src/gui/shell/shell_measure_tools.cpp
     src/gui/shell/shell_assembly_tools.cpp
+    src/gui/shell/shell_feature_edit_tools.cpp
     src/gui/shell/shell_manipulator_overlay.cpp
     src/gui/shell/shell_origin.cpp
     src/gui/shell/shell_ribbon.cpp
@@ -593,6 +594,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_shell_surface_tools_tests.cpp
       tests/gui/gui_shell_measure_tools_tests.cpp
       tests/gui/gui_shell_assembly_tools_tests.cpp
+      tests/gui/gui_shell_feature_edit_tests.cpp
       tests/gui/gui_shell_window_tests.cpp
       tests/gui/gui_shell_sketch_tools_tests.cpp
       tests/gui/gui_shell_sketch_operations_tests.cpp

@@ -637,6 +637,32 @@ Legacy Feature tests now locate Apply in their own task panel; native Sketch dia
 wait at most 500 ms for asynchronous window-manager placement and still require the complete frame
 inside the available screen. These checks validate this slice without closing whole-block acceptance.
 
+#### Block 136 next slice — Browser Feature Edit
+
+`ShellFeatureEditTools`, owned explicitly by `ShellWindow`, restores actual browser mouse double-click
+editing for all thirteen persistent feature-update families. The task preloads existing names, typed
+parameter bindings, scalar settings, references, ordered lists and optional Sweep/Loft settings.
+Existing intent structure and result identities remain fixed. One selected scalar uses the shared
+native manipulator layer with live/numeric input and drag Escape; references use the form controls.
+
+The headless edit controller supplies a disposable candidate after prepared parameter updates and the
+matching Core `update_*`. Exact FeatureId validation prevents redirecting an edit to another record.
+The shell recomputes the whole candidate, including downstream features, and displays actual result
+Bodies. Source snapshots, freshness/task checks, cancellation and atomic session history protect the
+authored model. Shared parameter and expression behavior, abandoned-binding edit disposal and ordered
+reference edits have focused proof. Contract: `docs/gui-feature-edit-mvp9.md`, `[block136-feature-edit]`.
+
+Whole-block acceptance and manifest validation remain open.
+
+Validation on 22 October 2026: Core passes 513 cases / 15124 assertions; Geometry passes 427 cases /
+28518 assertions. Full offscreen GUI passes 281 cases with 12 explicit native-only skips and 17452
+assertions. Combined native Feature Edit/Assembly/Measure/Surface/spatial/Body/pattern/finishing/
+Sketch UI/viewport/lifecycle/Extrude-Revolve regression passes all 109 cases / 11967 assertions,
+covering every offscreen skip. Focused edit proof passes 10 cases with one native-only skip and
+1297 assertions; native mouse editing has separate proof within the combined run. Captures at
+1280×800 were inspected, and desktop startup passes (intentional six-second timeout). Commands:
+`docs/development-setup.md`. These checks validate this slice without closing whole-block acceptance.
+
 ### Sketch interaction follow-up — 21 October 2026
 
 The shell uses a nonmodal editor for snapped mouse/numeric transformations and multiple curve

@@ -665,3 +665,18 @@ group solve, ordered slot limits, slider/numeric motion, history and persistence
 verify real occurrence picking and translate/rotate/motion handles, numeric refinement, drag Escape,
 and reachable task controls. Offscreen explicitly skips the native-only cases; run xcb to cover them.
 `BLCAD_UI_CAPTURE_DIR` enables native captures. These checks do not complete Block 136 acceptance.
+
+### Block 136 browser Feature Edit slice
+
+```bash
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[block136-feature-edit],[gui][feature-edit],[integration][feature-edit-recompute]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-feature-edit]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
+```
+
+The focused shell cases cover all thirteen update-capable families, complete downstream previews and
+failure rejection, parameter values/rebinding/formulas, ordered sections and edge membership, optional
+Sweep twist, stale tasks and exact history/persistence. The native-only case checks actual tree mouse
+double-clicks, scalar drag/numeric refinement, drag Escape and reachable Apply at 1280×800; offscreen
+explicitly skips it. The headless proof also rejects attempts to redirect an edit to another feature id.
+`BLCAD_UI_CAPTURE_DIR` enables captures. Whole-block acceptance and manifest validation remain open.

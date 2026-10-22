@@ -545,3 +545,23 @@ stay between -180 and 180 degrees. Preview diagnostics explain incompatible inpu
 or handle for the solved-pose preview. **Baugruppe lösen** operates on the complete selected root
 component group. **Anwenden** commits a valid preview as one undoable step; **Abbrechen** discards it.
 Nested/cross-hierarchy endpoint editing and constrained free dragging remain outside this shell slice.
+
+## Editing an existing feature
+
+Double-click a Feature in the Part model browser to open its saved inputs. Edit the name, parameter
+binding, numeric values or existing references. Ordered sections, boundaries and sources support
+adding, removing and moving entries. Optional Sweep/Loft inputs use their **verwenden** checkbox and
+existing document definitions. Feature type, extent mode, reference categories and result identities
+are shown as fixed context. Transform-stack entries retain their separate scope.
+
+Parameter rows show mm, deg or count values. A literal value can be changed; a formula-driven value
+remains controlled by its formula. Shared parameters affect every use, so the preview also checks
+expressions and downstream features. Rebinding to another parameter discards uncommitted value edits
+to the abandoned binding when the feature no longer uses it.
+
+Choose **Dynamischer Wert** for a live scalar handle. Drag it or type a matching measure and press
+Enter. Escape restores the value before the drag; another Escape cancels the edit. The numeric field
+uses the same preview. **Anwenden** updates the existing feature and parameter values in one undoable
+step. **Abbrechen** discards them. Invalid inputs or failed downstream geometry disable Apply and show
+a diagnostic while the saved model remains intact. Opening another document and Undo/Redo exit the
+edit task and clear its preview.

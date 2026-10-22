@@ -194,7 +194,6 @@
       "selection_scope": "Unambiguous current-body semantic box edges and planar faces, including four-line Sketch rectangles."
     },
     "remaining": [
-      "Browser feature edit",
       "Full shell acceptance and manifest validation"
     ],
     "pattern_mirror_slice": {
@@ -276,6 +275,19 @@
         "Root group solve"
       ],
       "selection_scope": "Visible active root component semantic references with compatibility-filtered A/B picks; root component and rigid-subassembly placement; ordered bounded joint coordinates. Nested/cross-hierarchy endpoint authoring and constrained free-drag remain deferred."
+    },
+    "feature_edit_slice": {
+      "status": "implemented",
+      "contract": "docs/gui-feature-edit-mvp9.md",
+      "proof": "[block136-feature-edit]",
+      "commands": [
+        "Browser double-click feature edit",
+        "Typed parameter rebinding and scalar editing",
+        "Ordered reference editing",
+        "Candidate-only scalar drag / numeric refinement",
+        "Atomic feature update with downstream recompute"
+      ],
+      "selection_scope": "Current Part Feature nodes across all thirteen update-capable families; preloaded existing intent structure, fixed feature type/extent-mode/source-category/result identities, form-based references and native scalar handles. BodyTransform stack editing and feature reorder remain outside the authority."
     }
   }
 }
