@@ -7,6 +7,7 @@
 
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <utility>
 
 namespace blcad::gui {
@@ -72,16 +73,46 @@ public:
   // Preview the edited replacement on a disposable clone via the Core update
   // command, validating the whole feature graph without mutating the document.
   template <typename FeatureT>
+  [[nodiscard]] Result<PartDocument>
+  candidate(const GuiDocumentSession& session, FeatureT replacement,
+            Result<std::size_t> (PartDocument::*updater)(FeatureT),
+            const GuiPartMutation& prepare = {}) const {
+    if (!active_ || !session.part_document())
+      return Result<PartDocument>::failure(
+          Error::validation("gui.feature_edit", "no active Part feature edit"));
+    const auto id = [&] {
+      if constexpr (std::is_same_v<FeatureT, SurfaceFeature>)
+        return surface_feature_id(replacement);
+      else
+        return replacement.id();
+    }();
+    if (id != feature_)
+      return Result<PartDocument>::failure(
+          Error::validation("gui.feature_edit", "replacement must retain the edited feature id"));
+    PartDocument draft = *session.part_document();
+    if (prepare) {
+      auto prepared = prepare(draft);
+      if (!prepared)
+        return Result<PartDocument>::failure(prepared.error());
+    }
+    auto updated = (draft.*updater)(std::move(replacement));
+    if (!updated)
+      return Result<PartDocument>::failure(updated.error());
+    auto plan = draft.create_recompute_plan();
+    if (!plan)
+      return Result<PartDocument>::failure(plan.error());
+    return Result<PartDocument>::success(std::move(draft));
+  }
+
+  template <typename FeatureT>
   [[nodiscard]] Result<GuiPartFeaturePreview>
   preview(const GuiDocumentSession& session, FeatureT replacement,
-          Result<std::size_t> (PartDocument::*updater)(FeatureT)) const {
-    if (!active_) return preview_fail("no feature edit is active");
-    const auto* part = session.part_document();
-    if (part == nullptr) return preview_fail("preview requires an active Part document");
-    PartDocument candidate = *part;
-    auto updated = (candidate.*updater)(std::move(replacement));
-    if (updated.has_error()) return Result<GuiPartFeaturePreview>::failure(updated.error());
-    auto plan = candidate.create_recompute_plan();
+          Result<std::size_t> (PartDocument::*updater)(FeatureT),
+          const GuiPartMutation& prepare = {}) const {
+    auto draft = candidate(session, std::move(replacement), updater, prepare);
+    if (!draft)
+      return Result<GuiPartFeaturePreview>::failure(draft.error());
+    auto plan = draft.value().create_recompute_plan();
     if (plan.has_error()) return Result<GuiPartFeaturePreview>::failure(plan.error());
     return Result<GuiPartFeaturePreview>::success(
         {feature_, "edit feature", plan.value().step_count()});
@@ -90,14 +121,19 @@ public:
   // Commit the edit as one transaction. The session recompute makes any
   // downstream failure fail the whole edit closed.
   template <typename FeatureT>
-  [[nodiscard]] Result<std::size_t>
-  commit(GuiDocumentSession& session, FeatureT replacement,
-         Result<std::size_t> (PartDocument::*updater)(FeatureT)) {
-    auto checked = preview(session, replacement, updater);
+  [[nodiscard]] Result<std::size_t> commit(GuiDocumentSession& session, FeatureT replacement,
+                                           Result<std::size_t> (PartDocument::*updater)(FeatureT),
+                                           const GuiPartMutation& prepare = {}) {
+    auto checked = preview(session, replacement, updater, prepare);
     if (checked.has_error()) return Result<std::size_t>::failure(checked.error());
     auto committed = session.commit_part_transaction(
         "Edit feature",
-        [replacement = std::move(replacement), updater](PartDocument& part) mutable {
+        [replacement = std::move(replacement), updater, prepare](PartDocument& part) mutable {
+          if (prepare) {
+            auto prepared = prepare(part);
+            if (!prepared)
+              return prepared;
+          }
           return (part.*updater)(std::move(replacement));
         });
     if (!committed.has_error()) active_ = false;
