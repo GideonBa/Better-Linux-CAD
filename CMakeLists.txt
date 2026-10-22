@@ -130,6 +130,7 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/assembly_generic_relationship_equation_builder.cpp
     src/geometry/assembly_constraint_numeric_system.cpp
     src/geometry/assembly_constraint_target_resolver.cpp
+    src/geometry/assembly_interaction.cpp
     src/geometry/assembly_contact_analyzer.cpp
     src/geometry/assembly_cross_hierarchy_constraint_solver.cpp
     src/geometry/assembly_cross_hierarchy_freshness.cpp
@@ -551,6 +552,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/spline_profile_pipeline_tests.cpp
       tests/geometry/step_exporter_tests.cpp
       tests/geometry/viewport_scene_tests.cpp
+      tests/geometry/assembly_interaction_tests.cpp
       tests/geometry/workplane_resolver_tests.cpp
       tests/geometry/workplane_resolver_recovery_tests.cpp
     )

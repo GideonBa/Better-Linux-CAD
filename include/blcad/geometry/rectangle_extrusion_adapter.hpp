@@ -68,6 +68,7 @@ private:
   friend class ViewportSceneBuilder;
   friend class FinishingSelectionBuilder;
   friend class MeasureSelectionBuilder;
+  friend class AssemblyInteractionGeometry;
   friend class detail::AssemblyPartShapeDefinitionBuilder;
   friend class detail::AssemblyPosedLeafShapeBuilder;
 
