@@ -1,7 +1,7 @@
 {
-  "schema": "blcad.gui-feature-coverage.v2",
+  "schema": "blcad.gui-feature-coverage.v3",
   "implemented_through": 131,
-  "tag_validity_note": "Accepted record of the MVP-9 dispositions as of Block 131. The Block-133 shell reset (docs/gui-shell-reset-sequence-mvp9r.md) deleted the shell-bound test files, so these tags no longer resolve: [gui][modeling-workspace], [gui][in-context-command], [gui][view-navigation-aids], [gui][interactive-extrude], [gui][interactive-revolve], [integration][extrude-revolve-manipulator]. The headless authorities they covered are unchanged; Block 135 restores the manipulator and Extrude/Revolve tags and Block 136 the workspace tags, both against ShellWindow. The machine check [integration][gui-feature-coverage] was deleted with the same reset and Block 136 restores it.",
+  "tag_validity_note": "implemented_through, acceptance_contract and families[].interactive retain the historical Block-131 record. Historical proof filters are not current ShellWindow evidence; some were deleted by Block 133, while others resolve only to retained controller tests. families[].shell is the current bounded UI audit. [integration][gui-feature-coverage] validates that inventory against the registered tests and their source files; a passing inventory audit does not close Block 136.",
   "extends": "docs/gui-feature-coverage-manifest-mvp7.json",
   "acceptance_contract": "docs/interactive-modeling-mvp9-acceptance.md",
   "families": [
@@ -11,6 +11,28 @@
       "interactive": {
         "disposition": "validation_sufficient",
         "justification": "Document lifecycle, transactions, save/load, undo/redo, and recompute are list/menu actions without a direct-manipulation upgrade path."
+      },
+      "shell": {
+        "owner": 136,
+        "status": "restored",
+        "contract": "docs/gui-shell-reset-sequence-mvp9r.md",
+        "scope": "Document create/open/save, dirty-work protection, undo/redo and presentation reset.",
+        "gaps": [],
+        "proofs": [
+          {
+            "filter": "[gui][shell][document-lifecycle]",
+            "source": "tests/gui/gui_shell_window_tests.cpp"
+          }
+        ],
+        "actions": [
+          "new_part",
+          "open",
+          "save",
+          "save_as",
+          "undo",
+          "redo"
+        ],
+        "widgets": []
       }
     },
     {
@@ -21,6 +43,29 @@
         "owner": 122,
         "contract": "docs/gui-modeling-workspace-mvp9.md",
         "proof": "[gui][modeling-workspace],[gui][in-context-command],[gui][view-navigation-aids]"
+      },
+      "shell": {
+        "owner": 136,
+        "status": "partial",
+        "contract": "docs/gui-modeling-workspace-mvp9.md",
+        "scope": "Semantic selection synchronizes viewport, browser and session; standard camera controls exist.",
+        "gaps": [
+          "Restore contextual commands and selection-filter UI.",
+          "Restore view cube, reusable view bookmarks and repeat-last-command presentation."
+        ],
+        "proofs": [
+          {
+            "filter": "[gui][selection-sync]",
+            "source": "tests/gui/gui_shell_window_tests.cpp"
+          }
+        ],
+        "actions": [
+          "fit",
+          "perspective"
+        ],
+        "widgets": [
+          "blcad.shell.browser"
+        ]
       }
     },
     {
@@ -31,6 +76,28 @@
         "owner": 129,
         "contract": "docs/gui-feature-edit-mvp9.md",
         "proof": "[gui][feature-edit],[integration][feature-edit-recompute]"
+      },
+      "shell": {
+        "owner": 136,
+        "status": "restored",
+        "contract": "docs/gui-feature-edit-mvp9.md",
+        "scope": "Browser selection, editable properties and all thirteen persistent Feature editors.",
+        "gaps": [],
+        "proofs": [
+          {
+            "filter": "[gui][shell][property-editor]",
+            "source": "tests/gui/gui_shell_window_tests.cpp"
+          },
+          {
+            "filter": "[block136-feature-edit]",
+            "source": "tests/gui/gui_shell_feature_edit_tests.cpp"
+          }
+        ],
+        "actions": [],
+        "widgets": [
+          "blcad.shell.browser",
+          "blcad.shell.properties"
+        ]
       }
     },
     {
@@ -41,6 +108,30 @@
         "owner": 115,
         "contract": "docs/gui-sketch-dimension-authoring-mvp8.md",
         "proof": "[gui][sketch-dimensions],[integration][sketch-expression-edit]"
+      },
+      "shell": {
+        "owner": 136,
+        "status": "partial",
+        "contract": "docs/gui-sketch-dimension-authoring-mvp8.md",
+        "scope": "Existing parameter values/formulas and driving Sketch dimensions can be edited.",
+        "gaps": [
+          "Restore standalone parameter creation and explicit parameter-management commands."
+        ],
+        "proofs": [
+          {
+            "filter": "[gui][shell][property-editor]",
+            "source": "tests/gui/gui_shell_window_tests.cpp"
+          },
+          {
+            "filter": "[sketch-dimension-workflow]",
+            "source": "tests/gui/gui_shell_dimension_workflow_tests.cpp"
+          }
+        ],
+        "actions": [],
+        "widgets": [
+          "blcad.shell.properties",
+          "sketch.dimension.editor"
+        ]
       }
     },
     {
@@ -51,6 +142,27 @@
         "owner": 122,
         "contract": "docs/gui-modeling-workspace-mvp9.md",
         "proof": "[gui][modeling-workspace],[gui][in-context-command]"
+      },
+      "shell": {
+        "owner": 136,
+        "status": "partial",
+        "contract": "docs/gui-sketch-workbench-mvp7.md",
+        "scope": "Seeded origin planes/axes and existing reference geometry are selectable.",
+        "gaps": [
+          "Restore authoring/editing of datum and construction geometry and workplanes beyond seeded origins."
+        ],
+        "proofs": [
+          {
+            "filter": "[gui][origin]",
+            "source": "tests/gui/gui_shell_window_tests.cpp"
+          }
+        ],
+        "actions": [
+          "create_sketch"
+        ],
+        "widgets": [
+          "blcad.shell.browser"
+        ]
       }
     },
     {
@@ -61,6 +173,30 @@
         "owner": 121,
         "contract": "docs/interactive-sketcher-mvp8-acceptance.md",
         "proof": "[integration][interactive-sketcher],[integration][sketch-gui-headless]"
+      },
+      "shell": {
+        "owner": 136,
+        "status": "partial",
+        "contract": "docs/interactive-sketcher-mvp8-acceptance.md",
+        "scope": "Planar drawing, constraints, dimensions, multi-entity drag transforms, projection and spline extrusion.",
+        "gaps": [
+          "Restore explicit broken-reference repair authoring and diagnostics controls."
+        ],
+        "proofs": [
+          {
+            "filter": "[sketch-mouse-operations]",
+            "source": "tests/gui/gui_shell_sketch_operations_tests.cpp"
+          },
+          {
+            "filter": "[spline-create-workflow]",
+            "source": "tests/gui/gui_shell_sketch_operations_tests.cpp"
+          }
+        ],
+        "actions": [
+          "create_sketch",
+          "finish_sketch"
+        ],
+        "widgets": []
       }
     },
     {
@@ -71,6 +207,26 @@
         "owner": 124,
         "contract": "docs/gui-interactive-extrude-revolve-mvp9.md",
         "proof": "[gui][interactive-extrude],[gui][interactive-revolve],[integration][extrude-revolve-manipulator]"
+      },
+      "shell": {
+        "owner": 136,
+        "status": "partial",
+        "contract": "docs/gui-interactive-extrude-revolve-mvp9.md",
+        "scope": "Candidate-only Extrude/Revolve with native manipulation and selectable closed spline profiles.",
+        "gaps": [
+          "Restore dedicated Hole authoring and audit advanced extent/termination editors against the retained foundation API."
+        ],
+        "proofs": [
+          {
+            "filter": "[gui][shell-features][extrude-revolve]",
+            "source": "tests/gui/gui_shell_feature_tools_tests.cpp"
+          }
+        ],
+        "actions": [
+          "extrude",
+          "revolve"
+        ],
+        "widgets": []
       }
     },
     {
@@ -81,6 +237,33 @@
         "owner": 126,
         "contract": "docs/gui-interactive-pattern-body-mvp9.md",
         "proof": "[gui][interactive-finishing],[gui][interactive-shell-draft],[gui][interactive-pattern-mirror]"
+      },
+      "shell": {
+        "owner": 136,
+        "status": "restored",
+        "contract": "docs/gui-interactive-pattern-body-mvp9.md",
+        "scope": "Bounded semantic Fillet/Chamfer/Shell/Draft plus multi-Body linear/circular patterns and Mirror.",
+        "gaps": [],
+        "proofs": [
+          {
+            "filter": "[block136-finishing]",
+            "source": "tests/gui/gui_shell_finishing_tools_tests.cpp"
+          },
+          {
+            "filter": "[block136-patterns]",
+            "source": "tests/gui/gui_shell_pattern_tools_tests.cpp"
+          }
+        ],
+        "actions": [
+          "fillet",
+          "chamfer",
+          "shell",
+          "draft",
+          "linear_pattern",
+          "circular_pattern",
+          "body_mirror"
+        ],
+        "widgets": []
       }
     },
     {
@@ -91,6 +274,26 @@
         "owner": 126,
         "contract": "docs/gui-interactive-pattern-body-mvp9.md",
         "proof": "[gui][interactive-body-operation],[integration][pattern-ghost-preview]"
+      },
+      "shell": {
+        "owner": 136,
+        "status": "restored",
+        "contract": "docs/gui-interactive-pattern-body-mvp9.md",
+        "scope": "Target/tool Boolean operations and multiple Body Translate/Rotate/UniformScale with numeric/drag preview.",
+        "gaps": [],
+        "proofs": [
+          {
+            "filter": "[block136-body]",
+            "source": "tests/gui/gui_shell_body_tools_tests.cpp"
+          }
+        ],
+        "actions": [
+          "body_boolean",
+          "body_translate",
+          "body_rotate",
+          "body_scale"
+        ],
+        "widgets": []
       }
     },
     {
@@ -101,6 +304,25 @@
         "owner": 127,
         "contract": "docs/gui-interactive-path-sweep-loft-mvp9.md",
         "proof": "[gui][sketch-3d-edit],[gui][interactive-path-sweep]"
+      },
+      "shell": {
+        "owner": 136,
+        "status": "partial",
+        "contract": "docs/gui-interactive-path-sweep-loft-mvp9.md",
+        "scope": "Ordered PathCurve authoring consumes existing supported geometry.",
+        "gaps": [
+          "Restore Sketch3D point/segment authoring and editing; PathCurve coverage does not prove Sketch3D authoring."
+        ],
+        "proofs": [
+          {
+            "filter": "[block136-spatial]",
+            "source": "tests/gui/gui_shell_spatial_tools_tests.cpp"
+          }
+        ],
+        "actions": [
+          "path_curve"
+        ],
+        "widgets": []
       }
     },
     {
@@ -111,6 +333,24 @@
         "owner": 127,
         "contract": "docs/gui-interactive-path-sweep-loft-mvp9.md",
         "proof": "[gui][interactive-path-sweep],[gui][interactive-loft],[integration][ordered-section-picking]"
+      },
+      "shell": {
+        "owner": 136,
+        "status": "restored",
+        "contract": "docs/gui-interactive-path-sweep-loft-mvp9.md",
+        "scope": "Ordered supported profiles/paths/sections, solid/cut/surface modes, twist and continuity inputs.",
+        "gaps": [],
+        "proofs": [
+          {
+            "filter": "[block136-spatial]",
+            "source": "tests/gui/gui_shell_spatial_tools_tests.cpp"
+          }
+        ],
+        "actions": [
+          "sweep",
+          "loft"
+        ],
+        "widgets": []
       }
     },
     {
@@ -121,6 +361,28 @@
         "owner": 128,
         "contract": "docs/gui-interactive-surface-mvp9.md",
         "proof": "[gui][interactive-surface],[integration][stitch-diagnostic-overlay]"
+      },
+      "shell": {
+        "owner": 136,
+        "status": "restored",
+        "contract": "docs/gui-interactive-surface-mvp9.md",
+        "scope": "Boundary/Fill, Trim/Extend, Stitch and closed-shell-to-solid through supported semantic inputs.",
+        "gaps": [],
+        "proofs": [
+          {
+            "filter": "[block136-surface]",
+            "source": "tests/gui/gui_shell_surface_tools_tests.cpp"
+          }
+        ],
+        "actions": [
+          "surface_boundary",
+          "surface_fill",
+          "surface_trim",
+          "surface_extend",
+          "surface_stitch",
+          "surface_to_solid"
+        ],
+        "widgets": []
       }
     },
     {
@@ -131,6 +393,29 @@
         "owner": 130,
         "contract": "docs/gui-interactive-assembly-mvp9.md",
         "proof": "[gui][interactive-assembly-placement]"
+      },
+      "shell": {
+        "owner": 136,
+        "status": "partial",
+        "contract": "docs/gui-interactive-assembly-mvp9.md",
+        "scope": "Project creation, definition loading and root component/rigid-subassembly placement.",
+        "gaps": [
+          "Restore the former hierarchy-validation controls for supported nested/cross-hierarchy authoring."
+        ],
+        "proofs": [
+          {
+            "filter": "[block136-assembly]",
+            "source": "tests/gui/gui_shell_assembly_tools_tests.cpp"
+          }
+        ],
+        "actions": [
+          "new_project",
+          "assembly_import",
+          "assembly_insert_component",
+          "assembly_insert_subassembly",
+          "assembly_placement"
+        ],
+        "widgets": []
       }
     },
     {
@@ -141,6 +426,26 @@
         "owner": 130,
         "contract": "docs/gui-interactive-assembly-mvp9.md",
         "proof": "[gui][interactive-relationships],[gui][interactive-joint-motion]"
+      },
+      "shell": {
+        "owner": 136,
+        "status": "partial",
+        "contract": "docs/gui-interactive-assembly-mvp9.md",
+        "scope": "Compatibility-filtered root relationship/joint authoring and typed bounded coordinate slots.",
+        "gaps": [
+          "Restore supported cross-hierarchy relationship/joint editing surfaces removed with the old workbench."
+        ],
+        "proofs": [
+          {
+            "filter": "[block136-assembly]",
+            "source": "tests/gui/gui_shell_assembly_tools_tests.cpp"
+          }
+        ],
+        "actions": [
+          "assembly_relationship",
+          "assembly_joint"
+        ],
+        "widgets": []
       }
     },
     {
@@ -151,6 +456,26 @@
         "owner": 130,
         "contract": "docs/gui-interactive-assembly-mvp9.md",
         "proof": "[gui][interactive-joint-motion]"
+      },
+      "shell": {
+        "owner": 136,
+        "status": "partial",
+        "contract": "docs/gui-interactive-assembly-mvp9.md",
+        "scope": "Root component-group solve and selected joint-coordinate motion with candidate poses.",
+        "gaps": [
+          "Restore supported cross-hierarchy solve/application controls."
+        ],
+        "proofs": [
+          {
+            "filter": "[block136-assembly]",
+            "source": "tests/gui/gui_shell_assembly_tools_tests.cpp"
+          }
+        ],
+        "actions": [
+          "assembly_solve",
+          "assembly_motion"
+        ],
+        "widgets": []
       }
     },
     {
@@ -159,6 +484,26 @@
       "interactive": {
         "disposition": "validation_sufficient",
         "justification": "Analysis is a read-only query with deterministic result tables and occurrence highlights; direct manipulation would not add model authority."
+      },
+      "shell": {
+        "owner": 136,
+        "status": "partial",
+        "contract": "docs/gui-analysis-step-export-workbench-mvp7.md",
+        "scope": "Read-only interference, clearance, contact and exact root-constraint-group DOF inspection.",
+        "gaps": [
+          "Restore bounded sampled Revolute sweep controls.",
+          "Restore occurrence-linked result highlighting."
+        ],
+        "proofs": [
+          {
+            "filter": "[shell-assembly-analysis]",
+            "source": "tests/gui/gui_shell_inspect_tools_tests.cpp"
+          }
+        ],
+        "actions": [
+          "assembly_analysis"
+        ],
+        "widgets": []
       }
     },
     {
@@ -167,6 +512,23 @@
       "interactive": {
         "disposition": "validation_sufficient",
         "justification": "STEP export is a preflight/file-output workflow whose existing dialog and progress presentation are complete."
+      },
+      "shell": {
+        "owner": 136,
+        "status": "restored",
+        "contract": "docs/gui-analysis-step-export-workbench-mvp7.md",
+        "scope": "Visible Body STEP with synchronous staged publication and actual completion counts.",
+        "gaps": [],
+        "proofs": [
+          {
+            "filter": "[shell-part-step]",
+            "source": "tests/gui/gui_shell_inspect_tools_tests.cpp"
+          }
+        ],
+        "actions": [
+          "export_part_step"
+        ],
+        "widgets": []
       }
     },
     {
@@ -175,6 +537,24 @@
       "interactive": {
         "disposition": "validation_sufficient",
         "justification": "Flattened and structured STEP export are explicit file consumers with no direct-manipulation authoring semantics."
+      },
+      "shell": {
+        "owner": 136,
+        "status": "restored",
+        "contract": "docs/gui-analysis-step-export-workbench-mvp7.md",
+        "scope": "Flat/structured visible-active posed leaves, including nested occurrences; staged publication.",
+        "gaps": [],
+        "proofs": [
+          {
+            "filter": "[shell-assembly-step]",
+            "source": "tests/gui/gui_shell_inspect_tools_tests.cpp"
+          }
+        ],
+        "actions": [
+          "export_assembly_flat_step",
+          "export_assembly_structured_step"
+        ],
+        "widgets": []
       }
     }
   ],
@@ -194,7 +574,9 @@
       "selection_scope": "Unambiguous current-body semantic box edges and planar faces, including four-line Sketch rectangles."
     },
     "remaining": [
-      "Full shell acceptance and manifest validation"
+      "Resolve each families[].shell.gaps entry.",
+      "Complete shell_reset_progress.acceptance.pending_workflows.",
+      "Require manifest readiness plus passing full suites before closing Block 136."
     ],
     "pattern_mirror_slice": {
       "status": "implemented",
@@ -288,6 +670,45 @@
         "Atomic feature update with downstream recompute"
       ],
       "selection_scope": "Current Part Feature nodes across all thirteen update-capable families; preloaded existing intent structure, fixed feature type/extent-mode/source-category/result identities, form-based references and native scalar handles. BodyTransform stack editing and feature reorder remain outside the authority."
+    },
+    "inspect_export_slice": {
+      "status": "implemented",
+      "contract": "docs/gui-analysis-step-export-workbench-mvp7.md",
+      "proof": "[block136-inspect-export]",
+      "commands": [
+        "Part STEP",
+        "Flattened Assembly STEP",
+        "Structured Assembly STEP",
+        "Interference",
+        "Clearance",
+        "Contact",
+        "Root-group DOF"
+      ],
+      "remaining": [
+        "Sampled Revolute sweep controls",
+        "Occurrence-linked result highlighting"
+      ]
+    },
+    "acceptance": {
+      "audited_on": "2026-10-22",
+      "complete": false,
+      "blocked_families": [
+        "viewport-selection",
+        "parameters-expressions",
+        "datum-construction-workplanes",
+        "planar-sketch-reference-repair",
+        "bodies-extrude-revolve-holes",
+        "sketch3d-pathcurve",
+        "assembly-project-hierarchy",
+        "assembly-relationships-joints",
+        "assembly-solve-motion",
+        "assembly-analysis"
+      ],
+      "pending_workflows": [
+        "Restore equivalent-or-better integrated Part and Assembly workflows using actual ShellWindow interactions, including history and persistence.",
+        "Complete whole-shell native acceptance, including restored workspace, construction, repair, Sketch3D and advanced Assembly surfaces."
+      ]
     }
-  }
+  },
+  "current_shell_acceptance_contract": "docs/gui-shell-acceptance-mvp9r.md"
 }

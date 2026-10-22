@@ -694,3 +694,18 @@ context guards, preserved targets and source files, read-only collision/clearanc
 input/model invalidation and history/persistence preservation. The native case checks reachable task
 controls at 1280×800 and Qt file-dialog acceptance/cancellation; only that case skips offscreen.
 `BLCAD_UI_CAPTURE_DIR` enables captures. These bounded consumers do not complete whole-shell acceptance.
+
+### Block 136 shell coverage inventory
+
+```bash
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][gui-feature-coverage]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[gui][shell-coverage],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
+```
+
+The inventory checks exact family parity, real registered proof tags/source files, shell entry points,
+explicit gap accounting and plan/manifest completion consistency. Its negative controls reject missing
+families, deleted tags, headless substitutions, OR masking and false readiness. Inventory validity
+is separate from whole-shell acceptance: `docs/gui-shell-acceptance-mvp9r.md` describes the remaining
+work and the opt-in `BLCAD_REQUIRE_SHELL_ACCEPTANCE=1` closure gate, which fails while gaps remain.
+Run full Core, Geometry and offscreen GUI suites plus native interaction coverage before closing the
+block; historical controller tests alone do not establish equivalent shell coverage.
