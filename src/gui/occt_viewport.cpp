@@ -513,7 +513,13 @@ OcctViewport::~OcctViewport() {
   }
 }
 
+void OcctViewport::set_view_changed_callback(std::function<void()> callback) {
+  view_changed_callback_ = std::move(callback);
+}
+
 void OcctViewport::render_update() {
+  if (view_changed_callback_)
+    view_changed_callback_();
   if (gl_surface_ != nullptr)
     gl_surface_->update();
   else
@@ -1606,7 +1612,8 @@ void OcctViewport::apply_sketch_focus() {
       presentation.interactive->SetTransparency(
           presentation.item.kind == geometry::ViewportSceneKind::Datum ? 0.72
           : profile_face || (presentation.item.kind == geometry::ViewportSceneKind::Face &&
-                             presentation.item.semantic_id.starts_with("finishing/"))
+                             (presentation.item.semantic_id.starts_with("finishing/") ||
+                              presentation.item.semantic_id.starts_with("measure/")))
               ? 0.88
               : 0.0);
       continue;

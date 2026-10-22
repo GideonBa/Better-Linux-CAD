@@ -5,6 +5,7 @@
 #include "blcad/gui/gui_interactive_profile_materialization.hpp"
 #include "blcad/gui/gui_sketch_intent_remap.hpp"
 #include "blcad/gui/shell/shell_feature_tools.hpp"
+#include "blcad/gui/shell/shell_measure_tools.hpp"
 #include "blcad/gui/shell/shell_origin.hpp"
 #include "blcad/gui/shell/shell_ribbon.hpp"
 #include "blcad/gui/shell/shell_sketch_tools.hpp"
@@ -240,6 +241,8 @@ ShellWindow::ShellWindow() {
                                                      tab_sketch_);
   feature_tools_ = std::make_unique<ShellFeatureTools>(
       *this, session_, sketch_workbench_, *viewport_, *ribbon_, tab_model_);
+  measure_tools_ =
+      std::make_unique<ShellMeasureTools>(*this, session_, *viewport_, *ribbon_, tab_model_);
   statusBar()->showMessage(QStringLiteral("Bereit"));
   refresh();
 }
@@ -248,6 +251,8 @@ ShellWindow::~ShellWindow() {
   // Release the viewer while its native top-level drawable and the session
   // still exist. QMainWindow/QWidget teardown otherwise destroys that drawable
   // before deleting the central viewport and its OCCT GL resources.
+  viewport_->set_view_changed_callback({});
+  measure_tools_.reset();
   feature_tools_.reset();
   sketch_tools_.reset();
   delete centralWidget();
@@ -453,6 +458,12 @@ void ShellWindow::build_docks() {
 }
 
 void ShellWindow::wire_viewport() {
+  viewport_->set_view_changed_callback([this] {
+    if (feature_tools_)
+      feature_tools_->refresh_presentation();
+    if (measure_tools_)
+      measure_tools_->refresh_presentation();
+  });
   viewport_->set_selection_callback(
       [this](std::optional<GuiSelection> selection) { apply_viewport_selection(selection); });
 }
@@ -528,6 +539,8 @@ bool ShellWindow::confirm_document_replacement() {
 }
 
 void ShellWindow::reset_document_interaction() {
+  if (measure_tools_)
+    measure_tools_->cancel();
   if (feature_tools_)
     feature_tools_->reset();
   if (sketch_tools_)
@@ -782,6 +795,8 @@ bool ShellWindow::finish_active_sketch() {
 }
 
 bool ShellWindow::undo() {
+  if (measure_tools_)
+    measure_tools_->cancel();
   if (feature_tools_ && feature_tools_->active())
     feature_tools_->cancel();
   if (active_sketch_ && sketch_tools_) {
@@ -802,6 +817,8 @@ bool ShellWindow::undo() {
 }
 
 bool ShellWindow::redo() {
+  if (measure_tools_)
+    measure_tools_->cancel();
   if (feature_tools_ && feature_tools_->active())
     feature_tools_->cancel();
   if (active_sketch_ && sketch_tools_) {
@@ -839,6 +856,8 @@ void ShellWindow::apply_viewport_selection(const std::optional<GuiSelection>& se
       (void)feature_tools_->accept_spatial_selection(*selection);
     if (feature_tools_)
       (void)feature_tools_->accept_surface_selection(*selection);
+    if (measure_tools_)
+      (void)measure_tools_->accept_selection(*selection);
     selected_semantic_id_ = selection->semantic_id;
     if (feature_tools_)
       if (const auto* part = session_.part_document())
@@ -971,7 +990,7 @@ void ShellWindow::refresh() {
   action_save_as_->setEnabled(has_document);
   action_undo_->setEnabled(session_.can_undo());
   action_redo_->setEnabled(session_.can_redo());
-  action_create_sketch_->setEnabled(has_document && !sketch_active &&
+  action_create_sketch_->setEnabled(has_document && !sketch_active && !session_.task().active() &&
                                     selected_datum_plane().has_value());
   action_finish_sketch_->setEnabled(sketch_active);
   action_perspective_->setEnabled(!sketch_active);
@@ -994,6 +1013,8 @@ void ShellWindow::refresh() {
 
   refresh_browser();
   refresh_properties();
+  if (measure_tools_)
+    measure_tools_->refresh();
   refresh_viewport_scene();
   if (sketch_tools_)
     sketch_tools_->refresh_enablement();
@@ -1067,6 +1088,10 @@ void ShellWindow::refresh_viewport_scene() {
   }
   if (feature_tools_) {
     auto targets = feature_tools_->finishing_selection_items();
+    scene.value().insert(scene.value().end(), targets.begin(), targets.end());
+  }
+  if (measure_tools_) {
+    auto targets = measure_tools_->selection_items();
     scene.value().insert(scene.value().end(), targets.begin(), targets.end());
   }
   const auto published = viewport_->set_scene(std::move(scene.value()));

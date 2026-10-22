@@ -115,6 +115,8 @@ public:
   void set_sketch_selection_callback(SketchSelectionCallback callback);
   void set_context_menu_callback(std::function<void(QPoint)> callback);
   void fit_all();
+  // Explicit presentation notification for shell-owned model-space overlays.
+  void set_view_changed_callback(std::function<void()> callback);
 
   void set_selection_filter_mask(std::uint32_t mask);
   void set_selection_semantic_scope(std::optional<std::vector<std::string>> scope);
@@ -207,6 +209,7 @@ private:
   SketchPointerPhaseCallback sketch_pointer_phase_callback_;
   SketchSelectionCallback sketch_selection_callback_;
   std::function<void(QPoint)> context_menu_callback_;
+  std::function<void()> view_changed_callback_;
   std::optional<GuiSelection> selected_semantic_;
   std::vector<GuiSelection> sketch_selections_;
   std::optional<GuiPlaneCamera> plane_camera_;

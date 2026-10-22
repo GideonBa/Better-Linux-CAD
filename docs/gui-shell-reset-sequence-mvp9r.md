@@ -563,7 +563,8 @@ Cancel, Undo/Redo and Save/Open retain their authorities. Color-coded gap overla
 this slice displays diagnostic text and valid result geometry. Contract/proof:
 `docs/gui-interactive-surface-mvp9.md`, `[block136-surface]`.
 
-Measure, Assembly, browser feature editing and whole-block acceptance remain open.
+The Measure follow-up below restores that family. Assembly, browser feature editing and whole-block
+acceptance remain open.
 
 Validation for the Surface slice on 21 October 2026: full Core (513 cases, 15124 assertions),
 Geometry (424 cases, 28199 assertions), and offscreen GUI (260 passed, seven explicit native skips,
@@ -575,6 +576,34 @@ Apply. Focused proof also covers ordered Boundary inputs, a semantic solid-face 
 profile, closed-shell conversion, candidate collisions and exact history/persistence. Native task
 captures were inspected and desktop startup passed (intentional six-second timeout). Commands:
 `docs/development-setup.md`. Whole-block acceptance is still open.
+
+#### Block 136 next slice — Measure
+
+`ShellMeasureTools`, owned explicitly by `ShellWindow`, adds Abstand, Winkel, Radius / Durchmesser
+and Körperdaten to the Prüfen ribbon group. A read-only task dock separates A/B picks, offers native
+point/edge/face filters, displays units and permits copying current results. The existing analytic
+Measure authority retains supporting-line/plane distance and 0–90 degree angle semantics.
+
+A Geometry catalogue extracts compatible subshapes from current visible Bodies and posed Project
+components. Its generation-scoped viewer ids never become Core references or saved topology indices.
+Model-revision/freshness changes clear all picks, readout and witnesses before reselection. Close,
+Escape and dock close restore the preceding selection filters/scope; no model transaction, dirty
+state or history entry is introduced. A mouse-pass-through witness overlay follows explicit viewport
+view-change notifications. Intersecting planes share a witness lying on both planes.
+Contract/proof: `docs/gui-measure-mvp9.md`, `[block136-measure]`.
+
+Assembly authoring, browser feature editing and whole-block acceptance remain open.
+
+Validation for the Measure slice on 22 October 2026: full Core (513 cases, 15124 assertions),
+Geometry (426 cases, 28348 assertions) and offscreen GUI (266 passed, eight explicit native skips,
+15653 assertions) pass. The combined native Measure/Surface/spatial/Body/pattern/finishing/Sketch UI/
+viewport/lifecycle run passes all 57 cases and 9066 assertions, covering all offscreen skips. Native
+Measure proof opens the ribbon command, picks actual vertices, changes camera, picks circular edges
+and cylindrical faces, then closes the reachable dock. Focused proof covers clipboard/clear, all
+exit paths, same-target rejection, stale/replaced topology, a known 100 mm posed-component distance,
+unchanged dirty/history state and byte-identical saved Part files. Native captures were inspected
+and desktop startup passed (intentional six-second timeout). Commands: `docs/development-setup.md`.
+These checks validate the Measure slice without advancing whole-block acceptance.
 
 ### Sketch interaction follow-up — 21 October 2026
 

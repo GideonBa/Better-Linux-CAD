@@ -615,11 +615,17 @@ Apply; Cancel, Undo/Redo and Save/Open preserve the existing authorities. Planar
 plane for reliable downstream Trim. Contract/proof: `docs/gui-interactive-surface-mvp9.md`,
 `[block136-surface]`.
 
-Measure, Assembly, browser feature editing and whole-block acceptance remain open.
+The replacement shell restores read-only Measure for distance, angle, radius/diameter and Body
+volume/solid count. Explicit A/B roles and native topology filters select fresh derived Bodies or
+posed Project components. Disposable target identities and readouts are cleared after model or
+freshness changes; witness overlays follow camera changes. Measurement preserves document, history,
+dirty state and save format. Contract/proof: `docs/gui-measure-mvp9.md`, `[block136-measure]`.
+
+Assembly, browser feature editing and whole-block acceptance remain open.
 
 ## Current next technical step — Block 136
 
-Restore the remaining feature commands (Measure and Assembly),
+Restore the remaining Assembly feature commands,
 browser-double-click feature editing, and replacement-shell acceptance/coverage as defined in
 `docs/gui-shell-reset-sequence-mvp9r.md`.
 
