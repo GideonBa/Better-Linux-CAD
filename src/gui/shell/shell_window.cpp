@@ -4,6 +4,7 @@
 #include "blcad/geometry/viewport_scene.hpp"
 #include "blcad/gui/gui_interactive_profile_materialization.hpp"
 #include "blcad/gui/gui_sketch_intent_remap.hpp"
+#include "blcad/gui/shell/shell_assembly_tools.hpp"
 #include "blcad/gui/shell/shell_feature_tools.hpp"
 #include "blcad/gui/shell/shell_measure_tools.hpp"
 #include "blcad/gui/shell/shell_origin.hpp"
@@ -243,6 +244,8 @@ ShellWindow::ShellWindow() {
       *this, session_, sketch_workbench_, *viewport_, *ribbon_, tab_model_);
   measure_tools_ =
       std::make_unique<ShellMeasureTools>(*this, session_, *viewport_, *ribbon_, tab_model_);
+  assembly_tools_ =
+      std::make_unique<ShellAssemblyTools>(*this, session_, *viewport_, *ribbon_, tab_assembly_);
   statusBar()->showMessage(QStringLiteral("Bereit"));
   refresh();
 }
@@ -252,6 +255,7 @@ ShellWindow::~ShellWindow() {
   // still exist. QMainWindow/QWidget teardown otherwise destroys that drawable
   // before deleting the central viewport and its OCCT GL resources.
   viewport_->set_view_changed_callback({});
+  assembly_tools_.reset();
   measure_tools_.reset();
   feature_tools_.reset();
   sketch_tools_.reset();
@@ -264,6 +268,7 @@ void ShellWindow::build_ribbon() {
   tab_model_ = ribbon_->add_tab(QStringLiteral("3D-Modell"));
   tab_sketch_ = ribbon_->add_tab(QStringLiteral("Skizze"));
   tab_view_ = ribbon_->add_tab(QStringLiteral("Ansicht"));
+  tab_assembly_ = ribbon_->add_tab(QStringLiteral("Baugruppe"));
 
   // 3D-Modell → Dokument
   auto* document_group = ribbon_->add_group(tab_model_, QStringLiteral("Dokument"));
@@ -463,6 +468,8 @@ void ShellWindow::wire_viewport() {
       feature_tools_->refresh_presentation();
     if (measure_tools_)
       measure_tools_->refresh_presentation();
+    if (assembly_tools_)
+      assembly_tools_->refresh_presentation();
   });
   viewport_->set_selection_callback(
       [this](std::optional<GuiSelection> selection) { apply_viewport_selection(selection); });
@@ -487,6 +494,22 @@ bool ShellWindow::new_part(const QString& name) {
   return !seeded.has_error();
 }
 
+bool ShellWindow::new_project(const QString& name) {
+  if (!confirm_document_replacement())
+    return false;
+  reset_document_interaction();
+  const auto id = sanitized_document_id(name, u"project.");
+  auto created = session_.create_project(DocumentId(id.toStdString()), name.toStdString(), true);
+  if (!created) {
+    show_error(created.error());
+    refresh();
+    return false;
+  }
+  refresh();
+  ribbon_->set_current_tab(tab_assembly_);
+  return true;
+}
+
 bool ShellWindow::open_path(const QString& path) {
   if (!confirm_document_replacement())
     return false;
@@ -499,6 +522,8 @@ bool ShellWindow::open_path(const QString& path) {
   }
   refresh();
   viewport_->fit_all();
+  if (session_.project())
+    ribbon_->set_current_tab(tab_assembly_);
   return true;
 }
 
@@ -539,6 +564,8 @@ bool ShellWindow::confirm_document_replacement() {
 }
 
 void ShellWindow::reset_document_interaction() {
+  if (assembly_tools_)
+    assembly_tools_->cancel();
   if (measure_tools_)
     measure_tools_->cancel();
   if (feature_tools_)
@@ -795,6 +822,8 @@ bool ShellWindow::finish_active_sketch() {
 }
 
 bool ShellWindow::undo() {
+  if (assembly_tools_)
+    assembly_tools_->cancel();
   if (measure_tools_)
     measure_tools_->cancel();
   if (feature_tools_ && feature_tools_->active())
@@ -817,6 +846,8 @@ bool ShellWindow::undo() {
 }
 
 bool ShellWindow::redo() {
+  if (assembly_tools_)
+    assembly_tools_->cancel();
   if (measure_tools_)
     measure_tools_->cancel();
   if (feature_tools_ && feature_tools_->active())
@@ -858,6 +889,8 @@ void ShellWindow::apply_viewport_selection(const std::optional<GuiSelection>& se
       (void)feature_tools_->accept_surface_selection(*selection);
     if (measure_tools_)
       (void)measure_tools_->accept_selection(*selection);
+    if (assembly_tools_)
+      (void)assembly_tools_->accept_selection(*selection);
     selected_semantic_id_ = selection->semantic_id;
     if (feature_tools_)
       if (const auto* part = session_.part_document())
@@ -1015,6 +1048,8 @@ void ShellWindow::refresh() {
   refresh_properties();
   if (measure_tools_)
     measure_tools_->refresh();
+  if (assembly_tools_)
+    assembly_tools_->refresh();
   refresh_viewport_scene();
   if (sketch_tools_)
     sketch_tools_->refresh_enablement();
@@ -1092,6 +1127,10 @@ void ShellWindow::refresh_viewport_scene() {
   }
   if (measure_tools_) {
     auto targets = measure_tools_->selection_items();
+    scene.value().insert(scene.value().end(), targets.begin(), targets.end());
+  }
+  if (assembly_tools_) {
+    auto targets = assembly_tools_->selection_items();
     scene.value().insert(scene.value().end(), targets.begin(), targets.end());
   }
   const auto published = viewport_->set_scene(std::move(scene.value()));

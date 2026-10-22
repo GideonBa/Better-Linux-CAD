@@ -51,7 +51,10 @@ QTreeWidgetItem* find_tree_item(QTreeWidget& tree, const QString& semantic_id) {
 }
 
 QPushButton* find_push_button(QWidget& root, const QString& text) {
-  const auto buttons = root.findChildren<QPushButton*>();
+  const auto* panel = root.findChild<QWidget*>(QStringLiteral("blcad.shell.feature_task"));
+  if (!panel)
+    return nullptr;
+  const auto buttons = panel->findChildren<QPushButton*>();
   const auto found = std::find_if(buttons.begin(), buttons.end(), [&text](const auto* button) {
     return button != nullptr && button->text() == text;
   });
@@ -1037,12 +1040,7 @@ TEST_CASE("Extrusion starts through real tree and ribbon mouse clicks",
   REQUIRE(window.feature_tools().active());
 
   const BodyId body = window.feature_tools().coordinator().extrude().result_body_id();
-  QPushButton* apply_button = nullptr;
-  for (auto* button : window.findChildren<QPushButton*>())
-    if (button->text() == QStringLiteral("Anwenden")) {
-      apply_button = button;
-      break;
-    }
+  auto* apply_button = find_push_button(window, QStringLiteral("Anwenden"));
   REQUIRE(apply_button != nullptr);
   REQUIRE(apply_button->isVisible());
   REQUIRE(apply_button->isEnabled());

@@ -520,3 +520,28 @@ Distance witnesses and A/B markers follow the camera. **Kopieren** copies a curr
 **Neu auswählen** clears the inputs. Model changes or stale geometry clear the readout and require
 new picks. **Schließen**, Escape or the dock close button exits Measure and restores the previous
 selection filters. Measurement creates no model change or history entry.
+
+## Assembly tools in the replacement shell
+
+Use **Baugruppe → Neue Baugruppe** to create a Project. **Definition laden** loads an existing Part
+or Project as a reusable definition; **Bauteil einsetzen** or **Unterbaugruppe einsetzen** then adds
+an occurrence. Identical Parts may be reused; conflicting ids and unsupported cross-hierarchy imports
+show an error without a partial import.
+
+**Platzieren** selects a root component by model click or a component/subassembly in **Vorkommen**.
+Choose **Verschieben XYZ** or **Drehen X/Y/Z** for the handles, or enter the six position/rotation
+values. Drag for a live preview; type a measure with mm/deg and press Enter to finish the drag.
+Escape restores the drag's initial placement, and a further Escape cancels the task. **Fixiert**,
+**Sichtbar** and **Unterdrückt** share the same preview and Apply transaction. Grounding affects the
+solver; manual placement does not automatically solve existing relationships.
+
+**Beziehung** and **Gelenk** select references A and B in the model or panel. After A, the model
+selects B; **Modellklick wählt** changes the role. B is restricted to compatible references on another
+root component. Revolute/Prismatic/Cylindrical/Planar require oriented seat frames; Spherical uses
+points and remains passive. Moving joint coordinates require a value and both limits. Angular limits
+stay between -180 and 180 degrees. Preview diagnostics explain incompatible inputs before Apply.
+
+**Gelenk bewegen** selects an active driven joint and coordinate, then uses a slider, numeric field
+or handle for the solved-pose preview. **Baugruppe lösen** operates on the complete selected root
+component group. **Anwenden** commits a valid preview as one undoable step; **Abbrechen** discards it.
+Nested/cross-hierarchy endpoint editing and constrained free dragging remain outside this shell slice.

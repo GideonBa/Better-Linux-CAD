@@ -194,7 +194,6 @@
       "selection_scope": "Unambiguous current-body semantic box edges and planar faces, including four-line Sketch rectangles."
     },
     "remaining": [
-      "Assembly",
       "Browser feature edit",
       "Full shell acceptance and manifest validation"
     ],
@@ -261,6 +260,22 @@
         "Body volume / solid count"
       ],
       "selection_scope": "Fresh visible Body topology and posed Project component vertices, straight/circular edges and planar/cylindrical faces; disposable generation-scoped picks, explicit A/B roles and filters, read-only results and witness overlay. Supporting lines/planes retain existing analytic distance semantics."
+    },
+    "assembly_slice": {
+      "status": "implemented",
+      "contract": "docs/gui-interactive-assembly-mvp9.md",
+      "proof": "[block136-assembly]",
+      "commands": [
+        "Create Project",
+        "Load Part / Assembly definition",
+        "Insert component / rigid subassembly",
+        "Placement / occurrence states",
+        "Relationship",
+        "Joint",
+        "Joint coordinate motion",
+        "Root group solve"
+      ],
+      "selection_scope": "Visible active root component semantic references with compatibility-filtered A/B picks; root component and rigid-subassembly placement; ordered bounded joint coordinates. Nested/cross-hierarchy endpoint authoring and constrained free-drag remain deferred."
     }
   }
 }

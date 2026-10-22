@@ -649,3 +649,19 @@ button and Escape events, preview cleanup, and main-window Undo/Redo.
 It rejects high-severity OCCT teardown messages, including attempts to make a GLX context current
 after its top-level drawable has already been destroyed. The shell releases its central viewer while
 that drawable and the document session still exist. This case is skipped on the offscreen backend.
+
+### Block 136 Assembly slice
+
+```bash
+./build/dev-gui/blcad_geometry_tests "[block136-assembly]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[block136-assembly]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-assembly]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle]"
+```
+
+The focused slice covers disposable semantic targets, definition imports, component/rigid-subassembly
+insertion, placement and state previews, compatibility-filtered relationships, all joint families,
+group solve, ordered slot limits, slider/numeric motion, history and persistence. Native cases also
+verify real occurrence picking and translate/rotate/motion handles, numeric refinement, drag Escape,
+and reachable task controls. Offscreen explicitly skips the native-only cases; run xcb to cover them.
+`BLCAD_UI_CAPTURE_DIR` enables native captures. These checks do not complete Block 136 acceptance.

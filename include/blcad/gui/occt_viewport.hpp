@@ -72,6 +72,8 @@ public:
   [[nodiscard]] Result<std::size_t>
   set_feature_preview(geometry::GeometryShape shape,
                       std::optional<std::string> replaced_body = std::nullopt);
+  // A replacement-only preview temporarily hides occurrences when visibility or
+  // suppression leaves no result shapes. Clearing restores their presentation.
   [[nodiscard]] Result<std::size_t>
   set_feature_previews(std::vector<geometry::GeometryShape> shapes,
                        std::vector<std::string> replaced_bodies = {});

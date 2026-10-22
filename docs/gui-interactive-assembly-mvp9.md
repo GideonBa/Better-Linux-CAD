@@ -1,6 +1,7 @@
 # GUI Interactive Assembly Placement, Relationships, Joints, and Motion MVP-9
 
-Status: implemented in Block 130.
+Status: headless authorities implemented in Block 130; replacement-shell integration restored in
+the Assembly slice of Block 136 (22 October 2026).
 
 Block 130 upgrades the MVP-7 Assembly validation workbench into direct-manipulation authoring over
 the existing component-instance, relationship, joint-coordinate, solve, and vector-drive contracts.
@@ -103,12 +104,67 @@ live solve/HUD status, atomic coordinate/pose Apply, and Spherical drive rejecti
 ## Scope and deferrals
 
 General constrained free-drag is not introduced. It needs a Geometry drag-objective solve mode that
-does not exist in the current contracts. Cross-hierarchy relationship/joint authoring remains
-available through the MVP-7 validation workbench, but this block's direct-manipulation controllers
-operate on root-Assembly occurrences so one existing local solve/application boundary remains atomic.
+does not exist in the current contracts. These direct-manipulation controllers operate on root-Assembly occurrences so one existing local
+solve/application boundary remains atomic. The former MVP-7 cross-hierarchy validation workbench was
+removed by the shell reset; its Core/Geometry contracts remain, but cross-hierarchy authoring is not
+exposed by this replacement shell.
 
 ## Next boundary
 
 Block 131 adds read-only Measure, the coverage manifest v2, and integrated MVP-9 acceptance in
 `docs/interactive-modeling-mvp9-acceptance.md`. Block 132 starts GUI Shell Reset MVP-9R
 (`docs/gui-shell-reset-sequence-mvp9r.md`).
+
+## Replacement-shell integration — Block 136
+
+`ShellWindow` owns `ShellAssemblyTools` and the shared transparent manipulator overlay. The
+**Baugruppe** ribbon creates a Project, loads definitions, inserts Part/rigid-subassembly occurrences,
+edits placement and states, creates relationships/joints, drives one joint coordinate, and solves an
+explicit root-component group. The scrollable task panel keeps Apply/Cancel reachable.
+
+Definition loading imports a Part or a Project's root/child Assembly definitions in one transaction.
+An identical already-owned Part can be reused; conflicting Part identities and duplicate Assembly
+identities reject the whole import. Projects with cross-hierarchy intent are rejected before import
+because that intent cannot currently be transferred to a child definition without remapping.
+
+Placement uses XYZ translation arrows or one selected X/Y/Z rotation ring, together with six numeric
+fields. A root component can be picked in the model; a root subassembly is selected by name in the
+panel. A preview Project supplies actual posed leaf shapes for the changed occurrence/subtree.
+Visibility/suppression can publish a replacement-only preview with no ghost shapes. Other occurrences
+stay pickable. Escape restores the complete transform at drag start; a second Escape cancels the
+command. Typed input during a drag accepts mm/deg and Enter finishes the drag. Grounding is a solver
+state; free placement does not automatically solve existing relationships.
+
+`AssemblyInteractionGeometry` enumerates resolvable semantic root targets over visible active
+components: generated faces/edges/vertices, supported cylindrical axes and seat frames, and existing
+datum/construction references. Actual generated planar faces and disposable point/axis/frame glyphs
+follow occurrence transforms. Their ids are presentation-only; authored endpoints retain existing
+component ids and Core semantic-reference spellings. There are no persisted OCCT topology indices.
+The second endpoint chooser and native selection whitelist share the controller compatibility matrix.
+Only the current pick role's targets and the selected first reference are presented.
+
+Revolute, Prismatic, Cylindrical and Planar expose their existing ordered typed slots. Cylindrical
+orders linear translation before angular rotation; Planar orders U, V, normal rotation. All driven
+slots require both limits; angular limits stay in the principal -180..180 degree range. Spherical is
+passive with no coordinate rows and does not appear in the motion chooser. Motion uses a slider,
+numeric field or one native handle; an invalid requested value restores the last valid candidate.
+Relationships, motion and group solve display actual solved-pose previews and diagnostics. Relationship
+authoring retains the controller's two-component connected-group boundary; group solve requires the
+complete selected connected group. Nested/cross-hierarchy endpoint authoring remains deferred.
+
+Every task records its source Project snapshot. External intent changes, stale geometry, document
+replacement, Undo/Redo or cancellation discard its targets, ghosts and handles. Apply repeats authority
+validation and commits one Project history entry. Selection filters are restored on exit. No file
+schema, solver equations or semantic-reference contracts change.
+
+```bash
+./build/dev-gui/blcad_geometry_tests "[block136-assembly]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[block136-assembly]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-assembly]"
+```
+
+The shell proof covers definition loading, component/subassembly insertion, placement/state preview,
+all five joint families, compatibility-filtered relationships, group solve, limits, motion,
+Undo/Redo and Save/Open. Native cases exercise occurrence picking and translate/rotate/motion handles
+with numeric refinement and drag cancellation. Geometry proof checks posed semantic glyphs, unique
+identities, valid OCCT shapes and unchanged authored JSON.
