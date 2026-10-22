@@ -45,7 +45,9 @@ Export uses the existing visible-Body / visible-active posed-occurrence inclusio
 Kernel writers run synchronously, without a promise of cancellation during writing. Cancelling the
 file dialog starts no writer. The shell stages output in a temporary sibling directory, copies it to
 `QSaveFile` and commits only a complete successful export. Failures preserve an existing target;
-temporary output is removed. The current BLCAD source file cannot be replaced with STEP. Completion
+temporary output is removed. The current BLCAD source path cannot be replaced with STEP, even if that
+file was removed externally. A removed source file does not block export of the loaded geometry to
+another path. Completion
 reports actual exported item and byte counts, including nested assembly leaves. Neither consumer
 changes document bytes, dirty state, history, placements or joint coordinates.
 

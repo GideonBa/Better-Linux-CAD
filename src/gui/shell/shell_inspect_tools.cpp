@@ -4,6 +4,7 @@
 
 #include <QAction>
 #include <QComboBox>
+#include <QDir>
 #include <QDockWidget>
 #include <QDoubleSpinBox>
 #include <QFile>
@@ -355,8 +356,13 @@ Result<GuiStepExportResult> ShellInspectTools::export_step(const GuiStepExportRe
     return Result<GuiStepExportResult>::failure(preflight.error());
   const auto target = QString::fromStdString(request.output.string());
   const auto document_path = QString::fromStdString(window_.session().file_path().string());
-  if (!document_path.isEmpty() &&
-      QFileInfo(target).canonicalFilePath() == QFileInfo(document_path).canonicalFilePath())
+  const QFileInfo target_info(target), document_info(document_path);
+  const auto canonical_source = document_info.canonicalFilePath();
+  const bool same_path = QDir::cleanPath(target_info.absoluteFilePath()) ==
+                         QDir::cleanPath(document_info.absoluteFilePath());
+  const bool same_existing_file =
+      !canonical_source.isEmpty() && target_info.canonicalFilePath() == canonical_source;
+  if (!document_path.isEmpty() && (same_path || same_existing_file))
     return Result<GuiStepExportResult>::failure(
         error("STEP darf die BLCAD-Quelldatei nicht ersetzen"));
   // Kernel writers write synchronously. Stage their output beside the target,

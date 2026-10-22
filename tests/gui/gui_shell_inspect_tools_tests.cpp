@@ -114,6 +114,18 @@ TEST_CASE("Shell exports an authored Part without changing source history or per
   ShellWindow reopened;
   REQUIRE(reopened.open_path(directory.filePath("part.blcad.json")));
   CHECK(snapshot(reopened) == before);
+  // Missing paths have empty canonical names. Two different missing names
+  // must not be mistaken for the same file, while the source path stays protected.
+  REQUIRE(QFile::remove(directory.filePath("part.blcad.json")));
+  CHECK(window.inspect_tools()
+            .export_step({GuiStepExportMode::PartMultiBody,
+                          directory.filePath("part.blcad.json").toStdString()})
+            .has_error());
+  auto recovered = checked(window.inspect_tools().export_step(
+      {GuiStepExportMode::PartMultiBody, directory.filePath("recovered.step").toStdString()}));
+  CHECK(recovered.exported_item_count == 1);
+  CHECK(bytes(directory.filePath("recovered.step")).startsWith("ISO-10303-21;"));
+  CHECK(snapshot(window) == before);
 }
 TEST_CASE("Shell exports flat and structured nested assembly occurrences without changing poses",
           "[gui][block136-inspect-export][shell-assembly-step]") {
