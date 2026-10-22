@@ -633,6 +633,12 @@ scalar drag/numeric changes recompute the complete candidate before one atomic u
 and result identities, expression bindings, downstream failure handling, history and persistence retain
 their authorities. Contract/proof: `docs/gui-feature-edit-mvp9.md`, `[block136-feature-edit]`.
 
+The replacement shell restores Part and flattened/structured Assembly STEP export plus read-only
+interference, clearance, contact and local DOF inspection. Failed exports preserve existing targets;
+analysis results expire after model changes. Source intent, history and authored poses remain unchanged.
+Sampled sweep controls and occurrence-linked result highlighting remain open. Contract/proof:
+`docs/gui-analysis-step-export-workbench-mvp7.md`, `[block136-inspect-export]`.
+
 Whole-block acceptance remains open.
 
 ## Current next technical step — Block 136

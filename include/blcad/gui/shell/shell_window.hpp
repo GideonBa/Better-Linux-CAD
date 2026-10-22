@@ -27,6 +27,7 @@ class ShellRibbon;
 class ShellFeatureTools;
 class ShellSketchTools;
 class ShellMeasureTools;
+class ShellInspectTools;
 class ShellAssemblyTools;
 class ShellFeatureEditTools;
 
@@ -63,6 +64,10 @@ public:
   }
   [[nodiscard]] ShellFeatureEditTools& feature_edit_tools() noexcept {
     return *feature_edit_tools_;
+  }
+
+  [[nodiscard]] ShellInspectTools& inspect_tools() noexcept {
+    return *inspect_tools_;
   }
 
   // Appends to the diagnostics panel and the status bar (shell components
@@ -118,6 +123,7 @@ private:
   std::unique_ptr<ShellSketchTools> sketch_tools_;
   std::unique_ptr<ShellFeatureTools> feature_tools_;
   std::unique_ptr<ShellMeasureTools> measure_tools_;
+  std::unique_ptr<ShellInspectTools> inspect_tools_;
   std::unique_ptr<ShellAssemblyTools> assembly_tools_;
   std::unique_ptr<ShellFeatureEditTools> feature_edit_tools_;
 

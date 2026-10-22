@@ -7,6 +7,7 @@
 #include "blcad/gui/shell/shell_assembly_tools.hpp"
 #include "blcad/gui/shell/shell_feature_edit_tools.hpp"
 #include "blcad/gui/shell/shell_feature_tools.hpp"
+#include "blcad/gui/shell/shell_inspect_tools.hpp"
 #include "blcad/gui/shell/shell_measure_tools.hpp"
 #include "blcad/gui/shell/shell_origin.hpp"
 #include "blcad/gui/shell/shell_ribbon.hpp"
@@ -248,6 +249,7 @@ ShellWindow::ShellWindow() {
   assembly_tools_ =
       std::make_unique<ShellAssemblyTools>(*this, session_, *viewport_, *ribbon_, tab_assembly_);
   feature_edit_tools_ = std::make_unique<ShellFeatureEditTools>(*this);
+  inspect_tools_ = std::make_unique<ShellInspectTools>(*this, *ribbon_, tab_model_, tab_assembly_);
   statusBar()->showMessage(QStringLiteral("Bereit"));
   refresh();
 }
@@ -257,6 +259,7 @@ ShellWindow::~ShellWindow() {
   // still exist. QMainWindow/QWidget teardown otherwise destroys that drawable
   // before deleting the central viewport and its OCCT GL resources.
   viewport_->set_view_changed_callback({});
+  inspect_tools_.reset();
   feature_edit_tools_.reset();
   assembly_tools_.reset();
   measure_tools_.reset();
@@ -569,6 +572,8 @@ bool ShellWindow::confirm_document_replacement() {
 }
 
 void ShellWindow::reset_document_interaction() {
+  if (inspect_tools_)
+    inspect_tools_->cancel();
   if (feature_edit_tools_)
     feature_edit_tools_->cancel();
   if (assembly_tools_)
@@ -829,6 +834,8 @@ bool ShellWindow::finish_active_sketch() {
 }
 
 bool ShellWindow::undo() {
+  if (inspect_tools_)
+    inspect_tools_->cancel();
   if (feature_edit_tools_)
     feature_edit_tools_->cancel();
   if (assembly_tools_)
@@ -855,6 +862,8 @@ bool ShellWindow::undo() {
 }
 
 bool ShellWindow::redo() {
+  if (inspect_tools_)
+    inspect_tools_->cancel();
   if (feature_edit_tools_)
     feature_edit_tools_->cancel();
   if (assembly_tools_)
@@ -1063,6 +1072,8 @@ void ShellWindow::refresh() {
 
   refresh_browser();
   refresh_properties();
+  if (inspect_tools_)
+    inspect_tools_->refresh();
   if (measure_tools_)
     measure_tools_->refresh();
   if (assembly_tools_)
