@@ -2,6 +2,11 @@
 
 Status: implemented in Block 115.
 
+The replacement shell's standalone Part parameter catalog, literal/formula creation, local batch
+editing, direct consumers and complete Preview/Apply contract are documented in
+`docs/parameter-model.md`. This complements the annotation/dimension workflow below; it does not
+change dimension ownership or the expression grammar.
+
 The replacement shell uses `ShellSketchTools` and `GuiSketchDimensionController`. Dimension values
 are edited in a `QLineEdit` at the canvas annotation; Enter applies and Escape/focus loss cancels.
 Invalid edits leave the editor open and publish a diagnostic.

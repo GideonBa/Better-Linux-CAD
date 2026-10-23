@@ -880,6 +880,20 @@ STEP. Contracts/evidence: `docs/gui-sketch3d-interaction-mvp8.md`,
 `docs/gui-shell-acceptance-mvp9r.md`. Eleven bounded families are restored and seven remain partial.
 Block 136 stays open, with the numbered completion boundary unchanged at Block 135.
 
+### Block 136 — Standalone Part parameter management — 2026-10-23
+
+The Model ribbon now opens a standalone parameter catalog with stable identities, types, evaluated
+values/formulas and direct consumer IDs. Users create Length/Count/Angle literals and Length/Count
+expressions and stage existing value/formula edits locally. Complete downstream Preview precedes
+one atomic Apply; invalid text, cycles and geometry remain correctable without publishing intent.
+Task/history/save/document boundaries discard local drafts. Formula loading now resolves later
+authored inputs and restores catalog order, retaining canonical history and persistence after rebinds.
+The fourteenth combined UI workflow creates a Sketch/Extrude and typed/formula parameters, rebinds
+the feature, corrects rejected formula/numeric edits, and checks exact history, reopening and STEP.
+Contracts: `docs/parameter-model.md`, `docs/parameter-expression-mvp.md`; evidence:
+`docs/gui-shell-acceptance-mvp9r.md`. Twelve bounded families are restored and six remain partial.
+Block 136 stays open and numbered completion remains at Block 135.
+
 ## Current next technical step — Block 136
 
 The current v3 coverage inventory records all eighteen accepted families, current shell proof sources,
@@ -887,9 +901,11 @@ reachable entry points and explicit remaining gaps. The machine check distinguis
 from closure readiness; historical controller proofs cannot close a shell gap. Acceptance contract:
 `docs/gui-shell-acceptance-mvp9r.md`, `[integration][gui-feature-coverage]` / `[gui][shell-coverage]`.
 
-Continue with standalone parameter management, then dedicated Hole authoring and advanced extent
-editors. The bounded Sketch3D/PathCurve surface now includes typed/shared-point line editing, native
-collection, constrained grips, anchored pointer/direction placement and explicit planar-point copies.
+Continue with dedicated Hole authoring and advanced extent editors. The bounded standalone Part
+parameter manager now creates and edits typed literals and Length/Count formulas through local
+batches, complete downstream Preview and one atomic Apply. The Sketch3D/PathCurve surface includes
+typed/shared-point line editing, native collection, constrained grips, anchored pointer/direction
+placement and explicit planar-point copies.
 Live associative point projection and new arc/spline/helix parameter tools remain extensions of their
 existing bounded contracts.
 Explicit constraint-diagnostic suggestion controls cover the accepted bounded Core diagnostic/repair
@@ -898,7 +914,7 @@ The bounded repair-open path now supports failed-recompute Parts and missing fac
 with typed intent, complete atomic publication and failed-state history. Other structural dependency
 failures remain strict loading errors.
 The construction task now has fourteen bounded create/edit modes, native reference collection and
-position/direction/frame/new-offset grips. Continue with parameter/Hole/extent editors, workspace
+position/direction/frame/new-offset grips. Continue with Hole/extent editors, workspace
 navigation/context, advanced Assembly controls and integrated native Part/Assembly acceptance in the
 order recorded in
 `docs/gui-shell-acceptance-mvp9r.md`. Block 136 remains in progress until all recorded gaps and pending

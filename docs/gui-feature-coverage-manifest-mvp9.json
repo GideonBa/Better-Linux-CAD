@@ -119,12 +119,10 @@
       },
       "shell": {
         "owner": 136,
-        "status": "partial",
+        "status": "restored",
         "contract": "docs/gui-sketch-dimension-authoring-mvp8.md",
-        "scope": "Existing parameter values/formulas and driving Sketch dimensions can be edited.",
-        "gaps": [
-          "Restore standalone parameter creation and explicit parameter-management commands."
-        ],
+        "scope": "Standalone Part parameter catalog and direct consumers; local typed literal/Length-Count formula creation and editing with full-model Preview and atomic Apply; existing property and driving Sketch dimension edits. Identity/category changes and Assembly parameter management retain their documented Core boundaries.",
+        "gaps": [],
         "proofs": [
           {
             "filter": "[gui][shell][property-editor]",
@@ -133,12 +131,24 @@
           {
             "filter": "[sketch-dimension-workflow]",
             "source": "tests/gui/gui_shell_dimension_workflow_tests.cpp"
+          },
+          {
+            "filter": "[block136-parameters]",
+            "source": "tests/gui/gui_shell_parameter_tests.cpp"
+          },
+          {
+            "filter": "[shell-combined-parameters]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
           }
         ],
-        "actions": [],
+        "actions": [
+          "parameters"
+        ],
         "widgets": [
           "blcad.shell.properties",
-          "sketch.dimension.editor"
+          "sketch.dimension.editor",
+          "blcad.shell.parameters_task",
+          "blcad.parameters.catalog"
         ]
       }
     },
@@ -917,7 +927,6 @@
       "complete": false,
       "blocked_families": [
         "viewport-selection",
-        "parameters-expressions",
         "bodies-extrude-revolve-holes",
         "assembly-project-hierarchy",
         "assembly-relationships-joints",

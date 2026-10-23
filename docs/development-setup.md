@@ -1060,3 +1060,26 @@ Inspect `sketch3d-planar-copy-controls.png` and `sketch3d-planar-copy-provenance
 Include both new tags in the canonical native filter in `docs/gui-shell-acceptance-mvp9r.md`.
 Builds, GUI runs and the separate startup smoke remain serial. Numeric/target/copy contracts live
 in `docs/gui-sketch3d-interaction-mvp8.md`; Block 136 and remaining work live in `docs/mvp-plan.md`.
+
+## Standalone Part parameter management
+
+```bash
+cmake --build --preset dev-gui --target blcad_gui_tests blcad_app blcad_core_tests blcad_geometry_tests -j6
+./build/dev-gui/blcad_core_tests "[core][parameter],[core][parameter-expression]"
+./build/dev-gui/blcad_geometry_tests "[geometry][parameter-expression]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[block136-parameters],[shell-combined-parameters],[gui][shell][property-editor],[sketch-dimension-workflow],[integration][gui-feature-coverage]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-parameters QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-parameters],[shell-combined-parameters]"
+```
+
+Core checks later-input formula loading, re-derived values/edges, authored order and strict rejection
+of missing names/cycles/invalid units in both loading modes. Shell cases cover all literal types,
+formula chains, full precision, global graph-ID collisions, pending input, duplicates/type/unit/cycle
+rejection, complete downstream geometry, correction, one-step batch history and session expiry.
+The fourteenth combined workflow authors a Sketch/Extrude and parameter batch through actual ribbon,
+popup, field, button, browser and file input, rebinds the extrusion to a formula, checks 2400→3600→9600
+mm³ volumes, recovers from invalid formulas/count text, exercises three-step Undo/Redo, cancels local
+changes, reopens canonically and exports STEP. Thirteen combined workflows have fully UI-authored
+inputs; Planar motion retains its imported seated Part boundary. Inspect
+`parameter-manager-preview.png` and `parameter-manager-usage.png` at 1280×800. Include both new tags
+in the canonical native regression in `docs/gui-shell-acceptance-mvp9r.md`, then run startup separately.
+Contracts and remaining work: `docs/parameter-model.md`, `docs/mvp-plan.md`.

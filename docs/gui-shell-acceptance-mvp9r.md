@@ -39,7 +39,7 @@ source, hide a missing tag behind OR and claim completion with gaps. They must a
 
 The machine-readable details live in `families[].shell.gaps`; this is the execution order:
 
-1. Restore standalone parameter management, dedicated Hole authoring and audit advanced extent
+1. Restore dedicated Hole authoring and audit advanced extent
    editors against the foundation API.
 2. Restore contextual commands, selection-filter UI, view cube, view bookmarks and repeat command.
 3. Restore the supported hierarchy validation, cross-hierarchy relationship/joint/solve controls,
@@ -71,7 +71,7 @@ QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][gui-fea
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests
 ./build/dev-gui/blcad_core_tests
 ./build/dev-gui/blcad_geometry_tests
-QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-sketch3d-projection],[shell-combined-projected-sweep],[block136-sketch3d-direction],[shell-sketch3d-direction-workflow],[block136-sketch3d-placement],[shell-sketch3d-placement-workflow],[block136-sketch3d-grips],[shell-sketch3d-grips-workflow],[block136-sketch3d],[shell-combined-sketch3d],[block136-sketch-diagnostics],[missing-reference-session],[block136-missing-reference],[repair-open-session],[block136-repair-open],[block136-reference-repair-batches],[block136-reference-repair],[block136-construction-manipulators],[block136-construction-picking],[shell-mixed-path-loft],[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-parameters],[shell-combined-parameters],[block136-sketch3d-projection],[shell-combined-projected-sweep],[block136-sketch3d-direction],[shell-sketch3d-direction-workflow],[block136-sketch3d-placement],[shell-sketch3d-placement-workflow],[block136-sketch3d-grips],[shell-sketch3d-grips-workflow],[block136-sketch3d],[shell-combined-sketch3d],[block136-sketch-diagnostics],[missing-reference-session],[block136-missing-reference],[repair-open-session],[block136-repair-open],[block136-reference-repair-batches],[block136-reference-repair],[block136-construction-manipulators],[block136-construction-picking],[shell-mixed-path-loft],[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
 ```
 
 The regular inventory audit passes while it accurately records unfinished work. For closure,
@@ -770,3 +770,53 @@ for this slice. The ordinary inventory passes. The opt-in closure gate correctly
 acceptance (one of three cases fails, 173 assertions). Eleven bounded families are restored and seven
 remain partial; Block 136 stays open with numbered completion at Block 135. Standalone parameter
 management is the next documented step.
+
+## Standalone Part parameter management — 2026-10-23
+
+The Model ribbon now owns an explicit parameter manager with a read-only catalog and direct graph
+consumer IDs. It creates typed Length/Count/Angle literals and Length/Count expressions, edits
+existing literals/formulas and collects changes locally. Complete downstream Preview precedes one
+atomic Apply. Pending input, invalid numbers/names/units, cycles and failed geometry remain
+correctable without publishing live intent or history. Selection/reset, Escape, dock close, foreign
+commands, revisions, Save, history and document boundaries retain the session authority. Contract:
+`docs/parameter-model.md`; formula grammar/loading: `docs/parameter-expression-mvp.md`.
+
+Seven `[block136-parameters]` cases cover all literal types, formula chains, full precision,
+global graph-ID collisions, direct usages, local rejection/recovery, complete downstream geometry,
+accepted constraint/dimension sidecars, atomic history, canonical reopening and context/lifetime
+guards. The fourteenth `[shell-combined-workflow]` case, `[shell-combined-parameters]`, uses actual
+ribbon/popup/field/button/browser/file input to create a Sketch/Extrude and parameter batch, rebind
+the feature to a formula, correct rejected cycles/count text, check 2400→3600→9600 mm³ volumes,
+exercise three-step Undo/Redo, cancel a local batch, reopen canonically and export STEP. Thirteen
+combined workflows have fully UI-authored inputs; Planar motion retains its imported seated Part.
+
+Formula editing exposed a persistence gap: a formula can reference a later authored parameter.
+Core now loads parameters in dependency-ready passes, re-derives values and graph edges, then restores
+authored order. The focused Core regression covers canonical roundtrip, stale stored values,
+downstream edits, duplicates, units, missing names and cycles in both strict/reference-repair modes.
+There is no persistence schema change or relaxation of structural dependency errors.
+
+`blcad_gui_tests`, `blcad_app`, `blcad_core_tests` and `blcad_geometry_tests` built with `dev-gui`.
+Final verification:
+
+| Suite | Cases | Assertions | Result |
+| --- | ---: | ---: | --- |
+| Full Core | 528 | 15,861 | All passed |
+| Full Geometry | 437 | 29,821 | All passed |
+| Full offscreen GUI | 413 | 34,495 | 398 passed; 15 native-only skips |
+| Full combined native shell | 229 | 29,773 | All passed; no skips |
+
+The final 1280×800 `parameter-manager-preview.png` and `parameter-manager-usage.png` captures in
+`/tmp/blcad-parameters-native` were inspected: Name/Type/Value are the leading catalog columns,
+formula and consumer text are readable, scrolling reaches local actions and the Preview/Apply/Cancel
+footer stays pinned. Fixed DatumPlane records keep their normal wire presentation so unchanged
+planes do not cover the body preview. Native logs retain the known medium depth/stencil visual
+warning, without high-severity, BadDrawable or fatal lifecycle diagnostics. The separate six-second
+application startup reaches intentional timeout 124. Builds, GUI runs and startup were serial;
+formatting and diff checks pass. Repeatable commands live in `docs/development-setup.md`.
+
+The ordinary inventory audit passes; the opt-in closure gate correctly rejects unfinished acceptance
+(one of three cases fails, 177 assertions). Twelve bounded families are restored and six remain
+partial. Block 136 stays open with numbered completion at Block 135. Dedicated Hole authoring and
+advanced extent editors are the next documented step; literal/formula conversion, rename/delete,
+Angle formulas and Assembly parameter management retain their existing Core boundaries.

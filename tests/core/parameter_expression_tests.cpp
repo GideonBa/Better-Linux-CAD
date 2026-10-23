@@ -4,6 +4,7 @@
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include <nlohmann/json.hpp>
 
 #include <algorithm>
 #include <string>
@@ -233,5 +234,57 @@ TEST_CASE("Expression formulas can be rewritten with edge replacement",
     CHECK(cyclic.error().message() == "expression formula edit must not create a dependency cycle");
     CHECK(document.find_parameter(ParameterId("part.margin"))->formula().value() ==
           "width / 2 - 15 mm");
+  }
+}
+
+TEST_CASE("Expression JSON loads later inputs without changing authored parameter order",
+          "[core][parameter-expression]") {
+  auto document = make_document();
+  REQUIRE(document.add_expression_parameter(ParameterId("early"), "early", ParameterType::Length,
+                                            "width / 2"));
+  REQUIRE(document.add_expression_parameter(ParameterId("middle"), "middle", ParameterType::Length,
+                                            "height / 2"));
+  REQUIRE(document.add_parameter(make_length_parameter("late", "late", 12)));
+  REQUIRE(document.set_parameter_formula(ParameterId("early"), "middle / 2"));
+  REQUIRE(document.set_parameter_formula(ParameterId("middle"), "late * 3"));
+  const auto saved = serialize_part_document_to_json(document);
+  REQUIRE(saved);
+  auto json = nlohmann::json::parse(saved.value());
+  SECTION("rederive stale values and preserve canonical order after a forward rebind") {
+    json["parameters"][3]["value"] = 999;
+    json["parameters"][4]["value"] = 998;
+    for (const auto mode : {PartDocumentReadMode::Strict, PartDocumentReadMode::ReferenceRepair}) {
+      auto restored = deserialize_part_document_from_json(json.dump(), mode);
+      REQUIRE(restored);
+      CHECK(serialize_part_document_to_json(restored.value()).value() == saved.value());
+      CHECK(restored.value().parameters()[3].id() == ParameterId("early"));
+      CHECK(restored.value().parameters()[5].id() == ParameterId("late"));
+      CHECK(restored.value().find_parameter(ParameterId("early"))->value().millimeters() == 18);
+      CHECK(restored.value().dependency_graph().has_dependency("late", "middle"));
+      CHECK(restored.value().dependency_graph().has_dependency("middle", "early"));
+      REQUIRE(restored.value().set_parameter_value(ParameterId("late"),
+                                                   Quantity::length_mm(20).value()));
+      CHECK(restored.value().find_parameter(ParameterId("early"))->value().millimeters() == 30);
+    }
+  }
+  SECTION("missing inputs and cycles fail strictly in both loading modes") {
+    for (const auto& formula : {"missing / 2", "early * 2", "middle / 2"}) {
+      json["parameters"][4]["formula"] = formula;
+      for (const auto mode : {PartDocumentReadMode::Strict, PartDocumentReadMode::ReferenceRepair})
+        CHECK_FALSE(deserialize_part_document_from_json(json.dump(), mode));
+    }
+  }
+  SECTION("duplicate identities names invalid units and non-array catalogs remain errors") {
+    const auto valid = json;
+    json["parameters"][4]["id"] = "early";
+    CHECK_FALSE(deserialize_part_document_from_json(json.dump()));
+    json = valid;
+    json["parameters"][4]["name"] = "width";
+    CHECK_FALSE(deserialize_part_document_from_json(json.dump()));
+    json = valid;
+    json["parameters"][4]["formula"] = "2";
+    CHECK_FALSE(deserialize_part_document_from_json(json.dump()));
+    json["parameters"] = nlohmann::json::object();
+    CHECK_FALSE(deserialize_part_document_from_json(json.dump()));
   }
 }

@@ -4011,28 +4011,48 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
       if (added.has_error())
         return Result<PartDocument>::failure(added.error());
     }
-    for (const auto& parameter_json : root.at("parameters")) {
-      if (parameter_json.contains("formula")) {
-        // Expression parameters re-derive value and dependency edges from the
-        // persisted formula; earlier file order guarantees inputs exist.
-        const std::string type_name = parameter_json.at("type").get<std::string>();
-        auto type = type_name == "count"   ? ParameterType::Count
-                    : type_name == "angle" ? ParameterType::Angle
-                                           : ParameterType::Length;
-        auto added = document.value().add_expression_parameter(
-            ParameterId(parameter_json.at("id").get<std::string>()),
-            parameter_json.at("name").get<std::string>(), type,
-            parameter_json.at("formula").get<std::string>());
-        if (added.has_error())
-          return Result<PartDocument>::failure(added.error());
-        continue;
+    const auto& parameter_array = root.at("parameters");
+    if (!parameter_array.is_array())
+      return Result<PartDocument>::failure(json_error("parameters must be an array"));
+    std::vector<bool> added_parameters(parameter_array.size(), false);
+    std::size_t remaining_parameters = parameter_array.size();
+    while (remaining_parameters > 0) {
+      bool progress = false;
+      for (std::size_t index = 0; index < parameter_array.size(); ++index) {
+        if (added_parameters[index])
+          continue;
+        const auto& parameter_json = parameter_array[index];
+        if (parameter_json.contains("formula")) {
+          // Expression parameters re-derive value and dependency edges from the
+          // persisted formula. Formula edits can bind to a later authored record.
+          const std::string type_name = parameter_json.at("type").get<std::string>();
+          auto type = type_name == "count"   ? ParameterType::Count
+                      : type_name == "angle" ? ParameterType::Angle
+                                             : ParameterType::Length;
+          auto added = document.value().add_expression_parameter(
+              ParameterId(parameter_json.at("id").get<std::string>()),
+              parameter_json.at("name").get<std::string>(), type,
+              parameter_json.at("formula").get<std::string>());
+          if (!added &&
+              added.error().message().starts_with("expression references unknown parameter"))
+            continue;
+          if (added.has_error())
+            return Result<PartDocument>::failure(added.error());
+        } else {
+          auto parameter = parameter_from_json(parameter_json);
+          if (parameter.has_error())
+            return Result<PartDocument>::failure(parameter.error());
+          auto added = document.value().add_parameter(parameter.value());
+          if (added.has_error())
+            return Result<PartDocument>::failure(added.error());
+        }
+        added_parameters[index] = true;
+        --remaining_parameters;
+        progress = true;
       }
-      auto parameter = parameter_from_json(parameter_json);
-      if (parameter.has_error())
-        return Result<PartDocument>::failure(parameter.error());
-      auto added = document.value().add_parameter(parameter.value());
-      if (added.has_error())
-        return Result<PartDocument>::failure(added.error());
+      if (!progress)
+        return Result<PartDocument>::failure(json_error(
+            "could not resolve parameter expression dependencies (unknown name or cycle)"));
     }
     for (const auto& datum_plane_json : root.at("datum_planes")) {
       auto datum_plane = datum_plane_from_json(datum_plane_json);
@@ -4478,6 +4498,7 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
         return positions.at(left.id().value()) < positions.at(right.id().value());
       });
     };
+    restore_order(document.value().parameters_, parameter_array);
     restore_order(document.value().construction_points_, construction_point_array);
     restore_order(document.value().construction_planes_, construction_plane_array);
     restore_order(document.value().construction_lines_, construction_line_array);
