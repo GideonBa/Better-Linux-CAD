@@ -83,6 +83,7 @@ struct ShellReferenceRepairTools::Impl {
   std::vector<Choice> choices;
   std::vector<Pending> pending;
   std::optional<PartDocument> prepared;
+  std::optional<geometry::ShapeCache> selection_cache;
   std::size_t revision{};
   bool active{};
   bool previewed{};
@@ -96,6 +97,27 @@ struct ShellReferenceRepairTools::Impl {
   }
   const PartDocument& selection_part() const {
     return prepared ? *prepared : *window.session().part_document();
+  }
+  Result<std::size_t> prepare_selection_cache() {
+    if (const auto* cache = window.session().part_shape_cache()) {
+      selection_cache = *cache;
+      return Result<std::size_t>::success(1);
+    }
+    auto cache = geometry::ShapeCache::create(ShapeCacheId("reference.repair.sources"));
+    if (!cache)
+      return Result<std::size_t>::failure(cache.error());
+    // These successful producer results are only provisional repair input. The
+    // session never receives this partial cache or labels it fresh Geometry.
+    const auto& part = selection_part();
+    geometry::GeometryRecomputeExecutor executor;
+    for (const auto& feature : part.features())
+      if (feature.type() == FeatureType::AdditiveExtrude) {
+        auto producer_cache = cache.value();
+        if (executor.execute_additive_extrude(part, feature.id(), producer_cache))
+          cache.value() = std::move(producer_cache);
+      }
+    selection_cache = std::move(cache.value());
+    return Result<std::size_t>::success(selection_cache->feature_shape_count());
   }
   static bool same_reference(const Reference& a, const Reference& b) {
     return a.kind == b.kind && a.owner == b.owner && a.entity == b.entity;
@@ -142,7 +164,7 @@ struct ShellReferenceRepairTools::Impl {
   void inspect() {
     entries.clear();
     const auto& part = *window.session().part_document();
-    const auto& cache = *window.session().part_shape_cache();
+    const auto& cache = *selection_cache;
     const auto status = [](const auto& result) {
       return result ? QStringLiteral("Aufgelöst")
                     : QStringLiteral("Verloren: ") + text(result.error().message());
@@ -181,7 +203,7 @@ struct ShellReferenceRepairTools::Impl {
       return;
     const auto& part = selection_part();
     const auto* sketch = part.find_sketch(SketchId(entry.owner));
-    const auto& cache = *window.session().part_shape_cache();
+    const auto& cache = *selection_cache;
     bool valid;
     if constexpr (std::is_same_v<T, ProjectedSketchPoint>)
       valid = bool(
@@ -213,6 +235,12 @@ struct ShellReferenceRepairTools::Impl {
       update_buttons();
       return;
     }
+    auto cached = prepare_selection_cache();
+    if (!cached) {
+      summary->setText(text(cached.error().message()));
+      update_buttons();
+      return;
+    }
     const auto& entry = entries.at(references->currentIndex());
     QString detail = entry.diagnostic + QStringLiteral("\nQuelle: ") + text(entry.source);
     for (const auto& item : pending)
@@ -236,8 +264,8 @@ struct ShellReferenceRepairTools::Impl {
           add_projection(entry, replacement.value(), text(line.name() + " / " + line.id().value()),
                          line.id().value());
       }
-    auto sources = geometry::ViewportSceneBuilder{}.build_construction_sources(
-        part, *window.session().part_shape_cache());
+    auto sources =
+        geometry::ViewportSceneBuilder{}.build_construction_sources(part, *selection_cache);
     if (sources)
       for (const auto& source : sources.value())
         std::visit(
@@ -399,8 +427,9 @@ bool ShellReferenceRepairTools::active() const noexcept {
 Result<std::size_t> ShellReferenceRepairTools::begin() {
   auto& ui = *impl_;
   auto& session = ui.window.session();
-  if (!session.part_document() || !session.part_shape_cache() || session.task().active() ||
-      ui.window.active_sketch())
+  if (!session.part_document() ||
+      (!session.part_shape_cache() && !session.reference_repair_mode()) ||
+      session.task().active() || ui.window.active_sketch())
     return Result<std::size_t>::failure(
         error("Referenzreparatur benötigt ein Bauteil ohne aktiven Befehl"));
   if (!session.task().begin(std::string(task_id)) || !session.task().begin_parameter_editing())
@@ -410,6 +439,11 @@ Result<std::size_t> ShellReferenceRepairTools::begin() {
   ui.pending.clear();
   ui.prepared.reset();
   ui.show_pending();
+  auto cached = ui.prepare_selection_cache();
+  if (!cached) {
+    cancel();
+    return cached;
+  }
   ui.inspect();
   ui.select_reference();
   ui.dock->show();
@@ -556,7 +590,7 @@ Result<std::size_t> ShellReferenceRepairTools::apply() {
   if (!valid)
     return valid;
   const auto changes = ui.pending;
-  auto result = ui.window.session().commit_part_transaction(
+  auto result = ui.window.session().commit_part_repair_transaction(
       changes.size() == 1 ? "Repair reference" : "Repair references",
       [changes](PartDocument& part) {
         for (const auto& change : changes) {
@@ -587,6 +621,7 @@ void ShellReferenceRepairTools::cancel() {
   ui.choices.clear();
   ui.pending.clear();
   ui.prepared.reset();
+  ui.selection_cache.reset();
   ui.show_pending();
   ui.window.refresh();
 }
@@ -597,7 +632,8 @@ void ShellReferenceRepairTools::refresh() {
     return;
   }
   const auto& session = ui.window.session();
-  ui.action->setEnabled(session.part_document() && session.part_shape_cache() &&
+  ui.action->setEnabled(session.part_document() &&
+                        (session.part_shape_cache() || session.reference_repair_mode()) &&
                         !session.task().active() && !ui.window.active_sketch());
 }
 bool ShellReferenceRepairTools::eventFilter(QObject* watched, QEvent* event) {

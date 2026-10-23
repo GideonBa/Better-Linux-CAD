@@ -884,3 +884,17 @@ popup, list and button events. It exercises a failed partial preview, five queue
 remove/restage, whole-list preview/Apply, one-step history and canonical save/reopen. Retained
 single-reference proofs run alongside it. Run native tests and the application startup smoke
 serially. Repair-time loading and constraint-diagnostic controls remain the next documented work.
+
+
+## Repair-time opening checks
+
+```bash
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[repair-open-session],[block136-repair-open],[block136-reference-repair-batches],[block136-reference-repair],[integration][gui-feature-coverage]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-repair-open QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-repair-open]"
+```
+
+The new session cases verify admission, validation, cache/freshness guards, repair transactions,
+failed-state history and canonical persistence. The native input case opens a failed-recompute Part
+through the real file dialog, repairs two plane-driven solids, checks Preview/Fit/Apply and Undo/Redo,
+then saves and reopens a fresh Part through file controls. Run native tests and startup serially.
+The Core-invalid missing-source loading boundary remains separate planned work.

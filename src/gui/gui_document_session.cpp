@@ -288,12 +288,15 @@ Result<std::size_t> GuiDocumentSession::create_project(DocumentId id, std::strin
 }
 
 Result<std::size_t> GuiDocumentSession::open_file(const std::filesystem::path& path,
-                                                   bool discard_dirty) {
+                                                  bool discard_dirty, GuiDocumentOpenMode mode) {
   if (const auto allowed = reject_replacement_if_needed(discard_dirty); allowed.has_error())
     return allowed;
   if (path.empty())
     return Result<std::size_t>::failure(session_error("document path must not be empty"));
 
+  if (mode == GuiDocumentOpenMode::ReferenceRepair && is_project_path(path))
+    return Result<std::size_t>::failure(session_error("reference repair opening requires a Part"));
+  std::optional<Error> repair_failure;
   Document candidate;
   std::vector<SketchConstraintCatalog> candidate_constraints;
   std::vector<SketchDimensionCatalog> candidate_dimensions;
@@ -360,11 +363,15 @@ Result<std::size_t> GuiDocumentSession::open_file(const std::filesystem::path& p
     if (cache.has_error()) return Result<std::size_t>::failure(cache.error());
     auto result = recompute_part(*part, cache.value());
     if (result.has_error()) {
-      record_error(result.error());
-      return result;
+      if (mode != GuiDocumentOpenMode::ReferenceRepair) {
+        record_error(result.error());
+        return result;
+      }
+      repair_failure = result.error();
+    } else {
+      part->mark_all_clean();
+      part_cache = std::move(cache.value());
     }
-    part->mark_all_clean();
-    part_cache = std::move(cache.value());
   } else {
     auto* active_project = std::get_if<Project>(&candidate);
     auto caches = recompute_project(*active_project);
@@ -383,7 +390,8 @@ Result<std::size_t> GuiDocumentSession::open_file(const std::filesystem::path& p
   part_shape_cache_ = std::move(part_cache);
   project_part_caches_ = std::move(project_caches);
   ++presentation_revision_;
-  recompute_status_ = GuiRecomputeStatus::Fresh;
+  reference_repair_mode_ = repair_failure.has_value();
+  recompute_status_ = repair_failure ? GuiRecomputeStatus::Failed : GuiRecomputeStatus::Fresh;
   if (auto* part = part_document()) {
     display_name_ = part->name();
     workspace_ = GuiWorkspace::Part;
@@ -395,6 +403,8 @@ Result<std::size_t> GuiDocumentSession::open_file(const std::filesystem::path& p
   if (json.has_error()) return Result<std::size_t>::failure(json.error());
   initialize_history(json.value(), "Open", true);
   record_information(path.string(), "document opened");
+  if (repair_failure)
+    record_error(*repair_failure);
   return Result<std::size_t>::success(1U);
 }
 
@@ -503,6 +513,7 @@ Result<std::size_t> GuiDocumentSession::recompute() {
     part_shape_cache_ = std::move(cache.value());
     project_part_caches_.clear();
     recompute_status_ = GuiRecomputeStatus::Fresh;
+    reference_repair_mode_ = false;
     part->mark_all_clean();
     ++presentation_revision_;
     return result;
@@ -518,6 +529,7 @@ Result<std::size_t> GuiDocumentSession::recompute() {
     for (const auto& cache : caches.value()) executed += cache.cache.feature_shape_count();
     project_part_caches_ = std::move(caches.value());
     part_shape_cache_.reset();
+    reference_repair_mode_ = false;
     for (auto& part : active_project->part_documents()) part.mark_all_clean();
     recompute_status_ = GuiRecomputeStatus::Fresh;
     ++presentation_revision_;
@@ -530,6 +542,14 @@ Result<std::size_t> GuiDocumentSession::recompute() {
 
 Result<std::size_t> GuiDocumentSession::commit_part_transaction(
     std::string label, const GuiPartMutation& mutation) {
+  if (reference_repair_mode_)
+    return Result<std::size_t>::failure(session_error("complete reference repair before modeling"));
+  return commit_part_repair_transaction(std::move(label), mutation);
+}
+
+Result<std::size_t>
+GuiDocumentSession::commit_part_repair_transaction(std::string label,
+                                                   const GuiPartMutation& mutation) {
   if (!part_document() || !mutation || label.empty())
     return Result<std::size_t>::failure(session_error("invalid Part transaction"));
   const auto serialized = serialize_current();
@@ -547,6 +567,8 @@ Result<std::size_t> GuiDocumentSession::commit_part_transaction(
 
 Result<std::size_t> GuiDocumentSession::commit_part_constraint_transaction(
     std::string label, const GuiPartConstraintMutation& mutation) {
+  if (reference_repair_mode_)
+    return Result<std::size_t>::failure(session_error("complete reference repair before modeling"));
   if (!part_document() || !mutation || label.empty())
     return Result<std::size_t>::failure(
         session_error("invalid Part/Sketch-constraint transaction"));
@@ -566,6 +588,8 @@ Result<std::size_t> GuiDocumentSession::commit_part_constraint_transaction(
 
 Result<std::size_t> GuiDocumentSession::commit_part_dimension_transaction(
     std::string label, const GuiPartDimensionMutation& mutation) {
+  if (reference_repair_mode_)
+    return Result<std::size_t>::failure(session_error("complete reference repair before modeling"));
   if (!part_document() || !mutation || label.empty())
     return Result<std::size_t>::failure(
         session_error("invalid Part/Sketch-dimension transaction"));
@@ -585,6 +609,8 @@ Result<std::size_t> GuiDocumentSession::commit_part_dimension_transaction(
 
 Result<std::size_t> GuiDocumentSession::commit_part_sketch_intent_transaction(
     std::string label, const GuiPartSketchIntentMutation& mutation) {
+  if (reference_repair_mode_)
+    return Result<std::size_t>::failure(session_error("complete reference repair before modeling"));
   if (!part_document() || !mutation || label.empty())
     return Result<std::size_t>::failure(
         session_error("invalid Part/Sketch-intent transaction"));
@@ -632,6 +658,7 @@ GuiDocumentSession::commit_project_transaction(std::string label,
   project_part_caches_ = std::move(caches.value());
   part_shape_cache_.reset();
   recompute_status_ = GuiRecomputeStatus::Fresh;
+  reference_repair_mode_ = false;
   ++presentation_revision_;
   append_history(json.value(), std::move(label));
   selection_.clear();
@@ -661,6 +688,8 @@ bool GuiDocumentSession::set_workspace(GuiWorkspace workspace) noexcept {
 }
 
 void GuiDocumentSession::set_derived_results_fresh(bool fresh) noexcept {
+  if (reference_repair_mode_)
+    return;
   recompute_status_ = fresh ? GuiRecomputeStatus::Fresh : GuiRecomputeStatus::Stale;
 }
 
@@ -696,6 +725,10 @@ bool GuiDocumentSession::dirty() const noexcept {
          current.sketch_constraints != *saved_sketch_constraint_catalogs_ ||
          !saved_sketch_dimension_catalogs_ ||
          current.sketch_dimensions != *saved_sketch_dimension_catalogs_;
+}
+
+bool GuiDocumentSession::reference_repair_mode() const noexcept {
+  return reference_repair_mode_;
 }
 
 bool GuiDocumentSession::derived_results_fresh() const noexcept {
@@ -853,19 +886,44 @@ Result<std::size_t> GuiDocumentSession::restore_history(std::size_t index) {
     restored = std::move(active_project.value());
   }
 
-  Document previous = std::move(document_);
-  auto previous_constraints = std::move(sketch_constraint_catalogs_);
-  auto previous_dimensions = std::move(sketch_dimension_catalogs_);
+  std::optional<geometry::ShapeCache> restored_cache;
+  std::vector<ProjectPartCache> restored_project_caches;
+  std::optional<Error> repair_failure;
+  if (auto* part = std::get_if<PartDocument>(&restored)) {
+    auto cache = geometry::ShapeCache::create(ShapeCacheId("gui.part." + part->id().value()));
+    if (!cache)
+      return Result<std::size_t>::failure(cache.error());
+    auto computed = recompute_part(*part, cache.value());
+    if (!computed) {
+      if (!entry.allow_failed_recompute) {
+        record_error(computed.error());
+        return computed;
+      }
+      repair_failure = computed.error();
+    } else {
+      part->mark_all_clean();
+      restored_cache = std::move(cache.value());
+    }
+  } else {
+    auto caches = recompute_project(std::get<Project>(restored));
+    if (!caches) {
+      record_error(caches.error());
+      return Result<std::size_t>::failure(caches.error());
+    }
+    restored_project_caches = std::move(caches.value());
+    for (auto& part : std::get<Project>(restored).part_documents())
+      part.mark_all_clean();
+  }
   document_ = std::move(restored);
   sketch_constraint_catalogs_ = entry.sketch_constraints;
   sketch_dimension_catalogs_ = entry.sketch_dimensions;
-  const auto result = recompute();
-  if (result.has_error()) {
-    document_ = std::move(previous);
-    sketch_constraint_catalogs_ = std::move(previous_constraints);
-    sketch_dimension_catalogs_ = std::move(previous_dimensions);
-    return result;
-  }
+  part_shape_cache_ = std::move(restored_cache);
+  project_part_caches_ = std::move(restored_project_caches);
+  reference_repair_mode_ = repair_failure.has_value();
+  recompute_status_ = repair_failure ? GuiRecomputeStatus::Failed : GuiRecomputeStatus::Fresh;
+  ++presentation_revision_;
+  if (repair_failure)
+    record_error(*repair_failure);
   history_index_ = index;
   selection_.clear();
   return Result<std::size_t>::success(1U);
@@ -964,7 +1022,6 @@ Result<std::size_t> GuiDocumentSession::publish_part_state(
   if (cache.has_error()) return Result<std::size_t>::failure(cache.error());
   auto executed = recompute_part(document, cache.value());
   if (executed.has_error()) {
-    recompute_status_ = GuiRecomputeStatus::Failed;
     record_error(executed.error());
     return executed;
   }
@@ -978,6 +1035,7 @@ Result<std::size_t> GuiDocumentSession::publish_part_state(
   part_shape_cache_ = std::move(cache.value());
   project_part_caches_.clear();
   recompute_status_ = GuiRecomputeStatus::Fresh;
+  reference_repair_mode_ = false;
   ++presentation_revision_;
   append_history(std::move(json.value()), std::move(label));
   selection_.clear();
@@ -986,7 +1044,7 @@ Result<std::size_t> GuiDocumentSession::publish_part_state(
 
 void GuiDocumentSession::initialize_history(std::string json, std::string label, bool saved) {
   history_ = {{document_kind(), std::move(json), sketch_constraint_catalogs_,
-               sketch_dimension_catalogs_, std::move(label)}};
+               sketch_dimension_catalogs_, std::move(label), reference_repair_mode_}};
   history_index_ = 0U;
   saved_json_ = saved ? std::optional<std::string>(history_.front().json) : std::nullopt;
   saved_sketch_constraint_catalogs_ =
@@ -1023,6 +1081,7 @@ void GuiDocumentSession::record_information(std::string object_id, std::string m
 void GuiDocumentSession::reset_document() noexcept {
   ++presentation_revision_;
   document_ = std::monostate{};
+  reference_repair_mode_ = false;
   display_name_.clear();
   file_path_.clear();
   workspace_ = GuiWorkspace::Part;

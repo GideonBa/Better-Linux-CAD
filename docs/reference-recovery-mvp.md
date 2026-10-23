@@ -182,23 +182,53 @@ global rewriting. Exact UI, tests and remaining load/recompute/batch limitations
 The shell repair task also supports an ordered transient list of replacements. Each stage validates
 Core intent without requiring a complete scene; one final preview/recompute and transaction publish
 the whole batch. This allows several lost references to be repaired together while preserving the
-existing status/remap semantics. Each intermediate Core update must remain valid. Repair-time
-loading of rejected documents remains planned; see the same GUI contract and `docs/mvp-plan.md`.
+existing status/remap semantics. Each intermediate Core update must remain valid. Core-invalid missing-source
+loading remains planned; see the same GUI contract and `docs/mvp-plan.md`.
 
 
-## Planned repair-time loading boundary
+## Repair-time loading and history — 2026-10-23
 
-The next step must preserve the existing transaction and persistence guarantees while admitting a
-Core-valid Part whose initial Geometry recompute fails. Implementation planning:
+**3D-Modell → Dokument → Zur Reparatur öffnen** explicitly opens a Part for reference repair. The
+session API is `open_file(path, discard_dirty, GuiDocumentOpenMode::ReferenceRepair)`. A Core-valid
+Part may be retained when initial complete Geometry recompute fails. Normal Open remains strict.
+Project files, malformed intent, missing Core sources and invalid constraint/dimension sidecars are
+rejected before session replacement in either applicable path. A repair-open request whose full
+recompute succeeds produces a normal fresh Part and can still open the repair task.
 
-- Add an explicit repair-open state with retained authored intent and failure diagnostics. A partial
-  or absent cache must never be published as fresh Geometry.
-- Supply repair-only target diagnostics and provisional typed choices without requiring a complete
-  initial scene. Ordinary modeling and export require a successful complete recompute.
-- Support Undo back to the original failed-recompute snapshot after a successful repair, clearing
-  unavailable derived presentation while preserving canonical intent and the saved/dirty boundary.
-- Publish repaired intent through the same complete recompute/session transaction. Audit the separate
-  missing-source validation boundary before allowing structurally rejected documents into a session.
+A failed repair-open Part retains authored intent, its file path, the saved JSON/catalog boundary
+and the actual Geometry diagnostic. `reference_repair_mode()` is true, recompute status is Failed,
+and the authoritative `part_shape_cache()` is absent. No partially computed cache is published.
+The shell marks the title `[Reparatur]`, clears old derived presentation and opens the repair task.
+Ordinary Part/constraint/dimension/Sketch transactions, Sketch entry and normal modeling/export
+controls are blocked until complete recompute succeeds. A freshness setter cannot promote this
+state to fresh. Opening/creating another document resets the repair state normally.
 
-These items are planned, not implemented by the batch-list continuation. They require dedicated
-session/history/file and native shell regression proofs before the loading gap can close.
+For repair target selection only, the shell builds a disposable cache of individually successful
+additive-extrude producers. Each attempt uses a cache copy and is retained only on success. Typed
+face/edge/vertex candidates still use the existing semantic resolver contract; no final-topology
+ordinals or nearest-shape matching are introduced. The local cache is rebuilt against staged intent
+when needed and never becomes session Geometry. Invalid or unavailable producers remain omitted.
+Final Preview and `commit_part_repair_transaction` both require a fresh complete candidate recompute,
+including all downstream features. Successful publication clears repair mode and installs its cache.
+Opening for repair does not guarantee that unrelated Geometry failures can be fixed through the
+currently supported reference editors. Failed repair transactions preserve the previous intent,
+cache and status.
+
+History entries admitted through failed repair-open carry an in-memory permission to restore that
+failed snapshot. Undo computes the target on a disposable state and restores original intent with
+Failed status and no cache when recompute still fails. Redo computes and publishes the repaired
+snapshot normally. Other history targets require successful recompute. Failed history attempts do
+not replace the current document or its valid cache/status. This adds no persistent JSON fields.
+
+Save during staging/Preview writes committed intent and expires the task; it can therefore save an
+unchanged failed Part without serializing the pending repair. Dirty state continues to compare
+canonical JSON and both sidecar catalogs. Saving a repaired state and undoing to the failed original
+makes it dirty; Redo returns to the saved repaired state. A saved failed copy requires explicit repair
+opening until a complete repair has been published.
+
+Proofs: three `[repair-open-session]` cases cover admission, strict source validation, transaction
+and freshness guards, failed/complete repair, canonical saving, saved/dirty boundaries and failed
+history/Redo. Three `[block136-repair-open]` shell cases cover cancellation, preview saves, protected
+modeling contexts and real file-dialog/ribbon/popup/list/button/camera/history input with native
+presentation. Structurally rejected missing-source documents remain the next separate Core audit;
+constraint-diagnostic suggestion controls remain open as recorded in `docs/mvp-plan.md`.

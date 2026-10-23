@@ -20,6 +20,8 @@
 
 namespace blcad::gui {
 
+enum class GuiDocumentOpenMode { Normal, ReferenceRepair };
+
 enum class GuiRecomputeStatus { Unavailable, Stale, Fresh, Failed };
 enum class GuiDiagnosticSeverity { Information, Warning, Error };
 
@@ -46,13 +48,16 @@ public:
                                                   bool discard_dirty = false);
   [[nodiscard]] Result<std::size_t> create_project(DocumentId id, std::string name,
                                                      bool discard_dirty = false);
-  [[nodiscard]] Result<std::size_t> open_file(const std::filesystem::path& path,
-                                                bool discard_dirty = false);
+  [[nodiscard]] Result<std::size_t>
+  open_file(const std::filesystem::path& path, bool discard_dirty = false,
+            GuiDocumentOpenMode mode = GuiDocumentOpenMode::Normal);
   [[nodiscard]] Result<std::uintmax_t> save();
   [[nodiscard]] Result<std::uintmax_t> save_as(const std::filesystem::path& path);
   [[nodiscard]] Result<std::size_t> recompute();
   [[nodiscard]] Result<std::size_t> commit_part_transaction(std::string label,
                                                               const GuiPartMutation& mutation);
+  [[nodiscard]] Result<std::size_t> commit_part_repair_transaction(std::string label,
+                                                                   const GuiPartMutation& mutation);
   [[nodiscard]] Result<std::size_t>
   commit_part_constraint_transaction(std::string label,
                                       const GuiPartConstraintMutation& mutation);
@@ -80,6 +85,7 @@ public:
   [[nodiscard]] bool has_document() const noexcept;
   [[nodiscard]] bool dirty() const noexcept;
   [[nodiscard]] bool derived_results_fresh() const noexcept;
+  [[nodiscard]] bool reference_repair_mode() const noexcept;
   [[nodiscard]] GuiRecomputeStatus recompute_status() const noexcept;
   [[nodiscard]] bool can_undo() const noexcept;
   [[nodiscard]] bool can_redo() const noexcept;
@@ -115,6 +121,7 @@ private:
     std::vector<SketchConstraintCatalog> sketch_constraints;
     std::vector<SketchDimensionCatalog> sketch_dimensions;
     std::string label;
+    bool allow_failed_recompute{false};
   };
 
   struct ProjectPartCache {
@@ -152,6 +159,7 @@ private:
   std::filesystem::path file_path_;
   GuiWorkspace workspace_{GuiWorkspace::Part};
   GuiRecomputeStatus recompute_status_{GuiRecomputeStatus::Unavailable};
+  bool reference_repair_mode_{false};
   std::optional<geometry::ShapeCache> part_shape_cache_;
   std::vector<ProjectPartCache> project_part_caches_;
   std::vector<SketchConstraintCatalog> sketch_constraint_catalogs_;

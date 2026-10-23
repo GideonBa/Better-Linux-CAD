@@ -1,4 +1,5 @@
 #include "../support/reference_repair_fixture.hpp"
+#include "../support/repair_open_fixture.hpp"
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/geometry/body_transform_adapter.hpp"
 #include "blcad/geometry/sketch_reference_projector.hpp"
@@ -14,13 +15,16 @@
 #include <QDir>
 #include <QDockWidget>
 #include <QFile>
+#include <QFileDialog>
 #include <QKeyEvent>
 #include <QLabel>
+#include <QLineEdit>
 #include <QListWidget>
 #include <QMouseEvent>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QTemporaryDir>
+#include <QTimer>
 #include <QToolButton>
 #include <catch2/catch_approx.hpp>
 
@@ -818,4 +822,213 @@ TEST_CASE(
   REQUIRE(reopened.save_to({}));
   CHECK(snapshot(reopened) == after);
   CHECK(bytes(directory.filePath("native-batch.blcad.json")) == saved);
+}
+
+namespace {
+QString repair_open_file(const QTemporaryDir& directory) {
+  const auto path = directory.filePath("failed-open.blcad.json");
+  QFile file(path);
+  REQUIRE(file.open(QIODevice::WriteOnly));
+  const auto json = reference_checked(serialize_part_document_to_json(test::repair_open_fixture()));
+  REQUIRE(file.write(QByteArray::fromStdString(json)) == static_cast<qint64>(json.size()));
+  file.close();
+  return path;
+}
+void file_input(ShellWindow& window, const char* action_name, const QString& path) {
+  auto* command = window.findChild<QAction*>(QStringLiteral("blcad.action.") + action_name);
+  REQUIRE(command);
+  bool selected = false;
+  bool timed_out = false;
+  QTimer watchdog;
+  watchdog.setSingleShot(true);
+  QObject::connect(&watchdog, &QTimer::timeout, [&] {
+    timed_out = true;
+    if (auto* dialog = qobject_cast<QFileDialog*>(QApplication::activeModalWidget()))
+      dialog->reject();
+  });
+  QTimer input;
+  QObject::connect(&input, &QTimer::timeout, [&] {
+    auto* dialog = qobject_cast<QFileDialog*>(QApplication::activeModalWidget());
+    if (!dialog)
+      return;
+    input.stop();
+    auto* filename = dialog->findChild<QLineEdit*>("fileNameEdit");
+    REQUIRE(filename);
+    filename->setFocus();
+    QKeyEvent select(QEvent::KeyPress, Qt::Key_A, Qt::ControlModifier);
+    QApplication::sendEvent(filename, &select);
+    QKeyEvent type(QEvent::KeyPress, 0, Qt::NoModifier, path);
+    QApplication::sendEvent(filename, &type);
+    selected = true;
+    QKeyEvent accept(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier);
+    QApplication::sendEvent(filename, &accept);
+  });
+  watchdog.start(5000);
+  input.start(10);
+  ribbon_command(window, *command, 0);
+  input.stop();
+  watchdog.stop();
+  CHECK_FALSE(timed_out);
+  REQUIRE(selected);
+}
+} // namespace
+TEST_CASE(
+    "Repair opening keeps failed Part intent and preview saves distinct from repaired geometry",
+    "[gui][block136-repair-open]") {
+  ShellWindow window;
+  QTemporaryDir directory;
+  const auto path = repair_open_file(directory);
+  const auto original = bytes(path);
+  REQUIRE(window.new_part("Previous"));
+  REQUIRE(window.save_to(directory.filePath("previous.blcad.json")));
+  const auto previous = snapshot(window);
+  CHECK_FALSE(window.open_path(path));
+  CHECK(snapshot(window) == previous);
+  REQUIRE(window.open_path(path, GuiDocumentOpenMode::ReferenceRepair));
+  CHECK(window.session().reference_repair_mode());
+  CHECK(window.windowTitle().contains("[Reparatur]"));
+  CHECK(window.session().part_shape_cache() == nullptr);
+  CHECK(window.viewport().presentation_count() == 0);
+  REQUIRE(window.reference_repair_tools().active());
+  const auto before = snapshot(window);
+  CHECK_FALSE(window.create_sketch_on_selection());
+  queue_repair(window, "plane/", "feature.new.face.top");
+  control<QPushButton>(window, "preview").click();
+  CHECK_FALSE(control<QPushButton>(window, "apply").isEnabled());
+  CHECK_FALSE(window.viewport().feature_preview_active());
+  queue_repair(window, "plane.second/", "feature.new.face.top");
+  preview(window);
+  CHECK(window.session().part_shape_cache() == nullptr);
+  CHECK(window.session().reference_repair_mode());
+  CHECK(snapshot(window) == before);
+  REQUIRE(window.save_to(directory.filePath("preview-copy.blcad.json")));
+  CHECK_FALSE(window.reference_repair_tools().active());
+  CHECK_FALSE(window.viewport().feature_preview_active());
+  CHECK(bytes(directory.filePath("preview-copy.blcad.json")) == original);
+  CHECK(bytes(path) == original);
+  CHECK_FALSE(window.session().dirty());
+  auto* repair = window.findChild<QAction*>("blcad.action.repair_references");
+  REQUIRE(repair);
+  CHECK(repair->isEnabled());
+  for (const auto* name : {"create_sketch", "extrude", "create_construction"}) {
+    auto* command = window.findChild<QAction*>(QStringLiteral("blcad.action.") + name);
+    REQUIRE(command);
+    CHECK_FALSE(command->isEnabled());
+  }
+  begin(window, "plane/");
+  queue_repair(window, "plane/", "feature.new.face.top");
+  queue_repair(window, "plane.second/", "feature.new.face.top");
+  preview(window);
+  apply(window);
+  const auto after = snapshot(window);
+  CHECK_FALSE(window.session().reference_repair_mode());
+  CHECK_FALSE(window.windowTitle().contains("[Reparatur]"));
+  CHECK(window.session().derived_results_fresh());
+  REQUIRE(window.session().part_shape_cache());
+  CHECK(window.session().part_shape_cache()->feature_shape_count() == 4);
+  REQUIRE(window.undo());
+  CHECK(snapshot(window) == before);
+  CHECK(window.session().reference_repair_mode());
+  CHECK(window.session().part_shape_cache() == nullptr);
+  CHECK(window.viewport().presentation_count() == 0);
+  CHECK_FALSE(window.viewport().feature_preview_active());
+  REQUIRE(window.redo());
+  CHECK(snapshot(window) == after);
+  CHECK_FALSE(window.session().reference_repair_mode());
+  REQUIRE(window.save_to(directory.filePath("repaired-open.blcad.json")));
+  ShellWindow reopened;
+  REQUIRE(reopened.open_path(directory.filePath("repaired-open.blcad.json")));
+  CHECK(snapshot(reopened) == after);
+}
+TEST_CASE("Repair-open cancellation and failed file replacement preserve committed recovery state",
+          "[gui][block136-repair-open]") {
+  ShellWindow window;
+  QTemporaryDir directory;
+  const auto path = repair_open_file(directory);
+  REQUIRE(window.open_path(path, GuiDocumentOpenMode::ReferenceRepair));
+  const auto before = snapshot(window);
+  queue_repair(window, "plane/", "feature.new.face.top");
+  control<QPushButton>(window, "cancel").click();
+  CHECK(snapshot(window) == before);
+  CHECK(window.session().reference_repair_mode());
+  CHECK_FALSE(window.session().dirty());
+  CHECK_FALSE(window.open_path(directory.filePath("missing.blcad.json"),
+                               GuiDocumentOpenMode::ReferenceRepair));
+  CHECK(snapshot(window) == before);
+  CHECK(window.session().reference_repair_mode());
+  REQUIRE(window.new_part("Next"));
+  CHECK_FALSE(window.session().reference_repair_mode());
+  CHECK(window.session().derived_results_fresh());
+}
+TEST_CASE(
+    "Native file input repairs a failed-recompute Part and restores both history presentations",
+    "[gui][block136-repair-open][shell-repair-open-input]") {
+  const bool old_dialogs = QApplication::testAttribute(Qt::AA_DontUseNativeDialogs);
+  QApplication::setAttribute(Qt::AA_DontUseNativeDialogs, true);
+  struct RestoreDialogs {
+    bool old;
+    ~RestoreDialogs() {
+      QApplication::setAttribute(Qt::AA_DontUseNativeDialogs, old);
+    }
+  } restore{old_dialogs};
+  ShellWindow window;
+  window.resize(1280, 800);
+  window.show();
+  qApp->processEvents();
+  if (QApplication::platformName() == "xcb")
+    REQUIRE(window.viewport().native_viewer_available());
+  QTemporaryDir directory;
+  const auto path = repair_open_file(directory);
+  file_input(window, "open_repair", path);
+  REQUIRE(window.session().reference_repair_mode());
+  REQUIRE(window.reference_repair_tools().active());
+  const auto before = snapshot(window);
+  const auto stage = [&](const QString& plane) {
+    mouse_choose(control<QComboBox>(window, "reference"), plane);
+    mouse_choose(control<QComboBox>(window, "replacement"), "feature.new.face.top");
+    click(control<QPushButton>(window, "stage"));
+  };
+  stage("plane/");
+  click(control<QPushButton>(window, "preview"));
+  CHECK_FALSE(control<QPushButton>(window, "apply").isEnabled());
+  stage("plane.second/");
+  click(control<QPushButton>(window, "preview"));
+  REQUIRE(control<QPushButton>(window, "apply").isEnabled());
+  REQUIRE(window.viewport().feature_preview_active());
+  auto* fit = window.findChild<QAction*>("blcad.action.fit");
+  REQUIRE(fit);
+  ribbon_command(window, *fit, 2);
+  CHECK(snapshot(window) == before);
+  CHECK(window.session().part_shape_cache() == nullptr);
+  if (QApplication::platformName() == "xcb") {
+    const auto captures = qEnvironmentVariable("BLCAD_UI_CAPTURE_DIR");
+    if (!captures.isEmpty()) {
+      REQUIRE(QDir().mkpath(captures));
+      CHECK(window.grab().save(QDir(captures).filePath("repair-open-preview.png")));
+    }
+  }
+  click(control<QPushButton>(window, "apply"));
+  CHECK_FALSE(window.session().reference_repair_mode());
+  REQUIRE(window.session().part_shape_cache());
+  const auto after = snapshot(window);
+  auto* undo = window.findChild<QAction*>("blcad.action.undo");
+  REQUIRE(undo);
+  ribbon_command(window, *undo, 0);
+  CHECK(window.session().reference_repair_mode());
+  CHECK(window.session().part_shape_cache() == nullptr);
+  CHECK(window.viewport().presentation_count() == 0);
+  CHECK(snapshot(window) == before);
+  auto* redo = window.findChild<QAction*>("blcad.action.redo");
+  REQUIRE(redo);
+  ribbon_command(window, *redo, 0);
+  CHECK_FALSE(window.session().reference_repair_mode());
+  CHECK(snapshot(window) == after);
+  CHECK(window.viewport().presentation_count() > 0);
+  const auto saved = directory.filePath("native-repaired.blcad.json");
+  file_input(window, "save_as", saved);
+  CHECK_FALSE(window.session().dirty());
+  file_input(window, "open", saved);
+  CHECK_FALSE(window.session().reference_repair_mode());
+  CHECK(snapshot(window) == after);
+  CHECK(window.session().derived_results_fresh());
 }

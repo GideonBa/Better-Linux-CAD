@@ -1,6 +1,9 @@
 #include "blcad/gui/gui_document_session.hpp"
 
+#include "../support/repair_open_fixture.hpp"
 #include "blcad/core/datum_plane.hpp"
+#include "blcad/core/part_document_json.hpp"
+#include <QTemporaryDir>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -198,4 +201,155 @@ TEST_CASE("GUI Project transaction recomputes owned Parts and supports undo redo
   CHECK(session.project()->part_document_count() == 0);
   REQUIRE(session.redo());
   CHECK(session.project()->part_document_count() == 1);
+}
+
+namespace {
+std::filesystem::path failed_part_file(const QTemporaryDir& directory) {
+  const auto path = std::filesystem::path(directory.filePath("failed.blcad.json").toStdString());
+  std::ofstream file(path);
+  file << test::reference_checked(serialize_part_document_to_json(test::repair_open_fixture()));
+  file.close();
+  REQUIRE(file.good());
+  return path;
+}
+std::string part_snapshot(const GuiDocumentSession& session) {
+  return test::reference_checked(serialize_part_document_to_json(*session.part_document()));
+}
+} // namespace
+TEST_CASE("Repair opening retains Core-valid failed intent without exposing partial Geometry",
+          "[gui][document-session][repair-open-session]") {
+  QTemporaryDir directory;
+  const auto path = failed_part_file(directory);
+  const auto original_file = read_file(path);
+  GuiDocumentSession session;
+  REQUIRE(session.create_part(DocumentId("previous"), "Previous"));
+  REQUIRE(session.save_as(directory.filePath("previous.blcad.json").toStdString()));
+  const auto before = part_snapshot(session);
+  CHECK_FALSE(session.open_file(path));
+  CHECK(part_snapshot(session) == before);
+  CHECK(session.derived_results_fresh());
+  CHECK_FALSE(session.reference_repair_mode());
+  REQUIRE(session.open_file(path, false, GuiDocumentOpenMode::ReferenceRepair));
+  CHECK(session.reference_repair_mode());
+  CHECK(session.recompute_status() == GuiRecomputeStatus::Failed);
+  CHECK_FALSE(session.derived_results_fresh());
+  CHECK(session.part_shape_cache() == nullptr);
+  CHECK_FALSE(session.dirty());
+  CHECK_FALSE(session.can_undo());
+  CHECK(session.file_path() == path);
+  CHECK(session.diagnostics().back().object_id == "feature.old");
+  CHECK(part_snapshot(session) == original_file);
+  REQUIRE(session.save_as(directory.filePath("copy.blcad.json").toStdString()));
+  CHECK(read_file(session.file_path()) == original_file);
+  CHECK(read_file(path) == original_file);
+  CHECK(session.reference_repair_mode());
+  CHECK_FALSE(session.dirty());
+  REQUIRE(session.close(true));
+  REQUIRE(session.create_part(DocumentId("new"), "New"));
+  CHECK_FALSE(session.reference_repair_mode());
+  CHECK(session.derived_results_fresh());
+  REQUIRE(session.save_as(directory.filePath("fresh.blcad.json").toStdString()));
+  REQUIRE(session.open_file(session.file_path(), false, GuiDocumentOpenMode::ReferenceRepair));
+  CHECK_FALSE(session.reference_repair_mode());
+  CHECK(session.derived_results_fresh());
+  CHECK_FALSE(session.dirty());
+}
+TEST_CASE("Repair transactions restore failed snapshots and fresh repaired history atomically",
+          "[gui][document-session][repair-open-session]") {
+  QTemporaryDir directory;
+  const auto path = failed_part_file(directory);
+  GuiDocumentSession session;
+  REQUIRE(session.open_file(path, false, GuiDocumentOpenMode::ReferenceRepair));
+  const auto before = part_snapshot(session);
+  CHECK_FALSE(session.commit_part_repair_transaction(
+      "Partial repair", [](PartDocument& part) { return test::repair_open_planes(part, false); }));
+  CHECK(part_snapshot(session) == before);
+  CHECK(session.reference_repair_mode());
+  CHECK(session.part_shape_cache() == nullptr);
+  CHECK_FALSE(session.can_undo());
+  CHECK_FALSE(session.dirty());
+  REQUIRE(session.commit_part_repair_transaction(
+      "Repair references", [](PartDocument& part) { return test::repair_open_planes(part); }));
+  const auto after = part_snapshot(session);
+  CHECK(after != before);
+  CHECK_FALSE(session.reference_repair_mode());
+  CHECK(session.derived_results_fresh());
+  REQUIRE(session.part_shape_cache());
+  CHECK(session.part_shape_cache()->feature_shape_count() == 4);
+  const auto* valid_cache = session.part_shape_cache();
+  CHECK_FALSE(session.commit_part_repair_transaction("Invalid replacement", [](PartDocument& part) {
+    return part.update_derived_workplane(
+        test::reference_checked(DerivedWorkplane::create_on_feature_face(
+            DatumPlaneId("plane"), "Face plane",
+            test::reference_checked(
+                SemanticFaceReference::create(FeatureId("feature.old"), SemanticFace::Top)))));
+  }));
+  CHECK(part_snapshot(session) == after);
+  CHECK(session.part_shape_cache() == valid_cache);
+  CHECK(session.derived_results_fresh());
+  CHECK_FALSE(session.reference_repair_mode());
+  CHECK(session.undo_label() == "Repair references");
+  CHECK(session.dirty());
+  REQUIRE(session.save());
+  CHECK_FALSE(session.dirty());
+  REQUIRE(session.undo());
+  CHECK(part_snapshot(session) == before);
+  CHECK(session.reference_repair_mode());
+  CHECK_FALSE(session.derived_results_fresh());
+  CHECK(session.part_shape_cache() == nullptr);
+  CHECK(session.dirty());
+  CHECK(session.can_redo());
+  REQUIRE(session.redo());
+  CHECK(part_snapshot(session) == after);
+  CHECK_FALSE(session.reference_repair_mode());
+  CHECK(session.derived_results_fresh());
+  CHECK_FALSE(session.dirty());
+  REQUIRE(session.undo());
+  REQUIRE(session.save_as(directory.filePath("original-copy.blcad.json").toStdString()));
+  CHECK_FALSE(session.dirty());
+  REQUIRE(session.redo());
+  CHECK(session.dirty());
+  CHECK(part_snapshot(session) == after);
+}
+TEST_CASE("Repair opening preserves strict validation and blocks ordinary transaction bypasses",
+          "[gui][document-session][repair-open-session]") {
+  QTemporaryDir directory;
+  const auto path = failed_part_file(directory);
+  GuiDocumentSession session;
+  REQUIRE(session.open_file(path, false, GuiDocumentOpenMode::ReferenceRepair));
+  const auto before = part_snapshot(session);
+  bool called = false;
+  const auto forbidden = [&](auto&...) {
+    called = true;
+    return Result<std::size_t>::success(1);
+  };
+  CHECK_FALSE(session.commit_part_transaction("Ordinary", forbidden));
+  CHECK_FALSE(session.commit_part_constraint_transaction("Constraints", forbidden));
+  CHECK_FALSE(session.commit_part_dimension_transaction("Dimensions", forbidden));
+  CHECK_FALSE(session.commit_part_sketch_intent_transaction("Intent", forbidden));
+  CHECK_FALSE(called);
+  session.set_derived_results_fresh(true);
+  CHECK_FALSE(session.derived_results_fresh());
+  session.set_derived_results_fresh(false);
+  CHECK(session.recompute_status() == GuiRecomputeStatus::Failed);
+  CHECK(part_snapshot(session) == before);
+  CHECK_FALSE(session.dirty());
+  const auto corrupt_path = directory.filePath("invalid.blcad.json").toStdString();
+  auto corrupt = before;
+  const std::string source = "\"source_feature\": \"feature.old\"";
+  const auto at = corrupt.find(source);
+  REQUIRE(at != std::string::npos);
+  corrupt.replace(at, source.size(), "\"source_feature\": \"feature.absent\"");
+  std::ofstream(corrupt_path) << corrupt;
+  CHECK_FALSE(session.open_file(corrupt_path, false, GuiDocumentOpenMode::ReferenceRepair));
+  CHECK(part_snapshot(session) == before);
+  CHECK(session.reference_repair_mode());
+  const auto sidecar = path.string() + ".sketch-constraints.json";
+  std::ofstream(sidecar) << "{}";
+  CHECK_FALSE(session.open_file(path, false, GuiDocumentOpenMode::ReferenceRepair));
+  CHECK(part_snapshot(session) == before);
+  CHECK(session.reference_repair_mode());
+  CHECK_FALSE(session.open_file(directory.filePath("missing.blcad.project.json").toStdString(),
+                                false, GuiDocumentOpenMode::ReferenceRepair));
+  CHECK(part_snapshot(session) == before);
 }

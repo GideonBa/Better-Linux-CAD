@@ -309,6 +309,15 @@ void ShellWindow::build_ribbon() {
     if (!path.isEmpty())
       (void)open_path(path);
   });
+  action_open_repair_ = new QAction(QStringLiteral("Zur Reparatur öffnen"), this);
+  action_open_repair_->setObjectName("blcad.action.open_repair");
+  connect(action_open_repair_, &QAction::triggered, this, [this] {
+    const QString path = QFileDialog::getOpenFileName(
+        this, QStringLiteral("Bauteil zur Referenzreparatur öffnen"), {},
+        QStringLiteral("BLCAD-Bauteile (*.blcad.json);;JSON (*.json)"));
+    if (!path.isEmpty())
+      (void)open_path(path, GuiDocumentOpenMode::ReferenceRepair);
+  });
   action_save_ = new QAction(QStringLiteral("Speichern"), this);
   action_save_->setObjectName("blcad.action.save");
   action_save_->setShortcut(QKeySequence::Save);
@@ -329,6 +338,7 @@ void ShellWindow::build_ribbon() {
   });
   ribbon_->add_button(document_group, action_new_part_);
   ribbon_->add_button(document_group, action_open_);
+  ribbon_->add_small_button(document_group, action_open_repair_);
   ribbon_->add_button(document_group, action_save_);
   ribbon_->add_button(document_group, action_save_as_);
   // Keep the standard document shortcuts active regardless of the visible
@@ -539,11 +549,11 @@ bool ShellWindow::new_project(const QString& name) {
   return true;
 }
 
-bool ShellWindow::open_path(const QString& path) {
+bool ShellWindow::open_path(const QString& path, GuiDocumentOpenMode mode) {
   if (!confirm_document_replacement())
     return false;
   reset_document_interaction();
-  const auto opened = session_.open_file(path.toStdString(), true);
+  const auto opened = session_.open_file(path.toStdString(), true, mode);
   if (opened.has_error()) {
     show_error(opened.error());
     refresh();
@@ -553,6 +563,16 @@ bool ShellWindow::open_path(const QString& path) {
   viewport_->fit_all();
   if (session_.project())
     ribbon_->set_current_tab(tab_assembly_);
+  if (mode == GuiDocumentOpenMode::ReferenceRepair) {
+    ribbon_->set_current_tab(tab_model_);
+    auto begun = reference_repair_tools_->begin();
+    if (!begun) {
+      show_error(begun.error());
+      return false;
+    }
+    statusBar()->showMessage(
+        QStringLiteral("Referenzen prüfen und Reparatur vollständig anwenden."));
+  }
   return true;
 }
 
@@ -679,7 +699,8 @@ std::optional<DatumPlaneId> ShellWindow::selected_datum_plane() const {
 bool ShellWindow::create_sketch_on_selection() {
   const auto* part = session_.part_document();
   const auto plane = selected_datum_plane();
-  if (active_sketch_ || session_.task().active() || part == nullptr || !plane) {
+  if (session_.reference_repair_mode() || active_sketch_ || session_.task().active() ||
+      part == nullptr || !plane) {
     statusBar()->showMessage(
         QStringLiteral("Zuerst eine Arbeitsebene wählen, dann 2D-Skizze erstellen"));
     return false;
@@ -704,6 +725,8 @@ bool ShellWindow::create_sketch_on_selection() {
 }
 
 bool ShellWindow::enter_sketch(SketchId sketch) {
+  if (session_.reference_repair_mode())
+    return false;
   sketch_camera_bookmark_ = viewport_->camera_bookmark();
   model_selection_filter_mask_ = viewport_->selection_filter_mask();
   const auto plane = sketch_workspace_.enter(session_, sketch_workbench_, sketch);
@@ -1048,7 +1071,7 @@ void ShellWindow::refresh_properties() {
     auto* label = new QTableWidgetItem(QString::fromStdString(property.label));
     label->setFlags(Qt::ItemIsEnabled);
     auto* value = new QTableWidgetItem(QString::fromStdString(property.value));
-    if (property.editable) {
+    if (property.editable && !session_.reference_repair_mode()) {
       value->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsEditable);
       value->setData(kSemanticIdRole, QString::fromStdString(property.key));
     } else {
@@ -1063,7 +1086,7 @@ void ShellWindow::refresh_properties() {
 }
 
 void ShellWindow::handle_property_changed(QTableWidgetItem* item) {
-  if (item == nullptr || item->column() != 1)
+  if (session_.reference_repair_mode() || item == nullptr || item->column() != 1)
     return;
   const std::string key = item->data(kSemanticIdRole).toString().toStdString();
   if (key.empty())
@@ -1102,7 +1125,8 @@ void ShellWindow::refresh() {
   action_save_as_->setEnabled(has_document);
   action_undo_->setEnabled(session_.can_undo());
   action_redo_->setEnabled(session_.can_redo());
-  action_create_sketch_->setEnabled(has_document && !sketch_active && !session_.task().active() &&
+  action_create_sketch_->setEnabled(has_document && !session_.reference_repair_mode() &&
+                                    !sketch_active && !session_.task().active() &&
                                     selected_datum_plane().has_value());
   action_finish_sketch_->setEnabled(sketch_active);
   action_perspective_->setEnabled(!sketch_active);
@@ -1114,6 +1138,9 @@ void ShellWindow::refresh() {
                      ? QStringLiteral("%1%2 — BLCAD")
                            .arg(name, session_.dirty() ? QStringLiteral(" *") : QString())
                      : QStringLiteral("BLCAD"));
+
+  if (session_.reference_repair_mode())
+    setWindowTitle(windowTitle() + QStringLiteral(" [Reparatur]"));
 
   QStringList lines;
   for (const auto& diagnostic : session_.diagnostics())
@@ -1195,6 +1222,10 @@ void ShellWindow::refresh_viewport_scene() {
     return;
   viewport_revision_ = session_.presentation_revision();
   if (!session_.has_document()) {
+    viewport_->clear_scene();
+    return;
+  }
+  if (session_.reference_repair_mode()) {
     viewport_->clear_scene();
     return;
   }

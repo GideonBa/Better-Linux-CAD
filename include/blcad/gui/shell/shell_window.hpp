@@ -87,7 +87,8 @@ public:
   // tests call them directly.
   [[nodiscard]] bool new_part(const QString& name);
   [[nodiscard]] bool new_project(const QString& name);
-  [[nodiscard]] bool open_path(const QString& path);
+  [[nodiscard]] bool open_path(const QString& path,
+                               GuiDocumentOpenMode mode = GuiDocumentOpenMode::Normal);
   [[nodiscard]] bool save_to(const QString& path); // empty → current session path
   [[nodiscard]] bool create_sketch_on_selection();
   [[nodiscard]] bool finish_active_sketch();
@@ -148,6 +149,7 @@ private:
   QAction* action_redo_{nullptr};
   QAction* action_new_part_{nullptr};
   QAction* action_open_{nullptr};
+  QAction* action_open_repair_{nullptr};
   QAction* action_save_{nullptr};
   QAction* action_save_as_{nullptr};
   QAction* action_create_sketch_{nullptr};

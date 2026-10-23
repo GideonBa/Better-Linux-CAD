@@ -265,7 +265,7 @@ families and integrated acceptance. Explicit broken-reference repair is the next
 opens a nonmodal task listing every projected point, projected line and generated-face workplane in
 an open Part. Each entry reports its current semantic source and the actual Geometry resolver result
 (`Aufgelöst` or `Verloren` plus the failure message). Resolved references can be deliberately rebound
-as well. The command requires a Part cache and an idle modeling context; it rejects Project,
+as well. The command requires an idle Part context with a cache or explicit repair mode; it rejects Project,
 active-Sketch and occupied-task contexts. A stale flag alone does not disable the repair command.
 
 A point may be rebound to a resolvable construction point or supported semantic vertex; a line to a
@@ -296,7 +296,8 @@ face is rejected when its downstream profile exceeds the workplane bounds; a val
 recomputes its dependent solid. The shared session task excludes competing tools.
 
 This is a bounded repair surface, not completion of the entire planar/reference family: documents
-rejected during initial source validation or recompute still cannot be opened for repair. The
+rejected during initial Core/source validation still cannot be opened for repair. Explicit repair
+opening now admits Core-valid Parts whose complete Geometry recompute fails. The
 complete repair list must make the candidate scene/recompute valid. Arbitrary topology
 matching, construction-relation remapping and constraint-diagnostic suggestion controls remain
 separate work. The batch extension below permits multiple changes before complete recompute. The
@@ -341,8 +342,8 @@ entire list and transient presentation. Saving during staging/preview writes com
 repaired candidate is never copied directly into the session outside the transaction authority.
 
 The batch is ordered: each intermediate Core update must validate. It does not bypass cycle checks
-to permit temporary cyclic graph rewrites, open documents rejected during initial load, or implement
-new topology/constraint repair kinds. These boundaries keep the family partial and Block 136 open.
+to permit temporary cyclic graph rewrites, open Core-invalid documents, or implement new topology/constraint repair kinds. The repair-open
+extension below supports failed initial Geometry recompute. These boundaries keep the family partial and Block 136 open.
 
 Proof: six `[block136-reference-repair-batches]` cases in
 `tests/gui/gui_shell_reference_repair_tests.cpp`. They cover two lost planes with dependent projected
@@ -352,3 +353,26 @@ batch, all task exits and single-entry compatibility via the retained tests.
 `[shell-repair-batch-input]` uses actual ribbon/popup/button/list mouse input: partial repair failure →
 five staged changes across two planes/two Sketches → remove/restage → whole preview → native Fit →
 one Apply → Undo/Redo → canonical save/reopen → clear/cancel. Input fixtures are explicitly imported.
+
+
+## Explicit repair-open integration — 2026-10-23
+
+**Zur Reparatur öffnen** retains a Core-valid Part whose initial full recompute fails and immediately
+opens this task. The session exposes failed status and no authoritative ShapeCache; the shell clears
+old derived geometry and blocks ordinary modeling/Sketch/property editing. Diagnostics and typed
+replacement choices use disposable successful producer results, rebuilt on staged intent. One partial
+plane repair may still fail full Preview until its dependent consumers and other lost planes are
+repaired. A complete valid list can be previewed and published atomically through the dedicated
+session repair transaction, restoring normal modeling.
+
+Undo back to the original failed snapshot clears repaired Geometry and re-enters repair mode; Redo
+recomputes the repaired Part. Cancellation leaves the loaded failed intent intact. Save during Preview
+writes committed original intent and expires the task. The full session/history/source-validation and
+persistence boundaries are documented in `docs/reference-recovery-mvp.md`. Missing Core sources remain
+rejected and explicitly tracked as a separate gap.
+
+Proof: `[block136-repair-open]` in `tests/gui/gui_shell_reference_repair_tests.cpp`. The imported
+fixture has two plane-driven solids that fail initial recompute. The real file dialog opens it for
+repair, followed by partial-preview failure, two staged plane replacements, whole Preview/Fit/Apply,
+Undo/Redo with different derived presentations, and canonical Save/Open through file controls.
+Session authority proofs are `[repair-open-session]` in `tests/gui/gui_document_session_tests.cpp`.

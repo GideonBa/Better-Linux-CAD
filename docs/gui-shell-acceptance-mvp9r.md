@@ -39,8 +39,9 @@ source, hide a missing tag behind OR and claim completion with gaps. They must a
 
 The machine-readable details live in `families[].shell.gaps`; this is the execution order:
 
-1. Implement repair-time loading and explicit constraint diagnostics/suggestion controls;
-   then restore Sketch3D authoring/editing. Single and batch repair of loadable Parts is available.
+1. Audit repair loading for Core-invalid missing sources and restore explicit constraint
+   diagnostics/suggestion controls; then restore Sketch3D authoring/editing. Repair opening now
+   supports Core-valid failed-recompute Parts and single/batch reference replacement.
 2. Restore standalone parameter management, dedicated Hole authoring and audit advanced extent
    editors against the foundation API.
 3. Restore contextual commands, selection-filter UI, view cube, view bookmarks and repeat command.
@@ -68,7 +69,7 @@ QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][gui-fea
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests
 ./build/dev-gui/blcad_core_tests
 ./build/dev-gui/blcad_geometry_tests
-QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-reference-repair-batches],[block136-reference-repair],[block136-construction-manipulators],[block136-construction-picking],[shell-mixed-path-loft],[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[repair-open-session],[block136-repair-open],[block136-reference-repair-batches],[block136-reference-repair],[block136-construction-manipulators],[block136-construction-picking],[shell-mixed-path-loft],[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
 ```
 
 The regular inventory audit passes while it accurately records unfinished work. For closure,
@@ -391,3 +392,35 @@ Verification of the final implementation:
 The separate native application startup reached the intentional six-second timeout (124). Native
 logs retain the existing medium incomplete-visual depth/stencil warning, without high-severity or
 drawable-lifecycle errors.
+
+
+## Repair-time opening continuation — 2026-10-23
+
+The explicit Part repair-open command admits Core-valid intent after failed initial Geometry recompute
+without publishing a partial cache. Three session and three shell cases cover normal-open rejection,
+strict validation, ordinary mutation/freshness guards, complete atomic repair, failed-state history,
+preview saving, cancellation and actual file/ribbon/popup/list/button/camera input. Undo clears derived
+presentation when restoring the failed original; Redo recomputes the repaired model. Exact contract:
+`docs/reference-recovery-mvp.md` and `docs/gui-sketch-workbench-mvp7.md`. The family remains partial for
+Core-invalid source recovery and constraint-diagnostic controls; Block 136 remains open.
+
+Verification of the final implementation:
+
+- GUI/application/Core/Geometry targets built with `dev-gui` and `-j4`; GUI and GUI-test objects
+  were rebuilt after identifying cached objects with missing header-dependency metadata.
+- Focused session/repair/inventory filter: **22 cases, 2,590 assertions**, all passed offscreen.
+- Full Core: **522 cases, 15,410 assertions**; full Geometry: **436 cases, 29,779 assertions**,
+  all passed.
+- Full offscreen GUI: **361 cases — 346 passed, 15 native-only skips; 25,403 assertions passed**.
+  The six new cases introduce no skip.
+- Combined native Qt/OCCT filter above: **177 cases, 20,259 assertions**, all passed without skips.
+  File-dialog input, two-plane repair Preview/Fit/Apply, Undo/Redo presentation replacement and
+  canonical file actions executed natively. The repair preview was captured and inspected at
+  1280×800; task/file/view controls remain reachable.
+- Changed-line C++ formatting, new fixture formatting, manifest JSON and `git diff --check` passed.
+  The normal inventory passes; the explicit closure gate correctly fails **one of three cases,
+  147 assertions** while Core-invalid source recovery and other acceptance gaps remain open.
+
+The separate native startup smoke reached the intentional six-second timeout (124). Native logs
+retain the existing medium incomplete-visual depth/stencil warning without high-severity or
+drawable-lifecycle errors. Block 136 remains in progress.
