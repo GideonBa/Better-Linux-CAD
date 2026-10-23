@@ -8,6 +8,7 @@
 namespace blcad::gui {
 class ShellWindow;
 class ShellRibbon;
+class GuiViewportManipulatorLayer;
 class ShellSketch3DTools final : public QObject {
 public:
   ShellSketch3DTools(ShellWindow&, ShellRibbon&, int model_tab);
@@ -19,6 +20,8 @@ public:
   [[nodiscard]] bool active() const noexcept;
   void cancel();
   void refresh();
+  void refresh_presentation();
+  [[nodiscard]] const GuiViewportManipulatorLayer& manipulators() const noexcept;
 
 protected:
   bool eventFilter(QObject*, QEvent*) override;

@@ -819,6 +819,17 @@ checks four-step history, canonical reopening and STEP. Contract:
 Native collection/locks/direct handles, distance/direction input and planar projection remain open.
 Ten families remain restored and eight partial; neither this family nor Block 136 is closed.
 
+### Block 136 — Sketch3D viewport collection and point grips — 2026-10-23
+
+The Sketch3D task adds projected active-candidate point/line collection and opt-in XYZ point grips
+with axis/plane restrictions and absolute numeric refinement. Gesture candidates retain full
+precision and complete downstream previews; Escape, invalid numeric release, camera/focus/size
+changes and task/document boundaries roll back or discard them without live history. Parameter
+bindings require explicit consent. Focused tests and the extended actual-input Sweep workflow
+cover these contracts. See `docs/gui-sketch3d-interaction-mvp8.md` for exact bounds and
+`docs/gui-shell-acceptance-mvp9r.md` for verification. Ten families remain restored and eight partial;
+Block 136 remains in progress.
+
 ## Current next technical step — Block 136
 
 The current v3 coverage inventory records all eighteen accepted families, current shell proof sources,
@@ -826,10 +837,11 @@ reachable entry points and explicit remaining gaps. The machine check distinguis
 from closure readiness; historical controller proofs cannot close a shell gap. Acceptance contract:
 `docs/gui-shell-acceptance-mvp9r.md`, `[integration][gui-feature-coverage]` / `[gui][shell-coverage]`.
 
-Continue Sketch3D with native point/segment collection, axis/plane-lock handles,
-distance/direction input and explicit planar-point projection. Typed XYZ point editing and
-shared-point line authoring now have a shell surface; explicit constraint-diagnostic suggestion
-controls cover the accepted bounded Core diagnostic/repair subset.
+Continue Sketch3D with pointer placement of new points, distance/direction input and explicit
+planar-point projection. Active-candidate point/line collection and direct point grips with
+axis/plane restrictions now extend typed XYZ point editing and shared-point line authoring.
+Explicit constraint-diagnostic suggestion controls cover the accepted bounded Core diagnostic/repair
+subset.
 The bounded repair-open path now supports failed-recompute Parts and missing face/point/line sources,
 with typed intent, complete atomic publication and failed-state history. Other structural dependency
 failures remain strict loading errors.

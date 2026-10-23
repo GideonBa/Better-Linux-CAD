@@ -1,16 +1,20 @@
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/core/sketch_3d_interaction.hpp"
 #include "blcad/geometry/sketch_3d_geometry_adapter.hpp"
+#include "blcad/gui/gui_viewport_manipulator.hpp"
 #include "blcad/gui/shell/shell_sketch_3d_tools.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
 #include <QAction>
 #include <QApplication>
 #include <QCheckBox>
 #include <QComboBox>
+#include <QDir>
 #include <QDockWidget>
 #include <QDoubleSpinBox>
 #include <QKeyEvent>
 #include <QLabel>
+#include <QLineEdit>
+#include <QMouseEvent>
 #include <QPushButton>
 #include <QTemporaryDir>
 #include <QTreeWidget>
@@ -338,4 +342,316 @@ TEST_CASE("Sketch3D entry points reject unavailable contexts and allocate across
   CHECK(sketch.find_arc(SketchEntityId("point.1")));
   CHECK(sketch.find_point(SketchEntityId("point.2")));
   CHECK(sketch.find_line(SketchEntityId("line.2")));
+}
+
+namespace {
+void prepare_handles(ShellWindow& window) {
+  seed(window);
+  window.resize(1280, 800);
+  window.show();
+  qApp->processEvents();
+  window.viewport().set_projection(GuiViewportProjection::Orthographic);
+  window.viewport().set_standard_view(GuiStandardView::Isometric);
+  window.viewport().fit_all();
+  auto camera = window.viewport().camera_bookmark();
+  camera.eye = {150, 150, 160};
+  camera.target = {0, 0, 10};
+  if (QApplication::platformName() != "xcb")
+    camera.scale = 120;
+  REQUIRE(window.viewport().restore_camera_bookmark(camera));
+  if (QApplication::platformName() == "xcb")
+    REQUIRE(window.viewport().native_viewer_available());
+  edit(window);
+  if (QApplication::platformName() == "xcb") {
+    window.raise();
+    window.activateWindow();
+    QGuiApplication::sync();
+    qApp->processEvents();
+    REQUIRE(window.isActiveWindow());
+  }
+  control<QCheckBox>(window, "grips").setChecked(true);
+  window.sketch_3d_tools().refresh_presentation();
+  qApp->processEvents();
+}
+void pointer(ShellWindow& window, QEvent::Type type, GuiSketchScreenPoint p) {
+  auto& viewport = window.viewport();
+  const QPointF local(p.x, p.y);
+  QMouseEvent event(type, local, viewport.mapToGlobal(local.toPoint()),
+                    type == QEvent::MouseMove ? Qt::NoButton : Qt::LeftButton,
+                    type == QEvent::MouseButtonRelease ? Qt::NoButton : Qt::LeftButton,
+                    Qt::NoModifier);
+  QApplication::sendEvent(&viewport, &event);
+  qApp->processEvents();
+}
+GuiSketchScreenPoint press(ShellWindow& window, const std::string& axis) {
+  window.sketch_3d_tools().refresh_presentation();
+  const auto presentations = window.sketch_3d_tools().manipulators().presentations();
+  const auto found = std::find_if(presentations.begin(), presentations.end(), [&](const auto& h) {
+    return h.handle_id == "sketch3d.position." + axis;
+  });
+  REQUIRE(found != presentations.end());
+  REQUIRE(window.viewport().rect().contains(
+      QPoint(qRound(found->endpoint.x), qRound(found->endpoint.y))));
+  pointer(window, QEvent::MouseButtonPress, found->endpoint);
+  REQUIRE(window.sketch_3d_tools().manipulators().active_handle_id() ==
+          "sketch3d.position." + axis);
+  CHECK_FALSE(control<QPushButton>(window, "apply").isEnabled());
+  return found->endpoint;
+}
+void numeric(ShellWindow& window, const QString& value) {
+  auto& editor = control<QLineEdit>(window, "grip_numeric");
+  REQUIRE_FALSE(editor.isReadOnly());
+  editor.selectAll();
+  QKeyEvent event(QEvent::KeyPress, 0, Qt::NoModifier, value);
+  QApplication::sendEvent(&editor, &event);
+  qApp->processEvents();
+}
+void drag_to(ShellWindow& window, const std::string& axis, const QString& value) {
+  const auto p = press(window, axis);
+  numeric(window, value);
+  REQUIRE(window.sketch_3d_tools().manipulators().numeric_override_active());
+  CHECK_FALSE(window.sketch_3d_tools().apply());
+  pointer(window, QEvent::MouseMove, {p.x + 11, p.y + 7});
+  pointer(window, QEvent::MouseButtonRelease, {p.x + 19, p.y + 13});
+  CHECK(window.sketch_3d_tools().manipulators().active_handle_id().empty());
+  CHECK(window.viewport().mouseGrabber() != &window.viewport());
+}
+void pick_point(ShellWindow& window, int role, Point3 point) {
+  control<QComboBox>(window, "pick").setCurrentIndex(role);
+  const auto screen = checked(window.viewport().model_to_screen(point));
+  REQUIRE(window.viewport().rect().contains(QPoint(qRound(screen.x), qRound(screen.y))));
+  pointer(window, QEvent::MouseButtonPress, screen);
+  pointer(window, QEvent::MouseButtonRelease, screen);
+}
+void escape_handle(ShellWindow& window) {
+  QKeyEvent event(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier);
+  QApplication::sendEvent(&control<QLineEdit>(window, "grip_numeric"), &event);
+}
+} // namespace
+
+TEST_CASE("Sketch3D viewport collection uses candidate point and line identities without changing "
+          "filters",
+          "[gui][block136-sketch3d-grips]") {
+  ShellWindow window;
+  prepare_handles(window);
+  const auto before = snapshot(window);
+  window.viewport().set_selection_filter_mask(17);
+  window.viewport().set_selection_semantic_scope(std::vector<std::string>{"custom"});
+  pick_point(window, 1, {5, 0, 20});
+  CHECK(control<QComboBox>(window, "point").currentData().toString() == "c");
+  CHECK(window.sketch_3d_tools().manipulators().handles().empty());
+  pick_point(window, 2, {5, 0, 0});
+  pick_point(window, 3, {15, 0, 30});
+  CHECK(control<QComboBox>(window, "start").currentData().toString() == "a");
+  CHECK(control<QComboBox>(window, "end").currentData().toString() == "d");
+  pick_point(window, 4, {5, 0, 15});
+  CHECK(control<QComboBox>(window, "start").currentData().toString() == "b");
+  CHECK(control<QComboBox>(window, "end").currentData().toString() == "c");
+  // New locally staged points are collected from the same model IDs as committed points.
+  point(window, -20, 10, 15);
+  REQUIRE(window.sketch_3d_tools().preview());
+  pick_point(window, 2, {-20, 10, 15});
+  CHECK(control<QComboBox>(window, "start").currentData().toString() == "point.1");
+  pointer(window, QEvent::MouseButtonPress, {2, 2});
+  pointer(window, QEvent::MouseButtonRelease, {2, 2});
+  CHECK(control<QLabel>(window, "summary").text().contains("Kein passender"));
+  CHECK(snapshot(window) == before);
+  window.sketch_3d_tools().cancel();
+  CHECK(window.viewport().selection_filter_mask() == 17);
+  CHECK(window.viewport().selection_semantic_scope() ==
+        std::optional(std::vector<std::string>{"custom"}));
+}
+
+TEST_CASE("Sketch3D locked grips preserve bindings precision and all downstream curve references",
+          "[gui][block136-sketch3d-grips]") {
+  ShellWindow window;
+  prepare_handles(window);
+  const auto before = snapshot(window);
+  select(window, "point", "driven");
+  CHECK(window.sketch_3d_tools().manipulators().handles().empty());
+  control<QCheckBox>(window, "detach").setChecked(true);
+  const std::array<std::size_t, 7> counts{3, 1, 1, 1, 2, 2, 2};
+  for (int mode = 0; mode < 7; ++mode) {
+    control<QComboBox>(window, "lock").setCurrentIndex(mode);
+    const auto& handles = window.sketch_3d_tools().manipulators().handles();
+    REQUIRE(handles.size() == counts[mode]);
+    for (const auto& handle : handles) {
+      if (mode >= 1 && mode <= 3)
+        CHECK(handle.id.back() == "xyz"[mode - 1]);
+      if (mode >= 4)
+        CHECK(handle.id.back() != "zxy"[mode - 4]);
+    }
+  }
+  control<QComboBox>(window, "lock").setCurrentIndex(1);
+  drag_to(window, "x", "-8.123456789123 mm");
+  CHECK(control<QCheckBox>(window, "detach").isHidden());
+  CHECK(snapshot(window) == before);
+  REQUIRE(window.viewport().feature_preview_active());
+  REQUIRE(window.sketch_3d_tools().apply());
+  const auto* source = window.session().part_document()->find_sketch_3d(Sketch3DId("spatial"));
+  const auto* point = source->find_point(SketchEntityId("driven"));
+  CHECK(point->x().explicit_coordinate()->millimeters() == -8.123456789123);
+  CHECK(point->y().explicit_coordinate()->millimeters() == 4.123456789123);
+  CHECK(point->parameter_dependencies().empty());
+  CHECK(source->arcs().size() == 1);
+  CHECK(source->splines().size() == 1);
+  CHECK(source->polylines().size() == 1);
+  CHECK(source->guide_curves().size() == 1);
+  const auto after = snapshot(window);
+  REQUIRE(window.undo());
+  CHECK(snapshot(window) == before);
+  REQUIRE(window.redo());
+  CHECK(snapshot(window) == after);
+  QTemporaryDir directory;
+  REQUIRE(window.save_to(directory.filePath("grips.blcad")));
+  REQUIRE(window.open_path(directory.filePath("grips.blcad")));
+  CHECK(snapshot(window) == after);
+}
+
+TEST_CASE("Sketch3D drag uses the final release and Escape restores the complete local candidate",
+          "[gui][block136-sketch3d-grips]") {
+  ShellWindow window;
+  prepare_handles(window);
+  select(window, "point", "d");
+  const auto before = snapshot(window);
+  const auto p = press(window, "x");
+  pointer(window, QEvent::MouseMove, {p.x + 8, p.y + 3});
+  const auto during = control<QDoubleSpinBox>(window, "x").value();
+  pointer(window, QEvent::MouseButtonRelease, {p.x + 28, p.y + 15});
+  const auto released = control<QDoubleSpinBox>(window, "x").value();
+  CHECK(released != Catch::Approx(during));
+  REQUIRE(window.viewport().feature_preview_active());
+  press(window, "z");
+  numeric(window, "55 mm");
+  escape_handle(window);
+  CHECK(window.sketch_3d_tools().active());
+  CHECK(control<QDoubleSpinBox>(window, "z").value() == 30);
+  CHECK(control<QDoubleSpinBox>(window, "x").value() == released);
+  REQUIRE(window.viewport().feature_preview_active());
+  control<QComboBox>(window, "lock").setCurrentIndex(4);
+  drag_to(window, "y", "8.75 mm");
+  CHECK(control<QDoubleSpinBox>(window, "x").value() == released);
+  CHECK(control<QDoubleSpinBox>(window, "y").value() == 8.75);
+  CHECK(control<QDoubleSpinBox>(window, "z").value() == 30);
+  REQUIRE(window.sketch_3d_tools().apply());
+  const auto& edited = *window.session()
+                            .part_document()
+                            ->find_sketch_3d(Sketch3DId("spatial"))
+                            ->find_point(SketchEntityId("d"));
+  CHECK(edited.y().explicit_coordinate()->millimeters() == 8.75);
+  CHECK(edited.z().explicit_coordinate()->millimeters() == 30);
+  CHECK(snapshot(window) != before);
+  REQUIRE(window.undo());
+  CHECK(snapshot(window) == before);
+}
+
+TEST_CASE("Sketch3D invalid numeric and degenerate downstream drag candidates remain correctable",
+          "[gui][block136-sketch3d-grips]") {
+  ShellWindow window;
+  prepare_handles(window);
+  select(window, "point", "b");
+  const auto before = snapshot(window);
+  const auto p = press(window, "z");
+  numeric(window, "0 mm");
+  CHECK_FALSE(window.viewport().feature_preview_active());
+  CHECK_FALSE(window.sketch_3d_tools().apply());
+  numeric(window, "not a number");
+  CHECK_FALSE(window.sketch_3d_tools().preview());
+  CHECK_FALSE(control<QPushButton>(window, "apply").isEnabled());
+  pointer(window, QEvent::MouseButtonRelease, p);
+  CHECK(control<QDoubleSpinBox>(window, "z").value() == 10);
+  CHECK(snapshot(window) == before);
+  drag_to(window, "z", "12 mm");
+  CHECK(window.viewport().feature_preview_replaces("path/path"));
+  REQUIRE(window.sketch_3d_tools().apply());
+  CHECK(window.session()
+            .part_document()
+            ->find_sketch_3d(Sketch3DId("spatial"))
+            ->find_point(SketchEntityId("b"))
+            ->z()
+            .explicit_coordinate()
+            ->millimeters() == 12);
+}
+
+TEST_CASE("Sketch3D grips roll back on camera focus resize toggles and stale document boundaries",
+          "[gui][block136-sketch3d-grips]") {
+  ShellWindow window;
+  prepare_handles(window);
+  select(window, "point", "d");
+  const auto before = snapshot(window);
+  press(window, "x");
+  numeric(window, "25 mm");
+  SECTION("camera") {
+    auto camera = window.viewport().camera_bookmark();
+    camera.scale *= 1.2;
+    REQUIRE(window.viewport().restore_camera_bookmark(camera));
+  }
+  SECTION("resize") {
+    window.resize(1400, 900);
+    qApp->processEvents();
+  }
+  SECTION("focus") {
+    QEvent event(QEvent::WindowDeactivate);
+    QApplication::sendEvent(&window, &event);
+  }
+  SECTION("lock") {
+    control<QComboBox>(window, "lock").setCurrentIndex(4);
+  }
+  SECTION("point choice") {
+    select(window, "point", "c");
+  }
+  SECTION("grip toggle") {
+    control<QCheckBox>(window, "grips").setChecked(false);
+  }
+  SECTION("revision") {
+    window.session().report_error(Error::validation("test", "Revision changed"));
+    window.refresh();
+    CHECK_FALSE(window.sketch_3d_tools().active());
+  }
+  SECTION("document replacement") {
+    (void)window.session().task().cancel();
+    REQUIRE(window.session().close(true));
+    window.refresh();
+    CHECK_FALSE(window.sketch_3d_tools().active());
+    CHECK(window.sketch_3d_tools().manipulators().handles().empty());
+    CHECK(window.viewport().mouseGrabber() != &window.viewport());
+    return;
+  }
+  CHECK(window.sketch_3d_tools().manipulators().active_handle_id().empty());
+  CHECK(window.viewport().mouseGrabber() != &window.viewport());
+  CHECK(snapshot(window) == before);
+  if (window.sketch_3d_tools().active() &&
+      control<QComboBox>(window, "point").currentData().toString() == "d")
+    CHECK(control<QDoubleSpinBox>(window, "x").value() == 15);
+  window.sketch_3d_tools().cancel();
+  CHECK(window.sketch_3d_tools().manipulators().handles().empty());
+}
+
+TEST_CASE("Sketch3D typed point input replaces an active gesture without retaining its other axes",
+          "[gui][block136-sketch3d-grips]") {
+  ShellWindow window;
+  prepare_handles(window);
+  select(window, "point", "d");
+  const auto before = snapshot(window);
+  press(window, "x");
+  numeric(window, "25 mm");
+  control<QDoubleSpinBox>(window, "z").setValue(42);
+  CHECK(window.sketch_3d_tools().manipulators().active_handle_id().empty());
+  CHECK(window.viewport().mouseGrabber() != &window.viewport());
+  CHECK(control<QDoubleSpinBox>(window, "x").value() == 15);
+  CHECK(control<QDoubleSpinBox>(window, "z").value() == 42);
+  CHECK(window.sketch_3d_tools().manipulators().handles().empty());
+  CHECK_FALSE(window.sketch_3d_tools().apply());
+  CHECK(snapshot(window) == before);
+  button(window, "stage_point");
+  REQUIRE(window.sketch_3d_tools().preview());
+  REQUIRE(window.sketch_3d_tools().apply());
+  const auto* edited = window.session()
+                           .part_document()
+                           ->find_sketch_3d(Sketch3DId("spatial"))
+                           ->find_point(SketchEntityId("d"));
+  CHECK(edited->x().explicit_coordinate()->millimeters() == 15);
+  CHECK(edited->z().explicit_coordinate()->millimeters() == 42);
+  REQUIRE(window.undo());
+  CHECK(snapshot(window) == before);
 }

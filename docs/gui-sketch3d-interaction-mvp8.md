@@ -97,7 +97,47 @@ exercise four-step exact Undo/Redo, cancel another edit, reopen canonically and 
 on both offscreen and native backends; native OCCT presentation and reachable controls at 1280×800
 remain required evidence.
 
-The family remains partial: native point/segment collection, direct axis/plane-lock handles,
-distance/direction entry and explicit planar-point projection still need replacement-shell UI proof.
+This initial typed slice left native collection, direct handles, distance/direction entry and
+planar-point projection open. The collection/grip extension below supplies the bounded point/line
+interactions; pointer placement, distance/direction and projection remain unfinished.
 New arc/spline/helix parameter tools and variational 3D constraints remain later extensions of the
 historical bounded Core contract, rather than implied capabilities of this editor.
+
+## Replacement shell: point/line collection and direct grips — Block 136, 2026-10-23
+
+The existing task adds **Modellklick wählt** roles for editing a point, collecting either new-line
+endpoint and collecting both endpoints from an existing line. Collection uses the active candidate's
+stable local IDs and the viewport's authoritative model-to-screen transform, including newly staged
+points. A hit must be within 10 device-independent pixels of a projected point or straight segment;
+nearest hits win, with authored order breaking ties. This is explicit active-sketch collection through
+the view, including points occluded by a body; it does not use OCCT vertex identity or select foreign
+sketches/geometry. Arc/spline/helix picking is outside this bounded point/line surface. Global selection
+masks and scopes remain unchanged; the task's explicit collection roles consume their own clicks.
+
+**Punktgriffe anzeigen** enables translation grips for an existing or locally staged selected point.
+The **Griffrichtungen** selector exposes XYZ, one X/Y/Z axis or the two independent axes of XY/YZ/ZX.
+These restrictions reuse `Sketch3DInteractionService::resolve_point`; a plane restriction does not
+provide a free plane-surface drag. Grips use the existing manipulator layer and the actual viewport
+ray/projection mapping. Mouse movement and the final release build complete local candidates, with
+full downstream previews. Numeric refinement supplies an absolute XYZ coordinate in mm; later motion
+or release cannot replace that override. Full-precision untouched components remain intact.
+
+Point grips require staged numeric point edits and explicit parameter-detachment consent when any
+coordinate is bound. Each gesture retains a complete pre-drag candidate. Escape first rolls back the
+gesture; another Escape closes the task. Invalid numeric release, camera/viewport size changes,
+window deactivation and changing point/lock/pick/grip controls roll back the gesture. Editing an
+XYZ field also rolls back the gesture and retains the newly typed component as separate pending
+input; the other fields return to their pre-gesture values. Revision,
+history, Save, document replacement and task cancellation release capture and clear handles. Apply
+is blocked during a gesture and requires a valid candidate afterward. A rejected downstream candidate
+remains locally correctable; no drag creates live intent or separate history entries.
+
+The extended fully UI-authored Sweep workflow now picks the source endpoint in the viewport, locks
+the Z grip, rejects a collapsed segment and refines it to 40 mm before one Apply, preserving the
+480→640 mm³ volume proof and four-step history/reopen/STEP sequence. Focused input tests also cover
+candidate-only picking, all seven lock modes, precise explicit detachment, raw final-release mapping,
+Escape rollback, invalid text and lifecycle/camera/focus boundaries. Both backends execute the same
+cases: `[block136-sketch3d-grips]` and `[shell-sketch3d-grips-workflow]`.
+
+Pointer placement of new points, explicit distance/azimuth/elevation entry and planar-point projection
+remain the next Sketch3D work. The family and Block 136 remain partial.

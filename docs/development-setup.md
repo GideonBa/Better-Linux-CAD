@@ -956,3 +956,20 @@ rejects collapse, extends the swept solid, exercises four-step history, cancels,
 STEP. Both backends run all new scenarios without skips. Include both new tags in the combined native
 regression above; run application startup separately. Contract and remaining native Sketch3D gaps:
 `docs/gui-sketch3d-interaction-mvp8.md`. Block 136 remains in progress.
+
+## Sketch3D viewport collection and direct point grips
+
+```bash
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[block136-sketch3d-grips],[shell-sketch3d-grips-workflow],[block136-sketch3d],[integration][gui-feature-coverage]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-sketch3d-grips QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-sketch3d-grips],[shell-sketch3d-grips-workflow]"
+```
+
+The same Qt input cases execute on both backends: candidate point/line roles, all seven grip-direction
+modes, precise parameter detachment, raw final release, numeric override, Escape/camera/size/focus
+rollback, invalid/recovered downstream candidates and stale task cleanup. The combined Sweep workflow
+now picks the endpoint and drives a locked Z grip through rejected collapse and corrected solid
+recompute, followed by exact history, canonical reopening and STEP. Include both new tags in the
+combined native filter above, inspect the 1280×800 capture and run application startup serially.
+Offscreen camera mapping uses a model span; native retains the fitted OCCT zoom factor. Contract,
+remaining pointer-placement/distance/projection work and block status:
+`docs/gui-sketch3d-interaction-mvp8.md`, `docs/mvp-plan.md`.

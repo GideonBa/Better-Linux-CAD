@@ -516,6 +516,8 @@ void ShellWindow::wire_viewport() {
       feature_edit_tools_->refresh_presentation();
     if (construction_tools_)
       construction_tools_->refresh_presentation();
+    if (sketch_3d_tools_)
+      sketch_3d_tools_->refresh_presentation();
   });
   viewport_->set_selection_callback(
       [this](std::optional<GuiSelection> selection) { apply_viewport_selection(selection); });
