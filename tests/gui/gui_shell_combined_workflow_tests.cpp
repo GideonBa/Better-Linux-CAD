@@ -1712,7 +1712,7 @@ TEST_CASE("Combined UI construction grips rotate a workplane and move its downst
 TEST_CASE("Combined UI creates a spatial chain sweeps it edits endpoints rejects collapse and "
           "restores history",
           "[gui][integration][shell-combined-workflow][shell-combined-sketch3d][shell-sketch3d-"
-          "grips-workflow]") {
+          "grips-workflow][shell-sketch3d-placement-workflow]") {
   WorkflowUi ui;
   QTemporaryDir directory;
   REQUIRE(directory.isValid());
@@ -1720,6 +1720,14 @@ TEST_CASE("Combined UI creates a spatial chain sweeps it edits endpoints rejects
   const auto profile = ui.rectangle("datum.xy", {-2, -2}, {2, 2});
   const auto initial = ui.snapshot();
   ui.command("sketch_3d");
+  ui.command("fit", 2);
+  auto placement_camera = ui.window.viewport().camera_bookmark();
+  placement_camera.eye = {150, 150, 165};
+  placement_camera.target = {0, 0, 15};
+  placement_camera.projection = GuiViewportProjection::Orthographic;
+  if (QApplication::platformName() != "xcb")
+    placement_camera.scale = 120;
+  REQUIRE(ui.window.viewport().restore_camera_bookmark(placement_camera));
   const auto coordinate = [&](const char* axis, double value) {
     auto& spin = ui.widget<QDoubleSpinBox>(QStringLiteral("blcad.sketch3d.") + axis);
     auto* editor = spin.findChild<QLineEdit*>();
@@ -1728,7 +1736,31 @@ TEST_CASE("Combined UI creates a spatial chain sweeps it edits endpoints rejects
   };
   auto& points = ui.widget<QComboBox>("blcad.sketch3d.point");
   for (int index = 0; index < 4; ++index) {
-    ui.choose(points, 0);
+    if (index == 0)
+      ui.choose(points, 0);
+    else {
+      ui.data(ui.widget<QComboBox>("blcad.sketch3d.placement_anchor"), "point.1");
+      ui.choose(ui.widget<QComboBox>("blcad.sketch3d.lock"), 3);
+      ui.choose(ui.widget<QComboBox>("blcad.sketch3d.pick"), 5);
+      const auto p = checked(ui.window.viewport().model_to_screen({0, 0, index * 10.0}));
+      REQUIRE(ui.window.viewport().rect().contains(QPoint(qRound(p.x), qRound(p.y))));
+      QMouseEvent hover(QEvent::MouseMove, {p.x, p.y},
+                        ui.window.viewport().mapToGlobal(QPoint(qRound(p.x), qRound(p.y))),
+                        Qt::NoButton, Qt::NoButton, Qt::NoModifier);
+      QApplication::sendEvent(&ui.window.viewport(), &hover);
+      ui.flush();
+      REQUIRE(ui.widget<QWidget>("blcad.sketch3d.placement_overlay").isVisible());
+      if (index == 2)
+        ui.capture("sketch3d-point-placement-hover");
+      const auto count = points.count();
+      ui.click_at(ui.window.viewport(), {p.x, p.y});
+      CHECK(points.count() == count + 1);
+      CHECK(points.currentData().toString() == "point." + QString::number(index + 1));
+      CHECK(ui.snapshot() == initial);
+      ui.choose(ui.widget<QComboBox>("blcad.sketch3d.pick"), 0);
+    }
+    // Refine placed coordinates through the existing typed stage so the same
+    // Sweep dimensions remain exact across native pixel quantization.
     coordinate("x", 0);
     coordinate("y", 0);
     coordinate("z", index * 10);

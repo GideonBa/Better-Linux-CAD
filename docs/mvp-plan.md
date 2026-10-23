@@ -842,6 +842,19 @@ This strengthens the integrated evidence without expanding command contracts or 
 family gaps. The Surface/Boolean chain also guards the corrected shared-task layout after a transform,
 keeping NewBody and retention inputs reachable. Block 136 remains in progress.
 
+### Block 136 — Anchored Sketch3D pointer placement — 2026-10-23
+
+The existing Sketch3D task now stages new points through viewport hover/press/final release, with
+an explicit origin/local-point anchor and all seven direction restrictions. XYZ uses a camera-facing
+plane through the anchor; model-axis/plane modes fail closed when the view cannot resolve them.
+Transient markers and capture never publish intent. Pending numeric text, interrupted gestures and
+task/document boundaries retain or discard candidates through the existing preview/Apply authority.
+New points copy anchor values explicitly while bound anchors retain their bindings and precision.
+Six focused input cases and the extended UI-authored chain/PathCurve/Sweep scenario cover both
+projections, cleanup, downstream recompute, exact history and persistence. Contract:
+`docs/gui-sketch3d-interaction-mvp8.md`; verification: `docs/gui-shell-acceptance-mvp9r.md`.
+Ten families remain restored and eight partial; Block 136 stays in progress.
+
 ## Current next technical step — Block 136
 
 The current v3 coverage inventory records all eighteen accepted families, current shell proof sources,
@@ -849,9 +862,10 @@ reachable entry points and explicit remaining gaps. The machine check distinguis
 from closure readiness; historical controller proofs cannot close a shell gap. Acceptance contract:
 `docs/gui-shell-acceptance-mvp9r.md`, `[integration][gui-feature-coverage]` / `[gui][shell-coverage]`.
 
-Continue Sketch3D with pointer placement of new points, distance/direction input and explicit
-planar-point projection. Active-candidate point/line collection and direct point grips with
-axis/plane restrictions now extend typed XYZ point editing and shared-point line authoring.
+Continue Sketch3D with explicit distance/azimuth/elevation input relative to the placement anchor,
+then planar-point projection with explicit source-association semantics. Anchored pointer placement,
+active-candidate point/line collection and direct point grips with axis/plane restrictions now extend
+typed XYZ point editing and shared-point line authoring.
 Explicit constraint-diagnostic suggestion controls cover the accepted bounded Core diagnostic/repair
 subset.
 The bounded repair-open path now supports failed-recompute Parts and missing face/point/line sources,

@@ -39,8 +39,8 @@ source, hide a missing tag behind OR and claim completion with gaps. They must a
 
 The machine-readable details live in `families[].shell.gaps`; this is the execution order:
 
-1. Complete Sketch3D pointer placement of new points, distance/direction input and planar
-   projection beyond the restored typed point/line editor and native collection/direct grips. The
+1. Complete Sketch3D distance/direction input and planar projection beyond the restored typed
+   point/line editor, native collection/direct grips and anchored pointer placement. The
    planar/reference surface includes explicit diagnostic suggestion Preview/Apply controls plus
    failed-recompute Part repair opening, missing
    face/point/line sources and single/batch reference replacement.
@@ -71,7 +71,7 @@ QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][gui-fea
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests
 ./build/dev-gui/blcad_core_tests
 ./build/dev-gui/blcad_geometry_tests
-QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-sketch3d-grips],[shell-sketch3d-grips-workflow],[block136-sketch3d],[shell-combined-sketch3d],[block136-sketch-diagnostics],[missing-reference-session],[block136-missing-reference],[repair-open-session],[block136-repair-open],[block136-reference-repair-batches],[block136-reference-repair],[block136-construction-manipulators],[block136-construction-picking],[shell-mixed-path-loft],[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-sketch3d-placement],[shell-sketch3d-placement-workflow],[block136-sketch3d-grips],[shell-sketch3d-grips-workflow],[block136-sketch3d],[shell-combined-sketch3d],[block136-sketch-diagnostics],[missing-reference-session],[block136-missing-reference],[repair-open-session],[block136-repair-open],[block136-reference-repair-batches],[block136-reference-repair],[block136-construction-manipulators],[block136-construction-picking],[shell-mixed-path-loft],[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
 ```
 
 The regular inventory audit passes while it accurately records unfinished work. For closure,
@@ -635,3 +635,48 @@ The ordinary inventory passes. The opt-in closure gate still correctly rejects a
 three cases fails, 161 assertions) because the eight partial families and pending whole-shell
 workflows remain open. The numbered completion boundary stays at Block 135, with Block 136 in
 progress.
+
+## Anchored Sketch3D pointer placement — 2026-10-23
+
+The spatial source task stages new points through an explicit origin/local-point anchor and final
+viewport release. XYZ fixes depth in a camera-facing plane; six axis/plane locks reuse model
+directions. Hover markers remain transient, ambiguous directions reject placement, and bound
+anchors retain their bindings while newly placed points copy explicit values. Existing complete
+downstream Preview/Apply, identity allocation and persistence remain authoritative. Exact bounds:
+`docs/gui-sketch3d-interaction-mvp8.md`.
+
+Six new cases tagged `[block136-sketch3d-placement]` cover all seven modes in both projections,
+pixel-aware coordinates, stable anchors, precise copied bindings, final-release staging, earlier
+local preview preservation, pending numeric text, invalid/unobservable rays and
+Escape/camera/resize/focus/capture/control/save/revision/document cleanup. The existing UI-authored
+Sketch3D/PathCurve/Sweep workflow also places its points via actual popup/viewport input before typed
+refinement; its exact downstream volumes, failed/corrected edits, four-step history, canonical reopen
+and STEP checks remain intact. Its additional tag is `[shell-sketch3d-placement-workflow]`; the
+combined workflow count stays twelve.
+
+The coverage inventory narrows the Sketch3D gap to explicit distance/direction input and planar-point
+projection. Ten families remain restored and eight partial; Block 136 remains in progress. Repeatable
+focused commands and the canonical native filter are in `docs/development-setup.md` and above.
+
+`blcad_gui_tests` and `blcad_app` built successfully with `dev-gui`. Final verification:
+
+| Suite | Cases | Assertions | Result |
+| --- | ---: | ---: | --- |
+| Focused Core Sketch3D edit/update contracts | 6 | 291 | All passed |
+| Focused offscreen Sketch3D and inventory | 22 | 2,889 | All passed |
+| Full offscreen GUI | 393 | 31,507 | 378 passed; 15 native-only skips |
+| Focused native placement and combined Sweep | 7 | 1,931 | All passed; no skips |
+| Full combined native shell | 209 | 26,684 | All passed; no skips |
+
+The native `sketch3d-point-placement-hover.png` capture was inspected at 1280×800: the amber
+anchor/candidate marker, explicit anchor and Z lock, coordinate summary and pinned task footer are
+visible and reachable. The native fixture now conditionally awaits the window manager's actual
+activation before input, with a two-second deadline and the original active-window assertion.
+The separate six-second native startup smoke reaches intentional timeout 124. Native logs retain
+the known medium depth/stencil visual warning, without high-severity, BadDrawable or fatal lifecycle
+diagnostics. Builds, GUI runs and startup were serial.
+
+Core/Geometry sources and persistence are unchanged; the full Core/Geometry suites were not rerun
+for this slice. The ordinary inventory passes. The opt-in closure gate correctly rejects acceptance
+(one of three cases fails, 163 assertions) while eight families and whole-shell workflows retain
+documented gaps. Block 136 stays open, with the numbered completion boundary at Block 135.

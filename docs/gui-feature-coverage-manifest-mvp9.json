@@ -427,9 +427,9 @@
         "owner": 136,
         "status": "partial",
         "contract": "docs/gui-interactive-path-sweep-loft-mvp9.md",
-        "scope": "Ordered PathCurve authoring; typed Sketch3D points/shared-point lines, active-sketch point/line collection and direct XYZ point grips with axis/plane restrictions, full downstream previews and atomic history.",
+        "scope": "Ordered PathCurve authoring; typed Sketch3D points/shared-point lines, active-sketch collection, anchored ray-based pointer placement and direct XYZ point grips with axis/plane restrictions, full downstream previews and atomic history.",
         "gaps": [
-          "Restore pointer placement of new Sketch3D points, explicit distance/direction input and planar-point projection; plane restrictions expose independent allowed-axis grips rather than free plane dragging."
+          "Restore explicit distance/direction input and planar-point projection; pointer placement fixes depth through an explicit anchor, while plane-restricted grips expose independent axes rather than free plane dragging."
         ],
         "proofs": [
           {
@@ -451,6 +451,14 @@
           {
             "filter": "[shell-sketch3d-grips-workflow]",
             "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
+          },
+          {
+            "filter": "[block136-sketch3d-placement]",
+            "source": "tests/gui/gui_shell_sketch_3d_tests.cpp"
+          },
+          {
+            "filter": "[shell-sketch3d-placement-workflow]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
           }
         ],
         "actions": [
@@ -458,7 +466,9 @@
           "sketch_3d"
         ],
         "widgets": [
-          "blcad.shell.sketch3d_task"
+          "blcad.shell.sketch3d_task",
+          "blcad.sketch3d.placement_anchor",
+          "blcad.sketch3d.placement_overlay"
         ]
       }
     },
