@@ -11,6 +11,7 @@
 #include "blcad/gui/shell/shell_inspect_tools.hpp"
 #include "blcad/gui/shell/shell_measure_tools.hpp"
 #include "blcad/gui/shell/shell_origin.hpp"
+#include "blcad/gui/shell/shell_reference_repair_tools.hpp"
 #include "blcad/gui/shell/shell_ribbon.hpp"
 #include "blcad/gui/shell/shell_sketch_tools.hpp"
 
@@ -252,6 +253,8 @@ ShellWindow::ShellWindow() {
   feature_edit_tools_ = std::make_unique<ShellFeatureEditTools>(*this);
   inspect_tools_ = std::make_unique<ShellInspectTools>(*this, *ribbon_, tab_model_, tab_assembly_);
   construction_tools_ = std::make_unique<ShellConstructionTools>(*this, *ribbon_, tab_model_);
+  reference_repair_tools_ =
+      std::make_unique<ShellReferenceRepairTools>(*this, *ribbon_, tab_model_);
   statusBar()->showMessage(QStringLiteral("Bereit"));
   refresh();
 }
@@ -261,6 +264,7 @@ ShellWindow::~ShellWindow() {
   // still exist. QMainWindow/QWidget teardown otherwise destroys that drawable
   // before deleting the central viewport and its OCCT GL resources.
   viewport_->set_view_changed_callback({});
+  reference_repair_tools_.reset();
   construction_tools_.reset();
   inspect_tools_.reset();
   feature_edit_tools_.reset();
@@ -589,6 +593,8 @@ bool ShellWindow::confirm_document_replacement() {
 }
 
 void ShellWindow::reset_document_interaction() {
+  if (reference_repair_tools_)
+    reference_repair_tools_->cancel();
   if (construction_tools_)
     construction_tools_->cancel();
   if (inspect_tools_)
@@ -861,6 +867,8 @@ bool ShellWindow::finish_active_sketch() {
 }
 
 bool ShellWindow::undo() {
+  if (reference_repair_tools_)
+    reference_repair_tools_->cancel();
   if (construction_tools_)
     construction_tools_->cancel();
   if (inspect_tools_)
@@ -891,6 +899,8 @@ bool ShellWindow::undo() {
 }
 
 bool ShellWindow::redo() {
+  if (reference_repair_tools_)
+    reference_repair_tools_->cancel();
   if (construction_tools_)
     construction_tools_->cancel();
   if (inspect_tools_)
@@ -1115,6 +1125,8 @@ void ShellWindow::refresh() {
 
   refresh_browser();
   refresh_properties();
+  if (reference_repair_tools_)
+    reference_repair_tools_->refresh();
   if (construction_tools_)
     construction_tools_->refresh();
   if (inspect_tools_)

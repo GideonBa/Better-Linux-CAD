@@ -599,6 +599,28 @@ const SketchPoint* Sketch::find_point(SketchEntityId id) const noexcept {
   return nullptr;
 }
 
+Result<std::size_t> Sketch::replace_reference(ProjectedSketchPoint reference) {
+  const auto found = std::find_if(projected_points_.begin(), projected_points_.end(),
+                                  [&](const auto& item) { return item.id() == reference.id(); });
+  if (found == projected_points_.end())
+    return Result<std::size_t>::failure(Error::validation(
+        reference.id().value(), "projected point to replace must exist in sketch"));
+  const auto index = static_cast<std::size_t>(std::distance(projected_points_.begin(), found));
+  *found = std::move(reference);
+  return Result<std::size_t>::success(index);
+}
+
+Result<std::size_t> Sketch::replace_reference(ProjectedSketchLine reference) {
+  const auto found = std::find_if(projected_lines_.begin(), projected_lines_.end(),
+                                  [&](const auto& item) { return item.id() == reference.id(); });
+  if (found == projected_lines_.end())
+    return Result<std::size_t>::failure(Error::validation(
+        reference.id().value(), "projected line to replace must exist in sketch"));
+  const auto index = static_cast<std::size_t>(std::distance(projected_lines_.begin(), found));
+  *found = std::move(reference);
+  return Result<std::size_t>::success(index);
+}
+
 Result<std::size_t> Sketch::add_reference(ProjectedSketchPoint point_reference) {
   if (has_entity_id(point_reference.id())) {
     return Result<std::size_t>::failure(Error::validation(
