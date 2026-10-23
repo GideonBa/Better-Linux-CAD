@@ -995,7 +995,7 @@ now picks the endpoint and drives a locked Z grip through rejected collapse and 
 recompute, followed by exact history, canonical reopening and STEP. Include both new tags in the
 combined native filter above, inspect the 1280×800 capture and run application startup serially.
 Offscreen camera mapping uses a model span; native retains the fitted OCCT zoom factor. Contract,
-remaining distance/projection work and block status:
+remaining projection work and block status:
 `docs/gui-sketch3d-interaction-mvp8.md`, `docs/mvp-plan.md`.
 
 ## Anchored Sketch3D pointer placement
@@ -1016,5 +1016,23 @@ dimensions exact. Native Sketch3D fixtures await actual window activation throug
 event loop with a two-second deadline, retaining the active-window assertion before pointer input.
 Inspect `sketch3d-point-placement-hover.png` at 1280×800. Include the two new tags in
 the canonical native filter in `docs/gui-shell-acceptance-mvp9r.md` and run startup separately.
-Pointer depth/anchor/copy semantics and the remaining distance/projection work:
+Pointer depth/anchor/copy semantics and the remaining projection work:
 `docs/gui-sketch3d-interaction-mvp8.md`, `docs/mvp-plan.md`.
+
+## Sketch3D distance/direction checks
+
+```bash
+cmake --build --preset dev-gui --target blcad_gui_tests blcad_app -j6
+./build/dev-gui/blcad_core_tests "[gui][sketch-3d-edit],[integration][sketch-3d-direct-manipulation],[core][sketch-3d-update]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[block136-sketch3d-direction],[shell-sketch3d-direction-workflow],[block136-sketch3d-placement],[block136-sketch3d-grips],[block136-sketch3d],[integration][gui-feature-coverage]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-sketch3d-direction QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-sketch3d-direction],[shell-sketch3d-direction-workflow]"
+```
+
+The new cases cover precise copied bound/local anchors, tuple conventions, numeric/text/coordinate
+bounds, invalid/corrected candidates, competing authoring, live-gesture rollback, pending XYZ,
+history, persistence and task expiry. The combined input workflow mixes XYZ, pointer and direction
+placement, rejects an incomplete tuple, then authors PathCurve/Sweep and retains downstream grip
+recovery, four-step history, canonical reopening and STEP export. Include the two new tags in the
+canonical native regression in `docs/gui-shell-acceptance-mvp9r.md`. Inspect
+`sketch3d-distance-direction-input.png` at 1280×800 and run startup separately, with builds and GUI
+executions serial. Planar-point projection remains next; Block 136 stays open.

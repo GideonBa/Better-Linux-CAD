@@ -1712,7 +1712,7 @@ TEST_CASE("Combined UI construction grips rotate a workplane and move its downst
 TEST_CASE("Combined UI creates a spatial chain sweeps it edits endpoints rejects collapse and "
           "restores history",
           "[gui][integration][shell-combined-workflow][shell-combined-sketch3d][shell-sketch3d-"
-          "grips-workflow][shell-sketch3d-placement-workflow]") {
+          "grips-workflow][shell-sketch3d-placement-workflow][shell-sketch3d-direction-workflow]") {
   WorkflowUi ui;
   QTemporaryDir directory;
   REQUIRE(directory.isValid());
@@ -1738,7 +1738,24 @@ TEST_CASE("Combined UI creates a spatial chain sweeps it edits endpoints rejects
   for (int index = 0; index < 4; ++index) {
     if (index == 0)
       ui.choose(points, 0);
-    else {
+    else if (index == 3) {
+      ui.data(ui.widget<QComboBox>("blcad.sketch3d.placement_anchor"), "point.3");
+      const auto count = points.count();
+      ui.text(ui.widget<QLineEdit>("blcad.sketch3d.distance"), "10");
+      ui.button("blcad.sketch3d.stage_direction");
+      CHECK(points.count() == count);
+      CHECK(ui.snapshot() == initial);
+      ui.button("blcad.sketch3d.preview");
+      CHECK_FALSE(ui.window.viewport().feature_preview_active());
+      ui.text(ui.widget<QLineEdit>("blcad.sketch3d.azimuth"), "0");
+      ui.text(ui.widget<QLineEdit>("blcad.sketch3d.elevation"), "90");
+      ui.reveal(ui.widget<QPushButton>("blcad.sketch3d.stage_direction"));
+      ui.capture("sketch3d-distance-direction-input");
+      ui.button("blcad.sketch3d.stage_direction");
+      CHECK(points.count() == count + 1);
+      CHECK(points.currentData().toString() == "point.4");
+      CHECK(ui.snapshot() == initial);
+    } else {
       ui.data(ui.widget<QComboBox>("blcad.sketch3d.placement_anchor"), "point.1");
       ui.choose(ui.widget<QComboBox>("blcad.sketch3d.lock"), 3);
       ui.choose(ui.widget<QComboBox>("blcad.sketch3d.pick"), 5);

@@ -199,5 +199,10 @@ exact history and persistence. Contracts and remaining distance/projection work 
 The spatial source task additionally stages new points by anchored viewport placement. Its combined
 Sweep proof now places the chain points with a locked Z pointer, refines them numerically and retains
 the downstream grip/rejection/history/reopen/export sequence. Depth, copied-anchor and input-gesture
-contracts are documented in `docs/gui-sketch3d-interaction-mvp8.md`; distance/direction and explicit
-planar projection remain planned.
+contracts are documented in `docs/gui-sketch3d-interaction-mvp8.md`.
+
+The source task now also stages explicit distance/azimuth/elevation points relative to its anchor.
+The same combined Sweep proof mixes pointer placement with direction input, including incomplete
+tuple rejection/recovery, then retains downstream edits/history/reopen/export. Exact numeric and
+pending-input contracts live in `docs/gui-sketch3d-interaction-mvp8.md`; explicit planar projection
+remains planned.

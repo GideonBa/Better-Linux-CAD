@@ -180,5 +180,37 @@ anchors, final release, prior-preview preservation, pending text, unobservable d
 tasks. `[shell-sketch3d-placement-workflow]` extends the existing fully UI-authored chain/PathCurve/
 Sweep scenario: viewport point placement, typed refinement, downstream rejection/recovery, exact
 history, canonical reopen and STEP. Native capture/reachability checks remain required at 1280×800.
-Explicit distance/direction input and planar-point projection remain next; the family and Block 136
-stay partial.
+The distance/direction extension below supplies explicit model-direction input. Planar-point
+projection remains next; the family and Block 136 stay partial.
+
+## Replacement shell: distance/direction input — Block 136, 2026-10-23
+
+**Distanz (mm)**, **Azimut (°)** and **Elevation (°)** plus **Punkt aus Richtung ergänzen** create
+one new local explicit point relative to **Platzierungsanker**. Origin, existing candidate points
+and newly staged points share the same precise anchor resolver as pointer placement. Azimuth starts
+at model +X and increases toward +Y; elevation starts at XY and increases toward +Z. The resolved
+offset is `(d cos(e) cos(a), d cos(e) sin(a), d sin(e))`. This explicit tuple supersedes pointer/grip
+locks and does not need a visible ray or camera gesture. Selecting an existing point for editing
+does not turn the command into a move. Bound anchors retain their parameters; new points copy values.
+
+All three fields are required. They accept finite bare numbers with decimal points, optional signs
+and scientific notation; units come from the labels. Distance is bounded to 0…1e9 mm, azimuth to
+−360…360° and elevation to −90…90°. Resolved XYZ must remain within ±1e9 mm. Invalid or incomplete
+text is retained with an error, without clamping, consuming IDs or changing the local candidate.
+Zero distance is valid point input; a later degenerate line remains subject to ordinary validation.
+
+Any nonempty tuple field invalidates the previous complete preview and blocks typed point/line
+staging, pointer placement, grips and Preview/Apply until the tuple is staged or **Richtungseingabe
+leeren** discards its text. Earlier staged points/curves remain intact. Editing a tuple rolls back
+an active grip or cancels pointer capture before retaining the text. Conversely, pending XYZ text
+must be staged or discarded through point selection before the tuple can create a point. Successful
+staging clears the tuple fields, selects the allocated point and preserves the chosen anchor.
+The existing complete downstream Preview and single Apply transaction remain required. Escape,
+Save/revision/task/document boundaries discard unfinished state and reset tuple text on reopening.
+Persistence and Core resolver semantics are unchanged.
+
+Proofs: five `[block136-sketch3d-direction]` cases plus `[shell-sketch3d-direction-workflow]`.
+The combined workflow mixes typed XYZ, pointer placement and a direction tuple; it rejects an
+incomplete tuple, recovers the endpoint, authors PathCurve/Sweep, rejects/corrects a downstream grip,
+checks exact four-step history, canonical reopen and STEP. Native controls/capture are checked at
+1280×800. Explicit planar-point projection remains the next Sketch3D gap; Block 136 stays open.
