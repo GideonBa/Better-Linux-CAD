@@ -2,6 +2,11 @@
 
 Status: target architecture. Not implemented yet.
 
+The replacement shell implements bounded plain cylindrical through-all single/bolt-circle cuts
+through `CircleProfile` / `CircularHolePattern` and `SubtractiveExtrude`; see
+`docs/gui-part-foundation-workbench-mvp7.md`. Those commands do not introduce the semantic
+standards-oriented `HoleFeature`, threads, countersinks or assembly hole features described here.
+
 The hole wizard creates holes as semantic, parametric, standards-oriented features, not as a bare circle plus cut. A `HoleFeature` carries hole type, standard, diameter, depth, thread, counterbore/countersink, fit, fastener type, and manufacturing intent. This makes later drawings, BOMs, fastener placement, collision checks, and manufacturing notes possible.
 
 ## Why more than a cut

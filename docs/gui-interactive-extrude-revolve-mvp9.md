@@ -109,8 +109,10 @@ generated inputs, default in-plane origin-axis choice, and atomic Revolve Undo.
 
 Bounded here and not introduced implicitly by this block:
 
-- the **bolt-circle hole** workflow keeps its dedicated MVP-7 command
-  (`GuiPartFoundationWorkbench::apply_hole_workflow`); Block 124 does not re-implement it;
+- the **bolt-circle hole** foundation (`GuiPartFoundationWorkbench::apply_hole_workflow`) now also
+  has dedicated replacement-shell creation through `ShellHoleTools`, including a single-hole
+  variant using the existing CircleProfile cut. Exact bounds are in
+  `docs/gui-part-foundation-workbench-mvp7.md`; it does not enlarge the semantic Hole Wizard contract;
 - `ToFace`/`Between` consume already-resolved semantic `FaceReference`s; interactive limit-face
   **picking/highlighting** is the caller's selection responsibility;
 - continuous **shaded viewport preview** rendering is the existing recompute/presentation path after a

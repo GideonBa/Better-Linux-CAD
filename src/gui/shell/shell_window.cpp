@@ -8,6 +8,7 @@
 #include "blcad/gui/shell/shell_construction_tools.hpp"
 #include "blcad/gui/shell/shell_feature_edit_tools.hpp"
 #include "blcad/gui/shell/shell_feature_tools.hpp"
+#include "blcad/gui/shell/shell_hole_tools.hpp"
 #include "blcad/gui/shell/shell_inspect_tools.hpp"
 #include "blcad/gui/shell/shell_measure_tools.hpp"
 #include "blcad/gui/shell/shell_origin.hpp"
@@ -262,6 +263,7 @@ ShellWindow::ShellWindow() {
       std::make_unique<ShellSketchDiagnosticsTools>(*this, *ribbon_, tab_model_, tab_sketch_);
   sketch_3d_tools_ = std::make_unique<ShellSketch3DTools>(*this, *ribbon_, tab_model_);
   parameter_tools_ = std::make_unique<ShellParameterTools>(*this, *ribbon_, tab_model_);
+  hole_tools_ = std::make_unique<ShellHoleTools>(*this, *ribbon_, tab_model_);
   statusBar()->showMessage(QStringLiteral("Bereit"));
   refresh();
 }
@@ -273,6 +275,7 @@ ShellWindow::~ShellWindow() {
   viewport_->set_view_changed_callback({});
   sketch_3d_tools_.reset();
   parameter_tools_.reset();
+  hole_tools_.reset();
   sketch_diagnostics_tools_.reset();
   reference_repair_tools_.reset();
   construction_tools_.reset();
@@ -625,6 +628,8 @@ bool ShellWindow::confirm_document_replacement() {
 }
 
 void ShellWindow::reset_document_interaction() {
+  if (hole_tools_)
+    hole_tools_->cancel();
   if (parameter_tools_)
     parameter_tools_->cancel();
   if (sketch_3d_tools_)
@@ -910,6 +915,8 @@ bool ShellWindow::finish_active_sketch() {
 }
 
 bool ShellWindow::undo() {
+  if (hole_tools_)
+    hole_tools_->cancel();
   if (parameter_tools_)
     parameter_tools_->cancel();
   if (sketch_3d_tools_)
@@ -948,6 +955,8 @@ bool ShellWindow::undo() {
 }
 
 bool ShellWindow::redo() {
+  if (hole_tools_)
+    hole_tools_->cancel();
   if (parameter_tools_)
     parameter_tools_->cancel();
   if (sketch_3d_tools_)
@@ -993,6 +1002,8 @@ void ShellWindow::apply_viewport_selection(const std::optional<GuiSelection>& se
   bool selected_feature_profile = false;
   if (selection) {
     (void)session_.selection().add(*selection);
+    if (hole_tools_)
+      (void)hole_tools_->accept_selection(*selection);
     if (construction_tools_)
       (void)construction_tools_->accept_selection(*selection);
     if (feature_tools_)
@@ -1040,6 +1051,9 @@ void ShellWindow::handle_tree_selection(QTreeWidgetItem* current) {
     synchronizing_selection_ = false;
     if (const auto& selected = viewport_->selected_semantic())
       (void)session_.selection().add(*selected);
+    if (hole_tools_)
+      for (const auto& selected : session_.selection().entries())
+        (void)hole_tools_->accept_selection(selected);
     if (feature_tools_)
       if (const auto* part = session_.part_document())
         if (const auto profile = feature_profile_for_selection(*part, property_semantic_id_))
@@ -1190,6 +1204,8 @@ void ShellWindow::refresh() {
 
   refresh_browser();
   refresh_properties();
+  if (hole_tools_)
+    hole_tools_->refresh();
   if (parameter_tools_)
     parameter_tools_->refresh();
   if (sketch_3d_tools_)

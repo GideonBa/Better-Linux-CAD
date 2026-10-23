@@ -77,6 +77,13 @@ With a subtractive cut consuming the sketch, changing any pattern parameter mark
 
 ## Deliberate limitations
 
+The replacement-shell **Bohrungen** task now creates a full bolt circle or a single cylindrical
+through-all cut from explicit workplane/Body inputs. It can create the typed parameters locally
+or bind existing literals/formulas, and requires complete Preview before atomic Apply. The exact
+creation, target, bounds, history and lifecycle contract is in
+`docs/gui-part-foundation-workbench-mvp7.md`; the frozen Core/Geometry pattern contract above is
+unchanged.
+
 - the pattern lives in one sketch of one part; assembly-scoped parameters are MVP 4 (`docs/mvp-plan.md`).
 - holes are plain through-all cylindrical cuts; hole semantics (clearance/thread/countersink) belong to the hole wizard (`docs/hole-wizard.md`).
 - no skip instances, partial angles, or seed-feature patterns yet (`docs/pattern-and-mirror-features.md`).
