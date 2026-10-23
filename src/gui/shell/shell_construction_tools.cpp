@@ -1,5 +1,6 @@
 #include "blcad/gui/shell/shell_construction_tools.hpp"
 
+#include "blcad/geometry/recompute_executor.hpp"
 #include "blcad/geometry/viewport_scene.hpp"
 #include "blcad/gui/shell/shell_ribbon.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
@@ -23,6 +24,7 @@
 namespace blcad::gui {
 namespace {
 constexpr std::string_view task_id = "construction.create";
+constexpr std::string_view edit_task_id = "construction.edit";
 Error error(std::string message) {
   return Error::validation("gui.shell.construction", std::move(message));
 }
@@ -198,11 +200,14 @@ void ShellConstructionTools::fill_references() {
   for (const auto& plane : part.datum_planes())
     add(plane_, plane);
   for (const auto& plane : part.construction_planes())
-    add(plane_, plane);
+    if (!editing_ || plane.id().value() != id_)
+      add(plane_, plane);
   for (const auto& plane : part.derived_workplanes())
-    add(plane_, plane);
+    if (!editing_ || plane.id().value() != id_)
+      add(plane_, plane);
   for (const auto& line : part.construction_lines())
-    add(line_, line);
+    if (!editing_ || line.id().value() != id_)
+      add(line_, line);
   for (const auto& point : part.construction_points())
     for (auto* control : points_)
       add(control, point);
@@ -233,6 +238,10 @@ Result<std::size_t> ShellConstructionTools::begin(Kind kind) {
     return Result<std::size_t>::failure(
         error("Konstruktion benötigt ein aktuelles Bauteil ohne aktiven Befehl"));
   updating_ = true;
+  editing_ = false;
+  dependencies_.clear();
+  kind_->setEnabled(true);
+  dock_->setWindowTitle(QStringLiteral("Konstruktion erstellen"));
   fill_references();
   std::size_t number = 1;
   const auto& graph = session.part_document()->dependency_graph();
@@ -240,6 +249,7 @@ Result<std::size_t> ShellConstructionTools::begin(Kind kind) {
     id_ = "construction.shell." + std::to_string(number++);
   } while (graph.has_node(id_) || graph.has_node(id_ + ".offset") ||
            graph.has_node(id_ + ".relation"));
+  relation_id_ = id_ + ".relation";
   name_->setText(QStringLiteral("Konstruktion %1").arg(number - 1));
   kind_->setCurrentIndex(static_cast<int>(kind));
   for (auto* coordinate : origin_)
@@ -250,7 +260,132 @@ Result<std::size_t> ShellConstructionTools::begin(Kind kind) {
   }
   offset_->setValue(10);
   updating_ = false;
-  if (!session.task().begin(std::string(task_id)) || !session.task().begin_parameter_editing())
+  return open_task();
+}
+
+Result<std::size_t> ShellConstructionTools::begin_edit(std::string_view object_id) {
+  auto& session = window_.session();
+  const auto* part = session.part_document();
+  if (!part || !session.derived_results_fresh() || window_.active_sketch() ||
+      session.task().active())
+    return Result<std::size_t>::failure(
+        error("Bearbeiten benötigt ein aktuelles Bauteil ohne aktiven Befehl"));
+  // Principal origin geometry stays fixed in the shell.
+  if (object_id == "datum.axis.x" || object_id == "datum.axis.y" || object_id == "datum.axis.z")
+    return Result<std::size_t>::failure(error("Ursprungsgeometrie ist fest definiert"));
+  Kind kind;
+  std::string name;
+  std::optional<ConstructionRelation> relation;
+  Vector3 origin{}, direction{1, 0, 0}, y_direction{0, 1, 0};
+  Vector3 normal{0, 0, 1};
+  std::vector<ParameterId> dependencies;
+  std::string source_line;
+  const auto id = std::string(object_id);
+  const auto position = [](Point3 value) { return Vector3{value.x, value.y, value.z}; };
+  const auto unsupported = [] {
+    return Result<std::size_t>::failure(
+        error("Dieser Konstruktionstyp kann noch nicht im Dialog bearbeitet werden"));
+  };
+  if (const auto* point = part->find_construction_point(ConstructionPointId(id))) {
+    if (point->kind() != ConstructionPointKind::Explicit)
+      return unsupported();
+    kind = Kind::Point;
+    name = point->name();
+    origin = position(point->position());
+    dependencies = point->parameter_dependencies();
+  } else if (const auto* line = part->find_construction_line(ConstructionLineId(id))) {
+    if (line->kind() != ConstructionLineKind::Explicit &&
+        line->kind() != ConstructionLineKind::ThroughTwoPoints)
+      return unsupported();
+    kind = line->kind() == ConstructionLineKind::Explicit ? Kind::Line : Kind::LineThroughPoints;
+    name = line->name();
+    origin = position(line->point());
+    direction = line->direction();
+    relation = line->relation();
+    dependencies = line->parameter_dependencies();
+  } else if (const auto* axis = part->find_datum_axis(DatumAxisId(id))) {
+    kind = axis->kind() == DatumAxisKind::Explicit ? Kind::Axis : Kind::AxisFromLine;
+    name = axis->name();
+    origin = position(axis->origin());
+    direction = axis->direction();
+    source_line = axis->source_construction_line().value();
+    dependencies = axis->parameter_dependencies();
+  } else if (const auto* plane = part->find_construction_plane(ConstructionPlaneId(id))) {
+    switch (plane->kind()) {
+    case ConstructionPlaneKind::Explicit:
+      kind = Kind::Plane;
+      break;
+    case ConstructionPlaneKind::OffsetFromPlane:
+      kind = Kind::OffsetPlane;
+      break;
+    case ConstructionPlaneKind::ThroughThreePoints:
+      kind = Kind::PlaneThroughPoints;
+      break;
+    default:
+      return unsupported();
+    }
+    name = plane->name();
+    origin = position(plane->origin());
+    direction = plane->x_axis();
+    y_direction = plane->y_axis();
+    normal = plane->normal();
+    relation = plane->relation();
+    dependencies = plane->parameter_dependencies();
+  } else if (const auto* plane = part->find_derived_workplane(DatumPlaneId(id))) {
+    kind = Kind::FacePlane;
+    name = plane->name();
+  } else {
+    return Result<std::size_t>::failure(error("Kein bearbeitbares Konstruktionselement gewählt"));
+  }
+  updating_ = true;
+  editing_ = true;
+  edit_kind_ = kind;
+  id_ = id;
+  dependencies_ = std::move(dependencies);
+  relation_id_ = relation ? relation->id().value() : id + ".relation";
+  fill_references();
+  kind_->setCurrentIndex(static_cast<int>(kind));
+  kind_->setEnabled(false);
+  name_->setText(QString::fromStdString(name));
+  original_name_ = name;
+  original_values_ = {origin, direction, y_direction};
+  const std::array controls{origin_, direction_, y_direction_};
+  for (std::size_t i = 0; i < controls.size(); ++i) {
+    controls[i][0]->setValue(original_values_[i].x);
+    controls[i][1]->setValue(original_values_[i].y);
+    controls[i][2]->setValue(original_values_[i].z);
+    initial_values_[i] = vector(controls[i]);
+  }
+  original_normal_ = normal;
+  const auto select = [](QComboBox* combo, const std::string& value) {
+    combo->setCurrentIndex(combo->findData(QString::fromStdString(value)));
+  };
+  if (relation) {
+    select(plane_, relation->source_plane().value());
+    select(parameter_, relation->offset_parameter().value());
+    select(points_[0], relation->first_point().value());
+    select(points_[1], relation->second_point().value());
+    select(points_[2], relation->third_point().value());
+  }
+  if (kind == Kind::AxisFromLine)
+    select(line_, source_line);
+  if (kind == Kind::FacePlane) {
+    const auto& reference = part->find_derived_workplane(DatumPlaneId(id))->face_reference();
+    face_->setCurrentIndex(-1);
+    for (int i = 0; i < face_->count(); ++i)
+      if (face_->itemData(i).toString().toStdString() == reference.source_feature().value() &&
+          face_->itemData(i, Qt::UserRole + 1).toInt() == static_cast<int>(reference.face()))
+        face_->setCurrentIndex(i);
+  }
+  dock_->setWindowTitle(QStringLiteral("Konstruktion bearbeiten"));
+  updating_ = false;
+  return open_task();
+}
+
+Result<std::size_t> ShellConstructionTools::open_task() {
+  auto& session = window_.session();
+  if (!session.task().begin(std::string(editing_ ? edit_task_id : task_id)) ||
+      !session.task().begin_parameter_editing())
     return Result<std::size_t>::failure(error("Konstruktion konnte nicht gestartet werden"));
   revision_ = session.presentation_revision();
   active_ = true;
@@ -297,36 +432,63 @@ void ShellConstructionTools::update_inputs() {
 
 Result<std::size_t> ShellConstructionTools::populate(PartDocument& part) const {
   const auto kind = static_cast<Kind>(kind_->currentIndex());
-  const auto name = name_->text().trimmed().toStdString();
+  if (editing_ && kind != edit_kind_)
+    return Result<std::size_t>::failure(
+        error("Der Konstruktionstyp bleibt beim Bearbeiten erhalten"));
+  const auto name = editing_ && name_->text().toStdString() == original_name_
+                        ? original_name_
+                        : name_->text().trimmed().toStdString();
   if (name.empty())
     return Result<std::size_t>::failure(error("Name darf nicht leer sein"));
-  const auto coordinates = vector(origin_);
+  const auto coordinates = [&] {
+    auto value = vector(origin_);
+    if (editing_) {
+      if (value.x == initial_values_[0].x)
+        value.x = original_values_[0].x;
+      if (value.y == initial_values_[0].y)
+        value.y = original_values_[0].y;
+      if (value.z == initial_values_[0].z)
+        value.z = original_values_[0].z;
+    }
+    return value;
+  }();
   const Point3 origin{coordinates.x, coordinates.y, coordinates.z};
-  const auto direction = unit(vector(direction_));
-  const ConstructionRelationId relation_id(id_ + ".relation");
+  const bool direction_unchanged = editing_ && vector(direction_) == initial_values_[1];
+  const bool y_unchanged = editing_ && vector(y_direction_) == initial_values_[2];
+  const auto direction = direction_unchanged ? original_values_[1] : unit(vector(direction_));
+  const ConstructionRelationId relation_id(relation_id_);
   switch (kind) {
   case Kind::Point:
-    return insert(part, ConstructionPoint::create_explicit(ConstructionPointId(id_), name, origin),
-                  &PartDocument::add_construction_point);
-  case Kind::Line:
     return insert(
-        part, ConstructionLine::create_explicit(ConstructionLineId(id_), name, origin, direction),
-        &PartDocument::add_construction_line);
+        part,
+        ConstructionPoint::create_explicit(ConstructionPointId(id_), name, origin, dependencies_),
+        editing_ ? &PartDocument::update_construction_point
+                 : &PartDocument::add_construction_point);
+  case Kind::Line:
+    return insert(part,
+                  ConstructionLine::create_explicit(ConstructionLineId(id_), name, origin,
+                                                    direction, dependencies_),
+                  editing_ ? &PartDocument::update_construction_line
+                           : &PartDocument::add_construction_line);
   case Kind::Axis:
-    return insert(part, DatumAxis::create_explicit(DatumAxisId(id_), name, origin, direction),
-                  &PartDocument::add_datum_axis);
+    return insert(
+        part, DatumAxis::create_explicit(DatumAxisId(id_), name, origin, direction, dependencies_),
+        editing_ ? &PartDocument::update_datum_axis : &PartDocument::add_datum_axis);
   case Kind::AxisFromLine:
     return insert(part,
                   DatumAxis::create_from_construction_line(
                       DatumAxisId(id_), name,
                       ConstructionLineId(line_->currentData().toString().toStdString())),
-                  &PartDocument::add_datum_axis);
+                  editing_ ? &PartDocument::update_datum_axis : &PartDocument::add_datum_axis);
   case Kind::Plane: {
-    const auto y = unit(vector(y_direction_));
+    const auto y = y_unchanged ? original_values_[2] : unit(vector(y_direction_));
     return insert(part,
-                  ConstructionPlane::create_explicit(ConstructionPlaneId(id_), name, origin,
-                                                     direction, y, cross(direction, y)),
-                  &PartDocument::add_construction_plane);
+                  ConstructionPlane::create_explicit(
+                      ConstructionPlaneId(id_), name, origin, direction, y,
+                      direction_unchanged && y_unchanged ? original_normal_ : cross(direction, y),
+                      dependencies_),
+                  editing_ ? &PartDocument::update_construction_plane
+                           : &PartDocument::add_construction_plane);
   }
   case Kind::LineThroughPoints:
   case Kind::PlaneThroughPoints: {
@@ -344,21 +506,31 @@ Result<std::size_t> ShellConstructionTools::populate(PartDocument& part) const {
       return insert(part,
                     ConstructionLine::create_through_two_points(ConstructionLineId(id_), name,
                                                                 relation.value()),
-                    &PartDocument::add_construction_line);
+                    editing_ ? &PartDocument::update_construction_line
+                             : &PartDocument::add_construction_line);
     return insert(part,
                   ConstructionPlane::create_through_three_points(ConstructionPlaneId(id_), name,
                                                                  relation.value()),
-                  &PartDocument::add_construction_plane);
+                  editing_ ? &PartDocument::update_construction_plane
+                           : &PartDocument::add_construction_plane);
   }
   case Kind::OffsetPlane: {
     ParameterId parameter(parameter_->currentData().toString().toStdString());
     if (parameter.empty()) {
       parameter = ParameterId(id_ + ".offset");
+      for (std::size_t suffix = 2; part.dependency_graph().has_node(parameter.value()); ++suffix)
+        parameter = ParameterId(id_ + ".offset." + std::to_string(suffix));
       auto quantity = Quantity::length_mm(offset_->value(), parameter.value());
       if (!quantity)
         return Result<std::size_t>::failure(quantity.error());
+      auto parameter_name = "Versatz " + name;
+      for (std::size_t suffix = 2;
+           std::any_of(part.parameters().begin(), part.parameters().end(),
+                       [&](const Parameter& item) { return item.name() == parameter_name; });
+           ++suffix)
+        parameter_name = "Versatz " + name + " " + std::to_string(suffix);
       auto added =
-          insert(part, Parameter::create_length(parameter, "Versatz " + name, quantity.value()),
+          insert(part, Parameter::create_length(parameter, parameter_name, quantity.value()),
                  &PartDocument::add_parameter);
       if (!added)
         return added;
@@ -370,7 +542,8 @@ Result<std::size_t> ShellConstructionTools::populate(PartDocument& part) const {
     return insert(part,
                   ConstructionPlane::create_offset_from_plane(ConstructionPlaneId(id_), name,
                                                               relation.value()),
-                  &PartDocument::add_construction_plane);
+                  editing_ ? &PartDocument::update_construction_plane
+                           : &PartDocument::add_construction_plane);
   }
   case Kind::FacePlane: {
     auto reference = SemanticFaceReference::create(
@@ -380,7 +553,7 @@ Result<std::size_t> ShellConstructionTools::populate(PartDocument& part) const {
       return Result<std::size_t>::failure(reference.error());
     return insert(
         part, DerivedWorkplane::create_on_feature_face(DatumPlaneId(id_), name, reference.value()),
-        &PartDocument::add_derived_workplane);
+        editing_ ? &PartDocument::update_derived_workplane : &PartDocument::add_derived_workplane);
   }
   }
   return Result<std::size_t>::failure(error("Unbekannter Konstruktionstyp"));
@@ -389,8 +562,8 @@ Result<std::size_t> ShellConstructionTools::populate(PartDocument& part) const {
 bool ShellConstructionTools::current() const {
   const auto& session = window_.session();
   return active_ && session.part_document() && session.part_shape_cache() &&
-         session.task().command_id() == task_id && session.derived_results_fresh() &&
-         session.presentation_revision() == revision_;
+         session.task().command_id() == (editing_ ? edit_task_id : task_id) &&
+         session.derived_results_fresh() && session.presentation_revision() == revision_;
 }
 Result<std::size_t> ShellConstructionTools::preview() {
   if (!current())
@@ -403,8 +576,19 @@ Result<std::size_t> ShellConstructionTools::preview() {
   auto added = populate(candidate);
   if (!added)
     return added;
-  auto scene =
-      geometry::ViewportSceneBuilder{}.build_part(candidate, *window_.session().part_shape_cache());
+  std::optional<geometry::ShapeCache> preview_cache;
+  if (editing_) {
+    auto cache = geometry::ShapeCache::create(ShapeCacheId("construction.edit.preview"));
+    if (!cache)
+      return Result<std::size_t>::failure(cache.error());
+    auto executed =
+        geometry::GeometryRecomputeExecutor{}.execute_document(candidate, cache.value());
+    if (!executed)
+      return Result<std::size_t>::failure(executed.error());
+    preview_cache = std::move(cache.value());
+  }
+  auto scene = geometry::ViewportSceneBuilder{}.build_part(
+      candidate, preview_cache ? *preview_cache : *window_.session().part_shape_cache());
   if (!scene)
     return Result<std::size_t>::failure(scene.error());
   const auto kind = static_cast<Kind>(kind_->currentIndex());
@@ -415,17 +599,44 @@ Result<std::size_t> ShellConstructionTools::preview() {
                              : kind == Kind::FacePlane ? "derived-workplane/"
                                                        : "construction-plane/";
   std::vector<geometry::GeometryShape> shapes;
+  std::vector<std::string> replaced;
+  auto affected = candidate.dependency_graph().transitive_dependents(id_);
+  affected.push_back(id_);
+  const auto included = [&](const geometry::ViewportSceneItem& item) {
+    if (!editing_)
+      return item.semantic_id == prefix + id_;
+    if (item.kind == geometry::ViewportSceneKind::SolidBody ||
+        item.kind == geometry::ViewportSceneKind::SurfaceBody)
+      return true;
+    return std::any_of(affected.begin(), affected.end(), [&](const std::string& id) {
+      const auto slash = item.semantic_id.find('/');
+      return (slash != std::string::npos && item.semantic_id.substr(slash + 1) == id) ||
+             item.semantic_id.starts_with("sketch/" + id + "/");
+    });
+  };
   for (auto& item : scene.value())
-    if (item.semantic_id == prefix + id_)
+    if (included(item))
       shapes.push_back(std::move(item.shape));
-  if (shapes.size() != 1)
+  if (shapes.empty() || (!editing_ && shapes.size() != 1))
     return Result<std::size_t>::failure(
         error("Konstruktionsgeometrie konnte nicht dargestellt werden"));
-  auto shown = window_.viewport().set_feature_previews(std::move(shapes));
+  if (editing_) {
+    auto original = geometry::ViewportSceneBuilder{}.build_part(
+        *window_.session().part_document(), *window_.session().part_shape_cache());
+    if (!original)
+      return Result<std::size_t>::failure(original.error());
+    for (const auto& item : original.value())
+      if (included(item))
+        replaced.push_back(item.semantic_id);
+  }
+  auto shown = window_.viewport().set_feature_previews(std::move(shapes), std::move(replaced));
   if (!shown)
     return shown;
   (void)window_.session().task().show_preview();
-  summary_->setText(QStringLiteral("Vorschau gültig. Anwenden erstellt ein Konstruktionselement."));
+  summary_->setText(
+      editing_ ? QStringLiteral("Vorschau einschließlich nachgelagerter Geometrie gültig. Anwenden "
+                                "übernimmt die Änderung.")
+               : QStringLiteral("Vorschau gültig. Anwenden erstellt ein Konstruktionselement."));
   apply_->setEnabled(true);
   return Result<std::size_t>::success(1);
 }
@@ -452,7 +663,8 @@ Result<std::size_t> ShellConstructionTools::apply() {
   if (!checked)
     return checked;
   auto result = window_.session().commit_part_transaction(
-      "Create construction geometry", [this](PartDocument& part) { return populate(part); });
+      editing_ ? "Edit construction geometry" : "Create construction geometry",
+      [this](PartDocument& part) { return populate(part); });
   if (!result)
     return result;
   (void)window_.session().task().apply();
@@ -463,7 +675,7 @@ void ShellConstructionTools::cancel() {
   if (!active_)
     return;
   active_ = false;
-  if (window_.session().task().command_id() == task_id)
+  if (window_.session().task().command_id() == (editing_ ? edit_task_id : task_id))
     (void)window_.session().task().cancel();
   window_.viewport().clear_feature_preview();
   apply_->setEnabled(false);

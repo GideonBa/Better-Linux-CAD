@@ -585,5 +585,11 @@ Apply. Saving during preview writes only the committed model and closes the pend
 
 Select a committed construction or derived plane in the model or browser, then choose **2D-Skizze
 erstellen**. The camera aligns to that plane; sketches on generated faces retain the face bounds.
-Editing an existing construction object's coordinates/references remains planned. Existing offset
-parameters can be edited through their properties.
+Double-click a construction object, datum axis or face workplane in the browser to edit its name,
+coordinates or reference selections. The type and ID remain fixed. The preview includes recomputed
+Body results; invalid downstream geometry or cyclic references disable Apply. **Anwenden** commits
+one reversible change; **Abbrechen** restores the model. Principal origin geometry stays fixed.
+For an offset plane, rebind an existing Length parameter or choose **Neuer Parameter** to create a
+new offset without changing the previous shared parameter. Existing offset values/formulas can also
+be edited through their properties. Generated-edge/vertex and parallel-through-point definitions
+and native reference picking/manipulators remain planned.

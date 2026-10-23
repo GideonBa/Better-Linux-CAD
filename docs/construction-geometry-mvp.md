@@ -245,9 +245,17 @@ The current construction-geometry layer does not implement:
 - 3D sketch splines, guide curves, lofts, sweeps, boundary surfaces, or surface stitching
 - exporting construction geometry as final STEP curves or surfaces by default
 
-## Next construction-geometry step
+## Construction editing and next step
 
-The next construction-geometry increment should project evaluated semantic generated edges and vertices into sketch-space reference geometry so sketches can consume projected construction points and lines without storing raw OCCT topology. It should still avoid a full sketch constraint solver.
+`PartDocument::update_datum_axis`, `update_construction_point`, `update_construction_line`,
+`update_construction_plane` and `update_derived_workplane` atomically replace existing typed intent.
+They preserve IDs, vector positions and downstream graph edges, revalidate incoming references
+through the add path, reject cycles and invalidate consumers. Geometry validation remains a separate
+boundary. JSON records and schema are unchanged; canonical roundtrips retain edited definitions.
+
+The replacement shell supports in-place editing for its nine restored creation modes, including
+source/offset rebinding and downstream recompute previews. Exact bounds and remaining relation/native
+pick workflows live in `docs/gui-sketch-workbench-mvp7.md`; sequencing remains in `docs/mvp-plan.md`.
 
 ## Relationship to existing roadmap
 

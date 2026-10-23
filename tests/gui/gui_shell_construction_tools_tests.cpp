@@ -1,4 +1,5 @@
 #include "blcad/core/part_document_json.hpp"
+#include "blcad/geometry/body_transform_adapter.hpp"
 #include "blcad/geometry/construction_line_resolver.hpp"
 #include "blcad/geometry/construction_point_resolver.hpp"
 #include "blcad/gui/shell/shell_construction_tools.hpp"
@@ -75,8 +76,8 @@ std::string point(ShellWindow& window, Point3 position) {
   apply(window);
   return window.session().part_document()->construction_points().back().id().value();
 }
-void authored_body(ShellWindow& window) {
-  REQUIRE(window.viewport().select_semantic("datum-plane/datum.xy"));
+void authored_body(ShellWindow& window, const std::string& plane = "datum-plane/datum.xy") {
+  REQUIRE(window.viewport().select_semantic(plane));
   REQUIRE(window.create_sketch_on_selection());
   REQUIRE(window.sketch_tools().begin_tool(GuiSketchCreateTool::CornerRectangle));
   REQUIRE(window.sketch_tools().add_pick({0, 0}));
@@ -498,4 +499,308 @@ TEST_CASE(
   REQUIRE(window.create_sketch_on_selection());
   CHECK_FALSE(action(window, "create_construction").isEnabled());
   CHECK(window.construction_tools().begin(Kind::Point).has_error());
+}
+
+namespace {
+void edit_tree(ShellWindow& window, const std::string& id) {
+  window.resize(1280, 800);
+  window.show();
+  auto& tree = window.model_browser();
+  tree.expandAll();
+  select_tree(window, id);
+  tree.scrollToItem(tree.currentItem());
+  qApp->processEvents();
+  const auto rect = tree.visualItemRect(tree.currentItem());
+  REQUIRE_FALSE(rect.isEmpty());
+  const QPointF local(rect.center());
+  for (auto type : {QEvent::MouseButtonPress, QEvent::MouseButtonRelease,
+                    QEvent::MouseButtonDblClick, QEvent::MouseButtonRelease}) {
+    QMouseEvent event(type, local, tree.viewport()->mapToGlobal(local.toPoint()), Qt::LeftButton,
+                      type == QEvent::MouseButtonRelease ? Qt::NoButton : Qt::LeftButton,
+                      Qt::NoModifier);
+    QApplication::sendEvent(tree.viewport(), &event);
+  }
+  qApp->processEvents();
+  REQUIRE(window.construction_tools().active());
+  REQUIRE(window.session().task().command_id() == "construction.edit");
+  CHECK_FALSE(control<QComboBox>(window, "kind").isEnabled());
+}
+std::string last_id(ShellWindow& window, Kind kind) {
+  const auto& part = *window.session().part_document();
+  if (kind == Kind::Point)
+    return part.construction_points().back().id().value();
+  if (kind == Kind::Line)
+    return part.construction_lines().back().id().value();
+  if (kind == Kind::Axis)
+    return part.datum_axes().back().id().value();
+  return part.construction_planes().back().id().value();
+}
+double body_z(ShellWindow& window) {
+  const auto* shape = window.session().part_shape_cache()->final_shape();
+  REQUIRE(shape);
+  return checked(geometry::BodyTransformAdapter{}.bounds(*shape)).minimum.z;
+}
+} // namespace
+
+TEST_CASE("Browser construction edits retain identity and exact reversible persistence",
+          "[gui][block136-construction-edit][shell-construction-edit][shell-construction-edit-"
+          "explicit]") {
+  for (auto kind : {Kind::Point, Kind::Line, Kind::Axis, Kind::Plane}) {
+    CAPTURE(static_cast<int>(kind));
+    ShellWindow window;
+    REQUIRE(window.new_part("Bearbeiten"));
+    begin(window, kind);
+    origin(window, {12, -8, 5});
+    apply(window);
+    const auto id = last_id(window, kind);
+    QTemporaryDir directory;
+    REQUIRE(window.save_to(directory.filePath("before.blcad.json")));
+    const auto before = snapshot(window);
+    const auto revision = window.session().presentation_revision();
+    edit_tree(window, id);
+    CHECK(control<QLineEdit>(window, "name").text() == "Konstruktion 1");
+    CHECK(control<QDoubleSpinBox>(window, "origin.z").value() == 5);
+    origin(window, {20, 3, 9});
+    control<QLineEdit>(window, "name").setText("Geändert");
+    CHECK(snapshot(window) == before);
+    CHECK(window.session().presentation_revision() == revision);
+    CHECK_FALSE(window.session().dirty());
+    CHECK(window.viewport().feature_preview_active());
+    apply(window);
+    CHECK(last_id(window, kind) == id);
+    CHECK(window.session().undo_label() == "Edit construction geometry");
+    const auto after = snapshot(window);
+    CHECK(after != before);
+    edit_tree(window, id);
+    CHECK(control<QDoubleSpinBox>(window, "origin.x").value() == 20);
+    CHECK(control<QDoubleSpinBox>(window, "origin.z").value() == 9);
+    CHECK(control<QLineEdit>(window, "name").text() == "Geändert");
+    control<QPushButton>(window, "cancel").click();
+    REQUIRE(window.undo());
+    CHECK(snapshot(window) == before);
+    CHECK_FALSE(window.session().dirty());
+    REQUIRE(window.redo());
+    CHECK(snapshot(window) == after);
+    REQUIRE(window.save_to(directory.filePath("after.blcad.json")));
+    ShellWindow reopened;
+    REQUIRE(reopened.open_path(directory.filePath("after.blcad.json")));
+    CHECK(snapshot(reopened) == after);
+  }
+}
+
+TEST_CASE("Construction edits rebind line axis and three-point plane without replacing consumers",
+          "[gui][block136-construction-edit][shell-construction-edit][shell-construction-edit-"
+          "relations]") {
+  ShellWindow window;
+  REQUIRE(window.new_part("Bezüge bearbeiten"));
+  const auto a = point(window, {0, 0, 0});
+  const auto b = point(window, {10, 0, 0});
+  const auto c = point(window, {0, 10, 0});
+  const auto d = point(window, {0, 0, 10});
+  begin(window, Kind::LineThroughPoints);
+  select(control<QComboBox>(window, "point1"), a);
+  select(control<QComboBox>(window, "point2"), b);
+  apply(window);
+  const auto line = window.session().part_document()->construction_lines().back().id();
+  begin(window, Kind::AxisFromLine);
+  select(control<QComboBox>(window, "line"), line.value());
+  apply(window);
+  const auto axis = window.session().part_document()->datum_axes().back().id();
+  const auto before = snapshot(window);
+  edit_tree(window, line.value());
+  CHECK(control<QComboBox>(window, "point2").currentData().toString().toStdString() == b);
+  select(control<QComboBox>(window, "point2"), c);
+  CHECK(window.viewport().feature_preview_replaces("datum-axis/" + axis.value()));
+  apply(window);
+  CHECK(
+      checked(geometry::ConstructionLineResolver{}.resolve(*window.session().part_document(), line))
+          .direction == Vector3{0, 1, 0});
+  const auto& part = *window.session().part_document();
+  CHECK_FALSE(part.dependency_graph().has_dependency(b, line.value()));
+  CHECK(part.dependency_graph().has_dependency(c, line.value()));
+  CHECK(part.dependency_graph().has_dependency(line.value(), axis.value()));
+  REQUIRE(window.undo());
+  CHECK(snapshot(window) == before);
+  REQUIRE(window.redo());
+
+  begin(window, Kind::Line);
+  apply(window);
+  const auto other_line = window.session().part_document()->construction_lines().back().id();
+  edit_tree(window, axis.value());
+  select(control<QComboBox>(window, "line"), other_line.value());
+  apply(window);
+  CHECK(window.session().part_document()->find_datum_axis(axis)->source_construction_line() ==
+        other_line);
+
+  const auto stable = snapshot(window);
+  edit_tree(window, c);
+  origin(window, {0, 0, 0}); // The dependent line would have coincident endpoints.
+  CHECK_FALSE(control<QPushButton>(window, "apply").isEnabled());
+  CHECK_FALSE(window.viewport().feature_preview_active());
+  CHECK(window.construction_tools().apply().has_error());
+  CHECK(snapshot(window) == stable);
+  origin(window, {0, 10, 0});
+  CHECK(control<QPushButton>(window, "apply").isEnabled());
+  control<QPushButton>(window, "cancel").click();
+  CHECK(snapshot(window) == stable);
+
+  begin(window, Kind::PlaneThroughPoints);
+  select(control<QComboBox>(window, "point1"), a);
+  select(control<QComboBox>(window, "point2"), b);
+  select(control<QComboBox>(window, "point3"), c);
+  apply(window);
+  const auto plane = window.session().part_document()->construction_planes().back().id();
+  const auto relation_id =
+      window.session().part_document()->construction_planes().back().relation()->id();
+  edit_tree(window, plane.value());
+  select(control<QComboBox>(window, "point3"), d);
+  apply(window);
+  CHECK(checked(geometry::WorkplaneResolver{}.resolve(*window.session().part_document(),
+                                                      DatumPlaneId(plane.value())))
+            .normal == Vector3{0, -1, 0});
+  CHECK(window.session().part_document()->find_construction_plane(plane)->relation()->id() ==
+        relation_id);
+}
+
+TEST_CASE("Workplane edit recomputes downstream solids and provisions a fresh offset atomically",
+          "[gui][block136-construction-edit][shell-construction-edit][shell-construction-edit-"
+          "downstream]") {
+  ShellWindow window;
+  REQUIRE(window.new_part("Arbeitsebene bearbeiten"));
+  begin(window, Kind::OffsetPlane);
+  apply(window);
+  const auto plane = window.session().part_document()->construction_planes().back().id();
+  const auto parameter =
+      window.session().part_document()->construction_planes().back().relation()->offset_parameter();
+  select_tree(window, plane.value());
+  REQUIRE(window.create_sketch_on_selection());
+  REQUIRE(window.sketch_tools().begin_tool(GuiSketchCreateTool::CornerRectangle));
+  REQUIRE(window.sketch_tools().add_pick({0, 0}));
+  REQUIRE(window.sketch_tools().add_pick({20, 10}));
+  REQUIRE(window.finish_active_sketch());
+  window.feature_tools().extrude_action().trigger();
+  REQUIRE(window.feature_tools().apply());
+  const auto feature = window.session().part_document()->features().back().id();
+  const auto sketch = window.session().part_document()->features().back().input_sketch();
+  CHECK(body_z(window) == Approx(10).margin(1e-6));
+  begin(window, Kind::OffsetPlane);
+  control<QDoubleSpinBox>(window, "offset").setValue(25);
+  apply(window);
+  const auto source_plane = window.session().part_document()->construction_planes().back().id();
+  const auto before = snapshot(window);
+  const auto parameters = window.session().part_document()->parameter_count();
+  edit_tree(window, plane.value());
+  CHECK(control<QComboBox>(window, "parameter").currentData().toString().toStdString() ==
+        parameter.value());
+  CHECK_FALSE(control<QDoubleSpinBox>(window, "offset").isEnabled());
+  select(control<QComboBox>(window, "plane"), source_plane.value());
+  control<QComboBox>(window, "parameter").setCurrentIndex(0);
+  control<QDoubleSpinBox>(window, "offset").setValue(7);
+  CHECK(snapshot(window) == before);
+  CHECK(body_z(window) == Approx(10).margin(1e-6));
+  CHECK(window.viewport().feature_preview_count() > 1);
+  CHECK(window.viewport().feature_preview_replaces("construction-plane/" + plane.value()));
+  apply(window);
+  const auto& part = *window.session().part_document();
+  CHECK(part.parameter_count() == parameters + 1);
+  CHECK(part.find_parameter(parameter)->value().millimeters() == 10);
+  CHECK(part.find_construction_plane(plane)->relation()->offset_parameter() != parameter);
+  CHECK(part.find_sketch(sketch)->workplane() == DatumPlaneId(plane.value()));
+  CHECK(part.find_feature(feature));
+  CHECK(body_z(window) == Approx(32).margin(1e-6));
+  const auto after = snapshot(window);
+  REQUIRE(window.undo());
+  CHECK(snapshot(window) == before);
+  CHECK(body_z(window) == Approx(10).margin(1e-6));
+  REQUIRE(window.redo());
+  CHECK(snapshot(window) == after);
+  QTemporaryDir directory;
+  REQUIRE(window.save_to(directory.filePath("edited.blcad.json")));
+  ShellWindow reopened;
+  REQUIRE(reopened.open_path(directory.filePath("edited.blcad.json")));
+  CHECK(snapshot(reopened) == after);
+  CHECK(body_z(reopened) == Approx(32).margin(1e-6));
+}
+
+TEST_CASE(
+    "Face workplanes rebind semantic faces and cyclic workplane edits fail closed",
+    "[gui][block136-construction-edit][shell-construction-edit][shell-construction-edit-faces]") {
+  ShellWindow window;
+  REQUIRE(window.new_part("Flächenbezug"));
+  begin(window, Kind::OffsetPlane);
+  apply(window);
+  const auto offset = window.session().part_document()->construction_planes().back().id();
+  authored_body(window, "construction-plane/" + offset.value());
+  begin(window, Kind::FacePlane);
+  apply(window);
+  const auto plane = window.session().part_document()->derived_workplanes().back().id();
+  edit_tree(window, plane.value());
+  auto& faces = control<QComboBox>(window, "face");
+  REQUIRE(faces.count() == 6);
+  CHECK(faces.currentData(Qt::UserRole + 1).toInt() == static_cast<int>(SemanticFace::Top));
+  faces.setCurrentIndex(1);
+  apply(window);
+  CHECK(window.session().part_document()->find_derived_workplane(plane)->face_reference().face() ==
+        SemanticFace::Bottom);
+  const auto before = snapshot(window);
+  edit_tree(window, plane.value());
+  control<QPushButton>(window, "cancel").click();
+  CHECK(snapshot(window) == before);
+  // offset -> Sketch -> Extrude -> face; the reverse reference forms a cycle.
+  const auto stable = snapshot(window);
+  edit_tree(window, offset.value());
+  select(control<QComboBox>(window, "plane"), plane.value());
+  CHECK_FALSE(control<QPushButton>(window, "apply").isEnabled());
+  CHECK_FALSE(window.viewport().feature_preview_active());
+  CHECK(window.construction_tools().apply().has_error());
+  CHECK(snapshot(window) == stable);
+  control<QPushButton>(window, "cancel").click();
+  CHECK_FALSE(window.session().task().active());
+}
+
+TEST_CASE("Construction edit preserves unmodified precision dependencies and task cancellation",
+          "[gui][block136-construction-edit][shell-construction-edit][shell-construction-edit-"
+          "lifecycle]") {
+  ShellWindow window;
+  REQUIRE(window.new_part("Präzision"));
+  const Point3 precise{1.1234567890123, -2.9876543210987, 3.3333333333333};
+  REQUIRE(
+      window.session().commit_part_transaction("Precise imported point", [&](PartDocument& part) {
+        REQUIRE(part.add_parameter(checked(
+            Parameter::create_length(ParameterId("p"), "p", checked(Quantity::length_mm(5))))));
+        return part.add_construction_point(checked(ConstructionPoint::create_explicit(
+            ConstructionPointId("precise"), "Imported", precise, {ParameterId("p")})));
+      }));
+  window.refresh();
+  const auto before = snapshot(window);
+  edit_tree(window, "precise");
+  control<QLineEdit>(window, "name").setText("Renamed");
+  apply(window);
+  const auto* point =
+      window.session().part_document()->find_construction_point(ConstructionPointId("precise"));
+  CHECK(point->position() == precise);
+  CHECK(point->parameter_dependencies() == std::vector{ParameterId("p")});
+  const auto after = snapshot(window);
+  edit_tree(window, "precise");
+  control<QLineEdit>(window, "name").setText(" ");
+  CHECK_FALSE(control<QPushButton>(window, "apply").isEnabled());
+  control<QLineEdit>(window, "name").setText("Valid");
+  REQUIRE(control<QPushButton>(window, "apply").isEnabled());
+  QKeyEvent escape(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier);
+  QApplication::sendEvent(&control<QLineEdit>(window, "name"), &escape);
+  CHECK_FALSE(window.construction_tools().active());
+  CHECK(snapshot(window) == after);
+  edit_tree(window, "precise");
+  REQUIRE(window.undo());
+  CHECK_FALSE(window.construction_tools().active());
+  CHECK(snapshot(window) == before);
+  REQUIRE(window.redo());
+  edit_tree(window, "precise");
+  QTemporaryDir directory;
+  REQUIRE(window.save_to(directory.filePath("saved.blcad.json")));
+  CHECK_FALSE(window.construction_tools().active());
+  CHECK_FALSE(window.viewport().feature_preview_active());
+  CHECK(snapshot(window) == after);
+  CHECK(window.construction_tools().begin_edit("datum.axis.x").has_error());
+  CHECK_FALSE(window.session().task().active());
 }

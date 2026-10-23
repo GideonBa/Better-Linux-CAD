@@ -817,3 +817,78 @@ TEST_CASE("Combined UI cancellation workflow preserves saved state through inval
   CHECK(ui.snapshot() == changed);
   ui.idle();
 }
+
+TEST_CASE(
+    "Combined UI workplane editing rejects cyclic references and preserves downstream history",
+    "[gui][integration][shell-combined-workflow][block136-construction-edit][shell-combined-"
+    "workplane-edit]") {
+  WorkflowUi ui;
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  ui.new_document("Workplane editing workflow");
+  const auto plane = ui.offset(10);
+  const auto sketch = ui.rectangle(plane.value(), {20, 20}, {50, 40});
+  const auto body = ui.extrude(6);
+  const auto initial = ui.snapshot();
+  CHECK(ui.bounds(body).minimum.z == Approx(10).margin(1e-5));
+  ui.tree(plane.value(), true);
+  REQUIRE(ui.window.construction_tools().active());
+  auto& binding = ui.widget<QComboBox>("blcad.construction.parameter");
+  ui.choose(binding, 0); // Provision another parameter; preserve the existing shared binding.
+  auto& offset = ui.widget<QDoubleSpinBox>("blcad.construction.offset");
+  ui.click(offset);
+  ui.key(offset, Qt::Key_A, {}, Qt::ControlModifier);
+  ui.key(offset, Qt::Key_2, "2");
+  ui.key(offset, Qt::Key_3, "3");
+  // Deliberately leave numeric text pending until the Apply mouse event.
+  CHECK(ui.snapshot() == initial);
+  ui.button("blcad.construction.apply");
+  ui.idle();
+  const auto edited = ui.snapshot();
+  CHECK(edited != initial);
+  CHECK(ui.bounds(body).minimum.z == Approx(23).margin(1e-5));
+  CHECK(ui.summary(body).volume_mm3 == Approx(3600).margin(1e-5));
+  CHECK(ui.window.session().part_document()->find_sketch(sketch)->workplane() == plane);
+
+  ui.command("create_construction");
+  ui.choose(ui.widget<QComboBox>("blcad.construction.kind"),
+            static_cast<int>(ShellConstructionTools::Kind::FacePlane));
+  ui.button("blcad.construction.apply");
+  const auto face = ui.window.session().part_document()->derived_workplanes().back().id();
+  const auto with_face = ui.snapshot();
+  ui.tree(plane.value(), true);
+  ui.data(ui.widget<QComboBox>("blcad.construction.plane"), QString::fromStdString(face.value()));
+  CHECK_FALSE(ui.widget<QPushButton>("blcad.construction.apply").isEnabled());
+  CHECK_FALSE(ui.window.viewport().feature_preview_active());
+  CHECK(ui.snapshot() == with_face);
+  // Recover in the same task, then cancel using Escape from an actual task input.
+  ui.data(ui.widget<QComboBox>("blcad.construction.plane"), "datum.xy");
+  CHECK(ui.widget<QPushButton>("blcad.construction.apply").isEnabled());
+  ui.key(ui.widget<QComboBox>("blcad.construction.plane"), Qt::Key_Escape);
+  ui.idle();
+  CHECK(ui.snapshot() == with_face);
+  ui.tree(plane.value(), true);
+  ui.text(ui.widget<QLineEdit>("blcad.construction.name"), "Machining datum");
+  ui.capture("combined-workplane-edit");
+  ui.button("blcad.construction.apply");
+  const auto renamed = ui.snapshot();
+  ui.command("undo");
+  CHECK(ui.snapshot() == with_face);
+  ui.command("undo");
+  CHECK(ui.snapshot() == edited);
+  ui.command("undo");
+  CHECK(ui.snapshot() == initial);
+  CHECK(ui.bounds(body).minimum.z == Approx(10).margin(1e-5));
+  for (int i = 0; i < 3; ++i)
+    ui.command("redo");
+  CHECK(ui.snapshot() == renamed);
+  CHECK(ui.bounds(body).minimum.z == Approx(23).margin(1e-5));
+  ui.roundtrip(directory.filePath("workplane-edit.blcad.json"));
+  CHECK(ui.bounds(body).minimum.z == Approx(23).margin(1e-5));
+  const auto exported = ui.snapshot();
+  const auto step = directory.filePath("workplane-edit.step");
+  ui.file("export_part_step", step);
+  CHECK(ui.bytes(step).contains("ISO-10303-21"));
+  CHECK(ui.snapshot() == exported);
+  ui.idle();
+}

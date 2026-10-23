@@ -53,6 +53,13 @@ public:
   [[nodiscard]] Result<std::size_t> add_construction_line(ConstructionLine line);
   [[nodiscard]] Result<std::size_t> add_construction_plane(ConstructionPlane plane);
   [[nodiscard]] Result<std::size_t> add_derived_workplane(DerivedWorkplane workplane);
+  // Replace existing construction intent without changing identity or ordered
+  // position. Revalidate references, reject cycles and invalidate dependents.
+  [[nodiscard]] Result<std::size_t> update_datum_axis(DatumAxis axis);
+  [[nodiscard]] Result<std::size_t> update_construction_point(ConstructionPoint point);
+  [[nodiscard]] Result<std::size_t> update_construction_line(ConstructionLine line);
+  [[nodiscard]] Result<std::size_t> update_construction_plane(ConstructionPlane plane);
+  [[nodiscard]] Result<std::size_t> update_derived_workplane(DerivedWorkplane workplane);
   [[nodiscard]] Result<std::size_t> add_sketch(Sketch sketch);
   // Replaces one existing planar sketch atomically while preserving its position in the authored
   // collection and every downstream dependency edge. The replacement must keep the same SketchId;
@@ -244,6 +251,9 @@ public:
   [[nodiscard]] bool has_workplane_id(const DatumPlaneId& id) const noexcept;
 
 private:
+  // Loading validates records in dependency order, then restores their authored
+  // collection order without exposing mutable collections to other clients.
+  friend Result<PartDocument> deserialize_part_document_from_json(std::string_view content);
   PartDocument(DocumentId id, std::string name);
 
   [[nodiscard]] Result<std::size_t>
@@ -285,6 +295,11 @@ private:
                                   const std::vector<ParameterId>& parameters);
   [[nodiscard]] Result<std::size_t> add_shell_dependencies(const ShellFeature& feature);
   [[nodiscard]] Result<std::size_t> add_draft_dependencies(const DraftFeature& feature);
+
+  template <typename T>
+  [[nodiscard]] Result<std::size_t>
+  update_construction_record(std::vector<T> PartDocument::*member, T replacement,
+                             Result<std::size_t> (PartDocument::*adder)(T));
 
   // Block 129 generic feature update/remove over the typed feature vectors.
   template <typename FeatureT>

@@ -1003,6 +1003,15 @@ void ShellWindow::handle_tree_activation(QTreeWidgetItem* item) {
       show_error(begun.error());
     return;
   }
+  if (node && node->owner_document_id == session_.part_document()->id().value() &&
+      (node->kind == GuiBrowserNodeKind::Construction ||
+       (node->kind == GuiBrowserNodeKind::Datum &&
+        !session_.part_document()->find_datum_plane(DatumPlaneId(semantic_id))))) {
+    auto begun = construction_tools_->begin_edit(semantic_id);
+    if (!begun)
+      show_error(begun.error());
+    return;
+  }
   const SketchId sketch_id(semantic_id);
   if (session_.part_document()->find_sketch(sketch_id) == nullptr)
     return;

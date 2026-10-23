@@ -155,10 +155,9 @@
         "owner": 136,
         "status": "partial",
         "contract": "docs/gui-sketch-workbench-mvp7.md",
-        "scope": "Seeded origins plus nine construction/workplane creation modes with resolved previews, atomic Apply, history/persistence and Sketch entry from browser or viewport.",
+        "scope": "Seeded origins plus nine construction/workplane creation and same-ID editing modes with downstream recompute previews, atomic Apply, reference rebinding, history/persistence and Sketch entry.",
         "gaps": [
-          "Restore in-place editing/rebinding of datum and construction geometry and workplanes beyond existing offset-parameter property edits.",
-          "Expose generated-edge/vertex and parallel-through-point construction authoring plus native reference collection/manipulators."
+          "Expose generated-edge/vertex and parallel-through-point construction creation/editing plus native reference collection/manipulators."
         ],
         "proofs": [
           {
@@ -171,6 +170,14 @@
           },
           {
             "filter": "[shell-combined-loft]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
+          },
+          {
+            "filter": "[shell-construction-edit]",
+            "source": "tests/gui/gui_shell_construction_tools_tests.cpp"
+          },
+          {
+            "filter": "[shell-combined-workplane-edit]",
             "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
           }
         ],
