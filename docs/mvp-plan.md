@@ -641,6 +641,21 @@ Sampled sweep controls and occurrence-linked result highlighting remain open. Co
 
 Whole-block acceptance remains open.
 
+### Block 136 — Construction and workplane creation slice — 2026-10-23
+
+The replacement shell restores explicit construction points, lines, planes and datum axes, lines
+through two points, axes from construction lines, three-point planes, parameter-bound offset planes
+and supported semantic-face workplanes. The nonmodal task provides disposable resolved Geometry
+previews, input rejection and one atomic Apply, including a newly provisioned offset parameter.
+Resolved helper geometry is visible and selectable, and construction/derived planes now support
+browser/viewport selection followed by normal-to-plane Sketch creation and downstream extrusion.
+Undo/Redo and canonical Save/Open retain existing authorities. Contract/proof:
+`docs/gui-sketch-workbench-mvp7.md`, `[block136-construction]`, `[geometry][construction-presentation]`.
+
+In-place construction/workplane editing, generated-reference and parallel-through-point authoring,
+and native reference collection/manipulators remain explicit gaps. This slice does not close the
+datum family or Block 136.
+
 ## Current next technical step — Block 136
 
 The current v3 coverage inventory records all eighteen accepted families, current shell proof sources,
@@ -648,8 +663,9 @@ reachable entry points and explicit remaining gaps. The machine check distinguis
 from closure readiness; historical controller proofs cannot close a shell gap. Acceptance contract:
 `docs/gui-shell-acceptance-mvp9r.md`, `[integration][gui-feature-coverage]` / `[gui][shell-coverage]`.
 
-Restore datum/construction geometry and workplane authoring beyond seeded origins next. Continue with
-reference repair and Sketch3D authoring, parameter/Hole/extent editors, workspace navigation/context,
+Complete construction/workplane object editing and the remaining relation/pick workflows next,
+building on the new creation task and resolved scene. Continue with reference repair and Sketch3D
+authoring, parameter/Hole/extent editors, workspace navigation/context,
 advanced Assembly controls and integrated native Part/Assembly acceptance in the order recorded in
 `docs/gui-shell-acceptance-mvp9r.md`. Block 136 remains in progress until all recorded gaps and pending
 workflows are resolved and the closure gate plus full/native regressions pass.

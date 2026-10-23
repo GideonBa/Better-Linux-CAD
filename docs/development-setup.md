@@ -352,10 +352,9 @@ Block 131 integrated acceptance:
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][interactive-modeling]"
 ```
 
-Measure (`include/blcad/geometry/geometry_measure.hpp`) and the coverage-manifest check currently have
-no tests: `[gui][measure]` and `[integration][modeling-coverage-manifest]` lived in the shell-bound
-files deleted by Block 133, and nothing replaced them. `GeometryMeasure` is therefore an uncovered
-Geometry authority; Block 136 owns restoring both (`docs/gui-shell-reset-sequence-mvp9r.md`).
+The original `[gui][measure]` and `[integration][modeling-coverage-manifest]` shell proofs were deleted
+by Block 133. Their replacement-shell coverage is restored through `[block136-measure]` and
+`[integration][gui-feature-coverage]`; commands and bounded acceptance are recorded below.
 
 ## Representative existing validation tags
 
@@ -709,3 +708,24 @@ is separate from whole-shell acceptance: `docs/gui-shell-acceptance-mvp9r.md` de
 work and the opt-in `BLCAD_REQUIRE_SHELL_ACCEPTANCE=1` closure gate, which fails while gaps remain.
 Run full Core, Geometry and offscreen GUI suites plus native interaction coverage before closing the
 block; historical controller tests alone do not establish equivalent shell coverage.
+
+### Block 136 construction and workplane creation
+
+```bash
+cmake --build --preset dev-gui --target blcad_gui_tests blcad_app blcad_geometry_tests blcad_core_tests -j4
+./build/dev-gui/blcad_geometry_tests "[geometry][construction-presentation]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[block136-construction],[integration][gui-feature-coverage]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-construction-captures QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-construction]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
+```
+
+The shell cases cover nine creation modes, normalized directions, stable source selectors, disposable
+Geometry previews, degenerate-input rejection, parameter-plus-plane atomicity and existing bindings,
+exact Undo/Redo, canonical Save/Open, committed-only saving during preview, context/revision guards,
+Escape/dock close and construction/derived planes as Sketch/Extrude inputs. Geometry tests inspect
+actual OCCT bounds for resolved points, lines, derived axes and offset/generated workplanes.
+The native case checks real ribbon mouse input, pending numeric keyboard input consumed by Apply,
+reachable Apply and OCCT preview at 1280×800; only that case skips offscreen.
+`BLCAD_UI_CAPTURE_DIR` enables captures.
+Editing and remaining relation/pick workflows keep the datum family and Block 136 open; see
+`docs/gui-sketch-workbench-mvp7.md` and `docs/gui-shell-acceptance-mvp9r.md`.

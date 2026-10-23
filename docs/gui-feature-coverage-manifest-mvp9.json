@@ -147,21 +147,29 @@
         "owner": 136,
         "status": "partial",
         "contract": "docs/gui-sketch-workbench-mvp7.md",
-        "scope": "Seeded origin planes/axes and existing reference geometry are selectable.",
+        "scope": "Seeded origins plus nine construction/workplane creation modes with resolved previews, atomic Apply, history/persistence and Sketch entry from browser or viewport.",
         "gaps": [
-          "Restore authoring/editing of datum and construction geometry and workplanes beyond seeded origins."
+          "Restore in-place editing/rebinding of datum and construction geometry and workplanes beyond existing offset-parameter property edits.",
+          "Expose generated-edge/vertex and parallel-through-point construction authoring plus native reference collection/manipulators."
         ],
         "proofs": [
           {
             "filter": "[gui][origin]",
             "source": "tests/gui/gui_shell_window_tests.cpp"
+          },
+          {
+            "filter": "[block136-construction]",
+            "source": "tests/gui/gui_shell_construction_tools_tests.cpp"
           }
         ],
         "actions": [
+          "create_construction",
+          "create_workplane",
           "create_sketch"
         ],
         "widgets": [
-          "blcad.shell.browser"
+          "blcad.shell.browser",
+          "blcad.shell.construction_task"
         ]
       }
     },
@@ -690,7 +698,7 @@
       ]
     },
     "acceptance": {
-      "audited_on": "2026-10-22",
+      "audited_on": "2026-10-23",
       "complete": false,
       "blocked_families": [
         "viewport-selection",

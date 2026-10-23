@@ -1,10 +1,13 @@
+#include "blcad/core/part_document_json.hpp"
 #include "blcad/geometry/occt_shape_view.hpp"
 #include "blcad/geometry/viewport_scene.hpp"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <BRepBndLib.hxx>
 #include <BRepGProp.hxx>
+#include <Bnd_Box.hxx>
 #include <GProp_GProps.hxx>
 #include <TopAbs_ShapeEnum.hxx>
 #include <TopExp_Explorer.hxx>
@@ -13,6 +16,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <filesystem>
 #include <numbers>
 #include <string>
 #include <string_view>
@@ -77,6 +81,95 @@ double surface_area(const TopoDS_Shape& shape) {
 }
 
 } // namespace
+
+TEST_CASE("Viewport resolves construction relationships into selectable world geometry",
+          "[geometry][viewport-scene][construction-presentation]") {
+  const auto checked = []<typename T>(Result<T> result) {
+    if (!result)
+      FAIL(result.error().message());
+    return std::move(result.value());
+  };
+  auto part = checked(PartDocument::create(DocumentId("part.construction_scene"), "Construction"));
+  REQUIRE(part.add_datum_plane(checked(DatumPlane::xy())));
+  REQUIRE(part.add_parameter(make_length_parameter("offset", "Offset", 25)));
+  REQUIRE(part.add_construction_point(
+      checked(ConstructionPoint::create_explicit(ConstructionPointId("point.a"), "A", {2, 3, 7}))));
+  REQUIRE(part.add_construction_point(checked(
+      ConstructionPoint::create_explicit(ConstructionPointId("point.b"), "B", {12, 3, 7}))));
+  auto line_relation = checked(ConstructionRelation::create_line_through_two_points(
+      ConstructionRelationId("relation.line"), ConstructionPointId("point.a"),
+      ConstructionPointId("point.b")));
+  REQUIRE(part.add_construction_line(checked(ConstructionLine::create_through_two_points(
+      ConstructionLineId("line.ab"), "AB", line_relation))));
+  REQUIRE(part.add_datum_axis(checked(DatumAxis::create_from_construction_line(
+      DatumAxisId("axis.ab"), "Axis", ConstructionLineId("line.ab")))));
+  auto offset_relation = checked(ConstructionRelation::create_plane_offset_from_plane(
+      ConstructionRelationId("relation.plane"), DatumPlaneId("datum.xy"), ParameterId("offset")));
+  REQUIRE(part.add_construction_plane(checked(ConstructionPlane::create_offset_from_plane(
+      ConstructionPlaneId("plane.offset"), "Offset", offset_relation))));
+  auto cache = checked(ShapeCache::create(ShapeCacheId("cache.construction")));
+  auto scene = checked(ViewportSceneBuilder{}.build_part(part, cache));
+  const auto bounds = [&](const std::string& id) {
+    auto found = std::find_if(scene.begin(), scene.end(),
+                              [&](const auto& item) { return item.semantic_id == id; });
+    REQUIRE(found != scene.end());
+    CHECK(found->kind == ViewportSceneKind::Datum);
+    const auto* shape = OcctShapeView::get(found->shape);
+    REQUIRE(shape);
+    Bnd_Box box;
+    BRepBndLib::Add(*shape, box);
+    std::array<double, 6> values{};
+    box.Get(values[0], values[1], values[2], values[3], values[4], values[5]);
+    return values;
+  };
+  auto point_bounds = bounds("construction-point/point.a");
+  CHECK(point_bounds[0] == Approx(2).margin(1e-6));
+  CHECK(point_bounds[1] == Approx(3).margin(1e-6));
+  CHECK(point_bounds[2] == Approx(7).margin(1e-6));
+  for (const auto* id : {"construction-line/line.ab", "datum-axis/axis.ab"}) {
+    const auto values = bounds(id);
+    CHECK(values[0] == Approx(-58).margin(1e-6));
+    CHECK(values[3] == Approx(62).margin(1e-6));
+    CHECK(values[1] == Approx(3).margin(1e-6));
+    CHECK(values[5] == Approx(7).margin(1e-6));
+  }
+  const auto plane = bounds("construction-plane/plane.offset");
+  CHECK(plane[2] == Approx(25).margin(1e-6));
+  CHECK(plane[5] == Approx(25).margin(1e-6));
+  CHECK(plane[3] - plane[0] == Approx(100).margin(1e-6));
+}
+
+TEST_CASE("Viewport presents generated construction points lines and semantic face workplanes",
+          "[geometry][viewport-scene][construction-presentation]") {
+  auto part = read_part_document_json_file(
+      std::filesystem::path(__FILE__).parent_path().parent_path().parent_path() /
+      "examples/generated_semantic_references.blcad.json");
+  REQUIRE(part);
+  auto reference = SemanticFaceReference::create(FeatureId("feature.base"), SemanticFace::Top);
+  REQUIRE(reference);
+  auto plane =
+      DerivedWorkplane::create_on_feature_face(DatumPlaneId("plane.top"), "Top", reference.value());
+  REQUIRE(plane);
+  REQUIRE(part.value().add_derived_workplane(plane.value()));
+  auto cache = ShapeCache::create(ShapeCacheId("cache.generated_construction"));
+  REQUIRE(cache);
+  auto scene = ViewportSceneBuilder{}.build_part(part.value(), cache.value());
+  REQUIRE(scene);
+  for (const auto* id :
+       {"construction-point/point.top_front_right", "construction-point/point.top_front_mid",
+        "construction-line/line.top_front_axis", "derived-workplane/plane.top"}) {
+    const auto found = std::find_if(scene.value().begin(), scene.value().end(),
+                                    [&](const auto& item) { return item.semantic_id == id; });
+    REQUIRE(found != scene.value().end());
+    Bnd_Box box;
+    REQUIRE(OcctShapeView::get(found->shape));
+    BRepBndLib::Add(*OcctShapeView::get(found->shape), box);
+    double x1, y1, z1, x2, y2, z2;
+    box.Get(x1, y1, z1, x2, y2, z2);
+    CHECK(z1 == Approx(10).margin(1e-6));
+    CHECK(z2 == Approx(10).margin(1e-6));
+  }
+}
 
 TEST_CASE("Viewport presents a line rectangle around a circle as two selectable regions",
           "[geometry][viewport-scene][nested-profile]") {

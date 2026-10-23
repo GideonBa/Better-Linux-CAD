@@ -273,11 +273,13 @@ GuiBrowserNode build_part(const PartDocument& part) {
   auto datums = group("Datums / Workplanes");
   append_part_nodes(datums, part, other_planes, GuiBrowserNodeKind::Datum, GuiSelectionKind::Datum, "datum-plane/");
   append_part_nodes(datums, part, other_axes, GuiBrowserNodeKind::Datum, GuiSelectionKind::Datum, "datum-axis/");
-  append_part_nodes(datums, part, part.derived_workplanes(), GuiBrowserNodeKind::Datum, GuiSelectionKind::Datum);
+  append_part_nodes(datums, part, part.derived_workplanes(), GuiBrowserNodeKind::Datum,
+                    GuiSelectionKind::Datum, "derived-workplane/");
   root.children.push_back(std::move(datums));
 
   auto construction = group("Construction");
-  append_part_nodes(construction, part, part.construction_points(), GuiBrowserNodeKind::Construction, GuiSelectionKind::Datum);
+  append_part_nodes(construction, part, part.construction_points(), GuiBrowserNodeKind::Construction,
+                    GuiSelectionKind::Datum, "construction-point/");
   append_part_nodes(construction, part, part.construction_lines(), GuiBrowserNodeKind::Construction, GuiSelectionKind::Datum, "construction-line/");
   append_part_nodes(construction, part, part.construction_planes(), GuiBrowserNodeKind::Construction, GuiSelectionKind::Datum, "construction-plane/");
   root.children.push_back(std::move(construction));

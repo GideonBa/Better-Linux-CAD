@@ -5,6 +5,7 @@
 #include "blcad/gui/gui_interactive_profile_materialization.hpp"
 #include "blcad/gui/gui_sketch_intent_remap.hpp"
 #include "blcad/gui/shell/shell_assembly_tools.hpp"
+#include "blcad/gui/shell/shell_construction_tools.hpp"
 #include "blcad/gui/shell/shell_feature_edit_tools.hpp"
 #include "blcad/gui/shell/shell_feature_tools.hpp"
 #include "blcad/gui/shell/shell_inspect_tools.hpp"
@@ -250,6 +251,7 @@ ShellWindow::ShellWindow() {
       std::make_unique<ShellAssemblyTools>(*this, session_, *viewport_, *ribbon_, tab_assembly_);
   feature_edit_tools_ = std::make_unique<ShellFeatureEditTools>(*this);
   inspect_tools_ = std::make_unique<ShellInspectTools>(*this, *ribbon_, tab_model_, tab_assembly_);
+  construction_tools_ = std::make_unique<ShellConstructionTools>(*this, *ribbon_, tab_model_);
   statusBar()->showMessage(QStringLiteral("Bereit"));
   refresh();
 }
@@ -259,6 +261,7 @@ ShellWindow::~ShellWindow() {
   // still exist. QMainWindow/QWidget teardown otherwise destroys that drawable
   // before deleting the central viewport and its OCCT GL resources.
   viewport_->set_view_changed_callback({});
+  construction_tools_.reset();
   inspect_tools_.reset();
   feature_edit_tools_.reset();
   assembly_tools_.reset();
@@ -584,6 +587,8 @@ bool ShellWindow::confirm_document_replacement() {
 }
 
 void ShellWindow::reset_document_interaction() {
+  if (construction_tools_)
+    construction_tools_->cancel();
   if (inspect_tools_)
     inspect_tools_->cancel();
   if (feature_edit_tools_)
@@ -649,18 +654,26 @@ void ShellWindow::closeEvent(QCloseEvent* event) {
 }
 
 std::optional<DatumPlaneId> ShellWindow::selected_datum_plane() const {
-  constexpr std::string_view kPrefix = "datum-plane/";
-  if (selected_semantic_id_.rfind(kPrefix, 0) != 0)
+  const auto* part = session_.part_document();
+  if (!part)
     return std::nullopt;
-  return DatumPlaneId(selected_semantic_id_.substr(kPrefix.size()));
+  for (const std::string_view prefix :
+       {"datum-plane/", "construction-plane/", "derived-workplane/"}) {
+    if (!selected_semantic_id_.starts_with(prefix))
+      continue;
+    const DatumPlaneId id(selected_semantic_id_.substr(prefix.size()));
+    if (geometry::WorkplaneResolver{}.resolve(*part, id))
+      return id;
+  }
+  return std::nullopt;
 }
 
 bool ShellWindow::create_sketch_on_selection() {
   const auto* part = session_.part_document();
   const auto plane = selected_datum_plane();
-  if (active_sketch_ || part == nullptr || !plane) {
+  if (active_sketch_ || session_.task().active() || part == nullptr || !plane) {
     statusBar()->showMessage(
-        QStringLiteral("Zuerst eine Ursprungsebene wählen, dann 2D-Skizze erstellen"));
+        QStringLiteral("Zuerst eine Arbeitsebene wählen, dann 2D-Skizze erstellen"));
     return false;
   }
   std::size_t number = 1;
@@ -846,6 +859,8 @@ bool ShellWindow::finish_active_sketch() {
 }
 
 bool ShellWindow::undo() {
+  if (construction_tools_)
+    construction_tools_->cancel();
   if (inspect_tools_)
     inspect_tools_->cancel();
   if (feature_edit_tools_)
@@ -874,6 +889,8 @@ bool ShellWindow::undo() {
 }
 
 bool ShellWindow::redo() {
+  if (construction_tools_)
+    construction_tools_->cancel();
   if (inspect_tools_)
     inspect_tools_->cancel();
   if (feature_edit_tools_)
@@ -972,7 +989,8 @@ void ShellWindow::handle_tree_selection(QTreeWidgetItem* current) {
 void ShellWindow::handle_tree_activation(QTreeWidgetItem* item) {
   // Feature activation opens the update task; planar Sketch activation retains
   // its existing editing route. Both are scoped to the current Part context.
-  if (item == nullptr || active_sketch_ || session_.part_document() == nullptr)
+  if (item == nullptr || active_sketch_ || session_.task().active() ||
+      session_.part_document() == nullptr)
     return;
   const std::string semantic_id = item->data(0, kSemanticIdRole).toString().toStdString();
   if (semantic_id.empty())
@@ -1084,6 +1102,8 @@ void ShellWindow::refresh() {
 
   refresh_browser();
   refresh_properties();
+  if (construction_tools_)
+    construction_tools_->refresh();
   if (inspect_tools_)
     inspect_tools_->refresh();
   if (measure_tools_)
