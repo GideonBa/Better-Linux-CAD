@@ -656,6 +656,17 @@ In-place construction/workplane editing, generated-reference and parallel-throug
 and native reference collection/manipulators remain explicit gaps. This slice does not close the
 datum family or Block 136.
 
+### Block 136 — Combined UI workflow regression — 2026-10-23
+
+Five longer ShellWindow regressions combine actual ribbon/menu, browser, viewport Sketch, task and
+dialog input paths across machining, multi-Body operations, multi-workplane Loft, Assembly consumers
+and cancellation/recovery. They check independent Geometry results, multi-step and branching history,
+complete canonical save/reopen and read-only export/analysis. Proof: `[shell-combined-workflow]`;
+scope and commands: `docs/gui-shell-acceptance-mvp9r.md`, `docs/development-setup.md`.
+
+This extends integrated shell evidence without closing the remaining feature-family/input variants
+or advancing Block 136. Construction/workplane editing remains the next implementation step.
+
 ## Current next technical step — Block 136
 
 The current v3 coverage inventory records all eighteen accepted families, current shell proof sources,

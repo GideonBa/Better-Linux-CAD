@@ -729,3 +729,30 @@ reachable Apply and OCCT preview at 1280×800; only that case skips offscreen.
 `BLCAD_UI_CAPTURE_DIR` enables captures.
 Editing and remaining relation/pick workflows keep the datum family and Block 136 open; see
 `docs/gui-sketch-workbench-mvp7.md` and `docs/gui-shell-acceptance-mvp9r.md`.
+
+### Combined replacement-shell UI workflows
+
+```bash
+cmake --build --preset dev-gui --target blcad_gui_tests -j4
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[shell-combined-workflow]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-combined-workflows QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[shell-combined-workflow]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
+```
+
+`tests/gui/gui_shell_combined_workflow_tests.cpp` combines long interaction sequences in five
+scenarios: machining/edit/pattern/transform/Measure/STEP, Boolean/scale/Mirror with history branching,
+multi-workplane Loft section ordering/editing, authored-Part import/Assembly placement/Mate/solve/
+analysis/STEP, and invalid/cancelled tasks plus dirty-file and document-switch recovery.
+
+The shared harness operates Qt ribbon buttons and popup menus, task widgets, browser clicks and
+double-clicks, viewport Sketch picks/hover, Escape and absolute/relative numeric coordinates, and
+actual Qt input/file/confirmation dialogs. It does not seed Core intent or invoke authoring
+controllers/workbenches. Assertions observe canonical
+intent, resolved volumes/solid counts/bounds, source/result identities, task/preview/filter cleanup,
+multi-step Undo/Redo and redo-branch truncation. Save/Open/Save compares complete bytes, including GUI
+sidecars; exports preserve source bytes. Dialog automation has bounded watchdogs, and native input
+checks widget reachability at 1280×800. Both backends execute all five scenarios; these tests introduce
+no native-only skips. The native run is required to prove actual OCCT presentation.
+
+These bounded combined workflows extend the shell evidence. Remaining families, manipulator/input
+variants and whole-block acceptance stay tracked in `docs/gui-shell-acceptance-mvp9r.md`.
