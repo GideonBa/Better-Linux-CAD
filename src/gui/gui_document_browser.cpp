@@ -288,7 +288,8 @@ GuiBrowserNode build_part(const PartDocument& part) {
   root.children.push_back(std::move(sketches));
 
   auto paths = group("Paths");
-  append_part_nodes(paths, part, part.path_curves(), GuiBrowserNodeKind::Path, GuiSelectionKind::SketchEntity);
+  append_part_nodes(paths, part, part.path_curves(), GuiBrowserNodeKind::Path,
+                    GuiSelectionKind::SketchEntity, "path/");
   root.children.push_back(std::move(paths));
 
   auto features = group("Features");

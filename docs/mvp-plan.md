@@ -593,11 +593,25 @@ sources and remain disposable. Apply appends one transform record per selected B
 transaction; Cancel, Undo/Redo, Save/Open and explicit ownership flags preserve existing authorities.
 Contract and proof: `docs/gui-interactive-pattern-body-mvp9.md`, tag `[block136-body]`.
 
-Sweep, Loft, Surface, Measure, Assembly, browser feature editing and whole-block acceptance remain open.
+The remaining Block-136 work is tracked by the follow-up slices and current next step below.
+
+### Block 136 — PathCurve, Sweep and Loft slice
+
+The replacement shell restores ordered PathCurve creation, Sweep and Loft through the shared task
+panel, explicit source roles and actual Geometry previews. Path segments and Loft sections can be
+reordered by dragging or task buttons, with explicit reversal/normal flips. Sweep exposes twist
+handles and numeric refinement; guides, center paths, orientation and continuity retain their existing
+contracts. Solid, cut and surface modes use correctly typed candidate Bodies or an existing cut target.
+New result Bodies and twist parameters commit atomically with the feature. Closed fitted-spline
+profiles remain usable, and planar rational spline trajectories reuse deterministic 32-span resolution.
+Cancel, Undo/Redo and Save/Open preserve the existing authorities. Contract and proof:
+`docs/gui-interactive-path-sweep-loft-mvp9.md`, tag `[block136-spatial]`.
+
+Surface, Measure, Assembly, browser feature editing and whole-block acceptance remain open.
 
 ## Current next technical step — Block 136
 
-Restore the remaining feature commands (Sweep, Loft, Surface, Measure, and Assembly),
+Restore the remaining feature commands (Surface, Measure, and Assembly),
 browser-double-click feature editing, and replacement-shell acceptance/coverage as defined in
 `docs/gui-shell-reset-sequence-mvp9r.md`.
 

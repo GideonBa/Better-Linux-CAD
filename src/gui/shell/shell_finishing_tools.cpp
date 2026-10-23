@@ -72,7 +72,8 @@ bool ShellFeatureTools::finishing() const noexcept {
 }
 bool ShellFeatureTools::angular_value() const noexcept {
   return command_ == Command::Revolve || command_ == Command::Draft ||
-         command_ == Command::CircularPattern || command_ == Command::BodyRotate;
+         command_ == Command::CircularPattern || command_ == Command::BodyRotate ||
+         command_ == Command::Sweep;
 }
 std::string_view ShellFeatureTools::command_id() const noexcept {
   switch (command_) {
@@ -100,6 +101,12 @@ std::string_view ShellFeatureTools::command_id() const noexcept {
   case Command::BodyRotate:
   case Command::BodyScale:
     return "part.body_transform";
+  case Command::PathCurve:
+    return "part.path_curve";
+  case Command::Sweep:
+    return "part.sweep";
+  case Command::Loft:
+    return "part.loft";
   case Command::None:
     return {};
   }

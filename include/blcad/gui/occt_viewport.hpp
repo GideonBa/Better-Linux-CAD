@@ -117,6 +117,11 @@ public:
   void fit_all();
 
   void set_selection_filter_mask(std::uint32_t mask);
+  void set_selection_semantic_scope(std::optional<std::vector<std::string>> scope);
+  [[nodiscard]] const std::optional<std::vector<std::string>>&
+  selection_semantic_scope() const noexcept {
+    return selection_semantic_scope_;
+  }
   void set_selection_callback(std::function<void(std::optional<GuiSelection>)> callback);
   [[nodiscard]] bool select_semantic(std::string_view semantic_id);
   void clear_selection();
@@ -179,6 +184,7 @@ private:
   [[nodiscard]] QPoint to_render_point(QPoint point) const;
   void apply_display_mode();
   void apply_selection_filters();
+  [[nodiscard]] bool selection_allowed(const GuiSelection& selection) const noexcept;
   void apply_sketch_focus();
   void rebuild_sketch_grid();
   void rebuild_sketch_annotations();
@@ -215,6 +221,7 @@ private:
   GuiViewportDisplayMode display_mode_{GuiViewportDisplayMode::ShadedWithEdges};
   GuiViewportProjection projection_{GuiViewportProjection::Perspective};
   GuiSketchSurroundingsMode sketch_surroundings_mode_{GuiSketchSurroundingsMode::Dim};
+  std::optional<std::vector<std::string>> selection_semantic_scope_;
   std::uint32_t selection_filter_mask_{0xFFFFFFFFU};
   std::string sketch_focus_id_;
   OcctViewportRenderSurface* gl_surface_{nullptr};

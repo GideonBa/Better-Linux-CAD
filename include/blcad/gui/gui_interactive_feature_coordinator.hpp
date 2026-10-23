@@ -65,6 +65,12 @@ public:
   [[nodiscard]] GuiInteractivePathSweepController& path_sweep() noexcept {
     return path_sweep_;
   }
+  [[nodiscard]] const GuiInteractivePathSweepController& path_sweep() const noexcept {
+    return path_sweep_;
+  }
+  [[nodiscard]] const GuiInteractiveLoftController& loft() const noexcept {
+    return loft_;
+  }
   [[nodiscard]] GuiInteractiveLoftController& loft() noexcept {
     return loft_;
   }

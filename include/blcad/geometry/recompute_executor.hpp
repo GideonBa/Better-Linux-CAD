@@ -34,6 +34,11 @@ struct GeometryRecomputeSummary {
 
 class GeometryRecomputeExecutor {
 public:
+  [[nodiscard]] Result<std::vector<SweepPathSegment>>
+  resolve_path_segments(const PartDocument& document, PathCurveId path,
+                        const ShapeCache& cache) const;
+  [[nodiscard]] Result<GeometryShape>
+  preview_path_curve(const PartDocument& document, PathCurveId path, const ShapeCache& cache) const;
   [[nodiscard]] Result<std::size_t> execute_additive_extrude(const PartDocument& document,
                                                              FeatureId feature_id,
                                                              ShapeCache& shape_cache) const;

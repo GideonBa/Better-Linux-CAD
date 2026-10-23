@@ -352,4 +352,24 @@ SweepAdapter::sweep_open_profile(FeatureId feature_id, const std::vector<SweepPa
       GeometryShape(std::make_shared<GeometryShape::Impl>(std::move(shape.value()))));
 }
 
+Result<GeometryShape> SweepAdapter::path_shape(PathCurveId path,
+                                               const std::vector<SweepPathSegment>& segments,
+                                               bool closed) const {
+  const FeatureId id(path.value());
+  try {
+    auto wire =
+        make_wire(id, segments, "path preview", closed, [&](const SweepPathSegment& segment) {
+          return path_edge(id, segment, "path preview");
+        });
+    if (!wire)
+      return Result<GeometryShape>::failure(wire.error());
+    return Result<GeometryShape>::success(
+        GeometryShape(std::make_shared<GeometryShape::Impl>(wire.value())));
+  } catch (const Standard_Failure& failure) {
+    return Result<GeometryShape>::failure(sweep_error(id, failure.GetMessageString()
+                                                              ? failure.GetMessageString()
+                                                              : "could not build path preview"));
+  }
+}
+
 } // namespace blcad::geometry

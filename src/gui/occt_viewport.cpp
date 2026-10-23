@@ -1004,6 +1004,20 @@ void OcctViewport::set_selection_filter_mask(std::uint32_t mask) {
     clear_selection();
 }
 
+bool OcctViewport::selection_allowed(const GuiSelection& selection) const noexcept {
+  return (selection_filter_mask_ & selection_kind_bit(selection.kind)) != 0U &&
+         (!selection_semantic_scope_ ||
+          std::find(selection_semantic_scope_->begin(), selection_semantic_scope_->end(),
+                    selection.semantic_id) != selection_semantic_scope_->end());
+}
+
+void OcctViewport::set_selection_semantic_scope(std::optional<std::vector<std::string>> scope) {
+  selection_semantic_scope_ = std::move(scope);
+  apply_selection_filters();
+  if (selected_semantic_ && !selection_allowed(*selected_semantic_))
+    clear_selection();
+}
+
 void OcctViewport::set_selection_callback(
     std::function<void(std::optional<GuiSelection>)> callback) {
   selection_callback_ = std::move(callback);
@@ -1025,7 +1039,7 @@ bool OcctViewport::select_semantic(std::string_view semantic_id) {
                                    [semantic_id](const auto& item) {
                                      return item.semantic_id == semantic_id;
                                    });
-    if (known) {
+    if (known && selection_allowed({GuiSelectionKind::SketchEntity, std::string(semantic_id)})) {
       sketch_selections_ = {{GuiSelectionKind::SketchEntity, std::string(semantic_id)}};
       publish_sketch_selection();
       return true;
@@ -1039,7 +1053,7 @@ bool OcctViewport::select_semantic(std::string_view semantic_id) {
   if (found == impl_->presentations.end())
     return false;
   GuiSelection selection{selection_kind(found->item.kind), found->item.semantic_id};
-  if ((selection_filter_mask_ & selection_kind_bit(selection.kind)) == 0U)
+  if (!selection_allowed(selection))
     return false;
   if (!impl_->context.IsNull() && !found->interactive.IsNull()) {
     impl_->context->ClearSelected(false);
@@ -1331,7 +1345,7 @@ void OcctViewport::mouseReleaseEvent(QMouseEvent* event) {
         if (!sketch_profile_face(item))
           continue;
         GuiSelection selection{selection_kind(item.kind), item.semantic_id};
-        if ((selection_filter_mask_ & selection_kind_bit(selection.kind)) == 0U)
+        if (!selection_allowed(selection))
           continue;
         profile_owner = owner;
         profile_selection = std::move(selection);
@@ -1567,10 +1581,9 @@ void OcctViewport::apply_selection_filters() {
     if (presentation.interactive.IsNull())
       continue;
     const GuiSelectionKind kind = selection_kind(presentation.item.kind);
-    impl_->context->SetSelectionModeActive(
-        presentation.interactive, 0,
-        (selection_filter_mask_ & selection_kind_bit(kind)) != 0U,
-        AIS_SelectionModesConcurrency_Single, true);
+    impl_->context->SetSelectionModeActive(presentation.interactive, 0,
+                                           selection_allowed({kind, presentation.item.semantic_id}),
+                                           AIS_SelectionModesConcurrency_Single, true);
     apply_selection_priority(presentation.item, presentation.interactive);
   }
   render_update();
@@ -1841,7 +1854,7 @@ std::optional<GuiSelection> OcctViewport::detected_selection() const {
     return std::nullopt;
   const auto& item = impl_->presentations[found->second].item;
   GuiSelection selection{selection_kind(item.kind), item.semantic_id};
-  if ((selection_filter_mask_ & selection_kind_bit(selection.kind)) == 0U)
+  if (!selection_allowed(selection))
     return std::nullopt;
   return selection;
 }

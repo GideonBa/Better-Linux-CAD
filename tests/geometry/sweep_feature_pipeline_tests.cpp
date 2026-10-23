@@ -1,4 +1,6 @@
+#include "blcad/core/part_document_json.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
+#include "blcad/geometry/viewport_scene.hpp"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -469,4 +471,71 @@ TEST_CASE("Block 81 adapter rejects non-adjacent path self-intersection",
   REQUIRE(result.has_error());
   CHECK(result.error().message() ==
         "sweep path must not self-intersect or repeat branch junctions");
+}
+
+TEST_CASE(
+    "Path previews resolve bounded construction trajectories without mutating document or cache",
+    "[geometry][sweep-feature][block136-spatial]") {
+  bool bounded = true;
+  SECTION("bounded line publishes a complete selectable path") {}
+  SECTION("infinite line cannot masquerade as a bounded path") {
+    bounded = false;
+  }
+  auto document = construction_line_sweep(std::nullopt, bounded);
+  auto shape_cache = cache();
+  const auto before = serialize_part_document_to_json(document).value();
+  auto preview = GeometryRecomputeExecutor{}.preview_path_curve(
+      document, PathCurveId("path.trajectory"), shape_cache);
+  CHECK(static_cast<bool>(preview) == bounded);
+  CHECK(serialize_part_document_to_json(document).value() == before);
+  CHECK(shape_cache.body_shape_count() == 0);
+  CHECK(shape_cache.feature_shape_count() == 0);
+  if (bounded) {
+    const auto bounds = BodyTransformAdapter{}.bounds(preview.value());
+    REQUIRE(bounds);
+    CHECK(bounds.value().minimum.z == Catch::Approx(0).margin(1e-6));
+    CHECK(bounds.value().maximum.z == Catch::Approx(20).margin(1e-6));
+    auto scene = ViewportSceneBuilder{}.build_part(document, shape_cache);
+    REQUIRE(scene);
+    CHECK(std::any_of(scene.value().begin(), scene.value().end(), [](const auto& item) {
+      return item.kind == ViewportSceneKind::Path && item.semantic_id == "path/path.trajectory";
+    }));
+  }
+}
+
+TEST_CASE("Planar rational spline trajectories share 32-span resolution with solid Sweep execution",
+          "[geometry][sweep-feature][sweep-3d][block136-spatial]") {
+  auto document = PartDocument::create(DocumentId("planar.spline"), "Planar spline").value();
+  REQUIRE(document.add_datum_plane(DatumPlane::xy().value()));
+  add_xz_path_plane(document);
+  add_profile(document);
+  auto sketch = Sketch::create(SketchId("spline"), "Spline", DatumPlaneId("plane.path")).value();
+  auto spline = SplineSegment::create_cubic_bezier(SketchEntityId("curve"), {0, 0}, {0, 6}, {0, 14},
+                                                   {0, 20}, {1, .8, 1.2, 1});
+  REQUIRE(spline);
+  REQUIRE(sketch.add_entity(spline.value()));
+  REQUIRE(document.add_sketch(sketch));
+  REQUIRE(document.add_path_curve(
+      path_curve("path.spline", {planar_segment("spline", "curve", PlanarPathCurveKind::Spline)})));
+  auto shape_cache = cache();
+  auto segments = GeometryRecomputeExecutor{}.resolve_path_segments(
+      document, PathCurveId("path.spline"), shape_cache);
+  REQUIRE(segments);
+  REQUIRE(segments.value().size() == 32);
+  CHECK(segments.value().front().start.z == 0);
+  CHECK(segments.value().back().end.z == 20);
+  auto preview = GeometryRecomputeExecutor{}.preview_path_curve(
+      document, PathCurveId("path.spline"), shape_cache);
+  REQUIRE(preview);
+  REQUIRE(document.add_body(body("body.spline")));
+  auto feature = SweepFeature::create_sweep(
+      FeatureId("sweep.spline"), "Spline Sweep",
+      closed_sweep_profile("sketch.profile", "profile.sweep"), PathCurveId("path.spline"),
+      context(FeatureBodyOperationMode::NewBody, "body.spline"));
+  REQUIRE(feature);
+  REQUIRE(document.add_sweep_feature(feature.value()));
+  const auto before = serialize_part_document_to_json(document).value();
+  REQUIRE(GeometryRecomputeExecutor{}.execute_document(document, shape_cache));
+  CHECK(body_volume(shape_cache, "body.spline") == Catch::Approx(480).margin(1e-5));
+  CHECK(serialize_part_document_to_json(document).value() == before);
 }

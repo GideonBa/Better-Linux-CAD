@@ -3,6 +3,7 @@
 #include "blcad/gui/gui_document_session.hpp"
 #include "blcad/gui/gui_interactive_extrude_revolve.hpp"
 #include "blcad/gui/gui_part_foundation_workbench.hpp"
+#include "blcad/gui/gui_pending_feature_inputs.hpp"
 #include "blcad/gui/gui_viewport_manipulator.hpp"
 
 #include "blcad/core/loft_feature.hpp"
@@ -42,6 +43,7 @@ public:
     reset();
     mode_ = GuiPathSweepMode::PathCurve;
     path_id_ = std::move(path_id);
+    feature_ = FeatureId(path_id_.value());
     name_ = std::move(name);
     closure_ = closure;
     orientation_ = orientation;
@@ -52,11 +54,21 @@ public:
   [[nodiscard]] Result<std::size_t>
   begin_sweep(const GuiDocumentSession& session, FeatureId feature, std::string name,
               SweepFeatureKind kind, SweepProfileReference profile, PathCurveId path,
-              BodyId result_body) {
+              BodyId result_body, std::optional<Body> pending_body = std::nullopt,
+              std::optional<Parameter> pending_twist = std::nullopt) {
     const auto* part = session.part_document();
     if (part == nullptr) return fail("interactive sweep requires an active Part document");
-    if (part->find_body(result_body) == nullptr)
-      return fail("interactive sweep requires an existing result Body");
+    auto valid = detail::validate_new_feature_body(session, result_body, pending_body);
+    if (!valid)
+      return valid;
+    if (kind == SweepFeatureKind::SweepCut && pending_body)
+      return fail("sweep cut requires an existing target Body");
+    if (pending_twist) {
+      valid = detail::validate_new_feature_parameters(
+          session, {*pending_twist}, {{pending_twist->id(), ParameterType::Angle}});
+      if (!valid)
+        return valid;
+    }
     if (part->find_path_curve(path) == nullptr)
       return fail("interactive sweep requires an existing trajectory PathCurve");
     reset();
@@ -67,6 +79,8 @@ public:
     profile_ = std::move(profile);
     sweep_path_ = std::move(path);
     result_body_ = std::move(result_body);
+    pending_body_ = std::move(pending_body);
+    pending_twist_ = std::move(pending_twist);
     active_ = true;
     return Result<std::size_t>::success(1);
   }
@@ -124,7 +138,8 @@ public:
   }
 
   [[nodiscard]] bool apply_manipulator(const GuiViewportManipulatorCandidate& candidate) {
-    if (candidate.handle_id == kSweepTwistHandleId && twist_parameter_.has_value() &&
+    if (active_ && mode_ == GuiPathSweepMode::Sweep && candidate.handle_id == kSweepTwistHandleId &&
+        twist_parameter_.has_value() &&
         candidate.value_kind == GuiViewportManipulatorValueKind::Angle) {
       twist_deg_ = candidate.scalar_value;
       return true;
@@ -144,6 +159,31 @@ public:
     auto plan = candidate.create_recompute_plan();
     if (plan.has_error()) return Result<GuiPartFeaturePreview>::failure(plan.error());
     return Result<GuiPartFeaturePreview>::success({feature_, summary(), plan.value().step_count()});
+  }
+
+  [[nodiscard]] Result<geometry::GeometryShape>
+  preview_shape(const GuiDocumentSession& session) const {
+    auto checked = preview(session);
+    if (!checked)
+      return Result<geometry::GeometryShape>::failure(checked.error());
+    PartDocument candidate = *session.part_document();
+    auto seeded = seed_parameters(candidate);
+    if (!seeded)
+      return Result<geometry::GeometryShape>::failure(seeded.error());
+    auto added = add_record(candidate);
+    if (!added)
+      return Result<geometry::GeometryShape>::failure(added.error());
+    if (mode_ == GuiPathSweepMode::Sweep)
+      return detail::preview_feature_body(candidate, feature_, result_body_);
+    auto cache = geometry::ShapeCache::create(ShapeCacheId(path_id_.value() + ".preview"));
+    if (!cache)
+      return Result<geometry::GeometryShape>::failure(cache.error());
+    auto recomputed =
+        geometry::GeometryRecomputeExecutor{}.execute_document(candidate, cache.value());
+    if (!recomputed)
+      return Result<geometry::GeometryShape>::failure(recomputed.error());
+    return geometry::GeometryRecomputeExecutor{}.preview_path_curve(candidate, path_id_,
+                                                                    cache.value());
   }
 
   [[nodiscard]] Result<std::size_t> apply(GuiDocumentSession& session) {
@@ -174,11 +214,25 @@ private:
     closure_ = PathClosure::Open;
     orientation_ = PathOrientationRule::MinimumTwist;
     sweep_kind_ = SweepFeatureKind::Sweep;
+    pending_body_.reset();
+    pending_twist_.reset();
   }
 
   [[nodiscard]] Result<std::size_t> seed_parameters(PartDocument& part) const {
+    if (pending_body_) {
+      auto added = part.add_body(*pending_body_);
+      if (!added)
+        return added;
+    }
     if (mode_ != GuiPathSweepMode::Sweep || !twist_parameter_.has_value())
       return Result<std::size_t>::success(0);
+    if (pending_twist_) {
+      if (pending_twist_->id() != *twist_parameter_)
+        return fail("pending twist parameter does not match driving input");
+      auto added = part.add_parameter(*pending_twist_);
+      if (!added)
+        return added;
+    }
     auto quantity = Quantity::angle_deg(twist_deg_, twist_parameter_->value());
     if (quantity.has_error()) return Result<std::size_t>::failure(quantity.error());
     auto changed = part.set_parameter_value(*twist_parameter_, quantity.value());
@@ -197,8 +251,11 @@ private:
     }
     if (!profile_.has_value())
       return fail("sweep requires a profile");
-    auto context = FeatureBodyResultContext::create(FeatureBodyOperationMode::NewBody, std::nullopt,
-                                                    result_body_);
+    auto context = sweep_kind_ == SweepFeatureKind::SweepCut
+                       ? FeatureBodyResultContext::create(FeatureBodyOperationMode::Cut,
+                                                          result_body_, std::nullopt)
+                       : FeatureBodyResultContext::create(FeatureBodyOperationMode::NewBody,
+                                                          std::nullopt, result_body_);
     if (context.has_error()) return Result<std::size_t>::failure(context.error());
     Result<SweepFeature> feature = build_sweep(context.value());
     if (feature.has_error()) return Result<std::size_t>::failure(feature.error());
@@ -261,17 +318,24 @@ private:
   double twist_deg_{0.0};
   std::optional<PathCurveId> guide_path_;
   GuiFeatureManipulatorFrame frame_;
+  std::optional<Body> pending_body_;
+  std::optional<Parameter> pending_twist_;
 };
 
 class GuiInteractiveLoftController {
 public:
-  [[nodiscard]] Result<std::size_t>
-  begin_loft(const GuiDocumentSession& session, FeatureId feature, std::string name,
-             LoftFeatureKind kind, BodyId result_body) {
+  [[nodiscard]] Result<std::size_t> begin_loft(const GuiDocumentSession& session, FeatureId feature,
+                                               std::string name, LoftFeatureKind kind,
+                                               BodyId result_body,
+                                               std::optional<Body> pending_body = std::nullopt) {
     const auto* part = session.part_document();
     if (part == nullptr) return fail("interactive loft requires an active Part document");
-    if (part->find_body(result_body) == nullptr)
-      return fail("interactive loft requires an existing result Body");
+    auto valid = detail::validate_new_feature_body(session, result_body, pending_body);
+    if (!valid)
+      return valid;
+    if (kind == LoftFeatureKind::LoftCut && pending_body)
+      return fail("loft cut requires an existing target Body");
+    pending_body_ = std::move(pending_body);
     feature_ = std::move(feature);
     name_ = std::move(name);
     kind_ = kind;
@@ -344,6 +408,18 @@ public:
     return Result<GuiPartFeaturePreview>::success({feature_, summary(), plan.value().step_count()});
   }
 
+  [[nodiscard]] Result<geometry::GeometryShape>
+  preview_shape(const GuiDocumentSession& session) const {
+    auto checked = preview(session);
+    if (!checked)
+      return Result<geometry::GeometryShape>::failure(checked.error());
+    PartDocument candidate = *session.part_document();
+    auto added = add_feature(candidate);
+    if (!added)
+      return Result<geometry::GeometryShape>::failure(added.error());
+    return detail::preview_feature_body(candidate, feature_, result_body_);
+  }
+
   [[nodiscard]] Result<std::size_t> apply(GuiDocumentSession& session) {
     auto checked = preview(session);
     if (checked.has_error()) return Result<std::size_t>::failure(checked.error());
@@ -358,17 +434,33 @@ public:
 
 private:
   [[nodiscard]] Result<std::size_t> add_section(ProfileSectionReference section) {
-    const std::string id = section.source_node_id();
+    const auto same_source = [&](const ProfileSectionReference& existing) {
+      if (existing.kind() != section.kind())
+        return false;
+      if (section.kind() == LoftSectionKind::OpenPath)
+        return std::get<PathCurveId>(existing.source()) == std::get<PathCurveId>(section.source());
+      const auto& a = std::get<ProfileRegionReference>(existing.source());
+      const auto& b = std::get<ProfileRegionReference>(section.source());
+      return a.sketch() == b.sketch() && a.profile() == b.profile();
+    };
     for (const auto& existing : sections_)
-      if (existing.source_node_id() == id)
+      if (same_source(existing))
         return fail("section is already in the loft");
     sections_.push_back(std::move(section));
     return Result<std::size_t>::success(sections_.size());
   }
 
   [[nodiscard]] Result<std::size_t> add_feature(PartDocument& part) const {
-    auto context = FeatureBodyResultContext::create(FeatureBodyOperationMode::NewBody, std::nullopt,
-                                                    result_body_);
+    if (pending_body_) {
+      auto added = part.add_body(*pending_body_);
+      if (!added)
+        return added;
+    }
+    auto context = kind_ == LoftFeatureKind::LoftCut
+                       ? FeatureBodyResultContext::create(FeatureBodyOperationMode::Cut,
+                                                          result_body_, std::nullopt)
+                       : FeatureBodyResultContext::create(FeatureBodyOperationMode::NewBody,
+                                                          std::nullopt, result_body_);
     if (context.has_error()) return Result<std::size_t>::failure(context.error());
     Result<LoftFeature> feature = build_loft(context.value());
     if (feature.has_error()) return Result<std::size_t>::failure(feature.error());
@@ -414,6 +506,7 @@ private:
   std::optional<PathCurveId> path_curve_;
   std::vector<PathCurveId> guide_curves_;
   LoftContinuity continuity_{LoftContinuity::C0};
+  std::optional<Body> pending_body_;
 };
 
 } // namespace blcad::gui

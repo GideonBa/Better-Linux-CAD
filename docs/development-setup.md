@@ -560,6 +560,22 @@ checks exercise actual Boolean target/tool picks, multi-Body detection, drag/num
 Escape rollback; offscreen skips those two cases explicitly. Optional `BLCAD_UI_CAPTURE_DIR` captures
 the preview windows.
 
+### Block 136 PathCurve, Sweep and Loft slice
+
+```bash
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[block136-spatial]"
+./build/dev-gui/blcad_geometry_tests "[block136-spatial]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-spatial]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle]"
+```
+
+The proof covers connected/reversed PathCurve creation, canonical path presentation, planar rational
+spline trajectories, solid/cut/surface Sweep and Loft, ordered list-model moves, twist, guides,
+center paths, G1/G2 handling, fitted spline profiles, candidate-only inputs, failed-preview isolation,
+Cancel, atomic Undo/Redo and Save/Open. Native checks exercise profile/path/section mouse picking
+and twist drag/numeric refinement; offscreen skips the native case explicitly. Optional
+`BLCAD_UI_CAPTURE_DIR` captures the preview windows.
+
 ### Sketch operation follow-up
 
 The shell wires pointer dragging, live previews, numeric refinement and Apply/Cancel for transforms,
