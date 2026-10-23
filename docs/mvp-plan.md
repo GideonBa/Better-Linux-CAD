@@ -855,6 +855,18 @@ projections, cleanup, downstream recompute, exact history and persistence. Contr
 `docs/gui-sketch3d-interaction-mvp8.md`; verification: `docs/gui-shell-acceptance-mvp9r.md`.
 Ten families remain restored and eight partial; Block 136 stays in progress.
 
+### Block 136 — Sketch3D distance/direction input — 2026-10-23
+
+The spatial task now stages new explicit points from a complete distance/azimuth/elevation tuple
+relative to the origin or a stable local anchor. It reuses the Core resolver, copies precise bound
+anchor values without detaching them, and keeps explicit model-direction input independent of
+pointer locks. Incomplete, non-finite and out-of-range inputs remain correctable; pending tuples
+block competing authoring and whole-model Preview/Apply until staged or cleared. Editing a tuple
+rolls back live gestures. Five focused input cases and the combined UI-authored chain/PathCurve/Sweep
+workflow cover rejection/recovery, precise anchors, history, session expiry, reopening and STEP.
+Contract and verification: `docs/gui-sketch3d-interaction-mvp8.md`,
+`docs/gui-shell-acceptance-mvp9r.md`. Ten families remain restored and eight partial; Block 136 stays open.
+
 ## Current next technical step — Block 136
 
 The current v3 coverage inventory records all eighteen accepted families, current shell proof sources,
@@ -862,10 +874,10 @@ reachable entry points and explicit remaining gaps. The machine check distinguis
 from closure readiness; historical controller proofs cannot close a shell gap. Acceptance contract:
 `docs/gui-shell-acceptance-mvp9r.md`, `[integration][gui-feature-coverage]` / `[gui][shell-coverage]`.
 
-Continue Sketch3D with explicit distance/azimuth/elevation input relative to the placement anchor,
-then planar-point projection with explicit source-association semantics. Anchored pointer placement,
-active-candidate point/line collection and direct point grips with axis/plane restrictions now extend
-typed XYZ point editing and shared-point line authoring.
+Continue Sketch3D with planar-point projection and explicit source-association semantics. Anchored
+pointer placement, explicit distance/azimuth/elevation input, active-candidate point/line collection
+and direct point grips with axis/plane restrictions now extend typed XYZ point editing and
+shared-point line authoring.
 Explicit constraint-diagnostic suggestion controls cover the accepted bounded Core diagnostic/repair
 subset.
 The bounded repair-open path now supports failed-recompute Parts and missing face/point/line sources,

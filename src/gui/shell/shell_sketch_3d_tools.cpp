@@ -24,6 +24,7 @@
 #include <QSignalBlocker>
 #include <QVBoxLayout>
 #include <array>
+#include <numbers>
 
 namespace blcad::gui {
 namespace {
@@ -109,6 +110,7 @@ struct ShellSketch3DTools::Impl {
   QComboBox* pick{};
   QComboBox* lock{};
   QComboBox* placement_anchor{};
+  std::array<QLineEdit*, 3> direction{};
   QCheckBox* grips{};
   QLineEdit* numeric{};
   QWidget* overlay{};
@@ -144,6 +146,26 @@ struct ShellSketch3DTools::Impl {
     return draft && session.part_document() && session.derived_results_fresh() &&
            !session.reference_repair_mode() && !window.active_sketch() &&
            session.task().command_id() == task_id && session.presentation_revision() == revision;
+  }
+  bool has_direction_input() const {
+    return std::any_of(direction.begin(), direction.end(),
+                       [](const auto* field) { return !field->text().trimmed().isEmpty(); });
+  }
+  void reset_direction() {
+    for (auto* field : direction) {
+      QSignalBlocker blocker(field);
+      field->clear();
+    }
+  }
+  void edit_direction() {
+    if (!current())
+      return;
+    cancel_drag();
+    cancel_placement();
+    invalidate();
+    refresh_handles();
+    summary->setText(QStringLiteral(
+        "Distanz, Azimut und Elevation vollständig ergänzen oder Richtungseingabe leeren."));
   }
   void invalidate() {
     previewed = false;
@@ -217,8 +239,9 @@ struct ShellSketch3DTools::Impl {
     if (!current())
       return Result<std::size_t>::failure(
           error("3D-Skizze neu öffnen: Modell oder Befehl geändert."));
-    if (drag || placement_pressed)
-      return Result<std::size_t>::failure(error("Griffbewegung zuerst beenden."));
+    if (drag || placement_pressed || has_direction_input())
+      return Result<std::size_t>::failure(
+          error("Zeigergeste beenden und Richtungseingabe ergänzen oder leeren."));
     for (auto* spin : coordinates)
       spin->interpretText();
     const SketchPoint3DValue value{coordinates[0]->value(), coordinates[1]->value(),
@@ -244,7 +267,7 @@ struct ShellSketch3DTools::Impl {
     return Result<std::size_t>::success(draft->entity_count());
   }
   Result<std::size_t> stage_line() {
-    if (!current() || pending_point || drag || placement_pressed)
+    if (!current() || pending_point || drag || placement_pressed || has_direction_input())
       return Result<std::size_t>::failure(
           error("Punktänderung zuerst lokal übernehmen oder neu auswählen."));
     invalidate();
@@ -315,7 +338,8 @@ struct ShellSketch3DTools::Impl {
         detach->setChecked(false);
     }
     if (current() && grips->isChecked() && pick->currentIndex() == 0 && !pending_point &&
-        selected && (selected->parameter_dependencies().empty() || detach->isChecked())) {
+        !has_direction_input() && selected &&
+        (selected->parameter_dependencies().empty() || detach->isChecked())) {
       const auto value = resolved_point(*selected);
       const std::array values{value.x, value.y, value.z};
       const int restriction = lock->currentIndex();
@@ -436,6 +460,57 @@ struct ShellSketch3DTools::Impl {
       summary->setText(QStringLiteral(
           "Punktplatzierung verworfen. Frühere lokale Änderungen bleiben erhalten."));
   }
+  Result<Point3> anchor_point() const {
+    const auto id = placement_anchor->currentData().toString();
+    if (id.isEmpty())
+      return Result<Point3>::success({});
+    const auto* anchor = draft->find_point(SketchEntityId(id.toStdString()));
+    if (!anchor)
+      return Result<Point3>::failure(error("Platzierungsanker neu auswählen."));
+    return Result<Point3>::success(resolved_point(*anchor));
+  }
+  Result<std::size_t> stage_direction() {
+    if (!current() || drag || placement_pressed)
+      return Result<std::size_t>::failure(
+          error("Aktuelle 3D-Skizze öffnen und Zeigergeste beenden."));
+    for (auto* spin : coordinates)
+      spin->interpretText();
+    if (pending_point)
+      return Result<std::size_t>::failure(
+          error("XYZ-Punktänderung zuerst lokal übernehmen oder neu auswählen."));
+    std::array<double, 3> values{};
+    for (std::size_t i = 0; i < direction.size(); ++i) {
+      bool valid = false;
+      values[i] = direction[i]->text().trimmed().toDouble(&valid);
+      if (!valid || !std::isfinite(values[i]))
+        return Result<std::size_t>::failure(
+            error("Distanz, Azimut und Elevation als endliche Zahlen vollständig eingeben."));
+    }
+    if (values[0] < 0 || values[0] > 1e9 || std::abs(values[1]) > 360 || std::abs(values[2]) > 90)
+      return Result<std::size_t>::failure(
+          error("Distanz: 0 bis 1e9 mm; Azimut: -360 bis 360°, Elevation: -90 bis 90°."));
+    const auto anchor = anchor_point();
+    if (!anchor)
+      return Result<std::size_t>::failure(anchor.error());
+    Sketch3DTypedInput typed;
+    typed.distance = values[0];
+    typed.azimuth_radians = values[1] * std::numbers::pi / 180;
+    typed.elevation_radians = values[2] * std::numbers::pi / 180;
+    const SketchPoint3DValue origin{anchor.value().x, anchor.value().y, anchor.value().z};
+    const auto value =
+        Sketch3DInteractionService::resolve_point(origin, origin, Sketch3DLock::Free, typed);
+    if (!value)
+      return Result<std::size_t>::failure(value.error());
+    const auto p = value.value();
+    if (std::abs(p.x) > 1e9 || std::abs(p.y) > 1e9 || std::abs(p.z) > 1e9)
+      return Result<std::size_t>::failure(error("Punkt liegt außerhalb des XYZ-Bereichs ±1e9 mm."));
+    auto result = stage_placement({p.x, p.y, p.z});
+    if (result) {
+      reset_direction();
+      refresh_handles();
+    }
+    return result;
+  }
   Result<Point3> resolve_placement(GuiSketchScreenPoint pointer) {
     using namespace manipulator_detail;
     auto& viewport = window.viewport();
@@ -443,14 +518,10 @@ struct ShellSketch3DTools::Impl {
         pointer.y >= viewport.height())
       return Result<Point3>::failure(error("Punkt innerhalb des Modellfensters platzieren."));
     if (!placement_pressed) {
-      placement_origin = {};
-      const auto id = placement_anchor->currentData().toString();
-      if (!id.isEmpty()) {
-        const auto* anchor = draft->find_point(SketchEntityId(id.toStdString()));
-        if (!anchor)
-          return Result<Point3>::failure(error("Platzierungsanker neu auswählen."));
-        placement_origin = resolved_point(*anchor);
-      }
+      const auto anchor = anchor_point();
+      if (!anchor)
+        return anchor;
+      placement_origin = anchor.value();
     }
     auto ray = viewport.screen_to_view_ray(pointer);
     if (!ray || !finite(ray.value().origin) || !finite(ray.value().direction) ||
@@ -496,9 +567,9 @@ struct ShellSketch3DTools::Impl {
     return Result<Point3>::success(value);
   }
   void update_placement(GuiSketchScreenPoint pointer) {
-    if (pending_point) {
+    if (pending_point || has_direction_input()) {
       placement_hover.reset();
-      summary->setText(QStringLiteral("Punktänderung zuerst lokal übernehmen oder neu auswählen."));
+      summary->setText(QStringLiteral("Punkt-/Richtungseingabe zuerst übernehmen oder verwerfen."));
     } else {
       const auto value = resolve_placement(pointer);
       placement_hover = value ? std::optional(value.value()) : std::nullopt;
@@ -798,6 +869,23 @@ ShellSketch3DTools::ShellSketch3DTools(ShellWindow& window, ShellRibbon& ribbon,
   ui.numeric->setReadOnly(true);
   ui.numeric->setPlaceholderText(QStringLiteral("Griff ziehen, dann XYZ-Koordinate in mm"));
   form->addRow(QStringLiteral("Griffwert (XYZ)"), ui.numeric);
+  const std::array direction_ids{"distance", "azimuth", "elevation"};
+  const std::array direction_labels{QStringLiteral("Distanz (mm)"), QStringLiteral("Azimut (°)"),
+                                    QStringLiteral("Elevation (°)")};
+  const std::array direction_hints{QStringLiteral("0 bis 1e9"), QStringLiteral("-360 bis 360"),
+                                   QStringLiteral("-90 bis 90")};
+  for (std::size_t i = 0; i < ui.direction.size(); ++i) {
+    auto* field = new QLineEdit(inputs);
+    field->setObjectName(QStringLiteral("blcad.sketch3d.") + direction_ids[i]);
+    field->setPlaceholderText(direction_hints[i]);
+    ui.direction[i] = field;
+    form->addRow(direction_labels[i], field);
+    connect(field, &QLineEdit::textChanged, this, [this] { impl_->edit_direction(); });
+  }
+  auto* stage_direction =
+      stage_button("stage_direction", QStringLiteral("Punkt aus Richtung ergänzen"));
+  auto* clear_direction =
+      stage_button("clear_direction", QStringLiteral("Richtungseingabe leeren"));
   ui.start = combo("start", QStringLiteral("Linienstart"));
   ui.end = combo("end", QStringLiteral("Linienende"));
   auto* stage_line = stage_button("stage_line", QStringLiteral("Linie ergänzen"));
@@ -806,7 +894,9 @@ ShellSketch3DTools::ShellSketch3DTools(ShellWindow& window, ShellRibbon& ribbon,
       QStringLiteral(
           "Punkte platzieren: XYZ nutzt die Bildebene durch den Anker; Achsen/Ebenen nutzen "
           "Modellrichtungen durch denselben Anker. Ankerkoordinaten werden kopiert. Escape beendet "
-          "die Platzierung und erhält bereits lokal übernommene Punkte."),
+          "die Platzierung und erhält bereits lokal übernommene Punkte. Richtungseingabe ergänzt "
+          "einen neuen Punkt relativ zum Anker: Azimut ab +X in Richtung +Y, Elevation ab XY nach "
+          "+Z. Zahlen mit Dezimalpunkt eingeben. Diese Winkel ersetzen die Zeiger-/Griffsperre."),
       inputs);
   placement_hint->setWordWrap(true);
   column->addWidget(placement_hint);
@@ -842,6 +932,14 @@ ShellSketch3DTools::ShellSketch3DTools(ShellWindow& window, ShellRibbon& ribbon,
   connect(stage_point, &QPushButton::clicked, this,
           [this, report] { report(impl_->stage_point()); });
   connect(stage_line, &QPushButton::clicked, this, [this, report] { report(impl_->stage_line()); });
+  connect(stage_direction, &QPushButton::clicked, this,
+          [this, report] { report(impl_->stage_direction()); });
+  connect(clear_direction, &QPushButton::clicked, this, [this] {
+    if (impl_->current() && impl_->has_direction_input()) {
+      impl_->reset_direction();
+      impl_->edit_direction();
+    }
+  });
   connect(preview_button, &QPushButton::clicked, this, [this, report] { report(preview()); });
   connect(ui.apply, &QPushButton::clicked, this, [this, report] { report(apply()); });
   connect(cancel_button, &QPushButton::clicked, this, [this] { cancel(); });
@@ -912,6 +1010,7 @@ Result<std::size_t> ShellSketch3DTools::open(Sketch3D sketch, bool editing) {
   ui.changed = false;
   ui.numeric_invalid = false;
   ui.numeric->clear();
+  ui.reset_direction();
   {
     QSignalBlocker pick_blocker(ui.pick), grip_blocker(ui.grips), lock_blocker(ui.lock),
         anchor_blocker(ui.placement_anchor);
@@ -941,6 +1040,8 @@ Result<std::size_t> ShellSketch3DTools::preview() {
   if (ui.placement_pressed)
     return Result<std::size_t>::failure(error("Punktplatzierung zuerst beenden."));
   ui.invalidate();
+  if (ui.has_direction_input())
+    return Result<std::size_t>::failure(error("Richtungseingabe zuerst ergänzen oder leeren."));
   if (ui.numeric_invalid)
     return Result<std::size_t>::failure(
         error("Ungültigen Griffwert korrigieren oder Escape drücken."));
@@ -1001,6 +1102,7 @@ void ShellSketch3DTools::cancel() {
   ui.cancel_drag(false);
   ui.cancel_placement();
   ui.draft.reset();
+  ui.reset_direction();
   ui.layer.clear_handles();
   ui.numeric_invalid = false;
   ui.synchronize_overlay();

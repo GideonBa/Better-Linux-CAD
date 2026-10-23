@@ -995,3 +995,266 @@ TEST_CASE(
   CHECK(window.viewport().mouseGrabber() != &window.viewport());
   CHECK_FALSE(control<QWidget>(window, "placement_overlay").isVisible());
 }
+
+namespace {
+void direction_tuple(ShellWindow& window, const QString& distance, const QString& azimuth,
+                     const QString& elevation) {
+  control<QLineEdit>(window, "distance").setText(distance);
+  control<QLineEdit>(window, "azimuth").setText(azimuth);
+  control<QLineEdit>(window, "elevation").setText(elevation);
+}
+} // namespace
+
+TEST_CASE("Sketch3D distance direction copies precise anchors and commits one reversible candidate",
+          "[gui][block136-sketch3d-direction]") {
+  ShellWindow window;
+  prepare_handles(window);
+  const auto before = snapshot(window);
+  const auto undo = std::string(window.session().undo_label());
+  select(window, "placement_anchor", "driven");
+  control<QComboBox>(window, "lock").setCurrentIndex(1);
+  direction_tuple(window, "10", "0", "30");
+  button(window, "stage_direction");
+  CHECK(control<QComboBox>(window, "point").currentData().toString() == "point.1");
+  CHECK(control<QComboBox>(window, "placement_anchor").currentData().toString() == "driven");
+  CHECK_FALSE(control<QCheckBox>(window, "detach").isChecked());
+  select(window, "placement_anchor", "point.1");
+  direction_tuple(window, "4", "-90", "0");
+  button(window, "stage_direction");
+  // Zero distance and signed angular boundaries are valid explicit point input.
+  direction_tuple(window, "0", "-360", "-90");
+  button(window, "stage_direction");
+  CHECK(control<QComboBox>(window, "point").count() == 9);
+  for (const auto* field : {"distance", "azimuth", "elevation"})
+    CHECK(control<QLineEdit>(window, field).text().isEmpty());
+  CHECK(snapshot(window) == before);
+  CHECK(window.session().undo_label() == undo);
+  REQUIRE(window.sketch_3d_tools().preview());
+  CHECK(snapshot(window) == before);
+  REQUIRE(window.sketch_3d_tools().apply());
+  const auto& sketch = *window.session().part_document()->find_sketch_3d(Sketch3DId("spatial"));
+  const auto* first = sketch.find_point(SketchEntityId("point.1"));
+  const auto* second = sketch.find_point(SketchEntityId("point.2"));
+  const auto* zero = sketch.find_point(SketchEntityId("point.3"));
+  REQUIRE(first);
+  REQUIRE(second);
+  REQUIRE(zero);
+  CHECK(first->x().explicit_coordinate()->millimeters() == Catch::Approx(13.660254037844386));
+  CHECK(first->y().explicit_coordinate()->millimeters() == 4.123456789123);
+  CHECK(first->z().explicit_coordinate()->millimeters() == Catch::Approx(5));
+  CHECK(second->x().explicit_coordinate()->millimeters() ==
+        first->x().explicit_coordinate()->millimeters());
+  CHECK(second->y().explicit_coordinate()->millimeters() == Catch::Approx(0.123456789123));
+  CHECK(second->z().explicit_coordinate()->millimeters() ==
+        first->z().explicit_coordinate()->millimeters());
+  CHECK(zero->x().explicit_coordinate()->millimeters() ==
+        first->x().explicit_coordinate()->millimeters());
+  CHECK(zero->y().explicit_coordinate()->millimeters() ==
+        first->y().explicit_coordinate()->millimeters());
+  CHECK(zero->z().explicit_coordinate()->millimeters() ==
+        first->z().explicit_coordinate()->millimeters());
+  CHECK(first->parameter_dependencies().empty());
+  CHECK(second->parameter_dependencies().empty());
+  CHECK(sketch.find_point(SketchEntityId("driven"))->x().parameter() == ParameterId("px"));
+  CHECK(sketch.arcs().size() == 1);
+  CHECK(sketch.splines().size() == 1);
+  CHECK(sketch.guide_curves().size() == 1);
+  const auto after = snapshot(window);
+  REQUIRE(window.undo());
+  CHECK(snapshot(window) == before);
+  REQUIRE(window.redo());
+  CHECK(snapshot(window) == after);
+  QTemporaryDir directory;
+  REQUIRE(window.save_to(directory.filePath("direction.blcad")));
+  REQUIRE(window.open_path(directory.filePath("direction.blcad")));
+  CHECK(snapshot(window) == after);
+}
+
+TEST_CASE("Sketch3D distance direction rejects incomplete nonfinite and bounded inputs atomically",
+          "[gui][block136-sketch3d-direction]") {
+  ShellWindow window;
+  prepare_handles(window);
+  const auto before = snapshot(window);
+  const auto undo = std::string(window.session().undo_label());
+  const int count = control<QComboBox>(window, "point").count();
+  select(window, "placement_anchor", "b");
+  const std::vector<std::array<QString, 3>> invalid{
+      {"", "", ""},        {"10", "", "0"},    {"10", "0", ""},
+      {"", "0", "0"},      {"nan", "0", "0"},  {"10", "inf", "0"},
+      {"10", "0", "-inf"}, {"-1", "0", "0"},   {"1000000001", "0", "0"},
+      {"1e309", "0", "0"}, {"10", "361", "0"}, {"10", "-361", "0"},
+      {"10", "0", "91"},   {"10", "0", "-91"}, {"1,5", "0", "0"},
+      {"10 mm", "0", "0"}, {"2", "abc", "0"}};
+  for (const auto& tuple : invalid) {
+    CAPTURE(tuple);
+    direction_tuple(window, tuple[0], tuple[1], tuple[2]);
+    button(window, "stage_direction");
+    CHECK(control<QComboBox>(window, "point").count() == count);
+    CHECK(control<QLineEdit>(window, "distance").text() == tuple[0]);
+    CHECK(control<QLineEdit>(window, "azimuth").text() == tuple[1]);
+    CHECK(control<QLineEdit>(window, "elevation").text() == tuple[2]);
+    CHECK_FALSE(control<QLabel>(window, "summary").text().isEmpty());
+    CHECK(snapshot(window) == before);
+    CHECK(window.session().undo_label() == undo);
+  }
+  direction_tuple(window, "2.5e0", " -90 ", "0");
+  button(window, "stage_direction");
+  REQUIRE(control<QComboBox>(window, "point").count() == count + 1);
+  CHECK(control<QComboBox>(window, "point").currentData().toString() == "point.1");
+  REQUIRE(window.sketch_3d_tools().preview());
+  REQUIRE(window.sketch_3d_tools().apply());
+  const auto* point = window.session()
+                          .part_document()
+                          ->find_sketch_3d(Sketch3DId("spatial"))
+                          ->find_point(SketchEntityId("point.1"));
+  REQUIRE(point);
+  CHECK(point->x().explicit_coordinate()->millimeters() == 5);
+  CHECK(point->y().explicit_coordinate()->millimeters() == Catch::Approx(-2.5));
+  CHECK(point->z().explicit_coordinate()->millimeters() == 10);
+}
+
+TEST_CASE(
+    "Sketch3D pending direction blocks competing authors and clears without losing local edits",
+    "[gui][block136-sketch3d-direction]") {
+  ShellWindow window;
+  prepare_handles(window);
+  const auto before = snapshot(window);
+  point(window, -10, 5, 15);
+  REQUIRE(window.sketch_3d_tools().preview());
+  const int count = control<QComboBox>(window, "point").count();
+  direction_tuple(window, "10", "", "");
+  CHECK_FALSE(window.viewport().feature_preview_active());
+  CHECK_FALSE(control<QPushButton>(window, "apply").isEnabled());
+  CHECK(window.sketch_3d_tools().manipulators().presentations().empty());
+  button(window, "stage_point");
+  button(window, "stage_line");
+  placement_mode(window);
+  const auto screen = placement_screen(window, {12, 6, 10});
+  placement_hover(window, screen);
+  CHECK_FALSE(control<QWidget>(window, "placement_overlay").isVisible());
+  pointer(window, QEvent::MouseButtonPress, screen);
+  pointer(window, QEvent::MouseButtonRelease, screen);
+  CHECK(control<QComboBox>(window, "point").count() == count);
+  CHECK_FALSE(window.sketch_3d_tools().preview());
+  CHECK_FALSE(window.sketch_3d_tools().apply());
+  CHECK(snapshot(window) == before);
+  button(window, "clear_direction");
+  REQUIRE(window.sketch_3d_tools().preview());
+  REQUIRE(window.sketch_3d_tools().apply());
+  CHECK(window.session().part_document()->find_sketch_3d(Sketch3DId("spatial"))->points().size() ==
+        6);
+  REQUIRE(window.undo());
+  CHECK(snapshot(window) == before);
+}
+
+TEST_CASE("Sketch3D direction input cancels live gestures before staging a separate point",
+          "[gui][block136-sketch3d-direction]") {
+  ShellWindow window;
+  prepare_handles(window);
+  const auto before = snapshot(window);
+  point(window, -10, 5, 15);
+  select(window, "point", "b");
+  select(window, "placement_anchor", "b");
+  REQUIRE(window.sketch_3d_tools().preview());
+  const int count = control<QComboBox>(window, "point").count();
+  GuiSketchScreenPoint release;
+  SECTION("point grip") {
+    release = press(window, "z");
+    numeric(window, "14 mm");
+  }
+  SECTION("pointer placement") {
+    placement_mode(window);
+    release = placement_screen(window, {12, 6, 10});
+    pointer(window, QEvent::MouseButtonPress, release);
+  }
+  REQUIRE(window.viewport().mouseGrabber() == &window.viewport());
+  direction_tuple(window, "2", "0", "0");
+  CHECK(window.viewport().mouseGrabber() != &window.viewport());
+  CHECK(window.sketch_3d_tools().manipulators().active_handle_id().empty());
+  CHECK_FALSE(control<QWidget>(window, "placement_overlay").isVisible());
+  pointer(window, QEvent::MouseButtonRelease, release);
+  CHECK(control<QComboBox>(window, "point").count() == count);
+  CHECK_FALSE(window.viewport().feature_preview_active());
+  button(window, "stage_direction");
+  CHECK(control<QComboBox>(window, "point").count() == count + 1);
+  REQUIRE(window.sketch_3d_tools().preview());
+  REQUIRE(window.sketch_3d_tools().apply());
+  const auto& sketch = *window.session().part_document()->find_sketch_3d(Sketch3DId("spatial"));
+  CHECK(sketch.find_point(SketchEntityId("b"))->z().explicit_coordinate()->millimeters() == 10);
+  CHECK(sketch.find_point(SketchEntityId("point.2"))->x().explicit_coordinate()->millimeters() ==
+        7);
+  CHECK(sketch.points().size() == 7);
+  REQUIRE(window.undo());
+  CHECK(snapshot(window) == before);
+}
+
+TEST_CASE("Sketch3D direction guards pending XYZ overflow and session boundaries",
+          "[gui][block136-sketch3d-direction]") {
+  ShellWindow window;
+  prepare_handles(window);
+  const auto before = snapshot(window);
+  SECTION("pending uninterpreted XYZ survives rejection") {
+    select(window, "point", "b");
+    auto* editor = control<QDoubleSpinBox>(window, "z").findChild<QLineEdit*>();
+    REQUIRE(editor);
+    editor->setText("14 mm");
+    direction_tuple(window, "2", "0", "0");
+    button(window, "stage_direction");
+    CHECK(control<QComboBox>(window, "point").count() == 6);
+    CHECK(control<QDoubleSpinBox>(window, "z").value() == 14);
+    CHECK(control<QLineEdit>(window, "distance").text() == "2");
+    button(window, "clear_direction");
+    button(window, "stage_point");
+    REQUIRE(window.sketch_3d_tools().preview());
+    REQUIRE(window.sketch_3d_tools().apply());
+    CHECK(window.session()
+              .part_document()
+              ->find_sketch_3d(Sketch3DId("spatial"))
+              ->find_point(SketchEntityId("b"))
+              ->z()
+              .explicit_coordinate()
+              ->millimeters() == 14);
+    return;
+  }
+  SECTION("resolved coordinate overflow keeps prior local candidate") {
+    point(window, 1e9, 0, 0);
+    select(window, "placement_anchor", "point.1");
+    direction_tuple(window, "1", "0", "0");
+    button(window, "stage_direction");
+    CHECK(control<QComboBox>(window, "point").count() == 7);
+    CHECK(control<QLabel>(window, "summary").text().contains("XYZ-Bereich"));
+    CHECK(snapshot(window) == before);
+    button(window, "clear_direction");
+    REQUIRE(window.sketch_3d_tools().preview());
+    REQUIRE(window.sketch_3d_tools().apply());
+    return;
+  }
+  SECTION("Escape") {
+    direction_tuple(window, "10", "0", "90");
+    button(window, "stage_direction");
+    direction_tuple(window, "2", "", "");
+    escape_handle(window);
+  }
+  SECTION("save") {
+    direction_tuple(window, "10", "0", "90");
+    button(window, "stage_direction");
+    direction_tuple(window, "2", "", "");
+    QTemporaryDir directory;
+    REQUIRE(window.save_to(directory.filePath("pending-direction.blcad")));
+    GuiDocumentSession opened;
+    REQUIRE(opened.open_file(directory.filePath("pending-direction.blcad").toStdString()));
+    CHECK(checked(serialize_part_document_to_json(*opened.part_document())) == before);
+  }
+  SECTION("revision") {
+    direction_tuple(window, "2", "", "");
+    window.session().report_error(Error::validation("test", "Revision changed"));
+    window.refresh();
+  }
+  CHECK(snapshot(window) == before);
+  CHECK_FALSE(window.sketch_3d_tools().active());
+  for (const auto* field : {"distance", "azimuth", "elevation"})
+    CHECK(control<QLineEdit>(window, field).text().isEmpty());
+  edit(window);
+  CHECK(control<QComboBox>(window, "placement_anchor").currentIndex() == 0);
+  CHECK(control<QLineEdit>(window, "distance").text().isEmpty());
+}
