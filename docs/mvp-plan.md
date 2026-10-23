@@ -793,6 +793,20 @@ Verification lives in `docs/gui-shell-acceptance-mvp9r.md`. This closes the reco
 missing-source loading gap; constraint-diagnostic suggestion controls keep the family and Block 136
 partial. Missing sources in other feature/construction kinds remain outside this repair contract.
 
+### Block 136 — Explicit Sketch diagnostic suggestions — 2026-10-23
+
+The shell now exposes existing Sketch diagnostics and safe explicit repair suggestions through an
+owned task in the model and Sketch ribbons. Supported fixes require a fully validated disposable
+session Preview before one Apply transaction; unsupported/manual suggestions remain visible and
+blocked. Active Sketch interactions resume from committed intent on exit. Catalogs, persistence,
+history and task/revision boundaries retain their authority. The bounded planar/reference family
+is restored, with no expansion of Core repair kinds or live-solver diagnostics.
+
+Contract/proof: `docs/gui-sketch-workbench-mvp7.md` and `[block136-sketch-diagnostics]`, including
+actual ribbon/list/button/camera/history/file input. Verification lives in
+`docs/gui-shell-acceptance-mvp9r.md`. Ten families have restored bounded surfaces and eight retain
+explicit gaps. The entire Block 136 remains in progress.
+
 ## Current next technical step — Block 136
 
 The current v3 coverage inventory records all eighteen accepted families, current shell proof sources,
@@ -800,7 +814,8 @@ reachable entry points and explicit remaining gaps. The machine check distinguis
 from closure readiness; historical controller proofs cannot close a shell gap. Acceptance contract:
 `docs/gui-shell-acceptance-mvp9r.md`, `[integration][gui-feature-coverage]` / `[gui][shell-coverage]`.
 
-Restore explicit constraint-diagnostic suggestion controls next, followed by Sketch3D authoring.
+Restore Sketch3D authoring/editing next. Explicit constraint-diagnostic suggestion controls now
+cover the accepted bounded Core diagnostic/repair subset.
 The bounded repair-open path now supports failed-recompute Parts and missing face/point/line sources,
 with typed intent, complete atomic publication and failed-state history. Other structural dependency
 failures remain strict loading errors.

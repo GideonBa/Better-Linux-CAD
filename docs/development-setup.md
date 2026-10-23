@@ -916,3 +916,20 @@ staging/Preview failures, complete atomic repair, cache protection, failed-state
 The shell input case uses actual file dialogs, popup/list/buttons, Fit, Undo/Redo and canonical
 Save/Open. Run native tests and application startup serially. Constraint-diagnostic suggestion
 controls remain the next work; Block 136 remains in progress.
+
+
+## Explicit Sketch diagnostic repair checks
+
+```bash
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[block136-sketch-diagnostics],[gui][sketch-repair],[integration][gui-feature-coverage]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-sketch-diagnostics QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-sketch-diagnostics]"
+```
+
+The fixture combines a solid, raw lines/spline, all seven Core diagnostic kinds, supported and
+manual suggestions, three Sketches and accepted constraint/dimension sidecars. Tests exercise
+read-only inspection, all three supported repairs, catalog preservation, unsupported actions and
+identity collisions, preview invalidation, cancellation/Save/history/context guards and restoration
+of an active Sketch. The native input case uses actual model/Sketch ribbon buttons, diagnostic-list
+clicks, Preview/Cancel/Apply, Fit, Undo/Redo and Save, with canonical reopening. Run native tests and
+application startup serially. The next planned surface is Sketch3D authoring/editing; see
+`docs/mvp-plan.md` for Block 136 status.

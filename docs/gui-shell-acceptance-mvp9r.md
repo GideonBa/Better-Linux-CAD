@@ -39,9 +39,9 @@ source, hide a missing tag behind OR and claim completion with gaps. They must a
 
 The machine-readable details live in `families[].shell.gaps`; this is the execution order:
 
-1. Restore explicit constraint diagnostics/suggestion controls; then restore Sketch3D
-   authoring/editing. Repair opening now supports failed-recompute Parts and bounded missing
-   face/point/line sources, with single/batch reference replacement.
+1. Restore Sketch3D authoring/editing. The bounded planar/reference surface now includes explicit
+   diagnostic suggestion Preview/Apply controls plus failed-recompute Part repair opening, missing
+   face/point/line sources and single/batch reference replacement.
 2. Restore standalone parameter management, dedicated Hole authoring and audit advanced extent
    editors against the foundation API.
 3. Restore contextual commands, selection-filter UI, view cube, view bookmarks and repeat command.
@@ -69,7 +69,7 @@ QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][gui-fea
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests
 ./build/dev-gui/blcad_core_tests
 ./build/dev-gui/blcad_geometry_tests
-QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[missing-reference-session],[block136-missing-reference],[repair-open-session],[block136-repair-open],[block136-reference-repair-batches],[block136-reference-repair],[block136-construction-manipulators],[block136-construction-picking],[shell-mixed-path-loft],[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-sketch-diagnostics],[missing-reference-session],[block136-missing-reference],[repair-open-session],[block136-repair-open],[block136-reference-repair-batches],[block136-reference-repair],[block136-construction-manipulators],[block136-construction-picking],[shell-mixed-path-loft],[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
 ```
 
 The regular inventory audit passes while it accurately records unfinished work. For closure,
@@ -458,3 +458,42 @@ drawable-lifecycle errors. The family remains partial for explicit constraint-di
 controls. Nine families and integrated workflows still retain acceptance gaps; Block 136 remains in
 progress. The ordinary inventory passes; the opt-in closure gate correctly fails one of three
 cases (147 assertions) for the remaining acceptance gaps.
+
+
+## Explicit Sketch diagnostic suggestion continuation — 2026-10-23
+
+The model and Sketch ribbons now open an owned diagnostic task over the existing Core diagnostic
+and safe repair subset. All seven diagnostic kinds are visible; three supported actions require
+Preview and one explicit Apply. Unsupported/manual suggestions stay visible and blocked. A complete
+session copy validates candidate catalogs and Geometry without touching live history, caches or
+files. Active Sketch authoring pauses and resumes from committed intent. Contract:
+`docs/gui-sketch-workbench-mvp7.md`.
+
+Six `[block136-sketch-diagnostics]` cases cover all supported/manual/no-suggestion paths, duplicate
+identity preservation, deterministic repair-ID collisions, three Sketches and a solid, accepted
+constraint/dimension sidecars, Preview/Apply/history/persistence, freshness/revision/foreign-command
+and reference-repair guards, cancellation/Save/Finish and active Sketch restoration. The native
+input proof uses actual model/Sketch ribbon, diagnostic-list, button, Fit, history and Save events.
+Combined workflow popup input now centers the visible row and synchronizes native desktop pointer,
+hover and click events; it keeps event-level selection assertions instead of assigning combo indices.
+
+Verification of the final implementation:
+
+- All GUI/application/Core/Geometry targets built with `dev-gui` and `-j4`.
+- Focused diagnostics/workbench/inventory: **10 cases, 1,357 assertions**, all passed offscreen.
+- Full Core: **525 cases, 15,545 assertions**; full Geometry: **437 cases, 29,821 assertions**,
+  all passed.
+- Full offscreen GUI: **371 cases — 356 passed, 15 native-only skips; 26,969 assertions passed**.
+  The six new diagnostic cases add no skip.
+- Combined native Qt/OCCT filter above: **187 cases, 21,882 assertions**, all passed without skips.
+  Preview was captured and inspected at 1280×800. Diagnostic target/message, selected repair,
+  changed IDs, remaining errors/warnings and Preview/Apply/Cancel controls are readable/reachable.
+- Changed-line C++ and new-file formatting, manifest JSON and `git diff --check` passed.
+
+The native application startup reached the intentional six-second timeout (124). Native logs retain
+the existing medium incomplete-visual depth/stencil warning without high-severity or drawable
+lifecycle errors. The bounded planar/reference family is restored: ten families have restored
+surfaces and eight retain explicit gaps. Sketch3D authoring/editing is next. Block 136 remains in
+progress until remaining families and integrated acceptance pass the documented closure gate.
+The ordinary inventory passes; the opt-in closure gate correctly fails one of three cases
+(158 assertions) for the remaining eight families and integrated workflows.

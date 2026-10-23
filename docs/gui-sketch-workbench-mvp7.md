@@ -395,3 +395,48 @@ Core admission and validation limits live in `docs/reference-recovery-mvp.md`. P
 missing face/semantic/construction sources, a generated-line consumer, two solids, real file-dialog,
 popup/list/button/Fit/history input, preview cancellation and committed-only saving. Explicit
 constraint-diagnostic suggestion controls remain open; the family and Block 136 remain partial.
+
+
+### Explicit Sketch diagnostic suggestions — 2026-10-23
+
+`ShellWindow` owns `ShellSketchDiagnosticsTools`. **3D-Modell → Skizzendiagnose → Skizze prüfen**
+opens a nonmodal task with a Sketch selector, severity/target diagnostic list, full diagnostic text,
+a suggestion selector, Preview, Apply and Cancel. The same command is available in the Sketch ribbon.
+Inside an active Sketch, its identity is fixed and its authoring interactions pause for the task;
+closing/cancelling or successfully applying restores the committed interaction scene and handles.
+
+The task uses the existing `SketchConstraintDiagnostics` and `SketchRepairSuggester` contracts over
+explicit historical geometric constraints and driving dimensions. All seven diagnostic kinds are
+visible. This diagnostic subset is separate from live solver DOF feedback and accepted interactive
+constraint/dimension catalogs. Those catalogs are validated and preserved by repair transactions;
+the task neither converts nor deletes accepted interactive intents.
+
+The existing explicit executor supports exactly three suggestion actions: fix an unconstrained line
+endpoint, remove duplicate endpoint fixations, and remove duplicate driving dimensions. Duplicate
+removal preserves the deterministic lowest identity. Missing/manual actions, including conflicting
+horizontal/vertical orientation and adding a driving dimension, remain visible with an explanation;
+Preview and Apply stay disabled. Free spline controls and redundant orientation have no automatic
+suggestion. A deterministic repair-ID collision also disables publication instead of overwriting it.
+
+Selection and inspection do not edit intent. Preview executes the selected existing repair on a
+complete disposable `GuiDocumentSession` value copy, using the same transaction authority, catalog
+validation and full Geometry recompute as Apply. Preview shows the selected Sketch and all recomputed solid/surface outputs transiently. The summary lists changed constraint/dimension IDs and
+remaining error/warning counts; other diagnostics may remain after one bounded repair. No candidate
+session/history/cache or file write escapes Preview. Apply repeats validation, then runs one
+`GuiSketchWorkbench::apply_repair` transaction against the live session. One Undo/Redo restores it.
+No persistent schema fields are added.
+
+Changing Sketch, diagnostic or suggestion revokes Preview. Cancel, Escape from the task/viewport,
+dock close, Save, Undo/Redo, document replacement, freshness loss, revision changes and Sketch
+context changes discard it. Save writes committed Part JSON and both catalogs; it never saves the
+pending repair. Finish Sketch cancels the diagnostic task before running normal finish validation,
+so remaining diagnostic errors still prevent Finish. Empty documents, Projects, failed reference
+repair mode and foreign active commands reject diagnostic entry. Candidate errors stay local to
+the editable task instead of expiring it through a session diagnostic revision.
+
+Proof: `[block136-sketch-diagnostics]` in `tests/gui/gui_shell_sketch_diagnostics_tests.cpp`, including
+all diagnostic kinds, all supported/unsupported actions, accepted catalog preservation, deterministic
+identity collisions, lifecycle/guards, active Sketch restoration and actual ribbon/list/button/Fit/
+history/Save input. Reproduction and final results live in `docs/development-setup.md` and
+`docs/gui-shell-acceptance-mvp9r.md`. This restores the bounded planar/reference shell family;
+Block 136 still requires the remaining recorded families and integrated native acceptance.
