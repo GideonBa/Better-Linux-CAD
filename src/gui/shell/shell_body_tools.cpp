@@ -13,6 +13,7 @@
 #include <QListWidget>
 #include <QPushButton>
 #include <QSignalBlocker>
+#include <QVBoxLayout>
 
 #include <algorithm>
 
@@ -50,7 +51,11 @@ QString ShellFeatureTools::body_summary() const {
 void ShellFeatureTools::build_body_controls(QWidget* panel) {
   body_controls_ = new QWidget(panel);
   body_controls_->setMinimumWidth(280);
-  auto* form = new QFormLayout(body_controls_);
+  auto* column = new QVBoxLayout(body_controls_);
+  column->setContentsMargins(0, 0, 0, 0);
+  auto* form = new QFormLayout;
+  body_form_ = form;
+  column->addLayout(form);
   boolean_operation_ = new QComboBox(body_controls_);
   boolean_operation_->setObjectName("blcad.boolean.operation");
   boolean_operation_->addItems(
@@ -121,7 +126,9 @@ void ShellFeatureTools::build_body_controls(QWidget* panel) {
                      "Die Liste bleibt auch bei ausgeblendeten Ausgangskörpern verfügbar."),
       body_controls_);
   hint->setWordWrap(true);
-  form->addRow(hint);
+  // Keep wrapping guidance out of the dynamic form: Qt 6.4's height-for-width
+  // pass can reuse hidden rows' indices and collapse unrelated visible fields.
+  column->addWidget(hint);
   panel->layout()->addWidget(body_controls_);
   body_controls_->hide();
   connect(body_sources_, &QListWidget::itemSelectionChanged, this, [this] {
@@ -252,7 +259,7 @@ Result<std::size_t> ShellFeatureTools::begin_body_operation(Command command) {
   boolean_keep_tools_->setChecked(false);
   body_owned_sketches_->setChecked(false);
   body_owned_construction_->setChecked(false);
-  auto* form = static_cast<QFormLayout*>(body_controls_->layout());
+  auto* form = body_form_;
   for (QWidget* widget : std::array<QWidget*, 4>{boolean_operation_, boolean_target_,
                                                  boolean_result_, boolean_keep_tools_})
     form->setRowVisible(widget, command == Command::BodyBoolean);

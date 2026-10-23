@@ -124,6 +124,13 @@ a tool. Operation, result mode and tool retention rebuild the same disposable ca
 provisions the result only in that candidate and in the final Apply transaction. A failed or empty
 intersection clears the preview and blocks Apply without adding Bodies or history.
 
+The shared task keeps wrapping guidance outside the dynamic form rows, preserving the result-mode,
+target/tool and retention controls when switching from a transform back to Boolean. The combined
+surface/solid workflow checks actual hit-tested popup input after Translate, then a NewBody union
+with retained sources, exact history and canonical reopening: `[shell-combined-surface-solid]`.
+The Revolve/circular-pattern workflow also checks Rotate/Scale consumers across upstream edits:
+`[shell-combined-revolve-pattern]`. Verification is recorded in `docs/gui-shell-acceptance-mvp9r.md`.
+
 Transforms collect multiple Body picks in the model/list and share one set of transform inputs.
 Translation uses three independent handles and fields; the handles start from the current X/Y/Z
 values, including repeated drags. Rotation has a reference chooser and model axis-pick mode. Uniform

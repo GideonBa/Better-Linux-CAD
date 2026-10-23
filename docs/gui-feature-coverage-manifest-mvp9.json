@@ -314,6 +314,10 @@
           {
             "filter": "[shell-combined-part]",
             "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
+          },
+          {
+            "filter": "[shell-combined-revolve-pattern]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
           }
         ],
         "actions": [
@@ -349,6 +353,10 @@
           },
           {
             "filter": "[shell-combined-part]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
+          },
+          {
+            "filter": "[shell-combined-revolve-pattern]",
             "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
           }
         ],
@@ -386,6 +394,14 @@
           },
           {
             "filter": "[shell-combined-bodies]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
+          },
+          {
+            "filter": "[shell-combined-revolve-pattern]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
+          },
+          {
+            "filter": "[shell-combined-surface-solid]",
             "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
           }
         ],
@@ -501,6 +517,10 @@
           {
             "filter": "[block136-surface]",
             "source": "tests/gui/gui_shell_surface_tools_tests.cpp"
+          },
+          {
+            "filter": "[shell-combined-surface-solid]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
           }
         ],
         "actions": [
@@ -539,6 +559,10 @@
           {
             "filter": "[shell-combined-assembly]",
             "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
+          },
+          {
+            "filter": "[shell-combined-planar-motion]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
           }
         ],
         "actions": [
@@ -576,6 +600,10 @@
           {
             "filter": "[shell-combined-assembly]",
             "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
+          },
+          {
+            "filter": "[shell-combined-planar-motion]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
           }
         ],
         "actions": [
@@ -610,6 +638,10 @@
           {
             "filter": "[shell-combined-assembly]",
             "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
+          },
+          {
+            "filter": "[shell-combined-planar-motion]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
           }
         ],
         "actions": [
@@ -642,6 +674,10 @@
           },
           {
             "filter": "[shell-combined-assembly]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
+          },
+          {
+            "filter": "[shell-combined-planar-motion]",
             "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
           }
         ],

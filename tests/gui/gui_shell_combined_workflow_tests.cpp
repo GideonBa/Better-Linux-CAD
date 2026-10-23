@@ -14,6 +14,7 @@
 #include "blcad/gui/shell/shell_window.hpp"
 
 #include <QAbstractItemView>
+#include <QAbstractSpinBox>
 #include <QAction>
 #include <QApplication>
 #include <QCheckBox>
@@ -37,6 +38,7 @@
 #include <QPushButton>
 #include <QScrollArea>
 #include <QScrollBar>
+#include <QSlider>
 #include <QSpinBox>
 #include <QTableWidget>
 #include <QTemporaryDir>
@@ -47,7 +49,9 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <functional>
+#include <numbers>
 #include <vector>
 
 using namespace blcad;
@@ -62,8 +66,9 @@ template <typename T> T checked(Result<T> result) {
 }
 
 // Interaction helpers deliberately stop at Qt widgets and input events.
-// The seven combined workflows author their inputs through the UI. The separately
-// tagged mixed-path workflow opens preauthored Sketch/plane inputs through Open.
+// Eleven combined workflows author their inputs through the UI. The Planar
+// motion case imports the repository's seated Part definition through a file
+// dialog; the separately tagged mixed-path case opens preauthored Sketch/planes.
 // Neither path drives authoring controllers/workbenches directly.
 class WorkflowUi {
 public:
@@ -112,6 +117,7 @@ public:
     return ready();
   }
   void reveal(QWidget& control) {
+    flush();
     for (auto* ancestor = control.parentWidget(); ancestor; ancestor = ancestor->parentWidget())
       if (auto* scroll = qobject_cast<QScrollArea*>(ancestor))
         scroll->ensureWidgetVisible(&control, 8, 8);
@@ -120,6 +126,11 @@ public:
     REQUIRE(control.isVisible());
     const QPoint center = control.mapTo(&window, control.rect().center());
     const auto* hit = window.childAt(center);
+    INFO("Control center: " << center.x() << "," << center.y());
+    INFO("Hit widget: " << (hit ? hit->metaObject()->className() : "none"));
+    INFO("Hit identity: " << (hit ? hit->objectName().toStdString() : "none"));
+    INFO("Visible region: " << control.visibleRegion().boundingRect().width() << "x"
+                            << control.visibleRegion().boundingRect().height());
     REQUIRE((hit == &control || (hit && control.isAncestorOf(hit))));
   }
   void mouse(QWidget& target, QPointF point, QEvent::Type type,
@@ -163,6 +174,28 @@ public:
   }
   void scalar(const QString& value) {
     text(widget<QLineEdit>("blcad.manipulator_numeric_hud"), value);
+  }
+  void number(QAbstractSpinBox& control, const QString& value) {
+    auto* editor = control.findChild<QLineEdit*>();
+    REQUIRE(editor);
+    text(*editor, value);
+  }
+  void cell(QTableWidget& control, int row, int column, const QString& value) {
+    auto* item = control.item(row, column);
+    REQUIRE(item);
+    reveal(control);
+    control.scrollToItem(item);
+    flush();
+    const auto rectangle = control.visualItemRect(item);
+    REQUIRE(control.viewport()->rect().contains(rectangle.center()));
+    click_at(*control.viewport(), rectangle.center());
+    key(control, Qt::Key_F2);
+    auto* editor =
+        qobject_cast<QLineEdit*>(control.indexWidget(control.model()->index(row, column)));
+    REQUIRE(editor);
+    REQUIRE(control.isAncestorOf(editor));
+    text(*editor, value);
+    CHECK(control.item(row, column)->text() == value);
   }
   void choose(QComboBox& control, int row) {
     INFO(control.objectName().toStdString());
@@ -465,6 +498,19 @@ public:
     command("save");
     CHECK(bytes(path) == saved); // Includes the GUI constraint/dimension sidecars.
     CHECK_FALSE(window.session().can_undo());
+  }
+  void history(const std::vector<std::string>& states) {
+    REQUIRE(states.size() > 1);
+    for (std::size_t i = states.size() - 1; i > 0; --i) {
+      command("undo");
+      CHECK(snapshot() == states[i - 1]);
+      idle();
+    }
+    for (std::size_t i = 1; i < states.size(); ++i) {
+      command("redo");
+      CHECK(snapshot() == states[i]);
+      idle();
+    }
   }
   void idle() {
     CHECK_FALSE(window.session().task().active());
@@ -858,6 +904,381 @@ TEST_CASE(
   CHECK(ui.bytes(step).contains("ISO-10303-21"));
   CHECK(ui.bytes(saved) == source_bytes);
   CHECK(ui.snapshot() == edited);
+  ui.idle();
+}
+
+TEST_CASE("Combined UI sews authored faces rejects an open shell and branches into a solid Boolean",
+          "[gui][integration][shell-combined-workflow][shell-combined-surface-solid]") {
+  WorkflowUi ui;
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  ui.new_document("Sewn solid workflow");
+  ui.rectangle("datum.xy", {20, 20}, {40, 40});
+  const auto base = ui.extrude(10);
+  const auto source_name = ui.window.session().part_document()->features().front().name();
+  CHECK(ui.summary(base).volume_mm3 == Approx(4000).margin(1e-6));
+  const auto original = ui.snapshot();
+  const auto stitch = [&](int faces) {
+    ui.command("surface_stitch");
+    for (int index = 0; index < faces; ++index) {
+      auto& target = ui.widget<QComboBox>("blcad.surface.target");
+      ui.choose(target, target.findText(QString::fromStdString(
+                            source_name + " / " +
+                            std::string(to_string(static_cast<SemanticFace>(index))))));
+      ui.button("blcad.surface.add");
+    }
+    CHECK(ui.widget<QListWidget>("blcad.surface.order").count() == faces);
+    REQUIRE(ui.window.viewport().feature_preview_active());
+    CHECK(ui.snapshot() == original);
+    ui.scalar("0.001 mm");
+    ui.button("blcad.feature.apply");
+    return ui.window.session().part_document()->bodies().back().id();
+  };
+  const auto open_shell = stitch(5);
+  CHECK(ui.summary(open_shell).solid_count == 0);
+  const auto incomplete = ui.snapshot();
+  ui.command("surface_to_solid");
+  auto& target = ui.widget<QComboBox>("blcad.surface.target");
+  ui.choose(target, target.findText(QString::fromStdString(
+                        ui.window.session().part_document()->find_body(open_shell)->name())));
+  CHECK_FALSE(ui.window.viewport().feature_preview_active());
+  CHECK_FALSE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+  CHECK(ui.snapshot() == incomplete);
+  ui.button("blcad.feature.cancel");
+  ui.idle();
+  ui.command("undo");
+  CHECK(ui.snapshot() == original);
+  CHECK(ui.window.session().can_redo());
+
+  const auto shell = stitch(6);
+  CHECK_FALSE(ui.window.session().can_redo());
+  CHECK(ui.summary(shell).solid_count == 0);
+  std::vector<std::string> states{original, ui.snapshot()};
+  ui.command("surface_to_solid");
+  ui.choose(target, target.findText(QString::fromStdString(
+                        ui.window.session().part_document()->find_body(shell)->name())));
+  REQUIRE(ui.window.viewport().feature_preview_active());
+  CHECK(ui.snapshot() == states.back());
+  ui.capture("combined-sewn-solid-preview");
+  ui.button("blcad.feature.apply");
+  const auto solid = ui.window.session().part_document()->bodies().back().id();
+  CHECK(ui.summary(solid).solid_count == 1);
+  CHECK(ui.summary(solid).volume_mm3 == Approx(4000).margin(1e-6));
+  CHECK(ui.window.session().part_document()->find_body(solid)->kind() == BodyKind::Solid);
+  states.push_back(ui.snapshot());
+
+  ui.command("body_translate");
+  ui.list_data(ui.widget<QListWidget>("blcad.body.sources"), QString::fromStdString(solid.value()));
+  ui.scalar("10 mm");
+  ui.button("blcad.feature.apply");
+  CHECK(ui.bounds(solid).minimum.x == Approx(30).margin(1e-5));
+  CHECK(ui.bounds(solid).maximum.x == Approx(50).margin(1e-5));
+  CHECK(ui.summary(base).volume_mm3 == Approx(4000).margin(1e-6));
+  states.push_back(ui.snapshot());
+
+  ui.command("body_boolean");
+  ui.choose(ui.widget<QComboBox>("blcad.boolean.operation"), 0);
+  ui.data(ui.widget<QComboBox>("blcad.boolean.target"), QString::fromStdString(base.value()));
+  ui.capture("combined-sewn-boolean-controls");
+  ui.choose(ui.widget<QComboBox>("blcad.boolean.result"), 1);
+  auto& keep = ui.widget<QCheckBox>("blcad.boolean.keep_tools");
+  if (!keep.isChecked())
+    ui.click(keep);
+  ui.list_data(ui.widget<QListWidget>("blcad.body.sources"), QString::fromStdString(solid.value()));
+  REQUIRE(ui.window.viewport().feature_preview_active());
+  CHECK(ui.snapshot() == states.back());
+  ui.button("blcad.feature.apply");
+  const auto& operation = ui.window.session().part_document()->body_boolean_features().back();
+  REQUIRE(operation.produced_body());
+  const auto united = *operation.produced_body();
+  CHECK(operation.result_mode() == BodyBooleanResultMode::NewBody);
+  CHECK(operation.target_body() == base);
+  CHECK(operation.keep_tool_bodies());
+  CHECK(united != base);
+  CHECK(united != solid);
+  CHECK(ui.summary(united).solid_count == 1);
+  CHECK(ui.summary(united).volume_mm3 == Approx(6000).margin(1e-5));
+  CHECK(ui.summary(base).volume_mm3 == Approx(4000).margin(1e-6));
+  CHECK(ui.summary(solid).volume_mm3 == Approx(4000).margin(1e-6));
+  states.push_back(ui.snapshot());
+  ui.history(states);
+  ui.roundtrip(directory.filePath("sewn-solid.blcad.json"));
+  const auto saved = ui.bytes(directory.filePath("sewn-solid.blcad.json"));
+  ui.file("export_part_step", directory.filePath("sewn-solid.step"));
+  CHECK(ui.bytes(directory.filePath("sewn-solid.step")).startsWith("ISO-10303-21;"));
+  CHECK(ui.bytes(directory.filePath("sewn-solid.blcad.json")) == saved);
+  CHECK(ui.snapshot() == states.back());
+  CHECK_FALSE(ui.window.session().dirty());
+  ui.idle();
+}
+
+TEST_CASE("Combined UI edits a revolved source through a rotated scaled circular pattern",
+          "[gui][integration][shell-combined-workflow][shell-combined-revolve-pattern]") {
+  WorkflowUi ui;
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  ui.new_document("Revolved pattern workflow");
+  ui.rectangle("datum.xy", {20, 2}, {24, 4});
+  ui.command("revolve");
+  ui.scalar("180 deg");
+  ui.button("blcad.feature.apply");
+  const auto source = ui.window.session().part_document()->bodies().back().id();
+  const auto revolve = ui.window.session().part_document()->revolve_features().back().id();
+  const double initial_volume = 24 * std::numbers::pi;
+  CHECK(ui.summary(source).solid_count == 1);
+  CHECK(ui.summary(source).volume_mm3 == Approx(initial_volume).margin(1e-5));
+  std::vector<std::string> states{ui.snapshot()};
+
+  ui.command("circular_pattern");
+  ui.list_data(ui.widget<QListWidget>("blcad.pattern.sources"),
+               QString::fromStdString(source.value()));
+  ui.number(ui.widget<QSpinBox>("blcad.pattern.count"), "4");
+  ui.scalar("360 deg");
+  CHECK(ui.snapshot() == states.back());
+  ui.button("blcad.feature.apply");
+  const auto result = ui.window.session().part_document()->bodies().back().id();
+  const auto pattern = ui.window.session().part_document()->circular_pattern_features().back().id();
+  CHECK(ui.summary(result).solid_count == 4);
+  CHECK(ui.summary(result).volume_mm3 == Approx(4 * initial_volume).margin(1e-5));
+  const auto patterned_bounds = ui.bounds(result);
+  states.push_back(ui.snapshot());
+  ui.command("body_rotate");
+  ui.list_data(ui.widget<QListWidget>("blcad.body.sources"),
+               QString::fromStdString(result.value()));
+  ui.scalar("45 deg");
+  ui.button("blcad.feature.apply");
+  CHECK(ui.summary(result).volume_mm3 == Approx(4 * initial_volume).margin(1e-5));
+  const auto rotated_bounds = ui.bounds(result);
+  CHECK(rotated_bounds.maximum.x < patterned_bounds.maximum.x - 1);
+  CHECK(rotated_bounds.minimum.x > patterned_bounds.minimum.x + 1);
+  states.push_back(ui.snapshot());
+  ui.command("body_scale");
+  ui.list_data(ui.widget<QListWidget>("blcad.body.sources"),
+               QString::fromStdString(result.value()));
+  for (const auto& [axis, value] :
+       std::vector<std::pair<int, QString>>{{0, "5 mm"}, {1, "-3 mm"}, {2, "2 mm"}})
+    ui.text(ui.widget<QLineEdit>(QString("blcad.body.center.%1").arg(axis)), value);
+  ui.scalar("1.5");
+  ui.button("blcad.feature.apply");
+  const double scale_volume = 1.5 * 1.5 * 1.5;
+  CHECK(ui.summary(result).volume_mm3 == Approx(4 * initial_volume * scale_volume).margin(1e-4));
+  const auto scaled_bounds = ui.bounds(result);
+  CHECK(scaled_bounds.minimum.x == Approx(1.5 * rotated_bounds.minimum.x - 2.5).margin(0.05));
+  CHECK(scaled_bounds.minimum.y == Approx(1.5 * rotated_bounds.minimum.y + 1.5).margin(0.05));
+  CHECK(scaled_bounds.minimum.z == Approx(1.5 * rotated_bounds.minimum.z - 1).margin(0.05));
+  states.push_back(ui.snapshot());
+
+  ui.tree(revolve.value(), true);
+  REQUIRE(ui.window.feature_edit_tools().active());
+  ui.number(ui.widget<QDoubleSpinBox>("blcad.feature_edit.field/extent/angle_deg"), "90");
+  CHECK(ui.snapshot() == states.back());
+  REQUIRE(ui.window.viewport().feature_preview_active());
+  ui.capture("combined-revolve-pattern-edit-preview");
+  ui.button("blcad.feature_edit.apply");
+  CHECK(ui.window.session().part_document()->revolve_features().back().id() == revolve);
+  CHECK(ui.summary(source).volume_mm3 == Approx(initial_volume / 2).margin(1e-5));
+  CHECK(ui.summary(result).solid_count == 4);
+  CHECK(ui.summary(result).volume_mm3 == Approx(2 * initial_volume * scale_volume).margin(1e-4));
+  states.push_back(ui.snapshot());
+
+  ui.tree(pattern.value(), true);
+  ui.number(ui.widget<QDoubleSpinBox>("blcad.feature_edit.field/count_parameter"), "1");
+  CHECK_FALSE(ui.window.viewport().feature_preview_active());
+  CHECK_FALSE(ui.widget<QPushButton>("blcad.feature_edit.apply").isEnabled());
+  CHECK(ui.snapshot() == states.back());
+  ui.number(ui.widget<QDoubleSpinBox>("blcad.feature_edit.field/count_parameter"), "6");
+  ui.text(ui.widget<QLineEdit>("blcad.feature_edit.field/name"), "Six transformed quarter sleeves");
+  REQUIRE(ui.window.viewport().feature_preview_active());
+  ui.button("blcad.feature_edit.apply");
+  CHECK(ui.window.session().part_document()->circular_pattern_features().back().id() == pattern);
+  CHECK(ui.summary(result).solid_count == 6);
+  CHECK(ui.summary(result).volume_mm3 == Approx(3 * initial_volume * scale_volume).margin(1e-4));
+  states.push_back(ui.snapshot());
+  ui.history(states);
+
+  ui.command("measure_body");
+  const auto& targets = ui.window.measure_tools().targets();
+  const auto found = std::find_if(targets.begin(), targets.end(), [&](const auto& target) {
+    return target.body && *target.body == result;
+  });
+  REQUIRE(found != targets.end());
+  ui.data(ui.widget<QComboBox>("blcad.measure.first"), static_cast<int>(found - targets.begin()));
+  REQUIRE(ui.window.measure_tools().result());
+  CHECK(ui.window.measure_tools().result()->solid_count == 6);
+  CHECK(ui.window.measure_tools().result()->volume_mm3 ==
+        Approx(3 * initial_volume * scale_volume).margin(1e-4));
+  ui.button("blcad.measure.copy");
+  CHECK_FALSE(QApplication::clipboard()->text().isEmpty());
+  ui.button("blcad.measure.close");
+  CHECK(ui.snapshot() == states.back());
+  ui.roundtrip(directory.filePath("revolved-pattern.blcad.json"));
+  ui.command("fit", 2);
+  ui.capture("combined-revolve-pattern");
+  ui.idle();
+}
+
+TEST_CASE("Combined UI authors a bounded Planar joint drives all coordinates and branches motion",
+          "[gui][integration][shell-combined-workflow][shell-combined-planar-motion]") {
+  WorkflowUi ui;
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  // Frame-capable seats currently come from the retained circular-hole contract.
+  // Use the public definition import; do not synthesize missing Hole UI coverage.
+  const auto definition_path =
+      QStringLiteral(BLCAD_SOURCE_DIR) + "/examples/revolute_joint.blcad.project.json";
+  const auto definition_bytes = ui.bytes(definition_path);
+  ui.new_document("Planar motion workflow", true);
+  ui.file("assembly_import", definition_path);
+  REQUIRE(ui.window.session().project()->part_documents().size() == 1);
+  const auto definition = ui.window.session().project()->part_documents().front().id();
+  std::vector<ComponentInstanceId> instances;
+  for (int index = 0; index < 2; ++index) {
+    ui.command("assembly_insert_component");
+    ui.data(ui.widget<QComboBox>("blcad.assembly.definition"),
+            QString::fromStdString(definition.value()));
+    ui.text(ui.widget<QLineEdit>("blcad.assembly.name"),
+            index == 0 ? "Fixed plate" : "Moving plate");
+    ui.number(ui.widget<QDoubleSpinBox>("blcad.assembly.placement.0"), QString::number(index * 35));
+    ui.number(ui.widget<QDoubleSpinBox>("blcad.assembly.placement.2"), QString::number(index * 12));
+    if (index == 0)
+      ui.click(ui.window.assembly_tools().grounding_editor());
+    ui.button("blcad.assembly.apply");
+    instances.push_back(
+        ui.window.session().project()->assembly().component_instances().back().id());
+  }
+  std::vector<std::string> states{ui.snapshot()};
+  ui.command("assembly_joint");
+  ui.choose(ui.window.assembly_tools().joint_type_editor(),
+            static_cast<int>(AssemblyJointType::Planar));
+  const auto reference = [&](QComboBox& choice, const ComponentInstanceId& instance) {
+    const auto& targets = ui.window.assembly_tools().targets();
+    const auto found = std::find_if(targets.begin(), targets.end(), [&](const auto& target) {
+      return target.reference.component_instance() == instance &&
+             target.reference.semantic_reference() == "feature.hole.seat";
+    });
+    REQUIRE(found != targets.end());
+    ui.data(choice, static_cast<int>(found - targets.begin()));
+  };
+  reference(ui.widget<QComboBox>("blcad.assembly.first"), instances[0]);
+  reference(ui.widget<QComboBox>("blcad.assembly.second"), instances[1]);
+  auto& coordinates = ui.widget<QTableWidget>("blcad.assembly.slots");
+  REQUIRE(coordinates.rowCount() == 3);
+  ui.capture("combined-planar-limits-input");
+  ui.cell(coordinates, 0, 2, "-50");
+  ui.cell(coordinates, 0, 3, "50");
+  ui.cell(coordinates, 1, 2, "-40");
+  ui.cell(coordinates, 1, 3, "40");
+  ui.cell(coordinates, 2, 2, "-90");
+  ui.cell(coordinates, 2, 3, "90");
+  ui.cell(coordinates, 0, 2, "60");
+  CHECK_FALSE(ui.widget<QPushButton>("blcad.assembly.apply").isEnabled());
+  CHECK_FALSE(ui.window.viewport().feature_preview_active());
+  CHECK(ui.snapshot() == states.back());
+  ui.cell(coordinates, 0, 2, "-50");
+  REQUIRE(ui.window.viewport().feature_preview_active());
+  ui.button("blcad.assembly.apply");
+  const auto joint = ui.window.session().project()->assembly().joints().back().id();
+  CHECK(ui.window.session().project()->assembly().joints().back().type() ==
+        AssemblyJointType::Planar);
+  const auto& joint_coordinates =
+      ui.window.session().project()->assembly().joints().back().coordinate_slots();
+  REQUIRE(joint_coordinates.size() == 3);
+  for (int index = 0; index < 3; ++index) {
+    const double limit = index == 0 ? 50 : index == 1 ? 40 : 90;
+    REQUIRE(joint_coordinates[index].lower_limit());
+    REQUIRE(joint_coordinates[index].upper_limit());
+    const auto scalar = [index](const Quantity& value) {
+      return index == 2 ? value.degrees() : value.millimeters();
+    };
+    CHECK(scalar(*joint_coordinates[index].lower_limit()) == -limit);
+    CHECK(scalar(*joint_coordinates[index].upper_limit()) == limit);
+  }
+  states.push_back(ui.snapshot());
+  const auto motion = [&](AssemblyJointCoordinateRole role, const QString& value) {
+    ui.command("assembly_motion");
+    ui.data(ui.widget<QComboBox>("blcad.assembly.joint"), QString::fromStdString(joint.value()));
+    ui.data(ui.window.assembly_tools().coordinate_editor(), static_cast<int>(role));
+    ui.number(ui.widget<QDoubleSpinBox>("blcad.assembly.value"), value);
+    REQUIRE(ui.window.viewport().feature_preview_active());
+    CHECK(ui.snapshot() == states.back());
+  };
+  motion(AssemblyJointCoordinateRole::TranslationU, "35");
+  auto& slider = ui.window.assembly_tools().slider();
+  ui.click(slider);
+  ui.key(slider, Qt::Key_End);
+  CHECK(ui.widget<QDoubleSpinBox>("blcad.assembly.value").value() == 50);
+  ui.key(slider, Qt::Key_Home);
+  CHECK(ui.widget<QDoubleSpinBox>("blcad.assembly.value").value() == -50);
+  CHECK(ui.snapshot() == states.back());
+  ui.button("blcad.assembly.cancel");
+  CHECK(ui.snapshot() == states.back());
+  ui.idle();
+  motion(AssemblyJointCoordinateRole::TranslationU, "30");
+  ui.button("blcad.assembly.apply");
+  states.push_back(ui.snapshot());
+  motion(AssemblyJointCoordinateRole::TranslationV, "20");
+  ui.button("blcad.assembly.apply");
+  states.push_back(ui.snapshot());
+  motion(AssemblyJointCoordinateRole::RotationNormal, "90");
+  ui.capture("combined-planar-motion-preview");
+  ui.button("blcad.assembly.apply");
+  const auto& assembly = ui.window.session().project()->assembly();
+  const auto* driven = assembly.find_joint(joint);
+  REQUIRE(driven);
+  CHECK(driven->find_coordinate_slot(AssemblyJointCoordinateRole::TranslationU)
+            ->value()
+            .millimeters() == 30);
+  CHECK(driven->find_coordinate_slot(AssemblyJointCoordinateRole::TranslationV)
+            ->value()
+            .millimeters() == 20);
+  CHECK(driven->find_coordinate_slot(AssemblyJointCoordinateRole::RotationNormal)
+            ->value()
+            .degrees() == 90);
+  CHECK(assembly.find_component_instance(instances[0])->transform() == identity_rigid_transform());
+  const auto posed = assembly.find_component_instance(instances[1])->transform();
+  CHECK(posed.translation_mm.x == Approx(30).margin(1e-5));
+  CHECK(posed.translation_mm.y == Approx(20).margin(1e-5));
+  CHECK(posed.translation_mm.z == Approx(0).margin(1e-5));
+  CHECK(posed.rotation_deg.z == Approx(90).margin(1e-5));
+  states.push_back(ui.snapshot());
+  ui.history(states);
+  ui.command("undo");
+  CHECK(ui.snapshot() == states[states.size() - 2]);
+  states.pop_back();
+  motion(AssemblyJointCoordinateRole::RotationNormal, "-45");
+  ui.button("blcad.assembly.apply");
+  CHECK_FALSE(ui.window.session().can_redo());
+  const auto branched = ui.snapshot();
+  ui.command("undo");
+  CHECK(ui.snapshot() == states.back());
+  ui.command("redo");
+  CHECK(ui.snapshot() == branched);
+  ui.command("assembly_analysis");
+  ui.choose(ui.widget<QComboBox>("blcad.inspect.kind"), 1);
+  ui.number(ui.widget<QDoubleSpinBox>("blcad.inspect.clearance"), "100");
+  ui.button("blcad.inspect.run");
+  auto& rows = ui.widget<QTableWidget>("blcad.inspect.results");
+  REQUIRE(rows.rowCount() == 1);
+  CHECK(rows.item(0, 2)->text().startsWith("Abstand:"));
+  bool parsed = false;
+  const double clearance = rows.item(0, 2)->text().section(' ', 1, 1).toDouble(&parsed);
+  REQUIRE(parsed);
+  // The imported 10x20 plate is centered at its seat. At U=30, V=20 and -45°,
+  // its nearest corner lies diagonally beyond the fixed plate's (5,10) corner.
+  const double expected_clearance = std::hypot(25 - 15 / std::sqrt(2), 10 - 5 / std::sqrt(2));
+  CHECK(clearance == Approx(expected_clearance).margin(1e-5));
+  ui.button("blcad.inspect.close");
+  CHECK(ui.snapshot() == branched);
+  ui.roundtrip(directory.filePath("planar-motion.blcad.project.json"));
+  for (const auto& [command, name] : std::vector<std::pair<QString, QString>>{
+           {"export_assembly_flat_step", "planar-flat.step"},
+           {"export_assembly_structured_step", "planar-structured.step"}}) {
+    ui.file(command, directory.filePath(name));
+    CHECK(ui.bytes(directory.filePath(name)).startsWith("ISO-10303-21;"));
+    CHECK(ui.snapshot() == branched);
+    CHECK_FALSE(ui.window.session().dirty());
+  }
+  CHECK(ui.bytes(definition_path) == definition_bytes);
   ui.idle();
 }
 
