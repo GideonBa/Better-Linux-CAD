@@ -16,6 +16,7 @@
 #include <QFile>
 #include <QKeyEvent>
 #include <QLabel>
+#include <QListWidget>
 #include <QMouseEvent>
 #include <QPushButton>
 #include <QScrollArea>
@@ -55,6 +56,35 @@ void load(ShellWindow& window, const QTemporaryDir& directory, bool broken = tru
   file.close();
   REQUIRE(window.open_path(file.fileName()));
 }
+void load_batch(ShellWindow& window, const QTemporaryDir& directory) {
+  auto part = test::reference_repair_fixture();
+  for (const std::string suffix : {"a", "b"}) {
+    const auto plane = DatumPlaneId("plane." + suffix);
+    REQUIRE(part.add_derived_workplane(reference_checked(DerivedWorkplane::create_on_feature_face(
+        plane, "Plane " + suffix,
+        reference_checked(
+            SemanticFaceReference::create(FeatureId("feature.old"), SemanticFace::Top))))));
+    auto sketch =
+        reference_checked(Sketch::create(SketchId("sketch." + suffix), "Sketch " + suffix, plane));
+    REQUIRE(sketch.add_entity(
+        reference_checked(LineSegment::create(SketchEntityId("line"), {0, 0}, {3, 0}))));
+    REQUIRE(
+        sketch.add_reference(reference_checked(ProjectedSketchPoint::create_from_semantic_vertex(
+            SketchEntityId("point"),
+            reference_checked(SemanticVertexReference::create(FeatureId("feature.old"),
+                                                              SemanticVertex::TopFrontRight))))));
+    REQUIRE(sketch.add_reference(reference_checked(ProjectedSketchLine::create_from_semantic_edge(
+        SketchEntityId("edge"), reference_checked(SemanticEdgeReference::create(
+                                    FeatureId("feature.old"), SemanticEdge::TopFront))))));
+    REQUIRE(part.add_sketch(sketch));
+  }
+  QFile file(directory.filePath("batch.blcad.json"));
+  REQUIRE(file.open(QIODevice::WriteOnly));
+  const auto json = reference_checked(serialize_part_document_to_json(part));
+  REQUIRE(file.write(QByteArray::fromStdString(json)) == static_cast<qint64>(json.size()));
+  file.close();
+  REQUIRE(window.open_path(file.fileName()));
+}
 void choose(ShellWindow& window, const char* control_name, const QString& identity) {
   auto& combo = control<QComboBox>(window, control_name);
   const auto index = combo.findData(identity);
@@ -82,6 +112,14 @@ void apply(ShellWindow& window) {
   REQUIRE_FALSE(window.session().task().active());
   REQUIRE_FALSE(window.viewport().feature_preview_active());
 }
+void queue_repair(ShellWindow& window, const QString& reference, const QString& target) {
+  choose(window, "reference", reference);
+  choose(window, "replacement", target);
+  REQUIRE(control<QPushButton>(window, "stage").isEnabled());
+  control<QPushButton>(window, "stage").click();
+  CHECK_FALSE(control<QPushButton>(window, "apply").isEnabled());
+  CHECK_FALSE(window.viewport().feature_preview_active());
+}
 void click(QWidget& widget, QPoint point = {}) {
   REQUIRE(widget.isVisible());
   if (point.isNull())
@@ -107,11 +145,11 @@ void mouse_choose(QComboBox& combo, const QString& id) {
   click(*view->viewport(), view->visualRect(index).center());
   REQUIRE(combo.currentIndex() == row);
 }
-void ribbon(ShellWindow& window) {
-  window.ribbon().set_current_tab(0);
+void ribbon_command(ShellWindow& window, QAction& command, int tab) {
+  window.ribbon().set_current_tab(tab);
   qApp->processEvents();
   for (auto* button : window.ribbon().findChildren<QToolButton*>())
-    if (button->defaultAction() == &action(window)) {
+    if (button->defaultAction() == &command) {
       for (auto* parent = button->parentWidget(); parent; parent = parent->parentWidget())
         if (auto* scroll = qobject_cast<QScrollArea*>(parent))
           scroll->ensureWidgetVisible(button, 8, 8);
@@ -120,7 +158,10 @@ void ribbon(ShellWindow& window) {
       click(*button);
       return;
     }
-  FAIL("Repair ribbon button missing");
+  FAIL("Ribbon button missing: " + command.objectName().toStdString());
+}
+void ribbon(ShellWindow& window) {
+  ribbon_command(window, action(window), 0);
 }
 } // namespace
 
@@ -442,4 +483,339 @@ TEST_CASE(
   ShellWindow reopened;
   REQUIRE(reopened.open_path(directory.filePath("ui.blcad.json")));
   CHECK(snapshot(reopened) == repaired);
+}
+
+TEST_CASE(
+    "Reference repair batches resolve dependent plane and projected inputs in one transaction",
+    "[gui][block136-reference-repair-batches]") {
+  ShellWindow window;
+  QTemporaryDir directory;
+  load_batch(window, directory);
+  const auto before = snapshot(window);
+  const auto revision = window.session().presentation_revision();
+  begin(window, "sketch.a/point");
+  CHECK(control<QComboBox>(window, "replacement").count() == 0);
+  queue_repair(window, "plane.a/", "feature.new.face.top");
+  REQUIRE(control<QListWidget>(window, "pending").count() == 1);
+  CHECK(window.reference_repair_tools().preview().has_error());
+  CHECK_FALSE(window.viewport().feature_preview_active());
+  CHECK_FALSE(control<QPushButton>(window, "apply").isEnabled());
+  // Choices now resolve against the staged upstream plane, while the file stays broken.
+  queue_repair(window, "sketch.a/point", "feature.new.vertex.top_front_right");
+  queue_repair(window, "sketch.a/edge", "feature.new.edge.top_front");
+  queue_repair(window, "plane.b/", "feature.new.face.bottom");
+  queue_repair(window, "sketch.b/point", "point.fallback");
+  REQUIRE(control<QListWidget>(window, "pending").count() == 5);
+  CHECK(snapshot(window) == before);
+  CHECK_FALSE(window.session().dirty());
+  CHECK(window.session().presentation_revision() == revision);
+  preview(window);
+  for (const std::string id :
+       {"derived-workplane/plane.a", "derived-workplane/plane.b", "sketch/sketch.a/entity/point",
+        "sketch/sketch.a/entity/edge", "sketch/sketch.b/entity/point"})
+    CHECK(window.viewport().feature_preview_replaces(id));
+  apply(window);
+  const auto after = snapshot(window);
+  CHECK(after != before);
+  CHECK(window.session().undo_label() == "Repair references");
+  CHECK(control<QListWidget>(window, "pending").count() == 0);
+  const auto& part = *window.session().part_document();
+  CHECK(part.find_sketch(SketchId("sketch.a"))
+            ->projected_points()
+            .front()
+            .semantic_vertex()
+            ->source_feature() == FeatureId("feature.new"));
+  CHECK(part.find_sketch(SketchId("sketch.b"))->projected_points().front().construction_point() ==
+        ConstructionPointId("point.fallback"));
+  CHECK(part.find_sketch(SketchId("sketch.refs"))->constraints().size() == 2);
+  REQUIRE(window.undo());
+  CHECK(snapshot(window) == before);
+  CHECK_FALSE(window.session().can_undo());
+  REQUIRE(window.redo());
+  CHECK(snapshot(window) == after);
+  REQUIRE(window.save_to(directory.filePath("repaired-batch.blcad.json")));
+  const auto saved = bytes(directory.filePath("repaired-batch.blcad.json"));
+  ShellWindow reopened;
+  REQUIRE(reopened.open_path(directory.filePath("repaired-batch.blcad.json")));
+  CHECK(snapshot(reopened) == after);
+  REQUIRE(reopened.save_to({}));
+  CHECK(bytes(directory.filePath("repaired-batch.blcad.json")) == saved);
+}
+
+TEST_CASE("Repair list edits upsert scoped identities remove individual entries and reset staging",
+          "[gui][block136-reference-repair-batches]") {
+  ShellWindow window;
+  QTemporaryDir directory;
+  load_batch(window, directory);
+  const auto before = snapshot(window);
+  begin(window, "plane.a/");
+  queue_repair(window, "plane.a/", "feature.new.face.top");
+  queue_repair(window, "plane.b/", "feature.new.face.bottom");
+  queue_repair(window, "sketch.a/point", "point.fallback");
+  queue_repair(window, "sketch.b/point", "feature.new.vertex.top_front_left");
+  auto& pending = control<QListWidget>(window, "pending");
+  REQUIRE(pending.count() == 4);
+  CHECK(pending.item(0)->text().contains("new / Fläche oben"));
+  queue_repair(window, "sketch.a/point", "feature.new.vertex.top_back_right");
+  REQUIRE(pending.count() == 4);
+  CHECK(pending.item(2)->toolTip() == "feature.new.vertex.top_back_right");
+  CHECK(pending.item(3)->toolTip() == "feature.new.vertex.top_front_left");
+  preview(window);
+  pending.setCurrentRow(0);
+  control<QPushButton>(window, "remove").click();
+  REQUIRE(pending.count() == 3);
+  CHECK_FALSE(window.viewport().feature_preview_active());
+  CHECK_FALSE(control<QPushButton>(window, "apply").isEnabled());
+  CHECK(window.reference_repair_tools().preview().has_error());
+  CHECK(snapshot(window) == before);
+  queue_repair(window, "plane.a/", "feature.new.face.top");
+  preview(window);
+  control<QPushButton>(window, "clear").click();
+  CHECK(pending.count() == 0);
+  CHECK_FALSE(window.viewport().feature_preview_active());
+  CHECK_FALSE(control<QPushButton>(window, "preview").isEnabled());
+  CHECK_FALSE(control<QPushButton>(window, "apply").isEnabled());
+  choose(window, "reference", "sketch.a/point");
+  CHECK(control<QComboBox>(window, "replacement").count() == 0);
+  CHECK(snapshot(window) == before);
+  CHECK_FALSE(window.session().dirty());
+  window.reference_repair_tools().cancel();
+}
+
+TEST_CASE("Cyclic batch edits preserve the previous valid list and revoke its preview",
+          "[gui][block136-reference-repair-batches]") {
+  ShellWindow window;
+  QTemporaryDir directory;
+  load(window, directory, false, false, true);
+  const auto before = snapshot(window);
+  begin(window);
+  queue_repair(window, "sketch.refs/point", "feature.new.vertex.top_front_left");
+  queue_repair(window, "sketch.refs/edge", "line.fallback");
+  preview(window);
+  const auto revision = window.session().presentation_revision();
+  queue_repair(window, "sketch.refs/point", "feature.consumer.vertex.top_front_right");
+  auto& pending = control<QListWidget>(window, "pending");
+  REQUIRE(pending.count() == 2);
+  CHECK(pending.item(0)->toolTip() == "feature.new.vertex.top_front_left");
+  CHECK(control<QLabel>(window, "summary").text().contains("cycle"));
+  CHECK(window.session().presentation_revision() == revision);
+  CHECK(snapshot(window) == before);
+  // Selecting another reference discards the failed draft, retaining the staged list.
+  choose(window, "reference", "sketch.refs/edge");
+  preview(window);
+  apply(window);
+  CHECK(window.session().undo_label() == "Repair references");
+  REQUIRE(window.undo());
+  CHECK(snapshot(window) == before);
+}
+
+TEST_CASE("Whole repair batches recompute multiple solids and reject downstream bounds atomically",
+          "[gui][block136-reference-repair-batches]") {
+  ShellWindow window;
+  QTemporaryDir directory;
+  load(window, directory, false, true);
+  REQUIRE(window.session().commit_part_transaction("Plane consumers", [](PartDocument& part) {
+    auto second_plane =
+        part.add_derived_workplane(reference_checked(DerivedWorkplane::create_on_feature_face(
+            DatumPlaneId("plane.second"), "Second",
+            reference_checked(
+                SemanticFaceReference::create(FeatureId("feature.new"), SemanticFace::Top)))));
+    if (!second_plane)
+      return second_plane;
+    for (const std::string suffix : {"one", "two"}) {
+      auto sketch = reference_checked(
+          Sketch::create(SketchId("face." + suffix), "Face " + suffix,
+                         DatumPlaneId(suffix == "one" ? "plane" : "plane.second")));
+      REQUIRE(sketch.add_profile(reference_checked(RectangleProfile::create(
+          ProfileId("face.profile." + suffix), ParameterId("width"), ParameterId("height")))));
+      auto added = part.add_sketch(sketch);
+      if (!added)
+        return added;
+      added = part.add_feature(reference_checked(
+          Feature::create_additive_extrude(FeatureId("face.solid." + suffix), "Solid " + suffix,
+                                           sketch.id(), ParameterId("depth"))));
+      if (!added)
+        return added;
+    }
+    return Result<std::size_t>::success(4);
+  }));
+  window.refresh();
+  REQUIRE(window.save_to(directory.filePath("solids.blcad.json")));
+  const auto before = snapshot(window);
+  const auto bounds = [&](const std::string& suffix) {
+    const auto* shape =
+        window.session().part_shape_cache()->find_feature_shape(FeatureId("face.solid." + suffix));
+    REQUIRE(shape);
+    return reference_checked(geometry::BodyTransformAdapter{}.bounds(*shape));
+  };
+  begin(window, "plane/");
+  queue_repair(window, "plane/", "feature.new.face.bottom");
+  queue_repair(window, "plane.second/", "feature.old.face.front");
+  control<QPushButton>(window, "preview").click();
+  CHECK(control<QLabel>(window, "summary").text().contains("bounds"));
+  CHECK_FALSE(control<QPushButton>(window, "apply").isEnabled());
+  CHECK_FALSE(window.viewport().feature_preview_active());
+  CHECK(snapshot(window) == before);
+  for (const std::string suffix : {"one", "two"})
+    CHECK(bounds(suffix).minimum.z == Catch::Approx(8).margin(1e-6));
+  queue_repair(window, "plane.second/", "feature.old.face.bottom");
+  REQUIRE(control<QListWidget>(window, "pending").count() == 2);
+  preview(window);
+  CHECK(window.viewport().feature_preview_replaces("derived-workplane/plane"));
+  CHECK(window.viewport().feature_preview_replaces("derived-workplane/plane.second"));
+  CHECK(snapshot(window) == before);
+  apply(window);
+  const auto after = snapshot(window);
+  for (const std::string suffix : {"one", "two"}) {
+    CHECK(bounds(suffix).minimum.z == Catch::Approx(-8).margin(1e-6));
+    CHECK(bounds(suffix).maximum.z == Catch::Approx(0).margin(1e-6));
+  }
+  REQUIRE(window.undo());
+  CHECK(snapshot(window) == before);
+  for (const std::string suffix : {"one", "two"})
+    CHECK(bounds(suffix).minimum.z == Catch::Approx(8).margin(1e-6));
+  REQUIRE(window.redo());
+  CHECK(snapshot(window) == after);
+  REQUIRE(window.save_to({}));
+  ShellWindow reopened;
+  REQUIRE(reopened.open_path(directory.filePath("solids.blcad.json")));
+  CHECK(snapshot(reopened) == after);
+}
+
+TEST_CASE("Pending repair batches expire without publishing on every task exit",
+          "[gui][block136-reference-repair-batches]") {
+  for (int exit = 0; exit < 8; ++exit) {
+    CAPTURE(exit);
+    ShellWindow window;
+    QTemporaryDir directory;
+    load_batch(window, directory);
+    const auto before = snapshot(window);
+    begin(window, "plane.a/");
+    queue_repair(window, "plane.a/", "feature.new.face.top");
+    queue_repair(window, "plane.b/", "feature.new.face.bottom");
+    preview(window);
+    switch (exit) {
+    case 0:
+      control<QPushButton>(window, "cancel").click();
+      break;
+    case 1:
+      window.findChild<QDockWidget*>("blcad.shell.reference_repair_task")->close();
+      break;
+    case 2: {
+      QKeyEvent escape(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier);
+      QApplication::sendEvent(&control<QListWidget>(window, "pending"), &escape);
+      break;
+    }
+    case 3:
+      REQUIRE(window.save_to(directory.filePath("pending.blcad.json")));
+      break;
+    case 4:
+      CHECK_FALSE(window.undo());
+      break;
+    case 5:
+      CHECK_FALSE(window.redo());
+      break;
+    case 6:
+      REQUIRE(window.new_part("Replacement"));
+      break;
+    case 7:
+      REQUIRE(window.session().commit_part_transaction("External", [](PartDocument& part) {
+        return part.add_construction_point(reference_checked(ConstructionPoint::create_explicit(
+            ConstructionPointId("external"), "External", {2, 3, 4})));
+      }));
+      CHECK(window.reference_repair_tools().apply().has_error());
+      window.refresh();
+      break;
+    }
+    CHECK_FALSE(window.reference_repair_tools().active());
+    CHECK_FALSE(window.session().task().active());
+    CHECK_FALSE(window.viewport().feature_preview_active());
+    CHECK(control<QListWidget>(window, "pending").count() == 0);
+    if (exit < 6) {
+      CHECK(snapshot(window) == before);
+      CHECK_FALSE(window.session().dirty());
+    }
+    if (exit == 3) {
+      ShellWindow reopened;
+      REQUIRE(reopened.open_path(directory.filePath("pending.blcad.json")));
+      CHECK(snapshot(reopened) == before);
+    }
+  }
+}
+
+TEST_CASE(
+    "Native ribbon popup and repair list input commits a corrected multi-plane batch atomically",
+    "[gui][block136-reference-repair-batches][shell-repair-batch-input]") {
+  ShellWindow window;
+  window.resize(1280, 800);
+  window.show();
+  qApp->processEvents();
+  if (QApplication::platformName() == "xcb")
+    REQUIRE(window.viewport().native_viewer_available());
+  QTemporaryDir directory;
+  load_batch(window, directory);
+  const auto before = snapshot(window);
+  ribbon(window);
+  const auto stage_input = [&](const QString& reference, const QString& target) {
+    mouse_choose(control<QComboBox>(window, "reference"), reference);
+    mouse_choose(control<QComboBox>(window, "replacement"), target);
+    click(control<QPushButton>(window, "stage"));
+  };
+  stage_input("plane.a/", "feature.new.face.top");
+  click(control<QPushButton>(window, "preview"));
+  CHECK_FALSE(control<QPushButton>(window, "apply").isEnabled());
+  CHECK(snapshot(window) == before);
+  stage_input("sketch.a/point", "feature.new.vertex.top_front_right");
+  stage_input("sketch.a/edge", "feature.new.edge.top_front");
+  stage_input("plane.b/", "feature.new.face.bottom");
+  stage_input("sketch.b/point", "point.fallback");
+  auto& pending = control<QListWidget>(window, "pending");
+  REQUIRE(pending.count() == 5);
+  pending.scrollToItem(pending.item(0));
+  qApp->processEvents();
+  click(*pending.viewport(), pending.visualItemRect(pending.item(0)).center());
+  click(control<QPushButton>(window, "remove"));
+  REQUIRE(pending.count() == 4);
+  stage_input("plane.a/", "feature.new.face.top");
+  REQUIRE(pending.count() == 5);
+  click(control<QPushButton>(window, "preview"));
+  REQUIRE(control<QPushButton>(window, "apply").isEnabled());
+  REQUIRE(window.viewport().feature_preview_active());
+  auto* fit = window.findChild<QAction*>("blcad.action.fit");
+  REQUIRE(fit);
+  ribbon_command(window, *fit, 2);
+  CHECK(window.viewport().feature_preview_active());
+  CHECK(pending.count() == 5);
+  CHECK(snapshot(window) == before);
+  if (QApplication::platformName() == "xcb") {
+    const auto captures = qEnvironmentVariable("BLCAD_UI_CAPTURE_DIR");
+    if (!captures.isEmpty()) {
+      REQUIRE(QDir().mkpath(captures));
+      CHECK(window.grab().save(QDir(captures).filePath("reference-batch-preview.png")));
+    }
+  }
+  click(control<QPushButton>(window, "apply"));
+  REQUIRE_FALSE(window.reference_repair_tools().active());
+  const auto after = snapshot(window);
+  CHECK(after != before);
+  CHECK(window.session().undo_label() == "Repair references");
+  REQUIRE(window.undo());
+  CHECK(snapshot(window) == before);
+  CHECK_FALSE(window.session().can_undo());
+  REQUIRE(window.redo());
+  CHECK(snapshot(window) == after);
+  REQUIRE(window.save_to(directory.filePath("native-batch.blcad.json")));
+  const auto saved = bytes(directory.filePath("native-batch.blcad.json"));
+  ribbon(window);
+  stage_input("sketch.a/point", "point.fallback");
+  click(control<QPushButton>(window, "clear"));
+  CHECK(pending.count() == 0);
+  click(control<QPushButton>(window, "cancel"));
+  CHECK(snapshot(window) == after);
+  CHECK_FALSE(window.session().dirty());
+  ShellWindow reopened;
+  REQUIRE(reopened.open_path(directory.filePath("native-batch.blcad.json")));
+  REQUIRE(reopened.save_to({}));
+  CHECK(snapshot(reopened) == after);
+  CHECK(bytes(directory.filePath("native-batch.blcad.json")) == saved);
 }

@@ -276,14 +276,15 @@ so an edge projecting to a point is excluded. The original target is excluded an
 preselected. Source identities are stable feature/role or construction IDs; kernel subshape indices
 never become persistent intent.
 
-**Vorschau** applies the selected replacement to a disposable Part, validates graph dependencies,
-recomputes downstream features and builds the candidate presentation. Apply stays disabled until
-that succeeds. Changing either selector discards the preview and requires another explicit Preview.
+**Gesamtvorschau** adds a selected replacement to the visible repair list, then applies the whole
+list to a disposable Part, validates graph dependencies, recomputes downstream features and builds
+the candidate presentation. **Hinzufügen** can stage more changes before that full recompute. Apply
+stays disabled until that succeeds. Changing either selector discards the preview and requires another explicit Preview.
 **Anwenden** revalidates and executes one `GuiDocumentSession::commit_part_transaction`. Projected
 entity IDs, Sketch order, constraints, generated-line consumers and workplane IDs/names are retained;
 Core rebuilds the changed dependency edges. A regression exposed a missing cycle guard in
-`PartDocument::update_sketch`; it now rejects the candidate before publishing any state. One Undo/Redo restores the whole replacement. Rebinding
-changes the selected consumer's authored source, rather than interpreting a historical remap record
+`PartDocument::update_sketch`; it now rejects the candidate before publishing any state. One Undo/Redo
+restores the whole repair list. Rebinding changes the selected consumer's authored source, rather than interpreting a historical remap record
 as a global rewrite rule. It adds no schema fields.
 
 Preview and diagnostics leave history, dirty state and persisted intent unchanged. Cancel, dock close,
@@ -295,11 +296,11 @@ face is rejected when its downstream profile exceeds the workplane bounds; a val
 recomputes its dependent solid. The shared session task excludes competing tools.
 
 This is a bounded repair surface, not completion of the entire planar/reference family: documents
-rejected during initial source validation or recompute still cannot be opened for repair. A repair
-must currently make the complete candidate scene/recompute valid; batches of interdependent repairs,
-arbitrary topology matching, construction-relation remapping and constraint-diagnostic suggestion
-controls remain separate work. The coarse Core `ReferenceRecoveryEvaluator` status is not used as a
-substitute for Geometry diagnostics. Stored historical status/remap records are not rewritten.
+rejected during initial source validation or recompute still cannot be opened for repair. The
+complete repair list must make the candidate scene/recompute valid. Arbitrary topology
+matching, construction-relation remapping and constraint-diagnostic suggestion controls remain
+separate work. The batch extension below permits multiple changes before complete recompute. The
+coarse Core `ReferenceRecoveryEvaluator` status is not used as a substitute for Geometry diagnostics. Stored historical status/remap records are not rewritten.
 
 Proof: three `[core][sketch-reference-repair]` cases and seven `[block136-reference-repair]` shell cases.
 The dedicated `[shell-reference-repair-input]` case uses actual ribbon/button/popup mouse input on
@@ -307,3 +308,47 @@ imported intent, repairs two references, cancels another preview and checks hist
 The other cases cover missing/wrong-kind/cyclic sources, construction fallbacks, face placement,
 selection-change invalidation, stale/revision/context guards and canonical JSON. Imported fixture
 setup is explicit; this is not a claim of a wholly UI-authored modeling acceptance workflow.
+
+
+## Replacement-shell repair lists — 2026-10-23
+
+The same task now collects multiple projected point/line and generated-face-workplane replacements.
+**Hinzufügen** stages a selected change in **Vorgemerkte Änderungen**, keyed by reference kind,
+owner Sketch/workplane and entity ID. Generated targets show the feature name and a German
+face/edge/vertex role; tooltips and item data retain the exact semantic identity. Repeating a reference
+replaces its queued choice; equal entity IDs in different Sketches remain distinct. **Entfernen** removes the selected list item, while
+**Liste leeren** restores the original disposable candidate. Selecting an item only changes which
+entry Remove targets. Every content or source-selector change revokes the previous preview.
+
+Staging rebuilds a Part copy from committed intent and all queued changes, using existing Core
+source validation, same-ID updates and cycle guards. An invalid stage leaves the previous list and
+candidate intact, with Apply disabled and the error shown locally. Staging does not require valid
+complete Geometry yet: one repaired workplane can enable projected-reference choices while another
+broken workplane still prevents a complete scene. The target selectors evaluate the staged intent;
+the committed source/status remains visible, with a separate `Vorgemerkt` annotation. The existing
+cache supports provisional target selection; only a new full recompute validates the final result.
+
+**Gesamtvorschau** first stages the current selection when one exists, then recomputes the complete
+list and presents all affected workplanes/Sketches plus downstream solid/surface outputs. The visible
+list is the exact scope of the preview and Apply. A failure leaves that list editable without
+publishing or changing dirty/history state. Apply repeats complete validation and publishes all
+queued replacements in one transaction (`Repair references` for multiple entries, the existing
+`Repair reference` for one). Single-selection Preview remains supported. One Undo/Redo restores the
+whole batch; Save/Open retains canonical authored intent without any persistent queue fields.
+
+Cancel, close, Escape, save, history commands, document replacement and revision expiry discard the
+entire list and transient presentation. Saving during staging/preview writes committed intent. The
+repaired candidate is never copied directly into the session outside the transaction authority.
+
+The batch is ordered: each intermediate Core update must validate. It does not bypass cycle checks
+to permit temporary cyclic graph rewrites, open documents rejected during initial load, or implement
+new topology/constraint repair kinds. These boundaries keep the family partial and Block 136 open.
+
+Proof: six `[block136-reference-repair-batches]` cases in
+`tests/gui/gui_shell_reference_repair_tests.cpp`. They cover two lost planes with dependent projected
+inputs, identical entity IDs across Sketches, upsert/remove/reset, invalid cyclic stages, complete
+preview replacement scope, a failed two-solid bounds candidate followed by a valid reversed-plane
+batch, all task exits and single-entry compatibility via the retained tests.
+`[shell-repair-batch-input]` uses actual ribbon/popup/button/list mouse input: partial repair failure →
+five staged changes across two planes/two Sketches → remove/restage → whole preview → native Fit →
+one Apply → Undo/Redo → canonical save/reopen → clear/cancel. Input fixtures are explicitly imported.

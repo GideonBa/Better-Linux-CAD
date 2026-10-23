@@ -39,8 +39,8 @@ source, hide a missing tag behind OR and claim completion with gaps. They must a
 
 The machine-readable details live in `families[].shell.gaps`; this is the execution order:
 
-1. Complete repair-time loading, interdependent reference-repair batches and explicit constraint
-   diagnostics/suggestion controls; then restore Sketch3D authoring/editing.
+1. Implement repair-time loading and explicit constraint diagnostics/suggestion controls;
+   then restore Sketch3D authoring/editing. Single and batch repair of loadable Parts is available.
 2. Restore standalone parameter management, dedicated Hole authoring and audit advanced extent
    editors against the foundation API.
 3. Restore contextual commands, selection-filter UI, view cube, view bookmarks and repeat command.
@@ -68,7 +68,7 @@ QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][gui-fea
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests
 ./build/dev-gui/blcad_core_tests
 ./build/dev-gui/blcad_geometry_tests
-QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-reference-repair],[block136-construction-manipulators],[block136-construction-picking],[shell-mixed-path-loft],[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-reference-repair-batches],[block136-reference-repair],[block136-construction-manipulators],[block136-construction-picking],[shell-mixed-path-loft],[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
 ```
 
 The regular inventory audit passes while it accurately records unfinished work. For closure,
@@ -360,3 +360,34 @@ Verification of the final implementation:
 - The explicit closure gate still correctly fails **one of three cases, 141 assertions** because
   acceptance is incomplete. The ordinary inventory audit passes. Nine families retain gaps;
   Block 136 remains in progress, with the remaining repair work next in `docs/mvp-plan.md`.
+
+
+## Atomic reference-repair list continuation — 2026-10-23
+
+The task now collects changes across several workplanes and Sketches before a complete preview and
+one history transaction. Six new cases cover partial Geometry failure/recovery, scoped identities,
+upsert/remove/clear, cycle rejection with the prior list preserved, complete transient replacement
+scope, all task exits and canonical history/files. The native input workflow stages five changes,
+removes/restages a plane and commits the complete repair through actual ribbon/popup/list/button
+input. Existing single-reference tests remain compatibility proofs. Contract and limits live in
+`docs/gui-sketch-workbench-mvp7.md`. The planar/reference family remains partial; nine blocked
+families and integrated acceptance keep Block 136 open.
+
+Verification of the final implementation:
+
+- All GUI/application/Core/Geometry targets built with `dev-gui` and `-j4`.
+- Focused single/batch repair plus inventory: **16 cases, 2,120 assertions**, all passed offscreen.
+- Full Core: **522 cases, 15,410 assertions**; full Geometry: **436 cases, 29,779 assertions**,
+  all passed.
+- Full offscreen GUI: **355 cases — 340 passed, 15 native-only skips; 24,933 assertions passed**.
+  The six new batch cases add no skip.
+- Combined native Qt/OCCT filter above: **171 cases, 19,785 assertions**, all passed without skips.
+  The five-entry repair list, readable target labels, complete preview, native Fit and reachable
+  Add/Remove/Clear/Preview/Apply/Cancel controls were captured and inspected at 1280×800.
+- Changed C++ formatting, manifest JSON and `git diff --check` passed. The ordinary inventory audit
+  passes; the explicit closure gate correctly fails **one of three cases, 145 assertions** for the
+  recorded remaining acceptance gaps. Block 136 remains in progress.
+
+The separate native application startup reached the intentional six-second timeout (124). Native
+logs retain the existing medium incomplete-visual depth/stencil warning, without high-severity or
+drawable-lifecycle errors.

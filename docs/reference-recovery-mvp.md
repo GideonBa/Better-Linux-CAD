@@ -177,3 +177,28 @@ cycles while preserving downstream edges. Persisted source fields change only fo
 consumer. Stored `ReferenceRemapRecord` entries remain explicit historical intent, without automatic
 global rewriting. Exact UI, tests and remaining load/recompute/batch limitations live in
 `docs/gui-sketch-workbench-mvp7.md` under “Replacement-shell explicit reference repair”.
+
+
+The shell repair task also supports an ordered transient list of replacements. Each stage validates
+Core intent without requiring a complete scene; one final preview/recompute and transaction publish
+the whole batch. This allows several lost references to be repaired together while preserving the
+existing status/remap semantics. Each intermediate Core update must remain valid. Repair-time
+loading of rejected documents remains planned; see the same GUI contract and `docs/mvp-plan.md`.
+
+
+## Planned repair-time loading boundary
+
+The next step must preserve the existing transaction and persistence guarantees while admitting a
+Core-valid Part whose initial Geometry recompute fails. Implementation planning:
+
+- Add an explicit repair-open state with retained authored intent and failure diagnostics. A partial
+  or absent cache must never be published as fresh Geometry.
+- Supply repair-only target diagnostics and provisional typed choices without requiring a complete
+  initial scene. Ordinary modeling and export require a successful complete recompute.
+- Support Undo back to the original failed-recompute snapshot after a successful repair, clearing
+  unavailable derived presentation while preserving canonical intent and the saved/dirty boundary.
+- Publish repaired intent through the same complete recompute/session transaction. Audit the separate
+  missing-source validation boundary before allowing structurally rejected documents into a session.
+
+These items are planned, not implemented by the batch-list continuation. They require dedicated
+session/history/file and native shell regression proofs before the loading gap can close.

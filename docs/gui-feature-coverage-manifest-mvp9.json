@@ -227,9 +227,9 @@
         "owner": 136,
         "status": "partial",
         "contract": "docs/interactive-sketcher-mvp8-acceptance.md",
-        "scope": "Planar authoring and same-id repair of projected points/lines and generated-face workplanes with explicit diagnostics, preview, atomic history and canonical persistence.",
+        "scope": "Planar authoring and explicit single/batch repair of projected points/lines and generated-face workplanes, with staged choices, whole-list preview and atomic history/persistence.",
         "gaps": [
-          "Restore repair-time loading of documents rejected by initial recompute or missing-source validation, multi-reference repair batches and explicit constraint-diagnostic suggestion controls."
+          "Restore repair-time loading of documents rejected by initial recompute or missing-source validation and explicit constraint-diagnostic suggestion controls."
         ],
         "proofs": [
           {
@@ -242,6 +242,10 @@
           },
           {
             "filter": "[block136-reference-repair]",
+            "source": "tests/gui/gui_shell_reference_repair_tests.cpp"
+          },
+          {
+            "filter": "[block136-reference-repair-batches]",
             "source": "tests/gui/gui_shell_reference_repair_tests.cpp"
           }
         ],
@@ -256,7 +260,11 @@
           "blcad.reference_repair.replacement",
           "blcad.reference_repair.diagnostic",
           "blcad.reference_repair.preview",
-          "blcad.reference_repair.apply"
+          "blcad.reference_repair.apply",
+          "blcad.reference_repair.pending",
+          "blcad.reference_repair.stage",
+          "blcad.reference_repair.remove",
+          "blcad.reference_repair.clear"
         ]
       }
     },
