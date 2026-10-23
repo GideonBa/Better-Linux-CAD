@@ -115,7 +115,7 @@ sketches/geometry. Arc/spline/helix picking is outside this bounded point/line s
 masks and scopes remain unchanged; the task's explicit collection roles consume their own clicks.
 
 **Punktgriffe anzeigen** enables translation grips for an existing or locally staged selected point.
-The **Griffrichtungen** selector exposes XYZ, one X/Y/Z axis or the two independent axes of XY/YZ/ZX.
+The **Zeiger-/Griffsperre** selector exposes XYZ, one X/Y/Z axis or the two independent axes of XY/YZ/ZX.
 These restrictions reuse `Sketch3DInteractionService::resolve_point`; a plane restriction does not
 provide a free plane-surface drag. Grips use the existing manipulator layer and the actual viewport
 ray/projection mapping. Mouse movement and the final release build complete local candidates, with
@@ -139,5 +139,46 @@ candidate-only picking, all seven lock modes, precise explicit detachment, raw f
 Escape rollback, invalid text and lifecycle/camera/focus boundaries. Both backends execute the same
 cases: `[block136-sketch3d-grips]` and `[shell-sketch3d-grips-workflow]`.
 
-Pointer placement of new points, explicit distance/azimuth/elevation entry and planar-point projection
-remain the next Sketch3D work. The family and Block 136 remain partial.
+This collection/grip slice left pointer placement, explicit distance/azimuth/elevation entry and
+planar-point projection open. The anchored placement extension below supplies pointer input;
+distance/direction and projection remain unfinished. The family and Block 136 remain partial.
+
+## Replacement shell: anchored pointer placement — Block 136, 2026-10-23
+
+**Modellklick wählt → Neuen Punkt platzieren** stages new explicit points with actual viewport
+input. **Platzierungsanker** selects the model origin or a stable local point of the active candidate,
+including previously staged points. This selector remains explicit after each placement; selecting
+the newly created point for editing does not silently change the anchor.
+
+**Zeiger-/Griffsperre** shares the existing seven restrictions. XYZ intersects the view ray with the
+camera-facing plane through the anchor, fixing depth explicitly rather than inferring a surface.
+X/Y/Z use the closest point on the corresponding model axis through that anchor. XY/YZ/ZX intersect
+the corresponding model plane through it. Nearly view-parallel axes and edge-on planes fail closed;
+the task asks for a different view. Both orthographic and perspective mappings use the viewport's
+authoritative ray/projection. Perspective points behind the camera and coordinates outside ±1e9 mm
+are rejected. There is no automatic topology/surface snapping or planar-reference association.
+
+The transient amber marker and anchor line show the resolved hover point; XYZ values appear in the
+task summary. Hover and press do not change the local sketch, document, history or dirty state. A
+matching left-button release inside the viewport recomputes from its final sample and stages exactly
+one new point through `Sketch3DInteractionService::add_point`. The anchor's full-precision resolved
+coordinates are frozen during the gesture. Bound anchors keep their parameter bindings; new points
+copy explicit values without a live association or detachment requirement. Stable IDs reuse the
+existing complete-entity allocator and unchanged persistence schema.
+
+Pending XYZ text must be staged or discarded before placement, including spin text not yet committed
+by focus loss. Apply and Preview are blocked during a captured placement. Existing local edits and
+their valid preview survive rejected release, camera/size/focus changes and anchor/lock/mode/control
+changes. Editing XYZ cancels capture and keeps that typed edit pending. Mouse navigation remains
+available through non-left buttons. Escape first exits placement and retains earlier local edits;
+another Escape closes the task. Save/revision/task/document boundaries clear the marker and capture
+without publishing an unfinished point. Accepted local points still require the existing complete
+downstream Preview and one Apply transaction.
+
+Proofs: `[block136-sketch3d-placement]` covers all seven modes in both projections, bound and local
+anchors, final release, prior-preview preservation, pending text, unobservable directions and stale
+tasks. `[shell-sketch3d-placement-workflow]` extends the existing fully UI-authored chain/PathCurve/
+Sweep scenario: viewport point placement, typed refinement, downstream rejection/recovery, exact
+history, canonical reopen and STEP. Native capture/reachability checks remain required at 1280×800.
+Explicit distance/direction input and planar-point projection remain next; the family and Block 136
+stay partial.

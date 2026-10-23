@@ -193,5 +193,11 @@ The point/line contract and remaining native interaction gaps live in
 The spatial source editor also supports active-candidate point/line collection and direct point
 translation grips with axis/plane restrictions. The combined Sweep proof now selects the source
 endpoint through the viewport and moves its locked Z grip, retaining complete downstream validation,
-exact history and persistence. Contracts and remaining placement/projection work remain owned by
+exact history and persistence. Contracts and remaining distance/projection work remain owned by
 `docs/gui-sketch3d-interaction-mvp8.md`.
+
+The spatial source task additionally stages new points by anchored viewport placement. Its combined
+Sweep proof now places the chain points with a locked Z pointer, refines them numerically and retains
+the downstream grip/rejection/history/reopen/export sequence. Depth, copied-anchor and input-gesture
+contracts are documented in `docs/gui-sketch3d-interaction-mvp8.md`; distance/direction and explicit
+planar projection remain planned.

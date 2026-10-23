@@ -995,5 +995,26 @@ now picks the endpoint and drives a locked Z grip through rejected collapse and 
 recompute, followed by exact history, canonical reopening and STEP. Include both new tags in the
 combined native filter above, inspect the 1280×800 capture and run application startup serially.
 Offscreen camera mapping uses a model span; native retains the fitted OCCT zoom factor. Contract,
-remaining pointer-placement/distance/projection work and block status:
+remaining distance/projection work and block status:
+`docs/gui-sketch3d-interaction-mvp8.md`, `docs/mvp-plan.md`.
+
+## Anchored Sketch3D pointer placement
+
+```bash
+cmake --build --preset dev-gui --target blcad_gui_tests blcad_app -j6
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[block136-sketch3d-placement],[shell-sketch3d-placement-workflow],[block136-sketch3d-grips],[block136-sketch3d],[integration][gui-feature-coverage]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-sketch3d-placement QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-sketch3d-placement],[shell-sketch3d-placement-workflow]"
+```
+
+The same input cases cover all seven locks in orthographic and perspective views, copied bound and
+local anchors, hover versus final-release staging, preserved earlier previews, pending spin text,
+unobservable directions, Escape/camera/resize/focus/control changes and save/revision/document expiry.
+The combined workflow authors a profile and spatial chain through actual ribbon, popup, viewport,
+numeric and file input, then checks PathCurve/Sweep recompute, rejection/recovery, history and STEP.
+Native pixel quantization is bounded using projected model axes; typed refinement keeps downstream
+dimensions exact. Native Sketch3D fixtures await actual window activation through a conditional
+event loop with a two-second deadline, retaining the active-window assertion before pointer input.
+Inspect `sketch3d-point-placement-hover.png` at 1280×800. Include the two new tags in
+the canonical native filter in `docs/gui-shell-acceptance-mvp9r.md` and run startup separately.
+Pointer depth/anchor/copy semantics and the remaining distance/projection work:
 `docs/gui-sketch3d-interaction-mvp8.md`, `docs/mvp-plan.md`.

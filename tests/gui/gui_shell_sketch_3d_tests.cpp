@@ -11,12 +11,14 @@
 #include <QDir>
 #include <QDockWidget>
 #include <QDoubleSpinBox>
+#include <QEventLoop>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
 #include <QMouseEvent>
 #include <QPushButton>
 #include <QTemporaryDir>
+#include <QTimer>
 #include <QTreeWidget>
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -367,6 +369,19 @@ void prepare_handles(ShellWindow& window) {
     window.activateWindow();
     QGuiApplication::sync();
     qApp->processEvents();
+    if (!window.isActiveWindow()) {
+      QEventLoop activation;
+      QTimer poll, deadline;
+      deadline.setSingleShot(true);
+      QObject::connect(&poll, &QTimer::timeout, &activation, [&] {
+        if (window.isActiveWindow())
+          activation.quit();
+      });
+      QObject::connect(&deadline, &QTimer::timeout, &activation, &QEventLoop::quit);
+      poll.start(5);
+      deadline.start(2000);
+      activation.exec();
+    }
     REQUIRE(window.isActiveWindow());
   }
   control<QCheckBox>(window, "grips").setChecked(true);
@@ -426,6 +441,39 @@ void pick_point(ShellWindow& window, int role, Point3 point) {
 void escape_handle(ShellWindow& window) {
   QKeyEvent event(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier);
   QApplication::sendEvent(&control<QLineEdit>(window, "grip_numeric"), &event);
+}
+void placement_hover(ShellWindow& window, GuiSketchScreenPoint p) {
+  auto& viewport = window.viewport();
+  const QPointF local(p.x, p.y);
+  QMouseEvent event(QEvent::MouseMove, local, viewport.mapToGlobal(local.toPoint()), Qt::NoButton,
+                    Qt::NoButton, Qt::NoModifier);
+  QApplication::sendEvent(&viewport, &event);
+  qApp->processEvents();
+}
+void placement_mode(ShellWindow& window, const char* anchor = "b", int lock = 4) {
+  select(window, "placement_anchor", anchor);
+  control<QComboBox>(window, "lock").setCurrentIndex(lock);
+  control<QComboBox>(window, "pick").setCurrentIndex(5);
+}
+GuiSketchScreenPoint placement_screen(ShellWindow& window, Point3 p) {
+  const auto screen = checked(window.viewport().model_to_screen(p));
+  REQUIRE(window.viewport().rect().contains(QPoint(qRound(screen.x), qRound(screen.y))));
+  return screen;
+}
+double placement_tolerance(ShellWindow& window) {
+  if (QApplication::platformName() != "xcb")
+    return 1e-6;
+  // Native projection rounds to physical pixels. Bound the model-coordinate
+  // error using the visible projection of a ten-millimeter axis, not a fixed
+  // model tolerance that depends on desktop resolution or fitted OCCT zoom.
+  const auto origin = placement_screen(window, {5, 0, 10});
+  double pixels = 1e9;
+  for (const auto p : std::array<Point3, 3>{{{15, 0, 10}, {5, 10, 10}, {5, 0, 20}}}) {
+    const auto screen = placement_screen(window, p);
+    pixels = std::min(pixels, manipulator_detail::screen_distance(screen, origin));
+  }
+  REQUIRE(pixels > 1);
+  return 40 / pixels;
 }
 } // namespace
 
@@ -654,4 +702,296 @@ TEST_CASE("Sketch3D typed point input replaces an active gesture without retaini
   CHECK(edited->z().explicit_coordinate()->millimeters() == 42);
   REQUIRE(window.undo());
   CHECK(snapshot(window) == before);
+}
+
+TEST_CASE("Sketch3D pointer placement resolves all seven anchor locks with atomic history",
+          "[gui][block136-sketch3d-placement]") {
+  bool perspective = false;
+  SECTION("orthographic") {}
+  SECTION("perspective") {
+    perspective = true;
+  }
+  ShellWindow window;
+  prepare_handles(window);
+  if (perspective) {
+    auto camera = window.viewport().camera_bookmark();
+    camera.projection = GuiViewportProjection::Perspective;
+    REQUIRE(window.viewport().restore_camera_bookmark(camera));
+  }
+  const auto before = snapshot(window);
+  const auto undo = std::string(window.session().undo_label());
+  const double tolerance = placement_tolerance(window);
+  window.viewport().set_selection_filter_mask(17);
+  window.viewport().set_selection_semantic_scope(std::vector<std::string>{"custom"});
+  const std::array<Point3, 7> expected{
+      {{11, -6, 10}, {13, 0, 10}, {5, 8, 10}, {5, 0, 18}, {11, 7, 10}, {5, 7, 18}, {11, 0, 18}}};
+  for (int mode = 0; mode < 7; ++mode) {
+    CAPTURE(mode, perspective);
+    placement_mode(window, "b", mode);
+    const auto screen = placement_screen(window, expected[mode]);
+    const int count = control<QComboBox>(window, "point").count();
+    placement_hover(window, screen);
+    CHECK(control<QWidget>(window, "placement_overlay").isVisible());
+    CHECK(control<QComboBox>(window, "point").count() == count);
+    CHECK(snapshot(window) == before);
+    pointer(window, QEvent::MouseButtonPress, {screen.x + 9, screen.y + 7});
+    CHECK(control<QComboBox>(window, "point").count() == count);
+    CHECK_FALSE(control<QPushButton>(window, "apply").isEnabled());
+    CHECK_FALSE(window.sketch_3d_tools().preview());
+    pointer(window, QEvent::MouseButtonRelease, screen);
+    CHECK(control<QComboBox>(window, "point").count() == count + 1);
+    CHECK(control<QComboBox>(window, "point").currentData().toString() ==
+          "point." + QString::number(mode + 1));
+    CHECK(control<QComboBox>(window, "placement_anchor").currentData().toString() == "b");
+    CHECK_FALSE(control<QWidget>(window, "placement_overlay").isVisible());
+    CHECK(window.viewport().mouseGrabber() != &window.viewport());
+    CHECK(snapshot(window) == before);
+    CHECK(window.session().undo_label() == undo);
+  }
+  REQUIRE(window.sketch_3d_tools().preview());
+  REQUIRE(window.sketch_3d_tools().apply());
+  CHECK(window.viewport().selection_filter_mask() == 17);
+  CHECK(window.viewport().selection_semantic_scope() ==
+        std::optional(std::vector<std::string>{"custom"}));
+  const auto* sketch = window.session().part_document()->find_sketch_3d(Sketch3DId("spatial"));
+  REQUIRE(sketch);
+  CHECK(sketch->points().size() == 12);
+  CHECK(sketch->arcs().size() == 1);
+  CHECK(sketch->splines().size() == 1);
+  CHECK(sketch->guide_curves().size() == 1);
+  for (int mode = 0; mode < 7; ++mode) {
+    CAPTURE(mode);
+    const auto* point = sketch->find_point(SketchEntityId("point." + std::to_string(mode + 1)));
+    REQUIRE(point);
+    CHECK(point->x().explicit_coordinate()->millimeters() ==
+          Catch::Approx(expected[mode].x).margin(tolerance));
+    CHECK(point->y().explicit_coordinate()->millimeters() ==
+          Catch::Approx(expected[mode].y).margin(tolerance));
+    CHECK(point->z().explicit_coordinate()->millimeters() ==
+          Catch::Approx(expected[mode].z).margin(tolerance));
+    if (mode == 1 || mode == 3 || mode == 6)
+      CHECK(point->y().explicit_coordinate()->millimeters() == 0);
+    if (mode == 2 || mode == 3 || mode == 5)
+      CHECK(point->x().explicit_coordinate()->millimeters() == 5);
+    if (mode == 1 || mode == 2 || mode == 4)
+      CHECK(point->z().explicit_coordinate()->millimeters() == 10);
+  }
+  const auto after = snapshot(window);
+  REQUIRE(window.undo());
+  CHECK(snapshot(window) == before);
+  REQUIRE(window.redo());
+  CHECK(snapshot(window) == after);
+  QTemporaryDir directory;
+  REQUIRE(window.save_to(directory.filePath("placed.blcad")));
+  REQUIRE(window.open_path(directory.filePath("placed.blcad")));
+  CHECK(snapshot(window) == after);
+}
+
+TEST_CASE(
+    "Sketch3D placement copies bound anchors and supports newly staged anchors without detaching",
+    "[gui][block136-sketch3d-placement]") {
+  ShellWindow window;
+  prepare_handles(window);
+  const auto before = snapshot(window);
+  placement_mode(window, "driven", 3);
+  const auto first = placement_screen(window, {5, 4.123456789123, 12});
+  pointer(window, QEvent::MouseButtonPress, first);
+  pointer(window, QEvent::MouseButtonRelease, first);
+  CHECK_FALSE(control<QCheckBox>(window, "detach").isChecked());
+  placement_mode(window, "point.1", 1);
+  const auto second =
+      placement_screen(window, {14, 4.123456789123, control<QDoubleSpinBox>(window, "z").value()});
+  pointer(window, QEvent::MouseButtonPress, second);
+  pointer(window, QEvent::MouseButtonRelease, second);
+  REQUIRE(window.sketch_3d_tools().preview());
+  CHECK(snapshot(window) == before);
+  REQUIRE(window.sketch_3d_tools().apply());
+  const auto* sketch = window.session().part_document()->find_sketch_3d(Sketch3DId("spatial"));
+  REQUIRE(sketch);
+  const auto* anchor = sketch->find_point(SketchEntityId("driven"));
+  REQUIRE(anchor);
+  CHECK(anchor->x().parameter() == ParameterId("px"));
+  CHECK(anchor->y().explicit_coordinate()->millimeters() == 4.123456789123);
+  for (const char* id : {"point.1", "point.2"}) {
+    const auto* placed = sketch->find_point(SketchEntityId(id));
+    REQUIRE(placed);
+    CHECK(placed->parameter_dependencies().empty());
+    CHECK(placed->y().explicit_coordinate()->millimeters() == 4.123456789123);
+  }
+  CHECK(sketch->find_point(SketchEntityId("point.1"))->z().explicit_coordinate()->millimeters() ==
+        sketch->find_point(SketchEntityId("point.2"))->z().explicit_coordinate()->millimeters());
+}
+
+TEST_CASE("Sketch3D placement interruptions retain earlier local previews and release capture",
+          "[gui][block136-sketch3d-placement]") {
+  ShellWindow window;
+  prepare_handles(window);
+  const auto before = snapshot(window);
+  point(window, -10, 5, 15);
+  REQUIRE(window.sketch_3d_tools().preview());
+  const int count = control<QComboBox>(window, "point").count();
+  placement_mode(window, "point.1", 4);
+  const auto screen = placement_screen(window, {0, 10, 15});
+  pointer(window, QEvent::MouseButtonPress, screen);
+  REQUIRE(window.viewport().mouseGrabber() == &window.viewport());
+  SECTION("Escape exits placement first") {
+    escape_handle(window);
+    CHECK(control<QComboBox>(window, "pick").currentIndex() == 0);
+  }
+  SECTION("release outside viewport") {
+    pointer(window, QEvent::MouseButtonRelease,
+            {window.viewport().width() + 10.0, window.viewport().height() + 10.0});
+  }
+  SECTION("camera") {
+    auto camera = window.viewport().camera_bookmark();
+    camera.scale *= 1.1;
+    REQUIRE(window.viewport().restore_camera_bookmark(camera));
+  }
+  SECTION("resize") {
+    window.resize(1380, 880);
+    qApp->processEvents();
+  }
+  SECTION("deactivate") {
+    QEvent event(QEvent::WindowDeactivate);
+    QApplication::sendEvent(&window, &event);
+  }
+  SECTION("capture lost") {
+    QEvent event(QEvent::UngrabMouse);
+    QApplication::sendEvent(&window.viewport(), &event);
+  }
+  SECTION("anchor") {
+    select(window, "placement_anchor", "b");
+  }
+  SECTION("lock") {
+    control<QComboBox>(window, "lock").setCurrentIndex(2);
+  }
+  SECTION("collection mode") {
+    control<QComboBox>(window, "pick").setCurrentIndex(1);
+  }
+  CHECK(window.viewport().mouseGrabber() != &window.viewport());
+  CHECK_FALSE(control<QWidget>(window, "placement_overlay").isVisible());
+  CHECK(control<QComboBox>(window, "point").count() == count);
+  CHECK(window.sketch_3d_tools().active());
+  CHECK(window.viewport().feature_preview_active());
+  CHECK(control<QPushButton>(window, "apply").isEnabled());
+  CHECK(snapshot(window) == before);
+  REQUIRE(window.sketch_3d_tools().apply());
+  CHECK(window.session().part_document()->find_sketch_3d(Sketch3DId("spatial"))->points().size() ==
+        6);
+  REQUIRE(window.undo());
+  CHECK(snapshot(window) == before);
+}
+
+TEST_CASE("Sketch3D placement refuses pending typed input and unmatched releases",
+          "[gui][block136-sketch3d-placement]") {
+  ShellWindow window;
+  prepare_handles(window);
+  const auto before = snapshot(window);
+  const int count = control<QComboBox>(window, "point").count();
+  select(window, "point", "b");
+  auto* editor = control<QDoubleSpinBox>(window, "z").findChild<QLineEdit*>();
+  REQUIRE(editor);
+  editor->setText("14 mm"); // Pending spin text has not emitted valueChanged.
+  placement_mode(window);
+  const auto screen = placement_screen(window, {12, 6, 10});
+  pointer(window, QEvent::MouseButtonRelease, screen);
+  CHECK(control<QComboBox>(window, "point").count() == count);
+  pointer(window, QEvent::MouseButtonPress, screen);
+  pointer(window, QEvent::MouseButtonRelease, screen);
+  CHECK(control<QComboBox>(window, "point").count() == count);
+  CHECK(control<QDoubleSpinBox>(window, "z").value() == 14);
+  CHECK_FALSE(window.sketch_3d_tools().preview());
+  button(window, "stage_point");
+  REQUIRE(window.sketch_3d_tools().preview());
+  pointer(window, QEvent::MouseButtonPress, screen);
+  control<QDoubleSpinBox>(window, "x").setValue(7);
+  CHECK(window.viewport().mouseGrabber() != &window.viewport());
+  pointer(window, QEvent::MouseButtonRelease, screen);
+  CHECK(control<QComboBox>(window, "point").count() == count);
+  CHECK(control<QDoubleSpinBox>(window, "x").value() == 7);
+  CHECK(control<QDoubleSpinBox>(window, "z").value() == 14);
+  CHECK_FALSE(window.sketch_3d_tools().apply());
+  CHECK(snapshot(window) == before);
+  button(window, "stage_point");
+  REQUIRE(window.sketch_3d_tools().preview());
+  REQUIRE(window.sketch_3d_tools().apply());
+  const auto* edited = window.session()
+                           .part_document()
+                           ->find_sketch_3d(Sketch3DId("spatial"))
+                           ->find_point(SketchEntityId("b"));
+  REQUIRE(edited);
+  CHECK(edited->x().explicit_coordinate()->millimeters() == 7);
+  CHECK(edited->z().explicit_coordinate()->millimeters() == 14);
+}
+
+TEST_CASE("Sketch3D placement rejects unobservable axes and planes and recovers from the origin",
+          "[gui][block136-sketch3d-placement]") {
+  ShellWindow window;
+  prepare_handles(window);
+  window.sketch_3d_tools().cancel();
+  REQUIRE(window.sketch_3d_tools().begin());
+  const auto before = snapshot(window);
+  auto camera = window.viewport().camera_bookmark();
+  camera.eye = {0, -100, 0};
+  camera.target = {0, 0, 0};
+  camera.up_direction = {0, 0, 1};
+  REQUIRE(window.viewport().restore_camera_bookmark(camera));
+  for (int lock : {2, 4}) {
+    placement_mode(window, "", lock);
+    const auto p = placement_screen(window, {0, 0, 0});
+    placement_hover(window, p);
+    CHECK_FALSE(control<QWidget>(window, "placement_overlay").isVisible());
+    pointer(window, QEvent::MouseButtonPress, p);
+    pointer(window, QEvent::MouseButtonRelease, p);
+    CHECK(control<QComboBox>(window, "point").count() == 1);
+    CHECK(control<QLabel>(window, "summary").text().contains("Ansicht ändern"));
+    CHECK(snapshot(window) == before);
+  }
+  placement_mode(window, "", 6);
+  const auto p = placement_screen(window, {10, 0, 10});
+  placement_hover(window, p);
+  REQUIRE(control<QWidget>(window, "placement_overlay").isVisible());
+  pointer(window, QEvent::MouseButtonPress, p);
+  pointer(window, QEvent::MouseButtonRelease, p);
+  REQUIRE(window.sketch_3d_tools().preview());
+  REQUIRE(window.sketch_3d_tools().apply());
+  const auto* created =
+      window.session().part_document()->sketches_3d().back().find_point(SketchEntityId("point.1"));
+  REQUIRE(created);
+  CHECK(created->y().explicit_coordinate()->millimeters() == 0);
+  CHECK(created->x().explicit_coordinate()->millimeters() == Catch::Approx(10).margin(1));
+  CHECK(created->z().explicit_coordinate()->millimeters() == Catch::Approx(10).margin(1));
+}
+
+TEST_CASE(
+    "Sketch3D placement expires on save revision and document boundaries without leaking a point",
+    "[gui][block136-sketch3d-placement]") {
+  ShellWindow window;
+  prepare_handles(window);
+  const auto before = snapshot(window);
+  placement_mode(window);
+  const auto p = placement_screen(window, {12, 6, 10});
+  pointer(window, QEvent::MouseButtonPress, p);
+  REQUIRE(window.viewport().mouseGrabber() == &window.viewport());
+  SECTION("save committed state") {
+    QTemporaryDir directory;
+    REQUIRE(window.save_to(directory.filePath("pending-placement.blcad")));
+    GuiDocumentSession opened;
+    REQUIRE(opened.open_file(directory.filePath("pending-placement.blcad").toStdString()));
+    CHECK(checked(serialize_part_document_to_json(*opened.part_document())) == before);
+    CHECK(snapshot(window) == before);
+  }
+  SECTION("revision") {
+    window.session().report_error(Error::validation("test", "Revision changed"));
+    window.refresh();
+    CHECK(snapshot(window) == before);
+  }
+  SECTION("document replacement") {
+    (void)window.session().task().cancel();
+    REQUIRE(window.session().close(true));
+    window.refresh();
+  }
+  CHECK_FALSE(window.sketch_3d_tools().active());
+  CHECK(window.viewport().mouseGrabber() != &window.viewport());
+  CHECK_FALSE(control<QWidget>(window, "placement_overlay").isVisible());
 }
