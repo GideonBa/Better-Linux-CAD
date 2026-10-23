@@ -18,7 +18,7 @@ phase_status:
   mvp_7: "GUI Feature Validation — Blocks 95–105 implemented; MVP complete"
   mvp_8: "Interactive Sketcher — Blocks 106–121 implemented; MVP complete"
   mvp_9: "Interactive Part & Assembly Modeling — Blocks 122–131 implemented; MVP complete"
-  mvp_9r: "GUI Shell Reset — Blocks 132–135 implemented; Block 136 planned"
+  mvp_9r: "GUI Shell Reset — Blocks 132–135 implemented; Block 136 in progress"
   mvp_10: "STEP Import — Blocks 137–143 planned"
 ---
 
@@ -59,7 +59,7 @@ MVP-6   Part Construction                              Blocks 48–94 implemente
 MVP-7   GUI Feature Validation                        Blocks 95–105 implemented
 MVP-8   Interactive Sketcher                          Blocks 106–121 implemented
 MVP-9   Interactive Part & Assembly Modeling          Blocks 122–131 implemented
-MVP-9R  GUI Shell Reset                       Blocks 132–135 implemented; Block 136 planned
+MVP-9R  GUI Shell Reset                       Blocks 132–135 implemented; Block 136 in progress
 MVP-10  STEP Import                                            Blocks 137–143 planned
 ```
 
@@ -633,12 +633,26 @@ scalar drag/numeric changes recompute the complete candidate before one atomic u
 and result identities, expression bindings, downstream failure handling, history and persistence retain
 their authorities. Contract/proof: `docs/gui-feature-edit-mvp9.md`, `[block136-feature-edit]`.
 
+The replacement shell restores Part and flattened/structured Assembly STEP export plus read-only
+interference, clearance, contact and local DOF inspection. Failed exports preserve existing targets;
+analysis results expire after model changes. Source intent, history and authored poses remain unchanged.
+Sampled sweep controls and occurrence-linked result highlighting remain open. Contract/proof:
+`docs/gui-analysis-step-export-workbench-mvp7.md`, `[block136-inspect-export]`.
+
 Whole-block acceptance remains open.
 
 ## Current next technical step — Block 136
 
-Restore replacement-shell acceptance/coverage and audit the bounded command/editor surfaces as defined in
-`docs/gui-shell-reset-sequence-mvp9r.md`.
+The current v3 coverage inventory records all eighteen accepted families, current shell proof sources,
+reachable entry points and explicit remaining gaps. The machine check distinguishes inventory validity
+from closure readiness; historical controller proofs cannot close a shell gap. Acceptance contract:
+`docs/gui-shell-acceptance-mvp9r.md`, `[integration][gui-feature-coverage]` / `[gui][shell-coverage]`.
+
+Restore datum/construction geometry and workplane authoring beyond seeded origins next. Continue with
+reference repair and Sketch3D authoring, parameter/Hole/extent editors, workspace navigation/context,
+advanced Assembly controls and integrated native Part/Assembly acceptance in the order recorded in
+`docs/gui-shell-acceptance-mvp9r.md`. Block 136 remains in progress until all recorded gaps and pending
+workflows are resolved and the closure gate plus full/native regressions pass.
 
 ## Later phases
 

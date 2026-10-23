@@ -714,3 +714,24 @@ real source curve and persist contact/tangency together with the new shape. Coni
 has been restored with `[core][sketch-conics]`, `[geometry][sketch-conics]` and
 `[gui][sketch-create-conics]`; see the creation and modify contracts for remaining bounded cases.
 This hardening does not mark the outstanding Block-136 feature command surface complete.
+
+## Block 136 acceptance audit and consumer restoration — 2026-10-22
+
+`ShellInspectTools`, explicitly owned by `ShellWindow`, restores Part and flat/structured Assembly
+STEP output plus read-only interference, clearance, contact and root-constraint-group DOF inspection.
+Target publication is atomic after a successful staged export; source intent/history/poses remain
+unchanged. Native proof checks actual task reachability and Qt file-dialog accept/cancel at 1280×800.
+Contract/proof: `docs/gui-analysis-step-export-workbench-mvp7.md`, `[block136-inspect-export]`.
+
+The v3 feature coverage manifest preserves the historical Block-131 dispositions and adds a separate
+`shell` record per accepted family. Registered test/source verification and constructed-window entry
+point checks are restored under `[integration][gui-feature-coverage]` / `[gui][shell-coverage]`.
+Its regular green audit means the inventory is consistent, including its declared gaps. Completion
+requires all family gaps and pending integrated workflows to be resolved; use the explicit closure
+gate in `docs/gui-shell-acceptance-mvp9r.md`. Retained controller API tests are not shell UI proof.
+
+The audit still identifies missing construction/workplane authoring, reference repair, Sketch3D,
+parameter/Hole/advanced-extent editors, workspace aids and supported advanced Assembly controls.
+These are concrete follow-up work, not a reason to certify whole-block parity. Execution order and
+verification live in `docs/gui-shell-acceptance-mvp9r.md`; numbered status remains Block 136 in
+`docs/mvp-plan.md`.

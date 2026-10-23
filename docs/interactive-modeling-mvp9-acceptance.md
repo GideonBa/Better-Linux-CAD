@@ -1,10 +1,15 @@
 # Interactive Modeling MVP-9 Acceptance
 
-Status: accepted through Block 131.
+Status: historical acceptance through Block 131. Replacement-shell Block 136 remains in progress.
+Current shell evidence and closure requirements: `docs/gui-shell-acceptance-mvp9r.md`.
+
+The integrated test below exercises the retained controller APIs; it does not operate the replacement
+ShellWindow. Historical proof descriptions must not be used as current shell interaction coverage.
 
 Block 131 closes Interactive Part & Assembly Modeling MVP-9 without adding persistent modeling
 intent. The machine-readable disposition inventory is
-`docs/gui-feature-coverage-manifest-mvp9.json` (`blcad.gui-feature-coverage.v2`). Its CI proof
+`docs/gui-feature-coverage-manifest-mvp9.json` (originally `blcad.gui-feature-coverage.v2`, now v3
+with a separate current-shell audit). The original Block-131 CI proof
 compares the family set with the accepted MVP-7 manifest, rejects missing or duplicate families,
 requires an owner in Blocks 106–131 for every interactive disposition, and requires a one-line
 reason for every `validation_sufficient` disposition.

@@ -7,6 +7,7 @@
 #include "blcad/gui/shell/shell_assembly_tools.hpp"
 #include "blcad/gui/shell/shell_feature_edit_tools.hpp"
 #include "blcad/gui/shell/shell_feature_tools.hpp"
+#include "blcad/gui/shell/shell_inspect_tools.hpp"
 #include "blcad/gui/shell/shell_measure_tools.hpp"
 #include "blcad/gui/shell/shell_origin.hpp"
 #include "blcad/gui/shell/shell_ribbon.hpp"
@@ -248,6 +249,7 @@ ShellWindow::ShellWindow() {
   assembly_tools_ =
       std::make_unique<ShellAssemblyTools>(*this, session_, *viewport_, *ribbon_, tab_assembly_);
   feature_edit_tools_ = std::make_unique<ShellFeatureEditTools>(*this);
+  inspect_tools_ = std::make_unique<ShellInspectTools>(*this, *ribbon_, tab_model_, tab_assembly_);
   statusBar()->showMessage(QStringLiteral("Bereit"));
   refresh();
 }
@@ -257,6 +259,7 @@ ShellWindow::~ShellWindow() {
   // still exist. QMainWindow/QWidget teardown otherwise destroys that drawable
   // before deleting the central viewport and its OCCT GL resources.
   viewport_->set_view_changed_callback({});
+  inspect_tools_.reset();
   feature_edit_tools_.reset();
   assembly_tools_.reset();
   measure_tools_.reset();
@@ -276,6 +279,7 @@ void ShellWindow::build_ribbon() {
   // 3D-Modell → Dokument
   auto* document_group = ribbon_->add_group(tab_model_, QStringLiteral("Dokument"));
   action_new_part_ = new QAction(QStringLiteral("Neu"), this);
+  action_new_part_->setObjectName("blcad.action.new_part");
   action_new_part_->setShortcut(QKeySequence::New);
   action_new_part_->setShortcutContext(Qt::WindowShortcut);
   connect(action_new_part_, &QAction::triggered, this, [this] {
@@ -288,6 +292,7 @@ void ShellWindow::build_ribbon() {
       (void)new_part(name);
   });
   action_open_ = new QAction(QStringLiteral("Öffnen"), this);
+  action_open_->setObjectName("blcad.action.open");
   action_open_->setShortcut(QKeySequence::Open);
   action_open_->setShortcutContext(Qt::WindowShortcut);
   connect(action_open_, &QAction::triggered, this, [this] {
@@ -298,10 +303,12 @@ void ShellWindow::build_ribbon() {
       (void)open_path(path);
   });
   action_save_ = new QAction(QStringLiteral("Speichern"), this);
+  action_save_->setObjectName("blcad.action.save");
   action_save_->setShortcut(QKeySequence::Save);
   action_save_->setShortcutContext(Qt::WindowShortcut);
   connect(action_save_, &QAction::triggered, this, [this] { (void)save_to({}); });
   action_save_as_ = new QAction(QStringLiteral("Speichern unter"), this);
+  action_save_as_->setObjectName("blcad.action.save_as");
   action_save_as_->setShortcut(QKeySequence::SaveAs);
   action_save_as_->setShortcutContext(Qt::WindowShortcut);
   connect(action_save_as_, &QAction::triggered, this, [this] {
@@ -327,10 +334,12 @@ void ShellWindow::build_ribbon() {
   // 3D-Modell → Bearbeiten (undo/redo, always available via shortcut)
   auto* edit_group = ribbon_->add_group(tab_model_, QStringLiteral("Bearbeiten"));
   action_undo_ = new QAction(QStringLiteral("Rückgängig"), this);
+  action_undo_->setObjectName("blcad.action.undo");
   action_undo_->setShortcut(QKeySequence::Undo);
   action_undo_->setShortcutContext(Qt::WindowShortcut);
   connect(action_undo_, &QAction::triggered, this, [this] { (void)undo(); });
   action_redo_ = new QAction(QStringLiteral("Wiederholen"), this);
+  action_redo_->setObjectName("blcad.action.redo");
   action_redo_->setShortcut(QKeySequence::Redo);
   action_redo_->setShortcutContext(Qt::WindowShortcut);
   connect(action_redo_, &QAction::triggered, this, [this] { (void)redo(); });
@@ -343,6 +352,7 @@ void ShellWindow::build_ribbon() {
   // 3D-Modell → Skizze
   auto* sketch_group = ribbon_->add_group(tab_model_, QStringLiteral("Skizze"));
   action_create_sketch_ = new QAction(QStringLiteral("2D-Skizze erstellen"), this);
+  action_create_sketch_->setObjectName("blcad.action.create_sketch");
   action_create_sketch_->setToolTip(
       QStringLiteral("Ursprungsebene wählen, dann Skizze auf dieser Ebene beginnen"));
   connect(action_create_sketch_, &QAction::triggered, this,
@@ -352,6 +362,7 @@ void ShellWindow::build_ribbon() {
   // Skizze → Beenden (draw/constrain/dimension groups arrive with Block 134)
   auto* finish_group = ribbon_->add_group(tab_sketch_, QStringLiteral("Beenden"));
   action_finish_sketch_ = new QAction(QStringLiteral("Skizze fertig stellen"), this);
+  action_finish_sketch_->setObjectName("blcad.action.finish_sketch");
   connect(action_finish_sketch_, &QAction::triggered, this,
           [this] { (void)finish_active_sketch(); });
   ribbon_->add_button(finish_group, action_finish_sketch_);
@@ -360,6 +371,7 @@ void ShellWindow::build_ribbon() {
   // Ansicht → Navigation
   auto* navigate_group = ribbon_->add_group(tab_view_, QStringLiteral("Navigation"));
   action_fit_ = new QAction(QStringLiteral("Einpassen"), this);
+  action_fit_->setObjectName("blcad.action.fit");
   connect(action_fit_, &QAction::triggered, this, [this] {
     viewport_->fit_all();
     if (feature_tools_)
@@ -387,6 +399,7 @@ void ShellWindow::build_ribbon() {
   // Ansicht → Darstellung
   auto* display_group = ribbon_->add_group(tab_view_, QStringLiteral("Darstellung"));
   action_perspective_ = new QAction(QStringLiteral("Perspektive"), this);
+  action_perspective_->setObjectName("blcad.action.perspective");
   action_perspective_->setCheckable(true);
   action_perspective_->setChecked(true);
   connect(action_perspective_, &QAction::toggled, this, [this](bool checked) {
@@ -423,6 +436,7 @@ void ShellWindow::build_docks() {
   auto* browser_dock = new QDockWidget(QStringLiteral("Modell"), this);
   browser_dock->setFeatures(QDockWidget::DockWidgetMovable);
   browser_tree_ = new QTreeWidget(browser_dock);
+  browser_tree_->setObjectName("blcad.shell.browser");
   browser_tree_->setHeaderLabel(QStringLiteral("Kein Dokument"));
   browser_tree_->setMinimumWidth(220);
   browser_tree_->header()->setStretchLastSection(true);
@@ -439,6 +453,7 @@ void ShellWindow::build_docks() {
   auto* property_dock = new QDockWidget(QStringLiteral("Eigenschaften"), this);
   property_dock->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetClosable);
   properties_ = new QTableWidget(property_dock);
+  properties_->setObjectName("blcad.shell.properties");
   properties_->setColumnCount(2);
   properties_->setHorizontalHeaderLabels(
       {QStringLiteral("Eigenschaft"), QStringLiteral("Wert")});
@@ -569,6 +584,8 @@ bool ShellWindow::confirm_document_replacement() {
 }
 
 void ShellWindow::reset_document_interaction() {
+  if (inspect_tools_)
+    inspect_tools_->cancel();
   if (feature_edit_tools_)
     feature_edit_tools_->cancel();
   if (assembly_tools_)
@@ -829,6 +846,8 @@ bool ShellWindow::finish_active_sketch() {
 }
 
 bool ShellWindow::undo() {
+  if (inspect_tools_)
+    inspect_tools_->cancel();
   if (feature_edit_tools_)
     feature_edit_tools_->cancel();
   if (assembly_tools_)
@@ -855,6 +874,8 @@ bool ShellWindow::undo() {
 }
 
 bool ShellWindow::redo() {
+  if (inspect_tools_)
+    inspect_tools_->cancel();
   if (feature_edit_tools_)
     feature_edit_tools_->cancel();
   if (assembly_tools_)
@@ -1063,6 +1084,8 @@ void ShellWindow::refresh() {
 
   refresh_browser();
   refresh_properties();
+  if (inspect_tools_)
+    inspect_tools_->refresh();
   if (measure_tools_)
     measure_tools_->refresh();
   if (assembly_tools_)
