@@ -130,6 +130,7 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/assembly_generic_relationship_equation_builder.cpp
     src/geometry/assembly_constraint_numeric_system.cpp
     src/geometry/assembly_constraint_target_resolver.cpp
+    src/geometry/assembly_interaction.cpp
     src/geometry/assembly_contact_analyzer.cpp
     src/geometry/assembly_cross_hierarchy_constraint_solver.cpp
     src/geometry/assembly_cross_hierarchy_freshness.cpp
@@ -305,6 +306,8 @@ if(BLCAD_BUILD_GUI)
     src/gui/shell/shell_spatial_tools.cpp
     src/gui/shell/shell_surface_tools.cpp
     src/gui/shell/shell_measure_tools.cpp
+    src/gui/shell/shell_assembly_tools.cpp
+    src/gui/shell/shell_manipulator_overlay.cpp
     src/gui/shell/shell_origin.cpp
     src/gui/shell/shell_ribbon.cpp
     src/gui/shell/shell_sketch_tools.cpp
@@ -551,6 +554,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/spline_profile_pipeline_tests.cpp
       tests/geometry/step_exporter_tests.cpp
       tests/geometry/viewport_scene_tests.cpp
+      tests/geometry/assembly_interaction_tests.cpp
       tests/geometry/workplane_resolver_tests.cpp
       tests/geometry/workplane_resolver_recovery_tests.cpp
     )
@@ -588,6 +592,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_shell_spatial_tools_tests.cpp
       tests/gui/gui_shell_surface_tools_tests.cpp
       tests/gui/gui_shell_measure_tools_tests.cpp
+      tests/gui/gui_shell_assembly_tools_tests.cpp
       tests/gui/gui_shell_window_tests.cpp
       tests/gui/gui_shell_sketch_tools_tests.cpp
       tests/gui/gui_shell_sketch_operations_tests.cpp

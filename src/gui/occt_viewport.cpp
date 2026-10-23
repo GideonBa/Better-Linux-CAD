@@ -623,8 +623,9 @@ Result<std::size_t> OcctViewport::set_feature_preview(geometry::GeometryShape sh
 
 Result<std::size_t> OcctViewport::set_feature_previews(std::vector<geometry::GeometryShape> shapes,
                                                        std::vector<std::string> replaced_bodies) {
-  if (shapes.empty())
-    return Result<std::size_t>::failure(viewport_error("feature preview requires shapes"));
+  if (shapes.empty() && replaced_bodies.empty())
+    return Result<std::size_t>::failure(
+        viewport_error("feature preview requires shapes or replacements"));
   std::vector<Impl::Presentation> candidates;
   for (auto& shape : shapes) {
     if (shape.empty())
@@ -663,14 +664,13 @@ Result<std::size_t> OcctViewport::set_feature_previews(std::vector<geometry::Geo
 }
 
 bool OcctViewport::feature_preview_replaces(std::string_view semantic_id) const noexcept {
-  return !impl_->feature_previews.empty() &&
-         std::find(impl_->feature_preview_replaced_bodies.begin(),
+  return std::find(impl_->feature_preview_replaced_bodies.begin(),
                    impl_->feature_preview_replaced_bodies.end(),
                    semantic_id) != impl_->feature_preview_replaced_bodies.end();
 }
 
 void OcctViewport::clear_feature_preview() {
-  if (impl_->feature_previews.empty())
+  if (impl_->feature_previews.empty() && impl_->feature_preview_replaced_bodies.empty())
     return;
   for (const auto& preview : impl_->feature_previews)
     if (!impl_->context.IsNull() && !preview.interactive.IsNull())
@@ -1611,9 +1611,10 @@ void OcctViewport::apply_sketch_focus() {
       impl_->context->Display(presentation.interactive, false);
       presentation.interactive->SetTransparency(
           presentation.item.kind == geometry::ViewportSceneKind::Datum ? 0.72
-          : profile_face || (presentation.item.kind == geometry::ViewportSceneKind::Face &&
-                             (presentation.item.semantic_id.starts_with("finishing/") ||
-                              presentation.item.semantic_id.starts_with("measure/")))
+          : profile_face || presentation.item.kind == geometry::ViewportSceneKind::AssemblyTarget ||
+                  (presentation.item.kind == geometry::ViewportSceneKind::Face &&
+                   (presentation.item.semantic_id.starts_with("finishing/") ||
+                    presentation.item.semantic_id.starts_with("measure/")))
               ? 0.88
               : 0.0);
       continue;

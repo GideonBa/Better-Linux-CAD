@@ -186,6 +186,20 @@ public:
     return false;
   }
 
+  [[nodiscard]] Result<Project> preview_project(const GuiDocumentSession& session) const {
+    if (!active_ || !session.project())
+      return Result<Project>::failure(
+          Error::validation("assembly.placement", "no active Project placement"));
+    Project candidate = *session.project();
+    auto changed = mutate(candidate);
+    if (!changed)
+      return Result<Project>::failure(changed.error());
+    auto valid = candidate.validate_assembly_structure();
+    if (!valid)
+      return Result<Project>::failure(valid.error());
+    return Result<Project>::success(std::move(candidate));
+  }
+
   [[nodiscard]] Result<GuiAssemblyPlacementPreview>
   preview(const GuiDocumentSession& session) const {
     if (!active_)

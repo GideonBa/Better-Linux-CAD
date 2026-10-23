@@ -14,6 +14,7 @@
 #include <QDialogButtonBox>
 #include <QDir>
 #include <QDoubleSpinBox>
+#include <QElapsedTimer>
 #include <QEventLoop>
 #include <QKeyEvent>
 #include <QLabel>
@@ -674,9 +675,22 @@ TEST_CASE("Visible Sketch ribbon buttons complete every numeric operation and re
     CHECK(controls->button(QDialogButtonBox::Ok)->isEnabled());
     CHECK(window.viewport().sketch_operation_preview_count() > 0U);
     CHECK(json(window) == before);
-    if (QApplication::platformName() == QStringLiteral("xcb"))
+    if (QApplication::platformName() == QStringLiteral("xcb")) {
+      // Native decorations and final placement arrive asynchronously from the
+      // window manager, especially while another GUI suite is rendering.
+      QElapsedTimer placement;
+      placement.start();
+      while (!dialog->screen()->availableGeometry().contains(dialog->frameGeometry()) &&
+             placement.elapsed() < 500) {
+        QEventLoop frame;
+        QTimer::singleShot(10, &frame, &QEventLoop::quit);
+        frame.exec();
+      }
+      INFO("command=" << command << " frame=" << dialog->frameGeometry().x() << ','
+                      << dialog->frameGeometry().y() << ' ' << dialog->frameGeometry().width()
+                      << 'x' << dialog->frameGeometry().height());
       CHECK(dialog->screen()->availableGeometry().contains(dialog->frameGeometry()));
-    else {
+    } else {
       // The offscreen backend reports an 800x800 virtual screen even when the
       // synthetic parent is wider. Native xcb verifies actual placement.
       CHECK(dialog->width() <= dialog->screen()->availableGeometry().width());

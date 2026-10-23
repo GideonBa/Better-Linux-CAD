@@ -27,6 +27,7 @@ class ShellRibbon;
 class ShellFeatureTools;
 class ShellSketchTools;
 class ShellMeasureTools;
+class ShellAssemblyTools;
 
 // GUI Shell Reset MVP-9R Block 133: the single Qt shell window (replaces the
 // deleted MainWindow-and-binders architecture). ShellWindow owns every
@@ -56,6 +57,10 @@ public:
     return *measure_tools_;
   }
 
+  [[nodiscard]] ShellAssemblyTools& assembly_tools() noexcept {
+    return *assembly_tools_;
+  }
+
   // Appends to the diagnostics panel and the status bar (shell components
   // report through here).
   void report_error(const Error& error);
@@ -63,6 +68,7 @@ public:
   // Dialog-free command surface. The ribbon slots prompt and then call these;
   // tests call them directly.
   [[nodiscard]] bool new_part(const QString& name);
+  [[nodiscard]] bool new_project(const QString& name);
   [[nodiscard]] bool open_path(const QString& path);
   [[nodiscard]] bool save_to(const QString& path); // empty → current session path
   [[nodiscard]] bool create_sketch_on_selection();
@@ -108,6 +114,7 @@ private:
   std::unique_ptr<ShellSketchTools> sketch_tools_;
   std::unique_ptr<ShellFeatureTools> feature_tools_;
   std::unique_ptr<ShellMeasureTools> measure_tools_;
+  std::unique_ptr<ShellAssemblyTools> assembly_tools_;
 
   OcctViewport* viewport_{nullptr};
   ShellRibbon* ribbon_{nullptr};
@@ -132,6 +139,7 @@ private:
   int tab_model_{-1};
   int tab_sketch_{-1};
   int tab_view_{-1};
+  int tab_assembly_{-1};
 
   std::optional<SketchId> active_sketch_;
   std::optional<GuiViewportCameraBookmark> sketch_camera_bookmark_;

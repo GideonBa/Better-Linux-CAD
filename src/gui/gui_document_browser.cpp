@@ -358,7 +358,7 @@ GuiBrowserNode build_assembly(const AssemblyDocument& assembly, std::string labe
   for (const auto& component : assembly.component_instances()) {
     GuiBrowserNode node{GuiBrowserNodeKind::Component, component.id().value(), assembly.id().value(),
                         component.name(), GuiSelectionKind::Component};
-    node.viewport_semantic_id = "component/" + component.id().value();
+    node.viewport_semantic_id = "component/" + assembly.id().value() + "/" + component.id().value();
     node.properties = {
         property("id", "Identifier", component.id().value(), GuiPropertyKind::Identifier, false, {}, "Persistent identifiers are read-only"),
         property("name", "Name", component.name()),

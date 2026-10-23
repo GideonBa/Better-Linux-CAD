@@ -1,6 +1,7 @@
 # GUI Assembly Authoring, Relationships, and Motion Workbench MVP-7
 
-Status: implemented in Block 103.
+Status: headless workbench implemented in Block 103. The former window was removed by the
+shell reset; root-local replacement-shell commands are restored by the Block-136 Assembly slice.
 
 `GuiAssemblyWorkbench` exposes Project-owned shared Part definitions, child Assembly documents,
 repeated component occurrences, rigid nested subassembly occurrences, authored placement,
@@ -23,8 +24,9 @@ move an Assembly.
 Block 130 adds the direct-manipulation layer over this validation workbench in
 `docs/gui-interactive-assembly-mvp9.md`: component/subassembly triads, capability-filtered second
 targets, solved relationship candidates, oriented joint frames, typed coordinate controls, and
-in-viewport single-coordinate motion. The MVP-7 commands remain the form-driven and cross-hierarchy
-fallback; authority continues to reside in the same Project transactions and solve/motion appliers.
+in-viewport single-coordinate motion. The headless MVP-7 API remains available to its tests; the removed
+window is no longer a GUI fallback. Replacement-shell root-local scope and cross-hierarchy deferrals are recorded in that
+contract. Authority remains in the same Project transactions and solve/motion appliers.
 
 ## Verification
 

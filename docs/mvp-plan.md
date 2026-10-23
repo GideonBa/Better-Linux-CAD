@@ -621,12 +621,17 @@ posed Project components. Disposable target identities and readouts are cleared 
 freshness changes; witness overlays follow camera changes. Measurement preserves document, history,
 dirty state and save format. Contract/proof: `docs/gui-measure-mvp9.md`, `[block136-measure]`.
 
-Assembly, browser feature editing and whole-block acceptance remain open.
+The replacement shell restores Assembly Project creation/definition loading, component and rigid
+subassembly placement, compatibility-filtered root relationships/joints, coordinate motion and group
+solve. Actual posed previews, native handles and numeric inputs remain candidate-only until one
+Project transaction. Passive Spherical and bounded root-local authoring retain their existing limits.
+Contract/proof: `docs/gui-interactive-assembly-mvp9.md`, `[block136-assembly]`.
+
+Browser feature editing and whole-block acceptance remain open.
 
 ## Current next technical step — Block 136
 
-Restore the remaining Assembly feature commands,
-browser-double-click feature editing, and replacement-shell acceptance/coverage as defined in
+Restore browser-double-click feature editing and replacement-shell acceptance/coverage as defined in
 `docs/gui-shell-reset-sequence-mvp9r.md`.
 
 ## Later phases

@@ -592,7 +592,8 @@ state or history entry is introduced. A mouse-pass-through witness overlay follo
 view-change notifications. Intersecting planes share a witness lying on both planes.
 Contract/proof: `docs/gui-measure-mvp9.md`, `[block136-measure]`.
 
-Assembly authoring, browser feature editing and whole-block acceptance remain open.
+The Assembly follow-up below restores that family. Browser feature editing and whole-block
+acceptance remain open.
 
 Validation for the Measure slice on 22 October 2026: full Core (513 cases, 15124 assertions),
 Geometry (426 cases, 28348 assertions) and offscreen GUI (266 passed, eight explicit native skips,
@@ -604,6 +605,37 @@ exit paths, same-target rejection, stale/replaced topology, a known 100 mm posed
 unchanged dirty/history state and byte-identical saved Part files. Native captures were inspected
 and desktop startup passed (intentional six-second timeout). Commands: `docs/development-setup.md`.
 These checks validate the Measure slice without advancing whole-block acceptance.
+
+#### Block 136 next slice — Assembly tools
+
+`ShellAssemblyTools` restores a Baugruppe ribbon and scrollable task dock on `ShellWindow`. Project
+creation and definition loading feed reusable Part/child-Assembly occurrences. Root components and
+rigid subassemblies receive actual posed preview geometry, XYZ translation arrows or a chosen rotation
+ring, six numeric placement fields and occurrence-state controls. Replacement-only previews support
+hiding/suppressing an occurrence with no ghost result. Browser component identities now match scene
+identities so a native component pick selects its tree row.
+
+Disposable semantic target presentations follow occurrence placement; native A/B selection uses the
+same second-target compatibility matrix as the existing relationship/joint controllers. Relationships,
+joint coordinate motion and root-group solve publish actual solved poses. The joint table preserves
+all five families and their typed slot order/limits; Spherical remains passive. The common overlay is
+shared with Part feature manipulators. Source snapshots, freshness checks, drag Escape and task Cancel
+protect document intent; one Apply remains one Project transaction. Scope is root-local, with nested
+endpoint authoring and constrained free dragging deferred. Contract/proof:
+`docs/gui-interactive-assembly-mvp9.md`, `[block136-assembly]`.
+
+Browser feature editing and whole-block acceptance remain open; the numbered plan remains at
+Block 136.
+
+Validation on 22 October 2026: Core passes 513 cases / 15124 assertions; Geometry passes 427 cases /
+28518 assertions. Full offscreen GUI passes 274 cases with 11 explicit native-only skips and 16191
+assertions. The combined native Assembly/Measure/Surface/spatial/Body/pattern/finishing/Sketch UI/
+viewport/lifecycle suite passes all 68 cases / 9737 assertions and covers every offscreen skip.
+Additional native Extrude/Revolve proof passes 34 cases / 1085 assertions. Assembly captures at
+1280×800 were inspected. The desktop startup smoke passes (intentional six-second timeout).
+Legacy Feature tests now locate Apply in their own task panel; native Sketch dialog bounds checks
+wait at most 500 ms for asynchronous window-manager placement and still require the complete frame
+inside the available screen. These checks validate this slice without closing whole-block acceptance.
 
 ### Sketch interaction follow-up — 21 October 2026
 
