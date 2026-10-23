@@ -1083,3 +1083,29 @@ inputs; Planar motion retains its imported seated Part boundary. Inspect
 `parameter-manager-preview.png` and `parameter-manager-usage.png` at 1280×800. Include both new tags
 in the canonical native regression in `docs/gui-shell-acceptance-mvp9r.md`, then run startup separately.
 Contracts and remaining work: `docs/parameter-model.md`, `docs/mvp-plan.md`.
+
+## Dedicated through-all hole authoring
+
+```bash
+cmake --build --preset dev-gui --target blcad_gui_tests blcad_app -j6
+./build/dev-gui/blcad_core_tests "*hole*,[core][extrude-extent]"
+./build/dev-gui/blcad_geometry_tests "*circular*,[geometry][extrude-extent],[geometry][workplane]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[block136-holes],[shell-combined-holes],[gui][part-foundation],[integration][gui-feature-coverage]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-holes QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-holes],[shell-combined-holes]"
+```
+
+The same new shell cases execute on both backends: single/circular creation; XY/XZ/YZ and tilted
+construction planes; generated-face bounds; global ID/name collisions; literal/formula bindings,
+typed/count limits and preserved local text; no-op/erased-solid rejection; whole-model previews,
+atomic history, sidecars, canonical reopening and session expiry. The fifteenth combined workflow
+uses actual ribbon, popup, field, browser, button and file input to author an 80×60×12 plate, Fillet,
+four-hole pattern, parameter-driven six-hole recompute and an additional single hole sharing the
+existing diameter. It exercises rejected/corrected inputs, browser workplane selection during the
+task, four-step Undo/Redo, cancellation, canonical reopening and STEP. Fourteen combined workflows
+have fully UI-authored inputs; Planar motion retains its imported seated Part boundary.
+
+Inspect `hole-circle-preview.png` and `hole-single-bound-preview.png` at 1280×800. Include both new
+tags in the canonical native regression in `docs/gui-shell-acceptance-mvp9r.md`, then run startup
+separately, with builds and GUI executions serial. Contract and remaining extent-editor work:
+`docs/gui-part-foundation-workbench-mvp7.md`, `docs/mvp-plan.md`. The semantic Hole Wizard is not
+claimed by these plain cylindrical cut controls.

@@ -312,9 +312,9 @@
         "owner": 136,
         "status": "partial",
         "contract": "docs/gui-interactive-extrude-revolve-mvp9.md",
-        "scope": "Candidate-only Extrude/Revolve with native manipulation and selectable closed spline profiles.",
+        "scope": "Candidate-only Extrude/Revolve with native manipulation and selectable closed spline profiles; dedicated through-all single/bolt-circle cuts with local typed inputs, parameter bindings and complete atomic Preview/Apply.",
         "gaps": [
-          "Restore dedicated Hole authoring and audit advanced extent/termination editors against the retained foundation API."
+          "Audit and restore advanced extent/termination editors against the retained foundation API."
         ],
         "proofs": [
           {
@@ -328,13 +328,24 @@
           {
             "filter": "[shell-combined-revolve-pattern]",
             "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
+          },
+          {
+            "filter": "[block136-holes]",
+            "source": "tests/gui/gui_shell_hole_tests.cpp"
+          },
+          {
+            "filter": "[shell-combined-holes]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
           }
         ],
         "actions": [
           "extrude",
-          "revolve"
+          "revolve",
+          "hole"
         ],
-        "widgets": []
+        "widgets": [
+          "blcad.shell.hole_task"
+        ]
       }
     },
     {
@@ -923,7 +934,7 @@
       ]
     },
     "acceptance": {
-      "audited_on": "2026-10-23",
+      "audited_on": "2026-10-24",
       "complete": false,
       "blocked_families": [
         "viewport-selection",

@@ -894,6 +894,20 @@ Contracts: `docs/parameter-model.md`, `docs/parameter-expression-mvp.md`; eviden
 `docs/gui-shell-acceptance-mvp9r.md`. Twelve bounded families are restored and six remain partial.
 Block 136 stays open and numbered completion remains at Block 135.
 
+### Block 136 — Dedicated through-all hole authoring — 2026-10-24
+
+The replacement shell now creates single cylindrical holes and complete bolt circles through a
+dedicated task. Explicit Body/workplane/placement inputs, new typed values and existing literal/
+formula bindings stay local until complete downstream Preview and one atomic Apply. Existing
+modifiers remain in the Body chain. Invalid numeric, bounded-face, no-op and erased-solid candidates
+remain correctable; history, sidecars, persistence and session boundaries retain their authority.
+Seven focused shell cases and a fifteenth combined actual-input workflow cover oriented planes,
+bindings, a finished/parameter-driven plate, rejection/recovery, exact history, reopening and STEP.
+Contract: `docs/gui-part-foundation-workbench-mvp7.md`; evidence:
+`docs/gui-shell-acceptance-mvp9r.md`. Advanced extent editors remain a gap in the same family.
+Twelve bounded families remain restored and six partial; Block 136 and the Block-135 numbered
+completion boundary are unchanged. The semantic Hole Wizard remains separate target architecture.
+
 ## Current next technical step — Block 136
 
 The current v3 coverage inventory records all eighteen accepted families, current shell proof sources,
@@ -901,7 +915,8 @@ reachable entry points and explicit remaining gaps. The machine check distinguis
 from closure readiness; historical controller proofs cannot close a shell gap. Acceptance contract:
 `docs/gui-shell-acceptance-mvp9r.md`, `[integration][gui-feature-coverage]` / `[gui][shell-coverage]`.
 
-Continue with dedicated Hole authoring and advanced extent editors. The bounded standalone Part
+Continue with advanced extent/termination editors. Dedicated plain through-all Hole authoring is
+available within the retained circular-cut/Core target boundaries. The bounded standalone Part
 parameter manager now creates and edits typed literals and Length/Count formulas through local
 batches, complete downstream Preview and one atomic Apply. The Sketch3D/PathCurve surface includes
 typed/shared-point line editing, native collection, constrained grips, anchored pointer/direction
@@ -914,7 +929,7 @@ The bounded repair-open path now supports failed-recompute Parts and missing fac
 with typed intent, complete atomic publication and failed-state history. Other structural dependency
 failures remain strict loading errors.
 The construction task now has fourteen bounded create/edit modes, native reference collection and
-position/direction/frame/new-offset grips. Continue with Hole/extent editors, workspace
+position/direction/frame/new-offset grips. Continue with extent editors, workspace
 navigation/context, advanced Assembly controls and integrated native Part/Assembly acceptance in the
 order recorded in
 `docs/gui-shell-acceptance-mvp9r.md`. Block 136 remains in progress until all recorded gaps and pending

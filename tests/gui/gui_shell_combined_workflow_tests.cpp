@@ -6,6 +6,7 @@
 #include "blcad/gui/shell/shell_construction_tools.hpp"
 #include "blcad/gui/shell/shell_feature_edit_tools.hpp"
 #include "blcad/gui/shell/shell_feature_tools.hpp"
+#include "blcad/gui/shell/shell_hole_tools.hpp"
 #include "blcad/gui/shell/shell_inspect_tools.hpp"
 #include "blcad/gui/shell/shell_measure_tools.hpp"
 #include "blcad/gui/shell/shell_parameter_tools.hpp"
@@ -67,7 +68,7 @@ template <typename T> T checked(Result<T> result) {
 }
 
 // Interaction helpers deliberately stop at Qt widgets and input events.
-// Thirteen combined workflows author their inputs through the UI. The Planar
+// Fourteen combined workflows author their inputs through the UI. The Planar
 // motion case imports the repository's seated Part definition through a file
 // dialog; the separately tagged mixed-path case opens preauthored Sketch/planes.
 // Neither path drives authoring controllers/workbenches directly.
@@ -2109,6 +2110,108 @@ TEST_CASE("Combined UI parameter batches drive a rebound extrusion through formu
   ui.roundtrip(directory.filePath("parameters.blcad"));
   CHECK(ui.summary(body).volume_mm3 == Approx(9600).margin(1e-5));
   const auto step = directory.filePath("parameters.step");
+  ui.file("export_part_step", step);
+  CHECK(ui.bytes(step).contains("ISO-10303-21"));
+  CHECK(ui.snapshot() == states.back());
+  ui.idle();
+}
+
+TEST_CASE("Combined UI hole workflow cuts a finished body then edits pattern parameters and adds a "
+          "single hole",
+          "[gui][integration][shell-combined-workflow][shell-combined-holes]") {
+  WorkflowUi ui;
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  ui.new_document("Machined hole plate");
+  ui.rectangle("datum.xy", {-40, -30}, {40, 30});
+  const auto body = ui.extrude(12);
+  CHECK(ui.summary(body).volume_mm3 == Approx(57600).margin(1e-5));
+  std::vector<std::string> states{ui.snapshot()};
+  ui.command("fillet");
+  auto& edges = ui.widget<QListWidget>("blcad.finishing.targets");
+  REQUIRE(edges.count() > 0);
+  ui.list(edges, 0);
+  ui.scalar("1 mm");
+  ui.button("blcad.feature.apply");
+  const auto rounded_volume = ui.summary(body).volume_mm3;
+  REQUIRE(rounded_volume < 57600);
+  states.push_back(ui.snapshot());
+  ui.tree(body.value());
+  ui.command("hole");
+  REQUIRE(ui.window.hole_tools().active());
+  CHECK(ui.widget<QComboBox>("blcad.hole.target").currentData().toString() ==
+        QString::fromStdString(body.value()));
+  ui.choose(ui.widget<QComboBox>("blcad.hole.placement"), 1);
+  ui.tree("datum.xz");
+  CHECK(ui.widget<QComboBox>("blcad.hole.plane").currentData() == "datum.xz");
+  ui.tree("datum.xy");
+  CHECK(ui.widget<QComboBox>("blcad.hole.plane").currentData() == "datum.xy");
+  ui.data(ui.widget<QComboBox>("blcad.hole.plane"), "datum.xy");
+  ui.text(ui.widget<QLineEdit>("blcad.hole.diameter"), "6");
+  ui.text(ui.widget<QLineEdit>("blcad.hole.radius"), "20");
+  ui.text(ui.widget<QLineEdit>("blcad.hole.count"), "3.5");
+  ui.button("blcad.hole.preview");
+  CHECK_FALSE(ui.widget<QPushButton>("blcad.hole.apply").isEnabled());
+  CHECK(ui.widget<QLineEdit>("blcad.hole.count").text() == "3.5");
+  CHECK(ui.snapshot() == states.back());
+  ui.text(ui.widget<QLineEdit>("blcad.hole.count"), "4");
+  ui.text(ui.widget<QLineEdit>("blcad.hole.angle"), "30.123456789012345");
+  ui.button("blcad.hole.preview");
+  REQUIRE(ui.widget<QPushButton>("blcad.hole.apply").isEnabled());
+  CHECK(ui.snapshot() == states.back());
+  ui.capture("hole-circle-preview");
+  ui.button("blcad.hole.apply");
+  ui.idle();
+  CHECK(ui.summary(body).volume_mm3 ==
+        Approx(rounded_volume - 4 * std::numbers::pi * 9 * 12).margin(1e-5));
+  states.push_back(ui.snapshot());
+  const auto cut = ui.window.session().part_document()->features().back();
+  const auto pattern = ui.window.session()
+                           .part_document()
+                           ->find_sketch(cut.input_sketch())
+                           ->circular_hole_patterns()
+                           .front();
+  const auto pattern_parameters = ui.window.session().part_document()->parameter_count();
+  ui.command("parameters");
+  ui.data(ui.widget<QComboBox>("blcad.parameters.parameter"),
+          QString::fromStdString(pattern.count_parameter().value()));
+  ui.text(ui.widget<QLineEdit>("blcad.parameters.input"), "6");
+  ui.button("blcad.parameters.stage");
+  ui.button("blcad.parameters.preview");
+  ui.button("blcad.parameters.apply");
+  CHECK(ui.summary(body).volume_mm3 ==
+        Approx(rounded_volume - 6 * std::numbers::pi * 9 * 12).margin(1e-5));
+  states.push_back(ui.snapshot());
+  ui.command("hole");
+  ui.choose(ui.widget<QComboBox>("blcad.hole.placement"), 0);
+  // Reuse the circle's diameter instead of creating or overwriting a parameter.
+  ui.data(ui.widget<QComboBox>("blcad.hole.diameter_binding"),
+          QString::fromStdString(pattern.hole_diameter_parameter().value()));
+  CHECK(ui.widget<QLineEdit>("blcad.hole.diameter").isReadOnly());
+  ui.text(ui.widget<QLineEdit>("blcad.hole.center_x"), "1000");
+  ui.button("blcad.hole.preview");
+  CHECK_FALSE(ui.widget<QPushButton>("blcad.hole.apply").isEnabled());
+  CHECK(ui.snapshot() == states.back());
+  ui.text(ui.widget<QLineEdit>("blcad.hole.center_x"), "0");
+  ui.button("blcad.hole.preview");
+  ui.capture("hole-single-bound-preview");
+  ui.button("blcad.hole.apply");
+  CHECK(ui.window.session().part_document()->parameter_count() == pattern_parameters);
+  CHECK(ui.summary(body).volume_mm3 ==
+        Approx(rounded_volume - 7 * std::numbers::pi * 9 * 12).margin(1e-5));
+  states.push_back(ui.snapshot());
+  ui.history(states);
+  ui.command("hole");
+  ui.text(ui.widget<QLineEdit>("blcad.hole.center_x"), "10");
+  ui.button("blcad.hole.preview");
+  REQUIRE(ui.widget<QPushButton>("blcad.hole.apply").isEnabled());
+  ui.button("blcad.hole.cancel");
+  CHECK(ui.snapshot() == states.back());
+  ui.idle();
+  ui.roundtrip(directory.filePath("machined-holes.blcad"));
+  CHECK(ui.summary(body).volume_mm3 ==
+        Approx(rounded_volume - 7 * std::numbers::pi * 9 * 12).margin(1e-5));
+  const auto step = directory.filePath("machined-holes.step");
   ui.file("export_part_step", step);
   CHECK(ui.bytes(step).contains("ISO-10303-21"));
   CHECK(ui.snapshot() == states.back());

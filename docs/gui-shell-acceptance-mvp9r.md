@@ -1,6 +1,6 @@
 # Replacement shell acceptance — MVP-9R
 
-Status: Block 136 in progress; inventory updated 2026-10-23. Numbered completion remains owned by
+Status: Block 136 in progress; inventory updated 2026-10-24. Numbered completion remains owned by
 `docs/mvp-plan.md`. STEP Import remains Blocks 137–143.
 
 ## Current evidence and historical acceptance
@@ -39,7 +39,7 @@ source, hide a missing tag behind OR and claim completion with gaps. They must a
 
 The machine-readable details live in `families[].shell.gaps`; this is the execution order:
 
-1. Restore dedicated Hole authoring and audit advanced extent
+1. Audit and restore advanced extent
    editors against the foundation API.
 2. Restore contextual commands, selection-filter UI, view cube, view bookmarks and repeat command.
 3. Restore the supported hierarchy validation, cross-hierarchy relationship/joint/solve controls,
@@ -71,7 +71,7 @@ QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][gui-fea
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests
 ./build/dev-gui/blcad_core_tests
 ./build/dev-gui/blcad_geometry_tests
-QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-parameters],[shell-combined-parameters],[block136-sketch3d-projection],[shell-combined-projected-sweep],[block136-sketch3d-direction],[shell-sketch3d-direction-workflow],[block136-sketch3d-placement],[shell-sketch3d-placement-workflow],[block136-sketch3d-grips],[shell-sketch3d-grips-workflow],[block136-sketch3d],[shell-combined-sketch3d],[block136-sketch-diagnostics],[missing-reference-session],[block136-missing-reference],[repair-open-session],[block136-repair-open],[block136-reference-repair-batches],[block136-reference-repair],[block136-construction-manipulators],[block136-construction-picking],[shell-mixed-path-loft],[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-holes],[shell-combined-holes],[block136-parameters],[shell-combined-parameters],[block136-sketch3d-projection],[shell-combined-projected-sweep],[block136-sketch3d-direction],[shell-sketch3d-direction-workflow],[block136-sketch3d-placement],[shell-sketch3d-placement-workflow],[block136-sketch3d-grips],[shell-sketch3d-grips-workflow],[block136-sketch3d],[shell-combined-sketch3d],[block136-sketch-diagnostics],[missing-reference-session],[block136-missing-reference],[repair-open-session],[block136-repair-open],[block136-reference-repair-batches],[block136-reference-repair],[block136-construction-manipulators],[block136-construction-picking],[shell-mixed-path-loft],[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
 ```
 
 The regular inventory audit passes while it accurately records unfinished work. For closure,
@@ -820,3 +820,55 @@ The ordinary inventory audit passes; the opt-in closure gate correctly rejects u
 partial. Block 136 stays open with numbered completion at Block 135. Dedicated Hole authoring and
 advanced extent editors are the next documented step; literal/formula conversion, rename/delete,
 Angle formulas and Assembly parameter management retain their existing Core boundaries.
+
+## Dedicated through-all hole authoring — 2026-10-24
+
+The Model ribbon's **Bohrungen** task now creates a single cylindrical through-hole or a complete
+parametric bolt circle. It collects explicit Body/workplane/local-center inputs and typed new values
+or existing literal/formula bindings. A disposable complete-model Preview validates Geometry,
+material removal and retained Solid output before one Apply publishes the placement Sketch,
+required parameters and Cut. This uses the frozen CircleProfile/CircularHolePattern/SubtractiveExtrude
+contract, with no Core, Geometry or schema changes. Exact target, coordinate, count, bounds and
+creation-only limits: `docs/gui-part-foundation-workbench-mvp7.md`.
+
+Seven `[block136-holes]` cases cover single/circular creation; XY/XZ/YZ and tilted construction planes;
+generated-face bounds; graph-wide ID/name collisions; typed literal/formula bindings, full precision,
+local text retention and bounded counts; invalid/no-op/erased-solid rejection; other-body preservation;
+atomic history, accepted constraint/dimension sidecars, canonical reopening and task/context expiry,
+including a queued binding event after a direct session close.
+
+`[shell-combined-holes]` is the fifteenth combined workflow. Actual ribbon, popup, field, browser,
+button and file input authors an 80×60×12 plate, applies Fillet, creates four holes, edits the driving
+count to six and adds a single hole sharing the existing diameter. Checks cover exact removed
+volumes, retained modifier history, rejected/corrected count/no-op inputs, browser plane selection
+during the task, four-step Undo/Redo, cancellation, canonical reopening and STEP. Fourteen combined
+workflows have fully UI-authored inputs; the retained Planar-motion case imports its seated Part.
+
+The inventory retains twelve restored and six partial families. Hole authoring is covered, while
+advanced extent/termination editors remain a gap in the same family. Whole-shell acceptance and
+Block 136 stay open with numbered completion at Block 135. The next step is the extent-editor audit
+and implementation; semantic standards/thread/countersink HoleFeature intent remains separate target
+architecture in `docs/hole-wizard.md`.
+
+`blcad_gui_tests` and `blcad_app` built successfully with `dev-gui`. Final verification:
+
+| Suite | Cases | Assertions | Result |
+| --- | ---: | ---: | --- |
+| Focused Core hole/Extrude contracts | 11 | 379 | All passed |
+| Focused Geometry circular/extent/workplane pipelines | 46 | 2,161 | All passed |
+| Full offscreen GUI | 421 | 35,800 | 406 passed; 15 native-only skips |
+| Full combined native shell | 237 | 31,094 | All passed; no skips |
+
+The final 1280×800 `hole-circle-preview.png` / `hole-single-bound-preview.png` captures in
+`/tmp/blcad-holes-native` were inspected: labels are not clipped horizontally, parameter bindings
+and literal fields remain readable, circular-only fields are disabled for single placement and
+Preview/Apply/Cancel stay pinned while the form scrolls. Supporting planes keep their normal wire
+presentation. Native logs retain the known medium depth/stencil visual warning, without
+high-severity, BadDrawable or fatal lifecycle diagnostics. The separate six-second application
+startup reaches intentional timeout 124. Builds, GUI runs and startup were serial; formatting and
+diff checks pass. Repeatable commands live in `docs/development-setup.md`.
+
+Core/Geometry sources and persistence schema are unchanged; their full suites were not rerun for
+this slice. The ordinary inventory audit passes. The opt-in closure gate correctly rejects the
+remaining acceptance work (one of three cases fails, 180 assertions). This does not close the
+extent-editor gap, the six partial families or Block 136.
