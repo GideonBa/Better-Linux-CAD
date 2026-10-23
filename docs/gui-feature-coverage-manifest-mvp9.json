@@ -22,6 +22,10 @@
           {
             "filter": "[gui][shell][document-lifecycle]",
             "source": "tests/gui/gui_shell_window_tests.cpp"
+          },
+          {
+            "filter": "[shell-combined-cancel]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
           }
         ],
         "actions": [
@@ -91,6 +95,10 @@
           {
             "filter": "[block136-feature-edit]",
             "source": "tests/gui/gui_shell_feature_edit_tests.cpp"
+          },
+          {
+            "filter": "[shell-combined-part]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
           }
         ],
         "actions": [],
@@ -160,6 +168,10 @@
           {
             "filter": "[block136-construction]",
             "source": "tests/gui/gui_shell_construction_tools_tests.cpp"
+          },
+          {
+            "filter": "[shell-combined-loft]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
           }
         ],
         "actions": [
@@ -228,6 +240,10 @@
           {
             "filter": "[gui][shell-features][extrude-revolve]",
             "source": "tests/gui/gui_shell_feature_tools_tests.cpp"
+          },
+          {
+            "filter": "[shell-combined-part]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
           }
         ],
         "actions": [
@@ -260,6 +276,10 @@
           {
             "filter": "[block136-patterns]",
             "source": "tests/gui/gui_shell_pattern_tools_tests.cpp"
+          },
+          {
+            "filter": "[shell-combined-part]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
           }
         ],
         "actions": [
@@ -293,6 +313,10 @@
           {
             "filter": "[block136-body]",
             "source": "tests/gui/gui_shell_body_tools_tests.cpp"
+          },
+          {
+            "filter": "[shell-combined-bodies]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
           }
         ],
         "actions": [
@@ -352,6 +376,10 @@
           {
             "filter": "[block136-spatial]",
             "source": "tests/gui/gui_shell_spatial_tools_tests.cpp"
+          },
+          {
+            "filter": "[shell-combined-loft]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
           }
         ],
         "actions": [
@@ -414,6 +442,10 @@
           {
             "filter": "[block136-assembly]",
             "source": "tests/gui/gui_shell_assembly_tools_tests.cpp"
+          },
+          {
+            "filter": "[shell-combined-assembly]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
           }
         ],
         "actions": [
@@ -447,6 +479,10 @@
           {
             "filter": "[block136-assembly]",
             "source": "tests/gui/gui_shell_assembly_tools_tests.cpp"
+          },
+          {
+            "filter": "[shell-combined-assembly]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
           }
         ],
         "actions": [
@@ -477,6 +513,10 @@
           {
             "filter": "[block136-assembly]",
             "source": "tests/gui/gui_shell_assembly_tools_tests.cpp"
+          },
+          {
+            "filter": "[shell-combined-assembly]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
           }
         ],
         "actions": [
@@ -506,6 +546,10 @@
           {
             "filter": "[shell-assembly-analysis]",
             "source": "tests/gui/gui_shell_inspect_tools_tests.cpp"
+          },
+          {
+            "filter": "[shell-combined-assembly]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
           }
         ],
         "actions": [
@@ -531,6 +575,10 @@
           {
             "filter": "[shell-part-step]",
             "source": "tests/gui/gui_shell_inspect_tools_tests.cpp"
+          },
+          {
+            "filter": "[shell-combined-part]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
           }
         ],
         "actions": [
@@ -556,6 +604,10 @@
           {
             "filter": "[shell-assembly-step]",
             "source": "tests/gui/gui_shell_inspect_tools_tests.cpp"
+          },
+          {
+            "filter": "[shell-combined-assembly]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
           }
         ],
         "actions": [

@@ -65,7 +65,7 @@ QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][gui-fea
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests
 ./build/dev-gui/blcad_core_tests
 ./build/dev-gui/blcad_geometry_tests
-QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[gui][shell-coverage],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
 ```
 
 The regular inventory audit passes while it accurately records unfinished work. For closure,
@@ -117,3 +117,49 @@ or drawable-lifecycle errors. The explicit closure gate still correctly refuses 
 families retain covered bounded surfaces and ten retain gaps; creation narrows the datum-family gap
 without closing it. Next work is construction/workplane object editing and the remaining relation/
 pick workflows, followed by the existing acceptance sequence above.
+
+## Combined UI workflow regression — 2026-10-23
+
+`[shell-combined-workflow]` adds five replacement-shell scenarios using actual Qt widget/input paths:
+
+1. Offset workplane → mouse/numeric Sketch → Extrude → Fillet → upstream feature edit → linear Body
+   pattern → XYZ translation → Body Measure/copy → multi-step history → canonical reopen → Part STEP.
+2. Two authored Bodies → cancelled Boolean preview → subtract with retained tool → scale → Mirror →
+   multi-step history → new translation branch that truncates redo → canonical reopen.
+3. Three mouse/numeric sections on origin/offset workplanes → Loft source collection and list reordering
+   → feature rename → exact history → canonical reopen.
+4. UI-authored Part → save → new Project → definition file import → grounded/free placements → Mate
+   preview/solved pose → group Solve → clearance/contact analysis → exact history → canonical reopen
+   → flat and structured Assembly STEP.
+5. Saved Sketch → cancelled Extrude → rejected/recovered construction input and Escape → extrusion →
+   cancelled Open and dirty-file confirmation → history/save → document switch/reopen → cancelled
+   partial Sketch gesture.
+
+These tests use no Core fixtures or direct authoring-controller calls. They check independent
+Geometry results, intent/identity preservation, atomic and branching history, complete persistence,
+read-only consumers and interaction cleanup. Both offscreen and native backends execute the same
+scenarios; native widget reachability and OCCT availability are explicit assertions. Repeatable
+commands: `docs/development-setup.md`.
+
+Sketch creation combines an actual viewport pick, Escape backout, absolute keyboard coordinates,
+mouse hover/rubber-band feedback and relative keyboard coordinates. This preserves exact authored
+dimensions across native pixel quantization. Loft bounds are checked as conservative enclosures of
+the authored end planes; native display triangulation may enlarge that envelope. Volume/solid-count
+checks remain independent Geometry assertions.
+
+The scenarios cover selected combinations of the restored command surfaces. Remaining family gaps,
+joint/motion combinations, native manipulator variants and broader integrated acceptance still need
+proof; neither the numbered boundary nor the closure gate changes.
+
+| Suite | Cases | Assertions | Result |
+| --- | ---: | ---: | --- |
+| Combined workflows, offscreen | 5 | 1,337 | All passed; no skips |
+| Full offscreen GUI | 316 | 19,670 | 302 passed; 14 native-only skips |
+| Combined native shell | 132 | 14,343 | All passed; no skips |
+| Focused inventory | 3 | 128 | All passed |
+
+The native run includes all five new workflows and every offscreen-only omission. Machining, Loft
+and Assembly captures at 1280×800 were inspected. The log retains the existing incomplete-visual
+depth/stencil warning, without high-severity or drawable-lifecycle errors. The explicit closure gate
+was exercised and still rejects the open Block-136 acceptance state. This increment changes tests,
+test registration and documentation; Core/Geometry and application behavior remain unchanged.

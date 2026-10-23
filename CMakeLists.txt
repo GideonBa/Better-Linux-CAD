@@ -597,6 +597,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_shell_measure_tools_tests.cpp
       tests/gui/gui_shell_inspect_tools_tests.cpp
       tests/gui/gui_shell_construction_tools_tests.cpp
+      tests/gui/gui_shell_combined_workflow_tests.cpp
       tests/gui/gui_shell_coverage_tests.cpp
       tests/gui/gui_shell_assembly_tools_tests.cpp
       tests/gui/gui_shell_feature_edit_tests.cpp
