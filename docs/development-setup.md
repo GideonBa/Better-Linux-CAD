@@ -516,6 +516,21 @@ solver-backed dragging. Block 135 proves persistent profile handoff/reselection,
 units, pointer-drag numeric override and rollback, candidate-only auto-provisioning, mutation-free
 Cancel, recomputed Extrude/Revolve results, and atomic Undo.
 
+### Block 136 finishing slice
+
+```bash
+./build/dev-gui/blcad_core_tests "[rectangular-finishing]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[block136-finishing]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-finishing]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle]"
+```
+
+The shell proof covers Fillet, three Chamfer modes, Shell and Draft through actual actions and task
+controls, current-body multi-selection, recomputed solid results, pending parameter isolation,
+Cancel, rejection/rollback, atomic Undo/Redo and Save/Open. The native-only case also checks actual
+subshape mouse detection and drag/numeric coupling; it skips explicitly with the offscreen backend.
+Optional `BLCAD_UI_CAPTURE_DIR` captures the test windows.
+
 ### Sketch operation follow-up
 
 The shell wires pointer dragging, live previews, numeric refinement and Apply/Cancel for transforms,

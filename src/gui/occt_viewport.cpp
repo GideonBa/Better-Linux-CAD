@@ -459,6 +459,7 @@ struct OcctViewport::Impl {
   Aspect_Drawable native_drawable{0};
   std::vector<Presentation> presentations;
   std::optional<Presentation> feature_preview;
+  std::optional<std::string> feature_preview_replaced_body;
   std::unordered_map<const AIS_InteractiveObject*, std::size_t> owner_to_index;
   std::string initialization_error;
   bool initialization_attempted{false};
@@ -607,7 +608,8 @@ Result<std::size_t> OcctViewport::set_scene(std::vector<geometry::ViewportSceneI
   return Result<std::size_t>::success(impl_->presentations.size());
 }
 
-Result<std::size_t> OcctViewport::set_feature_preview(geometry::GeometryShape shape) {
+Result<std::size_t> OcctViewport::set_feature_preview(geometry::GeometryShape shape,
+                                                      std::optional<std::string> replaced_body) {
   if (shape.empty())
     return Result<std::size_t>::failure(
         viewport_error("feature preview requires a non-empty Geometry shape"));
@@ -630,6 +632,7 @@ Result<std::size_t> OcctViewport::set_feature_preview(geometry::GeometryShape sh
       !impl_->feature_preview->interactive.IsNull())
     impl_->context->Remove(impl_->feature_preview->interactive, false);
   impl_->feature_preview = std::move(candidate);
+  impl_->feature_preview_replaced_body = std::move(replaced_body);
   if (!impl_->context.IsNull() && !impl_->feature_preview->interactive.IsNull()) {
     const int mode = display_mode_ == GuiViewportDisplayMode::Wireframe ? 0 : 1;
     impl_->context->Display(impl_->feature_preview->interactive, false);
@@ -639,8 +642,14 @@ Result<std::size_t> OcctViewport::set_feature_preview(geometry::GeometryShape sh
         AIS_SelectionModesConcurrency_Single, true);
     render_update();
   }
+  apply_sketch_focus();
   update();
   return Result<std::size_t>::success(1U);
+}
+
+bool OcctViewport::feature_preview_replaces(std::string_view semantic_id) const noexcept {
+  return impl_->feature_preview && impl_->feature_preview_replaced_body &&
+         *impl_->feature_preview_replaced_body == semantic_id;
 }
 
 void OcctViewport::clear_feature_preview() {
@@ -651,6 +660,8 @@ void OcctViewport::clear_feature_preview() {
     render_update();
   }
   impl_->feature_preview.reset();
+  impl_->feature_preview_replaced_body.reset();
+  apply_sketch_focus();
   update();
 }
 
@@ -661,6 +672,8 @@ void OcctViewport::clear_scene() {
   }
   impl_->presentations.clear();
   impl_->feature_preview.reset();
+  impl_->feature_preview_replaced_body.reset();
+  apply_sketch_focus();
   impl_->owner_to_index.clear();
   clear_sketch_interaction();
   publish_selection(std::nullopt);
@@ -1560,13 +1573,19 @@ void OcctViewport::apply_sketch_focus() {
     if (presentation.interactive.IsNull())
       continue;
     const bool profile_face = sketch_profile_face(presentation.item);
+    if (feature_preview_replaces(presentation.item.semantic_id)) {
+      impl_->context->Erase(presentation.interactive, false);
+      continue;
+    }
 
     if (!sketch_focus_active()) {
       impl_->context->Display(presentation.interactive, false);
       presentation.interactive->SetTransparency(
-          presentation.item.kind == geometry::ViewportSceneKind::Datum
-              ? 0.72
-              : profile_face ? 0.88 : 0.0);
+          presentation.item.kind == geometry::ViewportSceneKind::Datum ? 0.72
+          : profile_face || (presentation.item.kind == geometry::ViewportSceneKind::Face &&
+                             presentation.item.semantic_id.starts_with("finishing/"))
+              ? 0.88
+              : 0.0);
       continue;
     }
 
@@ -1591,7 +1610,9 @@ void OcctViewport::apply_sketch_focus() {
     else
       impl_->context->Display(impl_->feature_preview->interactive, false);
   }
-  render_update();
+  // Display() can reactivate an object's default selection mode. Apply the
+  // capability filter after every visibility change, including preview updates.
+  apply_selection_filters();
 }
 
 void OcctViewport::rebuild_sketch_grid() {

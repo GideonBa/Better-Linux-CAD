@@ -66,6 +66,7 @@ private:
   friend class Sketch3DGeometryAdapter;
   friend class OcctShapeView;
   friend class ViewportSceneBuilder;
+  friend class FinishingSelectionBuilder;
   friend class detail::AssemblyPartShapeDefinitionBuilder;
   friend class detail::AssemblyPosedLeafShapeBuilder;
 

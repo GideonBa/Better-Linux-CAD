@@ -41,6 +41,12 @@ public:
   [[nodiscard]] GuiInteractiveFinishingController& finishing() noexcept {
     return finishing_;
   }
+  [[nodiscard]] const GuiInteractiveFinishingController& finishing() const noexcept {
+    return finishing_;
+  }
+  [[nodiscard]] const GuiInteractiveShellDraftController& shell_draft() const noexcept {
+    return shell_draft_;
+  }
   [[nodiscard]] GuiInteractiveShellDraftController& shell_draft() noexcept {
     return shell_draft_;
   }

@@ -1,4 +1,5 @@
 #include "blcad/geometry/workplane_resolver.hpp"
+#include "blcad/core/rectangular_extrude_profile.hpp"
 #include "blcad/geometry/shape_cache.hpp"
 
 #include <cmath>
@@ -75,27 +76,12 @@ resolve_additive_extrude_face(const PartDocument& document,
     return Result<ResolvedWorkplane>::failure(validation_error(
         source_feature->id().value(), "source feature input sketch must exist in part document"));
   }
-  if (source_sketch->rectangle_profiles().size() != 1U ||
-      !source_sketch->circle_profiles().empty() || !source_sketch->closed_profiles().empty()) {
-    return Result<ResolvedWorkplane>::failure(validation_error(
-        source_sketch->id().value(), std::string(context) +
-                                         " resolution requires a source sketch with exactly one "
-                                         "rectangle profile"));
-  }
-
-  const RectangleProfile& rectangle = source_sketch->rectangle_profiles().front();
-  const Parameter* width = find_parameter(document, rectangle.width_parameter());
-  if (width == nullptr) {
-    return Result<ResolvedWorkplane>::failure(
-        validation_error(rectangle.width_parameter().value(),
-                         "rectangle width parameter must exist in part document"));
-  }
-  const Parameter* height = find_parameter(document, rectangle.height_parameter());
-  if (height == nullptr) {
-    return Result<ResolvedWorkplane>::failure(
-        validation_error(rectangle.height_parameter().value(),
-                         "rectangle height parameter must exist in part document"));
-  }
+  auto rectangle = resolve_rectangular_extrude_profile(document, *source_feature);
+  if (!rectangle)
+    return Result<ResolvedWorkplane>::failure(rectangle.error());
+  auto source_plane = WorkplaneResolver{}.resolve_for_sketch(document, *source_sketch);
+  if (!source_plane)
+    return source_plane;
   const Parameter* thickness = find_parameter(document, source_feature->length_parameter());
   if (thickness == nullptr) {
     return Result<ResolvedWorkplane>::failure(
@@ -103,49 +89,67 @@ resolve_additive_extrude_face(const PartDocument& document,
                          "additive extrude length parameter must exist in part document"));
   }
 
-  const Point2 rectangle_center = rectangle.center();
-  const double width_mm = width->value().millimeters();
-  const double height_mm = height->value().millimeters();
+  const Point2 rectangle_center = rectangle.value().center;
+  const double width_mm = rectangle.value().width;
+  const double height_mm = rectangle.value().height;
   const double thickness_mm = thickness->value().millimeters();
 
-  switch (face_reference.face()) {
-  case SemanticFace::Top:
-    return Result<ResolvedWorkplane>::success(ResolvedWorkplane{
-        std::move(resolved_id), Point3{rectangle_center.x, rectangle_center.y, thickness_mm},
-        Vector3{1.0, 0.0, 0.0}, Vector3{0.0, 1.0, 0.0}, Vector3{0.0, 0.0, 1.0},
-        make_bounds(width_mm, height_mm)});
-  case SemanticFace::Bottom:
-    return Result<ResolvedWorkplane>::success(ResolvedWorkplane{
-        std::move(resolved_id), Point3{rectangle_center.x, rectangle_center.y, 0.0},
-        Vector3{1.0, 0.0, 0.0}, Vector3{0.0, 1.0, 0.0}, Vector3{0.0, 0.0, -1.0},
-        make_bounds(width_mm, height_mm)});
-  case SemanticFace::Right:
-    return Result<ResolvedWorkplane>::success(ResolvedWorkplane{
-        std::move(resolved_id),
-        Point3{rectangle_center.x + width_mm / 2.0, rectangle_center.y, thickness_mm / 2.0},
-        Vector3{0.0, 1.0, 0.0}, Vector3{0.0, 0.0, 1.0}, Vector3{1.0, 0.0, 0.0},
-        make_bounds(height_mm, thickness_mm)});
-  case SemanticFace::Left:
-    return Result<ResolvedWorkplane>::success(ResolvedWorkplane{
-        std::move(resolved_id),
-        Point3{rectangle_center.x - width_mm / 2.0, rectangle_center.y, thickness_mm / 2.0},
-        Vector3{0.0, -1.0, 0.0}, Vector3{0.0, 0.0, 1.0}, Vector3{-1.0, 0.0, 0.0},
-        make_bounds(height_mm, thickness_mm)});
-  case SemanticFace::Front:
-    return Result<ResolvedWorkplane>::success(ResolvedWorkplane{
-        std::move(resolved_id),
-        Point3{rectangle_center.x, rectangle_center.y + height_mm / 2.0, thickness_mm / 2.0},
-        Vector3{-1.0, 0.0, 0.0}, Vector3{0.0, 0.0, 1.0}, Vector3{0.0, 1.0, 0.0},
-        make_bounds(width_mm, thickness_mm)});
-  case SemanticFace::Back:
-    return Result<ResolvedWorkplane>::success(ResolvedWorkplane{
-        std::move(resolved_id),
-        Point3{rectangle_center.x, rectangle_center.y - height_mm / 2.0, thickness_mm / 2.0},
-        Vector3{1.0, 0.0, 0.0}, Vector3{0.0, 0.0, 1.0}, Vector3{0.0, -1.0, 0.0},
-        make_bounds(width_mm, thickness_mm)});
-  }
-  return Result<ResolvedWorkplane>::failure(
-      validation_error(resolved_id.value(), "unsupported semantic face"));
+  const auto local_face = [&]() -> Result<ResolvedWorkplane> {
+    switch (face_reference.face()) {
+    case SemanticFace::Top:
+      return Result<ResolvedWorkplane>::success(ResolvedWorkplane{
+          std::move(resolved_id), Point3{rectangle_center.x, rectangle_center.y, thickness_mm},
+          Vector3{1.0, 0.0, 0.0}, Vector3{0.0, 1.0, 0.0}, Vector3{0.0, 0.0, 1.0},
+          make_bounds(width_mm, height_mm)});
+    case SemanticFace::Bottom:
+      return Result<ResolvedWorkplane>::success(ResolvedWorkplane{
+          std::move(resolved_id), Point3{rectangle_center.x, rectangle_center.y, 0.0},
+          Vector3{1.0, 0.0, 0.0}, Vector3{0.0, 1.0, 0.0}, Vector3{0.0, 0.0, -1.0},
+          make_bounds(width_mm, height_mm)});
+    case SemanticFace::Right:
+      return Result<ResolvedWorkplane>::success(ResolvedWorkplane{
+          std::move(resolved_id),
+          Point3{rectangle_center.x + width_mm / 2.0, rectangle_center.y, thickness_mm / 2.0},
+          Vector3{0.0, 1.0, 0.0}, Vector3{0.0, 0.0, 1.0}, Vector3{1.0, 0.0, 0.0},
+          make_bounds(height_mm, thickness_mm)});
+    case SemanticFace::Left:
+      return Result<ResolvedWorkplane>::success(ResolvedWorkplane{
+          std::move(resolved_id),
+          Point3{rectangle_center.x - width_mm / 2.0, rectangle_center.y, thickness_mm / 2.0},
+          Vector3{0.0, -1.0, 0.0}, Vector3{0.0, 0.0, 1.0}, Vector3{-1.0, 0.0, 0.0},
+          make_bounds(height_mm, thickness_mm)});
+    case SemanticFace::Front:
+      return Result<ResolvedWorkplane>::success(ResolvedWorkplane{
+          std::move(resolved_id),
+          Point3{rectangle_center.x, rectangle_center.y + height_mm / 2.0, thickness_mm / 2.0},
+          Vector3{-1.0, 0.0, 0.0}, Vector3{0.0, 0.0, 1.0}, Vector3{0.0, 1.0, 0.0},
+          make_bounds(width_mm, thickness_mm)});
+    case SemanticFace::Back:
+      return Result<ResolvedWorkplane>::success(ResolvedWorkplane{
+          std::move(resolved_id),
+          Point3{rectangle_center.x, rectangle_center.y - height_mm / 2.0, thickness_mm / 2.0},
+          Vector3{1.0, 0.0, 0.0}, Vector3{0.0, 0.0, 1.0}, Vector3{0.0, -1.0, 0.0},
+          make_bounds(width_mm, thickness_mm)});
+    }
+    return Result<ResolvedWorkplane>::failure(
+        validation_error(resolved_id.value(), "unsupported semantic face"));
+  };
+  auto face = local_face();
+  if (!face)
+    return face;
+  const auto& base = source_plane.value();
+  const auto vector = [&](Vector3 v) {
+    return Vector3{base.x_axis.x * v.x + base.y_axis.x * v.y + base.normal.x * v.z,
+                   base.x_axis.y * v.x + base.y_axis.y * v.y + base.normal.y * v.z,
+                   base.x_axis.z * v.x + base.y_axis.z * v.y + base.normal.z * v.z};
+  };
+  const auto offset = vector({face.value().origin.x, face.value().origin.y, face.value().origin.z});
+  face.value().origin = {base.origin.x + offset.x, base.origin.y + offset.y,
+                         base.origin.z + offset.z};
+  face.value().x_axis = vector(face.value().x_axis);
+  face.value().y_axis = vector(face.value().y_axis);
+  face.value().normal = vector(face.value().normal);
+  return face;
 }
 
 [[nodiscard]] Result<ResolvedWorkplane>

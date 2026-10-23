@@ -1,5 +1,6 @@
 #include "blcad/geometry/semantic_reference_evaluator.hpp"
 
+#include "blcad/core/rectangular_extrude_profile.hpp"
 #include "blcad/geometry/shape_cache.hpp"
 #include "blcad/geometry/workplane_resolver.hpp"
 
@@ -48,31 +49,23 @@ resolve_rectangular_additive_extrude_corners(const PartDocument& document, Featu
         feature->id().value(), "semantic reference source feature input sketch must exist"));
   }
 
-  if (sketch->rectangle_profiles().size() != 1U || !sketch->circle_profiles().empty() ||
-      !sketch->closed_profiles().empty()) {
-    return Result<RectangularExtrudeCorners>::failure(
-        validation_error(sketch->id().value(), "semantic edge and vertex evaluation requires a "
-                                               "source sketch with exactly one rectangle profile"));
-  }
-
-  const RectangleProfile& rectangle = sketch->rectangle_profiles().front();
-  const Parameter* width = document.find_parameter(rectangle.width_parameter());
-  const Parameter* height = document.find_parameter(rectangle.height_parameter());
+  auto rectangle = resolve_rectangular_extrude_profile(document, *feature);
+  if (!rectangle)
+    return Result<RectangularExtrudeCorners>::failure(rectangle.error());
   const Parameter* depth = document.find_parameter(feature->length_parameter());
-  if (width == nullptr || height == nullptr || depth == nullptr) {
-    return Result<RectangularExtrudeCorners>::failure(validation_error(
-        feature->id().value(), "semantic reference source feature parameters must exist"));
-  }
+  if (!depth)
+    return Result<RectangularExtrudeCorners>::failure(
+        validation_error(feature->id().value(), "extrusion depth parameter is missing"));
 
   const WorkplaneResolver resolver;
-  auto workplane = resolver.resolve(document, sketch->workplane());
+  auto workplane = resolver.resolve_for_sketch(document, *sketch);
   if (workplane.has_error()) {
     return Result<RectangularExtrudeCorners>::failure(workplane.error());
   }
 
-  const Point2 center = rectangle.center();
-  const double half_width = width->value().millimeters() / 2.0;
-  const double half_height = height->value().millimeters() / 2.0;
+  const Point2 center = rectangle.value().center;
+  const double half_width = rectangle.value().width / 2.0;
+  const double half_height = rectangle.value().height / 2.0;
   const double depth_mm = depth->value().millimeters();
 
   const Point3 bottom_front_right = resolver.evaluate_point(

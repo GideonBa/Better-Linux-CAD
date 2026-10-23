@@ -10,6 +10,7 @@
 #include "blcad/gui/shell/shell_window.hpp"
 
 #include <QAction>
+#include <QComboBox>
 #include <QDockWidget>
 #include <QEvent>
 #include <QFormLayout>
@@ -17,6 +18,7 @@
 #include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
+#include <QListWidget>
 #include <QMetaObject>
 #include <QMouseEvent>
 #include <QPainter>
@@ -242,6 +244,22 @@ ShellFeatureTools::ShellFeatureTools(ShellWindow& window, GuiDocumentSession& se
   ribbon.add_button(feature_group, action_extrude_);
   ribbon.add_button(feature_group, action_revolve_);
 
+  auto* finishing_group = ribbon.add_group(model_tab, QStringLiteral("Bearbeiten"));
+  for (const auto& [command, label, id] : {std::tuple{Command::Fillet, "Verrunden", "fillet"},
+                                           std::tuple{Command::Chamfer, "Fase", "chamfer"},
+                                           std::tuple{Command::Shell, "Aushöhlen", "shell"},
+                                           std::tuple{Command::Draft, "Formschräge", "draft"}}) {
+    auto* action = new QAction(QString::fromUtf8(label), this);
+    action->setObjectName(QStringLiteral("blcad.action.") + QString::fromUtf8(id));
+    connect(action, &QAction::triggered, this, [this, command] {
+      auto begun = begin_finishing(command);
+      if (!begun)
+        report(begun.error());
+    });
+    ribbon.add_small_button(finishing_group, action);
+    finishing_actions_.emplace_back(command, action);
+  }
+
   overlay_ = new ShellManipulatorOverlay(&viewport_, layer_);
   overlay_->setGeometry(viewport_.rect());
   viewport_.installEventFilter(this);
@@ -258,11 +276,15 @@ ShellFeatureTools::ShellFeatureTools(ShellWindow& window, GuiDocumentSession& se
   auto* form = new QFormLayout();
   numeric_editor_ = new QLineEdit(panel);
   numeric_editor_->setObjectName(QStringLiteral("blcad.manipulator_numeric_hud"));
-  form->addRow(QStringLiteral("Wert"), numeric_editor_);
+  value_label_ = new QLabel(QStringLiteral("Wert"), panel);
+  form->addRow(value_label_, numeric_editor_);
   column->addLayout(form);
+  build_finishing_controls(panel, *form);
   auto* buttons = new QHBoxLayout();
   apply_button_ = new QPushButton(QStringLiteral("Anwenden"), panel);
+  apply_button_->setObjectName(QStringLiteral("blcad.feature.apply"));
   cancel_button_ = new QPushButton(QStringLiteral("Abbrechen"), panel);
+  cancel_button_->setObjectName(QStringLiteral("blcad.feature.cancel"));
   buttons->addWidget(apply_button_);
   buttons->addWidget(cancel_button_);
   column->addLayout(buttons);
@@ -306,7 +328,7 @@ ShellFeatureTools::ShellFeatureTools(ShellWindow& window, GuiDocumentSession& se
 ShellFeatureTools::~ShellFeatureTools() = default;
 
 bool ShellFeatureTools::active() const noexcept {
-  return command_ != Command::None && coordinator_.active();
+  return command_ != Command::None && (finishing() || coordinator_.active());
 }
 
 bool ShellFeatureTools::select_profile(SketchId sketch, ProfileId profile) {
@@ -519,7 +541,7 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::set_numeric_text(const QString&
   if (!active())
     return Result<GuiPartFeaturePreview>::failure(
         Error::validation("gui.shell.feature", "kein aktiver Feature-Wert"));
-  const std::string_view unit = command_ == Command::Extrude ? "mm" : "deg";
+  const std::string_view unit = angular_value() ? "deg" : "mm";
   const auto value = parse_numeric(text, unit);
   if (!value.has_value()) {
     synchronize_numeric_editor(current_value());
@@ -529,6 +551,37 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::set_numeric_text(const QString&
   auto preview = set_numeric_value(*value);
   if (preview.has_error())
     synchronize_numeric_editor(current_value());
+  return preview;
+}
+
+Result<GuiPartFeaturePreview> ShellFeatureTools::set_secondary_numeric_text(const QString& text) {
+  if (command_ != Command::Chamfer || finishing_mode_->currentIndex() <= 0)
+    return Result<GuiPartFeaturePreview>::failure(
+        Error::validation("finishing", "kein zweites Fasenmaß aktiv"));
+  const bool angular = finishing_mode_->currentIndex() == 2;
+  auto value = parse_numeric(text, angular ? "deg" : "mm");
+  if (!value) {
+    secondary_numeric_editor_->setText(number_text(finishing_second_value_));
+    return Result<GuiPartFeaturePreview>::failure(
+        Error::validation("finishing", "zweites Maß oder Einheit ist ungültig"));
+  }
+  GuiViewportManipulatorCandidate candidate;
+  candidate.handle_id = std::string(angular ? kChamferAngleHandleId : kChamferDistance2HandleId);
+  candidate.value_kind =
+      angular ? GuiViewportManipulatorValueKind::Angle : GuiViewportManipulatorValueKind::Distance;
+  candidate.source = GuiViewportManipulatorInputSource::Numeric;
+  candidate.scalar_value = *value;
+  if (!layer_.active_handle_id().empty()) {
+    if (layer_.active_handle_id() != candidate.handle_id ||
+        !layer_.set_numeric_input(number_text(*value).toStdString() + (angular ? " deg" : " mm")) ||
+        !layer_.candidate())
+      return Result<GuiPartFeaturePreview>::failure(
+          Error::validation("finishing", "aktiver Manipulatorzug passt nicht zum zweiten Maß"));
+    candidate = *layer_.candidate();
+  }
+  auto preview = accept_manipulator_candidate(candidate);
+  finishing_second_value_ = coordinator_.finishing().second_value();
+  secondary_numeric_editor_->setText(number_text(finishing_second_value_));
   return preview;
 }
 
@@ -551,9 +604,22 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::set_numeric_value(double value)
           Error::validation("gui.shell.feature", "Drehwinkel muss zwischen 0 und 360 Grad liegen"));
     candidate.handle_id = std::string(kRevolveAngleHandleId);
     candidate.value_kind = GuiViewportManipulatorValueKind::Angle;
+  } else if (finishing()) {
+    const auto handles = command_ == Command::Fillet || command_ == Command::Chamfer
+                             ? coordinator_.finishing().handles()
+                             : coordinator_.shell_draft().handles();
+    if (handles.empty())
+      return Result<GuiPartFeaturePreview>::failure(
+          Error::validation("finishing", "zuerst gültige Eingaben und Elemente auswählen"));
+    candidate.handle_id = handles.front().id;
+    candidate.value_kind = angular_value() ? GuiViewportManipulatorValueKind::Angle
+                                           : GuiViewportManipulatorValueKind::Distance;
   }
   if (!layer_.active_handle_id().empty()) {
-    const std::string unit = command_ == Command::Extrude ? " mm" : " deg";
+    if (layer_.active_handle_id() != candidate.handle_id)
+      return Result<GuiPartFeaturePreview>::failure(
+          Error::validation(candidate.handle_id, "zuerst den aktiven Manipulatorzug abschließen"));
+    const std::string unit = angular_value() ? " deg" : " mm";
     if (!layer_.set_numeric_input(number_text(value).toStdString() + unit) ||
         !layer_.candidate().has_value())
       return Result<GuiPartFeaturePreview>::failure(
@@ -568,12 +634,20 @@ ShellFeatureTools::accept_manipulator_candidate(const GuiViewportManipulatorCand
   if (!active())
     return Result<GuiPartFeaturePreview>::failure(
         Error::validation("gui.shell.feature", "kein aktives interaktives Feature"));
-  const double previous_value = current_value();
+  const bool secondary =
+      command_ == Command::Chamfer && (candidate.handle_id == kChamferDistance2HandleId ||
+                                       candidate.handle_id == kChamferAngleHandleId);
+  const double previous_value =
+      secondary ? coordinator_.finishing().second_value() : current_value();
   if (!std::isfinite(candidate.scalar_value) || !coordinator_.on_candidate(candidate))
     return Result<GuiPartFeaturePreview>::failure(
         Error::validation(candidate.handle_id.empty() ? "gui.shell.feature" : candidate.handle_id,
                           "Manipulator-Kandidat passt nicht zum aktiven Feature"));
   synchronize_numeric_editor(current_value());
+  if (secondary) {
+    finishing_second_value_ = coordinator_.finishing().second_value();
+    secondary_numeric_editor_->setText(number_text(finishing_second_value_));
+  }
   auto preview = preview_and_publish();
   if (!preview.has_error())
     return preview;
@@ -592,6 +666,10 @@ ShellFeatureTools::accept_manipulator_candidate(const GuiViewportManipulatorCand
         "gültiger Manipulatorwert konnte nach Vorschaufehler nicht wiederhergestellt werden"));
   }
   synchronize_numeric_editor(current_value());
+  if (secondary) {
+    finishing_second_value_ = coordinator_.finishing().second_value();
+    secondary_numeric_editor_->setText(number_text(finishing_second_value_));
+  }
   auto restored = preview_and_publish();
   if (restored.has_error())
     report(restored.error());
@@ -600,7 +678,13 @@ ShellFeatureTools::accept_manipulator_candidate(const GuiViewportManipulatorCand
 
 Result<GuiPartFeaturePreview> ShellFeatureTools::preview_and_publish() {
   preview_valid_ = false;
-  auto preview = coordinator_.preview();
+  auto preview =
+      finishing() && finishing_targets_list_->selectedItems().empty()
+          ? Result<GuiPartFeaturePreview>::failure(Error::validation(
+                "gui.shell.finishing", command_ == Command::Fillet || command_ == Command::Chamfer
+                                           ? "Mindestens eine Kante auswählen."
+                                           : "Mindestens eine Fläche auswählen."))
+          : coordinator_.preview();
   if (preview.has_error()) {
     viewport_.clear_feature_preview();
     task_summary_->setText(QString::fromStdString(preview.error().message()));
@@ -608,9 +692,11 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::preview_and_publish() {
     synchronize_overlay();
     return preview;
   }
-  auto shape = command_ == Command::Extrude
-                   ? coordinator_.extrude().preview_shape(session_)
-                   : coordinator_.revolve().preview_shape(session_);
+  auto shape = command_ == Command::Extrude   ? coordinator_.extrude().preview_shape(session_)
+               : command_ == Command::Revolve ? coordinator_.revolve().preview_shape(session_)
+               : command_ == Command::Fillet || command_ == Command::Chamfer
+                   ? coordinator_.finishing().preview_shape(session_)
+                   : coordinator_.shell_draft().preview_shape(session_);
   if (shape.has_error()) {
     viewport_.clear_feature_preview();
     task_summary_->setText(QString::fromStdString(shape.error().message()));
@@ -618,7 +704,12 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::preview_and_publish() {
     synchronize_overlay();
     return Result<GuiPartFeaturePreview>::failure(shape.error());
   }
-  auto published = viewport_.set_feature_preview(std::move(shape.value()));
+  auto published = viewport_.set_feature_preview(
+      std::move(shape.value()),
+      finishing()
+          ? std::optional<std::string>{"body/" +
+                                       finishing_body_->currentData().toString().toStdString()}
+          : std::nullopt);
   if (published.has_error()) {
     viewport_.clear_feature_preview();
     task_summary_->setText(QString::fromStdString(published.error().message()));
@@ -626,13 +717,14 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::preview_and_publish() {
     synchronize_overlay();
     return Result<GuiPartFeaturePreview>::failure(published.error());
   }
-  task_summary_->setText(QStringLiteral("%1\n%2 betroffene Recompute-Schritte")
-                             .arg(QString::fromStdString(preview.value().semantic_summary))
-                             .arg(preview.value().affected_nodes));
+  task_summary_->setText(finishing() ? finishing_summary()
+                                     : QString::fromStdString(preview.value().semantic_summary));
   preview_valid_ = true;
   refresh_enablement();
   window_.statusBar()->showMessage(
-      QStringLiteral("Vorschau: %1").arg(QString::fromStdString(preview.value().semantic_summary)));
+      QStringLiteral("Vorschau: %1")
+          .arg(finishing() ? finishing_summary()
+                           : QString::fromStdString(preview.value().semantic_summary)));
   synchronize_overlay();
   return preview;
 }
@@ -644,8 +736,7 @@ Result<std::size_t> ShellFeatureTools::apply() {
   if (!layer_.active_handle_id().empty())
     return Result<std::size_t>::failure(Error::validation(
         "gui.shell.feature", "aktiven Manipulatorzug vor dem Anwenden abschließen"));
-  const std::string_view expected_command =
-      command_ == Command::Extrude ? "part.extrude" : "part.revolve";
+  const std::string_view expected_command = command_id();
   if (session_.task().stage() != GuiTaskStage::Preview ||
       session_.task().command_id() != expected_command) {
     return Result<std::size_t>::failure(Error::validation(
@@ -666,7 +757,13 @@ Result<std::size_t> ShellFeatureTools::apply() {
   const bool task_applied = session_.task().apply();
   if (!task_applied && session_.task().active())
     (void)session_.task().cancel();
+  const bool was_finishing = finishing();
   command_ = Command::None;
+  if (was_finishing) {
+    finishing_targets_.clear();
+    viewport_.set_selection_filter_mask(previous_selection_mask_);
+    window_.refresh_feature_selection_scene();
+  }
   preview_valid_ = false;
   drag_start_value_.reset();
   selected_profile_.reset();
@@ -689,7 +786,13 @@ void ShellFeatureTools::cancel() noexcept {
   drag_start_value_.reset();
   if (command_ != Command::None && session_.task().active())
     (void)session_.task().cancel();
+  const bool was_finishing = finishing();
   command_ = Command::None;
+  if (was_finishing) {
+    finishing_targets_.clear();
+    viewport_.set_selection_filter_mask(previous_selection_mask_);
+    window_.refresh_feature_selection_scene();
+  }
   preview_valid_ = false;
   hide_task_panel();
   synchronize_overlay();
@@ -717,12 +820,25 @@ void ShellFeatureTools::refresh_enablement() {
     revolve_available = !plane.has_error() && !default_revolve_axis(plane.value()).has_error();
   }
   action_revolve_->setEnabled(revolve_available);
+  for (const auto& [command, action] : finishing_actions_) {
+    bool available = false;
+    if (idle_part && session_.part_shape_cache())
+      for (const auto& body : session_.part_document()->bodies()) {
+        const auto role = command == Command::Fillet    ? PartFeatureInputRole::FilletEdge
+                          : command == Command::Chamfer ? PartFeatureInputRole::ChamferEdge
+                          : command == Command::Shell   ? PartFeatureInputRole::ShellRemovalFace
+                                                        : PartFeatureInputRole::DraftFace;
+        auto targets = geometry::FinishingSelectionBuilder::build(
+            *session_.part_document(), *session_.part_shape_cache(), body.id(), role);
+        if (targets && !targets.value().empty()) {
+          available = true;
+          break;
+        }
+      }
+    action->setEnabled(available);
+  }
   action_escape_->setEnabled(active());
-  const std::string_view expected_command =
-      command_ == Command::Extrude
-          ? std::string_view("part.extrude")
-          : command_ == Command::Revolve ? std::string_view("part.revolve")
-                                         : std::string_view{};
+  const std::string_view expected_command = command_id();
   const bool task_ready = session_.task().stage() == GuiTaskStage::Preview &&
                           session_.task().command_id() == expected_command;
   apply_button_->setEnabled(active() && preview_valid_ && task_ready);
@@ -734,6 +850,13 @@ double ShellFeatureTools::current_value() const noexcept {
     return coordinator_.extrude().distance();
   if (command_ == Command::Revolve)
     return coordinator_.revolve().angle();
+  if (command_ == Command::Fillet || command_ == Command::Chamfer)
+    return coordinator_.finishing().active() ? coordinator_.finishing().first_value()
+                                             : finishing_first_value_;
+  if (command_ == Command::Shell)
+    return coordinator_.shell_draft().thickness();
+  if (command_ == Command::Draft)
+    return coordinator_.shell_draft().angle();
   return 0.0;
 }
 
@@ -777,7 +900,14 @@ void ShellFeatureTools::restore_drag_start_value() {
     return;
   const double value = *drag_start_value_;
   drag_start_value_.reset();
-  const auto restored = set_numeric_value(value);
+  GuiViewportManipulatorCandidate candidate;
+  candidate.handle_id = drag_start_handle_;
+  candidate.value_kind = angular_value() || drag_start_handle_ == kChamferAngleHandleId
+                             ? GuiViewportManipulatorValueKind::Angle
+                             : GuiViewportManipulatorValueKind::Distance;
+  candidate.source = GuiViewportManipulatorInputSource::Numeric;
+  candidate.scalar_value = value;
+  const auto restored = accept_manipulator_candidate(candidate);
   if (restored.has_error())
     report(restored.error());
 }
@@ -797,7 +927,14 @@ void ShellFeatureTools::handle_escape() {
 }
 
 void ShellFeatureTools::show_task_panel(QString title, QString unit, double value) {
+  finishing_controls_->setVisible(finishing());
   task_dock_->setWindowTitle(std::move(title));
+  const QString label = command_ == Command::Fillet    ? QStringLiteral("Radius")
+                        : command_ == Command::Chamfer ? QStringLiteral("Abstand")
+                        : command_ == Command::Shell   ? QStringLiteral("Wandstärke")
+                        : angular_value()              ? QStringLiteral("Winkel")
+                                                       : QStringLiteral("Tiefe");
+  value_label_->setText(label + QStringLiteral(" (") + unit + QStringLiteral(")"));
   numeric_editor_->setPlaceholderText(std::move(unit));
   synchronize_numeric_editor(value);
   task_dock_->show();
@@ -832,7 +969,12 @@ bool ShellFeatureTools::eventFilter(QObject* watched, QEvent* event) {
       if (mouse->button() == Qt::LeftButton) {
         (void)update_mapping();
         if (layer_.begin_drag({mouse->position().x(), mouse->position().y()})) {
-          drag_start_value_ = current_value();
+          drag_start_handle_ = std::string(layer_.active_handle_id());
+          drag_start_value_ =
+              command_ == Command::Chamfer && (drag_start_handle_ == kChamferDistance2HandleId ||
+                                               drag_start_handle_ == kChamferAngleHandleId)
+                  ? coordinator_.finishing().second_value()
+                  : current_value();
           viewport_.grabMouse();
           synchronize_overlay();
           return true;

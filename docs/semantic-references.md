@@ -75,6 +75,13 @@ semantic face token
   -> shared numeric solver/DOF path
 ```
 
+Rectangular distance extrusions share the Core `resolve_rectangular_extrude_profile` authority for
+parameter-backed rectangles and axis-aligned four-line closed contours. Generated edges, vertices
+and face workplanes use the source Sketch frame, including its origin override. The finishing
+picker resolves each role against the current Body and offers only unique subshape matches; its
+transient viewport ids do not become a second persistence format. General topology naming remains
+outside this bounded producer contract.
+
 ## Generated-axis family
 
 Canonical detail: `docs/assembly-semantic-axis-concentric-residuals-mvp5.md`.

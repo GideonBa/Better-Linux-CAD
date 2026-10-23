@@ -179,6 +179,7 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/construction_line_resolver.cpp
     src/geometry/construction_point_resolver.cpp
     src/geometry/dimension_driven_profile_resolver.cpp
+    src/geometry/finishing_selection.cpp
     src/geometry/fillet_adapter.cpp
     src/geometry/geometry_measure.cpp
     src/geometry/chamfer_adapter.cpp
@@ -297,6 +298,7 @@ if(BLCAD_BUILD_GUI)
     src/gui/gui_task_state.cpp
     src/gui/occt_viewport.cpp
     src/gui/shell/shell_feature_tools.cpp
+    src/gui/shell/shell_finishing_tools.cpp
     src/gui/shell/shell_origin.cpp
     src/gui/shell/shell_ribbon.cpp
     src/gui/shell/shell_sketch_tools.cpp
@@ -534,6 +536,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/draft_feature_pipeline_tests.cpp
       tests/geometry/right_workplane_pipeline_tests.cpp
       tests/geometry/semantic_reference_evaluator_tests.cpp
+      tests/geometry/finishing_selection_tests.cpp
       tests/geometry/shape_cache_tests.cpp
       tests/geometry/sketch_3d_geometry_adapter_tests.cpp
       tests/geometry/sketch_reference_projector_tests.cpp
@@ -572,6 +575,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_sketch_conic_workflow_tests.cpp
       tests/gui/gui_shell_dimension_workflow_tests.cpp
       tests/gui/gui_shell_feature_tools_tests.cpp
+      tests/gui/gui_shell_finishing_tools_tests.cpp
       tests/gui/gui_shell_window_tests.cpp
       tests/gui/gui_shell_sketch_tools_tests.cpp
       tests/gui/gui_shell_sketch_operations_tests.cpp

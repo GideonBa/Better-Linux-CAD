@@ -69,8 +69,11 @@ public:
   // Publish a disposable feature result above the persistent document scene.
   // Preview geometry is deliberately not selectable and never replaces the
   // authoritative scene or selection model.
-  [[nodiscard]] Result<std::size_t> set_feature_preview(geometry::GeometryShape shape);
+  [[nodiscard]] Result<std::size_t>
+  set_feature_preview(geometry::GeometryShape shape,
+                      std::optional<std::string> replaced_body = std::nullopt);
   void clear_feature_preview();
+  [[nodiscard]] bool feature_preview_replaces(std::string_view semantic_id) const noexcept;
   void clear_scene();
   void set_display_mode(GuiViewportDisplayMode mode);
   void set_projection(GuiViewportProjection projection);

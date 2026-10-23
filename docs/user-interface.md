@@ -430,3 +430,16 @@ No widget may implement substitute constraint mathematics. Sketch and modeling i
 transient picks to explicit semantic capabilities and public Core/application commands, use existing
 solver/Geometry authorities for disposable candidates, and commit through the validated document
 transaction/history boundary.
+
+## Solid finishing in the replacement shell
+
+The 3D-Modell **Bearbeiten** group provides **Verrunden**, **Fase**, **Aushöhlen** and **Formschräge**.
+Choose the Body in the Feature panel and select edges or faces in the model or target list. Multiple
+picks toggle independently. Only unambiguous current-body semantic targets are offered; an empty
+selection disables Apply. The numeric value and viewport handle edit the same live geometry preview.
+Fase exposes its three modes and a second distance/angle when needed; Aushöhlen chooses inward or
+outward; Formschräge chooses a datum pull axis and neutral plane. Cancel/Escape leaves the model
+unchanged, while Apply creates one undo entry including its new driving parameters.
+
+This first Block-136 slice supports stable box roles from axis-aligned Sketch rectangles. The
+remaining feature ribbon families and browser feature editing remain in the plan.

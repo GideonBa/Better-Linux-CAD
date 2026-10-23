@@ -68,6 +68,7 @@ public:
   // Command enablement plus revision-gated presentation refresh (browser and
   // viewport rebuild only when session().presentation_revision() moved).
   void refresh();
+  void refresh_feature_selection_scene();
 
 protected:
   void closeEvent(QCloseEvent* event) override;
