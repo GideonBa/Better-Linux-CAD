@@ -185,3 +185,23 @@ mapping, translate/rotate triad construction, PatternCount quantization, and vis
 
 Block 124 consumes this infrastructure for interactive Extrude, path Extrude, and Revolve authoring.
 Block 123 itself does not create feature previews or commit feature parameters.
+
+## Replacement-shell construction consumer — 2026-10-23
+
+`ShellConstructionTools` owns a separate layer and transparent overlay, with World XYZ position,
+World-axis direction/frame rotation and positive new-offset handles. Axis labels and separated ring
+radii keep three-axis controls identifiable. The owner freezes full-precision pre-drag vectors,
+consumes candidates into existing task fields and runs the existing disposable construction preview;
+only Apply commits. Relative rotations preserve both plane axes together. Numeric override, exact
+final release, drag-only Escape, focus/camera cancellation and command expiry use the same layer
+contracts, without granting it document authority. Reference-defined objects and existing shared
+parameter bindings retain their established reference/read-only controls.
+
+The render notification also occurs on preview redraw. This consumer compares camera and viewport
+size before aborting a drag, keeping ordinary redraws from resetting a live interaction. Native
+mapping continues to use the actual viewport ray/projection providers. Without a native viewer,
+restoring a bookmark now retains its camera values and notifies consumers instead of discarding the
+eye/target/scale used by the headless mapping.
+
+Contract/proof: `docs/gui-sketch-workbench-mvp7.md`, `[shell-construction-manipulators]`,
+`[shell-combined-manipulators]` and `[construction-manipulator-camera]`.

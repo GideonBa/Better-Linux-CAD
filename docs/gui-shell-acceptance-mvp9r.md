@@ -39,18 +39,19 @@ source, hide a missing tag behind OR and claim completion with gaps. They must a
 
 The machine-readable details live in `families[].shell.gaps`; this is the execution order:
 
-1. Complete construction position/direction/offset manipulators. Fourteen creation/edit modes
-   including generated-reference and parallel-through-point definitions, native role-based source
-   collection, downstream recompute previews, resolved helper presentation and Sketch entry are restored;
-   the exact implemented boundary lives in `docs/gui-sketch-workbench-mvp7.md`.
-2. Restore explicit broken-reference repair and Sketch3D authoring/editing.
-3. Restore standalone parameter management, dedicated Hole authoring and audit advanced extent
+1. Restore explicit broken-reference repair and Sketch3D authoring/editing.
+2. Restore standalone parameter management, dedicated Hole authoring and audit advanced extent
    editors against the foundation API.
-4. Restore contextual commands, selection-filter UI, view cube, view bookmarks and repeat command.
-5. Restore the supported hierarchy validation, cross-hierarchy relationship/joint/solve controls,
+3. Restore contextual commands, selection-filter UI, view cube, view bookmarks and repeat command.
+4. Restore the supported hierarchy validation, cross-hierarchy relationship/joint/solve controls,
    sampled Revolute analysis and occurrence-linked result highlighting.
-6. Finish integrated Part and Assembly acceptance using actual ShellWindow input paths, disposable
+5. Finish integrated Part and Assembly acceptance using actual ShellWindow input paths, disposable
    previews, invalid-input rejection, history, canonical save/load and native presentation.
+
+The datum family's fourteen creation/edit modes, native role-based reference collection and explicit
+position/direction/frame/new-offset grips now have a restored bounded surface. Reference-driven
+objects and shared parameter bindings keep their existing authority; the exact supported boundary
+lives in `docs/gui-sketch-workbench-mvp7.md`.
 
 Current finishing/pattern, Body, spatial, Surface, Measure, Assembly, Feature Edit and STEP/analysis
 slices retain their individual documented bounds. The new Part Sketch/Extrude/STEP regression and
@@ -66,7 +67,7 @@ QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][gui-fea
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests
 ./build/dev-gui/blcad_core_tests
 ./build/dev-gui/blcad_geometry_tests
-QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-construction-picking],[shell-mixed-path-loft],[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-construction-manipulators],[block136-construction-picking],[shell-mixed-path-loft],[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
 ```
 
 The regular inventory audit passes while it accurately records unfinished work. For closure,
@@ -294,3 +295,36 @@ errors. The explicit closure gate correctly rejects unfinished acceptance (one o
 130 assertions). Coverage inventory now includes the exact proof tag/source and role widget.
 Construction position/direction/offset manipulators remain next. The datum family stays partial,
 Block 136 remains in progress, and the subsequent acceptance sequence above is unchanged.
+
+## Construction manipulator verification — 2026-10-23
+
+The construction task adds XYZ position arrows, direction/frame rotation rings and a positive
+new-offset arrow using the shared candidate-only layer. Explicit plane rotation preserves both axes
+at full precision. Reference-driven definitions keep their picks; shared/expression offset bindings
+stay read-only unless a new candidate parameter is chosen. Separated, labeled rings keep world axes
+selectable. Numeric override, exact final release, two-level Escape, focus/camera rollback and command
+expiry retain existing preview/Apply/history authority. Preview redraws do not abort the frozen drag.
+
+Seven new construction cases cover explicit authoring, composed rotations and precision across edits,
+offset bindings, drag rollback, final mouse sample, dependent degeneracy/recovery and task expiry.
+An additional viewport regression retains restored camera values without a native viewer. The eighth
+combined UI workflow creates a rotated workplane, authors Sketch/Extrude, moves the same plane with a
+downstream solid preview, exercises exact history/canonical reopen and exports STEP. All nine cases
+execute on both backends; no new native-only skips are introduced. Native tests retain the fitted
+OCCT zoom factor, while headless tests restore a useful model span for their mapping.
+
+| Suite | Cases | Assertions | Result |
+| --- | ---: | ---: | --- |
+| Focused offscreen manipulators/camera/combined | 9 | 897 | All passed |
+| Full Core | 519 | 15,311 | All passed |
+| Full Geometry | 436 | 29,779 | All passed |
+| Full offscreen GUI | 342 | 22,945 | 327 passed; 15 native-only skips |
+| Combined native shell | 158 | 17,788 | All passed; no skips |
+
+Native rotation-grip and downstream-solid captures were inspected at 1280×800. Task controls and
+Apply/Cancel remain reachable. The separate startup smoke reached the intentional six-second timeout
+(124). Native logs contain the existing incomplete-visual depth/stencil warning, with no high-severity
+or drawable-lifecycle errors. The explicit closure gate correctly refuses unfinished acceptance (one
+of three cases, 133 assertions). Nine families now have restored bounded surfaces; nine retain gaps.
+The datum family is restored within its documented definition/parameter boundaries. Block 136 remains
+in progress; explicit broken-reference repair is next, followed by Sketch3D and the remaining sequence.

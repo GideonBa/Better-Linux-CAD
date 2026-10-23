@@ -1340,3 +1340,320 @@ TEST_CASE("Construction source detection excludes hidden Bodies and explicit coo
   REQUIRE(window.viewport().select_semantic(target));
   window.construction_tools().cancel();
 }
+
+namespace {
+void prepare_grips(ShellWindow& window) {
+  window.resize(1280, 800);
+  window.show();
+  qApp->processEvents();
+  REQUIRE(window.new_part("Konstruktionsgriffe"));
+  window.viewport().set_projection(GuiViewportProjection::Orthographic);
+  window.viewport().set_standard_view(GuiStandardView::Isometric);
+  auto camera = window.viewport().camera_bookmark();
+  camera.eye = {150, 150, 150};
+  camera.target = {0, 0, 0};
+  if (QApplication::platformName() != "xcb")
+    camera.scale = 200; // Headless model span; native keeps its fitted OCCT zoom factor.
+  REQUIRE(window.viewport().restore_camera_bookmark(camera));
+  if (QApplication::platformName() == "xcb")
+    REQUIRE(window.viewport().native_viewer_available());
+}
+void grip_mouse(ShellWindow& window, QEvent::Type type, GuiSketchScreenPoint p) {
+  auto& viewport = window.viewport();
+  const QPointF local(p.x, p.y);
+  QMouseEvent event(type, local, viewport.mapToGlobal(local.toPoint()),
+                    type == QEvent::MouseMove ? Qt::NoButton : Qt::LeftButton,
+                    type == QEvent::MouseButtonRelease ? Qt::NoButton : Qt::LeftButton,
+                    Qt::NoModifier);
+  QApplication::sendEvent(&viewport, &event);
+  qApp->processEvents();
+}
+GuiSketchScreenPoint press_grip(ShellWindow& window, const std::string& id) {
+  window.construction_tools().refresh_presentation();
+  qApp->processEvents();
+  const auto presentations = window.construction_tools().manipulators().presentations();
+  const auto found = std::find_if(presentations.begin(), presentations.end(),
+                                  [&](const auto& p) { return p.handle_id == id; });
+  INFO(id);
+  REQUIRE(found != presentations.end());
+  const auto p = found->endpoint;
+  REQUIRE(window.viewport().rect().contains(QPoint(qRound(p.x), qRound(p.y))));
+  grip_mouse(window, QEvent::MouseButtonPress, p);
+  REQUIRE(window.construction_tools().manipulators().active_handle_id() == id);
+  return p;
+}
+void type_grip(ShellWindow& window, const QString& text) {
+  auto& input = control<QLineEdit>(window, "grip_numeric");
+  REQUIRE_FALSE(input.isReadOnly());
+  input.selectAll();
+  QKeyEvent key(QEvent::KeyPress, 0, Qt::NoModifier, text);
+  QApplication::sendEvent(&input, &key);
+  qApp->processEvents();
+}
+void numeric_grip(ShellWindow& window, const std::string& id, const QString& text) {
+  const auto start = press_grip(window, id);
+  type_grip(window, text);
+  REQUIRE(window.construction_tools().manipulators().numeric_override_active());
+  // Later motion and the exact final release cannot replace a typed override.
+  grip_mouse(window, QEvent::MouseMove, {start.x + 11, start.y + 7});
+  grip_mouse(window, QEvent::MouseButtonRelease, {start.x + 19, start.y + 13});
+  CHECK(window.construction_tools().manipulators().active_handle_id().empty());
+  CHECK(window.viewport().mouseGrabber() != &window.viewport());
+}
+void grip_escape(ShellWindow& window) {
+  QKeyEvent key(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier);
+  QApplication::sendEvent(&control<QLineEdit>(window, "grip_numeric"), &key);
+}
+} // namespace
+
+TEST_CASE("Construction XYZ grips author explicit geometry without publishing drag history",
+          "[gui][block136-construction-manipulators][shell-construction-manipulators]") {
+  for (auto kind : {Kind::Point, Kind::Line, Kind::Axis, Kind::Plane}) {
+    CAPTURE(static_cast<int>(kind));
+    ShellWindow window;
+    prepare_grips(window);
+    const auto before = snapshot(window);
+    begin(window, kind);
+    REQUIRE(window.construction_tools().manipulators().handles().size() == 3);
+    numeric_grip(window, "construction.position.x", "12.5 mm");
+    numeric_grip(window, "construction.position.y", "-7.25 mm");
+    numeric_grip(window, "construction.position.z", "8 mm");
+    CHECK(snapshot(window) == before);
+    CHECK_FALSE(window.session().can_undo());
+    REQUIRE(window.viewport().feature_preview_active());
+    apply(window);
+    const auto& part = *window.session().part_document();
+    const Point3 expected{12.5, -7.25, 8};
+    if (kind == Kind::Point)
+      CHECK(part.construction_points().back().position() == expected);
+    if (kind == Kind::Line)
+      CHECK(part.construction_lines().back().point() == expected);
+    if (kind == Kind::Axis)
+      CHECK(part.datum_axes().back().origin() == expected);
+    if (kind == Kind::Plane)
+      CHECK(part.construction_planes().back().origin() == expected);
+    const auto after = snapshot(window);
+    REQUIRE(window.undo());
+    CHECK(snapshot(window) == before);
+    REQUIRE(window.redo());
+    CHECK(snapshot(window) == after);
+    CHECK(window.construction_tools().manipulators().handles().empty());
+  }
+}
+
+TEST_CASE(
+    "Construction rotation grips retain precise orthonormal frames and semantic edit identity",
+    "[gui][block136-construction-manipulators][shell-construction-manipulators]") {
+  for (auto kind : {Kind::Line, Kind::Axis, Kind::Plane}) {
+    ShellWindow window;
+    prepare_grips(window);
+    begin(window, kind);
+    control<QComboBox>(window, "manipulation").setCurrentIndex(1);
+    numeric_grip(window, "construction.rotation.z", "31.23456789 deg");
+    numeric_grip(window, "construction.rotation.y", "17.65432109 deg");
+    const auto captures = qEnvironmentVariable("BLCAD_UI_CAPTURE_DIR");
+    if (!captures.isEmpty()) {
+      REQUIRE(QDir().mkpath(captures));
+      CHECK(window.grab().save(QDir(captures).filePath("construction-rotation-grips.png")));
+    }
+    apply(window);
+    const double z = 31.23456789 * std::acos(-1) / 180;
+    const double y = 17.65432109 * std::acos(-1) / 180;
+    const Vector3 expected{std::cos(y) * std::cos(z), std::sin(z), -std::sin(y) * std::cos(z)};
+    const auto& part = *window.session().part_document();
+    const auto direction = kind == Kind::Line   ? part.construction_lines().back().direction()
+                           : kind == Kind::Axis ? part.datum_axes().back().direction()
+                                                : part.construction_planes().back().x_axis();
+    CHECK(direction.x == Approx(expected.x).margin(1e-12));
+    CHECK(direction.y == Approx(expected.y).margin(1e-12));
+    CHECK(direction.z == Approx(expected.z).margin(1e-12));
+    std::string id;
+    if (kind == Kind::Plane) {
+      const auto& plane = part.construction_planes().back();
+      CHECK(dot(plane.x_axis(), plane.y_axis()) == Approx(0).margin(1e-12));
+      CHECK(length(plane.normal()) == Approx(1).margin(1e-12));
+      CHECK(plane.y_axis().z == Approx(std::sin(y) * std::sin(z)).margin(1e-12));
+      id = plane.id().value();
+    } else
+      id = kind == Kind::Line ? part.construction_lines().back().id().value()
+                              : part.datum_axes().back().id().value();
+    const auto created = snapshot(window);
+    edit_tree(window, id);
+    // Renaming must not round the rotated frame through the six-decimal fields.
+    control<QLineEdit>(window, "name").setText("Gedreht");
+    apply(window);
+    const auto edited = snapshot(window);
+    REQUIRE(window.undo());
+    CHECK(snapshot(window) == created);
+    REQUIRE(window.redo());
+    CHECK(snapshot(window) == edited);
+    QTemporaryDir directory;
+    REQUIRE(window.save_to(directory.filePath("rotated.blcad.json")));
+    REQUIRE(window.open_path(directory.filePath("rotated.blcad.json")));
+    CHECK(snapshot(window) == edited);
+  }
+}
+
+TEST_CASE(
+    "Construction offset grip follows its source normal and respects shared parameter bindings",
+    "[gui][block136-construction-manipulators][shell-construction-manipulators]") {
+  ShellWindow window;
+  prepare_grips(window);
+  const auto before = snapshot(window);
+  begin(window, Kind::OffsetPlane);
+  select(control<QComboBox>(window, "plane"), "datum.yz");
+  numeric_grip(window, "construction.offset", "25.123456789 mm");
+  CHECK(snapshot(window) == before);
+  CHECK(window.session().part_document()->parameter_count() == 0);
+  apply(window);
+  const auto& part = *window.session().part_document();
+  const auto plane = part.construction_planes().back().id();
+  const auto parameter = part.construction_planes().back().relation()->offset_parameter();
+  CHECK(part.find_parameter(parameter)->value().millimeters() ==
+        Approx(25.123456789).margin(1e-12));
+  CHECK(
+      checked(geometry::WorkplaneResolver{}.resolve(part, DatumPlaneId(plane.value()))).origin.x ==
+      Approx(25.123456789).margin(1e-12));
+  const auto created = snapshot(window);
+  edit_tree(window, plane.value());
+  CHECK(window.construction_tools().manipulators().handles().empty());
+  CHECK(control<QComboBox>(window, "manipulation").isHidden());
+  CHECK_FALSE(control<QDoubleSpinBox>(window, "offset").isEnabled());
+  select(control<QComboBox>(window, "parameter"), "");
+  numeric_grip(window, "construction.offset", "32 mm");
+  apply(window);
+  CHECK(window.session().part_document()->find_parameter(parameter)->value().millimeters() ==
+        Approx(25.123456789).margin(1e-12));
+  const auto edited = snapshot(window);
+  REQUIRE(window.undo());
+  CHECK(snapshot(window) == created);
+  REQUIRE(window.undo());
+  CHECK(snapshot(window) == before);
+  REQUIRE(window.redo());
+  REQUIRE(window.redo());
+  CHECK(snapshot(window) == edited);
+}
+
+TEST_CASE(
+    "Construction grips cancel drags on Escape focus loss camera changes or invalid numeric text",
+    "[gui][block136-construction-manipulators][shell-construction-manipulators]") {
+  ShellWindow window;
+  prepare_grips(window);
+  begin(window, Kind::Line);
+  origin(window, {3, 4, 5});
+  control<QDoubleSpinBox>(window, "direction.x").setValue(2);
+  const auto before = snapshot(window);
+  const auto start = press_grip(window, "construction.position.x");
+  type_grip(window, "23 mm");
+  REQUIRE(control<QDoubleSpinBox>(window, "origin.x").value() == 23);
+  SECTION("Escape backs out the drag before the task") {
+    grip_escape(window);
+  }
+  SECTION("focus loss") {
+    QEvent event(QEvent::WindowDeactivate);
+    QApplication::sendEvent(&window, &event);
+  }
+  SECTION("camera change") {
+    auto camera = window.viewport().camera_bookmark();
+    camera.scale *= 1.2;
+    REQUIRE(window.viewport().restore_camera_bookmark(camera));
+  }
+  SECTION("invalid unit blocks Apply and release restores the start") {
+    type_grip(window, "9 deg");
+    CHECK_FALSE(control<QPushButton>(window, "apply").isEnabled());
+    CHECK_FALSE(window.construction_tools().apply());
+    grip_mouse(window, QEvent::MouseButtonRelease, start);
+  }
+  CHECK(window.construction_tools().active());
+  CHECK(window.construction_tools().manipulators().active_handle_id().empty());
+  CHECK(control<QDoubleSpinBox>(window, "origin.x").value() == 3);
+  CHECK(control<QDoubleSpinBox>(window, "direction.x").value() == 2);
+  CHECK(snapshot(window) == before);
+  CHECK(window.viewport().mouseGrabber() != &window.viewport());
+  grip_escape(window);
+  CHECK_FALSE(window.construction_tools().active());
+}
+
+TEST_CASE("Construction position drag consumes an otherwise unseen final mouse sample",
+          "[gui][block136-construction-manipulators][shell-construction-manipulators]") {
+  ShellWindow window;
+  prepare_grips(window);
+  begin(window, Kind::Point);
+  const auto start = press_grip(window, "construction.position.x");
+  const auto a = checked(window.viewport().model_to_screen({0, 0, 0}));
+  const auto b = checked(window.viewport().model_to_screen({20, 0, 0}));
+  grip_mouse(window, QEvent::MouseButtonRelease, {start.x + b.x - a.x, start.y + b.y - a.y});
+  CHECK(control<QDoubleSpinBox>(window, "origin.x").value() == Approx(20).margin(.5));
+  apply(window);
+  CHECK(window.session().part_document()->construction_points().back().position().x ==
+        Approx(20).margin(.5)); // Native pointer conversion is pixel-quantized.
+}
+
+TEST_CASE("Construction grip edits reject degenerate dependent geometry and recover without "
+          "changing identity",
+          "[gui][block136-construction-manipulators][shell-construction-manipulators]") {
+  ShellWindow window;
+  prepare_grips(window);
+  const auto a = point(window, {0, 0, 0});
+  const auto b = point(window, {10, 0, 0});
+  begin(window, Kind::LineThroughPoints);
+  select(control<QComboBox>(window, "point1"), a);
+  select(control<QComboBox>(window, "point2"), b);
+  apply(window);
+  const auto line = window.session().part_document()->construction_lines().back().id();
+  const auto before = snapshot(window);
+  edit_tree(window, b);
+  numeric_grip(window, "construction.position.x", "0 mm");
+  CHECK_FALSE(control<QPushButton>(window, "apply").isEnabled());
+  CHECK_FALSE(window.viewport().feature_preview_active());
+  CHECK_FALSE(window.construction_tools().apply());
+  CHECK(snapshot(window) == before);
+  control<QDoubleSpinBox>(window, "origin.x").setValue(12);
+  REQUIRE(window.viewport().feature_preview_active());
+  apply(window);
+  CHECK(window.session()
+            .part_document()
+            ->find_construction_point(ConstructionPointId(b))
+            ->position() == Point3{12, 0, 0});
+  CHECK(
+      checked(geometry::ConstructionLineResolver{}.resolve(*window.session().part_document(), line))
+          .direction == Vector3{1, 0, 0});
+  REQUIRE(window.undo());
+  CHECK(snapshot(window) == before);
+}
+
+TEST_CASE("Construction drag expiry releases mouse capture and preserves only committed intent",
+          "[gui][block136-construction-manipulators][shell-construction-manipulators]") {
+  ShellWindow window;
+  prepare_grips(window);
+  point(window, {2, 3, 4});
+  QTemporaryDir directory;
+  const auto path = directory.filePath("committed.blcad.json");
+  REQUIRE(window.save_to(path));
+  const auto before = snapshot(window);
+  begin(window, Kind::Point);
+  press_grip(window, "construction.position.x");
+  type_grip(window, "23 mm");
+  SECTION("Save expires a candidate drag") {
+    REQUIRE(window.save_to(path));
+    CHECK(snapshot(window) == before);
+    REQUIRE(window.open_path(path));
+    CHECK(snapshot(window) == before);
+  }
+  SECTION("document switch") {
+    REQUIRE(window.new_project("Assembly"));
+  }
+  SECTION("Undo changes revision") {
+    REQUIRE(window.undo());
+  }
+  SECTION("dock close") {
+    auto* dock = window.findChild<QDockWidget*>("blcad.shell.construction_task");
+    REQUIRE(dock);
+    dock->close();
+    CHECK(snapshot(window) == before);
+  }
+  CHECK_FALSE(window.construction_tools().active());
+  CHECK(window.construction_tools().manipulators().handles().empty());
+  CHECK_FALSE(window.viewport().feature_preview_active());
+  CHECK(window.viewport().mouseGrabber() != &window.viewport());
+}

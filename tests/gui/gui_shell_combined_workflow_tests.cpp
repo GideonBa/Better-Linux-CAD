@@ -1147,3 +1147,82 @@ TEST_CASE("Combined UI semantic construction chain updates downstream bodies and
   CHECK(ui.snapshot() == before_export);
   ui.idle();
 }
+
+TEST_CASE("Combined UI construction grips rotate a workplane and move its downstream solid",
+          "[gui][integration][shell-combined-workflow][shell-combined-manipulators]") {
+  WorkflowUi ui;
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  ui.new_document("Construction grips workflow");
+  const auto drag = [&](const std::string& id, const QString& value) {
+    INFO(id);
+    ui.window.construction_tools().refresh_presentation();
+    const auto handles = ui.window.construction_tools().manipulators().presentations();
+    const auto found = std::find_if(handles.begin(), handles.end(),
+                                    [&](const auto& h) { return h.handle_id == id; });
+    REQUIRE(found != handles.end());
+    const QPointF p(found->endpoint.x, found->endpoint.y);
+    REQUIRE(ui.window.viewport().rect().contains(p.toPoint()));
+    ui.mouse(ui.window.viewport(), p, QEvent::MouseButtonPress);
+    ui.flush();
+    REQUIRE(ui.window.construction_tools().manipulators().active_handle_id() == id);
+    auto& numeric = ui.widget<QLineEdit>("blcad.construction.grip_numeric");
+    ui.key(numeric, Qt::Key_A, {}, Qt::ControlModifier);
+    ui.key(numeric, 0, value);
+    REQUIRE(ui.window.construction_tools().manipulators().numeric_override_active());
+    // Numeric input stays authoritative even when release has a different position.
+    ui.mouse(ui.window.viewport(), p + QPointF(17, 9), QEvent::MouseButtonRelease);
+    ui.flush();
+    REQUIRE(ui.window.construction_tools().manipulators().active_handle_id().empty());
+  };
+  // Headless mapping uses a model span; retain the fitted native OCCT zoom factor.
+  auto camera = ui.window.viewport().camera_bookmark();
+  camera.eye = {150, 150, 150};
+  camera.target = {0, 0, 0};
+  if (QApplication::platformName() != "xcb")
+    camera.scale = 200;
+  REQUIRE(ui.window.viewport().restore_camera_bookmark(camera));
+  ui.command("create_construction");
+  ui.choose(ui.widget<QComboBox>("blcad.construction.kind"),
+            static_cast<int>(ShellConstructionTools::Kind::Plane));
+  const auto before = ui.snapshot();
+  drag("construction.position.z", "15 mm");
+  ui.choose(ui.widget<QComboBox>("blcad.construction.manipulation"), 1);
+  drag("construction.rotation.x", "30 deg");
+  CHECK(ui.snapshot() == before);
+  ui.button("blcad.construction.apply");
+  const auto plane = ui.window.session().part_document()->construction_planes().back().id();
+  const auto sketch = ui.rectangle(plane.value(), {20, 20}, {50, 40});
+  const auto body = ui.extrude(6);
+  const auto volume = ui.summary(body).volume_mm3;
+  CHECK(volume == Approx(3600).epsilon(1e-8));
+  const auto lower = ui.bounds(body).minimum.z;
+  const auto modeled = ui.snapshot();
+  ui.tree(plane.value(), true);
+  ui.choose(ui.widget<QComboBox>("blcad.construction.manipulation"), 0);
+  drag("construction.position.z", "45 mm");
+  CHECK(ui.snapshot() == modeled);
+  CHECK(ui.window.viewport().feature_preview_replaces("body/" + body.value()));
+  ui.button("blcad.construction.apply");
+  CHECK(ui.window.session().part_document()->find_sketch(sketch)->workplane() ==
+        DatumPlaneId(plane.value()));
+  CHECK(ui.summary(body).volume_mm3 == Approx(volume).epsilon(1e-8));
+  CHECK(ui.bounds(body).minimum.z == Approx(lower + 30).margin(1e-5));
+  const auto edited = ui.snapshot();
+  ui.command("undo");
+  CHECK(ui.snapshot() == modeled);
+  CHECK(ui.bounds(body).minimum.z == Approx(lower).margin(1e-5));
+  ui.command("redo");
+  CHECK(ui.snapshot() == edited);
+  ui.idle();
+  ui.capture("construction-grips-downstream-solid");
+  const auto saved = directory.filePath("grips.blcad");
+  ui.roundtrip(saved);
+  const auto bytes = ui.bytes(saved);
+  const auto step = directory.filePath("grips.step");
+  ui.file("export_part_step", step);
+  CHECK(ui.bytes(step).contains("ISO-10303-21"));
+  CHECK(ui.bytes(saved) == bytes);
+  CHECK(ui.snapshot() == edited);
+  ui.idle();
+}

@@ -442,6 +442,7 @@ void apply_selection_set(std::vector<GuiSelection>& current,
 } // namespace
 
 struct OcctViewport::Impl {
+  GuiViewportCameraBookmark fallback_camera;
   struct Presentation {
     geometry::ViewportSceneItem item;
     Handle(AIS_Shape) interactive;
@@ -751,7 +752,7 @@ bool OcctViewport::set_plane_camera(Point3 target, Vector3 normal, Vector3 up) {
 }
 
 GuiViewportCameraBookmark OcctViewport::camera_bookmark() const noexcept {
-  GuiViewportCameraBookmark bookmark;
+  auto bookmark = impl_->fallback_camera;
   bookmark.projection = projection_;
   bookmark.plane_camera = plane_camera_;
   if (plane_camera_) {
@@ -785,12 +786,12 @@ bool OcctViewport::restore_camera_bookmark(const GuiViewportCameraBookmark& book
       impl_->view->SetUp(bookmark.up_direction.x, bookmark.up_direction.y,
                          bookmark.up_direction.z);
       impl_->view->SetScale(bookmark.scale);
-      impl_->view->Camera()->SetProjectionType(
-          projection_ == GuiViewportProjection::Perspective
-              ? Graphic3d_Camera::Projection_Perspective
-              : Graphic3d_Camera::Projection_Orthographic);
-      render_update();
+      impl_->view->Camera()->SetProjectionType(projection_ == GuiViewportProjection::Perspective
+                                                   ? Graphic3d_Camera::Projection_Perspective
+                                                   : Graphic3d_Camera::Projection_Orthographic);
     }
+    impl_->fallback_camera = bookmark;
+    render_update();
     rebuild_sketch_grid();
     return true;
   } catch (const Standard_Failure&) {

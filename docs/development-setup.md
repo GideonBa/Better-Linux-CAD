@@ -736,15 +736,16 @@ Remaining relation/pick workflows keep the datum family and Block 136 open; see
 cmake --build --preset dev-gui --target blcad_gui_tests -j4
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[shell-combined-workflow]"
 BLCAD_UI_CAPTURE_DIR=/tmp/blcad-combined-workflows QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[shell-combined-workflow]"
-QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-construction-picking],[shell-mixed-path-loft],[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-construction-manipulators],[block136-construction-picking],[shell-mixed-path-loft],[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
 ```
 
-`tests/gui/gui_shell_combined_workflow_tests.cpp` combines long interaction sequences in seven
+`tests/gui/gui_shell_combined_workflow_tests.cpp` combines long interaction sequences in eight
 scenarios: machining/edit/pattern/transform/Measure/STEP, Boolean/scale/Mirror with history branching,
 multi-workplane Loft section ordering/editing, authored-Part import/Assembly placement/Mate/solve/
 analysis/STEP, invalid/cancelled tasks plus dirty-file and document-switch recovery, and workplane
 editing with cyclic-reference recovery and downstream solid recompute, plus generated-reference
-construction chains feeding a second Sketch/Extrude and later upstream edits.
+construction chains feeding a second Sketch/Extrude and later upstream edits, and construction grips
+rotating a workplane and moving its downstream solid.
 
 The shared harness operates Qt ribbon buttons and popup menus, task widgets, browser clicks and
 double-clicks, viewport Sketch picks/hover, Escape and absolute/relative numeric coordinates, and
@@ -753,7 +754,7 @@ controllers/workbenches. Assertions observe canonical
 intent, resolved volumes/solid counts/bounds, source/result identities, task/preview/filter cleanup,
 multi-step Undo/Redo and redo-branch truncation. Save/Open/Save compares complete bytes, including GUI
 sidecars; exports preserve source bytes. Dialog automation has bounded watchdogs, and native input
-checks widget reachability at 1280×800. Both backends execute all seven scenarios; these tests introduce
+checks widget reachability at 1280×800. Both backends execute all eight scenarios; these tests introduce
 no native-only skips. The native run is required to prove actual OCCT presentation.
 
 These bounded combined workflows extend the shell evidence. Remaining families, manipulator/input
@@ -812,7 +813,7 @@ closed/open Loft, LoftSurface, guide control and Sweep, plus recompute/persisten
 The shell case imports only preauthored Sketch/plane inputs through Open, then uses actual Qt input
 for path collection/reversal, five-section ordering, invalid/recovered previews, Loft Apply, middle
 width property editing, three-step history, canonical reopen and STEP. This imported-input boundary
-is separate from the seven fully UI-authored `[shell-combined-workflow]` scenarios. Add the distinct
+is separate from the eight fully UI-authored `[shell-combined-workflow]` scenarios. Add the distinct
 `[shell-mixed-path-loft]` tag to the combined native regression above; both backends run it without
 new skips. Run native GUI suites and the application startup smoke sequentially so a second window
 cannot disturb popup focus. Contracts and current limits: `docs/part-guided-loft-geometry-mvp6.md` and
@@ -837,3 +838,20 @@ vertex point and face plane, then checks four-step history and canonical reopen 
 that case skips offscreen. Inspect captures and run the expanded combined native filter above, then
 the startup smoke sequentially. The source-feature geometry contract and remaining construction
 manipulators are documented in `docs/gui-sketch-workbench-mvp7.md`; Block 136 remains open.
+
+### Construction position, direction/frame and new-offset grips
+
+```bash
+cmake --build --preset dev-gui --target blcad_gui_tests blcad_app blcad_core_tests blcad_geometry_tests -j4
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[block136-construction-manipulators],[shell-combined-manipulators],[construction-manipulator-camera],[integration][gui-feature-coverage]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-construction-manipulators QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-construction-manipulators],[shell-combined-manipulators],[construction-manipulator-camera]"
+```
+
+The same Qt mouse/key cases execute on both backends: XYZ position, composed direction/frame
+rotations with full-precision persistence, new-offset normal/bindings, numeric override, final release,
+Escape/focus/camera rollback, dependent-degeneracy recovery and capture cleanup on task expiry. The
+eighth combined UI workflow adds rotated-plane Sketch/Extrude, downstream preview on same-ID plane
+movement, exact history, canonical reopen and STEP. Native tests preserve the fitted OCCT zoom factor;
+headless tests restore a useful model-span camera for their mapping. Include the new tag in the
+combined native filter above and run startup separately. Contracts and remaining acceptance:
+`docs/gui-sketch-workbench-mvp7.md`, `docs/gui-shell-acceptance-mvp9r.md`.
