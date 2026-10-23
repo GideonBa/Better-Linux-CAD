@@ -1,6 +1,7 @@
 # Feature Edit Lifecycle and Core Feature-Update Commands MVP-9
 
-Status: implemented in Block 129.
+Status: headless lifecycle implemented in Block 129; replacement-shell browser editing restored
+in the Feature Edit slice of Block 136 (22 October 2026).
 
 > **GUI Shell Reset MVP-9R:** Block 133 deleted the Qt shell this document names — `MainWindow` and
 > all seven self-installing binders — and replaced it with `ShellWindow` + `ShellRibbon`
@@ -96,3 +97,61 @@ and fail-closed rejection, and downstream recompute after an upstream edit.
 Block 130 adds interactive Assembly placement, relationships, joints, and motion in
 `docs/gui-interactive-assembly-mvp9.md`. Block 131 adds Measure, the coverage manifest v2, and
 integrated acceptance.
+
+## Replacement-shell browser editing — Block 136
+
+`ShellWindow` routes a double-click on a current Part's Feature node to its explicitly owned
+`ShellFeatureEditTools`. The family-specific task title and input form preload existing persistent
+intent for Extrude, Revolve, Sweep, Loft, Surface, linear/circular Pattern, Mirror, Fillet, Chamfer,
+Shell, Draft and Body Boolean. Sketch activation keeps its existing route. Project-owned definitions
+require their own Part editing context. Individual BodyTransform stack entries remain outside this
+edit boundary and fail without starting a task.
+
+The editor exposes names, scalar values, typed parameter bindings, existing reference choices,
+booleans and ordered inputs. Edge membership, section/boundary/source order and guide lists have
+add/remove/up/down controls. A required list can be emptied and then refilled within the same
+edit; its invalid intermediate state disables Apply. Optional Sweep/Loft guides, twist, orientation, up vector, alignment and
+rotation-offset inputs can be enabled against existing document definitions. Reference choices retain
+their stored source category. Feature type, extent-mode discriminators and result-body identities are
+fixed context; the editor updates inputs within that existing intent structure. It does not introduce
+feature conversion, reorder, rollback or transform-stack mutation authorities.
+
+A parameter row selects a compatible existing binding and displays its value with mm/deg/count units.
+Literal values are editable; computed values display their formula and remain driven by it. Shared
+parameter changes affect every use, including expressions and downstream geometry. After rebinding,
+abandoned edits to parameters no longer referenced by this feature are discarded. Only declared
+parameter fields count as dependencies; matching display names or other strings do not. Parameter
+changes and the feature update share one transaction. No parameter or feature is silently duplicated.
+
+The **Dynamischer Wert** chooser connects one scalar to the shared native manipulator layer. Dragging,
+typed refinement and direct numeric fields rebuild the same candidate. Enter finishes a drag;
+Escape restores its starting value, and a further Escape cancels the edit. The scrollable task inputs
+keep Apply/Cancel reachable at 1280×800. Reference and ordered-input changes use form controls;
+model picking is suspended while this edit task owns the viewer.
+
+Internally, the existing canonical record codec translates preloaded form values into typed Core
+records. `GuiFeatureEditController::candidate` applies prepared parameter changes and the matching
+`update_*` to a disposable original Part. It requires the replacement's exact edited FeatureId.
+The shell recomputes the complete candidate with `GeometryRecomputeExecutor`, then displays actual
+visible result Bodies, including downstream modifiers. It never publishes a rewritten whole-document
+record as the edit authority. Apply repeats preview validation and the same prepared update through
+one `GuiDocumentSession` transaction. Unrelated intent, feature identity and graph ordering remain
+under Core authority; the file schema is unchanged.
+
+An invalid input or downstream Geometry failure disables Apply and restores the authored scene.
+The document stays unchanged and the user can correct the candidate. Cancel, task Escape, Undo/Redo,
+document replacement and stale/source-snapshot changes discard previews and restore viewer filters.
+A failed commit leaves the edit available for correction. Normal browser/property selection survives
+refreshes through its existing semantic identity mechanism.
+
+```bash
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[block136-feature-edit],[gui][feature-edit],[integration][feature-edit-recompute]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-feature-edit]"
+```
+
+Proof covers preloading and atomic updates for all thirteen families, upstream edits with downstream
+Fillet recompute/failure, literal and expression parameter semantics, unused-binding edit disposal,
+ordered Loft sections, Fillet edge membership, optional Sweep twist, stale inputs, exact Undo/Redo
+and Save/Open. Native proof performs actual tree mouse double-clicks, drags the scalar handle, refines
+it numerically, restores another drag with Escape and clicks the visible Apply button at 1280×800.
+Whole-block replacement-shell acceptance remains separate work.

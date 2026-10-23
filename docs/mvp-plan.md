@@ -627,11 +627,17 @@ solve. Actual posed previews, native handles and numeric inputs remain candidate
 Project transaction. Passive Spherical and bounded root-local authoring retain their existing limits.
 Contract/proof: `docs/gui-interactive-assembly-mvp9.md`, `[block136-assembly]`.
 
-Browser feature editing and whole-block acceptance remain open.
+The replacement shell restores browser-double-click editing for all thirteen persistent feature
+families. Existing inputs, parameter bindings and ordered references preload into an edit task;
+scalar drag/numeric changes recompute the complete candidate before one atomic update. Stable feature
+and result identities, expression bindings, downstream failure handling, history and persistence retain
+their authorities. Contract/proof: `docs/gui-feature-edit-mvp9.md`, `[block136-feature-edit]`.
+
+Whole-block acceptance remains open.
 
 ## Current next technical step — Block 136
 
-Restore browser-double-click feature editing and replacement-shell acceptance/coverage as defined in
+Restore replacement-shell acceptance/coverage and audit the bounded command/editor surfaces as defined in
 `docs/gui-shell-reset-sequence-mvp9r.md`.
 
 ## Later phases

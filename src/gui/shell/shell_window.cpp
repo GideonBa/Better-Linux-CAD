@@ -5,6 +5,7 @@
 #include "blcad/gui/gui_interactive_profile_materialization.hpp"
 #include "blcad/gui/gui_sketch_intent_remap.hpp"
 #include "blcad/gui/shell/shell_assembly_tools.hpp"
+#include "blcad/gui/shell/shell_feature_edit_tools.hpp"
 #include "blcad/gui/shell/shell_feature_tools.hpp"
 #include "blcad/gui/shell/shell_measure_tools.hpp"
 #include "blcad/gui/shell/shell_origin.hpp"
@@ -246,6 +247,7 @@ ShellWindow::ShellWindow() {
       std::make_unique<ShellMeasureTools>(*this, session_, *viewport_, *ribbon_, tab_model_);
   assembly_tools_ =
       std::make_unique<ShellAssemblyTools>(*this, session_, *viewport_, *ribbon_, tab_assembly_);
+  feature_edit_tools_ = std::make_unique<ShellFeatureEditTools>(*this);
   statusBar()->showMessage(QStringLiteral("Bereit"));
   refresh();
 }
@@ -255,6 +257,7 @@ ShellWindow::~ShellWindow() {
   // still exist. QMainWindow/QWidget teardown otherwise destroys that drawable
   // before deleting the central viewport and its OCCT GL resources.
   viewport_->set_view_changed_callback({});
+  feature_edit_tools_.reset();
   assembly_tools_.reset();
   measure_tools_.reset();
   feature_tools_.reset();
@@ -470,6 +473,8 @@ void ShellWindow::wire_viewport() {
       measure_tools_->refresh_presentation();
     if (assembly_tools_)
       assembly_tools_->refresh_presentation();
+    if (feature_edit_tools_)
+      feature_edit_tools_->refresh_presentation();
   });
   viewport_->set_selection_callback(
       [this](std::optional<GuiSelection> selection) { apply_viewport_selection(selection); });
@@ -564,6 +569,8 @@ bool ShellWindow::confirm_document_replacement() {
 }
 
 void ShellWindow::reset_document_interaction() {
+  if (feature_edit_tools_)
+    feature_edit_tools_->cancel();
   if (assembly_tools_)
     assembly_tools_->cancel();
   if (measure_tools_)
@@ -822,6 +829,8 @@ bool ShellWindow::finish_active_sketch() {
 }
 
 bool ShellWindow::undo() {
+  if (feature_edit_tools_)
+    feature_edit_tools_->cancel();
   if (assembly_tools_)
     assembly_tools_->cancel();
   if (measure_tools_)
@@ -846,6 +855,8 @@ bool ShellWindow::undo() {
 }
 
 bool ShellWindow::redo() {
+  if (feature_edit_tools_)
+    feature_edit_tools_->cancel();
   if (assembly_tools_)
     assembly_tools_->cancel();
   if (measure_tools_)
@@ -938,15 +949,21 @@ void ShellWindow::handle_tree_selection(QTreeWidgetItem* current) {
 }
 
 void ShellWindow::handle_tree_activation(QTreeWidgetItem* item) {
-  // Re-enter an existing planar Sketch by double-clicking its node. A planar
-  // Sketch node carries the SketchId as its semantic id; child records and
-  // other node kinds are ignored. Guarded against re-entry while a Sketch is
-  // already active.
+  // Feature activation opens the update task; planar Sketch activation retains
+  // its existing editing route. Both are scoped to the current Part context.
   if (item == nullptr || active_sketch_ || session_.part_document() == nullptr)
     return;
   const std::string semantic_id = item->data(0, kSemanticIdRole).toString().toStdString();
   if (semantic_id.empty())
     return;
+  const auto* node = browser_model_.find(semantic_id);
+  if (node && node->kind == GuiBrowserNodeKind::Feature &&
+      node->owner_document_id == session_.part_document()->id().value()) {
+    auto begun = feature_edit_tools_->begin(FeatureId(semantic_id));
+    if (!begun)
+      show_error(begun.error());
+    return;
+  }
   const SketchId sketch_id(semantic_id);
   if (session_.part_document()->find_sketch(sketch_id) == nullptr)
     return;
@@ -1050,6 +1067,8 @@ void ShellWindow::refresh() {
     measure_tools_->refresh();
   if (assembly_tools_)
     assembly_tools_->refresh();
+  if (feature_edit_tools_)
+    feature_edit_tools_->refresh();
   refresh_viewport_scene();
   if (sketch_tools_)
     sketch_tools_->refresh_enablement();

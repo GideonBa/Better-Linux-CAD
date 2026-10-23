@@ -99,6 +99,17 @@ TEST_CASE("Block 129 feature edit commits one update transaction and fails close
   CHECK(serialize_part_document_to_json(*session.part_document()).value() == before);
   CHECK(edit.active());  // still editing after a rejected commit
 
+  // Editing one feature must never redirect an update to another existing id.
+  CHECK(edit.preview(session,
+                     *session.part_document()->find_fillet_feature(FeatureId("feature.fillet")),
+                     &PartDocument::update_fillet_feature)
+            .has_error());
+  CHECK(edit.commit(session,
+                    *session.part_document()->find_fillet_feature(FeatureId("feature.fillet")),
+                    &PartDocument::update_fillet_feature)
+            .has_error());
+  CHECK(serialize_part_document_to_json(*session.part_document()).value() == before);
+
   // A valid rebind commits one transaction with a stable id and exact undo.
   REQUIRE(edit.preview(session, extrude("depth2"), &PartDocument::update_feature));
   REQUIRE(edit.commit(session, extrude("depth2"), &PartDocument::update_feature));

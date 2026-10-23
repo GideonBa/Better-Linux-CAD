@@ -50,3 +50,12 @@ session diagnostics are projected into a read-only analysis group as well as the
 
 Coverage includes deterministic groups, typed/read-only metadata, Preview versus Apply, undoable
 quantity/body edits, Project occurrence state changes, and semantic tree selection.
+
+## Replacement-shell feature activation — Block 136
+
+A double-click on a current Part Feature node opens `ShellFeatureEditTools` with persistent inputs
+preloaded. The editor reuses the Core update and headless edit lifecycle for all thirteen supported
+families, and recomputes downstream Geometry before Apply. Sketch activation retains its existing
+route; read-only nodes and Project definition context do not become editable by this route.
+Transform-stack records retain their explicit non-goal. Contract and proof:
+`docs/gui-feature-edit-mvp9.md`, `[block136-feature-edit]`.
