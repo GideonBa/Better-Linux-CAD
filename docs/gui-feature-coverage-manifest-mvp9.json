@@ -411,9 +411,9 @@
         "owner": 136,
         "status": "partial",
         "contract": "docs/gui-interactive-path-sweep-loft-mvp9.md",
-        "scope": "Ordered PathCurve authoring plus typed Sketch3D point creation/editing and shared-point line creation; full disposable downstream previews and atomic history.",
+        "scope": "Ordered PathCurve authoring; typed Sketch3D points/shared-point lines, active-sketch point/line collection and direct XYZ point grips with axis/plane restrictions, full downstream previews and atomic history.",
         "gaps": [
-          "Restore native Sketch3D point/segment picking and direct axis/plane-lock handles, distance/direction input and explicit planar-point projection; typed XYZ editing alone does not prove these interactions."
+          "Restore pointer placement of new Sketch3D points, explicit distance/direction input and planar-point projection; plane restrictions expose independent allowed-axis grips rather than free plane dragging."
         ],
         "proofs": [
           {
@@ -426,6 +426,14 @@
           },
           {
             "filter": "[shell-combined-sketch3d]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
+          },
+          {
+            "filter": "[block136-sketch3d-grips]",
+            "source": "tests/gui/gui_shell_sketch_3d_tests.cpp"
+          },
+          {
+            "filter": "[shell-sketch3d-grips-workflow]",
             "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
           }
         ],

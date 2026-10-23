@@ -39,9 +39,10 @@ source, hide a missing tag behind OR and claim completion with gaps. They must a
 
 The machine-readable details live in `families[].shell.gaps`; this is the execution order:
 
-1. Complete Sketch3D native collection/direct lock handles, distance/direction input and planar
-   projection beyond the restored typed XYZ point/line editor. The planar/reference surface includes explicit
-   diagnostic suggestion Preview/Apply controls plus failed-recompute Part repair opening, missing
+1. Complete Sketch3D pointer placement of new points, distance/direction input and planar
+   projection beyond the restored typed point/line editor and native collection/direct grips. The
+   planar/reference surface includes explicit diagnostic suggestion Preview/Apply controls plus
+   failed-recompute Part repair opening, missing
    face/point/line sources and single/batch reference replacement.
 2. Restore standalone parameter management, dedicated Hole authoring and audit advanced extent
    editors against the foundation API.
@@ -70,7 +71,7 @@ QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][gui-fea
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests
 ./build/dev-gui/blcad_core_tests
 ./build/dev-gui/blcad_geometry_tests
-QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-sketch3d],[shell-combined-sketch3d],[block136-sketch-diagnostics],[missing-reference-session],[block136-missing-reference],[repair-open-session],[block136-repair-open],[block136-reference-repair-batches],[block136-reference-repair],[block136-construction-manipulators],[block136-construction-picking],[shell-mixed-path-loft],[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-sketch3d-grips],[shell-sketch3d-grips-workflow],[block136-sketch3d],[shell-combined-sketch3d],[block136-sketch-diagnostics],[missing-reference-session],[block136-missing-reference],[repair-open-session],[block136-repair-open],[block136-reference-repair-batches],[block136-reference-repair],[block136-construction-manipulators],[block136-construction-picking],[shell-mixed-path-loft],[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
 ```
 
 The regular inventory audit passes while it accurately records unfinished work. For closure,
@@ -534,3 +535,40 @@ The ordinary inventory passes. The opt-in closure gate still fails one of three 
 assertions), as expected: ten bounded families are restored and eight retain gaps. Native Sketch3D
 collection/direct lock handles, distance/direction input and explicit planar projection remain next.
 Block 136 stays in progress; `docs/mvp-plan.md` retains the numbered boundary at Block 135.
+
+## Sketch3D viewport collection and point-grip verification — 2026-10-23
+
+The active Sketch3D candidate now supports projected point/straight-line collection and opt-in
+translation grips. All seven direction restrictions expose the permitted independent axis handles;
+numeric grip input specifies an absolute XYZ component in millimeters. Disposable previews validate
+the complete downstream model before Apply. Gesture rollback preserves earlier local edits and
+precision, and parameter detachment still requires explicit consent. Contract, picking bounds and
+remaining placement/distance/projection work: `docs/gui-sketch3d-interaction-mvp8.md`.
+
+Six additional Qt input cases cover local-ID collection, all locks, bound-point consent, final
+release and numeric precedence, invalid/recovered paths, camera/resize/focus/task cleanup and typed
+coordinate edits during a drag. The existing UI-authored Sketch3D/Sweep workflow now collects its
+endpoint in the viewport, rejects a locked Z-grip collapse, recomputes the corrected 640 mm³ solid
+and retains exact history, canonical reopening and STEP export.
+
+All four `dev-gui` targets built successfully. Final verification:
+
+| Suite | Cases | Assertions | Result |
+| --- | ---: | ---: | --- |
+| Core | 527 | 15,779 | All passed |
+| Geometry | 437 | 29,821 | All passed |
+| Focused offscreen Sketch3D and inventory | 16 | 1,615 | All passed |
+| Full offscreen GUI | 384 | 28,674 | 369 passed; 15 native-only skips |
+| Focused native point grips and combined Sweep | 7 | 1,143 | All passed; no skips |
+| Full combined native shell | 200 | 23,706 | All passed; no skips |
+
+The native `sketch3d-downstream-sweep-preview.png` capture was inspected at 1280×800: the Z grip,
+40 mm numeric input, candidate solid and pinned Apply footer are readable and reachable. The
+separate six-second native application startup smoke exits with intentional timeout 124. Native
+logs retain the known medium depth/stencil visual warning; no high-severity, BadDrawable or fatal
+lifecycle diagnostics occurred. Startup and GUI runs were serial.
+
+The ordinary inventory passes. The opt-in closure gate correctly fails one of three cases (161
+assertions): ten bounded families are restored and eight retain explicit gaps. Block 136 remains
+in progress, with the numbered completion boundary at Block 135. Next Sketch3D work is pointer
+placement of new points, explicit distance/direction input and planar-point projection.

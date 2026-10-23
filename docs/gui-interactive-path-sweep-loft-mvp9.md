@@ -189,3 +189,9 @@ existing geometry. Its combined UI proof creates a shared-point chain, consumes 
 then edits the source endpoint with complete downstream preview, exact history and persistence.
 The point/line contract and remaining native interaction gaps live in
 `docs/gui-sketch3d-interaction-mvp8.md`; this does not close whole-shell acceptance.
+
+The spatial source editor also supports active-candidate point/line collection and direct point
+translation grips with axis/plane restrictions. The combined Sweep proof now selects the source
+endpoint through the viewport and moves its locked Z grip, retaining complete downstream validation,
+exact history and persistence. Contracts and remaining placement/projection work remain owned by
+`docs/gui-sketch3d-interaction-mvp8.md`.

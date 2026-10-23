@@ -1290,7 +1290,8 @@ TEST_CASE("Combined UI construction grips rotate a workplane and move its downst
 
 TEST_CASE("Combined UI creates a spatial chain sweeps it edits endpoints rejects collapse and "
           "restores history",
-          "[gui][integration][shell-combined-workflow][shell-combined-sketch3d]") {
+          "[gui][integration][shell-combined-workflow][shell-combined-sketch3d][shell-sketch3d-"
+          "grips-workflow]") {
   WorkflowUi ui;
   QTemporaryDir directory;
   REQUIRE(directory.isValid());
@@ -1350,16 +1351,43 @@ TEST_CASE("Combined UI creates a spatial chain sweeps it edits endpoints rejects
   const auto swept = ui.snapshot();
   ui.tree(spatial.value(), true);
   REQUIRE(ui.window.sketch_3d_tools().active());
-  ui.data(points, "point.4");
-  coordinate("z", 20);
-  ui.button("blcad.sketch3d.stage_point");
-  ui.button("blcad.sketch3d.preview");
+  auto camera = ui.window.viewport().camera_bookmark();
+  camera.eye = {150, 150, 165};
+  camera.target = {0, 0, 15};
+  camera.projection = GuiViewportProjection::Orthographic;
+  if (QApplication::platformName() != "xcb")
+    camera.scale = 120;
+  REQUIRE(ui.window.viewport().restore_camera_bookmark(camera));
+  auto& pick = ui.widget<QComboBox>("blcad.sketch3d.pick");
+  ui.choose(pick, 1);
+  const auto endpoint = checked(ui.window.viewport().model_to_screen({0, 0, 30}));
+  ui.click_at(ui.window.viewport(), {endpoint.x, endpoint.y});
+  REQUIRE(points.currentData().toString() == "point.4");
+  ui.choose(pick, 0);
+  ui.click(ui.widget<QCheckBox>("blcad.sketch3d.grips"));
+  ui.choose(ui.widget<QComboBox>("blcad.sketch3d.lock"), 3);
+  const auto drag_point = [&](const QString& value) {
+    ui.window.sketch_3d_tools().refresh_presentation();
+    const auto handles = ui.window.sketch_3d_tools().manipulators().presentations();
+    REQUIRE(handles.size() == 1);
+    const QPointF point(handles.front().endpoint.x, handles.front().endpoint.y);
+    REQUIRE(ui.window.viewport().rect().contains(point.toPoint()));
+    ui.mouse(ui.window.viewport(), point, QEvent::MouseButtonPress);
+    ui.flush();
+    REQUIRE(ui.window.sketch_3d_tools().manipulators().active_handle_id() == "sketch3d.position.z");
+    auto& numeric = ui.widget<QLineEdit>("blcad.sketch3d.grip_numeric");
+    ui.key(numeric, Qt::Key_A, {}, Qt::ControlModifier);
+    ui.key(numeric, 0, value);
+    REQUIRE(ui.window.sketch_3d_tools().manipulators().numeric_override_active());
+    ui.mouse(ui.window.viewport(), point + QPointF(17, 9), QEvent::MouseButtonRelease);
+    ui.flush();
+    CHECK(ui.window.sketch_3d_tools().manipulators().active_handle_id().empty());
+  };
+  drag_point("20 mm");
   CHECK_FALSE(ui.window.viewport().feature_preview_active());
   CHECK_FALSE(ui.widget<QPushButton>("blcad.sketch3d.apply").isEnabled());
   CHECK(ui.snapshot() == swept);
-  coordinate("z", 40);
-  ui.button("blcad.sketch3d.stage_point");
-  ui.button("blcad.sketch3d.preview");
+  drag_point("40 mm");
   REQUIRE(ui.window.viewport().feature_preview_active());
   CHECK(ui.window.viewport().feature_preview_replaces("body/" + body.value()));
   CHECK(ui.snapshot() == swept);
