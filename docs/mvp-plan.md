@@ -807,6 +807,18 @@ actual ribbon/list/button/camera/history/file input. Verification lives in
 `docs/gui-shell-acceptance-mvp9r.md`. Ten families have restored bounded surfaces and eight retain
 explicit gaps. The entire Block 136 remains in progress.
 
+### Block 136 — Typed Sketch3D point/line editor — 2026-10-23
+
+The shell now creates spatial points and shared-point lines and reopens existing Sketch3D records
+for typed XYZ point editing. Local changes require a complete disposable downstream Preview before
+one Apply transaction; parameter detachment is explicit. Same-ID Core updates preserve order and
+references while revalidating consuming paths. Focused tests retain curved/guide intent and reject
+invalid candidates; the combined UI scenario creates PathCurve/Sweep, edits a spatial endpoint,
+checks four-step history, canonical reopening and STEP. Contract:
+`docs/gui-sketch3d-interaction-mvp8.md`; verification: `docs/gui-shell-acceptance-mvp9r.md`.
+Native collection/locks/direct handles, distance/direction input and planar projection remain open.
+Ten families remain restored and eight partial; neither this family nor Block 136 is closed.
+
 ## Current next technical step — Block 136
 
 The current v3 coverage inventory records all eighteen accepted families, current shell proof sources,
@@ -814,8 +826,10 @@ reachable entry points and explicit remaining gaps. The machine check distinguis
 from closure readiness; historical controller proofs cannot close a shell gap. Acceptance contract:
 `docs/gui-shell-acceptance-mvp9r.md`, `[integration][gui-feature-coverage]` / `[gui][shell-coverage]`.
 
-Restore Sketch3D authoring/editing next. Explicit constraint-diagnostic suggestion controls now
-cover the accepted bounded Core diagnostic/repair subset.
+Continue Sketch3D with native point/segment collection, axis/plane-lock handles,
+distance/direction input and explicit planar-point projection. Typed XYZ point editing and
+shared-point line authoring now have a shell surface; explicit constraint-diagnostic suggestion
+controls cover the accepted bounded Core diagnostic/repair subset.
 The bounded repair-open path now supports failed-recompute Parts and missing face/point/line sources,
 with typed intent, complete atomic publication and failed-state history. Other structural dependency
 failures remain strict loading errors.

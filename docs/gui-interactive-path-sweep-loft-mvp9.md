@@ -182,3 +182,10 @@ Bounded here and not introduced implicitly by this block:
 
 Block 128 adds interactive Surface authoring (Boundary/Fill, Trim, Extend, Stitch) and closed-shell to
 solid conversion over the same manipulator layer.
+
+
+The Block-136 typed Sketch3D point/line editor now supplies newly authored spatial paths as well as
+existing geometry. Its combined UI proof creates a shared-point chain, consumes it as PathCurve/Sweep,
+then edits the source endpoint with complete downstream preview, exact history and persistence.
+The point/line contract and remaining native interaction gaps live in
+`docs/gui-sketch3d-interaction-mvp8.md`; this does not close whole-shell acceptance.

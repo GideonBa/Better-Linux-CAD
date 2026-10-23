@@ -739,17 +739,22 @@ BLCAD_UI_CAPTURE_DIR=/tmp/blcad-combined-workflows QT_QPA_PLATFORM=xcb ./build/d
 QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-construction-manipulators],[block136-construction-picking],[shell-mixed-path-loft],[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
 ```
 
-`tests/gui/gui_shell_combined_workflow_tests.cpp` combines long interaction sequences in eight
+`tests/gui/gui_shell_combined_workflow_tests.cpp` combines long interaction sequences in nine
 scenarios: machining/edit/pattern/transform/Measure/STEP, Boolean/scale/Mirror with history branching,
 multi-workplane Loft section ordering/editing, authored-Part import/Assembly placement/Mate/solve/
 analysis/STEP, invalid/cancelled tasks plus dirty-file and document-switch recovery, and workplane
 editing with cyclic-reference recovery and downstream solid recompute, plus generated-reference
 construction chains feeding a second Sketch/Extrude and later upstream edits, and construction grips
-rotating a workplane and moving its downstream solid.
+rotating a workplane and moving its downstream solid, plus a typed Sketch3D chain feeding a
+PathCurve/Sweep with endpoint editing and four-step history.
 
 The shared harness operates Qt ribbon buttons and popup menus, task widgets, browser clicks and
 double-clicks, viewport Sketch picks/hover, Escape and absolute/relative numeric coordinates, and
-actual Qt input/file/confirmation dialogs. It does not seed Core intent or invoke authoring
+actual Qt input/file/confirmation dialogs. Native combo selection establishes and confirms native
+window focus, synchronizes the desktop pointer and window-system events before opening/hovering,
+awaits a visible popup with a two-second deadline, then checks the hit-tested row and its actual
+highlight before the click. This preserves mouse coverage without direct index
+assignment or timing sleeps. It does not seed Core intent or invoke authoring
 controllers/workbenches. Assertions observe canonical
 intent, resolved volumes/solid counts/bounds, source/result identities, task/preview/filter cleanup,
 multi-step Undo/Redo and redo-branch truncation. Save/Open/Save compares complete bytes, including GUI
@@ -813,7 +818,7 @@ closed/open Loft, LoftSurface, guide control and Sweep, plus recompute/persisten
 The shell case imports only preauthored Sketch/plane inputs through Open, then uses actual Qt input
 for path collection/reversal, five-section ordering, invalid/recovered previews, Loft Apply, middle
 width property editing, three-step history, canonical reopen and STEP. This imported-input boundary
-is separate from the eight fully UI-authored `[shell-combined-workflow]` scenarios. Add the distinct
+is separate from the nine fully UI-authored `[shell-combined-workflow]` scenarios. Add the distinct
 `[shell-mixed-path-loft]` tag to the combined native regression above; both backends run it without
 new skips. Run native GUI suites and the application startup smoke sequentially so a second window
 cannot disturb popup focus. Contracts and current limits: `docs/part-guided-loft-geometry-mvp6.md` and
@@ -931,5 +936,23 @@ read-only inspection, all three supported repairs, catalog preservation, unsuppo
 identity collisions, preview invalidation, cancellation/Save/history/context guards and restoration
 of an active Sketch. The native input case uses actual model/Sketch ribbon buttons, diagnostic-list
 clicks, Preview/Cancel/Apply, Fit, Undo/Redo and Save, with canonical reopening. Run native tests and
-application startup serially. The next planned surface is Sketch3D authoring/editing; see
+application startup serially. The subsequent typed Sketch3D slice is documented below; see
 `docs/mvp-plan.md` for Block 136 status.
+
+
+## Typed Sketch3D point/line checks
+
+```bash
+./build/dev-gui/blcad_core_tests "[core][sketch-3d-update]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[block136-sketch3d],[shell-combined-sketch3d],[integration][gui-feature-coverage]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-sketch3d QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-sketch3d],[shell-combined-sketch3d]"
+```
+
+Core checks stable order/dependencies, canonical roundtrip and atomic rejection of missing sources,
+removed segments and disconnected junctions. Shell checks typed staging, shared endpoints, retained
+curved/guide intent and precision, explicit binding detachment, invalid geometry, history and task
+expiry. The ninth fully UI-authored combined workflow builds a four-point chain, PathCurve and Sweep,
+rejects collapse, extends the swept solid, exercises four-step history, cancels, reopens and exports
+STEP. Both backends run all new scenarios without skips. Include both new tags in the combined native
+regression above; run application startup separately. Contract and remaining native Sketch3D gaps:
+`docs/gui-sketch3d-interaction-mvp8.md`. Block 136 remains in progress.
