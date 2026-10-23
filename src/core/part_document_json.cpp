@@ -13,6 +13,7 @@
 #include <system_error>
 #include <type_traits>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -3048,24 +3049,32 @@ body_transform_rotation_axis_from_json(const json& value) {
   return value;
 }
 
-[[nodiscard]] bool sketch_dependencies_available(const PartDocument& document,
-                                                 const Sketch& sketch) {
+[[nodiscard]] bool
+sketch_dependencies_available(const PartDocument& document, const Sketch& sketch,
+                              const std::unordered_set<std::string>* authored_ids) {
+  const auto missing_is_retained = [&](const std::string& id) {
+    return authored_ids && !authored_ids->contains(id);
+  };
   if (!document.has_workplane_id(sketch.workplane()))
     return false;
   for (const auto& point : sketch.projected_points()) {
     if (point.source() == ProjectedSketchPointSource::ConstructionPoint &&
-        document.find_construction_point(point.construction_point()) == nullptr)
+        document.find_construction_point(point.construction_point()) == nullptr &&
+        !missing_is_retained(point.construction_point().value()))
       return false;
     if (point.source() == ProjectedSketchPointSource::SemanticVertex &&
-        document.find_feature(point.semantic_vertex().value().source_feature()) == nullptr)
+        document.find_feature(point.semantic_vertex().value().source_feature()) == nullptr &&
+        !missing_is_retained(point.semantic_vertex()->source_feature().value()))
       return false;
   }
   for (const auto& line : sketch.projected_lines()) {
     if (line.source() == ProjectedSketchLineSource::ConstructionLine &&
-        document.find_construction_line(line.construction_line()) == nullptr)
+        document.find_construction_line(line.construction_line()) == nullptr &&
+        !missing_is_retained(line.construction_line().value()))
       return false;
     if (line.source() == ProjectedSketchLineSource::SemanticEdge &&
-        document.find_feature(line.semantic_edge().value().source_feature()) == nullptr)
+        document.find_feature(line.semantic_edge().value().source_feature()) == nullptr &&
+        !missing_is_retained(line.semantic_edge()->source_feature().value()))
       return false;
   }
   for (const auto& dimension : sketch.driving_dimensions()) {
@@ -3961,6 +3970,11 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
 }
 
 Result<PartDocument> deserialize_part_document_from_json(std::string_view content) {
+  return deserialize_part_document_from_json(content, PartDocumentReadMode::Strict);
+}
+
+Result<PartDocument> deserialize_part_document_from_json(std::string_view content,
+                                                         PartDocumentReadMode mode) {
   try {
     const json root = json::parse(content.begin(), content.end());
     if (!root.is_object())
@@ -3969,6 +3983,17 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
       return Result<PartDocument>::failure(json_error("unsupported part document json schema"));
     if (root.at("version").get<int>() != k_version)
       return Result<PartDocument>::failure(json_error("unsupported part document json version"));
+    // A record that is present later in the file must still resolve normally.
+    // IDs belonging to another record kind are never treated as absent sources.
+    std::unordered_set<std::string> authored_ids;
+    if (mode == PartDocumentReadMode::ReferenceRepair)
+      for (const auto& value : root)
+        if (value.is_array())
+          for (const auto& record : value)
+            if (record.is_object() && record.contains("id"))
+              authored_ids.insert(record.at("id").get<std::string>());
+    const auto* retained_ids =
+        mode == PartDocumentReadMode::ReferenceRepair ? &authored_ids : nullptr;
     const auto& document_json = root.at("document");
     auto document = PartDocument::create(DocumentId(document_json.at("id").get<std::string>()),
                                          document_json.at("name").get<std::string>());
@@ -4110,9 +4135,10 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
         auto sketch = sketch_from_json(sketch_array.at(index));
         if (sketch.has_error())
           return Result<PartDocument>::failure(sketch.error());
-        if (!sketch_dependencies_available(document.value(), sketch.value()))
+        if (!sketch_dependencies_available(document.value(), sketch.value(), retained_ids))
           continue;
-        auto added = document.value().add_sketch(sketch.value());
+        auto added = document.value().add_sketch_impl(sketch.value(),
+                                                      retained_ids ? &sketch.value() : nullptr);
         if (added.has_error())
           return Result<PartDocument>::failure(added.error());
         added_sketch[index] = true;
@@ -4153,10 +4179,11 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
         auto workplane = derived_workplane_from_json(derived_workplane_array.at(index));
         if (workplane.has_error())
           return Result<PartDocument>::failure(workplane.error());
-        if (document.value().find_feature(workplane.value().face_reference().source_feature()) ==
-            nullptr)
+        const auto& source_id = workplane.value().face_reference().source_feature();
+        const bool retain_missing = retained_ids && !authored_ids.contains(source_id.value());
+        if (document.value().find_feature(source_id) == nullptr && !retain_missing)
           continue;
-        auto added = document.value().add_derived_workplane(workplane.value());
+        auto added = document.value().add_derived_workplane_impl(workplane.value(), retain_missing);
         if (added.has_error())
           return Result<PartDocument>::failure(added.error());
         added_workplane[index] = true;
@@ -4497,6 +4524,11 @@ Result<std::uintmax_t> write_part_document_json_file(const PartDocument& documen
 }
 
 Result<PartDocument> read_part_document_json_file(const std::filesystem::path& path) {
+  return read_part_document_json_file(path, PartDocumentReadMode::Strict);
+}
+
+Result<PartDocument> read_part_document_json_file(const std::filesystem::path& path,
+                                                  PartDocumentReadMode mode) {
   if (path.empty())
     return Result<PartDocument>::failure(
         json_file_error(path, "part document json file path must not be empty"));
@@ -4509,7 +4541,7 @@ Result<PartDocument> read_part_document_json_file(const std::filesystem::path& p
   if (!input.good() && !input.eof())
     return Result<PartDocument>::failure(
         json_file_error(path, "could not read part document json file"));
-  return deserialize_part_document_from_json(buffer.str());
+  return deserialize_part_document_from_json(buffer.str(), mode);
 }
 
 } // namespace blcad

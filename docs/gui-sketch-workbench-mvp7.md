@@ -342,8 +342,9 @@ entire list and transient presentation. Saving during staging/preview writes com
 repaired candidate is never copied directly into the session outside the transaction authority.
 
 The batch is ordered: each intermediate Core update must validate. It does not bypass cycle checks
-to permit temporary cyclic graph rewrites, open Core-invalid documents, or implement new topology/constraint repair kinds. The repair-open
-extension below supports failed initial Geometry recompute. These boundaries keep the family partial and Block 136 open.
+to permit temporary cyclic graph rewrites or implement new topology/constraint repair kinds. The
+repair-open extension below supports failed initial Geometry recompute and bounded missing sources.
+These boundaries keep the family partial and Block 136 open.
 
 Proof: six `[block136-reference-repair-batches]` cases in
 `tests/gui/gui_shell_reference_repair_tests.cpp`. They cover two lost planes with dependent projected
@@ -368,11 +369,29 @@ session repair transaction, restoring normal modeling.
 Undo back to the original failed snapshot clears repaired Geometry and re-enters repair mode; Redo
 recomputes the repaired Part. Cancellation leaves the loaded failed intent intact. Save during Preview
 writes committed original intent and expires the task. The full session/history/source-validation and
-persistence boundaries are documented in `docs/reference-recovery-mvp.md`. Missing Core sources remain
-rejected and explicitly tracked as a separate gap.
+persistence boundaries are documented in `docs/reference-recovery-mvp.md`. The missing-source
+extension below defines the additional bounded admission path.
 
 Proof: `[block136-repair-open]` in `tests/gui/gui_shell_reference_repair_tests.cpp`. The imported
 fixture has two plane-driven solids that fail initial recompute. The real file dialog opens it for
 repair, followed by partial-preview failure, two staged plane replacements, whole Preview/Fit/Apply,
 Undo/Redo with different derived presentations, and canonical Save/Open through file controls.
 Session authority proofs are `[repair-open-session]` in `tests/gui/gui_document_session_tests.cpp`.
+
+
+### Missing-source repair opening — 2026-10-23
+
+The same explicit repair-open command now retains absent producers of face-derived workplanes and
+projected semantic/construction point/line references. Original typed source identities and actual
+resolver diagnostics remain visible; replacement selection is explicit. The session stays Failed
+with no cache or derived presentation. Staging one reference may retain unchanged missing inputs;
+every incomplete whole-model Preview fails. After all missing inputs and downstream Geometry are
+valid, one Apply publishes the complete repair. Undo restores the original failed intent and clears
+presentation; Redo recomputes the repaired model. Normal Open remains strict, including after saving
+an unrepaired copy. No new controls or serialized recovery flags are introduced.
+
+Core admission and validation limits live in `docs/reference-recovery-mvp.md`. Proof:
+`[block136-missing-reference]` in `tests/gui/gui_shell_reference_repair_tests.cpp`, including six
+missing face/semantic/construction sources, a generated-line consumer, two solids, real file-dialog,
+popup/list/button/Fit/history input, preview cancellation and committed-only saving. Explicit
+constraint-diagnostic suggestion controls remain open; the family and Block 136 remain partial.

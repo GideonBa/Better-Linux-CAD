@@ -1,3 +1,4 @@
+#include "../support/missing_reference_fixture.hpp"
 #include "../support/reference_repair_fixture.hpp"
 #include "../support/repair_open_fixture.hpp"
 #include "blcad/core/part_document_json.hpp"
@@ -872,6 +873,124 @@ void file_input(ShellWindow& window, const char* action_name, const QString& pat
   REQUIRE(selected);
 }
 } // namespace
+TEST_CASE(
+    "Missing-source shell repair cancels and saves only committed intent during partial staging",
+    "[gui][block136-missing-reference]") {
+  ShellWindow window;
+  QTemporaryDir directory;
+  const auto path = directory.filePath("missing.blcad.json");
+  {
+    QFile file(path);
+    REQUIRE(file.open(QIODevice::WriteOnly));
+    const auto input = test::missing_reference_fixture_json();
+    REQUIRE(file.write(QByteArray::fromStdString(input)) == static_cast<qint64>(input.size()));
+  }
+  REQUIRE(window.open_path(path, GuiDocumentOpenMode::ReferenceRepair));
+  REQUIRE(window.reference_repair_tools().active());
+  const auto before = snapshot(window);
+  queue_repair(window, "sketch.refs/point", "feature.new.vertex.top_front_right");
+  control<QPushButton>(window, "preview").click();
+  CHECK_FALSE(control<QPushButton>(window, "apply").isEnabled());
+  CHECK_FALSE(window.viewport().feature_preview_active());
+  CHECK(snapshot(window) == before);
+  window.reference_repair_tools().cancel();
+  CHECK(snapshot(window) == before);
+  CHECK(window.session().reference_repair_mode());
+  REQUIRE(window.reference_repair_tools().begin());
+  queue_repair(window, "plane/", "feature.new.face.top");
+  const auto saved = directory.filePath("missing-saved.blcad.json");
+  REQUIRE(window.save_to(saved));
+  CHECK(bytes(saved).toStdString() == before);
+  CHECK_FALSE(window.reference_repair_tools().active());
+  CHECK_FALSE(read_part_document_json_file(saved.toStdString()));
+  CHECK_FALSE(window.open_path(saved));
+  CHECK(snapshot(window) == before);
+  REQUIRE(window.open_path(saved, GuiDocumentOpenMode::ReferenceRepair));
+  CHECK(window.session().reference_repair_mode());
+  CHECK_FALSE(window.session().dirty());
+}
+
+TEST_CASE("Native input repairs six missing face point and line sources in one saved history step",
+          "[gui][block136-missing-reference][shell-missing-reference-input]") {
+  const bool old_dialogs = QApplication::testAttribute(Qt::AA_DontUseNativeDialogs);
+  QApplication::setAttribute(Qt::AA_DontUseNativeDialogs, true);
+  struct RestoreDialogs {
+    bool old;
+    ~RestoreDialogs() {
+      QApplication::setAttribute(Qt::AA_DontUseNativeDialogs, old);
+    }
+  } restore{old_dialogs};
+  ShellWindow window;
+  window.resize(1280, 800);
+  window.show();
+  qApp->processEvents();
+  if (QApplication::platformName() == "xcb")
+    REQUIRE(window.viewport().native_viewer_available());
+  QTemporaryDir directory;
+  const auto path = directory.filePath("six-missing.blcad.json");
+  {
+    QFile file(path);
+    REQUIRE(file.open(QIODevice::WriteOnly));
+    const auto input = test::missing_reference_fixture_json();
+    REQUIRE(file.write(QByteArray::fromStdString(input)) == static_cast<qint64>(input.size()));
+  }
+  file_input(window, "open_repair", path);
+  REQUIRE(window.reference_repair_tools().active());
+  REQUIRE(window.session().reference_repair_mode());
+  const auto before = snapshot(window);
+  const std::vector<std::pair<QString, QString>> changes{
+      {"sketch.refs/point", "feature.new.vertex.top_front_right"},
+      {"plane/", "feature.new.face.top"},
+      {"sketch.refs/point.construction", "feature.new.vertex.bottom_back_left"},
+      {"sketch.refs/edge", "feature.new.edge.top_front"},
+      {"plane.second/", "feature.new.face.top"},
+      {"sketch.refs/line.construction", "feature.new.edge.top_front"}};
+  for (std::size_t index = 0; index < changes.size(); ++index) {
+    mouse_choose(control<QComboBox>(window, "reference"), changes[index].first);
+    mouse_choose(control<QComboBox>(window, "replacement"), changes[index].second);
+    click(control<QPushButton>(window, "stage"));
+    REQUIRE(control<QListWidget>(window, "pending").count() == static_cast<int>(index + 1));
+    click(control<QPushButton>(window, "preview"));
+    CHECK(control<QPushButton>(window, "apply").isEnabled() == (index + 1 == changes.size()));
+    CHECK(snapshot(window) == before);
+    CHECK_FALSE(window.session().part_shape_cache());
+  }
+  REQUIRE(window.viewport().feature_preview_active());
+  auto* fit = window.findChild<QAction*>("blcad.action.fit");
+  REQUIRE(fit);
+  ribbon_command(window, *fit, 2);
+  if (QApplication::platformName() == "xcb") {
+    const auto captures = qEnvironmentVariable("BLCAD_UI_CAPTURE_DIR");
+    if (!captures.isEmpty()) {
+      REQUIRE(QDir().mkpath(captures));
+      CHECK(window.grab().save(QDir(captures).filePath("missing-reference-preview.png")));
+    }
+  }
+  click(control<QPushButton>(window, "apply"));
+  CHECK_FALSE(window.session().reference_repair_mode());
+  REQUIRE(window.session().part_shape_cache());
+  const auto after = snapshot(window);
+  auto* undo = window.findChild<QAction*>("blcad.action.undo");
+  auto* redo = window.findChild<QAction*>("blcad.action.redo");
+  REQUIRE(undo);
+  REQUIRE(redo);
+  ribbon_command(window, *undo, 0);
+  CHECK(snapshot(window) == before);
+  CHECK(window.session().reference_repair_mode());
+  CHECK_FALSE(window.session().part_shape_cache());
+  CHECK(window.viewport().presentation_count() == 0);
+  CHECK_FALSE(window.session().can_undo());
+  ribbon_command(window, *redo, 0);
+  CHECK(snapshot(window) == after);
+  CHECK_FALSE(window.session().reference_repair_mode());
+  CHECK(window.viewport().presentation_count() > 0);
+  const auto saved = directory.filePath("six-repaired.blcad.json");
+  file_input(window, "save_as", saved);
+  CHECK_FALSE(window.session().dirty());
+  file_input(window, "open", saved);
+  CHECK(snapshot(window) == after);
+  CHECK(window.session().derived_results_fresh());
+}
 TEST_CASE(
     "Repair opening keeps failed Part intent and preview saves distinct from repaired geometry",
     "[gui][block136-repair-open]") {

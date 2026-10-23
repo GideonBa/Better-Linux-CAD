@@ -1,3 +1,4 @@
+#include "../support/missing_reference_fixture.hpp"
 #include "blcad/gui/gui_document_session.hpp"
 
 #include "../support/repair_open_fixture.hpp"
@@ -215,7 +216,77 @@ std::filesystem::path failed_part_file(const QTemporaryDir& directory) {
 std::string part_snapshot(const GuiDocumentSession& session) {
   return test::reference_checked(serialize_part_document_to_json(*session.part_document()));
 }
+std::filesystem::path missing_part_file(const QTemporaryDir& directory) {
+  const auto path = std::filesystem::path(directory.filePath("missing.blcad.json").toStdString());
+  std::ofstream(path) << test::missing_reference_fixture_json();
+  return path;
+}
 } // namespace
+TEST_CASE("Missing-source repair opening saving atomic publication and history preserve intent",
+          "[gui][document-session][missing-reference-session]") {
+  QTemporaryDir directory;
+  const auto path = missing_part_file(directory);
+  GuiDocumentSession session;
+  REQUIRE(session.create_part(DocumentId("previous"), "Previous"));
+  const auto previous = part_snapshot(session);
+  CHECK_FALSE(session.open_file(path, true));
+  CHECK(part_snapshot(session) == previous);
+  REQUIRE(session.open_file(path, true, GuiDocumentOpenMode::ReferenceRepair));
+  const auto before = part_snapshot(session);
+  CHECK(session.reference_repair_mode());
+  CHECK_FALSE(session.part_shape_cache());
+  CHECK_FALSE(session.dirty());
+  CHECK_FALSE(session.recompute());
+  CHECK(session.reference_repair_mode());
+  CHECK_FALSE(session.part_shape_cache());
+  CHECK_FALSE(session.commit_part_repair_transaction(
+      "Partial", [](PartDocument& part) { return test::repair_open_planes(part); }));
+  CHECK(part_snapshot(session) == before);
+  CHECK_FALSE(session.can_undo());
+  const auto saved_failed = directory.filePath("failed-copy.blcad.json").toStdString();
+  REQUIRE(session.save_as(saved_failed));
+  CHECK(read_file(saved_failed) == before);
+  CHECK_FALSE(read_part_document_json_file(saved_failed));
+  REQUIRE(session.commit_part_repair_transaction("Repair missing references",
+                                                 test::repair_all_missing_references));
+  REQUIRE(session.part_shape_cache());
+  CHECK_FALSE(session.reference_repair_mode());
+  const auto after = part_snapshot(session);
+  CHECK(session.dirty());
+  REQUIRE(session.save());
+  REQUIRE(session.undo());
+  CHECK(part_snapshot(session) == before);
+  CHECK(session.reference_repair_mode());
+  CHECK_FALSE(session.part_shape_cache());
+  CHECK(session.dirty());
+  REQUIRE(session.redo());
+  CHECK(part_snapshot(session) == after);
+  CHECK_FALSE(session.reference_repair_mode());
+  CHECK_FALSE(session.dirty());
+  REQUIRE(read_part_document_json_file(saved_failed));
+  GuiDocumentSession reopened;
+  REQUIRE(reopened.open_file(saved_failed));
+  CHECK(part_snapshot(reopened) == after);
+}
+
+TEST_CASE("Missing-source admission still validates sidecars and preserves the previous session",
+          "[gui][document-session][missing-reference-session]") {
+  QTemporaryDir directory;
+  const auto path = missing_part_file(directory);
+  GuiDocumentSession session;
+  REQUIRE(session.create_part(DocumentId("previous"), "Previous"));
+  const auto before = part_snapshot(session);
+  for (const std::string suffix : {".sketch-constraints.json", ".sketch-dimensions.json"}) {
+    const auto sidecar = path.string() + suffix;
+    std::ofstream(sidecar) << "{}";
+    CHECK_FALSE(session.open_file(path, true, GuiDocumentOpenMode::ReferenceRepair));
+    CHECK(part_snapshot(session) == before);
+    CHECK_FALSE(session.reference_repair_mode());
+    REQUIRE(std::filesystem::remove(sidecar));
+  }
+  REQUIRE(session.open_file(path, true, GuiDocumentOpenMode::ReferenceRepair));
+  CHECK(session.reference_repair_mode());
+}
 TEST_CASE("Repair opening retains Core-valid failed intent without exposing partial Geometry",
           "[gui][document-session][repair-open-session]") {
   QTemporaryDir directory;
@@ -339,7 +410,7 @@ TEST_CASE("Repair opening preserves strict validation and blocks ordinary transa
   const std::string source = "\"source_feature\": \"feature.old\"";
   const auto at = corrupt.find(source);
   REQUIRE(at != std::string::npos);
-  corrupt.replace(at, source.size(), "\"source_feature\": \"feature.absent\"");
+  corrupt.replace(at, source.size(), "\"source_feature\": \"width\"");
   std::ofstream(corrupt_path) << corrupt;
   CHECK_FALSE(session.open_file(corrupt_path, false, GuiDocumentOpenMode::ReferenceRepair));
   CHECK(part_snapshot(session) == before);

@@ -778,6 +778,21 @@ Contract/proof: `docs/reference-recovery-mvp.md`, `docs/gui-sketch-workbench-mvp
 Verification lives in `docs/gui-shell-acceptance-mvp9r.md`. Core-invalid missing-source documents and
 constraint-diagnostic suggestion controls still keep the family and Block 136 partial.
 
+### Block 136 — Missing-source reference recovery — 2026-10-23
+
+Explicit Part repair loading now retains absent sources of existing face-derived workplanes and
+projected semantic/construction points and lines. The loader preserves typed intent and authored
+order without synthetic source records; ordinary loading and unrelated Core validation stay strict.
+Intermediate Sketch repairs retain only unchanged missing inputs. Complete Geometry validates all
+reference sources before cache mutation, so partial repairs cannot publish even when a projected
+input has no executable consumer. Failed-state saving/history reuse the bounded repair-load mode.
+
+Contract/proof: `docs/reference-recovery-mvp.md`, `[missing-reference-recovery]`,
+`[missing-reference-session]` and actual six-input shell workflow `[block136-missing-reference]`.
+Verification lives in `docs/gui-shell-acceptance-mvp9r.md`. This closes the recorded bounded
+missing-source loading gap; constraint-diagnostic suggestion controls keep the family and Block 136
+partial. Missing sources in other feature/construction kinds remain outside this repair contract.
+
 ## Current next technical step — Block 136
 
 The current v3 coverage inventory records all eighteen accepted families, current shell proof sources,
@@ -785,10 +800,10 @@ reachable entry points and explicit remaining gaps. The machine check distinguis
 from closure readiness; historical controller proofs cannot close a shell gap. Acceptance contract:
 `docs/gui-shell-acceptance-mvp9r.md`, `[integration][gui-feature-coverage]` / `[gui][shell-coverage]`.
 
-Audit Core-invalid missing-source recovery next, preserving strict ordinary loading, typed intent
-and atomic repair publication. Explicit repair opening now supports Core-valid failed-recompute Parts
-and their history. Restore constraint-diagnostic suggestion controls next, followed by Sketch3D
-authoring.
+Restore explicit constraint-diagnostic suggestion controls next, followed by Sketch3D authoring.
+The bounded repair-open path now supports failed-recompute Parts and missing face/point/line sources,
+with typed intent, complete atomic publication and failed-state history. Other structural dependency
+failures remain strict loading errors.
 The construction task now has fourteen bounded create/edit modes, native reference collection and
 position/direction/frame/new-offset grips. Continue with parameter/Hole/extent editors, workspace
 navigation/context, advanced Assembly controls and integrated native Part/Assembly acceptance in the
