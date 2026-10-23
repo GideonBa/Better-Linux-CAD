@@ -53,6 +53,9 @@ public:
   [[nodiscard]] GuiInteractivePatternMirrorController& pattern_mirror() noexcept {
     return pattern_mirror_;
   }
+  [[nodiscard]] const GuiInteractivePatternMirrorController& pattern_mirror() const noexcept {
+    return pattern_mirror_;
+  }
   [[nodiscard]] GuiInteractiveBodyOperationController& body_operation() noexcept {
     return body_operation_;
   }

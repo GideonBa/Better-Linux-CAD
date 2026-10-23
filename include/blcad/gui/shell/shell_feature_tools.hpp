@@ -18,6 +18,7 @@ class QEvent;
 class QLabel;
 class QFormLayout;
 class QLineEdit;
+class QSpinBox;
 class QPushButton;
 class QString;
 class QWidget;
@@ -36,7 +37,18 @@ class ShellWindow;
 // polling timer).
 class ShellFeatureTools final : public QObject {
 public:
-  enum class Command { None, Extrude, Revolve, Fillet, Chamfer, Shell, Draft };
+  enum class Command {
+    None,
+    Extrude,
+    Revolve,
+    Fillet,
+    Chamfer,
+    Shell,
+    Draft,
+    LinearPattern,
+    CircularPattern,
+    BodyMirror
+  };
 
   ShellFeatureTools(ShellWindow& window, GuiDocumentSession& session,
                     const GuiSketchWorkbench& sketch_workbench, OcctViewport& viewport,
@@ -76,6 +88,27 @@ public:
   [[nodiscard]] Result<std::size_t> begin_extrude();
   [[nodiscard]] Result<std::size_t> begin_revolve(std::optional<DatumAxisId> axis = std::nullopt);
   [[nodiscard]] Result<std::size_t> begin_finishing(Command command);
+  [[nodiscard]] Result<std::size_t> begin_pattern(Command command);
+  [[nodiscard]] bool accept_pattern_selection(const GuiSelection& selection);
+  [[nodiscard]] QListWidget& pattern_source_editor() noexcept {
+    return *pattern_sources_;
+  }
+  [[nodiscard]] QComboBox& pattern_reference_editor() noexcept {
+    return *pattern_reference_;
+  }
+  [[nodiscard]] QComboBox& pattern_extent_editor() noexcept {
+    return *pattern_extent_;
+  }
+  [[nodiscard]] QComboBox& pattern_direction_editor() noexcept {
+    return *pattern_direction_;
+  }
+  [[nodiscard]] QSpinBox& pattern_count_editor() noexcept {
+    return *pattern_count_editor_;
+  }
+  [[nodiscard]] QPushButton& pattern_reference_button() noexcept {
+    return *pattern_reference_button_;
+  }
+  [[nodiscard]] Result<GuiPartFeaturePreview> set_pattern_count(int value);
   [[nodiscard]] bool accept_finishing_selection(const GuiSelection& selection);
   [[nodiscard]] std::vector<geometry::ViewportSceneItem> finishing_selection_items() const;
   [[nodiscard]] QComboBox& finishing_body_editor() noexcept {
@@ -108,6 +141,14 @@ protected:
 
 private:
   [[nodiscard]] bool finishing() const noexcept;
+  [[nodiscard]] bool pattern() const noexcept;
+  [[nodiscard]] QString pattern_summary() const;
+  void build_pattern_controls(QWidget* panel);
+  void refresh_pattern_preview();
+  [[nodiscard]] Result<std::size_t> rebuild_pattern_controller();
+  void update_pattern_pick_mode();
+  void synchronize_pattern_editors();
+  [[nodiscard]] double value_for_handle(std::string_view handle) const noexcept;
   [[nodiscard]] std::string_view command_id() const noexcept;
   [[nodiscard]] bool angular_value() const noexcept;
   [[nodiscard]] QString finishing_summary() const;
@@ -162,6 +203,35 @@ private:
   std::uint32_t previous_selection_mask_{0};
   double finishing_first_value_{1};
   double finishing_second_value_{1};
+
+  struct PatternAxisChoice {
+    AxisReference reference;
+    Point3 origin;
+    Vector3 direction;
+    std::string semantic_id;
+  };
+  struct PatternPlaneChoice {
+    PlaneReference reference;
+    std::string semantic_id;
+  };
+  std::vector<PatternAxisChoice> pattern_axes_;
+  std::vector<PatternPlaneChoice> pattern_planes_;
+  std::vector<std::pair<Command, QAction*>> pattern_actions_;
+  QWidget* pattern_controls_{nullptr};
+  QListWidget* pattern_sources_{nullptr};
+  QComboBox* pattern_reference_{nullptr};
+  QComboBox* pattern_extent_{nullptr};
+  QComboBox* pattern_direction_{nullptr};
+  QSpinBox* pattern_count_editor_{nullptr};
+  QPushButton* pattern_reference_button_{nullptr};
+  FeatureId pattern_feature_{""};
+  BodyId pattern_result_{""};
+  std::string pattern_name_;
+  ParameterId pattern_count_parameter_{""};
+  ParameterId pattern_extent_parameter_{""};
+  double pattern_value_{40};
+  int pattern_count_{3};
+  bool pattern_reference_picking_{false};
 
   std::optional<std::pair<SketchId, ProfileId>> selected_profile_;
   std::optional<double> drag_start_value_;

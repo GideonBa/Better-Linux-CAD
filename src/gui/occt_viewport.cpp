@@ -1609,6 +1609,9 @@ void OcctViewport::apply_sketch_focus() {
       impl_->context->Erase(impl_->feature_preview->interactive, false);
     else
       impl_->context->Display(impl_->feature_preview->interactive, false);
+    // Visibility changes must never turn a disposable result into a pick owner.
+    impl_->context->SetSelectionModeActive(impl_->feature_preview->interactive, 0, false,
+                                           AIS_SelectionModesConcurrency_Single, true);
   }
   // Display() can reactivate an object's default selection mode. Apply the
   // capability filter after every visibility change, including preview updates.

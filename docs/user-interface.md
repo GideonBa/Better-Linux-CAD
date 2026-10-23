@@ -443,3 +443,15 @@ unchanged, while Apply creates one undo entry including its new driving paramete
 
 This first Block-136 slice supports stable box roles from axis-aligned Sketch rectangles. The
 remaining feature ribbon families and browser feature editing remain in the plan.
+
+## Body patterns and Mirror
+
+The 3D-Modell **Muster** group provides **Lineares Muster**, **Kreismuster** and **Körper spiegeln**.
+Toggle multiple source Bodies in the model or list. Choose a pattern axis or mirror plane in the
+reference chooser, or click **Referenz im Modell wählen** to pick it in the viewport. Source picks
+survive reference changes. Linear patterns support spacing or total length and either direction;
+circular patterns use equal spacing over a total angle up to 360 degrees. Count includes the original
+placement. Spacing, angle and integer count have numeric editors and separate viewport handles.
+
+Previews use the actual computed result. Apply creates a new result Body and any driving parameters
+in the same undo step; source Bodies remain unchanged. Cancel/Escape discards all pending inputs.

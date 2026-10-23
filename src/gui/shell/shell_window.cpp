@@ -831,6 +831,8 @@ void ShellWindow::apply_viewport_selection(const std::optional<GuiSelection>& se
     (void)session_.selection().add(*selection);
     if (feature_tools_)
       (void)feature_tools_->accept_finishing_selection(*selection);
+    if (feature_tools_)
+      (void)feature_tools_->accept_pattern_selection(*selection);
     selected_semantic_id_ = selection->semantic_id;
     if (feature_tools_)
       if (const auto* part = session_.part_document())

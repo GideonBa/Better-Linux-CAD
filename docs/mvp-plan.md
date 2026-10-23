@@ -569,13 +569,25 @@ The target picker supports current, unambiguous semantic box edges/faces, includ
 as four Sketch lines. Cancel, Undo/Redo and Save/Open use the existing authorities. Contract and proof:
 `docs/gui-interactive-finishing-mvp9.md`, tag `[block136-finishing]`.
 
-This slice leaves the rest of Block 136 open: Pattern, Mirror, Boolean, Body Transform, Sweep, Loft,
-Surface, Measure, Assembly, browser feature editing and complete replacement-shell acceptance.
+The remaining Block-136 work is tracked by the follow-up slices and current next step below.
+
+### Block 136 — Body pattern and Mirror slice
+
+The replacement shell restores linear and circular Body patterns and Body Mirror through the shared
+Feature task panel. Multiple source Bodies can be toggled in the model or list; datum/construction
+axes and planes can be chosen from the editor or picked in the model. Spacing/total extent, direction,
+angle and integer count share live Geometry previews with the numeric editors and separate drag
+handles. Candidate-only parameters and the result Body commit atomically with the feature. Cancel,
+Undo/Redo and Save/Open preserve the existing authorities. Contract and proof:
+`docs/gui-interactive-pattern-body-mvp9.md`, tag `[block136-patterns]`.
+
+Body Boolean, Body Transform, Sweep, Loft, Surface, Measure, Assembly, browser feature editing and
+whole-block acceptance remain open.
 
 ## Current next technical step — Block 136
 
-Restore the remaining feature commands (Pattern, Mirror, Boolean, Body Transform, Sweep, Loft,
-Surface, Measure, and Assembly), browser-double-click feature editing, and
+Restore the remaining feature commands (Body Boolean, Body Transform, Sweep, Loft, Surface, Measure,
+and Assembly), browser-double-click feature editing, and
 replacement-shell acceptance/coverage as defined in `docs/gui-shell-reset-sequence-mvp9r.md`.
 
 ## Later phases
