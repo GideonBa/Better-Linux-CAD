@@ -3,6 +3,7 @@
 #include "blcad/geometry/recompute_executor.hpp"
 #include "blcad/geometry/semantic_reference_evaluator.hpp"
 #include "blcad/geometry/viewport_scene.hpp"
+#include "blcad/gui/shell/shell_manipulator_overlay.hpp"
 #include "blcad/gui/shell/shell_ribbon.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
 
@@ -39,11 +40,6 @@ Result<std::size_t> insert(PartDocument& part, Result<T> object, Add add) {
 }
 Vector3 vector(const std::array<QDoubleSpinBox*, 3>& controls) {
   return {controls[0]->value(), controls[1]->value(), controls[2]->value()};
-}
-Vector3 unit(Vector3 value) {
-  const double magnitude = length(value);
-  return magnitude > 1e-12 ? Vector3{value.x / magnitude, value.y / magnitude, value.z / magnitude}
-                           : Vector3{};
 }
 void select_generated(QComboBox* combo, const FeatureId& feature, int element) {
   combo->setCurrentIndex(-1);
@@ -163,6 +159,19 @@ ShellConstructionTools::ShellConstructionTools(ShellWindow& window, ShellRibbon&
   pick_role_->setObjectName("blcad.construction.pick_role");
   form_->addRow(QStringLiteral("Modellklick wählt"), pick_role_);
   connect(pick_role_, &QComboBox::currentIndexChanged, this, [this] { update_pick_scope(); });
+  manipulation_ = new QComboBox(inputs);
+  manipulation_->setObjectName("blcad.construction.manipulation");
+  form_->addRow(QStringLiteral("Griffe"), manipulation_);
+  grip_numeric_ = new QLineEdit(inputs);
+  grip_numeric_->setObjectName("blcad.construction.grip_numeric");
+  grip_numeric_->setPlaceholderText(QStringLiteral("Griff ziehen, dann mm oder deg eingeben"));
+  grip_numeric_->setReadOnly(true);
+  form_->addRow(QStringLiteral("Griffwert"), grip_numeric_);
+  connect(manipulation_, &QComboBox::currentIndexChanged, this, [this] {
+    cancel_drag();
+    refresh_handles();
+  });
+  connect(grip_numeric_, &QLineEdit::textEdited, this, [this] { edit_grip_numeric(); });
   layout->addLayout(form_);
   summary_ = new QLabel(inputs);
   summary_->setObjectName("blcad.construction.summary");
@@ -185,6 +194,10 @@ ShellConstructionTools::ShellConstructionTools(ShellWindow& window, ShellRibbon&
   dock_->installEventFilter(this);
   window.installEventFilter(this);
   window.viewport().installEventFilter(this);
+  overlay_ = make_shell_manipulator_overlay(&window.viewport(), layer_);
+  overlay_->setObjectName("blcad.construction.manipulator_overlay");
+  manipulation_->installEventFilter(this);
+  grip_numeric_->installEventFilter(this);
   // Children added to the panel are explicit task controls, not discovered widgets.
   for (auto* control : {static_cast<QWidget*>(kind_), static_cast<QWidget*>(name_),
                         static_cast<QWidget*>(apply_), static_cast<QWidget*>(cancel)})
@@ -197,6 +210,7 @@ ShellConstructionTools::ShellConstructionTools(ShellWindow& window, ShellRibbon&
       control->installEventFilter(this);
   offset_->installEventFilter(this);
   connect(kind_, &QComboBox::currentIndexChanged, this, [this] {
+    cancel_drag();
     update_inputs();
     update_preview();
     if (active_)
@@ -464,6 +478,9 @@ Result<std::size_t> ShellConstructionTools::open_task() {
   revision_ = session.presentation_revision();
   previous_filter_ = window_.viewport().selection_filter_mask();
   previous_scope_ = window_.viewport().selection_semantic_scope();
+  precise_values_.reset();
+  precise_offset_.reset();
+  numeric_invalid_ = false;
   {
     const QSignalBlocker blocker(pick_role_);
     pick_role_->clear();
@@ -474,6 +491,7 @@ Result<std::size_t> ShellConstructionTools::open_task() {
   dock_->raise();
   window_.refresh_feature_selection_scene();
   update_preview();
+  refresh_presentation();
   window_.refresh();
   return Result<std::size_t>::success(1);
 }
@@ -509,12 +527,15 @@ void ShellConstructionTools::update_inputs() {
       const bool previous = updating_;
       updating_ = true;
       offset_->setValue(parameter->value().millimeters());
+      precise_offset_ = parameter->value().millimeters();
+      precise_offset_display_ = offset_->value();
       updating_ = previous;
     }
   show_row(face_, kind == Kind::FacePlane);
   show_row(edge_, kind == Kind::PointOnEdge || kind == Kind::ParallelEdgeThroughPoint);
   show_row(vertex_, kind == Kind::PointOnVertex);
   update_pick_roles();
+  update_manipulator_mode();
 }
 
 QComboBox* ShellConstructionTools::pick_input() const {
@@ -597,22 +618,12 @@ Result<std::size_t> ShellConstructionTools::populate(PartDocument& part) const {
                         : name_->text().trimmed().toStdString();
   if (name.empty())
     return Result<std::size_t>::failure(error("Name darf nicht leer sein"));
-  const auto coordinates = [&] {
-    auto value = vector(origin_);
-    if (editing_) {
-      if (value.x == initial_values_[0].x)
-        value.x = original_values_[0].x;
-      if (value.y == initial_values_[0].y)
-        value.y = original_values_[0].y;
-      if (value.z == initial_values_[0].z)
-        value.z = original_values_[0].z;
-    }
-    return value;
-  }();
+  const auto values = definition_values();
+  const auto coordinates = values[0];
   const Point3 origin{coordinates.x, coordinates.y, coordinates.z};
-  const bool direction_unchanged = editing_ && vector(direction_) == initial_values_[1];
-  const bool y_unchanged = editing_ && vector(y_direction_) == initial_values_[2];
-  const auto direction = direction_unchanged ? original_values_[1] : unit(vector(direction_));
+  const bool direction_unchanged = editing_ && values[1] == original_values_[1];
+  const bool y_unchanged = editing_ && values[2] == original_values_[2];
+  const auto direction = values[1];
   const ConstructionRelationId relation_id(relation_id_);
   switch (kind) {
   case Kind::PointOnEdge:
@@ -708,7 +719,7 @@ Result<std::size_t> ShellConstructionTools::populate(PartDocument& part) const {
                       ConstructionLineId(line_->currentData().toString().toStdString())),
                   editing_ ? &PartDocument::update_datum_axis : &PartDocument::add_datum_axis);
   case Kind::Plane: {
-    const auto y = y_unchanged ? original_values_[2] : unit(vector(y_direction_));
+    const auto y = values[2];
     return insert(part,
                   ConstructionPlane::create_explicit(
                       ConstructionPlaneId(id_), name, origin, direction, y,
@@ -747,7 +758,7 @@ Result<std::size_t> ShellConstructionTools::populate(PartDocument& part) const {
       parameter = ParameterId(id_ + ".offset");
       for (std::size_t suffix = 2; part.dependency_graph().has_node(parameter.value()); ++suffix)
         parameter = ParameterId(id_ + ".offset." + std::to_string(suffix));
-      auto quantity = Quantity::length_mm(offset_->value(), parameter.value());
+      auto quantity = Quantity::length_mm(offset_value(), parameter.value());
       if (!quantity)
         return Result<std::size_t>::failure(quantity.error());
       auto parameter_name = "Versatz " + name;
@@ -876,11 +887,24 @@ void ShellConstructionTools::update_preview() {
   auto result = preview();
   if (!result)
     summary_->setText(QString::fromStdString(result.error().message()));
+  if (numeric_invalid_) {
+    apply_->setEnabled(false);
+    summary_->setText(
+        QStringLiteral("Ungültiger Griffwert. Zahl in mm bzw. deg eingeben oder Escape drücken."));
+  }
+  refresh_handles();
 }
 Result<std::size_t> ShellConstructionTools::apply() {
   if (!current())
     return Result<std::size_t>::failure(
         error("Modell oder Befehl geändert. Konstruktion neu öffnen."));
+  if (numeric_invalid_)
+    return Result<std::size_t>::failure(
+        error("Ungültiger Griffwert. Wert korrigieren oder Escape drücken."));
+  drag_.reset();
+  layer_.cancel();
+  if (window_.viewport().mouseGrabber() == &window_.viewport())
+    window_.viewport().releaseMouse();
   // Keyboard tracking is disabled for numeric refinement. A click on Apply
   // must consume pending editor text even before native focus-out is delivered.
   updating_ = true;
@@ -905,6 +929,13 @@ void ShellConstructionTools::cancel() {
   if (!active_)
     return;
   active_ = false;
+  drag_.reset();
+  layer_.clear_handles();
+  if (window_.viewport().mouseGrabber() == &window_.viewport())
+    window_.viewport().releaseMouse();
+  grip_numeric_->clear();
+  grip_numeric_->setReadOnly(true);
+  overlay_->hide();
   if (window_.session().task().command_id() == (editing_ ? edit_task_id : task_id))
     (void)window_.session().task().cancel();
   window_.viewport().clear_feature_preview();
@@ -928,9 +959,14 @@ void ShellConstructionTools::refresh() {
   workplane_action_->setEnabled(enabled);
 }
 bool ShellConstructionTools::eventFilter(QObject* watched, QEvent* event) {
+  if (manipulator_event(watched, event))
+    return true;
   if (active_ && event->type() == QEvent::KeyPress &&
       static_cast<QKeyEvent*>(event)->key() == Qt::Key_Escape) {
-    cancel();
+    if (drag_)
+      cancel_drag();
+    else
+      cancel();
     return true;
   }
   if (active_ && watched == dock_ && event->type() == QEvent::Close)

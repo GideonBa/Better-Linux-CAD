@@ -2,6 +2,7 @@
 
 #include "blcad/geometry/viewport_scene.hpp"
 #include "blcad/gui/gui_document_session.hpp"
+#include "blcad/gui/gui_viewport_manipulator.hpp"
 
 #include <QObject>
 #include <array>
@@ -43,12 +44,17 @@ public:
   };
 
   ShellConstructionTools(ShellWindow&, ShellRibbon&, int model_tab);
+  ~ShellConstructionTools() override;
   [[nodiscard]] Result<std::size_t> begin(Kind);
   [[nodiscard]] Result<std::size_t> begin_edit(std::string_view object_id);
   [[nodiscard]] Result<std::size_t> preview();
   [[nodiscard]] Result<std::size_t> apply();
   void cancel();
   void refresh();
+  void refresh_presentation();
+  [[nodiscard]] const GuiViewportManipulatorLayer& manipulators() const noexcept {
+    return layer_;
+  }
   [[nodiscard]] bool accept_selection(const GuiSelection&);
   [[nodiscard]] std::vector<geometry::ViewportSceneItem> selection_items() const;
   [[nodiscard]] bool active() const noexcept {
@@ -67,6 +73,16 @@ private:
   void fill_references();
   void update_pick_roles();
   void update_pick_scope();
+  void update_manipulator_mode();
+  void refresh_handles();
+  void synchronize_overlay();
+  void cancel_drag();
+  void accept_candidate(const GuiViewportManipulatorCandidate&);
+  void edit_grip_numeric();
+  [[nodiscard]] bool manipulator_event(QObject*, QEvent*);
+  [[nodiscard]] std::array<Vector3, 3> definition_values() const;
+  [[nodiscard]] double offset_value() const;
+  void write_values(const std::array<Vector3, 3>&);
   [[nodiscard]] QComboBox* pick_input() const;
   void show_row(QWidget*, bool);
   ShellWindow& window_;
@@ -74,6 +90,22 @@ private:
   QFormLayout* form_{};
   QComboBox* kind_{};
   QComboBox* pick_role_{};
+  QComboBox* manipulation_{};
+  QLineEdit* grip_numeric_{};
+  QWidget* overlay_{};
+  GuiViewportManipulatorLayer layer_;
+  std::optional<GuiViewportCameraBookmark> mapping_camera_;
+  std::array<int, 2> mapping_size_{};
+  struct DragState {
+    std::array<Vector3, 3> values, display;
+    double offset, displayed_offset;
+  };
+  std::optional<DragState> drag_;
+  std::optional<std::array<Vector3, 3>> precise_values_;
+  std::array<Vector3, 3> precise_display_{};
+  std::optional<double> precise_offset_;
+  double precise_offset_display_{};
+  bool numeric_invalid_{false};
   QLineEdit* name_{};
   std::array<QDoubleSpinBox*, 3> origin_{};
   std::array<QDoubleSpinBox*, 3> direction_{};

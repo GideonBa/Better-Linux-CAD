@@ -308,6 +308,7 @@ if(BLCAD_BUILD_GUI)
     src/gui/shell/shell_measure_tools.cpp
     src/gui/shell/shell_inspect_tools.cpp
     src/gui/shell/shell_construction_tools.cpp
+    src/gui/shell/shell_construction_manipulators.cpp
     src/gui/shell/shell_assembly_tools.cpp
     src/gui/shell/shell_feature_edit_tools.cpp
     src/gui/shell/shell_manipulator_overlay.cpp

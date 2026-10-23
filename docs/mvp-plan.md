@@ -724,6 +724,20 @@ Contract/proof: `docs/gui-sketch-workbench-mvp7.md`, `[block136-construction-pic
 `docs/gui-shell-acceptance-mvp9r.md`. Construction position/direction/offset manipulators remain open;
 this slice does not close the datum family or Block 136.
 
+### Block 136 — Construction position, direction/frame and offset grips — 2026-10-23
+
+The construction task consumes the shared manipulator layer for explicit XYZ positions, World-axis
+line/axis directions and complete plane frames, plus positive offsets for new candidate parameters.
+Typed input overrides further pointer motion; final release, two-level Escape, focus/camera changes
+and task expiry preserve candidate/transaction authority. Full-precision frames survive rounded
+field presentation and later edits. Reference-driven definitions and shared offset bindings retain
+their reference/read-only controls. The headless camera bookmark path now retains restored values.
+
+Contract/proof: `docs/gui-sketch-workbench-mvp7.md`, `docs/gui-viewport-manipulators-mvp9.md`,
+`[shell-construction-manipulators]`, `[shell-combined-manipulators]` (the eighth combined UI workflow).
+The datum family's bounded surface is restored; remaining family gaps and integrated acceptance keep
+Block 136 open. Verification is recorded in `docs/gui-shell-acceptance-mvp9r.md`.
+
 ## Current next technical step — Block 136
 
 The current v3 coverage inventory records all eighteen accepted families, current shell proof sources,
@@ -731,11 +745,11 @@ reachable entry points and explicit remaining gaps. The machine check distinguis
 from closure readiness; historical controller proofs cannot close a shell gap. Acceptance contract:
 `docs/gui-shell-acceptance-mvp9r.md`, `[integration][gui-feature-coverage]` / `[gui][shell-coverage]`.
 
-Complete construction position/direction/offset manipulators next, building on the fourteen
-creation/edit modes, native role-based reference collection and resolved scene. Continue with
-reference repair and Sketch3D authoring,
-parameter/Hole/extent editors, workspace navigation/context, advanced Assembly controls and integrated
-native Part/Assembly acceptance in the order recorded in
+Implement explicit broken-reference repair in the replacement shell next, then Sketch3D authoring.
+The construction task now has fourteen bounded create/edit modes, native reference collection and
+position/direction/frame/new-offset grips. Continue with parameter/Hole/extent editors, workspace
+navigation/context, advanced Assembly controls and integrated native Part/Assembly acceptance in the
+order recorded in
 `docs/gui-shell-acceptance-mvp9r.md`. Block 136 remains in progress until all recorded gaps and pending
 workflows are resolved and the closure gate plus full/native regressions pass.
 

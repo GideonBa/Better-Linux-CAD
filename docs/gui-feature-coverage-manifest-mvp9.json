@@ -153,12 +153,10 @@
       },
       "shell": {
         "owner": 136,
-        "status": "partial",
+        "status": "restored",
         "contract": "docs/gui-sketch-workbench-mvp7.md",
-        "scope": "Seeded origins plus fourteen construction/workplane creation and same-ID editing modes, including generated edge/vertex points and parallel-through-point lines/planes, with native role-based reference collection, downstream recompute previews, atomic Apply, reference rebinding, history/persistence and Sketch entry.",
-        "gaps": [
-          "Restore construction position, direction and offset manipulators across the supported definitions."
-        ],
+        "scope": "Seeded origins plus fourteen construction/workplane creation and same-ID editing modes, including generated edge/vertex points and parallel-through-point lines/planes, with native role-based reference collection, explicit position/frame/direction and new-offset grips, downstream recompute previews, atomic Apply, reference rebinding, history/persistence and Sketch entry.",
+        "gaps": [],
         "proofs": [
           {
             "filter": "[gui][origin]",
@@ -189,6 +187,14 @@
             "source": "tests/gui/gui_shell_construction_tools_tests.cpp"
           },
           {
+            "filter": "[shell-construction-manipulators]",
+            "source": "tests/gui/gui_shell_construction_tools_tests.cpp"
+          },
+          {
+            "filter": "[shell-combined-manipulators]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
+          },
+          {
             "filter": "[shell-combined-construction]",
             "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
           }
@@ -201,7 +207,10 @@
         "widgets": [
           "blcad.shell.browser",
           "blcad.shell.construction_task",
-          "blcad.construction.pick_role"
+          "blcad.construction.pick_role",
+          "blcad.construction.manipulation",
+          "blcad.construction.grip_numeric",
+          "blcad.construction.manipulator_overlay"
         ]
       }
     },
@@ -779,7 +788,6 @@
       "blocked_families": [
         "viewport-selection",
         "parameters-expressions",
-        "datum-construction-workplanes",
         "planar-sketch-reference-repair",
         "bodies-extrude-revolve-holes",
         "sketch3d-pathcurve",

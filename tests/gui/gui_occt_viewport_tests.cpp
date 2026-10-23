@@ -65,8 +65,7 @@ TEST_CASE("OCCT viewport owns transient display and navigation state",
   CHECK(viewport.plane_camera()->target == Point3{0.0, 0.0, 5.0});
   CHECK_FALSE(viewport.restore_camera_bookmark(
       GuiViewportCameraBookmark{{1.0, 1.0, 1.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 1.0}, 0.0}));
-  CHECK_FALSE(viewport.set_plane_camera({0.0, 0.0, 0.0}, {0.0, 0.0, 1.0},
-                                        {0.0, 0.0, 1.0}));
+  CHECK_FALSE(viewport.set_plane_camera({0.0, 0.0, 0.0}, {0.0, 0.0, 1.0}, {0.0, 0.0, 1.0}));
 
   viewport.set_sketch_focus("sketch.path");
   CHECK(viewport.sketch_focus_active());
@@ -149,4 +148,26 @@ TEST_CASE("Viewport scene builder emits stable datum and planar sketch identitie
   CHECK(scene.value().size() == 2);
   CHECK(scene.value()[0].semantic_id == "datum-plane/datum.xy");
   CHECK(scene.value()[1].semantic_id == "sketch/sketch.path/entity/line.main");
+}
+
+TEST_CASE("Restored viewport camera values remain authoritative without a native viewer",
+          "[gui][viewport][construction-manipulator-camera]") {
+  OcctViewport viewport;
+  // No native drawable exists yet; manipulator mapping still needs the saved camera.
+  GuiViewportCameraBookmark camera;
+  camera.eye = {150, 160, 170};
+  camera.target = {3, 4, 5};
+  camera.scale = 200;
+  camera.projection = GuiViewportProjection::Orthographic;
+  int notifications = 0;
+  viewport.set_view_changed_callback([&] { ++notifications; });
+  REQUIRE(viewport.restore_camera_bookmark(camera));
+  const auto restored = viewport.camera_bookmark();
+  CHECK(restored.eye == camera.eye);
+  CHECK(restored.target == camera.target);
+  CHECK(restored.up_direction == camera.up_direction);
+  CHECK(restored.scale == camera.scale);
+  CHECK(restored.projection == camera.projection);
+  CHECK(notifications == 1);
+  REQUIRE(viewport.model_to_screen({3, 4, 5}));
 }

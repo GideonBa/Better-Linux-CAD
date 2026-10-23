@@ -42,6 +42,10 @@ protected:
       if (!presentation.value_text.empty())
         painter.drawText(endpoint + QPointF(9.0, 16.0),
                          QString::fromStdString(presentation.value_text));
+      if (presentation.handle_id.ends_with(".x") || presentation.handle_id.ends_with(".y") ||
+          presentation.handle_id.ends_with(".z"))
+        painter.drawText(endpoint + QPointF(8, -8),
+                         QString(QChar(presentation.handle_id.back())).toUpper());
     }
   }
 

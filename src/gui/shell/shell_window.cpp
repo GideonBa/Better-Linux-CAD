@@ -493,6 +493,8 @@ void ShellWindow::wire_viewport() {
       assembly_tools_->refresh_presentation();
     if (feature_edit_tools_)
       feature_edit_tools_->refresh_presentation();
+    if (construction_tools_)
+      construction_tools_->refresh_presentation();
   });
   viewport_->set_selection_callback(
       [this](std::optional<GuiSelection> selection) { apply_viewport_selection(selection); });

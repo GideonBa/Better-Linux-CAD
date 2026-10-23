@@ -71,7 +71,7 @@ Coordinates use millimeters; direction vectors are normalized before Core frame 
 directions, nonperpendicular plane axes, coincident/collinear defining points, empty names and missing
 references disable Apply and clear the preview. Source roles use explicit task selectors with stable
 document identities. The initial slice uses selectors; native reference collection is added below.
-Construction manipulators remain open.
+The manipulator slice below adds direct editing of explicit definitions and new offsets.
 
 Preview adds intent to a disposable Part copy and resolves it through the existing construction and
 workplane authorities. The viewport displays only the new candidate shape. Neither preview nor
@@ -93,7 +93,7 @@ camera mapping, bounded face checks and downstream feature recompute use the exi
 contracts. These changes add no persistence fields or raw OCCT identities.
 
 Additional generated-reference/parallel modes and native reference collection are recorded below.
-Construction manipulators remain open Block-136 work. Offset parameter value
+The later manipulator slice extends direct editing. Offset parameter value
 and formula edits remain available through the existing parameter property inspector. Reference
 diagnostics/repair retain their separate acceptance gap.
 
@@ -135,8 +135,8 @@ canonical roundtrips. No persistence schema or raw kernel IDs are added.
 
 Proof: `[core][construction-update]`, `[block136-construction-edit]`, including
 `[shell-combined-workplane-edit]` with real ribbon, browser, task, numeric, history and file-dialog
-input on offscreen and native xcb. The subsequent relation slice extends this boundary;
-construction manipulators keep the datum family and Block 136 partial.
+input on offscreen and native xcb. The subsequent relation, source-picking and manipulator slices
+extend this boundary.
 
 ## Replacement-shell generated references and parallel relations — 2026-10-23
 
@@ -171,8 +171,7 @@ The existing preview, revision, transaction, cancellation, Undo/Redo and canonic
 apply to all five modes. Point/line/plane rebinding revalidates the complete candidate, so a generated
 point cannot be rebound to an extrusion that already depends on it. Invalid or absent references,
 degenerate downstream geometry and cycles clear preview and disable Apply; recovery stays within the
-task. Native reference collection is added below; construction manipulators keep the datum family
-and Block 136 partial.
+task. The subsequent native reference collection and manipulator slices extend this boundary.
 
 Proof: `[core][construction-generated]`, `[geometry][construction-generated]`,
 `[shell-construction-relations]` and the seventh combined UI scenario
@@ -211,5 +210,50 @@ Proof: `[block136-construction-picking]` / `[shell-construction-picking]` in
 four-step history and canonical reopen; it explicitly skips offscreen. Other cases exercise roles,
 repeated-point recovery, semantic editing, hidden sources and custom-scope restoration on exit.
 Verification lives in `docs/gui-shell-acceptance-mvp9r.md`; reproducible commands live in
-`docs/development-setup.md`. Construction manipulators are next; the datum family and Block 136
-remain partial.
+`docs/development-setup.md`. The following manipulator slice completes this bounded datum surface;
+whole-block acceptance remains open.
+
+## Replacement-shell construction manipulators — 2026-10-23
+
+**Griffe** selects the editable quantity in the existing construction task:
+
+- Explicit point/line/axis/plane: World XYZ position arrows with absolute coordinate values in `mm`.
+- Explicit line/axis: World-axis rotation rings for the direction; explicit planes rotate both frame
+  axes together, preserving an orthonormal frame. **Ebenenrahmen drehen** changes the complete frame,
+  not independent rounded axis components. Rotation values are relative to drag start, in `deg`.
+- Offset plane with **Neuer Parameter**: one positive offset arrow along the evaluated source-plane
+  normal. Existing shared/expression parameter bindings retain their read-only value; choosing a new
+  parameter enables a separate candidate offset without overwriting the old parameter.
+
+Reference-driven definitions retain their source-pick controls; they do not receive independent
+coordinate grips that would change the definition kind. Arrows/rings have fixed DIP sizes and axis
+labels. Rotation ring radii are separated so all three world axes remain independently selectable.
+The transparent shell-owned overlay is `blcad.construction.manipulator_overlay`; the role and numeric
+controls are `blcad.construction.manipulation` and `blcad.construction.grip_numeric`.
+
+Dragging updates the same disposable candidate as the numeric fields. Keyboard focus moves to
+**Griffwert** during a drag: a valid number with an optional matching `mm`/`deg` suffix overrides
+later motion/release. Values respect existing coordinate/positive-offset bounds. Invalid text keeps
+the last accepted candidate but disables Apply; correcting it recovers, while release with invalid
+text restores the drag start. Release consumes the exact final pointer sample. No drag writes intent,
+history or dirty state. Apply remains the single validated transaction.
+
+Escape first restores the complete pre-drag candidate, including displayed fields; a second Escape
+cancels the task. Window deactivation, resize or a changed camera aborts the drag. Preview redraws
+retain the frozen drag frame. Save, revision/freshness expiry, document replacement, task close and
+Cancel remove grips and release capture through the existing task lifetime. Rotated frame vectors
+and manipulated coordinates/offsets retain full precision behind the six-decimal fields; unchanged
+fields in later edits preserve that precision and existing dependencies. No new persistent fields or
+Core/Geometry intent types are introduced.
+
+Proof: `[shell-construction-manipulators]` exercises XYZ authoring, composed rotations, exact frame
+precision, shared offset bindings, dependent degeneracy/recovery, capture/expiry and final release
+through Qt mouse/key events. `[shell-combined-manipulators]` is the eighth fully UI-authored combined
+workflow: rotated workplane → Sketch/Extrude → same-ID plane movement with downstream Body preview
+→ history → canonical reopen → STEP. All these cases execute offscreen and natively. The camera
+regression additionally preserves restored bookmark values without a native viewer so the headless
+mapping follows the requested camera. Commands/results live in `docs/development-setup.md` and
+`docs/gui-shell-acceptance-mvp9r.md`.
+
+The datum family's bounded command surface is restored. Block 136 remains open for the other recorded
+families and integrated acceptance. Explicit broken-reference repair is the next implementation step.
