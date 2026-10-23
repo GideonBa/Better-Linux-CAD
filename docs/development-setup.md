@@ -897,4 +897,22 @@ The new session cases verify admission, validation, cache/freshness guards, repa
 failed-state history and canonical persistence. The native input case opens a failed-recompute Part
 through the real file dialog, repairs two plane-driven solids, checks Preview/Fit/Apply and Undo/Redo,
 then saves and reopens a fresh Part through file controls. Run native tests and startup serially.
-The Core-invalid missing-source loading boundary remains separate planned work.
+The bounded missing-source loading extension is verified separately below.
+
+
+## Missing-source recovery checks
+
+```bash
+./build/dev-gui/blcad_core_tests "[missing-reference-recovery]"
+./build/dev-gui/blcad_geometry_tests "[missing-reference-recovery]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[missing-reference-session],[block136-missing-reference],[repair-open-session],[block136-repair-open],[block136-reference-repair-batches],[block136-reference-repair],[integration][gui-feature-coverage]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-missing-reference QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[missing-reference-session],[block136-missing-reference]"
+```
+
+The fixture removes one producer and both construction source records, leaving six typed references,
+constraints, a generated line and two plane-driven solids. Checks cover strict ordinary loading,
+bounded admission, unchanged canonical failed intent, wrong-kind/cyclic/invalid rejection, partial
+staging/Preview failures, complete atomic repair, cache protection, failed-state history and saving.
+The shell input case uses actual file dialogs, popup/list/buttons, Fit, Undo/Redo and canonical
+Save/Open. Run native tests and application startup serially. Constraint-diagnostic suggestion
+controls remain the next work; Block 136 remains in progress.

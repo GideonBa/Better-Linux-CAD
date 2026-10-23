@@ -1,3 +1,4 @@
+#include "../support/missing_reference_fixture.hpp"
 #include "../support/reference_repair_fixture.hpp"
 #include "blcad/core/part_document_json.hpp"
 
@@ -8,6 +9,91 @@ std::string snapshot(const PartDocument& part) {
   return reference_checked(serialize_part_document_to_json(part));
 }
 } // namespace
+TEST_CASE("Explicit recovery retains missing typed sources and preserves canonical authored intent",
+          "[core][missing-reference-recovery]") {
+  const auto input = test::missing_reference_fixture_json();
+  REQUIRE_FALSE(deserialize_part_document_from_json(input));
+  auto part = reference_checked(
+      deserialize_part_document_from_json(input, PartDocumentReadMode::ReferenceRepair));
+  CHECK(snapshot(part) == input);
+  CHECK_FALSE(part.validate_reference_sources());
+  CHECK_FALSE(part.find_feature(FeatureId("feature.old")));
+  CHECK_FALSE(part.dependency_graph().has_node("feature.old"));
+  CHECK_FALSE(part.dependency_graph().has_node("point.fallback"));
+  CHECK_FALSE(part.dependency_graph().has_node("line.fallback"));
+  REQUIRE(part.find_sketch(SketchId("sketch.refs")));
+  CHECK(part.find_sketch(SketchId("sketch.refs"))->constraints().size() == 4);
+  CHECK(part.find_sketch(SketchId("sketch.refs"))->reference_generated_lines().size() == 1);
+  CHECK(snapshot(reference_checked(deserialize_part_document_from_json(
+            snapshot(part), PartDocumentReadMode::ReferenceRepair))) == input);
+  REQUIRE(test::repair_missing_projected(part));
+  CHECK_FALSE(part.validate_reference_sources());
+  REQUIRE(test::repair_open_planes(part));
+  CHECK(part.validate_reference_sources());
+  CHECK(snapshot(reference_checked(deserialize_part_document_from_json(snapshot(part)))) ==
+        snapshot(part));
+  CHECK(part.dependency_graph().has_dependency("feature.new", "plane"));
+  CHECK(
+      part.dependency_graph().has_dependency("feature.new.vertex.top_front_right", "sketch.refs"));
+  CHECK(part.dependency_graph().has_dependency("feature.new.vertex.bottom_back_left",
+                                               "sketch.refs.reference_generated_line.generated"));
+  CHECK(part.sketches().back().id() == SketchId("face.two"));
+}
+
+TEST_CASE("Intermediate recovery updates cannot introduce new missing targets or change lost roles",
+          "[core][missing-reference-recovery]") {
+  auto part = reference_checked(deserialize_part_document_from_json(
+      test::missing_reference_fixture_json(), PartDocumentReadMode::ReferenceRepair));
+  const auto before = snapshot(part);
+  for (const std::string source : {"feature.absent", "feature.old"}) {
+    auto sketch = *part.find_sketch(SketchId("sketch.refs"));
+    REQUIRE(sketch.replace_reference(
+        reference_checked(ProjectedSketchPoint::create_from_semantic_vertex(
+            SketchEntityId("point"), reference_checked(SemanticVertexReference::create(
+                                         FeatureId(source), SemanticVertex::BottomBackLeft))))));
+    CHECK_FALSE(part.update_sketch(sketch));
+    CHECK(snapshot(part) == before);
+  }
+  auto sketch = *part.find_sketch(SketchId("sketch.refs"));
+  REQUIRE(
+      sketch.add_reference(reference_checked(ProjectedSketchPoint::create_from_construction_point(
+          SketchEntityId("new.missing"), ConstructionPointId("point.fallback")))));
+  CHECK_FALSE(part.update_sketch(sketch));
+  CHECK(snapshot(part) == before);
+  // Once a consumer is repaired, its old missing source cannot be reintroduced.
+  REQUIRE(test::repair_missing_projected(part));
+  const auto repaired = snapshot(part);
+  sketch = *part.find_sketch(SketchId("sketch.refs"));
+  REQUIRE(
+      sketch.replace_reference(reference_checked(ProjectedSketchLine::create_from_construction_line(
+          SketchEntityId("edge"), ConstructionLineId("line.fallback")))));
+  CHECK_FALSE(part.update_sketch(sketch));
+  CHECK(snapshot(part) == repaired);
+}
+
+TEST_CASE("Recovery rejects unrelated invalid intent wrong-kind sources and cycles",
+          "[core][missing-reference-recovery]") {
+  const auto input = nlohmann::json::parse(test::missing_reference_fixture_json());
+  for (const std::string invalid :
+       {"parameter", "workplane", "wrong-kind", "cycle", "role", "duplicate"}) {
+    CAPTURE(invalid);
+    auto root = input;
+    if (invalid == "parameter")
+      root["parameters"].erase(root["parameters"].begin());
+    else if (invalid == "workplane")
+      root["sketches"][0]["workplane"] = "plane.absent";
+    else if (invalid == "wrong-kind")
+      root["derived_workplanes"][0]["source_feature"] = "width";
+    else if (invalid == "cycle")
+      root["derived_workplanes"][0]["source_feature"] = "face.solid.one";
+    else if (invalid == "role")
+      root["derived_workplanes"][0]["face"] = "unsupported";
+    else
+      root["derived_workplanes"].push_back(root["derived_workplanes"][0]);
+    CHECK_FALSE(
+        deserialize_part_document_from_json(root.dump(), PartDocumentReadMode::ReferenceRepair));
+  }
+}
 TEST_CASE("Projected reference replacement preserves identity constraints and dependency consumers",
           "[core][sketch-reference-repair]") {
   auto part = test::reference_repair_fixture(false, false, true);

@@ -308,7 +308,9 @@ Result<std::size_t> GuiDocumentSession::open_file(const std::filesystem::path& p
     }
     candidate = std::move(read.value());
   } else {
-    auto read = read_part_document_json_file(path);
+    auto read = read_part_document_json_file(path, mode == GuiDocumentOpenMode::ReferenceRepair
+                                                       ? PartDocumentReadMode::ReferenceRepair
+                                                       : PartDocumentReadMode::Strict);
     if (read.has_error()) {
       record_error(read.error());
       return Result<std::size_t>::failure(read.error());
@@ -554,7 +556,9 @@ GuiDocumentSession::commit_part_repair_transaction(std::string label,
     return Result<std::size_t>::failure(session_error("invalid Part transaction"));
   const auto serialized = serialize_current();
   if (serialized.has_error()) return Result<std::size_t>::failure(serialized.error());
-  auto cloned = deserialize_part_document_from_json(serialized.value());
+  auto cloned = deserialize_part_document_from_json(
+      serialized.value(), reference_repair_mode_ ? PartDocumentReadMode::ReferenceRepair
+                                                 : PartDocumentReadMode::Strict);
   if (cloned.has_error()) return Result<std::size_t>::failure(cloned.error());
   auto changed = mutation(cloned.value());
   if (changed.has_error()) {
@@ -872,7 +876,9 @@ Result<std::size_t> GuiDocumentSession::restore_history(std::size_t index) {
   const auto& entry = history_[index];
   Document restored;
   if (entry.kind == GuiDocumentKind::Part) {
-    auto part = deserialize_part_document_from_json(entry.json);
+    auto part = deserialize_part_document_from_json(
+        entry.json, entry.allow_failed_recompute ? PartDocumentReadMode::ReferenceRepair
+                                                 : PartDocumentReadMode::Strict);
     if (part.has_error()) return Result<std::size_t>::failure(part.error());
     auto valid_constraints = validate_constraint_catalogs(part.value(), entry.sketch_constraints);
     if (valid_constraints.has_error()) return valid_constraints;

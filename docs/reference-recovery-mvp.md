@@ -182,18 +182,19 @@ global rewriting. Exact UI, tests and remaining load/recompute/batch limitations
 The shell repair task also supports an ordered transient list of replacements. Each stage validates
 Core intent without requiring a complete scene; one final preview/recompute and transaction publish
 the whole batch. This allows several lost references to be repaired together while preserving the
-existing status/remap semantics. Each intermediate Core update must remain valid. Core-invalid missing-source
-loading remains planned; see the same GUI contract and `docs/mvp-plan.md`.
+existing status/remap semantics. Each intermediate Core update must remain valid. The bounded
+missing-source loading extension below retains existing typed intent; other invalid Core dependencies
+remain rejected. See `docs/mvp-plan.md` for the remaining scope.
 
 
 ## Repair-time loading and history — 2026-10-23
 
 **3D-Modell → Dokument → Zur Reparatur öffnen** explicitly opens a Part for reference repair. The
-session API is `open_file(path, discard_dirty, GuiDocumentOpenMode::ReferenceRepair)`. A Core-valid
-Part may be retained when initial complete Geometry recompute fails. Normal Open remains strict.
-Project files, malformed intent, missing Core sources and invalid constraint/dimension sidecars are
-rejected before session replacement in either applicable path. A repair-open request whose full
-recompute succeeds produces a normal fresh Part and can still open the repair task.
+session API is `open_file(path, discard_dirty, GuiDocumentOpenMode::ReferenceRepair)`. A Part may be
+retained when initial complete Geometry recompute fails. Normal Open remains strict. Project files,
+malformed intent and invalid constraint/dimension sidecars are rejected before session replacement.
+The missing-source extension below defines the only relaxed Core admission checks. A repair-open
+request whose full recompute succeeds produces a normal fresh Part and can still open the repair task.
 
 A failed repair-open Part retains authored intent, its file path, the saved JSON/catalog boundary
 and the actual Geometry diagnostic. `reference_repair_mode()` is true, recompute status is Failed,
@@ -230,5 +231,46 @@ Proofs: three `[repair-open-session]` cases cover admission, strict source valid
 and freshness guards, failed/complete repair, canonical saving, saved/dirty boundaries and failed
 history/Redo. Three `[block136-repair-open]` shell cases cover cancellation, preview saves, protected
 modeling contexts and real file-dialog/ribbon/popup/list/button/camera/history input with native
-presentation. Structurally rejected missing-source documents remain the next separate Core audit;
-constraint-diagnostic suggestion controls remain open as recorded in `docs/mvp-plan.md`.
+presentation. Missing-source admission is extended below; constraint-diagnostic suggestion controls
+remain open as recorded in `docs/mvp-plan.md`.
+
+
+## Missing-source recovery — 2026-10-23
+
+The explicit repair-open path additionally retains missing sources of existing face-derived
+workplanes and projected Sketch points/lines. This covers absent additive-extrude producers and
+absent ConstructionPoint/ConstructionLine records. `PartDocumentReadMode::ReferenceRepair` is an
+explicit overload of the JSON reader/deserializer; the existing one-argument APIs remain strict.
+No source record, default shape, status record or replacement is invented. Authored arrays, scoped
+consumer IDs, semantic roles, constraints and reference-generated lines round-trip unchanged.
+
+Before dependency-ready insertion, the reader inventories authored top-level record IDs. A source
+present later in the file must resolve normally. An ID belonging to another record kind cannot be
+admitted as missing. Missing workplanes, parameters, feature inputs, construction relations,
+malformed records, duplicate IDs and cycles remain outside this recovery scope. They are rejected
+transactionally before replacing the current session.
+
+The recovery dependency graph contains existing records and resolvable edges only. Unavailable
+sources receive no synthetic nodes or edges. Intermediate `update_sketch` calls may retain only an
+unchanged missing reference with the same scoped entity, kind, source and semantic role. New missing
+targets and changed lost roles are rejected; after replacement, the original missing target cannot
+be reintroduced. Each repaired input restores its ordinary dependency edges. Normal add operations
+and derived-workplane updates retain strict target validation.
+
+`PartDocument::validate_reference_sources()` validates all retained face/point/line sources strictly.
+Complete Geometry recompute invokes it before touching its cache, including for projected inputs
+without executable consumers. Consequently partial repairs cannot produce a successful whole-model
+Preview, publication or Fresh state. Individual successful producers remain available only in the
+repair task's disposable selection cache. Full Preview and Apply still require every source and all
+downstream Geometry to succeed.
+
+The session clones repair transactions and restores admitted failed history snapshots with the
+explicit read mode. Successful history snapshots and ordinary loading stay strict. Saving an
+unrepaired copy writes the unchanged committed canonical JSON and sidecars; that file still requires
+explicit repair opening. No persistent schema/version fields or recovery permissions are added.
+
+Proof: `[missing-reference-recovery]` in Core/Geometry, `[missing-reference-session]` in the session,
+and `[block136-missing-reference]` in the shell. The six-input fixture combines two missing faces,
+semantic point/line and construction point/line sources with constraints, a generated line and two
+plane-driven solids. Actual file/ribbon/popup/list/button/camera input exercises every partial
+Preview failure, complete Apply, one-step Undo/Redo and strict Save/Open of the repaired model.

@@ -3884,6 +3884,9 @@ GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const Reco
 Result<GeometryRecomputeSummary>
 GeometryRecomputeExecutor::execute_document(const PartDocument& document,
                                             ShapeCache& shape_cache) const {
+  const auto references = document.validate_reference_sources();
+  if (!references)
+    return Result<GeometryRecomputeSummary>::failure(references.error());
   ShapeCache working_cache = shape_cache;
   ShapeCache& execution_cache = document.bodies().empty() ? shape_cache : working_cache;
   GeometryRecomputeSummary summary;

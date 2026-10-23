@@ -600,9 +600,18 @@ add_parameter_dependencies(DependencyGraph& graph,
   return Result<std::size_t>::success(graph.dependency_count());
 }
 
-[[nodiscard]] Result<std::size_t> validate_projected_sketch_references(const PartDocument& document,
-                                                                       const Sketch& sketch) {
+[[nodiscard]] Result<std::size_t>
+validate_projected_sketch_references(const PartDocument& document, const Sketch& sketch,
+                                     const Sketch* retained = nullptr) {
   for (const auto& point : sketch.projected_points()) {
+    const auto* previous = retained ? retained->find_projected_point(point.id()) : nullptr;
+    const bool unchanged = previous && previous->source() == point.source() &&
+                           previous->referenced_node_id() == point.referenced_node_id();
+    if (unchanged &&
+        (point.source() == ProjectedSketchPointSource::ConstructionPoint
+             ? document.find_construction_point(point.construction_point()) == nullptr
+             : document.find_feature(point.semantic_vertex()->source_feature()) == nullptr))
+      continue;
     if (point.source() == ProjectedSketchPointSource::ConstructionPoint) {
       if (document.find_construction_point(point.construction_point()) == nullptr) {
         return Result<std::size_t>::failure(Error::validation(
@@ -616,6 +625,14 @@ add_parameter_dependencies(DependencyGraph& graph,
     }
   }
   for (const auto& line : sketch.projected_lines()) {
+    const auto* previous = retained ? retained->find_projected_line(line.id()) : nullptr;
+    const bool unchanged = previous && previous->source() == line.source() &&
+                           previous->referenced_node_id() == line.referenced_node_id();
+    if (unchanged &&
+        (line.source() == ProjectedSketchLineSource::ConstructionLine
+             ? document.find_construction_line(line.construction_line()) == nullptr
+             : document.find_feature(line.semantic_edge()->source_feature()) == nullptr))
+      continue;
     if (line.source() == ProjectedSketchLineSource::ConstructionLine) {
       if (document.find_construction_line(line.construction_line()) == nullptr) {
         return Result<std::size_t>::failure(Error::validation(
@@ -658,7 +675,13 @@ add_semantic_reference_dependency(DependencyGraph& graph, const FeatureId& sourc
 
 [[nodiscard]] Result<std::size_t> add_projected_point_dependency(DependencyGraph& graph,
                                                                  const ProjectedSketchPoint& point,
-                                                                 const std::string& dependent_id) {
+                                                                 const std::string& dependent_id,
+                                                                 bool allow_missing_sources) {
+  const auto source = point.source() == ProjectedSketchPointSource::ConstructionPoint
+                          ? point.construction_point().value()
+                          : point.semantic_vertex()->source_feature().value();
+  if (allow_missing_sources && !graph.has_node(source))
+    return Result<std::size_t>::success(graph.dependency_count());
   if (point.source() == ProjectedSketchPointSource::ConstructionPoint) {
     return add_dependency_if_missing(graph, point.construction_point().value(), dependent_id);
   }
@@ -669,7 +692,13 @@ add_semantic_reference_dependency(DependencyGraph& graph, const FeatureId& sourc
 
 [[nodiscard]] Result<std::size_t> add_projected_line_dependency(DependencyGraph& graph,
                                                                 const ProjectedSketchLine& line,
-                                                                const std::string& dependent_id) {
+                                                                const std::string& dependent_id,
+                                                                bool allow_missing_sources) {
+  const auto source = line.source() == ProjectedSketchLineSource::ConstructionLine
+                          ? line.construction_line().value()
+                          : line.semantic_edge()->source_feature().value();
+  if (allow_missing_sources && !graph.has_node(source))
+    return Result<std::size_t>::success(graph.dependency_count());
   if (line.source() == ProjectedSketchLineSource::ConstructionLine) {
     return add_dependency_if_missing(graph, line.construction_line().value(), dependent_id);
   }
@@ -681,14 +710,14 @@ add_semantic_reference_dependency(DependencyGraph& graph, const FeatureId& sourc
 [[nodiscard]] Result<std::size_t>
 add_constraint_reference_dependency(DependencyGraph& graph, const Sketch& sketch,
                                     const SketchConstraint& constraint,
-                                    const std::string& dependent_id) {
+                                    const std::string& dependent_id, bool allow_missing_sources) {
   if (const ProjectedSketchPoint* point =
           find_projected_point_target(sketch, constraint.reference_target())) {
-    return add_projected_point_dependency(graph, *point, dependent_id);
+    return add_projected_point_dependency(graph, *point, dependent_id, allow_missing_sources);
   }
   if (const ProjectedSketchLine* line =
           find_projected_line_target(sketch, constraint.reference_target())) {
-    return add_projected_line_dependency(graph, *line, dependent_id);
+    return add_projected_line_dependency(graph, *line, dependent_id, allow_missing_sources);
   }
   return Result<std::size_t>::success(graph.dependency_count());
 }
@@ -744,14 +773,17 @@ add_constraint_reference_dependency(DependencyGraph& graph, const Sketch& sketch
 }
 
 [[nodiscard]] Result<std::size_t> add_projected_reference_dependencies(DependencyGraph& graph,
-                                                                       const Sketch& sketch) {
+                                                                       const Sketch& sketch,
+                                                                       bool allow_missing_sources) {
   for (const auto& point : sketch.projected_points()) {
-    auto dependency = add_projected_point_dependency(graph, point, sketch.id().value());
+    auto dependency =
+        add_projected_point_dependency(graph, point, sketch.id().value(), allow_missing_sources);
     if (dependency.has_error())
       return dependency;
   }
   for (const auto& line : sketch.projected_lines()) {
-    auto dependency = add_projected_line_dependency(graph, line, sketch.id().value());
+    auto dependency =
+        add_projected_line_dependency(graph, line, sketch.id().value(), allow_missing_sources);
     if (dependency.has_error())
       return dependency;
   }
@@ -766,10 +798,12 @@ add_constraint_reference_dependency(DependencyGraph& graph, const Sketch& sketch
       return Result<std::size_t>::failure(Error::validation(
           line.id().value(), "reference-generated line endpoint constraints must exist in sketch"));
     }
-    auto start_dependency = add_constraint_reference_dependency(graph, sketch, *start, line_node);
+    auto start_dependency = add_constraint_reference_dependency(graph, sketch, *start, line_node,
+                                                                allow_missing_sources);
     if (start_dependency.has_error())
       return start_dependency;
-    auto end_dependency = add_constraint_reference_dependency(graph, sketch, *end, line_node);
+    auto end_dependency =
+        add_constraint_reference_dependency(graph, sketch, *end, line_node, allow_missing_sources);
     if (end_dependency.has_error())
       return end_dependency;
     if (line.direction_constraint().has_value()) {
@@ -780,8 +814,8 @@ add_constraint_reference_dependency(DependencyGraph& graph, const Sketch& sketch
             line.id().value(),
             "reference-generated line direction constraint must exist in sketch"));
       }
-      auto direction_dependency =
-          add_constraint_reference_dependency(graph, sketch, *direction, line_node);
+      auto direction_dependency = add_constraint_reference_dependency(
+          graph, sketch, *direction, line_node, allow_missing_sources);
       if (direction_dependency.has_error())
         return direction_dependency;
     }
@@ -1082,14 +1116,19 @@ Result<std::size_t> PartDocument::add_construction_plane(ConstructionPlane plane
 }
 
 Result<std::size_t> PartDocument::add_derived_workplane(DerivedWorkplane workplane) {
+  return add_derived_workplane_impl(std::move(workplane), false);
+}
+
+Result<std::size_t> PartDocument::add_derived_workplane_impl(DerivedWorkplane workplane,
+                                                             bool allow_missing_source) {
   if (has_workplane_id(workplane.id()))
     return Result<std::size_t>::failure(Error::validation(
         workplane.id().value(), "workplane id must be unique within part document"));
   const Feature* source_feature = find_feature(workplane.face_reference().source_feature());
-  if (source_feature == nullptr)
+  if (source_feature == nullptr && !allow_missing_source)
     return Result<std::size_t>::failure(Error::validation(
         workplane.id().value(), "derived workplane source feature must exist in part document"));
-  if (source_feature->type() != FeatureType::AdditiveExtrude)
+  if (source_feature && source_feature->type() != FeatureType::AdditiveExtrude)
     return Result<std::size_t>::failure(Error::validation(
         workplane.id().value(), "derived workplane source feature must be an additive extrude"));
   if (!is_supported_derived_face(workplane.face_reference().face()))
@@ -1100,10 +1139,12 @@ Result<std::size_t> PartDocument::add_derived_workplane(DerivedWorkplane workpla
   auto added_node = graph.add_node(workplane.id().value());
   if (added_node.has_error())
     return Result<std::size_t>::failure(added_node.error());
-  auto source_dependency = add_dependency_if_missing(
-      graph, workplane.face_reference().source_feature().value(), workplane.id().value());
-  if (source_dependency.has_error())
-    return Result<std::size_t>::failure(source_dependency.error());
+  if (source_feature) {
+    auto source_dependency = add_dependency_if_missing(
+        graph, workplane.face_reference().source_feature().value(), workplane.id().value());
+    if (source_dependency.has_error())
+      return Result<std::size_t>::failure(source_dependency.error());
+  }
   auto invalidation_state = invalidation_state_;
   auto synced = sync_graph(std::move(graph), invalidation_state, dependency_graph_);
   if (synced.has_error())
@@ -1176,13 +1217,17 @@ Result<std::size_t> PartDocument::update_derived_workplane(DerivedWorkplane work
 }
 
 Result<std::size_t> PartDocument::add_sketch(Sketch sketch) {
+  return add_sketch_impl(std::move(sketch), nullptr);
+}
+
+Result<std::size_t> PartDocument::add_sketch_impl(Sketch sketch, const Sketch* retained) {
   if (has_sketch_id(sketch.id()) || has_sketch_3d_id(Sketch3DId(sketch.id().value())))
     return Result<std::size_t>::failure(
         Error::validation(sketch.id().value(), "sketch id must be unique within part document"));
   if (!has_workplane_id(sketch.workplane()))
     return Result<std::size_t>::failure(
         Error::validation(sketch.id().value(), "sketch workplane must exist in part document"));
-  auto valid_projected_references = validate_projected_sketch_references(*this, sketch);
+  auto valid_projected_references = validate_projected_sketch_references(*this, sketch, retained);
   if (valid_projected_references.has_error())
     return Result<std::size_t>::failure(valid_projected_references.error());
   auto valid_reference_generated_lines = validate_reference_generated_lines(sketch);
@@ -1231,7 +1276,8 @@ Result<std::size_t> PartDocument::add_sketch(Sketch sketch) {
     if (workplane_dependency.has_error())
       return Result<std::size_t>::failure(workplane_dependency.error());
   }
-  auto projected_reference_dependencies = add_projected_reference_dependencies(graph, sketch);
+  auto projected_reference_dependencies =
+      add_projected_reference_dependencies(graph, sketch, retained != nullptr);
   if (projected_reference_dependencies.has_error())
     return Result<std::size_t>::failure(projected_reference_dependencies.error());
   auto dimension_dependencies = add_driving_dimension_dependencies(graph, sketch);
@@ -1271,6 +1317,22 @@ Result<std::size_t> PartDocument::add_sketch(Sketch sketch) {
   return Result<std::size_t>::success(sketches_.size() - 1U);
 }
 
+Result<std::size_t> PartDocument::validate_reference_sources() const {
+  for (const auto& plane : derived_workplanes_) {
+    const auto* source = find_feature(plane.face_reference().source_feature());
+    if (!source || source->type() != FeatureType::AdditiveExtrude)
+      return Result<std::size_t>::failure(Error::validation(
+          plane.id().value(),
+          "derived workplane source feature must be an additive extrude in part document"));
+  }
+  for (const auto& sketch : sketches_) {
+    auto valid = validate_projected_sketch_references(*this, sketch);
+    if (!valid)
+      return valid;
+  }
+  return Result<std::size_t>::success(0);
+}
+
 Result<std::size_t> PartDocument::update_sketch(Sketch sketch) {
   const auto found = std::find_if(sketches_.begin(), sketches_.end(), [&sketch](const Sketch& item) {
     return item.id() == sketch.id();
@@ -1292,7 +1354,7 @@ Result<std::size_t> PartDocument::update_sketch(Sketch sketch) {
     return Result<std::size_t>::failure(removed.error());
   candidate.invalidation_state_.untrack_node(sketch.id().value());
 
-  auto added = candidate.add_sketch(std::move(sketch));
+  auto added = candidate.add_sketch_impl(std::move(sketch), &*found);
   if (added.has_error())
     return Result<std::size_t>::failure(added.error());
   Sketch replacement = std::move(candidate.sketches_.back());

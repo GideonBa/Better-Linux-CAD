@@ -1,3 +1,4 @@
+#include "../support/missing_reference_fixture.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
 
 #include <catch2/catch_approx.hpp>
@@ -5,6 +6,25 @@
 
 using namespace blcad;
 using namespace blcad::geometry;
+
+TEST_CASE("Complete recompute rejects missing sources before altering an existing Geometry cache",
+          "[geometry][missing-reference-recovery]") {
+  auto part = test::reference_checked(deserialize_part_document_from_json(
+      test::missing_reference_fixture_json(), PartDocumentReadMode::ReferenceRepair));
+  auto cache = test::reference_checked(ShapeCache::create(ShapeCacheId("missing.references")));
+  GeometryRecomputeExecutor executor;
+  REQUIRE(executor.execute_additive_extrude(part, FeatureId("feature.new"), cache));
+  REQUIRE(cache.feature_shape_count() == 1);
+  CHECK_FALSE(executor.execute_document(part, cache));
+  CHECK(cache.feature_shape_count() == 1);
+  REQUIRE(test::repair_open_planes(part));
+  // Unused projected inputs must also prevent incomplete repair publication.
+  CHECK_FALSE(executor.execute_document(part, cache));
+  CHECK(cache.feature_shape_count() == 1);
+  REQUIRE(test::repair_missing_projected(part));
+  REQUIRE(executor.execute_document(part, cache));
+  CHECK(cache.feature_shape_count() == 3);
+}
 
 namespace {
 

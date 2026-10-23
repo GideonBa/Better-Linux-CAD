@@ -36,6 +36,8 @@
 
 namespace blcad {
 
+enum class PartDocumentReadMode;
+
 class PartDocument {
 public:
   [[nodiscard]] static Result<PartDocument> create(DocumentId id, std::string name);
@@ -61,6 +63,9 @@ public:
   [[nodiscard]] Result<std::size_t> update_construction_plane(ConstructionPlane plane);
   [[nodiscard]] Result<std::size_t> update_derived_workplane(DerivedWorkplane workplane);
   [[nodiscard]] Result<std::size_t> add_sketch(Sketch sketch);
+  // Recovery intent may retain missing reference sources; complete Geometry
+  // and repair publication must pass this strict check first.
+  [[nodiscard]] Result<std::size_t> validate_reference_sources() const;
   // Replaces one existing planar sketch atomically while preserving its position in the authored
   // collection and every downstream dependency edge. The replacement must keep the same SketchId;
   // all normal add_sketch validation is applied before this document changes.
@@ -253,7 +258,11 @@ public:
 private:
   // Loading validates records in dependency order, then restores their authored
   // collection order without exposing mutable collections to other clients.
-  friend Result<PartDocument> deserialize_part_document_from_json(std::string_view content);
+  friend Result<PartDocument> deserialize_part_document_from_json(std::string_view content,
+                                                                  PartDocumentReadMode mode);
+  [[nodiscard]] Result<std::size_t> add_sketch_impl(Sketch sketch, const Sketch* retained);
+  [[nodiscard]] Result<std::size_t> add_derived_workplane_impl(DerivedWorkplane workplane,
+                                                               bool allow_missing_source);
   PartDocument(DocumentId id, std::string name);
 
   [[nodiscard]] Result<std::size_t>
