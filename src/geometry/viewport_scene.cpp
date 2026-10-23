@@ -8,6 +8,7 @@
 #include "blcad/geometry/construction_point_resolver.hpp"
 #include "blcad/geometry/profile_region_classifier.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
+#include "blcad/geometry/semantic_reference_evaluator.hpp"
 #include "blcad/geometry/sketch_3d_geometry_adapter.hpp"
 #include "blcad/geometry/sketch_finish.hpp"
 #include "blcad/geometry/sketch_reference_projector.hpp"
@@ -171,6 +172,83 @@ Result<TopoDS_Shape> make_profile_face(const PointRange& points, PointMapper map
 }
 
 } // namespace
+
+Result<std::vector<ConstructionSelectionTarget>>
+ViewportSceneBuilder::build_construction_sources(const PartDocument& document,
+                                                 const ShapeCache& shape_cache) const {
+  std::vector<ConstructionSelectionTarget> targets;
+  const SemanticReferenceEvaluator evaluator;
+  try {
+    for (const auto& feature : document.features()) {
+      if (!shape_cache.find_feature_shape(feature.id()))
+        continue;
+      if (feature.body_result_context()) {
+        const auto* body =
+            document.find_body(feature.body_result_context()->effective_produced_body());
+        if (body && body->visibility() == BodyVisibility::Hidden)
+          continue;
+      }
+      const auto identity = "construction-source/" + std::to_string(feature.id().value().size()) +
+                            ":" + feature.id().value() + "/";
+      for (int i = 0; i < 6; ++i) {
+        auto reference = SemanticFaceReference::create(feature.id(), static_cast<SemanticFace>(i));
+        if (!reference)
+          continue;
+        auto frame = WorkplaneResolver{}.resolve_generated_face(document, reference.value());
+        if (frame) {
+          const auto& plane = frame.value();
+          const auto center = plane.bounds.center;
+          const double x = plane.bounds.width_mm / 2, y = plane.bounds.height_mm / 2;
+          BRepBuilderAPI_MakePolygon polygon;
+          for (const auto local :
+               {Point2{center.x - x, center.y - y}, Point2{center.x + x, center.y - y},
+                Point2{center.x + x, center.y + y}, Point2{center.x - x, center.y + y}})
+            polygon.Add(to_point(WorkplaneResolver{}.evaluate_point(plane, local)));
+          polygon.Close();
+          targets.push_back({{ViewportSceneKind::Face,
+                              identity + "face/" + std::string(to_string(reference.value().face())),
+                              GeometryShape(std::make_shared<GeometryShape::Impl>(
+                                  BRepBuilderAPI_MakeFace(polygon.Wire()).Shape()))},
+                             reference.value()});
+        }
+      }
+      for (int i = 0; i < 12; ++i) {
+        auto reference = SemanticEdgeReference::create(feature.id(), static_cast<SemanticEdge>(i));
+        if (!reference)
+          continue;
+        // Match ConstructionPoint/Line and DerivedWorkplane evaluation. These
+        // are source-feature references, not final-Body subshape ordinals.
+        auto edge = evaluator.resolve_edge(document, reference.value());
+        if (edge)
+          targets.push_back({{ViewportSceneKind::Edge,
+                              identity + "edge/" + std::string(to_string(reference.value().edge())),
+                              GeometryShape(std::make_shared<GeometryShape::Impl>(
+                                  BRepBuilderAPI_MakeEdge(to_point(edge.value().start),
+                                                          to_point(edge.value().end))
+                                      .Shape()))},
+                             reference.value()});
+      }
+      for (int i = 0; i < 8; ++i) {
+        auto reference =
+            SemanticVertexReference::create(feature.id(), static_cast<SemanticVertex>(i));
+        if (!reference)
+          continue;
+        auto vertex = evaluator.resolve_vertex(document, reference.value());
+        if (vertex)
+          targets.push_back(
+              {{ViewportSceneKind::Vertex,
+                identity + "vertex/" + std::string(to_string(reference.value().vertex())),
+                GeometryShape(std::make_shared<GeometryShape::Impl>(
+                    BRepBuilderAPI_MakeVertex(to_point(vertex.value().position)).Shape()))},
+               reference.value()});
+      }
+    }
+  } catch (const Standard_Failure&) {
+    return Result<std::vector<ConstructionSelectionTarget>>::failure(
+        scene_error("could not build construction selection sources"));
+  }
+  return Result<std::vector<ConstructionSelectionTarget>>::success(std::move(targets));
+}
 
 Result<std::vector<ViewportSceneItem>>
 ViewportSceneBuilder::build_part(const PartDocument& document,

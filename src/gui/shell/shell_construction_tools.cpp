@@ -17,10 +17,12 @@
 #include <QLineEdit>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QSignalBlocker>
 #include <QVBoxLayout>
 
 #include <algorithm>
 #include <cmath>
+#include <type_traits>
 
 namespace blcad::gui {
 namespace {
@@ -157,6 +159,10 @@ ShellConstructionTools::ShellConstructionTools(ShellWindow& window, ShellRibbon&
   face_ = combo("face", QStringLiteral("Modellfläche"));
   edge_ = combo("edge", QStringLiteral("Modellkante"));
   vertex_ = combo("vertex", QStringLiteral("Modellecke"));
+  pick_role_ = new QComboBox(inputs);
+  pick_role_->setObjectName("blcad.construction.pick_role");
+  form_->addRow(QStringLiteral("Modellklick wählt"), pick_role_);
+  connect(pick_role_, &QComboBox::currentIndexChanged, this, [this] { update_pick_scope(); });
   layout->addLayout(form_);
   summary_ = new QLabel(inputs);
   summary_->setObjectName("blcad.construction.summary");
@@ -183,8 +189,8 @@ ShellConstructionTools::ShellConstructionTools(ShellWindow& window, ShellRibbon&
   for (auto* control : {static_cast<QWidget*>(kind_), static_cast<QWidget*>(name_),
                         static_cast<QWidget*>(apply_), static_cast<QWidget*>(cancel)})
     control->installEventFilter(this);
-  for (auto* combo_control :
-       {plane_, line_, parameter_, face_, edge_, vertex_, points_[0], points_[1], points_[2]})
+  for (auto* combo_control : {plane_, line_, parameter_, face_, edge_, vertex_, points_[0],
+                              points_[1], points_[2], pick_role_})
     combo_control->installEventFilter(this);
   for (const auto& controls : {origin_, direction_, y_direction_})
     for (auto* control : controls)
@@ -193,6 +199,8 @@ ShellConstructionTools::ShellConstructionTools(ShellWindow& window, ShellRibbon&
   connect(kind_, &QComboBox::currentIndexChanged, this, [this] {
     update_inputs();
     update_preview();
+    if (active_)
+      window_.refresh_feature_selection_scene();
   });
   connect(name_, &QLineEdit::textChanged, this, [this] { update_preview(); });
   connect(offset_, &QDoubleSpinBox::valueChanged, this, [this] { update_preview(); });
@@ -209,72 +217,73 @@ void ShellConstructionTools::fill_references() {
   for (auto* control :
        {plane_, line_, parameter_, face_, edge_, vertex_, points_[0], points_[1], points_[2]})
     control->clear();
-  const auto add = [](QComboBox* control, const auto& object) {
+  const auto add = [](QComboBox* control, const auto& object, const char* prefix = "") {
     control->addItem(QString::fromStdString(object.name()),
                      QString::fromStdString(object.id().value()));
     control->setItemData(control->count() - 1, QString::fromStdString(object.id().value()),
                          Qt::ToolTipRole);
+    control->setItemData(control->count() - 1, QString::fromStdString(prefix + object.id().value()),
+                         Qt::UserRole + 2);
   };
   for (const auto& plane : part.datum_planes())
-    add(plane_, plane);
+    add(plane_, plane, "datum-plane/");
   for (const auto& plane : part.construction_planes())
     if (!editing_ || plane.id().value() != id_)
-      add(plane_, plane);
+      add(plane_, plane, "construction-plane/");
   for (const auto& plane : part.derived_workplanes())
     if (!editing_ || plane.id().value() != id_)
-      add(plane_, plane);
+      add(plane_, plane, "derived-workplane/");
   for (const auto& line : part.construction_lines())
     if (!editing_ || line.id().value() != id_)
-      add(line_, line);
+      add(line_, line, "construction-line/");
   for (const auto& point : part.construction_points())
     for (auto* control : points_)
-      add(control, point);
+      add(control, point, "construction-point/");
   for (int i = 0; i < 3; ++i)
     points_[i]->setCurrentIndex(std::min(i, points_[i]->count() - 1));
   parameter_->addItem(QStringLiteral("Neuer Parameter"), QString{});
   for (const auto& parameter : part.parameters())
     if (parameter.type() == ParameterType::Length)
       add(parameter_, parameter);
-  const geometry::WorkplaneResolver resolver;
-  const geometry::SemanticReferenceEvaluator evaluator;
-  const auto add_generated = [](QComboBox* combo, const Feature& feature, auto element) {
-    combo->addItem(QString::fromStdString(feature.name() + " / " + std::string(to_string(element))),
-                   QString::fromStdString(feature.id().value()));
-    combo->setItemData(combo->count() - 1, static_cast<int>(element), Qt::UserRole + 1);
-    combo->setItemData(
-        combo->count() - 1,
-        QString::fromStdString(feature.id().value() + " / " + std::string(to_string(element))),
-        Qt::ToolTipRole);
-  };
-  for (const auto& feature : part.features()) {
-    for (auto edge : {SemanticEdge::TopFront, SemanticEdge::TopBack, SemanticEdge::TopRight,
-                      SemanticEdge::TopLeft, SemanticEdge::BottomFront, SemanticEdge::BottomBack,
-                      SemanticEdge::BottomRight, SemanticEdge::BottomLeft, SemanticEdge::FrontRight,
-                      SemanticEdge::FrontLeft, SemanticEdge::BackRight, SemanticEdge::BackLeft}) {
-      auto reference = SemanticEdgeReference::create(feature.id(), edge);
-      if (reference && evaluator.resolve_edge(part, reference.value()))
-        add_generated(edge_, feature, edge);
-    }
-    for (auto vertex : {SemanticVertex::TopFrontRight, SemanticVertex::TopFrontLeft,
-                        SemanticVertex::TopBackRight, SemanticVertex::TopBackLeft,
-                        SemanticVertex::BottomFrontRight, SemanticVertex::BottomFrontLeft,
-                        SemanticVertex::BottomBackRight, SemanticVertex::BottomBackLeft}) {
-      auto reference = SemanticVertexReference::create(feature.id(), vertex);
-      if (reference && evaluator.resolve_vertex(part, reference.value()))
-        add_generated(vertex_, feature, vertex);
-    }
+  selection_targets_.clear();
+  auto targets = geometry::ViewportSceneBuilder{}.build_construction_sources(
+      part, *window_.session().part_shape_cache());
+  if (!targets) {
+    window_.report_error(targets.error());
+    return;
   }
-  for (const auto& feature : part.features())
-    for (auto face : {SemanticFace::Top, SemanticFace::Bottom, SemanticFace::Right,
-                      SemanticFace::Left, SemanticFace::Front, SemanticFace::Back}) {
-      auto reference = SemanticFaceReference::create(feature.id(), face);
-      if (!reference || !resolver.resolve_generated_face(part, reference.value()))
-        continue;
-      const auto label =
-          QString::fromStdString(feature.name() + " / " + std::string(to_string(face)));
-      face_->addItem(label, QString::fromStdString(feature.id().value()));
-      face_->setItemData(face_->count() - 1, static_cast<int>(face), Qt::UserRole + 1);
-    }
+  selection_targets_ = std::move(targets.value());
+  for (const auto& target : selection_targets_)
+    std::visit(
+        [&](const auto& reference) {
+          using T = std::decay_t<decltype(reference)>;
+          QComboBox* control;
+          int element;
+          std::string token;
+          if constexpr (std::is_same_v<T, SemanticFaceReference>) {
+            control = face_;
+            element = static_cast<int>(reference.face());
+            token = to_string(reference.face());
+          } else if constexpr (std::is_same_v<T, SemanticEdgeReference>) {
+            control = edge_;
+            element = static_cast<int>(reference.edge());
+            token = to_string(reference.edge());
+          } else {
+            control = vertex_;
+            element = static_cast<int>(reference.vertex());
+            token = to_string(reference.vertex());
+          }
+          const auto* feature = part.find_feature(reference.source_feature());
+          control->addItem(QString::fromStdString(feature->name() + " / " + token),
+                           QString::fromStdString(feature->id().value()));
+          const int row = control->count() - 1;
+          control->setItemData(row, element, Qt::UserRole + 1);
+          control->setItemData(row, QString::fromStdString(target.item.semantic_id),
+                               Qt::UserRole + 2);
+          control->setItemData(row, QString::fromStdString(feature->id().value() + " / " + token),
+                               Qt::ToolTipRole);
+        },
+        target.reference);
 }
 
 Result<std::size_t> ShellConstructionTools::begin(Kind kind) {
@@ -453,10 +462,17 @@ Result<std::size_t> ShellConstructionTools::open_task() {
       !session.task().begin_parameter_editing())
     return Result<std::size_t>::failure(error("Konstruktion konnte nicht gestartet werden"));
   revision_ = session.presentation_revision();
+  previous_filter_ = window_.viewport().selection_filter_mask();
+  previous_scope_ = window_.viewport().selection_semantic_scope();
+  {
+    const QSignalBlocker blocker(pick_role_);
+    pick_role_->clear();
+  }
   active_ = true;
   update_inputs();
   dock_->show();
   dock_->raise();
+  window_.refresh_feature_selection_scene();
   update_preview();
   window_.refresh();
   return Result<std::size_t>::success(1);
@@ -498,6 +514,77 @@ void ShellConstructionTools::update_inputs() {
   show_row(face_, kind == Kind::FacePlane);
   show_row(edge_, kind == Kind::PointOnEdge || kind == Kind::ParallelEdgeThroughPoint);
   show_row(vertex_, kind == Kind::PointOnVertex);
+  update_pick_roles();
+}
+
+QComboBox* ShellConstructionTools::pick_input() const {
+  const auto key = pick_role_->currentData().toString();
+  for (auto* input : {plane_, line_, points_[0], points_[1], points_[2], face_, edge_, vertex_})
+    if (input->objectName() == key)
+      return input;
+  return nullptr;
+}
+
+void ShellConstructionTools::update_pick_roles() {
+  const auto previous = pick_role_->currentData();
+  {
+    const QSignalBlocker blocker(pick_role_);
+    pick_role_->clear();
+    for (auto* input : {plane_, line_, points_[0], points_[1], points_[2], face_, edge_, vertex_})
+      if (!input->isHidden()) {
+        const auto* label = qobject_cast<QLabel*>(form_->labelForField(input));
+        pick_role_->addItem(label->text(), input->objectName());
+      }
+    const int retained = pick_role_->findData(previous);
+    if (retained >= 0)
+      pick_role_->setCurrentIndex(retained);
+  }
+  show_row(pick_role_, pick_role_->count() != 0);
+  update_pick_scope();
+}
+
+void ShellConstructionTools::update_pick_scope() {
+  if (!current())
+    return;
+  std::vector<std::string> scope;
+  if (const auto* input = pick_input())
+    for (int row = 0; row < input->count(); ++row)
+      scope.push_back(input->itemData(row, Qt::UserRole + 2).toString().toStdString());
+  auto& viewport = window_.viewport();
+  viewport.set_selection_filter_mask(
+      selection_kind_bit(GuiSelectionKind::Datum) | selection_kind_bit(GuiSelectionKind::Face) |
+      selection_kind_bit(GuiSelectionKind::Edge) | selection_kind_bit(GuiSelectionKind::Vertex));
+  viewport.set_selection_semantic_scope(std::move(scope));
+}
+
+bool ShellConstructionTools::accept_selection(const GuiSelection& selection) {
+  if (!current())
+    return false;
+  auto* input = pick_input();
+  if (!input)
+    return false;
+  const int row = input->findData(QString::fromStdString(selection.semantic_id), Qt::UserRole + 2);
+  if (row < 0)
+    return false;
+  input->setCurrentIndex(row);
+  // Defining points are collected in order; any role can also be chosen explicitly.
+  if (input == points_[0] || input == points_[1]) {
+    const int next = pick_role_->currentIndex() + 1;
+    if (next < pick_role_->count())
+      pick_role_->setCurrentIndex(next);
+  }
+  return true;
+}
+
+std::vector<geometry::ViewportSceneItem> ShellConstructionTools::selection_items() const {
+  std::vector<geometry::ViewportSceneItem> items;
+  if (current())
+    for (const auto& target : selection_targets_)
+      for (const auto* input : {face_, edge_, vertex_})
+        if (!input->isHidden() &&
+            input->findData(QString::fromStdString(target.item.semantic_id), Qt::UserRole + 2) >= 0)
+          items.push_back(target.item);
+  return items;
 }
 
 Result<std::size_t> ShellConstructionTools::populate(PartDocument& part) const {
@@ -821,8 +908,12 @@ void ShellConstructionTools::cancel() {
   if (window_.session().task().command_id() == (editing_ ? edit_task_id : task_id))
     (void)window_.session().task().cancel();
   window_.viewport().clear_feature_preview();
+  window_.viewport().set_selection_semantic_scope(previous_scope_);
+  window_.viewport().set_selection_filter_mask(previous_filter_);
+  selection_targets_.clear();
   apply_->setEnabled(false);
   dock_->hide();
+  window_.refresh_feature_selection_scene();
   window_.refresh();
 }
 void ShellConstructionTools::refresh() {

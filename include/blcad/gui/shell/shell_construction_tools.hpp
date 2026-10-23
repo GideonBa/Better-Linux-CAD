@@ -1,5 +1,6 @@
 #pragma once
 
+#include "blcad/geometry/viewport_scene.hpp"
 #include "blcad/gui/gui_document_session.hpp"
 
 #include <QObject>
@@ -48,6 +49,8 @@ public:
   [[nodiscard]] Result<std::size_t> apply();
   void cancel();
   void refresh();
+  [[nodiscard]] bool accept_selection(const GuiSelection&);
+  [[nodiscard]] std::vector<geometry::ViewportSceneItem> selection_items() const;
   [[nodiscard]] bool active() const noexcept {
     return active_;
   }
@@ -62,11 +65,15 @@ private:
   void update_inputs();
   void update_preview();
   void fill_references();
+  void update_pick_roles();
+  void update_pick_scope();
+  [[nodiscard]] QComboBox* pick_input() const;
   void show_row(QWidget*, bool);
   ShellWindow& window_;
   QDockWidget* dock_{};
   QFormLayout* form_{};
   QComboBox* kind_{};
+  QComboBox* pick_role_{};
   QLineEdit* name_{};
   std::array<QDoubleSpinBox*, 3> origin_{};
   std::array<QDoubleSpinBox*, 3> direction_{};
@@ -98,5 +105,8 @@ private:
   bool active_{false};
   bool editing_{false};
   bool updating_{false};
+  std::uint32_t previous_filter_{0xFFFFFFFFU};
+  std::optional<std::vector<std::string>> previous_scope_;
+  std::vector<geometry::ConstructionSelectionTarget> selection_targets_;
 };
 } // namespace blcad::gui

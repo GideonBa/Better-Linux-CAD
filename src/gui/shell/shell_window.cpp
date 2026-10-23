@@ -926,6 +926,8 @@ void ShellWindow::apply_viewport_selection(const std::optional<GuiSelection>& se
   bool selected_feature_profile = false;
   if (selection) {
     (void)session_.selection().add(*selection);
+    if (construction_tools_)
+      (void)construction_tools_->accept_selection(*selection);
     if (feature_tools_)
       (void)feature_tools_->accept_finishing_selection(*selection);
     if (feature_tools_)
@@ -1202,6 +1204,10 @@ void ShellWindow::refresh_viewport_scene() {
   }
   if (assembly_tools_) {
     auto targets = assembly_tools_->selection_items();
+    scene.value().insert(scene.value().end(), targets.begin(), targets.end());
+  }
+  if (construction_tools_) {
+    auto targets = construction_tools_->selection_items();
     scene.value().insert(scene.value().end(), targets.begin(), targets.end());
   }
   const auto published = viewport_->set_scene(std::move(scene.value()));
