@@ -18,6 +18,7 @@
 #include <QCheckBox>
 #include <QClipboard>
 #include <QComboBox>
+#include <QCursor>
 #include <QDialog>
 #include <QDir>
 #include <QDoubleSpinBox>
@@ -145,6 +146,8 @@ public:
     text(widget<QLineEdit>("blcad.manipulator_numeric_hud"), value);
   }
   void choose(QComboBox& control, int row) {
+    INFO(control.objectName().toStdString());
+    INFO("Popup row: " << row);
     REQUIRE(row >= 0);
     REQUIRE(row < control.count());
     reveal(control);
@@ -152,10 +155,25 @@ public:
     flush();
     auto* view = control.view();
     const auto index = control.model()->index(row, control.modelColumn());
-    view->scrollTo(index);
+    view->scrollTo(index, QAbstractItemView::PositionAtCenter);
     flush();
     const auto rectangle = view->visualRect(index);
     REQUIRE(view->viewport()->rect().contains(rectangle.center()));
+    if (QApplication::platformName() == "xcb") {
+      // Native popup tracking also consults the desktop pointer. Keep it at
+      // the same row as the synthetic events, including after earlier tests.
+      const auto global = view->viewport()->mapToGlobal(rectangle.center());
+      QCursor::setPos(global);
+      flush();
+      REQUIRE(QCursor::pos() == global);
+    }
+    // A real popup selection first moves over the scrolled row. Publish the
+    // hover before clicking so native menu selection follows the visible item.
+    QMouseEvent move(QEvent::MouseMove, rectangle.center(),
+                     view->viewport()->mapToGlobal(rectangle.center()), Qt::NoButton, Qt::NoButton,
+                     Qt::NoModifier);
+    QApplication::sendEvent(view->viewport(), &move);
+    flush();
     click_at(*view->viewport(), rectangle.center());
     REQUIRE(control.currentIndex() == row);
   }

@@ -274,3 +274,9 @@ and `[block136-missing-reference]` in the shell. The six-input fixture combines 
 semantic point/line and construction point/line sources with constraints, a generated line and two
 plane-driven solids. Actual file/ribbon/popup/list/button/camera input exercises every partial
 Preview failure, complete Apply, one-step Undo/Redo and strict Save/Open of the repaired model.
+
+
+The separate Sketch constraint-diagnostic suggestion surface is now restored through
+`ShellSketchDiagnosticsTools`; its bounded explicit repair, preview, catalog and active-Sketch
+contracts live in `docs/gui-sketch-workbench-mvp7.md`. It does not enlarge the source-reference
+recovery kinds above. `docs/mvp-plan.md` records Sketch3D authoring/editing as the next step.

@@ -225,12 +225,10 @@
       },
       "shell": {
         "owner": 136,
-        "status": "partial",
+        "status": "restored",
         "contract": "docs/interactive-sketcher-mvp8-acceptance.md",
-        "scope": "Planar authoring and explicit single/batch reference repair, including failed-recompute Part opening, bounded missing face/point/line sources and recoverable history, with full-preview atomic publication.",
-        "gaps": [
-          "Restore explicit constraint-diagnostic suggestion controls."
-        ],
+        "scope": "Planar authoring, explicit single/batch reference repair, failed-recompute and bounded missing-source Part opening/history, plus existing Core diagnostic suggestions with validated Preview/Apply and visible unsupported/manual actions.",
+        "gaps": [],
         "proofs": [
           {
             "filter": "[sketch-mouse-operations]",
@@ -255,13 +253,18 @@
           {
             "filter": "[block136-missing-reference]",
             "source": "tests/gui/gui_shell_reference_repair_tests.cpp"
+          },
+          {
+            "filter": "[block136-sketch-diagnostics]",
+            "source": "tests/gui/gui_shell_sketch_diagnostics_tests.cpp"
           }
         ],
         "actions": [
           "create_sketch",
           "finish_sketch",
           "repair_references",
-          "open_repair"
+          "open_repair",
+          "sketch_diagnostics"
         ],
         "widgets": [
           "blcad.shell.reference_repair_task",
@@ -273,7 +276,16 @@
           "blcad.reference_repair.pending",
           "blcad.reference_repair.stage",
           "blcad.reference_repair.remove",
-          "blcad.reference_repair.clear"
+          "blcad.reference_repair.clear",
+          "blcad.shell.sketch_diagnostics_task",
+          "blcad.sketch_diagnostics.sketch",
+          "blcad.sketch_diagnostics.diagnostics",
+          "blcad.sketch_diagnostics.suggestion",
+          "blcad.sketch_diagnostics.detail",
+          "blcad.sketch_diagnostics.summary",
+          "blcad.sketch_diagnostics.preview",
+          "blcad.sketch_diagnostics.apply",
+          "blcad.sketch_diagnostics.cancel"
         ]
       }
     },
@@ -817,7 +829,6 @@
       "blocked_families": [
         "viewport-selection",
         "parameters-expressions",
-        "planar-sketch-reference-repair",
         "bodies-extrude-revolve-holes",
         "sketch3d-pathcurve",
         "assembly-project-hierarchy",

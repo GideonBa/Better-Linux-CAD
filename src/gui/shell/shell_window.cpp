@@ -13,6 +13,7 @@
 #include "blcad/gui/shell/shell_origin.hpp"
 #include "blcad/gui/shell/shell_reference_repair_tools.hpp"
 #include "blcad/gui/shell/shell_ribbon.hpp"
+#include "blcad/gui/shell/shell_sketch_diagnostics_tools.hpp"
 #include "blcad/gui/shell/shell_sketch_tools.hpp"
 
 #include <QAbstractItemView>
@@ -255,6 +256,8 @@ ShellWindow::ShellWindow() {
   construction_tools_ = std::make_unique<ShellConstructionTools>(*this, *ribbon_, tab_model_);
   reference_repair_tools_ =
       std::make_unique<ShellReferenceRepairTools>(*this, *ribbon_, tab_model_);
+  sketch_diagnostics_tools_ =
+      std::make_unique<ShellSketchDiagnosticsTools>(*this, *ribbon_, tab_model_, tab_sketch_);
   statusBar()->showMessage(QStringLiteral("Bereit"));
   refresh();
 }
@@ -264,6 +267,7 @@ ShellWindow::~ShellWindow() {
   // still exist. QMainWindow/QWidget teardown otherwise destroys that drawable
   // before deleting the central viewport and its OCCT GL resources.
   viewport_->set_view_changed_callback({});
+  sketch_diagnostics_tools_.reset();
   reference_repair_tools_.reset();
   construction_tools_.reset();
   inspect_tools_.reset();
@@ -613,6 +617,8 @@ bool ShellWindow::confirm_document_replacement() {
 }
 
 void ShellWindow::reset_document_interaction() {
+  if (sketch_diagnostics_tools_)
+    sketch_diagnostics_tools_->cancel();
   if (reference_repair_tools_)
     reference_repair_tools_->cancel();
   if (construction_tools_)
@@ -759,6 +765,8 @@ bool ShellWindow::enter_sketch(SketchId sketch) {
 }
 
 bool ShellWindow::finish_active_sketch() {
+  if (sketch_diagnostics_tools_)
+    sketch_diagnostics_tools_->cancel();
   if (!active_sketch_)
     return false;
   if (!sketch_tools_->finish_tool())
@@ -890,6 +898,8 @@ bool ShellWindow::finish_active_sketch() {
 }
 
 bool ShellWindow::undo() {
+  if (sketch_diagnostics_tools_)
+    sketch_diagnostics_tools_->cancel();
   if (reference_repair_tools_)
     reference_repair_tools_->cancel();
   if (construction_tools_)
@@ -922,6 +932,8 @@ bool ShellWindow::undo() {
 }
 
 bool ShellWindow::redo() {
+  if (sketch_diagnostics_tools_)
+    sketch_diagnostics_tools_->cancel();
   if (reference_repair_tools_)
     reference_repair_tools_->cancel();
   if (construction_tools_)
@@ -1152,6 +1164,8 @@ void ShellWindow::refresh() {
 
   refresh_browser();
   refresh_properties();
+  if (sketch_diagnostics_tools_)
+    sketch_diagnostics_tools_->refresh();
   if (reference_repair_tools_)
     reference_repair_tools_->refresh();
   if (construction_tools_)
