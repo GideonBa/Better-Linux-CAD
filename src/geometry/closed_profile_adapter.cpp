@@ -183,6 +183,21 @@ struct ThroughAllPlacement {
         {first.x + previous_direction.x * t, first.y + previous_direction.y * t});
   }
 
+  // A mitered inward offset can pass through a collapsed contour and become
+  // a large inverted polygon again. OCCT may still loft that polygon into a
+  // valid solid. Preserve each corresponding edge's forward orientation so
+  // the candidate fails at the first collapsed/reversed side instead.
+  for (std::size_t index = 0; index < polygon.size(); ++index) {
+    const auto next = (index + 1U) % polygon.size();
+    const Vector2 original{polygon[next].x - polygon[index].x, polygon[next].y - polygon[index].y};
+    const Vector2 shifted{offset_polygon[next].x - offset_polygon[index].x,
+                          offset_polygon[next].y - offset_polygon[index].y};
+    if ((original.x * shifted.x + original.y * shifted.y) / std::hypot(original.x, original.y) <=
+        kAxisTolerance)
+      return Result<TopoDS_Shape>::failure(
+          make_geometry_error("taper offset collapses or reverses a profile edge"));
+  }
+
   std::vector<Point3> top_vertices;
   top_vertices.reserve(offset_polygon.size());
   for (const Point2 vertex : offset_polygon) {

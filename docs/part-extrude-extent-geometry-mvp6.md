@@ -35,6 +35,12 @@ cylindrical or oblique limit fails explicitly instead of producing an approximat
 semantic source is resolved through `WorkplaneResolver`; raw OCCT face identity is never written to
 Core.
 
+An in-place Extrude resolves its target from the latest direct Body predecessor in dependency
+order, using the shared modifier target resolver. A `ToFace`/`Between` reference to the original
+base feature must not reset an intervening Cut or finishing operation. Full and isolated repeated
+recomputes retain the same result, even when the cache already contains the current feature's
+output. Regression: `[geometry][extrude-limit-history]`, added with the Block-136 extent editor.
+
 ## Taper
 
 A nonzero signed taper builds a solid loft between the start polygon and its planar offset at the
@@ -47,6 +53,11 @@ tan(taper_angle_deg) * span_depth
 Positive taper expands outward according to polygon orientation; negative taper contracts. Empty,
 collapsed, non-planar, degenerate-edge, and OCCT-invalid results fail closed. Zero taper uses the
 straight-prism path.
+
+Inward miter offsets must keep every corresponding polygon edge oriented forward. An edge that
+collapses or reverses is rejected before lofting, including offsets that have passed through a
+collapsed contour and form a large inverted polygon. An OCCT-valid loft alone cannot establish
+this constraint. Regression: `[geometry][extrude-taper-collapse]`.
 
 ## Thin feature
 

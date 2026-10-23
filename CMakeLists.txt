@@ -300,6 +300,7 @@ if(BLCAD_BUILD_GUI)
     src/gui/gui_task_state.cpp
     src/gui/occt_viewport.cpp
     src/gui/shell/shell_feature_tools.cpp
+    src/gui/shell/shell_extrude_tools.cpp
     src/gui/shell/shell_finishing_tools.cpp
     src/gui/shell/shell_pattern_tools.cpp
     src/gui/shell/shell_body_tools.cpp
@@ -609,6 +610,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_shell_sketch_diagnostics_tests.cpp
       tests/gui/gui_shell_parameter_tests.cpp
       tests/gui/gui_shell_hole_tests.cpp
+      tests/gui/gui_shell_extrude_extent_tests.cpp
       tests/gui/gui_shell_sketch_3d_tests.cpp
       tests/gui/gui_shell_construction_tools_tests.cpp
       tests/gui/gui_shell_combined_workflow_tests.cpp

@@ -107,10 +107,12 @@ bool parameter_name_exists(const PartDocument& part, std::string_view name) {
 std::size_t next_extrude_index(const PartDocument& part) {
   for (std::size_t index = 1U;; ++index) {
     const std::string suffix = std::to_string(index);
-    if (!feature_id_exists(part, FeatureId("feature.extrusion." + suffix)) &&
-        part.find_body(BodyId("body." + suffix)) == nullptr &&
-        part.find_parameter(ParameterId("parameter.extrusion." + suffix + ".depth")) == nullptr &&
-        !parameter_name_exists(part, "Extrusion " + suffix + " Tiefe"))
+    if (!part.dependency_graph().has_node("feature.extrusion." + suffix) &&
+        !part.dependency_graph().has_node("body." + suffix) &&
+        !part.dependency_graph().has_node("parameter.extrusion." + suffix + ".depth") &&
+        !part.dependency_graph().has_node("parameter.extrusion." + suffix + ".depth.second") &&
+        !parameter_name_exists(part, "Extrusion " + suffix + " Tiefe") &&
+        !parameter_name_exists(part, "feature.extrusion." + suffix + " zweite Tiefe"))
       return index;
   }
 }
@@ -281,6 +283,7 @@ ShellFeatureTools::ShellFeatureTools(ShellWindow& window, GuiDocumentSession& se
   value_label_ = new QLabel(QStringLiteral("Wert"), panel);
   form->addRow(value_label_, numeric_editor_);
   column->addLayout(form);
+  build_extrude_controls(panel);
   build_finishing_controls(panel, *form);
   build_pattern_controls(panel);
   build_body_controls(panel);
@@ -458,6 +461,7 @@ Result<std::size_t> ShellFeatureTools::begin_extrude() {
     return begun;
   }
   command_ = Command::Extrude;
+  reset_extrude_controls(frame);
   if (!session_.task().show_preview()) {
     cancel();
     return Result<std::size_t>::failure(
@@ -781,6 +785,16 @@ ShellFeatureTools::accept_manipulator_candidate(const GuiViewportManipulatorCand
 
 Result<GuiPartFeaturePreview> ShellFeatureTools::preview_and_publish() {
   preview_valid_ = false;
+  if (command_ == Command::Extrude) {
+    auto configured = configure_extrude_candidate();
+    if (!configured) {
+      viewport_.clear_feature_preview();
+      task_summary_->setText(QString::fromStdString(configured.error().message()));
+      refresh_enablement();
+      synchronize_overlay();
+      return Result<GuiPartFeaturePreview>::failure(configured.error());
+    }
+  }
   auto preview =
       pattern() && pattern_sources_->selectedItems().empty()
           ? Result<GuiPartFeaturePreview>::failure(
@@ -827,6 +841,8 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::preview_and_publish() {
   std::vector<std::string> replacements;
   if (body_operation())
     replacements = body_preview_replacements();
+  else if (command_ == Command::Extrude && extrude_operation_->currentIndex() != 0)
+    replacements.push_back("body/" + extrude_target_->currentData().toString().toStdString());
   else if (spatial() && command_ != Command::PathCurve && spatial_mode_->currentIndex() == 1)
     replacements.push_back("body/" + spatial_target_->currentData().toString().toStdString());
   else if (finishing())
@@ -840,23 +856,19 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::preview_and_publish() {
     synchronize_overlay();
     return Result<GuiPartFeaturePreview>::failure(published.error());
   }
-  task_summary_->setText(surface()
-                             ? task_dock_->windowTitle() + QStringLiteral(": Vorschau gültig.")
-                         : spatial()        ? spatial_summary()
-                         : body_operation() ? body_summary()
-                         : finishing()      ? finishing_summary()
-                         : pattern()        ? pattern_summary()
-                                     : QString::fromStdString(preview.value().semantic_summary));
+  const auto summary = surface() ? task_dock_->windowTitle() + QStringLiteral(": Vorschau gültig.")
+                       : command_ == Command::Extrude ? QStringLiteral("%1 · %2: Vorschau gültig.")
+                                                            .arg(extrude_operation_->currentText(),
+                                                                 extrude_extent_->currentText())
+                       : spatial()        ? spatial_summary()
+                       : body_operation() ? body_summary()
+                       : finishing()      ? finishing_summary()
+                       : pattern()        ? pattern_summary()
+                                   : QString::fromStdString(preview.value().semantic_summary);
+  task_summary_->setText(summary);
   preview_valid_ = true;
   refresh_enablement();
-  window_.statusBar()->showMessage(
-      QStringLiteral("Vorschau: %1")
-          .arg(surface()   ? task_dock_->windowTitle() + QStringLiteral(": Vorschau gültig.")
-               : spatial() ? spatial_summary()
-               : body_operation() ? body_summary()
-               : finishing()      ? finishing_summary()
-               : pattern()        ? pattern_summary()
-                                  : QString::fromStdString(preview.value().semantic_summary)));
+  window_.statusBar()->showMessage(QStringLiteral("Vorschau: %1").arg(summary));
   synchronize_overlay();
   return preview;
 }
@@ -872,8 +884,7 @@ Result<std::size_t> ShellFeatureTools::apply() {
   if (session_.task().stage() != GuiTaskStage::Preview ||
       session_.task().command_id() != expected_command) {
     return Result<std::size_t>::failure(Error::validation(
-        "gui.shell.feature",
-        "Feature-Aufgabe ist nicht in einem anwendbaren Vorschauzustand"));
+        "gui.shell.feature", "Feature-Aufgabe ist nicht in einem anwendbaren Vorschauzustand"));
   }
   auto preview = preview_and_publish();
   if (preview.has_error())
@@ -1053,6 +1064,8 @@ double ShellFeatureTools::current_value() const noexcept {
 }
 
 double ShellFeatureTools::value_for_handle(std::string_view handle) const noexcept {
+  if (command_ == Command::Extrude && handle == kExtrudeTaperHandleId)
+    return coordinator_.extrude().taper().value_or(0);
   if (command_ == Command::BodyTranslate) {
     const auto value = coordinator_.body_operation().translation();
     return handle.ends_with(".y") ? value.y : handle.ends_with(".z") ? value.z : value.x;
@@ -1082,6 +1095,10 @@ void ShellFeatureTools::synchronize_numeric_editor(double value) {
   const QSignalBlocker blocker(numeric_editor_);
   synchronizing_numeric_ = true;
   numeric_editor_->setText(number_text(value));
+  if (command_ == Command::Extrude && coordinator_.extrude().taper()) {
+    const QSignalBlocker taper_blocker(extrude_taper_);
+    extrude_taper_->setText(QString::number(*coordinator_.extrude().taper(), 'g', 17));
+  }
   if (pattern())
     synchronize_pattern_editors();
   if (body_operation())
@@ -1094,6 +1111,8 @@ void ShellFeatureTools::synchronize_numeric_editor(double value) {
 }
 
 void ShellFeatureTools::synchronize_overlay() {
+  if (command_ == Command::Extrude)
+    extrude_controls_->setEnabled(layer_.active_handle_id().empty());
   const bool visible = active() && preview_valid_ && !layer_.handles().empty() &&
                        !pattern_reference_picking_ && !body_reference_picking_;
   overlay_->setVisible(visible);
@@ -1116,7 +1135,8 @@ void ShellFeatureTools::restore_drag_start_value() {
   drag_start_value_.reset();
   GuiViewportManipulatorCandidate candidate;
   candidate.handle_id = drag_start_handle_;
-  candidate.value_kind = angular_value() || drag_start_handle_ == kChamferAngleHandleId
+  candidate.value_kind = angular_value() || drag_start_handle_ == kChamferAngleHandleId ||
+                                 drag_start_handle_ == kExtrudeTaperHandleId
                              ? GuiViewportManipulatorValueKind::Angle
                              : GuiViewportManipulatorValueKind::Distance;
   candidate.source = GuiViewportManipulatorInputSource::Numeric;
@@ -1149,6 +1169,7 @@ void ShellFeatureTools::handle_escape() {
 }
 
 void ShellFeatureTools::show_task_panel(QString title, QString unit, double value) {
+  extrude_controls_->setVisible(command_ == Command::Extrude);
   finishing_controls_->setVisible(finishing());
   pattern_controls_->setVisible(pattern());
   body_controls_->setVisible(body_operation());

@@ -256,6 +256,12 @@ protected:
   bool eventFilter(QObject* watched, QEvent* event) override;
 
 private:
+  void build_extrude_controls(QWidget* panel);
+  void reset_extrude_controls(GuiFeatureManipulatorFrame frame);
+  void update_extrude_controls();
+  void invalidate_extrude_preview();
+  void refresh_extrude_preview();
+  [[nodiscard]] Result<std::size_t> configure_extrude_candidate();
   [[nodiscard]] bool finishing() const noexcept;
   [[nodiscard]] bool pattern() const noexcept;
   [[nodiscard]] bool surface() const noexcept;
@@ -341,6 +347,18 @@ private:
   QLabel* task_summary_{nullptr};
   QLabel* value_label_{nullptr};
   QLineEdit* numeric_editor_{nullptr};
+  QWidget* extrude_controls_{nullptr};
+  QFormLayout* extrude_form_{nullptr};
+  QComboBox* extrude_extent_{nullptr};
+  QComboBox* extrude_operation_{nullptr};
+  QComboBox* extrude_target_{nullptr};
+  QComboBox* extrude_direction_{nullptr};
+  QComboBox* extrude_first_face_{nullptr};
+  QComboBox* extrude_second_face_{nullptr};
+  QLineEdit* extrude_second_distance_{nullptr};
+  QLineEdit* extrude_taper_{nullptr};
+  std::vector<FaceReference> extrude_faces_;
+  GuiFeatureManipulatorFrame extrude_frame_;
   QPushButton* apply_button_{nullptr};
   QPushButton* cancel_button_{nullptr};
   QAction* action_extrude_{nullptr};
