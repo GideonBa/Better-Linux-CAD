@@ -18,12 +18,21 @@ Parameter references use the parameter name. Unit dimension is a length power: b
 - `PartDocument::add_expression_parameter(id, name, type, formula)` evaluates against the current document, stores the parameter, and adds dependency edges from every referenced parameter to the expression parameter. Cycles are rejected through the existing graph cycle detection.
 - `PartDocument::set_parameter_value` rejects direct writes to expression-driven parameters; after any accepted parameter write it re-evaluates every affected expression parameter in topological order, so chained formulas read already-updated inputs, before returning the affected node list.
 - `PartDocument::set_parameter_formula` is the mutation path for expression parameters: the new formula is evaluated first, the parameter's old input edges are replaced through `DependencyGraph::remove_dependencies_of_dependent`, direct and indirect cycles are rejected before any state changes, and dependents (including chained expressions) are invalidated and re-evaluated. Invalid edits leave the document untouched.
-- JSON persists the formula string; deserialization re-derives the value and the edges through `add_expression_parameter` (file order preserves input-before-expression validity).
+- JSON persists the formula string; deserialization re-derives values and edges through
+  `add_expression_parameter` in dependency-ready passes. Formula edits may reference parameters
+  appearing later in the file. Loading restores the authored parameter order after validation;
+  missing names and cycles remain strict errors in normal and reference-repair modes. No schema
+  change or persisted evaluated-value authority is introduced.
 - Block 59 Extrude `distance`, `symmetric`, `two_sided`, and thin-wall inputs reference normal
   Length parameters. Formula-driven Length parameters therefore participate through the same
   dependency chain; Extrude intent does not persist duplicate evaluated lengths.
 
 ## Covered by tests
+
+The replacement shell exposes standalone Part literal/formula creation and existing formula editing
+with local batches, complete downstream Preview and one Apply transaction. The exact availability,
+input, usage, history and persistence contract lives in `docs/parameter-model.md`. Formula validation
+continues to use these Core APIs; there is no separate GUI evaluator or schema.
 
 `tests/core/parameter_expression_tests.cpp`: formula evaluation (mm literals, parentheses, unary minus, count inputs), unit-violation and malformed-input rejection, graph edges, direct-write rejection, input-change re-evaluation, chained topological re-evaluation, duplicate/self-reference rejection, JSON roundtrip with re-derived edges, and formula editing (value/edge replacement, detached old inputs, chained re-evaluation, transactional invalid-edit rejection, indirect cycle rejection).
 

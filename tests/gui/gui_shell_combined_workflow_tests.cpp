@@ -8,6 +8,7 @@
 #include "blcad/gui/shell/shell_feature_tools.hpp"
 #include "blcad/gui/shell/shell_inspect_tools.hpp"
 #include "blcad/gui/shell/shell_measure_tools.hpp"
+#include "blcad/gui/shell/shell_parameter_tools.hpp"
 #include "blcad/gui/shell/shell_ribbon.hpp"
 #include "blcad/gui/shell/shell_sketch_3d_tools.hpp"
 #include "blcad/gui/shell/shell_sketch_tools.hpp"
@@ -66,7 +67,7 @@ template <typename T> T checked(Result<T> result) {
 }
 
 // Interaction helpers deliberately stop at Qt widgets and input events.
-// Twelve combined workflows author their inputs through the UI. The Planar
+// Thirteen combined workflows author their inputs through the UI. The Planar
 // motion case imports the repository's seated Part definition through a file
 // dialog; the separately tagged mixed-path case opens preauthored Sketch/planes.
 // Neither path drives authoring controllers/workbenches directly.
@@ -2009,5 +2010,107 @@ TEST_CASE(
   ui.file("export_part_step", step);
   CHECK(ui.bytes(step).contains("ISO-10303-21"));
   CHECK(ui.snapshot() == edited);
+  ui.idle();
+}
+
+TEST_CASE("Combined UI parameter batches drive a rebound extrusion through formula recovery "
+          "history and export",
+          "[gui][integration][shell-combined-workflow][shell-combined-parameters]") {
+  WorkflowUi ui;
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  ui.new_document("Parameterized solid");
+  ui.rectangle("datum.xy", {20, 20}, {50, 40});
+  const auto body = ui.extrude(4);
+  const auto feature = ui.window.session().part_document()->features().front().id();
+  CHECK(ui.summary(body).volume_mm3 == Approx(2400).margin(1e-5));
+  std::vector<std::string> states{ui.snapshot()};
+  ui.command("parameters");
+  const auto add_parameter = [&](const QString& name, const QString& value, int type,
+                                 bool formula) {
+    ui.data(ui.widget<QComboBox>("blcad.parameters.parameter"), QString());
+    ui.text(ui.widget<QLineEdit>("blcad.parameters.name"), name);
+    ui.choose(ui.widget<QComboBox>("blcad.parameters.type"), type);
+    ui.choose(ui.widget<QComboBox>("blcad.parameters.mode"), formula ? 1 : 0);
+    ui.text(ui.widget<QLineEdit>("blcad.parameters.input"), value);
+    ui.button("blcad.parameters.stage");
+    const auto id = ui.widget<QComboBox>("blcad.parameters.parameter").currentData().toString();
+    REQUIRE_FALSE(id.isEmpty());
+    return id;
+  };
+  const auto depth = add_parameter("base_depth", "2", 0, false);
+  const auto copies = add_parameter("copies", "3", 1, false);
+  const auto angle = add_parameter("inclination", "-22.123456789012345", 2, false);
+  const auto computed = add_parameter("driven_depth", "base_depth * copies", 0, true);
+  add_parameter("depth_twice", "driven_depth * 2", 0, true);
+  ui.button("blcad.parameters.preview");
+  CHECK(ui.snapshot() == states.back());
+  CHECK(ui.window.viewport().feature_preview_active());
+  ui.capture("parameter-manager-preview");
+  ui.button("blcad.parameters.apply");
+  ui.idle();
+  states.push_back(ui.snapshot());
+  CHECK(ui.window.session()
+            .part_document()
+            ->find_parameter(ParameterId(angle.toStdString()))
+            ->value()
+            .degrees() == -22.123456789012345);
+
+  ui.tree(feature.value(), true);
+  ui.data(ui.widget<QComboBox>("blcad.feature_edit.binding/length_parameter"), computed);
+  CHECK_FALSE(ui.widget<QDoubleSpinBox>("blcad.feature_edit.field/length_parameter").isEnabled());
+  ui.button("blcad.feature_edit.apply");
+  CHECK(ui.summary(body).volume_mm3 == Approx(3600).margin(1e-5));
+  states.push_back(ui.snapshot());
+
+  ui.command("parameters");
+  ui.data(ui.widget<QComboBox>("blcad.parameters.parameter"), depth);
+  ui.text(ui.widget<QLineEdit>("blcad.parameters.input"), "4");
+  ui.button("blcad.parameters.stage");
+  ui.data(ui.widget<QComboBox>("blcad.parameters.parameter"), computed);
+  CHECK(ui.widget<QLabel>("blcad.parameters.usage")
+            .text()
+            .contains(QString::fromStdString(feature.value())));
+  ui.text(ui.widget<QLineEdit>("blcad.parameters.input"), "depth_twice / 2");
+  ui.button("blcad.parameters.stage");
+  CHECK_FALSE(ui.widget<QPushButton>("blcad.parameters.preview").isEnabled());
+  CHECK(ui.widget<QLineEdit>("blcad.parameters.input").text() == "depth_twice / 2");
+  CHECK(ui.snapshot() == states.back());
+  ui.text(ui.widget<QLineEdit>("blcad.parameters.input"), "base_depth * (copies + 1)");
+  ui.button("blcad.parameters.stage");
+  ui.button("blcad.parameters.preview");
+  REQUIRE(ui.widget<QPushButton>("blcad.parameters.apply").isEnabled());
+  // New pending invalid input must revoke an earlier successful whole-model preview.
+  ui.text(ui.widget<QLineEdit>("blcad.parameters.input"), "driven_depth + 1 mm");
+  CHECK_FALSE(ui.widget<QPushButton>("blcad.parameters.apply").isEnabled());
+  CHECK_FALSE(ui.window.viewport().feature_preview_active());
+  ui.button("blcad.parameters.stage");
+  CHECK_FALSE(ui.widget<QPushButton>("blcad.parameters.preview").isEnabled());
+  ui.data(ui.widget<QComboBox>("blcad.parameters.parameter"), copies);
+  ui.text(ui.widget<QLineEdit>("blcad.parameters.input"), "1.5");
+  ui.button("blcad.parameters.stage");
+  CHECK_FALSE(ui.widget<QPushButton>("blcad.parameters.preview").isEnabled());
+  ui.data(ui.widget<QComboBox>("blcad.parameters.parameter"), computed);
+  ui.button("blcad.parameters.preview");
+  CHECK(ui.snapshot() == states.back());
+  CHECK(ui.summary(body).volume_mm3 == Approx(3600).margin(1e-5));
+  ui.capture("parameter-manager-usage");
+  ui.button("blcad.parameters.apply");
+  CHECK(ui.summary(body).volume_mm3 == Approx(9600).margin(1e-5));
+  states.push_back(ui.snapshot());
+  ui.history(states);
+  CHECK(ui.summary(body).volume_mm3 == Approx(9600).margin(1e-5));
+  ui.command("parameters");
+  add_parameter("discarded", "7", 0, false);
+  ui.button("blcad.parameters.preview");
+  ui.button("blcad.parameters.cancel");
+  CHECK(ui.snapshot() == states.back());
+  ui.idle();
+  ui.roundtrip(directory.filePath("parameters.blcad"));
+  CHECK(ui.summary(body).volume_mm3 == Approx(9600).margin(1e-5));
+  const auto step = directory.filePath("parameters.step");
+  ui.file("export_part_step", step);
+  CHECK(ui.bytes(step).contains("ISO-10303-21"));
+  CHECK(ui.snapshot() == states.back());
   ui.idle();
 }

@@ -309,6 +309,7 @@ if(BLCAD_BUILD_GUI)
     src/gui/shell/shell_inspect_tools.cpp
     src/gui/shell/shell_reference_repair_tools.cpp
     src/gui/shell/shell_sketch_diagnostics_tools.cpp
+    src/gui/shell/shell_parameter_tools.cpp
     src/gui/shell/shell_sketch_3d_tools.cpp
     src/gui/shell/shell_construction_tools.cpp
     src/gui/shell/shell_construction_manipulators.cpp
@@ -605,6 +606,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_shell_inspect_tools_tests.cpp
       tests/gui/gui_shell_reference_repair_tests.cpp
       tests/gui/gui_shell_sketch_diagnostics_tests.cpp
+      tests/gui/gui_shell_parameter_tests.cpp
       tests/gui/gui_shell_sketch_3d_tests.cpp
       tests/gui/gui_shell_construction_tools_tests.cpp
       tests/gui/gui_shell_combined_workflow_tests.cpp

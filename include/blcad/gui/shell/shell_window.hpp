@@ -34,6 +34,7 @@ class ShellConstructionTools;
 class ShellReferenceRepairTools;
 class ShellSketchDiagnosticsTools;
 class ShellSketch3DTools;
+class ShellParameterTools;
 
 // GUI Shell Reset MVP-9R Block 133: the single Qt shell window (replaces the
 // deleted MainWindow-and-binders architecture). ShellWindow owns every
@@ -87,6 +88,10 @@ public:
 
   [[nodiscard]] ShellSketch3DTools& sketch_3d_tools() noexcept {
     return *sketch_3d_tools_;
+  }
+
+  [[nodiscard]] ShellParameterTools& parameter_tools() noexcept {
+    return *parameter_tools_;
   }
 
   // Appends to the diagnostics panel and the status bar (shell components
@@ -150,6 +155,7 @@ private:
   std::unique_ptr<ShellReferenceRepairTools> reference_repair_tools_;
   std::unique_ptr<ShellSketchDiagnosticsTools> sketch_diagnostics_tools_;
   std::unique_ptr<ShellSketch3DTools> sketch_3d_tools_;
+  std::unique_ptr<ShellParameterTools> parameter_tools_;
 
   OcctViewport* viewport_{nullptr};
   ShellRibbon* ribbon_{nullptr};

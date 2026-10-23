@@ -11,6 +11,7 @@
 #include "blcad/gui/shell/shell_inspect_tools.hpp"
 #include "blcad/gui/shell/shell_measure_tools.hpp"
 #include "blcad/gui/shell/shell_origin.hpp"
+#include "blcad/gui/shell/shell_parameter_tools.hpp"
 #include "blcad/gui/shell/shell_reference_repair_tools.hpp"
 #include "blcad/gui/shell/shell_ribbon.hpp"
 #include "blcad/gui/shell/shell_sketch_3d_tools.hpp"
@@ -260,6 +261,7 @@ ShellWindow::ShellWindow() {
   sketch_diagnostics_tools_ =
       std::make_unique<ShellSketchDiagnosticsTools>(*this, *ribbon_, tab_model_, tab_sketch_);
   sketch_3d_tools_ = std::make_unique<ShellSketch3DTools>(*this, *ribbon_, tab_model_);
+  parameter_tools_ = std::make_unique<ShellParameterTools>(*this, *ribbon_, tab_model_);
   statusBar()->showMessage(QStringLiteral("Bereit"));
   refresh();
 }
@@ -270,6 +272,7 @@ ShellWindow::~ShellWindow() {
   // before deleting the central viewport and its OCCT GL resources.
   viewport_->set_view_changed_callback({});
   sketch_3d_tools_.reset();
+  parameter_tools_.reset();
   sketch_diagnostics_tools_.reset();
   reference_repair_tools_.reset();
   construction_tools_.reset();
@@ -622,6 +625,8 @@ bool ShellWindow::confirm_document_replacement() {
 }
 
 void ShellWindow::reset_document_interaction() {
+  if (parameter_tools_)
+    parameter_tools_->cancel();
   if (sketch_3d_tools_)
     sketch_3d_tools_->cancel();
   if (sketch_diagnostics_tools_)
@@ -905,6 +910,8 @@ bool ShellWindow::finish_active_sketch() {
 }
 
 bool ShellWindow::undo() {
+  if (parameter_tools_)
+    parameter_tools_->cancel();
   if (sketch_3d_tools_)
     sketch_3d_tools_->cancel();
   if (sketch_diagnostics_tools_)
@@ -941,6 +948,8 @@ bool ShellWindow::undo() {
 }
 
 bool ShellWindow::redo() {
+  if (parameter_tools_)
+    parameter_tools_->cancel();
   if (sketch_3d_tools_)
     sketch_3d_tools_->cancel();
   if (sketch_diagnostics_tools_)
@@ -1181,6 +1190,8 @@ void ShellWindow::refresh() {
 
   refresh_browser();
   refresh_properties();
+  if (parameter_tools_)
+    parameter_tools_->refresh();
   if (sketch_3d_tools_)
     sketch_3d_tools_->refresh();
   if (sketch_diagnostics_tools_)
