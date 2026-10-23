@@ -126,8 +126,14 @@ Result<GeometryDistanceMeasurement> plane_plane(const AssemblyPlanarTargetDescri
       length(na) <= epsilon || length(nb) <= epsilon)
     return Result<GeometryDistanceMeasurement>::failure(
         measure_error("face/face distance requires two finite planes"));
-  if (length(cross(na, nb)) > epsilon)
-    return Result<GeometryDistanceMeasurement>::success({0.0, a.origin, a.origin});
+  const Vector3 intersection_direction = cross(na, nb);
+  const double denominator = dot(intersection_direction, intersection_direction);
+  if (denominator > epsilon * epsilon) {
+    const Point3 witness =
+        add(a.origin, scale(cross(intersection_direction, na),
+                            dot(nb, subtract(b.origin, a.origin)) / denominator));
+    return Result<GeometryDistanceMeasurement>::success({0.0, witness, witness});
+  }
   return point_plane(a.origin, b, true);
 }
 

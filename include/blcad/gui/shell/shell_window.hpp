@@ -26,6 +26,7 @@ namespace blcad::gui {
 class ShellRibbon;
 class ShellFeatureTools;
 class ShellSketchTools;
+class ShellMeasureTools;
 
 // GUI Shell Reset MVP-9R Block 133: the single Qt shell window (replaces the
 // deleted MainWindow-and-binders architecture). ShellWindow owns every
@@ -50,6 +51,10 @@ public:
   }
   [[nodiscard]] ShellSketchTools& sketch_tools() noexcept { return *sketch_tools_; }
   [[nodiscard]] ShellFeatureTools& feature_tools() noexcept { return *feature_tools_; }
+
+  [[nodiscard]] ShellMeasureTools& measure_tools() noexcept {
+    return *measure_tools_;
+  }
 
   // Appends to the diagnostics panel and the status bar (shell components
   // report through here).
@@ -102,6 +107,7 @@ private:
   GuiDocumentBrowser browser_model_;
   std::unique_ptr<ShellSketchTools> sketch_tools_;
   std::unique_ptr<ShellFeatureTools> feature_tools_;
+  std::unique_ptr<ShellMeasureTools> measure_tools_;
 
   OcctViewport* viewport_{nullptr};
   ShellRibbon* ribbon_{nullptr};

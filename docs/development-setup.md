@@ -592,6 +592,23 @@ frames. Native proof uses real target/boundary clicks, extension dragging, typed
 visible Apply button. Optional `BLCAD_UI_CAPTURE_DIR` saves review captures. Contract and bounded
 limits: `docs/gui-interactive-surface-mvp9.md`. These checks do not close Block-136 acceptance.
 
+### Block 136 Measure slice
+
+```bash
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[block136-measure]"
+./build/dev-gui/blcad_geometry_tests "[block136-measure]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-measure]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle]"
+```
+
+The slice verifies all four readouts, clipboard and clear, explicit pick roles/filters, cancellation
+through all close paths, scope restoration, stale and replaced geometry, byte-identical saved Parts,
+unchanged dirty/history state and a known posed Project-component distance. Geometry proof verifies
+World-space targets and intersecting-plane witnesses. Native proof opens the ribbon command, clicks
+actual model vertices, follows a camera change, selects circular edges/cylindrical faces and closes
+the reachable task dock. Optional `BLCAD_UI_CAPTURE_DIR` records review captures. Scope and existing
+analytic distance semantics: `docs/gui-measure-mvp9.md`. Block-136 acceptance remains open.
+
 ### Sketch operation follow-up
 
 The shell wires pointer dragging, live previews, numeric refinement and Apply/Cancel for transforms,

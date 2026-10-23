@@ -503,3 +503,20 @@ a further Escape cancels the command.
 stitched closed shell can become a solid through **Hülle zu Volumen**. Incompatible/open inputs show
 an error before Apply. A valid preview enables **Anwenden**, which creates the new result Body and
 its feature in one undoable step; **Abbrechen** discards the candidate. Source Bodies remain available.
+
+## Measure
+
+Open **3D-Modell → Prüfen** and choose **Abstand**, **Winkel**, **Radius / Durchmesser** or
+**Körperdaten**. Select elements in the model or through **Element A/B** in the **Messen** panel.
+After A, the next model click selects B; **Modellklick wählt** changes that role explicitly.
+**Auswahlfilter** isolates points, edges or faces when geometry overlaps.
+
+Distance uses the supporting straight lines and planes, including their extensions beyond selected
+edges/faces. Angle shows the smaller angle from 0° to 90°. Circular edges and cylindrical faces
+provide radius/diameter. Part Bodies provide volume in mm³ and solid count; Project geometry can be
+measured in its displayed assembly position.
+
+Distance witnesses and A/B markers follow the camera. **Kopieren** copies a current result and
+**Neu auswählen** clears the inputs. Model changes or stale geometry clear the readout and require
+new picks. **Schließen**, Escape or the dock close button exits Measure and restores the previous
+selection filters. Measurement creates no model change or history entry.

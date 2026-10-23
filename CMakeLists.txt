@@ -182,6 +182,7 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/finishing_selection.cpp
     src/geometry/fillet_adapter.cpp
     src/geometry/geometry_measure.cpp
+    src/geometry/measure_selection.cpp
     src/geometry/chamfer_adapter.cpp
     src/geometry/shell_adapter.cpp
     src/geometry/draft_adapter.cpp
@@ -303,6 +304,7 @@ if(BLCAD_BUILD_GUI)
     src/gui/shell/shell_body_tools.cpp
     src/gui/shell/shell_spatial_tools.cpp
     src/gui/shell/shell_surface_tools.cpp
+    src/gui/shell/shell_measure_tools.cpp
     src/gui/shell/shell_origin.cpp
     src/gui/shell/shell_ribbon.cpp
     src/gui/shell/shell_sketch_tools.cpp
@@ -534,6 +536,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/sweep_feature_pipeline_tests.cpp
       tests/geometry/surface_boundary_fill_pipeline_tests.cpp
       tests/geometry/surface_trim_extend_pipeline_tests.cpp
+      tests/geometry/measure_selection_tests.cpp
       tests/geometry/surface_stitch_pipeline_tests.cpp
       tests/geometry/surface_close_shell_pipeline_tests.cpp
       tests/geometry/shell_feature_pipeline_tests.cpp
@@ -584,6 +587,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_shell_body_tools_tests.cpp
       tests/gui/gui_shell_spatial_tools_tests.cpp
       tests/gui/gui_shell_surface_tools_tests.cpp
+      tests/gui/gui_shell_measure_tools_tests.cpp
       tests/gui/gui_shell_window_tests.cpp
       tests/gui/gui_shell_sketch_tools_tests.cpp
       tests/gui/gui_shell_sketch_operations_tests.cpp
