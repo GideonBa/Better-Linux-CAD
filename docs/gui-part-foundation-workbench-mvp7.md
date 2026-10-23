@@ -29,3 +29,12 @@ recompute contract before a GUI can authorize it.
 ./build/dev-gui/blcad_gui_tests "[gui][part-foundation]"
 ./build/dev-gui/blcad_gui_tests "[gui][extrude-revolve]"
 ```
+
+
+## Explicit reference-repair state
+
+A Core-valid Part opened through the explicit failed-recompute repair path blocks ordinary Part,
+constraint, dimension and Sketch transactions until a complete repair succeeds. The dedicated repair
+transaction retains the same full recompute/publication authority. Rejected Part candidates preserve
+the current intent, cache and freshness status. Failed-snapshot history and file semantics are owned
+by `docs/reference-recovery-mvp.md`; the supported repair UI is in `docs/gui-sketch-workbench-mvp7.md`.
