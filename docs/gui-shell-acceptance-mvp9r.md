@@ -39,8 +39,8 @@ source, hide a missing tag behind OR and claim completion with gaps. They must a
 
 The machine-readable details live in `families[].shell.gaps`; this is the execution order:
 
-1. Complete generated-reference and parallel-through-point construction creation/editing plus native
-   reference collection/manipulators. Nine creation/edit modes, downstream recompute previews,
+1. Complete native construction reference collection/manipulators. Fourteen creation/edit modes
+   including generated-reference and parallel-through-point definitions, downstream recompute previews,
    resolved helper presentation and Sketch-on-workplane entry are restored;
    the exact implemented boundary lives in `docs/gui-sketch-workbench-mvp7.md`.
 2. Restore explicit broken-reference repair and Sketch3D authoring/editing.
@@ -121,7 +121,7 @@ workflows and the acceptance sequence above stay open.
 
 ## Combined UI workflow regression — 2026-10-23
 
-`[shell-combined-workflow]` covers six replacement-shell scenarios using actual Qt widget/input paths:
+`[shell-combined-workflow]` covers seven replacement-shell scenarios using actual Qt widget/input paths:
 
 1. Offset workplane → mouse/numeric Sketch → Extrude → Fillet → upstream feature edit → linear Body
    pattern → XYZ translation → Body Measure/copy → multi-step history → canonical reopen → Part STEP.
@@ -138,6 +138,9 @@ workflows and the acceptance sequence above stay open.
 6. Offset workplane → Sketch/Extrude → same-ID workplane edit with a new offset binding → semantic
    face workplane → cyclic-reference rejection/recovery/Escape → rename → three-step Undo/Redo →
    canonical reopen → Part STEP. Pending numeric text is consumed by the Apply mouse event.
+7. Authored solid → semantic vertex/midpoint points → parallel edge line and derived axis → parallel
+   point workplane → Sketch/Extrude → upstream point rebind and cyclic-reference recovery → edge/line
+   edits → three-step exact history → canonical reopen → Part STEP.
 
 These tests use no Core fixtures or direct authoring-controller calls. They check independent
 Geometry results, intent/identity preservation, atomic and branching history, complete persistence,
@@ -193,3 +196,30 @@ one of three cases (129 assertions) because whole-shell acceptance remains open:
 covered bounded surfaces and ten retain gaps. Continue with generated-reference/parallel construction
 creation/editing and native reference collection/manipulators; the remaining acceptance order above
 is unchanged. This slice does not close the datum family or Block 136.
+
+## Generated construction relations verification — 2026-10-23
+
+| Suite | Cases | Assertions | Result |
+| --- | ---: | ---: | --- |
+| Full Core | 519 | 15,311 | All passed |
+| Full Geometry | 431 | 28,613 | All passed |
+| Full offscreen GUI | 327 | 21,266 | 313 passed; 14 native-only skips |
+| Combined native shell | 143 | 15,945 | All passed; no skips |
+
+Two new Core cases cover missing semantic source rejection and canonical loading across later
+feature/point/plane dependencies without changing point order. Two Geometry cases check evaluated
+three-point and parallel frames, upstream depth changes and evaluated degeneracy. Four shell cases
+exercise creation and same-ID reference edits for all five added modes, exact history/persistence,
+generated-point consumers, cyclic/degenerate input recovery and cancellation with unavailable inputs.
+The seventh combined UI workflow extends the real input proof through semantic points, parallel
+line/axis/plane construction, a downstream Sketch/Extrude, three upstream edits, cyclic-reference
+recovery, three-step Undo/Redo, canonical file roundtrip and STEP. It also checks that long type names
+do not force horizontal task scrolling at 1280×800.
+
+Native captures were inspected after correcting type-selector sizing; labels and input controls
+remain visible. The startup smoke reached the intentional six-second timeout (124). Native logs
+contain the existing incomplete-visual depth/stencil warning, with no high-severity or drawable-
+lifecycle errors. The explicit closure gate continues to reject the open acceptance state (one of
+three cases, 129 assertions). Eight families have covered bounded surfaces and ten retain gaps.
+Native construction reference collection/manipulators remain next; the datum family and Block 136
+stay partial and the subsequent acceptance sequence is unchanged.

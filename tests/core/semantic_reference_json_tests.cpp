@@ -95,3 +95,79 @@ TEST_CASE("PartDocument JSON round-trips relation-driven generated reference poi
   REQUIRE(edge_mid->relation().has_value());
   CHECK(edge_mid->relation().value().generated_edge().has_value());
 }
+namespace {
+template <typename T> T checked(Result<T> result) {
+  if (!result)
+    FAIL(result.error().message());
+  return std::move(result.value());
+}
+} // namespace
+
+TEST_CASE("Generated point updates reject missing semantic sources without mutation",
+          "[core][construction-generated]") {
+  auto part = make_document_with_semantic_reference_points();
+  const auto before = checked(serialize_part_document_to_json(part));
+  const auto edges = part.dependency_graph().dependencies();
+  auto relation = checked(ConstructionRelation::create_point_on_generated_vertex(
+      ConstructionRelationId("relation.point_vertex"), ConstructionPointId("point.vertex"),
+      checked(SemanticVertexReference::create(FeatureId("missing"), SemanticVertex::TopBackLeft))));
+  CHECK_FALSE(part.update_construction_point(checked(ConstructionPoint::create_on_generated_vertex(
+      ConstructionPointId("point.vertex"), "Invalid vertex", relation))));
+  auto edge_relation = checked(ConstructionRelation::create_point_on_generated_edge(
+      ConstructionRelationId("missing.edge.relation"), ConstructionPointId("missing.edge"),
+      checked(SemanticEdgeReference::create(FeatureId("missing"), SemanticEdge::TopFront))));
+  CHECK_FALSE(part.add_construction_point(checked(ConstructionPoint::create_on_generated_edge(
+      ConstructionPointId("missing.edge"), "Invalid edge", edge_relation))));
+  CHECK(checked(serialize_part_document_to_json(part)) == before);
+  CHECK(part.dependency_graph().dependencies() == edges);
+  auto invalid_json = before;
+  const std::string source = "\"source_feature\": \"feature.base\"";
+  const auto position = invalid_json.find(source);
+  REQUIRE(position != std::string::npos);
+  invalid_json.replace(position, source.size(), "\"source_feature\": \"missing\"");
+  CHECK_FALSE(deserialize_part_document_from_json(invalid_json));
+}
+
+TEST_CASE("JSON retains generated point order across later feature and plane dependencies",
+          "[core][json][construction-generated]") {
+  auto part = make_document_with_semantic_reference_points();
+  auto plane_relation = checked(ConstructionRelation::create_plane_parallel_to_plane_through_point(
+      ConstructionRelationId("later.plane.relation"), DatumPlaneId("datum.xy"),
+      ConstructionPointId("point.edge_mid")));
+  REQUIRE(
+      part.add_construction_plane(checked(ConstructionPlane::create_parallel_to_plane_through_point(
+          ConstructionPlaneId("later.plane"), "Later plane", plane_relation))));
+  auto sketch =
+      checked(Sketch::create(SketchId("later.sketch"), "Later", DatumPlaneId("later.plane")));
+  REQUIRE(sketch.add_profile(checked(RectangleProfile::create(
+      ProfileId("later.profile"), ParameterId("part.width"), ParameterId("part.height")))));
+  REQUIRE(part.add_sketch(std::move(sketch)));
+  REQUIRE(part.add_feature(checked(
+      Feature::create_additive_extrude(FeatureId("later.feature"), "Later feature",
+                                       SketchId("later.sketch"), ParameterId("part.depth")))));
+  auto relation = checked(ConstructionRelation::create_point_on_generated_vertex(
+      ConstructionRelationId("relation.point_vertex"), ConstructionPointId("point.vertex"),
+      checked(SemanticVertexReference::create(FeatureId("later.feature"),
+                                              SemanticVertex::TopFrontRight))));
+  REQUIRE(part.update_construction_point(checked(ConstructionPoint::create_on_generated_vertex(
+      ConstructionPointId("point.vertex"), "Rebound vertex", relation))));
+  auto line_relation = checked(ConstructionRelation::create_line_through_two_points(
+      ConstructionRelationId("line.relation"), ConstructionPointId("point.vertex"),
+      ConstructionPointId("point.edge_mid")));
+  REQUIRE(part.add_construction_line(checked(ConstructionLine::create_through_two_points(
+      ConstructionLineId("line"), "Join", line_relation))));
+  const auto serialized = checked(serialize_part_document_to_json(part));
+  auto loaded = checked(deserialize_part_document_from_json(serialized));
+  CHECK(checked(serialize_part_document_to_json(loaded)) == serialized);
+  CHECK(loaded.construction_points()[0].id() == ConstructionPointId("point.vertex"));
+  CHECK(loaded.construction_points()[1].id() == ConstructionPointId("point.edge_mid"));
+  CHECK(loaded.dependency_graph().has_dependency("later.feature", "point.vertex"));
+  CHECK(loaded.dependency_graph().has_dependency("point.edge_mid", "later.plane"));
+  // Rebinding the source point back to its own derived feature is cyclic.
+  auto cyclic_relation = checked(ConstructionRelation::create_point_on_generated_edge(
+      ConstructionRelationId("relation.point_edge"), ConstructionPointId("point.edge_mid"),
+      checked(SemanticEdgeReference::create(FeatureId("later.feature"), SemanticEdge::TopFront))));
+  CHECK_FALSE(part.update_construction_point(checked(ConstructionPoint::create_on_generated_edge(
+      ConstructionPointId("point.edge_mid"), "Cycle", cyclic_relation))));
+  CHECK(checked(serialize_part_document_to_json(part)) == serialized);
+}

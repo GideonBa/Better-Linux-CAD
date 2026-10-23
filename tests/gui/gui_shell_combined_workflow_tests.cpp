@@ -32,6 +32,7 @@
 #include <QMouseEvent>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QScrollBar>
 #include <QSpinBox>
 #include <QTableWidget>
 #include <QTemporaryDir>
@@ -302,6 +303,8 @@ public:
     click_at(window.viewport(), local);
   }
   SketchId rectangle(const std::string& plane, Point2 first, Point2 second) {
+    INFO("Rectangle on " << plane << ": " << first.x << "," << first.y << " to " << second.x << ","
+                         << second.y);
     tree(plane);
     command("create_sketch");
     REQUIRE(window.active_sketch());
@@ -890,5 +893,119 @@ TEST_CASE(
   ui.file("export_part_step", step);
   CHECK(ui.bytes(step).contains("ISO-10303-21"));
   CHECK(ui.snapshot() == exported);
+  ui.idle();
+}
+
+TEST_CASE("Combined UI semantic construction chain updates downstream bodies and preserves history",
+          "[gui][integration][shell-combined-workflow][block136-construction-relations][shell-"
+          "combined-construction]") {
+  WorkflowUi ui;
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  ui.new_document("Semantic construction workflow");
+  ui.rectangle("datum.xy", {20, 20}, {50, 40});
+  const auto base = ui.extrude(6);
+  const auto feature = ui.window.session().part_document()->features().front().id();
+  const auto mode = [&](ShellConstructionTools::Kind kind) {
+    ui.command("create_construction");
+    ui.choose(ui.widget<QComboBox>("blcad.construction.kind"), static_cast<int>(kind));
+  };
+  const auto element = [&](const QString& role, const FeatureId& source, int value) {
+    auto& combo = ui.widget<QComboBox>("blcad.construction." + role);
+    int row = -1;
+    for (int i = 0; i < combo.count(); ++i)
+      if (combo.itemData(i).toString().toStdString() == source.value() &&
+          combo.itemData(i, Qt::UserRole + 1).toInt() == value)
+        row = i;
+    ui.choose(combo, row);
+  };
+  mode(ShellConstructionTools::Kind::PointOnVertex);
+  element("vertex", feature, static_cast<int>(SemanticVertex::TopFrontRight));
+  ui.button("blcad.construction.apply");
+  const auto vertex = ui.window.session().part_document()->construction_points().back().id();
+  mode(ShellConstructionTools::Kind::PointOnEdge);
+  element("edge", feature, static_cast<int>(SemanticEdge::TopFront));
+  ui.button("blcad.construction.apply");
+  const auto midpoint = ui.window.session().part_document()->construction_points().back().id();
+  mode(ShellConstructionTools::Kind::ParallelEdgeThroughPoint);
+  element("edge", feature, static_cast<int>(SemanticEdge::FrontRight));
+  ui.data(ui.widget<QComboBox>("blcad.construction.point1"),
+          QString::fromStdString(midpoint.value()));
+  ui.button("blcad.construction.apply");
+  const auto line = ui.window.session().part_document()->construction_lines().back().id();
+  mode(ShellConstructionTools::Kind::AxisFromLine);
+  ui.data(ui.widget<QComboBox>("blcad.construction.line"), QString::fromStdString(line.value()));
+  ui.button("blcad.construction.apply");
+  const auto axis = ui.window.session().part_document()->datum_axes().back().id();
+  mode(ShellConstructionTools::Kind::ParallelPlaneThroughPoint);
+  ui.data(ui.widget<QComboBox>("blcad.construction.plane"), "datum.xy");
+  ui.data(ui.widget<QComboBox>("blcad.construction.point1"),
+          QString::fromStdString(vertex.value()));
+  ui.button("blcad.construction.apply");
+  const auto plane =
+      ui.window.session().part_document()->construction_planes().back().workplane_id();
+  const auto sketch = ui.rectangle(plane.value(), {20, 20}, {40, 40});
+  const auto child = ui.extrude(4);
+  const auto child_feature = ui.window.session().part_document()->features().back().id();
+  CHECK(ui.summary(base).volume_mm3 == Approx(3600).margin(1e-5));
+  CHECK(ui.summary(child).volume_mm3 == Approx(1600).margin(1e-5));
+  CHECK(ui.bounds(child).minimum.z == Approx(6).margin(1e-5));
+  std::vector<std::string> states{ui.snapshot()};
+
+  ui.tree(vertex.value(), true);
+  element("vertex", feature, static_cast<int>(SemanticVertex::BottomBackLeft));
+  CHECK(ui.snapshot() == states.back());
+  CHECK(ui.window.viewport().feature_preview_replaces("construction-plane/" + plane.value()));
+  ui.button("blcad.construction.apply");
+  states.push_back(ui.snapshot());
+  CHECK(ui.bounds(child).minimum.x == Approx(40).margin(1e-5));
+  CHECK(ui.bounds(child).minimum.y == Approx(40).margin(1e-5));
+  CHECK(ui.bounds(child).minimum.z == Approx(0).margin(1e-5));
+  CHECK(ui.bounds(child).maximum.z == Approx(4).margin(1e-5));
+  CHECK(ui.summary(child).volume_mm3 == Approx(1600).margin(1e-5));
+  CHECK(ui.window.session().part_document()->find_sketch(sketch)->workplane() == plane);
+  ui.tree(vertex.value(), true);
+  element("vertex", child_feature, static_cast<int>(SemanticVertex::TopFrontRight));
+  CHECK_FALSE(ui.widget<QPushButton>("blcad.construction.apply").isEnabled());
+  CHECK_FALSE(ui.window.viewport().feature_preview_active());
+  CHECK(ui.snapshot() == states.back());
+  element("vertex", feature, static_cast<int>(SemanticVertex::BottomBackLeft));
+  CHECK(ui.widget<QPushButton>("blcad.construction.apply").isEnabled());
+  ui.key(ui.widget<QComboBox>("blcad.construction.vertex"), Qt::Key_Escape);
+  ui.idle();
+  ui.tree(midpoint.value(), true);
+  element("edge", feature, static_cast<int>(SemanticEdge::BottomBack));
+  CHECK(ui.window.viewport().feature_preview_replaces("datum-axis/" + axis.value()));
+  ui.button("blcad.construction.apply");
+  states.push_back(ui.snapshot());
+  ui.tree(line.value(), true);
+  element("edge", feature, static_cast<int>(SemanticEdge::TopRight));
+  // Long definition labels must not force the task inputs off the left edge.
+  auto* panel = ui.widget<QComboBox>("blcad.construction.kind").parentWidget();
+  while (panel && !qobject_cast<QScrollArea*>(panel))
+    panel = panel->parentWidget();
+  REQUIRE(panel);
+  CHECK(static_cast<QScrollArea*>(panel)->horizontalScrollBar()->maximum() == 0);
+  ui.capture("combined-construction-relations");
+  ui.button("blcad.construction.apply");
+  states.push_back(ui.snapshot());
+  CHECK(ui.window.session().part_document()->find_datum_axis(axis)->source_construction_line() ==
+        line);
+  for (std::size_t i = states.size() - 1; i > 0; --i) {
+    ui.command("undo");
+    CHECK(ui.snapshot() == states[i - 1]);
+  }
+  CHECK(ui.bounds(child).minimum.z == Approx(6).margin(1e-5));
+  for (std::size_t i = 1; i < states.size(); ++i) {
+    ui.command("redo");
+    CHECK(ui.snapshot() == states[i]);
+  }
+  CHECK(ui.bounds(child).minimum.z == Approx(0).margin(1e-5));
+  ui.roundtrip(directory.filePath("semantic-chain.blcad.json"));
+  const auto before_export = ui.snapshot();
+  const auto step = directory.filePath("semantic-chain.step");
+  ui.file("export_part_step", step);
+  CHECK(ui.bytes(step).contains("ISO-10303-21"));
+  CHECK(ui.snapshot() == before_export);
   ui.idle();
 }

@@ -804,3 +804,222 @@ TEST_CASE("Construction edit preserves unmodified precision dependencies and tas
   CHECK(window.construction_tools().begin_edit("datum.axis.x").has_error());
   CHECK_FALSE(window.session().task().active());
 }
+
+namespace {
+void select_element(QComboBox& combo, const FeatureId& feature, int element) {
+  for (int i = 0; i < combo.count(); ++i)
+    if (combo.itemData(i).toString().toStdString() == feature.value() &&
+        combo.itemData(i, Qt::UserRole + 1).toInt() == element) {
+      combo.setCurrentIndex(i);
+      return;
+    }
+  FAIL("Missing semantic element in construction selector");
+}
+ConstructionPointId vertex_point(ShellWindow& window, const FeatureId& feature,
+                                 SemanticVertex vertex) {
+  begin(window, Kind::PointOnVertex);
+  select_element(control<QComboBox>(window, "vertex"), feature, static_cast<int>(vertex));
+  apply(window);
+  return window.session().part_document()->construction_points().back().id();
+}
+} // namespace
+
+TEST_CASE(
+    "Generated construction points rebind semantic elements with exact history and persistence",
+    "[gui][block136-construction-relations][shell-construction-relations][construction-semantic-"
+    "points]") {
+  for (auto kind : {Kind::PointOnEdge, Kind::PointOnVertex}) {
+    CAPTURE(static_cast<int>(kind));
+    ShellWindow window;
+    REQUIRE(window.new_part("Modellbezüge"));
+    authored_body(window);
+    const auto feature = window.session().part_document()->features().front().id();
+    const auto& base = *window.session().part_document();
+    const auto depth =
+        base.find_parameter(base.features().front().length_parameter())->value().millimeters();
+    const auto before = snapshot(window);
+    begin(window, kind);
+    auto& combo = control<QComboBox>(window, kind == Kind::PointOnEdge ? "edge" : "vertex");
+    REQUIRE(combo.count() == (kind == Kind::PointOnEdge ? 12 : 8));
+    const auto first = kind == Kind::PointOnEdge ? static_cast<int>(SemanticEdge::TopFront)
+                                                 : static_cast<int>(SemanticVertex::TopFrontRight);
+    const auto second = kind == Kind::PointOnEdge
+                            ? static_cast<int>(SemanticEdge::BottomBack)
+                            : static_cast<int>(SemanticVertex::BottomBackLeft);
+    select_element(combo, feature, first);
+    CHECK(snapshot(window) == before);
+    REQUIRE(window.viewport().feature_preview_count() == 1);
+    apply(window);
+    const auto id = window.session().part_document()->construction_points().back().id();
+    const auto relation =
+        window.session().part_document()->construction_points().back().relation()->id();
+    CHECK(checked(
+              geometry::ConstructionPointResolver{}.resolve(*window.session().part_document(), id))
+              .position == Point3{kind == Kind::PointOnEdge ? 10.0 : 20.0, 10, depth});
+    const auto created = snapshot(window);
+    edit_tree(window, id.value());
+    CHECK(combo.currentData(Qt::UserRole + 1).toInt() == first);
+    select_element(combo, feature, second);
+    CHECK(window.viewport().feature_preview_replaces("construction-point/" + id.value()));
+    apply(window);
+    CHECK(window.session().part_document()->construction_point_count() == 1);
+    CHECK(window.session().part_document()->find_construction_point(id)->relation()->id() ==
+          relation);
+    CHECK(checked(
+              geometry::ConstructionPointResolver{}.resolve(*window.session().part_document(), id))
+              .position == Point3{kind == Kind::PointOnEdge ? 10.0 : 0.0, 0, 0});
+    const auto after = snapshot(window);
+    REQUIRE(window.undo());
+    CHECK(snapshot(window) == created);
+    REQUIRE(window.undo());
+    CHECK(snapshot(window) == before);
+    REQUIRE(window.redo());
+    REQUIRE(window.redo());
+    CHECK(snapshot(window) == after);
+    QTemporaryDir directory;
+    REQUIRE(window.save_to(directory.filePath("semantic.blcad.json")));
+    ShellWindow reopened;
+    REQUIRE(reopened.open_path(directory.filePath("semantic.blcad.json")));
+    CHECK(snapshot(reopened) == after);
+  }
+}
+
+TEST_CASE(
+    "Parallel construction definitions edit source roles and consume generated points",
+    "[gui][block136-construction-relations][shell-construction-relations][construction-parallel]") {
+  ShellWindow window;
+  REQUIRE(window.new_part("Parallele Bezüge"));
+  authored_body(window);
+  const auto feature = window.session().part_document()->features().front().id();
+  const auto through = vertex_point(window, feature, SemanticVertex::TopFrontRight);
+  begin(window, Kind::Line);
+  apply(window);
+  const auto source = window.session().part_document()->construction_lines().back().id();
+  begin(window, Kind::ParallelLineThroughPoint);
+  select(control<QComboBox>(window, "line"), source.value());
+  select(control<QComboBox>(window, "point1"), through.value());
+  apply(window);
+  const auto parallel = window.session().part_document()->construction_lines().back().id();
+  CHECK(checked(geometry::ConstructionLineResolver{}.resolve(*window.session().part_document(),
+                                                             parallel))
+            .direction == Vector3{1, 0, 0});
+  begin(window, Kind::ParallelEdgeThroughPoint);
+  select_element(control<QComboBox>(window, "edge"), feature,
+                 static_cast<int>(SemanticEdge::FrontRight));
+  select(control<QComboBox>(window, "point1"), through.value());
+  apply(window);
+  const auto edge = window.session().part_document()->construction_lines().back().id();
+  CHECK(
+      checked(geometry::ConstructionLineResolver{}.resolve(*window.session().part_document(), edge))
+          .direction == Vector3{0, 0, 1});
+  begin(window, Kind::ParallelPlaneThroughPoint);
+  select(control<QComboBox>(window, "plane"), "datum.xy");
+  select(control<QComboBox>(window, "point1"), through.value());
+  apply(window);
+  const auto plane = window.session().part_document()->construction_planes().back().workplane_id();
+  const auto position = checked(geometry::ConstructionPointResolver{}.resolve(
+                                    *window.session().part_document(), through))
+                            .position;
+  CHECK(checked(geometry::WorkplaneResolver{}.resolve(*window.session().part_document(), plane))
+            .origin == position);
+  const auto before = snapshot(window);
+  edit_tree(window, parallel.value());
+  select(control<QComboBox>(window, "line"), edge.value());
+  apply(window);
+  CHECK(checked(geometry::ConstructionLineResolver{}.resolve(*window.session().part_document(),
+                                                             parallel))
+            .direction == Vector3{0, 0, 1});
+  edit_tree(window, edge.value());
+  select_element(control<QComboBox>(window, "edge"), feature,
+                 static_cast<int>(SemanticEdge::TopRight));
+  apply(window);
+  CHECK(checked(geometry::ConstructionLineResolver{}.resolve(*window.session().part_document(),
+                                                             parallel))
+            .direction == Vector3{0, -1, 0});
+  edit_tree(window, plane.value());
+  select(control<QComboBox>(window, "plane"), "datum.yz");
+  apply(window);
+  const auto resolved =
+      checked(geometry::WorkplaneResolver{}.resolve(*window.session().part_document(), plane));
+  CHECK(resolved.origin == position);
+  CHECK(resolved.normal == Vector3{1, 0, 0});
+  const auto after = snapshot(window);
+  for (int i = 0; i < 3; ++i)
+    REQUIRE(window.undo());
+  CHECK(snapshot(window) == before);
+  for (int i = 0; i < 3; ++i)
+    REQUIRE(window.redo());
+  CHECK(snapshot(window) == after);
+  QTemporaryDir directory;
+  REQUIRE(window.save_to(directory.filePath("parallel.blcad.json")));
+  ShellWindow reopened;
+  REQUIRE(reopened.open_path(directory.filePath("parallel.blcad.json")));
+  CHECK(snapshot(reopened) == after);
+}
+
+TEST_CASE("Generated three-point workplanes reject coincident and cyclic downstream edits",
+          "[gui][block136-construction-relations][shell-construction-relations][construction-"
+          "generated-consumers]") {
+  ShellWindow window;
+  REQUIRE(window.new_part("Abgeleitete Ebene"));
+  authored_body(window);
+  const auto feature = window.session().part_document()->features().front().id();
+  const auto a = vertex_point(window, feature, SemanticVertex::TopBackLeft);
+  const auto b = vertex_point(window, feature, SemanticVertex::TopBackRight);
+  const auto c = vertex_point(window, feature, SemanticVertex::TopFrontLeft);
+  begin(window, Kind::PlaneThroughPoints);
+  select(control<QComboBox>(window, "point1"), a.value());
+  select(control<QComboBox>(window, "point2"), b.value());
+  select(control<QComboBox>(window, "point3"), c.value());
+  apply(window);
+  const auto plane = window.session().part_document()->construction_planes().back().workplane_id();
+  CHECK(checked(geometry::WorkplaneResolver{}.resolve(*window.session().part_document(), plane))
+            .normal == Vector3{0, 0, 1});
+  authored_body(window, "construction-plane/" + plane.value());
+  const auto downstream = window.session().part_document()->features().back().id();
+  const auto stable = snapshot(window);
+  edit_tree(window, a.value());
+  select_element(control<QComboBox>(window, "vertex"), feature,
+                 static_cast<int>(SemanticVertex::TopBackRight));
+  CHECK_FALSE(control<QPushButton>(window, "apply").isEnabled());
+  CHECK_FALSE(window.viewport().feature_preview_active());
+  CHECK(window.construction_tools().apply().has_error());
+  CHECK(snapshot(window) == stable);
+  select_element(control<QComboBox>(window, "vertex"), downstream,
+                 static_cast<int>(SemanticVertex::TopBackLeft));
+  CHECK_FALSE(control<QPushButton>(window, "apply").isEnabled());
+  CHECK(window.construction_tools().apply().has_error());
+  CHECK(snapshot(window) == stable);
+  select_element(control<QComboBox>(window, "vertex"), feature,
+                 static_cast<int>(SemanticVertex::TopBackLeft));
+  CHECK(control<QPushButton>(window, "apply").isEnabled());
+  control<QPushButton>(window, "cancel").click();
+  CHECK(snapshot(window) == stable);
+  QTemporaryDir directory;
+  REQUIRE(window.save_to(directory.filePath("three.blcad.json")));
+  ShellWindow reopened;
+  REQUIRE(reopened.open_path(directory.filePath("three.blcad.json")));
+  CHECK(snapshot(reopened) == stable);
+}
+
+TEST_CASE("New construction relation modes reject unavailable inputs and cancel without mutation",
+          "[gui][block136-construction-relations][shell-construction-relations][construction-"
+          "relations-invalid]") {
+  ShellWindow window;
+  REQUIRE(window.new_part("Fehlende Bezüge"));
+  const auto before = snapshot(window);
+  for (auto kind : {Kind::PointOnEdge, Kind::PointOnVertex, Kind::ParallelLineThroughPoint,
+                    Kind::ParallelEdgeThroughPoint, Kind::ParallelPlaneThroughPoint}) {
+    begin(window, kind);
+    CHECK_FALSE(control<QPushButton>(window, "apply").isEnabled());
+    CHECK_FALSE(window.viewport().feature_preview_active());
+    CHECK(window.construction_tools().apply().has_error());
+    CHECK(snapshot(window) == before);
+    auto* dock = window.findChild<QDockWidget*>("blcad.shell.construction_task");
+    REQUIRE(dock);
+    dock->close();
+    CHECK_FALSE(window.construction_tools().active());
+    CHECK_FALSE(window.session().task().active());
+    CHECK(snapshot(window) == before);
+  }
+}

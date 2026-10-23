@@ -551,9 +551,13 @@ Part-document persistence remains canonical in the existing single-part format s
 
 Construction/workplane edits retain the existing record fields, IDs and schema version. Records may
 reference later construction planes or generated-face workplanes, provided the dependency graph is
-acyclic. Loading validates interdependent planes, lines, workplanes, Sketches and extrusions through
-their normal add paths as inputs become available, then restores each saved array's authored order.
-Dependency readiness must not reorder browser intent, Undo/Redo snapshots or canonical Save/Open bytes.
+acyclic. Loading validates interdependent generated points, planes, lines, workplanes, Sketches and
+extrusions through their normal add paths as inputs become available, then restores each saved
+array's authored order.
+Generated-point source features must exist and have a supported Core type. The loader defers their
+records until those features are available and retains saved point-array order, including after a
+rebind to a later feature. Dependency readiness must not reorder browser intent, Undo/Redo snapshots
+or canonical Save/Open bytes.
 
 Block 33 adds additive optional `datum_axes` records. Missing `datum_axes` remains historical-file compatible and loads an empty collection.
 

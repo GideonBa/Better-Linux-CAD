@@ -736,14 +736,15 @@ Remaining relation/pick workflows keep the datum family and Block 136 open; see
 cmake --build --preset dev-gui --target blcad_gui_tests -j4
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[shell-combined-workflow]"
 BLCAD_UI_CAPTURE_DIR=/tmp/blcad-combined-workflows QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[shell-combined-workflow]"
-QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
 ```
 
-`tests/gui/gui_shell_combined_workflow_tests.cpp` combines long interaction sequences in six
+`tests/gui/gui_shell_combined_workflow_tests.cpp` combines long interaction sequences in seven
 scenarios: machining/edit/pattern/transform/Measure/STEP, Boolean/scale/Mirror with history branching,
 multi-workplane Loft section ordering/editing, authored-Part import/Assembly placement/Mate/solve/
 analysis/STEP, invalid/cancelled tasks plus dirty-file and document-switch recovery, and workplane
-editing with cyclic-reference recovery and downstream solid recompute.
+editing with cyclic-reference recovery and downstream solid recompute, plus generated-reference
+construction chains feeding a second Sketch/Extrude and later upstream edits.
 
 The shared harness operates Qt ribbon buttons and popup menus, task widgets, browser clicks and
 double-clicks, viewport Sketch picks/hover, Escape and absolute/relative numeric coordinates, and
@@ -752,7 +753,7 @@ controllers/workbenches. Assertions observe canonical
 intent, resolved volumes/solid counts/bounds, source/result identities, task/preview/filter cleanup,
 multi-step Undo/Redo and redo-branch truncation. Save/Open/Save compares complete bytes, including GUI
 sidecars; exports preserve source bytes. Dialog automation has bounded watchdogs, and native input
-checks widget reachability at 1280×800. Both backends execute all six scenarios; these tests introduce
+checks widget reachability at 1280×800. Both backends execute all seven scenarios; these tests introduce
 no native-only skips. The native run is required to prove actual OCCT presentation.
 
 These bounded combined workflows extend the shell evidence. Remaining families, manipulator/input
@@ -775,3 +776,23 @@ recompute dependent solids, exercise exact history/persistence and cancel stale 
 UI scenario also covers pending numeric text, cyclic-reference correction, three-step history and
 STEP via actual widget/dialog input. Run the combined native filter above and full suites for broad
 regression evidence. Startup timeout exit 124 is expected; it is an intentional smoke-test stop.
+
+### Block 136 generated construction references and parallel relations
+
+```bash
+cmake --build --preset dev-gui --target blcad_core_tests blcad_geometry_tests blcad_gui_tests blcad_app -j4
+./build/dev-gui/blcad_core_tests "[core][construction-generated]"
+./build/dev-gui/blcad_geometry_tests "[geometry][construction-generated]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[block136-construction-relations],[integration][gui-feature-coverage]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-construction-relations QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-construction-relations]"
+```
+
+Core/Geometry regressions check generated source validation, dependency-ready loading without point
+reordering, evaluated three-point and parallel plane frames, upstream parameter changes and evaluated
+degeneracy. Shell regressions create/rebind all five added modes, consume generated points in existing
+line/plane/axis and Sketch/Extrude workflows, reject missing/degenerate/cyclic inputs, recover/cancel,
+and preserve exact history and canonical persistence. The seventh combined UI workflow uses actual
+widget input through construction, downstream modeling, reference edits, three-step history, file
+roundtrip and STEP, including horizontal task fit with long type labels. Native selectors and
+captures use the existing 1280×800 harness; no new native-only
+skips are introduced. Native reference collection/manipulators still keep Block 136 open.

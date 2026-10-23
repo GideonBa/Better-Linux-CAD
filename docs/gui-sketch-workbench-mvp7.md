@@ -91,8 +91,8 @@ Selecting a resolvable construction or derived plane in either surface enables *
 camera mapping, bounded face checks and downstream feature recompute use the existing workplane
 contracts. These changes add no persistence fields or raw OCCT identities.
 
-Generated-edge/vertex and parallel-through-point creation/editing and broader native reference
-collection remain open Block-136 work. Offset parameter value
+Additional generated-reference and parallel modes are recorded below. Broader native reference
+collection and construction manipulators remain open Block-136 work. Offset parameter value
 and formula edits remain available through the existing parameter property inspector. Reference
 diagnostics/repair retain their separate acceptance gap.
 
@@ -107,8 +107,8 @@ Double-click a construction object, datum axis or derived workplane in the Part 
 its existing definition in `ShellConstructionTools`. The nine restored creation modes can now be
 edited in place: names, explicit coordinates/directions, defining points, source lines/planes,
 offset-parameter bindings and semantic faces. Type and persistent identity stay fixed; principal
-origin geometry remains fixed. Generated-reference points and parallel-through-point definitions
-remain outside this editor and report an explicit unsupported-type diagnostic.
+origin geometry remains fixed. The additional generated-reference and parallel definitions are
+recorded in the subsequent relation slice below.
 
 The task loads the current references, preserves relation IDs and explicit parameter dependencies,
 and retains original full-precision coordinates/frame components when their displayed fields are
@@ -134,5 +134,46 @@ canonical roundtrips. No persistence schema or raw kernel IDs are added.
 
 Proof: `[core][construction-update]`, `[block136-construction-edit]`, including
 `[shell-combined-workplane-edit]` with real ribbon, browser, task, numeric, history and file-dialog
-input on offscreen and native xcb. The datum family and Block 136 remain partial pending the relation
-and native picking/manipulator gaps above.
+input on offscreen and native xcb. The subsequent relation slice extends this boundary; native
+picking/manipulators keep the datum family and Block 136 partial.
+
+## Replacement-shell generated references and parallel relations — 2026-10-23
+
+The construction task adds five creation and same-type editing modes, bringing the restored total
+to fourteen:
+
+- **Punkt auf Modellkante (Mitte)** stores a semantic edge reference and evaluates its midpoint.
+- **Punkt auf Modellecke** stores a semantic vertex reference.
+- **Linie parallel zu Linie durch Punkt** reuses a construction line's evaluated direction at a
+  selected construction point.
+- **Linie parallel zu Modellkante durch Punkt** uses a supported semantic edge's direction at the
+  selected point.
+- **Ebene parallel zu Ebene durch Punkt** retains a source workplane's frame at the evaluated point.
+
+Dedicated **Modellkante**/**Modellecke** selectors list only references resolved by the existing
+semantic evaluator, labeled by source feature and semantic element. The current supported topology
+is rectangular additive-extrude intent; arbitrary kernel edges/vertices and edge parameterization
+beyond midpoint remain unsupported. Source roles use stable document IDs and enum tokens, never
+transient OCCT identities. Existing definitions preload the exact feature/element pair when reopened.
+The type selector uses a bounded width so long definition names do not push field labels off the
+left edge; the combined 1280×800 UI proof checks horizontal task fit.
+
+Generated points can feed two-point lines, three-point planes and parallel definitions, including
+axes from those lines and Sketch/Extrude consumers on those planes. Workplane resolution evaluates
+all defining points through `ConstructionPointResolver`; stored placeholders must not become plane
+origins. Core retains its early explicit-point collinearity check and validates generated source
+features. Geometry rejects coincident/collinear evaluated points during disposable preview. The JSON
+loader waits for generated source features and point-dependent inputs, preserving saved point and
+other authored collection order without changing the schema.
+
+The existing preview, revision, transaction, cancellation, Undo/Redo and canonical Save/Open contracts
+apply to all five modes. Point/line/plane rebinding revalidates the complete candidate, so a generated
+point cannot be rebound to an extrusion that already depends on it. Invalid or absent references,
+degenerate downstream geometry and cycles clear preview and disable Apply; recovery stays within the
+task. Native reference collection and construction manipulators remain open, keeping the datum
+family and Block 136 partial.
+
+Proof: `[core][construction-generated]`, `[geometry][construction-generated]`,
+`[shell-construction-relations]` and the seventh combined UI scenario
+`[shell-combined-construction]`. Validation and commands remain in
+`docs/gui-shell-acceptance-mvp9r.md` and `docs/development-setup.md`.
