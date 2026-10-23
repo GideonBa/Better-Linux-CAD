@@ -1308,6 +1308,10 @@ Result<std::size_t> PartDocument::update_sketch(Sketch sketch) {
     if (restored.has_error())
       return Result<std::size_t>::failure(restored.error());
   }
+  if (candidate.dependency_graph_.has_cycle())
+    return Result<std::size_t>::failure(
+        Error::dependency(candidate.sketches_[index].id().value(),
+                          "sketch update must not create a dependency cycle"));
   auto synced = candidate.invalidation_state_.sync_from_graph(candidate.dependency_graph_);
   if (synced.has_error())
     return Result<std::size_t>::failure(synced.error());

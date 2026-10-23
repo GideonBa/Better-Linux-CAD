@@ -157,10 +157,23 @@ The implemented test coverage includes:
 
 ## Deliberate limitations
 
-This block does not implement a GUI remapping dialog.
+The initial seed does not implement a GUI remapping dialog. The replacement-shell consumer below
+now provides explicit per-consumer rebinding within the documented bounded scope.
 
 It does not implement automatic topology matching after arbitrary feature edits. The current evaluator only knows whether the source feature is available in the implemented rectangular additive-extrude semantic topology seed.
 
 It does not rewrite sketches or projected references through a remap record automatically. Remap records are explicit model intent for later application by a dedicated repair operation.
 
 It does not add a full sketch solver, automatic region detection, or arbitrary generated topology evaluation.
+
+
+## Replacement-shell repair consumer — 2026-10-23
+
+The application now exposes explicit same-ID rebinding for projected Sketch points/lines and
+generated-face workplanes. It diagnoses with Geometry resolvers, previews a recomputed Part copy,
+and publishes one undoable session transaction. `Sketch::replace_reference` requires an existing
+projected entity of the same kind; `PartDocument::update_sketch` validates the new source and rejects
+cycles while preserving downstream edges. Persisted source fields change only for the selected
+consumer. Stored `ReferenceRemapRecord` entries remain explicit historical intent, without automatic
+global rewriting. Exact UI, tests and remaining load/recompute/batch limitations live in
+`docs/gui-sketch-workbench-mvp7.md` under “Replacement-shell explicit reference repair”.

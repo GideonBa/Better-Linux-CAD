@@ -39,7 +39,8 @@ source, hide a missing tag behind OR and claim completion with gaps. They must a
 
 The machine-readable details live in `families[].shell.gaps`; this is the execution order:
 
-1. Restore explicit broken-reference repair and Sketch3D authoring/editing.
+1. Complete repair-time loading, interdependent reference-repair batches and explicit constraint
+   diagnostics/suggestion controls; then restore Sketch3D authoring/editing.
 2. Restore standalone parameter management, dedicated Hole authoring and audit advanced extent
    editors against the foundation API.
 3. Restore contextual commands, selection-filter UI, view cube, view bookmarks and repeat command.
@@ -67,7 +68,7 @@ QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][gui-fea
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests
 ./build/dev-gui/blcad_core_tests
 ./build/dev-gui/blcad_geometry_tests
-QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-construction-manipulators],[block136-construction-picking],[shell-mixed-path-loft],[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-reference-repair],[block136-construction-manipulators],[block136-construction-picking],[shell-mixed-path-loft],[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
 ```
 
 The regular inventory audit passes while it accurately records unfinished work. For closure,
@@ -328,3 +329,34 @@ or drawable-lifecycle errors. The explicit closure gate correctly refuses unfini
 of three cases, 133 assertions). Nine families now have restored bounded surfaces; nine retain gaps.
 The datum family is restored within its documented definition/parameter boundaries. Block 136 remains
 in progress; explicit broken-reference repair is next, followed by Sketch3D and the remaining sequence.
+
+
+## Explicit reference-repair continuation — 2026-10-23
+
+The shell now offers a bounded explicit repair task for projected points/lines and generated-face
+workplanes. Geometry diagnostics, unselected replacement choices, explicit Preview, selector-change
+invalidation and one atomic Apply preserve stable consumer identities. The three Core regressions
+and seven shell cases cover replacement/dependency integrity, cyclic and wrong-kind rejection,
+construction fallbacks, lost-reference diagnostics, face placement, lifecycle expiry, canonical files
+and native ribbon/popup/button input on imported fixtures. Contract and remaining limits:
+`docs/gui-sketch-workbench-mvp7.md`. This advances the existing partial planar/reference family;
+nine blocked families and the pending integrated workflows still keep Block 136 open.
+
+Verification of the final implementation:
+
+- GUI/application/Core/Geometry targets built with the `dev-gui` preset and `-j4`.
+- Focused Core: **3 cases, 99 assertions**, all passed. Repair plus shell-inventory regression:
+  **10 cases, 1,189 assertions**, all passed offscreen.
+- Full Core: **522 cases, 15,410 assertions**, all passed. Full Geometry:
+  **436 cases, 29,779 assertions**, all passed.
+- Full offscreen GUI: **349 cases — 334 passed, 15 native-only skips; 24,002 assertions passed**.
+  No additional skip was introduced by this slice.
+- Combined native Qt/OCCT filter above: **165 cases, 18,851 assertions**, all passed without skips.
+  Point/line repair previews were captured and inspected at 1280×800; task selectors, diagnostic
+  text, Preview/Apply/Cancel and the ribbon scroll path remain reachable.
+- Separate application startup reached the intentional six-second timeout (124). Native logs retain
+  the existing medium incomplete-visual depth/stencil warning, without high-severity or drawable
+  lifecycle errors. New/changed C++ formatting, JSON parsing and `git diff --check` passed.
+- The explicit closure gate still correctly fails **one of three cases, 141 assertions** because
+  acceptance is incomplete. The ordinary inventory audit passes. Nine families retain gaps;
+  Block 136 remains in progress, with the remaining repair work next in `docs/mvp-plan.md`.

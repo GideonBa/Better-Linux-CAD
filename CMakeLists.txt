@@ -307,6 +307,7 @@ if(BLCAD_BUILD_GUI)
     src/gui/shell/shell_surface_tools.cpp
     src/gui/shell/shell_measure_tools.cpp
     src/gui/shell/shell_inspect_tools.cpp
+    src/gui/shell/shell_reference_repair_tools.cpp
     src/gui/shell/shell_construction_tools.cpp
     src/gui/shell/shell_construction_manipulators.cpp
     src/gui/shell/shell_assembly_tools.cpp
@@ -435,6 +436,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/reference_driven_sketch_constraint_tests.cpp
     tests/core/reference_generated_line_json_tests.cpp
     tests/core/reference_recovery_tests.cpp
+    tests/core/sketch_reference_repair_tests.cpp
     tests/core/revolve_feature_tests.cpp
     tests/core/semantic_reference_invalidation_tests.cpp
     tests/core/semantic_reference_json_tests.cpp
@@ -599,6 +601,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_shell_surface_tools_tests.cpp
       tests/gui/gui_shell_measure_tools_tests.cpp
       tests/gui/gui_shell_inspect_tools_tests.cpp
+      tests/gui/gui_shell_reference_repair_tests.cpp
       tests/gui/gui_shell_construction_tools_tests.cpp
       tests/gui/gui_shell_combined_workflow_tests.cpp
       tests/gui/gui_shell_coverage_tests.cpp

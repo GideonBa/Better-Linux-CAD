@@ -738,6 +738,18 @@ Contract/proof: `docs/gui-sketch-workbench-mvp7.md`, `docs/gui-viewport-manipula
 The datum family's bounded surface is restored; remaining family gaps and integrated acceptance keep
 Block 136 open. Verification is recorded in `docs/gui-shell-acceptance-mvp9r.md`.
 
+### Block 136 — Explicit reference repair — 2026-10-23
+
+The replacement shell now diagnoses and explicitly rebinds projected Sketch points/lines and
+semantic-face workplanes. Preview recomputes a disposable Part; Apply revalidates one atomic history
+transaction while retaining consumer IDs, constraints and dependency edges. Selector changes revoke
+preview; cancellation, save, history and document/revision expiry preserve committed intent. Core and
+shell regression proofs cover fallbacks, cyclic rejection, placement, persistence and actual input.
+Contract: `docs/gui-sketch-workbench-mvp7.md`; proof: `[core][sketch-reference-repair]` and
+`[block136-reference-repair]`. Test results are recorded in `docs/gui-shell-acceptance-mvp9r.md`.
+The family remains partial because initial-load failures, interdependent repair batches and explicit
+constraint-diagnostic suggestion controls remain open. Block 136 has not advanced to complete.
+
 ## Current next technical step — Block 136
 
 The current v3 coverage inventory records all eighteen accepted families, current shell proof sources,
@@ -745,7 +757,9 @@ reachable entry points and explicit remaining gaps. The machine check distinguis
 from closure readiness; historical controller proofs cannot close a shell gap. Acceptance contract:
 `docs/gui-shell-acceptance-mvp9r.md`, `[integration][gui-feature-coverage]` / `[gui][shell-coverage]`.
 
-Implement explicit broken-reference repair in the replacement shell next, then Sketch3D authoring.
+Complete the remaining reference-repair gaps (repair-time loading, interdependent batches and
+constraint-diagnostic suggestion controls), then restore Sketch3D authoring. The first explicit
+projected-reference/workplane repair slice is implemented.
 The construction task now has fourteen bounded create/edit modes, native reference collection and
 position/direction/frame/new-offset grips. Continue with parameter/Hole/extent editors, workspace
 navigation/context, advanced Assembly controls and integrated native Part/Assembly acceptance in the

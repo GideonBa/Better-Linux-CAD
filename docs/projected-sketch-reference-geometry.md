@@ -14,7 +14,11 @@ For a sketch placed on a generated face, the origin is reconstructed by `Workpla
 
 Because generated-face workplanes are resolved from source feature parameters, the sketch frame moves when the dimensions of the source body change. For example, a top-face sketch on `feature.base.top` moves in Z when the extrusion depth parameter changes. Side-face workplanes move when width, height, or depth changes according to the corresponding semantic face frame.
 
-If the referenced generated face no longer exists after topology changes, the current implementation does not yet provide interactive reference repair. The intended behavior is not to silently attach the sketch to an arbitrary replacement face. The model should report a lost semantic reference and require either an explicit remap to a valid semantic face/reference or a user-defined construction plane fallback. This recovery workflow is planned in a later reference robustness block.
+If a generated reference no longer resolves, the replacement shell offers explicit rebinding for
+loadable Parts within the bounds documented in `docs/gui-sketch-workbench-mvp7.md`. The user selects
+a replacement and checks a disposable recompute preview before applying it. Loading documents
+already rejected by source validation/recompute and repairing multiple interdependent references
+remain planned reference-robustness work.
 
 ## Implemented scope
 
@@ -185,6 +189,8 @@ Projected line references remain helper geometry for profile inference. Semantic
 finite derived endpoints for display and snapping. The helper path can produce a deterministic
 profile `LineSegment` only when two projected endpoint constraints are available and fully resolved.
 
-Interactive reference repair is not implemented yet. If a referenced generated face, edge, or vertex disappears after topology changes, the intended future behavior is explicit lost-reference reporting and user-controlled remapping, not silent reassignment.
+The replacement shell supports explicit same-ID point/line and generated-face-workplane rebinding
+for loadable Parts. See `docs/gui-sketch-workbench-mvp7.md` for preview, transaction and remaining
+recovery limits. Automatic reassignment after arbitrary topology changes remains unsupported.
 
 GUI manipulators, live selection, associative dimensions, automatic region detection, and a general solver remain deferred.

@@ -855,3 +855,18 @@ movement, exact history, canonical reopen and STEP. Native tests preserve the fi
 headless tests restore a useful model-span camera for their mapping. Include the new tag in the
 combined native filter above and run startup separately. Contracts and remaining acceptance:
 `docs/gui-sketch-workbench-mvp7.md`, `docs/gui-shell-acceptance-mvp9r.md`.
+
+
+## Explicit reference-repair checks
+
+```bash
+./build/dev-gui/blcad_core_tests "[core][sketch-reference-repair]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[block136-reference-repair],[integration][gui-feature-coverage]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-reference-repair QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-reference-repair]"
+```
+
+Run the native application smoke separately from GUI tests to preserve popup focus. The input case
+opens authored fixtures, repairs point/line sources using actual ribbon/popup/button input, cancels
+another preview, and checks history plus save/reopen. Initial-load failures, repair batches and
+constraint-diagnostic suggestions remain open; see `docs/gui-sketch-workbench-mvp7.md` and the
+Block-136 coverage manifest. The manifest continues to report the family as partial.

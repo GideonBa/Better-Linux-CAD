@@ -257,3 +257,53 @@ mapping follows the requested camera. Commands/results live in `docs/development
 
 The datum family's bounded command surface is restored. Block 136 remains open for the other recorded
 families and integrated acceptance. Explicit broken-reference repair is the next implementation step.
+
+
+## Replacement-shell explicit reference repair — 2026-10-23
+
+`ShellWindow` owns `ShellReferenceRepairTools`. **3D-Modell → Referenzen → Referenzen reparieren**
+opens a nonmodal task listing every projected point, projected line and generated-face workplane in
+an open Part. Each entry reports its current semantic source and the actual Geometry resolver result
+(`Aufgelöst` or `Verloren` plus the failure message). Resolved references can be deliberately rebound
+as well. The command requires a Part cache and an idle modeling context; it rejects Project,
+active-Sketch and occupied-task contexts. A stale flag alone does not disable the repair command.
+
+A point may be rebound to a resolvable construction point or supported semantic vertex; a line to a
+resolvable construction line or supported semantic edge. A face workplane may be rebound to a
+supported semantic face. Generated choices use the existing typed rectangular additive-extrude source
+contract and omit hidden source Bodies. Projected candidates also pass `SketchReferenceProjector`,
+so an edge projecting to a point is excluded. The original target is excluded and no replacement is
+preselected. Source identities are stable feature/role or construction IDs; kernel subshape indices
+never become persistent intent.
+
+**Vorschau** applies the selected replacement to a disposable Part, validates graph dependencies,
+recomputes downstream features and builds the candidate presentation. Apply stays disabled until
+that succeeds. Changing either selector discards the preview and requires another explicit Preview.
+**Anwenden** revalidates and executes one `GuiDocumentSession::commit_part_transaction`. Projected
+entity IDs, Sketch order, constraints, generated-line consumers and workplane IDs/names are retained;
+Core rebuilds the changed dependency edges. A regression exposed a missing cycle guard in
+`PartDocument::update_sketch`; it now rejects the candidate before publishing any state. One Undo/Redo restores the whole replacement. Rebinding
+changes the selected consumer's authored source, rather than interpreting a historical remap record
+as a global rewrite rule. It adds no schema fields.
+
+Preview and diagnostics leave history, dirty state and persisted intent unchanged. Cancel, dock close,
+Escape, document replacement, history commands and revision expiry remove the task and transient
+presentation. Save during Preview writes committed intent and expires the task. Failed/cyclic
+candidates clear the preview and cannot publish. Their messages stay in the task so a failed
+candidate does not itself expire the task via a session diagnostic revision. A too-small replacement
+face is rejected when its downstream profile exceeds the workplane bounds; a valid reversed plane
+recomputes its dependent solid. The shared session task excludes competing tools.
+
+This is a bounded repair surface, not completion of the entire planar/reference family: documents
+rejected during initial source validation or recompute still cannot be opened for repair. A repair
+must currently make the complete candidate scene/recompute valid; batches of interdependent repairs,
+arbitrary topology matching, construction-relation remapping and constraint-diagnostic suggestion
+controls remain separate work. The coarse Core `ReferenceRecoveryEvaluator` status is not used as a
+substitute for Geometry diagnostics. Stored historical status/remap records are not rewritten.
+
+Proof: three `[core][sketch-reference-repair]` cases and seven `[block136-reference-repair]` shell cases.
+The dedicated `[shell-reference-repair-input]` case uses actual ribbon/button/popup mouse input on
+imported intent, repairs two references, cancels another preview and checks history/save/reopen.
+The other cases cover missing/wrong-kind/cyclic sources, construction fallbacks, face placement,
+selection-change invalidation, stale/revision/context guards and canonical JSON. Imported fixture
+setup is explicit; this is not a claim of a wholly UI-authored modeling acceptance workflow.

@@ -473,6 +473,10 @@ public:
   [[nodiscard]] Result<std::size_t> add_reference(ProjectedSketchPoint point_reference);
   [[nodiscard]] Result<std::size_t> add_reference(ProjectedSketchLine line_reference);
   [[nodiscard]] Result<std::size_t> add_reference(ReferenceGeneratedLine line_reference);
+  // Explicit same-id rebinding preserves all consumers of the projected entity.
+  // PartDocument::update_sketch validates sources and dependency cycles.
+  [[nodiscard]] Result<std::size_t> replace_reference(ProjectedSketchPoint reference);
+  [[nodiscard]] Result<std::size_t> replace_reference(ProjectedSketchLine reference);
   [[nodiscard]] Result<std::size_t> add_constraint(SketchConstraint constraint);
   [[nodiscard]] Result<std::size_t> add_constraint(SketchGeometricConstraint constraint);
   [[nodiscard]] Result<std::size_t> add_dimension(SketchDrivingDimension dimension);
