@@ -12,6 +12,7 @@
 #include <string_view>
 #include <system_error>
 #include <type_traits>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -4026,32 +4027,6 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
     }
     const json construction_plane_array = root.value("construction_planes", json::array());
     std::vector<bool> added_construction_plane(construction_plane_array.size(), false);
-    std::size_t remaining_construction_planes = construction_plane_array.size();
-    while (remaining_construction_planes > 0U) {
-      bool progress = false;
-      for (std::size_t index = 0; index < construction_plane_array.size(); ++index) {
-        if (added_construction_plane[index])
-          continue;
-        auto plane = construction_plane_from_json(construction_plane_array.at(index));
-        if (plane.has_error())
-          return Result<PartDocument>::failure(plane.error());
-        auto added = document.value().add_construction_plane(plane.value());
-        if (added.has_error()) {
-          const auto message = added.error().message();
-          if (message == "plane offset source plane must exist in part document" ||
-              message ==
-                  "plane parallel to plane through point references must exist in part document")
-            continue;
-          return Result<PartDocument>::failure(added.error());
-        }
-        added_construction_plane[index] = true;
-        --remaining_construction_planes;
-        progress = true;
-      }
-      if (!progress)
-        return Result<PartDocument>::failure(
-            json_error("could not resolve construction plane json dependencies"));
-    }
     const auto& sketch_array = root.at("sketches");
     const auto& feature_array = root.at("features");
     const json derived_workplane_array = root.value("derived_workplanes", json::array());
@@ -4090,9 +4065,29 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
         added_workplane(derived_workplane_array.size(), false),
         added_construction_line(construction_line_array.size(), false);
     std::size_t remaining = sketch_array.size() + feature_array.size() +
-                            derived_workplane_array.size() + construction_line_array.size();
+                            derived_workplane_array.size() + construction_line_array.size() +
+                            construction_plane_array.size();
     while (remaining > 0U) {
       bool progress = false;
+      for (std::size_t index = 0; index < construction_plane_array.size(); ++index) {
+        if (added_construction_plane[index])
+          continue;
+        auto plane = construction_plane_from_json(construction_plane_array.at(index));
+        if (plane.has_error())
+          return Result<PartDocument>::failure(plane.error());
+        auto added = document.value().add_construction_plane(plane.value());
+        if (added.has_error()) {
+          const auto message = added.error().message();
+          if (message == "plane offset source plane must exist in part document" ||
+              message ==
+                  "plane parallel to plane through point references must exist in part document")
+            continue;
+          return Result<PartDocument>::failure(added.error());
+        }
+        added_construction_plane[index] = true;
+        --remaining;
+        progress = true;
+      }
       for (std::size_t index = 0; index < sketch_array.size(); ++index) {
         if (added_sketch[index])
           continue;
@@ -4425,6 +4420,21 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
       if (added.has_error())
         return Result<PartDocument>::failure(added.error());
     }
+    // Dependency-ready insertion may differ from authored array order after a
+    // rebind to a later record. Preserve the saved intent/history order.
+    const auto restore_order = [](auto& records, const json& array) {
+      std::unordered_map<std::string, std::size_t> positions;
+      for (std::size_t i = 0; i < array.size(); ++i)
+        positions.emplace(array.at(i).at("id").get<std::string>(), i);
+      std::sort(records.begin(), records.end(), [&](const auto& left, const auto& right) {
+        return positions.at(left.id().value()) < positions.at(right.id().value());
+      });
+    };
+    restore_order(document.value().construction_planes_, construction_plane_array);
+    restore_order(document.value().construction_lines_, construction_line_array);
+    restore_order(document.value().derived_workplanes_, derived_workplane_array);
+    restore_order(document.value().sketches_, sketch_array);
+    restore_order(document.value().features_, feature_array);
     return document;
   } catch (const json::exception& exception) {
     return Result<PartDocument>::failure(

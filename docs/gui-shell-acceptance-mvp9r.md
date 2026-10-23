@@ -39,8 +39,9 @@ source, hide a missing tag behind OR and claim completion with gaps. They must a
 
 The machine-readable details live in `families[].shell.gaps`; this is the execution order:
 
-1. Complete datum/construction/workplane object editing and remaining relation/pick workflows.
-   Nine creation modes, resolved helper presentation and Sketch-on-workplane entry are restored;
+1. Complete generated-reference and parallel-through-point construction creation/editing plus native
+   reference collection/manipulators. Nine creation/edit modes, downstream recompute previews,
+   resolved helper presentation and Sketch-on-workplane entry are restored;
    the exact implemented boundary lives in `docs/gui-sketch-workbench-mvp7.md`.
 2. Restore explicit broken-reference repair and Sketch3D authoring/editing.
 3. Restore standalone parameter management, dedicated Hole authoring and audit advanced extent
@@ -115,12 +116,12 @@ actual ribbon mouse input, pending numeric text committed by Apply and reachable
 The native log contains the existing incomplete-visual depth/stencil warning, with no high-severity
 or drawable-lifecycle errors. The explicit closure gate still correctly refuses acceptance. Eight
 families retain covered bounded surfaces and ten retain gaps; creation narrows the datum-family gap
-without closing it. Next work is construction/workplane object editing and the remaining relation/
-pick workflows, followed by the existing acceptance sequence above.
+without closing it. The subsequent editing slice is recorded below; remaining relation/pick
+workflows and the acceptance sequence above stay open.
 
 ## Combined UI workflow regression — 2026-10-23
 
-`[shell-combined-workflow]` adds five replacement-shell scenarios using actual Qt widget/input paths:
+`[shell-combined-workflow]` covers six replacement-shell scenarios using actual Qt widget/input paths:
 
 1. Offset workplane → mouse/numeric Sketch → Extrude → Fillet → upstream feature edit → linear Body
    pattern → XYZ translation → Body Measure/copy → multi-step history → canonical reopen → Part STEP.
@@ -134,6 +135,9 @@ pick workflows, followed by the existing acceptance sequence above.
 5. Saved Sketch → cancelled Extrude → rejected/recovered construction input and Escape → extrusion →
    cancelled Open and dirty-file confirmation → history/save → document switch/reopen → cancelled
    partial Sketch gesture.
+6. Offset workplane → Sketch/Extrude → same-ID workplane edit with a new offset binding → semantic
+   face workplane → cyclic-reference rejection/recovery/Escape → rename → three-step Undo/Redo →
+   canonical reopen → Part STEP. Pending numeric text is consumed by the Apply mouse event.
 
 These tests use no Core fixtures or direct authoring-controller calls. They check independent
 Geometry results, intent/identity preservation, atomic and branching history, complete persistence,
@@ -163,3 +167,29 @@ and Assembly captures at 1280×800 were inspected. The log retains the existing 
 depth/stencil warning, without high-severity or drawable-lifecycle errors. The explicit closure gate
 was exercised and still rejects the open Block-136 acceptance state. This increment changes tests,
 test registration and documentation; Core/Geometry and application behavior remain unchanged.
+
+## Construction editing verification — 2026-10-23
+
+| Suite | Cases | Assertions | Result |
+| --- | ---: | ---: | --- |
+| Focused Core construction updates | 4 | 116 | All passed |
+| Full Core | 517 | 15,240 | All passed |
+| Full Geometry | 429 | 28,575 | All passed |
+| Full offscreen GUI | 322 | 20,508 | 308 passed; 14 native-only skips |
+| Combined native shell | 138 | 15,184 | All passed; no skips |
+
+Five new browser-edit regressions cover all nine restored definitions, reference rebinding,
+downstream degenerate-input rejection, exact identity/history/persistence, precision/dependency
+retention and task cancellation. The sixth combined UI workflow exercises these consumers through
+actual ribbon/browser/task/file input, including pending numeric text, cyclic-reference recovery,
+three-step Undo/Redo, canonical Save/Open/Save and STEP export. Core regression also covers forward
+plane references and construction planes rebound to generated-face workplanes: JSON loading preserves
+authored array order rather than changing intent during dependency-ready insertion.
+
+Native 1280×800 captures were inspected. The startup smoke run remained running until the intentional
+six-second timeout (exit 124). The native log contains the existing incomplete-visual depth/stencil
+warning and no high-severity or drawable-lifecycle errors. The explicit closure gate correctly fails
+one of three cases (129 assertions) because whole-shell acceptance remains open: eight families have
+covered bounded surfaces and ten retain gaps. Continue with generated-reference/parallel construction
+creation/editing and native reference collection/manipulators; the remaining acceptance order above
+is unchanged. This slice does not close the datum family or Block 136.

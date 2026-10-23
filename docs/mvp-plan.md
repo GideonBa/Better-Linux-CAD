@@ -665,7 +665,21 @@ complete canonical save/reopen and read-only export/analysis. Proof: `[shell-com
 scope and commands: `docs/gui-shell-acceptance-mvp9r.md`, `docs/development-setup.md`.
 
 This extends integrated shell evidence without closing the remaining feature-family/input variants
-or advancing Block 136. Construction/workplane editing remains the next implementation step.
+or advancing Block 136. Construction/workplane editing was the next implementation step; its
+restored boundary is recorded below.
+
+### Block 136 — Construction and workplane editing slice — 2026-10-23
+
+Browser double-click reopens the nine restored construction/workplane definitions for same-ID name,
+placement and reference edits. Core typed updates preserve ordered intent and downstream graph edges,
+reject cycles atomically and invalidate consumers. Disposable previews recompute downstream Geometry;
+Apply retains existing session history and persistence authorities. Offset rebinding can provision a
+fresh parameter without changing shared bindings. Proof: `[core][construction-update]`,
+`[block136-construction-edit]`, including the sixth `[shell-combined-workflow]` scenario.
+Contract: `docs/gui-sketch-workbench-mvp7.md`; validation: `docs/gui-shell-acceptance-mvp9r.md`.
+
+Generated-reference and parallel-through-point creation/editing, native reference collection and
+manipulators remain open. This slice does not close the datum family or Block 136.
 
 ## Current next technical step — Block 136
 
@@ -674,9 +688,10 @@ reachable entry points and explicit remaining gaps. The machine check distinguis
 from closure readiness; historical controller proofs cannot close a shell gap. Acceptance contract:
 `docs/gui-shell-acceptance-mvp9r.md`, `[integration][gui-feature-coverage]` / `[gui][shell-coverage]`.
 
-Complete construction/workplane object editing and the remaining relation/pick workflows next,
-building on the new creation task and resolved scene. Continue with reference repair and Sketch3D
-authoring, parameter/Hole/extent editors, workspace navigation/context,
+Complete generated-reference and parallel-through-point construction creation/editing and native
+reference collection/manipulators next, building on the creation/edit task and resolved scene.
+Continue with reference repair and Sketch3D authoring, parameter/Hole/extent editors, workspace
+navigation/context,
 advanced Assembly controls and integrated native Part/Assembly acceptance in the order recorded in
 `docs/gui-shell-acceptance-mvp9r.md`. Block 136 remains in progress until all recorded gaps and pending
 workflows are resolved and the closure gate plus full/native regressions pass.

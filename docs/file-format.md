@@ -549,6 +549,12 @@ Changing the semantic meaning of an established target token family is a format 
 
 Part-document persistence remains canonical in the existing single-part format sections/documents. Parameters, formulas, datum/workplane intent, construction geometry, sketches/profiles, semantic-reference recovery/remap intent, and feature history are model authority.
 
+Construction/workplane edits retain the existing record fields, IDs and schema version. Records may
+reference later construction planes or generated-face workplanes, provided the dependency graph is
+acyclic. Loading validates interdependent planes, lines, workplanes, Sketches and extrusions through
+their normal add paths as inputs become available, then restores each saved array's authored order.
+Dependency readiness must not reorder browser intent, Undo/Redo snapshots or canonical Save/Open bytes.
+
 Block 33 adds additive optional `datum_axes` records. Missing `datum_axes` remains historical-file compatible and loads an empty collection.
 
 Block 35 adds no PartDocument JSON field. Its generated-topology classification and recovery derive from current feature/sketch/profile intent.

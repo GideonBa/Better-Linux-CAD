@@ -4,6 +4,8 @@
 
 #include <QObject>
 #include <array>
+#include <string_view>
+#include <vector>
 
 class QAction;
 class QComboBox;
@@ -36,6 +38,7 @@ public:
 
   ShellConstructionTools(ShellWindow&, ShellRibbon&, int model_tab);
   [[nodiscard]] Result<std::size_t> begin(Kind);
+  [[nodiscard]] Result<std::size_t> begin_edit(std::string_view object_id);
   [[nodiscard]] Result<std::size_t> preview();
   [[nodiscard]] Result<std::size_t> apply();
   void cancel();
@@ -50,6 +53,7 @@ protected:
 private:
   [[nodiscard]] Result<std::size_t> populate(PartDocument&) const;
   [[nodiscard]] bool current() const;
+  [[nodiscard]] Result<std::size_t> open_task();
   void update_inputs();
   void update_preview();
   void fill_references();
@@ -76,8 +80,16 @@ private:
   QAction* construction_action_{};
   QAction* workplane_action_{};
   std::string id_;
+  std::string relation_id_;
+  std::string original_name_;
+  std::vector<ParameterId> dependencies_;
+  std::array<Vector3, 3> initial_values_{};
+  std::array<Vector3, 3> original_values_{};
+  Vector3 original_normal_{};
+  Kind edit_kind_{};
   std::size_t revision_{};
   bool active_{false};
+  bool editing_{false};
   bool updating_{false};
 };
 } // namespace blcad::gui

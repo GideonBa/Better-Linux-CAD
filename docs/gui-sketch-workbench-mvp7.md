@@ -91,8 +91,8 @@ Selecting a resolvable construction or derived plane in either surface enables *
 camera mapping, bounded face checks and downstream feature recompute use the existing workplane
 contracts. These changes add no persistence fields or raw OCCT identities.
 
-In-place object editing/rebinding, generated-edge/vertex construction authoring, parallel-through-point
-creation and broader native reference collection remain open Block-136 work. Offset parameter value
+Generated-edge/vertex and parallel-through-point creation/editing and broader native reference
+collection remain open Block-136 work. Offset parameter value
 and formula edits remain available through the existing parameter property inspector. Reference
 diagnostics/repair retain their separate acceptance gap.
 
@@ -100,3 +100,39 @@ Proof: `[block136-construction]` in `tests/gui/gui_shell_construction_tools_test
 `[geometry][construction-presentation]` in `tests/geometry/viewport_scene_tests.cpp`. Commands and
 native/offscreen accounting live in `docs/development-setup.md` and
 `docs/gui-shell-acceptance-mvp9r.md`.
+
+## Replacement-shell construction editing — 2026-10-23
+
+Double-click a construction object, datum axis or derived workplane in the Part browser to reopen
+its existing definition in `ShellConstructionTools`. The nine restored creation modes can now be
+edited in place: names, explicit coordinates/directions, defining points, source lines/planes,
+offset-parameter bindings and semantic faces. Type and persistent identity stay fixed; principal
+origin geometry remains fixed. Generated-reference points and parallel-through-point definitions
+remain outside this editor and report an explicit unsupported-type diagnostic.
+
+The task loads the current references, preserves relation IDs and explicit parameter dependencies,
+and retains original full-precision coordinates/frame components when their displayed fields are
+unchanged. An existing offset binding displays its evaluated value read-only, including expressions.
+Choose another existing Length parameter to rebind, or **Neuer Parameter** for a different positive
+offset. The latter allocates a collision-free parameter ID/name together with the object update in
+one transaction; the previously bound parameter and its other consumers remain intact. Unused old
+parameters are retained. Direct value/formula changes continue to use the parameter inspector.
+
+Core typed `update_*` commands replace construction intent at its original vector position through
+the corresponding validated add path. They rebuild incoming dependencies, preserve outgoing edges,
+reject cycles, mark the object changed and its consumers dirty, and publish only a complete valid
+candidate. Core remains independent of Geometry and does not claim to validate downstream shapes.
+
+Editing previews recompute a disposable complete Part into a fresh ShapeCache and resolve the scene.
+The viewport temporarily replaces the affected helpers/Sketch entities and candidate Body results;
+Cancel restores committed presentation. Degenerate downstream geometry, invalid references or cycles
+clear the preview and disable Apply. Apply repeats validation/recompute through the existing session
+transaction. History, stale-revision cancellation, Escape/close, document replacement and committed-only
+Save semantics are the same as creation. The JSON loader resolves forward construction/workplane
+dependencies while preserving authored array order, so same-ID rebinds retain exact history and
+canonical roundtrips. No persistence schema or raw kernel IDs are added.
+
+Proof: `[core][construction-update]`, `[block136-construction-edit]`, including
+`[shell-combined-workplane-edit]` with real ribbon, browser, task, numeric, history and file-dialog
+input on offscreen and native xcb. The datum family and Block 136 remain partial pending the relation
+and native picking/manipulator gaps above.

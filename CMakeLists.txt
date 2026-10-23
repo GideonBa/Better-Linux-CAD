@@ -396,6 +396,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/composite_closed_profile_tests.cpp
     tests/core/construction_geometry_tests.cpp
     tests/core/construction_geometry_json_tests.cpp
+    tests/core/construction_update_tests.cpp
     tests/core/datum_axis_json_tests.cpp
     tests/core/datum_axis_tests.cpp
     tests/core/datum_plane_tests.cpp

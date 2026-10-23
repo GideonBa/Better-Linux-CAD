@@ -1108,6 +1108,68 @@ Result<std::size_t> PartDocument::add_derived_workplane(DerivedWorkplane workpla
   return Result<std::size_t>::success(derived_workplanes_.size() - 1U);
 }
 
+template <typename T>
+Result<std::size_t>
+PartDocument::update_construction_record(std::vector<T> PartDocument::*member, T replacement,
+                                         Result<std::size_t> (PartDocument::*adder)(T)) {
+  const auto node_id = replacement.id().value();
+  const auto& records = this->*member;
+  const auto found = std::find_if(records.begin(), records.end(),
+                                  [&](const T& item) { return item.id() == replacement.id(); });
+  if (found == records.end())
+    return Result<std::size_t>::failure(
+        Error::validation(node_id, "construction object to update must exist in part document"));
+  const auto index = static_cast<std::size_t>(std::distance(records.begin(), found));
+  const auto downstream = dependency_graph_.direct_dependents(node_id);
+  PartDocument candidate = *this;
+  auto& updated = candidate.*member;
+  updated.erase(updated.begin() + static_cast<std::ptrdiff_t>(index));
+  auto removed = candidate.dependency_graph_.remove_node(node_id);
+  if (!removed)
+    return Result<std::size_t>::failure(removed.error());
+  candidate.invalidation_state_.untrack_node(node_id);
+  auto added = (candidate.*adder)(std::move(replacement));
+  if (!added)
+    return added;
+  auto moved = std::move(updated.back());
+  updated.pop_back();
+  updated.insert(updated.begin() + static_cast<std::ptrdiff_t>(index), std::move(moved));
+  for (const auto& dependent : downstream) {
+    auto restored = add_dependency_if_missing(candidate.dependency_graph_, node_id, dependent);
+    if (!restored)
+      return Result<std::size_t>::failure(restored.error());
+  }
+  if (candidate.dependency_graph_.has_cycle())
+    return Result<std::size_t>::failure(
+        Error::dependency(node_id, "construction update must not create a dependency cycle"));
+  auto changed = candidate.invalidation_state_.mark_changed(candidate.dependency_graph_, node_id);
+  if (!changed)
+    return Result<std::size_t>::failure(changed.error());
+  *this = std::move(candidate);
+  return Result<std::size_t>::success(index);
+}
+
+Result<std::size_t> PartDocument::update_datum_axis(DatumAxis axis) {
+  return update_construction_record(&PartDocument::datum_axes_, std::move(axis),
+                                    &PartDocument::add_datum_axis);
+}
+Result<std::size_t> PartDocument::update_construction_point(ConstructionPoint point) {
+  return update_construction_record(&PartDocument::construction_points_, std::move(point),
+                                    &PartDocument::add_construction_point);
+}
+Result<std::size_t> PartDocument::update_construction_line(ConstructionLine line) {
+  return update_construction_record(&PartDocument::construction_lines_, std::move(line),
+                                    &PartDocument::add_construction_line);
+}
+Result<std::size_t> PartDocument::update_construction_plane(ConstructionPlane plane) {
+  return update_construction_record(&PartDocument::construction_planes_, std::move(plane),
+                                    &PartDocument::add_construction_plane);
+}
+Result<std::size_t> PartDocument::update_derived_workplane(DerivedWorkplane workplane) {
+  return update_construction_record(&PartDocument::derived_workplanes_, std::move(workplane),
+                                    &PartDocument::add_derived_workplane);
+}
+
 Result<std::size_t> PartDocument::add_sketch(Sketch sketch) {
   if (has_sketch_id(sketch.id()) || has_sketch_3d_id(Sketch3DId(sketch.id().value())))
     return Result<std::size_t>::failure(
