@@ -33,7 +33,7 @@ Cancel, and Undo/Redo.
 
 ## Reusable handle families
 
-The frozen handle families are:
+The handle families are:
 
 ```text
 Linear          signed distances and thicknesses
@@ -43,12 +43,14 @@ TranslateAxis   X/Y/Z translation-triad axes
 RotateAxis      X/Y/Z rotation-triad rings
 PatternCount    integer count along a model-space direction
 PatternSpacing  non-negative spacing along a model-space direction
+UniformScale    dimensionless uniform scale factor along a model-space direction (Block 136)
 ```
 
 `translation_triad(...)` and `rotation_triad(...)` produce three stable `.x`, `.y`, and `.z` handles.
 Every handle descriptor contains a stable id, model-space origin, axis, plane frame where applicable,
 reference value, optional limits, fixed presentation size in DIP, hit tolerance in DIP, and the model
-step used to turn PatternCount drag distance into integer count changes.
+step used to turn PatternCount drag distance into integer count changes. UniformScale has an
+independent positive `scale_model_step` (25 model millimeters per factor unit by default).
 
 Handle descriptors and candidates are transient GUI/application data. They are not feature intent and
 are never serialized.
@@ -115,7 +117,7 @@ handle and candidate. Since no document was modified, no compensating transactio
 
 ```text
 stable handle id
-Distance | Angle | Radius | Translation | Rotation | Count | Spacing
+Distance | Angle | Radius | Translation | Rotation | Count | Spacing | ScaleFactor
 Drag | Numeric input source
 scalar value
 axis-scaled vector for translation/rotation
@@ -124,6 +126,8 @@ integer count where applicable
 
 Radial and spacing values are non-negative. Pattern count is integral and at least one. Explicit handle
 limits are applied before publication.
+ScaleFactor is unitless; the Body-transform controller validates its strictly positive value before
+publishing Geometry or committing a record.
 
 The candidate is not a command result. For example, dragging an Extrude arrow in Block 124 will only
 produce a candidate distance; the Block-124 command must build and validate the disposable Extrude
@@ -132,7 +136,7 @@ preview and commit the accepted feature transaction.
 ## Bidirectional numeric HUD coupling
 
 Dragging formats the current candidate into the shell HUD using the value family unit (`mm`, `deg`, or
-unitless count). Typing a valid value updates the same candidate and becomes the authoritative input
+unitless count/scale factor). Typing a valid value updates the same candidate and becomes the authoritative input
 source. While a numeric override is active, further pointer movement does not replace the typed value.
 The override may be explicitly cleared to resume drag-derived values from the latest pointer sample.
 

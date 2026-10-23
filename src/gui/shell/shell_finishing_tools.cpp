@@ -72,7 +72,7 @@ bool ShellFeatureTools::finishing() const noexcept {
 }
 bool ShellFeatureTools::angular_value() const noexcept {
   return command_ == Command::Revolve || command_ == Command::Draft ||
-         command_ == Command::CircularPattern;
+         command_ == Command::CircularPattern || command_ == Command::BodyRotate;
 }
 std::string_view ShellFeatureTools::command_id() const noexcept {
   switch (command_) {
@@ -94,6 +94,12 @@ std::string_view ShellFeatureTools::command_id() const noexcept {
     return "part.circular_pattern";
   case Command::BodyMirror:
     return "part.mirror";
+  case Command::BodyBoolean:
+    return "part.body_boolean";
+  case Command::BodyTranslate:
+  case Command::BodyRotate:
+  case Command::BodyScale:
+    return "part.body_transform";
   case Command::None:
     return {};
   }

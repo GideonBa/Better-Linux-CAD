@@ -7,10 +7,12 @@
 
 #include <QObject>
 
+#include <array>
 #include <optional>
 #include <utility>
 
 class QAction;
+class QCheckBox;
 class QComboBox;
 class QListWidget;
 class QDockWidget;
@@ -47,7 +49,11 @@ public:
     Draft,
     LinearPattern,
     CircularPattern,
-    BodyMirror
+    BodyMirror,
+    BodyBoolean,
+    BodyTranslate,
+    BodyRotate,
+    BodyScale
   };
 
   ShellFeatureTools(ShellWindow& window, GuiDocumentSession& session,
@@ -89,6 +95,45 @@ public:
   [[nodiscard]] Result<std::size_t> begin_revolve(std::optional<DatumAxisId> axis = std::nullopt);
   [[nodiscard]] Result<std::size_t> begin_finishing(Command command);
   [[nodiscard]] Result<std::size_t> begin_pattern(Command command);
+  [[nodiscard]] Result<std::size_t> begin_body_operation(Command command);
+  [[nodiscard]] bool accept_body_selection(const GuiSelection& selection);
+  [[nodiscard]] QListWidget& body_source_editor() noexcept {
+    return *body_sources_;
+  }
+  [[nodiscard]] QComboBox& boolean_target_editor() noexcept {
+    return *boolean_target_;
+  }
+  [[nodiscard]] QComboBox& boolean_operation_editor() noexcept {
+    return *boolean_operation_;
+  }
+  [[nodiscard]] QComboBox& boolean_result_editor() noexcept {
+    return *boolean_result_;
+  }
+  [[nodiscard]] QCheckBox& boolean_keep_tools_editor() noexcept {
+    return *boolean_keep_tools_;
+  }
+  [[nodiscard]] QComboBox& body_axis_editor() noexcept {
+    return *body_axis_;
+  }
+  [[nodiscard]] QPushButton& body_reference_button() noexcept {
+    return *body_reference_button_;
+  }
+  [[nodiscard]] QCheckBox& body_owned_sketches_editor() noexcept {
+    return *body_owned_sketches_;
+  }
+  [[nodiscard]] QCheckBox& body_owned_construction_editor() noexcept {
+    return *body_owned_construction_;
+  }
+  [[nodiscard]] QLineEdit& translation_editor(std::size_t component) noexcept {
+    return component == 0 ? *numeric_editor_ : *body_translation_editors_.at(component - 1);
+  }
+  [[nodiscard]] QLineEdit& scale_center_editor(std::size_t component) noexcept {
+    return *body_center_editors_.at(component);
+  }
+  [[nodiscard]] Result<GuiPartFeaturePreview> set_translation_text(std::size_t component,
+                                                                   const QString& text);
+  [[nodiscard]] Result<GuiPartFeaturePreview> set_scale_center_text(std::size_t component,
+                                                                    const QString& text);
   [[nodiscard]] bool accept_pattern_selection(const GuiSelection& selection);
   [[nodiscard]] QListWidget& pattern_source_editor() noexcept {
     return *pattern_sources_;
@@ -142,6 +187,16 @@ protected:
 private:
   [[nodiscard]] bool finishing() const noexcept;
   [[nodiscard]] bool pattern() const noexcept;
+  [[nodiscard]] bool body_operation() const noexcept;
+  [[nodiscard]] bool body_transform() const noexcept;
+  [[nodiscard]] QString body_summary() const;
+  void build_body_controls(QWidget* panel);
+  void refresh_body_preview();
+  [[nodiscard]] Result<std::size_t> rebuild_body_controller();
+  void synchronize_body_editors();
+  void update_body_pick_mode();
+  void refresh_body_enablement(bool idle_part);
+  [[nodiscard]] std::vector<std::string> body_preview_replacements() const;
   [[nodiscard]] QString pattern_summary() const;
   void build_pattern_controls(QWidget* panel);
   void refresh_pattern_preview();
@@ -232,6 +287,35 @@ private:
   double pattern_value_{40};
   int pattern_count_{3};
   bool pattern_reference_picking_{false};
+
+  struct BodyAxisChoice {
+    BodyTransformRotationAxis reference;
+    Point3 origin;
+    Vector3 direction;
+    std::string semantic_id;
+  };
+  std::vector<BodyAxisChoice> body_axes_;
+  std::vector<std::pair<Command, QAction*>> body_actions_;
+  QWidget* body_controls_{nullptr};
+  QListWidget* body_sources_{nullptr};
+  QComboBox* boolean_target_{nullptr};
+  QComboBox* boolean_operation_{nullptr};
+  QComboBox* boolean_result_{nullptr};
+  QCheckBox* boolean_keep_tools_{nullptr};
+  QComboBox* body_axis_{nullptr};
+  QPushButton* body_reference_button_{nullptr};
+  QCheckBox* body_owned_sketches_{nullptr};
+  QCheckBox* body_owned_construction_{nullptr};
+  std::array<QLineEdit*, 2> body_translation_editors_{};
+  std::array<QLineEdit*, 3> body_center_editors_{};
+  FeatureId body_feature_{""};
+  BodyId body_result_{""};
+  std::string body_result_name_;
+  std::vector<BodyTransformId> body_transform_ids_;
+  Vector3 body_translation_{};
+  Point3 body_scale_center_{};
+  double body_value_{0};
+  bool body_reference_picking_{false};
 
   std::optional<std::pair<SketchId, ProfileId>> selected_profile_;
   std::optional<double> drag_start_value_;

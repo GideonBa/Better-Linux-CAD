@@ -277,6 +277,23 @@ ShellFeatureTools::ShellFeatureTools(ShellWindow& window, GuiDocumentSession& se
     pattern_actions_.emplace_back(command, action);
   }
 
+  auto* body_group = ribbon.add_group(model_tab, QStringLiteral("Körper"));
+  for (const auto& [command, label, id] :
+       {std::tuple{Command::BodyBoolean, "Kombinieren", "body_boolean"},
+        std::tuple{Command::BodyTranslate, "Verschieben", "body_translate"},
+        std::tuple{Command::BodyRotate, "Drehen", "body_rotate"},
+        std::tuple{Command::BodyScale, "Skalieren", "body_scale"}}) {
+    auto* action = new QAction(QString::fromUtf8(label), this);
+    action->setObjectName(QStringLiteral("blcad.action.") + QString::fromUtf8(id));
+    connect(action, &QAction::triggered, this, [this, command] {
+      auto begun = begin_body_operation(command);
+      if (!begun)
+        report(begun.error());
+    });
+    ribbon.add_small_button(body_group, action);
+    body_actions_.emplace_back(command, action);
+  }
+
   overlay_ = new ShellManipulatorOverlay(&viewport_, layer_);
   overlay_->setGeometry(viewport_.rect());
   viewport_.installEventFilter(this);
@@ -298,6 +315,7 @@ ShellFeatureTools::ShellFeatureTools(ShellWindow& window, GuiDocumentSession& se
   column->addLayout(form);
   build_finishing_controls(panel, *form);
   build_pattern_controls(panel);
+  build_body_controls(panel);
   auto* buttons = new QHBoxLayout();
   apply_button_ = new QPushButton(QStringLiteral("Anwenden"), panel);
   apply_button_->setObjectName(QStringLiteral("blcad.feature.apply"));
@@ -346,7 +364,8 @@ ShellFeatureTools::ShellFeatureTools(ShellWindow& window, GuiDocumentSession& se
 ShellFeatureTools::~ShellFeatureTools() = default;
 
 bool ShellFeatureTools::active() const noexcept {
-  return command_ != Command::None && (finishing() || pattern() || coordinator_.active());
+  return command_ != Command::None &&
+         (finishing() || pattern() || body_operation() || coordinator_.active());
 }
 
 bool ShellFeatureTools::select_profile(SketchId sketch, ProfileId profile) {
@@ -559,7 +578,9 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::set_numeric_text(const QString&
   if (!active())
     return Result<GuiPartFeaturePreview>::failure(
         Error::validation("gui.shell.feature", "kein aktiver Feature-Wert"));
-  const std::string_view unit = angular_value() ? "deg" : "mm";
+  const std::string_view unit = command_ == Command::BodyScale ? ""
+                                : angular_value()              ? "deg"
+                                                               : "mm";
   const auto value = parse_numeric(text, unit);
   if (!value.has_value()) {
     synchronize_numeric_editor(current_value());
@@ -569,6 +590,59 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::set_numeric_text(const QString&
   auto preview = set_numeric_value(*value);
   if (preview.has_error())
     synchronize_numeric_editor(current_value());
+  return preview;
+}
+
+Result<GuiPartFeaturePreview> ShellFeatureTools::set_translation_text(std::size_t component,
+                                                                      const QString& text) {
+  const auto value = parse_numeric(text, "mm");
+  if (command_ != Command::BodyTranslate || component > 2 || !value) {
+    synchronize_numeric_editor(current_value());
+    return Result<GuiPartFeaturePreview>::failure(
+        Error::validation("body", "Verschiebung oder Einheit ist ungültig"));
+  }
+  GuiViewportManipulatorCandidate candidate;
+  candidate.handle_id = std::string(kTransformTranslatePrefix) + "." + "xyz"[component];
+  candidate.value_kind = GuiViewportManipulatorValueKind::Translation;
+  candidate.source = GuiViewportManipulatorInputSource::Numeric;
+  candidate.scalar_value = *value;
+  if (!layer_.active_handle_id().empty()) {
+    if (layer_.active_handle_id() != candidate.handle_id ||
+        !layer_.set_numeric_input(number_text(*value).toStdString() + " mm") ||
+        !layer_.candidate()) {
+      synchronize_numeric_editor(current_value());
+      return Result<GuiPartFeaturePreview>::failure(
+          Error::validation("body", "zuerst den aktiven Manipulatorzug abschließen"));
+    }
+    candidate = *layer_.candidate();
+  }
+  return accept_manipulator_candidate(candidate);
+}
+
+Result<GuiPartFeaturePreview> ShellFeatureTools::set_scale_center_text(std::size_t component,
+                                                                       const QString& text) {
+  const auto value = parse_numeric(text, "mm");
+  if (command_ != Command::BodyScale || component > 2 || !value ||
+      !layer_.active_handle_id().empty()) {
+    synchronize_body_editors();
+    return Result<GuiPartFeaturePreview>::failure(
+        Error::validation("body", "Skalierungszentrum oder Einheit ist ungültig"));
+  }
+  const auto previous = body_scale_center_;
+  if (component == 0)
+    body_scale_center_.x = *value;
+  else if (component == 1)
+    body_scale_center_.y = *value;
+  else
+    body_scale_center_.z = *value;
+  auto rebuilt = rebuild_body_controller();
+  auto preview =
+      rebuilt ? preview_and_publish() : Result<GuiPartFeaturePreview>::failure(rebuilt.error());
+  if (!preview) {
+    body_scale_center_ = previous;
+    refresh_body_preview();
+  }
+  synchronize_body_editors();
   return preview;
 }
 
@@ -622,6 +696,18 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::set_numeric_value(double value)
           Error::validation("gui.shell.feature", "Drehwinkel muss zwischen 0 und 360 Grad liegen"));
     candidate.handle_id = std::string(kRevolveAngleHandleId);
     candidate.value_kind = GuiViewportManipulatorValueKind::Angle;
+  } else if (body_operation()) {
+    if (command_ == Command::BodyBoolean)
+      return Result<GuiPartFeaturePreview>::failure(
+          Error::validation("body", "Boolean hat kein numerisches Maß"));
+    candidate.handle_id = command_ == Command::BodyTranslate
+                              ? std::string(kTransformTranslatePrefix) + ".x"
+                          : command_ == Command::BodyRotate ? std::string(kTransformAngleHandleId)
+                                                            : std::string(kTransformScaleHandleId);
+    candidate.value_kind =
+        command_ == Command::BodyTranslate ? GuiViewportManipulatorValueKind::Translation
+        : command_ == Command::BodyRotate  ? GuiViewportManipulatorValueKind::Angle
+                                           : GuiViewportManipulatorValueKind::ScaleFactor;
   } else if (pattern()) {
     if (command_ == Command::BodyMirror)
       return Result<GuiPartFeaturePreview>::failure(
@@ -645,7 +731,7 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::set_numeric_value(double value)
     if (layer_.active_handle_id() != candidate.handle_id)
       return Result<GuiPartFeaturePreview>::failure(
           Error::validation(candidate.handle_id, "zuerst den aktiven Manipulatorzug abschließen"));
-    const std::string unit = angular_value() ? " deg" : " mm";
+    const std::string unit = command_ == Command::BodyScale ? "" : angular_value() ? " deg" : " mm";
     if (!layer_.set_numeric_input(number_text(value).toStdString() + unit) ||
         !layer_.candidate().has_value())
       return Result<GuiPartFeaturePreview>::failure(
@@ -722,25 +808,35 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::preview_and_publish() {
     synchronize_overlay();
     return preview;
   }
-  auto shape = command_ == Command::Extrude   ? coordinator_.extrude().preview_shape(session_)
-               : command_ == Command::Revolve ? coordinator_.revolve().preview_shape(session_)
-               : pattern() ? coordinator_.pattern_mirror().preview_shape(session_)
-               : command_ == Command::Fillet || command_ == Command::Chamfer
-                   ? coordinator_.finishing().preview_shape(session_)
-                   : coordinator_.shell_draft().preview_shape(session_);
-  if (shape.has_error()) {
+  Result<std::vector<geometry::GeometryShape>> shapes =
+      Result<std::vector<geometry::GeometryShape>>::success({});
+  if (body_operation())
+    shapes = coordinator_.body_operation().preview_shapes(session_);
+  else {
+    auto shape = command_ == Command::Extrude   ? coordinator_.extrude().preview_shape(session_)
+                 : command_ == Command::Revolve ? coordinator_.revolve().preview_shape(session_)
+                 : pattern() ? coordinator_.pattern_mirror().preview_shape(session_)
+                 : command_ == Command::Fillet || command_ == Command::Chamfer
+                     ? coordinator_.finishing().preview_shape(session_)
+                     : coordinator_.shell_draft().preview_shape(session_);
+    shapes = shape
+                 ? Result<std::vector<geometry::GeometryShape>>::success({std::move(shape.value())})
+                 : Result<std::vector<geometry::GeometryShape>>::failure(shape.error());
+  }
+  if (!shapes) {
     viewport_.clear_feature_preview();
-    task_summary_->setText(QString::fromStdString(shape.error().message()));
+    task_summary_->setText(QString::fromStdString(shapes.error().message()));
     refresh_enablement();
     synchronize_overlay();
-    return Result<GuiPartFeaturePreview>::failure(shape.error());
+    return Result<GuiPartFeaturePreview>::failure(shapes.error());
   }
-  auto published = viewport_.set_feature_preview(
-      std::move(shape.value()),
-      finishing()
-          ? std::optional<std::string>{"body/" +
-                                       finishing_body_->currentData().toString().toStdString()}
-          : std::nullopt);
+  std::vector<std::string> replacements;
+  if (body_operation())
+    replacements = body_preview_replacements();
+  else if (finishing())
+    replacements.push_back("body/" + finishing_body_->currentData().toString().toStdString());
+  auto published =
+      viewport_.set_feature_previews(std::move(shapes.value()), std::move(replacements));
   if (published.has_error()) {
     viewport_.clear_feature_preview();
     task_summary_->setText(QString::fromStdString(published.error().message()));
@@ -748,16 +844,18 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::preview_and_publish() {
     synchronize_overlay();
     return Result<GuiPartFeaturePreview>::failure(published.error());
   }
-  task_summary_->setText(finishing() ? finishing_summary()
-                         : pattern() ? pattern_summary()
+  task_summary_->setText(body_operation() ? body_summary()
+                         : finishing()    ? finishing_summary()
+                         : pattern()      ? pattern_summary()
                                      : QString::fromStdString(preview.value().semantic_summary));
   preview_valid_ = true;
   refresh_enablement();
   window_.statusBar()->showMessage(
       QStringLiteral("Vorschau: %1")
-          .arg(finishing() ? finishing_summary()
-               : pattern() ? pattern_summary()
-                           : QString::fromStdString(preview.value().semantic_summary)));
+          .arg(body_operation() ? body_summary()
+               : finishing()    ? finishing_summary()
+               : pattern()      ? pattern_summary()
+                                : QString::fromStdString(preview.value().semantic_summary)));
   synchronize_overlay();
   return preview;
 }
@@ -791,10 +889,11 @@ Result<std::size_t> ShellFeatureTools::apply() {
   if (!task_applied && session_.task().active())
     (void)session_.task().cancel();
   const bool was_finishing = finishing();
-  const bool was_pattern = pattern();
+  const bool restore_selection = pattern() || body_operation();
   command_ = Command::None;
-  if (was_pattern) {
+  if (restore_selection) {
     pattern_reference_picking_ = false;
+    body_reference_picking_ = false;
     viewport_.set_selection_filter_mask(previous_selection_mask_);
   }
   if (was_finishing) {
@@ -825,10 +924,11 @@ void ShellFeatureTools::cancel() noexcept {
   if (command_ != Command::None && session_.task().active())
     (void)session_.task().cancel();
   const bool was_finishing = finishing();
-  const bool was_pattern = pattern();
+  const bool restore_selection = pattern() || body_operation();
   command_ = Command::None;
-  if (was_pattern) {
+  if (restore_selection) {
     pattern_reference_picking_ = false;
+    body_reference_picking_ = false;
     viewport_.set_selection_filter_mask(previous_selection_mask_);
   }
   if (was_finishing) {
@@ -897,6 +997,7 @@ void ShellFeatureTools::refresh_enablement() {
              : !part->datum_axes().empty() || !part->construction_lines().empty());
     action->setEnabled(source_available && reference_available);
   }
+  refresh_body_enablement(idle_part);
   action_escape_->setEnabled(active());
   const std::string_view expected_command = command_id();
   const bool task_ready = session_.task().stage() == GuiTaskStage::Preview &&
@@ -917,6 +1018,14 @@ double ShellFeatureTools::current_value() const noexcept {
     return coordinator_.shell_draft().thickness();
   if (command_ == Command::Draft)
     return coordinator_.shell_draft().angle();
+  if (body_transform()) {
+    if (!coordinator_.body_operation().active())
+      return command_ == Command::BodyTranslate ? body_translation_.x : body_value_;
+    const auto& body = coordinator_.body_operation();
+    return command_ == Command::BodyTranslate ? body.translation().x
+           : command_ == Command::BodyRotate  ? body.angle()
+                                              : body.scale_factor();
+  }
   if (pattern())
     return coordinator_.pattern_mirror().active()
                ? (command_ == Command::LinearPattern ? coordinator_.pattern_mirror().spacing()
@@ -926,6 +1035,10 @@ double ShellFeatureTools::current_value() const noexcept {
 }
 
 double ShellFeatureTools::value_for_handle(std::string_view handle) const noexcept {
+  if (command_ == Command::BodyTranslate) {
+    const auto value = coordinator_.body_operation().translation();
+    return handle.ends_with(".y") ? value.y : handle.ends_with(".z") ? value.z : value.x;
+  }
   if (pattern() && handle == kPatternCountHandleId)
     return coordinator_.pattern_mirror().count();
   if (command_ == Command::Chamfer &&
@@ -953,12 +1066,14 @@ void ShellFeatureTools::synchronize_numeric_editor(double value) {
   numeric_editor_->setText(number_text(value));
   if (pattern())
     synchronize_pattern_editors();
+  if (body_operation())
+    synchronize_body_editors();
   synchronizing_numeric_ = false;
 }
 
 void ShellFeatureTools::synchronize_overlay() {
-  const bool visible =
-      active() && preview_valid_ && !layer_.handles().empty() && !pattern_reference_picking_;
+  const bool visible = active() && preview_valid_ && !layer_.handles().empty() &&
+                       !pattern_reference_picking_ && !body_reference_picking_;
   overlay_->setVisible(visible);
   if (visible) {
     overlay_->setGeometry(viewport_.rect());
@@ -984,6 +1099,10 @@ void ShellFeatureTools::restore_drag_start_value() {
                              : GuiViewportManipulatorValueKind::Distance;
   candidate.source = GuiViewportManipulatorInputSource::Numeric;
   candidate.scalar_value = value;
+  if (command_ == Command::BodyTranslate)
+    candidate.value_kind = GuiViewportManipulatorValueKind::Translation;
+  if (command_ == Command::BodyScale)
+    candidate.value_kind = GuiViewportManipulatorValueKind::ScaleFactor;
   if (drag_start_handle_ == kPatternCountHandleId) {
     candidate.value_kind = GuiViewportManipulatorValueKind::Count;
     candidate.count_value = static_cast<int>(value);
@@ -1010,16 +1129,20 @@ void ShellFeatureTools::handle_escape() {
 void ShellFeatureTools::show_task_panel(QString title, QString unit, double value) {
   finishing_controls_->setVisible(finishing());
   pattern_controls_->setVisible(pattern());
-  value_label_->setVisible(command_ != Command::BodyMirror);
-  numeric_editor_->setVisible(command_ != Command::BodyMirror);
+  body_controls_->setVisible(body_operation());
+  value_label_->setVisible(command_ != Command::BodyMirror && command_ != Command::BodyBoolean);
+  numeric_editor_->setVisible(command_ != Command::BodyMirror && command_ != Command::BodyBoolean);
   task_dock_->setWindowTitle(std::move(title));
-  const QString label = command_ == Command::Fillet          ? QStringLiteral("Radius")
+  const QString label = command_ == Command::BodyTranslate   ? QStringLiteral("X")
+                        : command_ == Command::BodyScale     ? QStringLiteral("Faktor")
+                        : command_ == Command::Fillet        ? QStringLiteral("Radius")
                         : command_ == Command::Chamfer       ? QStringLiteral("Abstand")
                         : command_ == Command::Shell         ? QStringLiteral("Wandstärke")
                         : command_ == Command::LinearPattern ? QStringLiteral("Abstand / Länge")
                         : angular_value()                    ? QStringLiteral("Winkel")
                                                              : QStringLiteral("Tiefe");
-  value_label_->setText(label + QStringLiteral(" (") + unit + QStringLiteral(")"));
+  value_label_->setText(unit.isEmpty() ? label
+                                       : label + QStringLiteral(" (") + unit + QStringLiteral(")"));
   numeric_editor_->setPlaceholderText(std::move(unit));
   synchronize_numeric_editor(value);
   task_dock_->show();
@@ -1051,7 +1174,8 @@ bool ShellFeatureTools::eventFilter(QObject* watched, QEvent* event) {
       if (!active())
         break;
       const auto* mouse = static_cast<QMouseEvent*>(event);
-      if (mouse->button() == Qt::LeftButton && preview_valid_ && !pattern_reference_picking_) {
+      if (mouse->button() == Qt::LeftButton && preview_valid_ && !pattern_reference_picking_ &&
+          !body_reference_picking_) {
         (void)update_mapping();
         if (layer_.begin_drag({mouse->position().x(), mouse->position().y()})) {
           drag_start_handle_ = std::string(layer_.active_handle_id());

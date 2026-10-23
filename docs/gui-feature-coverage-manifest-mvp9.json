@@ -194,8 +194,6 @@
       "selection_scope": "Unambiguous current-body semantic box edges and planar faces, including four-line Sketch rectangles."
     },
     "remaining": [
-      "Body Boolean",
-      "Body Transform",
       "Sweep",
       "Loft",
       "Surface",
@@ -214,6 +212,18 @@
         "Body Mirror"
       ],
       "selection_scope": "Visible recomputed solid Bodies; existing datum/construction axes and planes."
+    },
+    "body_operation_slice": {
+      "status": "implemented",
+      "contract": "docs/gui-interactive-pattern-body-mvp9.md",
+      "proof": "[block136-body]",
+      "commands": [
+        "Body Boolean",
+        "Body Translate",
+        "Body Rotate",
+        "Body Uniform Scale"
+      ],
+      "selection_scope": "Visible recomputed Bodies; Boolean solid target/tools, batch World transforms, datum/construction rotation axes and explicit scale center."
     }
   }
 }

@@ -31,6 +31,7 @@ enum class GuiViewportManipulatorKind {
   RotateAxis,
   PatternCount,
   PatternSpacing,
+  UniformScale,
 };
 
 enum class GuiViewportManipulatorValueKind {
@@ -41,6 +42,7 @@ enum class GuiViewportManipulatorValueKind {
   Rotation,
   Count,
   Spacing,
+  ScaleFactor,
 };
 
 enum class GuiViewportManipulatorInputSource { Drag, Numeric };
@@ -50,7 +52,9 @@ manipulator_unit(GuiViewportManipulatorValueKind kind) noexcept {
   switch (kind) {
   case GuiViewportManipulatorValueKind::Angle:
   case GuiViewportManipulatorValueKind::Rotation: return "deg";
-  case GuiViewportManipulatorValueKind::Count: return {};
+  case GuiViewportManipulatorValueKind::Count:
+  case GuiViewportManipulatorValueKind::ScaleFactor:
+    return {};
   case GuiViewportManipulatorValueKind::Distance:
   case GuiViewportManipulatorValueKind::Radius:
   case GuiViewportManipulatorValueKind::Translation:
@@ -72,6 +76,7 @@ struct GuiViewportManipulatorHandle {
   double display_size_dip{68.0};
   double hit_tolerance_dip{9.0};
   double count_model_step{12.0};
+  double scale_model_step{25.0};
 };
 
 struct GuiViewportManipulatorCandidate {
@@ -168,6 +173,8 @@ inline constexpr double pi = 3.141592653589793238462643383279502884;
 [[nodiscard]] inline GuiViewportManipulatorValueKind
 value_kind(GuiViewportManipulatorKind kind) noexcept {
   switch (kind) {
+  case GuiViewportManipulatorKind::UniformScale:
+    return GuiViewportManipulatorValueKind::ScaleFactor;
   case GuiViewportManipulatorKind::Linear:
     return GuiViewportManipulatorValueKind::Distance;
   case GuiViewportManipulatorKind::Angular:
@@ -489,6 +496,7 @@ private:
           Error::validation("gui.viewport_manipulator", "handle id must not be empty"));
     if (!finite(h.origin) || !finite(h.axis) || !finite(h.plane_normal) ||
         !finite(h.reference_direction) || !std::isfinite(h.reference_value) ||
+        !std::isfinite(h.scale_model_step) || h.scale_model_step <= 0.0 ||
         !std::isfinite(h.display_size_dip) || h.display_size_dip <= 0.0 ||
         !std::isfinite(h.hit_tolerance_dip) || h.hit_tolerance_dip <= 0.0 ||
         !std::isfinite(h.count_model_step) || h.count_model_step <= 0.0 ||
@@ -653,6 +661,8 @@ private:
     }
     if (h.kind == GuiViewportManipulatorKind::PatternCount)
       delta /= h.count_model_step;
+    if (h.kind == GuiViewportManipulatorKind::UniformScale)
+      delta /= h.scale_model_step;
     return clamp_value(h, h.reference_value + delta);
   }
 

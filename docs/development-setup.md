@@ -545,6 +545,21 @@ parameters/result Body, Cancel, atomic Undo/Redo and Save/Open. The native-only 
 live preview and spacing/angle/count drag refinement; it skips explicitly offscreen. Optional
 `BLCAD_UI_CAPTURE_DIR` captures the test windows.
 
+### Block 136 Body Boolean and Transform slice
+
+```bash
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[block136-body]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-body]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle]"
+```
+
+This proof covers Add/Subtract/Intersect, target/tool picking, both result modes, tool retention,
+candidate-only NewBody, actual solid results, multi-Body XYZ/rotation/scale, ordered stack retention,
+explicit ownership flags, failed-preview isolation, Cancel, atomic Undo/Redo and Save/Open. Native
+checks exercise actual Boolean target/tool picks, multi-Body detection, drag/numeric refinement and
+Escape rollback; offscreen skips those two cases explicitly. Optional `BLCAD_UI_CAPTURE_DIR` captures
+the preview windows.
+
 ### Sketch operation follow-up
 
 The shell wires pointer dragging, live previews, numeric refinement and Apply/Cancel for transforms,

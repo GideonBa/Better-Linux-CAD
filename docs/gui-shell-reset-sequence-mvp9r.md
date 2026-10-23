@@ -481,8 +481,9 @@ shared scalar/count manipulators and numeric refinement. Result Body and driving
 candidate-only until one atomic Apply. Source Bodies remain unchanged. The focused shell and native
 proof is `[block136-patterns]`; see `docs/gui-interactive-pattern-body-mvp9.md`.
 
-The finishing and pattern slices are implemented. Body Boolean/Transform, Sweep/Loft, Surface,
-Measure, Assembly, browser feature editing and whole-block acceptance remain open.
+The finishing and pattern slices are implemented. The Body-operation follow-up below restores
+Boolean/Transform; Sweep/Loft, Surface, Measure, Assembly, browser feature editing and whole-block
+acceptance remain open.
 
 Validation for the pattern slice on 21 October 2026: full Core (513 cases, 15124 assertions),
 Geometry (421 cases, 28002 assertions), and offscreen GUI (238 passed, three explicitly skipped
@@ -493,6 +494,29 @@ refinement through release. Closed fitted-spline extrusions are also valid patte
 visibility updates preserve nonselectability, and invalid previews expose no active drag grips.
 Native captures were inspected and the desktop startup smoke passed (intentional six-second timeout).
 These checks validate this slice without closing whole-block coverage.
+
+#### Block 136 next slice — Body Boolean and Transform
+
+`ShellFeatureTools` adds Kombinieren, Verschieben, Drehen and Skalieren through the shared task
+panel and coordinator. Boolean separates target and tool picks and supports Add/Subtract/Intersect,
+ModifyTarget/NewBody and keep/consume tools. New result Bodies remain candidate-only until Apply.
+Transforms support multiple Body targets, XYZ translation, datum/construction rotation references,
+and unitless uniform scaling about an explicit center. Independent Sketch/construction ownership
+flags remain explicit. Actual multi-Body previews hide all replaced/consumed sources; Cancel and
+failed candidates restore the prior scene. One Apply commits the ordered per-Body transform batch
+and one Undo reverses it. Contract/proof: `docs/gui-interactive-pattern-body-mvp9.md`, `[block136-body]`.
+
+Sweep/Loft, Surface, Measure, Assembly, browser feature editing and whole-block acceptance remain open.
+
+Validation for the Body-operation slice on 21 October 2026: full Core (513 cases, 15124 assertions),
+Geometry (421 cases, 28002 assertions), and offscreen GUI (246 passed, five explicit native skips,
+9611 assertions) pass. The combined native Body/pattern/finishing/Sketch UI/viewport/lifecycle run
+passes all 34 cases and 2140 assertions, including the offscreen skips. It exercises model target/tool
+picking for a cut, two-Body transformation, numeric refinement and Escape rollback. Focused proof
+also checks repeated translation drags, unitless scale input, owned Sketch frames, pending-Body
+collisions and rollback when the second batch target has no producer. Native captures were inspected
+and desktop startup passed (intentional six-second timeout). Commands: `docs/development-setup.md`.
+These results validate the slice without advancing whole-block acceptance.
 
 ### Sketch interaction follow-up — 21 October 2026
 

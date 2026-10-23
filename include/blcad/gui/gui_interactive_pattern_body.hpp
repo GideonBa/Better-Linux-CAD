@@ -443,16 +443,23 @@ enum class GuiBodyOperationKind { Boolean, Transform };
 class GuiInteractiveBodyOperationController {
 public:
   [[nodiscard]] Result<std::size_t>
-  begin_boolean(const GuiDocumentSession& session, FeatureId feature, BodyBooleanOperation operation,
-                BodyId target_body, BodyBooleanResultMode result_mode,
-                std::optional<BodyId> produced_body) {
+  begin_boolean(const GuiDocumentSession& session, FeatureId feature,
+                BodyBooleanOperation operation, BodyId target_body,
+                BodyBooleanResultMode result_mode, std::optional<BodyId> produced_body,
+                std::optional<Body> pending_result_body = std::nullopt) {
     const auto* part = session.part_document();
     if (part == nullptr) return fail("interactive boolean requires an active Part document");
     if (part->find_body(target_body) == nullptr)
       return fail("interactive boolean requires an existing target Body");
-    if (result_mode == BodyBooleanResultMode::NewBody &&
-        (!produced_body.has_value() || part->find_body(*produced_body) == nullptr))
-      return fail("boolean NewBody requires an existing produced Body");
+    if (result_mode == BodyBooleanResultMode::NewBody) {
+      if (!produced_body)
+        return fail("boolean NewBody requires a produced Body");
+      auto valid = detail::validate_new_feature_body(session, *produced_body, pending_result_body);
+      if (!valid)
+        return valid;
+    } else if (pending_result_body)
+      return fail("ModifyTarget cannot provision a result Body");
+    pending_result_body_ = std::move(pending_result_body);
     kind_ = GuiBodyOperationKind::Boolean;
     feature_ = std::move(feature);
     operation_ = operation;
@@ -514,6 +521,22 @@ public:
   void set_angle(double degrees) noexcept { angle_ = degrees; }
   void set_scale_factor(double factor) noexcept { scale_factor_ = factor; }
   void set_apply_to_owned_sketches(bool value) noexcept { apply_to_owned_sketches_ = value; }
+  void set_apply_to_owned_construction_geometry(bool value) noexcept {
+    apply_to_owned_construction_geometry_ = value;
+  }
+
+  [[nodiscard]] Result<std::size_t> add_transform_body(const GuiDocumentSession& session,
+                                                       BodyTransformId id, BodyId body) {
+    const auto* part = session.part_document();
+    if (!active_ || kind_ != GuiBodyOperationKind::Transform || !part || !part->find_body(body) ||
+        part->find_body_transform(id) ||
+        std::any_of(transform_targets_.begin(), transform_targets_.end(), [&](const auto& target) {
+          return target.first == id || target.second == body;
+        }))
+      return fail("transform target or identity is invalid or duplicated");
+    transform_targets_.emplace_back(std::move(id), std::move(body));
+    return Result<std::size_t>::success(transform_targets_.size());
+  }
   void set_manipulator_frame(GuiFeatureManipulatorFrame frame) noexcept { frame_ = frame; }
 
   [[nodiscard]] bool active() const noexcept { return active_; }
@@ -531,6 +554,9 @@ public:
     if (transform_kind_ == BodyTransformKind::Translate) {
       handles = GuiViewportManipulatorLayer::translation_triad(std::string(kTransformTranslatePrefix),
                                                                frame_.origin);
+      handles[0].reference_value = translation_.x;
+      handles[1].reference_value = translation_.y;
+      handles[2].reference_value = translation_.z;
     } else if (transform_kind_ == BodyTransformKind::Rotate) {
       GuiViewportManipulatorHandle handle;
       handle.id = std::string(kTransformAngleHandleId);
@@ -543,7 +569,7 @@ public:
     } else {
       GuiViewportManipulatorHandle handle;
       handle.id = std::string(kTransformScaleHandleId);
-      handle.kind = GuiViewportManipulatorKind::Linear;
+      handle.kind = GuiViewportManipulatorKind::UniformScale;
       handle.origin = frame_.origin;
       handle.axis = frame_.axis;
       handle.reference_value = scale_factor_;
@@ -554,7 +580,8 @@ public:
   }
 
   [[nodiscard]] bool apply_manipulator(const GuiViewportManipulatorCandidate& candidate) {
-    if (kind_ != GuiBodyOperationKind::Transform) return false;
+    if (!active_ || kind_ != GuiBodyOperationKind::Transform)
+      return false;
     if (candidate.value_kind == GuiViewportManipulatorValueKind::Translation &&
         transform_kind_ == BodyTransformKind::Translate) {
       const std::string prefix(kTransformTranslatePrefix);
@@ -563,13 +590,16 @@ public:
       if (candidate.handle_id == prefix + ".z") { translation_.z = candidate.scalar_value; return true; }
       return false;
     }
-    if (candidate.handle_id == kTransformAngleHandleId &&
+    if (transform_kind_ == BodyTransformKind::Rotate &&
+        candidate.handle_id == kTransformAngleHandleId &&
         candidate.value_kind == GuiViewportManipulatorValueKind::Angle) {
       angle_ = candidate.scalar_value;
       return true;
     }
-    if (candidate.handle_id == kTransformScaleHandleId &&
-        candidate.value_kind == GuiViewportManipulatorValueKind::Distance) {
+    if (transform_kind_ == BodyTransformKind::UniformScale &&
+        candidate.handle_id == kTransformScaleHandleId &&
+        (candidate.value_kind == GuiViewportManipulatorValueKind::ScaleFactor ||
+         candidate.value_kind == GuiViewportManipulatorValueKind::Distance)) {
       scale_factor_ = candidate.scalar_value;
       return true;
     }
@@ -586,6 +616,40 @@ public:
     auto plan = candidate.create_recompute_plan();
     if (plan.has_error()) return Result<GuiPartFeaturePreview>::failure(plan.error());
     return Result<GuiPartFeaturePreview>::success({feature_, summary(), plan.value().step_count()});
+  }
+
+  [[nodiscard]] Result<std::vector<geometry::GeometryShape>>
+  preview_shapes(const GuiDocumentSession& session) const {
+    auto checked = preview(session);
+    if (!checked)
+      return Result<std::vector<geometry::GeometryShape>>::failure(checked.error());
+    PartDocument candidate = *session.part_document();
+    auto added = add_record(candidate);
+    if (!added)
+      return Result<std::vector<geometry::GeometryShape>>::failure(added.error());
+    auto cache = geometry::ShapeCache::create(ShapeCacheId(feature_.value() + ".preview"));
+    if (!cache)
+      return Result<std::vector<geometry::GeometryShape>>::failure(cache.error());
+    auto computed =
+        geometry::GeometryRecomputeExecutor{}.execute_document(candidate, cache.value());
+    if (!computed)
+      return Result<std::vector<geometry::GeometryShape>>::failure(computed.error());
+    std::vector<BodyId> bodies;
+    if (kind_ == GuiBodyOperationKind::Boolean)
+      bodies.push_back(result_mode_ == BodyBooleanResultMode::NewBody ? *produced_body_
+                                                                      : target_body_);
+    else
+      for (const auto& target : transform_targets_)
+        bodies.push_back(target.second);
+    std::vector<geometry::GeometryShape> shapes;
+    for (const auto& body : bodies) {
+      const auto* shape = cache.value().find_body_shape(body);
+      if (!shape || shape->empty())
+        return Result<std::vector<geometry::GeometryShape>>::failure(
+            Error::geometry(body.value(), "body operation produced no preview shape"));
+      shapes.push_back(*shape);
+    }
+    return Result<std::vector<geometry::GeometryShape>>::success(std::move(shapes));
   }
 
   [[nodiscard]] Result<std::size_t> apply(GuiDocumentSession& session) {
@@ -612,42 +676,56 @@ private:
     feature_ = FeatureId(id.value());
     transform_id_ = std::move(id);
     transform_body_ = std::move(body);
+    transform_targets_ = {{transform_id_, transform_body_}};
+    pending_result_body_.reset();
     apply_to_owned_sketches_ = false;
+    apply_to_owned_construction_geometry_ = false;
     active_ = true;
     return Result<std::size_t>::success(1);
   }
 
   [[nodiscard]] Result<std::size_t> add_record(PartDocument& part) const {
     if (kind_ == GuiBodyOperationKind::Boolean) {
+      if (pending_result_body_) {
+        auto added = part.add_body(*pending_result_body_);
+        if (!added)
+          return added;
+      }
       auto feature =
           BodyBooleanFeature::create(feature_, operation_, target_body_, tool_bodies_, result_mode_,
                                      produced_body_, keep_tool_bodies_);
       if (feature.has_error()) return Result<std::size_t>::failure(feature.error());
       return part.add_body_boolean_feature(std::move(feature.value()));
     }
-    Result<BodyTransform> transform = build_transform();
-    if (transform.has_error()) return Result<std::size_t>::failure(transform.error());
-    return part.add_body_transform(std::move(transform.value()));
+    for (const auto& [id, body] : transform_targets_) {
+      auto transform = build_transform(id, body);
+      if (!transform)
+        return Result<std::size_t>::failure(transform.error());
+      auto added = part.add_body_transform(std::move(transform.value()));
+      if (!added)
+        return added;
+    }
+    return Result<std::size_t>::success(transform_targets_.size());
   }
 
-  [[nodiscard]] Result<BodyTransform> build_transform() const {
+  [[nodiscard]] Result<BodyTransform> build_transform(const BodyTransformId& id,
+                                                      const BodyId& body) const {
     switch (transform_kind_) {
     case BodyTransformKind::Translate:
-      return BodyTransform::create_translate(transform_id_, transform_body_,
-                                             BodyTransformCoordinateSpace::World, std::nullopt,
-                                             translation_, apply_to_owned_sketches_, false);
+      return BodyTransform::create_translate(id, body, BodyTransformCoordinateSpace::World,
+                                             std::nullopt, translation_, apply_to_owned_sketches_,
+                                             apply_to_owned_construction_geometry_);
     case BodyTransformKind::Rotate:
       if (!rotation_axis_.has_value())
         return Result<BodyTransform>::failure(
             Error::validation(transform_id_.value(), "rotate requires a rotation axis"));
-      return BodyTransform::create_rotate(transform_id_, transform_body_,
-                                          BodyTransformCoordinateSpace::World, std::nullopt,
-                                          *rotation_axis_, angle_, apply_to_owned_sketches_, false);
+      return BodyTransform::create_rotate(
+          id, body, BodyTransformCoordinateSpace::World, std::nullopt, *rotation_axis_, angle_,
+          apply_to_owned_sketches_, apply_to_owned_construction_geometry_);
     case BodyTransformKind::UniformScale:
-      return BodyTransform::create_uniform_scale(transform_id_, transform_body_,
-                                                 BodyTransformCoordinateSpace::World, std::nullopt,
-                                                 scale_factor_, scale_center_,
-                                                 apply_to_owned_sketches_, false);
+      return BodyTransform::create_uniform_scale(
+          id, body, BodyTransformCoordinateSpace::World, std::nullopt, scale_factor_, scale_center_,
+          apply_to_owned_sketches_, apply_to_owned_construction_geometry_);
     }
     return Result<BodyTransform>::failure(
         Error::validation(transform_id_.value(), "unsupported transform kind"));
@@ -689,6 +767,9 @@ private:
   double scale_factor_{1.0};
   Point3 scale_center_{0.0, 0.0, 0.0};
   bool apply_to_owned_sketches_{false};
+  bool apply_to_owned_construction_geometry_{false};
+  std::optional<Body> pending_result_body_;
+  std::vector<std::pair<BodyTransformId, BodyId>> transform_targets_;
   GuiFeatureManipulatorFrame frame_;
 };
 
