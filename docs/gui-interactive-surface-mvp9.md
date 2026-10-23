@@ -1,102 +1,79 @@
 # GUI Interactive Surface Authoring and Surface-to-Solid MVP-9
 
-Status: implemented in Block 128.
+Status: headless authority implemented in Block 128; replacement-shell integration implemented as a
+Block-136 slice. Block 136 remains open for Measure, Assembly, browser feature editing and acceptance.
 
-> **GUI Shell Reset MVP-9R:** Block 133 deleted the Qt shell this document names — `MainWindow` and
-> all seven self-installing binders — and replaced it with `ShellWindow` + `ShellRibbon`
-> (`src/gui/shell/`, contract: `docs/gui-shell-reset-sequence-mvp9r.md`). The headless authorities and
-> the Core/Geometry contracts below are unchanged and are consumed by the new shell; read every
-> "`MainWindow`" and "binder" below as the shell's Qt presentation layer, whose current form is
-> Block 135/136 work.
+## Authority and transaction boundary
 
-Block 128 upgrades the MVP-7 form-driven surface commands (`docs/gui-spatial-surface-workbench-mvp7.md`)
-into direct-manipulation authoring over the frozen Block-88..92 `SurfaceFeature` contracts
-(`docs/part-surface-feature-intent-mvp6.md`, `docs/part-boundary-fill-surface-geometry-mvp6.md`,
-`docs/part-trim-extend-surface-geometry-mvp6.md`, `docs/part-surface-stitch-geometry-mvp6.md`,
-`docs/part-closed-shell-to-solid-geometry-mvp6.md`). It consumes the Block-122 selection-first
-workspace and the Block-123 candidate-only manipulator layer. No new Core or Geometry intent is
-introduced.
+`ShellFeatureTools`, owned explicitly by `ShellWindow`, presents the six Surface commands in the
+3D-Modell ribbon's **Flächen** group and the shared feature task panel. It calls the existing
+`GuiInteractiveFeatureCoordinator` and `GuiInteractiveSurfaceController`; it installs no binder,
+searches no foreign widget tree and uses no polling timer.
 
-## Authority boundary
+Inputs resolve to the existing Block-88..92 references and `SurfaceFeature` records. The controller
+accepts an existing result Body or an optional new candidate Body; Extend/Stitch additionally accept
+candidate Length parameters. Identity, name and parameter-type collisions fail before authoring.
+Preview provisions these records on a disposable Part clone and runs actual Geometry recompute.
+`preview_shape` returns the resulting Body shape for a nonselectable viewport ghost. The session,
+history and persistence stay unchanged until Apply commits all inputs and the feature in one
+`commit_part_transaction`. Cancel discards everything. No save-format change is introduced.
 
-```text
-boundary curves / target surface + contour / surfaces + typed tolerance / shell
-  [+ Length distance parameter]
-  -> GuiInteractiveSurfaceController (headless)
-     candidate SurfaceFeature parameter set
-     Block-123 extend distance handle
-     disposable PartDocument clone + real geometry recompute (diagnostics)
-  -> one commit_part_transaction (seed distance/tolerance + add SurfaceFeature)
-  -> existing recompute / freshness / undo authority
-```
+## Commands and input roles
 
-`GuiInteractiveSurfaceController` owns no `PartDocument`, `ShapeCache`, or save-format field. It is
-owned by the Block-124 `GuiInteractiveFeatureCoordinator` alongside the other interactive commands.
+- **Begrenzungsfläche / Boundary:** two boundary curves span a surface; three or four ordered curves
+  must form one closed contour. The task list supports dragging, up/down and removal.
+- **Füllfläche / Fill:** one closed path, or ordered connected paths/edges forming one closed contour.
+  Planar contours produce an exact analytic plane; spatial contours retain the existing filling
+  algorithm.
+- **Fläche trimmen / Trim:** select a target and a closed path/profile contour. Separate model-click
+  roles select each input. The retained result is the region inside the contour, under the existing
+  deterministic Trim contract.
+- **Fläche erweitern / Extend:** select a target and one matching linear boundary. A live arrow and
+  an explicit millimeter field drive distance. Its origin/direction come from the same Geometry
+  outward-frame calculation as actual extension; changing the target/boundary rebuilds that frame.
+- **Flächen vernähen / Stitch (Knit/Sew):** collect duplicate-free surface inputs and type a positive
+  Length tolerance. Geometry diagnoses gaps, disconnected or non-manifold inputs before Apply. The
+  result remains a Surface Body, including a closed stitched shell.
+- **Hülle zu Volumen / Closed shell to solid:** select an existing Surface Body. Geometry requires
+  a closed, orientable shell with no free edges and produces a new Solid Body.
 
-## Surface authoring
+All commands provide an actual result preview and a fixed Apply/Cancel footer. Failed previews clear
+that ghost and disable Apply; invalid numeric candidates restore the preceding valid value and
+preview. Extend supports pointer dragging and numeric refinement of an active drag. Escape restores
+the value at drag start, then a further Escape cancels the command. Stitch tolerance is typed only.
 
-The controller authors one of the six `SurfaceFeature` kinds:
+The task exposes existing PathCurves, visible recomputed Surface Bodies, materialized Sketch profiles
+for Trim, and supported unambiguous semantic box faces/linear edges on visible solid Bodies. The latter
+reuse stable finishing-selection resolution, including four-line drawn rectangle extrusions.
+Extend's path chooser admits only single linear segments; Trim admits closed paths and profiles.
+Selection masks and an explicit semantic whitelist restrict native picking to the active input role,
+then restore the previous viewport context on Apply/Cancel. The result is a new Body; source Bodies
+remain under the existing Surface feature contract.
 
-- **Boundary / Fill** — collect an ordered, duplicate-free set of boundary curves (PathCurve or
-  semantic edge) and produce a surface body.
-- **Trim** — a target surface (Body or semantic face) and one trimming contour (boundary curve or
-  profile region). The deterministic kept region is the Core contract's; no keep-side guess is made.
-- **Extend** — a target surface, a linear boundary, and an existing `Length` distance parameter driven
-  by the `surface.extend` linear handle.
-- **Stitch** — an ordered set of surfaces and an existing `Length` tolerance parameter set as a typed
-  HUD value (at least two surfaces are required).
-- **Closed-shell-to-solid** — a closed shell surface converted to a solid body.
+## Geometric limits and diagnostics
 
-## Geometry diagnostics before commit
-
-Stitch free-edge/gap and closed-shell closedness/manifold/orientation checks are geometric, so
-`preview(...)` runs the real `GeometryRecomputeExecutor` on a throwaway document clone rather than only
-a structural plan. A failing stitch surfaces the authoritative "stitched shell left free faces or gaps
-outside tolerance" / "non-manifold" diagnostic, and a closed-shell conversion surfaces "requires a
-closed shell with no free edges" — each before any document mutation. Raising the typed tolerance past
-the gap resolves the stitch diagnostic. The color-coded free-edge overlay itself is a transient binder
-presentation of these diagnostics.
-
-## Manipulator coupling
-
-The extend distance handle produces a Block-123 candidate the controller folds into the distance
-parameter (`apply_manipulator`); a numeric HUD override is authoritative the same way. The proof shows
-a coordinator-routed extend-distance drag committing a byte-identical document to the equivalent typed
-edit.
-
-## Failure policy
-
-Every command fails closed before any document mutation: a missing result Body, a missing or
-wrong-typed distance/tolerance parameter, fewer than the required inputs (no boundary, fewer than two
-stitch surfaces, missing trim/extend references), and any geometry rejected by the recompute
-(free edges, gaps, non-manifold, non-closed shell). Preview never publishes a partial `ShapeCache`.
+The shell preserves the established contracts in `part-surface-feature-intent-mvp6.md`,
+`part-boundary-fill-surface-geometry-mvp6.md`, `part-trim-extend-surface-geometry-mvp6.md`,
+`part-surface-stitch-geometry-mvp6.md` and `part-closed-shell-to-solid-geometry-mvp6.md`.
+Extend currently requires one unambiguous face with a planar linear polygon boundary; it does not
+extend arbitrary curved surfaces. Missing, stale, ambiguous or incompatible references fail closed.
+Arbitrary OCCT topology indices are never persisted or guessed. Open raw Sketch chains first become
+PathCurves through **Pfad erstellen**. Color-coded free-edge/gap overlays are not implemented by this
+slice; the task displays the authoritative diagnostic and valid result geometry.
 
 ## Focused proof
 
 ```bash
-QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][interactive-surface]"
-QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][stitch-diagnostic-overlay]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[block136-surface],[interactive-surface]"
+./build/dev-gui/blcad_geometry_tests "[surface-boundary-fill],[surface-trim-extend],[surface-stitch],[surface-to-solid]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-surface]"
 ```
 
-The proof covers fill authoring with duplicate rejection, extend distance driving and apply,
-closed-shell-to-solid fail-closed reporting, fail-closed rejection of invalid inputs, the
-tolerance-driven stitch free-edge/gap diagnostic surfaced before commit, a clean coplanar stitch, and
-coordinator-routed extend-distance/typed document equivalence.
-
-## Scope and deferrals
-
-Bounded here and not introduced implicitly by this block:
-
-- the **color-coded free-edge/gap overlay** and the trim **kept-region highlight** are transient
-  viewport presentation the binder renders from the controller's diagnostics and the Core kept-region
-  contract; the controller owns the validated candidate and diagnostic, not pixels;
-- boundary/surface/contour and shell **picking** resolve to already-built references and Body ids;
-  their interactive selection is the caller's selection responsibility;
-- mapping the Block-122 `surface.boundary_fill` / `surface.trim_extend` / `surface.stitch` /
-  `surface.closed_shell_to_solid` command ids to resolved inputs and a manipulator frame is a
-  `MainWindow` command-handler policy consuming the coordinator's surface controller.
-
-## Next boundary
-
-Block 129 adds the feature edit lifecycle and the Core feature-update command boundary, so any of the
-Block-124..128 interactive commands can also edit existing persistent feature intent.
+`gui_shell_surface_tools_tests.cpp` verifies ribbon reachability, actual Boundary/Fill/Trim/Extend,
+Stitch and shell-to-solid results, pending-record isolation, invalid-candidate rollback, role-specific
+selection, cancellation, identity/type collisions, exact Undo/Redo and Save/Open. Native proof changes
+target and boundary through actual model clicks, drags the extension arrow, refines its value, and
+restores a second drag with Escape and clicks the reachable Apply button. Geometry proof verifies
+exact planar Fill and an outward frame
+that survives reversed boundary direction and source-parameter recompute. Existing headless Surface
+proof continues to cover tolerance-driven gap diagnostics and coordinator routing.

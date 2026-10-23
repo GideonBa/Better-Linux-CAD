@@ -34,6 +34,10 @@ struct GeometryRecomputeSummary {
 
 class GeometryRecomputeExecutor {
 public:
+  [[nodiscard]] Result<SurfaceExtensionFrame>
+  surface_extension_frame(const PartDocument& document, const SurfaceReference& target,
+                          const BoundaryCurveReference& boundary, const ShapeCache& cache) const;
+
   [[nodiscard]] Result<std::vector<SweepPathSegment>>
   resolve_path_segments(const PartDocument& document, PathCurveId path,
                         const ShapeCache& cache) const;

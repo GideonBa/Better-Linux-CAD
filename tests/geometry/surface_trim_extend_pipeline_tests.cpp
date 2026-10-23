@@ -247,3 +247,47 @@ TEST_CASE("Block 90 fails closed on an ambiguous multi-face trim target",
   REQUIRE_FALSE(result);
   CHECK(result.error().message().find("unambiguous") != std::string::npos);
 }
+
+TEST_CASE("Surface extension frame follows the actual outward edge and recomputed parameters",
+          "[geometry][surface-trim-extend][block136-surface]") {
+  auto document = extend_document();
+  auto shapes = cache();
+  GeometryRecomputeExecutor executor;
+  REQUIRE(executor.execute_document(document, shapes));
+  const auto target = body_surface("body.fill");
+  auto frame =
+      executor.surface_extension_frame(document, target, boundary("path.extend-edge"), shapes);
+  REQUIRE(frame);
+  CHECK(frame.value().origin.x == Catch::Approx(6));
+  CHECK(frame.value().origin.y == Catch::Approx(0));
+  CHECK(frame.value().direction.x == Catch::Approx(0).margin(1e-7));
+  CHECK(frame.value().direction.y == Catch::Approx(-1));
+  auto reverse = PathCurve::create(PathCurveId("path.reverse"), "Reversed edge",
+                                   {PathSegmentReference::create_sketch_3d(
+                                        Sketch3DId("sketch3d.boundary"), SketchEntityId("line.0"),
+                                        Sketch3DPathCurveKind::Line, true)
+                                        .value()},
+                                   PathClosure::Open, PathOrientationRule::MinimumTwist);
+  REQUIRE(reverse);
+  REQUIRE(document.add_path_curve(reverse.value()));
+  auto reversed =
+      executor.surface_extension_frame(document, target, boundary("path.reverse"), shapes);
+  REQUIRE(reversed);
+  CHECK(reversed.value().direction.y == Catch::Approx(-1));
+  CHECK(reversed.value().origin.x == Catch::Approx(6));
+  REQUIRE(
+      document.set_parameter_value(ParameterId("boundary.width"), Quantity::length_mm(16).value()));
+  REQUIRE(executor.execute_document(document, shapes));
+  auto wider =
+      executor.surface_extension_frame(document, target, boundary("path.extend-edge"), shapes);
+  REQUIRE(wider);
+  CHECK(wider.value().origin.x == Catch::Approx(8));
+  const auto* shape = shapes.find_body_shape(BodyId("body.extend"));
+  REQUIRE(shape);
+  auto bounds = BodyTransformAdapter{}.bounds(*shape);
+  REQUIRE(bounds);
+  CHECK(bounds.value().minimum.y == Catch::Approx(wider.value().direction.y * 3).margin(1e-6));
+  CHECK_FALSE(executor.surface_extension_frame(document, target, boundary("path.closed"), shapes));
+  CHECK_FALSE(executor.surface_extension_frame(document, body_surface("missing"),
+                                               boundary("path.extend-edge"), shapes));
+}

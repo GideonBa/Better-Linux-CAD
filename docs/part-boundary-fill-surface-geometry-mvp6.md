@@ -56,3 +56,10 @@ Blocks 48–94 are implemented. Trim/Extend, Stitch, and Closed-shell-to-solid e
 in `docs/part-trim-extend-surface-geometry-mvp6.md`,
 `docs/part-surface-stitch-geometry-mvp6.md`, and
 `docs/part-closed-shell-to-solid-geometry-mvp6.md`. Block 93 multi-body STEP export and deterministic body naming is implemented; Block 94 integrated Part Construction MVP acceptance is implemented; Block 95 Qt application shell, GUI document session, and command architecture is implemented; Block 96 document lifecycle, transactions, recompute, and diagnostics is implemented; Block 97 OCCT viewport, navigation, display, and semantic picking is implemented; Block 98 browser, property editor, and selection synchronization is the current next technical step.
+
+## Block-136 execution refinement
+
+A closed planar Fill contour now produces an exact analytic planar face. This preserves its intended
+geometry and avoids an unnecessary BSpline approximation during subsequent Trim/intersection. The
+existing filling algorithm remains the fallback for nonplanar contours. Core intent and persistence
+are unchanged; `[surface-boundary-fill]` verifies both planar and spatial execution.

@@ -194,7 +194,6 @@
       "selection_scope": "Unambiguous current-body semantic box edges and planar faces, including four-line Sketch rectangles."
     },
     "remaining": [
-      "Surface",
       "Measure",
       "Assembly",
       "Browser feature edit",
@@ -237,6 +236,20 @@
         "Loft Surface"
       ],
       "selection_scope": "Materialized Sketch profiles, bounded ordered path sources and existing open paths; explicit cut targets, twist, guides and section order."
+    },
+    "surface_slice": {
+      "status": "implemented",
+      "contract": "docs/gui-interactive-surface-mvp9.md",
+      "proof": "[block136-surface]",
+      "commands": [
+        "Boundary Surface",
+        "Fill Surface",
+        "Trim Surface",
+        "Extend Surface",
+        "Surface Stitch (Knit/Sew)",
+        "Closed Shell to Solid"
+      ],
+      "selection_scope": "Existing PathCurves, materialized Trim profiles, visible recomputed Surface Bodies and supported semantic box faces/linear edges; explicit pick roles, ordered input lists, live extension distance and typed stitch tolerance."
     }
   }
 }

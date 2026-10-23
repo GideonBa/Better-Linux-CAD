@@ -506,8 +506,8 @@ flags remain explicit. Actual multi-Body previews hide all replaced/consumed sou
 failed candidates restore the prior scene. One Apply commits the ordered per-Body transform batch
 and one Undo reverses it. Contract/proof: `docs/gui-interactive-pattern-body-mvp9.md`, `[block136-body]`.
 
-The spatial follow-up below restores Sweep/Loft. Surface, Measure, Assembly, browser feature editing
-and whole-block acceptance remain open.
+The spatial and Surface follow-ups below restore those families. Measure, Assembly, browser feature
+editing and whole-block acceptance remain open.
 
 Validation for the Body-operation slice on 21 October 2026: full Core (513 cases, 15124 assertions),
 Geometry (421 cases, 28002 assertions), and offscreen GUI (246 passed, five explicit native skips,
@@ -534,7 +534,8 @@ construction paths. Existing planar rational spline intent now resolves through 
 spans for preview and execution. The task inputs scroll while Apply/Cancel remains visible.
 Contract/proof: `docs/gui-interactive-path-sweep-loft-mvp9.md`, `[block136-spatial]`.
 
-Surface, Measure, Assembly, browser feature editing and whole-block acceptance remain open.
+The Surface follow-up below restores that family. Measure, Assembly, browser feature editing and
+whole-block acceptance remain open.
 
 Validation for the spatial slice on 21 October 2026: full Core (513 cases, 15124 assertions),
 Geometry (423 cases, 28106 assertions), and offscreen GUI (254 passed, six explicit native skips,
@@ -546,6 +547,34 @@ list-model section moves, G1 guides, rejected G2 and twist/guide conflicts, fitt
 pending-input isolation, selection-scope restoration, exact Undo/Redo and Save/Open. Native captures
 were inspected and desktop startup passed (intentional six-second timeout). Commands:
 `docs/development-setup.md`. These checks do not close whole-block acceptance.
+
+#### Block 136 next slice — Surface tools
+
+`ShellFeatureTools` adds Boundary/Fill, Trim/Extend, Stitch (Knit/Sew) and closed-shell-to-solid in the
+Flächen ribbon group. The shared task panel provides ordered input lists, separate target/contour
+pick roles, a live extension-distance arrow with numeric refinement and typed stitch tolerance.
+Stable semantic box faces/edges supplement existing paths, materialized Trim profiles and visible
+Surface Bodies. Pick masks and semantic scopes restore on Apply/Cancel. The Geometry authority
+provides the actual outward extension frame and exact planar Fill, retaining spatial filling.
+
+Pending Bodies and Length parameters stay off the session until one Apply transaction. Real result
+previews and authoritative diagnostics gate Apply; invalid numeric edits restore the prior preview.
+Cancel, Undo/Redo and Save/Open retain their authorities. Color-coded gap overlays remain deferred;
+this slice displays diagnostic text and valid result geometry. Contract/proof:
+`docs/gui-interactive-surface-mvp9.md`, `[block136-surface]`.
+
+Measure, Assembly, browser feature editing and whole-block acceptance remain open.
+
+Validation for the Surface slice on 21 October 2026: full Core (513 cases, 15124 assertions),
+Geometry (424 cases, 28199 assertions), and offscreen GUI (260 passed, seven explicit native skips,
+15252 assertions) pass. The combined native Surface/spatial/Body/pattern/finishing/Sketch UI/viewport/
+lifecycle run passes all 50 cases and 8592 assertions, covering all seven offscreen skips. Native
+Surface proof opens the ribbon command, changes target and boundary by actual model clicks, drags
+the outward arrow, refines the distance numerically, restores a second drag with Escape and clicks
+Apply. Focused proof also covers ordered Boundary inputs, a semantic solid-face Trim with a Sketch
+profile, closed-shell conversion, candidate collisions and exact history/persistence. Native task
+captures were inspected and desktop startup passed (intentional six-second timeout). Commands:
+`docs/development-setup.md`. Whole-block acceptance is still open.
 
 ### Sketch interaction follow-up — 21 October 2026
 
@@ -559,6 +588,7 @@ the full right-click gesture. Copy previews report relationships that are not du
 
 Focused tags: `[sketch-mouse-operations]`, `[spline-create-workflow]`, `[sketch-delivery-review]`.
 These changes retain the Block-135/136 boundary above; see the feature-specific contracts for details.
+
 
 ## Test accounting
 

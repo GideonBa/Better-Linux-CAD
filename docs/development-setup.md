@@ -576,6 +576,22 @@ Cancel, atomic Undo/Redo and Save/Open. Native checks exercise profile/path/sect
 and twist drag/numeric refinement; offscreen skips the native case explicitly. Optional
 `BLCAD_UI_CAPTURE_DIR` captures the preview windows.
 
+### Block 136 Surface slice
+
+```bash
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[block136-surface],[interactive-surface]"
+./build/dev-gui/blcad_geometry_tests "[surface-boundary-fill],[surface-trim-extend],[surface-stitch],[surface-to-solid]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-surface]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle]"
+```
+
+The Surface slice verifies all six commands, candidate-only Bodies/Length parameters, invalid
+geometry/numeric rollback, ordered selections, role-specific picking, actual result shapes, exact
+Undo/Redo and Save/Open. Geometry proof covers exact planar Fill and recomputed outward extension
+frames. Native proof uses real target/boundary clicks, extension dragging, typed refinement and the
+visible Apply button. Optional `BLCAD_UI_CAPTURE_DIR` saves review captures. Contract and bounded
+limits: `docs/gui-interactive-surface-mvp9.md`. These checks do not close Block-136 acceptance.
+
 ### Sketch operation follow-up
 
 The shell wires pointer dragging, live previews, numeric refinement and Apply/Cancel for transforms,

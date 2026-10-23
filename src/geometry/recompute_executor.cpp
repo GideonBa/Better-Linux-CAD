@@ -2739,6 +2739,19 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_loft(const PartDocument& 
   return stored;
 }
 
+Result<SurfaceExtensionFrame> GeometryRecomputeExecutor::surface_extension_frame(
+    const PartDocument& document, const SurfaceReference& target,
+    const BoundaryCurveReference& boundary, const ShapeCache& cache) const {
+  const FeatureId preview_id("surface.extension.frame");
+  auto shape = resolve_surface_target(document, target, cache, surface_adapter_, preview_id);
+  if (!shape)
+    return Result<SurfaceExtensionFrame>::failure(shape.error());
+  auto segments = resolve_surface_boundary(document, boundary, cache, workplane_resolver_);
+  if (!segments)
+    return Result<SurfaceExtensionFrame>::failure(segments.error());
+  return surface_adapter_.extension_frame(preview_id, shape.value(), segments.value());
+}
+
 Result<std::size_t> GeometryRecomputeExecutor::execute_surface_feature(
     const PartDocument& document, FeatureId feature_id, ShapeCache& shape_cache) const {
   if (feature_id.empty())
