@@ -830,6 +830,18 @@ cover these contracts. See `docs/gui-sketch3d-interaction-mvp8.md` for exact bou
 `docs/gui-shell-acceptance-mvp9r.md` for verification. Ten families remain restored and eight partial;
 Block 136 remains in progress.
 
+### Block 136 — Extended cross-family GUI workflows — 2026-10-23
+
+Three additional actual-input shell workflows combine authored solid faces with Stitch/solid
+conversion/Boolean, Revolve with circular pattern/rotation/scale and upstream edits, and the imported
+seated-Part example with bounded Planar joint coordinates/motion/analysis/exports. They check rejected
+previews, corrected candidates, exact multi-step and branching history, canonical reopening and
+read-only consumers. Coverage proofs and verification are tracked in
+`docs/gui-shell-acceptance-mvp9r.md`; repeatable commands live in `docs/development-setup.md`.
+This strengthens the integrated evidence without expanding command contracts or closing remaining
+family gaps. The Surface/Boolean chain also guards the corrected shared-task layout after a transform,
+keeping NewBody and retention inputs reachable. Block 136 remains in progress.
+
 ## Current next technical step — Block 136
 
 The current v3 coverage inventory records all eighteen accepted families, current shell proof sources,

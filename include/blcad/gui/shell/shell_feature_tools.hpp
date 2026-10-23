@@ -401,6 +401,7 @@ private:
   std::vector<BodyAxisChoice> body_axes_;
   std::vector<std::pair<Command, QAction*>> body_actions_;
   QWidget* body_controls_{nullptr};
+  QFormLayout* body_form_{nullptr};
   QListWidget* body_sources_{nullptr};
   QComboBox* boolean_target_{nullptr};
   QComboBox* boolean_operation_{nullptr};

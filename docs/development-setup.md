@@ -739,14 +739,19 @@ BLCAD_UI_CAPTURE_DIR=/tmp/blcad-combined-workflows QT_QPA_PLATFORM=xcb ./build/d
 QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-construction-manipulators],[block136-construction-picking],[shell-mixed-path-loft],[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
 ```
 
-`tests/gui/gui_shell_combined_workflow_tests.cpp` combines long interaction sequences in nine
-scenarios: machining/edit/pattern/transform/Measure/STEP, Boolean/scale/Mirror with history branching,
+`tests/gui/gui_shell_combined_workflow_tests.cpp` combines long interaction sequences in twelve
+scenarios, eleven with fully UI-authored inputs and one with an imported seated Part definition:
+machining/edit/pattern/transform/Measure/STEP, Boolean/scale/Mirror with history branching,
 multi-workplane Loft section ordering/editing, authored-Part import/Assembly placement/Mate/solve/
 analysis/STEP, invalid/cancelled tasks plus dirty-file and document-switch recovery, and workplane
 editing with cyclic-reference recovery and downstream solid recompute, plus generated-reference
 construction chains feeding a second Sketch/Extrude and later upstream edits, and construction grips
 rotating a workplane and moving its downstream solid, plus a typed Sketch3D chain feeding a
-PathCurve/Sweep with endpoint editing and four-step history.
+PathCurve/Sweep with endpoint editing and four-step history. Three further scenarios sew authored
+solid faces into a shell/solid/Boolean chain, edit a revolved source through circular pattern and
+rotation/scale consumers, and import the retained seated-Part example to author/drive all three
+coordinates of a bounded Planar joint with branching motion history, analysis and Assembly exports.
+The latter does not claim missing dedicated Hole-authoring coverage.
 
 The shared harness operates Qt ribbon buttons and popup menus, task widgets, browser clicks and
 double-clicks, viewport Sketch picks/hover, Escape and absolute/relative numeric coordinates, and
@@ -759,11 +764,30 @@ controllers/workbenches. Assertions observe canonical
 intent, resolved volumes/solid counts/bounds, source/result identities, task/preview/filter cleanup,
 multi-step Undo/Redo and redo-branch truncation. Save/Open/Save compares complete bytes, including GUI
 sidecars; exports preserve source bytes. Dialog automation has bounded watchdogs, and native input
-checks widget reachability at 1280×800. Both backends execute all eight scenarios; these tests introduce
+checks widget reachability at 1280×800. Both backends execute all twelve scenarios; these tests introduce
 no native-only skips. The native run is required to prove actual OCCT presentation.
 
 These bounded combined workflows extend the shell evidence. Remaining families, manipulator/input
 variants and whole-block acceptance stay tracked in `docs/gui-shell-acceptance-mvp9r.md`.
+
+The three extended cross-family workflows can also be run on their own:
+
+```bash
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[shell-combined-surface-solid],[shell-combined-revolve-pattern],[shell-combined-planar-motion]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-complex-workflows QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[shell-combined-surface-solid],[shell-combined-revolve-pattern],[shell-combined-planar-motion]"
+```
+
+The input harness edits numeric widgets and joint-limit table cells through keyboard events and
+selects actual popup/list rows. These tests reject open-shell conversion, recover invalid pattern
+counts and joint limits, compare every committed history checkpoint, and verify canonical file bytes
+and read-only consumer/export behavior. Run native GUI tests serially with other GUI suites and
+application startup.
+
+The Surface/Boolean chain also guards the shared Body task's field geometry after a transform.
+Wrapping guidance stays outside its conditional form rows: the reference Qt 6.4.2
+[height-for-width pass](https://github.com/qt/qtbase/blob/v6.4.2/src/widgets/kernel/qformlayout.cpp#L479)
+can otherwise process stale indices of hidden rows. The test must reach the actual result-mode
+popup at 1280×800. Keep this input proof when changing the task layout.
 
 ### Block 136 construction and workplane editing
 

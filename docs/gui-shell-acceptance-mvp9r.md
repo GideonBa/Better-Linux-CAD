@@ -572,3 +572,66 @@ The ordinary inventory passes. The opt-in closure gate correctly fails one of th
 assertions): ten bounded families are restored and eight retain explicit gaps. Block 136 remains
 in progress, with the numbered completion boundary at Block 135. Next Sketch3D work is pointer
 placement of new points, explicit distance/direction input and planar-point projection.
+
+## Additional cross-family UI workflows — 2026-10-23
+
+Three further `[shell-combined-workflow]` cases extend the combined coverage to twelve scenarios:
+eleven with fully UI-authored inputs and one with an imported seated Part definition. They use the
+same real widget/input harness on offscreen and native Qt/OCCT:
+
+- `[shell-combined-surface-solid]`: Sketch/Extrude → sew five semantic faces → reject open-shell
+  conversion → cancel/Undo → replace the redo branch with six faces → closed-shell solid → translate
+  → overlapping Boolean union into a new Body with retained sources → four-step exact history →
+  canonical Save/Open/Save → Part STEP. Independent volumes are 4,000 mm³ per source and 6,000 mm³
+  for the union; disposable previews leave committed intent unchanged.
+- `[shell-combined-revolve-pattern]`: authored rectangle → 180° Revolve → four-instance circular
+  pattern → Rotate → Scale about an explicit center → edit the same Revolve to 90° and check all
+  downstream volumes → reject count one, correct to six and rename the same pattern → five-step
+  exact history → Body Measure/copy → canonical reopen. Rotation and scaling about the entered
+  center also have independent bounds checks. This uses the current bounded partial-angle
+  editor; it does not claim a Full-extent mode selector.
+- `[shell-combined-planar-motion]`: retained seated-Part example file → new Project/import →
+  grounded/free component placements → Planar joint with three table-edited bounded coordinate slots
+  → reject and correct inverted limits → slider Home/End and cancelled motion preview → commit
+  U/V/normal-rotation separately → exact
+  four-step history → Undo and a new rotation branch → clearance analysis → canonical reopen → flat
+  and structured Assembly STEP. Coordinate retention, the grounded pose, driven normal rotation,
+  source-definition bytes and read-only consumers remain explicit assertions. The clearance result
+  is checked against the analytical corner distance of the posed rectangles. It imports
+  `examples/revolute_joint.blcad.project.json` for Frame-capable seat references, without claiming
+  missing dedicated Hole-authoring coverage.
+
+The harness types into numeric widgets and actual table-cell editors; it does not seed Core intent
+or drive authoring controllers. Every history checkpoint also checks task/preview/filter cleanup and
+derived freshness. Focused commands and serial native-run requirements are recorded in
+`docs/development-setup.md`. The coverage manifest links the new tags to their exact shell source.
+These proofs preserve the bounded contracts, ten restored/eight partial families and Block 136's
+open status; whole-shell acceptance and remaining family gaps still require the documented work.
+
+The Surface/Boolean chain also caught collapsed fields when reusing the shared task after a
+transform: wrapped guidance in the dynamic form allowed hidden rows to corrupt the visible field
+heights. Guidance now lives beside the form in its containing column. The regression operates the
+actual result-mode popup at 1280×800 and checks NewBody identity and retained target/tools; it does
+not bypass hit testing with direct field assignment. Core authority and persistence are unchanged.
+
+`blcad_gui_tests` and `blcad_app` built successfully with `dev-gui`. Final verification:
+
+| Suite | Cases | Assertions | Result |
+| --- | ---: | ---: | --- |
+| Focused new workflows and inventory, offscreen | 6 | 1,719 | All passed |
+| Full offscreen GUI | 387 | 30,233 | 372 passed; 15 native-only skips |
+| Full combined native shell | 203 | 25,346 | All passed; no skips |
+
+The native run includes all twelve combined workflows and the separate imported mixed-path Loft
+case. Captures `combined-sewn-boolean-controls.png`, `combined-revolve-pattern-edit-preview.png`,
+`combined-revolve-pattern.png` and `combined-planar-motion-preview.png` were inspected at 1280×800.
+The corrected Boolean result-mode input and pinned Apply footer are reachable; candidate geometry
+and the joint's coordinate/limit controls remain visible. Native logs retain the known medium
+depth/stencil warning, without high-severity, BadDrawable or fatal lifecycle errors. The separate
+six-second startup smoke reached intentional timeout 124. GUI tests and startup were serial.
+
+Core/Geometry suites were not rerun for this GUI layout/test change; their sources are unchanged.
+The ordinary inventory passes. The opt-in closure gate still correctly rejects acceptance (one of
+three cases fails, 161 assertions) because the eight partial families and pending whole-shell
+workflows remain open. The numbered completion boundary stays at Block 135, with Block 136 in
+progress.
