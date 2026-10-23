@@ -425,12 +425,10 @@
       },
       "shell": {
         "owner": 136,
-        "status": "partial",
+        "status": "restored",
         "contract": "docs/gui-interactive-path-sweep-loft-mvp9.md",
-        "scope": "Ordered PathCurve authoring; typed Sketch3D points/shared-point lines, active-sketch collection, anchored ray-based pointer and distance/direction placement, direct XYZ point grips with axis/plane restrictions, full downstream previews and atomic history.",
-        "gaps": [
-          "Restore planar-point projection with explicit source-association semantics; pointer placement fixes depth through an explicit anchor, while plane-restricted grips expose independent axes rather than free plane dragging."
-        ],
+        "scope": "Ordered PathCurve authoring; typed/shared-point Sketch3D lines, native collection, anchored pointer/direction placement, restricted point grips and explicit planar endpoint/projected-point XYZ copies with per-copy consent and transient provenance, full downstream previews and atomic history. Copies are independent; plane-restricted grips expose independent axes.",
+        "gaps": [],
         "proofs": [
           {
             "filter": "[block136-spatial]",
@@ -467,6 +465,14 @@
           {
             "filter": "[shell-sketch3d-direction-workflow]",
             "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
+          },
+          {
+            "filter": "[block136-sketch3d-projection]",
+            "source": "tests/gui/gui_shell_sketch_3d_tests.cpp"
+          },
+          {
+            "filter": "[shell-combined-projected-sweep]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
           }
         ],
         "actions": [
@@ -481,7 +487,12 @@
           "blcad.sketch3d.azimuth",
           "blcad.sketch3d.elevation",
           "blcad.sketch3d.stage_direction",
-          "blcad.sketch3d.clear_direction"
+          "blcad.sketch3d.clear_direction",
+          "blcad.sketch3d.projection_source",
+          "blcad.sketch3d.projection_copy",
+          "blcad.sketch3d.stage_projection",
+          "blcad.sketch3d.projection_info",
+          "blcad.sketch3d.projection_receipts"
         ]
       }
     },
@@ -908,7 +919,6 @@
         "viewport-selection",
         "parameters-expressions",
         "bodies-extrude-revolve-holes",
-        "sketch3d-pathcurve",
         "assembly-project-hierarchy",
         "assembly-relationships-joints",
         "assembly-solve-motion",

@@ -213,4 +213,42 @@ Proofs: five `[block136-sketch3d-direction]` cases plus `[shell-sketch3d-directi
 The combined workflow mixes typed XYZ, pointer placement and a direction tuple; it rejects an
 incomplete tuple, recovers the endpoint, authors PathCurve/Sweep, rejects/corrects a downstream grip,
 checks exact four-step history, canonical reopen and STEP. Native controls/capture are checked at
-1280×800. Explicit planar-point projection remains the next Sketch3D gap; Block 136 stays open.
+1280×800. The planar-point extension below supplies the remaining bounded copy surface; Block 136
+stays open for the other recorded families and whole-shell acceptance.
+
+## Replacement shell: explicit planar-point copies — Block 136, 2026-10-23
+
+**Planarer Quellpunkt** lists authored line starts/ends and existing projected points from the
+current Part's planar Sketches. Each entry retains the stable Sketch ID, entity ID and typed
+`SketchReferenceTarget` kind, including equal entity IDs in different Sketches. Standalone Sketch
+points, arc/spline points and raw OCCT vertices are outside the accepted target vocabulary.
+
+Geometry resolves each selected point through the current workplane and reference projector,
+including principal/arbitrary construction planes, generated-face workplanes and projected semantic
+vertices. Both resolvers receive the current shape cache when available. A projected source is first
+resolved in its planar Sketch; the resulting planar coordinates are then mapped into model XYZ.
+This retains the source Sketch's projection semantics. Non-finite or resolved coordinates outside
+±1e9 mm reject locally without consuming a point ID or changing previous local intent.
+
+**Unabhängige XYZ-Kopie bestätigen** is required before each **Quellpunkt nach 3D kopieren**.
+Changing the source resets consent. This surface deliberately chooses the historical Core contract's
+explicit-copy option: `project_planar_point` returns a new local point plus a typed source receipt.
+The task shows the selected source/XYZ values and retains every local point's source receipt until
+completion. Apply persists independent explicit XYZ values. These copies retain their values after
+source edits; no dependency or source receipt is persisted. Reopening shows no stale provenance or
+consent. Live associative projection would require a separate persistent contract.
+
+Selection and consent alone preserve earlier local previews. Changing either rolls back a live grip
+or cancels pointer capture. Copying requires staged/discarded XYZ text, empty direction fields and a
+finished gesture; it re-resolves the current source before staging through the Core service. Several
+copies and other local edits still require complete downstream Preview and one Apply transaction.
+Copying resets consent, selects the new local point and keeps the explicit placement anchor unchanged.
+Save/revision/task/document boundaries and Escape clear the source controls and local receipts.
+
+Six `[block136-sketch3d-projection]` cases cover four oriented planes, projected construction points,
+cached generated faces/semantic vertices, precision, source identity, per-copy consent, pending input,
+gesture rollback, coordinate bounds, source-edit independence, exact history and persistence/expiry.
+`[shell-combined-projected-sweep]` adds a fully UI-authored workflow: XZ source and XY profile Sketches,
+two explicit endpoint copies, a direction point, shared lines, PathCurve/Sweep, failed/corrected
+endpoint edits, four-step history, canonical reopening and STEP. Inspect native controls and receipts
+at 1280×800. This restores the bounded Sketch3D/PathCurve family; Block 136 remains in progress.

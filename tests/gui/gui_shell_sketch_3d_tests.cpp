@@ -1258,3 +1258,360 @@ TEST_CASE("Sketch3D direction guards pending XYZ overflow and session boundaries
   CHECK(control<QComboBox>(window, "placement_anchor").currentIndex() == 0);
   CHECK(control<QLineEdit>(window, "distance").text().isEmpty());
 }
+
+namespace {
+void prepare_projection(ShellWindow& window) {
+  prepare_handles(window);
+  window.sketch_3d_tools().cancel();
+  REQUIRE(window.session().commit_part_transaction("Planar point sources", [](PartDocument& part) {
+    REQUIRE(part.add_construction_plane(checked(
+        ConstructionPlane::create_explicit(ConstructionPlaneId("tilted"), "Tilted", {10, 20, 30},
+                                           {.6, .8, 0}, {0, 0, 1}, {.8, -.6, 0}))));
+    REQUIRE(part.add_construction_point(checked(ConstructionPoint::create_explicit(
+        ConstructionPointId("projected.source"), "Source", {9, 12, 99}))));
+    for (const auto& [id, plane] :
+         std::array<std::pair<const char*, const char*>, 4>{{{"planar.xy", "datum.xy"},
+                                                             {"planar.xz", "datum.xz"},
+                                                             {"planar.yz", "datum.yz"},
+                                                             {"planar.tilted", "tilted"}}}) {
+      auto sketch = checked(Sketch::create(SketchId(id), id, DatumPlaneId(plane)));
+      const bool tilted = std::string_view(id) == "planar.tilted";
+      REQUIRE(sketch.add_entity(checked(LineSegment::create(
+          SketchEntityId("edge"), tilted ? Point2{2, 3} : Point2{1.123456789123, 2},
+          tilted ? Point2{-4, 5} : Point2{4, 6}))));
+      if (std::string_view(id) == "planar.xy")
+        REQUIRE(sketch.add_reference(checked(ProjectedSketchPoint::create_from_construction_point(
+            SketchEntityId("projected"), ConstructionPointId("projected.source")))));
+      REQUIRE(part.add_sketch(std::move(sketch)));
+    }
+    return Result<std::size_t>::success(4);
+  }));
+  window.refresh();
+  edit(window);
+}
+void projection_source(ShellWindow& window, const char* sketch, SketchReferenceTargetKind kind,
+                       const char* entity = "edge") {
+  auto& sources = control<QComboBox>(window, "projection_source");
+  for (int row = 1; row < sources.count(); ++row)
+    if (sources.itemData(row).toString() == sketch &&
+        sources.itemData(row, Qt::UserRole + 1).toInt() == static_cast<int>(kind) &&
+        sources.itemData(row, Qt::UserRole + 2).toString() == entity) {
+      sources.setCurrentIndex(row);
+      return;
+    }
+  FAIL("Missing stable planar source");
+}
+void copy_projection(ShellWindow& window) {
+  control<QCheckBox>(window, "projection_copy").setChecked(true);
+  button(window, "stage_projection");
+}
+} // namespace
+
+TEST_CASE(
+    "Sketch3D copies planar endpoints and projected points on four oriented planes atomically",
+    "[gui][block136-sketch3d-projection]") {
+  ShellWindow window;
+  prepare_projection(window);
+  const auto before = snapshot(window);
+  const auto undo = std::string(window.session().undo_label());
+  CHECK(control<QComboBox>(window, "projection_source").count() == 10);
+  const std::array<const char*, 4> sketches{"planar.xy", "planar.xz", "planar.yz", "planar.tilted"};
+  const std::array<Point3, 8> expected{{{1.123456789123, 2, 0},
+                                        {4, 6, 0},
+                                        {1.123456789123, 0, 2},
+                                        {4, 0, 6},
+                                        {0, 1.123456789123, 2},
+                                        {0, 4, 6},
+                                        {11.2, 21.6, 33},
+                                        {7.6, 16.8, 35}}};
+  int index = 0;
+  for (const auto* sketch : sketches)
+    for (auto kind :
+         {SketchReferenceTargetKind::LineSegmentStart, SketchReferenceTargetKind::LineSegmentEnd}) {
+      projection_source(window, sketch, kind);
+      CHECK(control<QLabel>(window, "projection_info").text().contains(sketch));
+      CHECK_FALSE(control<QCheckBox>(window, "projection_copy").isChecked());
+      copy_projection(window);
+      ++index;
+      CHECK(control<QComboBox>(window, "point").currentData().toString() ==
+            "point." + QString::number(index));
+      CHECK_FALSE(control<QCheckBox>(window, "projection_copy").isChecked());
+      CHECK(snapshot(window) == before);
+      CHECK(window.session().undo_label() == undo);
+    }
+  projection_source(window, "planar.xy", SketchReferenceTargetKind::ProjectedPoint, "projected");
+  copy_projection(window);
+  CHECK(control<QLabel>(window, "projection_receipts")
+            .text()
+            .contains("point.9 ← planar.xy / projected / Projizierter Punkt"));
+  REQUIRE(window.sketch_3d_tools().preview());
+  REQUIRE(window.sketch_3d_tools().apply());
+  const auto& sketch = *window.session().part_document()->find_sketch_3d(Sketch3DId("spatial"));
+  for (int i = 0; i < 8; ++i) {
+    const auto* copied = sketch.find_point(SketchEntityId("point." + std::to_string(i + 1)));
+    REQUIRE(copied);
+    CHECK(copied->x().explicit_coordinate()->millimeters() ==
+          Catch::Approx(expected[i].x).margin(1e-12));
+    CHECK(copied->y().explicit_coordinate()->millimeters() ==
+          Catch::Approx(expected[i].y).margin(1e-12));
+    CHECK(copied->z().explicit_coordinate()->millimeters() ==
+          Catch::Approx(expected[i].z).margin(1e-12));
+    CHECK(copied->parameter_dependencies().empty());
+  }
+  CHECK(sketch.find_point(SketchEntityId("point.1"))->x().explicit_coordinate()->millimeters() ==
+        1.123456789123);
+  const auto* projected = sketch.find_point(SketchEntityId("point.9"));
+  REQUIRE(projected);
+  CHECK(projected->x().explicit_coordinate()->millimeters() == 9);
+  CHECK(projected->y().explicit_coordinate()->millimeters() == 12);
+  CHECK(projected->z().explicit_coordinate()->millimeters() == 0);
+  CHECK(sketch.arcs().size() == 1);
+  CHECK(sketch.splines().size() == 1);
+  CHECK(sketch.guide_curves().size() == 1);
+  const auto after = snapshot(window);
+  REQUIRE(window.undo());
+  CHECK(snapshot(window) == before);
+  REQUIRE(window.redo());
+  CHECK(snapshot(window) == after);
+  QTemporaryDir directory;
+  REQUIRE(window.save_to(directory.filePath("copied.blcad")));
+  REQUIRE(window.open_path(directory.filePath("copied.blcad")));
+  CHECK(snapshot(window) == after);
+}
+
+TEST_CASE("Sketch3D planar copying requires per-source consent and protects pending numeric edits",
+          "[gui][block136-sketch3d-projection]") {
+  ShellWindow window;
+  prepare_projection(window);
+  const auto before = snapshot(window);
+  point(window, -10, 5, 15);
+  REQUIRE(window.sketch_3d_tools().preview());
+  const int count = control<QComboBox>(window, "point").count();
+  for (int row : {-1, 0}) {
+    control<QComboBox>(window, "projection_source").setCurrentIndex(row);
+    copy_projection(window);
+    CHECK(control<QComboBox>(window, "point").count() == count);
+  }
+  projection_source(window, "planar.xy", SketchReferenceTargetKind::LineSegmentStart);
+  control<QCheckBox>(window, "projection_copy").setChecked(true);
+  projection_source(window, "planar.xz", SketchReferenceTargetKind::LineSegmentEnd);
+  CHECK_FALSE(control<QCheckBox>(window, "projection_copy").isChecked());
+  button(window, "stage_projection");
+  CHECK(control<QComboBox>(window, "point").count() == count);
+  CHECK(window.viewport().feature_preview_active());
+  CHECK(control<QPushButton>(window, "apply").isEnabled());
+  auto* editor = control<QDoubleSpinBox>(window, "z").findChild<QLineEdit*>();
+  REQUIRE(editor);
+  editor->setText("14 mm");
+  copy_projection(window);
+  CHECK(control<QDoubleSpinBox>(window, "z").value() == 14);
+  CHECK(control<QComboBox>(window, "point").count() == count);
+  select(window, "point", "b");
+  direction_tuple(window, "2", "0", "0");
+  copy_projection(window);
+  CHECK(control<QComboBox>(window, "point").count() == count);
+  CHECK(control<QLineEdit>(window, "distance").text() == "2");
+  button(window, "clear_direction");
+  copy_projection(window);
+  CHECK(control<QComboBox>(window, "point").count() == count + 1);
+  button(window, "stage_projection"); // A second copy needs fresh consent.
+  CHECK(control<QComboBox>(window, "point").count() == count + 1);
+  CHECK(snapshot(window) == before);
+  REQUIRE(window.sketch_3d_tools().preview());
+  REQUIRE(window.sketch_3d_tools().apply());
+  REQUIRE(window.undo());
+  CHECK(snapshot(window) == before);
+}
+
+TEST_CASE("Sketch3D planar source controls roll back live gestures without losing earlier previews",
+          "[gui][block136-sketch3d-projection]") {
+  ShellWindow window;
+  prepare_projection(window);
+  const auto before = snapshot(window);
+  point(window, -10, 5, 15);
+  select(window, "point", "b");
+  control<QCheckBox>(window, "grips").setChecked(true);
+  REQUIRE(window.sketch_3d_tools().preview());
+  const int count = control<QComboBox>(window, "point").count();
+  GuiSketchScreenPoint release;
+  SECTION("grip") {
+    release = press(window, "z");
+    numeric(window, "14 mm");
+  }
+  SECTION("placement") {
+    placement_mode(window);
+    release = placement_screen(window, {12, 6, 10});
+    pointer(window, QEvent::MouseButtonPress, release);
+  }
+  REQUIRE(window.viewport().mouseGrabber() == &window.viewport());
+  projection_source(window, "planar.tilted", SketchReferenceTargetKind::LineSegmentStart);
+  CHECK(window.viewport().mouseGrabber() != &window.viewport());
+  CHECK(window.sketch_3d_tools().manipulators().active_handle_id().empty());
+  CHECK_FALSE(control<QWidget>(window, "placement_overlay").isVisible());
+  pointer(window, QEvent::MouseButtonRelease, release);
+  CHECK(control<QComboBox>(window, "point").count() == count);
+  CHECK(window.viewport().feature_preview_active());
+  copy_projection(window);
+  REQUIRE(window.sketch_3d_tools().preview());
+  REQUIRE(window.sketch_3d_tools().apply());
+  CHECK(window.session()
+            .part_document()
+            ->find_sketch_3d(Sketch3DId("spatial"))
+            ->find_point(SketchEntityId("b"))
+            ->z()
+            .explicit_coordinate()
+            ->millimeters() == 10);
+  REQUIRE(window.undo());
+  CHECK(snapshot(window) == before);
+}
+
+TEST_CASE("Sketch3D copied planar points remain independent after source editing and reopening",
+          "[gui][block136-sketch3d-projection]") {
+  ShellWindow window;
+  prepare_projection(window);
+  const auto before = snapshot(window);
+  projection_source(window, "planar.xy", SketchReferenceTargetKind::LineSegmentStart);
+  copy_projection(window);
+  REQUIRE(window.sketch_3d_tools().preview());
+  REQUIRE(window.sketch_3d_tools().apply());
+  const auto copied = snapshot(window);
+  REQUIRE(window.session().commit_part_transaction(
+      "Edit original planar source", [](PartDocument& part) {
+        auto replacement =
+            checked(Sketch::create(SketchId("planar.xy"), "planar.xy", DatumPlaneId("datum.xy")));
+        REQUIRE(replacement.add_entity(
+            checked(LineSegment::create(SketchEntityId("edge"), {91, 92}, {94, 96}))));
+        REQUIRE(replacement.add_reference(
+            part.find_sketch(SketchId("planar.xy"))->projected_points().front()));
+        return part.update_sketch(std::move(replacement));
+      }));
+  window.refresh();
+  CHECK(window.session().derived_results_fresh());
+  const auto* point = window.session()
+                          .part_document()
+                          ->find_sketch_3d(Sketch3DId("spatial"))
+                          ->find_point(SketchEntityId("point.1"));
+  REQUIRE(point);
+  CHECK(point->x().explicit_coordinate()->millimeters() == 1.123456789123);
+  CHECK(point->y().explicit_coordinate()->millimeters() == 2);
+  const auto edited = snapshot(window);
+  REQUIRE(window.undo());
+  CHECK(snapshot(window) == copied);
+  REQUIRE(window.undo());
+  CHECK(snapshot(window) == before);
+  REQUIRE(window.redo());
+  REQUIRE(window.redo());
+  CHECK(snapshot(window) == edited);
+  QTemporaryDir directory;
+  REQUIRE(window.save_to(directory.filePath("independent.blcad")));
+  REQUIRE(window.open_path(directory.filePath("independent.blcad")));
+  CHECK(snapshot(window) == edited);
+  edit(window);
+  CHECK(control<QLabel>(window, "projection_receipts").text().isEmpty());
+  CHECK_FALSE(control<QCheckBox>(window, "projection_copy").isChecked());
+}
+
+TEST_CASE("Sketch3D planar copying rejects coordinate overflow and expires unfinished provenance",
+          "[gui][block136-sketch3d-projection]") {
+  ShellWindow window;
+  prepare_projection(window);
+  const auto before = snapshot(window);
+  SECTION("overflow") {
+    window.sketch_3d_tools().cancel();
+    REQUIRE(window.session().commit_part_transaction("Far source", [](PartDocument& part) {
+      REQUIRE(part.add_construction_plane(checked(ConstructionPlane::create_explicit(
+          ConstructionPlaneId("far"), "Far", {1e9, 0, 0}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}))));
+      auto sketch = checked(Sketch::create(SketchId("far.sketch"), "Far", DatumPlaneId("far")));
+      REQUIRE(
+          sketch.add_entity(checked(LineSegment::create(SketchEntityId("edge"), {2, 0}, {4, 0}))));
+      return part.add_sketch(std::move(sketch));
+    }));
+    window.refresh();
+    edit(window);
+    projection_source(window, "far.sketch", SketchReferenceTargetKind::LineSegmentStart);
+    copy_projection(window);
+    CHECK(control<QComboBox>(window, "point").count() == 6);
+    CHECK(control<QLabel>(window, "summary").text().contains("XYZ-Bereich"));
+    return;
+  }
+  projection_source(window, "planar.xy", SketchReferenceTargetKind::LineSegmentStart);
+  copy_projection(window);
+  REQUIRE(window.sketch_3d_tools().preview());
+  control<QCheckBox>(window, "projection_copy").setChecked(true);
+  SECTION("Escape in source control") {
+    QKeyEvent escape(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier);
+    QApplication::sendEvent(&control<QComboBox>(window, "projection_source"), &escape);
+  }
+  SECTION("save") {
+    QTemporaryDir directory;
+    REQUIRE(window.save_to(directory.filePath("pending-projection.blcad")));
+    GuiDocumentSession opened;
+    REQUIRE(opened.open_file(directory.filePath("pending-projection.blcad").toStdString()));
+    CHECK(checked(serialize_part_document_to_json(*opened.part_document())) == before);
+  }
+  SECTION("revision") {
+    window.session().report_error(Error::validation("test", "Revision changed"));
+    window.refresh();
+  }
+  CHECK(snapshot(window) == before);
+  CHECK_FALSE(window.sketch_3d_tools().active());
+  CHECK(control<QComboBox>(window, "projection_source").count() == 0);
+  CHECK_FALSE(control<QCheckBox>(window, "projection_copy").isChecked());
+  CHECK(control<QLabel>(window, "projection_receipts").text().isEmpty());
+}
+
+TEST_CASE("Sketch3D planar copying resolves cached generated-face and semantic-vertex sources",
+          "[gui][block136-sketch3d-projection]") {
+  ShellWindow window;
+  REQUIRE(window.new_part("Cached projection"));
+  REQUIRE(window.session().commit_part_transaction(
+      "Solid and planar references", [](PartDocument& part) {
+        for (auto [id, value] : {std::pair{"width", 10.}, {"height", 8.}, {"depth", 6.}})
+          REQUIRE(part.add_parameter(checked(
+              Parameter::create_length(ParameterId(id), id, checked(Quantity::length_mm(value))))));
+        auto base = checked(Sketch::create(SketchId("base"), "Base", DatumPlaneId("datum.xy")));
+        REQUIRE(base.add_profile(checked(RectangleProfile::create(
+            ProfileId("profile"), ParameterId("width"), ParameterId("height")))));
+        REQUIRE(part.add_sketch(base));
+        REQUIRE(part.add_body(checked(Body::create(BodyId("body"), "Body", BodyKind::Solid))));
+        auto feature = checked(Feature::create_additive_extrude(FeatureId("solid"), "Solid",
+                                                                base.id(), ParameterId("depth")));
+        REQUIRE(part.add_feature(
+            checked(feature.with_body_result_context(checked(FeatureBodyResultContext::create(
+                FeatureBodyOperationMode::NewBody, std::nullopt, BodyId("body")))))));
+        REQUIRE(part.add_derived_workplane(checked(DerivedWorkplane::create_on_feature_face(
+            DatumPlaneId("top"), "Top",
+            checked(SemanticFaceReference::create(feature.id(), SemanticFace::Top))))));
+        auto top =
+            checked(Sketch::create(SketchId("top.source"), "Top source", DatumPlaneId("top")));
+        REQUIRE(
+            top.add_entity(checked(LineSegment::create(SketchEntityId("edge"), {2, 3}, {4, 5}))));
+        REQUIRE(part.add_sketch(top));
+        auto projected = checked(Sketch::create(SketchId("vertex.source"), "Projected vertex",
+                                                DatumPlaneId("datum.xy")));
+        REQUIRE(projected.add_reference(checked(ProjectedSketchPoint::create_from_semantic_vertex(
+            SketchEntityId("vertex"), checked(SemanticVertexReference::create(
+                                          feature.id(), SemanticVertex::TopFrontRight))))));
+        return part.add_sketch(projected);
+      }));
+  window.refresh();
+  REQUIRE(window.session().part_shape_cache());
+  REQUIRE(window.sketch_3d_tools().begin());
+  projection_source(window, "top.source", SketchReferenceTargetKind::LineSegmentStart);
+  copy_projection(window);
+  projection_source(window, "vertex.source", SketchReferenceTargetKind::ProjectedPoint, "vertex");
+  copy_projection(window);
+  REQUIRE(window.sketch_3d_tools().preview());
+  REQUIRE(window.sketch_3d_tools().apply());
+  const auto& sketch = window.session().part_document()->sketches_3d().back();
+  const auto* top = sketch.find_point(SketchEntityId("point.1"));
+  const auto* vertex = sketch.find_point(SketchEntityId("point.2"));
+  REQUIRE(top);
+  REQUIRE(vertex);
+  CHECK(top->x().explicit_coordinate()->millimeters() == Catch::Approx(2));
+  CHECK(top->y().explicit_coordinate()->millimeters() == Catch::Approx(3));
+  CHECK(top->z().explicit_coordinate()->millimeters() == Catch::Approx(6));
+  CHECK(vertex->x().explicit_coordinate()->millimeters() == Catch::Approx(5));
+  CHECK(vertex->y().explicit_coordinate()->millimeters() == Catch::Approx(4));
+  CHECK(vertex->z().explicit_coordinate()->millimeters() == Catch::Approx(0));
+}

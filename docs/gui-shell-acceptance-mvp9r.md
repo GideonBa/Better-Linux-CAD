@@ -39,18 +39,18 @@ source, hide a missing tag behind OR and claim completion with gaps. They must a
 
 The machine-readable details live in `families[].shell.gaps`; this is the execution order:
 
-1. Complete Sketch3D planar projection beyond the restored typed point/line editor, native
-   collection/direct grips, anchored pointer placement and distance/direction input. The
-   planar/reference surface includes explicit diagnostic suggestion Preview/Apply controls plus
-   failed-recompute Part repair opening, missing
-   face/point/line sources and single/batch reference replacement.
-2. Restore standalone parameter management, dedicated Hole authoring and audit advanced extent
+1. Restore standalone parameter management, dedicated Hole authoring and audit advanced extent
    editors against the foundation API.
-3. Restore contextual commands, selection-filter UI, view cube, view bookmarks and repeat command.
-4. Restore the supported hierarchy validation, cross-hierarchy relationship/joint/solve controls,
+2. Restore contextual commands, selection-filter UI, view cube, view bookmarks and repeat command.
+3. Restore the supported hierarchy validation, cross-hierarchy relationship/joint/solve controls,
    sampled Revolute analysis and occurrence-linked result highlighting.
-5. Finish integrated Part and Assembly acceptance using actual ShellWindow input paths, disposable
+4. Finish integrated Part and Assembly acceptance using actual ShellWindow input paths, disposable
    previews, invalid-input rejection, history, canonical save/load and native presentation.
+
+The bounded Sketch3D/PathCurve surface includes typed/shared-point editing, native collection and
+grips, anchored pointer/direction placement and explicit independent planar-point copies with visible
+source identity. Exact copy semantics live in `docs/gui-sketch3d-interaction-mvp8.md`. The bounded
+planar/reference surface retains diagnostic repair, repair opening and single/batch source replacement.
 
 The datum family's fourteen creation/edit modes, native role-based reference collection and explicit
 position/direction/frame/new-offset grips now have a restored bounded surface. Reference-driven
@@ -71,7 +71,7 @@ QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][gui-fea
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests
 ./build/dev-gui/blcad_core_tests
 ./build/dev-gui/blcad_geometry_tests
-QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-sketch3d-direction],[shell-sketch3d-direction-workflow],[block136-sketch3d-placement],[shell-sketch3d-placement-workflow],[block136-sketch3d-grips],[shell-sketch3d-grips-workflow],[block136-sketch3d],[shell-combined-sketch3d],[block136-sketch-diagnostics],[missing-reference-session],[block136-missing-reference],[repair-open-session],[block136-repair-open],[block136-reference-repair-batches],[block136-reference-repair],[block136-construction-manipulators],[block136-construction-picking],[shell-mixed-path-loft],[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-sketch3d-projection],[shell-combined-projected-sweep],[block136-sketch3d-direction],[shell-sketch3d-direction-workflow],[block136-sketch3d-placement],[shell-sketch3d-placement-workflow],[block136-sketch3d-grips],[shell-sketch3d-grips-workflow],[block136-sketch3d],[shell-combined-sketch3d],[block136-sketch-diagnostics],[missing-reference-session],[block136-missing-reference],[repair-open-session],[block136-repair-open],[block136-reference-repair-batches],[block136-reference-repair],[block136-construction-manipulators],[block136-construction-picking],[shell-mixed-path-loft],[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
 ```
 
 The regular inventory audit passes while it accurately records unfinished work. For closure,
@@ -723,3 +723,50 @@ Core/Geometry sources and persistence are unchanged; their full suites were not 
 slice. The ordinary inventory passes. The opt-in closure gate correctly rejects unfinished
 acceptance (one of three cases fails, 168 assertions). Remaining family and whole-shell gaps keep
 Block 136 open, with explicit planar-point projection next for Sketch3D.
+
+## Explicit planar-point copying into Sketch3D — 2026-10-23
+
+The source task stages current planar line endpoints/projected points as independent XYZ copies,
+with stable typed source identities, per-copy consent and local provenance receipts. Geometry uses
+the current workplane/reference cache, including arbitrary and generated-face planes. Pending input,
+invalid sources, interrupted gestures and task boundaries retain the existing complete Preview/Apply
+authority. Committed copies remain independent after source edits; persistence stores only explicit
+XYZ values. Contract: `docs/gui-sketch3d-interaction-mvp8.md`.
+
+Six `[block136-sketch3d-projection]` cases cover four oriented planes, construction-projected points,
+cached generated-face/semantic-vertex sources, precision, consent, pending numeric input, gesture
+rollback, coordinate bounds, independent source edits, history, canonical reopening and expiry.
+`[shell-combined-projected-sweep]` is the thirteenth combined workflow: actual ribbon/Sketch/popup/
+checkbox/button/numeric/file input authors an XZ source and XY profile, copies endpoints, adds a
+direction point and shared lines, builds PathCurve/Sweep and verifies failed/corrected downstream
+edits, 640→800 mm³ volumes, four-step history, canonical reopening and STEP. Twelve combined workflows
+have fully UI-authored inputs; the retained Planar-motion workflow imports its seated Part example.
+
+The inventory restores this bounded family: eleven restored, seven partial. Whole-shell acceptance
+and Block 136 remain open. Repeatable commands and native captures
+`sketch3d-planar-copy-controls.png` / `sketch3d-planar-copy-provenance.png` are recorded below and in
+`docs/development-setup.md`.
+
+`blcad_gui_tests` and `blcad_app` built successfully with `dev-gui`. Final verification:
+
+| Suite | Cases | Assertions | Result |
+| --- | ---: | ---: | --- |
+| Focused Core Sketch3D edit/update contracts | 6 | 291 | All passed |
+| Focused Geometry Sketch3D/reference/workplanes | 38 | 1,505 | All passed |
+| Focused offscreen Sketch3D and inventory | 34 | 4,442 | All passed |
+| Full offscreen GUI | 405 | 33,060 | 390 passed; 15 native-only skips |
+| Focused native planar copies and combined Sweep | 7 | 1,021 | All passed; no skips |
+| Full combined native shell | 221 | 28,286 | All passed; no skips |
+
+The native controls and provenance captures were inspected at 1280×800: source identity, per-copy
+consent, staging action, resolved XYZ and both source receipts are readable, with the pinned
+Preview/Apply/Cancel footer reachable. Native logs retain the known medium depth/stencil visual
+warning, without high-severity, BadDrawable or fatal lifecycle diagnostics. The separate six-second
+application startup smoke reaches intentional timeout 124. Builds, GUI runs and startup were serial;
+formatting and diff checks pass.
+
+Core/Geometry sources and the persistence schema are unchanged; their full suites were not rerun
+for this slice. The ordinary inventory passes. The opt-in closure gate correctly rejects unfinished
+acceptance (one of three cases fails, 173 assertions). Eleven bounded families are restored and seven
+remain partial; Block 136 stays open with numbered completion at Block 135. Standalone parameter
+management is the next documented step.
