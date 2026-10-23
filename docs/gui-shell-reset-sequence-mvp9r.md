@@ -735,3 +735,13 @@ parameter/Hole/advanced-extent editors, workspace aids and supported advanced As
 These are concrete follow-up work, not a reason to certify whole-block parity. Execution order and
 verification live in `docs/gui-shell-acceptance-mvp9r.md`; numbered status remains Block 136 in
 `docs/mvp-plan.md`.
+
+## Block 136 construction/workplane creation — 2026-10-23
+
+`ShellConstructionTools` is an explicitly owned shell task for nine construction creation modes,
+with disposable resolved previews and atomic parameter-plus-plane Apply. Resolved helper geometry
+now appears in the viewport, and construction/derived workplanes support Sketch creation from both
+the browser and viewport. The source selectors, invalid-input rejection, task lifecycle, exact
+history/persistence and native 1280×800 presentation are covered by `[block136-construction]`.
+Contract: `docs/gui-sketch-workbench-mvp7.md`. Object editing and remaining relation/pick workflows
+stay recorded as datum-family gaps; whole-block acceptance is unchanged.

@@ -4,6 +4,8 @@
 #include "assembly_posed_leaf_shapes.hpp"
 #include "geometry_shape_internal.hpp"
 
+#include "blcad/geometry/construction_line_resolver.hpp"
+#include "blcad/geometry/construction_point_resolver.hpp"
 #include "blcad/geometry/profile_region_classifier.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
 #include "blcad/geometry/sketch_3d_geometry_adapter.hpp"
@@ -201,25 +203,50 @@ ViewportSceneBuilder::build_part(const PartDocument& document,
                        wrap(make_plane_shape(plane.origin(), plane.x_axis(), plane.y_axis()))});
     }
     for (const DatumAxis& axis : document.datum_axes()) {
-      if (axis.kind() == DatumAxisKind::Explicit) {
-        items.push_back({ViewportSceneKind::Datum, "datum-axis/" + axis.id().value(),
-                         wrap(make_axis_shape(axis.origin(), axis.direction()))});
+      Point3 origin = axis.origin();
+      Vector3 direction = axis.direction();
+      if (axis.kind() == DatumAxisKind::FromConstructionLine) {
+        auto line = ConstructionLineResolver{}.resolve(document, axis.source_construction_line());
+        if (!line)
+          return Result<std::vector<ViewportSceneItem>>::failure(line.error());
+        origin = line.value().point;
+        direction = line.value().direction;
       }
+      items.push_back({ViewportSceneKind::Datum, "datum-axis/" + axis.id().value(),
+                       wrap(make_axis_shape(origin, direction))});
+    }
+    for (const ConstructionPoint& point : document.construction_points()) {
+      auto resolved = ConstructionPointResolver{}.resolve(document, point.id());
+      if (!resolved)
+        return Result<std::vector<ViewportSceneItem>>::failure(resolved.error());
+      items.push_back({ViewportSceneKind::Datum, "construction-point/" + point.id().value(),
+                       wrap(BRepBuilderAPI_MakeVertex(to_point(resolved.value().position)).Shape())});
     }
     for (const ConstructionLine& line : document.construction_lines()) {
-      if (line.kind() == ConstructionLineKind::Explicit) {
-        items.push_back({ViewportSceneKind::Datum, "construction-line/" + line.id().value(),
-                         wrap(make_axis_shape(line.point(), line.direction()))});
-      }
+      auto resolved = ConstructionLineResolver{}.resolve(document, line.id());
+      if (!resolved)
+        return Result<std::vector<ViewportSceneItem>>::failure(resolved.error());
+      items.push_back({ViewportSceneKind::Datum, "construction-line/" + line.id().value(),
+                       wrap(make_axis_shape(resolved.value().point, resolved.value().direction))});
     }
+    const WorkplaneResolver workplane_resolver;
     for (const ConstructionPlane& plane : document.construction_planes()) {
-      if (plane.kind() == ConstructionPlaneKind::Explicit) {
-        items.push_back({ViewportSceneKind::Datum, "construction-plane/" + plane.id().value(),
-                         wrap(make_plane_shape(plane.origin(), plane.x_axis(), plane.y_axis()))});
-      }
+      auto resolved = workplane_resolver.resolve(document, plane.workplane_id());
+      if (!resolved)
+        return Result<std::vector<ViewportSceneItem>>::failure(resolved.error());
+      items.push_back({ViewportSceneKind::Datum, "construction-plane/" + plane.id().value(),
+                       wrap(make_plane_shape(resolved.value().origin, resolved.value().x_axis,
+                                             resolved.value().y_axis))});
+    }
+    for (const DerivedWorkplane& plane : document.derived_workplanes()) {
+      auto resolved = workplane_resolver.resolve(document, plane.id());
+      if (!resolved)
+        return Result<std::vector<ViewportSceneItem>>::failure(resolved.error());
+      items.push_back({ViewportSceneKind::Datum, "derived-workplane/" + plane.id().value(),
+                       wrap(make_plane_shape(resolved.value().origin, resolved.value().x_axis,
+                                             resolved.value().y_axis))});
     }
 
-    const WorkplaneResolver workplane_resolver;
     for (const Sketch& sketch : document.sketches()) {
       auto workplane = workplane_resolver.resolve_for_sketch(document, sketch, shape_cache);
       if (workplane.has_error())

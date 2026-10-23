@@ -565,3 +565,25 @@ uses the same preview. **Anwenden** updates the existing feature and parameter v
 step. **Abbrechen** discards them. Invalid inputs or failed downstream geometry disable Apply and show
 a diagnostic while the saved model remains intact. Opening another document and Undo/Redo exit the
 edit task and clear its preview.
+
+## Construction geometry and workplanes
+
+Choose **3D-Modell → Konstruktion → Konstruktionsgeometrie** or **Arbeitsebene**. In the task panel,
+choose **Typ** and enter a name. Points use XYZ coordinates in mm. Lines and axes use an origin and
+direction; a plane uses an origin and perpendicular X/Y directions. Direction lengths are normalized.
+For a line through two points, an axis from a construction line or a plane through three points,
+choose the existing references in the labeled selectors.
+
+**Versatzebene** selects a source plane and a positive offset along its normal. Choose **Neuer
+Parameter** to create the offset parameter together with the plane, or bind an existing Length
+parameter. **Ebene auf Modellfläche** selects a supported semantic generated face. Only faces that
+the current workplane resolver supports are offered.
+
+The blue preview changes with valid inputs. **Anwenden** creates the geometry in one undoable step;
+**Abbrechen**, Escape or the dock close button discards it. Invalid or degenerate inputs disable
+Apply. Saving during preview writes only the committed model and closes the pending task.
+
+Select a committed construction or derived plane in the model or browser, then choose **2D-Skizze
+erstellen**. The camera aligns to that plane; sketches on generated faces retain the face bounds.
+Editing an existing construction object's coordinates/references remains planned. Existing offset
+parameters can be edited through their properties.

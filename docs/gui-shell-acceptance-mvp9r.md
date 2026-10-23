@@ -1,6 +1,6 @@
 # Replacement shell acceptance — MVP-9R
 
-Status: Block 136 in progress; inventory audited 2026-10-22. Numbered completion remains owned by
+Status: Block 136 in progress; inventory updated 2026-10-23. Numbered completion remains owned by
 `docs/mvp-plan.md`. STEP Import remains Blocks 137–143.
 
 ## Current evidence and historical acceptance
@@ -39,7 +39,9 @@ source, hide a missing tag behind OR and claim completion with gaps. They must a
 
 The machine-readable details live in `families[].shell.gaps`; this is the execution order:
 
-1. Restore datum/construction geometry and workplane creation/editing beyond seeded origins.
+1. Complete datum/construction/workplane object editing and remaining relation/pick workflows.
+   Nine creation modes, resolved helper presentation and Sketch-on-workplane entry are restored;
+   the exact implemented boundary lives in `docs/gui-sketch-workbench-mvp7.md`.
 2. Restore explicit broken-reference repair and Sketch3D authoring/editing.
 3. Restore standalone parameter management, dedicated Hole authoring and audit advanced extent
    editors against the foundation API.
@@ -94,3 +96,24 @@ errors. Startup remained running until the intentional six-second timeout. The e
 was also exercised and correctly refused the open acceptance state. Eight families have covered
 bounded surfaces; ten retain explicit gaps. These results validate the current slices and inventory,
 without closing Block 136.
+
+## Construction creation verification — 2026-10-23
+
+| Suite | Cases | Assertions | Result |
+| --- | ---: | ---: | --- |
+| Core | 513 | 15,124 | All passed |
+| Geometry | 429 | 28,575 | All passed |
+| Full offscreen GUI | 311 | 18,333 | 297 passed; 14 native-only skips |
+| Combined native shell | 127 | 12,995 | All passed; no skips |
+| Focused inventory | 3 | 128 | All passed |
+
+The eight new shell cases cover construction/workplane creation, exact history and persistence,
+input rejection, context/revision guards and downstream Sketch/Extrude consumption. Two new Geometry
+cases inspect resolved OCCT presentation bounds. The native regression covers the offscreen skips,
+actual ribbon mouse input, pending numeric text committed by Apply and reachable controls at
+1280×800. Captures were inspected; startup remained running until the intentional six-second timeout.
+The native log contains the existing incomplete-visual depth/stencil warning, with no high-severity
+or drawable-lifecycle errors. The explicit closure gate still correctly refuses acceptance. Eight
+families retain covered bounded surfaces and ten retain gaps; creation narrows the datum-family gap
+without closing it. Next work is construction/workplane object editing and the remaining relation/
+pick workflows, followed by the existing acceptance sequence above.

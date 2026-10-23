@@ -4,6 +4,11 @@ Status: explicit construction geometry, relation-driven construction geometry, s
 
 This document records the construction-geometry layer for BLCAD. The implementation supports explicit construction points, lines, and planes; relation-driven construction points, lines, and planes; and semantic references to generated edges and vertices. Semantic generated references are saved as model intent by source feature plus semantic enum, not as raw OCCT topology handles.
 
+The replacement-shell creation task, preview/history boundaries and remaining editing/pick gaps are
+specified in `docs/gui-sketch-workbench-mvp7.md` (Block 136, 2026-10-23). Resolved construction
+points/lines/planes, derived axes and semantic-face workplanes now have stable selectable viewport
+presentations. These consume the resolvers below without changing construction persistence.
+
 ## Goal
 
 Construction geometry gives users stable helper geometry that is part of model intent.
