@@ -411,20 +411,31 @@
         "owner": 136,
         "status": "partial",
         "contract": "docs/gui-interactive-path-sweep-loft-mvp9.md",
-        "scope": "Ordered PathCurve authoring consumes existing supported geometry.",
+        "scope": "Ordered PathCurve authoring plus typed Sketch3D point creation/editing and shared-point line creation; full disposable downstream previews and atomic history.",
         "gaps": [
-          "Restore Sketch3D point/segment authoring and editing; PathCurve coverage does not prove Sketch3D authoring."
+          "Restore native Sketch3D point/segment picking and direct axis/plane-lock handles, distance/direction input and explicit planar-point projection; typed XYZ editing alone does not prove these interactions."
         ],
         "proofs": [
           {
             "filter": "[block136-spatial]",
             "source": "tests/gui/gui_shell_spatial_tools_tests.cpp"
+          },
+          {
+            "filter": "[block136-sketch3d]",
+            "source": "tests/gui/gui_shell_sketch_3d_tests.cpp"
+          },
+          {
+            "filter": "[shell-combined-sketch3d]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
           }
         ],
         "actions": [
-          "path_curve"
+          "path_curve",
+          "sketch_3d"
         ],
-        "widgets": []
+        "widgets": [
+          "blcad.shell.sketch3d_task"
+        ]
       }
     },
     {

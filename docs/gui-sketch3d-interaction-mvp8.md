@@ -57,3 +57,47 @@ GUI/headless equivalence, exact undo/redo, atomicity, high-DPI mapping, and meas
 performance in `docs/interactive-sketcher-mvp8-acceptance.md`. Direct handles for arc/spline/helix
 parameters and any variational 3D constraint solving remain bounded later extensions and are not
 implied by Block 120. Block 122 begins Interactive Modeling MVP-9.
+
+
+## Replacement shell: typed point/line editor — Block 136, 2026-10-23
+
+The model ribbon's **3D-Skizze** action (`blcad.action.sketch_3d`) creates a spatial sketch.
+Double-clicking its browser node reopens the same sketch. The owned `ShellSketch3DTools` task
+(`sketch3d.edit`, dock `blcad.shell.sketch3d_task`) offers model-space XYZ values in millimetres,
+a new/existing point selector and start/end selectors for new lines between shared local points.
+IDs are allocated across the complete entity namespace. Moving a selected point edits all curves
+that reference it; existing arc, spline, polyline, helix and guide intent remains in the candidate.
+This surface does not offer curve deletion or endpoint-reference rebinding.
+
+**Punkt übernehmen** and **Linie ergänzen** stage changes locally; they do not dirty the document,
+create history or save intent. Several local changes form one Apply transaction. Pending numeric
+point edits must be staged or discarded by reselecting a point before Preview/Apply. Numeric inputs
+accept signed values within ±1e9 mm with nine decimal places. Unedited points and curves retain
+original precision and bindings. Editing a parameter-driven point requires the explicit checkbox
+**Parameterbindungen durch XYZ-Werte ersetzen**; that accepted edit replaces all three coordinates
+with explicit values. No parameter is deleted.
+
+Preview commits into a disposable copy of the entire value session, using normal catalog validation
+and complete Geometry recompute. It presents the candidate Sketch3D, paths and solid/surface outputs.
+Apply repeats validation and publishes once. `PartDocument::update_sketch_3d` preserves identity,
+collection position and downstream dependency edges, refreshes incoming dependencies, rejects cycles
+and revalidates every consuming PathCurve's source identities, connectivity, closure and junctions.
+The existing JSON schema remains unchanged. Degenerate geometry or invalid downstream results reject
+publication; the local candidate remains correctable. Undo/Redo restores the complete transaction.
+
+The task requires a fresh Part, no planar Sketch editor, no repair mode and no foreign active task.
+Escape (including numeric children), dock close, history, saving/revision changes and document/context
+replacement discard it. Saving during preview writes committed intent only. Selection masks/scopes
+are not changed by this typed editor.
+
+Proofs: `[core][sketch-3d-update]`, `[block136-sketch3d]` and `[shell-combined-sketch3d]`.
+The combined scenario uses real Qt ribbon/popup/tree/numeric/button/file input to create four points,
+three connected lines, PathCurve and Sweep, reject an endpoint collapse, extend the swept solid,
+exercise four-step exact Undo/Redo, cancel another edit, reopen canonically and export STEP. It runs
+on both offscreen and native backends; native OCCT presentation and reachable controls at 1280×800
+remain required evidence.
+
+The family remains partial: native point/segment collection, direct axis/plane-lock handles,
+distance/direction entry and explicit planar-point projection still need replacement-shell UI proof.
+New arc/spline/helix parameter tools and variational 3D constraints remain later extensions of the
+historical bounded Core contract, rather than implied capabilities of this editor.

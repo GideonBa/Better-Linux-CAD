@@ -847,6 +847,44 @@ add_constraint_reference_dependency(DependencyGraph& graph, const Sketch& sketch
   return Result<std::size_t>::success(dependency_graph.node_count());
 }
 
+Result<std::size_t> validate_path_curve(const PartDocument& document, const PathCurve& path_curve) {
+  std::vector<std::pair<PathEndpoint, PathEndpoint>> endpoints;
+  endpoints.reserve(path_curve.segments().size());
+  for (const auto& segment : path_curve.segments()) {
+    auto resolved = path_segment_endpoints(document, segment);
+    if (resolved.has_error())
+      return Result<std::size_t>::failure(resolved.error());
+    endpoints.push_back(std::move(resolved.value()));
+  }
+  for (std::size_t index = 1; index < endpoints.size(); ++index)
+    if (!path_endpoints_connect(endpoints[index - 1U].second, endpoints[index].first,
+                                path_curve.connection_tolerance_mm()))
+      return Result<std::size_t>::failure(Error::validation(
+          path_curve.id().value(), "path segments must be ordered and connected within tolerance"));
+  if (path_curve.closure() == PathClosure::Closed &&
+      !path_endpoints_connect(endpoints.back().second, endpoints.front().first,
+                              path_curve.connection_tolerance_mm()))
+    return Result<std::size_t>::failure(Error::validation(
+        path_curve.id().value(), "closed path endpoints must connect within tolerance"));
+  std::vector<PathEndpoint> junctions;
+  junctions.reserve(endpoints.size() + 1U);
+  junctions.push_back(endpoints.front().first);
+  for (const auto& endpoint : endpoints)
+    junctions.push_back(endpoint.second);
+  for (std::size_t right = 1U; right < junctions.size(); ++right)
+    for (std::size_t left = 0U; left < right; ++left) {
+      const bool permitted_closed_seam = path_curve.closure() == PathClosure::Closed &&
+                                         left == 0U && right + 1U == junctions.size();
+      if (!permitted_closed_seam && path_endpoints_connect(junctions[left], junctions[right],
+                                                           path_curve.connection_tolerance_mm()))
+        return Result<std::size_t>::failure(Error::validation(
+            path_curve.id().value(),
+            "path curve must not contain branch points or repeated internal junctions"));
+    }
+
+  return Result<std::size_t>::success(endpoints.size());
+}
+
 } // namespace
 
 Result<PartDocument> PartDocument::create(DocumentId id, std::string name) {
@@ -1478,6 +1516,29 @@ Result<std::size_t> PartDocument::add_sketch_3d(Sketch3D sketch) {
   return Result<std::size_t>::success(sketches_3d_.size() - 1U);
 }
 
+Result<std::size_t> PartDocument::update_sketch_3d(Sketch3D sketch) {
+  if (!find_sketch_3d(sketch.id()))
+    return Result<std::size_t>::failure(
+        Error::validation(sketch.id().value(), "3D sketch to update must exist in part document"));
+  const auto id = sketch.id();
+  PartDocument candidate = *this;
+  auto updated = candidate.update_construction_record(
+      &PartDocument::sketches_3d_, std::move(sketch), &PartDocument::add_sketch_3d);
+  if (!updated)
+    return updated;
+  for (const auto& path : candidate.path_curves()) {
+    const auto& segments = path.segments();
+    if (std::any_of(segments.begin(), segments.end(),
+                    [&](const auto& segment) { return segment.sketch_3d() == id; })) {
+      auto valid = validate_path_curve(candidate, path);
+      if (!valid)
+        return valid;
+    }
+  }
+  *this = std::move(candidate);
+  return updated;
+}
+
 Result<std::size_t> PartDocument::remove_sketch_3d(Sketch3DId id) {
   if (id.empty())
     return Result<std::size_t>::failure(
@@ -1507,39 +1568,9 @@ Result<std::size_t> PartDocument::add_path_curve(PathCurve path_curve) {
   if (has_path_curve_id(path_curve.id()))
     return Result<std::size_t>::failure(
         Error::validation(path_curve.id().value(), "path curve id must be unique"));
-  std::vector<std::pair<PathEndpoint, PathEndpoint>> endpoints;
-  endpoints.reserve(path_curve.segments().size());
-  for (const auto& segment : path_curve.segments()) {
-    auto resolved = path_segment_endpoints(*this, segment);
-    if (resolved.has_error())
-      return Result<std::size_t>::failure(resolved.error());
-    endpoints.push_back(std::move(resolved.value()));
-  }
-  for (std::size_t index = 1; index < endpoints.size(); ++index)
-    if (!path_endpoints_connect(endpoints[index - 1U].second, endpoints[index].first,
-                                path_curve.connection_tolerance_mm()))
-      return Result<std::size_t>::failure(Error::validation(
-          path_curve.id().value(), "path segments must be ordered and connected within tolerance"));
-  if (path_curve.closure() == PathClosure::Closed &&
-      !path_endpoints_connect(endpoints.back().second, endpoints.front().first,
-                              path_curve.connection_tolerance_mm()))
-    return Result<std::size_t>::failure(Error::validation(
-        path_curve.id().value(), "closed path endpoints must connect within tolerance"));
-  std::vector<PathEndpoint> junctions;
-  junctions.reserve(endpoints.size() + 1U);
-  junctions.push_back(endpoints.front().first);
-  for (const auto& endpoint : endpoints)
-    junctions.push_back(endpoint.second);
-  for (std::size_t right = 1U; right < junctions.size(); ++right)
-    for (std::size_t left = 0U; left < right; ++left) {
-      const bool permitted_closed_seam = path_curve.closure() == PathClosure::Closed &&
-                                         left == 0U && right + 1U == junctions.size();
-      if (!permitted_closed_seam && path_endpoints_connect(junctions[left], junctions[right],
-                                                           path_curve.connection_tolerance_mm()))
-        return Result<std::size_t>::failure(Error::validation(
-            path_curve.id().value(),
-            "path curve must not contain branch points or repeated internal junctions"));
-    }
+  auto valid = validate_path_curve(*this, path_curve);
+  if (!valid)
+    return valid;
 
   auto graph = dependency_graph_;
   auto node = graph.add_node(path_curve.id().value());

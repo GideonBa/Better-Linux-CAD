@@ -220,3 +220,83 @@ TEST_CASE("Block 120 projects a planar Sketch point with explicit source intent"
   CHECK(projected.value().projected_point->local_point == SketchEntityId("point.projected"));
   REQUIRE(projected.value().sketch.find_point(SketchEntityId("point.projected")) != nullptr);
 }
+
+TEST_CASE("Sketch3D updates retain ordered records path identities and recompute dependencies",
+          "[core][sketch-3d-update]") {
+  auto document = PartDocument::create(DocumentId("part.update"), "Update").value();
+  REQUIRE(document.add_parameter(length_parameter("path.x", 10)));
+  REQUIRE(document.add_parameter(length_parameter("path.z", 5)));
+  auto original = populated_sketch();
+  REQUIRE(original.add_point(parameter_point("driven")));
+  REQUIRE(document.add_sketch_3d(original));
+  REQUIRE(document.add_sketch_3d(Sketch3D::create(Sketch3DId("other"), "Other").value()));
+  auto segment =
+      PathSegmentReference::create_sketch_3d(original.id(), SketchEntityId("polyline.path"),
+                                             Sketch3DPathCurveKind::Polyline)
+          .value();
+  REQUIRE(document.add_path_curve(PathCurve::create(PathCurveId("path"), "Path", {segment},
+                                                    PathClosure::Open,
+                                                    PathOrientationRule::MinimumTwist)
+                                      .value()));
+  document.mark_all_clean();
+  auto moved =
+      Sketch3DInteractionService::move_point(original, SketchEntityId("driven"), {1, 2, 3});
+  REQUIRE(moved);
+  REQUIRE(document.update_sketch_3d(moved.value().sketch));
+  CHECK(document.sketches_3d()[0].id() == original.id());
+  CHECK(document.sketches_3d()[1].id() == Sketch3DId("other"));
+  CHECK(document.dependency_graph().has_dependency("sketch3d.path", "path"));
+  CHECK_FALSE(document.dependency_graph().has_dependency("path.x", "sketch3d.path"));
+  CHECK_FALSE(document.dependency_graph().has_dependency("path.z", "sketch3d.path"));
+  auto plan = document.create_recompute_plan().value();
+  CHECK(std::any_of(plan.steps().begin(), plan.steps().end(),
+                    [](const RecomputeStep& step) { return step.node_id == "path"; }));
+  const auto json = serialize_part_document_to_json(document).value();
+  auto restored = deserialize_part_document_from_json(json);
+  REQUIRE(restored);
+  CHECK(serialize_part_document_to_json(restored.value()).value() == json);
+}
+
+TEST_CASE("Sketch3D updates reject invalid sources and broken dependent paths atomically",
+          "[core][sketch-3d-update]") {
+  auto document = PartDocument::create(DocumentId("part.update"), "Update").value();
+  auto original = populated_sketch();
+  // A separate endpoint with the same initial position tests geometric connectivity,
+  // rather than relying on a shared point identity at the junction.
+  REQUIRE(original.add_point(point("second.start", 10, 0, 5)));
+  REQUIRE(original.add_line(SketchLine3D::create(SketchEntityId("line.bc"),
+                                                 SketchEntityId("second.start"),
+                                                 SketchEntityId("point.c"))
+                                .value()));
+  REQUIRE(document.add_sketch_3d(original));
+  std::vector<PathSegmentReference> segments;
+  for (const char* id : {"line.ab", "line.bc"})
+    segments.push_back(PathSegmentReference::create_sketch_3d(original.id(), SketchEntityId(id),
+                                                              Sketch3DPathCurveKind::Line)
+                           .value());
+  REQUIRE(document.add_path_curve(PathCurve::create(PathCurveId("path"), "Path", segments,
+                                                    PathClosure::Open,
+                                                    PathOrientationRule::MinimumTwist)
+                                      .value()));
+  const auto before = serialize_part_document_to_json(document).value();
+  SECTION("disconnected junction") {
+    auto moved =
+        Sketch3DInteractionService::move_point(original, SketchEntityId("point.b"), {11, 0, 5});
+    REQUIRE(moved);
+    CHECK_FALSE(document.update_sketch_3d(moved.value().sketch));
+  }
+  SECTION("removed referenced segment") {
+    REQUIRE(original.remove_line(SketchEntityId("line.ab")));
+    CHECK_FALSE(document.update_sketch_3d(original));
+  }
+  SECTION("missing coordinate parameter") {
+    REQUIRE(original.add_point(parameter_point("missing.parameter")));
+    CHECK_FALSE(document.update_sketch_3d(original));
+  }
+  SECTION("unknown sketch identity") {
+    CHECK_FALSE(
+        document.update_sketch_3d(Sketch3D::create(Sketch3DId("unknown"), "Unknown").value()));
+  }
+  CHECK(serialize_part_document_to_json(document).value() == before);
+  CHECK(document.dependency_graph().has_dependency("sketch3d.path", "path"));
+}

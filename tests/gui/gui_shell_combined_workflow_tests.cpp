@@ -9,6 +9,7 @@
 #include "blcad/gui/shell/shell_inspect_tools.hpp"
 #include "blcad/gui/shell/shell_measure_tools.hpp"
 #include "blcad/gui/shell/shell_ribbon.hpp"
+#include "blcad/gui/shell/shell_sketch_3d_tools.hpp"
 #include "blcad/gui/shell/shell_sketch_tools.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
 
@@ -22,6 +23,7 @@
 #include <QDialog>
 #include <QDir>
 #include <QDoubleSpinBox>
+#include <QEventLoop>
 #include <QFile>
 #include <QFileDialog>
 #include <QInputDialog>
@@ -92,6 +94,23 @@ public:
     QCoreApplication::sendPostedEvents(nullptr, QEvent::MetaCall);
     qApp->processEvents();
   }
+  bool wait_for_ui(const std::function<bool()>& ready) {
+    if (!ready()) {
+      QEventLoop transition;
+      QTimer poll;
+      QTimer deadline;
+      deadline.setSingleShot(true);
+      QObject::connect(&poll, &QTimer::timeout, &transition, [&] {
+        if (ready())
+          transition.quit();
+      });
+      QObject::connect(&deadline, &QTimer::timeout, &transition, &QEventLoop::quit);
+      poll.start(5);
+      deadline.start(2000);
+      transition.exec();
+    }
+    return ready();
+  }
   void reveal(QWidget& control) {
     for (auto* ancestor = control.parentWidget(); ancestor; ancestor = ancestor->parentWidget())
       if (auto* scroll = qobject_cast<QScrollArea*>(ancestor))
@@ -151,22 +170,45 @@ public:
     REQUIRE(row >= 0);
     REQUIRE(row < control.count());
     reveal(control);
+    REQUIRE(control.isEnabled());
+    const bool native = QApplication::platformName() == "xcb";
+    if (native) {
+      // Synthetic Qt clicks do not activate the desktop window like a real
+      // mouse click. Establish native focus before asking it to grab a popup.
+      window.raise();
+      window.activateWindow();
+      QGuiApplication::sync();
+      flush();
+      REQUIRE(wait_for_ui([&] { return window.isActiveWindow(); }));
+      QCursor::setPos(control.mapToGlobal(control.rect().center()));
+      QGuiApplication::sync();
+      flush();
+    }
     control.showPopup();
+    if (native)
+      QGuiApplication::sync();
     flush();
     auto* view = control.view();
+    INFO("Main window active: " << window.isActiveWindow());
+    INFO("Combo visible: " << control.isVisible());
+    INFO("Combo animation: " << QApplication::isEffectEnabled(Qt::UI_AnimateCombo));
+    REQUIRE(wait_for_ui([&] { return view->isVisible(); }));
     const auto index = control.model()->index(row, control.modelColumn());
     view->scrollTo(index, QAbstractItemView::PositionAtCenter);
     flush();
     const auto rectangle = view->visualRect(index);
     REQUIRE(view->viewport()->rect().contains(rectangle.center()));
-    if (QApplication::platformName() == "xcb") {
+    if (native) {
       // Native popup tracking also consults the desktop pointer. Keep it at
       // the same row as the synthetic events, including after earlier tests.
       const auto global = view->viewport()->mapToGlobal(rectangle.center());
       QCursor::setPos(global);
+      QGuiApplication::sync();
       flush();
       REQUIRE(QCursor::pos() == global);
     }
+    REQUIRE(view->isVisible());
+    REQUIRE(view->indexAt(rectangle.center()) == index);
     // A real popup selection first moves over the scrolled row. Publish the
     // hover before clicking so native menu selection follows the visible item.
     QMouseEvent move(QEvent::MouseMove, rectangle.center(),
@@ -174,6 +216,7 @@ public:
                      Qt::NoModifier);
     QApplication::sendEvent(view->viewport(), &move);
     flush();
+    REQUIRE(view->currentIndex() == index);
     click_at(*view->viewport(), rectangle.center());
     REQUIRE(control.currentIndex() == row);
   }
@@ -1241,6 +1284,115 @@ TEST_CASE("Combined UI construction grips rotate a workplane and move its downst
   ui.file("export_part_step", step);
   CHECK(ui.bytes(step).contains("ISO-10303-21"));
   CHECK(ui.bytes(saved) == bytes);
+  CHECK(ui.snapshot() == edited);
+  ui.idle();
+}
+
+TEST_CASE("Combined UI creates a spatial chain sweeps it edits endpoints rejects collapse and "
+          "restores history",
+          "[gui][integration][shell-combined-workflow][shell-combined-sketch3d]") {
+  WorkflowUi ui;
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  ui.new_document("Spatial chain workflow");
+  const auto profile = ui.rectangle("datum.xy", {-2, -2}, {2, 2});
+  const auto initial = ui.snapshot();
+  ui.command("sketch_3d");
+  const auto coordinate = [&](const char* axis, double value) {
+    auto& spin = ui.widget<QDoubleSpinBox>(QStringLiteral("blcad.sketch3d.") + axis);
+    auto* editor = spin.findChild<QLineEdit*>();
+    REQUIRE(editor);
+    ui.text(*editor, QString::number(value));
+  };
+  auto& points = ui.widget<QComboBox>("blcad.sketch3d.point");
+  for (int index = 0; index < 4; ++index) {
+    ui.choose(points, 0);
+    coordinate("x", 0);
+    coordinate("y", 0);
+    coordinate("z", index * 10);
+    ui.button("blcad.sketch3d.stage_point");
+  }
+  for (int index = 1; index <= 3; ++index) {
+    ui.data(ui.widget<QComboBox>("blcad.sketch3d.start"), "point." + QString::number(index));
+    ui.data(ui.widget<QComboBox>("blcad.sketch3d.end"), "point." + QString::number(index + 1));
+    ui.button("blcad.sketch3d.stage_line");
+  }
+  ui.button("blcad.sketch3d.preview");
+  REQUIRE(ui.window.viewport().feature_preview_active());
+  CHECK(ui.snapshot() == initial);
+  ui.command("fit", 2);
+  ui.capture("sketch3d-chain-preview");
+  ui.button("blcad.sketch3d.apply");
+  const auto spatial = ui.window.session().part_document()->sketches_3d().back().id();
+  const auto created = ui.snapshot();
+  ui.command("path_curve");
+  for (int index = 1; index <= 3; ++index) {
+    auto& source = ui.widget<QComboBox>("blcad.spatial.source");
+    ui.choose(source,
+              source.findText("3D-Skizze 1 / line." + QString::number(index), Qt::MatchStartsWith));
+    ui.button("blcad.spatial.add");
+  }
+  ui.button("blcad.feature.apply");
+  const auto path = ui.window.session().part_document()->path_curves().back().id();
+  const auto with_path = ui.snapshot();
+  ui.command("sweep");
+  auto& source = ui.widget<QComboBox>("blcad.spatial.source");
+  ui.choose(source,
+            source.findText(QString::fromStdString(
+                                ui.window.session().part_document()->find_sketch(profile)->name()) +
+                                " /",
+                            Qt::MatchStartsWith));
+  ui.data(ui.widget<QComboBox>("blcad.spatial.path"), QString::fromStdString(path.value()));
+  ui.button("blcad.feature.apply");
+  const auto body = ui.window.session().part_document()->bodies().back().id();
+  CHECK(ui.summary(body).solid_count == 1);
+  CHECK(ui.summary(body).volume_mm3 == Approx(480).margin(1e-6));
+  const auto swept = ui.snapshot();
+  ui.tree(spatial.value(), true);
+  REQUIRE(ui.window.sketch_3d_tools().active());
+  ui.data(points, "point.4");
+  coordinate("z", 20);
+  ui.button("blcad.sketch3d.stage_point");
+  ui.button("blcad.sketch3d.preview");
+  CHECK_FALSE(ui.window.viewport().feature_preview_active());
+  CHECK_FALSE(ui.widget<QPushButton>("blcad.sketch3d.apply").isEnabled());
+  CHECK(ui.snapshot() == swept);
+  coordinate("z", 40);
+  ui.button("blcad.sketch3d.stage_point");
+  ui.button("blcad.sketch3d.preview");
+  REQUIRE(ui.window.viewport().feature_preview_active());
+  CHECK(ui.window.viewport().feature_preview_replaces("body/" + body.value()));
+  CHECK(ui.snapshot() == swept);
+  ui.command("fit", 2);
+  ui.capture("sketch3d-downstream-sweep-preview");
+  ui.button("blcad.sketch3d.apply");
+  const auto edited = ui.snapshot();
+  CHECK(ui.summary(body).volume_mm3 == Approx(640).margin(1e-6));
+  CHECK(ui.bounds(body).maximum.z == Approx(40).margin(1e-5));
+  CHECK(ui.window.session().part_document()->path_curves().back().segments().back().entity() ==
+        SketchEntityId("line.3"));
+  for (const auto& expected : {swept, with_path, created, initial}) {
+    ui.command("undo");
+    CHECK(ui.snapshot() == expected);
+  }
+  for (int index = 0; index < 4; ++index)
+    ui.command("redo");
+  CHECK(ui.snapshot() == edited);
+  CHECK(ui.summary(body).volume_mm3 == Approx(640).margin(1e-6));
+  ui.tree(spatial.value(), true);
+  ui.data(points, "point.2");
+  coordinate("x", 3);
+  ui.button("blcad.sketch3d.stage_point");
+  ui.key(ui.widget<QDoubleSpinBox>("blcad.sketch3d.x"), Qt::Key_Escape);
+  CHECK(ui.snapshot() == edited);
+  ui.idle();
+  const auto saved = directory.filePath("spatial.blcad");
+  ui.roundtrip(saved);
+  const auto source_bytes = ui.bytes(saved);
+  const auto step = directory.filePath("spatial.step");
+  ui.file("export_part_step", step);
+  CHECK(ui.bytes(step).contains("ISO-10303-21"));
+  CHECK(ui.bytes(saved) == source_bytes);
   CHECK(ui.snapshot() == edited);
   ui.idle();
 }

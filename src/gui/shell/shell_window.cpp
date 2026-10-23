@@ -13,6 +13,7 @@
 #include "blcad/gui/shell/shell_origin.hpp"
 #include "blcad/gui/shell/shell_reference_repair_tools.hpp"
 #include "blcad/gui/shell/shell_ribbon.hpp"
+#include "blcad/gui/shell/shell_sketch_3d_tools.hpp"
 #include "blcad/gui/shell/shell_sketch_diagnostics_tools.hpp"
 #include "blcad/gui/shell/shell_sketch_tools.hpp"
 
@@ -258,6 +259,7 @@ ShellWindow::ShellWindow() {
       std::make_unique<ShellReferenceRepairTools>(*this, *ribbon_, tab_model_);
   sketch_diagnostics_tools_ =
       std::make_unique<ShellSketchDiagnosticsTools>(*this, *ribbon_, tab_model_, tab_sketch_);
+  sketch_3d_tools_ = std::make_unique<ShellSketch3DTools>(*this, *ribbon_, tab_model_);
   statusBar()->showMessage(QStringLiteral("Bereit"));
   refresh();
 }
@@ -267,6 +269,7 @@ ShellWindow::~ShellWindow() {
   // still exist. QMainWindow/QWidget teardown otherwise destroys that drawable
   // before deleting the central viewport and its OCCT GL resources.
   viewport_->set_view_changed_callback({});
+  sketch_3d_tools_.reset();
   sketch_diagnostics_tools_.reset();
   reference_repair_tools_.reset();
   construction_tools_.reset();
@@ -617,6 +620,8 @@ bool ShellWindow::confirm_document_replacement() {
 }
 
 void ShellWindow::reset_document_interaction() {
+  if (sketch_3d_tools_)
+    sketch_3d_tools_->cancel();
   if (sketch_diagnostics_tools_)
     sketch_diagnostics_tools_->cancel();
   if (reference_repair_tools_)
@@ -898,6 +903,8 @@ bool ShellWindow::finish_active_sketch() {
 }
 
 bool ShellWindow::undo() {
+  if (sketch_3d_tools_)
+    sketch_3d_tools_->cancel();
   if (sketch_diagnostics_tools_)
     sketch_diagnostics_tools_->cancel();
   if (reference_repair_tools_)
@@ -932,6 +939,8 @@ bool ShellWindow::undo() {
 }
 
 bool ShellWindow::redo() {
+  if (sketch_3d_tools_)
+    sketch_3d_tools_->cancel();
   if (sketch_diagnostics_tools_)
     sketch_diagnostics_tools_->cancel();
   if (reference_repair_tools_)
@@ -1061,6 +1070,12 @@ void ShellWindow::handle_tree_activation(QTreeWidgetItem* item) {
       show_error(begun.error());
     return;
   }
+  if (session_.part_document()->find_sketch_3d(Sketch3DId(semantic_id))) {
+    auto begun = sketch_3d_tools_->begin_edit(Sketch3DId(semantic_id));
+    if (!begun)
+      show_error(begun.error());
+    return;
+  }
   const SketchId sketch_id(semantic_id);
   if (session_.part_document()->find_sketch(sketch_id) == nullptr)
     return;
@@ -1164,6 +1179,8 @@ void ShellWindow::refresh() {
 
   refresh_browser();
   refresh_properties();
+  if (sketch_3d_tools_)
+    sketch_3d_tools_->refresh();
   if (sketch_diagnostics_tools_)
     sketch_diagnostics_tools_->refresh();
   if (reference_repair_tools_)

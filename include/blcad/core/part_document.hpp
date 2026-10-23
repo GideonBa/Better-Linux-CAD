@@ -71,6 +71,8 @@ public:
   // all normal add_sketch validation is applied before this document changes.
   [[nodiscard]] Result<std::size_t> update_sketch(Sketch sketch);
   [[nodiscard]] Result<std::size_t> add_sketch_3d(Sketch3D sketch);
+  // Preserve identity/order and outgoing dependencies; revalidate paths before publication.
+  [[nodiscard]] Result<std::size_t> update_sketch_3d(Sketch3D sketch);
   [[nodiscard]] Result<std::size_t> remove_sketch_3d(Sketch3DId id);
   [[nodiscard]] Result<std::size_t> add_path_curve(PathCurve path_curve);
   [[nodiscard]] Result<std::size_t> remove_path_curve(PathCurveId id);
