@@ -1,5 +1,6 @@
 #include "blcad/geometry/workplane_resolver.hpp"
 #include "blcad/core/rectangular_extrude_profile.hpp"
+#include "blcad/geometry/construction_point_resolver.hpp"
 #include "blcad/geometry/shape_cache.hpp"
 
 #include <cmath>
@@ -184,14 +185,16 @@ resolve_relation_driven_construction_plane(const PartDocument& document,
         RectangularWorkplaneBounds{}});
   }
   if (plane.kind() == ConstructionPlaneKind::ThroughThreePoints) {
-    const ConstructionPoint* first = document.find_construction_point(relation.first_point());
-    const ConstructionPoint* second = document.find_construction_point(relation.second_point());
-    const ConstructionPoint* third = document.find_construction_point(relation.third_point());
-    if (first == nullptr || second == nullptr || third == nullptr)
-      return Result<ResolvedWorkplane>::failure(validation_error(
-          plane.id().value(), "plane through three points references must exist in part document"));
-    const Vector3 first_to_second = vector_between(first->position(), second->position());
-    const Vector3 first_to_third = vector_between(first->position(), third->position());
+    const ConstructionPointResolver points;
+    auto first = points.resolve(document, relation.first_point());
+    auto second = points.resolve(document, relation.second_point());
+    auto third = points.resolve(document, relation.third_point());
+    if (!first || !second || !third)
+      return Result<ResolvedWorkplane>::failure(!first    ? first.error()
+                                                : !second ? second.error()
+                                                          : third.error());
+    const Vector3 first_to_second = vector_between(first.value().position, second.value().position);
+    const Vector3 first_to_third = vector_between(first.value().position, third.value().position);
     const Vector3 normal_seed = cross(first_to_second, first_to_third);
     if (length(first_to_second) <= k_tolerance || length(normal_seed) <= k_tolerance)
       return Result<ResolvedWorkplane>::failure(validation_error(
@@ -200,19 +203,18 @@ resolve_relation_driven_construction_plane(const PartDocument& document,
     const Vector3 normal = normalize(normal_seed);
     const Vector3 y_axis = normalize(cross(normal, x_axis));
     return Result<ResolvedWorkplane>::success(
-        ResolvedWorkplane{plane.workplane_id(), first->position(), x_axis, y_axis, normal,
+        ResolvedWorkplane{plane.workplane_id(), first.value().position, x_axis, y_axis, normal,
                           RectangularWorkplaneBounds{}});
   }
   if (plane.kind() == ConstructionPlaneKind::ParallelToPlaneThroughPoint) {
     auto source = resolver.resolve(document, relation.source_plane());
     if (source.has_error())
       return Result<ResolvedWorkplane>::failure(source.error());
-    const ConstructionPoint* point = document.find_construction_point(relation.first_point());
-    if (point == nullptr)
-      return Result<ResolvedWorkplane>::failure(validation_error(
-          plane.id().value(), "plane parallel to plane through point reference point must exist"));
+    auto point = ConstructionPointResolver{}.resolve(document, relation.first_point());
+    if (!point)
+      return Result<ResolvedWorkplane>::failure(point.error());
     return Result<ResolvedWorkplane>::success(ResolvedWorkplane{
-        plane.workplane_id(), point->position(), source.value().x_axis, source.value().y_axis,
+        plane.workplane_id(), point.value().position, source.value().x_axis, source.value().y_axis,
         source.value().normal, RectangularWorkplaneBounds{}});
   }
   return Result<ResolvedWorkplane>::failure(

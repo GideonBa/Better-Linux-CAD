@@ -33,7 +33,12 @@ public:
     Plane,
     OffsetPlane,
     PlaneThroughPoints,
-    FacePlane
+    FacePlane,
+    PointOnEdge,
+    PointOnVertex,
+    ParallelLineThroughPoint,
+    ParallelEdgeThroughPoint,
+    ParallelPlaneThroughPoint
   };
 
   ShellConstructionTools(ShellWindow&, ShellRibbon&, int model_tab);
@@ -75,6 +80,8 @@ private:
   QComboBox* parameter_{};
   QDoubleSpinBox* offset_{};
   QComboBox* face_{};
+  QComboBox* edge_{};
+  QComboBox* vertex_{};
   QLabel* summary_{};
   QPushButton* apply_{};
   QAction* construction_action_{};

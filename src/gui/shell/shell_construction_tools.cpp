@@ -1,6 +1,7 @@
 #include "blcad/gui/shell/shell_construction_tools.hpp"
 
 #include "blcad/geometry/recompute_executor.hpp"
+#include "blcad/geometry/semantic_reference_evaluator.hpp"
 #include "blcad/geometry/viewport_scene.hpp"
 #include "blcad/gui/shell/shell_ribbon.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
@@ -42,6 +43,13 @@ Vector3 unit(Vector3 value) {
   return magnitude > 1e-12 ? Vector3{value.x / magnitude, value.y / magnitude, value.z / magnitude}
                            : Vector3{};
 }
+void select_generated(QComboBox* combo, const FeatureId& feature, int element) {
+  combo->setCurrentIndex(-1);
+  for (int i = 0; i < combo->count(); ++i)
+    if (combo->itemData(i).toString().toStdString() == feature.value() &&
+        combo->itemData(i, Qt::UserRole + 1).toInt() == element)
+      combo->setCurrentIndex(i);
+}
 } // namespace
 
 ShellConstructionTools::ShellConstructionTools(ShellWindow& window, ShellRibbon& ribbon,
@@ -77,12 +85,18 @@ ShellConstructionTools::ShellConstructionTools(ShellWindow& window, ShellRibbon&
   form_->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
   kind_ = new QComboBox(inputs);
   kind_->setObjectName("blcad.construction.kind");
+  kind_->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
+  kind_->setMinimumContentsLength(12);
   kind_->addItems(
       {QStringLiteral("Punkt (XYZ)"), QStringLiteral("Linie (Punkt und Richtung)"),
        QStringLiteral("Linie durch zwei Punkte"), QStringLiteral("Achse (Punkt und Richtung)"),
        QStringLiteral("Achse aus Konstruktionslinie"),
        QStringLiteral("Ebene (Ursprung und Richtungen)"), QStringLiteral("Versatzebene"),
-       QStringLiteral("Ebene durch drei Punkte"), QStringLiteral("Ebene auf Modellfläche")});
+       QStringLiteral("Ebene durch drei Punkte"), QStringLiteral("Ebene auf Modellfläche"),
+       QStringLiteral("Punkt auf Modellkante (Mitte)"), QStringLiteral("Punkt auf Modellecke"),
+       QStringLiteral("Linie parallel zu Linie durch Punkt"),
+       QStringLiteral("Linie parallel zu Modellkante durch Punkt"),
+       QStringLiteral("Ebene parallel zu Ebene durch Punkt")});
   form_->addRow(QStringLiteral("Typ"), kind_);
   name_ = new QLineEdit(inputs);
   name_->setObjectName("blcad.construction.name");
@@ -141,6 +155,8 @@ ShellConstructionTools::ShellConstructionTools(ShellWindow& window, ShellRibbon&
   offset_->setKeyboardTracking(false);
   form_->addRow(QStringLiteral("Versatz (+Normalrichtung)"), offset_);
   face_ = combo("face", QStringLiteral("Modellfläche"));
+  edge_ = combo("edge", QStringLiteral("Modellkante"));
+  vertex_ = combo("vertex", QStringLiteral("Modellecke"));
   layout->addLayout(form_);
   summary_ = new QLabel(inputs);
   summary_->setObjectName("blcad.construction.summary");
@@ -167,7 +183,8 @@ ShellConstructionTools::ShellConstructionTools(ShellWindow& window, ShellRibbon&
   for (auto* control : {static_cast<QWidget*>(kind_), static_cast<QWidget*>(name_),
                         static_cast<QWidget*>(apply_), static_cast<QWidget*>(cancel)})
     control->installEventFilter(this);
-  for (auto* combo_control : {plane_, line_, parameter_, face_, points_[0], points_[1], points_[2]})
+  for (auto* combo_control :
+       {plane_, line_, parameter_, face_, edge_, vertex_, points_[0], points_[1], points_[2]})
     combo_control->installEventFilter(this);
   for (const auto& controls : {origin_, direction_, y_direction_})
     for (auto* control : controls)
@@ -189,7 +206,8 @@ ShellConstructionTools::ShellConstructionTools(ShellWindow& window, ShellRibbon&
 
 void ShellConstructionTools::fill_references() {
   const auto& part = *window_.session().part_document();
-  for (auto* control : {plane_, line_, parameter_, face_, points_[0], points_[1], points_[2]})
+  for (auto* control :
+       {plane_, line_, parameter_, face_, edge_, vertex_, points_[0], points_[1], points_[2]})
     control->clear();
   const auto add = [](QComboBox* control, const auto& object) {
     control->addItem(QString::fromStdString(object.name()),
@@ -218,6 +236,34 @@ void ShellConstructionTools::fill_references() {
     if (parameter.type() == ParameterType::Length)
       add(parameter_, parameter);
   const geometry::WorkplaneResolver resolver;
+  const geometry::SemanticReferenceEvaluator evaluator;
+  const auto add_generated = [](QComboBox* combo, const Feature& feature, auto element) {
+    combo->addItem(QString::fromStdString(feature.name() + " / " + std::string(to_string(element))),
+                   QString::fromStdString(feature.id().value()));
+    combo->setItemData(combo->count() - 1, static_cast<int>(element), Qt::UserRole + 1);
+    combo->setItemData(
+        combo->count() - 1,
+        QString::fromStdString(feature.id().value() + " / " + std::string(to_string(element))),
+        Qt::ToolTipRole);
+  };
+  for (const auto& feature : part.features()) {
+    for (auto edge : {SemanticEdge::TopFront, SemanticEdge::TopBack, SemanticEdge::TopRight,
+                      SemanticEdge::TopLeft, SemanticEdge::BottomFront, SemanticEdge::BottomBack,
+                      SemanticEdge::BottomRight, SemanticEdge::BottomLeft, SemanticEdge::FrontRight,
+                      SemanticEdge::FrontLeft, SemanticEdge::BackRight, SemanticEdge::BackLeft}) {
+      auto reference = SemanticEdgeReference::create(feature.id(), edge);
+      if (reference && evaluator.resolve_edge(part, reference.value()))
+        add_generated(edge_, feature, edge);
+    }
+    for (auto vertex : {SemanticVertex::TopFrontRight, SemanticVertex::TopFrontLeft,
+                        SemanticVertex::TopBackRight, SemanticVertex::TopBackLeft,
+                        SemanticVertex::BottomFrontRight, SemanticVertex::BottomFrontLeft,
+                        SemanticVertex::BottomBackRight, SemanticVertex::BottomBackLeft}) {
+      auto reference = SemanticVertexReference::create(feature.id(), vertex);
+      if (reference && evaluator.resolve_vertex(part, reference.value()))
+        add_generated(vertex_, feature, vertex);
+    }
+  }
   for (const auto& feature : part.features())
     for (auto face : {SemanticFace::Top, SemanticFace::Bottom, SemanticFace::Right,
                       SemanticFace::Left, SemanticFace::Front, SemanticFace::Back}) {
@@ -282,22 +328,37 @@ Result<std::size_t> ShellConstructionTools::begin_edit(std::string_view object_i
   std::string source_line;
   const auto id = std::string(object_id);
   const auto position = [](Point3 value) { return Vector3{value.x, value.y, value.z}; };
-  const auto unsupported = [] {
-    return Result<std::size_t>::failure(
-        error("Dieser Konstruktionstyp kann noch nicht im Dialog bearbeitet werden"));
-  };
   if (const auto* point = part->find_construction_point(ConstructionPointId(id))) {
-    if (point->kind() != ConstructionPointKind::Explicit)
-      return unsupported();
-    kind = Kind::Point;
+    switch (point->kind()) {
+    case ConstructionPointKind::Explicit:
+      kind = Kind::Point;
+      break;
+    case ConstructionPointKind::OnGeneratedEdge:
+      kind = Kind::PointOnEdge;
+      break;
+    case ConstructionPointKind::OnGeneratedVertex:
+      kind = Kind::PointOnVertex;
+      break;
+    }
     name = point->name();
     origin = position(point->position());
     dependencies = point->parameter_dependencies();
+    relation = point->relation();
   } else if (const auto* line = part->find_construction_line(ConstructionLineId(id))) {
-    if (line->kind() != ConstructionLineKind::Explicit &&
-        line->kind() != ConstructionLineKind::ThroughTwoPoints)
-      return unsupported();
-    kind = line->kind() == ConstructionLineKind::Explicit ? Kind::Line : Kind::LineThroughPoints;
+    switch (line->kind()) {
+    case ConstructionLineKind::Explicit:
+      kind = Kind::Line;
+      break;
+    case ConstructionLineKind::ThroughTwoPoints:
+      kind = Kind::LineThroughPoints;
+      break;
+    case ConstructionLineKind::ParallelToLineThroughPoint:
+      kind = Kind::ParallelLineThroughPoint;
+      break;
+    case ConstructionLineKind::ParallelToGeneratedEdgeThroughPoint:
+      kind = Kind::ParallelEdgeThroughPoint;
+      break;
+    }
     name = line->name();
     origin = position(line->point());
     direction = line->direction();
@@ -321,8 +382,9 @@ Result<std::size_t> ShellConstructionTools::begin_edit(std::string_view object_i
     case ConstructionPlaneKind::ThroughThreePoints:
       kind = Kind::PlaneThroughPoints;
       break;
-    default:
-      return unsupported();
+    case ConstructionPlaneKind::ParallelToPlaneThroughPoint:
+      kind = Kind::ParallelPlaneThroughPoint;
+      break;
     }
     name = plane->name();
     origin = position(plane->origin());
@@ -366,16 +428,19 @@ Result<std::size_t> ShellConstructionTools::begin_edit(std::string_view object_i
     select(points_[0], relation->first_point().value());
     select(points_[1], relation->second_point().value());
     select(points_[2], relation->third_point().value());
+    select(line_, relation->source_line().value());
+    if (relation->generated_edge())
+      select_generated(edge_, relation->generated_edge()->source_feature(),
+                       static_cast<int>(relation->generated_edge()->edge()));
+    if (relation->generated_vertex())
+      select_generated(vertex_, relation->generated_vertex()->source_feature(),
+                       static_cast<int>(relation->generated_vertex()->vertex()));
   }
   if (kind == Kind::AxisFromLine)
     select(line_, source_line);
   if (kind == Kind::FacePlane) {
     const auto& reference = part->find_derived_workplane(DatumPlaneId(id))->face_reference();
-    face_->setCurrentIndex(-1);
-    for (int i = 0; i < face_->count(); ++i)
-      if (face_->itemData(i).toString().toStdString() == reference.source_feature().value() &&
-          face_->itemData(i, Qt::UserRole + 1).toInt() == static_cast<int>(reference.face()))
-        face_->setCurrentIndex(i);
+    select_generated(face_, reference.source_feature(), static_cast<int>(reference.face()));
   }
   dock_->setWindowTitle(QStringLiteral("Konstruktion bearbeiten"));
   updating_ = false;
@@ -411,11 +476,14 @@ void ShellConstructionTools::update_inputs() {
   show_row(origin_row_, explicit_position);
   show_row(direction_row_, kind == Kind::Line || kind == Kind::Axis || kind == Kind::Plane);
   show_row(y_direction_row_, kind == Kind::Plane);
-  show_row(plane_, kind == Kind::OffsetPlane);
-  show_row(line_, kind == Kind::AxisFromLine);
+  show_row(plane_, kind == Kind::OffsetPlane || kind == Kind::ParallelPlaneThroughPoint);
+  show_row(line_, kind == Kind::AxisFromLine || kind == Kind::ParallelLineThroughPoint);
   for (int i = 0; i < 3; ++i)
-    show_row(points_[i],
-             kind == Kind::PlaneThroughPoints || (kind == Kind::LineThroughPoints && i < 2));
+    show_row(points_[i], kind == Kind::PlaneThroughPoints ||
+                             (kind == Kind::LineThroughPoints && i < 2) ||
+                             (i == 0 && (kind == Kind::ParallelLineThroughPoint ||
+                                         kind == Kind::ParallelEdgeThroughPoint ||
+                                         kind == Kind::ParallelPlaneThroughPoint)));
   show_row(parameter_, kind == Kind::OffsetPlane);
   show_row(offset_, kind == Kind::OffsetPlane);
   offset_->setEnabled(parameter_->currentData().toString().isEmpty());
@@ -428,6 +496,8 @@ void ShellConstructionTools::update_inputs() {
       updating_ = previous;
     }
   show_row(face_, kind == Kind::FacePlane);
+  show_row(edge_, kind == Kind::PointOnEdge || kind == Kind::ParallelEdgeThroughPoint);
+  show_row(vertex_, kind == Kind::PointOnVertex);
 }
 
 Result<std::size_t> ShellConstructionTools::populate(PartDocument& part) const {
@@ -458,6 +528,76 @@ Result<std::size_t> ShellConstructionTools::populate(PartDocument& part) const {
   const auto direction = direction_unchanged ? original_values_[1] : unit(vector(direction_));
   const ConstructionRelationId relation_id(relation_id_);
   switch (kind) {
+  case Kind::PointOnEdge:
+  case Kind::PointOnVertex: {
+    const ConstructionPointId point(id_);
+    Result<ConstructionRelation> relation = [&] {
+      if (kind == Kind::PointOnEdge) {
+        auto reference = SemanticEdgeReference::create(
+            FeatureId(edge_->currentData().toString().toStdString()),
+            static_cast<SemanticEdge>(edge_->currentData(Qt::UserRole + 1).toInt()));
+        if (!reference)
+          return Result<ConstructionRelation>::failure(reference.error());
+        return ConstructionRelation::create_point_on_generated_edge(relation_id, point,
+                                                                    reference.value());
+      }
+      auto reference = SemanticVertexReference::create(
+          FeatureId(vertex_->currentData().toString().toStdString()),
+          static_cast<SemanticVertex>(vertex_->currentData(Qt::UserRole + 1).toInt()));
+      if (!reference)
+        return Result<ConstructionRelation>::failure(reference.error());
+      return ConstructionRelation::create_point_on_generated_vertex(relation_id, point,
+                                                                    reference.value());
+    }();
+    if (!relation)
+      return Result<std::size_t>::failure(relation.error());
+    auto object =
+        kind == Kind::PointOnEdge
+            ? ConstructionPoint::create_on_generated_edge(point, name, relation.value())
+            : ConstructionPoint::create_on_generated_vertex(point, name, relation.value());
+    return insert(part, std::move(object),
+                  editing_ ? &PartDocument::update_construction_point
+                           : &PartDocument::add_construction_point);
+  }
+  case Kind::ParallelLineThroughPoint:
+  case Kind::ParallelEdgeThroughPoint: {
+    const ConstructionPointId through(points_[0]->currentData().toString().toStdString());
+    auto relation = [&] {
+      if (kind == Kind::ParallelLineThroughPoint)
+        return ConstructionRelation::create_line_parallel_to_line_through_point(
+            relation_id, ConstructionLineId(line_->currentData().toString().toStdString()),
+            through);
+      auto reference = SemanticEdgeReference::create(
+          FeatureId(edge_->currentData().toString().toStdString()),
+          static_cast<SemanticEdge>(edge_->currentData(Qt::UserRole + 1).toInt()));
+      if (!reference)
+        return Result<ConstructionRelation>::failure(reference.error());
+      return ConstructionRelation::create_line_parallel_to_generated_edge_through_point(
+          relation_id, reference.value(), through);
+    }();
+    if (!relation)
+      return Result<std::size_t>::failure(relation.error());
+    auto object = kind == Kind::ParallelLineThroughPoint
+                      ? ConstructionLine::create_parallel_to_line_through_point(
+                            ConstructionLineId(id_), name, relation.value())
+                      : ConstructionLine::create_parallel_to_generated_edge_through_point(
+                            ConstructionLineId(id_), name, relation.value());
+    return insert(part, std::move(object),
+                  editing_ ? &PartDocument::update_construction_line
+                           : &PartDocument::add_construction_line);
+  }
+  case Kind::ParallelPlaneThroughPoint: {
+    auto relation = ConstructionRelation::create_plane_parallel_to_plane_through_point(
+        relation_id, DatumPlaneId(plane_->currentData().toString().toStdString()),
+        ConstructionPointId(points_[0]->currentData().toString().toStdString()));
+    if (!relation)
+      return Result<std::size_t>::failure(relation.error());
+    return insert(part,
+                  ConstructionPlane::create_parallel_to_plane_through_point(
+                      ConstructionPlaneId(id_), name, relation.value()),
+                  editing_ ? &PartDocument::update_construction_plane
+                           : &PartDocument::add_construction_plane);
+  }
   case Kind::Point:
     return insert(
         part,
@@ -592,12 +732,15 @@ Result<std::size_t> ShellConstructionTools::preview() {
   if (!scene)
     return Result<std::size_t>::failure(scene.error());
   const auto kind = static_cast<Kind>(kind_->currentIndex());
-  const std::string prefix = kind == Kind::Point ? "construction-point/"
-                             : kind == Kind::Line || kind == Kind::LineThroughPoints
-                                 ? "construction-line/"
-                             : kind == Kind::Axis || kind == Kind::AxisFromLine ? "datum-axis/"
-                             : kind == Kind::FacePlane ? "derived-workplane/"
-                                                       : "construction-plane/";
+  const std::string prefix =
+      kind == Kind::Point || kind == Kind::PointOnEdge || kind == Kind::PointOnVertex
+          ? "construction-point/"
+      : kind == Kind::Line || kind == Kind::LineThroughPoints ||
+              kind == Kind::ParallelLineThroughPoint || kind == Kind::ParallelEdgeThroughPoint
+          ? "construction-line/"
+      : kind == Kind::Axis || kind == Kind::AxisFromLine ? "datum-axis/"
+      : kind == Kind::FacePlane                          ? "derived-workplane/"
+                                                         : "construction-plane/";
   std::vector<geometry::GeometryShape> shapes;
   std::vector<std::string> replaced;
   auto affected = candidate.dependency_graph().transitive_dependents(id_);

@@ -4017,14 +4017,8 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
       if (added.has_error())
         return Result<PartDocument>::failure(added.error());
     }
-    for (const auto& point_json : root.value("construction_points", json::array())) {
-      auto point = construction_point_from_json(point_json);
-      if (point.has_error())
-        return Result<PartDocument>::failure(point.error());
-      auto added = document.value().add_construction_point(point.value());
-      if (added.has_error())
-        return Result<PartDocument>::failure(added.error());
-    }
+    const json construction_point_array = root.value("construction_points", json::array());
+    std::vector<bool> added_construction_point(construction_point_array.size(), false);
     const json construction_plane_array = root.value("construction_planes", json::array());
     std::vector<bool> added_construction_plane(construction_plane_array.size(), false);
     const auto& sketch_array = root.at("sketches");
@@ -4066,9 +4060,30 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
         added_construction_line(construction_line_array.size(), false);
     std::size_t remaining = sketch_array.size() + feature_array.size() +
                             derived_workplane_array.size() + construction_line_array.size() +
-                            construction_plane_array.size();
+                            construction_plane_array.size() + construction_point_array.size();
     while (remaining > 0U) {
       bool progress = false;
+      for (std::size_t index = 0; index < construction_point_array.size(); ++index) {
+        if (added_construction_point[index])
+          continue;
+        auto point = construction_point_from_json(construction_point_array.at(index));
+        if (!point)
+          return Result<PartDocument>::failure(point.error());
+        if (point.value().relation()) {
+          const auto& relation = *point.value().relation();
+          const auto source = relation.generated_edge()
+                                  ? relation.generated_edge()->source_feature()
+                                  : relation.generated_vertex()->source_feature();
+          if (!document.value().find_feature(source))
+            continue;
+        }
+        auto added = document.value().add_construction_point(std::move(point.value()));
+        if (!added)
+          return Result<PartDocument>::failure(added.error());
+        added_construction_point[index] = true;
+        --remaining;
+        progress = true;
+      }
       for (std::size_t index = 0; index < construction_plane_array.size(); ++index) {
         if (added_construction_plane[index])
           continue;
@@ -4078,7 +4093,8 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
         auto added = document.value().add_construction_plane(plane.value());
         if (added.has_error()) {
           const auto message = added.error().message();
-          if (message == "plane offset source plane must exist in part document" ||
+          if (message == "plane through three points references must exist in part document" ||
+              message == "plane offset source plane must exist in part document" ||
               message ==
                   "plane parallel to plane through point references must exist in part document")
             continue;
@@ -4153,10 +4169,15 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
         auto line = construction_line_from_json(construction_line_array.at(index));
         if (line.has_error())
           return Result<PartDocument>::failure(line.error());
+        if (line.value().relation() && line.value().relation()->generated_edge() &&
+            !document.value().find_feature(
+                line.value().relation()->generated_edge()->source_feature()))
+          continue;
         auto added = document.value().add_construction_line(line.value());
         if (added.has_error()) {
           const auto message = added.error().message();
-          if (message ==
+          if (message == "line through two points references must exist in part document" ||
+              message ==
                   "line parallel to line through point references must exist in part document" ||
               message == "line parallel to generated edge through point references must exist in "
                          "part document")
@@ -4430,6 +4451,7 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
         return positions.at(left.id().value()) < positions.at(right.id().value());
       });
     };
+    restore_order(document.value().construction_points_, construction_point_array);
     restore_order(document.value().construction_planes_, construction_plane_array);
     restore_order(document.value().construction_lines_, construction_line_array);
     restore_order(document.value().derived_workplanes_, derived_workplane_array);

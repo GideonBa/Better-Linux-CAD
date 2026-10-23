@@ -505,7 +505,12 @@ validate_semantic_reference_target(const PartDocument& document,
       return Result<std::size_t>::failure(Error::validation(
           object_id, "plane through three points references must exist in part document"));
     }
-    if (are_collinear(first->position(), second->position(), third->position())) {
+    // Relation-driven points carry placeholder coordinates. Only Geometry can
+    // test their evaluated positions; keep the early check for explicit input.
+    if (first->kind() == ConstructionPointKind::Explicit &&
+        second->kind() == ConstructionPointKind::Explicit &&
+        third->kind() == ConstructionPointKind::Explicit &&
+        are_collinear(first->position(), second->position(), third->position())) {
       return Result<std::size_t>::failure(
           Error::validation(object_id, "plane through three points requires non-collinear points"));
     }
@@ -530,13 +535,13 @@ validate_semantic_reference_target(const PartDocument& document,
       return Result<std::size_t>::failure(Error::validation(
           object_id, "point-on-generated-edge relation must carry a generated edge reference"));
     }
-    break;
+    return validate_generated_edge_reference(document, *relation.generated_edge(), object_id);
   case ConstructionRelationType::PointOnGeneratedVertex:
     if (!relation.generated_vertex().has_value()) {
       return Result<std::size_t>::failure(Error::validation(
           object_id, "point-on-generated-vertex relation must carry a generated vertex reference"));
     }
-    break;
+    return validate_generated_vertex_reference(document, *relation.generated_vertex(), object_id);
   case ConstructionRelationType::LineOnPlane:
     if (document.find_construction_line(relation.source_line()) == nullptr ||
         !document.has_workplane_id(relation.source_plane())) {

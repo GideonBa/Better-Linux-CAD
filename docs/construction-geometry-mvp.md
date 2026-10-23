@@ -253,9 +253,17 @@ They preserve IDs, vector positions and downstream graph edges, revalidate incom
 through the add path, reject cycles and invalidate consumers. Geometry validation remains a separate
 boundary. JSON records and schema are unchanged; canonical roundtrips retain edited definitions.
 
-The replacement shell supports in-place editing for its nine restored creation modes, including
-source/offset rebinding and downstream recompute previews. Exact bounds and remaining relation/native
+The replacement shell supports creation and in-place editing for fourteen modes, including
+generated edge/vertex points, parallel-through-point lines/planes, source/offset rebinding and
+downstream recompute previews. Exact bounds and remaining relation/native
 pick workflows live in `docs/gui-sketch-workbench-mvp7.md`; sequencing remains in `docs/mvp-plan.md`.
+
+Three-point and parallel-through-point workplanes resolve every defining point through
+`ConstructionPointResolver`, including semantic vertex/edge-midpoint definitions. Core validates
+source-feature existence/type and retains early collinearity rejection for entirely explicit input;
+Geometry validates evaluated positions and rejects degenerate frames. JSON loading defers generated
+points until their source features are available and restores authored point order. This adds no
+persistent fields and retains stable source feature/semantic element identities.
 
 ## Relationship to existing roadmap
 

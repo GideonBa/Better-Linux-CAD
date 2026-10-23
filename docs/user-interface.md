@@ -591,5 +591,11 @@ Body results; invalid downstream geometry or cyclic references disable Apply. **
 one reversible change; **Abbrechen** restores the model. Principal origin geometry stays fixed.
 For an offset plane, rebind an existing Length parameter or choose **Neuer Parameter** to create a
 new offset without changing the previous shared parameter. Existing offset values/formulas can also
-be edited through their properties. Generated-edge/vertex and parallel-through-point definitions
-and native reference picking/manipulators remain planned.
+be edited through their properties.
+
+Additional types create a point at a semantic edge midpoint or vertex, a line parallel to another
+line or model edge through a point, and a plane parallel to another plane through a point. Use the
+**Modellkante**, **Modellecke**, source-line/plane and point selectors. Only supported semantic model
+references are offered. Generated points also serve as inputs for two-point lines and three-point
+planes; downstream geometry follows later reference edits. Double-click these objects in the browser
+to edit their existing roles. Native reference picking and construction manipulators remain planned.
