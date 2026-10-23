@@ -66,7 +66,7 @@ template <typename T> T checked(Result<T> result) {
 }
 
 // Interaction helpers deliberately stop at Qt widgets and input events.
-// Eleven combined workflows author their inputs through the UI. The Planar
+// Twelve combined workflows author their inputs through the UI. The Planar
 // motion case imports the repository's seated Part definition through a file
 // dialog; the separately tagged mixed-path case opens preauthored Sketch/planes.
 // Neither path drives authoring controllers/workbenches directly.
@@ -1891,6 +1891,123 @@ TEST_CASE("Combined UI creates a spatial chain sweeps it edits endpoints rejects
   ui.file("export_part_step", step);
   CHECK(ui.bytes(step).contains("ISO-10303-21"));
   CHECK(ui.bytes(saved) == source_bytes);
+  CHECK(ui.snapshot() == edited);
+  ui.idle();
+}
+
+TEST_CASE(
+    "Combined UI copies planar endpoints into a spatial path and recovers a downstream Sweep edit",
+    "[gui][integration][shell-combined-workflow][shell-combined-projected-sweep]") {
+  WorkflowUi ui;
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  ui.new_document("Planar point copy workflow");
+  // Keep the hover beyond the origin-axis snap tolerance in the initial view.
+  const auto source = ui.rectangle("datum.xz", {0, 0}, {20, 30});
+  const auto profile = ui.rectangle("datum.xy", {-2, -2}, {2, 2});
+  const auto edge =
+      ui.window.session().part_document()->find_sketch(source)->line_segments().back().id();
+  const auto initial = ui.snapshot();
+  ui.command("sketch_3d");
+  auto& points = ui.widget<QComboBox>("blcad.sketch3d.point");
+  auto& sources = ui.widget<QComboBox>("blcad.sketch3d.projection_source");
+  for (auto kind :
+       {SketchReferenceTargetKind::LineSegmentEnd, SketchReferenceTargetKind::LineSegmentStart}) {
+    int row = -1;
+    for (int i = 1; i < sources.count(); ++i)
+      if (sources.itemData(i).toString() == QString::fromStdString(source.value()) &&
+          sources.itemData(i, Qt::UserRole + 1).toInt() == static_cast<int>(kind) &&
+          sources.itemData(i, Qt::UserRole + 2).toString() == QString::fromStdString(edge.value()))
+        row = i;
+    REQUIRE(row > 0);
+    ui.choose(sources, row);
+    auto& consent = ui.widget<QCheckBox>("blcad.sketch3d.projection_copy");
+    CHECK_FALSE(consent.isChecked());
+    const int count = points.count();
+    ui.button("blcad.sketch3d.stage_projection");
+    CHECK(points.count() == count);
+    CHECK(ui.snapshot() == initial);
+    ui.click(consent);
+    if (kind == SketchReferenceTargetKind::LineSegmentStart) {
+      ui.reveal(ui.widget<QPushButton>("blcad.sketch3d.stage_projection"));
+      ui.capture("sketch3d-planar-copy-controls");
+    }
+    ui.button("blcad.sketch3d.stage_projection");
+    CHECK(points.count() == count + 1);
+    CHECK_FALSE(consent.isChecked());
+    CHECK(ui.snapshot() == initial);
+  }
+  auto& receipt = ui.widget<QLabel>("blcad.sketch3d.projection_receipts");
+  CHECK(receipt.text().contains("point.1"));
+  CHECK(receipt.text().contains("point.2"));
+  CHECK(receipt.text().contains(QString::fromStdString(source.value())));
+  ui.reveal(receipt);
+  ui.capture("sketch3d-planar-copy-provenance");
+  ui.data(ui.widget<QComboBox>("blcad.sketch3d.placement_anchor"), "point.2");
+  ui.text(ui.widget<QLineEdit>("blcad.sketch3d.distance"), "10");
+  ui.text(ui.widget<QLineEdit>("blcad.sketch3d.azimuth"), "0");
+  ui.text(ui.widget<QLineEdit>("blcad.sketch3d.elevation"), "90");
+  ui.button("blcad.sketch3d.stage_direction");
+  for (int index = 1; index <= 2; ++index) {
+    ui.data(ui.widget<QComboBox>("blcad.sketch3d.start"), "point." + QString::number(index));
+    ui.data(ui.widget<QComboBox>("blcad.sketch3d.end"), "point." + QString::number(index + 1));
+    ui.button("blcad.sketch3d.stage_line");
+  }
+  ui.button("blcad.sketch3d.preview");
+  CHECK(ui.snapshot() == initial);
+  ui.button("blcad.sketch3d.apply");
+  const auto spatial = ui.window.session().part_document()->sketches_3d().back().id();
+  const auto created = ui.snapshot();
+  ui.command("path_curve");
+  for (int index = 1; index <= 2; ++index) {
+    auto& input = ui.widget<QComboBox>("blcad.spatial.source");
+    ui.choose(input,
+              input.findText("3D-Skizze 1 / line." + QString::number(index), Qt::MatchStartsWith));
+    ui.button("blcad.spatial.add");
+  }
+  ui.button("blcad.feature.apply");
+  const auto path = ui.window.session().part_document()->path_curves().back().id();
+  const auto with_path = ui.snapshot();
+  ui.command("sweep");
+  auto& input = ui.widget<QComboBox>("blcad.spatial.source");
+  ui.choose(input,
+            input.findText(QString::fromStdString(
+                               ui.window.session().part_document()->find_sketch(profile)->name()) +
+                               " /",
+                           Qt::MatchStartsWith));
+  ui.data(ui.widget<QComboBox>("blcad.spatial.path"), QString::fromStdString(path.value()));
+  ui.button("blcad.feature.apply");
+  const auto body = ui.window.session().part_document()->bodies().back().id();
+  CHECK(ui.summary(body).volume_mm3 == Approx(640).margin(1e-6));
+  const auto swept = ui.snapshot();
+  ui.tree(spatial.value(), true);
+  ui.data(points, "point.3");
+  auto& z = ui.widget<QDoubleSpinBox>("blcad.sketch3d.z");
+  ui.number(z, "30");
+  ui.button("blcad.sketch3d.stage_point");
+  ui.button("blcad.sketch3d.preview");
+  CHECK_FALSE(ui.window.viewport().feature_preview_active());
+  CHECK_FALSE(ui.widget<QPushButton>("blcad.sketch3d.apply").isEnabled());
+  CHECK(ui.snapshot() == swept);
+  ui.number(z, "50");
+  ui.button("blcad.sketch3d.stage_point");
+  ui.button("blcad.sketch3d.preview");
+  REQUIRE(ui.window.viewport().feature_preview_active());
+  ui.button("blcad.sketch3d.apply");
+  const auto edited = ui.snapshot();
+  CHECK(ui.summary(body).volume_mm3 == Approx(800).margin(1e-6));
+  CHECK(ui.bounds(body).maximum.z == Approx(50).margin(1e-6));
+  for (const auto& expected : {swept, with_path, created, initial}) {
+    ui.command("undo");
+    CHECK(ui.snapshot() == expected);
+  }
+  for (int index = 0; index < 4; ++index)
+    ui.command("redo");
+  CHECK(ui.snapshot() == edited);
+  ui.roundtrip(directory.filePath("planar-copy.blcad"));
+  const auto step = directory.filePath("planar-copy.step");
+  ui.file("export_part_step", step);
+  CHECK(ui.bytes(step).contains("ISO-10303-21"));
   CHECK(ui.snapshot() == edited);
   ui.idle();
 }

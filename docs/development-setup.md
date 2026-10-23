@@ -739,8 +739,8 @@ BLCAD_UI_CAPTURE_DIR=/tmp/blcad-combined-workflows QT_QPA_PLATFORM=xcb ./build/d
 QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-construction-manipulators],[block136-construction-picking],[shell-mixed-path-loft],[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
 ```
 
-`tests/gui/gui_shell_combined_workflow_tests.cpp` combines long interaction sequences in twelve
-scenarios, eleven with fully UI-authored inputs and one with an imported seated Part definition:
+`tests/gui/gui_shell_combined_workflow_tests.cpp` combines long interaction sequences in thirteen
+scenarios, twelve with fully UI-authored inputs and one with an imported seated Part definition:
 machining/edit/pattern/transform/Measure/STEP, Boolean/scale/Mirror with history branching,
 multi-workplane Loft section ordering/editing, authored-Part import/Assembly placement/Mate/solve/
 analysis/STEP, invalid/cancelled tasks plus dirty-file and document-switch recovery, and workplane
@@ -751,7 +751,9 @@ PathCurve/Sweep with endpoint editing and four-step history. Three further scena
 solid faces into a shell/solid/Boolean chain, edit a revolved source through circular pattern and
 rotation/scale consumers, and import the retained seated-Part example to author/drive all three
 coordinates of a bounded Planar joint with branching motion history, analysis and Assembly exports.
-The latter does not claim missing dedicated Hole-authoring coverage.
+The latter does not claim missing dedicated Hole-authoring coverage. A thirteenth workflow copies
+UI-authored planar endpoints into Sketch3D and drives a PathCurve/Sweep through rejected/corrected
+edits, history, canonical reopening and STEP export.
 
 The shared harness operates Qt ribbon buttons and popup menus, task widgets, browser clicks and
 double-clicks, viewport Sketch picks/hover, Escape and absolute/relative numeric coordinates, and
@@ -764,7 +766,7 @@ controllers/workbenches. Assertions observe canonical
 intent, resolved volumes/solid counts/bounds, source/result identities, task/preview/filter cleanup,
 multi-step Undo/Redo and redo-branch truncation. Save/Open/Save compares complete bytes, including GUI
 sidecars; exports preserve source bytes. Dialog automation has bounded watchdogs, and native input
-checks widget reachability at 1280×800. Both backends execute all twelve scenarios; these tests introduce
+checks widget reachability at 1280×800. Both backends execute all thirteen scenarios; these tests introduce
 no native-only skips. The native run is required to prove actual OCCT presentation.
 
 These bounded combined workflows extend the shell evidence. Remaining families, manipulator/input
@@ -995,7 +997,7 @@ now picks the endpoint and drives a locked Z grip through rejected collapse and 
 recompute, followed by exact history, canonical reopening and STEP. Include both new tags in the
 combined native filter above, inspect the 1280×800 capture and run application startup serially.
 Offscreen camera mapping uses a model span; native retains the fitted OCCT zoom factor. Contract,
-remaining projection work and block status:
+bounded projection-copy semantics and block status:
 `docs/gui-sketch3d-interaction-mvp8.md`, `docs/mvp-plan.md`.
 
 ## Anchored Sketch3D pointer placement
@@ -1016,7 +1018,7 @@ dimensions exact. Native Sketch3D fixtures await actual window activation throug
 event loop with a two-second deadline, retaining the active-window assertion before pointer input.
 Inspect `sketch3d-point-placement-hover.png` at 1280×800. Include the two new tags in
 the canonical native filter in `docs/gui-shell-acceptance-mvp9r.md` and run startup separately.
-Pointer depth/anchor/copy semantics and the remaining projection work:
+Pointer depth/anchor/copy semantics and the planar-copy contract:
 `docs/gui-sketch3d-interaction-mvp8.md`, `docs/mvp-plan.md`.
 
 ## Sketch3D distance/direction checks
@@ -1035,4 +1037,26 @@ placement, rejects an incomplete tuple, then authors PathCurve/Sweep and retains
 recovery, four-step history, canonical reopening and STEP export. Include the two new tags in the
 canonical native regression in `docs/gui-shell-acceptance-mvp9r.md`. Inspect
 `sketch3d-distance-direction-input.png` at 1280×800 and run startup separately, with builds and GUI
-executions serial. Planar-point projection remains next; Block 136 stays open.
+executions serial. The planar-point copy extension is documented below; Block 136 stays open.
+
+## Explicit planar-point copying into Sketch3D
+
+```bash
+cmake --build --preset dev-gui --target blcad_gui_tests blcad_app -j6
+./build/dev-gui/blcad_core_tests "[gui][sketch-3d-edit],[integration][sketch-3d-direct-manipulation],[core][sketch-3d-update]"
+./build/dev-gui/blcad_geometry_tests "[geometry][sketch-3d],[geometry][sketch-reference],[geometry][workplane]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[block136-sketch3d-projection],[shell-combined-projected-sweep],[block136-sketch3d-direction],[block136-sketch3d-placement],[block136-sketch3d-grips],[block136-sketch3d],[shell-combined-sketch3d],[integration][gui-feature-coverage]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-sketch3d-projection QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-sketch3d-projection],[shell-combined-projected-sweep]"
+```
+
+The same focused cases check four plane orientations, projected construction points, cached
+generated-face/semantic-vertex sources, copied precision, stable identities, per-copy consent,
+pending-input guards, gesture rollback, bounds, independence after source editing and canonical
+history/persistence/expiry. The thirteenth combined workflow authors both planar sources through
+actual Sketch input, copies endpoints and adds a direction point, then checks PathCurve/Sweep,
+failed/corrected edits, four-step history, canonical reopening and STEP. Its source rectangle hover
+stays beyond the origin-axis snap tolerance and source rows use observed stable entity identities.
+Inspect `sketch3d-planar-copy-controls.png` and `sketch3d-planar-copy-provenance.png` at 1280×800.
+Include both new tags in the canonical native filter in `docs/gui-shell-acceptance-mvp9r.md`.
+Builds, GUI runs and the separate startup smoke remain serial. Numeric/target/copy contracts live
+in `docs/gui-sketch3d-interaction-mvp8.md`; Block 136 and remaining work live in `docs/mvp-plan.md`.

@@ -1,6 +1,8 @@
 #include "blcad/gui/shell/shell_sketch_3d_tools.hpp"
 #include "blcad/core/sketch_3d_interaction.hpp"
+#include "blcad/geometry/sketch_reference_projector.hpp"
 #include "blcad/geometry/viewport_scene.hpp"
+#include "blcad/geometry/workplane_resolver.hpp"
 #include "blcad/gui/gui_viewport_manipulator.hpp"
 #include "blcad/gui/shell/shell_manipulator_overlay.hpp"
 #include "blcad/gui/shell/shell_ribbon.hpp"
@@ -22,6 +24,7 @@
 #include <QPushButton>
 #include <QScrollArea>
 #include <QSignalBlocker>
+#include <QStringList>
 #include <QVBoxLayout>
 #include <array>
 #include <numbers>
@@ -111,6 +114,16 @@ struct ShellSketch3DTools::Impl {
   QComboBox* lock{};
   QComboBox* placement_anchor{};
   std::array<QLineEdit*, 3> direction{};
+  QComboBox* projection_source{};
+  QCheckBox* projection_copy{};
+  QLabel* projection_info{};
+  QLabel* projection_receipts{};
+  struct PlanarSource {
+    SketchId sketch;
+    SketchReferenceTarget target;
+  };
+  std::vector<PlanarSource> planar_sources;
+  std::vector<Sketch3DProjectedPointIntent> copied_sources;
   QCheckBox* grips{};
   QLineEdit* numeric{};
   QWidget* overlay{};
@@ -468,6 +481,146 @@ struct ShellSketch3DTools::Impl {
     if (!anchor)
       return Result<Point3>::failure(error("Platzierungsanker neu auswählen."));
     return Result<Point3>::success(resolved_point(*anchor));
+  }
+  const PlanarSource* selected_projection() const {
+    const int row = projection_source->currentIndex() - 1;
+    return row >= 0 && static_cast<std::size_t>(row) < planar_sources.size() ? &planar_sources[row]
+                                                                             : nullptr;
+  }
+  QString source_description(const PlanarSource& source) const {
+    const auto role = source.target.kind() == SketchReferenceTargetKind::LineSegmentStart
+                          ? QStringLiteral("Start")
+                      : source.target.kind() == SketchReferenceTargetKind::LineSegmentEnd
+                          ? QStringLiteral("Ende")
+                          : QStringLiteral("Projizierter Punkt");
+    return text(source.sketch.value()) + " / " + text(source.target.entity().value()) + " / " +
+           role;
+  }
+  Result<Point3> resolve_projection(const PlanarSource& source) const {
+    const auto& part = *window.session().part_document();
+    const auto* sketch = part.find_sketch(source.sketch);
+    if (!sketch)
+      return Result<Point3>::failure(error("Quellskizze nicht mehr vorhanden. Befehl neu öffnen."));
+    const auto* cache = window.session().part_shape_cache();
+    const auto plane = cache
+                           ? geometry::WorkplaneResolver{}.resolve_for_sketch(part, *sketch, *cache)
+                           : geometry::WorkplaneResolver{}.resolve_for_sketch(part, *sketch);
+    if (!plane)
+      return Result<Point3>::failure(plane.error());
+    Point2 local{};
+    if (source.target.kind() == SketchReferenceTargetKind::ProjectedPoint) {
+      const auto* point = sketch->find_projected_point(source.target.entity());
+      if (!point)
+        return Result<Point3>::failure(error("Projizierter Quellpunkt nicht mehr vorhanden."));
+      const auto resolved =
+          cache ? geometry::SketchReferenceProjector{}.resolve_point(part, *sketch, *point, *cache)
+                : geometry::SketchReferenceProjector{}.resolve_point(part, *sketch, *point);
+      if (!resolved)
+        return Result<Point3>::failure(resolved.error());
+      local = resolved.value().position;
+    } else if (source.target.kind() == SketchReferenceTargetKind::LineSegmentStart ||
+               source.target.kind() == SketchReferenceTargetKind::LineSegmentEnd) {
+      const auto* line = sketch->find_line_segment(source.target.entity());
+      if (!line)
+        return Result<Point3>::failure(error("Quelllinie nicht mehr vorhanden."));
+      local = source.target.kind() == SketchReferenceTargetKind::LineSegmentStart ? line->start()
+                                                                                  : line->end();
+    } else
+      return Result<Point3>::failure(error("Quelle muss ein unterstützter Skizzenpunkt sein."));
+    const auto value = geometry::WorkplaneResolver{}.evaluate_point(plane.value(), local);
+    if (!manipulator_detail::finite(value) || std::abs(value.x) > 1e9 || std::abs(value.y) > 1e9 ||
+        std::abs(value.z) > 1e9)
+      return Result<Point3>::failure(error("Quellpunkt liegt außerhalb des XYZ-Bereichs ±1e9 mm."));
+    return Result<Point3>::success(value);
+  }
+  void update_projection_info() {
+    const auto* source = selected_projection();
+    if (!current() || !source) {
+      projection_info->setText(QStringLiteral(
+          "Quellpunkt wählen. Übernahme erzeugt eine unabhängige XYZ-Kopie ohne Verknüpfung."));
+      return;
+    }
+    const auto value = resolve_projection(*source);
+    projection_info->setText(
+        source_description(*source) + "\n" +
+        (value ? QStringLiteral("XYZ: %1, %2, %3 mm. Übernahme als unabhängige Kopie bestätigen.")
+                     .arg(value.value().x, 0, 'g', 15)
+                     .arg(value.value().y, 0, 'g', 15)
+                     .arg(value.value().z, 0, 'g', 15)
+               : text(value.error().message())));
+  }
+  void fill_projection_sources() {
+    QSignalBlocker source_blocker(projection_source), copy_blocker(projection_copy);
+    projection_source->clear();
+    projection_source->addItem(QStringLiteral("Quellpunkt wählen"));
+    projection_copy->setChecked(false);
+    planar_sources.clear();
+    copied_sources.clear();
+    projection_receipts->clear();
+    projection_receipts->hide();
+    for (const auto& sketch : window.session().part_document()->sketches()) {
+      const auto add = [&](SketchReferenceTarget target, const QString& role) {
+        projection_source->addItem(text(sketch.name()) + " / " + text(target.entity().value()) +
+                                       " / " + role,
+                                   text(sketch.id().value()));
+        const int row = projection_source->count() - 1;
+        projection_source->setItemData(row, static_cast<int>(target.kind()), Qt::UserRole + 1);
+        projection_source->setItemData(row, text(target.entity().value()), Qt::UserRole + 2);
+        planar_sources.push_back({sketch.id(), std::move(target)});
+      };
+      for (const auto& line : sketch.line_segments()) {
+        add(SketchReferenceTarget(SketchReferenceTargetKind::LineSegmentStart, line.id()),
+            QStringLiteral("Start"));
+        add(SketchReferenceTarget(SketchReferenceTargetKind::LineSegmentEnd, line.id()),
+            QStringLiteral("Ende"));
+      }
+      for (const auto& point : sketch.projected_points())
+        add(SketchReferenceTarget(SketchReferenceTargetKind::ProjectedPoint, point.id()),
+            QStringLiteral("Projizierter Punkt"));
+    }
+    projection_source->setCurrentIndex(0);
+    update_projection_info();
+  }
+  Result<std::size_t> stage_projection() {
+    if (!current() || drag || placement_pressed)
+      return Result<std::size_t>::failure(
+          error("Aktuelle 3D-Skizze öffnen und Zeigergeste beenden."));
+    for (auto* spin : coordinates)
+      spin->interpretText();
+    if (pending_point || has_direction_input())
+      return Result<std::size_t>::failure(
+          error("XYZ-/Richtungseingabe zuerst übernehmen oder verwerfen."));
+    const auto* source = selected_projection();
+    if (!source || !projection_copy->isChecked())
+      return Result<std::size_t>::failure(
+          error("Quellpunkt wählen und unabhängige XYZ-Kopie ausdrücklich bestätigen."));
+    const auto value = resolve_projection(*source);
+    if (!value)
+      return Result<std::size_t>::failure(value.error());
+    const auto id = next_entity(*draft, "point");
+    const auto p = value.value();
+    auto candidate = Sketch3DInteractionService::project_planar_point(
+        *draft, id, {p.x, p.y, p.z}, source->sketch, source->target);
+    if (!candidate)
+      return Result<std::size_t>::failure(candidate.error());
+    copied_sources.push_back(*candidate.value().projected_point);
+    draft = std::move(candidate.value().sketch);
+    changed = true;
+    fill_points(id);
+    {
+      QSignalBlocker blocker(projection_copy);
+      projection_copy->setChecked(false);
+    }
+    QStringList receipts;
+    for (const auto& copied : copied_sources)
+      receipts.push_back(text(copied.local_point.value()) + " ← " +
+                         source_description({copied.source_sketch, copied.source_target}));
+    projection_receipts->setText(QStringLiteral("Kopierherkunft (unabhängige XYZ-Werte):\n") +
+                                 receipts.join('\n'));
+    projection_receipts->show();
+    summary->setText(QStringLiteral("Punkt %1 aus %2 lokal kopiert. Gesamte Vorschau prüfen.")
+                         .arg(text(id.value()), source_description(*source)));
+    return Result<std::size_t>::success(draft->entity_count());
   }
   Result<std::size_t> stage_direction() {
     if (!current() || drag || placement_pressed)
@@ -886,10 +1039,24 @@ ShellSketch3DTools::ShellSketch3DTools(ShellWindow& window, ShellRibbon& ribbon,
       stage_button("stage_direction", QStringLiteral("Punkt aus Richtung ergänzen"));
   auto* clear_direction =
       stage_button("clear_direction", QStringLiteral("Richtungseingabe leeren"));
+  ui.projection_source = combo("projection_source", QStringLiteral("Planarer Quellpunkt"));
+  ui.projection_copy = new QCheckBox(QStringLiteral("Unabhängige XYZ-Kopie bestätigen"), inputs);
+  ui.projection_copy->setObjectName("blcad.sketch3d.projection_copy");
+  form->addRow(ui.projection_copy);
+  auto* stage_projection =
+      stage_button("stage_projection", QStringLiteral("Quellpunkt nach 3D kopieren"));
   ui.start = combo("start", QStringLiteral("Linienstart"));
   ui.end = combo("end", QStringLiteral("Linienende"));
   auto* stage_line = stage_button("stage_line", QStringLiteral("Linie ergänzen"));
   column->addLayout(form);
+  ui.projection_info = new QLabel(inputs);
+  ui.projection_info->setObjectName("blcad.sketch3d.projection_info");
+  ui.projection_info->setWordWrap(true);
+  column->addWidget(ui.projection_info);
+  ui.projection_receipts = new QLabel(inputs);
+  ui.projection_receipts->setObjectName("blcad.sketch3d.projection_receipts");
+  ui.projection_receipts->setWordWrap(true);
+  column->addWidget(ui.projection_receipts);
   auto* placement_hint = new QLabel(
       QStringLiteral(
           "Punkte platzieren: XYZ nutzt die Bildebene durch den Anker; Achsen/Ebenen nutzen "
@@ -934,6 +1101,18 @@ ShellSketch3DTools::ShellSketch3DTools(ShellWindow& window, ShellRibbon& ribbon,
   connect(stage_line, &QPushButton::clicked, this, [this, report] { report(impl_->stage_line()); });
   connect(stage_direction, &QPushButton::clicked, this,
           [this, report] { report(impl_->stage_direction()); });
+  connect(stage_projection, &QPushButton::clicked, this,
+          [this, report] { report(impl_->stage_projection()); });
+  connect(ui.projection_source, &QComboBox::currentIndexChanged, this, [this] {
+    impl_->cancel_drag();
+    impl_->cancel_placement();
+    impl_->projection_copy->setChecked(false);
+    impl_->update_projection_info();
+  });
+  connect(ui.projection_copy, &QCheckBox::toggled, this, [this] {
+    impl_->cancel_drag();
+    impl_->cancel_placement();
+  });
   connect(clear_direction, &QPushButton::clicked, this, [this] {
     if (impl_->current() && impl_->has_direction_input()) {
       impl_->reset_direction();
@@ -1022,6 +1201,7 @@ Result<std::size_t> ShellSketch3DTools::open(Sketch3D sketch, bool editing) {
   ui.title->setText(text(ui.draft->name()) + " / " + text(ui.draft->id().value()));
   ui.fill_points(editing && !ui.draft->points().empty() ? ui.draft->points().front().id()
                                                         : SketchEntityId{});
+  ui.fill_projection_sources();
   ui.dock->show();
   ui.dock->raise();
   ui.refresh_mapping();
@@ -1103,6 +1283,16 @@ void ShellSketch3DTools::cancel() {
   ui.cancel_placement();
   ui.draft.reset();
   ui.reset_direction();
+  ui.copied_sources.clear();
+  ui.planar_sources.clear();
+  {
+    QSignalBlocker source_blocker(ui.projection_source), copy_blocker(ui.projection_copy);
+    ui.projection_source->clear();
+    ui.projection_copy->setChecked(false);
+  }
+  ui.projection_info->clear();
+  ui.projection_receipts->clear();
+  ui.projection_receipts->hide();
   ui.layer.clear_handles();
   ui.numeric_invalid = false;
   ui.synchronize_overlay();

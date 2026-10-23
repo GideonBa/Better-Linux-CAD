@@ -867,6 +867,19 @@ workflow cover rejection/recovery, precise anchors, history, session expiry, reo
 Contract and verification: `docs/gui-sketch3d-interaction-mvp8.md`,
 `docs/gui-shell-acceptance-mvp9r.md`. Ten families remain restored and eight partial; Block 136 stays open.
 
+### Block 136 — Explicit planar-point copying into Sketch3D — 2026-10-23
+
+The spatial task now collects supported planar endpoints/projected points by stable Sketch/entity/
+target identity, resolves them through Geometry's current workplane/reference cache and stages
+explicit XYZ copies after per-point consent. Local source receipts make the independent-copy
+semantics reviewable; committed values retain no live source dependency. Pending numeric input,
+gesture rollback and session expiry preserve complete Preview/Apply authority. Six focused cases
+cover oriented/cached/projected sources and independence/history; a thirteenth combined UI workflow
+authors the planar sources, spatial chain and Sweep through rejection/recovery, history, reopen and
+STEP. Contracts/evidence: `docs/gui-sketch3d-interaction-mvp8.md`,
+`docs/gui-shell-acceptance-mvp9r.md`. Eleven bounded families are restored and seven remain partial.
+Block 136 stays open, with the numbered completion boundary unchanged at Block 135.
+
 ## Current next technical step — Block 136
 
 The current v3 coverage inventory records all eighteen accepted families, current shell proof sources,
@@ -874,10 +887,11 @@ reachable entry points and explicit remaining gaps. The machine check distinguis
 from closure readiness; historical controller proofs cannot close a shell gap. Acceptance contract:
 `docs/gui-shell-acceptance-mvp9r.md`, `[integration][gui-feature-coverage]` / `[gui][shell-coverage]`.
 
-Continue Sketch3D with planar-point projection and explicit source-association semantics. Anchored
-pointer placement, explicit distance/azimuth/elevation input, active-candidate point/line collection
-and direct point grips with axis/plane restrictions now extend typed XYZ point editing and
-shared-point line authoring.
+Continue with standalone parameter management, then dedicated Hole authoring and advanced extent
+editors. The bounded Sketch3D/PathCurve surface now includes typed/shared-point line editing, native
+collection, constrained grips, anchored pointer/direction placement and explicit planar-point copies.
+Live associative point projection and new arc/spline/helix parameter tools remain extensions of their
+existing bounded contracts.
 Explicit constraint-diagnostic suggestion controls cover the accepted bounded Core diagnostic/repair
 subset.
 The bounded repair-open path now supports failed-recompute Parts and missing face/point/line sources,

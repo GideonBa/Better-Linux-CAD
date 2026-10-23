@@ -193,7 +193,7 @@ The point/line contract and remaining native interaction gaps live in
 The spatial source editor also supports active-candidate point/line collection and direct point
 translation grips with axis/plane restrictions. The combined Sweep proof now selects the source
 endpoint through the viewport and moves its locked Z grip, retaining complete downstream validation,
-exact history and persistence. Contracts and remaining distance/projection work remain owned by
+exact history and persistence. Contracts and bounded planar-copy semantics remain owned by
 `docs/gui-sketch3d-interaction-mvp8.md`.
 
 The spatial source task additionally stages new points by anchored viewport placement. Its combined
@@ -204,5 +204,12 @@ contracts are documented in `docs/gui-sketch3d-interaction-mvp8.md`.
 The source task now also stages explicit distance/azimuth/elevation points relative to its anchor.
 The same combined Sweep proof mixes pointer placement with direction input, including incomplete
 tuple rejection/recovery, then retains downstream edits/history/reopen/export. Exact numeric and
-pending-input contracts live in `docs/gui-sketch3d-interaction-mvp8.md`; explicit planar projection
-remains planned.
+pending-input contracts live in `docs/gui-sketch3d-interaction-mvp8.md`.
+
+The shell additionally copies supported planar line endpoints/projected points into explicit local
+Sketch3D points with source selection, per-copy consent and visible transient provenance. Geometry
+resolves current model XYZ; committed points remain independent after source edits. The new actual-
+input `[shell-combined-projected-sweep]` workflow authors an XZ source and XY profile, copies two
+endpoints, adds a direction point and drives PathCurve/Sweep through rejected/corrected edits,
+history, canonical reopening and STEP. Exact target and copy semantics remain owned by
+`docs/gui-sketch3d-interaction-mvp8.md`.
