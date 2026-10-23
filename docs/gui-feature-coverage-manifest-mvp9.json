@@ -312,9 +312,9 @@
         "owner": 136,
         "status": "partial",
         "contract": "docs/gui-interactive-extrude-revolve-mvp9.md",
-        "scope": "Candidate-only Extrude/Revolve with native manipulation and selectable closed spline profiles; dedicated through-all single/bolt-circle cuts with local typed inputs, parameter bindings and complete atomic Preview/Apply.",
+        "scope": "Candidate-only Extrude/Revolve with native manipulation and selectable closed spline profiles; all seven Extrude extent modes with explicit semantic planar limits, four Body operations, reversed direction, a local second distance and taper; dedicated through-all single/bolt-circle cuts with typed inputs, parameter bindings and complete atomic Preview/Apply.",
         "gaps": [
-          "Audit and restore advanced extent/termination editors against the retained foundation API."
+          "Restore thin/open-profile and path Extrude controls, expanded Revolve extent/operation/axis controls and native limit-face collection against the retained foundation API."
         ],
         "proofs": [
           {
@@ -336,6 +336,14 @@
           {
             "filter": "[shell-combined-holes]",
             "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
+          },
+          {
+            "filter": "[block136-extrude-extents]",
+            "source": "tests/gui/gui_shell_extrude_extent_tests.cpp"
+          },
+          {
+            "filter": "[shell-combined-extrude-extents]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
           }
         ],
         "actions": [
@@ -344,7 +352,8 @@
           "hole"
         ],
         "widgets": [
-          "blcad.shell.hole_task"
+          "blcad.shell.hole_task",
+          "blcad.extrude.inputs"
         ]
       }
     },

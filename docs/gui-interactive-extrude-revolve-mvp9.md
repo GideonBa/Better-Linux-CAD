@@ -55,6 +55,42 @@ The extent arrow (`extrude.extent`, Linear), taper wheel (`extrude.taper`, Angul
 distance and thickness parameter values and adds the feature in one transaction, so undo reverts the
 parameter change and the feature together.
 
+## Replacement-shell extent editor — Block 136, 2026-10-24
+
+The existing Extrusion task now exposes all seven scalar/face termination modes, `NewBody`,
+`Join`, `Cut` and `Intersect`, a visible recomputed solid target, normal/opposite direction, the
+second distance for `TwoSided` and optional literal taper. The normal extent HUD retains its
+last-valid-value rollback contract. New second-distance/taper fields retain rejected text and
+disable Apply until corrected; incomplete text cannot apply an earlier candidate.
+Inward taper that collapses/reverses a corresponding profile edge is rejected before lofting;
+typed and handle-driven candidates share this Geometry check.
+
+`ToFace` and `Between` offer explicitly selected, resolved semantic source-feature planes from the
+existing construction-source boundary. They are not arbitrary OCCT subshape ordinals or references
+to a modified final Body. Sources are the six box roles of untapered, normal `Distance` rectangle
+extrusions, including rectangles drawn as four lines. Symmetric/reversed/tapered features do not
+implicitly gain generated box roles. Transverse planes, coincident limits, limits behind a `ToFace`
+direction and unsupported profile/taper combinations fail in the disposable complete-document recompute.
+`ThroughAll` and `ToNext` require a modifying operation and a target Body. They have no distance
+input or extent arrow; the three distance modes retain the primary extent handle, and taper adds
+its own angle handle. Direction reversal also reverses the extent handle frame.
+
+Only inputs used by the final mode are provisioned: two distances for `TwoSided`, one for
+`Distance`/`Symmetric`, none for face/target terminations; a new Body is added only for `NewBody`.
+New IDs reserve both distance identities against the full document dependency namespace. Preview
+replaces only the modifying target Body; supporting sketches and planes retain their presentations.
+Apply publishes the feature and its used inputs in one transaction, preserving exact Undo/Redo,
+sidecars and canonical reopening. Existing Feature Edit can edit retained parameter/reference
+fields; it does not change extent discriminators.
+
+Focused proof: `[block136-extrude-extents]` in `gui_shell_extrude_extent_tests.cpp`. The actual-input
+`[shell-combined-extrude-extents]` workflow creates a plate and offset sketch, cuts with two sides,
+corrects transverse/coincident face bounds, cuts to/between source planes, checks exact history,
+cancels a symmetric tapered candidate, reopens canonically and exports STEP.
+
+Thin/open-profile and path Extrude controls, expanded Revolve extent/operation/axis controls and
+native limit-face collection remain separate shell work. Their headless contracts are unchanged.
+
 ## Revolve authoring
 
 `GuiInteractiveRevolveController` begins from a materialized profile region, an `AxisReference`

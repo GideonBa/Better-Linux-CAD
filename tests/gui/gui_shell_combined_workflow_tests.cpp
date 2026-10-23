@@ -632,6 +632,87 @@ TEST_CASE("Combined UI machining workflow edits upstream geometry then patterns 
   ui.idle();
 }
 
+TEST_CASE("Combined UI extrude extents machine an offset profile through corrections and history",
+          "[gui][integration][shell-combined-workflow][shell-combined-extrude-extents]") {
+  WorkflowUi ui;
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  ui.new_document("Extent machining");
+  ui.rectangle("datum.xy", {-40, -30}, {40, 30});
+  const auto base = ui.extrude(20);
+  const auto feature = ui.window.session().part_document()->features().back().id();
+  const auto plane = ui.offset(10);
+  const auto sketch = ui.rectangle(plane.value(), {-12, -8}, {12, 8});
+  const auto initial_parameters = ui.window.session().part_document()->parameter_count();
+  std::vector<std::string> states{ui.snapshot()};
+  ui.command("extrude");
+  ui.choose(ui.widget<QComboBox>("blcad.extrude.operation"), 2);
+  ui.data(ui.widget<QComboBox>("blcad.extrude.target"), QString::fromStdString(base.value()));
+  ui.choose(ui.widget<QComboBox>("blcad.extrude.extent"), 2);
+  ui.scalar("6 mm");
+  ui.text(ui.widget<QLineEdit>("blcad.extrude.second_distance"), "4 deg");
+  CHECK_FALSE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+  CHECK(ui.widget<QLineEdit>("blcad.extrude.second_distance").text() == "4 deg");
+  CHECK(ui.snapshot() == states.back());
+  ui.text(ui.widget<QLineEdit>("blcad.extrude.second_distance"), "4 mm");
+  REQUIRE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+  ui.capture("extrude-two-sided-cut-preview");
+  ui.button("blcad.feature.apply");
+  CHECK(ui.summary(base).volume_mm3 == Approx(92160).margin(1e-4));
+  CHECK(ui.window.session().part_document()->parameter_count() == initial_parameters + 2);
+  states.push_back(ui.snapshot());
+  ui.tree(sketch.value());
+  ui.command("extrude");
+  ui.choose(ui.widget<QComboBox>("blcad.extrude.operation"), 2);
+  ui.choose(ui.widget<QComboBox>("blcad.extrude.extent"), 5);
+  const auto first = QString::fromStdString(feature.value());
+  ui.data(ui.widget<QComboBox>("blcad.extrude.first_face"), first + "/right");
+  CHECK_FALSE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+  CHECK(ui.snapshot() == states.back());
+  ui.data(ui.widget<QComboBox>("blcad.extrude.first_face"), first + "/top");
+  REQUIRE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+  ui.capture("extrude-to-face-cut-preview");
+  ui.button("blcad.feature.apply");
+  CHECK(ui.summary(base).volume_mm3 == Approx(90624).margin(1e-4));
+  CHECK(ui.window.session().part_document()->parameter_count() == initial_parameters + 2);
+  states.push_back(ui.snapshot());
+  ui.tree(sketch.value());
+  ui.command("extrude");
+  ui.choose(ui.widget<QComboBox>("blcad.extrude.operation"), 2);
+  ui.choose(ui.widget<QComboBox>("blcad.extrude.extent"), 6);
+  ui.data(ui.widget<QComboBox>("blcad.extrude.first_face"), first + "/bottom");
+  ui.data(ui.widget<QComboBox>("blcad.extrude.second_face"), first + "/bottom");
+  CHECK_FALSE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+  ui.data(ui.widget<QComboBox>("blcad.extrude.second_face"), first + "/top");
+  REQUIRE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+  ui.capture("extrude-between-cut-preview");
+  ui.button("blcad.feature.apply");
+  CHECK(ui.summary(base).volume_mm3 == Approx(88320).margin(1e-4));
+  CHECK(ui.window.session().part_document()->parameter_count() == initial_parameters + 2);
+  states.push_back(ui.snapshot());
+  ui.history(states);
+  ui.tree(sketch.value());
+  ui.command("extrude");
+  ui.choose(ui.widget<QComboBox>("blcad.extrude.extent"), 1);
+  ui.scalar("8 mm");
+  ui.text(ui.widget<QLineEdit>("blcad.extrude.taper"), "90 deg");
+  CHECK_FALSE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+  ui.text(ui.widget<QLineEdit>("blcad.extrude.taper"), "-2 deg");
+  REQUIRE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+  ui.choose(ui.widget<QComboBox>("blcad.extrude.direction"), 1);
+  ui.capture("extrude-symmetric-taper-preview");
+  ui.button("blcad.feature.cancel");
+  CHECK(ui.snapshot() == states.back());
+  ui.idle();
+  ui.roundtrip(directory.filePath("extent-machining.blcad"));
+  CHECK(ui.summary(base).volume_mm3 == Approx(88320).margin(1e-4));
+  const auto step = directory.filePath("extent-machining.step");
+  ui.file("export_part_step", step);
+  CHECK(ui.bytes(step).contains("ISO-10303-21"));
+  CHECK(ui.snapshot() == states.back());
+  ui.idle();
+}
+
 TEST_CASE("Combined UI Boolean transform and Mirror workflow preserves branching history and "
           "source roles",
           "[gui][integration][shell-combined-workflow][shell-combined-bodies]") {

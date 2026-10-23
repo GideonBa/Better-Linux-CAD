@@ -148,6 +148,7 @@ private:
     first_face_.reset();
     second_face_.reset();
     second_distance_parameter_.reset();
+    pending_second_distance_parameter_.reset();
     active_ = true;
   }
 
@@ -165,7 +166,16 @@ public:
   void set_distance(double millimeters) noexcept { distance_ = millimeters; }
   void set_direction(ExtrudeDirection direction) noexcept { direction_ = direction; }
   void set_taper(std::optional<double> degrees) noexcept { taper_deg_ = degrees; }
-  void set_two_sided_parameter(ParameterId second) { second_distance_parameter_ = std::move(second); }
+  void set_two_sided_parameter(ParameterId second) {
+    second_distance_parameter_ = std::move(second);
+    pending_second_distance_parameter_.reset();
+  }
+  // A new second distance belongs to the same disposable candidate as the
+  // primary distance and Body. Switching modes must not publish unused inputs.
+  void set_two_sided_new_parameter(Parameter second) {
+    second_distance_parameter_ = second.id();
+    pending_second_distance_parameter_ = std::move(second);
+  }
   void set_limit_faces(std::optional<FaceReference> first,
                        std::optional<FaceReference> second = std::nullopt) {
     first_face_ = std::move(first);
@@ -358,6 +368,7 @@ public:
     if (committed.has_error()) return committed;
     active_ = false;
     pending_distance_parameter_.reset();
+    pending_second_distance_parameter_.reset();
     pending_result_body_.reset();
     pending_profile_materialization_.reset();
     return committed;
@@ -366,6 +377,7 @@ public:
   void cancel() noexcept {
     active_ = false;
     pending_distance_parameter_.reset();
+    pending_second_distance_parameter_.reset();
     pending_result_body_.reset();
     pending_profile_materialization_.reset();
   }
@@ -408,9 +420,15 @@ private:
 
   [[nodiscard]] Result<std::size_t> provision_pending_objects(PartDocument& part) const {
     std::size_t changed = 0U;
-    if (pending_distance_parameter_.has_value()) {
+    if (drives_distance() && pending_distance_parameter_.has_value()) {
       auto added = part.add_parameter(*pending_distance_parameter_);
       if (added.has_error()) return added;
+      changed += added.value();
+    }
+    if (extent_mode_ == ExtrudeExtentMode::TwoSided && pending_second_distance_parameter_) {
+      auto added = part.add_parameter(*pending_second_distance_parameter_);
+      if (added.has_error())
+        return added;
       changed += added.value();
     }
     if (operation_ == FeatureBodyOperationMode::NewBody && pending_result_body_.has_value()) {
@@ -536,6 +554,7 @@ private:
   std::optional<FaceReference> first_face_;
   std::optional<FaceReference> second_face_;
   std::optional<Parameter> pending_distance_parameter_;
+  std::optional<Parameter> pending_second_distance_parameter_;
   std::optional<Body> pending_result_body_;
   std::optional<GuiPendingProfileMaterialization> pending_profile_materialization_;
   GuiFeatureManipulatorFrame frame_;

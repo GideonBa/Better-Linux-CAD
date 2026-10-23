@@ -908,6 +908,25 @@ Contract: `docs/gui-part-foundation-workbench-mvp7.md`; evidence:
 Twelve bounded families remain restored and six partial; Block 136 and the Block-135 numbered
 completion boundary are unchanged. The semantic Hole Wizard remains separate target architecture.
 
+### Block 136 — Advanced Extrude extent authoring — 2026-10-24
+
+The existing Extrusion task now exposes all seven termination modes, four Body operations, explicit
+semantic source-plane limits, reversed direction, a candidate-only second distance and optional
+taper. Used inputs and the feature publish in one transaction; switching modes leaves no unused
+parameters or Bodies. Focused GUI cases cover oriented profiles, Body results, rejected bounds/text,
+taper handle rollback, canonical persistence and global identity collisions. A sixteenth combined
+actual-input workflow machines an offset profile with two-sided, to-face and between cuts, corrects
+invalid bounds, checks exact history, cancels a tapered candidate, reopens and exports STEP.
+The workflow also exposed and fixed target resolution that could select an older face-source Body
+instead of the latest modifier. A focused Geometry regression proves both face modes preserve
+previous cuts through full and isolated repeated recomputes.
+Strong inward taper now rejects collapsed/reversed offset edges before OCCT can loft a large
+inverted contour; a second Geometry regression and the GUI taper rollback case cover this boundary.
+Contract: `docs/gui-interactive-extrude-revolve-mvp9.md`; evidence:
+`docs/gui-shell-acceptance-mvp9r.md`. Thin/open-profile and path Extrude, expanded Revolve controls
+and native limit collection remain in the same partial family. Twelve bounded families remain
+restored and six partial. Block 136 and the Block-135 numbered completion boundary are unchanged.
+
 ## Current next technical step — Block 136
 
 The current v3 coverage inventory records all eighteen accepted families, current shell proof sources,
@@ -915,10 +934,11 @@ reachable entry points and explicit remaining gaps. The machine check distinguis
 from closure readiness; historical controller proofs cannot close a shell gap. Acceptance contract:
 `docs/gui-shell-acceptance-mvp9r.md`, `[integration][gui-feature-coverage]` / `[gui][shell-coverage]`.
 
-Continue with advanced extent/termination editors. Dedicated plain through-all Hole authoring is
-available within the retained circular-cut/Core target boundaries. The bounded standalone Part
-parameter manager now creates and edits typed literals and Length/Count formulas through local
-batches, complete downstream Preview and one atomic Apply. The Sketch3D/PathCurve surface includes
+Continue with thin/open-profile and path Extrude plus expanded Revolve controls and native limit
+collection. All seven bounded Extrude terminations now have explicit shell editors. Dedicated plain
+through-all Hole authoring is available within the retained circular-cut/Core target boundaries.
+The bounded standalone Part parameter manager now creates and edits typed literals and Length/Count
+formulas through local batches, complete downstream Preview and one atomic Apply. The Sketch3D/PathCurve surface includes
 typed/shared-point line editing, native collection, constrained grips, anchored pointer/direction
 placement and explicit planar-point copies.
 Live associative point projection and new arc/spline/helix parameter tools remain extensions of their
@@ -929,9 +949,9 @@ The bounded repair-open path now supports failed-recompute Parts and missing fac
 with typed intent, complete atomic publication and failed-state history. Other structural dependency
 failures remain strict loading errors.
 The construction task now has fourteen bounded create/edit modes, native reference collection and
-position/direction/frame/new-offset grips. Continue with extent editors, workspace
-navigation/context, advanced Assembly controls and integrated native Part/Assembly acceptance in the
-order recorded in
+position/direction/frame/new-offset grips. Continue with the remaining Extrude/Revolve controls,
+workspace navigation/context, advanced Assembly controls and integrated native Part/Assembly acceptance
+in the order recorded in
 `docs/gui-shell-acceptance-mvp9r.md`. Block 136 remains in progress until all recorded gaps and pending
 workflows are resolved and the closure gate plus full/native regressions pass.
 

@@ -39,8 +39,9 @@ source, hide a missing tag behind OR and claim completion with gaps. They must a
 
 The machine-readable details live in `families[].shell.gaps`; this is the execution order:
 
-1. Audit and restore advanced extent
-   editors against the foundation API.
+1. Finish thin/open-profile and path Extrude controls, expanded Revolve extent/operation/axis
+   controls and native limit-face collection. All seven bounded Extrude terminations now have
+   explicit shell editors; arbitrary final-Body subshape references remain outside the contract.
 2. Restore contextual commands, selection-filter UI, view cube, view bookmarks and repeat command.
 3. Restore the supported hierarchy validation, cross-hierarchy relationship/joint/solve controls,
    sampled Revolute analysis and occurrence-linked result highlighting.
@@ -71,7 +72,7 @@ QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][gui-fea
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests
 ./build/dev-gui/blcad_core_tests
 ./build/dev-gui/blcad_geometry_tests
-QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-holes],[shell-combined-holes],[block136-parameters],[shell-combined-parameters],[block136-sketch3d-projection],[shell-combined-projected-sweep],[block136-sketch3d-direction],[shell-sketch3d-direction-workflow],[block136-sketch3d-placement],[shell-sketch3d-placement-workflow],[block136-sketch3d-grips],[shell-sketch3d-grips-workflow],[block136-sketch3d],[shell-combined-sketch3d],[block136-sketch-diagnostics],[missing-reference-session],[block136-missing-reference],[repair-open-session],[block136-repair-open],[block136-reference-repair-batches],[block136-reference-repair],[block136-construction-manipulators],[block136-construction-picking],[shell-mixed-path-loft],[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-extrude-extents],[shell-combined-extrude-extents],[block136-holes],[shell-combined-holes],[block136-parameters],[shell-combined-parameters],[block136-sketch3d-projection],[shell-combined-projected-sweep],[block136-sketch3d-direction],[shell-sketch3d-direction-workflow],[block136-sketch3d-placement],[shell-sketch3d-placement-workflow],[block136-sketch3d-grips],[shell-sketch3d-grips-workflow],[block136-sketch3d],[shell-combined-sketch3d],[block136-sketch-diagnostics],[missing-reference-session],[block136-missing-reference],[repair-open-session],[block136-repair-open],[block136-reference-repair-batches],[block136-reference-repair],[block136-construction-manipulators],[block136-construction-picking],[shell-mixed-path-loft],[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
 ```
 
 The regular inventory audit passes while it accurately records unfinished work. For closure,
@@ -872,3 +873,61 @@ Core/Geometry sources and persistence schema are unchanged; their full suites we
 this slice. The ordinary inventory audit passes. The opt-in closure gate correctly rejects the
 remaining acceptance work (one of three cases fails, 180 assertions). This does not close the
 extent-editor gap, the six partial families or Block 136.
+
+## Advanced Extrude extent editor — 2026-10-24
+
+The existing Extrusion task now exposes `Distance`, `Symmetric`, `TwoSided`, `ThroughAll`,
+`ToNext`, `ToFace` and `Between`, all four Body operations, normal/opposite direction, a local
+second distance and optional taper. Explicit semantic source-feature planes supply face limits.
+Target Body previews replace only the modified Body. Used inputs publish with the feature in one
+transaction; switching modes adds no unused parameters/Bodies. Exact supported profile/reference
+bounds and deferred controls live in `docs/gui-interactive-extrude-revolve-mvp9.md`.
+
+Six `[block136-extrude-extents]` cases cover scalar extents on XY/XZ/YZ in both directions,
+actual span bounds and volumes, all Body operations and target terminations, rejected/corrected
+transverse/coincident faces, canonical face-bound reopening, local invalid text, unused-input
+removal, taper handle rollback, atomic history, cancellation and graph-wide identity collisions.
+`[shell-combined-extrude-extents]` is the sixteenth combined workflow: actual widget input creates
+a plate and offset sketch, cuts with two sides, then to/between base faces, corrects units and
+limits, checks exact three-step Undo/Redo, cancels a symmetric tapered candidate, reopens
+canonically and exports STEP. Fifteen combined workflows have fully UI-authored inputs; the
+retained Planar-motion case still imports its seated Part.
+
+The workflow exposed two Geometry defects. A limit reference to an older Body producer could
+discard preceding cuts; Extrude now uses the shared modifier resolver in dependency order.
+`[extrude-limit-history]` failed before the fix (840 rather than 640 mm³) and now checks both face
+modes through full and isolated repeated recomputes. Strong inward taper could pass through a
+collapsed polygon and loft a large inverted contour; corresponding offset edges must now keep
+their forward orientation. `[extrude-taper-collapse]` and the GUI rollback case reject that
+candidate while retaining valid small taper. Core intent and the persistence schema are unchanged.
+
+The inventory retains twelve restored and six partial families. Remaining work in this family is
+thin/open-profile and path Extrude, expanded Revolve extent/operation/axis controls and native
+viewport collection of limit faces. Block 136 stays open and numbered completion remains Block 135.
+
+`blcad_gui_tests`, `blcad_app` and `blcad_geometry_tests` built successfully with `dev-gui`.
+Verification:
+
+| Suite | Cases | Assertions | Result |
+| --- | ---: | ---: | --- |
+| Full Core | 528 | 15,861 | All passed |
+| Full Geometry | 439 | 30,035 | All passed |
+| Focused offscreen Extrude and retained feature regressions | 45 | 2,560 | All passed |
+| Focused native extent editor/workflow | 7 | 1,413 | All passed; no skips |
+| Full offscreen GUI | 428 | 37,177 | 413 passed; 15 native-only skips |
+| Full combined native shell | 244 | 32,284 | All passed; no skips |
+
+The 1280×800 `extrude-two-sided-cut-preview.png`, `extrude-to-face-cut-preview.png`,
+`extrude-between-cut-preview.png` and `extrude-symmetric-taper-preview.png` captures in
+`/tmp/blcad-extents-native` were inspected. Fields and semantic-face labels are readable, unused
+rows disappear, the local taper wheel/direction frame remain visible and Apply/Cancel stay pinned.
+Native logs retain only the known medium depth/stencil visual warning, without high-severity,
+BadDrawable or fatal lifecycle diagnostics. Formatting and diff checks pass. The native suite was
+repeated separately after an earlier startup overlap; the final native run and six-second startup
+check are serial. The separate capture-enabled native run also passed (32,508 assertions); capture
+checks account for the assertion-count difference. The six-second startup ends at intentional timeout
+124. Repeatable commands live in `docs/development-setup.md`.
+
+The ordinary inventory audit passes. The opt-in closure gate correctly rejects the unfinished
+acceptance (three cases: two pass, one expected failure; 181 assertions). Six partial families and
+the pending integrated workflows remain recorded; this slice does not close Block 136.

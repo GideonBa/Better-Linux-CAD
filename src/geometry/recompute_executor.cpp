@@ -773,26 +773,11 @@ struct ResolvedExtrudeSpan {
   if (feature.body_result_context().has_value() &&
       feature.body_result_context()->target_body().has_value()) {
     const BodyId& body = *feature.body_result_context()->target_body();
-    for (const auto& [producer, dependent] : document.dependency_graph().dependencies()) {
-      if (dependent != feature.id().value() || producer.starts_with("body:"))
-        continue;
-      bool produces_target = false;
-      if (const Feature* previous = document.find_feature(FeatureId(producer));
-          previous != nullptr && previous->body_result_context().has_value())
-        produces_target = previous->body_result_context()->effective_produced_body() == body;
-      if (const BodyBooleanFeature* previous =
-              document.find_body_boolean_feature(FeatureId(producer));
-          previous != nullptr)
-        produces_target = previous->effective_result_body() == body;
-      if (const BodyTransform* previous = document.find_body_transform(BodyTransformId(producer));
-          previous != nullptr)
-        produces_target = previous->body() == body;
-      if (!produces_target)
-        continue;
-      if (const GeometryShape* previous = shape_cache.find_feature_shape(FeatureId(producer));
-          previous != nullptr)
-        return Result<const GeometryShape*>::success(previous);
-    }
+    // A limit-face source can be an older producer of the same Body. Recover
+    // the latest direct predecessor in dependency order, never the first
+    // matching reference source or this feature's already-published result.
+    if (feature.body_result_context()->effective_produced_body() == body)
+      return resolve_in_place_body_target(document, feature.id(), body, shape_cache);
     const GeometryShape* shape = shape_cache.find_body_shape(body);
     if (shape == nullptr)
       return Result<const GeometryShape*>::failure(

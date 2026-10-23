@@ -227,6 +227,68 @@ TEST_CASE("Block 60 resolves ToFace and Between semantic planar limits",
   }
 }
 
+TEST_CASE("Extrude face limits preserve the latest Body predecessor across repeated recomputes",
+          "[geometry][extrude-extent][extrude-limit-history]") {
+  for (const bool between : {false, true}) {
+    auto extent = ExtrudeExtentIntent::distance(ParameterId("depth"));
+    REQUIRE(extent);
+    auto document = operation_document(FeatureBodyOperationMode::Cut, extent.value());
+    REQUIRE(document.add_parameter(length_parameter("small", 4)));
+    REQUIRE(document.add_sketch(rectangle_sketch("sketch.finish", "small", "small")));
+    auto limit = between ? ExtrudeExtentIntent::between(limit_face(SemanticFace::Bottom),
+                                                        limit_face(SemanticFace::Top))
+                         : ExtrudeExtentIntent::to_face(limit_face(SemanticFace::Top));
+    REQUIRE(limit);
+    auto feature =
+        Feature::create_additive_extrude(FeatureId("feature.finish"), "Face-limited cut",
+                                         SketchId("sketch.finish"), extrude_intent(limit.value()));
+    REQUIRE(feature);
+    auto context = FeatureBodyResultContext::create(FeatureBodyOperationMode::Cut,
+                                                    BodyId("body.base"), std::nullopt);
+    REQUIRE(context);
+    REQUIRE(
+        document.add_feature(feature.value().with_body_result_context(context.value()).value()));
+    auto cache = shape_cache();
+    for (int repeat = 0; repeat < 2; ++repeat) {
+      REQUIRE(GeometryRecomputeExecutor{}.execute_document(document, cache));
+      const auto* previous = cache.find_feature_shape(FeatureId("feature.operation"));
+      REQUIRE(previous);
+      CHECK(summary(*previous).volume_mm3 == Approx(800).margin(1e-6));
+      REQUIRE(cache.find_body_shape(BodyId("body.base")));
+      CHECK(summary(*cache.find_body_shape(BodyId("body.base"))).volume_mm3 ==
+            Approx(640).margin(1e-6));
+      REQUIRE(GeometryRecomputeExecutor{}.execute_additive_extrude(document, feature.value().id(),
+                                                                   cache));
+      CHECK(summary(*cache.find_body_shape(BodyId("body.base"))).volume_mm3 ==
+            Approx(640).margin(1e-6));
+    }
+  }
+}
+
+TEST_CASE("Inward taper rejects contours that reverse after collapse",
+          "[geometry][extrude-extent][extrude-taper-collapse]") {
+  for (const double angle : {-10.0, -60.0, -89.0}) {
+    INFO(angle);
+    auto extent = ExtrudeExtentIntent::distance(ParameterId("second"));
+    REQUIRE(extent);
+    auto document = simple_extent_document(extrude_intent(extent.value(), angle));
+    auto cache = shape_cache();
+    const auto result = GeometryRecomputeExecutor{}.execute_document(document, cache);
+    if (angle == -10) {
+      REQUIRE(result);
+      REQUIRE(cache.final_shape());
+      const auto shape = summary(*cache.final_shape());
+      CHECK(shape.solid_count == 1);
+      CHECK(shape.volume_mm3 > 0);
+      CHECK(shape.volume_mm3 < 500);
+    } else {
+      REQUIRE_FALSE(result);
+      CHECK(result.error().message().find("collapses or reverses") != std::string::npos);
+      CHECK_FALSE(cache.has_final_shape());
+    }
+  }
+}
+
 TEST_CASE("Block 60 builds tapered and open-line thin extrusions", "[geometry][extrude-extent]") {
   SECTION("tapered rectangle") {
     auto extent = ExtrudeExtentIntent::distance(ParameterId("second"));
