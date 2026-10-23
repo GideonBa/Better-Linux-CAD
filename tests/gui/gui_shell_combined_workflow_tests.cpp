@@ -1,3 +1,4 @@
+#include "../support/mixed_path_loft_fixture.hpp"
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/core/project_json.hpp"
 #include "blcad/geometry/body_transform_adapter.hpp"
@@ -58,7 +59,9 @@ template <typename T> T checked(Result<T> result) {
 }
 
 // Interaction helpers deliberately stop at Qt widgets and input events.
-// The scenarios never create model intent or drive controllers/workbenches directly.
+// The seven combined workflows author their inputs through the UI. The separately
+// tagged mixed-path workflow opens preauthored Sketch/plane inputs through Open.
+// Neither path drives authoring controllers/workbenches directly.
 class WorkflowUi {
 public:
   WorkflowUi()
@@ -659,6 +662,141 @@ TEST_CASE(
   ui.roundtrip(directory.filePath("loft.blcad.json"));
   ui.command("fit", 2);
   ui.capture("combined-loft");
+  ui.idle();
+}
+
+TEST_CASE(
+    "Mixed path UI Loft reverses an arc reorders five oriented sections edits and restores history",
+    "[gui][integration][shell-mixed-path-loft]") {
+  namespace fixture = blcad::test::mixed_loft;
+  WorkflowUi ui;
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  const auto input = directory.filePath("oriented-inputs.blcad");
+  // This scenario tests consuming existing oriented Sketches, not their authoring.
+  // The imported document contains no PathCurve, Loft or body.
+  REQUIRE(write_part_document_json_file(fixture::inputs(5, false), input.toStdString()));
+  ui.file("open", input);
+  const auto imported = ui.snapshot();
+  REQUIRE(ui.window.session().part_document()->path_curves().empty());
+  REQUIRE(ui.window.session().part_document()->bodies().empty());
+  ui.command("path_curve");
+  const auto add = [&](const QString& prefix) {
+    auto& source = ui.widget<QComboBox>("blcad.spatial.source");
+    ui.choose(source, source.findText(prefix, Qt::MatchStartsWith));
+    ui.button("blcad.spatial.add");
+  };
+  add("Mixed trajectory / lead");
+  add("Mixed trajectory / spline");
+  add("Mixed trajectory / arc");
+  auto& path_order = ui.widget<QListWidget>("blcad.spatial.order");
+  REQUIRE(path_order.count() == 3);
+  CHECK_FALSE(ui.window.viewport().feature_preview_active());
+  CHECK_FALSE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+  CHECK(ui.snapshot() == imported);
+  ui.list(path_order, 2);
+  ui.key(path_order, Qt::Key_Space);
+  REQUIRE(path_order.item(2)->checkState() == Qt::Checked);
+  REQUIRE(ui.window.viewport().feature_preview_active());
+  CHECK(ui.snapshot() == imported);
+  ui.button("blcad.feature.apply");
+  REQUIRE(ui.window.session().part_document()->path_curves().size() == 1);
+  const auto path = ui.window.session().part_document()->path_curves().back().id();
+  const auto with_path = ui.snapshot();
+
+  ui.command("loft");
+  for (const int i : {0, 2, 1, 3, 4})
+    add(QString("Section %1 / ").arg(i));
+  ui.data(ui.widget<QComboBox>("blcad.spatial.path"), QString::fromStdString(path.value()));
+  CHECK_FALSE(ui.window.viewport().feature_preview_active());
+  CHECK_FALSE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+  auto& sections = ui.widget<QListWidget>("blcad.spatial.order");
+  REQUIRE(sections.count() == 5);
+  ui.list(sections, 2);
+  bool moved = false;
+  for (auto* button : ui.window.findChildren<QPushButton*>())
+    if (button->isVisible() && button->text() == "Hoch") {
+      ui.click(*button);
+      moved = true;
+      break;
+    }
+  REQUIRE(moved);
+  CHECK(sections.item(1)->text().startsWith("Section 1 / "));
+  REQUIRE(ui.window.viewport().feature_preview_active());
+  QComboBox* continuity{};
+  for (auto* combo : ui.window.findChildren<QComboBox*>())
+    if (combo->isVisible() && combo->findText("G2") >= 0)
+      continuity = combo;
+  REQUIRE(continuity);
+  ui.choose(*continuity, continuity->findText("G2"));
+  CHECK_FALSE(ui.window.viewport().feature_preview_active());
+  CHECK_FALSE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+  CHECK(ui.snapshot() == with_path);
+  ui.choose(*continuity, continuity->findText("C0"));
+  REQUIRE(ui.window.viewport().feature_preview_active());
+  ui.button("blcad.feature.apply");
+  const auto* part = ui.window.session().part_document();
+  REQUIRE(part->loft_features().size() == 1);
+  const auto& committed_sections = part->loft_features().back().sections();
+  REQUIRE(committed_sections.size() == 5);
+  for (std::size_t i = 0; i < committed_sections.size(); ++i) {
+    CHECK(committed_sections[i].source_node_id() == "section." + std::to_string(i));
+    CHECK_FALSE(committed_sections[i].flip_normal());
+  }
+  CHECK(part->loft_features().back().path_curve() == path);
+  const auto body = part->bodies().back().id();
+  CHECK(ui.summary(body).solid_count == 1);
+  const auto initial_volume = ui.summary(body).volume_mm3;
+  CHECK(initial_volume > 100);
+  const auto created = ui.snapshot();
+  ui.idle();
+
+  // Enter the middle profile's new width through the visible property delegate.
+  ui.tree("section.2.width");
+  auto& properties = ui.widget<QTableWidget>("blcad.shell.properties");
+  QTableWidgetItem* value{};
+  for (int row = 0; row < properties.rowCount(); ++row)
+    if (properties.item(row, 1)->data(Qt::UserRole).toString() == "value")
+      value = properties.item(row, 1);
+  REQUIRE(value);
+  properties.scrollToItem(value);
+  ui.flush();
+  ui.click_at(*properties.viewport(), properties.visualItemRect(value).center());
+  ui.key(properties, Qt::Key_F2);
+  auto* editor = properties.findChild<QLineEdit*>();
+  REQUIRE(editor);
+  ui.text(*editor, "4.5");
+  REQUIRE(ui.window.session()
+              .part_document()
+              ->find_parameter(ParameterId("section.2.width"))
+              ->value()
+              .millimeters() == 4.5);
+  const auto edited = ui.snapshot();
+  const auto edited_volume = ui.summary(body).volume_mm3;
+  CHECK(edited_volume > initial_volume + 5);
+  ui.command("undo");
+  CHECK(ui.snapshot() == created);
+  CHECK(ui.summary(body).volume_mm3 == Approx(initial_volume).epsilon(1e-8));
+  ui.command("undo");
+  CHECK(ui.snapshot() == with_path);
+  CHECK(ui.window.session().part_shape_cache()->body_shape_count() == 0);
+  ui.command("undo");
+  CHECK(ui.snapshot() == imported);
+  for (int i = 0; i < 3; ++i)
+    ui.command("redo");
+  CHECK(ui.snapshot() == edited);
+  CHECK(ui.summary(body).volume_mm3 == Approx(edited_volume).epsilon(1e-8));
+  ui.idle();
+  ui.capture("mixed-path-five-oriented-sections");
+  const auto saved = directory.filePath("mixed-loft.blcad");
+  ui.roundtrip(saved);
+  CHECK(ui.summary(body).volume_mm3 == Approx(edited_volume).epsilon(1e-8));
+  const auto source_bytes = ui.bytes(saved);
+  const auto step = directory.filePath("mixed-loft.step");
+  ui.file("export_part_step", step);
+  CHECK(ui.bytes(step).contains("ISO-10303-21"));
+  CHECK(ui.bytes(saved) == source_bytes);
+  CHECK(ui.snapshot() == edited);
   ui.idle();
 }
 

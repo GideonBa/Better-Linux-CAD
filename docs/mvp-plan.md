@@ -694,6 +694,22 @@ Contract: `docs/gui-sketch-workbench-mvp7.md`. Proof: `[construction-generated]`
 Native reference collection and construction manipulators remain open. This slice does not close
 the datum family or Block 136. Verification is recorded in `docs/gui-shell-acceptance-mvp9r.md`.
 
+### Block 136 — Mixed-path oriented Loft verification — 2026-10-23
+
+Deeper Loft/Sweep verification adds three/five unequal rectangle/trapezoid sections on
+independently oriented and rolled planes along connected line, cubic spline and reversed arc sources.
+It fixes the Loft control sampler's arc-to-chord reduction: binding stations and intermediate samples
+now retain true circular length/positions. Existing uniform normalized section stations and 32-span
+spline resolution remain explicit limits. Independent OCCT boundary checks cover solid/surface,
+open/guide controls, recompute, persistence and transactional rejection. A separate shell workflow
+opens prepared Sketch/plane inputs, then authors the path/Loft, recovers invalid direction/order/G2,
+edits a middle parameter and exercises history, canonical reopen and STEP through Qt input.
+
+Contracts/proof: `docs/part-guided-loft-geometry-mvp6.md`,
+`docs/gui-interactive-path-sweep-loft-mvp9.md`, `[mixed-path-loft]`, `[shell-mixed-path-loft]`.
+Verification is recorded in `docs/gui-shell-acceptance-mvp9r.md`. This slice does not close Block 136;
+native construction reference collection/manipulators remain the next implementation step.
+
 ## Current next technical step — Block 136
 
 The current v3 coverage inventory records all eighteen accepted families, current shell proof sources,

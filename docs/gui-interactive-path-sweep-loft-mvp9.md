@@ -86,8 +86,14 @@ Solid and surface modes create a candidate-only Body of the matching kind.
 Loft collects closed regions or open PathCurves in explicit list order, with row checks to flip normals.
 Dragging rows, Hoch/Runter and Entfernen change the same candidate order. A center path, ordered guide
 list and C0/G1/G2 continuity are explicit. Fewer than two sections, mixed incompatible section kinds,
-misbound paths/guides and unsupported G2 clear the preview and prevent Apply. G1 remains verified by
-Geometry; it is not silently substituted for G2. Solid, cut and surface results use the matching Body
+misbound paths/guides and unsupported G2 clear the preview and prevent Apply.
+For a center path, section `i` of `n` must have its center at normalized path-length station
+`i / (n - 1)`. Differently oriented/rolled planes and distinct compatible outlines are supported;
+arbitrary plane intersections or differing edge counts are not automatically reconciled.
+Circular path/guide arcs retain their true length and sampled circle positions in Loft control;
+splines remain 32-span approximations. See `docs/part-guided-loft-geometry-mvp6.md`.
+G1 remains verified by Geometry; it is not silently substituted for G2.
+Solid, cut and surface results use the matching Body
 contract. Cut mode uses the selected existing target instead of incorrectly creating NewBody intent.
 
 Geometry shares one bounded-path resolver between preview and execution. Planar rational splines now
@@ -108,6 +114,28 @@ QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-spatial]"
 The native-only case exercises actual profile/path picks, ordered Loft section picks, and Sweep twist
 drag/numeric refinement. It skips explicitly offscreen. `BLCAD_UI_CAPTURE_DIR` optionally records
 preview windows.
+
+## Mixed-path oriented-section regression — 2026-10-23
+
+`[shell-mixed-path-loft]` in `tests/gui/gui_shell_combined_workflow_tests.cpp` opens preauthored
+Sketch/plane inputs through the actual Open dialog. This is an input-consumption test: authoring the
+five differently oriented planes and their rectangle/trapezoid Sketches is outside this scenario.
+The imported file contains no PathCurve, Loft or Body. All subsequent authoring uses Qt controls:
+collect line/spline/arc → reject the disconnected reverse arc → reverse its list row → Apply path →
+collect five sections out of order → bind center path → reject/correct section order → reject G2 →
+restore C0 → Apply Loft → edit middle width through the property delegate → three-step Undo/Redo →
+canonical Save/Open/Save → STEP export. Rejected candidates preserve committed intent and clear the
+preview; recovered candidates restore it. Volume, solid count, identities, cache cleanup and source
+file preservation are checked. The same test runs offscreen and with native Qt/OCCT at 1280×800.
+
+```bash
+./build/dev-gui/blcad_geometry_tests "[mixed-path-loft]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[shell-mixed-path-loft]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-mixed-loft QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[shell-mixed-path-loft]"
+```
+
+These tests uncovered and now guard against treating circular Loft controls as two straight chords.
+They extend bounded spatial evidence without closing Block 136 or adding G2/Sketch3D authoring.
 
 ## Manipulator coupling
 

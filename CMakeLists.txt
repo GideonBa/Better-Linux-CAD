@@ -530,6 +530,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/linear_pattern_pipeline_tests.cpp
       tests/geometry/loft_feature_pipeline_tests.cpp
       tests/geometry/multi_section_loft_pipeline_tests.cpp
+      tests/geometry/mixed_path_loft_tests.cpp
       tests/geometry/mirror_feature_pipeline_tests.cpp
       tests/geometry/parameter_expression_pipeline_tests.cpp
       tests/geometry/path_extrude_pipeline_tests.cpp

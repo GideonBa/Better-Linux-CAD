@@ -395,6 +395,10 @@
           {
             "filter": "[shell-combined-loft]",
             "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
+          },
+          {
+            "filter": "[shell-mixed-path-loft]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
           }
         ],
         "actions": [
