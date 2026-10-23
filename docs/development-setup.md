@@ -870,3 +870,17 @@ opens authored fixtures, repairs point/line sources using actual ribbon/popup/bu
 another preview, and checks history plus save/reopen. Initial-load failures, repair batches and
 constraint-diagnostic suggestions remain open; see `docs/gui-sketch-workbench-mvp7.md` and the
 Block-136 coverage manifest. The manifest continues to report the family as partial.
+
+
+## Reference-repair list checks
+
+```bash
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[block136-reference-repair-batches],[block136-reference-repair],[integration][gui-feature-coverage]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-repair-batches QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-reference-repair-batches],[block136-reference-repair]"
+```
+
+The batch input workflow repairs two lost planes and their projected inputs through actual ribbon,
+popup, list and button events. It exercises a failed partial preview, five queued changes,
+remove/restage, whole-list preview/Apply, one-step history and canonical save/reopen. Retained
+single-reference proofs run alongside it. Run native tests and the application startup smoke
+serially. Repair-time loading and constraint-diagnostic controls remain the next documented work.

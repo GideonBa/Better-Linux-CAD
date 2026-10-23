@@ -12,6 +12,9 @@ public:
   ShellReferenceRepairTools(ShellWindow&, ShellRibbon&, int model_tab);
   ~ShellReferenceRepairTools() override;
   [[nodiscard]] Result<std::size_t> begin();
+  [[nodiscard]] Result<std::size_t> stage();
+  [[nodiscard]] Result<std::size_t> remove_staged();
+  void clear_staged();
   [[nodiscard]] Result<std::size_t> preview();
   [[nodiscard]] Result<std::size_t> apply();
   [[nodiscard]] bool active() const noexcept;

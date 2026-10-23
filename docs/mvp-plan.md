@@ -750,6 +750,20 @@ Contract: `docs/gui-sketch-workbench-mvp7.md`; proof: `[core][sketch-reference-r
 The family remains partial because initial-load failures, interdependent repair batches and explicit
 constraint-diagnostic suggestion controls remain open. Block 136 has not advanced to complete.
 
+### Block 136 — Atomic reference-repair lists — 2026-10-23
+
+The existing repair task now stages multiple replacements, updates repeated choices per scoped
+consumer identity, and supports remove/reset before one complete Geometry preview and atomic Apply.
+Staging can repair an upstream plane before choosing dependent projected inputs while another broken
+reference still prevents full presentation. Invalid stages preserve the previous queue; all exit paths
+discard it. Preview includes the union of affected consumers and downstream outputs. One Undo/Redo
+restores the complete repair, with canonical persistence and no new document schema fields.
+
+Contract/proof: `docs/gui-sketch-workbench-mvp7.md`, `[block136-reference-repair-batches]`, including
+actual ribbon/popup/list/button input. Verification lives in `docs/gui-shell-acceptance-mvp9r.md`.
+The batch prerequisite is implemented before repair-time loading; the family and Block 136 remain
+partial for the remaining loading and constraint-diagnostic controls.
+
 ## Current next technical step — Block 136
 
 The current v3 coverage inventory records all eighteen accepted families, current shell proof sources,
@@ -757,9 +771,10 @@ reachable entry points and explicit remaining gaps. The machine check distinguis
 from closure readiness; historical controller proofs cannot close a shell gap. Acceptance contract:
 `docs/gui-shell-acceptance-mvp9r.md`, `[integration][gui-feature-coverage]` / `[gui][shell-coverage]`.
 
-Complete the remaining reference-repair gaps (repair-time loading, interdependent batches and
-constraint-diagnostic suggestion controls), then restore Sketch3D authoring. The first explicit
-projected-reference/workplane repair slice is implemented.
+Implement repair-time loading next, including failed-recompute history and safe publication of
+repaired documents; missing-source validation and constraint-diagnostic suggestion controls remain
+explicit gaps. Single and multi-reference repair of loadable Parts are implemented. Then restore
+Sketch3D authoring.
 The construction task now has fourteen bounded create/edit modes, native reference collection and
 position/direction/frame/new-offset grips. Continue with parameter/Hole/extent editors, workspace
 navigation/context, advanced Assembly controls and integrated native Part/Assembly acceptance in the
