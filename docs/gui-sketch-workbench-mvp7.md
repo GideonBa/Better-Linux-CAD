@@ -70,7 +70,8 @@ transient. This preserves MVP-7 atomic recompute/undo semantics while adding dir
 Coordinates use millimeters; direction vectors are normalized before Core frame validation. Zero
 directions, nonperpendicular plane axes, coincident/collinear defining points, empty names and missing
 references disable Apply and clear the preview. Source roles use explicit task selectors with stable
-document identities. This slice does not add viewport pick collection or geometry manipulators.
+document identities. The initial slice uses selectors; native reference collection is added below.
+Construction manipulators remain open.
 
 Preview adds intent to a disposable Part copy and resolves it through the existing construction and
 workplane authorities. The viewport displays only the new candidate shape. Neither preview nor
@@ -91,8 +92,8 @@ Selecting a resolvable construction or derived plane in either surface enables *
 camera mapping, bounded face checks and downstream feature recompute use the existing workplane
 contracts. These changes add no persistence fields or raw OCCT identities.
 
-Additional generated-reference and parallel modes are recorded below. Broader native reference
-collection and construction manipulators remain open Block-136 work. Offset parameter value
+Additional generated-reference/parallel modes and native reference collection are recorded below.
+Construction manipulators remain open Block-136 work. Offset parameter value
 and formula edits remain available through the existing parameter property inspector. Reference
 diagnostics/repair retain their separate acceptance gap.
 
@@ -134,8 +135,8 @@ canonical roundtrips. No persistence schema or raw kernel IDs are added.
 
 Proof: `[core][construction-update]`, `[block136-construction-edit]`, including
 `[shell-combined-workplane-edit]` with real ribbon, browser, task, numeric, history and file-dialog
-input on offscreen and native xcb. The subsequent relation slice extends this boundary; native
-picking/manipulators keep the datum family and Block 136 partial.
+input on offscreen and native xcb. The subsequent relation slice extends this boundary;
+construction manipulators keep the datum family and Block 136 partial.
 
 ## Replacement-shell generated references and parallel relations — 2026-10-23
 
@@ -170,10 +171,45 @@ The existing preview, revision, transaction, cancellation, Undo/Redo and canonic
 apply to all five modes. Point/line/plane rebinding revalidates the complete candidate, so a generated
 point cannot be rebound to an extrusion that already depends on it. Invalid or absent references,
 degenerate downstream geometry and cycles clear preview and disable Apply; recovery stays within the
-task. Native reference collection and construction manipulators remain open, keeping the datum
-family and Block 136 partial.
+task. Native reference collection is added below; construction manipulators keep the datum family
+and Block 136 partial.
 
 Proof: `[core][construction-generated]`, `[geometry][construction-generated]`,
 `[shell-construction-relations]` and the seventh combined UI scenario
 `[shell-combined-construction]`. Validation and commands remain in
 `docs/gui-shell-acceptance-mvp9r.md` and `docs/development-setup.md`.
+
+## Replacement-shell native construction reference collection — 2026-10-23
+
+The construction task's **Modellklick wählt** selector makes each applicable reference role explicit:
+source plane, source construction line, defining points 1–3, generated face, edge or vertex. A model
+click updates the same stable reference as the corresponding input selector. Defining-point picks
+advance to the next role; roles can always be revisited explicitly. Parallel-through-point modes
+expose both inputs. Explicit coordinate/direction definitions retain numeric input and offer no
+reference-pick role.
+
+A task-local semantic scope activates only sources offered for the current role. Overlapping datum
+planes, Bodies and unrelated topology cannot steal its pick. Generated-source presentations are
+limited to the active definition's applicable kinds. Selectors and presentations share one typed
+`ViewportSceneBuilder::build_construction_sources` catalogue: six bounded faces, twelve straight
+edges and eight vertices for each supported recomputed rectangular additive-extrude source. Missing,
+unsupported or hidden-Body sources are omitted. These are source-feature semantic references evaluated
+by the same authorities as the resulting construction relations/derived workplanes, not inferred
+final-Body subshape ordinals or automatic remaps through later finishing/transforms. Ordinary existing
+construction points/lines and datum/construction/derived planes use their established scene IDs.
+
+Create and same-ID Edit use identical picking. Preview remains disposable; repeated defining points,
+cyclic rebinding and invalid downstream geometry still clear the preview and disable Apply. Apply,
+Cancel, Escape, dock close, revision/freshness expiry and committed-only Save restore the previous
+capability mask and semantic scope and remove transient source presentations. The additional role
+selector and transient catalogue add no Core intent or persistence fields.
+
+Proof: `[block136-construction-picking]` / `[shell-construction-picking]` in
+`tests/gui/gui_shell_construction_tools_tests.cpp`, plus `[geometry][construction-picking]` in
+`tests/geometry/viewport_scene_tests.cpp`. The native case clicks actual projected model locations at
+1280×800 through point/plane, parallel edge/point, generated vertex and generated face workflows,
+four-step history and canonical reopen; it explicitly skips offscreen. Other cases exercise roles,
+repeated-point recovery, semantic editing, hidden sources and custom-scope restoration on exit.
+Verification lives in `docs/gui-shell-acceptance-mvp9r.md`; reproducible commands live in
+`docs/development-setup.md`. Construction manipulators are next; the datum family and Block 136
+remain partial.

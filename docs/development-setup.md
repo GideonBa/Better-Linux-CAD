@@ -736,7 +736,7 @@ Remaining relation/pick workflows keep the datum family and Block 136 open; see
 cmake --build --preset dev-gui --target blcad_gui_tests -j4
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[shell-combined-workflow]"
 BLCAD_UI_CAPTURE_DIR=/tmp/blcad-combined-workflows QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[shell-combined-workflow]"
-QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[shell-mixed-path-loft],[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-construction-picking],[shell-mixed-path-loft],[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
 ```
 
 `tests/gui/gui_shell_combined_workflow_tests.cpp` combines long interaction sequences in seven
@@ -818,3 +818,22 @@ new skips. Run native GUI suites and the application startup smoke sequentially 
 cannot disturb popup focus. Contracts and current limits: `docs/part-guided-loft-geometry-mvp6.md` and
 `docs/gui-interactive-path-sweep-loft-mvp9.md`. Full-suite evidence lives in
 `docs/gui-shell-acceptance-mvp9r.md`; Block 136 remains open.
+
+### Native construction reference collection
+
+```bash
+cmake --build --preset dev-gui --target blcad_core_tests blcad_geometry_tests blcad_gui_tests blcad_app -j4
+./build/dev-gui/blcad_geometry_tests "[geometry][construction-picking]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[block136-construction-picking],[block136-construction],[block136-construction-edit],[block136-construction-relations],[integration][gui-feature-coverage]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-construction-picking QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-construction-picking]"
+```
+
+Geometry checks the typed 26-source catalogue, bounded face area and upstream dimension changes.
+Shell tests collect/revisit reference roles, reject/recover repeated defining points, edit generated
+sources, preserve history/reopen and restore custom masks/scopes after Apply, Escape, close, Save and
+revision changes. Hidden-Body and explicit numeric definitions cannot receive unintended topology
+picks. The native case clicks actual model locations for three defining points, a parallel edge,
+vertex point and face plane, then checks four-step history and canonical reopen at 1280×800; only
+that case skips offscreen. Inspect captures and run the expanded combined native filter above, then
+the startup smoke sequentially. The source-feature geometry contract and remaining construction
+manipulators are documented in `docs/gui-sketch-workbench-mvp7.md`; Block 136 remains open.

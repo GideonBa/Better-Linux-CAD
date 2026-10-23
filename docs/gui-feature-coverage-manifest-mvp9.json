@@ -155,9 +155,9 @@
         "owner": 136,
         "status": "partial",
         "contract": "docs/gui-sketch-workbench-mvp7.md",
-        "scope": "Seeded origins plus fourteen construction/workplane creation and same-ID editing modes, including generated edge/vertex points and parallel-through-point lines/planes, with downstream recompute previews, atomic Apply, reference rebinding, history/persistence and Sketch entry.",
+        "scope": "Seeded origins plus fourteen construction/workplane creation and same-ID editing modes, including generated edge/vertex points and parallel-through-point lines/planes, with native role-based reference collection, downstream recompute previews, atomic Apply, reference rebinding, history/persistence and Sketch entry.",
         "gaps": [
-          "Restore native construction reference collection and manipulators across the supported roles."
+          "Restore construction position, direction and offset manipulators across the supported definitions."
         ],
         "proofs": [
           {
@@ -185,6 +185,10 @@
             "source": "tests/gui/gui_shell_construction_tools_tests.cpp"
           },
           {
+            "filter": "[shell-construction-picking]",
+            "source": "tests/gui/gui_shell_construction_tools_tests.cpp"
+          },
+          {
             "filter": "[shell-combined-construction]",
             "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
           }
@@ -196,7 +200,8 @@
         ],
         "widgets": [
           "blcad.shell.browser",
-          "blcad.shell.construction_task"
+          "blcad.shell.construction_task",
+          "blcad.construction.pick_role"
         ]
       }
     },

@@ -14,12 +14,14 @@
 #include <QDir>
 #include <QDockWidget>
 #include <QDoubleSpinBox>
+#include <QEventLoop>
 #include <QKeyEvent>
 #include <QLineEdit>
 #include <QMouseEvent>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QTemporaryDir>
+#include <QTimer>
 #include <QToolButton>
 #include <QTreeWidget>
 #include <catch2/catch_approx.hpp>
@@ -1022,4 +1024,319 @@ TEST_CASE("New construction relation modes reject unavailable inputs and cancel 
     CHECK_FALSE(window.session().task().active());
     CHECK(snapshot(window) == before);
   }
+}
+
+namespace {
+void pick_role(ShellWindow& window, const char* role) {
+  select(control<QComboBox>(window, "pick_role"), std::string("blcad.construction.") + role);
+}
+std::string source_id(QComboBox& input, int row) {
+  REQUIRE(row >= 0);
+  return input.itemData(row, Qt::UserRole + 2).toString().toStdString();
+}
+void pick_generated(ShellWindow& window, const char* input, int element) {
+  auto& combo = control<QComboBox>(window, input);
+  for (int row = 0; row < combo.count(); ++row)
+    if (combo.itemData(row, Qt::UserRole + 1).toInt() == element) {
+      REQUIRE(window.viewport().select_semantic(source_id(combo, row)));
+      CHECK(combo.currentIndex() == row);
+      return;
+    }
+  FAIL("Missing generated construction source");
+}
+} // namespace
+
+TEST_CASE("Construction picks collect ordered point roles and isolate line and plane sources",
+          "[gui][block136-construction-picking][shell-construction-picking]") {
+  ShellWindow window;
+  REQUIRE(window.new_part("Bezugsauswahl"));
+  const auto a = point(window, {2, 3, 7});
+  const auto b = point(window, {12, 3, 7});
+  const auto c = point(window, {2, 13, 7});
+  const auto before = snapshot(window);
+  begin(window, Kind::PlaneThroughPoints);
+  pick_role(window, "point1");
+  CHECK_FALSE(window.viewport().select_semantic("datum-plane/datum.xy"));
+  CHECK_FALSE(window.construction_tools().accept_selection({GuiSelectionKind::Datum, "unknown"}));
+  for (const auto& id : {c, a, b})
+    REQUIRE(window.viewport().select_semantic("construction-point/" + id));
+  CHECK(control<QComboBox>(window, "point1").currentData().toString().toStdString() == c);
+  CHECK(control<QComboBox>(window, "point2").currentData().toString().toStdString() == a);
+  CHECK(control<QComboBox>(window, "point3").currentData().toString().toStdString() == b);
+  CHECK(snapshot(window) == before);
+  REQUIRE(window.viewport().feature_preview_active());
+  // Picking a repeated defining point invalidates only the candidate, then recovers.
+  pick_role(window, "point2");
+  REQUIRE(window.viewport().select_semantic("construction-point/" + c));
+  CHECK_FALSE(control<QPushButton>(window, "apply").isEnabled());
+  CHECK_FALSE(window.viewport().feature_preview_active());
+  pick_role(window, "point2");
+  REQUIRE(window.viewport().select_semantic("construction-point/" + a));
+  REQUIRE(control<QPushButton>(window, "apply").isEnabled());
+  apply(window);
+  const auto plane = window.session().part_document()->construction_planes().back().id();
+  const auto resolved = checked(geometry::WorkplaneResolver{}.resolve(
+      *window.session().part_document(), DatumPlaneId(plane.value())));
+  CHECK(resolved.origin == Point3{2, 13, 7});
+  begin(window, Kind::LineThroughPoints);
+  pick_role(window, "point1");
+  REQUIRE(window.viewport().select_semantic("construction-point/" + a));
+  REQUIRE(window.viewport().select_semantic("construction-point/" + b));
+  apply(window);
+  const auto line = window.session().part_document()->construction_lines().back().id();
+  begin(window, Kind::AxisFromLine);
+  CHECK_FALSE(window.viewport().select_semantic("construction-point/" + a));
+  REQUIRE(window.viewport().select_semantic("construction-line/" + line.value()));
+  apply(window);
+  CHECK(window.session().part_document()->datum_axes().back().source_construction_line() == line);
+  begin(window, Kind::ParallelPlaneThroughPoint);
+  pick_role(window, "plane");
+  REQUIRE(window.viewport().select_semantic("construction-plane/" + plane.value()));
+  pick_role(window, "point1");
+  REQUIRE(window.viewport().select_semantic("construction-point/" + b));
+  apply(window);
+  CHECK(window.session().part_document()->construction_planes().back().relation()->source_plane() ==
+        DatumPlaneId(plane.value()));
+  const auto after = snapshot(window);
+  for (int i = 0; i < 4; ++i)
+    REQUIRE(window.undo());
+  CHECK(snapshot(window) == before);
+  for (int i = 0; i < 4; ++i)
+    REQUIRE(window.redo());
+  CHECK(snapshot(window) == after);
+}
+
+TEST_CASE("Construction generated picks preserve semantic identity through edits and file history",
+          "[gui][block136-construction-picking][shell-construction-picking]") {
+  for (const auto kind : {Kind::FacePlane, Kind::PointOnEdge, Kind::PointOnVertex}) {
+    CAPTURE(static_cast<int>(kind));
+    ShellWindow window;
+    REQUIRE(window.new_part("Semantische Auswahl"));
+    authored_body(window);
+    const auto before = snapshot(window);
+    const auto presentations = window.viewport().presentation_count();
+    begin(window, kind);
+    const auto* role = kind == Kind::FacePlane     ? "face"
+                       : kind == Kind::PointOnEdge ? "edge"
+                                                   : "vertex";
+    const int first = kind == Kind::FacePlane     ? static_cast<int>(SemanticFace::Top)
+                      : kind == Kind::PointOnEdge ? static_cast<int>(SemanticEdge::TopBack)
+                                                  : static_cast<int>(SemanticVertex::TopBackLeft);
+    pick_generated(window, role, first);
+    CHECK(snapshot(window) == before);
+    CHECK_FALSE(window.viewport().select_semantic("datum-plane/datum.xy"));
+    REQUIRE(window.viewport().feature_preview_active());
+    apply(window);
+    CHECK(window.viewport().presentation_count() == presentations + 1);
+    const auto id =
+        kind == Kind::FacePlane
+            ? window.session().part_document()->derived_workplanes().back().id().value()
+            : window.session().part_document()->construction_points().back().id().value();
+    const auto created = snapshot(window);
+    edit_tree(window, id);
+    const int second = kind == Kind::FacePlane ? static_cast<int>(SemanticFace::Bottom)
+                       : kind == Kind::PointOnEdge
+                           ? static_cast<int>(SemanticEdge::BottomFront)
+                           : static_cast<int>(SemanticVertex::BottomFrontRight);
+    pick_generated(window, role, second);
+    CHECK(snapshot(window) == created);
+    apply(window);
+    const auto edited = snapshot(window);
+    REQUIRE(window.undo());
+    CHECK(snapshot(window) == created);
+    REQUIRE(window.undo());
+    CHECK(snapshot(window) == before);
+    REQUIRE(window.redo());
+    REQUIRE(window.redo());
+    CHECK(snapshot(window) == edited);
+    QTemporaryDir directory;
+    REQUIRE(window.save_to(directory.filePath("picked.blcad.json")));
+    REQUIRE(window.open_path(directory.filePath("picked.blcad.json")));
+    CHECK(snapshot(window) == edited);
+    CHECK(window.viewport().selection_filter_mask() == 0xFFFFFFFFU);
+    CHECK_FALSE(window.viewport().selection_semantic_scope());
+  }
+}
+
+TEST_CASE("Construction picking restores custom scopes and drops transient targets on every exit",
+          "[gui][block136-construction-picking][shell-construction-picking]") {
+  ShellWindow window;
+  REQUIRE(window.new_part("Auswahlgrenzen"));
+  authored_body(window);
+  const auto before = snapshot(window);
+  const auto presentations = window.viewport().presentation_count();
+  const auto mask =
+      selection_kind_bit(GuiSelectionKind::Datum) | selection_kind_bit(GuiSelectionKind::Body);
+  const std::optional<std::vector<std::string>> scope{{"datum-plane/datum.xy"}};
+  window.viewport().set_selection_filter_mask(mask);
+  window.viewport().set_selection_semantic_scope(scope);
+  begin(window, Kind::PointOnEdge);
+  REQUIRE(window.viewport().presentation_count() > presentations);
+  pick_generated(window, "edge", static_cast<int>(SemanticEdge::TopLeft));
+  SECTION("Escape") {
+    QKeyEvent key(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier);
+    QApplication::sendEvent(&control<QComboBox>(window, "pick_role"), &key);
+  }
+  SECTION("dock close") {
+    window.findChild<QDockWidget*>("blcad.shell.construction_task")->close();
+  }
+  SECTION("stale revision") {
+    REQUIRE(window.session().commit_part_transaction("External point", [](PartDocument& part) {
+      return part.add_construction_point(checked(ConstructionPoint::create_explicit(
+          ConstructionPointId("external.pick"), "External", {90, 80, 70})));
+    }));
+    window.refresh();
+  }
+  SECTION("committed-only Save") {
+    QTemporaryDir directory;
+    REQUIRE(window.save_to(directory.filePath("preview.blcad.json")));
+    CHECK(snapshot(window) == before);
+  }
+  SECTION("Apply") {
+    apply(window);
+  }
+  CHECK_FALSE(window.construction_tools().active());
+  CHECK_FALSE(window.viewport().feature_preview_active());
+  CHECK(window.construction_tools().selection_items().empty());
+  CHECK(window.viewport().selection_semantic_scope() == scope);
+  CHECK(window.viewport().selection_filter_mask() == mask);
+}
+
+TEST_CASE(
+    "Native construction clicks collect points edges vertices and faces with reversible intent",
+    "[gui][block136-construction-picking][shell-construction-picking][native-construction-"
+    "picking]") {
+  if (QApplication::platformName() != "xcb")
+    SKIP("Requires native Qt/OCCT construction detection");
+  ShellWindow window;
+  window.resize(1280, 800);
+  window.show();
+  qApp->processEvents();
+  REQUIRE(window.viewport().native_viewer_available());
+  REQUIRE(window.new_part("Native Bezüge"));
+  authored_body(window);
+  const auto a = point(window, {35, 0, 40});
+  const auto b = point(window, {0, 35, 50});
+  const auto c = point(window, {-30, -20, 30});
+  const auto before = snapshot(window);
+  const auto click_model = [&](Point3 position) {
+    qApp->processEvents();
+    QEventLoop frame;
+    QTimer::singleShot(40, &frame, &QEventLoop::quit);
+    frame.exec();
+    const auto screen = checked(window.viewport().model_to_screen(position));
+    const QPointF local(screen.x, screen.y);
+    REQUIRE(window.viewport().rect().contains(local.toPoint()));
+    for (auto type : {QEvent::MouseButtonPress, QEvent::MouseButtonRelease}) {
+      QMouseEvent event(type, local, window.viewport().mapToGlobal(local.toPoint()), Qt::LeftButton,
+                        type == QEvent::MouseButtonRelease ? Qt::NoButton : Qt::LeftButton,
+                        Qt::NoModifier);
+      QApplication::sendEvent(&window.viewport(), &event);
+    }
+    qApp->processEvents();
+  };
+  begin(window, Kind::PlaneThroughPoints);
+  pick_role(window, "point1");
+  click_model({-30, -20, 30});
+  click_model({35, 0, 40});
+  click_model({0, 35, 50});
+  CHECK(control<QComboBox>(window, "point1").currentData().toString().toStdString() == c);
+  CHECK(control<QComboBox>(window, "point2").currentData().toString().toStdString() == a);
+  CHECK(control<QComboBox>(window, "point3").currentData().toString().toStdString() == b);
+  CHECK(snapshot(window) == before);
+  apply(window);
+  begin(window, Kind::ParallelEdgeThroughPoint);
+  pick_role(window, "point1");
+  click_model({35, 0, 40});
+  CHECK(control<QComboBox>(window, "point1").currentData().toString().toStdString() == a);
+  CHECK(control<QComboBox>(window, "pick_role").currentData().toString() ==
+        "blcad.construction.edge");
+  const auto& base = *window.session().part_document();
+  const double depth =
+      base.find_parameter(base.features().front().length_parameter())->value().millimeters();
+  const auto feature = base.features().front().id();
+  select_element(control<QComboBox>(window, "edge"), feature,
+                 static_cast<int>(SemanticEdge::BottomBack));
+  click_model({10, 10, depth});
+  REQUIRE(window.viewport().selected_semantic());
+  CHECK(control<QComboBox>(window, "edge").currentData(Qt::UserRole + 1).toInt() ==
+        static_cast<int>(SemanticEdge::TopFront));
+  apply(window);
+  begin(window, Kind::PointOnVertex);
+  select_element(control<QComboBox>(window, "vertex"), feature,
+                 static_cast<int>(SemanticVertex::BottomBackLeft));
+  click_model({20, 10, depth});
+  REQUIRE(window.viewport().selected_semantic());
+  CHECK(control<QComboBox>(window, "vertex").currentData(Qt::UserRole + 1).toInt() ==
+        static_cast<int>(SemanticVertex::TopFrontRight));
+  apply(window);
+  CHECK(checked(geometry::ConstructionPointResolver{}.resolve(
+                    *window.session().part_document(),
+                    window.session().part_document()->construction_points().back().id()))
+            .position == Point3{20, 10, depth});
+  begin(window, Kind::FacePlane);
+  select_element(control<QComboBox>(window, "face"), feature,
+                 static_cast<int>(SemanticFace::Bottom));
+  click_model({10, 5, depth});
+  REQUIRE(window.viewport().selected_semantic());
+  CHECK(control<QComboBox>(window, "face").currentData(Qt::UserRole + 1).toInt() ==
+        static_cast<int>(SemanticFace::Top));
+  const auto captures = qEnvironmentVariable("BLCAD_UI_CAPTURE_DIR");
+  if (!captures.isEmpty()) {
+    REQUIRE(QDir().mkpath(captures));
+    CHECK(window.grab().save(QDir(captures).filePath("construction-native-picks.png")));
+  }
+  apply(window);
+  const auto plane = window.session().part_document()->derived_workplanes().back().id();
+  CHECK(checked(geometry::WorkplaneResolver{}.resolve(*window.session().part_document(), plane))
+            .origin.z == Approx(depth));
+  const auto after = snapshot(window);
+  for (int i = 0; i < 4; ++i)
+    REQUIRE(window.undo());
+  CHECK(snapshot(window) == before);
+  for (int i = 0; i < 4; ++i)
+    REQUIRE(window.redo());
+  CHECK(snapshot(window) == after);
+  CHECK(window.viewport().selection_filter_mask() == 0xFFFFFFFFU);
+  CHECK_FALSE(window.viewport().selection_semantic_scope());
+  QTemporaryDir directory;
+  REQUIRE(window.save_to(directory.filePath("native.blcad.json")));
+  REQUIRE(window.open_path(directory.filePath("native.blcad.json")));
+  CHECK(snapshot(window) == after);
+}
+
+TEST_CASE("Construction source detection excludes hidden Bodies and explicit coordinate modes",
+          "[gui][block136-construction-picking][shell-construction-picking]") {
+  ShellWindow window;
+  REQUIRE(window.new_part("Sichtbare Quellen"));
+  authored_body(window);
+  const auto body = window.session().part_document()->bodies().front().id();
+  const auto before = snapshot(window);
+  begin(window, Kind::PointOnEdge);
+  const auto target = source_id(control<QComboBox>(window, "edge"), 0);
+  REQUIRE(window.viewport().select_semantic(target));
+  control<QComboBox>(window, "kind").setCurrentIndex(static_cast<int>(Kind::Point));
+  CHECK(control<QComboBox>(window, "pick_role").isHidden());
+  CHECK(window.construction_tools().selection_items().empty());
+  CHECK_FALSE(window.viewport().select_semantic(target));
+  CHECK(window.viewport().selection_semantic_scope()->empty());
+  window.construction_tools().cancel();
+  CHECK(snapshot(window) == before);
+  REQUIRE(window.session().commit_part_transaction("Hide source", [body](PartDocument& part) {
+    return part.set_body_visibility(body, BodyVisibility::Hidden);
+  }));
+  window.refresh();
+  for (auto kind : {Kind::PointOnEdge, Kind::PointOnVertex, Kind::FacePlane}) {
+    begin(window, kind);
+    CHECK(window.construction_tools().selection_items().empty());
+    CHECK(window.viewport().selection_semantic_scope()->empty());
+    CHECK_FALSE(window.viewport().select_semantic(target));
+    CHECK_FALSE(control<QPushButton>(window, "apply").isEnabled());
+    window.construction_tools().cancel();
+  }
+  REQUIRE(window.undo());
+  CHECK(snapshot(window) == before);
+  begin(window, Kind::PointOnEdge);
+  REQUIRE(window.viewport().select_semantic(target));
+  window.construction_tools().cancel();
 }

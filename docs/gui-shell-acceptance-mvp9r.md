@@ -39,9 +39,9 @@ source, hide a missing tag behind OR and claim completion with gaps. They must a
 
 The machine-readable details live in `families[].shell.gaps`; this is the execution order:
 
-1. Complete native construction reference collection/manipulators. Fourteen creation/edit modes
-   including generated-reference and parallel-through-point definitions, downstream recompute previews,
-   resolved helper presentation and Sketch-on-workplane entry are restored;
+1. Complete construction position/direction/offset manipulators. Fourteen creation/edit modes
+   including generated-reference and parallel-through-point definitions, native role-based source
+   collection, downstream recompute previews, resolved helper presentation and Sketch entry are restored;
    the exact implemented boundary lives in `docs/gui-sketch-workbench-mvp7.md`.
 2. Restore explicit broken-reference repair and Sketch3D authoring/editing.
 3. Restore standalone parameter management, dedicated Hole authoring and audit advanced extent
@@ -66,7 +66,7 @@ QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][gui-fea
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests
 ./build/dev-gui/blcad_core_tests
 ./build/dev-gui/blcad_geometry_tests
-QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[shell-mixed-path-loft],[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-construction-picking],[shell-mixed-path-loft],[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
 ```
 
 The regular inventory audit passes while it accurately records unfinished work. For closure,
@@ -261,3 +261,36 @@ The closure gate still correctly rejects Block 136 (one of three cases fails, 12
 Uniform normalized path-length section stations, compatible section topology, 32-span spline
 approximation and unsupported G2 remain documented limits. Native construction reference
 collection/manipulators remain next; Block 136 stays in progress.
+
+## Native construction reference collection verification — 2026-10-23
+
+The construction task collects existing construction points/lines and datum/construction/derived
+planes through an explicit **Modellklick wählt** role. Ordered defining-point picks advance roles;
+generated face/edge/vertex picks use the same typed source catalogue as their selectors. Scope filters
+exclude overlapping unrelated geometry. Generated sources retain the existing rectangular-additive-
+extrude source-feature contract; they are not final-Body subshape ordinals or automatic topology
+remaps through later finishing/transforms. Hidden-Body and unavailable sources are omitted.
+
+One new Geometry case verifies the 26-source typed catalogue, bounded face area, source identities
+and upstream depth changes. Five shell cases cover ordered/revisited roles, repeated-point recovery,
+semantic create/edit, exact history/canonical reopen, hidden sources, explicit numeric modes and
+custom-mask/scope restoration after Apply, Escape, dock close, Save or revision expiry. The new native
+case clicks real model coordinates at 1280×800 through three-point plane, parallel edge/point,
+vertex-point and face-plane workflows, four-step history and canonical reopen. Before each generated
+edge/vertex/face click, a different source is selected so defaults cannot satisfy the pick assertion.
+Only that case skips offscreen; the seven fully UI-authored combined workflows retain their bounds.
+
+| Suite | Cases | Assertions | Result |
+| --- | ---: | ---: | --- |
+| Full Core | 519 | 15,311 | All passed |
+| Full Geometry | 436 | 29,779 | All passed |
+| Full offscreen GUI | 333 | 22,045 | 318 passed; 15 native-only skips |
+| Combined native shell | 149 | 16,861 | All passed; no skips |
+
+Native captures were inspected; the role selector and Apply/Cancel remain reachable at 1280×800.
+The separate startup smoke reached the intentional six-second timeout (124). Native logs contain
+the existing incomplete-visual depth/stencil warning, without high-severity or drawable-lifecycle
+errors. The explicit closure gate correctly rejects unfinished acceptance (one of three cases,
+130 assertions). Coverage inventory now includes the exact proof tag/source and role widget.
+Construction position/direction/offset manipulators remain next. The datum family stays partial,
+Block 136 remains in progress, and the subsequent acceptance sequence above is unchanged.

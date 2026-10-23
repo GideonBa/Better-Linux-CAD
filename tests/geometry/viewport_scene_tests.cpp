@@ -1,5 +1,6 @@
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/geometry/occt_shape_view.hpp"
+#include "blcad/geometry/recompute_executor.hpp"
 #include "blcad/geometry/viewport_scene.hpp"
 
 #include <catch2/catch_approx.hpp>
@@ -18,6 +19,7 @@
 #include <cmath>
 #include <filesystem>
 #include <numbers>
+#include <set>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -25,6 +27,70 @@
 using namespace blcad;
 using namespace blcad::geometry;
 using Catch::Approx;
+
+TEST_CASE("Construction source catalogue retains typed identities and exact bounded geometry",
+          "[geometry][construction-picking]") {
+  auto loaded = read_part_document_json_file(
+      std::filesystem::path(__FILE__).parent_path().parent_path().parent_path() /
+      "examples/generated_semantic_references.blcad.json");
+  REQUIRE(loaded);
+  auto part = loaded.value();
+  auto cache = ShapeCache::create(ShapeCacheId("construction.sources"));
+  REQUIRE(cache);
+  REQUIRE(ViewportSceneBuilder{}.build_construction_sources(part, cache.value()).value().empty());
+  REQUIRE(GeometryRecomputeExecutor{}.execute_document(part, cache.value()));
+  const auto sources = ViewportSceneBuilder{}.build_construction_sources(part, cache.value());
+  REQUIRE(sources);
+  REQUIRE(sources.value().size() == 26);
+  std::set<std::string> ids;
+  std::array<int, 3> counts{};
+  for (const auto& source : sources.value()) {
+    REQUIRE(ids.insert(source.item.semantic_id).second);
+    REQUIRE(OcctShapeView::get(source.item.shape));
+    CHECK(source.item.semantic_id.starts_with("construction-source/12:feature.base/"));
+    std::visit(
+        [&](const auto& reference) {
+          CHECK(reference.source_feature() == FeatureId("feature.base"));
+        },
+        source.reference);
+    const auto& native = *OcctShapeView::get(source.item.shape);
+    if (std::holds_alternative<SemanticFaceReference>(source.reference)) {
+      ++counts[0];
+      CHECK(source.item.kind == ViewportSceneKind::Face);
+      CHECK(native.ShapeType() == TopAbs_FACE);
+      GProp_GProps area;
+      BRepGProp::SurfaceProperties(native, area);
+      CHECK(area.Mass() > 0);
+      if (std::get<SemanticFaceReference>(source.reference).face() == SemanticFace::Top)
+        CHECK(area.Mass() == Approx(6000));
+    } else if (std::holds_alternative<SemanticEdgeReference>(source.reference)) {
+      ++counts[1];
+      CHECK(source.item.kind == ViewportSceneKind::Edge);
+      CHECK(native.ShapeType() == TopAbs_EDGE);
+    } else {
+      ++counts[2];
+      CHECK(source.item.kind == ViewportSceneKind::Vertex);
+      CHECK(native.ShapeType() == TopAbs_VERTEX);
+    }
+  }
+  CHECK(counts == std::array{6, 12, 8});
+  REQUIRE(part.set_parameter_value(ParameterId("part.depth"), Quantity::length_mm(27).value()));
+  REQUIRE(GeometryRecomputeExecutor{}.execute_document(part, cache.value()));
+  const auto updated = ViewportSceneBuilder{}.build_construction_sources(part, cache.value());
+  REQUIRE(updated);
+  REQUIRE(updated.value().size() == 26);
+  for (const auto& source : updated.value())
+    if (const auto* reference = std::get_if<SemanticFaceReference>(&source.reference);
+        reference && reference->face() == SemanticFace::Top) {
+      Bnd_Box box;
+      BRepBndLib::Add(*OcctShapeView::get(source.item.shape), box);
+      double x1, y1, z1, x2, y2, z2;
+      box.Get(x1, y1, z1, x2, y2, z2);
+      CHECK(z1 == Approx(27).margin(1e-6));
+      CHECK(z2 == Approx(27).margin(1e-6));
+      CHECK(ids.contains(source.item.semantic_id));
+    }
+}
 
 namespace {
 
