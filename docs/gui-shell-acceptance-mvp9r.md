@@ -66,7 +66,7 @@ QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][gui-fea
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests
 ./build/dev-gui/blcad_core_tests
 ./build/dev-gui/blcad_geometry_tests
-QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[shell-mixed-path-loft],[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
 ```
 
 The regular inventory audit passes while it accurately records unfinished work. For closure,
@@ -223,3 +223,41 @@ lifecycle errors. The explicit closure gate continues to reject the open accepta
 three cases, 129 assertions). Eight families have covered bounded surfaces and ten retain gaps.
 Native construction reference collection/manipulators remain next; the datum family and Block 136
 stay partial and the subsequent acceptance sequence is unchanged.
+
+## Mixed-path oriented Loft verification — 2026-10-23
+
+Four new Geometry cases exercise three/five unequal rectangle/trapezoid Sketches on differently
+oriented and rolled planes, following a connected line–cubic spline–reversed circular arc path.
+The original sampler reduced each circular control arc to two chords: the first three cases failed
+at Loft recompute against that implementation. The correction retains circular length/positions for
+center paths and guides. Independent formula-based station expectations are checked against OCCT
+boundary faces, including vertices, edge midpoints and an intermediate arc station; tests also cover
+valid solids/surfaces, open sections, a mixed guide, Sweep volume, middle-profile edits, canonical
+JSON/recompute and cached native-shape retention after invalid edits.
+
+The distinct `[shell-mixed-path-loft]` workflow opens only prepared Sketch/plane inputs through the
+Open dialog; those inputs are not authored by this UI scenario. PathCurve and five-section Loft
+creation, segment reversal, section reordering, rejected/recovered G2 preview, middle-width property
+editing, three-step history, canonical Save/Open/Save and STEP all use real Qt widget/dialog input.
+The seven `[shell-combined-workflow]` scenarios retain their separate fully UI-authored boundary.
+The inventory links the new exact tag/source without changing whole-block readiness.
+
+| Suite | Cases | Assertions | Result |
+| --- | ---: | ---: | --- |
+| Focused mixed-path Geometry | 4 | 989 | All passed |
+| Full Core | 519 | 15,311 | All passed |
+| Full Geometry | 435 | 29,602 | All passed |
+| Full offscreen GUI | 328 | 21,591 | 314 passed; 14 native-only skips |
+| Focused native mixed-path UI | 1 | 328 | All passed; no skips |
+| Combined native shell, serial rerun | 144 | 16,111 | All passed; no skips |
+
+The native five-plane Loft capture was inspected. Startup reached the intentional six-second timeout
+(exit 124). The first combined native run failed one existing workplane test at a ComboBox popup
+selection; the startup smoke had also opened an application window during that run. The rerun without
+a concurrent application window passed all 144 cases;
+the first failure was in UI selection rather than a Geometry assertion. Native logs contain the
+existing incomplete-visual depth/stencil warning, without high-severity or drawable-lifecycle errors.
+The closure gate still correctly rejects Block 136 (one of three cases fails, 129 assertions).
+Uniform normalized path-length section stations, compatible section topology, 32-span spline
+approximation and unsupported G2 remain documented limits. Native construction reference
+collection/manipulators remain next; Block 136 stays in progress.

@@ -8,14 +8,17 @@
 #include <BRepGProp.hxx>
 #include <BRepOffsetAPI_ThruSections.hxx>
 #include <BRep_Tool.hxx>
+#include <GCPnts_AbscissaPoint.hxx>
 #include <GC_MakeArcOfCircle.hxx>
 #include <GProp_GProps.hxx>
 #include <GeomAbs_Shape.hxx>
+#include <GeomAdaptor_Curve.hxx>
 #include <Geom_BezierCurve.hxx>
 #include <Geom_Surface.hxx>
+#include <Geom_TrimmedCurve.hxx>
 #include <Standard_Failure.hxx>
-#include <TColgp_Array1OfPnt.hxx>
 #include <TColStd_Array1OfReal.hxx>
+#include <TColgp_Array1OfPnt.hxx>
 #include <TopAbs_ShapeEnum.hxx>
 #include <TopExp_Explorer.hxx>
 #include <TopoDS.hxx>
@@ -53,49 +56,65 @@ constexpr std::size_t kControlSamplesPerSpan = 4U;
           first.z + (second.z - first.z) * ratio};
 }
 
-[[nodiscard]] std::vector<Point3> control_polyline(const std::vector<SweepPathSegment>& segments) {
-  std::vector<Point3> points;
-  if (segments.empty())
-    return points;
-  points.push_back(segments.front().start);
-  for (const SweepPathSegment& segment : segments) {
-    if (segment.kind == SweepPathSegmentKind::CircularArc)
-      points.push_back(segment.mid);
-    points.push_back(segment.end);
-  }
-  return points;
-}
-
+// Keep the trajectory's resolved line/spline spans and circular arcs intact.
+// Chord sampling changes both arc length stations and the bound section centers.
 [[nodiscard]] Result<Point3> sample_control_curve(const FeatureId& id,
                                                   const std::vector<SweepPathSegment>& segments,
                                                   double ratio, std::string_view role) {
-  const std::vector<Point3> points = control_polyline(segments);
-  if (points.size() < 2U)
+  if (segments.empty())
     return Result<Point3>::failure(
         loft_error(id, std::string(role) + " must contain a finite open curve"));
-  std::vector<double> lengths;
-  lengths.reserve(points.size() - 1U);
-  double total = 0.0;
-  for (std::size_t index = 1U; index < points.size(); ++index) {
-    const double length = distance(points[index - 1U], points[index]);
-    if (length <= kTolerance)
-      continue;
-    lengths.push_back(length);
-    total += length;
+  struct Span {
+    const SweepPathSegment* segment;
+    Handle(Geom_TrimmedCurve) arc;
+    double length;
+  };
+  try {
+    std::vector<Span> spans;
+    double total = 0;
+    for (const auto& segment : segments) {
+      if (!spans.empty() && distance(spans.back().segment->end, segment.start) > kTolerance)
+        return Result<Point3>::failure(
+            loft_error(id, std::string(role) + " must contain connected segments"));
+      Handle(Geom_TrimmedCurve) arc;
+      double span_length = distance(segment.start, segment.end);
+      if (segment.kind == SweepPathSegmentKind::CircularArc) {
+        GC_MakeArcOfCircle built(point(segment.start), point(segment.mid), point(segment.end));
+        if (!built.IsDone())
+          return Result<Point3>::failure(
+              loft_error(id, std::string(role) + " contains an invalid circular arc"));
+        arc = built.Value();
+        GeomAdaptor_Curve curve(arc);
+        span_length =
+            GCPnts_AbscissaPoint::Length(curve, arc->FirstParameter(), arc->LastParameter());
+      }
+      if (!std::isfinite(span_length) || span_length <= kTolerance)
+        return Result<Point3>::failure(
+            loft_error(id, std::string(role) + " contains a degenerate segment"));
+      spans.push_back({&segment, arc, span_length});
+      total += span_length;
+    }
+    const double target = std::clamp(ratio, 0.0, 1.0) * total;
+    double accumulated = 0;
+    for (std::size_t i = 0; i < spans.size(); ++i) {
+      const auto& span = spans[i];
+      if (target <= accumulated + span.length || i + 1 == spans.size()) {
+        const double t = std::clamp((target - accumulated) / span.length, 0.0, 1.0);
+        if (span.arc.IsNull())
+          return Result<Point3>::success(interpolate(span.segment->start, span.segment->end, t));
+        const auto value =
+            span.arc->Value(span.arc->FirstParameter() +
+                            t * (span.arc->LastParameter() - span.arc->FirstParameter()));
+        return Result<Point3>::success({value.X(), value.Y(), value.Z()});
+      }
+      accumulated += span.length;
+    }
+    return Result<Point3>::success(segments.back().end);
+  } catch (const Standard_Failure& failure) {
+    const auto* message = failure.GetMessageString();
+    return Result<Point3>::failure(loft_error(
+        id, std::string(role) + ": " + (message ? message : "OCCT curve evaluation failed")));
   }
-  if (lengths.size() != points.size() - 1U || total <= kTolerance)
-    return Result<Point3>::failure(
-        loft_error(id, std::string(role) + " contains a degenerate segment"));
-  const double target = std::clamp(ratio, 0.0, 1.0) * total;
-  double accumulated = 0.0;
-  for (std::size_t index = 0U; index < lengths.size(); ++index) {
-    if (target <= accumulated + lengths[index] || index + 1U == lengths.size())
-      return Result<Point3>::success(
-          interpolate(points[index], points[index + 1U],
-                      std::clamp((target - accumulated) / lengths[index], 0.0, 1.0)));
-    accumulated += lengths[index];
-  }
-  return Result<Point3>::success(points.back());
 }
 
 [[nodiscard]] Point3 closed_section_center(const std::vector<ClosedProfileCurveSegment>& section) {
@@ -390,7 +409,8 @@ controlled_open_sections(const FeatureId& id,
   poles.SetValue(3, point(segment.control2));
   poles.SetValue(4, point(segment.end));
   TColStd_Array1OfReal weights(1, 4);
-  for (int i = 1; i <= 4; ++i) weights.SetValue(i, segment.weights[i-1]);
+  for (int i = 1; i <= 4; ++i)
+    weights.SetValue(i, segment.weights[i - 1]);
   Handle(Geom_BezierCurve) curve = new Geom_BezierCurve(poles, weights);
   BRepBuilderAPI_MakeEdge edge(curve);
   if (!edge.IsDone())

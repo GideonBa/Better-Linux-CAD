@@ -736,7 +736,7 @@ Remaining relation/pick workflows keep the datum family and Block 136 open; see
 cmake --build --preset dev-gui --target blcad_gui_tests -j4
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[shell-combined-workflow]"
 BLCAD_UI_CAPTURE_DIR=/tmp/blcad-combined-workflows QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[shell-combined-workflow]"
-QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[shell-mixed-path-loft],[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
 ```
 
 `tests/gui/gui_shell_combined_workflow_tests.cpp` combines long interaction sequences in seven
@@ -796,3 +796,25 @@ widget input through construction, downstream modeling, reference edits, three-s
 roundtrip and STEP, including horizontal task fit with long type labels. Native selectors and
 captures use the existing 1280×800 harness; no new native-only
 skips are introduced. Native reference collection/manipulators still keep Block 136 open.
+
+### Mixed-path Loft and Sweep verification
+
+```bash
+cmake --build --preset dev-gui --target blcad_geometry_tests blcad_gui_tests blcad_app -j4
+./build/dev-gui/blcad_geometry_tests "[mixed-path-loft]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[shell-mixed-path-loft],[integration][gui-feature-coverage]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-mixed-loft QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[shell-mixed-path-loft]"
+```
+
+Geometry checks three/five unequal sections on differently oriented/rolled planes along line,
+32-span cubic spline and true circular-arc controls. Independent station/boundary assertions cover
+closed/open Loft, LoftSurface, guide control and Sweep, plus recompute/persistence and failed edits.
+The shell case imports only preauthored Sketch/plane inputs through Open, then uses actual Qt input
+for path collection/reversal, five-section ordering, invalid/recovered previews, Loft Apply, middle
+width property editing, three-step history, canonical reopen and STEP. This imported-input boundary
+is separate from the seven fully UI-authored `[shell-combined-workflow]` scenarios. Add the distinct
+`[shell-mixed-path-loft]` tag to the combined native regression above; both backends run it without
+new skips. Run native GUI suites and the application startup smoke sequentially so a second window
+cannot disturb popup focus. Contracts and current limits: `docs/part-guided-loft-geometry-mvp6.md` and
+`docs/gui-interactive-path-sweep-loft-mvp9.md`. Full-suite evidence lives in
+`docs/gui-shell-acceptance-mvp9r.md`; Block 136 remains open.
