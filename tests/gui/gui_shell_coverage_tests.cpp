@@ -7,6 +7,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QMenu>
 #include <QRegularExpression>
 #include <QSet>
 #include <QToolButton>
@@ -220,7 +221,8 @@ TEST_CASE("Every recorded shell entry point belongs to the constructed window an
       REQUIRE(actions.size() == 1);
       bool button_found = false;
       for (auto* button : window.ribbon().findChildren<QToolButton*>())
-        button_found = button_found || button->defaultAction() == actions.first();
+        button_found = button_found || button->defaultAction() == actions.first() ||
+                       (button->menu() && button->menu()->actions().contains(actions.first()));
       CHECK(button_found);
     }
     for (auto widget_id : shell["widgets"].toArray()) {

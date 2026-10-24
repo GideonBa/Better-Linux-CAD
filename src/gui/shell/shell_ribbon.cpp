@@ -136,6 +136,11 @@ void ShellRibbon::set_current_tab(int index) {
   tabs_->setCurrentIndex(index);
 }
 
+void ShellRibbon::add_widget(QWidget* group, QWidget* widget) {
+  widget->setParent(group);
+  button_row(group)->addWidget(widget);
+}
+
 int ShellRibbon::current_tab() const {
   return tabs_->currentIndex();
 }

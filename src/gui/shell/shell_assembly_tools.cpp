@@ -1172,7 +1172,7 @@ void ShellAssemblyTools::refresh() {
 void ShellAssemblyTools::end(bool applied) {
   coordinator_.cancel();
   if (viewport_.mouseGrabber() == &viewport_)
-    viewport_.releaseMouse();
+    viewport_.release_interaction_mouse();
   layer_.cancel();
   drag_transform_.reset();
   drag_value_.reset();
@@ -1230,7 +1230,7 @@ bool ShellAssemblyTools::eventFilter(QObject* watched, QEvent* event) {
       else {
         layer_.cancel();
         if (viewport_.mouseGrabber() == &viewport_)
-          viewport_.releaseMouse();
+          viewport_.release_interaction_mouse();
         restore_drag();
       }
       return true;
@@ -1241,7 +1241,7 @@ bool ShellAssemblyTools::eventFilter(QObject* watched, QEvent* event) {
           drag_buffer_.pop_back();
       } else if (key->key() == Qt::Key_Return || key->key() == Qt::Key_Enter) {
         auto final = layer_.end_drag(last_pointer_);
-        viewport_.releaseMouse();
+        viewport_.release_interaction_mouse();
         if (final)
           (void)candidate(*final);
         drag_transform_.reset();
@@ -1273,7 +1273,7 @@ bool ShellAssemblyTools::eventFilter(QObject* watched, QEvent* event) {
           drag_editor_->clear();
           drag_editor_->show();
           viewport_.setFocus();
-          viewport_.grabMouse();
+          viewport_.grab_interaction_mouse();
           apply_->setEnabled(false);
           return true;
         }
@@ -1289,7 +1289,7 @@ bool ShellAssemblyTools::eventFilter(QObject* watched, QEvent* event) {
     if (event->type() == QEvent::MouseButtonRelease && !layer_.active_handle_id().empty()) {
       auto* mouse = static_cast<QMouseEvent*>(event);
       auto result = layer_.end_drag({mouse->position().x(), mouse->position().y()});
-      viewport_.releaseMouse();
+      viewport_.release_interaction_mouse();
       if (result) {
         (void)candidate(*result);
         drag_transform_.reset();
@@ -1304,7 +1304,7 @@ bool ShellAssemblyTools::eventFilter(QObject* watched, QEvent* event) {
   if (event->type() == QEvent::WindowDeactivate && !layer_.active_handle_id().empty()) {
     layer_.cancel();
     if (viewport_.mouseGrabber() == &viewport_)
-      viewport_.releaseMouse();
+      viewport_.release_interaction_mouse();
     restore_drag();
   }
   return QObject::eventFilter(watched, event);

@@ -26,9 +26,9 @@ remain useful independent authority checks.
 - Every current positive tag filter against Catch's actual registered test metadata, including its
   exact shell test source. Each filter must match tests, and every match must come from that source.
   Comma-OR alternatives must be separate proofs, so a surviving arm cannot hide a deleted tag.
-- Every listed action has a unique object identity and a button in the constructed shell ribbon;
-  every listed widget belongs to that window. This is a reachability inventory, not a substitute
-  for executing the interaction regression tests.
+- Every listed action has a unique object identity and belongs to a direct ribbon button or its
+  menu; every listed widget belongs to that window. The ViewCube workflow exercises actual menu
+  input. This is a reachability inventory, not a substitute for executing the interaction regressions.
 - Gap/status consistency, exact blocked-family accounting and completion derived from remaining
   family gaps plus pending integrated workflows. Manifest completion must agree with the plan.
 
@@ -39,7 +39,8 @@ source, hide a missing tag behind OR and claim completion with gaps. They must a
 
 The machine-readable details live in `families[].shell.gaps`; this is the execution order:
 
-1. Restore contextual commands, selection-filter UI, view cube, view bookmarks and repeat command.
+1. Restore contextual commands, selection-filter UI and repeat command. ViewCube, Home and named
+   camera bookmarks now have replacement-shell controls.
 2. Restore the supported hierarchy validation, cross-hierarchy relationship/joint/solve controls,
    sampled Revolute analysis and occurrence-linked result highlighting.
 3. Finish integrated Part and Assembly acceptance using actual ShellWindow input paths, disposable
@@ -74,7 +75,7 @@ QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][gui-fea
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests
 ./build/dev-gui/blcad_core_tests
 ./build/dev-gui/blcad_geometry_tests
-QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-extrude-limit-picking],[shell-combined-extrude-limit-picking],[block136-thin-extrude],[shell-combined-thin-extrude],[block136-path-extrude],[shell-combined-path-extrude],[block136-revolve],[shell-combined-revolve-controls],[block136-extrude-extents],[shell-combined-extrude-extents],[block136-holes],[shell-combined-holes],[block136-parameters],[shell-combined-parameters],[block136-sketch3d-projection],[shell-combined-projected-sweep],[block136-sketch3d-direction],[shell-sketch3d-direction-workflow],[block136-sketch3d-placement],[shell-sketch3d-placement-workflow],[block136-sketch3d-grips],[shell-sketch3d-grips-workflow],[block136-sketch3d],[shell-combined-sketch3d],[block136-sketch-diagnostics],[missing-reference-session],[block136-missing-reference],[repair-open-session],[block136-repair-open],[block136-reference-repair-batches],[block136-reference-repair],[block136-construction-manipulators],[block136-construction-picking],[shell-mixed-path-loft],[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-navigation],[shell-combined-navigation],[block136-extrude-limit-picking],[shell-combined-extrude-limit-picking],[block136-thin-extrude],[shell-combined-thin-extrude],[block136-path-extrude],[shell-combined-path-extrude],[block136-revolve],[shell-combined-revolve-controls],[block136-extrude-extents],[shell-combined-extrude-extents],[block136-holes],[shell-combined-holes],[block136-parameters],[shell-combined-parameters],[block136-sketch3d-projection],[shell-combined-projected-sweep],[block136-sketch3d-direction],[shell-sketch3d-direction-workflow],[block136-sketch3d-placement],[shell-sketch3d-placement-workflow],[block136-sketch3d-grips],[shell-sketch3d-grips-workflow],[block136-sketch3d],[shell-combined-sketch3d],[block136-sketch-diagnostics],[missing-reference-session],[block136-missing-reference],[repair-open-session],[block136-repair-open],[block136-reference-repair-batches],[block136-reference-repair],[block136-construction-manipulators],[block136-construction-picking],[shell-mixed-path-loft],[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
 ```
 
 The regular inventory audit passes while it accurately records unfinished work. For closure,
@@ -1163,3 +1164,58 @@ Builds, GUI runs and the separate six-second native startup were serial. Startup
 until intentional timeout 124. Native focused/full/startup logs retain only the known medium OCCT
 depth/stencil visual warning, without high-severity, BadDrawable or fatal lifecycle diagnostics.
 Changed C++ sections pass the repository clang-format check; working and staged diff checks pass.
+
+## Camera navigation restoration — 2026-10-24
+
+`ShellNavigationTools` supplies seven standard views through the ViewCube menu, captured Home and
+trimmed named camera save/replace/restore/remove controls. The existing four direct view buttons and
+Fit remain reachable. Camera snapshots preserve projection and optional plane camera while remaining
+outside Core/history/persistence. Sketch/grip guards, document replacement and projection-checkbox
+synchronization follow `docs/gui-modeling-workspace-mvp9.md`.
+
+Five focused cases cover seven independent camera frames on both projections/backends, complete
+Home/bookmark restoration, duplicate/empty/unknown names, canonical file bytes, history, failed and
+successful document opening, Sketch focus and mouse grabs, invalid previews and reference scope.
+The twenty-first combined workflow, `[shell-combined-navigation]`, authors a plate and pocket through
+Qt input, captures and restores named views, re-enters Sketch, uses the ViewCube popup, corrects an
+invalid tapered cut, cancels an actual extent drag with Escape, applies the cut and changes source
+depth (46,800→56,400 mm³). An earlier-feature rename, three-step exact history, canonical reopening and
+STEP complete the workflow. Twenty combined workflows have fully UI-authored inputs; Planar motion
+retains its imported Part boundary. Context/filter/repeat controls keep viewport selection partial;
+thirteen families remain restored and five partial. Block 136 stays open.
+
+The first native run exposed orthographic bookmark eye displacement when restoring from perspective.
+OCCT projection is now restored before eye/target/up/scale; full-camera checks include resize and both
+projection transitions. Explicit viewport interaction-capture notifications keep navigation guards
+synchronized at grip begin/end. The combined test requires actual disabled controls and automatic
+re-enablement after Escape.
+
+The Qt input helper now scrolls the actual control bounds for an editable combo in a narrowed ribbon
+and sends Backspace when clearing a field. Actual visibility, center hit, popup row identity and
+exact desktop cursor checks remain enforced. The entry-point audit follows exact action identity in
+owned ribbon menus as well as direct buttons; native ViewCube input exercises the menu path.
+
+The final `dev-gui` application, GUI, Core and Geometry targets build successfully.
+
+| Suite | Cases | Assertions | Result |
+| --- | ---: | ---: | --- |
+| Full Core | 529 | 15,922 | All passed |
+| Full Geometry | 440 | 30,136 | All passed |
+| Focused native navigation and combined workflow | 6 | 859 | All passed; no skips |
+| Full offscreen GUI | 464 | 44,708 | 448 passed; 16 native-only skips |
+| Full combined native shell | 280 | 39,987 | All passed; no skips |
+
+The two native 1280×800 captures in `/tmp/blcad-navigation-native` were inspected: Home/ViewCube and
+named-view controls remain reachable through the ribbon scrollbar, the invalid-to-valid cut preview
+is visible, and Apply/Cancel remain pinned. Changed C++ sections/new files pass clang-format checks;
+working and staged diff checks pass.
+
+The ordinary inventory audit passes in the full GUI suite. The opt-in closure gate intentionally
+returns 1 (three cases: two pass, one expected failure; 213 assertions), retaining the five partial
+families and pending integrated workflows. This camera slice does not close the viewport family or
+Block 136.
+
+Builds, GUI suites and the separate native startup were serial. The application remained running
+until intentional six-second timeout 124. Native focused/full/startup logs retain only the known
+medium OCCT depth/stencil visual warning, without high-severity, BadDrawable or fatal lifecycle
+diagnostics.

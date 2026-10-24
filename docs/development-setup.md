@@ -251,7 +251,8 @@ manipulator overlay binder — and were removed with the Block-133 shell reset
 (`docs/gui-shell-reset-sequence-mvp9r.md`). The headless authorities they covered,
 `GuiModelingWorkspace` and `GuiViewportManipulatorLayer`, are unchanged and still exercised by the
 Block 124–130 controller proofs below. Block 135 re-establishes manipulator overlay coverage against
-`ShellWindow`; Block 136 restores the remaining workspace-level coverage.
+`ShellWindow`; Block 136 restores camera navigation through `[block136-navigation]` and
+`[shell-combined-navigation]`. Context/filter/repeat presentation remains open.
 
 The Block 124–130 proofs below are headless controller tests and are unaffected by the shell reset.
 
@@ -1179,3 +1180,19 @@ combos. Source-depth changes, an earlier-feature edit, exact history, canonical 
 exercise the full chain. Inspect `extrude-native-both-limits.png`, `extrude-picked-to-face-cut.png` and
 `extrude-picked-between-thin-wall.png` at 1280×800. Include both tags in the canonical native command in
 `docs/gui-shell-acceptance-mvp9r.md`. Keep builds, GUI runs and separate native startup serial.
+
+## ViewCube, Home and named-camera regression
+
+```bash
+cmake --build --preset dev-gui --target blcad_gui_tests blcad_app blcad_core_tests blcad_geometry_tests -j6
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[block136-navigation],[shell-combined-navigation],[gui][viewport],[integration][gui-feature-coverage]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-navigation-native QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-navigation],[shell-combined-navigation]"
+```
+
+Both backends execute all new cases. The focused tests compare independent standard camera axes,
+full Home/bookmark restoration and projection state; guard Sketch/grips and preserve invalid previews,
+reference scopes, history and document replacement. The combined Qt-input workflow covers named views,
+Sketch re-entry, ViewCube popup input, real drag/Escape after camera restoration, cut/source-depth
+edits, exact history, canonical reopening and STEP. Inspect `navigation-machining-preview.png` and
+`navigation-bookmarks-after-history.png` at 1280×800. Include both tags in the canonical native command
+in `docs/gui-shell-acceptance-mvp9r.md`; keep builds, GUI runs and separate native startup serial.

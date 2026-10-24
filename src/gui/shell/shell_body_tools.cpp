@@ -155,7 +155,7 @@ void ShellFeatureTools::build_body_controls(QWidget* panel) {
       layer_.cancel();
       restore_drag_start_value();
       if (viewport_.mouseGrabber() == &viewport_)
-        viewport_.releaseMouse();
+        viewport_.release_interaction_mouse();
     }
     body_reference_picking_ = checked;
     update_body_pick_mode();
@@ -288,7 +288,7 @@ Result<std::size_t> ShellFeatureTools::begin_body_operation(Command command) {
 
 Result<std::size_t> ShellFeatureTools::rebuild_body_controller() {
   if (viewport_.mouseGrabber() == &viewport_)
-    viewport_.releaseMouse();
+    viewport_.release_interaction_mouse();
   layer_.cancel();
   drag_start_value_.reset();
   coordinator_.cancel();

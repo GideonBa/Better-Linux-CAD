@@ -994,6 +994,25 @@ Verification evidence lives in `docs/gui-shell-acceptance-mvp9r.md`. The bounded
 family is restored; thirteen families are restored and five remain partial. Block 136 remains open
 and the numbered completion boundary stays at Block 135.
 
+### Block 136 — ViewCube, Home and named camera bookmarks — 2026-10-24
+
+The replacement shell now owns seven standard views, a ViewCube menu, explicit Home capture/restore
+and named camera save/replace/restore/remove controls through the retained transient workspace API.
+Names are trimmed; snapshots preserve complete camera values and remain outside model history and
+persistence. Sketch focus and viewport grip guards prevent competing camera commands; previews keep
+their task/reference/text state across navigation. Successful document replacement clears the
+catalog, while Save/history and failed or cancelled replacement preserve it.
+
+The offscreen viewport now applies OCCT's standard orientation frames instead of discarding the
+request, and projection changes notify consumers on both backends. Five focused cases and the
+twenty-first combined Qt-input workflow exercise camera/projection/plane restoration, preview and
+Sketch guards, real extent drag/Escape, source-depth propagation, three-step history, canonical
+reopening and STEP. Verification is recorded in `docs/gui-shell-acceptance-mvp9r.md`.
+
+Contextual commands, visible filters and repeat presentation remain in the partial viewport family;
+thirteen families remain restored and five partial. Block 136 stays open and completion remains
+through Block 135.
+
 ## Current next technical step — Block 136
 
 The current v3 coverage inventory records all eighteen accepted families, current shell proof sources,
@@ -1001,10 +1020,9 @@ reachable entry points and explicit remaining gaps. The machine check distinguis
 from closure readiness; historical controller proofs cannot close a shell gap. Acceptance contract:
 `docs/gui-shell-acceptance-mvp9r.md`, `[integration][gui-feature-coverage]` / `[gui][shell-coverage]`.
 
-Continue with workspace navigation/context controls: contextual commands, visible selection filters,
-view cube, bookmarks and repeat command, followed by the remaining advanced Assembly and integrated
-acceptance workflows. Native `ToFace`/`Between` collection now covers the supported semantic source
-roles. The bounded single-line Thin Extrude editors are available; general curved/open chains remain
+Continue with contextual commands, visible selection filters and repeat presentation, followed by the
+remaining advanced Assembly and integrated acceptance workflows. Native `ToFace`/`Between` collection
+now covers the supported semantic source roles. The bounded single-line Thin Extrude editors are available; general curved/open chains remain
 outside that Geometry boundary.
 All seven bounded Extrude terminations and the expanded Revolve controls now have explicit shell
 editors. Path Extrude selects open PathCurves with all four Body operations. Dedicated plain
@@ -1022,8 +1040,8 @@ The bounded repair-open path now supports failed-recompute Parts and missing fac
 with typed intent, complete atomic publication and failed-state history. Other structural dependency
 failures remain strict loading errors.
 The construction task now has fourteen bounded create/edit modes, native reference collection and
-position/direction/frame/new-offset grips. Continue with workspace navigation/context, advanced Assembly
-controls and integrated native Part/Assembly acceptance in the order recorded in
+position/direction/frame/new-offset grips. Continue with the remaining context/filter/repeat controls,
+advanced Assembly controls and integrated native Part/Assembly acceptance in the order recorded in
 `docs/gui-shell-acceptance-mvp9r.md`. Block 136 remains in progress until all recorded gaps and pending
 workflows are resolved and the closure gate plus full/native regressions pass.
 

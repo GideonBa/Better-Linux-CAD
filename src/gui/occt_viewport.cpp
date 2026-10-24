@@ -17,6 +17,7 @@
 #include <SelectMgr_EntityOwner.hxx>
 #include <Standard_Failure.hxx>
 #include <TopAbs_ShapeEnum.hxx>
+#include <V3d.hxx>
 #include <V3d_TypeOfOrientation.hxx>
 #include <V3d_View.hxx>
 #include <V3d_Viewer.hxx>
@@ -527,6 +528,20 @@ void OcctViewport::render_update() {
     update();
 }
 
+void OcctViewport::grab_interaction_mouse() {
+  if (QWidget::mouseGrabber() != this) {
+    QWidget::grabMouse();
+    render_update();
+  }
+}
+
+void OcctViewport::release_interaction_mouse() {
+  if (QWidget::mouseGrabber() == this) {
+    QWidget::releaseMouse();
+    render_update();
+  }
+}
+
 QPoint OcctViewport::to_render_point(QPoint point) const {
   // OCCT window/framebuffer coordinates are device pixels; Qt events are
   // logical pixels.
@@ -717,8 +732,8 @@ void OcctViewport::set_projection(GuiViewportProjection projection) {
     impl_->view->Camera()->SetProjectionType(projection == GuiViewportProjection::Perspective
                                                  ? Graphic3d_Camera::Projection_Perspective
                                                  : Graphic3d_Camera::Projection_Orthographic);
-    render_update();
   }
+  render_update();
   rebuild_sketch_grid();
 }
 
@@ -728,10 +743,32 @@ void OcctViewport::set_standard_view(GuiStandardView view) {
   // is cleared.
   if (sketch_focus_active())
     return;
+  auto camera = camera_bookmark();
   plane_camera_.reset();
   if (!impl_->view.IsNull()) {
     impl_->view->SetProj(occt_orientation(view));
     fit_all();
+  } else {
+    // Keep headless camera mappings consistent with OCCT's +Z-up views.
+    // SetProj otherwise has no effect without a native viewer.
+    const auto direction = V3d::GetProjAxis(occt_orientation(view));
+    const double distance =
+        std::hypot(camera.eye.x - camera.target.x, camera.eye.y - camera.target.y,
+                   camera.eye.z - camera.target.z);
+    camera.eye = {camera.target.x + distance * direction.X(),
+                  camera.target.y + distance * direction.Y(),
+                  camera.target.z + distance * direction.Z()};
+    Vector3 up = view == GuiStandardView::Top      ? Vector3{0, 1, 0}
+                 : view == GuiStandardView::Bottom ? Vector3{0, -1, 0}
+                                                   : Vector3{0, 0, 1};
+    const double alignment = up.x * direction.X() + up.y * direction.Y() + up.z * direction.Z();
+    up = {up.x - alignment * direction.X(), up.y - alignment * direction.Y(),
+          up.z - alignment * direction.Z()};
+    const double length = std::hypot(up.x, up.y, up.z);
+    camera.up_direction = {up.x / length, up.y / length, up.z / length};
+    camera.plane_camera.reset();
+    impl_->fallback_camera = camera;
+    render_update();
   }
   rebuild_sketch_grid();
 }
@@ -786,14 +823,16 @@ bool OcctViewport::restore_camera_bookmark(const GuiViewportCameraBookmark& book
     projection_ = bookmark.projection;
     plane_camera_ = bookmark.plane_camera;
     if (!impl_->view.IsNull()) {
+      // Perspective SetScale changes eye distance. Restore the projection
+      // first so an orthographic snapshot keeps its captured eye position.
+      impl_->view->Camera()->SetProjectionType(projection_ == GuiViewportProjection::Perspective
+                                                   ? Graphic3d_Camera::Projection_Perspective
+                                                   : Graphic3d_Camera::Projection_Orthographic);
       impl_->view->SetEye(bookmark.eye.x, bookmark.eye.y, bookmark.eye.z);
       impl_->view->SetAt(bookmark.target.x, bookmark.target.y, bookmark.target.z);
       impl_->view->SetUp(bookmark.up_direction.x, bookmark.up_direction.y,
                          bookmark.up_direction.z);
       impl_->view->SetScale(bookmark.scale);
-      impl_->view->Camera()->SetProjectionType(projection_ == GuiViewportProjection::Perspective
-                                                   ? Graphic3d_Camera::Projection_Perspective
-                                                   : Graphic3d_Camera::Projection_Orthographic);
     }
     impl_->fallback_camera = bookmark;
     render_update();

@@ -320,7 +320,7 @@ void ShellFeatureTools::reload_finishing_targets() {
 
 Result<std::size_t> ShellFeatureTools::rebuild_finishing_controller() {
   if (viewport_.mouseGrabber() == &viewport_)
-    viewport_.releaseMouse();
+    viewport_.release_interaction_mouse();
   layer_.cancel();
   drag_start_value_.reset();
   coordinator_.cancel();
