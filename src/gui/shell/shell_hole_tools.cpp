@@ -524,9 +524,10 @@ Result<std::size_t> ShellHoleTools::apply() {
       ui.window.session().commit_part_transaction("Durchgangsbohrungen", [&](PartDocument& part) {
         return add_candidate(part, definition.value());
       });
-  if (changed)
+  if (changed) {
     cancel();
-  else
+    ui.window.remember_repeatable_command(*ui.action);
+  } else
     ui.invalidate();
   return changed;
 }

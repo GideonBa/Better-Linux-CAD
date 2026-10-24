@@ -924,6 +924,14 @@ Result<std::size_t> ShellFeatureTools::apply() {
   auto applied = coordinator_.apply();
   if (applied.has_error())
     return applied;
+  QAction* accepted_action = command_ == Command::Extrude   ? action_extrude_
+                             : command_ == Command::Revolve ? action_revolve_
+                                                            : nullptr;
+  for (const auto* actions : {&finishing_actions_, &pattern_actions_, &body_actions_,
+                              &spatial_actions_, &surface_actions_})
+    for (const auto& [command, action] : *actions)
+      if (command == command_)
+        accepted_action = action;
   // The stage and command id were checked immediately before the synchronous
   // controller commit, and that commit does not mutate GuiTaskState.  Applying
   // the task is therefore deterministic here.  Normalize an unexpected future
@@ -960,6 +968,8 @@ Result<std::size_t> ShellFeatureTools::apply() {
   synchronize_overlay();
   window_.refresh();
   window_.statusBar()->showMessage(QStringLiteral("Feature angewendet"));
+  if (accepted_action)
+    window_.remember_repeatable_command(*accepted_action);
   return applied;
 }
 

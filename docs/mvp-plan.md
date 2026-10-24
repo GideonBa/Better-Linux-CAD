@@ -1029,6 +1029,22 @@ Verification is recorded in `docs/gui-shell-acceptance-mvp9r.md`. Contextual com
 presentation remain open in the viewport family. Thirteen families remain restored and five partial;
 Block 136 stays open and numbered completion remains through Block 135.
 
+### Block 136 — Repeat the last accepted modeling command — 2026-10-24
+
+The shell now owns a visible **Erneut: …** action and Ctrl+R window shortcut. Feature, Hole
+and Assembly task owners report the original command action only after successful Apply. Repeat
+starts that owner's ordinary fresh task with current compatible inputs and normal defaults; no old
+selection, parameters, path options or drafts are replayed. Failed/cancelled tasks do not replace the
+record. Task/Sketch/repair/capture guards and owner enablement prevent competing or invalid starts.
+Save/history and failed/cancelled replacement retain the transient record; successful document
+replacement clears it. Redo is separately labelled Wiederherstellen.
+
+Six focused scenarios and the twenty-third combined Qt-input workflow cover fresh defaults, changed
+profiles, invalid input, Assembly insertion, Ctrl+R/Escape, upstream edits, exact history, canonical
+reopening and STEP. Verification lives in `docs/gui-shell-acceptance-mvp9r.md`. Contextual commands
+remain open in the viewport family; thirteen families remain restored and five partial. Block 136
+stays open and numbered completion remains through Block 135.
+
 ## Current next technical step — Block 136
 
 The current v3 coverage inventory records all eighteen accepted families, current shell proof sources,
@@ -1036,7 +1052,7 @@ reachable entry points and explicit remaining gaps. The machine check distinguis
 from closure readiness; historical controller proofs cannot close a shell gap. Acceptance contract:
 `docs/gui-shell-acceptance-mvp9r.md`, `[integration][gui-feature-coverage]` / `[gui][shell-coverage]`.
 
-Continue with contextual commands and repeat presentation, followed by the remaining advanced
+Continue with contextual commands, followed by the remaining advanced
 Assembly and integrated acceptance workflows. Native `ToFace`/`Between` collection
 now covers the supported semantic source roles. The bounded single-line Thin Extrude editors are available; general curved/open chains remain
 outside that Geometry boundary.
@@ -1056,7 +1072,7 @@ The bounded repair-open path now supports failed-recompute Parts and missing fac
 with typed intent, complete atomic publication and failed-state history. Other structural dependency
 failures remain strict loading errors.
 The construction task now has fourteen bounded create/edit modes, native reference collection and
-position/direction/frame/new-offset grips. Continue with the remaining contextual/repeat controls,
+position/direction/frame/new-offset grips. Continue with the remaining contextual commands,
 advanced Assembly controls and integrated native Part/Assembly acceptance in the order recorded in
 `docs/gui-shell-acceptance-mvp9r.md`. Block 136 remains in progress until all recorded gaps and pending
 workflows are resolved and the closure gate plus full/native regressions pass.

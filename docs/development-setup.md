@@ -1213,3 +1213,19 @@ STEP. Native additionally clicks the actual Body through the filtered OCCT conte
 `selection-filter-finishing-preview.png`, `selection-filter-hole-preview.png` and
 `selection-filter-after-history.png` at 1280×800. Include both tags in the canonical native command in
 `docs/gui-shell-acceptance-mvp9r.md`; keep builds, GUI runs and separate native startup serial.
+
+## Last accepted modeling-command repeat regression
+
+```bash
+cmake --build --preset dev-gui --target blcad_gui_tests blcad_app blcad_core_tests blcad_geometry_tests -j6
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[block136-repeat],[shell-combined-repeat],[integration][gui-feature-coverage]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-repeat-native QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-repeat],[shell-combined-repeat]"
+```
+
+The focused cases distinguish accepted commands from failed/cancelled candidates, use a different
+current profile and fresh Hole/Assembly defaults, guard tasks/Sketch/capture and check Save, exact
+history and all document-replacement boundaries. The combined workflow authors two different holes,
+rejects invalid placement, applies Fillet, uses Ctrl+R/Escape, edits upstream depth, verifies four-step
+history, reopens canonically and exports STEP. Inspect `repeat-hole-preview.png` and
+`repeat-after-history.png` at 1280×800. Include both tags in the canonical native regression in
+`docs/gui-shell-acceptance-mvp9r.md`; keep builds, GUI runs and separate native startup serial.

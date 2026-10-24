@@ -1215,8 +1215,15 @@ Result<std::size_t> ShellAssemblyTools::apply() {
     return checked;
   auto applied = command_ == Command::Solve ? GuiAssemblyWorkbench{}.apply_solve(session_, *solved_)
                                             : coordinator_.apply();
-  if (applied)
+  if (applied) {
+    QAction* accepted_action = nullptr;
+    for (const auto& [command, action] : actions_)
+      if (command == command_)
+        accepted_action = action;
     end(true);
+    if (accepted_action)
+      window_.remember_repeatable_command(*accepted_action);
+  }
   return applied;
 }
 bool ShellAssemblyTools::eventFilter(QObject* watched, QEvent* event) {

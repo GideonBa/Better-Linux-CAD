@@ -3,7 +3,8 @@
 Status: the Block-122 application authority `GuiModelingWorkspace` is retained. Its original Qt
 adapter was deleted with the Block-133 shell reset. Block 136 now restores camera navigation through
 `ShellNavigationTools` on `ShellWindow`, as detailed below. Visible selection filters are also
-restored. Contextual commands and repeat presentation remain open; the old mini-toolbar/catalog adapter specifics are historical.
+restored. `ShellRepeatTools` now restores command-repeat presentation through the current command
+owners. Contextual commands remain open; the old mini-toolbar/catalog adapter specifics are historical.
 
 Block 122 introduces the shared application-layer interaction boundary used by the Part, Surface, and
 Assembly modeling workspaces. It upgrades the existing MVP-7 form-driven workbenches with
@@ -108,6 +109,43 @@ starts the same command id in the current compatible area without inventing prio
 selection state. Cancel or `Esc` restores both the consumed semantic selection and its complete
 capability context, so the mini-toolbar and command enablement return exactly to their pre-command
 state. Active Block-123 handles are likewise transient and can be cleared without a document rollback.
+
+### Replacement-shell repeat (Block 136)
+
+`ShellWindow` explicitly owns `ShellRepeatTools`. The ribbon action
+`blcad.action.repeat_last_command` shows **Erneut: …** and has the window shortcut Ctrl+R.
+The explicit ribbon button `blcad.repeat.button` tracks the changing label in its minimum width,
+so the command name remains readable in a narrow scrollable ribbon. Redo is separately labelled
+**Wiederherstellen** and retains its standard shortcut/history semantics.
+The record is transient and scoped to the current document. Save and Undo/Redo retain it; successful
+New Part, New Project and Open clear it. Failed Open and cancelled replacement retain it.
+
+The owning command reports its exact QAction only after successful atomic Apply. Supported owners
+are `ShellFeatureTools` (Extrude/Revolve, finishing, patterns, Body, spatial/path and Surface tasks),
+`ShellHoleTools` and `ShellAssemblyTools` (insertion, placement, relationships, joints, drive and solve).
+Sketch/construction editors, parameter/feature edits, repair, measurement and file operations do not
+replace this modeling-command record. Cancel, failed Apply and failed previews never replace it.
+
+Repeat invokes the original owner's existing entry point with current compatible inputs and normal
+new-task defaults. It stores no previous selection, dimensions, Body operation, path, references,
+component definition or local draft. Extrude's path/Thin/extent options are consequently chosen again
+in the fresh task. Repeating can open a collecting task that still needs its required inputs; it
+never directly commits a second result. A changed profile is used for a repeated Extrude, while a
+hidden/missing profile leaves Repeat disabled until the normal Extrude entry becomes available.
+
+The source action is supplied by its owner rather than discovered or inferred from task/history
+labels. A direct `QAction::changed` observer keeps enablement synchronized with late Finish Sketch
+handoffs; existing triggered handlers are neither replaced nor augmented. `QPointer` guards lifetime.
+The new action requires the source to be enabled, matching document kind, no active task or Sketch,
+no repair mode and no viewport mouse capture. The same guards run in its trigger handler. Native
+capture notifications update it without polling. The shell refreshes it after owner enablement.
+
+Six focused `[block136-repeat]` cases cover accepted-only recording, cancellation/failed input,
+current-profile/default behavior, hole creation, guards, canonical/history/replacement boundaries and
+fresh Assembly insertion. The twenty-third combined workflow `[shell-combined-repeat]` uses actual
+Qt input for two different holes, invalid placement recovery, Fillet, Ctrl+R/Escape, an upstream depth
+edit, four-step exact history, canonical reopening and STEP. Contextual command presentation remains
+open; this bounded repeat slice does not close the viewport family or Block 136.
 
 ## Finish Sketch handoff
 
@@ -219,7 +257,7 @@ ViewCube menu and saved views, re-enters Sketch, corrects invalid taper text, ca
 drag with Escape after restoring a camera, applies a cut, changes the source depth, edits an earlier
 feature, verifies three-step exact history, reopens canonically and exports STEP. Native tests execute
 the same controls and validate the actual camera frames. The viewport-selection family remains
-partial for contextual/repeat controls; Block 136 remains open.
+partial for contextual commands; Block 136 remains open.
 
 ## Focused proof
 
