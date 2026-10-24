@@ -1287,3 +1287,26 @@ also skips there. Inspect `finishing-context-shell-preview.png`,
 `finishing-context-chamfer-preview.png` and `finishing-context-after-history.png` at 1280×800 in the
 capture directory. Include both new tags in the canonical native filter in
 `docs/gui-shell-acceptance-mvp9r.md`. Block 136 remains open.
+
+## Body pattern and Mirror context regression
+
+Run builds, GUI suites and the native startup serially:
+
+```bash
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[block136-pattern-context],[shell-combined-pattern-context],[block136-patterns],[block136-finishing-context],[block136-profile-context],[block136-selection-filters],[integration][gui-feature-coverage]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-pattern-context-native QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-pattern-context],[shell-combined-pattern-context],[block136-patterns]"
+```
+
+Five focused cases cover exactly one current Body, a nondefault cylinder, all three commands,
+idempotent source seeding, task-owned Body/reference scopes, all cancellation routes, atomic Apply,
+history, Save and replacement. The twenty-seventh combined Qt-input workflow cancels/applies Mirror,
+creates Circular and Linear patterns, chains the reflected source, stages three upstream parameter
+changes together, edits the earlier Mirror, checks five-step exact history, reopens and exports STEP.
+Small rectangles first use a larger pointer preview before exact numeric refinement, beyond the
+axis-inference tolerance. Offscreen source selection uses the browser; native input hits actual OCCT
+Bodies. The existing
+native pattern-handle case skips explicitly offscreen. Inspect four 1280×800 captures:
+`pattern-context-mirror-preview.png`, `pattern-context-circular-preview.png`,
+`pattern-context-linear-preview.png` and `pattern-context-after-history.png` in the capture directory.
+Include both new tags in the canonical native filter in `docs/gui-shell-acceptance-mvp9r.md`.
+Block 136 remains open.

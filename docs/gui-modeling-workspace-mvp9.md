@@ -4,8 +4,9 @@ Status: the Block-122 application authority `GuiModelingWorkspace` is retained. 
 adapter was deleted with the Block-133 shell reset. Block 136 now restores camera navigation through
 `ShellNavigationTools` on `ShellWindow`, as detailed below. Visible selection filters are also
 restored. `ShellRepeatTools` now restores command-repeat presentation through the current command
-owners. `ShellContextTools` supplies the shared bounded profile and finishing mini-toolbar described below.
-Pattern, Body, Surface and Assembly context commands stay open; the old catalog adapter
+owners. `ShellContextTools` supplies the shared bounded profile, finishing and pattern mini-toolbar
+described below.
+Body Boolean/Transform, Surface and Assembly context commands stay open; the old catalog adapter
 specifics are historical.
 
 Block 122 introduces the shared application-layer interaction boundary used by the Part, Surface, and
@@ -149,7 +150,7 @@ restoration, raw-region exclusion, three-section atomic Apply, Save and replacem
 combined workflow `[shell-combined-spatial-context]` authors all its Sketch/plane/path inputs through Qt, cancels an
 invalid Sweep, corrects a three-section Loft's order and G2 input, creates a second Sweep, changes its
 twist parameter, edits the earlier Loft, verifies four-step history, reopens and exports STEP.
-Pattern, Body, Surface and Assembly contexts remain open; the viewport family stays partial.
+Body Boolean/Transform, Surface and Assembly contexts remain open; the viewport family stays partial.
 
 ### Replacement-shell finishing contexts (Block 136, 2026-10-24)
 
@@ -183,8 +184,37 @@ hidden/removed sources, Save and replacement. The twenty-sixth combined Qt-input
 `[shell-combined-finishing-context]` authors two Bodies, cancels Draft, shells one Body, fillets and
 chamfers the other, changes two upstream parameters in one batch, edits an earlier feature, checks
 five-step exact history, reopens canonically and exports STEP. It requires native OCCT subshape hits
-and explicitly skips offscreen. Pattern, Body, Surface and Assembly contexts remain open; the viewport
-family remains partial and Block 136 stays open.
+and explicitly skips offscreen. Body Boolean/Transform, Surface and Assembly contexts remain open;
+the viewport family remains partial and Block 136 stays open.
+
+### Replacement-shell Body pattern contexts (Block 136, 2026-10-24)
+
+Exactly one current, visible and recomputed solid Body offers `context_linear_pattern`,
+`context_circular_pattern` and `context_body_mirror` when the existing command owner has its required
+references. Body picking works under All or the explicit Bodies filter. The current Part and cache,
+selection kind, filter and semantic scope verify the typed BodyId; id spelling alone, multiple
+selections, stale/hidden/missing sources and surface Bodies do not grant this capability. Curved
+solids remain valid independently of the finishing tools' rectangular topology roles.
+
+The wrapper invokes the original QAction and idempotently seeds exactly the verified Body through
+`ShellFeatureTools::select_pattern_context()`. It consumes complete preselection after the task has
+started. Other Bodies remain available for explicit additional collection. Browser Body/reference
+selection reaches the same Pattern owner as viewport selection. The normal Pattern/Mirror owner
+keeps reference, count, extent, direction, preview and atomic Apply authority. Its temporary
+semantic scope switches between all offered Bodies and the command's offered axes/planes during
+reference picking. Apply and every cancellation route restore the previous filter and scope;
+context/task Cancel and Escape also restore the complete still-valid consumed selection. Save and
+replacement follow the existing common toolbar contract. No selection or context state is persisted.
+
+Five `[block136-pattern-context]` cases cover exact nondefault curved-Body seeding, eligibility guards,
+reference/scope transitions, idempotence, all cancellation routes, empty sources, atomic Apply,
+history, Save and replacement. The twenty-seventh combined workflow
+`[shell-combined-pattern-context]` authors two Bodies through Qt, cancels and applies Mirror, makes a
+Circular pattern and a Linear pattern from the reflected result, stages three upstream parameter
+changes in one batch, edits the earlier Mirror, checks five-step exact history, reopens and exports
+STEP. Offscreen selects the source through the browser; native input hits the actual OCCT Body.
+Body Boolean/Transform, Surface and Assembly contexts remain open; the viewport family and Block 136
+remain partial/open.
 
 ## Command lifecycle, cancellation, and repeat
 

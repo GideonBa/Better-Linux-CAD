@@ -5,6 +5,7 @@
 #include "blcad/gui/occt_viewport.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
 
+#include <QAction>
 #include <QComboBox>
 #include <QFormLayout>
 #include <QLabel>
@@ -13,6 +14,7 @@
 #include <QPushButton>
 #include <QSignalBlocker>
 #include <QSpinBox>
+#include <QVBoxLayout>
 #include <QWidget>
 
 #include <algorithm>
@@ -32,6 +34,61 @@ bool ShellFeatureTools::pattern() const noexcept {
   return command_ == Command::LinearPattern || command_ == Command::CircularPattern ||
          command_ == Command::BodyMirror;
 }
+QAction* ShellFeatureTools::pattern_action(Command command) const noexcept {
+  for (const auto& [kind, action] : pattern_actions_)
+    if (kind == command)
+      return action;
+  return nullptr;
+}
+
+bool ShellFeatureTools::pattern_context_available(const PatternContext& context) const {
+  if (session_.document_kind() != GuiDocumentKind::Part ||
+      session_.workspace() != GuiWorkspace::Part || !session_.part_document() ||
+      !session_.part_shape_cache() || !session_.derived_results_fresh())
+    return false;
+  const auto* body = session_.part_document()->find_body(context.body);
+  const auto* shape = session_.part_shape_cache()->find_body_shape(context.body);
+  return body && body->kind() == BodyKind::Solid && body->visibility() == BodyVisibility::Visible &&
+         shape && !shape->empty();
+}
+
+std::optional<ShellFeatureTools::PatternContext> ShellFeatureTools::pattern_context() const {
+  if (active() || session_.task().active() || window_.active_sketch() ||
+      session_.reference_repair_mode() || session_.selection().size() != 1 ||
+      !session_.part_document() || !session_.selection().allows(GuiSelectionKind::Body) ||
+      !(viewport_.selection_filter_mask() & selection_kind_bit(GuiSelectionKind::Body)))
+    return std::nullopt;
+  const auto& selected = session_.selection().entries().front();
+  if (selected.kind != GuiSelectionKind::Body)
+    return std::nullopt;
+  const auto& scope = viewport_.selection_semantic_scope();
+  if (scope && std::find(scope->begin(), scope->end(), selected.semantic_id) == scope->end())
+    return std::nullopt;
+  for (const auto& body : session_.part_document()->bodies())
+    if (selected.semantic_id == "body/" + body.id().value() &&
+        pattern_context_available({body.id()}))
+      return PatternContext{body.id()};
+  return std::nullopt;
+}
+
+bool ShellFeatureTools::select_pattern_context(const PatternContext& context) {
+  if (!pattern() || !session_.task().active() || session_.task().command_id() != command_id() ||
+      !pattern_context_available(context))
+    return false;
+  for (int i = 0; i < pattern_sources_->count(); ++i)
+    if (pattern_sources_->item(i)->data(Qt::UserRole).toString() ==
+        QString::fromStdString(context.body.value())) {
+      {
+        const QSignalBlocker block(pattern_sources_);
+        pattern_sources_->clearSelection();
+        pattern_sources_->item(i)->setSelected(true);
+      }
+      refresh_pattern_preview();
+      return true;
+    }
+  return false;
+}
+
 QString ShellFeatureTools::pattern_summary() const {
   const auto sources = pattern_sources_->selectedItems().size();
   return command_ == Command::BodyMirror
@@ -45,7 +102,9 @@ QString ShellFeatureTools::pattern_summary() const {
 void ShellFeatureTools::build_pattern_controls(QWidget* panel) {
   pattern_controls_ = new QWidget(panel);
   pattern_controls_->setMinimumWidth(280);
-  auto* form = new QFormLayout(pattern_controls_);
+  auto* column = new QVBoxLayout(pattern_controls_);
+  auto* form = pattern_form_ = new QFormLayout();
+  column->addLayout(form);
   pattern_reference_ = new QComboBox(pattern_controls_);
   pattern_reference_->setObjectName(QStringLiteral("blcad.pattern.reference"));
   form->addRow(QStringLiteral("Achse / Ebene"), pattern_reference_);
@@ -66,7 +125,8 @@ void ShellFeatureTools::build_pattern_controls(QWidget* panel) {
           "Weitere Klicks ergänzen oder entfernen Körper. Das Ergebnis entsteht als neuer Körper."),
       pattern_controls_);
   hint->setWordWrap(true);
-  form->addRow(hint);
+  // Keep wrapped guidance outside dynamic form rows, as in the Body task.
+  column->addWidget(hint);
   pattern_count_editor_ = new QSpinBox(pattern_controls_);
   pattern_count_editor_->setObjectName(QStringLiteral("blcad.pattern.count"));
   pattern_count_editor_->setRange(2, 1000);
@@ -235,13 +295,14 @@ Result<std::size_t> ShellFeatureTools::begin_pattern(Command command) {
     return fail("Musteraufgabe konnte nicht gestartet werden");
   }
   previous_selection_mask_ = viewport_.selection_filter_mask();
+  previous_semantic_scope_ = viewport_.selection_semantic_scope();
   pattern_reference_picking_ = false;
   pattern_count_ = 3;
   pattern_value_ = command == Command::CircularPattern ? 360 : 40;
   pattern_extent_->setCurrentIndex(0);
   pattern_direction_->setCurrentIndex(0);
   pattern_count_editor_->setValue(pattern_count_);
-  auto* form = static_cast<QFormLayout*>(pattern_controls_->layout());
+  auto* form = pattern_form_;
   form->setRowVisible(pattern_count_editor_, command != Command::BodyMirror);
   form->setRowVisible(pattern_extent_, command == Command::LinearPattern);
   form->setRowVisible(pattern_direction_, command == Command::LinearPattern);
@@ -385,6 +446,19 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::set_pattern_count(int value) {
 void ShellFeatureTools::update_pattern_pick_mode() {
   const QSignalBlocker block(pattern_reference_button_);
   pattern_reference_button_->setChecked(pattern_reference_picking_);
+  std::vector<std::string> scope;
+  if (pattern_reference_picking_) {
+    if (command_ == Command::BodyMirror)
+      for (const auto& plane : pattern_planes_)
+        scope.push_back(plane.semantic_id);
+    else
+      for (const auto& axis : pattern_axes_)
+        scope.push_back(axis.semantic_id);
+  } else
+    for (int i = 0; i < pattern_sources_->count(); ++i)
+      scope.push_back("body/" +
+                      pattern_sources_->item(i)->data(Qt::UserRole).toString().toStdString());
+  viewport_.set_selection_semantic_scope(std::move(scope));
   viewport_.set_selection_filter_mask(selection_kind_bit(
       pattern_reference_picking_ ? GuiSelectionKind::Datum : GuiSelectionKind::Body));
   synchronize_overlay();

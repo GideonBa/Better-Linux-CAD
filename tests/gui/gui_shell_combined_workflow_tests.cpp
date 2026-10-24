@@ -54,6 +54,7 @@
 #include <cmath>
 #include <functional>
 #include <numbers>
+#include <optional>
 #include <vector>
 
 using namespace blcad;
@@ -414,7 +415,8 @@ public:
     REQUIRE(window.viewport().rect().contains(local.toPoint()));
     click_at(window.viewport(), local);
   }
-  SketchId rectangle(const std::string& plane, Point2 first, Point2 second) {
+  SketchId rectangle(const std::string& plane, Point2 first, Point2 second,
+                     std::optional<Point2> preview_point = std::nullopt) {
     INFO("Rectangle on " << plane << ": " << first.x << "," << first.y << " to " << second.x << ","
                          << second.y);
     tree(plane);
@@ -443,7 +445,10 @@ public:
       key(window, Qt::Key_Return);
     };
     coordinates(first);
-    const auto hover = checked(window.viewport().sketch_plane_to_screen(second));
+    // Small final dimensions can fall inside axis-inference tolerance. Allow
+    // a wider pointer preview before the exact numeric refinement below.
+    const auto hover =
+        checked(window.viewport().sketch_plane_to_screen(preview_point.value_or(second)));
     QMouseEvent move(QEvent::MouseMove, {hover.x, hover.y},
                      window.viewport().mapToGlobal(QPoint(qRound(hover.x), qRound(hover.y))),
                      Qt::NoButton, Qt::NoButton, Qt::NoModifier);
@@ -3456,6 +3461,148 @@ TEST_CASE(
   ui.roundtrip(directory.filePath("finishing-context.blcad"));
   CHECK_FALSE(ui.widget<QWidget>("blcad.context.toolbar").isVisible());
   const auto step = directory.filePath("finishing-context.step");
+  ui.file("export_part_step", step);
+  CHECK(ui.bytes(step).contains("ISO-10303-21"));
+  CHECK(ui.snapshot() == states.back());
+  ui.idle();
+}
+
+TEST_CASE("Combined UI pattern contexts chain reflected sources through upstream parameter batches",
+          "[gui][integration][shell-combined-workflow][shell-combined-pattern-context]") {
+  WorkflowUi ui;
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  ui.new_document("Context pattern chain");
+  ui.rectangle("datum.xy", {0, 0}, {10, 10}, Point2{20, 20});
+  const auto unchanged = ui.extrude(10);
+  ui.rectangle("datum.xy", {20, 20}, {28, 28}, Point2{40, 40});
+  const auto source = ui.extrude(8);
+  const auto source_depth =
+      ui.window.session().part_document()->features().back().length_parameter();
+  std::vector<std::string> states{ui.snapshot()};
+  const auto context = [&](const QString& id) {
+    ui.click(ui.widget<QToolButton>("blcad.context." + id));
+  };
+  const auto pick = [&](const BodyId& body) {
+    ui.command("view_isometric", 2);
+    ui.data(ui.widget<QComboBox>("blcad.selection.filter"),
+            selection_kind_bit(GuiSelectionKind::Body));
+    ui.tree("datum.xy");
+    REQUIRE_FALSE(ui.widget<QWidget>("blcad.context.toolbar").isVisible());
+    if (QApplication::platformName() == "xcb") {
+      const auto bounds = ui.bounds(body);
+      const auto point = checked(ui.window.viewport().model_to_screen(
+          {(bounds.minimum.x + bounds.maximum.x) / 2, (bounds.minimum.y + bounds.maximum.y) / 2,
+           (bounds.minimum.z + bounds.maximum.z) / 2}));
+      ui.click_at(ui.window.viewport(), {point.x, point.y});
+      REQUIRE(ui.window.viewport().selected_semantic());
+      CHECK(ui.window.viewport().selected_semantic()->semantic_id == "body/" + body.value());
+    } else
+      ui.tree(body.value());
+    REQUIRE(ui.window.session().selection().size() == 1);
+    CHECK(ui.window.session().selection().entries().front().semantic_id == "body/" + body.value());
+    auto& toolbar = ui.widget<QWidget>("blcad.context.toolbar");
+    REQUIRE(toolbar.isVisible());
+    CHECK(ui.window.viewport().rect().contains(toolbar.geometry()));
+  };
+  const auto exact_source = [&](const BodyId& body) {
+    const auto& selected = ui.widget<QListWidget>("blcad.pattern.sources").selectedItems();
+    REQUIRE(selected.size() == 1);
+    CHECK(selected.front()->data(Qt::UserRole).toString() == QString::fromStdString(body.value()));
+  };
+  pick(source);
+  context("body_mirror");
+  exact_source(source);
+  ui.button("blcad.pattern.pick_reference");
+  ui.tree("datum.xz");
+  CHECK(ui.snapshot() == states.back());
+  context("cancel");
+  REQUIRE(ui.window.session().selection().size() == 1);
+  CHECK(ui.window.session().selection().entries().front().semantic_id == "body/" + source.value());
+  context("body_mirror");
+  ui.button("blcad.pattern.pick_reference");
+  ui.tree("datum.xz");
+  ui.capture("pattern-context-mirror-preview");
+  ui.button("blcad.feature.apply");
+  const auto reflected = ui.window.session().part_document()->bodies().back().id();
+  const auto mirror = ui.window.session().part_document()->mirror_features().back().id();
+  CHECK(ui.summary(reflected).volume_mm3 == Approx(512).margin(1e-5));
+  CHECK(ui.bounds(reflected).minimum.y == Approx(-28).margin(1e-5));
+  states.push_back(ui.snapshot());
+
+  pick(source);
+  context("circular_pattern");
+  exact_source(source);
+  auto& sources = ui.widget<QListWidget>("blcad.pattern.sources");
+  ui.list_data(sources, QString::fromStdString(source.value()));
+  CHECK_FALSE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+  CHECK(ui.snapshot() == states.back());
+  ui.list_data(sources, QString::fromStdString(source.value()));
+  auto& count = ui.widget<QSpinBox>("blcad.pattern.count");
+  CHECK(count.height() >= count.minimumSizeHint().height());
+  ui.number(count, "4");
+  ui.scalar("240 deg");
+  ui.capture("pattern-context-circular-preview");
+  ui.button("blcad.feature.apply");
+  const auto radial = ui.window.session().part_document()->bodies().back().id();
+  const auto count_parameter =
+      ui.window.session().part_document()->circular_pattern_features().back().count_parameter();
+  CHECK(ui.summary(radial).solid_count == 4);
+  CHECK(ui.summary(radial).volume_mm3 == Approx(2048).margin(1e-5));
+  states.push_back(ui.snapshot());
+
+  pick(reflected);
+  context("linear_pattern");
+  exact_source(reflected);
+  ui.number(count, "2");
+  ui.choose(ui.widget<QComboBox>("blcad.pattern.extent"), 1);
+  ui.choose(ui.widget<QComboBox>("blcad.pattern.direction"), 1);
+  ui.scalar("5 deg");
+  CHECK(ui.snapshot() == states.back());
+  ui.scalar("45 mm");
+  ui.capture("pattern-context-linear-preview");
+  ui.button("blcad.feature.apply");
+  const auto linear = ui.window.session().part_document()->bodies().back().id();
+  const auto extent_parameter =
+      ui.window.session().part_document()->linear_pattern_features().back().extent_parameter();
+  CHECK(ui.summary(linear).solid_count == 2);
+  CHECK(ui.summary(linear).volume_mm3 == Approx(1024).margin(1e-5));
+  const auto& linear_intent = ui.window.session().part_document()->linear_pattern_features().back();
+  CHECK(linear_intent.extent_mode() == LinearPatternExtentMode::TotalExtent);
+  CHECK(linear_intent.direction_sign() == PatternDirectionSign::Negative);
+  CHECK(ui.bounds(linear).minimum.x == Approx(ui.bounds(reflected).minimum.x - 45).margin(1e-5));
+  states.push_back(ui.snapshot());
+
+  ui.command("parameters");
+  for (const auto& [parameter, value] :
+       {std::pair{source_depth, "12"}, std::pair{count_parameter, "5"},
+        std::pair{extent_parameter, "55"}}) {
+    ui.data(ui.widget<QComboBox>("blcad.parameters.parameter"),
+            QString::fromStdString(parameter.value()));
+    ui.text(ui.widget<QLineEdit>("blcad.parameters.input"), value);
+    ui.button("blcad.parameters.stage");
+  }
+  ui.button("blcad.parameters.preview");
+  CHECK(ui.snapshot() == states.back());
+  ui.button("blcad.parameters.apply");
+  CHECK(ui.summary(unchanged).volume_mm3 == Approx(1000).margin(1e-5));
+  CHECK(ui.summary(source).volume_mm3 == Approx(768).margin(1e-5));
+  CHECK(ui.summary(reflected).volume_mm3 == Approx(768).margin(1e-5));
+  CHECK(ui.summary(radial).volume_mm3 == Approx(3840).margin(1e-5));
+  CHECK(ui.summary(linear).volume_mm3 == Approx(1536).margin(1e-5));
+  CHECK(ui.bounds(linear).minimum.x == Approx(ui.bounds(reflected).minimum.x - 55).margin(1e-5));
+  states.push_back(ui.snapshot());
+  ui.tree(mirror.value(), true);
+  ui.text(ui.widget<QLineEdit>("blcad.feature_edit.field/name"), "Context reflected source");
+  ui.button("blcad.feature_edit.apply");
+  states.push_back(ui.snapshot());
+  ui.data(ui.widget<QComboBox>("blcad.selection.filter"), 0xFFFFFFFFU);
+  ui.history(states);
+  pick(unchanged);
+  ui.capture("pattern-context-after-history");
+  ui.roundtrip(directory.filePath("pattern-context.blcad"));
+  CHECK_FALSE(ui.widget<QWidget>("blcad.context.toolbar").isVisible());
+  const auto step = directory.filePath("pattern-context.step");
   ui.file("export_part_step", step);
   CHECK(ui.bytes(step).contains("ISO-10303-21"));
   CHECK(ui.snapshot() == states.back());

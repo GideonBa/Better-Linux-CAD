@@ -39,7 +39,10 @@ ShellContextTools::ShellContextTools(ShellWindow& window) : QObject(&window), wi
         std::tuple{Command::Fillet, "fillet", "Verrunden"},
         std::tuple{Command::Chamfer, "chamfer", "Fase"},
         std::tuple{Command::Shell, "shell", "Aushöhlen"},
-        std::tuple{Command::Draft, "draft", "Formschräge"}}) {
+        std::tuple{Command::Draft, "draft", "Formschräge"},
+        std::tuple{Command::LinearPattern, "linear_pattern", "Lineares Muster"},
+        std::tuple{Command::CircularPattern, "circular_pattern", "Kreismuster"},
+        std::tuple{Command::BodyMirror, "body_mirror", "Spiegeln"}}) {
     const auto [wrapper, button] = action(id, label);
     commands_.at(index++) = {kind, wrapper, button};
     connect(wrapper, &QAction::triggered, this, [this, kind] { begin(kind); });
@@ -63,6 +66,8 @@ ShellContextTools::~ShellContextTools() {
 
 QAction* ShellContextTools::source_action(Command kind) const {
   auto& owner = window_.feature_tools();
+  if (auto* pattern = owner.pattern_action(kind))
+    return pattern;
   return kind == Command::Extrude   ? &owner.extrude_action()
          : kind == Command::Revolve ? &owner.revolve_action()
          : kind == Command::Sweep   ? &owner.sweep_action()
@@ -80,6 +85,9 @@ std::optional<ShellContextTools::Context> ShellContextTools::current_context(Com
       return *profile;
   } else if (const auto finishing = owner.finishing_context(kind))
     return *finishing;
+  if (owner.pattern_action(kind))
+    if (const auto pattern = owner.pattern_context())
+      return *pattern;
   return std::nullopt;
 }
 
@@ -106,9 +114,10 @@ void ShellContextTools::begin(Command kind) {
       if (kind == Command::Sweep || kind == Command::Loft)
         seeded =
             profile->profile && owner.select_spatial_profile(profile->sketch, *profile->profile);
-    } else
-      seeded =
-          owner.select_finishing_context(std::get<ShellFeatureTools::FinishingContext>(*context));
+    } else if (const auto* finishing = std::get_if<ShellFeatureTools::FinishingContext>(&*context))
+      seeded = owner.select_finishing_context(*finishing);
+    else
+      seeded = owner.select_pattern_context(std::get<ShellFeatureTools::PatternContext>(*context));
     if (!seeded) {
       owner.cancel();
       return;
@@ -131,10 +140,12 @@ void ShellContextTools::finish(bool applied) {
                  ? window_.feature_tools().select_profile(profile->sketch, *profile->profile)
                  : window_.feature_tools().select_open_line(profile->sketch);
     };
-    const bool restored =
-        profile ? restore_profile()
-                : window_.feature_tools().finishing_context_available(
-                      std::get<ShellFeatureTools::FinishingContext>(previous.context));
+    const auto* finishing = std::get_if<ShellFeatureTools::FinishingContext>(&previous.context);
+    const bool restored = profile ? restore_profile()
+                          : finishing
+                              ? window_.feature_tools().finishing_context_available(*finishing)
+                              : window_.feature_tools().pattern_context_available(
+                                    std::get<ShellFeatureTools::PatternContext>(previous.context));
     if (restored) {
       if (previous.viewport)
         (void)window_.viewport().select_semantic(previous.viewport->semantic_id);
