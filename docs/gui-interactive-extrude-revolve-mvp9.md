@@ -88,8 +88,40 @@ Focused proof: `[block136-extrude-extents]` in `gui_shell_extrude_extent_tests.c
 corrects transverse/coincident face bounds, cuts to/between source planes, checks exact history,
 cancels a symmetric tapered candidate, reopens canonically and exports STEP.
 
-Thin/open-profile and path Extrude controls and native limit-face collection remain separate shell
-work. Their headless contracts are unchanged. The expanded Revolve surface is described below.
+Thin/open-profile controls and native limit-face collection remain separate shell work.
+The path-directed and expanded Revolve surfaces are described below.
+
+### Replacement-shell path Extrude — Block 136, 2026-10-24
+
+The same Extrusion task offers `Entlang Pfad` alongside normal/opposite direction. Its explicit
+`blcad.extrude.path` selector lists existing open PathCurve names and retains stable IDs as references;
+closed paths are excluded. Path authoring and orientation remain in the existing PathCurve task. Extrusion
+consumes that orientation without adding Sweep-specific twist/guide controls. Supported profiles
+and planar/construction/Sketch3D/generated-edge sources retain the Geometry boundary documented in
+`docs/part-path-extrude-geometry-mvp6.md`; composite regions with holes remain unsupported.
+
+All four Body operations use the existing additive Extrude identity and Body result context,
+including Cut. Path mode disables the extent/taper controls, hides scalar/face inputs and publishes
+no extent, taper or thin manipulator. Stored straight-field text is retained locally and validated
+again on return to normal/opposite direction. Missing or incompatible path/profile candidates
+disable Apply and clear the preview without changing the document. Selecting a valid path recovers
+the candidate. Preview recomputes the complete document and replaces only the modifying target.
+Conditional rows hide their field and label together, avoiding Qt 6.4 hidden-row occlusion after
+mode/operation changes; the path popup remains reachable after revealing a target Body.
+
+Path Apply adds no distance parameters and provisions a Body only for NewBody. In particular, a
+previously staged TwoSided distance is not published. Returning to a straight direction clears the
+controller's path reference and restores the retained extent/taper inputs. Direct stale manipulator
+candidates are rejected in path mode. Apply, Cancel, history and document replacement retain the
+same atomic publication and profile-sidecar contracts as straight Extrude. Persistence uses the
+existing `direction: path` / `path_curve` fields, with no straight extent object or new schema.
+
+Proof: `[block136-path-extrude]` covers oriented Body operations, a mixed line/spline/reversed-arc
+route, mode changes, unused inputs, stale handles, missing selection, excluded closed paths,
+incompatible orientation with recovery, cancellation and reopening.
+`[shell-combined-path-extrude]` authors its sketches and three-segment Sketch3D path through actual
+widgets, cuts a previously machined Body, edits the earlier pocket and path endpoint, recovers a
+degenerate route, checks exact history, cancels a switched draft, reopens and exports STEP.
 
 ## Revolve authoring
 
@@ -184,8 +216,8 @@ Bounded here and not introduced implicitly by this block:
   **picking/highlighting** is the caller's selection responsibility;
 - continuous **shaded viewport preview** rendering is the existing recompute/presentation path after a
   validated candidate; the controllers publish the validated preview summary, not pixels;
-- path Extrude remains part of Block-136 full shell coverage. Block 135 maps `part.extrude` and
-  `part.revolve` to an auto-provisioned candidate Body/Length parameter and a resolved profile-plane
+- path Extrude is available through the Block-136 direction/path controls above. Block 135 maps
+  `part.extrude` and `part.revolve` to an auto-provisioned candidate Body/Length parameter and a resolved profile-plane
   frame through `ShellFeatureTools`; those objects persist only with Apply.
 
 ## Next boundary

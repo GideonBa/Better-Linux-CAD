@@ -612,6 +612,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_shell_parameter_tests.cpp
       tests/gui/gui_shell_hole_tests.cpp
       tests/gui/gui_shell_extrude_extent_tests.cpp
+      tests/gui/gui_shell_path_extrude_tests.cpp
       tests/gui/gui_shell_revolve_tests.cpp
       tests/gui/gui_shell_sketch_3d_tests.cpp
       tests/gui/gui_shell_construction_tools_tests.cpp

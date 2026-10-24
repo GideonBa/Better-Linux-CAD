@@ -39,9 +39,10 @@ source, hide a missing tag behind OR and claim completion with gaps. They must a
 
 The machine-readable details live in `families[].shell.gaps`; this is the execution order:
 
-1. Finish thin/open-profile and path Extrude controls and native viewport limit-face collection.
+1. Finish thin/open-profile Extrude controls and native viewport limit-face collection.
    Revolve extent/operation/axis controls and all seven bounded Extrude terminations now have
-   explicit shell editors; arbitrary final-Body subshape references remain outside the contract.
+   explicit shell editors. Path Extrude selects existing open PathCurves and all four Body
+   operations; arbitrary final-Body subshape references remain outside the contract.
 2. Restore contextual commands, selection-filter UI, view cube, view bookmarks and repeat command.
 3. Restore the supported hierarchy validation, cross-hierarchy relationship/joint/solve controls,
    sampled Revolute analysis and occurrence-linked result highlighting.
@@ -72,7 +73,7 @@ QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][gui-fea
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests
 ./build/dev-gui/blcad_core_tests
 ./build/dev-gui/blcad_geometry_tests
-QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-revolve],[shell-combined-revolve-controls],[block136-extrude-extents],[shell-combined-extrude-extents],[block136-holes],[shell-combined-holes],[block136-parameters],[shell-combined-parameters],[block136-sketch3d-projection],[shell-combined-projected-sweep],[block136-sketch3d-direction],[shell-sketch3d-direction-workflow],[block136-sketch3d-placement],[shell-sketch3d-placement-workflow],[block136-sketch3d-grips],[shell-sketch3d-grips-workflow],[block136-sketch3d],[shell-combined-sketch3d],[block136-sketch-diagnostics],[missing-reference-session],[block136-missing-reference],[repair-open-session],[block136-repair-open],[block136-reference-repair-batches],[block136-reference-repair],[block136-construction-manipulators],[block136-construction-picking],[shell-mixed-path-loft],[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-path-extrude],[shell-combined-path-extrude],[block136-revolve],[shell-combined-revolve-controls],[block136-extrude-extents],[shell-combined-extrude-extents],[block136-holes],[shell-combined-holes],[block136-parameters],[shell-combined-parameters],[block136-sketch3d-projection],[shell-combined-projected-sweep],[block136-sketch3d-direction],[shell-sketch3d-direction-workflow],[block136-sketch3d-placement],[shell-sketch3d-placement-workflow],[block136-sketch3d-grips],[shell-sketch3d-grips-workflow],[block136-sketch3d],[shell-combined-sketch3d],[block136-sketch-diagnostics],[missing-reference-session],[block136-missing-reference],[repair-open-session],[block136-repair-open],[block136-reference-repair-batches],[block136-reference-repair],[block136-construction-manipulators],[block136-construction-picking],[shell-mixed-path-loft],[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
 ```
 
 The regular inventory audit passes while it accurately records unfinished work. For closure,
@@ -990,3 +991,61 @@ without high-severity, BadDrawable or fatal lifecycle diagnostics. Formatting an
 The ordinary inventory audit passes. The opt-in closure gate correctly rejects the documented
 remaining work (three cases: two pass, one expected failure; 182 assertions). Six partial families
 and pending integrated workflows remain recorded; this does not close Block 136.
+
+## Path-directed Extrude controls — 2026-10-24
+
+The existing Extrusion task now offers normal/opposite/path direction and explicit open-PathCurve
+selection. All four Body operations preserve the established Extrude identity and use the path's
+orientation. Scalar/taper/face controls remain local while inactive; path mode adds no unused
+distance parameters or scalar handles. Returning to a straight direction clears the old path
+reference and revalidates retained text. Missing/incompatible routes clear preview and disable Apply;
+valid choices recover without document mutation. Exact contract:
+`docs/gui-interactive-extrude-revolve-mvp9.md`.
+
+Six `[block136-path-extrude]` cases cover XY/XZ/YZ and all Body operations, mixed
+line/spline/reversed-arc geometry, typed identity/persistence, no unused inputs, stale manipulator
+rejection, path/straight transitions, missing selection, excluded closed routes, incompatible
+fixed-up orientation with recovery, Cancel and document replacement. The focused tests retain
+exact volume/history assertions and full recomputation on reopening.
+
+`[shell-combined-path-extrude]` is the eighteenth combined workflow. Actual input authors the plate,
+two machining profiles, four shared Sketch3D points and a three-line PathCurve. A local invalid
+taper is superseded by path mode; the routed Cut preserves an earlier disjoint pocket. Editing the
+earlier pocket still retains the route. A coincident path endpoint is rejected, then a corrected
+endpoint recomputes the downstream Cut. Exact four-step Undo/Redo, mutation-free cancellation,
+canonical reopening and STEP export complete the workflow. Seventeen combined workflows now have
+fully UI-authored inputs; Planar motion retains its imported seated Part boundary.
+
+Native screenshot inspection exposed an occluded path field after target-row visibility changed.
+The strengthened workflow reopens the actual path popup after that transition and reproduced the
+failure. Extrude inputs now use independent row containers so conditional fields and their labels
+share visibility without interfering with neighboring geometry; inapplicable extent/taper controls
+stay visible and disabled in path mode. The footer remains outside the scroll area.
+
+The inventory retains twelve restored and six partial families. Thin/open-profile Extrude and
+native viewport limit-face collection remain in this family. Block 136 remains open; numbered
+completion stays at Block 135.
+
+`blcad_gui_tests`, `blcad_app`, `blcad_core_tests` and `blcad_geometry_tests` built with `dev-gui`.
+Final verification:
+
+| Suite | Cases | Assertions | Result |
+| --- | ---: | ---: | --- |
+| Full Core | 529 | 15,922 | All passed |
+| Full Geometry | 440 | 30,136 | All passed |
+| Focused native path/extent editors and combined workflows | 14 | 3,100 | All passed; no skips |
+| Full offscreen GUI | 443 | 40,076 | 428 passed; 15 native-only skips |
+| Full combined native shell | 259 | 35,255 | All passed; no skips |
+
+The 1280×800 `path-extrude-cut-preview.png`, `path-extrude-downstream-edit-preview.png` and
+`path-extrude-return-to-normal-preview.png` captures in `/tmp/blcad-path-extrude-native` were
+inspected. The path selector and every applicable label remain readable after mode/operation
+changes, disabled fields track path mode, straight mode restores its extent arrow and the footer
+stays pinned. The full offscreen run was repeated after the layout correction. Builds, GUI runs and
+the separate six-second native startup were serial; startup ends at intentional timeout 124.
+Native logs contain only the known medium depth/stencil warning, without high-severity,
+BadDrawable or fatal lifecycle diagnostics. Formatting and diff checks pass.
+
+The ordinary inventory audit passes. The opt-in closure gate continues to reject the documented
+unfinished acceptance (three cases: two pass, one expected failure; 183 assertions). This expected
+failure does not change the numbered completion boundary.

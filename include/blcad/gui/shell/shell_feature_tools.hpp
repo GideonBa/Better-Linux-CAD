@@ -362,11 +362,11 @@ private:
   QLabel* value_label_{nullptr};
   QLineEdit* numeric_editor_{nullptr};
   QWidget* extrude_controls_{nullptr};
-  QFormLayout* extrude_form_{nullptr};
   QComboBox* extrude_extent_{nullptr};
   QComboBox* extrude_operation_{nullptr};
   QComboBox* extrude_target_{nullptr};
   QComboBox* extrude_direction_{nullptr};
+  QComboBox* extrude_path_{nullptr};
   QComboBox* extrude_first_face_{nullptr};
   QComboBox* extrude_second_face_{nullptr};
   QLineEdit* extrude_second_distance_{nullptr};
