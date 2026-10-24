@@ -52,9 +52,9 @@
         "owner": 136,
         "status": "partial",
         "contract": "docs/gui-modeling-workspace-mvp9.md",
-        "scope": "Semantic selection synchronizes viewport, browser and session; seven OCCT standard views, captured Home and named session-local camera bookmarks, Sketch/grip guards and camera restoration during feature preview.",
+        "scope": "Semantic selection synchronizes viewport, browser and session; seven OCCT standard views, captured Home and named session-local camera bookmarks, Sketch/grip guards and camera restoration during feature preview. Eight visible model filters synchronize session/viewport selection, reject hidden browser fallbacks and restore after task-owned reference collection and Sketch focus.",
         "gaps": [
-          "Restore contextual commands and selection-filter UI.",
+          "Restore contextual commands.",
           "Restore repeat-last-command presentation."
         ],
         "proofs": [
@@ -68,6 +68,14 @@
           },
           {
             "filter": "[shell-combined-navigation]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
+          },
+          {
+            "filter": "[block136-selection-filters]",
+            "source": "tests/gui/gui_shell_selection_filter_tests.cpp"
+          },
+          {
+            "filter": "[shell-combined-selection-filters]",
             "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
           }
         ],
@@ -90,7 +98,8 @@
         "widgets": [
           "blcad.shell.browser",
           "blcad.navigation.view_cube",
-          "blcad.navigation.bookmarks"
+          "blcad.navigation.bookmarks",
+          "blcad.selection.filter"
         ]
       }
     },

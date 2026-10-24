@@ -623,6 +623,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_shell_assembly_tools_tests.cpp
       tests/gui/gui_shell_feature_edit_tests.cpp
       tests/gui/gui_shell_navigation_tests.cpp
+      tests/gui/gui_shell_selection_filter_tests.cpp
       tests/gui/gui_shell_window_tests.cpp
       tests/gui/gui_shell_sketch_tools_tests.cpp
       tests/gui/gui_shell_sketch_operations_tests.cpp

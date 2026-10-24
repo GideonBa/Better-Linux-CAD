@@ -61,14 +61,19 @@ a current successful preview, rechecks it and publishes the new Sketch, required
 cut in one Part transaction/Undo entry. Existing parameter bindings create no duplicate values.
 
 Body/workplane selectors are always explicit; compatible browser/viewport selection can fill them
-before or during the task through the owned selection bridge. Other selections cannot inject
-foreign identities. Escape in child controls, dock close, Cancel, Save, Undo/Redo, revision/task/context
-changes and document replacement discard candidates and previews. Cleanup never cancels a foreign
-task or changes selection filters/cameras. There are no polling timers or widget/action discovery.
+before or during the task through the owned selection bridge. Beginning saves the viewport mask,
+semantic scope and actual selection, then temporarily permits Body/Datum selection with unrestricted
+scope. This lets a Body-only model filter collect a different workplane. Every task exit restores
+the saved mask/scope/selection; the disabled global filter retains its choice. Expired cleanup leaves
+a subsequent task's own mask/scope intact. Other selections cannot inject foreign identities. Escape
+in child controls, dock close, Cancel, Save, Undo/Redo, revision/task/context changes and document
+replacement discard candidates and previews. Cleanup never cancels a foreign task or changes the
+chosen model filter/camera. There are no polling timers or widget/action discovery.
 
 Proof: `[block136-holes]` in `tests/gui/gui_shell_hole_tests.cpp` and actual-input
-`[shell-combined-holes]` in `tests/gui/gui_shell_combined_workflow_tests.cpp`. Contracts for generic
-Feature Edit and Part parameters remain `docs/gui-feature-edit-mvp9.md` / `docs/parameter-model.md`;
+`[shell-combined-holes]` in `tests/gui/gui_shell_combined_workflow_tests.cpp`. Filter/scope restoration
+also has `[block136-selection-filters]` and `[shell-combined-selection-filters]` proofs. Contracts for
+generic Feature Edit and Part parameters remain `docs/gui-feature-edit-mvp9.md` / `docs/parameter-model.md`;
 this task is dedicated creation, not a new profile-position editor or semantic Hole Wizard.
 
 ## Suppression boundary

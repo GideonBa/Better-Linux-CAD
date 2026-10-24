@@ -103,6 +103,9 @@ struct ShellHoleTools::Impl {
   bool previewed{false};
   std::size_t revision{};
   std::size_t index{};
+  std::uint32_t previous_mask{0xFFFFFFFFU};
+  std::optional<std::vector<std::string>> previous_scope;
+  std::optional<GuiSelection> previous_selection;
 
   bool available() const {
     const auto& session = window.session();
@@ -386,6 +389,9 @@ Result<std::size_t> ShellHoleTools::begin() {
   }
   (void)ui.window.session().task().begin(std::string(task_id));
   (void)ui.window.session().task().begin_parameter_editing();
+  ui.previous_mask = ui.window.viewport().selection_filter_mask();
+  ui.previous_scope = ui.window.viewport().selection_semantic_scope();
+  ui.previous_selection = ui.window.viewport().selected_semantic();
   ui.active = true;
   ui.revision = ui.window.session().presentation_revision();
   ui.loading = true;
@@ -431,6 +437,9 @@ Result<std::size_t> ShellHoleTools::begin() {
   ui.loading = false;
   for (const auto& selection : ui.window.session().selection().entries())
     (void)accept_selection(selection);
+  ui.window.viewport().set_selection_semantic_scope(std::nullopt);
+  ui.window.viewport().set_selection_filter_mask(selection_kind_bit(GuiSelectionKind::Body) |
+                                                 selection_kind_bit(GuiSelectionKind::Datum));
   ui.edited();
   ui.dock->show();
   ui.dock->raise();
@@ -546,10 +555,20 @@ void ShellHoleTools::cancel() {
   auto& ui = *impl_;
   if (!ui.active)
     return;
+  const bool restore_selection =
+      !ui.window.session().task().active() || ui.window.session().task().command_id() == task_id;
   ui.active = false;
   ui.invalidate();
   if (ui.window.session().task().command_id() == task_id)
     (void)ui.window.session().task().cancel();
+  if (restore_selection) {
+    ui.window.viewport().set_selection_semantic_scope(ui.previous_scope);
+    ui.window.viewport().set_selection_filter_mask(ui.previous_mask);
+    if (ui.previous_selection)
+      (void)ui.window.viewport().select_semantic(ui.previous_selection->semantic_id);
+    else
+      ui.window.viewport().clear_selection();
+  }
   ui.loading = true;
   ui.name->clear();
   ui.target->clear();

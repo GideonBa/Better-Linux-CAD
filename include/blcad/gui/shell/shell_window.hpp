@@ -15,6 +15,7 @@
 
 class QAction;
 class QCloseEvent;
+class QComboBox;
 class QPlainTextEdit;
 class QTableWidget;
 class QTableWidgetItem;
@@ -128,6 +129,9 @@ private:
   void build_docks();
   void wire_viewport();
   void synchronize_navigation();
+  void synchronize_selection_filter();
+  void change_selection_filter();
+  void reset_selection_filter();
   [[nodiscard]] bool confirm_document_replacement();
   void reset_document_interaction();
   void reconcile_active_sketch();
@@ -169,6 +173,7 @@ private:
   QTreeWidget* browser_tree_{nullptr};
   QTableWidget* properties_{nullptr};
   QPlainTextEdit* diagnostics_{nullptr};
+  QComboBox* selection_filter_{nullptr};
 
   QAction* action_undo_{nullptr};
   QAction* action_redo_{nullptr};

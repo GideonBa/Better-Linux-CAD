@@ -24,10 +24,12 @@
 #include <QAction>
 #include <QActionGroup>
 #include <QCloseEvent>
+#include <QComboBox>
 #include <QDockWidget>
 #include <QFileDialog>
 #include <QHeaderView>
 #include <QInputDialog>
+#include <QLabel>
 #include <QMessageBox>
 #include <QPlainTextEdit>
 #include <QSignalBlocker>
@@ -246,6 +248,26 @@ ShellWindow::ShellWindow() {
 
   build_ribbon();
   build_docks();
+  statusBar()->addPermanentWidget(new QLabel(QStringLiteral("Auswahl:"), this));
+  selection_filter_ = new QComboBox(this);
+  selection_filter_->setObjectName(QStringLiteral("blcad.selection.filter"));
+  selection_filter_->setAccessibleName(QStringLiteral("Auswahlfilter"));
+  selection_filter_->setToolTip(QStringLiteral("Auswahl im Modell und Browser begrenzen"));
+  const std::pair<const char*, GuiModelingSelectionFilter> filters[] = {
+      {"Alles", GuiModelingSelectionFilter::All},
+      {"Profile", GuiModelingSelectionFilter::Profiles},
+      {"Bezugselemente", GuiModelingSelectionFilter::Datums},
+      {"Flächen", GuiModelingSelectionFilter::Faces},
+      {"Kanten", GuiModelingSelectionFilter::Edges},
+      {"Körper", GuiModelingSelectionFilter::Bodies},
+      {"Komponenten", GuiModelingSelectionFilter::Components},
+      {"Baugruppen-Ziele", GuiModelingSelectionFilter::AssemblyTargets}};
+  for (const auto& [label, filter] : filters)
+    selection_filter_->addItem(QString::fromUtf8(label),
+                               GuiModelingWorkspace::selection_filter_mask(filter));
+  statusBar()->addPermanentWidget(selection_filter_);
+  connect(selection_filter_, &QComboBox::currentIndexChanged, this,
+          [this] { change_selection_filter(); });
   wire_viewport();
   sketch_tools_ = std::make_unique<ShellSketchTools>(*this, session_, sketch_workbench_,
                                                      sketch_workspace_, *viewport_, *ribbon_,
@@ -490,6 +512,7 @@ void ShellWindow::build_docks() {
 void ShellWindow::wire_viewport() {
   viewport_->set_view_changed_callback([this] {
     synchronize_navigation();
+    synchronize_selection_filter();
     if (feature_tools_)
       feature_tools_->refresh_presentation();
     if (measure_tools_)
@@ -519,6 +542,51 @@ void ShellWindow::synchronize_navigation() {
   }
 }
 
+void ShellWindow::synchronize_selection_filter() {
+  if (!selection_filter_)
+    return;
+  const bool task_owned = session_.task().active() || active_sketch_.has_value();
+  const auto previous_mask = session_.selection().filter_mask();
+  // Command components own temporary viewport masks/scopes. Let their accepted
+  // references reach the session even when the idle model filter excludes them.
+  session_.selection().set_filter_mask(task_owned ? 0xFFFFFFFFU : model_selection_filter_mask_);
+  selection_filter_->setEnabled(
+      session_.has_document() && !task_owned && !session_.reference_repair_mode() &&
+      !viewport_->sketch_focus_active() && QWidget::mouseGrabber() != viewport_);
+  if (!task_owned && previous_mask != model_selection_filter_mask_ &&
+      !session_.selection().allows(GuiSelectionKind::SketchEntity) && feature_tools_)
+    feature_tools_->clear_profile_selection();
+}
+
+void ShellWindow::change_selection_filter() {
+  synchronize_selection_filter();
+  if (!selection_filter_->isEnabled()) {
+    const QSignalBlocker blocker(selection_filter_);
+    selection_filter_->setCurrentIndex(selection_filter_->findData(model_selection_filter_mask_));
+    return;
+  }
+  model_selection_filter_mask_ = selection_filter_->currentData().toUInt();
+  session_.selection().set_filter_mask(model_selection_filter_mask_);
+  viewport_->set_selection_filter_mask(model_selection_filter_mask_);
+  if (!session_.selection().allows(GuiSelectionKind::SketchEntity))
+    feature_tools_->clear_profile_selection();
+  // A browser-only Finish Sketch handoff has no viewport selection to evict.
+  if (session_.selection().empty() &&
+      !session_.selection().allows(GuiSelectionKind::SketchEntity)) {
+    selected_semantic_id_.clear();
+    synchronize_tree_selection({});
+  }
+  refresh();
+}
+
+void ShellWindow::reset_selection_filter() {
+  const QSignalBlocker blocker(selection_filter_);
+  selection_filter_->setCurrentIndex(0);
+  model_selection_filter_mask_ = 0xFFFFFFFFU;
+  session_.selection().set_filter_mask(model_selection_filter_mask_);
+  viewport_->set_selection_filter_mask(model_selection_filter_mask_);
+}
+
 bool ShellWindow::new_part(const QString& name) {
   if (!confirm_document_replacement())
     return false;
@@ -531,6 +599,7 @@ bool ShellWindow::new_part(const QString& name) {
     return false;
   }
   navigation_tools_->reset();
+  reset_selection_filter();
   const auto seeded = seed_origin_geometry(session_);
   if (seeded.has_error())
     show_error(seeded.error());
@@ -551,6 +620,7 @@ bool ShellWindow::new_project(const QString& name) {
     return false;
   }
   navigation_tools_->reset();
+  reset_selection_filter();
   refresh();
   ribbon_->set_current_tab(tab_assembly_);
   return true;
@@ -567,6 +637,7 @@ bool ShellWindow::open_path(const QString& path, GuiDocumentOpenMode mode) {
     return false;
   }
   navigation_tools_->reset();
+  reset_selection_filter();
   refresh();
   viewport_->fit_all();
   if (session_.project())
@@ -993,11 +1064,11 @@ bool ShellWindow::redo() {
 void ShellWindow::apply_viewport_selection(const std::optional<GuiSelection>& selection) {
   if (synchronizing_selection_)
     return;
+  synchronize_selection_filter();
   session_.selection().clear();
   selected_semantic_id_.clear();
   bool selected_feature_profile = false;
-  if (selection) {
-    (void)session_.selection().add(*selection);
+  if (selection && session_.selection().add(*selection)) {
     if (hole_tools_)
       (void)hole_tools_->accept_selection(*selection);
     if (construction_tools_)
@@ -1046,13 +1117,13 @@ void ShellWindow::handle_tree_selection(QTreeWidgetItem* current) {
   bool selected_feature_profile = false;
   if (current != nullptr) {
     const std::string viewport_id = current->data(0, kViewportIdRole).toString().toStdString();
-    selected_semantic_id_ = viewport_id;
     synchronizing_selection_ = true;
     if (viewport_id.empty() || !viewport_->select_semantic(viewport_id))
       viewport_->clear_selection();
     synchronizing_selection_ = false;
     if (const auto& selected = viewport_->selected_semantic())
-      (void)session_.selection().add(*selected);
+      if (session_.selection().add(*selected))
+        selected_semantic_id_ = selected->semantic_id;
     if (hole_tools_)
       for (const auto& selected : session_.selection().entries())
         (void)hole_tools_->accept_selection(selected);
@@ -1177,6 +1248,7 @@ void ShellWindow::synchronize_tree_selection(const std::string& viewport_semanti
 }
 
 void ShellWindow::refresh() {
+  synchronize_selection_filter();
   const bool has_document = session_.has_document();
   const bool sketch_active = active_sketch_.has_value();
   action_save_->setEnabled(has_document);
