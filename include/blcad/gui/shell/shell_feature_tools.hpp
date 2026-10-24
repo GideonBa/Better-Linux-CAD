@@ -99,6 +99,11 @@ public:
   }
 
   // Selection-first dialog-free command surface (also used by tests).
+  struct ProfileContext {
+    SketchId sketch;
+    std::optional<ProfileId> profile; // Absent only for a verified single open line.
+  };
+  [[nodiscard]] std::optional<ProfileContext> profile_context() const;
   [[nodiscard]] bool select_profile(SketchId sketch, ProfileId profile);
   [[nodiscard]] bool select_open_line(SketchId sketch);
   void clear_profile_selection() noexcept;

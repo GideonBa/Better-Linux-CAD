@@ -14,6 +14,7 @@
 #include "blcad/gui/shell/shell_navigation_tools.hpp"
 #include "blcad/gui/shell/shell_origin.hpp"
 #include "blcad/gui/shell/shell_parameter_tools.hpp"
+#include "blcad/gui/shell/shell_profile_context_tools.hpp"
 #include "blcad/gui/shell/shell_reference_repair_tools.hpp"
 #include "blcad/gui/shell/shell_repeat_tools.hpp"
 #include "blcad/gui/shell/shell_ribbon.hpp"
@@ -289,6 +290,7 @@ ShellWindow::ShellWindow() {
   sketch_3d_tools_ = std::make_unique<ShellSketch3DTools>(*this, *ribbon_, tab_model_);
   parameter_tools_ = std::make_unique<ShellParameterTools>(*this, *ribbon_, tab_model_);
   hole_tools_ = std::make_unique<ShellHoleTools>(*this, *ribbon_, tab_model_);
+  profile_context_tools_ = std::make_unique<ShellProfileContextTools>(*this);
   statusBar()->showMessage(QStringLiteral("Bereit"));
   refresh();
 }
@@ -300,6 +302,7 @@ ShellWindow::~ShellWindow() {
   viewport_->set_view_changed_callback({});
   navigation_tools_.reset();
   repeat_tools_.reset();
+  profile_context_tools_.reset();
   sketch_3d_tools_.reset();
   parameter_tools_.reset();
   hole_tools_.reset();
@@ -530,6 +533,7 @@ void ShellWindow::wire_viewport() {
       construction_tools_->refresh_presentation();
     if (sketch_3d_tools_)
       sketch_3d_tools_->refresh_presentation();
+    refresh_profile_context();
   });
   viewport_->set_selection_callback(
       [this](std::optional<GuiSelection> selection) { apply_viewport_selection(selection); });
@@ -605,6 +609,7 @@ bool ShellWindow::new_part(const QString& name) {
   }
   navigation_tools_->reset();
   repeat_tools_->reset();
+  profile_context_tools_->reset();
   reset_selection_filter();
   const auto seeded = seed_origin_geometry(session_);
   if (seeded.has_error())
@@ -627,6 +632,7 @@ bool ShellWindow::new_project(const QString& name) {
   }
   navigation_tools_->reset();
   repeat_tools_->reset();
+  profile_context_tools_->reset();
   reset_selection_filter();
   refresh();
   ribbon_->set_current_tab(tab_assembly_);
@@ -645,6 +651,7 @@ bool ShellWindow::open_path(const QString& path, GuiDocumentOpenMode mode) {
   }
   navigation_tools_->reset();
   repeat_tools_->reset();
+  profile_context_tools_->reset();
   reset_selection_filter();
   refresh();
   viewport_->fit_all();
@@ -1320,6 +1327,17 @@ void ShellWindow::refresh() {
   }
   if (repeat_tools_)
     repeat_tools_->refresh();
+  refresh_profile_context();
+}
+
+void ShellWindow::refresh_profile_context() {
+  if (profile_context_tools_)
+    profile_context_tools_->refresh();
+}
+
+void ShellWindow::finish_profile_context(bool applied) {
+  if (profile_context_tools_)
+    profile_context_tools_->finish(applied);
 }
 
 void ShellWindow::remember_repeatable_command(QAction& command) {

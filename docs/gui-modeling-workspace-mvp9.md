@@ -4,7 +4,9 @@ Status: the Block-122 application authority `GuiModelingWorkspace` is retained. 
 adapter was deleted with the Block-133 shell reset. Block 136 now restores camera navigation through
 `ShellNavigationTools` on `ShellWindow`, as detailed below. Visible selection filters are also
 restored. `ShellRepeatTools` now restores command-repeat presentation through the current command
-owners. Contextual commands remain open; the old mini-toolbar/catalog adapter specifics are historical.
+owners. `ShellProfileContextTools` now supplies the bounded profile mini-toolbar described below.
+Remaining profile, Body, Surface and Assembly context commands stay open; the old catalog adapter
+specifics are historical.
 
 Block 122 introduces the shared application-layer interaction boundary used by the Part, Surface, and
 Assembly modeling workspaces. It upgrades the existing MVP-7 form-driven workbenches with
@@ -91,6 +93,45 @@ filter-hidden selections clear transient capability context and enable nothing.
 The contextual mini-toolbar is a deterministic priority-sorted subset of enabled commands. The Qt
 binder positions it next to the latest viewport click and exposes a Cancel action while a Block-122
 command-start task is active. It is a presentation product and is never persisted.
+
+### Replacement-shell profile context (Block 136)
+
+`ShellWindow` explicitly owns `ShellProfileContextTools` and the viewport child
+`blcad.context.toolbar`. It offers Extrude then Revolve in the existing deterministic priority order.
+`ShellFeatureTools::profile_context()` resolves current semantic selection or a Finish Sketch/browser
+handoff against materialized Core profiles. A verified single geometry line with no profile can offer
+Extrude for Thin authoring; it never gains a ProfileRegion capability or a Revolve action. Two-line
+chains and unmaterialized contours do not become closed profiles. The normal owner action must also
+be enabled, including its compatible-axis checks for Revolve.
+
+The context actions `context_extrude`, `context_revolve` and `context_cancel` are explicitly owned
+wrappers; they invoke the existing Feature entry points without changing their triggered handlers.
+The toolbar uses the last viewport left-press position plus a small offset and clamps to the viewport;
+browser/Finish handoffs use the last anchor, initially the upper-left corner. It hides if the viewport
+is too small to fit complete buttons. Sketch focus, repair, viewport mouse capture and unrelated
+active tasks hide it and reject command starts. Input/resize/presentation notifications update it;
+there are no polling timers or semantic-id/widget discovery heuristics.
+
+After the owner successfully starts a context task, the adapter consumes session/viewport selection
+and remembers its complete entries plus the verified typed Sketch/Profile or open-line source.
+Only Cancel remains in the toolbar while that same task is active. Context Cancel, task-panel Cancel
+and Escape all use the owner cleanup path, then restore the prior actual selection and typed handoff
+if it remains valid. Filter/scope ownership stays with the existing command. Apply discards the
+consumed context and lets the normal owner publish its result and repeat record. It adds no second
+transaction or history entry. Ribbon/Repeat starts retain their existing lifecycle.
+
+Successful New/Open resets context state. Cancelled replacement retains an active task. Failed Open
+uses the existing interaction reset: it cancels the draft and clears selection while retaining the
+committed model. Save serializes committed intent while the disposable feature preview remains local.
+History may remove the source; eligibility is resolved again against current Core, so stale handoffs
+never offer commands. No toolbar, anchor, selection or capability state is persisted.
+
+Current proof: six `[block136-profile-context]` cases and the twenty-fourth Qt-authored combined
+workflow `[shell-combined-profile-context]`. The latter selects a native materialized profile,
+starts Extrude through the actual toolbar, restores an invalid cancelled Cut, creates a Thin wall on
+another plane, updates source depth, edits an earlier feature, verifies five-step exact history,
+reopens canonically and exports STEP. The remaining profile/Sweep/Loft, Body, Surface and Assembly
+context catalog remains a separate open slice; this toolbar does not close the viewport family.
 
 ## Command lifecycle, cancellation, and repeat
 
@@ -257,7 +298,7 @@ ViewCube menu and saved views, re-enters Sketch, corrects invalid taper text, ca
 drag with Escape after restoring a camera, applies a cut, changes the source depth, edits an earlier
 feature, verifies three-step exact history, reopens canonically and exports STEP. Native tests execute
 the same controls and validate the actual camera frames. The viewport-selection family remains
-partial for contextual commands; Block 136 remains open.
+partial for the remaining contextual commands; Block 136 remains open.
 
 ## Focused proof
 
