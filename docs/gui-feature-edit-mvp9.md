@@ -38,10 +38,15 @@ find record by FeatureId in its typed vector
 
 `update_<family>(record)` replaces the record with the same `FeatureId` in the same position and
 re-runs the family's add validation. The dependency graph is rebuilt for the edited feature while its
-downstream dependents and the result body's other producers are preserved: the re-add is first tried
-directly (so a feature that modifies a body in place re-forms its own chain) and, only if the add
-rejects the body as already produced, retried with the body's co-producer edges released and restored
-around the add. `remove_<family>(id)` deletes a record only when nothing downstream depends on its
+downstream dependents and the result body's other producers are preserved. With the same result
+Body, the typed adder receives the original immediate Body predecessor, then the original terminal
+producer is restored. A reference to an older producer does not replace the immediate predecessor.
+Updates at the start, middle and end of an in-place chain retain exact Body edges; new input
+references replace old inputs without retaining stale dependencies. This prevents downstream
+modifiers from being reattached as predecessors and creating a cycle. `[revolve-update-history]`
+checks axis rebinds, graph-equivalent reopening and atomic invalid-input rejection.
+When rebinding to a different result Body, the direct/released-co-producer validation paths remain.
+`remove_<family>(id)` deletes a record only when nothing downstream depends on its
 result body or its intent, mirroring the existing `remove_surface_feature` protection. Both fail
 closed and never partially mutate the document.
 
