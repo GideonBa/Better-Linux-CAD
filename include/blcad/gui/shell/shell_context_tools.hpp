@@ -14,7 +14,7 @@ class QToolButton;
 namespace blcad::gui {
 class ShellWindow;
 
-// Bounded profile/finishing presentation. Verified preselection comes from the
+// Bounded profile/finishing/pattern presentation. Verified preselection comes from the
 // feature owner; existing command entry points own task/preview/commit state.
 class ShellContextTools final : public QObject {
 public:
@@ -29,7 +29,8 @@ protected:
 
 private:
   using Context =
-      std::variant<ShellFeatureTools::ProfileContext, ShellFeatureTools::FinishingContext>;
+      std::variant<ShellFeatureTools::ProfileContext, ShellFeatureTools::FinishingContext,
+                   ShellFeatureTools::PatternContext>;
   struct Entry {
     ShellFeatureTools::Command command{ShellFeatureTools::Command::None};
     QAction* action{nullptr};
@@ -47,7 +48,7 @@ private:
   void place();
   ShellWindow& window_;
   QFrame* panel_{nullptr};
-  std::array<Entry, 8> commands_{};
+  std::array<Entry, 11> commands_{};
   QAction* cancel_{nullptr};
   QToolButton* cancel_button_{nullptr};
   QPoint anchor_{16, 16};

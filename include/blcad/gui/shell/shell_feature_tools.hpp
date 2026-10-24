@@ -121,6 +121,13 @@ public:
   [[nodiscard]] std::optional<FinishingContext> finishing_context(Command command) const;
   [[nodiscard]] bool finishing_context_available(const FinishingContext& context) const;
   [[nodiscard]] bool select_finishing_context(const FinishingContext& context);
+  struct PatternContext {
+    BodyId body; // Verified visible, recomputed solid; independent of finishing topology roles.
+  };
+  [[nodiscard]] QAction* pattern_action(Command command) const noexcept;
+  [[nodiscard]] std::optional<PatternContext> pattern_context() const;
+  [[nodiscard]] bool pattern_context_available(const PatternContext& context) const;
+  [[nodiscard]] bool select_pattern_context(const PatternContext& context);
   [[nodiscard]] bool select_profile(SketchId sketch, ProfileId profile);
   [[nodiscard]] bool select_open_line(SketchId sketch);
   void clear_profile_selection() noexcept;
@@ -461,6 +468,7 @@ private:
   std::vector<PatternPlaneChoice> pattern_planes_;
   std::vector<std::pair<Command, QAction*>> pattern_actions_;
   QWidget* pattern_controls_{nullptr};
+  QFormLayout* pattern_form_{nullptr};
   QListWidget* pattern_sources_{nullptr};
   QComboBox* pattern_reference_{nullptr};
   QComboBox* pattern_extent_{nullptr};

@@ -95,6 +95,33 @@ The native-only case detects source Bodies through actual mouse events, toggles 
 through an active ghost preview, and couples spacing/angle/count dragging with numeric refinement.
 `BLCAD_UI_CAPTURE_DIR` optionally records preview windows. Offscreen skips the native case explicitly.
 
+## Replacement-shell pattern contexts — 2026-10-24
+
+Select a single solid Body under All or the Bodies model filter to expose Lineares Muster,
+Kreismuster and Spiegeln in `ShellContextTools`. `ShellFeatureTools::pattern_context()` verifies its
+BodyId against the current standalone Part, visible solid kind, fresh nonempty cache and active
+selection filter/scope. Curved solids need no rectangular finishing classification. Multiple,
+unknown, hidden, stale and surface sources offer no pattern context. The original action still owns
+its required references and command start.
+
+A typed handoff selects exactly that Body in the original task, without toggling an already selected
+source or depending on chooser order. Further Body collection remains explicit. Browser Body/reference
+picks reach the same Pattern owner as viewport picks; reference acceptance can clear selection while
+returning to Body scope, so the browser bridge passes a selection snapshot. The task temporarily owns
+a scope containing its offered Bodies, then only its offered axes/planes while reference picking.
+The normal ribbon lifecycle also uses this scope; Apply and Cancel restore the prior filter/scope.
+Context Cancel, task Cancel and Escape additionally restore complete consumed preselection if the
+source remains valid. Save serializes committed intent during a local preview; successful replacement
+clears context, cancelled replacement retains the task and failed Open cancels it. No new Core intent,
+transaction, capability or persistence authority is introduced.
+
+Wrapped guidance now lives below the dynamic pattern form, matching the Body task's layout boundary.
+Switching Mirror → Circular → Linear keeps count, distribution and direction controls complete and
+reachable. Five focused `[block136-pattern-context]` cases plus the Qt-authored
+`[shell-combined-pattern-context]` cover this bounded workflow and its lifecycle. Reproducible commands
+and captures live in `docs/development-setup.md`; evidence and remaining gaps live in
+`docs/gui-shell-acceptance-mvp9r.md`. Body Boolean/Transform contexts remain the next work.
+
 ## Body Boolean and Body Transform authoring
 
 `GuiInteractiveBodyOperationController` authors either:

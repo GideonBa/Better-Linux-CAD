@@ -1102,6 +1102,28 @@ selection requires native OCCT hits. Contracts and verification live in
 Thirteen families remain restored and five partial; Block 136 stays open and numbered completion
 remains through Block 135.
 
+### Block 136 — Body pattern and Mirror contexts — 2026-10-24
+
+A single verified current solid Body now offers Linear pattern, Circular pattern and Mirror through
+the shared toolbar. Typed source handoff seeds the exact Body through the original task, including
+curved solids, independently of chooser order or finishing topology roles. Normal preview and atomic
+Apply authority remain unchanged. The task owns its offered Body/reference scope and restores the
+prior scope/filter on Apply and Cancel; all context cancellation routes restore complete still-valid
+preselection. Browser Body/reference picks reach the same owner as viewport picks; the combined
+bounds checks exposed and now cover this previously missing browser handoff. Wrapped guidance stays
+outside dynamic form rows to preserve controls across tool switches. Multiple, hidden, stale, missing
+and surface sources fail closed.
+
+Five focused cases and the twenty-seventh combined Qt workflow cover source identity, scope/reference
+transitions, cancellation, atomic history, Save and replacement. The combined Part chains Mirror,
+Circular pattern and Linear pattern, changes source depth/count/extent together, edits the earlier
+Mirror, checks five-step exact history, reopens canonically and exports STEP. Native picking verifies
+the actual OCCT Body; offscreen uses the browser. Contracts and validation live in
+`docs/gui-modeling-workspace-mvp9.md`, `docs/gui-interactive-pattern-body-mvp9.md` and
+`docs/gui-shell-acceptance-mvp9r.md`. Continue with Body Boolean/Transform, Surface and Assembly
+contexts, then advanced Assembly and integrated acceptance. Thirteen families remain restored and
+five partial; Block 136 stays open and numbered completion remains through Block 135.
+
 ## Current next technical step — Block 136
 
 The current v3 coverage inventory records all eighteen accepted families, current shell proof sources,
@@ -1109,7 +1131,7 @@ reachable entry points and explicit remaining gaps. The machine check distinguis
 from closure readiness; historical controller proofs cannot close a shell gap. Acceptance contract:
 `docs/gui-shell-acceptance-mvp9r.md`, `[integration][gui-feature-coverage]` / `[gui][shell-coverage]`.
 
-Extend contextual commands to patterns, Body, Surface and Assembly, then continue the
+Extend contextual commands to Body Boolean/Transform, Surface and Assembly, then continue the
 remaining advanced Assembly and integrated acceptance workflows. Native `ToFace`/`Between` collection
 now covers the supported semantic source roles. The bounded single-line Thin Extrude editors are available; general curved/open chains remain
 outside that Geometry boundary.
@@ -1129,7 +1151,7 @@ The bounded repair-open path now supports failed-recompute Parts and missing fac
 with typed intent, complete atomic publication and failed-state history. Other structural dependency
 failures remain strict loading errors.
 The construction task now has fourteen bounded create/edit modes, native reference collection and
-position/direction/frame/new-offset grips. Continue with the remaining pattern/Body/Surface/
+position/direction/frame/new-offset grips. Continue with the remaining Body/Surface/
 Assembly context commands, advanced Assembly controls and integrated native Part/Assembly acceptance
 in the order recorded in
 `docs/gui-shell-acceptance-mvp9r.md`. Block 136 remains in progress until all recorded gaps and pending
