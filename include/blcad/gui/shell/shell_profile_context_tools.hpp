@@ -33,14 +33,16 @@ private:
     std::optional<GuiSelection> viewport;
     std::string task_id;
   };
-  void begin(bool revolve);
+  void begin(ShellFeatureTools::Command command);
   void place();
   ShellWindow& window_;
   QFrame* panel_{nullptr};
   QAction* extrude_{nullptr};
   QAction* revolve_{nullptr};
+  QAction* sweep_{nullptr};
+  QAction* loft_{nullptr};
   QAction* cancel_{nullptr};
-  std::array<QToolButton*, 3> buttons_{};
+  std::array<QToolButton*, 5> buttons_{};
   QPoint anchor_{16, 16};
   std::optional<ConsumedSelection> consumed_;
 };

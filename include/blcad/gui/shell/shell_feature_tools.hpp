@@ -94,6 +94,12 @@ public:
   [[nodiscard]] QAction& revolve_action() noexcept {
     return *action_revolve_;
   }
+  [[nodiscard]] QAction& sweep_action() noexcept {
+    return *action_sweep_;
+  }
+  [[nodiscard]] QAction& loft_action() noexcept {
+    return *action_loft_;
+  }
   [[nodiscard]] QLineEdit& numeric_editor() noexcept {
     return *numeric_editor_;
   }
@@ -102,6 +108,7 @@ public:
   struct ProfileContext {
     SketchId sketch;
     std::optional<ProfileId> profile; // Absent only for a verified single open line.
+    bool materialized{false};         // Persistent region rather than candidate-only raw intent.
   };
   [[nodiscard]] std::optional<ProfileContext> profile_context() const;
   [[nodiscard]] bool select_profile(SketchId sketch, ProfileId profile);
@@ -153,6 +160,8 @@ public:
   [[nodiscard]] Result<GuiPartFeaturePreview> set_scale_center_text(std::size_t component,
                                                                     const QString& text);
   [[nodiscard]] Result<std::size_t> begin_spatial(Command command);
+  // Typed first input for an already started Sweep/Loft context task.
+  [[nodiscard]] bool select_spatial_profile(SketchId sketch, ProfileId profile);
   [[nodiscard]] Result<std::size_t> begin_surface(Command command);
   [[nodiscard]] bool accept_surface_selection(const GuiSelection& selection);
   [[nodiscard]] Result<std::size_t> append_surface_input(int choice);
@@ -408,6 +417,8 @@ private:
   QPushButton* cancel_button_{nullptr};
   QAction* action_extrude_{nullptr};
   QAction* action_revolve_{nullptr};
+  QAction* action_sweep_{nullptr};
+  QAction* action_loft_{nullptr};
   QAction* action_escape_{nullptr};
   std::vector<std::pair<Command, QAction*>> finishing_actions_;
   QWidget* finishing_controls_{nullptr};

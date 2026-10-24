@@ -52,9 +52,9 @@
         "owner": 136,
         "status": "partial",
         "contract": "docs/gui-modeling-workspace-mvp9.md",
-        "scope": "Semantic selection synchronizes viewport, browser and session; seven OCCT standard views, captured Home and named session-local camera bookmarks, Sketch/grip guards and camera restoration during feature preview. Eight visible model filters synchronize session/viewport selection, reject hidden browser fallbacks and restore after task-owned reference collection and Sketch focus. Accepted Feature/Hole/Assembly commands expose guarded repeat with current inputs and fresh defaults, independent of Redo and persistence. Bounded profile mini-toolbar validates materialized Core profiles or a single open line, starts Extrude/Revolve through existing owners, consumes preselection and restores it on cancellation.",
+        "scope": "Semantic selection synchronizes viewport, browser and session; seven OCCT standard views, captured Home and named session-local camera bookmarks, Sketch/grip guards and camera restoration during feature preview. Eight visible model filters synchronize session/viewport selection, reject hidden browser fallbacks and restore after task-owned reference collection and Sketch focus. Accepted Feature/Hole/Assembly commands expose guarded repeat with current inputs and fresh defaults, independent of Redo and persistence. Bounded profile mini-toolbar validates Core profile or single-line sources, limits Sweep/Loft to materialized regions and starts Extrude/Revolve/Sweep/Loft through existing owners, seeds the exact typed Sweep profile or first Loft section, consumes preselection and restores it on cancellation.",
         "gaps": [
-          "Extend contextual commands beyond profile Extrude/Revolve and single-line Thin Extrude to the remaining profile, Body, Surface and Assembly commands."
+          "Extend contextual commands beyond the profile tools to finishing, patterns, Body, Surface and Assembly commands."
         ],
         "proofs": [
           {
@@ -92,6 +92,14 @@
           {
             "filter": "[shell-combined-profile-context]",
             "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
+          },
+          {
+            "filter": "[block136-spatial-context]",
+            "source": "tests/gui/gui_shell_profile_context_tests.cpp"
+          },
+          {
+            "filter": "[shell-combined-spatial-context]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
           }
         ],
         "actions": [
@@ -112,6 +120,8 @@
           "repeat_last_command",
           "context_extrude",
           "context_revolve",
+          "context_sweep",
+          "context_loft",
           "context_cancel"
         ],
         "widgets": [
@@ -647,7 +657,12 @@
           "sweep",
           "loft"
         ],
-        "widgets": []
+        "widgets": [
+          "blcad.spatial.order.up",
+          "blcad.spatial.order.down",
+          "blcad.spatial.order.remove",
+          "blcad.spatial.continuity"
+        ]
       }
     },
     {

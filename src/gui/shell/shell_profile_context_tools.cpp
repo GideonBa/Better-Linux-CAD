@@ -11,6 +11,7 @@
 #include <algorithm>
 
 namespace blcad::gui {
+using Command = ShellFeatureTools::Command;
 ShellProfileContextTools::ShellProfileContextTools(ShellWindow& window)
     : QObject(&window), window_(window) {
   panel_ = new QFrame(&window.viewport());
@@ -33,9 +34,13 @@ ShellProfileContextTools::ShellProfileContextTools(ShellWindow& window)
   };
   extrude_ = action("extrude", "Extrusion");
   revolve_ = action("revolve", "Drehung");
+  sweep_ = action("sweep", "Sweep");
+  loft_ = action("loft", "Loft");
   cancel_ = action("cancel", "Abbrechen");
-  connect(extrude_, &QAction::triggered, this, [this] { begin(false); });
-  connect(revolve_, &QAction::triggered, this, [this] { begin(true); });
+  connect(extrude_, &QAction::triggered, this, [this] { begin(Command::Extrude); });
+  connect(revolve_, &QAction::triggered, this, [this] { begin(Command::Revolve); });
+  connect(sweep_, &QAction::triggered, this, [this] { begin(Command::Sweep); });
+  connect(loft_, &QAction::triggered, this, [this] { begin(Command::Loft); });
   connect(cancel_, &QAction::triggered, this, [this] {
     if (cancel_->isEnabled() && panel_->isVisible() && consumed_ &&
         window_.session().task().active() &&
@@ -52,22 +57,33 @@ ShellProfileContextTools::~ShellProfileContextTools() {
   delete panel_;
 }
 
-void ShellProfileContextTools::begin(bool revolve) {
+void ShellProfileContextTools::begin(Command kind) {
   refresh();
-  auto* command = revolve ? revolve_ : extrude_;
-  const auto context = window_.feature_tools().profile_context();
+  auto& owner = window_.feature_tools();
+  auto* command = kind == Command::Extrude   ? extrude_
+                  : kind == Command::Revolve ? revolve_
+                  : kind == Command::Sweep   ? sweep_
+                                             : loft_;
+  const auto context = owner.profile_context();
   if (!panel_->isVisible() || !command->isEnabled() || !context)
     return;
   ConsumedSelection previous{*context,
                              window_.session().selection().entries(),
                              window_.viewport().selected_semantic(),
                              {}};
-  auto& source =
-      revolve ? window_.feature_tools().revolve_action() : window_.feature_tools().extrude_action();
+  auto& source = kind == Command::Extrude   ? owner.extrude_action()
+                 : kind == Command::Revolve ? owner.revolve_action()
+                 : kind == Command::Sweep   ? owner.sweep_action()
+                                            : owner.loft_action();
   source.trigger();
-  if (window_.feature_tools().active() && window_.session().task().active()) {
+  if (owner.active() && owner.command() == kind && window_.session().task().active()) {
     previous.task_id = std::string(window_.session().task().command_id());
     consumed_ = std::move(previous);
+    if ((kind == Command::Sweep || kind == Command::Loft) &&
+        (!context->profile || !owner.select_spatial_profile(context->sketch, *context->profile))) {
+      owner.cancel();
+      return;
+    }
     window_.session().selection().clear();
     window_.viewport().clear_selection();
   }
@@ -123,18 +139,20 @@ void ShellProfileContextTools::refresh() {
   const bool extrude = idle && window_.feature_tools().extrude_action().isEnabled();
   const bool revolve =
       idle && context->profile && window_.feature_tools().revolve_action().isEnabled();
+  const bool sweep =
+      idle && context->materialized && window_.feature_tools().sweep_action().isEnabled();
+  const bool loft =
+      idle && context->materialized && window_.feature_tools().loft_action().isEnabled();
   // Hidden QActions are effectively disabled. Derive visibility from owner
   // eligibility rather than the wrapper's previous effective enabled state.
-  extrude_->setVisible(extrude);
-  revolve_->setVisible(revolve);
-  cancel_->setVisible(cancelling);
-  extrude_->setEnabled(extrude);
-  revolve_->setEnabled(revolve);
-  cancel_->setEnabled(cancelling);
-  buttons_[0]->setVisible(extrude_->isVisible());
-  buttons_[1]->setVisible(revolve_->isVisible());
-  buttons_[2]->setVisible(cancel_->isVisible());
-  if (!extrude_->isVisible() && !revolve_->isVisible() && !cancel_->isVisible()) {
+  const std::array<QAction*, 5> actions{extrude_, revolve_, sweep_, loft_, cancel_};
+  const std::array<bool, 5> enabled{extrude, revolve, sweep, loft, cancelling};
+  for (std::size_t i = 0; i < actions.size(); ++i) {
+    actions[i]->setVisible(enabled[i]);
+    actions[i]->setEnabled(enabled[i]);
+    buttons_[i]->setVisible(enabled[i]);
+  }
+  if (std::none_of(enabled.begin(), enabled.end(), [](bool value) { return value; })) {
     panel_->hide();
     return;
   }

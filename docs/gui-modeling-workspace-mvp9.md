@@ -5,7 +5,7 @@ adapter was deleted with the Block-133 shell reset. Block 136 now restores camer
 `ShellNavigationTools` on `ShellWindow`, as detailed below. Visible selection filters are also
 restored. `ShellRepeatTools` now restores command-repeat presentation through the current command
 owners. `ShellProfileContextTools` now supplies the bounded profile mini-toolbar described below.
-Remaining profile, Body, Surface and Assembly context commands stay open; the old catalog adapter
+Finishing, pattern, Body, Surface and Assembly context commands stay open; the old catalog adapter
 specifics are historical.
 
 Block 122 introduces the shared application-layer interaction boundary used by the Part, Surface, and
@@ -97,15 +97,18 @@ command-start task is active. It is a presentation product and is never persiste
 ### Replacement-shell profile context (Block 136)
 
 `ShellWindow` explicitly owns `ShellProfileContextTools` and the viewport child
-`blcad.context.toolbar`. It offers Extrude then Revolve in the existing deterministic priority order.
+`blcad.context.toolbar`. It offers Extrude, Revolve, Sweep and Loft in the existing deterministic
+priority order, subject to the normal owner's remaining-input requirements.
 `ShellFeatureTools::profile_context()` resolves current semantic selection or a Finish Sketch/browser
-handoff against materialized Core profiles. A verified single geometry line with no profile can offer
-Extrude for Thin authoring; it never gains a ProfileRegion capability or a Revolve action. Two-line
-chains and unmaterialized contours do not become closed profiles. The normal owner action must also
-be enabled, including its compatible-axis checks for Revolve.
+handoff against Core and records whether its profile is already materialized. Extrude/Revolve also
+retain their verified candidate-only raw-region workflow; opening a context task does not persist it.
+A verified single geometry line with no profile can offer Extrude for Thin authoring; it never gains
+a ProfileRegion capability or Revolve/Sweep/Loft actions. Two-line chains do not become closed
+profiles. The normal owner action must also be enabled, including its compatible-axis checks for Revolve.
 
-The context actions `context_extrude`, `context_revolve` and `context_cancel` are explicitly owned
-wrappers; they invoke the existing Feature entry points without changing their triggered handlers.
+The context actions `context_extrude`, `context_revolve`, `context_sweep`, `context_loft` and
+`context_cancel` are explicitly owned wrappers; they invoke the existing Feature entry points without
+changing their triggered handlers.
 The toolbar uses the last viewport left-press position plus a small offset and clamps to the viewport;
 browser/Finish handoffs use the last anchor, initially the upper-left corner. It hides if the viewport
 is too small to fit complete buttons. Sketch focus, repair, viewport mouse capture and unrelated
@@ -126,12 +129,27 @@ committed model. Save serializes committed intent while the disposable feature p
 History may remove the source; eligibility is resolved again against current Core, so stale handoffs
 never offer commands. No toolbar, anchor, selection or capability state is persisted.
 
-Current proof: six `[block136-profile-context]` cases and the twenty-fourth Qt-authored combined
+The Sweep/Loft additions require a materialized closed region; an open profile PathCurve is not
+promoted to that capability. Sweep also requires an open trajectory, and Loft requires the normal
+owner's available section inputs. After the original QAction starts the task,
+`ShellFeatureTools::select_spatial_profile` matches the verified Sketch/Profile pair against the
+task's typed inputs: Sweep replaces its default source, while Loft appends exactly one first section.
+It rejects absent profiles and duplicate Loft sections. Geometry still owns preview validity; starting
+Loft with only its first section is local, invalid for Apply and ready for further collection.
+Ribbon/Repeat starts retain their existing source/list defaults. Path Extrude remains available through
+the normal Extrude task's path direction controls rather than another context button.
+
+Initial proof: six `[block136-profile-context]` cases and the twenty-fourth Qt-authored combined
 workflow `[shell-combined-profile-context]`. The latter selects a native materialized profile,
 starts Extrude through the actual toolbar, restores an invalid cancelled Cut, creates a Thin wall on
 another plane, updates source depth, edits an earlier feature, verifies five-step exact history,
-reopens canonically and exports STEP. The remaining profile/Sweep/Loft, Body, Surface and Assembly
-context catalog remains a separate open slice; this toolbar does not close the viewport family.
+reopens canonically and exports STEP. Five `[block136-spatial-context]` cases additionally cover
+remaining-input eligibility, exact nondefault profile seeding, all cancellation paths, role/filter/scope
+restoration, raw-region exclusion, three-section atomic Apply, Save and replacement. The twenty-fifth
+combined workflow `[shell-combined-spatial-context]` authors all its Sketch/plane/path inputs through Qt, cancels an
+invalid Sweep, corrects a three-section Loft's order and G2 input, creates a second Sweep, changes its
+twist parameter, edits the earlier Loft, verifies four-step history, reopens and exports STEP.
+Finishing, pattern, Body, Surface and Assembly contexts remain open; the viewport family stays partial.
 
 ## Command lifecycle, cancellation, and repeat
 

@@ -238,6 +238,10 @@ ShellFeatureTools::ShellFeatureTools(ShellWindow& window, GuiDocumentSession& se
     });
     ribbon.add_small_button(spatial_group, action);
     spatial_actions_.emplace_back(command, action);
+    if (command == Command::Sweep)
+      action_sweep_ = action;
+    else if (command == Command::Loft)
+      action_loft_ = action;
   }
 
   auto* surface_group = ribbon.add_group(model_tab, QStringLiteral("Flächen"));
@@ -271,6 +275,8 @@ ShellFeatureTools::ShellFeatureTools(ShellWindow& window, GuiDocumentSession& se
   auto* dock_column = new QVBoxLayout(dock_contents);
   auto* panel = new QWidget(dock_contents);
   auto* column = new QVBoxLayout(panel);
+  // Dynamic task rows must update the scroll content's minimum size.
+  column->setSizeConstraint(QLayout::SetMinAndMaxSize);
   task_summary_ = new QLabel(panel);
   task_summary_->setWordWrap(true);
   column->addWidget(task_summary_);
@@ -352,8 +358,12 @@ std::optional<ShellFeatureTools::ProfileContext> ShellFeatureTools::profile_cont
       !session_.selection().allows(GuiSelectionKind::SketchEntity))
     return std::nullopt;
   const auto selected = profile_from_selection();
-  if (selected)
-    return ProfileContext{selected.value().first, selected.value().second};
+  if (selected) {
+    const auto* source = session_.part_document()->find_sketch(selected.value().first);
+    return ProfileContext{
+        selected.value().first, selected.value().second,
+        source && GuiModelingWorkspace::has_materialized_profile(*source, selected.value().second)};
+  }
   if (const auto line = open_line_from_selection())
     return ProfileContext{*line, std::nullopt};
   return std::nullopt;

@@ -66,6 +66,26 @@ New result Bodies and driving Angle parameters remain disposable until Apply. Ev
 and recomputes the actual Geometry; invalid input clears the ghost and disables Apply. Cancel,
 Undo/Redo and Save/Open use the existing authorities and schema.
 
+The profile context mini-toolbar also starts Sweep and Loft through their original owner actions.
+It requires a verified materialized closed Sketch region and the normal command's enabled state.
+The selected typed Sketch/Profile pair replaces Sweep's default source or becomes Loft's first
+section, even when another profile is first in the source chooser. Loft still requires the remaining
+sections before Apply. Duplicate sections remain rejected. The context adapter consumes preselection
+only for a successfully started task; context Cancel, task Cancel and Escape restore it after the
+owner restores its previous filter and semantic scope. Apply retains the existing single transaction.
+The ribbon and Repeat entry points keep their previous default source/list behavior. Exact context
+contracts and proofs live in `docs/gui-modeling-workspace-mvp9.md`.
+
+The shared task layout propagates minimum/maximum size constraints to its scroll content. The
+spatial form updates its minimum height from its preferred row layout whenever command/mode
+visibility changes. Excess height scrolls instead of compressing the order buttons and overlapping
+the hint text with the path chooser after switching from Sweep to Loft. Ordering buttons and their
+hint share one layout group; the workflow checks complete button height and the actual gap to the
+trajectory chooser.
+
+The order controls have explicit `blcad.spatial.order.up`/`down`/`remove` identities; the continuity
+chooser is `blcad.spatial.continuity`. They remain normal local-candidate controls.
+
 PathCurve collects planar lines/arcs/splines, bounded construction lines and existing Sketch3D
 line/polyline/arc/spline/helix sources. Click sources or append them from the chooser, then reorder
 by dragging the list or using Hoch/Runter. Check a row to reverse its segment. Duplicate sources,
