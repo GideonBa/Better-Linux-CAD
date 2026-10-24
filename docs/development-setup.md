@@ -1084,6 +1084,32 @@ inputs; Planar motion retains its imported seated Part boundary. Inspect
 in the canonical native regression in `docs/gui-shell-acceptance-mvp9r.md`, then run startup separately.
 Contracts and remaining work: `docs/parameter-model.md`, `docs/mvp-plan.md`.
 
+## Open-line Thin Extrude authoring
+
+```bash
+cmake --build --preset dev-gui --target blcad_gui_tests blcad_app -j6
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[block136-thin-extrude],[shell-combined-thin-extrude],[block136-extrude-extents],[block136-path-extrude],[gui][extrude-revolve],[integration][gui-feature-coverage]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-thin-native QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[native-projection-precision],[block136-thin-extrude],[shell-combined-thin-extrude]"
+```
+
+The focused cases cover all three wall modes and signed bounds on XY/XZ/YZ, every Body operation,
+all seven extents, diagonal/reversed lines on a tilted offset plane, invalid text/recovery,
+independent thickness/depth rollback, semantic selection,
+pointer Escape in an oblique view with distinct handle projections, bounded input rejection,
+global identity collisions, Cancel, document replacement
+and canonical reopening. The nineteenth combined workflow authors a plate and two single-line
+Sketches through actual UI input, cuts a mid-plane groove and a one-sided through slot, creates a
+separate two-sided symmetric wall and edits an earlier thickness through the parameter manager.
+It edits the earlier feature's name while retaining thin intent and checks downstream volumes,
+exact five-step history, cancellation, canonical reopening and STEP.
+Eighteen combined workflows have fully UI-authored inputs; Planar motion retains its imported Part.
+
+Inspect `thin-midplane-cut-preview.png`, `thin-two-sided-new-body-preview.png` and
+`thin-through-all-cut-preview.png` at 1280×800. Include both tags in the canonical native command in
+`docs/gui-shell-acceptance-mvp9r.md`, then run startup separately. Keep builds, GUI runs and startup
+serial. The one-line boundary and remaining native limit collection are recorded in
+`docs/gui-interactive-extrude-revolve-mvp9.md` and `docs/mvp-plan.md`.
+
 ## Path-directed Extrude authoring
 
 ```bash

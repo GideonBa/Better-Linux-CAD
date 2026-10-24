@@ -100,6 +100,7 @@ public:
 
   // Selection-first dialog-free command surface (also used by tests).
   [[nodiscard]] bool select_profile(SketchId sketch, ProfileId profile);
+  [[nodiscard]] bool select_open_line(SketchId sketch);
   void clear_profile_selection() noexcept;
   [[nodiscard]] Result<std::size_t> begin_extrude();
   [[nodiscard]] Result<std::size_t> begin_revolve(std::optional<DatumAxisId> axis = std::nullopt);
@@ -336,12 +337,14 @@ private:
   [[nodiscard]] Result<std::size_t> rebuild_finishing_controller();
   void refresh_finishing_preview();
   [[nodiscard]] Result<std::pair<SketchId, ProfileId>> profile_from_selection() const;
+  [[nodiscard]] std::optional<SketchId> open_line_from_selection() const;
   [[nodiscard]] Result<GuiSketchPlaneView> selected_profile_plane() const;
   [[nodiscard]] Result<DatumAxisId> default_revolve_axis(const GuiSketchPlaneView& plane) const;
   [[nodiscard]] Result<GuiPartFeaturePreview> preview_and_publish();
   [[nodiscard]] double current_value() const noexcept;
   [[nodiscard]] bool update_mapping();
   void synchronize_numeric_editor(double value);
+  void synchronize_manipulator_editor(std::string_view handle);
   void synchronize_overlay();
   void restore_drag_start_value();
   void handle_escape();
@@ -371,6 +374,10 @@ private:
   QComboBox* extrude_second_face_{nullptr};
   QLineEdit* extrude_second_distance_{nullptr};
   QLineEdit* extrude_taper_{nullptr};
+  QComboBox* extrude_thin_mode_{nullptr};
+  QLineEdit* extrude_thickness_{nullptr};
+  QLineEdit* extrude_second_thickness_{nullptr};
+  QLabel* extrude_hint_{nullptr};
   std::vector<FaceReference> extrude_faces_;
   GuiFeatureManipulatorFrame extrude_frame_;
   QWidget* revolve_controls_{nullptr};
@@ -509,6 +516,7 @@ private:
   double surface_value_{5};
 
   std::optional<std::pair<SketchId, ProfileId>> selected_profile_;
+  std::optional<SketchId> selected_open_line_;
   std::optional<double> drag_start_value_;
   std::string drag_start_handle_;
   Command command_{Command::None};

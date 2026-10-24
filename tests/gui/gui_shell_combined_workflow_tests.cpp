@@ -243,7 +243,7 @@ public:
       QCursor::setPos(global);
       QGuiApplication::sync();
       flush();
-      REQUIRE(QCursor::pos() == global);
+      REQUIRE(wait_for_ui([&] { return QCursor::pos() == global; }));
     }
     REQUIRE(view->isVisible());
     REQUIRE(view->indexAt(rectangle.center()) == index);
@@ -465,6 +465,30 @@ public:
     button("blcad.feature.apply");
     REQUIRE_FALSE(window.session().task().active());
     return window.session().part_document()->bodies().back().id();
+  }
+  SketchId open_line(const std::string& plane, Point2 first, Point2 second) {
+    tree(plane);
+    command("create_sketch");
+    REQUIRE(window.active_sketch());
+    const auto id = *window.active_sketch();
+    command("sketch.create.line");
+    const auto coordinates = [&](Point2 point) {
+      const auto entry = QString::number(point.x) + ";" + QString::number(point.y);
+      for (const auto character : entry)
+        key(window, character.unicode(), QString(character));
+      key(window, Qt::Key_Return);
+    };
+    coordinates(first);
+    coordinates({second.x - first.x, second.y - first.y});
+    command("finish_sketch");
+    REQUIRE_FALSE(window.active_sketch());
+    const auto* sketch = window.session().part_document()->find_sketch(id);
+    REQUIRE(sketch);
+    REQUIRE(sketch->line_segments().size() == 1);
+    REQUIRE(sketch->profile_count() == 0);
+    REQUIRE(action("extrude").isEnabled());
+    CHECK_FALSE(action("revolve").isEnabled());
+    return id;
   }
   DatumPlaneId offset(double value) {
     command("create_workplane");
@@ -915,6 +939,122 @@ TEST_CASE("Combined UI path extrusion machines a prior cut and follows corrected
   ui.roundtrip(directory.filePath("path-machining.blcad"));
   CHECK(ui.summary(body).volume_mm3 == Approx(46848).margin(1e-5));
   const auto step = directory.filePath("path-machining.step");
+  ui.file("export_part_step", step);
+  CHECK(ui.bytes(step).contains("ISO-10303-21"));
+  CHECK(ui.snapshot() == states.back());
+  ui.idle();
+}
+
+TEST_CASE(
+    "Combined UI thin walls machine a plate and retain independent wall parameters through history",
+    "[gui][integration][shell-combined-workflow][shell-combined-thin-extrude]") {
+  WorkflowUi ui;
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  ui.new_document("Thin wall machining");
+  ui.rectangle("datum.xy", {-30, -20}, {30, 20});
+  const auto base = ui.extrude(20);
+  const auto groove = ui.open_line("datum.xy", {-20, 0}, {20, 0});
+  const auto slot = ui.open_line("datum.xy", {-20, 10}, {20, 10});
+  const auto parameters = ui.window.session().part_document()->parameter_count();
+  std::vector<std::string> states{ui.snapshot()};
+  ui.tree(groove.value());
+  ui.command("extrude");
+  ui.choose(ui.widget<QComboBox>("blcad.extrude.operation"), 2);
+  ui.choose(ui.widget<QComboBox>("blcad.extrude.thin_mode"), 1);
+  ui.text(ui.widget<QLineEdit>("blcad.extrude.thickness"), "2 mm");
+  ui.scalar("6 mm");
+  REQUIRE(ui.window.viewport().feature_preview_replaces("body/" + base.value()));
+  CHECK(ui.snapshot() == states.back());
+  const auto first = ui.window.feature_tools().coordinator().extrude().feature_id();
+  ui.capture("thin-midplane-cut-preview");
+  ui.button("blcad.feature.apply");
+  CHECK(ui.summary(base).volume_mm3 == Approx(47520).margin(1e-5));
+  const auto thickness = ui.window.session()
+                             .part_document()
+                             ->find_feature(first)
+                             ->extrude_intent()
+                             .thin()
+                             ->first_thickness_parameter();
+  states.push_back(ui.snapshot());
+
+  ui.tree(groove.value());
+  ui.command("extrude");
+  ui.choose(ui.widget<QComboBox>("blcad.extrude.extent"), 1);
+  ui.scalar("12 mm");
+  ui.choose(ui.widget<QComboBox>("blcad.extrude.thin_mode"), 2);
+  ui.text(ui.widget<QLineEdit>("blcad.extrude.thickness"), "2 mm");
+  ui.text(ui.widget<QLineEdit>("blcad.extrude.second_thickness"), "3 deg");
+  CHECK_FALSE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+  CHECK(ui.snapshot() == states.back());
+  ui.text(ui.widget<QLineEdit>("blcad.extrude.second_thickness"), "3 mm");
+  REQUIRE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+  const auto wall = ui.window.feature_tools().coordinator().extrude().result_body_id();
+  ui.capture("thin-two-sided-new-body-preview");
+  ui.button("blcad.feature.apply");
+  CHECK(ui.summary(wall).volume_mm3 == Approx(2400).margin(1e-5));
+  CHECK(ui.summary(base).volume_mm3 == Approx(47520).margin(1e-5));
+  states.push_back(ui.snapshot());
+
+  ui.tree(slot.value());
+  ui.command("extrude");
+  ui.choose(ui.widget<QComboBox>("blcad.extrude.operation"), 2);
+  ui.data(ui.widget<QComboBox>("blcad.extrude.target"), QString::fromStdString(base.value()));
+  ui.choose(ui.widget<QComboBox>("blcad.extrude.extent"), 3);
+  ui.text(ui.widget<QLineEdit>("blcad.extrude.thickness"), "3 mm");
+  REQUIRE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+  CHECK(ui.window.feature_tools().manipulators().handles().size() == 1);
+  ui.command("fit", 2);
+  ui.capture("thin-through-all-cut-preview");
+  ui.button("blcad.feature.apply");
+  CHECK(ui.summary(base).volume_mm3 == Approx(45120).margin(1e-5));
+  CHECK(ui.window.session().part_document()->parameter_count() == parameters + 6);
+  CHECK(ui.window.session().part_document()->body_count() == 2);
+  states.push_back(ui.snapshot());
+
+  ui.command("parameters");
+  ui.data(ui.widget<QComboBox>("blcad.parameters.parameter"),
+          QString::fromStdString(thickness.value()));
+  CHECK(ui.widget<QLabel>("blcad.parameters.usage")
+            .text()
+            .contains(QString::fromStdString(first.value())));
+  ui.text(ui.widget<QLineEdit>("blcad.parameters.input"), "4");
+  ui.button("blcad.parameters.stage");
+  ui.button("blcad.parameters.preview");
+  CHECK(ui.snapshot() == states.back());
+  ui.button("blcad.parameters.apply");
+  CHECK(ui.summary(base).volume_mm3 == Approx(44640).margin(1e-5));
+  CHECK(ui.summary(wall).volume_mm3 == Approx(2400).margin(1e-5));
+  states.push_back(ui.snapshot());
+  ui.tree(first.value(), true);
+  REQUIRE(ui.window.feature_edit_tools().active());
+  ui.text(ui.widget<QLineEdit>("blcad.feature_edit.field/name"), "Parameterized thin groove");
+  ui.button("blcad.feature_edit.apply");
+  const auto* edited = ui.window.session().part_document()->find_feature(first);
+  REQUIRE(edited);
+  REQUIRE(edited->extrude_intent().thin());
+  CHECK_FALSE(edited->profile());
+  CHECK(edited->extrude_intent().thin()->first_thickness_parameter() == thickness);
+  CHECK(ui.summary(base).volume_mm3 == Approx(44640).margin(1e-5));
+  CHECK(ui.summary(wall).volume_mm3 == Approx(2400).margin(1e-5));
+  states.push_back(ui.snapshot());
+  ui.history(states);
+  ui.tree(groove.value());
+  ui.command("extrude");
+  ui.choose(ui.widget<QComboBox>("blcad.extrude.thin_mode"), 2);
+  ui.text(ui.widget<QLineEdit>("blcad.extrude.second_thickness"), "7 mm");
+  ui.choose(ui.widget<QComboBox>("blcad.extrude.thin_mode"), 1);
+  ui.choose(ui.widget<QComboBox>("blcad.extrude.direction"), 1);
+  ui.text(ui.widget<QLineEdit>("blcad.extrude.thickness"), "2.5 mm");
+  ui.text(ui.widget<QLineEdit>("blcad.extrude.taper"), "-1 deg");
+  REQUIRE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+  ui.button("blcad.feature.cancel");
+  CHECK(ui.snapshot() == states.back());
+  ui.idle();
+  ui.roundtrip(directory.filePath("thin-machining.blcad"));
+  CHECK(ui.summary(base).volume_mm3 == Approx(44640).margin(1e-5));
+  CHECK(ui.summary(wall).volume_mm3 == Approx(2400).margin(1e-5));
+  const auto step = directory.filePath("thin-machining.step");
   ui.file("export_part_step", step);
   CHECK(ui.bytes(step).contains("ISO-10303-21"));
   CHECK(ui.snapshot() == states.back());

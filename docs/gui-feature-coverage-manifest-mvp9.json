@@ -312,9 +312,9 @@
         "owner": 136,
         "status": "partial",
         "contract": "docs/gui-interactive-extrude-revolve-mvp9.md",
-        "scope": "Candidate-only Extrude/Revolve with native manipulation and selectable closed spline profiles; all seven Extrude extents, four Body operations, reversed direction, a local second distance and taper; open-PathCurve Extrude with inherited orientation and no scalar inputs; Full/directed/Symmetric Revolve with typed compatible axes and operation-paired Cut intent; dedicated through-all single/bolt-circle cuts with typed inputs, bindings and complete atomic Preview/Apply.",
+        "scope": "Candidate-only Extrude/Revolve with native manipulation and selectable closed spline profiles; all seven Extrude extents, four Body operations, reversed direction, a local second distance and taper; single-open-line Thin Extrude with three wall modes and atomic new thickness inputs; open-PathCurve Extrude with inherited orientation and no scalar inputs; Full/directed/Symmetric Revolve with typed compatible axes and operation-paired Cut intent; dedicated through-all single/bolt-circle cuts with typed inputs, bindings and complete atomic Preview/Apply.",
         "gaps": [
-          "Restore thin/open-profile Extrude controls and native viewport limit-face collection against the retained foundation API."
+          "Restore native viewport limit-face collection against the retained semantic source API."
         ],
         "proofs": [
           {
@@ -360,6 +360,14 @@
           {
             "filter": "[shell-combined-path-extrude]",
             "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
+          },
+          {
+            "filter": "[block136-thin-extrude]",
+            "source": "tests/gui/gui_shell_thin_extrude_tests.cpp"
+          },
+          {
+            "filter": "[shell-combined-thin-extrude]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
           }
         ],
         "actions": [
@@ -371,7 +379,10 @@
           "blcad.shell.hole_task",
           "blcad.extrude.inputs",
           "blcad.revolve.inputs",
-          "blcad.extrude.path"
+          "blcad.extrude.path",
+          "blcad.extrude.thin_mode",
+          "blcad.extrude.thickness",
+          "blcad.extrude.second_thickness"
         ]
       }
     },

@@ -88,8 +88,47 @@ Focused proof: `[block136-extrude-extents]` in `gui_shell_extrude_extent_tests.c
 corrects transverse/coincident face bounds, cuts to/between source planes, checks exact history,
 cancels a symmetric tapered candidate, reopens canonically and exports STEP.
 
-Thin/open-profile controls and native limit-face collection remain separate shell work.
-The path-directed and expanded Revolve surfaces are described below.
+Native limit-face collection remains separate shell work. The bounded thin, path-directed and
+expanded Revolve surfaces are described below.
+
+### Replacement-shell open-line Thin Extrude — Block 136, 2026-10-24
+
+A Sketch containing exactly one nondegenerate real line and no profiles or additional curves is
+eligible for Thin Extrude. Finish Sketch hands it to the existing Extrusion task; browser Sketch/
+line selection and semantic viewport line selection use the same bounded predicate. Revolve still
+requires a closed profile. General chains, arcs, splines, projected/reference lines and closed
+profiles do not gain thin semantics. Standalone points do not contribute to the wall region.
+
+The controller's auto-provisioning entry accepts an absent ProfileId only for this validated open
+line; it never invents or materializes a closed profile. Such a candidate requires thickness intent
+before Preview/Apply. Closed-profile callers and their existing begin contract remain unchanged.
+The shell offers `Einseitig links`, `Mittig` and `Zwei Seiten`, a positive new first thickness and,
+only for TwoSided, a positive new second thickness. Left/right follow the authored Sketch-line
+direction, independent of normal/opposite extrusion. MidPlane uses half the first (total) thickness
+on each side. Path direction is unavailable for open-line candidates.
+
+The seven retained straight extent modes, optional taper and four Body operations use the same
+disposable whole-model recompute and target replacement as closed Extrude. Used thickness inputs,
+used distances, the feature and a NewBody result publish in one transaction. Switching wall modes
+does not publish an unused second thickness; target operations do not add a pending new Body.
+Generated IDs/names reserve both thickness inputs against the global dependency namespace.
+New thickness text retains invalid values and disables Apply until corrected. Editing another
+field does not silently replace a pending invalid thickness. Cancel and document replacement
+discard all candidate inputs and leave Sketch topology and intent sidecars untouched.
+
+The first-thickness handle represents the full first value, including MidPlane's total thickness.
+Its origin is the line midpoint and its axis is the resolved left direction in the Sketch plane.
+Depth, taper and thickness have independent rollback values and editors; failed geometry candidates
+and Escape restore the last accepted thickness without overwriting the extrusion depth.
+The second thickness remains a numeric input. Existing persistence records the optional `thin`
+intent with Length parameter references and omits `profile` for the open line; there is no schema
+change. Later parameter edits recompute downstream Body operations through existing dependencies.
+
+Proof: `[block136-thin-extrude]` and `[shell-combined-thin-extrude]`. The combined actual-input
+workflow authors two open lines, machines a mid-plane groove and one-sided through slot, creates
+an independent two-sided symmetric wall, edits an earlier thickness through downstream cuts,
+renames the earlier feature while retaining thin intent, checks exact history, cancels a
+tapered/reversed draft, reopens and exports STEP.
 
 ### Replacement-shell path Extrude — Block 136, 2026-10-24
 

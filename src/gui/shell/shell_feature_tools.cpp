@@ -102,8 +102,12 @@ std::size_t next_extrude_index(const PartDocument& part) {
         part.find_body(BodyId("body." + suffix)) == nullptr &&
         !part.dependency_graph().has_node("parameter.extrusion." + suffix + ".depth") &&
         !part.dependency_graph().has_node("parameter.extrusion." + suffix + ".depth.second") &&
+        !part.dependency_graph().has_node("parameter.extrusion." + suffix + ".depth.wall") &&
+        !part.dependency_graph().has_node("parameter.extrusion." + suffix + ".depth.wall.second") &&
         !parameter_name_exists(part, "Extrusion " + suffix + " Tiefe") &&
-        !parameter_name_exists(part, "feature.extrusion." + suffix + " zweite Tiefe"))
+        !parameter_name_exists(part, "feature.extrusion." + suffix + " zweite Tiefe") &&
+        !parameter_name_exists(part, "feature.extrusion." + suffix + " Wandstärke") &&
+        !parameter_name_exists(part, "feature.extrusion." + suffix + " zweite Wandstärke"))
       return index;
   }
 }
@@ -343,6 +347,7 @@ bool ShellFeatureTools::active() const noexcept {
 }
 
 bool ShellFeatureTools::select_profile(SketchId sketch, ProfileId profile) {
+  selected_open_line_.reset();
   const auto* part = session_.part_document();
   if (part == nullptr || !shell_feature_profile_available(*part, sketch, profile)) {
     selected_profile_.reset();
@@ -359,7 +364,30 @@ bool ShellFeatureTools::select_profile(SketchId sketch, ProfileId profile) {
 
 void ShellFeatureTools::clear_profile_selection() noexcept {
   selected_profile_.reset();
+  selected_open_line_.reset();
   refresh_enablement();
+}
+
+bool ShellFeatureTools::select_open_line(SketchId sketch) {
+  selected_profile_.reset();
+  selected_open_line_.reset();
+  const auto* part = session_.part_document();
+  const auto* source = part ? part->find_sketch(sketch) : nullptr;
+  if (source && interactive_thin_line(*source))
+    selected_open_line_ = std::move(sketch);
+  refresh_enablement();
+  return selected_open_line_.has_value();
+}
+
+std::optional<SketchId> ShellFeatureTools::open_line_from_selection() const {
+  const auto* part = session_.part_document();
+  if (!part)
+    return std::nullopt;
+  for (const auto& selection : session_.selection().entries())
+    if (const auto sketch = interactive_thin_selection(*part, selection.semantic_id))
+      return sketch;
+  const auto* source = selected_open_line_ ? part->find_sketch(*selected_open_line_) : nullptr;
+  return source && interactive_thin_line(*source) ? selected_open_line_ : std::nullopt;
 }
 
 Result<std::pair<SketchId, ProfileId>> ShellFeatureTools::profile_from_selection() const {
@@ -415,9 +443,11 @@ Result<std::size_t> ShellFeatureTools::begin_extrude() {
     return Result<std::size_t>::failure(
         Error::validation("gui.shell.feature", "zuerst den aktiven Befehl beenden"));
   auto selected = profile_from_selection();
-  if (selected.has_error())
+  const auto open_line = open_line_from_selection();
+  if (selected.has_error() && !open_line)
     return Result<std::size_t>::failure(selected.error());
-  auto plane = sketch_workbench_.plane_view(session_, selected.value().first);
+  const auto sketch = open_line ? *open_line : selected.value().first;
+  auto plane = sketch_workbench_.plane_view(session_, sketch);
   if (plane.has_error())
     return Result<std::size_t>::failure(plane.error());
   const auto* part = session_.part_document();
@@ -448,11 +478,25 @@ Result<std::size_t> ShellFeatureTools::begin_extrude() {
   GuiFeatureManipulatorFrame frame{plane.value().origin, plane.value().normal, plane.value().normal,
                                    plane.value().x_axis};
   auto begun = coordinator_.begin_extrude_with_new_inputs(
-      selected.value().first, selected.value().second, feature, "Extrusion " + suffix,
-      std::move(parameter.value()), std::move(body.value()), frame);
+      sketch, open_line ? std::nullopt : std::optional(selected.value().second), feature,
+      "Extrusion " + suffix, std::move(parameter.value()), std::move(body.value()), frame);
   if (begun.has_error()) {
     (void)session_.task().cancel();
     return begun;
+  }
+  if (open_line) {
+    const auto& line = part->find_sketch(sketch)->line_segments().front();
+    const auto& view = plane.value();
+    const double dx = line.end().x - line.start().x, dy = line.end().y - line.start().y;
+    const double length = std::hypot(dx, dy);
+    const Point2 middle{(line.start().x + line.end().x) / 2, (line.start().y + line.end().y) / 2};
+    const Point3 origin{view.origin.x + middle.x * view.x_axis.x + middle.y * view.y_axis.x,
+                        view.origin.y + middle.x * view.x_axis.y + middle.y * view.y_axis.y,
+                        view.origin.z + middle.x * view.x_axis.z + middle.y * view.y_axis.z};
+    const Vector3 left{(-dy * view.x_axis.x + dx * view.y_axis.x) / length,
+                       (-dy * view.x_axis.y + dx * view.y_axis.y) / length,
+                       (-dy * view.x_axis.z + dx * view.y_axis.z) / length};
+    coordinator_.extrude().set_thin_manipulator_frame({origin, left, view.normal, view.x_axis});
   }
   command_ = Command::Extrude;
   reset_extrude_controls(frame);
@@ -720,7 +764,7 @@ ShellFeatureTools::accept_manipulator_candidate(const GuiViewportManipulatorCand
     return Result<GuiPartFeaturePreview>::failure(
         Error::validation(candidate.handle_id.empty() ? "gui.shell.feature" : candidate.handle_id,
                           "Manipulator-Kandidat passt nicht zum aktiven Feature"));
-  synchronize_numeric_editor(current_value());
+  synchronize_manipulator_editor(candidate.handle_id);
   if (secondary) {
     finishing_second_value_ = coordinator_.finishing().second_value();
     secondary_numeric_editor_->setText(number_text(finishing_second_value_));
@@ -744,7 +788,7 @@ ShellFeatureTools::accept_manipulator_candidate(const GuiViewportManipulatorCand
         candidate.handle_id.empty() ? "gui.shell.feature" : candidate.handle_id,
         "gültiger Manipulatorwert konnte nach Vorschaufehler nicht wiederhergestellt werden"));
   }
-  synchronize_numeric_editor(current_value());
+  synchronize_manipulator_editor(candidate.handle_id);
   if (secondary) {
     finishing_second_value_ = coordinator_.finishing().second_value();
     secondary_numeric_editor_->setText(number_text(finishing_second_value_));
@@ -948,6 +992,7 @@ void ShellFeatureTools::cancel() noexcept {
 void ShellFeatureTools::reset() noexcept {
   cancel();
   selected_profile_.reset();
+  selected_open_line_.reset();
   window_.refresh();
 }
 
@@ -957,7 +1002,8 @@ void ShellFeatureTools::refresh_enablement() {
       session_.document_kind() == GuiDocumentKind::Part &&
       session_.workspace() == GuiWorkspace::Part && !session_.reference_repair_mode();
   const bool profile_available = idle_part && !profile_from_selection().has_error();
-  action_extrude_->setEnabled(profile_available);
+  action_extrude_->setEnabled(profile_available ||
+                              (idle_part && open_line_from_selection().has_value()));
   bool revolve_available = false;
   if (profile_available) {
     const auto plane = selected_profile_plane();
@@ -1047,6 +1093,8 @@ double ShellFeatureTools::current_value() const noexcept {
 double ShellFeatureTools::value_for_handle(std::string_view handle) const noexcept {
   if (command_ == Command::Extrude && handle == kExtrudeTaperHandleId)
     return coordinator_.extrude().taper().value_or(0);
+  if (command_ == Command::Extrude && handle == kExtrudeThinHandleId)
+    return coordinator_.extrude().thin_thickness();
   if (command_ == Command::BodyTranslate) {
     const auto value = coordinator_.body_operation().translation();
     return handle.ends_with(".y") ? value.y : handle.ends_with(".z") ? value.z : value.x;
@@ -1089,6 +1137,14 @@ void ShellFeatureTools::synchronize_numeric_editor(double value) {
   if (surface_scalar() && coordinator_.surface().active())
     surface_value_ = current_value();
   synchronizing_numeric_ = false;
+}
+
+void ShellFeatureTools::synchronize_manipulator_editor(std::string_view handle) {
+  synchronize_numeric_editor(current_value());
+  if (command_ == Command::Extrude && handle == kExtrudeThinHandleId) {
+    const QSignalBlocker blocker(extrude_thickness_);
+    extrude_thickness_->setText(QString::number(coordinator_.extrude().thin_thickness(), 'g', 17));
+  }
 }
 
 void ShellFeatureTools::synchronize_overlay() {

@@ -13,8 +13,10 @@
 #include <QAction>
 #include <QApplication>
 #include <QComboBox>
+#include <QCursor>
 #include <QDir>
 #include <QDockWidget>
+#include <QEventLoop>
 #include <QFile>
 #include <QFileDialog>
 #include <QKeyEvent>
@@ -141,13 +143,51 @@ void mouse_choose(QComboBox& combo, const QString& id) {
   const auto row = combo.findData(id);
   INFO(id.toStdString());
   REQUIRE(row >= 0);
+  REQUIRE(combo.isVisible());
+  REQUIRE(combo.isEnabled());
+  const auto wait_for_ui = [](auto ready) {
+    if (!ready()) {
+      QEventLoop transition;
+      QTimer poll, deadline;
+      deadline.setSingleShot(true);
+      QObject::connect(&poll, &QTimer::timeout, &transition, [&] {
+        if (ready())
+          transition.quit();
+      });
+      QObject::connect(&deadline, &QTimer::timeout, &transition, &QEventLoop::quit);
+      poll.start(5);
+      deadline.start(2000);
+      transition.exec();
+    }
+    return ready();
+  };
+  const bool native = QApplication::platformName() == "xcb";
+  if (native) {
+    combo.window()->raise();
+    combo.window()->activateWindow();
+    QGuiApplication::sync();
+    REQUIRE(wait_for_ui([&] { return combo.window()->isActiveWindow(); }));
+    QCursor::setPos(combo.mapToGlobal(combo.rect().center()));
+    QGuiApplication::sync();
+  }
   combo.showPopup();
   qApp->processEvents();
   auto* view = combo.view();
+  REQUIRE(wait_for_ui([&] { return view->isVisible(); }));
   const auto index = combo.model()->index(row, combo.modelColumn());
   view->scrollTo(index);
   qApp->processEvents();
-  click(*view->viewport(), view->visualRect(index).center());
+  const auto point = view->visualRect(index).center();
+  REQUIRE(view->viewport()->rect().contains(point));
+  if (native) {
+    const auto global = view->viewport()->mapToGlobal(point);
+    QCursor::setPos(global);
+    QGuiApplication::sync();
+    REQUIRE(wait_for_ui([&] { return QCursor::pos() == global; }));
+  }
+  REQUIRE(view->isVisible());
+  REQUIRE(view->indexAt(point) == index);
+  click(*view->viewport(), point);
   REQUIRE(combo.currentIndex() == row);
 }
 void ribbon_command(ShellWindow& window, QAction& command, int tab) {
