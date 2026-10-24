@@ -1,5 +1,6 @@
 #include "blcad/gui/shell/shell_feature_tools.hpp"
 
+#include "blcad/gui/gui_modeling_workspace.hpp"
 #include "blcad/gui/occt_viewport.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
 
@@ -14,6 +15,7 @@
 #include <QListWidget>
 #include <QPushButton>
 #include <QSignalBlocker>
+#include <QVBoxLayout>
 
 #include <algorithm>
 
@@ -156,13 +158,19 @@ void ShellFeatureTools::build_spatial_controls(QWidget* panel) {
   spatial_order_->setMaximumHeight(150);
   form->addRow(spatial_order_);
   spatial_order_buttons_ = new QWidget(spatial_controls_);
-  auto* buttons = new QHBoxLayout(spatial_order_buttons_);
+  auto* ordering = new QVBoxLayout(spatial_order_buttons_);
+  ordering->setContentsMargins(0, 0, 0, 0);
+  auto* buttons = new QHBoxLayout();
+  ordering->addLayout(buttons);
   buttons->setContentsMargins(0, 0, 0, 0);
   for (int direction : {-1, 1, 0}) {
     auto* button = new QPushButton(direction < 0   ? QStringLiteral("Hoch")
                                    : direction > 0 ? QStringLiteral("Runter")
                                                    : QStringLiteral("Entfernen"),
                                    spatial_order_buttons_);
+    button->setObjectName(direction < 0   ? "blcad.spatial.order.up"
+                          : direction > 0 ? "blcad.spatial.order.down"
+                                          : "blcad.spatial.order.remove");
     buttons->addWidget(button);
     connect(button, &QPushButton::clicked, this, [this, direction] {
       const int row = spatial_order_->currentRow();
@@ -179,12 +187,12 @@ void ShellFeatureTools::build_spatial_controls(QWidget* panel) {
   spatial_order_hint_ =
       new QLabel(QStringLiteral("Liste ziehen oder Hoch/Runter verwenden. Häkchen kehren "
                                 "Segmentrichtung bzw. Schnittnormalen um."),
-                 spatial_controls_);
+                 spatial_order_buttons_);
   spatial_order_hint_->setWordWrap(true);
   spatial_order_hint_->setMinimumHeight(64);
   spatial_order_hint_->setAlignment(Qt::AlignLeft | Qt::AlignTop);
   spatial_order_hint_->setObjectName("blcad.spatial.order_hint");
-  form->addRow(spatial_order_hint_);
+  ordering->addWidget(spatial_order_hint_);
   spatial_path_ = new QComboBox(spatial_controls_);
   spatial_path_->setObjectName("blcad.spatial.path");
   form->addRow(QStringLiteral("Pfad / Leitpfad"), spatial_path_);
@@ -221,6 +229,7 @@ void ShellFeatureTools::build_spatial_controls(QWidget* panel) {
     });
   }
   spatial_continuity_ = new QComboBox(spatial_controls_);
+  spatial_continuity_->setObjectName("blcad.spatial.continuity");
   spatial_continuity_->addItems({QStringLiteral("C0"), QStringLiteral("G1"), QStringLiteral("G2")});
   form->addRow(QStringLiteral("Stetigkeit"), spatial_continuity_);
   sweep_twist_ = new QCheckBox(QStringLiteral("Verdrehung aktiv"), spatial_controls_);
@@ -406,7 +415,6 @@ void ShellFeatureTools::update_spatial_controls() {
   for (QWidget* widget :
        std::array<QWidget*, 3>{spatial_add_, spatial_order_, spatial_order_buttons_})
     form->setRowVisible(widget, !sweep);
-  form->setRowVisible(spatial_order_hint_, !sweep);
   form->setRowVisible(spatial_path_, !path);
   form->setRowVisible(spatial_guide_, !path);
   form->setRowVisible(spatial_add_guide_, loft);
@@ -420,6 +428,10 @@ void ShellFeatureTools::update_spatial_controls() {
   form->setRowVisible(sweep_twist_, sweep);
   numeric_editor_->setVisible(spatial_scalar());
   value_label_->setVisible(spatial_scalar());
+  // QFormLayout can allocate less than its row widgets' minimum heights
+  // inside a resizable scroll child. Keep its preferred row heights scrollable.
+  spatial_controls_->setMinimumHeight(form->sizeHint().height());
+  spatial_controls_->updateGeometry();
 }
 
 void ShellFeatureTools::update_spatial_pick_scope() {
@@ -609,6 +621,24 @@ void ShellFeatureTools::refresh_spatial_preview() {
   }
   synchronize_numeric_editor(current_value());
   (void)preview_and_publish();
+}
+
+bool ShellFeatureTools::select_spatial_profile(SketchId sketch, ProfileId profile) {
+  const auto* part = session_.part_document();
+  const auto* source = part ? part->find_sketch(sketch) : nullptr;
+  if ((command_ != Command::Sweep && command_ != Command::Loft) || !session_.task().active() ||
+      session_.task().command_id() != command_id() || !part || !source ||
+      !GuiModelingWorkspace::has_materialized_profile(*source, profile))
+    return false;
+  const auto selected = std::pair{std::move(sketch), std::move(profile)};
+  for (std::size_t i = 0; i < spatial_inputs_.size(); ++i)
+    if (spatial_inputs_[i].profile == selected) {
+      if (command_ == Command::Loft)
+        return append_spatial_input(static_cast<int>(i)).has_value();
+      spatial_source_->setCurrentIndex(static_cast<int>(i));
+      return true;
+    }
+  return false;
 }
 
 bool ShellFeatureTools::accept_spatial_selection(const GuiSelection& selection) {

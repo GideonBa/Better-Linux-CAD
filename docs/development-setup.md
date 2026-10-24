@@ -1246,3 +1246,22 @@ depth and an earlier feature, verify five-step history, reopen canonically and e
 additionally clicks the actual profile and checks toolbar bounds. Inspect `context-cut-preview.png`,
 `context-thin-preview.png` and `context-after-history.png` at 1280×800. Include both tags in the canonical
 native command in `docs/gui-shell-acceptance-mvp9r.md`; keep builds, GUI runs and startup serial.
+
+## Sweep/Loft profile-context regression
+
+```bash
+cmake --build --preset dev-gui --target blcad_gui_tests blcad_app blcad_core_tests blcad_geometry_tests -j6
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[block136-spatial-context],[shell-combined-spatial-context],[block136-profile-context],[block136-spatial],[integration][gui-feature-coverage]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-spatial-context-native QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-spatial-context],[shell-combined-spatial-context],[block136-profile-context]"
+```
+
+The five new focused cases exercise remaining-input eligibility, exact nondefault Sweep/Loft source
+handoff, all three cancellation paths with actual viewport/session selection and restored filter/scope,
+raw-region exclusion, duplicate rejection, three-section atomic Apply, Save and replacement. The combined workflow authors
+all three Sketch sections, two offset planes and its trajectory through Qt, cancels an invalid Sweep,
+corrects Loft order and G2 input, creates a separate Sweep, edits its twist parameter and the earlier
+Loft, verifies four-step history, reopens canonically and exports STEP. Native additionally picks the
+actual profile and verifies toolbar bounds. Inspect `spatial-context-loft-preview.png`,
+`spatial-context-sweep-preview.png` and `spatial-context-after-history.png` at 1280×800. Include both
+new tags in the canonical native command in `docs/gui-shell-acceptance-mvp9r.md`. Keep builds, GUI
+runs and separate startup serial.

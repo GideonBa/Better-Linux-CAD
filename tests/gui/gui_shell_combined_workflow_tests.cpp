@@ -3209,3 +3209,129 @@ TEST_CASE("Combined UI profile contexts restore cancelled cuts then author Thin 
   CHECK(ui.snapshot() == states.back());
   ui.idle();
 }
+
+TEST_CASE("Combined UI spatial contexts seed chosen profiles recover Loft order and update a Sweep",
+          "[gui][integration][shell-combined-workflow][shell-combined-spatial-context]") {
+  WorkflowUi ui;
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  ui.new_document("Spatial context workflow");
+  // Author the lower profile last so it cannot be the default first source.
+  const auto middle_plane = ui.offset(10);
+  const auto middle = ui.rectangle(middle_plane.value(), {-8, -8}, {8, 8});
+  const auto upper_plane = ui.offset(20);
+  const auto upper = ui.rectangle(upper_plane.value(), {-6, -6}, {6, 6});
+  const auto lower = ui.rectangle("datum.xy", {-10, -10}, {10, 10});
+  const auto path_sketch = ui.open_line("datum.xz", {0, 0}, {0, 20});
+  const auto label = [&](const SketchId& sketch) {
+    return QString::fromStdString(
+               ui.window.session().part_document()->find_sketch(sketch)->name()) +
+           " / ";
+  };
+  const auto add = [&](const SketchId& sketch) {
+    auto& source = ui.widget<QComboBox>("blcad.spatial.source");
+    ui.choose(source, source.findText(label(sketch), Qt::MatchStartsWith));
+    ui.button("blcad.spatial.add");
+  };
+  const auto context = [&](const QString& id) {
+    ui.click(ui.widget<QToolButton>("blcad.context." + id));
+  };
+  ui.command("path_curve");
+  add(path_sketch);
+  ui.button("blcad.feature.apply");
+  const auto path = ui.window.session().part_document()->path_curves().back().id();
+  std::vector<std::string> states{ui.snapshot()};
+  ui.tree(lower.value());
+  ui.command("view_top", 2);
+  if (QApplication::platformName() == "xcb") {
+    ui.tree("datum.xy");
+    REQUIRE_FALSE(ui.widget<QWidget>("blcad.context.toolbar").isVisible());
+    const auto point = checked(ui.window.viewport().model_to_screen({-9, -9, 0}));
+    ui.click_at(ui.window.viewport(), {point.x, point.y});
+    REQUIRE(ui.window.feature_tools().profile_context());
+    CHECK(ui.window.feature_tools().profile_context()->sketch == lower);
+    auto& toolbar = ui.widget<QWidget>("blcad.context.toolbar");
+    REQUIRE(toolbar.isVisible());
+    CHECK(ui.window.viewport().rect().contains(toolbar.geometry()));
+  }
+  context("sweep");
+  CHECK(ui.widget<QComboBox>("blcad.spatial.source").currentText().startsWith(label(lower)));
+  ui.scalar("15 deg");
+  ui.data(ui.widget<QComboBox>("blcad.spatial.guide"), QString::fromStdString(path.value()));
+  CHECK_FALSE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+  CHECK(ui.snapshot() == states.back());
+  context("cancel");
+  REQUIRE(ui.window.feature_tools().profile_context());
+  CHECK(ui.window.feature_tools().profile_context()->sketch == lower);
+  context("loft");
+  auto& sections = ui.widget<QListWidget>("blcad.spatial.order");
+  REQUIRE(sections.count() == 1);
+  CHECK(sections.item(0)->text().startsWith(label(lower)));
+  CHECK_FALSE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+  add(lower);
+  CHECK(sections.count() == 1);
+  add(upper);
+  add(middle);
+  ui.list(sections, 2);
+  ui.button("blcad.spatial.order.up");
+  CHECK(sections.item(1)->text().startsWith(label(middle)));
+  ui.data(ui.widget<QComboBox>("blcad.spatial.path"), QString::fromStdString(path.value()));
+  ui.choose(ui.window.feature_tools().spatial_continuity_editor(), 2);
+  CHECK_FALSE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+  CHECK(ui.snapshot() == states.back());
+  ui.choose(ui.window.feature_tools().spatial_continuity_editor(), 0);
+  auto& up = ui.widget<QPushButton>("blcad.spatial.order.up");
+  auto& hint = ui.widget<QLabel>("blcad.spatial.order_hint");
+  auto& trajectory = ui.widget<QComboBox>("blcad.spatial.path");
+  CHECK(up.height() >= up.sizeHint().height());
+  CHECK(hint.mapTo(&ui.window, hint.rect().bottomLeft()).y() <
+        trajectory.mapTo(&ui.window, trajectory.rect().topLeft()).y());
+  ui.capture("spatial-context-loft-preview");
+  ui.button("blcad.feature.apply");
+  const auto loft = ui.window.session().part_document()->loft_features().back().id();
+  const auto loft_body = ui.window.session().part_document()->bodies().back().id();
+  CHECK(ui.summary(loft_body).solid_count == 1);
+  CHECK(ui.summary(loft_body).volume_mm3 > 3000);
+  CHECK(ui.summary(loft_body).volume_mm3 < 8000);
+  states.push_back(ui.snapshot());
+  ui.tree(lower.value());
+  context("sweep");
+  CHECK(ui.widget<QComboBox>("blcad.spatial.source").currentText().startsWith(label(lower)));
+  CHECK(ui.widget<QComboBox>("blcad.spatial.mode").currentIndex() == 0);
+  ui.scalar("0 deg");
+  ui.capture("spatial-context-sweep-preview");
+  ui.button("blcad.feature.apply");
+  const auto& sweep = ui.window.session().part_document()->sweep_features().back();
+  CHECK(std::get<ProfileRegionReference>(sweep.profile().source()).sketch() == lower);
+  REQUIRE(sweep.twist_parameter());
+  const auto twist = *sweep.twist_parameter();
+  const auto swept_body = ui.window.session().part_document()->bodies().back().id();
+  CHECK(ui.summary(swept_body).volume_mm3 == Approx(8000).margin(1e-4));
+  states.push_back(ui.snapshot());
+  ui.command("parameters");
+  ui.data(ui.widget<QComboBox>("blcad.parameters.parameter"),
+          QString::fromStdString(twist.value()));
+  ui.text(ui.widget<QLineEdit>("blcad.parameters.input"), "15");
+  ui.button("blcad.parameters.stage");
+  ui.button("blcad.parameters.preview");
+  ui.button("blcad.parameters.apply");
+  CHECK(ui.summary(swept_body).solid_count == 1);
+  CHECK(ui.summary(swept_body).volume_mm3 > 0);
+  states.push_back(ui.snapshot());
+  ui.tree(loft.value(), true);
+  ui.text(ui.widget<QLineEdit>("blcad.feature_edit.field/name"), "Context three-section loft");
+  ui.button("blcad.feature_edit.apply");
+  states.push_back(ui.snapshot());
+  ui.history(states);
+  ui.tree(lower.value());
+  REQUIRE(ui.widget<QToolButton>("blcad.context.sweep").isVisible());
+  REQUIRE(ui.widget<QToolButton>("blcad.context.loft").isVisible());
+  ui.capture("spatial-context-after-history");
+  ui.roundtrip(directory.filePath("spatial-context.blcad"));
+  CHECK_FALSE(ui.widget<QWidget>("blcad.context.toolbar").isVisible());
+  const auto step = directory.filePath("spatial-context.step");
+  ui.file("export_part_step", step);
+  CHECK(ui.bytes(step).contains("ISO-10303-21"));
+  CHECK(ui.snapshot() == states.back());
+  ui.idle();
+}
