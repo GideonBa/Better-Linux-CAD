@@ -945,6 +945,20 @@ family. Before a future shell Delete action, separately audit terminal-modifier 
 restoration of the preceding Body producer. Twelve bounded families remain restored and six partial.
 Block 136 and the Block-135 numbered completion boundary are unchanged.
 
+### Block 136 — Path-directed Extrude authoring — 2026-10-24
+
+The existing Extrusion task now selects an open PathCurve and all four Body operations, retaining
+Extrude identity and the path's orientation. Mode changes preserve local straight-field text,
+restore straight intent on return and publish no unused distance parameters or scalar handles in
+path mode. Candidate geometry and modifying-Body replacement use the complete disposable recompute;
+Apply remains one history transaction. Focused tests and an eighteenth combined actual-input
+workflow cover oriented operations, a line/spline/reversed-arc route, prior-cut preservation,
+upstream pocket/path edits, rejection/recovery, exact history, reopening and STEP. Contracts and
+verification evidence: `docs/gui-interactive-extrude-revolve-mvp9.md`,
+`docs/gui-shell-acceptance-mvp9r.md`. Thin/open-profile Extrude and native limit-face collection remain
+in the same partial family. Twelve bounded families remain restored and six partial; Block 136 and
+the Block-135 numbered completion boundary are unchanged.
+
 ## Current next technical step — Block 136
 
 The current v3 coverage inventory records all eighteen accepted families, current shell proof sources,
@@ -952,9 +966,14 @@ reachable entry points and explicit remaining gaps. The machine check distinguis
 from closure readiness; historical controller proofs cannot close a shell gap. Acceptance contract:
 `docs/gui-shell-acceptance-mvp9r.md`, `[integration][gui-feature-coverage]` / `[gui][shell-coverage]`.
 
-Continue with thin/open-profile and path Extrude and native viewport limit-face collection.
+Continue with thin/open-profile Extrude and native viewport limit-face collection.
+The next bounded slice should expose OneSided, MidPlane and TwoSided thickness for the retained
+single nondegenerate open Sketch-line adapter, with candidate-only thickness inputs and atomic
+Apply/history. General curved/open chains remain outside that Geometry boundary. Follow with native
+collection of the supported semantic limit-face roles for ToFace/Between.
 All seven bounded Extrude terminations and the expanded Revolve controls now have explicit shell
-editors. Dedicated plain through-all Hole authoring is available within the retained circular-cut/Core
+editors. Path Extrude selects open PathCurves with all four Body operations. Dedicated plain
+through-all Hole authoring is available within the retained circular-cut/Core
 target boundaries.
 The bounded standalone Part parameter manager now creates and edits typed literals and Length/Count
 formulas through local batches, complete downstream Preview and one atomic Apply. The Sketch3D/PathCurve surface includes

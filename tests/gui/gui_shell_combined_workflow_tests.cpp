@@ -68,7 +68,7 @@ template <typename T> T checked(Result<T> result) {
 }
 
 // Interaction helpers deliberately stop at Qt widgets and input events.
-// Fourteen combined workflows author their inputs through the UI. The Planar
+// Combined workflows author their inputs through the UI. The Planar
 // motion case imports the repository's seated Part definition through a file
 // dialog; the separately tagged mixed-path case opens preauthored Sketch/planes.
 // Neither path drives authoring controllers/workbenches directly.
@@ -796,6 +796,125 @@ TEST_CASE(
   ui.roundtrip(directory.filePath("rotational-machining.blcad"));
   CHECK(ui.summary(body).volume_mm3 == Approx(86400 - 1536 * std::numbers::pi).margin(1e-4));
   const auto step = directory.filePath("rotational-machining.step");
+  ui.file("export_part_step", step);
+  CHECK(ui.bytes(step).contains("ISO-10303-21"));
+  CHECK(ui.snapshot() == states.back());
+  ui.idle();
+}
+
+TEST_CASE("Combined UI path extrusion machines a prior cut and follows corrected spatial edits",
+          "[gui][integration][shell-combined-workflow][shell-combined-path-extrude]") {
+  WorkflowUi ui;
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  ui.new_document("Path machining");
+  ui.rectangle("datum.xy", {-30, -20}, {30, 20});
+  const auto body = ui.extrude(20);
+  const auto pocket = ui.rectangle("datum.xy", {16, -3}, {20, 3});
+  const auto profile = ui.rectangle("datum.xy", {-4, -3}, {4, 3});
+  ui.command("sketch_3d");
+  for (int index = 0; index < 4; ++index) {
+    ui.choose(ui.widget<QComboBox>("blcad.sketch3d.point"), 0);
+    for (const auto* axis : {"x", "y", "z"}) {
+      auto& spin = ui.widget<QDoubleSpinBox>(QStringLiteral("blcad.sketch3d.") + axis);
+      auto* editor = spin.findChild<QLineEdit*>();
+      REQUIRE(editor);
+      ui.text(*editor, QString::number(QString::fromLatin1(axis) == "z" ? index * 5 : 0));
+    }
+    ui.button("blcad.sketch3d.stage_point");
+  }
+  for (int index = 1; index <= 3; ++index) {
+    ui.data(ui.widget<QComboBox>("blcad.sketch3d.start"), "point." + QString::number(index));
+    ui.data(ui.widget<QComboBox>("blcad.sketch3d.end"), "point." + QString::number(index + 1));
+    ui.button("blcad.sketch3d.stage_line");
+  }
+  ui.button("blcad.sketch3d.preview");
+  ui.button("blcad.sketch3d.apply");
+  const auto spatial = ui.window.session().part_document()->sketches_3d().back().id();
+  ui.command("path_curve");
+  for (int index = 1; index <= 3; ++index) {
+    auto& source = ui.widget<QComboBox>("blcad.spatial.source");
+    ui.choose(source,
+              source.findText("3D-Skizze 1 / line." + QString::number(index), Qt::MatchStartsWith));
+    ui.button("blcad.spatial.add");
+  }
+  ui.button("blcad.feature.apply");
+  const auto path = ui.window.session().part_document()->path_curves().back().id();
+  std::vector<std::string> states{ui.snapshot()};
+  ui.tree(pocket.value());
+  ui.command("extrude");
+  ui.choose(ui.widget<QComboBox>("blcad.extrude.operation"), 2);
+  ui.scalar("6 mm");
+  const auto prior_cut = ui.window.feature_tools().coordinator().extrude().feature_id();
+  ui.button("blcad.feature.apply");
+  CHECK(ui.summary(body).volume_mm3 == Approx(47856).margin(1e-5));
+  states.push_back(ui.snapshot());
+  const auto parameters = ui.window.session().part_document()->parameter_count();
+  ui.tree(profile.value());
+  ui.command("extrude");
+  ui.choose(ui.widget<QComboBox>("blcad.extrude.extent"), 2);
+  ui.text(ui.widget<QLineEdit>("blcad.extrude.second_distance"), "4 mm");
+  ui.text(ui.widget<QLineEdit>("blcad.extrude.taper"), "90 deg");
+  CHECK_FALSE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+  ui.choose(ui.widget<QComboBox>("blcad.extrude.direction"), 2);
+  ui.data(ui.widget<QComboBox>("blcad.extrude.path"), QString::fromStdString(path.value()));
+  ui.choose(ui.widget<QComboBox>("blcad.extrude.operation"), 2);
+  ui.data(ui.widget<QComboBox>("blcad.extrude.target"), QString::fromStdString(body.value()));
+  // Re-open the path popup after changing target-row visibility. This catches
+  // form rows that remain logically visible but become occluded by another row.
+  ui.data(ui.widget<QComboBox>("blcad.extrude.path"), QString::fromStdString(path.value()));
+  REQUIRE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+  CHECK(ui.window.feature_tools().manipulators().handles().empty());
+  CHECK(ui.window.viewport().feature_preview_replaces("body/" + body.value()));
+  CHECK(ui.snapshot() == states.back());
+  ui.command("fit", 2);
+  ui.capture("path-extrude-cut-preview");
+  const auto routed_cut = ui.window.feature_tools().coordinator().extrude().feature_id();
+  ui.button("blcad.feature.apply");
+  CHECK(ui.summary(body).volume_mm3 == Approx(47136).margin(1e-5));
+  CHECK(ui.window.session().part_document()->parameter_count() == parameters);
+  CHECK(ui.window.session().part_document()->body_count() == 1);
+  states.push_back(ui.snapshot());
+
+  ui.tree(prior_cut.value(), true);
+  REQUIRE(ui.window.feature_edit_tools().active());
+  ui.number(ui.widget<QDoubleSpinBox>("blcad.feature_edit.field/length_parameter"), "8");
+  ui.text(ui.widget<QLineEdit>("blcad.feature_edit.field/name"), "Deeper pocket before route");
+  ui.button("blcad.feature_edit.apply");
+  CHECK(ui.summary(body).volume_mm3 == Approx(47088).margin(1e-5));
+  states.push_back(ui.snapshot());
+  ui.tree(spatial.value(), true);
+  ui.data(ui.widget<QComboBox>("blcad.sketch3d.point"), "point.4");
+  auto& z = ui.widget<QDoubleSpinBox>("blcad.sketch3d.z");
+  auto* editor = z.findChild<QLineEdit*>();
+  REQUIRE(editor);
+  ui.text(*editor, "10");
+  ui.button("blcad.sketch3d.stage_point");
+  ui.button("blcad.sketch3d.preview");
+  CHECK_FALSE(ui.widget<QPushButton>("blcad.sketch3d.apply").isEnabled());
+  CHECK(ui.snapshot() == states.back());
+  ui.text(*editor, "25");
+  ui.button("blcad.sketch3d.stage_point");
+  ui.button("blcad.sketch3d.preview");
+  REQUIRE(ui.widget<QPushButton>("blcad.sketch3d.apply").isEnabled());
+  ui.capture("path-extrude-downstream-edit-preview");
+  ui.button("blcad.sketch3d.apply");
+  CHECK(ui.summary(body).volume_mm3 == Approx(46848).margin(1e-5));
+  CHECK(ui.window.session().part_document()->find_feature(routed_cut)->path_curve() == path);
+  states.push_back(ui.snapshot());
+  ui.history(states);
+  ui.tree(profile.value());
+  ui.command("extrude");
+  ui.choose(ui.widget<QComboBox>("blcad.extrude.direction"), 2);
+  ui.choose(ui.widget<QComboBox>("blcad.extrude.direction"), 1);
+  ui.scalar("7 mm");
+  ui.capture("path-extrude-return-to-normal-preview");
+  ui.button("blcad.feature.cancel");
+  CHECK(ui.snapshot() == states.back());
+  ui.idle();
+  ui.roundtrip(directory.filePath("path-machining.blcad"));
+  CHECK(ui.summary(body).volume_mm3 == Approx(46848).margin(1e-5));
+  const auto step = directory.filePath("path-machining.step");
   ui.file("export_part_step", step);
   CHECK(ui.bytes(step).contains("ISO-10303-21"));
   CHECK(ui.snapshot() == states.back());

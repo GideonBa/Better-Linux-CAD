@@ -47,5 +47,12 @@ The proof covers stable feature identity, validation, dependency/removal protect
 round-trip and malformed input, plus additive, curved-route, and subtractive transactional
 geometry execution.
 
+## Replacement-shell authoring — Block 136
+
+The existing Extrusion task selects an open PathCurve and all four Body operations. It retains
+Extrude identity, uses the PathCurve orientation, adds no unused scalar parameters and restores
+straight intent when changing direction. Exact UI, preview and transaction contracts and focused
+shell/combined workflow proofs live in `docs/gui-interactive-extrude-revolve-mvp9.md`.
+
 Blocks 48–94 are implemented. Block 84 ProfileSectionReference and Loft Core intent plus JSON is
 next.

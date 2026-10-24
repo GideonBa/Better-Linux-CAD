@@ -164,7 +164,11 @@ public:
   }
   void set_extent_mode(ExtrudeExtentMode mode) noexcept { extent_mode_ = mode; }
   void set_distance(double millimeters) noexcept { distance_ = millimeters; }
-  void set_direction(ExtrudeDirection direction) noexcept { direction_ = direction; }
+  void set_direction(ExtrudeDirection direction) noexcept {
+    direction_ = direction;
+    if (direction != ExtrudeDirection::Path)
+      path_curve_.reset();
+  }
   void set_taper(std::optional<double> degrees) noexcept { taper_deg_ = degrees; }
   void set_two_sided_parameter(ParameterId second) {
     second_distance_parameter_ = std::move(second);
@@ -215,7 +219,8 @@ public:
     return handle;
   }
   [[nodiscard]] std::optional<GuiViewportManipulatorHandle> taper_handle() const {
-    if (!taper_deg_.has_value()) return std::nullopt;
+    if (direction_ == ExtrudeDirection::Path || !taper_deg_.has_value())
+      return std::nullopt;
     GuiViewportManipulatorHandle handle;
     handle.id = std::string(kExtrudeTaperHandleId);
     handle.kind = GuiViewportManipulatorKind::Angular;
@@ -228,7 +233,8 @@ public:
     return handle;
   }
   [[nodiscard]] std::optional<GuiViewportManipulatorHandle> thin_handle() const {
-    if (!thin_.has_value()) return std::nullopt;
+    if (direction_ == ExtrudeDirection::Path || !thin_.has_value())
+      return std::nullopt;
     GuiViewportManipulatorHandle handle;
     handle.id = std::string(kExtrudeThinHandleId);
     handle.kind = GuiViewportManipulatorKind::Linear;
@@ -252,6 +258,8 @@ public:
   // Fold a Block-123 candidate into the matching parameter. Returns true when a
   // field changed so the caller re-previews.
   [[nodiscard]] bool apply_manipulator(const GuiViewportManipulatorCandidate& candidate) {
+    if (direction_ == ExtrudeDirection::Path)
+      return false;
     if (candidate.handle_id == kExtrudeExtentHandleId &&
         candidate.value_kind == GuiViewportManipulatorValueKind::Distance &&
         std::isfinite(candidate.scalar_value) && candidate.scalar_value > 0.0) {
@@ -391,9 +399,9 @@ private:
   };
 
   [[nodiscard]] bool drives_distance() const noexcept {
-    return extent_mode_ == ExtrudeExtentMode::Distance ||
-           extent_mode_ == ExtrudeExtentMode::Symmetric ||
-           extent_mode_ == ExtrudeExtentMode::TwoSided;
+    return direction_ != ExtrudeDirection::Path && (extent_mode_ == ExtrudeExtentMode::Distance ||
+                                                    extent_mode_ == ExtrudeExtentMode::Symmetric ||
+                                                    extent_mode_ == ExtrudeExtentMode::TwoSided);
   }
 
   [[nodiscard]] Result<std::size_t> seed_parameters(PartDocument& part) const {
@@ -403,7 +411,7 @@ private:
       auto changed = part.set_parameter_value(distance_parameter_, quantity.value());
       if (changed.has_error()) return Result<std::size_t>::failure(changed.error());
     }
-    if (thin_.has_value()) {
+    if (direction_ != ExtrudeDirection::Path && thin_.has_value()) {
       auto quantity = Quantity::length_mm(thin_->thickness_mm, thin_->parameter.value());
       if (quantity.has_error()) return Result<std::size_t>::failure(quantity.error());
       auto changed = part.set_parameter_value(thin_->parameter, quantity.value());
@@ -425,7 +433,8 @@ private:
       if (added.has_error()) return added;
       changed += added.value();
     }
-    if (extent_mode_ == ExtrudeExtentMode::TwoSided && pending_second_distance_parameter_) {
+    if (drives_distance() && extent_mode_ == ExtrudeExtentMode::TwoSided &&
+        pending_second_distance_parameter_) {
       auto added = part.add_parameter(*pending_second_distance_parameter_);
       if (added.has_error())
         return added;
@@ -488,7 +497,10 @@ private:
     auto context = build_context();
     if (context.has_error()) return Result<Feature>::failure(context.error());
 
-    if (path_curve_.has_value()) {
+    if (direction_ == ExtrudeDirection::Path) {
+      if (!path_curve_)
+        return Result<Feature>::failure(
+            Error::validation(feature_.value(), "path extrude requires a selected PathCurve"));
       auto feature =
           Feature::create_additive_path_extrude(feature_, name_, sketch_, *path_curve_);
       if (feature.has_error()) return feature;

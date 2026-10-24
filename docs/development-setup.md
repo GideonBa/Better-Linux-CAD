@@ -1084,6 +1084,32 @@ inputs; Planar motion retains its imported seated Part boundary. Inspect
 in the canonical native regression in `docs/gui-shell-acceptance-mvp9r.md`, then run startup separately.
 Contracts and remaining work: `docs/parameter-model.md`, `docs/mvp-plan.md`.
 
+## Path-directed Extrude authoring
+
+```bash
+cmake --build --preset dev-gui --target blcad_gui_tests blcad_app -j6
+./build/dev-gui/blcad_core_tests "[core][path-extrude]"
+./build/dev-gui/blcad_geometry_tests "[geometry][path-extrude]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[block136-path-extrude],[shell-combined-path-extrude],[block136-extrude-extents],[gui][extrude-revolve],[integration][gui-feature-coverage]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-path-extrude-native QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-path-extrude],[shell-combined-path-extrude]"
+```
+
+The focused shell cases cover all four Body operations on XY/XZ/YZ, a line/spline/reversed-arc
+trajectory, path/straight switching, unused input suppression, stale handles, missing selection,
+excluded closed paths, incompatible orientation with recovery, Cancel, document replacement and
+canonical reopening. The eighteenth combined workflow authors a plate, separate pocket/tool
+profiles and a three-line shared-point Sketch3D path through actual UI
+input. It applies a pocket and path Cut, edits the earlier pocket through the downstream route,
+rejects a coincident endpoint and corrects it, checks exact four-step history, cancels a switched
+draft, reopens and exports STEP. Seventeen combined workflows have fully UI-authored inputs;
+Planar motion retains its imported Part boundary.
+
+Inspect `path-extrude-cut-preview.png`, `path-extrude-downstream-edit-preview.png` and
+`path-extrude-return-to-normal-preview.png` at 1280×800. Include both tags in the canonical native
+regression in `docs/gui-shell-acceptance-mvp9r.md`, then run native startup separately. Keep builds,
+GUI runs and startup serial. Contract and remaining work:
+`docs/gui-interactive-extrude-revolve-mvp9.md`, `docs/mvp-plan.md`.
+
 ## Dedicated through-all hole authoring
 
 ```bash

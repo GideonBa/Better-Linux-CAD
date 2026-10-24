@@ -835,7 +835,9 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::preview_and_publish() {
       surface() ? task_dock_->windowTitle() + QStringLiteral(": Vorschau gültig.")
       : command_ == Command::Extrude
           ? QStringLiteral("%1 · %2: Vorschau gültig.")
-                .arg(extrude_operation_->currentText(), extrude_extent_->currentText())
+                .arg(extrude_operation_->currentText(), extrude_direction_->currentIndex() == 2
+                                                            ? extrude_path_->currentText()
+                                                            : extrude_extent_->currentText())
       : command_ == Command::Revolve
           ? QStringLiteral("%1 · %2: Vorschau gültig.")
                 .arg(revolve_operation_->currentText(), revolve_extent_->currentText())
