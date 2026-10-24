@@ -349,7 +349,8 @@ bool ShellFeatureTools::active() const noexcept {
 bool ShellFeatureTools::select_profile(SketchId sketch, ProfileId profile) {
   selected_open_line_.reset();
   const auto* part = session_.part_document();
-  if (part == nullptr || !shell_feature_profile_available(*part, sketch, profile)) {
+  if (!session_.selection().allows(GuiSelectionKind::SketchEntity) || part == nullptr ||
+      !shell_feature_profile_available(*part, sketch, profile)) {
     selected_profile_.reset();
     refresh_enablement();
     return false;
@@ -373,7 +374,8 @@ bool ShellFeatureTools::select_open_line(SketchId sketch) {
   selected_open_line_.reset();
   const auto* part = session_.part_document();
   const auto* source = part ? part->find_sketch(sketch) : nullptr;
-  if (source && interactive_thin_line(*source))
+  if (session_.selection().allows(GuiSelectionKind::SketchEntity) && source &&
+      interactive_thin_line(*source))
     selected_open_line_ = std::move(sketch);
   refresh_enablement();
   return selected_open_line_.has_value();

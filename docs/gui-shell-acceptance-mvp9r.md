@@ -39,7 +39,7 @@ source, hide a missing tag behind OR and claim completion with gaps. They must a
 
 The machine-readable details live in `families[].shell.gaps`; this is the execution order:
 
-1. Restore contextual commands, selection-filter UI and repeat command. ViewCube, Home and named
+1. Restore contextual commands and repeat command. Selection filters, ViewCube, Home and named
    camera bookmarks now have replacement-shell controls.
 2. Restore the supported hierarchy validation, cross-hierarchy relationship/joint/solve controls,
    sampled Revolute analysis and occurrence-linked result highlighting.
@@ -75,7 +75,7 @@ QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][gui-fea
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests
 ./build/dev-gui/blcad_core_tests
 ./build/dev-gui/blcad_geometry_tests
-QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-navigation],[shell-combined-navigation],[block136-extrude-limit-picking],[shell-combined-extrude-limit-picking],[block136-thin-extrude],[shell-combined-thin-extrude],[block136-path-extrude],[shell-combined-path-extrude],[block136-revolve],[shell-combined-revolve-controls],[block136-extrude-extents],[shell-combined-extrude-extents],[block136-holes],[shell-combined-holes],[block136-parameters],[shell-combined-parameters],[block136-sketch3d-projection],[shell-combined-projected-sweep],[block136-sketch3d-direction],[shell-sketch3d-direction-workflow],[block136-sketch3d-placement],[shell-sketch3d-placement-workflow],[block136-sketch3d-grips],[shell-sketch3d-grips-workflow],[block136-sketch3d],[shell-combined-sketch3d],[block136-sketch-diagnostics],[missing-reference-session],[block136-missing-reference],[repair-open-session],[block136-repair-open],[block136-reference-repair-batches],[block136-reference-repair],[block136-construction-manipulators],[block136-construction-picking],[shell-mixed-path-loft],[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-selection-filters],[shell-combined-selection-filters],[block136-navigation],[shell-combined-navigation],[block136-extrude-limit-picking],[shell-combined-extrude-limit-picking],[block136-thin-extrude],[shell-combined-thin-extrude],[block136-path-extrude],[shell-combined-path-extrude],[block136-revolve],[shell-combined-revolve-controls],[block136-extrude-extents],[shell-combined-extrude-extents],[block136-holes],[shell-combined-holes],[block136-parameters],[shell-combined-parameters],[block136-sketch3d-projection],[shell-combined-projected-sweep],[block136-sketch3d-direction],[shell-sketch3d-direction-workflow],[block136-sketch3d-placement],[shell-sketch3d-placement-workflow],[block136-sketch3d-grips],[shell-sketch3d-grips-workflow],[block136-sketch3d],[shell-combined-sketch3d],[block136-sketch-diagnostics],[missing-reference-session],[block136-missing-reference],[repair-open-session],[block136-repair-open],[block136-reference-repair-batches],[block136-reference-repair],[block136-construction-manipulators],[block136-construction-picking],[shell-mixed-path-loft],[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
 ```
 
 The regular inventory audit passes while it accurately records unfinished work. For closure,
@@ -1219,3 +1219,52 @@ Builds, GUI suites and the separate native startup were serial. The application 
 until intentional six-second timeout 124. Native focused/full/startup logs retain only the known
 medium OCCT depth/stencil visual warning, without high-severity, BadDrawable or fatal lifecycle
 diagnostics.
+
+## Visible selection filters — 2026-10-24
+
+The always-visible `blcad.selection.filter` status-bar combo exposes All, Profiles, Datums, Faces,
+Edges, Bodies, Components and Assembly Targets using the retained workspace mask mapping. It evicts
+incompatible semantic selection and browser-only profile handoffs, guards tasks/Sketch/capture and
+resets only after successful document replacement. Compatible browser inspection and explicit edit
+activation remain available. No persistent intent, schema or history field is added.
+
+Six focused cases cover the eight-filter/eight-kind matrix including All/Vertex, hidden browser
+profile/datum rejection, task-owned Edge collection, Apply/Cancel/Escape/Undo exits, Sketch focus,
+mouse capture, canonical bytes, history and failed/cancelled/successful replacement. A dedicated
+hole case starts with a Body-only mask and exact Body scope, collects a different Datum, then restores
+the prior mask/scope on Apply, Cancel or Escape. Hole tasks now own that temporary Body/Datum mask and
+unrestricted reference scope; they previously inherited the idle viewport restriction. Expired hole
+cleanup preserves the mask/scope already installed by a subsequent task.
+
+The twenty-second combined workflow, `[shell-combined-selection-filters]`, authors a plate, filters
+its Sketch/Body selections, rejects invalid Fillet text by restoring the previous valid numeric
+candidate, creates a through-hole after correcting invalid placement, changes upstream depth,
+verifies three-step exact history, re-enters Sketch under the Body filter, reopens canonically and
+exports STEP. Native additionally picks the actual Body through OCCT's filtered selection context.
+Twenty-one combined workflows have fully UI-authored inputs; Planar motion retains its imported Part
+boundary. Contextual commands/repeat remain open; thirteen families are restored and five partial.
+Block 136 remains open and numbered completion remains through Block 135.
+
+The final application, GUI, Core and Geometry targets build successfully. Focused offscreen filter,
+combined workflow, existing hole and inventory checks pass: **17 cases, 2,750 assertions**. Focused
+native filters, combined workflow and existing holes pass: **14 cases, 2,571 assertions**, no skips.
+The three native 1280×800 captures in `/tmp/blcad-selection-native` were inspected: the global filter
+remains visible and disabled while tasks own references, hole/finishing previews are visible and
+Apply/Cancel remain reachable. The primary Fillet editor's existing invalid-text rollback contract
+is preserved, as specified in `docs/gui-interactive-finishing-mvp9.md`.
+
+| Suite | Cases | Assertions | Result |
+| --- | ---: | ---: | --- |
+| Full Core | 529 | 15,922 | All passed |
+| Full Geometry | 440 | 30,136 | All passed |
+| Full offscreen GUI | 471 | 46,346 | 455 passed; 16 native-only skips |
+| Full combined native shell | 287 | 41,653 | All passed; no skips |
+
+The ordinary inventory audit passes. The opt-in closure gate intentionally returns 1: three cases,
+two passed and one expected failure, 214 assertions. The five partial families and pending integrated
+workflows remain accurately recorded; this slice does not close Block 136.
+
+Changed C++ sections and the new test file pass clang-format checks; working/staged diff checks pass.
+Builds, GUI runs and the separate native startup were serial. The app stayed running until the
+intentional six-second timeout (124). Native focused/full/startup logs contain only the known medium
+OCCT depth/stencil visual warning, with no high-severity, BadDrawable or fatal lifecycle diagnostics.

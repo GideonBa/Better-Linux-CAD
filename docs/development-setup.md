@@ -1196,3 +1196,20 @@ Sketch re-entry, ViewCube popup input, real drag/Escape after camera restoration
 edits, exact history, canonical reopening and STEP. Inspect `navigation-machining-preview.png` and
 `navigation-bookmarks-after-history.png` at 1280×800. Include both tags in the canonical native command
 in `docs/gui-shell-acceptance-mvp9r.md`; keep builds, GUI runs and separate native startup serial.
+
+## Visible model selection-filter regression
+
+```bash
+cmake --build --preset dev-gui --target blcad_gui_tests blcad_app blcad_core_tests blcad_geometry_tests -j6
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[block136-selection-filters],[shell-combined-selection-filters],[integration][gui-feature-coverage]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-selection-native QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-selection-filters],[shell-combined-selection-filters]"
+```
+
+Both backends exercise the eight-filter semantic matrix including All/Vertex, browser fallback
+rejection, task/Sketch/capture guards, task-owned Edge/Datum collection, history and document changes.
+The combined workflow authors a plate, corrects invalid Fillet and Hole input under a Body filter,
+changes the source depth, verifies exact history, re-enters Sketch, reopens canonically and exports
+STEP. Native additionally clicks the actual Body through the filtered OCCT context. Inspect
+`selection-filter-finishing-preview.png`, `selection-filter-hole-preview.png` and
+`selection-filter-after-history.png` at 1280×800. Include both tags in the canonical native command in
+`docs/gui-shell-acceptance-mvp9r.md`; keep builds, GUI runs and separate native startup serial.

@@ -2936,3 +2936,103 @@ TEST_CASE("Combined UI hole workflow cuts a finished body then edits pattern par
   CHECK(ui.snapshot() == states.back());
   ui.idle();
 }
+
+TEST_CASE("Combined UI filters constrain model selection while finishing and hole tasks collect "
+          "references",
+          "[gui][integration][shell-combined-workflow][shell-combined-selection-filters]") {
+  WorkflowUi ui;
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  ui.new_document("Filtered machining");
+  const auto sketch = ui.rectangle("datum.xy", {-30, -20}, {30, 20});
+  const auto body = ui.extrude(12);
+  const auto depth = ui.window.session().part_document()->features().back().length_parameter();
+  auto& filter = ui.widget<QComboBox>("blcad.selection.filter");
+  ui.choose(filter, 1); // Profiles
+  ui.tree(sketch.value());
+  REQUIRE(ui.action("extrude").isEnabled());
+  ui.choose(filter, 5); // Bodies evicts the browser-only profile fallback.
+  CHECK_FALSE(ui.action("extrude").isEnabled());
+  ui.tree("datum.xy");
+  CHECK_FALSE(ui.action("create_sketch").isEnabled());
+  CHECK(ui.window.session().selection().empty());
+  ui.tree(body.value());
+  REQUIRE_FALSE(ui.window.session().selection().empty());
+  CHECK(ui.window.session().selection().entries().front().kind == GuiSelectionKind::Body);
+  ui.command("view_top", 2);
+  if (QApplication::platformName() == "xcb") {
+    const auto point = checked(ui.window.viewport().model_to_screen({15, 10, 12}));
+    ui.click_at(ui.window.viewport(), {point.x, point.y});
+    REQUIRE(ui.window.viewport().selected_semantic());
+    CHECK(ui.window.viewport().selected_semantic()->semantic_id == "body/" + body.value());
+  }
+  std::vector<std::string> states{ui.snapshot()};
+  ui.command("fillet");
+  CHECK_FALSE(filter.isEnabled());
+  CHECK(ui.window.viewport().selection_filter_mask() == selection_kind_bit(GuiSelectionKind::Edge));
+  auto& edges = ui.widget<QListWidget>("blcad.finishing.targets");
+  REQUIRE(edges.count() > 0);
+  ui.list(edges, 0);
+  const auto accepted_radius = ui.widget<QLineEdit>("blcad.manipulator_numeric_hud").text();
+  ui.scalar("invalid");
+  // The primary manipulator editor rejects bad text by restoring its last
+  // accepted value. No candidate or model change is accepted from that text.
+  CHECK(ui.widget<QLineEdit>("blcad.manipulator_numeric_hud").text() == accepted_radius);
+  CHECK(ui.snapshot() == states.back());
+  ui.scalar("1 mm");
+  ui.capture("selection-filter-finishing-preview");
+  ui.button("blcad.feature.apply");
+  REQUIRE(filter.isEnabled());
+  CHECK(filter.currentIndex() == 5);
+  CHECK(ui.window.viewport().selection_filter_mask() == selection_kind_bit(GuiSelectionKind::Body));
+  const auto rounded_volume = ui.summary(body).volume_mm3;
+  REQUIRE(rounded_volume < 28800);
+  states.push_back(ui.snapshot());
+  ui.command("hole");
+  CHECK_FALSE(filter.isEnabled());
+  ui.tree("datum.xz");
+  CHECK(ui.widget<QComboBox>("blcad.hole.plane").currentData() == "datum.xz");
+  REQUIRE_FALSE(ui.window.session().selection().empty());
+  CHECK(ui.window.session().selection().entries().front().kind == GuiSelectionKind::Datum);
+  ui.tree("datum.xy");
+  ui.text(ui.widget<QLineEdit>("blcad.hole.diameter"), "6");
+  ui.text(ui.widget<QLineEdit>("blcad.hole.center_x"), "1000");
+  ui.button("blcad.hole.preview");
+  CHECK_FALSE(ui.widget<QPushButton>("blcad.hole.apply").isEnabled());
+  ui.text(ui.widget<QLineEdit>("blcad.hole.center_x"), "0");
+  ui.button("blcad.hole.preview");
+  ui.capture("selection-filter-hole-preview");
+  ui.button("blcad.hole.apply");
+  CHECK(filter.currentIndex() == 5);
+  CHECK(ui.window.session().selection().filter_mask() ==
+        selection_kind_bit(GuiSelectionKind::Body));
+  CHECK(ui.summary(body).volume_mm3 ==
+        Approx(rounded_volume - std::numbers::pi * 9 * 12).margin(1e-5));
+  states.push_back(ui.snapshot());
+  ui.choose(filter, 0);
+  ui.command("parameters");
+  ui.data(ui.widget<QComboBox>("blcad.parameters.parameter"),
+          QString::fromStdString(depth.value()));
+  ui.text(ui.widget<QLineEdit>("blcad.parameters.input"), "16");
+  ui.button("blcad.parameters.stage");
+  ui.button("blcad.parameters.preview");
+  ui.button("blcad.parameters.apply");
+  states.push_back(ui.snapshot());
+  ui.history(states);
+  ui.choose(filter, 5);
+  ui.tree(sketch.value(), true);
+  REQUIRE(ui.window.active_sketch());
+  CHECK_FALSE(filter.isEnabled());
+  ui.command("finish_sketch");
+  CHECK(filter.currentIndex() == 5);
+  CHECK_FALSE(ui.action("extrude").isEnabled());
+  CHECK(ui.snapshot() == states.back());
+  ui.capture("selection-filter-after-history");
+  ui.roundtrip(directory.filePath("filtered-machining.blcad"));
+  CHECK(filter.currentIndex() == 0);
+  const auto step = directory.filePath("filtered-machining.step");
+  ui.file("export_part_step", step);
+  CHECK(ui.bytes(step).contains("ISO-10303-21"));
+  CHECK(ui.snapshot() == states.back());
+  ui.idle();
+}

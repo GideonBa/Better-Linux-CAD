@@ -1013,6 +1013,22 @@ Contextual commands, visible filters and repeat presentation remain in the parti
 thirteen families remain restored and five partial. Block 136 stays open and completion remains
 through Block 135.
 
+### Block 136 — Visible model selection filters — 2026-10-24
+
+The replacement shell now exposes all eight frozen filters in an always-visible status-bar combo.
+The session and viewport share the selected model mask; changing it removes incompatible selection
+and browser-only profile fallbacks. Hidden datums/profiles cannot enable Create Sketch/Extrude.
+Active tasks, Sketch focus and interaction capture guard the control. Task-owned reference masks
+remain authoritative, including Edge collection for finishing and Datum collection for holes under
+a Body model filter. Apply/Cancel/history restore the chosen model filter. Save/history preserve
+this transient choice; successful document replacement resets it to All.
+
+Six focused scenarios and the twenty-second combined Qt-input workflow cover filter semantics,
+reference collection, invalid-input recovery, upstream edits, history, canonical reopening and STEP.
+Verification is recorded in `docs/gui-shell-acceptance-mvp9r.md`. Contextual commands and repeat
+presentation remain open in the viewport family. Thirteen families remain restored and five partial;
+Block 136 stays open and numbered completion remains through Block 135.
+
 ## Current next technical step — Block 136
 
 The current v3 coverage inventory records all eighteen accepted families, current shell proof sources,
@@ -1020,8 +1036,8 @@ reachable entry points and explicit remaining gaps. The machine check distinguis
 from closure readiness; historical controller proofs cannot close a shell gap. Acceptance contract:
 `docs/gui-shell-acceptance-mvp9r.md`, `[integration][gui-feature-coverage]` / `[gui][shell-coverage]`.
 
-Continue with contextual commands, visible selection filters and repeat presentation, followed by the
-remaining advanced Assembly and integrated acceptance workflows. Native `ToFace`/`Between` collection
+Continue with contextual commands and repeat presentation, followed by the remaining advanced
+Assembly and integrated acceptance workflows. Native `ToFace`/`Between` collection
 now covers the supported semantic source roles. The bounded single-line Thin Extrude editors are available; general curved/open chains remain
 outside that Geometry boundary.
 All seven bounded Extrude terminations and the expanded Revolve controls now have explicit shell
@@ -1040,7 +1056,7 @@ The bounded repair-open path now supports failed-recompute Parts and missing fac
 with typed intent, complete atomic publication and failed-state history. Other structural dependency
 failures remain strict loading errors.
 The construction task now has fourteen bounded create/edit modes, native reference collection and
-position/direction/frame/new-offset grips. Continue with the remaining context/filter/repeat controls,
+position/direction/frame/new-offset grips. Continue with the remaining contextual/repeat controls,
 advanced Assembly controls and integrated native Part/Assembly acceptance in the order recorded in
 `docs/gui-shell-acceptance-mvp9r.md`. Block 136 remains in progress until all recorded gaps and pending
 workflows are resolved and the closure gate plus full/native regressions pass.

@@ -2,8 +2,8 @@
 
 Status: the Block-122 application authority `GuiModelingWorkspace` is retained. Its original Qt
 adapter was deleted with the Block-133 shell reset. Block 136 now restores camera navigation through
-`ShellNavigationTools` on `ShellWindow`, as detailed below. Contextual commands, selection-filter UI
-and repeat presentation remain open; the old mini-toolbar/catalog adapter specifics are historical.
+`ShellNavigationTools` on `ShellWindow`, as detailed below. Visible selection filters are also
+restored. Contextual commands and repeat presentation remain open; the old mini-toolbar/catalog adapter specifics are historical.
 
 Block 122 introduces the shared application-layer interaction boundary used by the Part, Surface, and
 Assembly modeling workspaces. It upgrades the existing MVP-7 form-driven workbenches with
@@ -137,6 +137,36 @@ selectability or overrides the default restored when a Sketch is finished. Chang
 incompatible transient selection and capability context instead of retaining an invisible command
 source.
 
+### Replacement-shell filter controls (Block 136)
+
+`ShellWindow` owns the always-visible status-bar combo `blcad.selection.filter`, labelled Auswahl.
+Its eight entries use the retained workspace mask mapping. Profiles denotes the existing
+`SketchEntity` kind, including open-line selections; it does not infer a new geometry capability.
+An incompatible browser selection may still show properties or activate an explicit edit task, but
+cannot become model preselection or enable Create Sketch/Extrude through a hidden datum/profile.
+Changing the filter also invalidates incompatible browser-only Finish Sketch fallbacks. Filters
+restrict already-published semantic presentations; they do not create arbitrary final-Body subshape
+IDs. Face/Edge/Assembly Target availability retains each command family's supported reference boundary.
+
+The combo is disabled without a document, in reference-repair mode, during Sketch or any active task,
+and while the viewport owns mouse capture. Slots check the same guard. Command components retain
+ownership of their temporary viewport mask and exact semantic scope. The session temporarily accepts
+command references during a task, so a Body filter cannot prevent a hole task from collecting a Datum
+or a finishing task from collecting an Edge. The hole task explicitly saves its prior viewport
+mask, semantic scope and actual selection, temporarily permits Body/Datum with unrestricted scope,
+and restores them on Apply/Cancel. If another task has already taken ownership, expired hole cleanup
+preserves that task's mask/scope. Ending the task restores the chosen model filter and
+removes incompatible session entries. Sketch editing similarly owns its temporary selection rules;
+Finish restores the model filter and only offers a profile handoff if that filter permits it.
+
+Filter changes are transient: they do not dirty Core, create Undo entries or alter saved bytes.
+Save and Undo/Redo retain the choice; failed Open and cancelled replacement retain it. Successful
+New Part, New Project and Open reset to All. No filter field is added to Part/Project persistence.
+The focused `[block136-selection-filters]` suite covers the complete kind/filter matrix, browser
+fallback rejection, task reference collection and lifecycle. `[shell-combined-selection-filters]`
+authors a plate, corrects invalid finishing/hole input under a Body filter, collects workplanes,
+changes the source depth, verifies history, re-enters Sketch and reopens/exports the final model.
+
 ## ViewCube, home view, and camera bookmarks
 
 The workspace reuses `OcctViewport` camera authority for Isometric, Front, Back, Left, Right, Top, and
@@ -189,7 +219,7 @@ ViewCube menu and saved views, re-enters Sketch, corrects invalid taper text, ca
 drag with Escape after restoring a camera, applies a cut, changes the source depth, edits an earlier
 feature, verifies three-step exact history, reopens canonically and exports STEP. Native tests execute
 the same controls and validate the actual camera frames. The viewport-selection family remains
-partial for contextual/filter/repeat controls; Block 136 remains open.
+partial for contextual/repeat controls; Block 136 remains open.
 
 ## Focused proof
 
