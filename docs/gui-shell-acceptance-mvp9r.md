@@ -39,15 +39,10 @@ source, hide a missing tag behind OR and claim completion with gaps. They must a
 
 The machine-readable details live in `families[].shell.gaps`; this is the execution order:
 
-1. Finish native viewport limit-face collection for the supported source roles.
-   Revolve extent/operation/axis controls and all seven bounded Extrude terminations now have
-   explicit shell editors. Path Extrude selects existing open PathCurves and all four Body
-   operations. Single-open-line Thin Extrude exposes all three wall modes; arbitrary final-Body
-   subshape references remain outside the contract.
-2. Restore contextual commands, selection-filter UI, view cube, view bookmarks and repeat command.
-3. Restore the supported hierarchy validation, cross-hierarchy relationship/joint/solve controls,
+1. Restore contextual commands, selection-filter UI, view cube, view bookmarks and repeat command.
+2. Restore the supported hierarchy validation, cross-hierarchy relationship/joint/solve controls,
    sampled Revolute analysis and occurrence-linked result highlighting.
-4. Finish integrated Part and Assembly acceptance using actual ShellWindow input paths, disposable
+3. Finish integrated Part and Assembly acceptance using actual ShellWindow input paths, disposable
    previews, invalid-input rejection, history, canonical save/load and native presentation.
 
 The bounded Sketch3D/PathCurve surface includes typed/shared-point editing, native collection and
@@ -59,6 +54,11 @@ The datum family's fourteen creation/edit modes, native role-based reference col
 position/direction/frame/new-offset grips now have a restored bounded surface. Reference-driven
 objects and shared parameter bindings keep their existing authority; the exact supported boundary
 lives in `docs/gui-sketch-workbench-mvp7.md`.
+
+The bounded Extrude/Revolve/Hole surface now includes native role-based source-plane collection for
+face extents, all seven terminations, four Body operations, path Extrude, single-line Thin Extrude,
+expanded Revolve and dedicated plain through-all holes. Arbitrary final-Body subshape references
+remain outside its contract. Thirteen families are restored and five remain partial.
 
 Current finishing/pattern, Body, spatial, Surface, Measure, Assembly, Feature Edit and STEP/analysis
 slices retain their individual documented bounds. The new Part Sketch/Extrude/STEP regression and
@@ -74,7 +74,7 @@ QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][gui-fea
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests
 ./build/dev-gui/blcad_core_tests
 ./build/dev-gui/blcad_geometry_tests
-QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-thin-extrude],[shell-combined-thin-extrude],[block136-path-extrude],[shell-combined-path-extrude],[block136-revolve],[shell-combined-revolve-controls],[block136-extrude-extents],[shell-combined-extrude-extents],[block136-holes],[shell-combined-holes],[block136-parameters],[shell-combined-parameters],[block136-sketch3d-projection],[shell-combined-projected-sweep],[block136-sketch3d-direction],[shell-sketch3d-direction-workflow],[block136-sketch3d-placement],[shell-sketch3d-placement-workflow],[block136-sketch3d-grips],[shell-sketch3d-grips-workflow],[block136-sketch3d],[shell-combined-sketch3d],[block136-sketch-diagnostics],[missing-reference-session],[block136-missing-reference],[repair-open-session],[block136-repair-open],[block136-reference-repair-batches],[block136-reference-repair],[block136-construction-manipulators],[block136-construction-picking],[shell-mixed-path-loft],[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-extrude-limit-picking],[shell-combined-extrude-limit-picking],[block136-thin-extrude],[shell-combined-thin-extrude],[block136-path-extrude],[shell-combined-path-extrude],[block136-revolve],[shell-combined-revolve-controls],[block136-extrude-extents],[shell-combined-extrude-extents],[block136-holes],[shell-combined-holes],[block136-parameters],[shell-combined-parameters],[block136-sketch3d-projection],[shell-combined-projected-sweep],[block136-sketch3d-direction],[shell-sketch3d-direction-workflow],[block136-sketch3d-placement],[shell-sketch3d-placement-workflow],[block136-sketch3d-grips],[shell-sketch3d-grips-workflow],[block136-sketch3d],[shell-combined-sketch3d],[block136-sketch-diagnostics],[missing-reference-session],[block136-missing-reference],[repair-open-session],[block136-repair-open],[block136-reference-repair-batches],[block136-reference-repair],[block136-construction-manipulators],[block136-construction-picking],[shell-mixed-path-loft],[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
 ```
 
 The regular inventory audit passes while it accurately records unfinished work. For closure,
@@ -1116,3 +1116,50 @@ Formatting and diff checks pass.
 The ordinary inventory audit passes. The opt-in closure gate continues to reject the documented
 unfinished acceptance (three cases: two pass, one expected failure; 186 assertions). Six partial
 families and pending integrated workflows remain; this slice does not close Block 136.
+
+## Native Extrude limit-face collection — 2026-10-24
+
+The role selector `blcad.extrude.pick_role` collects the supported semantic source planes with exact
+Face-only scope and synchronized combo/highlight state. Invalid transverse/coincident limits stay
+correctable and remove the result preview. Apply, Cancel, Escape, mode changes, history and document
+replacement restore selection context and remove temporary presentations. The existing source-plane
+boundary is unchanged. Five focused cases include native Right/Top/Bottom clicks and three origin
+plane orientations.
+
+The twentieth combined workflow, `[shell-combined-extrude-limit-picking]`, authors a plate, stop Body,
+pocket, ToFace cut and independent Between Thin wall using Qt input. Native runs click actual face
+locations. Changing the plate depth propagates to both limited features while retaining the earlier
+pocket: plate 45,600→59,520 mm³, wall 1,200→1,680 mm³ and unchanged 500 mm³ stop Body. An earlier-feature
+rename, five-step exact Undo/Redo, cancelled collection, canonical reopening and STEP finish the
+workflow. Nineteen combined workflows have fully UI-authored inputs; Planar motion retains its
+imported Part boundary. The bounded Extrude/Revolve/Hole family is restored. Thirteen families are
+restored and five remain partial; Block 136 remains open and completion through 135 is unchanged.
+
+The initial focused regression exposed lost invalid-reference highlighting: reporting a failed
+candidate advances the presentation revision, and the resulting scene rebuild clears OCCT selection.
+The shell now reasserts the active local role after that rebuild and synchronizes failed previews
+before returning to input. Source faces use translucent presentation and outline-only selection
+highlighting. The final 1280×800 captures `extrude-native-both-limits.png`,
+`extrude-picked-to-face-cut.png` and `extrude-picked-between-thin-wall.png` in
+`/tmp/blcad-limit-face-native` were inspected; both role fields remain readable and Apply/Cancel stay
+pinned.
+
+The final `dev-gui` builds of GUI tests, application, Core tests and Geometry tests pass.
+
+| Suite | Cases | Assertions | Result |
+| --- | ---: | ---: | --- |
+| Full Core | 529 | 15,922 | All passed |
+| Full Geometry | 440 | 30,136 | All passed |
+| Focused native limit collection and combined workflow | 6 | 1,441 | All passed; no skips |
+| Full offscreen GUI | 458 | 43,805 | 442 passed; 16 native-only skips |
+| Full combined native shell | 274 | 39,064 | All passed; no skips |
+
+The ordinary inventory audit passes in the full GUI suite. The opt-in closure gate intentionally
+returns 1 (three cases: two pass, one expected failure; 187 assertions), retaining the five partial
+families and pending integrated workflows. This restores the bounded modeling family without closing
+Block 136.
+
+Builds, GUI runs and the separate six-second native startup were serial. Startup remained running
+until intentional timeout 124. Native focused/full/startup logs retain only the known medium OCCT
+depth/stencil visual warning, without high-severity, BadDrawable or fatal lifecycle diagnostics.
+Changed C++ sections pass the repository clang-format check; working and staged diff checks pass.

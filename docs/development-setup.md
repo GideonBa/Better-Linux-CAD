@@ -1161,3 +1161,21 @@ tags in the canonical native regression in `docs/gui-shell-acceptance-mvp9r.md`,
 separately, with builds and GUI executions serial. Contract and remaining extent-editor work:
 `docs/gui-part-foundation-workbench-mvp7.md`, `docs/mvp-plan.md`. The semantic Hole Wizard is not
 claimed by these plain cylindrical cut controls.
+
+## Native Extrude limit-face collection regression
+
+```bash
+cmake --build --preset dev-gui --target blcad_gui_tests blcad_app blcad_core_tests blcad_geometry_tests -j6
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[block136-extrude-limit-picking],[shell-combined-extrude-limit-picking],[block136-extrude-extents],[block136-thin-extrude],[integration][gui-feature-coverage]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-limit-face-native QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-extrude-limit-picking],[shell-combined-extrude-limit-picking]"
+```
+
+The focused cases cover typed source identities, all three origin-plane normals, both limit roles,
+transverse/coincident failure recovery, selection scope/highlights, Apply/Cancel/Escape, mode changes,
+Undo and document replacement. The native case clicks actual Right/Top/Bottom source planes; it skips
+offscreen. The combined Qt-input workflow authors a plate, stop Body, pocket, ToFace cut and independent
+Between Thin wall; native runs click actual source-plane locations and offscreen uses the visible face
+combos. Source-depth changes, an earlier-feature edit, exact history, canonical reopening and STEP
+exercise the full chain. Inspect `extrude-native-both-limits.png`, `extrude-picked-to-face-cut.png` and
+`extrude-picked-between-thin-wall.png` at 1280×800. Include both tags in the canonical native command in
+`docs/gui-shell-acceptance-mvp9r.md`. Keep builds, GUI runs and separate native startup serial.

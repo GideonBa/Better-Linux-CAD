@@ -88,8 +88,37 @@ Focused proof: `[block136-extrude-extents]` in `gui_shell_extrude_extent_tests.c
 corrects transverse/coincident face bounds, cuts to/between source planes, checks exact history,
 cancels a symmetric tapered candidate, reopens canonically and exports STEP.
 
-Native limit-face collection remains separate shell work. The bounded thin, path-directed and
-expanded Revolve surfaces are described below.
+The bounded thin, path-directed and expanded Revolve surfaces are described below.
+
+### Replacement-shell viewport limit-face collection — Block 136, 2026-10-24
+
+For `ToFace` and `Between`, `blcad.extrude.pick_role` explicitly activates the first or second
+limit role. `Auswahl beenden` exits collection; the second role exists only for `Between`. The
+existing face combos remain usable and synchronize the highlight of the active role. Collection
+publishes disposable source-plane presentations from the same `build_construction_sources` result
+that populates those combos. Face-only filtering plus an exact semantic-ID scope excludes Bodies,
+sketches, datums, edges, arbitrary final-Body faces and disposable result previews. The selected
+source plane is highlighted even when it makes the candidate invalid. Source planes are translucent
+and use outline-only selection highlighting so their historical boundary does not cover the modified
+Body preview. Scalar handles cannot capture a reference click while collection is active.
+
+Transverse, coincident and otherwise invalid limit combinations retain their local typed references
+and active role, clear the result preview and disable Apply. A subsequent valid pick recomputes the
+complete candidate. No parameter, Body, feature or history entry is written by collection. Changing
+extent/direction to a mode without face bounds exits collection and removes the source presentations.
+Exiting collection restores the previous selection filter/scope and viewport selection; Apply,
+Cancel, Escape, Undo and document replacement remove all task-owned source presentations. Command
+completion restores the saved selection, including the Finish Sketch fallback when it had no viewport
+presentation. Escape retains the existing whole-command cancellation behavior.
+
+The source boundary stays limited to the six generated box roles described above; collecting a
+historical source plane does not reference a modified final Body subshape. Focused proof:
+`[block136-extrude-limit-picking]`, including actual native Right/Top/Bottom clicks. The combined
+`[shell-combined-extrude-limit-picking]` workflow authors three Bodies through Qt controls, preserves
+an earlier pocket, rejects a transverse cut limit and coincident wall limits, collects `ToFace` and
+Thin `Between` bounds, changes source depth, edits an earlier feature, verifies five-step history,
+reopens canonically and exports STEP. Native runs click actual source-plane locations; offscreen uses
+the same visible combo controls and verifies their synchronized semantic highlight.
 
 ### Replacement-shell open-line Thin Extrude — Block 136, 2026-10-24
 
@@ -252,7 +281,7 @@ Bounded here and not introduced implicitly by this block:
   variant using the existing CircleProfile cut. Exact bounds are in
   `docs/gui-part-foundation-workbench-mvp7.md`; it does not enlarge the semantic Hole Wizard contract;
 - `ToFace`/`Between` consume already-resolved semantic `FaceReference`s; interactive limit-face
-  **picking/highlighting** is the caller's selection responsibility;
+  **picking/highlighting** is supplied by the replacement shell role selector above;
 - continuous **shaded viewport preview** rendering is the existing recompute/presentation path after a
   validated candidate; the controllers publish the validated preview summary, not pixels;
 - path Extrude is available through the Block-136 direction/path controls above. Block 135 maps

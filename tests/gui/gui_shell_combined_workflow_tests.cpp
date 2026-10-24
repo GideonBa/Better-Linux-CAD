@@ -541,11 +541,43 @@ public:
       idle();
     }
   }
+  void standard_view(const QString& label) {
+    window.ribbon().set_current_tab(2);
+    flush();
+    for (auto* button : window.ribbon().findChildren<QToolButton*>())
+      if (button->defaultAction() && button->defaultAction()->text() == label) {
+        click(*button);
+        return;
+      }
+    FAIL("No standard view button: " + label.toStdString());
+  }
+  void limit_face(const FeatureId& source, const char* face, Point3 point) {
+    INFO("Limit source: " << source.value() << "/" << face);
+    const auto expected = "construction-source/" + std::to_string(source.value().size()) + ":" +
+                          source.value() + "/face/" + face;
+    if (QApplication::platformName() == "xcb") {
+      flush();
+      const auto screen = checked(window.viewport().model_to_screen(point));
+      const QPoint local(qRound(screen.x), qRound(screen.y));
+      REQUIRE(window.viewport().rect().contains(local));
+      click_at(window.viewport(), local);
+    } else {
+      const auto role = widget<QComboBox>("blcad.extrude.pick_role").currentIndex();
+      REQUIRE(role > 0);
+      data(widget<QComboBox>(role == 1 ? "blcad.extrude.first_face" : "blcad.extrude.second_face"),
+           QString::fromStdString(source.value() + "/" + face));
+    }
+    REQUIRE(window.viewport().selected_semantic());
+    CHECK(window.viewport().selected_semantic()->semantic_id == expected);
+    CHECK(window.feature_tools().manipulators().active_handle_id().empty());
+  }
   void idle() {
     CHECK_FALSE(window.session().task().active());
     CHECK_FALSE(window.viewport().feature_preview_active());
     CHECK(window.session().derived_results_fresh());
     CHECK(window.viewport().selection_filter_mask() == 0xFFFFFFFFU);
+    CHECK_FALSE(window.viewport().selection_semantic_scope());
+    CHECK(window.feature_tools().extrude_selection_items().empty());
   }
   void capture(const QString& name) {
     const auto directory = qEnvironmentVariable("BLCAD_UI_CAPTURE_DIR");
@@ -1055,6 +1087,132 @@ TEST_CASE(
   CHECK(ui.summary(base).volume_mm3 == Approx(44640).margin(1e-5));
   CHECK(ui.summary(wall).volume_mm3 == Approx(2400).margin(1e-5));
   const auto step = directory.filePath("thin-machining.step");
+  ui.file("export_part_step", step);
+  CHECK(ui.bytes(step).contains("ISO-10303-21"));
+  CHECK(ui.snapshot() == states.back());
+  ui.idle();
+}
+
+TEST_CASE(
+    "Combined UI face collection preserves earlier machining and propagates changed source limits",
+    "[gui][integration][shell-combined-workflow][shell-combined-extrude-limit-picking]") {
+  WorkflowUi ui;
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  ui.new_document("Semantic limit machining");
+  ui.rectangle("datum.xy", {-30, -20}, {30, 20});
+  const auto base = ui.extrude(20);
+  const auto source = ui.window.session().part_document()->features().back().id();
+  const auto depth = ui.window.session().part_document()->find_feature(source)->length_parameter();
+  ui.rectangle("datum.xy", {45, -5}, {55, 5});
+  const auto stop = ui.extrude(5);
+  const auto stop_source = ui.window.session().part_document()->features().back().id();
+  const auto pocket = ui.rectangle("datum.xy", {-10, -5}, {10, 5});
+  const auto through = ui.rectangle("datum.xy", {15, -4}, {25, 4});
+  const auto wall = ui.open_line("datum.xy", {-20, 10}, {20, 10});
+  const auto parameters = ui.window.session().part_document()->parameter_count();
+  std::vector<std::string> states{ui.snapshot()};
+
+  ui.tree(pocket.value());
+  ui.command("extrude");
+  ui.choose(ui.widget<QComboBox>("blcad.extrude.operation"), 2);
+  ui.data(ui.widget<QComboBox>("blcad.extrude.target"), QString::fromStdString(base.value()));
+  ui.scalar("4 mm");
+  ui.button("blcad.feature.apply");
+  CHECK(ui.summary(base).volume_mm3 == Approx(47200).margin(1e-5));
+  states.push_back(ui.snapshot());
+
+  ui.tree(through.value());
+  ui.command("extrude");
+  ui.choose(ui.widget<QComboBox>("blcad.extrude.operation"), 2);
+  ui.data(ui.widget<QComboBox>("blcad.extrude.target"), QString::fromStdString(base.value()));
+  ui.choose(ui.widget<QComboBox>("blcad.extrude.extent"), 5);
+  ui.choose(ui.widget<QComboBox>("blcad.extrude.pick_role"), 1);
+  ui.standard_view("Rechts");
+  ui.command("fit", 2);
+  ui.limit_face(source, "right", {30, -10, 10});
+  CHECK_FALSE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+  CHECK_FALSE(ui.window.viewport().feature_preview_active());
+  CHECK(ui.snapshot() == states.back());
+  ui.standard_view("Oben");
+  ui.limit_face(source, "top", {-20, -10, 20});
+  REQUIRE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+  CHECK(ui.window.viewport().feature_preview_replaces("body/" + base.value()));
+  const auto cut = ui.window.feature_tools().coordinator().extrude().feature_id();
+  ui.capture("extrude-picked-to-face-cut");
+  ui.button("blcad.feature.apply");
+  CHECK(ui.summary(base).volume_mm3 == Approx(45600).margin(1e-5));
+  ui.idle();
+  states.push_back(ui.snapshot());
+
+  ui.tree(wall.value());
+  ui.command("extrude");
+  ui.choose(ui.widget<QComboBox>("blcad.extrude.thin_mode"), 1);
+  ui.text(ui.widget<QLineEdit>("blcad.extrude.thickness"), "2 mm");
+  ui.choose(ui.widget<QComboBox>("blcad.extrude.extent"), 6);
+  ui.choose(ui.widget<QComboBox>("blcad.extrude.pick_role"), 1);
+  ui.limit_face(source, "top", {-20, -10, 20});
+  ui.choose(ui.widget<QComboBox>("blcad.extrude.pick_role"), 2);
+  ui.limit_face(source, "top", {-20, -10, 20});
+  CHECK_FALSE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+  CHECK(ui.snapshot() == states.back());
+  ui.limit_face(stop_source, "top", {50, 0, 5});
+  REQUIRE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+  const auto wall_body = ui.window.feature_tools().coordinator().extrude().result_body_id();
+  ui.capture("extrude-picked-between-thin-wall");
+  ui.button("blcad.feature.apply");
+  CHECK(ui.summary(wall_body).volume_mm3 == Approx(1200).margin(1e-5));
+  CHECK(ui.summary(base).volume_mm3 == Approx(45600).margin(1e-5));
+  CHECK(ui.summary(stop).volume_mm3 == Approx(500).margin(1e-5));
+  CHECK(ui.window.session().part_document()->parameter_count() == parameters + 2);
+  ui.idle();
+  states.push_back(ui.snapshot());
+
+  ui.command("parameters");
+  ui.data(ui.widget<QComboBox>("blcad.parameters.parameter"),
+          QString::fromStdString(depth.value()));
+  ui.text(ui.widget<QLineEdit>("blcad.parameters.input"), "26");
+  ui.button("blcad.parameters.stage");
+  ui.button("blcad.parameters.preview");
+  CHECK(ui.snapshot() == states.back());
+  ui.button("blcad.parameters.apply");
+  CHECK(ui.summary(base).volume_mm3 == Approx(59520).margin(1e-5));
+  CHECK(ui.summary(wall_body).volume_mm3 == Approx(1680).margin(1e-5));
+  CHECK(ui.summary(stop).volume_mm3 == Approx(500).margin(1e-5));
+  CHECK(ui.bounds(wall_body).minimum.z == Approx(5).margin(1e-5));
+  CHECK(ui.bounds(wall_body).maximum.z == Approx(26).margin(1e-5));
+  states.push_back(ui.snapshot());
+  ui.tree(cut.value(), true);
+  ui.text(ui.widget<QLineEdit>("blcad.feature_edit.field/name"), "Picked through cut");
+  ui.button("blcad.feature_edit.apply");
+  REQUIRE(ui.window.session()
+              .part_document()
+              ->find_feature(cut)
+              ->extrude_intent()
+              .extent()
+              .first_face());
+  CHECK(ui.summary(base).volume_mm3 == Approx(59520).margin(1e-5));
+  CHECK(ui.summary(wall_body).volume_mm3 == Approx(1680).margin(1e-5));
+  states.push_back(ui.snapshot());
+  ui.history(states);
+
+  ui.tree(wall.value());
+  ui.command("extrude");
+  ui.choose(ui.widget<QComboBox>("blcad.extrude.extent"), 6);
+  ui.choose(ui.widget<QComboBox>("blcad.extrude.pick_role"), 2);
+  ui.limit_face(stop_source, "top", {50, 0, 5});
+  ui.choose(ui.widget<QComboBox>("blcad.extrude.extent"), 0);
+  CHECK_FALSE(ui.window.viewport().selection_semantic_scope());
+  ui.choose(ui.widget<QComboBox>("blcad.extrude.extent"), 5);
+  ui.choose(ui.widget<QComboBox>("blcad.extrude.pick_role"), 1);
+  ui.limit_face(source, "top", {-20, -10, 26});
+  ui.button("blcad.feature.cancel");
+  CHECK(ui.snapshot() == states.back());
+  ui.idle();
+  ui.roundtrip(directory.filePath("picked-limits.blcad"));
+  CHECK(ui.summary(base).volume_mm3 == Approx(59520).margin(1e-5));
+  CHECK(ui.summary(wall_body).volume_mm3 == Approx(1680).margin(1e-5));
+  const auto step = directory.filePath("picked-limits.step");
   ui.file("export_part_step", step);
   CHECK(ui.bytes(step).contains("ISO-10303-21"));
   CHECK(ui.snapshot() == states.back());

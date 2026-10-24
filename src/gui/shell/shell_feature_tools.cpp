@@ -499,6 +499,11 @@ Result<std::size_t> ShellFeatureTools::begin_extrude() {
     coordinator_.extrude().set_thin_manipulator_frame({origin, left, view.normal, view.x_axis});
   }
   command_ = Command::Extrude;
+  previous_selection_mask_ = viewport_.selection_filter_mask();
+  previous_semantic_scope_ = viewport_.selection_semantic_scope();
+  extrude_previous_selection_ = viewport_.selected_semantic();
+  extrude_previous_profile_ = selected_profile_;
+  extrude_previous_open_line_ = selected_open_line_;
   reset_extrude_controls(frame);
   if (!session_.task().show_preview()) {
     cancel();
@@ -926,6 +931,7 @@ Result<std::size_t> ShellFeatureTools::apply() {
   if (!task_applied && session_.task().active())
     (void)session_.task().cancel();
   const bool was_finishing = finishing();
+  const bool was_extrude = command_ == Command::Extrude;
   const bool restore_selection = pattern() || body_operation() || spatial() || surface();
   const bool restore_scope = spatial() || surface();
   command_ = Command::None;
@@ -946,6 +952,8 @@ Result<std::size_t> ShellFeatureTools::apply() {
   drag_start_value_.reset();
   selected_profile_.reset();
   viewport_.clear_feature_preview();
+  if (was_extrude)
+    restore_extrude_selection();
   hide_task_panel();
   synchronize_overlay();
   window_.refresh();
@@ -965,6 +973,7 @@ void ShellFeatureTools::cancel() noexcept {
   if (command_ != Command::None && session_.task().active())
     (void)session_.task().cancel();
   const bool was_finishing = finishing();
+  const bool was_extrude = command_ == Command::Extrude;
   const bool restore_selection = pattern() || body_operation() || spatial() || surface();
   const bool restore_scope = spatial() || surface();
   command_ = Command::None;
@@ -982,6 +991,8 @@ void ShellFeatureTools::cancel() noexcept {
   }
   surface_targets_.clear();
   preview_valid_ = false;
+  if (was_extrude)
+    restore_extrude_selection();
   hide_task_panel();
   synchronize_overlay();
   window_.refresh();
@@ -1153,7 +1164,8 @@ void ShellFeatureTools::synchronize_overlay() {
   if (command_ == Command::Revolve)
     revolve_controls_->setEnabled(layer_.active_handle_id().empty());
   const bool visible = active() && preview_valid_ && !layer_.handles().empty() &&
-                       !pattern_reference_picking_ && !body_reference_picking_;
+                       !pattern_reference_picking_ && !body_reference_picking_ &&
+                       !extrude_reference_picking_;
   overlay_->setVisible(visible);
   if (visible) {
     overlay_->setGeometry(viewport_.rect());
@@ -1163,6 +1175,11 @@ void ShellFeatureTools::synchronize_overlay() {
 }
 
 void ShellFeatureTools::refresh_presentation() {
+  // Reporting a failed candidate advances the presentation revision. Scene
+  // rebuilding then clears OCCT selection, but the active local reference role
+  // still owns its highlight, including invalid limits.
+  if (extrude_reference_picking_ && !viewport_.selected_semantic())
+    update_extrude_pick_mode();
   (void)update_mapping();
   synchronize_overlay();
 }
@@ -1267,7 +1284,7 @@ bool ShellFeatureTools::eventFilter(QObject* watched, QEvent* event) {
         break;
       const auto* mouse = static_cast<QMouseEvent*>(event);
       if (mouse->button() == Qt::LeftButton && preview_valid_ && !pattern_reference_picking_ &&
-          !body_reference_picking_) {
+          !body_reference_picking_ && !extrude_reference_picking_) {
         (void)update_mapping();
         if (layer_.begin_drag({mouse->position().x(), mouse->position().y()})) {
           drag_start_handle_ = std::string(layer_.active_handle_id());
