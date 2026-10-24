@@ -7,6 +7,7 @@
 
 #include <QApplication>
 
+#include <cmath>
 #include <optional>
 
 using namespace blcad;
@@ -88,6 +89,40 @@ TEST_CASE("OCCT viewport owns transient display and navigation state",
   viewport.set_standard_view(GuiStandardView::Isometric);
   CHECK_FALSE(viewport.plane_camera().has_value());
   viewport.fit_all();
+}
+
+TEST_CASE("Viewport projection retains subpixel separation of small model-space axes",
+          "[gui][viewport][native-projection-precision]") {
+  OcctViewport viewport;
+  viewport.resize(800, 600);
+  viewport.show();
+  qApp->processEvents();
+  if (QApplication::platformName() == "xcb")
+    REQUIRE(viewport.native_viewer_available());
+  REQUIRE(viewport.set_scene({{ViewportSceneKind::SolidBody, "body/precision", box_shape()}}));
+  viewport.set_standard_view(GuiStandardView::Isometric);
+  for (const auto projection :
+       {GuiViewportProjection::Orthographic, GuiViewportProjection::Perspective}) {
+    viewport.set_projection(projection);
+    viewport.fit_all();
+    qApp->processEvents();
+    const auto center = viewport.model_to_screen({0, 0, 0});
+    const auto along_y = viewport.model_to_screen({0, .001, 0});
+    const auto along_z = viewport.model_to_screen({0, 0, .001});
+    REQUIRE(center);
+    REQUIRE(along_y);
+    REQUIRE(along_z);
+    const double yx = along_y.value().x - center.value().x,
+                 yy = along_y.value().y - center.value().y;
+    const double zx = along_z.value().x - center.value().x,
+                 zy = along_z.value().y - center.value().y;
+    const double y_length = std::hypot(yx, yy), z_length = std::hypot(zx, zy);
+    REQUIRE(y_length > 1e-6);
+    REQUIRE(z_length > 1e-6);
+    CHECK(y_length < .5);
+    CHECK(z_length < .5);
+    CHECK(std::abs((yx * zx + yy * zy) / (y_length * z_length)) < .8);
+  }
 }
 
 TEST_CASE("OCCT viewport semantic bridge filters selection and publishes stable ids",

@@ -908,6 +908,9 @@ bool ShellWindow::finish_active_sketch() {
   if (feature_tools_ && finished_profile.has_value() &&
       feature_tools_->select_profile(finished_sketch, *finished_profile))
     statusBar()->showMessage(QStringLiteral("Profil bereit — Extrusion oder Drehung wählen"));
+  else if (feature_tools_ && feature_tools_->select_open_line(finished_sketch))
+    statusBar()->showMessage(
+        QStringLiteral("Offene Linie bereit — Extrusion mit Wandstärke wählen"));
   else if (has_open_contours)
     statusBar()->showMessage(QStringLiteral(
         "Skizze beendet — offene Konturen bleiben zum Weiterbearbeiten erhalten"));
@@ -1021,11 +1024,15 @@ void ShellWindow::apply_viewport_selection(const std::optional<GuiSelection>& se
     if (assembly_tools_)
       (void)assembly_tools_->accept_selection(*selection);
     selected_semantic_id_ = selection->semantic_id;
-    if (feature_tools_)
-      if (const auto* part = session_.part_document())
+    if (feature_tools_) {
+      if (const auto* part = session_.part_document()) {
         if (const auto profile = feature_profile_for_selection(*part, selection->semantic_id))
           selected_feature_profile =
               feature_tools_->select_profile(profile->first, profile->second);
+        else if (const auto sketch = interactive_thin_selection(*part, selection->semantic_id))
+          selected_feature_profile = feature_tools_->select_open_line(*sketch);
+      }
+    }
   }
   if (feature_tools_ && !selected_feature_profile)
     feature_tools_->clear_profile_selection();
@@ -1054,11 +1061,15 @@ void ShellWindow::handle_tree_selection(QTreeWidgetItem* current) {
     if (hole_tools_)
       for (const auto& selected : session_.selection().entries())
         (void)hole_tools_->accept_selection(selected);
-    if (feature_tools_)
-      if (const auto* part = session_.part_document())
+    if (feature_tools_) {
+      if (const auto* part = session_.part_document()) {
         if (const auto profile = feature_profile_for_selection(*part, property_semantic_id_))
           selected_feature_profile =
               feature_tools_->select_profile(profile->first, profile->second);
+        else if (const auto sketch = interactive_thin_selection(*part, property_semantic_id_))
+          selected_feature_profile = feature_tools_->select_open_line(*sketch);
+      }
+    }
   } else {
     synchronizing_selection_ = true;
     viewport_->clear_selection();

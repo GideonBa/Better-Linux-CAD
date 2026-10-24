@@ -75,6 +75,11 @@ detected closed regions use the same richer span/taper path. Richer arc/composit
 execution remains fail-closed; their historical straight paths remain available. General open
 chains and curved thin profiles are later breadth, not silently approximated.
 
+The Block-136 replacement-shell authoring surface exposes this one-line boundary with all three
+wall modes, local new thickness parameters and a Sketch-plane thickness handle. It retains the
+seven extent modes, taper, Body operations and the existing persistence contract. Exact selection,
+preview, publication and test boundaries live in `docs/gui-interactive-extrude-revolve-mvp9.md`.
+
 ## Body operations and recompute
 
 The generated tool participates in the existing `FeatureBodyResultContext` matrix:

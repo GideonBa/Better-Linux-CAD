@@ -113,10 +113,9 @@ public:
   }
 
   [[nodiscard]] Result<std::size_t>
-  begin_extrude_with_new_inputs(SketchId sketch, ProfileId profile, FeatureId feature,
-                                std::string name, Parameter distance_parameter,
-                                Body result_body,
-                                GuiFeatureManipulatorFrame frame = {}) {
+  begin_extrude_with_new_inputs(SketchId sketch, std::optional<ProfileId> profile,
+                                FeatureId feature, std::string name, Parameter distance_parameter,
+                                Body result_body, GuiFeatureManipulatorFrame frame = {}) {
     cancel();
     if (session_ == nullptr)
       return no_session<std::size_t>();

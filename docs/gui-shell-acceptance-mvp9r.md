@@ -39,10 +39,11 @@ source, hide a missing tag behind OR and claim completion with gaps. They must a
 
 The machine-readable details live in `families[].shell.gaps`; this is the execution order:
 
-1. Finish thin/open-profile Extrude controls and native viewport limit-face collection.
+1. Finish native viewport limit-face collection for the supported source roles.
    Revolve extent/operation/axis controls and all seven bounded Extrude terminations now have
    explicit shell editors. Path Extrude selects existing open PathCurves and all four Body
-   operations; arbitrary final-Body subshape references remain outside the contract.
+   operations. Single-open-line Thin Extrude exposes all three wall modes; arbitrary final-Body
+   subshape references remain outside the contract.
 2. Restore contextual commands, selection-filter UI, view cube, view bookmarks and repeat command.
 3. Restore the supported hierarchy validation, cross-hierarchy relationship/joint/solve controls,
    sampled Revolute analysis and occurrence-linked result highlighting.
@@ -73,7 +74,7 @@ QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][gui-fea
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests
 ./build/dev-gui/blcad_core_tests
 ./build/dev-gui/blcad_geometry_tests
-QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-path-extrude],[shell-combined-path-extrude],[block136-revolve],[shell-combined-revolve-controls],[block136-extrude-extents],[shell-combined-extrude-extents],[block136-holes],[shell-combined-holes],[block136-parameters],[shell-combined-parameters],[block136-sketch3d-projection],[shell-combined-projected-sweep],[block136-sketch3d-direction],[shell-sketch3d-direction-workflow],[block136-sketch3d-placement],[shell-sketch3d-placement-workflow],[block136-sketch3d-grips],[shell-sketch3d-grips-workflow],[block136-sketch3d],[shell-combined-sketch3d],[block136-sketch-diagnostics],[missing-reference-session],[block136-missing-reference],[repair-open-session],[block136-repair-open],[block136-reference-repair-batches],[block136-reference-repair],[block136-construction-manipulators],[block136-construction-picking],[shell-mixed-path-loft],[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-thin-extrude],[shell-combined-thin-extrude],[block136-path-extrude],[shell-combined-path-extrude],[block136-revolve],[shell-combined-revolve-controls],[block136-extrude-extents],[shell-combined-extrude-extents],[block136-holes],[shell-combined-holes],[block136-parameters],[shell-combined-parameters],[block136-sketch3d-projection],[shell-combined-projected-sweep],[block136-sketch3d-direction],[shell-sketch3d-direction-workflow],[block136-sketch3d-placement],[shell-sketch3d-placement-workflow],[block136-sketch3d-grips],[shell-sketch3d-grips-workflow],[block136-sketch3d],[shell-combined-sketch3d],[block136-sketch-diagnostics],[missing-reference-session],[block136-missing-reference],[repair-open-session],[block136-repair-open],[block136-reference-repair-batches],[block136-reference-repair],[block136-construction-manipulators],[block136-construction-picking],[shell-mixed-path-loft],[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
 ```
 
 The regular inventory audit passes while it accurately records unfinished work. For closure,
@@ -1049,3 +1050,69 @@ BadDrawable or fatal lifecycle diagnostics. Formatting and diff checks pass.
 The ordinary inventory audit passes. The opt-in closure gate continues to reject the documented
 unfinished acceptance (three cases: two pass, one expected failure; 183 assertions). This expected
 failure does not change the numbered completion boundary.
+
+## Open-line Thin Extrude controls — 2026-10-24
+
+The existing Extrusion task now consumes one nondegenerate real Sketch line without closed profile
+materialization. Finish Sketch, browser Sketch/line selection and semantic viewport selection share
+the same eligibility predicate. The task exposes OneSided, MidPlane and TwoSided walls, positive
+local thickness inputs, all seven straight extent modes, taper and four Body operations. Used inputs
+publish atomically; no unused second thickness or modifying-operation Body is added. The first wall
+handle follows the line's left direction in the resolved Sketch plane and retains independent
+depth/thickness rollback, including pointer Escape. General curved/open chains and closed-profile
+thin semantics remain outside the retained Geometry boundary. Contract:
+`docs/gui-interactive-extrude-revolve-mvp9.md`.
+
+`[block136-thin-extrude]` covers all wall modes and signed bounds on XY/XZ/YZ, every operation and
+extent, a reversed diagonal line on a tilted offset plane, exact parameter counts, malformed text
+and recovery, failed-taper rollback, semantic selection, pointer Escape in an oblique view with
+distinct handle projections, bounded input rejection, global identity collisions, Cancel, document
+replacement and canonical reopening.
+
+`[shell-combined-thin-extrude]` is the nineteenth combined workflow. Actual UI input authors a plate
+and two single-line Sketches. It machines a mid-plane groove and one-sided through slot, creates an
+independent two-sided symmetric wall, corrects invalid units, edits the earlier wall thickness via
+the parameter manager, renames the earlier feature while retaining thin intent, checks downstream
+volumes and exact five-step Undo/Redo, cancels a tapered reversed draft, reopens canonically and
+exports STEP. Eighteen combined workflows have fully
+UI-authored inputs; Planar motion retains its imported Part boundary.
+
+The family remains partial for native viewport limit-face collection. Twelve bounded families
+remain restored and six partial. Block 136 remains open and numbered completion stays at Block 135.
+
+Native grip verification exposed integer projection rounding that could collapse different small
+model-axis displacements onto the same screen direction and choose the depth handle for a thickness
+click. `OcctViewport::model_to_screen` now uses OCCT camera NDC projection and the actual render-window
+size while retaining subpixel DIP coordinates. `[native-projection-precision]` failed before the fix
+with a zero-length displacement and checks orthographic/perspective lengths and distinct directions.
+Contract: `docs/gui-viewport-manipulators-mvp9.md`.
+
+The first full native pass also exposed popup readiness failures in the reference-repair and Planar
+motion input helpers. The helpers now synchronize window activation, popup visibility and exact
+desktop-pointer arrival through bounded Qt event-loop predicates before clicking the visible row.
+Visibility, hit/index identity and final selection checks remain enforced. These changes affect
+test input synchronization and retain the actual widget-input proof boundary.
+
+The `dev-gui` builds of `blcad_gui_tests`, `blcad_app`, `blcad_core_tests` and
+`blcad_geometry_tests` pass. Final verification:
+
+| Suite | Cases | Assertions | Result |
+| --- | ---: | ---: | --- |
+| Full Core | 529 | 15,922 | All passed |
+| Full Geometry | 440 | 30,136 | All passed |
+| Focused native precision, thin and popup workflows | 11 | 2,681 | All passed; no skips |
+| Full offscreen GUI | 452 | 42,121 | 437 passed; 15 native-only skips |
+| Full combined native shell | 268 | 37,396 | All passed; no skips |
+
+The 1280×800 `thin-midplane-cut-preview.png`, `thin-two-sided-new-body-preview.png` and
+`thin-through-all-cut-preview.png` captures in `/tmp/blcad-thin-native` were inspected. Conditional
+wall fields, direction and target labels stay readable; independent depth/thickness handles are
+visible and Apply/Cancel remain pinned. Full offscreen/native runs were repeated after the popup
+synchronization changes. Builds, GUI runs and the separate six-second native startup were serial;
+startup ends at intentional timeout 124. Final native logs retain only the known medium
+depth/stencil visual warning, without high-severity, BadDrawable or fatal lifecycle diagnostics.
+Formatting and diff checks pass.
+
+The ordinary inventory audit passes. The opt-in closure gate continues to reject the documented
+unfinished acceptance (three cases: two pass, one expected failure; 186 assertions). Six partial
+families and pending integrated workflows remain; this slice does not close Block 136.

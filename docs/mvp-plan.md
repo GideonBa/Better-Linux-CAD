@@ -959,6 +959,23 @@ verification evidence: `docs/gui-interactive-extrude-revolve-mvp9.md`,
 in the same partial family. Twelve bounded families remain restored and six partial; Block 136 and
 the Block-135 numbered completion boundary are unchanged.
 
+### Block 136 — Open-line Thin Extrude authoring — 2026-10-24
+
+The existing Extrusion task now consumes the retained single-open-line thin adapter with OneSided,
+MidPlane and TwoSided walls, candidate-only thickness parameters and a Sketch-plane thickness
+handle. Finish Sketch and browser/viewport semantic selection share the bounded input predicate;
+no closed profile is invented. The seven straight terminations, taper and four Body operations
+retain atomic whole-model Preview/Apply, sidecars, history and persistence. Focused shell cases and
+a nineteenth combined actual-input workflow cover oriented wall bounds, operations/extents,
+invalid text, handle rollback, unused-input suppression, downstream thickness edits, exact history,
+reopening and STEP. Contracts/evidence: `docs/gui-interactive-extrude-revolve-mvp9.md`,
+`docs/gui-shell-acceptance-mvp9r.md`. Native viewport limit-face collection remains in this partial
+family. General curved/open chains remain outside the retained Geometry boundary. Twelve bounded
+families remain restored and six partial; Block 136 and numbered completion through 135 are unchanged.
+Native verification also exposed integer projection rounding that could merge distinct handle
+directions. The viewport now preserves OCCT's subpixel camera projection; a separate red/green
+regression covers orthographic/perspective precision alongside the native Thin pointer workflow.
+
 ## Current next technical step — Block 136
 
 The current v3 coverage inventory records all eighteen accepted families, current shell proof sources,
@@ -966,11 +983,10 @@ reachable entry points and explicit remaining gaps. The machine check distinguis
 from closure readiness; historical controller proofs cannot close a shell gap. Acceptance contract:
 `docs/gui-shell-acceptance-mvp9r.md`, `[integration][gui-feature-coverage]` / `[gui][shell-coverage]`.
 
-Continue with thin/open-profile Extrude and native viewport limit-face collection.
-The next bounded slice should expose OneSided, MidPlane and TwoSided thickness for the retained
-single nondegenerate open Sketch-line adapter, with candidate-only thickness inputs and atomic
-Apply/history. General curved/open chains remain outside that Geometry boundary. Follow with native
-collection of the supported semantic limit-face roles for ToFace/Between.
+Continue with native collection of the supported semantic limit-face roles for ToFace/Between,
+including selection scope, reference highlighting, failed-candidate recovery and exact lifecycle
+restoration. The bounded single-line Thin Extrude editors are available; general curved/open chains
+remain outside that Geometry boundary.
 All seven bounded Extrude terminations and the expanded Revolve controls now have explicit shell
 editors. Path Extrude selects open PathCurves with all four Body operations. Dedicated plain
 through-all Hole authoring is available within the retained circular-cut/Core

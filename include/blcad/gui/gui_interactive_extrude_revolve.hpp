@@ -80,16 +80,22 @@ public:
   // has no Body or feature-distance parameter yet. Keep those objects in the
   // disposable candidate and add them in the same Apply transaction as the
   // feature, so Cancel is mutation-free and one Undo removes the complete
-  // operation. The established begin(...) path for existing inputs is
-  // unchanged.
+  // operation. An absent profile selects the validated single-open-line thin
+  // boundary; set thickness before previewing. The existing-input begin(...)
+  // contract remains unchanged.
   [[nodiscard]] Result<std::size_t>
-  begin_with_new_inputs(const GuiDocumentSession& session, SketchId sketch, ProfileId profile,
-                        FeatureId feature, std::string name, Parameter distance_parameter,
-                        Body result_body) {
+  begin_with_new_inputs(const GuiDocumentSession& session, SketchId sketch,
+                        std::optional<ProfileId> profile, FeatureId feature, std::string name,
+                        Parameter distance_parameter, Body result_body) {
     const auto* part = session.part_document();
     if (part == nullptr)
       return fail("interactive extrude requires an active Part document");
-    auto pending_profile = prepare_interactive_profile(*part, sketch, profile);
+    const auto* source = part->find_sketch(sketch);
+    if (!profile && (!source || !interactive_thin_line(*source)))
+      return fail("open thin extrusion requires exactly one nondegenerate Sketch line");
+    auto pending_profile =
+        profile ? prepare_interactive_profile(*part, sketch, *profile)
+                : Result<std::optional<GuiPendingProfileMaterialization>>::success(std::nullopt);
     if (pending_profile.has_error())
       return Result<std::size_t>::failure(pending_profile.error());
     if (distance_parameter.type() != ParameterType::Length)
@@ -130,8 +136,9 @@ public:
   [[nodiscard]] const BodyId& result_body_id() const noexcept { return result_body_; }
 
 private:
-  void initialize(SketchId sketch, ProfileId profile, FeatureId feature, std::string name,
-                  ParameterId distance_parameter, BodyId result_body, double distance) {
+  void initialize(SketchId sketch, std::optional<ProfileId> profile, FeatureId feature,
+                  std::string name, ParameterId distance_parameter, BodyId result_body,
+                  double distance) {
     sketch_ = std::move(sketch);
     profile_ = std::move(profile);
     feature_ = std::move(feature);
@@ -144,6 +151,9 @@ private:
     direction_ = ExtrudeDirection::SketchNormal;
     taper_deg_.reset();
     thin_.reset();
+    pending_thickness_parameter_.reset();
+    pending_second_thickness_parameter_.reset();
+    thin_frame_.reset();
     path_curve_.reset();
     first_face_.reset();
     second_face_.reset();
@@ -189,8 +199,30 @@ public:
   void set_thin(ExtrudeThinMode mode, ParameterId thickness_parameter, double thickness_mm,
                 std::optional<ParameterId> second_thickness = std::nullopt) {
     thin_ = ThinState{mode, std::move(thickness_parameter), thickness_mm, std::move(second_thickness)};
+    pending_thickness_parameter_.reset();
+    pending_second_thickness_parameter_.reset();
   }
-  void clear_thin() noexcept { thin_.reset(); }
+  void set_thin_new_inputs(ExtrudeThinMode mode, Parameter first,
+                           std::optional<Parameter> second = std::nullopt) {
+    thin_ = ThinState{mode, first.id(), first.value().millimeters(),
+                      second ? std::optional(second->id()) : std::nullopt};
+    pending_thickness_parameter_ = std::move(first);
+    pending_second_thickness_parameter_ = std::move(second);
+  }
+  void clear_thin() noexcept {
+    thin_.reset();
+    pending_thickness_parameter_.reset();
+    pending_second_thickness_parameter_.reset();
+  }
+  [[nodiscard]] bool uses_open_line() const noexcept {
+    return !profile_;
+  }
+  [[nodiscard]] double thin_thickness() const noexcept {
+    return thin_ ? thin_->thickness_mm : 0;
+  }
+  void set_thin_manipulator_frame(GuiFeatureManipulatorFrame frame) {
+    thin_frame_ = frame;
+  }
   // Path Extrude: follow a connected PathCurve instead of a scalar extent.
   void set_path_curve(PathCurveId path_curve) {
     path_curve_ = std::move(path_curve);
@@ -238,8 +270,8 @@ public:
     GuiViewportManipulatorHandle handle;
     handle.id = std::string(kExtrudeThinHandleId);
     handle.kind = GuiViewportManipulatorKind::Linear;
-    handle.origin = frame_.origin;
-    handle.axis = frame_.axis;
+    handle.origin = thin_frame_.value_or(frame_).origin;
+    handle.axis = thin_frame_.value_or(frame_).axis;
     handle.reference_value = thin_->thickness_mm;
     handle.minimum_value = std::numeric_limits<double>::epsilon();
     return handle;
@@ -374,11 +406,7 @@ public:
           });
     }();
     if (committed.has_error()) return committed;
-    active_ = false;
-    pending_distance_parameter_.reset();
-    pending_second_distance_parameter_.reset();
-    pending_result_body_.reset();
-    pending_profile_materialization_.reset();
+    cancel();
     return committed;
   }
 
@@ -386,6 +414,8 @@ public:
     active_ = false;
     pending_distance_parameter_.reset();
     pending_second_distance_parameter_.reset();
+    pending_thickness_parameter_.reset();
+    pending_second_thickness_parameter_.reset();
     pending_result_body_.reset();
     pending_profile_materialization_.reset();
   }
@@ -439,6 +469,20 @@ private:
       if (added.has_error())
         return added;
       changed += added.value();
+    }
+    if (direction_ != ExtrudeDirection::Path && thin_) {
+      for (const auto* parameter :
+           {&pending_thickness_parameter_, &pending_second_thickness_parameter_}) {
+        if (!*parameter)
+          continue;
+        if (parameter == &pending_second_thickness_parameter_ &&
+            thin_->mode != ExtrudeThinMode::TwoSided)
+          continue;
+        auto added = part.add_parameter(**parameter);
+        if (added.has_error())
+          return added;
+        changed += added.value();
+      }
     }
     if (operation_ == FeatureBodyOperationMode::NewBody && pending_result_body_.has_value()) {
       auto added = part.add_body(*pending_result_body_);
@@ -498,17 +542,20 @@ private:
     if (context.has_error()) return Result<Feature>::failure(context.error());
 
     if (direction_ == ExtrudeDirection::Path) {
-      if (!path_curve_)
-        return Result<Feature>::failure(
-            Error::validation(feature_.value(), "path extrude requires a selected PathCurve"));
+      if (!path_curve_ || !profile_)
+        return Result<Feature>::failure(Error::validation(
+            feature_.value(), "path extrude requires a closed profile and a selected PathCurve"));
       auto feature =
           Feature::create_additive_path_extrude(feature_, name_, sketch_, *path_curve_);
       if (feature.has_error()) return feature;
-      auto profiled = feature.value().with_profile(profile_);
+      auto profiled = feature.value().with_profile(*profile_);
       if (profiled.has_error()) return profiled;
       return profiled.value().with_body_result_context(context.value());
     }
 
+    if (!profile_ && !thin_)
+      return Result<Feature>::failure(
+          Error::validation(feature_.value(), "open line extrusion requires a wall thickness"));
     auto extent = build_extent();
     if (extent.has_error()) return Result<Feature>::failure(extent.error());
     std::optional<ExtrudeThinIntent> thin;
@@ -523,7 +570,9 @@ private:
     auto feature =
         Feature::create_additive_extrude(feature_, name_, sketch_, std::move(intent.value()), direction_);
     if (feature.has_error()) return feature;
-    auto profiled = feature.value().with_profile(profile_);
+    if (!profile_)
+      return feature.value().with_body_result_context(context.value());
+    auto profiled = feature.value().with_profile(*profile_);
     if (profiled.has_error()) return profiled;
     return profiled.value().with_body_result_context(context.value());
   }
@@ -550,7 +599,7 @@ private:
 
   bool active_{false};
   SketchId sketch_{""};
-  ProfileId profile_{""};
+  std::optional<ProfileId> profile_;
   FeatureId feature_{""};
   std::string name_;
   ParameterId distance_parameter_{""};
@@ -567,9 +616,12 @@ private:
   std::optional<FaceReference> second_face_;
   std::optional<Parameter> pending_distance_parameter_;
   std::optional<Parameter> pending_second_distance_parameter_;
+  std::optional<Parameter> pending_thickness_parameter_;
+  std::optional<Parameter> pending_second_thickness_parameter_;
   std::optional<Body> pending_result_body_;
   std::optional<GuiPendingProfileMaterialization> pending_profile_materialization_;
   GuiFeatureManipulatorFrame frame_;
+  std::optional<GuiFeatureManipulatorFrame> thin_frame_;
 };
 
 class GuiInteractiveRevolveController {
