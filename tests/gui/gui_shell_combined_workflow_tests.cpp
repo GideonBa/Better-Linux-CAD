@@ -3113,3 +3113,99 @@ TEST_CASE("Combined UI repeats fresh hole tasks then updates finishing and sourc
   CHECK(ui.snapshot() == states.back());
   ui.idle();
 }
+
+TEST_CASE("Combined UI profile contexts restore cancelled cuts then author Thin walls and "
+          "propagate upstream edits",
+          "[gui][integration][shell-combined-workflow][shell-combined-profile-context]") {
+  WorkflowUi ui;
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  ui.new_document("Context machining");
+  const auto plate = ui.rectangle("datum.xy", {-30, -20}, {30, 20});
+  const auto pocket = ui.rectangle("datum.xy", {-10, -5}, {10, 5});
+  const auto wall = ui.open_line("datum.xz", {40, 0}, {60, 0});
+  const auto context = [&](const QString& id) {
+    ui.click(ui.widget<QToolButton>("blcad.context." + id));
+  };
+  ui.tree(plate.value());
+  ui.command("view_top", 2);
+  if (QApplication::platformName() == "xcb") {
+    ui.tree("datum.xy");
+    REQUIRE_FALSE(ui.widget<QWidget>("blcad.context.toolbar").isVisible());
+    const auto point = checked(ui.window.viewport().model_to_screen({22, 12, 0}));
+    ui.click_at(ui.window.viewport(), {point.x, point.y});
+    REQUIRE(ui.window.viewport().selected_semantic());
+    CHECK(ui.window.viewport().selected_semantic()->kind == GuiSelectionKind::SketchEntity);
+    auto& toolbar = ui.widget<QWidget>("blcad.context.toolbar");
+    REQUIRE(toolbar.isVisible());
+    CHECK(ui.window.viewport().rect().contains(toolbar.geometry()));
+    CHECK(toolbar.geometry()
+              .adjusted(-16, -16, 16, 16)
+              .contains(QPoint(qRound(point.x), qRound(point.y))));
+  }
+  std::vector<std::string> states{ui.snapshot()};
+  context("extrude");
+  CHECK(ui.window.session().selection().empty());
+  ui.scalar("20 mm");
+  const auto base = ui.window.feature_tools().coordinator().extrude().result_body_id();
+  const auto base_feature = ui.window.feature_tools().coordinator().extrude().feature_id();
+  ui.button("blcad.feature.apply");
+  CHECK(ui.summary(base).volume_mm3 == Approx(48000).margin(1e-5));
+  const auto depth =
+      ui.window.session().part_document()->find_feature(base_feature)->length_parameter();
+  states.push_back(ui.snapshot());
+  ui.tree(pocket.value());
+  context("extrude");
+  ui.choose(ui.widget<QComboBox>("blcad.extrude.operation"), 2);
+  ui.scalar("6 mm");
+  ui.text(ui.widget<QLineEdit>("blcad.extrude.taper"), "invalid");
+  CHECK_FALSE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+  CHECK(ui.snapshot() == states.back());
+  context("cancel");
+  CHECK_FALSE(ui.window.session().task().active());
+  REQUIRE(ui.window.feature_tools().profile_context());
+  CHECK(ui.window.feature_tools().profile_context()->sketch == pocket);
+  context("extrude");
+  CHECK(ui.widget<QComboBox>("blcad.extrude.operation").currentIndex() == 0);
+  ui.choose(ui.widget<QComboBox>("blcad.extrude.operation"), 2);
+  ui.scalar("6 mm");
+  ui.capture("context-cut-preview");
+  ui.button("blcad.feature.apply");
+  CHECK(ui.summary(base).volume_mm3 == Approx(46800).margin(1e-5));
+  states.push_back(ui.snapshot());
+  ui.tree(wall.value());
+  CHECK_FALSE(ui.action("context_revolve").isVisible());
+  context("extrude");
+  ui.text(ui.widget<QLineEdit>("blcad.extrude.thickness"), "2");
+  ui.scalar("10 mm");
+  const auto wall_body = ui.window.feature_tools().coordinator().extrude().result_body_id();
+  ui.capture("context-thin-preview");
+  ui.button("blcad.feature.apply");
+  CHECK(ui.summary(wall_body).volume_mm3 == Approx(400).margin(1e-5));
+  states.push_back(ui.snapshot());
+  ui.command("parameters");
+  CHECK_FALSE(ui.widget<QWidget>("blcad.context.toolbar").isVisible());
+  ui.data(ui.widget<QComboBox>("blcad.parameters.parameter"),
+          QString::fromStdString(depth.value()));
+  ui.text(ui.widget<QLineEdit>("blcad.parameters.input"), "24");
+  ui.button("blcad.parameters.stage");
+  ui.button("blcad.parameters.preview");
+  ui.button("blcad.parameters.apply");
+  CHECK(ui.summary(base).volume_mm3 == Approx(56400).margin(1e-5));
+  states.push_back(ui.snapshot());
+  ui.tree(base_feature.value(), true);
+  ui.text(ui.widget<QLineEdit>("blcad.feature_edit.field/name"), "Context base plate");
+  ui.button("blcad.feature_edit.apply");
+  states.push_back(ui.snapshot());
+  ui.history(states);
+  ui.tree(pocket.value());
+  REQUIRE(ui.widget<QWidget>("blcad.context.toolbar").isVisible());
+  ui.capture("context-after-history");
+  ui.roundtrip(directory.filePath("context-machining.blcad"));
+  CHECK_FALSE(ui.widget<QWidget>("blcad.context.toolbar").isVisible());
+  const auto step = directory.filePath("context-machining.step");
+  ui.file("export_part_step", step);
+  CHECK(ui.bytes(step).contains("ISO-10303-21"));
+  CHECK(ui.snapshot() == states.back());
+  ui.idle();
+}

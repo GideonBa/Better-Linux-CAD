@@ -52,9 +52,9 @@
         "owner": 136,
         "status": "partial",
         "contract": "docs/gui-modeling-workspace-mvp9.md",
-        "scope": "Semantic selection synchronizes viewport, browser and session; seven OCCT standard views, captured Home and named session-local camera bookmarks, Sketch/grip guards and camera restoration during feature preview. Eight visible model filters synchronize session/viewport selection, reject hidden browser fallbacks and restore after task-owned reference collection and Sketch focus. Accepted Feature/Hole/Assembly commands expose guarded repeat with current inputs and fresh defaults, independent of Redo and persistence.",
+        "scope": "Semantic selection synchronizes viewport, browser and session; seven OCCT standard views, captured Home and named session-local camera bookmarks, Sketch/grip guards and camera restoration during feature preview. Eight visible model filters synchronize session/viewport selection, reject hidden browser fallbacks and restore after task-owned reference collection and Sketch focus. Accepted Feature/Hole/Assembly commands expose guarded repeat with current inputs and fresh defaults, independent of Redo and persistence. Bounded profile mini-toolbar validates materialized Core profiles or a single open line, starts Extrude/Revolve through existing owners, consumes preselection and restores it on cancellation.",
         "gaps": [
-          "Restore contextual commands."
+          "Extend contextual commands beyond profile Extrude/Revolve and single-line Thin Extrude to the remaining profile, Body, Surface and Assembly commands."
         ],
         "proofs": [
           {
@@ -84,6 +84,14 @@
           {
             "filter": "[shell-combined-repeat]",
             "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
+          },
+          {
+            "filter": "[block136-profile-context]",
+            "source": "tests/gui/gui_shell_profile_context_tests.cpp"
+          },
+          {
+            "filter": "[shell-combined-profile-context]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
           }
         ],
         "actions": [
@@ -101,14 +109,18 @@
           "bookmark_save",
           "bookmark_restore",
           "bookmark_remove",
-          "repeat_last_command"
+          "repeat_last_command",
+          "context_extrude",
+          "context_revolve",
+          "context_cancel"
         ],
         "widgets": [
           "blcad.shell.browser",
           "blcad.navigation.view_cube",
           "blcad.navigation.bookmarks",
           "blcad.selection.filter",
-          "blcad.repeat.button"
+          "blcad.repeat.button",
+          "blcad.context.toolbar"
         ]
       }
     },

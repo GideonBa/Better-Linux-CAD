@@ -346,6 +346,19 @@ bool ShellFeatureTools::active() const noexcept {
                                        surface() || coordinator_.active());
 }
 
+std::optional<ShellFeatureTools::ProfileContext> ShellFeatureTools::profile_context() const {
+  if (active() || session_.task().active() || window_.active_sketch() ||
+      session_.reference_repair_mode() ||
+      !session_.selection().allows(GuiSelectionKind::SketchEntity))
+    return std::nullopt;
+  const auto selected = profile_from_selection();
+  if (selected)
+    return ProfileContext{selected.value().first, selected.value().second};
+  if (const auto line = open_line_from_selection())
+    return ProfileContext{*line, std::nullopt};
+  return std::nullopt;
+}
+
 bool ShellFeatureTools::select_profile(SketchId sketch, ProfileId profile) {
   selected_open_line_.reset();
   const auto* part = session_.part_document();
@@ -940,6 +953,7 @@ Result<std::size_t> ShellFeatureTools::apply() {
   const bool task_applied = session_.task().apply();
   if (!task_applied && session_.task().active())
     (void)session_.task().cancel();
+  window_.finish_profile_context(true);
   const bool was_finishing = finishing();
   const bool was_extrude = command_ == Command::Extrude;
   const bool restore_selection = pattern() || body_operation() || spatial() || surface();
@@ -1007,6 +1021,7 @@ void ShellFeatureTools::cancel() noexcept {
     restore_extrude_selection();
   hide_task_panel();
   synchronize_overlay();
+  window_.finish_profile_context(false);
   window_.refresh();
   if (was_active)
     window_.statusBar()->showMessage(QStringLiteral("Feature-Befehl abgebrochen"));
@@ -1076,6 +1091,7 @@ void ShellFeatureTools::refresh_enablement() {
                           session_.task().command_id() == expected_command;
   apply_button_->setEnabled(active() && preview_valid_ && task_ready);
   cancel_button_->setEnabled(active());
+  window_.refresh_profile_context();
 }
 
 double ShellFeatureTools::current_value() const noexcept {

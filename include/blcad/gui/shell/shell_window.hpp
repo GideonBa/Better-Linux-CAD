@@ -27,6 +27,7 @@ namespace blcad::gui {
 class ShellRibbon;
 class ShellNavigationTools;
 class ShellRepeatTools;
+class ShellProfileContextTools;
 class ShellFeatureTools;
 class ShellSketchTools;
 class ShellMeasureTools;
@@ -106,6 +107,8 @@ public:
   void report_error(const Error& error);
   // Called by a command owner only after its candidate was successfully applied.
   void remember_repeatable_command(QAction& command);
+  void refresh_profile_context();
+  void finish_profile_context(bool applied);
 
   // Dialog-free command surface. The ribbon slots prompt and then call these;
   // tests call them directly.
@@ -189,6 +192,7 @@ private:
   QAction* action_finish_sketch_{nullptr};
   std::unique_ptr<ShellNavigationTools> navigation_tools_;
   std::unique_ptr<ShellRepeatTools> repeat_tools_;
+  std::unique_ptr<ShellProfileContextTools> profile_context_tools_;
   QAction* action_perspective_{nullptr};
   QAction* action_shaded_{nullptr};
   QAction* action_shaded_edges_{nullptr};

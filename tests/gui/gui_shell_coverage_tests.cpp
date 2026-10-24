@@ -223,6 +223,9 @@ TEST_CASE("Every recorded shell entry point belongs to the constructed window an
       for (auto* button : window.ribbon().findChildren<QToolButton*>())
         button_found = button_found || button->defaultAction() == actions.first() ||
                        (button->menu() && button->menu()->actions().contains(actions.first()));
+      if (auto* context = window.findChild<QWidget*>("blcad.context.toolbar"))
+        for (auto* button : context->findChildren<QToolButton*>())
+          button_found = button_found || button->defaultAction() == actions.first();
       CHECK(button_found);
     }
     for (auto widget_id : shell["widgets"].toArray()) {
