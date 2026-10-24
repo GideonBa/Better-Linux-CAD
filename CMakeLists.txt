@@ -322,7 +322,7 @@ if(BLCAD_BUILD_GUI)
     src/gui/shell/shell_origin.cpp
     src/gui/shell/shell_navigation_tools.cpp
     src/gui/shell/shell_repeat_tools.cpp
-    src/gui/shell/shell_profile_context_tools.cpp
+    src/gui/shell/shell_context_tools.cpp
     src/gui/shell/shell_ribbon.cpp
     src/gui/shell/shell_sketch_tools.cpp
     src/gui/shell/shell_sketch_operations.cpp
@@ -628,6 +628,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_shell_selection_filter_tests.cpp
       tests/gui/gui_shell_repeat_tests.cpp
       tests/gui/gui_shell_profile_context_tests.cpp
+      tests/gui/gui_shell_finishing_context_tests.cpp
       tests/gui/gui_shell_window_tests.cpp
       tests/gui/gui_shell_sketch_tools_tests.cpp
       tests/gui/gui_shell_sketch_operations_tests.cpp

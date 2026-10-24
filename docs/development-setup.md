@@ -1265,3 +1265,25 @@ actual profile and verifies toolbar bounds. Inspect `spatial-context-loft-previe
 `spatial-context-sweep-preview.png` and `spatial-context-after-history.png` at 1280×800. Include both
 new tags in the canonical native command in `docs/gui-shell-acceptance-mvp9r.md`. Keep builds, GUI
 runs and separate startup serial.
+
+## Stable Edge/Face finishing-context regression
+
+After building the four targets above, run builds, GUI suites and native startup serially:
+
+```bash
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[block136-finishing-context],[shell-combined-finishing-context],[block136-profile-context],[block136-spatial-context],[block136-finishing],[integration][gui-feature-coverage]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-finishing-context-native QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-finishing-context],[shell-combined-finishing-context],[block136-profile-context],[block136-spatial-context],[block136-finishing]"
+```
+
+The five focused cases exercise actual shared context buttons, all four finishing commands,
+nondefault Body seeding, complete selection/filter/scope restoration, every cancellation route,
+empty-target rejection, atomic history, stale/hidden sources, Save and replacement. Explicit Edges or
+Faces filters publish idle stable subshape targets; All retains its existing Body/profile picking.
+The twenty-sixth combined workflow authors both Bodies and all modeling intent through Qt. It uses
+actual native idle OCCT Edge/Face hits, cancels Draft and two-distance Chamfer, applies Shell/Fillet/
+angular Chamfer, batches two upstream parameter edits, edits an earlier feature, checks five-step exact
+history, reopens and exports STEP. It explicitly skips offscreen; the existing native finishing case
+also skips there. Inspect `finishing-context-shell-preview.png`,
+`finishing-context-chamfer-preview.png` and `finishing-context-after-history.png` at 1280×800 in the
+capture directory. Include both new tags in the canonical native filter in
+`docs/gui-shell-acceptance-mvp9r.md`. Block 136 remains open.

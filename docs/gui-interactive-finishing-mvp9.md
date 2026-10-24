@@ -91,8 +91,8 @@ for candidate-only driving parameters and produce actual recomputed Body shapes 
 The replaced Body is hidden during a valid preview, so removed material
 is visible; selection presentations stay transient. Invalid edits restore the previous valid numeric
 candidate. Clearing the selection removes the preview and disables Apply. Escape/Cancel removes
-handles, selection presentations and pending parameters, restores the previous selection filter, and
-leaves history and serialization unchanged. Apply recomputes again and commits parameters plus the
+handles, selection presentations and pending parameters, restores the previous selection filter and
+semantic scope, and leaves history and serialization unchanged. Apply recomputes again and commits parameters plus the
 feature atomically; one Undo removes the whole operation. Save/Open retains the existing schema.
 
 Stable box roles now also accept a four-line `ClosedProfile` rectangle produced by the shell, in
@@ -114,6 +114,33 @@ QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-finishing]"
 The native case detects actual OCCT edges/faces from mouse events and drives their handles with a
 numeric override. `BLCAD_UI_CAPTURE_DIR` optionally records preview windows for visual inspection.
 Offscreen skips that native-only case explicitly.
+
+## Replacement-shell selection contexts — 2026-10-24
+
+Select the **Kanten** or **Flächen** model filter before picking an idle stable subshape. The shared
+`ShellContextTools` toolbar offers Verrunden/Fase for exactly one verified Edge and
+Aushöhlen/Formschräge for exactly one verified Face. All retains its existing Body/profile picking.
+The current `FinishingSelectionBuilder` verifies the selected id, Body identity and command-specific
+role against the fresh cache. Missing, hidden, ambiguous and unsupported targets offer no command.
+The existing rectangular/stable-role Geometry boundary above remains unchanged.
+
+A context command starts the original QAction, seeds the exact typed Body and one offered target,
+then consumes preselection. The normal task keeps all parameter/preview/Apply authority. It temporarily
+owns a semantic scope containing only that Body's offered targets, plus its Edge/Face filter. Body
+changes rebuild both targets and scope. Apply, task Cancel, context Cancel and Escape restore the
+prior filter and scope; cancellation also restores the complete still-valid consumed selection.
+Ribbon/Repeat starts retain their ordinary fresh selection defaults. No context or selection state
+is persisted, and successful Apply remains one atomic history entry.
+The finishing form groups each label/editor in a complete layout row and preserves preferred row
+heights, including wrapped hints, inside the shared scroll area after command/mode switches. The mode
+and secondary-value editors remain complete and reachable at 1280×800.
+
+Proof: `[block136-finishing-context]` and the native Qt-authored
+`[shell-combined-finishing-context]`. The latter combines two Bodies, Draft cancellation, Shell,
+Fillet, both cancelled and applied Chamfer modes, batched upstream edits, earlier-feature editing,
+five-step exact Undo/Redo, canonical reopening and STEP. It explicitly skips offscreen because its
+idle source selection must hit actual OCCT subshapes; the focused logical lifecycle tests run on both
+platforms. Commands and capture paths are in `docs/development-setup.md`.
 
 ## Failure policy
 

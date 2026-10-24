@@ -52,9 +52,9 @@
         "owner": 136,
         "status": "partial",
         "contract": "docs/gui-modeling-workspace-mvp9.md",
-        "scope": "Semantic selection synchronizes viewport, browser and session; seven OCCT standard views, captured Home and named session-local camera bookmarks, Sketch/grip guards and camera restoration during feature preview. Eight visible model filters synchronize session/viewport selection, reject hidden browser fallbacks and restore after task-owned reference collection and Sketch focus. Accepted Feature/Hole/Assembly commands expose guarded repeat with current inputs and fresh defaults, independent of Redo and persistence. Bounded profile mini-toolbar validates Core profile or single-line sources, limits Sweep/Loft to materialized regions and starts Extrude/Revolve/Sweep/Loft through existing owners, seeds the exact typed Sweep profile or first Loft section, consumes preselection and restores it on cancellation.",
+        "scope": "Semantic selection synchronizes viewport, browser and session; seven OCCT standard views, captured Home and named session-local camera bookmarks, Sketch/grip guards and camera restoration during feature preview. Eight visible model filters synchronize session/viewport selection, reject hidden browser fallbacks and restore after task-owned reference collection and Sketch focus. Accepted Feature/Hole/Assembly commands expose guarded repeat with current inputs and fresh defaults, independent of Redo and persistence. Bounded profile mini-toolbar validates Core profile or single-line sources, limits Sweep/Loft to materialized regions and starts Extrude/Revolve/Sweep/Loft through existing owners, seeds the exact typed Sweep profile or first Loft section, consumes preselection and restores it on cancellation. Explicit Edge/Face model filters publish stable current-Body targets for bounded Fillet/Chamfer/Shell/Draft contexts; typed command/Body/semantic handoffs seed the original task, restrict its scope and restore complete valid preselection on cancellation.",
         "gaps": [
-          "Extend contextual commands beyond the profile tools to finishing, patterns, Body, Surface and Assembly commands."
+          "Extend contextual commands beyond the profile and finishing tools to patterns, Body, Surface and Assembly commands."
         ],
         "proofs": [
           {
@@ -100,6 +100,14 @@
           {
             "filter": "[shell-combined-spatial-context]",
             "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
+          },
+          {
+            "filter": "[block136-finishing-context]",
+            "source": "tests/gui/gui_shell_finishing_context_tests.cpp"
+          },
+          {
+            "filter": "[shell-combined-finishing-context]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
           }
         ],
         "actions": [
@@ -122,6 +130,10 @@
           "context_revolve",
           "context_sweep",
           "context_loft",
+          "context_fillet",
+          "context_chamfer",
+          "context_shell",
+          "context_draft",
           "context_cancel"
         ],
         "widgets": [

@@ -111,6 +111,16 @@ public:
     bool materialized{false};         // Persistent region rather than candidate-only raw intent.
   };
   [[nodiscard]] std::optional<ProfileContext> profile_context() const;
+  struct FinishingContext {
+    Command command;
+    BodyId body;
+    std::string semantic_id; // Resolved through FinishingSelectionBuilder, never parsed.
+  };
+  [[nodiscard]] QAction* finishing_action(Command command) const noexcept;
+  [[nodiscard]] std::uint32_t idle_finishing_selection_mask() const;
+  [[nodiscard]] std::optional<FinishingContext> finishing_context(Command command) const;
+  [[nodiscard]] bool finishing_context_available(const FinishingContext& context) const;
+  [[nodiscard]] bool select_finishing_context(const FinishingContext& context);
   [[nodiscard]] bool select_profile(SketchId sketch, ProfileId profile);
   [[nodiscard]] bool select_open_line(SketchId sketch);
   void clear_profile_selection() noexcept;

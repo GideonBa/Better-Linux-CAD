@@ -6,6 +6,7 @@
 #include <QPoint>
 
 #include <array>
+#include <variant>
 
 class QFrame;
 class QToolButton;
@@ -13,12 +14,12 @@ class QToolButton;
 namespace blcad::gui {
 class ShellWindow;
 
-// Bounded profile-context presentation. Typed preselection comes from the
+// Bounded profile/finishing presentation. Verified preselection comes from the
 // feature owner; existing command entry points own task/preview/commit state.
-class ShellProfileContextTools final : public QObject {
+class ShellContextTools final : public QObject {
 public:
-  explicit ShellProfileContextTools(ShellWindow&);
-  ~ShellProfileContextTools() override;
+  explicit ShellContextTools(ShellWindow&);
+  ~ShellContextTools() override;
   void refresh();
   void reset();
   void finish(bool applied);
@@ -27,22 +28,28 @@ protected:
   bool eventFilter(QObject*, QEvent*) override;
 
 private:
+  using Context =
+      std::variant<ShellFeatureTools::ProfileContext, ShellFeatureTools::FinishingContext>;
+  struct Entry {
+    ShellFeatureTools::Command command{ShellFeatureTools::Command::None};
+    QAction* action{nullptr};
+    QToolButton* button{nullptr};
+  };
   struct ConsumedSelection {
-    ShellFeatureTools::ProfileContext context;
+    Context context;
     std::vector<GuiSelection> entries;
     std::optional<GuiSelection> viewport;
     std::string task_id;
   };
   void begin(ShellFeatureTools::Command command);
+  [[nodiscard]] QAction* source_action(ShellFeatureTools::Command command) const;
+  [[nodiscard]] std::optional<Context> current_context(ShellFeatureTools::Command command) const;
   void place();
   ShellWindow& window_;
   QFrame* panel_{nullptr};
-  QAction* extrude_{nullptr};
-  QAction* revolve_{nullptr};
-  QAction* sweep_{nullptr};
-  QAction* loft_{nullptr};
+  std::array<Entry, 8> commands_{};
   QAction* cancel_{nullptr};
-  std::array<QToolButton*, 5> buttons_{};
+  QToolButton* cancel_button_{nullptr};
   QPoint anchor_{16, 16};
   std::optional<ConsumedSelection> consumed_;
 };

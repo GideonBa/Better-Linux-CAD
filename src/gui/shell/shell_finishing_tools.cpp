@@ -3,12 +3,15 @@
 #include "blcad/gui/occt_viewport.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
 
+#include <QAction>
 #include <QComboBox>
 #include <QFormLayout>
+#include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
 #include <QSignalBlocker>
+#include <QVBoxLayout>
 #include <QWidget>
 
 #include <algorithm>
@@ -54,6 +57,16 @@ QString target_label(const std::string& label) {
              QString::fromUtf8(text);
   return QString::fromStdString(label);
 }
+void preserve_finishing_row_heights(QWidget& controls, QLayout& form) {
+  // Preserve full row heights inside the resizable task scroll child, including
+  // mode-dependent rows after switching between different finishing commands.
+  form.invalidate();
+  // Wrapped hint text needs more height than the unconstrained size hint.
+  const int height =
+      std::max(form.sizeHint().height(), form.totalHeightForWidth(controls.minimumWidth()));
+  controls.setMinimumHeight(height);
+  controls.updateGeometry();
+}
 QString command_title(ShellFeatureTools::Command command) {
   using C = ShellFeatureTools::Command;
   if (command == C::Fillet)
@@ -69,6 +82,86 @@ QString command_title(ShellFeatureTools::Command command) {
 bool ShellFeatureTools::finishing() const noexcept {
   return command_ == Command::Fillet || command_ == Command::Chamfer ||
          command_ == Command::Shell || command_ == Command::Draft;
+}
+
+QAction* ShellFeatureTools::finishing_action(Command command) const noexcept {
+  for (const auto& [kind, action] : finishing_actions_)
+    if (kind == command)
+      return action;
+  return nullptr;
+}
+
+std::uint32_t ShellFeatureTools::idle_finishing_selection_mask() const {
+  if (active() || session_.task().active() || window_.active_sketch() ||
+      session_.reference_repair_mode() || session_.document_kind() != GuiDocumentKind::Part ||
+      session_.workspace() != GuiWorkspace::Part || !session_.part_shape_cache() ||
+      !session_.derived_results_fresh())
+    return 0;
+  const auto mask = viewport_.selection_filter_mask();
+  return mask == selection_kind_bit(GuiSelectionKind::Edge) ||
+                 mask == selection_kind_bit(GuiSelectionKind::Face)
+             ? mask
+             : 0U;
+}
+
+std::optional<ShellFeatureTools::FinishingContext>
+ShellFeatureTools::finishing_context(Command command) const {
+  const bool edge = command == Command::Fillet || command == Command::Chamfer;
+  if ((!edge && command != Command::Shell && command != Command::Draft) ||
+      idle_finishing_selection_mask() !=
+          selection_kind_bit(edge ? GuiSelectionKind::Edge : GuiSelectionKind::Face) ||
+      session_.selection().size() != 1)
+    return std::nullopt;
+  const auto& selected = session_.selection().entries().front();
+  if (selected.kind != (edge ? GuiSelectionKind::Edge : GuiSelectionKind::Face) ||
+      !session_.selection().allows(selected.kind))
+    return std::nullopt;
+  const auto& scope = viewport_.selection_semantic_scope();
+  if (scope && std::find(scope->begin(), scope->end(), selected.semantic_id) == scope->end())
+    return std::nullopt;
+  std::optional<FinishingContext> context;
+  for (const auto& body : session_.part_document()->bodies()) {
+    auto targets = geometry::FinishingSelectionBuilder::build(*session_.part_document(),
+                                                              *session_.part_shape_cache(),
+                                                              body.id(), selection_role(command));
+    if (targets)
+      for (const auto& target : targets.value())
+        if (target.semantic_id == selected.semantic_id) {
+          if (context)
+            return std::nullopt;
+          context = FinishingContext{command, body.id(), target.semantic_id};
+        }
+  }
+  return context;
+}
+
+bool ShellFeatureTools::finishing_context_available(const FinishingContext& context) const {
+  if (!finishing_action(context.command) || !session_.part_document() ||
+      !session_.part_shape_cache())
+    return false;
+  auto targets = geometry::FinishingSelectionBuilder::build(
+      *session_.part_document(), *session_.part_shape_cache(), context.body,
+      selection_role(context.command));
+  return targets &&
+         std::count_if(targets.value().begin(), targets.value().end(), [&](const auto& target) {
+           return target.semantic_id == context.semantic_id;
+         }) == 1;
+}
+
+bool ShellFeatureTools::select_finishing_context(const FinishingContext& context) {
+  if (!finishing() || command_ != context.command || !session_.task().active() ||
+      session_.task().command_id() != command_id() || !finishing_context_available(context))
+    return false;
+  const int body = finishing_body_->findData(QString::fromStdString(context.body.value()));
+  if (body < 0)
+    return false;
+  finishing_body_->setCurrentIndex(body);
+  for (std::size_t i = 0; i < finishing_targets_.size(); ++i)
+    if (finishing_targets_[i].semantic_id == context.semantic_id) {
+      finishing_targets_list_->item(static_cast<int>(i))->setSelected(true);
+      return true;
+    }
+  return false;
 }
 bool ShellFeatureTools::angular_value() const noexcept {
   return command_ == Command::Revolve || command_ == Command::Draft ||
@@ -125,35 +218,49 @@ std::string_view ShellFeatureTools::command_id() const noexcept {
 
 void ShellFeatureTools::build_finishing_controls(QWidget* panel, QFormLayout&) {
   finishing_controls_ = new QWidget(panel);
-  auto* form = new QFormLayout(finishing_controls_);
+  auto* column = new QVBoxLayout(finishing_controls_);
+  const auto add_row = [&](const QString& label, QWidget* input) {
+    // Keep the label and editor in one explicit row. Hiding the row removes its
+    // complete layout contribution; re-showing it retains the editor's height.
+    auto* row = new QWidget(finishing_controls_);
+    auto* layout = new QHBoxLayout(row);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->addWidget(new QLabel(label, row));
+    layout->addWidget(input, 1);
+    column->addWidget(row);
+  };
   finishing_controls_->setMinimumWidth(280);
   finishing_body_ = new QComboBox(finishing_controls_);
   finishing_body_->setObjectName(QStringLiteral("blcad.finishing.body"));
-  form->addRow(QStringLiteral("Körper"), finishing_body_);
+  add_row(QStringLiteral("Körper"), finishing_body_);
   finishing_targets_list_ = new QListWidget(finishing_controls_);
   finishing_targets_list_->setObjectName(QStringLiteral("blcad.finishing.targets"));
   finishing_targets_list_->setSelectionMode(QAbstractItemView::MultiSelection);
   finishing_targets_list_->setMinimumHeight(170);
-  form->addRow(new QLabel(QStringLiteral("Elemente auswählen"), finishing_controls_));
-  form->addRow(finishing_targets_list_);
+  column->addWidget(new QLabel(QStringLiteral("Elemente auswählen"), finishing_controls_));
+  column->addWidget(finishing_targets_list_);
   auto* hint =
       new QLabel(QStringLiteral("Kanten oder Flächen im Modell oder in der Liste anklicken. "
                                 "Ein weiterer Klick entfernt sie aus der Auswahl."),
                  finishing_controls_);
   hint->setWordWrap(true);
-  form->addRow(hint);
+  column->addWidget(hint);
   finishing_mode_ = new QComboBox(finishing_controls_);
   finishing_mode_->setObjectName(QStringLiteral("blcad.finishing.mode"));
-  form->addRow(QStringLiteral("Modus"), finishing_mode_);
+  add_row(QStringLiteral("Modus"), finishing_mode_);
   secondary_numeric_editor_ = new QLineEdit(finishing_controls_);
   secondary_numeric_editor_->setObjectName(QStringLiteral("blcad.finishing.secondary"));
-  form->addRow(QStringLiteral("Zweites Maß"), secondary_numeric_editor_);
+  add_row(QStringLiteral("Zweites Maß"), secondary_numeric_editor_);
   draft_axis_ = new QComboBox(finishing_controls_);
   draft_axis_->setObjectName(QStringLiteral("blcad.finishing.pull_axis"));
-  form->addRow(QStringLiteral("Zugrichtung"), draft_axis_);
+  add_row(QStringLiteral("Zugrichtung"), draft_axis_);
   draft_plane_ = new QComboBox(finishing_controls_);
   draft_plane_->setObjectName(QStringLiteral("blcad.finishing.neutral_plane"));
-  form->addRow(QStringLiteral("Neutrale Ebene"), draft_plane_);
+  add_row(QStringLiteral("Neutrale Ebene"), draft_plane_);
+  // Give each input its style-derived lower bound before computing scroll bounds.
+  for (QWidget* input : std::array<QWidget*, 5>{
+           finishing_body_, finishing_mode_, secondary_numeric_editor_, draft_axis_, draft_plane_})
+    input->setMinimumHeight(input->minimumSizeHint().height());
   panel->layout()->addWidget(finishing_controls_);
   finishing_controls_->hide();
   connect(finishing_body_, &QComboBox::currentIndexChanged, this, [this] {
@@ -164,11 +271,11 @@ void ShellFeatureTools::build_finishing_controls(QWidget* panel, QFormLayout&) {
     if (finishing())
       refresh_finishing_preview();
   });
-  connect(finishing_mode_, &QComboBox::currentIndexChanged, this, [this, form] {
+  connect(finishing_mode_, &QComboBox::currentIndexChanged, this, [this] {
     if (!finishing())
       return;
     const bool second = command_ == Command::Chamfer && finishing_mode_->currentIndex() > 0;
-    form->setRowVisible(secondary_numeric_editor_, second);
+    secondary_numeric_editor_->parentWidget()->setVisible(second);
     if (second) {
       finishing_second_value_ = finishing_mode_->currentIndex() == 2 ? 45 : 1;
       const QSignalBlocker block(secondary_numeric_editor_);
@@ -176,6 +283,7 @@ void ShellFeatureTools::build_finishing_controls(QWidget* panel, QFormLayout&) {
       secondary_numeric_editor_->setPlaceholderText(finishing_mode_->currentIndex() == 2 ? "deg"
                                                                                          : "mm");
     }
+    preserve_finishing_row_heights(*finishing_controls_, *finishing_controls_->layout());
     refresh_finishing_preview();
   });
   connect(secondary_numeric_editor_, &QLineEdit::editingFinished, this, [this] {
@@ -271,6 +379,7 @@ Result<std::size_t> ShellFeatureTools::begin_finishing(Command command) {
     break;
   }
   previous_selection_mask_ = viewport_.selection_filter_mask();
+  previous_semantic_scope_ = viewport_.selection_semantic_scope();
   command_ = command;
   if (!session_.task().begin(std::string(command_id())) ||
       !session_.task().begin_parameter_editing() || !session_.task().show_preview()) {
@@ -282,13 +391,14 @@ Result<std::size_t> ShellFeatureTools::begin_finishing(Command command) {
   finishing_first_value_ = command == Command::Draft ? 5 : 1;
   finishing_second_value_ = 1;
   secondary_numeric_editor_->setText(QStringLiteral("1"));
-  auto* form = static_cast<QFormLayout*>(finishing_controls_->layout());
-  form->setRowVisible(finishing_mode_, command == Command::Chamfer || command == Command::Shell);
-  form->setRowVisible(secondary_numeric_editor_, false);
-  form->setRowVisible(draft_axis_, command == Command::Draft);
-  form->setRowVisible(draft_plane_, command == Command::Draft);
   show_task_panel(title, angular_value() ? QStringLiteral("deg") : QStringLiteral("mm"),
                   finishing_first_value_);
+  finishing_mode_->parentWidget()->setVisible(command == Command::Chamfer ||
+                                              command == Command::Shell);
+  secondary_numeric_editor_->parentWidget()->hide();
+  draft_axis_->parentWidget()->setVisible(command == Command::Draft);
+  draft_plane_->parentWidget()->setVisible(command == Command::Draft);
+  preserve_finishing_row_heights(*finishing_controls_, *finishing_controls_->layout());
   reload_finishing_targets();
   window_.refresh();
   return Result<std::size_t>::success(1);
@@ -314,6 +424,10 @@ void ShellFeatureTools::reload_finishing_targets() {
   viewport_.set_selection_filter_mask(selection_kind_bit(
       command_ == Command::Fillet || command_ == Command::Chamfer ? GuiSelectionKind::Edge
                                                                   : GuiSelectionKind::Face));
+  std::vector<std::string> scope;
+  for (const auto& target : finishing_targets_)
+    scope.push_back(target.semantic_id);
+  viewport_.set_selection_semantic_scope(std::move(scope));
   window_.refresh_feature_selection_scene();
   refresh_finishing_preview();
 }
@@ -459,6 +573,19 @@ bool ShellFeatureTools::accept_finishing_selection(const GuiSelection& selection
 
 std::vector<geometry::ViewportSceneItem> ShellFeatureTools::finishing_selection_items() const {
   std::vector<geometry::ViewportSceneItem> items;
+  if (const auto mask = idle_finishing_selection_mask()) {
+    const bool edges = mask == selection_kind_bit(GuiSelectionKind::Edge);
+    for (const auto& body : session_.part_document()->bodies()) {
+      auto targets = geometry::FinishingSelectionBuilder::build(
+          *session_.part_document(), *session_.part_shape_cache(), body.id(),
+          edges ? PartFeatureInputRole::FilletEdge : PartFeatureInputRole::ShellRemovalFace);
+      if (targets)
+        for (const auto& target : targets.value())
+          items.push_back(
+              {edges ? geometry::ViewportSceneKind::Edge : geometry::ViewportSceneKind::Face,
+               target.semantic_id, target.shape});
+    }
+  }
   if (finishing())
     for (const auto& target : finishing_targets_)
       items.push_back({std::holds_alternative<EdgeReference>(target.reference)

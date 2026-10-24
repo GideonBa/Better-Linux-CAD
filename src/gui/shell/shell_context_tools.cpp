@@ -1,4 +1,4 @@
-#include "blcad/gui/shell/shell_profile_context_tools.hpp"
+#include "blcad/gui/shell/shell_context_tools.hpp"
 
 #include "blcad/gui/shell/shell_window.hpp"
 
@@ -9,11 +9,11 @@
 #include <QToolButton>
 
 #include <algorithm>
+#include <tuple>
 
 namespace blcad::gui {
 using Command = ShellFeatureTools::Command;
-ShellProfileContextTools::ShellProfileContextTools(ShellWindow& window)
-    : QObject(&window), window_(window) {
+ShellContextTools::ShellContextTools(ShellWindow& window) : QObject(&window), window_(window) {
   panel_ = new QFrame(&window.viewport());
   panel_->setObjectName(QStringLiteral("blcad.context.toolbar"));
   panel_->setFrameShape(QFrame::StyledPanel);
@@ -28,19 +28,23 @@ ShellProfileContextTools::ShellProfileContextTools(ShellWindow& window)
     button->setObjectName(QStringLiteral("blcad.context.") + QString::fromLatin1(id));
     button->setDefaultAction(result);
     button->setToolButtonStyle(Qt::ToolButtonTextOnly);
-    buttons_.at(static_cast<std::size_t>(row->count())) = button;
     row->addWidget(button);
-    return result;
+    return std::pair{result, button};
   };
-  extrude_ = action("extrude", "Extrusion");
-  revolve_ = action("revolve", "Drehung");
-  sweep_ = action("sweep", "Sweep");
-  loft_ = action("loft", "Loft");
-  cancel_ = action("cancel", "Abbrechen");
-  connect(extrude_, &QAction::triggered, this, [this] { begin(Command::Extrude); });
-  connect(revolve_, &QAction::triggered, this, [this] { begin(Command::Revolve); });
-  connect(sweep_, &QAction::triggered, this, [this] { begin(Command::Sweep); });
-  connect(loft_, &QAction::triggered, this, [this] { begin(Command::Loft); });
+  std::size_t index = 0;
+  for (const auto& [kind, id, label] :
+       {std::tuple{Command::Extrude, "extrude", "Extrusion"},
+        std::tuple{Command::Revolve, "revolve", "Drehung"},
+        std::tuple{Command::Sweep, "sweep", "Sweep"}, std::tuple{Command::Loft, "loft", "Loft"},
+        std::tuple{Command::Fillet, "fillet", "Verrunden"},
+        std::tuple{Command::Chamfer, "chamfer", "Fase"},
+        std::tuple{Command::Shell, "shell", "Aushöhlen"},
+        std::tuple{Command::Draft, "draft", "Formschräge"}}) {
+    const auto [wrapper, button] = action(id, label);
+    commands_.at(index++) = {kind, wrapper, button};
+    connect(wrapper, &QAction::triggered, this, [this, kind] { begin(kind); });
+  }
+  std::tie(cancel_, cancel_button_) = action("cancel", "Abbrechen");
   connect(cancel_, &QAction::triggered, this, [this] {
     if (cancel_->isEnabled() && panel_->isVisible() && consumed_ &&
         window_.session().task().active() &&
@@ -53,34 +57,59 @@ ShellProfileContextTools::ShellProfileContextTools(ShellWindow& window)
   refresh();
 }
 
-ShellProfileContextTools::~ShellProfileContextTools() {
+ShellContextTools::~ShellContextTools() {
   delete panel_;
 }
 
-void ShellProfileContextTools::begin(Command kind) {
+QAction* ShellContextTools::source_action(Command kind) const {
+  auto& owner = window_.feature_tools();
+  return kind == Command::Extrude   ? &owner.extrude_action()
+         : kind == Command::Revolve ? &owner.revolve_action()
+         : kind == Command::Sweep   ? &owner.sweep_action()
+         : kind == Command::Loft    ? &owner.loft_action()
+                                    : owner.finishing_action(kind);
+}
+
+std::optional<ShellContextTools::Context> ShellContextTools::current_context(Command kind) const {
+  const auto& owner = window_.feature_tools();
+  if (kind == Command::Extrude || kind == Command::Revolve || kind == Command::Sweep ||
+      kind == Command::Loft) {
+    const auto profile = owner.profile_context();
+    if (profile && (kind == Command::Extrude || (kind == Command::Revolve && profile->profile) ||
+                    ((kind == Command::Sweep || kind == Command::Loft) && profile->materialized)))
+      return *profile;
+  } else if (const auto finishing = owner.finishing_context(kind))
+    return *finishing;
+  return std::nullopt;
+}
+
+void ShellContextTools::begin(Command kind) {
   refresh();
   auto& owner = window_.feature_tools();
-  auto* command = kind == Command::Extrude   ? extrude_
-                  : kind == Command::Revolve ? revolve_
-                  : kind == Command::Sweep   ? sweep_
-                                             : loft_;
-  const auto context = owner.profile_context();
-  if (!panel_->isVisible() || !command->isEnabled() || !context)
+  const auto entry = std::find_if(commands_.begin(), commands_.end(),
+                                  [kind](const auto& command) { return command.command == kind; });
+  const auto context = current_context(kind);
+  auto* source = source_action(kind);
+  if (!panel_->isVisible() || entry == commands_.end() || !entry->action->isEnabled() || !source ||
+      !source->isEnabled() || !context)
     return;
   ConsumedSelection previous{*context,
                              window_.session().selection().entries(),
                              window_.viewport().selected_semantic(),
                              {}};
-  auto& source = kind == Command::Extrude   ? owner.extrude_action()
-                 : kind == Command::Revolve ? owner.revolve_action()
-                 : kind == Command::Sweep   ? owner.sweep_action()
-                                            : owner.loft_action();
-  source.trigger();
+  source->trigger();
   if (owner.active() && owner.command() == kind && window_.session().task().active()) {
     previous.task_id = std::string(window_.session().task().command_id());
     consumed_ = std::move(previous);
-    if ((kind == Command::Sweep || kind == Command::Loft) &&
-        (!context->profile || !owner.select_spatial_profile(context->sketch, *context->profile))) {
+    bool seeded = true;
+    if (const auto* profile = std::get_if<ShellFeatureTools::ProfileContext>(&*context)) {
+      if (kind == Command::Sweep || kind == Command::Loft)
+        seeded =
+            profile->profile && owner.select_spatial_profile(profile->sketch, *profile->profile);
+    } else
+      seeded =
+          owner.select_finishing_context(std::get<ShellFeatureTools::FinishingContext>(*context));
+    if (!seeded) {
       owner.cancel();
       return;
     }
@@ -90,16 +119,22 @@ void ShellProfileContextTools::begin(Command kind) {
   refresh();
 }
 
-void ShellProfileContextTools::finish(bool applied) {
+void ShellContextTools::finish(bool applied) {
   if (!consumed_)
     return;
   auto previous = std::move(*consumed_);
   consumed_.reset();
   if (!applied && !window_.session().task().active()) {
-    const bool restored = previous.context.profile
-                              ? window_.feature_tools().select_profile(previous.context.sketch,
-                                                                       *previous.context.profile)
-                              : window_.feature_tools().select_open_line(previous.context.sketch);
+    const auto* profile = std::get_if<ShellFeatureTools::ProfileContext>(&previous.context);
+    const auto restore_profile = [&] {
+      return profile->profile
+                 ? window_.feature_tools().select_profile(profile->sketch, *profile->profile)
+                 : window_.feature_tools().select_open_line(profile->sketch);
+    };
+    const bool restored =
+        profile ? restore_profile()
+                : window_.feature_tools().finishing_context_available(
+                      std::get<ShellFeatureTools::FinishingContext>(previous.context));
     if (restored) {
       if (previous.viewport)
         (void)window_.viewport().select_semantic(previous.viewport->semantic_id);
@@ -107,11 +142,8 @@ void ShellProfileContextTools::finish(bool applied) {
         window_.viewport().clear_selection();
       // The selection callback can clear a browser-only handoff. Publish the
       // verified typed fallback after restoring the authoritative viewport.
-      if (previous.context.profile)
-        (void)window_.feature_tools().select_profile(previous.context.sketch,
-                                                     *previous.context.profile);
-      else
-        (void)window_.feature_tools().select_open_line(previous.context.sketch);
+      if (profile)
+        (void)restore_profile();
       window_.session().selection().clear();
       for (auto& selection : previous.entries)
         (void)window_.session().selection().add(std::move(selection));
@@ -120,46 +152,43 @@ void ShellProfileContextTools::finish(bool applied) {
   refresh();
 }
 
-void ShellProfileContextTools::reset() {
+void ShellContextTools::reset() {
   consumed_.reset();
   anchor_ = {16, 16};
   panel_->hide();
 }
 
-void ShellProfileContextTools::refresh() {
+void ShellContextTools::refresh() {
   const bool guarded = !window_.session().has_document() || window_.active_sketch() ||
                        window_.viewport().sketch_focus_active() ||
                        window_.session().reference_repair_mode() ||
                        QWidget::mouseGrabber() == &window_.viewport();
-  const auto context = !guarded ? window_.feature_tools().profile_context() : std::nullopt;
-  const bool idle = context && !window_.session().task().active();
   const bool cancelling = !guarded && consumed_ && window_.session().task().active() &&
                           window_.session().task().command_id() == consumed_->task_id &&
                           window_.feature_tools().active();
-  const bool extrude = idle && window_.feature_tools().extrude_action().isEnabled();
-  const bool revolve =
-      idle && context->profile && window_.feature_tools().revolve_action().isEnabled();
-  const bool sweep =
-      idle && context->materialized && window_.feature_tools().sweep_action().isEnabled();
-  const bool loft =
-      idle && context->materialized && window_.feature_tools().loft_action().isEnabled();
   // Hidden QActions are effectively disabled. Derive visibility from owner
   // eligibility rather than the wrapper's previous effective enabled state.
-  const std::array<QAction*, 5> actions{extrude_, revolve_, sweep_, loft_, cancel_};
-  const std::array<bool, 5> enabled{extrude, revolve, sweep, loft, cancelling};
-  for (std::size_t i = 0; i < actions.size(); ++i) {
-    actions[i]->setVisible(enabled[i]);
-    actions[i]->setEnabled(enabled[i]);
-    buttons_[i]->setVisible(enabled[i]);
+  bool visible = cancelling;
+  for (const auto& entry : commands_) {
+    auto* source = source_action(entry.command);
+    const bool enabled = !guarded && !window_.session().task().active() && source &&
+                         source->isEnabled() && current_context(entry.command).has_value();
+    entry.action->setVisible(enabled);
+    entry.action->setEnabled(enabled);
+    entry.button->setVisible(enabled);
+    visible = visible || enabled;
   }
-  if (std::none_of(enabled.begin(), enabled.end(), [](bool value) { return value; })) {
+  cancel_->setVisible(cancelling);
+  cancel_->setEnabled(cancelling);
+  cancel_button_->setVisible(cancelling);
+  if (!visible) {
     panel_->hide();
     return;
   }
   place();
 }
 
-void ShellProfileContextTools::place() {
+void ShellContextTools::place() {
   const auto size = panel_->sizeHint();
   const auto viewport = window_.viewport().rect();
   if (size.width() + 16 > viewport.width() || size.height() + 16 > viewport.height()) {
@@ -173,7 +202,7 @@ void ShellProfileContextTools::place() {
   panel_->raise();
 }
 
-bool ShellProfileContextTools::eventFilter(QObject* object, QEvent* event) {
+bool ShellContextTools::eventFilter(QObject* object, QEvent* event) {
   if (object == &window_.viewport()) {
     if (event->type() == QEvent::MouseButtonPress) {
       const auto* mouse = static_cast<QMouseEvent*>(event);

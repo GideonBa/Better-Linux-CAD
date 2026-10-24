@@ -1079,6 +1079,29 @@ and full regression evidence are recorded in `docs/gui-shell-acceptance-mvp9r.md
 finishing, pattern, Body, Surface and Assembly context commands. Thirteen families remain restored and
 five partial; Block 136 stays open and numbered completion remains through Block 135.
 
+### Block 136 — Stable Edge/Face finishing contexts — 2026-10-24
+
+The shared `ShellContextTools` toolbar now offers Fillet/Chamfer and Shell/Draft for a single verified
+stable Edge/Face under the explicit model filter. The current Geometry builder resolves typed Body
+and semantic target identity. The original command starts and seeds that exact Body/target without
+adding an authoring authority. Its task owns the current Body's scope; Apply/Cancel restore the prior
+filter and scope, and all cancellation paths restore complete still-valid preselection. Idle target
+presentation responds to filter/task changes without a Core revision. Unsupported or lost roles,
+multiple selections, stale/hidden Bodies and unrelated interaction owners fail closed. The native
+combined test also exposed clipped mode controls after command switches; preferred form row heights
+now remain scrollable, including the secondary Chamfer value.
+
+Five focused cases and the twenty-sixth combined Qt workflow cover all four commands, a nondefault
+Body, consumption/restoration, atomic Apply, exact history, Save and document replacement. The native
+workflow authors two Bodies, cancels Draft and a two-distance Chamfer, applies Shell/Fillet/angular
+Chamfer, batches two upstream edits, renames an earlier feature, checks five-step exact Undo/Redo,
+reopens canonically and exports STEP. It explicitly skips offscreen because idle subshape source
+selection requires native OCCT hits. Contracts and verification live in
+`docs/gui-modeling-workspace-mvp9.md`, `docs/gui-interactive-finishing-mvp9.md` and
+`docs/gui-shell-acceptance-mvp9r.md`. Continue with pattern, Body, Surface and Assembly contexts.
+Thirteen families remain restored and five partial; Block 136 stays open and numbered completion
+remains through Block 135.
+
 ## Current next technical step — Block 136
 
 The current v3 coverage inventory records all eighteen accepted families, current shell proof sources,
@@ -1086,7 +1109,7 @@ reachable entry points and explicit remaining gaps. The machine check distinguis
 from closure readiness; historical controller proofs cannot close a shell gap. Acceptance contract:
 `docs/gui-shell-acceptance-mvp9r.md`, `[integration][gui-feature-coverage]` / `[gui][shell-coverage]`.
 
-Extend contextual commands to finishing, patterns, Body, Surface and Assembly, then continue the
+Extend contextual commands to patterns, Body, Surface and Assembly, then continue the
 remaining advanced Assembly and integrated acceptance workflows. Native `ToFace`/`Between` collection
 now covers the supported semantic source roles. The bounded single-line Thin Extrude editors are available; general curved/open chains remain
 outside that Geometry boundary.
@@ -1106,7 +1129,7 @@ The bounded repair-open path now supports failed-recompute Parts and missing fac
 with typed intent, complete atomic publication and failed-state history. Other structural dependency
 failures remain strict loading errors.
 The construction task now has fourteen bounded create/edit modes, native reference collection and
-position/direction/frame/new-offset grips. Continue with the remaining finishing/pattern/Body/Surface/
+position/direction/frame/new-offset grips. Continue with the remaining pattern/Body/Surface/
 Assembly context commands, advanced Assembly controls and integrated native Part/Assembly acceptance
 in the order recorded in
 `docs/gui-shell-acceptance-mvp9r.md`. Block 136 remains in progress until all recorded gaps and pending
