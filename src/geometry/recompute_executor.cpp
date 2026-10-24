@@ -651,13 +651,8 @@ store_pattern_result(const PartDocument& document, const PatternFeature& feature
   if (!context.target_body().has_value())
     return Result<const GeometryShape*>::success(nullptr);
   const BodyId& body = *context.target_body();
-  for (const auto& [producer, dependent] : document.dependency_graph().dependencies()) {
-    if (dependent != feature.id().value() || producer.starts_with("body:"))
-      continue;
-    if (feature_produces_body(document, producer, body))
-      if (const GeometryShape* shape = shape_cache.find_feature_shape(FeatureId(producer)))
-        return Result<const GeometryShape*>::success(shape);
-  }
+  if (context.effective_produced_body() == body)
+    return resolve_in_place_body_target(document, feature.id(), body, shape_cache);
   const GeometryShape* shape = shape_cache.find_body_shape(body);
   if (shape == nullptr)
     return Result<const GeometryShape*>::failure(
@@ -2064,6 +2059,11 @@ extrude_composite_profile(const Sketch& sketch, const Feature& feature) noexcept
 }
 
 } // namespace
+
+Result<std::pair<Point3, Vector3>> GeometryRecomputeExecutor::resolve_feature_axis(
+    const PartDocument& document, const AxisReference& reference, const ShapeCache& cache) const {
+  return resolve_axis_reference(document, reference, cache, workplane_resolver_);
+}
 
 Result<std::vector<SweepPathSegment>>
 GeometryRecomputeExecutor::resolve_path_segments(const PartDocument& document, PathCurveId id,

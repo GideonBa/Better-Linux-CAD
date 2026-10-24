@@ -312,9 +312,9 @@
         "owner": 136,
         "status": "partial",
         "contract": "docs/gui-interactive-extrude-revolve-mvp9.md",
-        "scope": "Candidate-only Extrude/Revolve with native manipulation and selectable closed spline profiles; all seven Extrude extent modes with explicit semantic planar limits, four Body operations, reversed direction, a local second distance and taper; dedicated through-all single/bolt-circle cuts with typed inputs, parameter bindings and complete atomic Preview/Apply.",
+        "scope": "Candidate-only Extrude/Revolve with native manipulation and selectable closed spline profiles; all seven Extrude extents, four Body operations, reversed direction, a local second distance and taper; Full/directed/Symmetric Revolve with typed compatible axes and operation-paired Cut intent; dedicated through-all single/bolt-circle cuts with typed inputs, bindings and complete atomic Preview/Apply.",
         "gaps": [
-          "Restore thin/open-profile and path Extrude controls, expanded Revolve extent/operation/axis controls and native limit-face collection against the retained foundation API."
+          "Restore thin/open-profile and path Extrude controls and native viewport limit-face collection against the retained foundation API."
         ],
         "proofs": [
           {
@@ -344,6 +344,14 @@
           {
             "filter": "[shell-combined-extrude-extents]",
             "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
+          },
+          {
+            "filter": "[block136-revolve]",
+            "source": "tests/gui/gui_shell_revolve_tests.cpp"
+          },
+          {
+            "filter": "[shell-combined-revolve-controls]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
           }
         ],
         "actions": [
@@ -353,7 +361,8 @@
         ],
         "widgets": [
           "blcad.shell.hole_task",
-          "blcad.extrude.inputs"
+          "blcad.extrude.inputs",
+          "blcad.revolve.inputs"
         ]
       }
     },

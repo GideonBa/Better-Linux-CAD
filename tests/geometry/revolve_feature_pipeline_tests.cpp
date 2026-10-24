@@ -89,7 +89,8 @@ PartDocument new_body_revolve(RevolveAngleExtent extent, double center_x = 15.0)
   return document.value();
 }
 
-PartDocument modifying_revolve(FeatureBodyOperationMode mode) {
+PartDocument modifying_revolve(FeatureBodyOperationMode mode, bool previous_cut = false,
+                               bool generated_axis = false) {
   auto document = PartDocument::create(DocumentId("part.revolve.modify"), "RevolveModify");
   REQUIRE(document);
   for (const auto& [id, value] : {std::pair{"base.width", 50.0},
@@ -131,15 +132,43 @@ PartDocument modifying_revolve(FeatureBodyOperationMode mode) {
   REQUIRE(base_with_context);
   REQUIRE(document.value().add_feature(base_with_context.value()));
 
+  if (previous_cut) {
+    REQUIRE(document.value().add_parameter(length_parameter("previous.height", 4)));
+    auto sketch =
+        Sketch::create(SketchId("sketch.previous"), "Previous cut", DatumPlaneId("datum.xy"));
+    REQUIRE(sketch);
+    REQUIRE(sketch.value().add_profile(
+        RectangleProfile::create(ProfileId("profile.previous"), ParameterId("revolve.width"),
+                                 ParameterId("previous.height"), {-15, 0})
+            .value()));
+    REQUIRE(document.value().add_sketch(sketch.value()));
+    auto cut = Feature::create_additive_extrude(FeatureId("feature.previous"), "Previous cut",
+                                                sketch.value().id(), ParameterId("base.depth"));
+    REQUIRE(cut);
+    REQUIRE(document.value().add_feature(
+        cut.value()
+            .with_body_result_context(context(FeatureBodyOperationMode::Cut, "body.base"))
+            .value()));
+  }
+  auto selected_axis = construction_axis("axis.y");
+  if (generated_axis)
+    selected_axis =
+        AxisReference::create_semantic_edge(
+            PartFeatureInputRole::RevolveAxis,
+            SemanticEdgeReference::create(FeatureId("feature.base"), SemanticEdge::BottomBack)
+                .value(),
+            PartFeatureInputCapability::Axis)
+            .value();
+
   Result<RevolveFeature> revolve =
       mode == FeatureBodyOperationMode::Cut
-          ? RevolveFeature::create_revolve_cut(
-                FeatureId("revolve.operation"), "Operation",
-                revolve_profile("sketch.revolve", "profile.revolve"), construction_axis("axis.y"),
-                RevolveAngleExtent::full(), context(mode, "body.base"))
+          ? RevolveFeature::create_revolve_cut(FeatureId("revolve.operation"), "Operation",
+                                               revolve_profile("sketch.revolve", "profile.revolve"),
+                                               selected_axis, RevolveAngleExtent::full(),
+                                               context(mode, "body.base"))
           : RevolveFeature::create_revolve(FeatureId("revolve.operation"), "Operation",
                                            revolve_profile("sketch.revolve", "profile.revolve"),
-                                           construction_axis("axis.y"), RevolveAngleExtent::full(),
+                                           selected_axis, RevolveAngleExtent::full(),
                                            context(mode, "body.base"));
   REQUIRE(revolve);
   REQUIRE(document.value().add_revolve_feature(revolve.value()));
@@ -285,6 +314,25 @@ TEST_CASE("Block 62 semantic axis dependency invalidates and recomputes Revolve"
   REQUIRE(summary);
   CHECK(summary.value().executed_feature_count == 2U);
   CHECK(body_volume(cache, "body.revolve") == Catch::Approx(before).epsilon(1.0e-8));
+}
+
+TEST_CASE("Revolve generated axes preserve intervening cuts during repeated recomputes",
+          "[geometry][revolve-feature][revolve-axis-history]") {
+  auto baseline = modifying_revolve(FeatureBodyOperationMode::Cut, false, true);
+  auto modified = modifying_revolve(FeatureBodyOperationMode::Cut, true, true);
+  const GeometryRecomputeExecutor executor;
+  auto reference = shape_cache();
+  REQUIRE(executor.execute_document(baseline, reference));
+  const auto expected = body_volume(reference, "body.base") - 1200;
+  auto cache = shape_cache();
+  for (int repeat = 0; repeat < 2; ++repeat) {
+    const auto result = executor.execute_document(modified, cache);
+    INFO((result ? std::string("recomputed") : result.error().message()));
+    REQUIRE(result);
+    CHECK(body_volume(cache, "body.base") == Catch::Approx(expected).margin(1e-5));
+    REQUIRE(executor.execute_revolve(modified, FeatureId("revolve.operation"), cache));
+    CHECK(body_volume(cache, "body.base") == Catch::Approx(expected).margin(1e-5));
+  }
 }
 
 TEST_CASE("Block 62 rejects a self-intersecting axis-crossing profile transactionally",

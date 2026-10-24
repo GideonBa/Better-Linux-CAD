@@ -133,6 +133,9 @@ public:
     INFO("Hit identity: " << (hit ? hit->objectName().toStdString() : "none"));
     INFO("Visible region: " << control.visibleRegion().boundingRect().width() << "x"
                             << control.visibleRegion().boundingRect().height());
+    if (!(hit == &control || (hit && control.isAncestorOf(hit))) &&
+        qEnvironmentVariableIsSet("BLCAD_UI_CAPTURE_DIR"))
+      capture("control-not-visible");
     REQUIRE((hit == &control || (hit && control.isAncestorOf(hit))));
   }
   void mouse(QWidget& target, QPointF point, QEvent::Type type,
@@ -707,6 +710,92 @@ TEST_CASE("Combined UI extrude extents machine an offset profile through correct
   ui.roundtrip(directory.filePath("extent-machining.blcad"));
   CHECK(ui.summary(base).volume_mm3 == Approx(88320).margin(1e-4));
   const auto step = directory.filePath("extent-machining.step");
+  ui.file("export_part_step", step);
+  CHECK(ui.bytes(step).contains("ISO-10303-21"));
+  CHECK(ui.snapshot() == states.back());
+  ui.idle();
+}
+
+TEST_CASE(
+    "Combined UI revolves directed and symmetric grooves through downstream edits and history",
+    "[gui][integration][shell-combined-workflow][shell-combined-revolve-controls]") {
+  WorkflowUi ui;
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  ui.new_document("Rotational machining");
+  ui.rectangle("datum.xy", {-30, -30}, {30, 30});
+  ui.command("extrude");
+  ui.choose(ui.widget<QComboBox>("blcad.extrude.extent"), 1);
+  ui.scalar("24 mm");
+  ui.button("blcad.feature.apply");
+  const auto body = ui.window.session().part_document()->bodies().back().id();
+  CHECK(ui.summary(body).volume_mm3 == Approx(86400).margin(1e-4));
+  const auto sketch = ui.rectangle("datum.xy", {-12, 6}, {12, 10});
+  const auto parameters = ui.window.session().part_document()->parameter_count();
+  std::vector<std::string> states{ui.snapshot()};
+  ui.command("revolve");
+  ui.choose(ui.widget<QComboBox>("blcad.revolve.operation"), 2);
+  ui.data(ui.widget<QComboBox>("blcad.revolve.target"), QString::fromStdString(body.value()));
+  ui.data(ui.widget<QComboBox>("blcad.revolve.axis"), "datum-axis/datum.axis.y");
+  CHECK_FALSE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+  CHECK(ui.snapshot() == states.back());
+  ui.data(ui.widget<QComboBox>("blcad.revolve.axis"), "datum-axis/datum.axis.x");
+  ui.scalar("90 mm");
+  CHECK(ui.widget<QLineEdit>("blcad.manipulator_numeric_hud").text() == "180");
+  ui.scalar("90 deg");
+  ui.choose(ui.widget<QComboBox>("blcad.revolve.side"), 1);
+  REQUIRE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+  ui.capture("revolve-negative-cut-preview");
+  const auto first = ui.window.feature_tools().coordinator().revolve().feature_id();
+  ui.button("blcad.feature.apply");
+  CHECK(ui.summary(body).volume_mm3 == Approx(86400 - 384 * std::numbers::pi).margin(1e-4));
+  states.push_back(ui.snapshot());
+  ui.tree(sketch.value());
+  ui.command("revolve");
+  ui.choose(ui.widget<QComboBox>("blcad.revolve.operation"), 2);
+  ui.choose(ui.widget<QComboBox>("blcad.revolve.extent"), 2);
+  ui.scalar("90 deg");
+  ui.capture("revolve-symmetric-cut-preview");
+  ui.button("blcad.feature.apply");
+  CHECK(ui.summary(body).volume_mm3 == Approx(86400 - 576 * std::numbers::pi).margin(1e-4));
+  states.push_back(ui.snapshot());
+  ui.tree(sketch.value());
+  ui.command("revolve");
+  ui.choose(ui.widget<QComboBox>("blcad.revolve.operation"), 2);
+  ui.choose(ui.widget<QComboBox>("blcad.revolve.extent"), 0);
+  REQUIRE(ui.window.feature_tools().manipulators().handles().empty());
+  ui.capture("revolve-full-cut-preview");
+  ui.button("blcad.feature.apply");
+  CHECK(ui.summary(body).volume_mm3 == Approx(86400 - 1536 * std::numbers::pi).margin(1e-4));
+  CHECK(ui.window.session().part_document()->body_count() == 1);
+  CHECK(ui.window.session().part_document()->parameter_count() == parameters);
+  states.push_back(ui.snapshot());
+  ui.tree(first.value(), true);
+  INFO((ui.window.session().diagnostics().empty()
+            ? std::string{}
+            : ui.window.session().diagnostics().back().message));
+  REQUIRE(ui.window.feature_edit_tools().active());
+  ui.number(ui.widget<QDoubleSpinBox>("blcad.feature_edit.field/extent/angle_deg"), "60");
+  ui.text(ui.widget<QLineEdit>("blcad.feature_edit.field/name"), "Directed groove");
+  ui.button("blcad.feature_edit.apply");
+  const auto* intermediate = ui.window.session().part_shape_cache()->find_feature_shape(first);
+  REQUIRE(intermediate);
+  CHECK(geometry::RectangleExtrusionAdapter{}.summarize(*intermediate).volume_mm3 ==
+        Approx(86400 - 256 * std::numbers::pi).margin(1e-4));
+  CHECK(ui.summary(body).volume_mm3 == Approx(86400 - 1536 * std::numbers::pi).margin(1e-4));
+  states.push_back(ui.snapshot());
+  ui.history(states);
+  ui.tree(sketch.value());
+  ui.command("revolve");
+  ui.choose(ui.widget<QComboBox>("blcad.revolve.extent"), 0);
+  ui.choose(ui.widget<QComboBox>("blcad.revolve.extent"), 2);
+  ui.scalar("120 deg");
+  ui.button("blcad.feature.cancel");
+  CHECK(ui.snapshot() == states.back());
+  ui.idle();
+  ui.roundtrip(directory.filePath("rotational-machining.blcad"));
+  CHECK(ui.summary(body).volume_mm3 == Approx(86400 - 1536 * std::numbers::pi).margin(1e-4));
+  const auto step = directory.filePath("rotational-machining.step");
   ui.file("export_part_step", step);
   CHECK(ui.bytes(step).contains("ISO-10303-21"));
   CHECK(ui.snapshot() == states.back());

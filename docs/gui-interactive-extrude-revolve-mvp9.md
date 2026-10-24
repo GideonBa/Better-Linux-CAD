@@ -88,8 +88,8 @@ Focused proof: `[block136-extrude-extents]` in `gui_shell_extrude_extent_tests.c
 corrects transverse/coincident face bounds, cuts to/between source planes, checks exact history,
 cancels a symmetric tapered candidate, reopens canonically and exports STEP.
 
-Thin/open-profile and path Extrude controls, expanded Revolve extent/operation/axis controls and
-native limit-face collection remain separate shell work. Their headless contracts are unchanged.
+Thin/open-profile and path Extrude controls and native limit-face collection remain separate shell
+work. Their headless contracts are unchanged. The expanded Revolve surface is described below.
 
 ## Revolve authoring
 
@@ -100,6 +100,37 @@ handle), signed partial `Angle` with an explicit side, and `Symmetric` total ang
 symmetric modes offer the `revolve.angle` angle-wheel handle seeded with the current magnitude.
 Revolve angles are literal Core values, so no parameter is seeded; Apply adds the revolve feature in
 one transaction.
+
+### Replacement-shell Revolve controls — Block 136, 2026-10-24
+
+The existing Drehung task now exposes `Full`, positive/negative `Angle` and total-angle `Symmetric`
+extents, a compatible typed axis and the four Body operations. Choosing Cut authors `RevolveCut`;
+the other operations author `Revolve`, preserving Core's kind/operation pairing. The default remains
+a positive 180-degree new Body. Full has no angle field or wheel; partial/symmetric modes retain the
+last valid magnitude. The existing HUD restores rejected numeric text. Negative Angle reverses the
+wheel frame normal; Symmetric uses the canonical axis and stores no side.
+Inapplicable target/direction controls stay visible and disabled, preserving reliable form geometry
+when the mode changes. The full-angle HUD is hidden.
+
+Axis choices include explicit/line-derived DatumAxis, ConstructionLine, the semantic primary axis
+of an eligible single circular Cut and supported semantic generated linear edges. Geometry's
+`resolve_feature_axis` exposes the same transformed frame used by execution. Only resolvable axes
+in the selected profile plane are offered; an axis-crossing profile remains a correctable geometry
+error. A compatible construction axis also enables Revolve on a plane away from all origin axes.
+Generated edges retain the existing rectangular-distance source-role boundary; arbitrary final-Body
+topology is not offered as an axis.
+The initial invalid geometry candidate stays open so another offered axis can be selected.
+
+Target choices are visible recomputed solid Bodies. Preview replaces only the modifying target;
+all geometry is recomputed in a disposable document. Only NewBody provisions the pending Body;
+angles remain literals and no parameter is created. Apply publishes once, preserving supporting
+sketch catalogs and exact history. Cancel/document replacement discard local choices.
+Mixed Extrude/Revolve allocation reserves both global identities and the Body dependency-node
+identity, including existing Bodies created by another feature family.
+
+Proof: `[block136-revolve]` and `[shell-combined-revolve-controls]`. The combined actual-input
+workflow machines negative, symmetric and full grooves, corrects invalid axes/units, edits an earlier
+angle through downstream features, checks exact history, reopens canonically and exports STEP.
 
 ## Manipulator coupling
 
