@@ -205,3 +205,18 @@ eye/target/scale used by the headless mapping.
 
 Contract/proof: `docs/gui-sketch-workbench-mvp7.md`, `[shell-construction-manipulators]`,
 `[shell-combined-manipulators]` and `[construction-manipulator-camera]`.
+
+## Native projection precision — 2026-10-24
+
+`OcctViewport::model_to_screen` retains subpixel coordinates from OCCT's own camera projection,
+maps normalized device coordinates to the actual render-window size and divides by the device
+pixel ratio. Integer pixel conversion previously collapsed nearby model points, which could give
+different handle axes the same displayed direction and select the wrong handle. The correction
+retains the native camera, perspective, window dimensions and DIP boundary; screen-to-ray picking
+continues through the existing native provider.
+
+`[gui][viewport][native-projection-precision]` projects small Y/Z displacements in orthographic and
+perspective views, checks positive subpixel lengths and distinct directions. It failed natively
+before the correction with a zero-length displacement. The Thin Extrude pointer/Escape regression
+also exercises separate depth/thickness handles in an oblique view. Full/native GUI evidence lives
+in `docs/gui-shell-acceptance-mvp9r.md`.

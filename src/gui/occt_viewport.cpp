@@ -835,12 +835,15 @@ Result<GuiSketchScreenPoint> OcctViewport::model_to_screen(Point3 point) const {
         Error::validation("gui.occt_viewport", "model point must be finite"));
   if (!impl_->view.IsNull() && !impl_->view->Window().IsNull()) {
     try {
-      int x{}, y{};
-      impl_->view->Convert(point.x, point.y, point.z, x, y);
+      // Preserve subpixel axis differences for manipulator directions. The
+      // integer V3d_View::Convert overload can collapse distinct model points.
+      const auto projected = impl_->view->Camera()->Project(gp_Pnt(point.x, point.y, point.z));
+      int width{}, height{};
+      impl_->view->Window()->Size(width, height);
       const qreal ratio =
           gl_surface_ != nullptr ? gl_surface_->devicePixelRatioF() : devicePixelRatioF();
       return Result<GuiSketchScreenPoint>::success(
-          {static_cast<double>(x) / ratio, static_cast<double>(y) / ratio});
+          {(projected.X() + 1) * width / (2 * ratio), (1 - projected.Y()) * height / (2 * ratio)});
     } catch (const Standard_Failure& failure) {
       return Result<GuiSketchScreenPoint>::failure(
           viewport_error(failure.GetMessageString() != nullptr
