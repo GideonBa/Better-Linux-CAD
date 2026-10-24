@@ -1010,6 +1010,8 @@ void ShellWindow::apply_viewport_selection(const std::optional<GuiSelection>& se
     if (construction_tools_)
       (void)construction_tools_->accept_selection(*selection);
     if (feature_tools_)
+      (void)feature_tools_->accept_extrude_selection(*selection);
+    if (feature_tools_)
       (void)feature_tools_->accept_finishing_selection(*selection);
     if (feature_tools_)
       (void)feature_tools_->accept_pattern_selection(*selection);
@@ -1311,6 +1313,8 @@ void ShellWindow::refresh_viewport_scene() {
     return;
   }
   if (feature_tools_) {
+    auto extrude_targets = feature_tools_->extrude_selection_items();
+    scene.value().insert(scene.value().end(), extrude_targets.begin(), extrude_targets.end());
     auto targets = feature_tools_->finishing_selection_items();
     scene.value().insert(scene.value().end(), targets.begin(), targets.end());
   }

@@ -103,6 +103,8 @@ public:
   [[nodiscard]] bool select_open_line(SketchId sketch);
   void clear_profile_selection() noexcept;
   [[nodiscard]] Result<std::size_t> begin_extrude();
+  [[nodiscard]] bool accept_extrude_selection(const GuiSelection& selection);
+  [[nodiscard]] std::vector<geometry::ViewportSceneItem> extrude_selection_items() const;
   [[nodiscard]] Result<std::size_t> begin_revolve(std::optional<DatumAxisId> axis = std::nullopt);
   [[nodiscard]] Result<std::size_t> begin_finishing(Command command);
   [[nodiscard]] Result<std::size_t> begin_pattern(Command command);
@@ -274,6 +276,8 @@ private:
   void build_extrude_controls(QWidget* panel);
   void reset_extrude_controls(GuiFeatureManipulatorFrame frame);
   void update_extrude_controls();
+  void update_extrude_pick_mode();
+  void restore_extrude_selection();
   void invalidate_extrude_preview();
   void refresh_extrude_preview();
   [[nodiscard]] Result<std::size_t> configure_extrude_candidate();
@@ -372,6 +376,7 @@ private:
   QComboBox* extrude_path_{nullptr};
   QComboBox* extrude_first_face_{nullptr};
   QComboBox* extrude_second_face_{nullptr};
+  QComboBox* extrude_pick_role_{nullptr};
   QLineEdit* extrude_second_distance_{nullptr};
   QLineEdit* extrude_taper_{nullptr};
   QComboBox* extrude_thin_mode_{nullptr};
@@ -379,6 +384,12 @@ private:
   QLineEdit* extrude_second_thickness_{nullptr};
   QLabel* extrude_hint_{nullptr};
   std::vector<FaceReference> extrude_faces_;
+  std::vector<geometry::ViewportSceneItem> extrude_face_items_;
+  bool extrude_reference_picking_{false};
+  bool synchronizing_extrude_selection_{false};
+  std::optional<GuiSelection> extrude_previous_selection_;
+  std::optional<std::pair<SketchId, ProfileId>> extrude_previous_profile_;
+  std::optional<SketchId> extrude_previous_open_line_;
   GuiFeatureManipulatorFrame extrude_frame_;
   QWidget* revolve_controls_{nullptr};
   QFormLayout* revolve_form_{nullptr};

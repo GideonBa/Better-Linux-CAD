@@ -562,6 +562,11 @@ Result<std::size_t> OcctViewport::set_scene(std::vector<geometry::ViewportSceneI
         // flashing it grey.
         interactive->SetHilightMode(0);
       }
+      // Source planes describe historical feature boundaries. Highlight their
+      // outline so selection cannot paint over a modified Body or its preview.
+      if (item.kind == geometry::ViewportSceneKind::Face &&
+          item.semantic_id.starts_with("construction-source/"))
+        interactive->SetHilightMode(0);
       apply_sketch_profile_style(item, interactive);
       apply_construction_line_style(item, interactive);
     }
@@ -1618,7 +1623,8 @@ void OcctViewport::apply_sketch_focus() {
           : profile_face || presentation.item.kind == geometry::ViewportSceneKind::AssemblyTarget ||
                   (presentation.item.kind == geometry::ViewportSceneKind::Face &&
                    (presentation.item.semantic_id.starts_with("finishing/") ||
-                    presentation.item.semantic_id.starts_with("measure/")))
+                    presentation.item.semantic_id.starts_with("measure/") ||
+                    presentation.item.semantic_id.starts_with("construction-source/")))
               ? 0.88
               : 0.0);
       continue;

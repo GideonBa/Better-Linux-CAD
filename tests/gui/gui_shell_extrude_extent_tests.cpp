@@ -1,14 +1,20 @@
 #include "../support/repair_open_fixture.hpp"
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/geometry/body_transform_adapter.hpp"
+#include "blcad/geometry/workplane_resolver.hpp"
 #include "blcad/gui/shell/shell_feature_tools.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
 
 #include <QApplication>
 #include <QComboBox>
+#include <QDir>
+#include <QEventLoop>
+#include <QKeyEvent>
 #include <QLineEdit>
+#include <QMouseEvent>
 #include <QPushButton>
 #include <QTemporaryDir>
+#include <QTimer>
 #include <catch2/catch_approx.hpp>
 
 using namespace blcad;
@@ -282,4 +288,256 @@ TEST_CASE("Extrude cancels local bounds and reserves both distances across the g
   CHECK(field<QComboBox>(window, "blcad.extrude.extent").currentIndex() == 0);
   CHECK(field<QLineEdit>(window, "blcad.extrude.second_distance").text() == "5");
   window.feature_tools().cancel();
+}
+
+namespace {
+std::string limit_source(const char* face) {
+  return std::string("construction-source/12:feature.base/face/") + face;
+}
+void pick_limit(ShellWindow& window, const char* face) {
+  REQUIRE(window.viewport().select_semantic(limit_source(face)));
+  REQUIRE(window.viewport().selected_semantic());
+  CHECK(window.viewport().selected_semantic()->semantic_id == limit_source(face));
+}
+void original_selection(ShellWindow& window) {
+  window.feature_tools().cancel();
+  window.viewport().set_selection_filter_mask(selection_kind_bit(GuiSelectionKind::Body));
+  window.viewport().set_selection_semantic_scope(std::vector<std::string>{"body/body.base"});
+  REQUIRE(window.viewport().select_semantic("body/body.base"));
+  REQUIRE(
+      window.feature_tools().select_profile(SketchId("sketch.tool"), ProfileId("profile.tool")));
+  REQUIRE(window.feature_tools().begin_extrude());
+}
+void restored_selection(ShellWindow& window) {
+  CHECK(window.viewport().selection_filter_mask() == selection_kind_bit(GuiSelectionKind::Body));
+  REQUIRE(window.viewport().selection_semantic_scope());
+  CHECK(*window.viewport().selection_semantic_scope() ==
+        std::vector<std::string>{"body/body.base"});
+  REQUIRE(window.viewport().selected_semantic());
+  CHECK(window.viewport().selected_semantic()->semantic_id == "body/body.base");
+  CHECK(window.feature_tools().extrude_selection_items().empty());
+}
+} // namespace
+
+TEST_CASE("Extrude viewport roles retain typed source planes on every origin plane",
+          "[gui][block136-extrude-limit-picking]") {
+  for (const auto* plane : {"datum.xy", "datum.xz", "datum.yz"})
+    for (int extent : {5, 6}) {
+      INFO(plane << " extent=" << extent);
+      ShellWindow window;
+      seed(window, true, plane);
+      original_selection(window);
+      const auto before = snapshot(window);
+      const auto parameters = window.session().part_document()->parameter_count();
+      choose(window, "blcad.extrude.extent", extent);
+      choose(window, "blcad.extrude.pick_role", 1);
+      CHECK(window.viewport().selection_filter_mask() ==
+            selection_kind_bit(GuiSelectionKind::Face));
+      REQUIRE(window.viewport().selection_semantic_scope());
+      CHECK(window.viewport().selection_semantic_scope()->size() == 6);
+      CHECK(window.feature_tools().extrude_selection_items().size() == 6);
+      CHECK_FALSE(window.viewport().select_semantic("body/body.base"));
+      CHECK_FALSE(window.viewport().select_semantic("datum-plane/datum.xy"));
+      CHECK_FALSE(window.feature_tools().accept_extrude_selection(
+          {GuiSelectionKind::Edge, limit_source("top")}));
+      CHECK_FALSE(window.feature_tools().accept_extrude_selection(
+          {GuiSelectionKind::Face, "finishing/body.base/face/0"}));
+      pick_limit(window, "right");
+      CHECK_FALSE(field<QPushButton>(window, "blcad.feature.apply").isEnabled());
+      CHECK_FALSE(window.viewport().feature_preview_active());
+      CHECK_FALSE(window.feature_tools().apply());
+      CHECK(field<QComboBox>(window, "blcad.extrude.pick_role").currentIndex() == 1);
+      CHECK(snapshot(window) == before);
+      pick_limit(window, "top");
+      if (extent == 6) {
+        choose(window, "blcad.extrude.pick_role", 2);
+        pick_limit(window, "top");
+        CHECK_FALSE(field<QPushButton>(window, "blcad.feature.apply").isEnabled());
+        CHECK_FALSE(window.viewport().feature_preview_active());
+        CHECK(snapshot(window) == before);
+        pick_limit(window, "bottom");
+        choose(window, "blcad.extrude.pick_role", 1);
+        REQUIRE(window.viewport().selected_semantic());
+        CHECK(window.viewport().selected_semantic()->semantic_id == limit_source("top"));
+      }
+      applicable(window);
+      const auto feature = window.feature_tools().coordinator().extrude().feature_id();
+      const auto body = window.feature_tools().coordinator().extrude().result_body_id();
+      REQUIRE(window.feature_tools().apply());
+      restored_selection(window);
+      CHECK(window.session().part_document()->parameter_count() == parameters);
+      CHECK(volume(window, body) == Approx(480).margin(1e-6));
+      const auto& intent =
+          window.session().part_document()->find_feature(feature)->extrude_intent().extent();
+      REQUIRE(intent.first_face());
+      CHECK(intent.first_face()->role() == PartFeatureInputRole::ExtrudeLimitFace);
+      const auto& first = std::get<SemanticFaceReference>(intent.first_face()->source());
+      CHECK(first.source_feature() == FeatureId("feature.base"));
+      CHECK(first.face() == SemanticFace::Top);
+      CHECK(intent.second_face().has_value() == (extent == 6));
+      if (intent.second_face())
+        CHECK(std::get<SemanticFaceReference>(intent.second_face()->source()).face() ==
+              SemanticFace::Bottom);
+      const auto after = snapshot(window);
+      REQUIRE(window.undo());
+      CHECK(snapshot(window) == before);
+      REQUIRE(window.redo());
+      CHECK(snapshot(window) == after);
+    }
+}
+
+TEST_CASE("Extrude picker mode transitions restore scope and retain correctable local inputs",
+          "[gui][block136-extrude-limit-picking]") {
+  ShellWindow window;
+  seed(window, true);
+  original_selection(window);
+  const auto before = snapshot(window);
+  choose(window, "blcad.extrude.extent", 6);
+  choose(window, "blcad.extrude.pick_role", 2);
+  pick_limit(window, "bottom");
+  choose(window, "blcad.extrude.pick_role", 1);
+  pick_limit(window, "top");
+  applicable(window);
+  choose(window, "blcad.extrude.pick_role", 0);
+  restored_selection(window);
+  applicable(window);
+  choose(window, "blcad.extrude.pick_role", 2);
+  pick_limit(window, "right");
+  choose(window, "blcad.extrude.extent", 0);
+  restored_selection(window);
+  CHECK_FALSE(field<QComboBox>(window, "blcad.extrude.pick_role").isVisible());
+  applicable(window);
+  choose(window, "blcad.extrude.extent", 6);
+  choose(window, "blcad.extrude.pick_role", 2);
+  CHECK_FALSE(field<QPushButton>(window, "blcad.feature.apply").isEnabled());
+  pick_limit(window, "bottom");
+  applicable(window);
+  input(window, "blcad.extrude.taper", "invalid");
+  CHECK_FALSE(window.feature_tools().apply());
+  pick_limit(window, "top");
+  CHECK_FALSE(window.feature_tools().apply());
+  CHECK(field<QLineEdit>(window, "blcad.extrude.taper").text() == "invalid");
+  input(window, "blcad.extrude.taper", "");
+  pick_limit(window, "bottom");
+  applicable(window);
+  CHECK(snapshot(window) == before);
+  QKeyEvent escape(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier);
+  QApplication::sendEvent(&window, &escape);
+  CHECK_FALSE(window.feature_tools().active());
+  restored_selection(window);
+  CHECK(snapshot(window) == before);
+}
+
+TEST_CASE("Extrude limit collection cancels cleanly on document replacement and history",
+          "[gui][block136-extrude-limit-picking]") {
+  for (int exit = 0; exit < 4; ++exit) {
+    INFO(exit);
+    ShellWindow window;
+    seed(window, true);
+    QTemporaryDir directory;
+    const auto path = directory.filePath("limits.blcad");
+    REQUIRE(window.save_to(path));
+    const auto before = snapshot(window);
+    choose(window, "blcad.extrude.extent", 5);
+    choose(window, "blcad.extrude.pick_role", 1);
+    pick_limit(window, "right");
+    if (exit == 0)
+      window.feature_tools().cancel();
+    else if (exit == 1)
+      REQUIRE(window.open_path(path));
+    else if (exit == 2)
+      REQUIRE(window.new_part("New after face collection"));
+    else
+      REQUIRE(window.undo());
+    CHECK_FALSE(window.feature_tools().active());
+    CHECK_FALSE(window.viewport().feature_preview_active());
+    CHECK(window.feature_tools().extrude_selection_items().empty());
+    if (exit == 0) {
+      CHECK(window.viewport().selection_filter_mask() == 0xFFFFFFFFU);
+      CHECK_FALSE(window.viewport().selection_semantic_scope());
+      CHECK(snapshot(window) == before);
+      REQUIRE(window.feature_tools().selected_profile());
+      CHECK(window.feature_tools().selected_profile()->first == SketchId("sketch.tool"));
+      REQUIRE(window.feature_tools().select_profile(SketchId("sketch.tool"),
+                                                    ProfileId("profile.tool")));
+      REQUIRE(window.feature_tools().begin_extrude());
+      CHECK(field<QComboBox>(window, "blcad.extrude.pick_role").currentIndex() == 0);
+      window.feature_tools().cancel();
+      CHECK(window.viewport().selection_filter_mask() == 0xFFFFFFFFU);
+      CHECK_FALSE(window.viewport().selection_semantic_scope());
+    } else {
+      CHECK(window.viewport().selection_filter_mask() == 0xFFFFFFFFU);
+      CHECK_FALSE(window.viewport().selection_semantic_scope());
+    }
+  }
+}
+
+TEST_CASE("Extrude limit picker is unavailable without eligible source geometry",
+          "[gui][block136-extrude-limit-picking]") {
+  ShellWindow window;
+  seed(window);
+  choose(window, "blcad.extrude.extent", 5);
+  CHECK_FALSE(field<QComboBox>(window, "blcad.extrude.pick_role").isEnabled());
+  CHECK(window.feature_tools().extrude_selection_items().empty());
+  CHECK_FALSE(window.feature_tools().apply());
+  choose(window, "blcad.extrude.extent", 0);
+  applicable(window);
+  window.feature_tools().cancel();
+}
+
+TEST_CASE("Native Extrude face clicks reject transverse limits and collect both source roles",
+          "[gui][block136-extrude-limit-picking][native-extrude-limit-picking]") {
+  if (QApplication::platformName() != "xcb")
+    SKIP("Requires native Qt/OCCT face detection");
+  ShellWindow window;
+  seed(window, true);
+  REQUIRE(window.viewport().native_viewer_available());
+  const auto before = snapshot(window);
+  choose(window, "blcad.extrude.extent", 6);
+  choose(window, "blcad.extrude.pick_role", 1);
+  const auto click = [&](SemanticFace face, GuiStandardView view) {
+    window.viewport().set_standard_view(view);
+    window.viewport().fit_all();
+    qApp->processEvents();
+    QEventLoop frame;
+    QTimer::singleShot(40, &frame, &QEventLoop::quit);
+    frame.exec();
+    const auto reference =
+        reference_checked(SemanticFaceReference::create(FeatureId("feature.base"), face));
+    const auto plane = reference_checked(geometry::WorkplaneResolver{}.resolve_generated_face(
+        *window.session().part_document(), reference));
+    const auto model = geometry::WorkplaneResolver{}.evaluate_point(plane, plane.bounds.center);
+    const auto screen = reference_checked(window.viewport().model_to_screen(model));
+    const QPointF point(screen.x, screen.y);
+    REQUIRE(window.viewport().rect().contains(point.toPoint()));
+    for (auto type : {QEvent::MouseButtonPress, QEvent::MouseButtonRelease}) {
+      QMouseEvent event(type, point, window.viewport().mapToGlobal(point.toPoint()), Qt::LeftButton,
+                        type == QEvent::MouseButtonRelease ? Qt::NoButton : Qt::LeftButton,
+                        Qt::NoModifier);
+      QApplication::sendEvent(&window.viewport(), &event);
+    }
+    qApp->processEvents();
+    REQUIRE(window.viewport().selected_semantic());
+    CHECK(window.viewport().selected_semantic()->semantic_id ==
+          limit_source(std::string(to_string(face)).c_str()));
+  };
+  click(SemanticFace::Right, GuiStandardView::Right);
+  CHECK_FALSE(window.feature_tools().apply());
+  CHECK(window.feature_tools().manipulators().active_handle_id().empty());
+  click(SemanticFace::Top, GuiStandardView::Top);
+  choose(window, "blcad.extrude.pick_role", 2);
+  click(SemanticFace::Top, GuiStandardView::Top);
+  CHECK_FALSE(window.feature_tools().apply());
+  click(SemanticFace::Bottom, GuiStandardView::Bottom);
+  applicable(window);
+  CHECK(snapshot(window) == before);
+  const auto captures = qEnvironmentVariable("BLCAD_UI_CAPTURE_DIR");
+  if (!captures.isEmpty()) {
+    REQUIRE(QDir().mkpath(captures));
+    CHECK(window.grab().save(QDir(captures).filePath("extrude-native-both-limits.png")));
+  }
+  const auto body = window.feature_tools().coordinator().extrude().result_body_id();
+  REQUIRE(window.feature_tools().apply());
+  CHECK(volume(window, body) == Approx(480));
+  CHECK(window.feature_tools().extrude_selection_items().empty());
 }

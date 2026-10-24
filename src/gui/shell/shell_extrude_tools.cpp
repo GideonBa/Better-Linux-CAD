@@ -8,6 +8,7 @@
 #include <QFormLayout>
 #include <QLabel>
 #include <QLineEdit>
+#include <QScopedValueRollback>
 #include <QSignalBlocker>
 #include <QVBoxLayout>
 
@@ -84,6 +85,9 @@ void ShellFeatureTools::build_extrude_controls(QWidget* panel) {
   row(QStringLiteral("Zweite Tiefe (mm)"), extrude_second_distance_);
   extrude_first_face_ = combo("blcad.extrude.first_face", QStringLiteral("Erste Fläche"));
   extrude_second_face_ = combo("blcad.extrude.second_face", QStringLiteral("Zweite Fläche"));
+  extrude_pick_role_ = combo("blcad.extrude.pick_role", QStringLiteral("Viewport-Auswahl"));
+  extrude_pick_role_->addItem(QStringLiteral("Auswahl beenden"));
+  extrude_pick_role_->addItem(QStringLiteral("Erste Fläche"));
   extrude_taper_ = new QLineEdit(extrude_controls_);
   extrude_taper_->setObjectName(QStringLiteral("blcad.extrude.taper"));
   extrude_taper_->setPlaceholderText(QStringLiteral("Optional, -90 < Winkel < 90"));
@@ -106,6 +110,10 @@ void ShellFeatureTools::build_extrude_controls(QWidget* panel) {
   for (auto* field : {extrude_extent_, extrude_operation_, extrude_target_, extrude_direction_,
                       extrude_first_face_, extrude_second_face_, extrude_path_, extrude_thin_mode_})
     connect(field, &QComboBox::currentIndexChanged, this, [this] { refresh_extrude_preview(); });
+  connect(extrude_pick_role_, &QComboBox::currentIndexChanged, this, [this] {
+    update_extrude_pick_mode();
+    synchronize_overlay();
+  });
   for (auto* field :
        {extrude_second_distance_, extrude_taper_, extrude_thickness_, extrude_second_thickness_}) {
     connect(field, &QLineEdit::textEdited, this, [this] { invalidate_extrude_preview(); });
@@ -136,6 +144,11 @@ void ShellFeatureTools::reset_extrude_controls(GuiFeatureManipulatorFrame frame)
   extrude_first_face_->clear();
   extrude_second_face_->clear();
   extrude_faces_.clear();
+  extrude_face_items_.clear();
+  {
+    const QSignalBlocker blocker(extrude_pick_role_);
+    extrude_pick_role_->setCurrentIndex(0);
+  }
   const auto& part = *session_.part_document();
   for (const auto& path : part.path_curves())
     if (path.closure() == PathClosure::Open)
@@ -179,6 +192,7 @@ void ShellFeatureTools::reset_extrude_controls(GuiFeatureManipulatorFrame frame)
           const auto identity = QString::fromStdString(face->source_feature().value() + "/" +
                                                        std::string(to_string(face->face())));
           extrude_faces_.push_back(reference.value());
+          extrude_face_items_.push_back(source.item);
           extrude_first_face_->addItem(label, identity);
           extrude_second_face_->addItem(label, identity);
         }
@@ -218,6 +232,19 @@ void ShellFeatureTools::update_extrude_controls() {
   show_row(extrude_first_face_,
            !path && (mode == ExtrudeExtentMode::ToFace || mode == ExtrudeExtentMode::Between));
   show_row(extrude_second_face_, !path && mode == ExtrudeExtentMode::Between);
+  const bool faces =
+      !path && (mode == ExtrudeExtentMode::ToFace || mode == ExtrudeExtentMode::Between);
+  {
+    const QSignalBlocker blocker(extrude_pick_role_);
+    if (mode == ExtrudeExtentMode::Between && extrude_pick_role_->count() < 3)
+      extrude_pick_role_->addItem(QStringLiteral("Zweite Fläche"));
+    if (mode != ExtrudeExtentMode::Between)
+      extrude_pick_role_->removeItem(2);
+    if (!faces)
+      extrude_pick_role_->setCurrentIndex(0);
+  }
+  show_row(extrude_pick_role_, faces);
+  extrude_pick_role_->setEnabled(!extrude_faces_.empty());
   show_row(extrude_target_, extrude_operation_->currentIndex() != 0);
   show_row(extrude_path_, !thin);
   show_row(extrude_thin_mode_, thin);
@@ -225,6 +252,83 @@ void ShellFeatureTools::update_extrude_controls() {
   show_row(extrude_second_thickness_,
            thin && static_cast<ExtrudeThinMode>(extrude_thin_mode_->currentData().toInt()) ==
                        ExtrudeThinMode::TwoSided);
+  update_extrude_pick_mode();
+}
+
+void ShellFeatureTools::update_extrude_pick_mode() {
+  if (command_ != Command::Extrude || synchronizing_extrude_selection_)
+    return;
+  const QScopedValueRollback guard(synchronizing_extrude_selection_, true);
+  const bool picking = extrude_pick_role_->currentIndex() > 0;
+  const bool changed = picking != extrude_reference_picking_;
+  extrude_reference_picking_ = picking;
+  if (picking) {
+    std::vector<std::string> scope;
+    for (const auto& item : extrude_face_items_)
+      scope.push_back(item.semantic_id);
+    viewport_.set_selection_filter_mask(selection_kind_bit(GuiSelectionKind::Face));
+    viewport_.set_selection_semantic_scope(std::move(scope));
+  } else if (changed) {
+    viewport_.set_selection_semantic_scope(previous_semantic_scope_);
+    viewport_.set_selection_filter_mask(previous_selection_mask_);
+  }
+  if (changed)
+    window_.refresh_feature_selection_scene();
+  if (picking) {
+    const auto* field =
+        extrude_pick_role_->currentIndex() == 1 ? extrude_first_face_ : extrude_second_face_;
+    if (field->currentIndex() >= 0)
+      (void)viewport_.select_semantic(
+          extrude_face_items_.at(static_cast<std::size_t>(field->currentIndex())).semantic_id);
+  } else if (changed && extrude_previous_selection_) {
+    (void)viewport_.select_semantic(extrude_previous_selection_->semantic_id);
+  }
+}
+
+bool ShellFeatureTools::accept_extrude_selection(const GuiSelection& selection) {
+  if (!extrude_reference_picking_ || synchronizing_extrude_selection_ ||
+      command_ != Command::Extrude || selection.kind != GuiSelectionKind::Face)
+    return false;
+  for (std::size_t row = 0; row < extrude_face_items_.size(); ++row)
+    if (extrude_face_items_[row].semantic_id == selection.semantic_id) {
+      auto* field =
+          extrude_pick_role_->currentIndex() == 1 ? extrude_first_face_ : extrude_second_face_;
+      {
+        const QSignalBlocker blocker(field);
+        field->setCurrentIndex(static_cast<int>(row));
+      }
+      refresh_extrude_preview();
+      return true;
+    }
+  return false;
+}
+
+std::vector<geometry::ViewportSceneItem> ShellFeatureTools::extrude_selection_items() const {
+  return command_ == Command::Extrude && extrude_reference_picking_
+             ? extrude_face_items_
+             : std::vector<geometry::ViewportSceneItem>{};
+}
+
+void ShellFeatureTools::restore_extrude_selection() {
+  const QScopedValueRollback guard(synchronizing_extrude_selection_, true);
+  const bool was_picking = extrude_reference_picking_;
+  extrude_reference_picking_ = false;
+  extrude_face_items_.clear();
+  extrude_faces_.clear();
+  viewport_.set_selection_semantic_scope(previous_semantic_scope_);
+  viewport_.set_selection_filter_mask(previous_selection_mask_);
+  if (was_picking)
+    window_.refresh_feature_selection_scene();
+  if (extrude_previous_selection_)
+    (void)viewport_.select_semantic(extrude_previous_selection_->semantic_id);
+  else {
+    viewport_.clear_selection();
+    selected_profile_ = extrude_previous_profile_;
+    selected_open_line_ = extrude_previous_open_line_;
+  }
+  extrude_previous_selection_.reset();
+  extrude_previous_profile_.reset();
+  extrude_previous_open_line_.reset();
 }
 
 void ShellFeatureTools::invalidate_extrude_preview() {
@@ -243,6 +347,8 @@ void ShellFeatureTools::refresh_extrude_preview() {
   auto preview = preview_and_publish();
   if (!preview)
     report(preview.error());
+  if (extrude_reference_picking_)
+    window_.refresh();
 }
 
 Result<std::size_t> ShellFeatureTools::configure_extrude_candidate() {

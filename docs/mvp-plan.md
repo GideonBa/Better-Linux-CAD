@@ -976,6 +976,24 @@ Native verification also exposed integer projection rounding that could merge di
 directions. The viewport now preserves OCCT's subpixel camera projection; a separate red/green
 regression covers orthographic/perspective precision alongside the native Thin pointer workflow.
 
+### Block 136 — Native Extrude limit-face collection — 2026-10-24
+
+The Extrude task now collects first/second semantic source-plane roles directly in the native
+viewport, with an explicit role selector, synchronized face combos/highlights, translucent source
+presentations and exact Face-only semantic scope. Invalid candidates remain correctable without
+stale result preview or Core/history writes. Ending collection, mode changes and command lifecycle
+restore the previous selection context and remove temporary source presentations. Both closed-profile
+and single-line Thin face extents use the same bounded source API; arbitrary final-Body topology is
+not added.
+
+Five focused GUI scenarios and the twentieth combined workflow cover origin-plane orientations,
+invalid reference recovery, scope/highlight restoration, lifecycle, native clicks and a fully
+UI-authored pocket/ToFace-cut/Between-Thin-wall model. Its changed source depth, earlier-feature edit,
+five-step exact history, canonical reopening and STEP export exercise downstream references.
+Verification evidence lives in `docs/gui-shell-acceptance-mvp9r.md`. The bounded Extrude/Revolve/Hole
+family is restored; thirteen families are restored and five remain partial. Block 136 remains open
+and the numbered completion boundary stays at Block 135.
+
 ## Current next technical step — Block 136
 
 The current v3 coverage inventory records all eighteen accepted families, current shell proof sources,
@@ -983,10 +1001,11 @@ reachable entry points and explicit remaining gaps. The machine check distinguis
 from closure readiness; historical controller proofs cannot close a shell gap. Acceptance contract:
 `docs/gui-shell-acceptance-mvp9r.md`, `[integration][gui-feature-coverage]` / `[gui][shell-coverage]`.
 
-Continue with native collection of the supported semantic limit-face roles for ToFace/Between,
-including selection scope, reference highlighting, failed-candidate recovery and exact lifecycle
-restoration. The bounded single-line Thin Extrude editors are available; general curved/open chains
-remain outside that Geometry boundary.
+Continue with workspace navigation/context controls: contextual commands, visible selection filters,
+view cube, bookmarks and repeat command, followed by the remaining advanced Assembly and integrated
+acceptance workflows. Native `ToFace`/`Between` collection now covers the supported semantic source
+roles. The bounded single-line Thin Extrude editors are available; general curved/open chains remain
+outside that Geometry boundary.
 All seven bounded Extrude terminations and the expanded Revolve controls now have explicit shell
 editors. Path Extrude selects open PathCurves with all four Body operations. Dedicated plain
 through-all Hole authoring is available within the retained circular-cut/Core
@@ -1003,9 +1022,8 @@ The bounded repair-open path now supports failed-recompute Parts and missing fac
 with typed intent, complete atomic publication and failed-state history. Other structural dependency
 failures remain strict loading errors.
 The construction task now has fourteen bounded create/edit modes, native reference collection and
-position/direction/frame/new-offset grips. Continue with the remaining Extrude and viewport reference
-controls, workspace navigation/context, advanced Assembly controls and integrated native Part/Assembly acceptance
-in the order recorded in
+position/direction/frame/new-offset grips. Continue with workspace navigation/context, advanced Assembly
+controls and integrated native Part/Assembly acceptance in the order recorded in
 `docs/gui-shell-acceptance-mvp9r.md`. Block 136 remains in progress until all recorded gaps and pending
 workflows are resolved and the closure gate plus full/native regressions pass.
 
